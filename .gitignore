@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Type check / lint caches
+.mypy_cache/
+.ruff_cache/
+
+# Packaging
+pip-wheel-metadata/
+
+# Local tooling
+.cache/
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+VENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (user-specific)
+.config/
+
+# Docs are part of the repo
+!docs/
+!docs/**
+
+# Backup files
+*.backup
+*.broken
+*.old

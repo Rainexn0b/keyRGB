@@ -1,0 +1,9 @@
+#!/bin/bash
+# Launcher for KeyRGB Tuxedo GUI with ITE backend
+# Sets up proper Python path and launches the forked Tuxedo UI
+
+cd "$(dirname "$0")"
+
+export PYTHONPATH="$PWD/ite8291r3-ctl:$PYTHONPATH"
+
+exec python3 keyrgb-tuxedo-gui.py "$@"
