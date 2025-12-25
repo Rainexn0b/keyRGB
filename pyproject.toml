@@ -57,7 +57,7 @@ keyrgb-uniform = "src.gui_uniform:main"
 keyrgb-calibrate = "src.gui_keymap_calibrator:main"
 
 [tool.setuptools]
-packages = ["src"]
+packages = ["src", "buildpython"]
 
 [tool.setuptools.package-data]
 src = ["*.png", "*.json"]
