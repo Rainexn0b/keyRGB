@@ -9,6 +9,7 @@ import os
 import subprocess
 import threading
 import time
+import colorsys
 from pathlib import Path
 from io import BytesIO
 import logging
@@ -108,6 +109,9 @@ class KeyRGBTray:
 
         # Start config polling so external tools (e.g. uniform GUI) can apply changes
         self._start_config_polling()
+
+        # Keep tray icon color roughly in sync with dynamic effects (e.g. rainbow)
+        self._start_icon_color_polling()
         
         # Start last effect on launch
         if self.config.autostart and not self.is_off:
@@ -200,6 +204,82 @@ class KeyRGBTray:
                 draw.rectangle([x, y, x+4, y+4], fill=color)
         
         return img
+
+    def _start_icon_color_polling(self):
+        """Update tray icon color periodically for dynamic effects.
+
+        Some effects (e.g. rainbow) are multi-color and change over time.
+        The icon color is updated at a low rate to roughly track them.
+        """
+
+        def poll_icon_color():
+            last_sig = None
+            while True:
+                try:
+                    # Signature: (off, effect, speed, brightness, color)
+                    sig = (
+                        bool(self.is_off),
+                        str(getattr(self.config, "effect", "")),
+                        int(getattr(self.config, "speed", 0) or 0),
+                        int(getattr(self.config, "brightness", 0) or 0),
+                        tuple(getattr(self.config, "color", (0, 0, 0)) or (0, 0, 0)),
+                    )
+
+                    dynamic = sig[1] in {"rainbow", "random", "aurora", "fireworks", "wave", "marquee"}
+
+                    if dynamic or sig != last_sig:
+                        self._update_icon()
+                        last_sig = sig
+                except Exception:
+                    pass
+
+                time.sleep(0.8)
+
+        t = threading.Thread(target=poll_icon_color, daemon=True)
+        t.start()
+
+    def _representative_color(self) -> tuple[int, int, int]:
+        """Pick an RGB color representative of the currently applied state."""
+
+        # Off state
+        if self.is_off or getattr(self.config, "brightness", 0) == 0:
+            return (64, 64, 64)
+
+        effect = str(getattr(self.config, "effect", "none") or "none")
+        brightness = int(getattr(self.config, "brightness", 25) or 25)
+
+        # Per-key: average of configured colors (roughly matches the visible theme)
+        if effect == "perkey":
+            try:
+                values = list(getattr(self.config, "per_key_colors", {}).values())
+            except Exception:
+                values = []
+
+            if values:
+                r = int(round(sum(c[0] for c in values) / len(values)))
+                g = int(round(sum(c[1] for c in values) / len(values)))
+                b = int(round(sum(c[2] for c in values) / len(values)))
+                base = (r, g, b)
+            else:
+                base = tuple(getattr(self.config, "color", (255, 0, 128)) or (255, 0, 128))
+        # Multi-color effects: cycle a hue so the icon changes as the keyboard does.
+        elif effect in {"rainbow", "random", "aurora", "fireworks", "wave", "marquee"}:
+            speed = int(getattr(self.config, "speed", 5) or 5)
+            # Convert speed 0..10 into a cycle rate.
+            rate = 0.05 + 0.10 * (max(0, min(10, speed)) / 10.0)
+            hue = (time.time() * rate) % 1.0
+            rr, gg, bb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+            base = (int(rr * 255), int(gg * 255), int(bb * 255))
+        else:
+            base = tuple(getattr(self.config, "color", (255, 0, 128)) or (255, 0, 128))
+
+        # Scale by brightness (0..50). Keep a minimum so the icon stays visible.
+        scale = max(0.25, min(1.0, brightness / 50.0))
+        return (
+            int(max(0, min(255, base[0] * scale))),
+            int(max(0, min(255, base[1] * scale))),
+            int(max(0, min(255, base[2] * scale))),
+        )
     
     def _start_current_effect(self):
         """Start effect from config"""
@@ -496,11 +576,7 @@ class KeyRGBTray:
     def _update_icon(self):
         """Update icon based on state"""
         if self.icon:
-            if self.is_off:
-                color = (64, 64, 64)   # Gray when off
-            else:
-                color = (255, 0, 128)  # Pink/magenta when on
-            self.icon.icon = self._create_icon(color)
+            self.icon.icon = self._create_icon(self._representative_color())
     
     def _update_menu(self):
         """Rebuild menu to update checkmarks"""
@@ -625,7 +701,7 @@ class KeyRGBTray:
         logger.info("Creating tray icon...")
         self.icon = pystray.Icon(
             'keyrgb',
-            self._create_icon(),
+            self._create_icon(self._representative_color()),
             'KeyRGB',
             menu=self._build_menu()  # Pass Menu object directly
         )
