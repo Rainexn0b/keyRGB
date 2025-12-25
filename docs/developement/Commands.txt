@@ -1,0 +1,46 @@
+s//Single Line Commit Precedure:
+
+git add .
+git commit -m "comment"
+npm version 0.0.0
+git push --follow-tags
+npm run build
+
+//Detailed Commit Procedure:
+
+git add -p
+git commit
+npm version 0.0.0
+git push --follow-tags
+npm run build
+
+/file commit procedure (commit.md)
+
+git add .
+git commit -F docs/architecture/00-commit.md
+npm version 0.0.0
+git push --follow-tags
+npm run build
+
+//Deployment:
+
+firebase deploy --only hosting
+firebase deploy --only functions
+---
+firebase deploy --only firestore:indexes
+---
+gcloud firestore indexes composite list --database="mdt-portal"
+firebase target:apply database mdt-portal mdt-portal
+
+//Fixes:
+
+npx eslint . --fix
+npm run lint:build
+delete .next cache folder | delete out cache folder
+
+//Rollback: (Destructive)
+
+git fetch origin
+git reset --hard origin/main
+
+build:step # Run specific steps
