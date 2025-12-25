@@ -1,0 +1,2 @@
+# Allow user access to ITE 8291 USB device via uaccess
+SUBSYSTEM=="usb", ATTR{idVendor}=="048d", ATTR{idProduct}=="600b", TAG+="uaccess"

@@ -17,6 +17,8 @@ If OpenRGB doesn't support your device (or is painful to operate), KeyRGB aims t
 ./install.sh
 ```
 
+Fedora / RPM users: see `packaging/rpm/README.md` for `dnf install` instructions.
+
 Or install from the repo (useful for development):
 
 ```bash
