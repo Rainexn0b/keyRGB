@@ -10,6 +10,15 @@ Logs are written to:
 
 This directory is ignored by git.
 
+## Summary outputs
+
+In addition to per-step logs, `buildpython` writes a build summary for every run:
+
+- `buildlog/keyrgb/build-summary.json`
+- `buildlog/keyrgb/build-summary.md`
+
+Some steps may also emit structured reports alongside their normal log (e.g. file size analysis).
+
 ## Format
 
 Each step log uses a standardized, machine-parsable format:
@@ -34,6 +43,7 @@ Exit Code: N
 When troubleshooting an issue or reviewing a PR, ask for:
 
 - The failing step’s log file from `buildlog/keyrgb/`
+- `buildlog/keyrgb/build-summary.json` and `buildlog/keyrgb/build-summary.md`
 - The command that was run (already recorded in the log)
 - OS + Python version
 

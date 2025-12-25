@@ -3,9 +3,12 @@
 
 KeyRGB's Python build runner lives in the `buildpython/` package.
 
-Keep this file so any existing docs/aliases like:
-  `python3 scripts/build/keyrgb-build.py --profile=ci`
-continue to work.
+This wrapper exists so you can run the build runner from a stable path:
+
+  python3 scripts/keyrgb-build.py --profile=ci
+
+It adjusts sys.path so the repo-root package imports work when executed
+as a script.
 """
 
 from __future__ import annotations
@@ -15,7 +18,7 @@ from pathlib import Path
 
 
 # Ensure repo-root imports work when running as a script.
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 from buildpython.core.cli import main

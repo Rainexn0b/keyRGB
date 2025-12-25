@@ -42,6 +42,7 @@ def steps() -> list[Step]:
     from .step_format import ruff_format_check_runner
     from .step_pip import pip_check_runner
     from .step_import_scan import import_scan_runner
+    from .step_repo_validation import repo_validation_runner
 
     return [
         Step(
@@ -106,5 +107,12 @@ def steps() -> list[Step]:
             description="Parse imports and verify required modules import",
             log_file=_log("step-09-import-scan.log"),
             runner=import_scan_runner,
+        ),
+        Step(
+            number=10,
+            name="Repo Validation",
+            description="Validate repo packaging/install/metadata consistency",
+            log_file=_log("step-10-repo-validation.log"),
+            runner=repo_validation_runner,
         ),
     ]

@@ -51,9 +51,7 @@ Thumbs.db
 !docs/**
 
 # Local reference build system (not part of KeyRGB)
-scripts/build/**
-!scripts/build/
-!scripts/build/keyrgb-build.py
+scripts/build/
 
 # Backup files
 *.backup

@@ -65,12 +65,12 @@ python3 -m buildpython --profile=full --continue-on-error
 
 For historical reasons, there is a small wrapper script:
 
-- `scripts/build/keyrgb-build.py`
+- `scripts/keyrgb-build.py`
 
 It delegates to `buildpython` so older docs/aliases continue to work:
 
 ```bash
-python3 scripts/build/keyrgb-build.py --profile=ci
+python3 scripts/keyrgb-build.py --profile=ci
 ```
 
 ## Profiles

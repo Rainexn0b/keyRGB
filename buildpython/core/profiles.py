@@ -14,7 +14,14 @@ PROFILES: dict[str, Profile] = {
     "ci": Profile(
         name="ci",
         description="CI checks (compile + pytest)",
-        include_steps=["Compile", "Import Validation", "Import Scan", "Pip Check", "Pytest"],
+        include_steps=[
+            "Compile",
+            "Import Validation",
+            "Import Scan",
+            "Pip Check",
+            "Pytest",
+            "Repo Validation",
+        ],
     ),
     "quick": Profile(
         name="quick",
@@ -27,6 +34,7 @@ PROFILES: dict[str, Profile] = {
             "Pytest",
             "Code Markers",
             "File Size",
+            "Repo Validation",
         ],
     ),
     "full": Profile(
@@ -42,6 +50,7 @@ PROFILES: dict[str, Profile] = {
             "Ruff Format",
             "Code Markers",
             "File Size",
+            "Repo Validation",
         ],
     ),
 }
