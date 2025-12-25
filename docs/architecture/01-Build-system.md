@@ -75,7 +75,7 @@ python3 scripts/build/keyrgb-build.py --profile=ci
 
 ## Profiles
 
-- `ci`: compile + import validation + pytest
+- `ci`: compile + import validation + pip check + import scan + pytest
 - `quick`: `ci` plus lightweight analysis steps
 - `full`: `quick` plus optional lint/format checks (if installed)
 
@@ -88,6 +88,8 @@ Typical steps include:
 - **Pytest**: `pytest -q -o addopts=`
 - **Ruff** (optional): `ruff check src`
 - **Ruff Format** (optional): `ruff format --check src`
+- **Pip Check**: `python -m pip check`
+- **Import Scan**: parses imports and validates required modules import
 - **Code Markers**: scans for TODO/FIXME/HACK/etc. (informational)
 - **File Size**: reports very large Python files by line count (informational)
 
@@ -122,4 +124,9 @@ The `buildlog/` directory is ignored by git.
 
 ## CI integration
 
-GitHub Actions runs the repo’s fast checks (compile + pytest). The build runner’s `ci` profile is designed to match that intent, while still keeping hardware tests opt-in.
+GitHub Actions runs `python -m buildpython --profile=ci` as the single source of truth.
+
+More detail:
+- Step descriptions: `docs/architecture/02-Build-steps.md`
+- Log format: `docs/architecture/03-Build-logs.md`
+- CI overview: `docs/architecture/04-CI.md`

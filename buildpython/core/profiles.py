@@ -14,12 +14,20 @@ PROFILES: dict[str, Profile] = {
     "ci": Profile(
         name="ci",
         description="CI checks (compile + pytest)",
-        include_steps=["Compile", "Import Validation", "Pytest"],
+        include_steps=["Compile", "Import Validation", "Import Scan", "Pip Check", "Pytest"],
     ),
     "quick": Profile(
         name="quick",
         description="Quick checks (compile + pytest + lightweight analysis)",
-        include_steps=["Compile", "Import Validation", "Pytest", "Code Markers", "File Size"],
+        include_steps=[
+            "Compile",
+            "Import Validation",
+            "Import Scan",
+            "Pip Check",
+            "Pytest",
+            "Code Markers",
+            "File Size",
+        ],
     ),
     "full": Profile(
         name="full",
@@ -27,6 +35,8 @@ PROFILES: dict[str, Profile] = {
         include_steps=[
             "Compile",
             "Import Validation",
+            "Import Scan",
+            "Pip Check",
             "Pytest",
             "Ruff",
             "Ruff Format",

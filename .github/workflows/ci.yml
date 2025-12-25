@@ -28,10 +28,7 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pytest
 
-      - name: Compile
-        run: python -m compileall -q src
-
-      - name: Run tests
+      - name: Buildpython CI profile
         env:
           KEYRGB_HW_TESTS: "0"
-        run: pytest -q -o addopts=
+        run: python -m buildpython --profile=ci

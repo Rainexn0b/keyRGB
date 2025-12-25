@@ -40,6 +40,8 @@ def steps() -> list[Step]:
     from .step_size import file_size_runner
     from .step_imports import import_validation_runner
     from .step_format import ruff_format_check_runner
+    from .step_pip import pip_check_runner
+    from .step_import_scan import import_scan_runner
 
     return [
         Step(
@@ -90,5 +92,19 @@ def steps() -> list[Step]:
             description="Check formatting with ruff format (optional)",
             log_file=_log("step-07-ruff-format.log"),
             runner=ruff_format_check_runner,
+        ),
+        Step(
+            number=8,
+            name="Pip Check",
+            description="Validate installed dependencies (pip check)",
+            log_file=_log("step-08-pip-check.log"),
+            runner=pip_check_runner,
+        ),
+        Step(
+            number=9,
+            name="Import Scan",
+            description="Parse imports and verify required modules import",
+            log_file=_log("step-09-import-scan.log"),
+            runner=import_scan_runner,
         ),
     ]
