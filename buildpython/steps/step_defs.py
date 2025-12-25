@@ -38,6 +38,8 @@ def steps() -> list[Step]:
 
     from .step_quality import code_markers_runner
     from .step_size import file_size_runner
+    from .step_imports import import_validation_runner
+    from .step_format import ruff_format_check_runner
 
     return [
         Step(
@@ -63,16 +65,30 @@ def steps() -> list[Step]:
         ),
         Step(
             number=4,
-            name="Code Markers",
-            description="Scan for TODO/FIXME/HACK and refactoring markers",
-            log_file=_log("step-04-code-markers.log"),
-            runner=code_markers_runner,
+            name="Import Validation",
+            description="Import core modules to catch missing deps / import errors",
+            log_file=_log("step-04-imports.log"),
+            runner=import_validation_runner,
         ),
         Step(
             number=5,
+            name="Code Markers",
+            description="Scan for TODO/FIXME/HACK and refactoring markers",
+            log_file=_log("step-05-code-markers.log"),
+            runner=code_markers_runner,
+        ),
+        Step(
+            number=6,
             name="File Size",
             description="Analyze large Python files (line thresholds)",
-            log_file=_log("step-05-file-size.log"),
+            log_file=_log("step-06-file-size.log"),
             runner=file_size_runner,
+        ),
+        Step(
+            number=7,
+            name="Ruff Format",
+            description="Check formatting with ruff format (optional)",
+            log_file=_log("step-07-ruff-format.log"),
+            runner=ruff_format_check_runner,
         ),
     ]

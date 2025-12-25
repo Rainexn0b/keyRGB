@@ -35,9 +35,9 @@ def run_step(step: Step, *, verbose: bool) -> StepOutcome:
     start = time.time()
 
     # Optional step gating
-    if step.name == "Ruff" and not _is_module_available("ruff"):
+    if step.name in {"Ruff", "Ruff Format"} and not _is_module_available("ruff"):
         duration = time.time() - start
-        _write_log(step, "python -m ruff check src", "(skipped: ruff not installed)\n", "", 0, duration)
+        _write_log(step, "python -m ruff ...", "(skipped: ruff not installed)\n", "", 0, duration)
         print(f"[{step.number}] {step.name}: SKIPPED")
         return StepOutcome(status="skipped", exit_code=0, duration_s=duration, message="ruff not installed")
 
