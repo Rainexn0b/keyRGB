@@ -12,7 +12,7 @@ from pathlib import Path
 # - When running from a repo checkout, prefer the vendored `ite8291r3-ctl/` (it
 #   contains local modifications / a pending PR).
 # - Allow opting into the installed dependency with KEYRGB_USE_INSTALLED_ITE=1.
-repo_root = Path(__file__).resolve().parent.parent
+repo_root = Path(__file__).resolve().parent.parent.parent
 vendored = repo_root / "ite8291r3-ctl"
 if vendored.exists() and os.environ.get("KEYRGB_USE_INSTALLED_ITE") != "1":
     sys.path.insert(0, str(vendored))

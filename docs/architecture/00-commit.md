@@ -1,7 +1,4 @@
-Refactor: Reorganize project structure and modularize Per-Key Editor
+Fix: Correct vendored dependency path resolution
 
-- Moved source files to src/core, src/gui, and src/legacy for better organization.
-- Refactored monolithic src/gui_perkey.py into src/gui/perkey package.
-- Updated build system to validate new module paths.
-- Updated entry points in pyproject.toml and launcher scripts.
-- Fixed CI import validation by using lazy imports for pystray in src/gui/tray.py.
+- Updated path resolution logic in src/legacy/effects.py, src/gui/tray.py, and src/gui/uniform.py to correctly locate the vendored ite8291r3-ctl library relative to the new project structure.
+- This fixes Import Validation failures in CI where the vendored library was not being found.

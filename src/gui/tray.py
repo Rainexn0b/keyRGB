@@ -101,7 +101,7 @@ except Exception:
 
 try:
     # Prefer vendored dependency when running from repo (matches EffectsEngine).
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = Path(__file__).resolve().parent.parent.parent
     vendored = repo_root / "ite8291r3-ctl"
     if vendored.exists() and os.environ.get("KEYRGB_USE_INSTALLED_ITE") != "1":
         sys.path.insert(0, str(vendored))

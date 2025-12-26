@@ -26,7 +26,7 @@ try:
     from ite8291r3_ctl.ite8291r3 import get
 except Exception:
     # Repo fallback if dependency wasn't installed.
-    repo_root = Path(__file__).resolve().parent.parent
+    repo_root = Path(__file__).resolve().parent.parent.parent
     vendored = repo_root / "ite8291r3-ctl"
     if vendored.exists():
         sys.path.insert(0, str(vendored))
