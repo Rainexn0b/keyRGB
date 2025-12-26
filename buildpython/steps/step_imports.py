@@ -7,9 +7,9 @@ from ..utils.subproc import RunResult
 
 
 DEFAULT_IMPORTS = [
-    "src.tray_app",
-    "src.gui_perkey",
-    "src.gui_keymap_calibrator",
+    "src.gui.tray",
+    "src.gui.perkey",
+    "src.gui.calibrator",
 ]
 
 

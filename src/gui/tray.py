@@ -14,12 +14,45 @@ from pathlib import Path
 from io import BytesIO
 import logging
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
 from PIL import Image, ImageDraw
-import pystray
-from pystray import MenuItem as item
+
+if TYPE_CHECKING:
+    import pystray as _pystray
 
 logger = logging.getLogger(__name__)
+
+
+_pystray_mod = None
+_pystray_item = None
+
+
+def _get_pystray():
+    """Import pystray only when the tray UI is actually needed.
+
+    Importing `pystray` on Linux may attempt to connect to an X display
+    immediately, which breaks headless environments (like CI) that still
+    need to be able to import this module.
+    """
+
+    global _pystray_mod, _pystray_item
+
+    if _pystray_mod is not None and _pystray_item is not None:
+        return _pystray_mod, _pystray_item
+
+    try:
+        import importlib
+
+        _pystray_mod = importlib.import_module("pystray")
+        _pystray_item = getattr(_pystray_mod, "MenuItem")
+        return _pystray_mod, _pystray_item
+    except Exception as exc:
+        raise RuntimeError(
+            "pystray could not be initialized. The tray app requires a desktop "
+            "session (X11/Wayland). In CI/headless environments, importing "
+            "src.gui.tray is supported but running the tray is not."
+        ) from exc
 
 
 _instance_lock_fh = None
@@ -56,15 +89,15 @@ def _acquire_single_instance_lock() -> bool:
         return False
 
 try:
-    from .effects_legacy import EffectsEngine
-    from .config_legacy import Config
-    from .power_manager import PowerManager
+    from src.legacy.effects import EffectsEngine
+    from src.legacy.config import Config
+    from src.core.power import PowerManager
 except Exception:
-    # Fallback for direct execution (e.g. `python src/tray_app.py`).
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from src.effects_legacy import EffectsEngine
-    from src.config_legacy import Config
-    from src.power_manager import PowerManager
+    # Fallback for direct execution (e.g. `python src/gui/tray.py`).
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    from src.legacy.effects import EffectsEngine
+    from src.legacy.config import Config
+    from src.core.power import PowerManager
 
 try:
     # Prefer vendored dependency when running from repo (matches EffectsEngine).
@@ -525,16 +558,16 @@ class KeyRGBTray:
     
     def _on_perkey_clicked(self, icon, item):
         """Open per-key editor window"""
-        parent_path = os.path.dirname(os.path.dirname(__file__))
+        parent_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
         try:
-            subprocess.Popen([sys.executable, '-m', 'src.gui_perkey'], cwd=parent_path)
+            subprocess.Popen([sys.executable, '-m', 'src.gui.perkey'], cwd=parent_path)
         except FileNotFoundError:
-            subprocess.Popen([sys.executable, '-m', 'src.gui_perkey_legacy'], cwd=parent_path)
+            subprocess.Popen([sys.executable, '-m', 'src.legacy.gui_perkey'], cwd=parent_path)
     
     def _on_tuxedo_gui_clicked(self, icon, item):
         """Launch uniform color GUI"""
-        parent_path = os.path.dirname(os.path.dirname(__file__))
-        subprocess.Popen([sys.executable, '-m', 'src.gui_uniform'], cwd=parent_path)
+        parent_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+        subprocess.Popen([sys.executable, '-m', 'src.gui.uniform'], cwd=parent_path)
     
     def _on_quit_clicked(self, icon, item):
         """Quit application"""
@@ -592,6 +625,8 @@ class KeyRGBTray:
     
     def _build_menu_items(self):
         """Build menu items list - for dynamic menu updates"""
+
+        pystray, item = _get_pystray()
         
         # Effect emojis for visual distinction
         hw_effect_icons = {
@@ -692,12 +727,14 @@ class KeyRGBTray:
     
     def _build_menu(self):
         """Build system tray menu - returns pystray.Menu object"""
+        pystray, _ = _get_pystray()
         # Reload config before building to ensure up-to-date state
         self.config.reload()
         return pystray.Menu(*self._build_menu_items())
     
     def run(self):
         """Run the tray application"""
+        pystray, _ = _get_pystray()
         logger.info("Creating tray icon...")
         self.icon = pystray.Icon(
             'keyrgb',

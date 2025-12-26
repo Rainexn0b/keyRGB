@@ -6,7 +6,7 @@ KeyRGB Tuxedo GUI - Forked UI with ITE8291 backend
 import sys
 import os
 
-REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 
 # Ensure we use our modified ite8291r3-ctl library
 ite8291_path = os.path.join(REPO_ROOT, 'ite8291r3-ctl')

@@ -11,9 +11,9 @@ from tkinter import ttk
 
 from PIL import Image, ImageTk
 
-from src.config_legacy import Config
-from src import profiles
-from src.y15_pro_layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
+from src.legacy.config import Config
+from src.core import profiles
+from src.core.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
 
 
 MATRIX_ROWS = 6

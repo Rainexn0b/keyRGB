@@ -14,13 +14,13 @@ import tkinter as tk
 from tkinter import ttk
 
 try:
-    from .color_wheel import ColorWheel
-    from .config_legacy import Config
+    from .widgets.color_wheel import ColorWheel
+    from src.legacy.config import Config
 except Exception:
-    # Fallback for direct execution (e.g. `python src/gui_uniform.py`).
-    sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-    from src.color_wheel import ColorWheel
-    from src.config_legacy import Config
+    # Fallback for direct execution (e.g. `python src/gui/uniform.py`).
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+    from src.gui.widgets.color_wheel import ColorWheel
+    from src.legacy.config import Config
 
 try:
     from ite8291r3_ctl.ite8291r3 import get

@@ -23,7 +23,7 @@ from typing import Dict, Iterable, Tuple
 
 
 # Keep imports lightweight: Config lives in the same project.
-from .config_legacy import Config
+from src.legacy.config import Config
 
 
 _DEFAULT_PROFILE = "default"

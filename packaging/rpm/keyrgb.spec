@@ -47,7 +47,7 @@ install -D -m 0644 packaging/udev/99-ite8291-wootbook.rules %{buildroot}%{_udevr
 
 %check
 # Basic import smoke test (no hardware)
-%{python3} -c "import src.tray_app"
+%{python3} -c "import src.gui.tray"
 %{python3} -c "import ite8291r3_ctl"
 
 %files

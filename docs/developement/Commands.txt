@@ -13,10 +13,7 @@ python -m build
 git add -p
 # Commit with prepared release notes (use -F to supply the prepared changelog file)
 git commit -F docs/architecture/00-commit.md
-# Bump version in pyproject.toml (manually), or use a tool like `bump2version` or `poetry version`.
-# Example (manual): edit `pyproject.toml` and set version = "X.Y.Z"
-# Create an annotated tag for the release and push tags
-git tag -a vX.Y.Z -m "release vX.Y.Z"
+git tag -a vX.Y.Z -m "release v0.0.1"
 git push --follow-tags
 # Build source+wheel artifacts
 python -m pip install --user --upgrade build
@@ -26,31 +23,7 @@ python -m build
 
 git add .
 git commit -F docs/architecture/00-commit.md
-# Update the `version` in `pyproject.toml` (or use `bump2version`/`poetry version`), then create a tag:
 git tag -a vX.Y.Z -m "release vX.Y.Z"
 git push --follow-tags
 python -m pip install --user --upgrade build
 python -m build
-
-//Deployment:
-
-firebase deploy --only hosting
-firebase deploy --only functions
----
-firebase deploy --only firestore:indexes
----
-gcloud firestore indexes composite list --database="mdt-portal"
-firebase target:apply database mdt-portal mdt-portal
-
-//Fixes:
-
-npx eslint . --fix
-npm run lint:build
-delete .next cache folder | delete out cache folder
-
-//Rollback: (Destructive)
-
-git fetch origin
-git reset --hard origin/main
-
-build:step # Run specific steps

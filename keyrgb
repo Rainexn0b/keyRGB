@@ -2,4 +2,4 @@
 # KeyRGB launcher script
 
 cd "$(dirname "$0")"
-exec python3 -m src.tray_app
+exec python3 -m src.gui.tray
