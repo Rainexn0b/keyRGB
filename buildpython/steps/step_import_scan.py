@@ -12,6 +12,7 @@ from ..utils.subproc import RunResult
 OPTIONAL_TOPLEVEL = {
     "PyQt6",  # optional UI sliders
     "ruff",  # optional lint/format
+    "pystray",  # optional tray icon (headless CI)
 
     # Legacy / optional Tuxedo integration (not required for KeyRGB core)
     "backlight_control",

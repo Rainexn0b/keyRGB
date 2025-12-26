@@ -1,4 +1,4 @@
-Fix: Correct vendored dependency path resolution
+Fix: Mark pystray as optional in import scan
 
-- Updated path resolution logic in src/legacy/effects.py, src/gui/tray.py, and src/gui/uniform.py to correctly locate the vendored ite8291r3-ctl library relative to the new project structure.
-- This fixes Import Validation failures in CI where the vendored library was not being found.
+- Added pystray to OPTIONAL_TOPLEVEL in buildpython/steps/step_import_scan.py.
+- This prevents build failures in headless CI environments where pystray cannot be imported due to missing X11 display.
