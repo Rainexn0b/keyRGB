@@ -1,4 +1,5 @@
-Fix: Mark pystray as optional in import scan
+Fix: Make per-key module runnable and ship all subpackages
 
-- Added pystray to OPTIONAL_TOPLEVEL in buildpython/steps/step_import_scan.py.
-- This prevents build failures in headless CI environments where pystray cannot be imported due to missing X11 display.
+- Added src/gui/perkey/__main__.py so `python -m src.gui.perkey` works.
+- Added missing __init__.py files under src/core, src/gui, src/gui/widgets, and src/legacy.
+- Updated pyproject.toml to use setuptools package discovery so wheels include src.* and buildpython.*.
