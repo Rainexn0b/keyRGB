@@ -1,9 +1,9 @@
 Name:           keyrgb
-Version:        1.0.0
+Version:        1.1.4
 Release:        1%{?dist}
 Summary:        Minimal RGB keyboard controller for ITE 8291 keyboards
 
-License:        GPL-2.0-only
+License:        GPL-2.0-or-later
 URL:            https://github.com/Rainexn0b/keyRGB
 
 Source0:        %{name}-%{version}.tar.gz
@@ -38,7 +38,7 @@ KeyRGB is a Linux tray app + per-key editor for laptop keyboards driven by ITE 8
 
 # Install vendored ite8291r3-ctl module (setup.py based)
 # This keeps the modified version bundled with the RPM.
-pushd ite8291r3-ctl
+pushd vendor/ite8291r3-ctl
 %{python3} setup.py install --skip-build --root %{buildroot} --prefix %{_prefix}
 popd
 
@@ -62,5 +62,5 @@ install -D -m 0644 packaging/udev/99-ite8291-wootbook.rules %{buildroot}%{_udevr
 %{python3_sitelib}/ite8291r3_ctl*
 
 %changelog
-* Thu Dec 25 2025 KeyRGB Contributors - 1.0.0-1
-- Initial RPM packaging for COPR/local installs
+* Sun Dec 28 2025 KeyRGB Contributors - 1.1.4-1
+- Tray + GUI integration updates

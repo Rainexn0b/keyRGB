@@ -1,42 +1,51 @@
 #!/usr/bin/env python3
+"""KeyRGB Effects Engine.
+
+RGB effects for ITE 8291 keyboards using ite8291r3-ctl library.
 """
-KeyRGB Effects Engine
-RGB effects for ITE 8291 keyboards using ite8291r3-ctl library
-"""
 
-import os
-import sys
-from pathlib import Path
-
-# Dependency policy:
-# - When running from a repo checkout, prefer the vendored `ite8291r3-ctl/` (it
-#   contains local modifications / a pending PR).
-# - Allow opting into the installed dependency with KEYRGB_USE_INSTALLED_ITE=1.
-repo_root = Path(__file__).resolve().parent.parent.parent
-vendored = repo_root / "ite8291r3-ctl"
-if vendored.exists() and os.environ.get("KEYRGB_USE_INSTALLED_ITE") != "1":
-    sys.path.insert(0, str(vendored))
-
-    # If the installed package was imported earlier in this interpreter session,
-    # force a re-import from the vendored path to avoid silently using an
-    # incompatible upstream version.
-    existing = sys.modules.get("ite8291r3_ctl")
-    try:
-        existing_file = Path(getattr(existing, "__file__", "")).resolve()
-    except Exception:
-        existing_file = None
-    if existing_file and vendored not in existing_file.parents:
-        for name in list(sys.modules.keys()):
-            if name == "ite8291r3_ctl" or name.startswith("ite8291r3_ctl."):
-                sys.modules.pop(name, None)
-
-from ite8291r3_ctl.ite8291r3 import get, effects as hw_effects, colors as hw_colors
+from src.legacy.ite_backend import NUM_COLS, NUM_ROWS, get, hw_colors, hw_effects
+from src.legacy.perkey_animation import (
+    build_full_color_grid,
+    enable_user_mode_once,
+    load_per_key_colors_from_config,
+    scaled_color_map,
+)
 
 import time
 import math
 import colorsys
 from threading import Thread, Event, RLock
-from typing import Optional
+from typing import Optional, Dict, Tuple
+
+
+
+class _NullKeyboard:
+    """Fallback keyboard implementation used when no device is available."""
+
+    def turn_off(self) -> None:
+        return
+
+    def set_brightness(self, _brightness: int) -> None:
+        return
+
+    def set_color(self, _color, *, brightness: int):
+        return
+
+    def set_key_colors(self, _color_map, *, brightness: int, enable_user_mode: bool = True):
+        return
+
+    def set_effect(self, _effect_data) -> None:
+        return
+
+    def set_palette_color(self, _slot: int, _color) -> None:
+        return
+
+    def get_brightness(self) -> int:
+        return 0
+
+    def is_off(self) -> bool:
+        return True
 
 
 
@@ -47,14 +56,17 @@ class EffectsEngine:
     HW_EFFECTS = ['rainbow', 'breathing', 'wave', 'ripple', 'marquee', 'raindrop', 'aurora', 'fireworks']
     
     # Custom software effects
-    SW_EFFECTS = ['static', 'pulse', 'strobe', 'fire', 'random']
+    SW_EFFECTS = ['static', 'pulse', 'strobe', 'fire', 'random', 'perkey_breathing', 'perkey_pulse']
     
     ALL_EFFECTS = HW_EFFECTS + SW_EFFECTS
     
     def __init__(self):
         self.kb_lock = RLock()
-        with self.kb_lock:
-            self.kb = get()
+        self.device_available = False
+        self.kb = _NullKeyboard()
+
+        # Attempt to acquire a hardware device, but do not crash if unavailable.
+        self._ensure_device_available()
         self.running = False
         self.thread: Optional[Thread] = None
         self.stop_event = Event()
@@ -63,6 +75,27 @@ class EffectsEngine:
         self.speed = 4  # 0-10 (UI speed scale; 10 = fastest)
         self.brightness = 25  # 0-50 (hardware brightness scale)
         self.current_color = (255, 0, 0)  # For static/custom effects
+        self.per_key_colors: Optional[Dict[Tuple[int, int], Tuple[int, int, int]]] = None  # For perkey effects
+
+    def _ensure_device_available(self) -> bool:
+        """Best-effort attempt to connect to the keyboard device."""
+
+        if self.device_available and not isinstance(self.kb, _NullKeyboard):
+            return True
+
+        try:
+            with self.kb_lock:
+                self.kb = get()
+            self.device_available = True
+            return True
+        except FileNotFoundError:
+            self.device_available = False
+            self.kb = _NullKeyboard()
+            return False
+        except Exception:
+            self.device_available = False
+            self.kb = _NullKeyboard()
+            return False
     
     def stop(self):
         """Stop current effect"""
@@ -78,18 +111,23 @@ class EffectsEngine:
     def turn_off(self):
         """Turn off all LEDs"""
         self.stop()
+        self._ensure_device_available()
         with self.kb_lock:
             self.kb.turn_off()
     
     def set_brightness(self, brightness: int):
         """Set brightness (0-50 hardware scale)"""
         self.brightness = max(0, min(50, brightness))
+        self._ensure_device_available()
         with self.kb_lock:
             self.kb.set_brightness(self.brightness)
     
     def start_effect(self, effect_name: str, speed: int = 5, brightness: int = 25, color: Optional[tuple] = None):
         """Start an effect (hardware or software)"""
         self.stop()
+
+        # If no device is present, keep state but do not crash.
+        self._ensure_device_available()
         
         effect_name = effect_name.lower()
         
@@ -130,6 +168,16 @@ class EffectsEngine:
         elif effect_name == 'random':
             self.running = True
             self.thread = Thread(target=self._effect_random, daemon=True)
+            self.thread.start()
+        
+        elif effect_name == 'perkey_breathing':
+            self.running = True
+            self.thread = Thread(target=self._effect_perkey_breathing, daemon=True)
+            self.thread.start()
+        
+        elif effect_name == 'perkey_pulse':
+            self.running = True
+            self.thread = Thread(target=self._effect_perkey_pulse, daemon=True)
             self.thread.start()
     
     def _start_hw_effect(self, effect_name: str):
@@ -287,6 +335,92 @@ class EffectsEngine:
 
             with self.kb_lock:
                 self.kb.set_color((r, g, b), brightness=self.brightness)
+            time.sleep(interval)
+    
+    def _effect_perkey_breathing(self):
+        """Per-Key Breathing: Breathing animation that preserves each key's individual color"""
+        phase = 0.0
+        # Breathing should feel slow/smooth but still obviously animated.
+        # Using a smaller base interval avoids the "looks static" problem at
+        # mid/low UI speeds.
+        interval = max(0.03, self._get_interval(120))
+        
+        # Load per-key colors if not already set
+        if not self.per_key_colors:
+            self.per_key_colors = load_per_key_colors_from_config()
+        
+        # If no per-key colors configured, fall back to uniform breathing
+        if not self.per_key_colors:
+            self._effect_pulse()
+            return
+        
+        # IMPORTANT:
+        # - `set_key_colors(..., enable_user_mode=True)` calls `enable_user_mode()` internally.
+        #   Doing that every frame causes visible flicker/flash on some firmware.
+        # - `set_key_colors()` writes a full 6x16 frame buffer. Any key missing from
+        #   `color_map` becomes black. If the saved per-key map is sparse, that looks
+        #   like erratic flashing. We therefore fill missing keys with the base color.
+        full_colors = build_full_color_grid(
+            base_color=tuple(int(x) for x in (self.current_color or (255, 0, 0))),
+            per_key_colors=self.per_key_colors,
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+        )
+
+        enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=self.brightness)
+
+        while self.running:
+            # Calculate breathing factor (0.2 to 1.0 to avoid going too dim)
+            breath = (math.sin(phase) + 1.0) / 2.0  # 0..1
+            # Smooth curve (ease-in/out) so it feels like "breathing".
+            breath = breath * breath * (3.0 - 2.0 * breath)  # smoothstep
+            breath = 0.15 + breath * 0.85  # 0.15..1.0
+            
+            color_map = scaled_color_map(full_colors, scale=breath)
+            
+            with self.kb_lock:
+                self.kb.set_key_colors(color_map, enable_user_mode=False)
+            
+            phase += 0.20
+            time.sleep(interval)
+    
+    def _effect_perkey_pulse(self):
+        """Per-Key Pulse: Pulse animation that preserves each key's individual color"""
+        phase = 0.0
+        # Pulse is intentionally more "snappy" than breathing.
+        interval = max(0.02, self._get_interval(90))
+        
+        # Load per-key colors if not already set
+        if not self.per_key_colors:
+            self.per_key_colors = load_per_key_colors_from_config()
+        
+        # If no per-key colors configured, fall back to uniform pulse
+        if not self.per_key_colors:
+            self._effect_pulse()
+            return
+        
+        full_colors = build_full_color_grid(
+            base_color=tuple(int(x) for x in (self.current_color or (255, 0, 0))),
+            per_key_colors=self.per_key_colors,
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+        )
+
+        enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=self.brightness)
+
+        while self.running:
+            # Calculate pulse factor (sharper than breathing)
+            pulse = (math.sin(phase) + 1.0) / 2.0  # 0..1
+            # Make it much sharper than breathing (quick "thump").
+            pulse = pulse ** 3
+            pulse = 0.08 + pulse * 0.92  # 0.08..1.0
+            
+            color_map = scaled_color_map(full_colors, scale=pulse)
+            
+            with self.kb_lock:
+                self.kb.set_key_colors(color_map, enable_user_mode=False)
+            
+            phase += 0.35
             time.sleep(interval)
 
 

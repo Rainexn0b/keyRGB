@@ -3,38 +3,25 @@
 
 from __future__ import annotations
 
-import json
-import os
-import sys
 import time
 import tkinter as tk
 from tkinter import ttk
-import subprocess
-from pathlib import Path
+from tkinter import filedialog
 
 from src.gui.widgets.color_wheel import ColorWheel
 from src.legacy.config import Config
-from src.core.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
+from src.core.layout import Y15_PRO_KEYS
 from src.core import profiles
+from src.gui.profile_backdrop_storage import reset_backdrop_image, save_backdrop_image
+from src.gui.launch_keymap_calibrator import launch_keymap_calibrator
 
 from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
-
-try:
-    from ite8291r3_ctl.ite8291r3 import get, NUM_ROWS, NUM_COLS
-except Exception:
-    # Repo fallback if dependency wasn't installed.
-    from pathlib import Path
-
-    repo_root = Path(__file__).resolve().parent.parent.parent.parent
-    vendored = repo_root / "ite8291r3-ctl"
-    if vendored.exists():
-        sys.path.insert(0, str(vendored))
-    try:
-        from ite8291r3_ctl.ite8291r3 import get, NUM_ROWS, NUM_COLS
-    except Exception:
-        get = None
-        NUM_ROWS, NUM_COLS = 6, 21
+from .hardware import get_keyboard, NUM_ROWS, NUM_COLS
+from .overlay_autosync import auto_sync_per_key_overlays
+from .profile_management import activate_profile, delete_profile, save_profile
+from .keyboard_apply import push_per_key_colors
+from .editor_ui import build_editor_ui
 
 
 class PerKeyEditor:
@@ -81,18 +68,38 @@ class PerKeyEditor:
         style.configure("TLabel", background=self.bg_color, foreground=self.fg_color)
         style.configure("TButton", background="#404040", foreground=self.fg_color)
         style.map("TButton", background=[("active", "#505050")])
+        style.configure("TCheckbutton", background=self.bg_color, foreground=self.fg_color)
 
         self.config = Config()
-        self.colors: dict[tuple[int, int], tuple[int, int, int]] = dict(self.config.per_key_colors)
-
         self.profile_name = profiles.get_active_profile()
+
+        base_color = (
+            tuple(self.config.color)
+            if isinstance(self.config.color, (list, tuple)) and len(self.config.color) == 3
+            else (255, 0, 0)
+        )
+        self._last_non_black_color: tuple[int, int, int] = (
+            (int(base_color[0]), int(base_color[1]), int(base_color[2]))
+            if base_color != (0, 0, 0)
+            else (255, 0, 0)
+        )
+
+        # Prefer profile-stored per-key colors over whatever happens to be in
+        # config.json (e.g., the calibrator probe state).
+        prof_colors = profiles.load_per_key_colors(self.profile_name)
+        if prof_colors:
+            self.colors = dict(prof_colors)
+        else:
+            self.colors = dict(self.config.per_key_colors)
 
         self.keymap: dict[str, tuple[int, int]] = self._load_keymap()
         self.layout_tweaks = self._load_layout_tweaks()
         self.per_key_layout_tweaks: dict[str, dict[str, float]] = self._load_per_key_layout_tweaks()
         
         self.overlay_scope = tk.StringVar(value="global")  # global | key
+        self.apply_all_keys = tk.BooleanVar(value=False)
         self._profiles_visible = False
+        self._overlay_visible = False
         self._profile_name_var = tk.StringVar(value=self.profile_name)
         self.selected_key_id: str | None = None
         self.selected_cell: tuple[int, int] | None = None
@@ -101,11 +108,7 @@ class PerKeyEditor:
         self._commit_interval = 0.06
 
         self.kb = None
-        if get is not None:
-            try:
-                self.kb = get()
-            except Exception:
-                self.kb = None
+        self.kb = get_keyboard()
 
         self._build_ui()
         self.canvas.redraw()
@@ -121,84 +124,7 @@ class PerKeyEditor:
                 break
 
     def _build_ui(self):
-        main = ttk.Frame(self.root, padding=16)
-        main.pack(fill="both", expand=True)
-
-        title = ttk.Label(main, text="Per-Key Keyboard Colors", font=("Sans", 14, "bold"))
-        title.pack(pady=(0, 10))
-
-        content = ttk.Frame(main)
-        content.pack(fill="both", expand=True)
-
-        left = ttk.Frame(content)
-        left.pack(side="left", fill="both", expand=True)
-
-        canvas_frame = ttk.Frame(left)
-        canvas_frame.pack(fill="both", expand=True)
-
-        self.canvas = KeyboardCanvas(
-            canvas_frame,
-            editor=self,
-            bg=self.bg_color,
-            highlightthickness=0,
-        )
-        self.canvas.pack(side=tk.LEFT, fill="both", expand=True)
-
-        right = ttk.Frame(content, width=self._right_panel_width)
-        right.pack(side="left", fill="y", padx=(16, 0))
-        right.pack_propagate(False)
-
-        self.status_label = ttk.Label(right, text="Click a key to start", font=("Sans", 9), width=32)
-        self.status_label.pack(pady=(0, 8))
-
-        initial = (
-            tuple(self.config.color)
-            if isinstance(self.config.color, (list, tuple)) and len(self.config.color) == 3
-            else (255, 0, 0)
-        )
-        self.color_wheel = ColorWheel(
-            right,
-            size=self._wheel_size,
-            initial_color=initial,
-            callback=self._on_color_change,
-            release_callback=self._on_color_release,
-        )
-        self.color_wheel.pack()
-
-        btns = ttk.Frame(right)
-        btns.pack(fill="x", pady=12)
-        ttk.Button(btns, text="Fill All", command=self._fill_all).pack(fill="x", pady=(0, 6))
-        ttk.Button(btns, text="Clear All", command=self._clear_all).pack(fill="x", pady=(0, 6))
-        ttk.Button(btns, text="Run Keymap Calibrator", command=self._run_calibrator).pack(fill="x", pady=(0, 6))
-        ttk.Button(btns, text="Reload Keymap", command=self._reload_keymap).pack(fill="x", pady=(0, 6))
-        ttk.Button(btns, text="Profiles", command=self._toggle_profiles).pack(fill="x", pady=(0, 6))
-        ttk.Button(btns, text="Close", command=self.root.destroy).pack(fill="x")
-
-        self._profiles_frame = ttk.LabelFrame(right, text="Profiles", padding=10)
-
-        ttk.Label(self._profiles_frame, text="Profile").grid(row=0, column=0, sticky="w")
-        self._profiles_combo = ttk.Combobox(
-            self._profiles_frame,
-            textvariable=self._profile_name_var,
-            values=profiles.list_profiles(),
-            width=22,
-        )
-        self._profiles_combo.grid(row=0, column=1, sticky="ew", padx=(8, 0))
-        self._profiles_frame.columnconfigure(1, weight=1)
-
-        pbtns = ttk.Frame(self._profiles_frame)
-        pbtns.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 0))
-        pbtns.columnconfigure(0, weight=1)
-        pbtns.columnconfigure(1, weight=1)
-        pbtns.columnconfigure(2, weight=1)
-
-        ttk.Button(pbtns, text="Activate", command=self._activate_profile).grid(row=0, column=0, sticky="ew", padx=(0, 6))
-        ttk.Button(pbtns, text="Save", command=self._save_profile).grid(row=0, column=1, sticky="ew", padx=(0, 6))
-        ttk.Button(pbtns, text="Delete", command=self._delete_profile).grid(row=0, column=2, sticky="ew")
-
-        self.overlay_controls = OverlayControls(right, editor=self)
-        self.overlay_controls.pack(fill="x", pady=(6, 0))
-        self.overlay_controls.sync_vars_from_scope()
+        build_editor_ui(self)
 
     def select_key_id(self, key_id: str):
         self.selected_key_id = key_id
@@ -214,7 +140,15 @@ class PerKeyEditor:
 
         row, col = self.selected_cell
         color = self.colors.get((row, col), (0, 0, 0))
-        self.color_wheel.set_color(*color)
+
+        # If the key is currently "off" (black), start the wheel at a usable
+        # brightness so users can immediately pick a color. This matches the
+        # common flow of starting from a unified color and tweaking individual keys.
+        if tuple(color) == (0, 0, 0):
+            self.color_wheel.set_color(*self._last_non_black_color)
+        else:
+            self._last_non_black_color = (int(color[0]), int(color[1]), int(color[2]))
+            self.color_wheel.set_color(*color)
         self.status_label.config(text=f"Selected {key_id} -> {row},{col}")
         self.canvas.redraw()
 
@@ -242,10 +176,21 @@ class PerKeyEditor:
         self.canvas.redraw()
         self.status_label.config(text="Reset global overlay alignment tweaks")
 
+    def auto_sync_per_key_overlays(self):
+        auto_sync_per_key_overlays(
+            layout_tweaks=self.layout_tweaks,
+            per_key_layout_tweaks=self.per_key_layout_tweaks,
+        )
+
+        # Refresh UI.
+        if self._overlay_visible:
+            self.overlay_controls.sync_vars_from_scope()
+        self.canvas.redraw()
+        self.status_label.config(text="Auto-synced overlay tweaks")
+
     def _run_calibrator(self):
-        parent_path = os.path.dirname(os.path.dirname(__file__))
         try:
-            subprocess.Popen([sys.executable, "-m", "src.gui.calibrator"], cwd=parent_path)
+            launch_keymap_calibrator()
             self.status_label.config(text="Calibrator started — map keys then Save")
         except Exception:
             self.status_label.config(text="Failed to start calibrator")
@@ -276,42 +221,79 @@ class PerKeyEditor:
         self.config.effect = "perkey"
         self.config.per_key_colors = self.colors
 
-        if self.kb is not None:
-            try:
-                self.kb.set_key_colors(
-                    self.colors,
-                    brightness=self.config.brightness,
-                    enable_user_mode=True,
-                )
-            except OSError as e:
-                if getattr(e, "errno", None) == 16:
-                    self.kb = None
-            except Exception:
-                pass
+        self.kb = push_per_key_colors(
+            self.kb,
+            self.colors,
+            brightness=int(self.config.brightness),
+            enable_user_mode=True,
+        )
 
     def _on_color_change(self, r: int, g: int, b: int):
-        if self.selected_cell is None:
-            return
-
-        row, col = self.selected_cell
         color = (r, g, b)
-        self.colors[(row, col)] = color
-        self.canvas.update_key_visual(self.selected_key_id, color)
+        if color != (0, 0, 0):
+            self._last_non_black_color = color
+
+        if self.apply_all_keys.get():
+            for row in range(NUM_ROWS):
+                for col in range(NUM_COLS):
+                    self.colors[(row, col)] = color
+            self.canvas.redraw()
+        else:
+            if self.selected_cell is None or not self.selected_key_id:
+                return
+            row, col = self.selected_cell
+            self.colors[(row, col)] = color
+            self.canvas.update_key_visual(self.selected_key_id, color)
         self._commit(force=False)
 
     def _on_color_release(self, r: int, g: int, b: int):
-        if self.selected_cell is None:
-            return
-
-        row, col = self.selected_cell
         color = (r, g, b)
-        self.colors[(row, col)] = color
-        self.canvas.update_key_visual(self.selected_key_id, color)
-        self._commit(force=True)
-        if self.selected_key_id is not None:
-            self.status_label.config(text=f"Saved {self.selected_key_id} = RGB({r},{g},{b})")
+        if color != (0, 0, 0):
+            self._last_non_black_color = color
+
+        if self.apply_all_keys.get():
+            for row in range(NUM_ROWS):
+                for col in range(NUM_COLS):
+                    self.colors[(row, col)] = color
+            self.canvas.redraw()
         else:
-            self.status_label.config(text=f"Saved key {row},{col} = RGB({r},{g},{b})")
+            if self.selected_cell is None or not self.selected_key_id:
+                return
+            row, col = self.selected_cell
+            self.colors[(row, col)] = color
+            self.canvas.update_key_visual(self.selected_key_id, color)
+        self._commit(force=True)
+        if self.apply_all_keys.get():
+            self.status_label.config(text=f"Saved all keys = RGB({r},{g},{b})")
+        elif self.selected_key_id is not None and self.selected_cell is not None:
+            self.status_label.config(text=f"Saved {self.selected_key_id} = RGB({r},{g},{b})")
+
+    def _set_backdrop(self):
+        path = filedialog.askopenfilename(
+            title="Select keyboard backdrop image",
+            filetypes=[
+                ("Image files", "*.png *.jpg *.jpeg *.bmp *.webp"),
+                ("All files", "*.*"),
+            ],
+        )
+        if not path:
+            return
+        try:
+            save_backdrop_image(profile_name=self.profile_name, source_path=path)
+            self.canvas._load_deck_image()
+            self.canvas.redraw()
+            self.status_label.config(text="Backdrop updated")
+        except Exception:
+            self.status_label.config(text="Failed to set backdrop")
+
+    def _reset_backdrop(self):
+        try:
+            reset_backdrop_image(self.profile_name)
+            self.canvas._load_deck_image()
+            self.canvas.redraw()
+            self.status_label.config(text="Backdrop reset")
+        except Exception:
+            self.status_label.config(text="Failed to reset backdrop")
 
     def _fill_all(self):
         r, g, b = self.color_wheel.get_color()
@@ -329,7 +311,12 @@ class PerKeyEditor:
         if len(self.colors) >= (NUM_ROWS * NUM_COLS):
             return
 
-        base = tuple(self.config.color)
+        # Use the last non-black wheel color as the base fill. This matches the
+        # expected workflow: start from a unified color, then override a few keys
+        # without blanking the rest of the keyboard.
+        base = tuple(getattr(self, "_last_non_black_color", tuple(self.config.color)))
+        if base == (0, 0, 0):
+            base = tuple(self.config.color)
         for row in range(NUM_ROWS):
             for col in range(NUM_COLS):
                 self.colors.setdefault((row, col), base)
@@ -340,14 +327,12 @@ class PerKeyEditor:
         self.config.effect = "perkey"
         self.config.per_key_colors = self.colors
 
-        if self.kb is not None:
-            try:
-                self.kb.set_key_colors(self.colors, brightness=self.config.brightness, enable_user_mode=True)
-            except OSError as e:
-                if getattr(e, "errno", None) == 16:
-                    self.kb = None
-            except Exception:
-                pass
+        self.kb = push_per_key_colors(
+            self.kb,
+            self.colors,
+            brightness=int(self.config.brightness),
+            enable_user_mode=True,
+        )
 
         self.status_label.config(text="Cleared all keys")
 
@@ -359,78 +344,78 @@ class PerKeyEditor:
 
     def _toggle_profiles(self):
         if self._profiles_visible:
-            self._profiles_frame.pack_forget()
+            self._profiles_frame.grid_remove()
             self._profiles_visible = False
         else:
             self._profiles_combo.configure(values=profiles.list_profiles())
-            self._profiles_frame.pack(fill="x", pady=(6, 0))
+            self._profiles_frame.grid()
             self._profiles_visible = True
 
+    def _toggle_overlay(self):
+        if self._overlay_visible:
+            self.overlay_controls.grid_remove()
+            self._overlay_visible = False
+        else:
+            self.overlay_controls.grid()
+            self._overlay_visible = True
+            self.overlay_controls.sync_vars_from_scope()
+
     def _activate_profile(self):
-        name = profiles.set_active_profile(self._profile_name_var.get())
-        self.profile_name = name
-        self._profile_name_var.set(name)
+        result = activate_profile(
+            self._profile_name_var.get(),
+            config=self.config,
+            current_colors=dict(getattr(self, "colors", {}) or {}),
+        )
+        self.profile_name = result.name
+        self._profile_name_var.set(result.name)
 
-        self.keymap = self._load_keymap()
-        self.layout_tweaks = self._load_layout_tweaks()
-        self.per_key_layout_tweaks = self._load_per_key_layout_tweaks()
+        self.keymap = result.keymap
+        self.layout_tweaks = result.layout_tweaks
+        self.per_key_layout_tweaks = result.per_key_layout_tweaks
+        self.colors = result.colors
 
-        prof_colors = profiles.load_per_key_colors(self.profile_name)
-        self.colors = dict(prof_colors)
-        profiles.apply_profile_to_config(self.config, self.colors)
+        # Ensure we're applying a full map, then push it to hardware.
+        self._ensure_full_map()
+        self._commit(force=True)
 
         self.overlay_controls.sync_vars_from_scope()
         self.canvas.redraw()
         self.status_label.config(text=f"Active profile: {self.profile_name}")
 
+        if self.selected_key_id:
+            self.select_key_id(self.selected_key_id)
+
     def _save_profile(self):
-        name = profiles.set_active_profile(self._profile_name_var.get())
+        name = save_profile(
+            self._profile_name_var.get(),
+            config=self.config,
+            keymap=self.keymap,
+            layout_tweaks=self.layout_tweaks,
+            per_key_layout_tweaks=self.per_key_layout_tweaks,
+            colors=self.colors,
+        )
         self.profile_name = name
         self._profile_name_var.set(name)
-        profiles.save_keymap(self.keymap, self.profile_name)
-        profiles.save_layout_global(self.layout_tweaks, self.profile_name)
-        profiles.save_layout_per_key(self.per_key_layout_tweaks, self.profile_name)
-        profiles.save_per_key_colors(self.colors, self.profile_name)
+
+        # Persist + push the saved state immediately.
+        self._ensure_full_map()
+        self._commit(force=True)
         self.status_label.config(text=f"Saved profile: {self.profile_name}")
 
     def _delete_profile(self):
-        name = self._profile_name_var.get().strip()
-        if not name:
+        result = delete_profile(self._profile_name_var.get())
+        if not result.deleted:
+            if result.message:
+                self.status_label.config(text=result.message)
             return
-        if not profiles.delete_profile(name):
-            self.status_label.config(text="Cannot delete 'default'")
-            return
-        if profiles.get_active_profile() == profiles._safe_name(name):
-            profiles.set_active_profile("default")
-            self.profile_name = "default"
-            self._profile_name_var.set("default")
+
+        self.profile_name = result.active_profile
+        self._profile_name_var.set(result.active_profile)
         self._profiles_combo.configure(values=profiles.list_profiles())
-        self.status_label.config(text=f"Deleted profile: {profiles._safe_name(name)}")
+        self.status_label.config(text=result.message)
 
     def _load_keymap(self) -> dict[str, tuple[int, int]]:
-        path = profiles.paths_for(self.profile_name).keymap
-        if not path.exists():
-            return {}
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            return {}
-
-        out: dict[str, tuple[int, int]] = {}
-        if isinstance(raw, dict):
-            for k, v in raw.items():
-                if isinstance(k, str) and isinstance(v, str) and "," in v:
-                    a, b = v.split(",", 1)
-                    try:
-                        out[k] = (int(a), int(b))
-                    except ValueError:
-                        continue
-                elif isinstance(k, str) and isinstance(v, (list, tuple)) and len(v) == 2:
-                    try:
-                        out[k] = (int(v[0]), int(v[1]))
-                    except Exception:
-                        continue
-        return out
+        return profiles.load_keymap(self.profile_name)
 
     def run(self):
         self.root.mainloop()

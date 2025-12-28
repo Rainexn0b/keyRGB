@@ -282,6 +282,10 @@ class ColorWheel(ttk.Frame):
         self.current_value = v
         
         self.brightness_var.set(v * 100)
+        # Keep the percentage label in sync when the slider is updated
+        # programmatically (some Tk themes do not call the Scale command).
+        if hasattr(self, "brightness_label"):
+            self.brightness_label.config(text=f'{int(v * 100)}%')
         
         self._update_selection()
         self._update_preview()

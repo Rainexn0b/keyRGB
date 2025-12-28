@@ -9,9 +9,10 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
 import time
 from pathlib import Path
+
+from .config_file_storage import load_config_settings, save_config_settings_atomic
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,12 @@ class Config:
         'brightness': 25,  # 0-50 hardware scale
         'color': [255, 0, 0],  # RGB for static/custom effects
         'autostart': True,
+        # Power management (lid/suspend)
+        'power_management_enabled': True,
+        'power_off_on_suspend': True,
+        'power_off_on_lid_close': True,
+        'power_restore_on_resume': True,
+        'power_restore_on_lid_open': True,
         # Per-key colors stored as {"row,col": [r,g,b]}
         'per_key_colors': {}
     }
@@ -76,30 +83,13 @@ class Config:
         Returns None if loading fails after retries.
         """
 
-        if not self.CONFIG_FILE.exists():
-            return self.DEFAULTS.copy()
-
-        last_error = None
-        for _ in range(max(1, retries)):
-            try:
-                with open(self.CONFIG_FILE, 'r') as f:
-                    loaded = json.load(f)
-                if not isinstance(loaded, dict):
-                    loaded = {}
-                # Normalize effect name to lowercase
-                if 'effect' in loaded and isinstance(loaded['effect'], str):
-                    loaded['effect'] = loaded['effect'].lower()
-                # Merge with defaults for any missing keys
-                return {**self.DEFAULTS, **loaded}
-            except json.JSONDecodeError as e:
-                last_error = e
-                time.sleep(retry_delay)
-            except Exception as e:
-                last_error = e
-                break
-
-        logger.warning("Failed to load config: %s", last_error)
-        return None
+        return load_config_settings(
+            config_file=self.CONFIG_FILE,
+            defaults=self.DEFAULTS,
+            retries=retries,
+            retry_delay=retry_delay,
+            logger=logger,
+        )
     
     def reload(self):
         """Reload settings from file (e.g., after external changes)"""
@@ -110,25 +100,12 @@ class Config:
     
     def _save(self):
         """Save settings to file"""
-        try:
-            self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-
-            # Atomic write: write to temp file then replace.
-            tmp_fd, tmp_path = tempfile.mkstemp(prefix='config.', suffix='.tmp', dir=str(self.CONFIG_DIR))
-            try:
-                with os.fdopen(tmp_fd, 'w') as f:
-                    json.dump(self._settings, f, indent=2)
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(tmp_path, self.CONFIG_FILE)
-            finally:
-                try:
-                    if os.path.exists(tmp_path):
-                        os.unlink(tmp_path)
-                except Exception:
-                    pass
-        except Exception as e:
-            logger.warning("Failed to save config: %s", e)
+        save_config_settings_atomic(
+            config_dir=self.CONFIG_DIR,
+            config_file=self.CONFIG_FILE,
+            settings=self._settings,
+            logger=logger,
+        )
     
     @property
     def effect(self) -> str:
@@ -173,6 +150,51 @@ class Config:
     @autostart.setter
     def autostart(self, value: bool):
         self._settings['autostart'] = value
+        self._save()
+
+    @property
+    def power_management_enabled(self) -> bool:
+        return bool(self._settings.get('power_management_enabled', True))
+
+    @power_management_enabled.setter
+    def power_management_enabled(self, value: bool):
+        self._settings['power_management_enabled'] = bool(value)
+        self._save()
+
+    @property
+    def power_off_on_suspend(self) -> bool:
+        return bool(self._settings.get('power_off_on_suspend', True))
+
+    @power_off_on_suspend.setter
+    def power_off_on_suspend(self, value: bool):
+        self._settings['power_off_on_suspend'] = bool(value)
+        self._save()
+
+    @property
+    def power_off_on_lid_close(self) -> bool:
+        return bool(self._settings.get('power_off_on_lid_close', True))
+
+    @power_off_on_lid_close.setter
+    def power_off_on_lid_close(self, value: bool):
+        self._settings['power_off_on_lid_close'] = bool(value)
+        self._save()
+
+    @property
+    def power_restore_on_resume(self) -> bool:
+        return bool(self._settings.get('power_restore_on_resume', True))
+
+    @power_restore_on_resume.setter
+    def power_restore_on_resume(self, value: bool):
+        self._settings['power_restore_on_resume'] = bool(value)
+        self._save()
+
+    @property
+    def power_restore_on_lid_open(self) -> bool:
+        return bool(self._settings.get('power_restore_on_lid_open', True))
+
+    @power_restore_on_lid_open.setter
+    def power_restore_on_lid_open(self, value: bool):
+        self._settings['power_restore_on_lid_open'] = bool(value)
         self._save()
 
     @property

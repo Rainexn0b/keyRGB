@@ -49,6 +49,8 @@ class OverlayControls(ttk.LabelFrame):
         ttk.Button(overlay_btns, text="Save", command=self.save_tweaks).grid(row=0, column=1, sticky="ew", padx=(0, 6))
         ttk.Button(overlay_btns, text="Reset", command=self.reset_tweaks).grid(row=0, column=2, sticky="ew")
 
+        ttk.Button(self, text="Auto Sync", command=self.auto_sync).grid(row=7, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+
     def sync_vars_from_scope(self):
         if self.editor.overlay_scope.get() == "key" and self.editor.selected_key_id:
             kt = self.editor.per_key_layout_tweaks.get(self.editor.selected_key_id, {})
@@ -72,8 +74,8 @@ class OverlayControls(ttk.LabelFrame):
         payload = {
             "dx": float(self.dx_var.get()),
             "dy": float(self.dy_var.get()),
-            "sx": f(self.sx_var.get(), 0.3, 2.0),
-            "sy": f(self.sy_var.get(), 0.3, 2.0),
+            "sx": f(self.sx_var.get(), 0.3, 4.0),
+            "sy": f(self.sy_var.get(), 0.3, 4.0),
             "inset": f(self.inset_var.get(), 0.0, 80.0),
         }
 
@@ -89,3 +91,6 @@ class OverlayControls(ttk.LabelFrame):
 
     def reset_tweaks(self):
         self.editor.reset_layout_tweaks()
+
+    def auto_sync(self):
+        self.editor.auto_sync_per_key_overlays()

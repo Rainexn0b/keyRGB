@@ -100,4 +100,4 @@ This repo includes some older experiments and patches under [PRs](PRs).
 
 ## License
 
-GPL-2.0-only. See [LICENSE](LICENSE).
+GPL-2.0-or-later. See [LICENSE](LICENSE).

@@ -11,6 +11,9 @@ import subprocess
 import threading
 import time
 
+from .acpi_monitoring import monitor_acpi_events
+from .lid_monitoring import start_sysfs_lid_monitoring
+from src.legacy.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +21,7 @@ logger = logging.getLogger(__name__)
 class PowerManager:
     """Monitor system power events and control keyboard accordingly"""
     
-    def __init__(self, keyboard_controller):
+    def __init__(self, keyboard_controller, *, config: Config | None = None):
         """
         Initialize power manager.
         
@@ -26,14 +29,32 @@ class PowerManager:
             keyboard_controller: The keyboard controller instance (should have turn_off/restore methods)
         """
         self.kb_controller = keyboard_controller
+        self._config = config or Config()
         self.monitoring = False
         self.monitor_thread = None
         self._saved_state = None
+
+    def _is_enabled(self) -> bool:
+        try:
+            self._config.reload()
+            return bool(getattr(self._config, "power_management_enabled", True))
+        except Exception:
+            return True
+
+    def _flag(self, name: str, default: bool = True) -> bool:
+        try:
+            self._config.reload()
+            return bool(getattr(self._config, name, default))
+        except Exception:
+            return default
         
     def start_monitoring(self):
         """Start monitoring power events in background thread"""
         if self.monitoring:
             return
+
+        # Still start monitoring even if disabled, so enabling it later in config works.
+        # Actual actions are gated in the event handlers.
             
         self.monitoring = True
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
@@ -96,136 +117,56 @@ class PowerManager:
             
     def _start_lid_monitor(self):
         """Start a separate thread to monitor lid switch via sysfs"""
-        lid_thread = threading.Thread(target=self._monitor_lid_sysfs, daemon=True)
-        lid_thread.start()
-        
-    def _monitor_lid_sysfs(self):
-        """Monitor lid state via /proc/acpi/button/lid/*/state files"""
-        # Find lid state file
-        import glob
-        lid_files = glob.glob('/proc/acpi/button/lid/*/state')
-        
-        if not lid_files:
-            logger.warning("No lid state file found")
-            return
-            
-        lid_file = lid_files[0]
-        logger.info("Monitoring lid state from: %s", lid_file)
-        
-        last_state = None
-        while self.monitoring:
-            try:
-                with open(lid_file) as f:
-                    content = f.read().strip()
-                    # Format is usually "state:      open" or "state:      closed"
-                    if 'open' in content.lower():
-                        state = 'open'
-                    elif 'closed' in content.lower():
-                        state = 'closed'
-                    else:
-                        state = None
-                    
-                if state and state != last_state:
-                    logger.info("Lid state changed: %s -> %s", last_state, state)
-                    if state == 'closed':
-                        self._on_lid_close()
-                    elif state == 'open':
-                        self._on_lid_open()
-                    last_state = state
-                    
-            except Exception as e:
-                logger.exception("Error reading lid state: %s", e)
-                break
-                
-            time.sleep(0.5)  # Poll every 500ms
+        start_sysfs_lid_monitoring(
+            is_running=lambda: self.monitoring,
+            on_lid_close=self._on_lid_close,
+            on_lid_open=self._on_lid_open,
+            logger=logger,
+        )
             
     def _monitor_acpi_events(self):
         """Fallback method using acpi_listen for lid events"""
-        try:
-            process = subprocess.Popen(
-                ['acpi_listen'],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                universal_newlines=True,
-                bufsize=1
-            )
-
-            assert process.stdout is not None
-            
-            while self.monitoring:
-                line = process.stdout.readline()
-                if not line:
-                    break
-                    
-                # Detect lid close/open events
-                if 'button/lid' in line.lower():
-                    if 'close' in line.lower():
-                        self._on_lid_close()
-                    elif 'open' in line.lower():
-                        self._on_lid_open()
-                        
-        except FileNotFoundError:
-            # Neither dbus-monitor nor acpi_listen available
-            # Fall back to polling /proc/acpi/button/lid/LID/state
-            self._poll_lid_state()
-            
-    def _poll_lid_state(self):
-        """Fallback: poll lid state from /proc or /sys"""
-        lid_paths = [
-            '/proc/acpi/button/lid/LID/state',
-            '/proc/acpi/button/lid/LID0/state',
-            '/sys/class/power_supply/AC/online'
-        ]
-        
-        lid_path = None
-        for path in lid_paths:
-            try:
-                with open(path) as f:
-                    lid_path = path
-                    break
-            except:
-                continue
-                
-        if not lid_path:
-            logger.warning("Could not find lid state file, power management disabled")
-            return
-            
-        last_state = None
-        while self.monitoring:
-            try:
-                with open(lid_path) as f:
-                    state = f.read().strip()
-                    
-                if state != last_state:
-                    if 'closed' in state.lower():
-                        self._on_lid_close()
-                    elif 'open' in state.lower():
-                        self._on_lid_open()
-                    last_state = state
-                    
-            except Exception as e:
-                logger.exception("Error reading lid state: %s", e)
-                
-            time.sleep(1)  # Poll every second
+        monitor_acpi_events(
+            is_running=lambda: self.monitoring,
+            on_lid_close=self._on_lid_close,
+            on_lid_open=self._on_lid_open,
+            logger=logger,
+        )
             
     def _on_suspend(self):
         """Called when system is about to suspend"""
+        if not self._is_enabled():
+            return
+        if not self._flag("power_off_on_suspend", True):
+            return
         logger.info("System suspending - turning off keyboard backlight")
         self._save_and_turn_off()
         
     def _on_resume(self):
         """Called when system resumes from suspend"""
+        if not self._is_enabled():
+            return
+        if not self._flag("power_restore_on_resume", True):
+            return
         logger.info("System resumed - restoring keyboard backlight")
         time.sleep(0.5)  # Give hardware time to wake up
         self._restore()
         
     def _on_lid_close(self):
         """Called when lid is closed"""
+        if not self._is_enabled():
+            return
+        if not self._flag("power_off_on_lid_close", True):
+            return
         logger.info("Lid closed - turning off keyboard backlight")
         self._save_and_turn_off()
         
     def _on_lid_open(self):
         """Called when lid is opened"""
+        if not self._is_enabled():
+            return
+        if not self._flag("power_restore_on_lid_open", True):
+            return
         logger.info("Lid opened - restoring keyboard backlight")
         self._restore()
         

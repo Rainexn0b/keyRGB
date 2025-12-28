@@ -57,3 +57,6 @@ scripts/build/
 *.backup
 *.broken
 *.old
+
+# Upstream reference clones (not shipped)
+vendor/tuxedo-control-center/
