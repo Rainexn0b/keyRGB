@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import webbrowser
 from pathlib import Path
 from threading import Thread
 
@@ -430,6 +431,9 @@ class PowerSettingsGUI:
         self.btn_copy_diagnostics = ttk.Button(diag_btn_row, text="Copy output", command=self._copy_diagnostics)
         self.btn_copy_diagnostics.pack(side="left", padx=(8, 0))
 
+        self.btn_open_issue = ttk.Button(diag_btn_row, text="Open issue", command=self._open_issue_form)
+        self.btn_open_issue.pack(side="left", padx=(8, 0))
+
         self._diagnostics_json: str = ""
 
         self.txt_diagnostics = scrolledtext.ScrolledText(
@@ -444,7 +448,7 @@ class PowerSettingsGUI:
         self.txt_diagnostics.pack(fill="both", expand=True)
         self.txt_diagnostics.insert(
             "1.0",
-            "Click 'Run diagnostics' then 'Copy output' and paste into a GitHub issue.\n",
+            "Click 'Run diagnostics', then use 'Copy output' or 'Open issue'.\n",
         )
         self.txt_diagnostics.configure(state="disabled")
 
@@ -655,6 +659,22 @@ class PowerSettingsGUI:
         self.root.clipboard_append(self._diagnostics_json)
         self.status.configure(text="✓ Copied to clipboard")
         self.root.after(1500, lambda: self.status.configure(text=""))
+
+    def _open_issue_form(self) -> None:
+        url = "https://github.com/Rainexn0b/keyRGB/issues/new/choose"
+        try:
+            ok = bool(webbrowser.open(url, new=2))
+        except Exception:
+            ok = False
+
+        if ok:
+            self.status.configure(text="Opened issue form")
+        else:
+            # Fallback: show the URL so the user can copy it.
+            self.root.clipboard_clear()
+            self.root.clipboard_append(url)
+            self.status.configure(text="Couldn't open browser (URL copied)")
+        self.root.after(2000, lambda: self.status.configure(text=""))
 
     def _on_toggle(self) -> None:
         self.config.power_management_enabled = bool(self.var_enabled.get())
