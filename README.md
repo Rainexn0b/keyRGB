@@ -16,6 +16,18 @@ If OpenRGB doesn't support your device (or is painful to operate), KeyRGB aims t
 - **Hardware-specific**: support depends on your keyboard controller + firmware.
 - **Per-key requires calibration**: you must build a keymap before per-key effects work.
 
+## Screenshots
+
+![Tray menu](assets/screenshots/tray.png)
+
+![Settings](assets/screenshots/settings.png)
+
+![Per-key editor](assets/screenshots/perkeyux.png)
+
+![Uniform color](assets/screenshots/uniformcolorux.png)
+
+![Keymap calibrator](assets/screenshots/keymapcalux.png)
+
 ## Quickstart
 
 ### Install
