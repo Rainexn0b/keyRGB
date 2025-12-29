@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -30,7 +31,11 @@ def launch_power_gui() -> None:
     """Launch the Settings GUI (power rules + autostart) as a subprocess."""
 
     parent_path = _repo_root_dir()
-    subprocess.Popen([sys.executable, "-m", "src.gui.power"], cwd=parent_path)
+    env = dict(os.environ)
+    # Settings runs in a separate process; tell it the tray PID so it can
+    # avoid flagging the tray as an "other" USB holder.
+    env["KEYRGB_TRAY_PID"] = str(os.getpid())
+    subprocess.Popen([sys.executable, "-m", "src.gui.power"], cwd=parent_path, env=env)
 
 
 def launch_tcc_profiles_gui() -> None:

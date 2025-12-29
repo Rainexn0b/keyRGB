@@ -408,6 +408,13 @@ class PowerSettingsGUI:
                 payload = diag.to_dict()
 
                 warnings: list[str] = []
+                expected_holder_pids: set[int] = set()
+                try:
+                    tray_pid = os.environ.get("KEYRGB_TRAY_PID")
+                    if tray_pid:
+                        expected_holder_pids.add(int(tray_pid))
+                except Exception:
+                    expected_holder_pids = set()
                 try:
                     usb_devices = payload.get("usb_devices")
                     if isinstance(usb_devices, list):
@@ -417,6 +424,27 @@ class PowerSettingsGUI:
                             others = dev.get("devnode_open_by_others")
                             if not isinstance(others, list) or not others:
                                 continue
+
+                            # Filter out the tray process when Settings is launched
+                            # from the tray. In that case, the tray holding the
+                            # device is expected and not a conflict.
+                            if expected_holder_pids:
+                                filtered: list[dict[str, object]] = []
+                                for h in others:
+                                    if not isinstance(h, dict):
+                                        continue
+                                    pid = h.get("pid")
+                                    try:
+                                        if pid is not None and int(pid) in expected_holder_pids:
+                                            continue
+                                    except Exception:
+                                        pass
+                                    filtered.append(h)
+                                others = filtered
+
+                            if not others:
+                                continue
+
                             devnode = dev.get("devnode") or dev.get("sysfs_path") or "(unknown)"
                             summaries: list[str] = []
                             for h in others:
