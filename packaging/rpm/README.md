@@ -15,12 +15,9 @@ Install build tools:
 sudo dnf install -y rpmdevtools rpmlint python3-devel python3-setuptools python3-wheel pyproject-rpm-macros
 ```
 
-From the repo root, create the source tarball (matches `Source0:` in the spec):
+`Source0:` in the spec points to the GitHub tag tarball (`v<version>`), so `rpmbuild` needs you to fetch sources into `~/rpmbuild/SOURCES/`.
 
-```bash
-VERSION=0.1.5
-git archive --format=tar.gz --prefix=keyrgb-$VERSION/ -o keyrgb-$VERSION.tar.gz HEAD
-```
+If you want to build from your local working tree instead of the tag tarball, you can still generate a local `Source0` tarball and place it in `~/rpmbuild/SOURCES/` (see note below).
 
 Then build an RPM:
 
@@ -28,13 +25,10 @@ Then build an RPM:
 # Creates ~/rpmbuild/{SOURCES,SPECS,...} if missing
 rpmdev-setuptree
 
-# Copy Source0 into rpmbuild SOURCES
-cp -f keyrgb-$VERSION.tar.gz ~/rpmbuild/SOURCES/
-
 # Copy Patch1 into rpmbuild SOURCES
 cp -f packaging/rpm/ite8291r3-ctl-wootbook-support.patch ~/rpmbuild/SOURCES/
 
-# Fetch Source1 (upstream ite8291r3-ctl tarball) into rpmbuild SOURCES
+# Fetch remote sources (Source0 + Source1) into rpmbuild SOURCES
 # (required because rpmbuild does not automatically download remote sources)
 spectool -g -R packaging/rpm/keyrgb.spec -C ~/rpmbuild/SOURCES/
 
@@ -43,6 +37,14 @@ cp -f packaging/rpm/keyrgb.spec ~/rpmbuild/SPECS/
 
 # Build
 rpmbuild -ba ~/rpmbuild/SPECS/keyrgb.spec
+```
+
+Note (build from local HEAD instead of the GitHub tag tarball):
+
+```bash
+VERSION=0.1.5
+git archive --format=tar.gz --prefix=keyRGB-$VERSION/ -o keyrgb-$VERSION.tar.gz HEAD
+cp -f keyrgb-$VERSION.tar.gz ~/rpmbuild/SOURCES/
 ```
 
 Install the resulting RPM:

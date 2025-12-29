@@ -1,12 +1,12 @@
 Name:           keyrgb
-Version:        0.1.4
+Version:        0.1.5
 Release:        1%{?dist}
 Summary:        Minimal RGB keyboard controller for ITE 8291 keyboards
 
 License:        GPL-2.0-or-later
 URL:            https://github.com/Rainexn0b/keyRGB
 
-Source0:        %{name}-%{version}.tar.gz
+Source0:        https://github.com/Rainexn0b/keyRGB/archive/refs/tags/v%{version}.tar.gz
 Source1:        https://github.com/pobrn/ite8291r3-ctl/archive/refs/heads/master.tar.gz
 
 Patch1:         ite8291r3-ctl-wootbook-support.patch
@@ -20,6 +20,7 @@ Patch1:         ite8291r3-ctl-wootbook-support.patch
 BuildArch:      noarch
 
 BuildRequires:  python3-devel
+BuildRequires:  python3-pip
 BuildRequires:  python3-setuptools
 BuildRequires:  python3-wheel
 BuildRequires:  pyproject-rpm-macros
@@ -32,7 +33,7 @@ Requires:       python3-pyusb
 KeyRGB is a Linux tray app + per-key editor for laptop keyboards driven by ITE 8291 / ITE8291R3-style controllers.
 
 %prep
-%autosetup -n %{name}-%{version}
+%autosetup -n keyRGB-%{version}
 
 # Unpack upstream ite8291r3-ctl source (Source1) and apply the Wootbook patch.
 tar -xf %{SOURCE1}
@@ -50,7 +51,12 @@ popd
 
 # Install upstream ite8291r3-ctl module (setup.py based), patched for Wootbook.
 pushd %{ite_upstream_dir}
-%{python3} setup.py install --skip-build --root %{buildroot} --prefix %{_prefix}
+%{python3} -m pip install . \
+  --root %{buildroot} \
+  --prefix %{_prefix} \
+  --no-deps \
+  --no-build-isolation \
+  --disable-pip-version-check
 popd
 
 # udev rule for non-root access
@@ -74,5 +80,8 @@ install -D -m 0644 packaging/udev/99-ite8291-wootbook.rules %{buildroot}%{_udevr
 %{python3_sitelib}/ite8291r3_ctl*
 
 %changelog
+* Mon Dec 29 2025 KeyRGB Contributors - 0.1.5-1
+- Release v0.1.5
+
 * Sun Dec 28 2025 KeyRGB Contributors - 0.1.4-1
 - Tray + GUI integration updates
