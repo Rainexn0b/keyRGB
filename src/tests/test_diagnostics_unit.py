@@ -25,6 +25,9 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     (leds_root / "tongfang::kbd_backlight").mkdir(parents=True)
     (leds_root / "tongfang::kbd_backlight" / "brightness").write_text("1\n", encoding="utf-8")
     (leds_root / "tongfang::kbd_backlight" / "max_brightness").write_text("10\n", encoding="utf-8")
+    (leds_root / "input3::capslock").mkdir(parents=True)
+    (leds_root / "input3::capslock" / "brightness").write_text("0\n", encoding="utf-8")
+    (leds_root / "input3::capslock" / "max_brightness").write_text("1\n", encoding="utf-8")
 
     monkeypatch.setenv("KEYRGB_SYSFS_DMI_ROOT", str(dmi_root))
     monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(leds_root))
@@ -33,6 +36,15 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     assert diag.dmi.get("sys_vendor") == "TONGFANG"
     assert diag.dmi.get("product_name") == "GM5"
     assert any(e.get("name") == "tongfang::kbd_backlight" for e in diag.leds)
+    assert any(e.get("name") == "tongfang::kbd_backlight" for e in diag.sysfs_leds)
+    assert any(e.get("name") == "input3::capslock" for e in diag.sysfs_leds)
+    assert isinstance(diag.system, dict)
+    assert isinstance(diag.hints, dict)
+    assert isinstance(diag.app, dict)
+    assert isinstance(diag.power_supply, dict)
+    assert isinstance(diag.backends, dict)
+    assert isinstance(diag.usb_devices, list)
+    assert isinstance(diag.config, dict)
 
     text = format_diagnostics_text(diag)
     assert "DMI:" in text
