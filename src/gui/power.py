@@ -469,8 +469,14 @@ class PowerSettingsGUI:
 
         margin_w = 80
         margin_h = 120
-        width = min(max(req_w, 520), max(320, screen_w - margin_w))
-        height = min(max(req_h, 640), max(320, screen_h - margin_h))
+
+        # Default to a comfortably wide/tall window so the two-column layout
+        # doesn't feel cramped on first open, but still clamp to screen size.
+        default_w = 980
+        default_h = 720
+
+        width = min(max(req_w, default_w), max(320, screen_w - margin_w))
+        height = min(max(req_h, default_h), max(320, screen_h - margin_h))
 
         x = max(0, (screen_w - width) // 2)
         y = max(0, (screen_h - height) // 2)
