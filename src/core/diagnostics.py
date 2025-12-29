@@ -307,6 +307,10 @@ def _config_snapshot() -> dict[str, Any]:
             "power_restore_on_lid_open",
             "battery_saver_enabled",
             "battery_saver_brightness",
+            "ac_lighting_enabled",
+            "ac_lighting_brightness",
+            "battery_lighting_enabled",
+            "battery_lighting_brightness",
         )
         settings: dict[str, Any] = {}
         for k in whitelist:

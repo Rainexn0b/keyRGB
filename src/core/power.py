@@ -90,6 +90,11 @@ class PowerManager:
 
         poll_interval_s = 2.0
         last_on_ac: Optional[bool] = None
+        last_change_ts: float = 0.0
+        debounce_s: float = 3.0
+
+        last_desired_enabled: Optional[bool] = None
+        last_desired_brightness: Optional[int] = None
 
         while self.monitoring:
             try:
@@ -98,12 +103,26 @@ class PowerManager:
                     time.sleep(poll_interval_s)
                     continue
 
+                now_mono = time.monotonic()
+
+                # Debounce rapid toggling.
+                if last_on_ac is not None and bool(on_ac) != bool(last_on_ac):
+                    if float(now_mono) - float(last_change_ts) < float(debounce_s):
+                        time.sleep(poll_interval_s)
+                        continue
+                    last_on_ac = bool(on_ac)
+                    last_change_ts = float(now_mono)
+                elif last_on_ac is None:
+                    last_on_ac = bool(on_ac)
+                    last_change_ts = float(now_mono)
+
                 # Update config every tick so toggling works without restart.
                 self._config.reload()
 
-                enabled = bool(getattr(self._config, "battery_saver_enabled", False))
-                target = int(getattr(self._config, "battery_saver_brightness", 25) or 0)
-                self._battery_policy.configure(enabled=enabled, target_brightness=int(target))
+                # Treat all power-source behavior as part of "power management".
+                if not bool(getattr(self._config, "power_management_enabled", True)):
+                    time.sleep(poll_interval_s)
+                    continue
 
                 # Determine current brightness and whether user explicitly turned off.
                 try:
@@ -113,11 +132,69 @@ class PowerManager:
 
                 is_off = bool(getattr(self.kb_controller, "is_off", False))
 
+                # Per power-source desired state.
+                ac_enabled = bool(getattr(self._config, "ac_lighting_enabled", True))
+                batt_enabled = bool(getattr(self._config, "battery_lighting_enabled", True))
+
+                ac_brightness_override = getattr(self._config, "ac_lighting_brightness", None)
+                batt_brightness_override = getattr(self._config, "battery_lighting_brightness", None)
+
+                desired_enabled = ac_enabled if bool(on_ac) else batt_enabled
+
+                # Apply on/off on transitions (or when the desired enabled flag changes).
+                if last_desired_enabled is None or bool(desired_enabled) != bool(last_desired_enabled):
+                    try:
+                        if not bool(desired_enabled):
+                            # Power-policy forced off (tray restore() will only undo if forced).
+                            if hasattr(self.kb_controller, "turn_off"):
+                                self.kb_controller.turn_off()
+                        else:
+                            if hasattr(self.kb_controller, "restore"):
+                                self.kb_controller.restore()
+                    except Exception:
+                        pass
+                    last_desired_enabled = bool(desired_enabled)
+
+                # If disabled in this power state, do not apply brightness policies.
+                if not bool(desired_enabled):
+                    time.sleep(poll_interval_s)
+                    continue
+
+                # Explicit brightness overrides (AC and/or battery).
+                desired_brightness: Optional[int] = None
+                if bool(on_ac):
+                    if ac_brightness_override is not None:
+                        try:
+                            desired_brightness = max(0, min(50, int(ac_brightness_override)))
+                        except Exception:
+                            desired_brightness = None
+                else:
+                    if batt_brightness_override is not None:
+                        try:
+                            desired_brightness = max(0, min(50, int(batt_brightness_override)))
+                        except Exception:
+                            desired_brightness = None
+
+                if desired_brightness is not None:
+                    # Apply only when it actually changes.
+                    if last_desired_brightness is None or int(desired_brightness) != int(last_desired_brightness):
+                        if not is_off:
+                            self._apply_brightness_policy(int(desired_brightness))
+                        last_desired_brightness = int(desired_brightness)
+                    time.sleep(poll_interval_s)
+                    continue
+
+                # Legacy battery saver policy (dim on AC unplug, restore on replug)
+                # when no explicit battery brightness override is configured.
+                enabled = bool(getattr(self._config, "battery_saver_enabled", False))
+                target = int(getattr(self._config, "battery_saver_brightness", 25) or 0)
+                self._battery_policy.configure(enabled=enabled, target_brightness=int(target))
+
                 action = self._battery_policy.update(
                     on_ac=bool(on_ac),
                     current_brightness=current_brightness,
                     is_off=is_off,
-                    now=time.monotonic(),
+                    now=now_mono,
                 )
 
                 if action is not None and last_on_ac is not None:

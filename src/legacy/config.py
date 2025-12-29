@@ -43,6 +43,15 @@ class Config:
         'battery_saver_enabled': False,
         # Uses the same brightness scale as `brightness`.
         'battery_saver_brightness': 25,
+
+        # Power-source lighting profiles (AC vs battery)
+        # These default to "enabled" with no brightness override (None).
+        # When brightness is None, KeyRGB will keep using the current brightness
+        # (and can optionally fall back to battery_saver_* behavior on battery).
+        'ac_lighting_enabled': True,
+        'ac_lighting_brightness': None,
+        'battery_lighting_enabled': True,
+        'battery_lighting_brightness': None,
         # Per-key colors stored as {"row,col": [r,g,b]}
         'per_key_colors': {}
     }
@@ -211,6 +220,85 @@ class Config:
     @power_restore_on_lid_open.setter
     def power_restore_on_lid_open(self, value: bool):
         self._settings['power_restore_on_lid_open'] = bool(value)
+        self._save()
+
+    # ---- battery saver (legacy)
+
+    @property
+    def battery_saver_enabled(self) -> bool:
+        return bool(self._settings.get('battery_saver_enabled', False))
+
+    @battery_saver_enabled.setter
+    def battery_saver_enabled(self, value: bool):
+        self._settings['battery_saver_enabled'] = bool(value)
+        self._save()
+
+    @property
+    def battery_saver_brightness(self) -> int:
+        try:
+            return max(0, min(50, int(self._settings.get('battery_saver_brightness', 25) or 0)))
+        except Exception:
+            return 25
+
+    @battery_saver_brightness.setter
+    def battery_saver_brightness(self, value: int):
+        self._settings['battery_saver_brightness'] = max(0, min(50, int(value)))
+        self._save()
+
+    # ---- power-source lighting profiles
+
+    @property
+    def ac_lighting_enabled(self) -> bool:
+        return bool(self._settings.get('ac_lighting_enabled', True))
+
+    @ac_lighting_enabled.setter
+    def ac_lighting_enabled(self, value: bool):
+        self._settings['ac_lighting_enabled'] = bool(value)
+        self._save()
+
+    @property
+    def ac_lighting_brightness(self) -> int | None:
+        v = self._settings.get('ac_lighting_brightness', None)
+        if v is None:
+            return None
+        try:
+            return max(0, min(50, int(v)))
+        except Exception:
+            return None
+
+    @ac_lighting_brightness.setter
+    def ac_lighting_brightness(self, value: int | None):
+        if value is None:
+            self._settings['ac_lighting_brightness'] = None
+        else:
+            self._settings['ac_lighting_brightness'] = max(0, min(50, int(value)))
+        self._save()
+
+    @property
+    def battery_lighting_enabled(self) -> bool:
+        return bool(self._settings.get('battery_lighting_enabled', True))
+
+    @battery_lighting_enabled.setter
+    def battery_lighting_enabled(self, value: bool):
+        self._settings['battery_lighting_enabled'] = bool(value)
+        self._save()
+
+    @property
+    def battery_lighting_brightness(self) -> int | None:
+        v = self._settings.get('battery_lighting_brightness', None)
+        if v is None:
+            return None
+        try:
+            return max(0, min(50, int(v)))
+        except Exception:
+            return None
+
+    @battery_lighting_brightness.setter
+    def battery_lighting_brightness(self, value: int | None):
+        if value is None:
+            self._settings['battery_lighting_brightness'] = None
+        else:
+            self._settings['battery_lighting_brightness'] = max(0, min(50, int(value)))
         self._save()
 
     @property

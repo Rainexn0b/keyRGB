@@ -36,7 +36,7 @@ class PowerSettingsGUI:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Settings")
         # Layout is content-driven; initial size is computed after widgets are created.
-        self.root.minsize(480, 520)
+        self.root.minsize(760, 560)
         self.root.resizable(True, True)
 
         # Match the existing dark-ish styling used by other KeyRGB Tk windows.
@@ -187,11 +187,20 @@ class PowerSettingsGUI:
         title = ttk.Label(main, text="Settings", font=("Sans", 14, "bold"))
         title.pack(anchor="w", pady=(0, 8))
 
-        pm_title = ttk.Label(main, text="Power Management", font=("Sans", 11, "bold"))
+        cols = ttk.Frame(main)
+        cols.pack(fill="both", expand=True)
+
+        left = ttk.Frame(cols)
+        left.pack(side="left", fill="both", expand=True)
+
+        right = ttk.Frame(cols)
+        right.pack(side="left", fill="both", expand=True, padx=(18, 0))
+
+        pm_title = ttk.Label(left, text="Power Management", font=("Sans", 11, "bold"))
         pm_title.pack(anchor="w", pady=(0, 6))
 
         desc = ttk.Label(
-            main,
+            left,
             text=(
                 "Control whether KeyRGB turns the keyboard LEDs off/on\n"
                 "when the lid closes/opens or the system suspends/resumes."
@@ -208,8 +217,45 @@ class PowerSettingsGUI:
         self.var_autostart = tk.BooleanVar(value=bool(getattr(self.config, "autostart", True)))
         self.var_os_autostart = tk.BooleanVar(value=self._detect_os_autostart_enabled())
 
+        # Power-source lighting defaults: if no explicit overrides exist, seed UI with
+        # effective current values so saving doesn't change behavior unexpectedly.
+        try:
+            base_brightness = int(getattr(self.config, "brightness", 25) or 0)
+        except Exception:
+            base_brightness = 25
+
+        try:
+            bs_enabled = bool(getattr(self.config, "battery_saver_enabled", False))
+        except Exception:
+            bs_enabled = False
+
+        try:
+            bs_brightness = int(getattr(self.config, "battery_saver_brightness", 25) or 0)
+        except Exception:
+            bs_brightness = 25
+
+        try:
+            ac_b = getattr(self.config, "ac_lighting_brightness", None)
+        except Exception:
+            ac_b = None
+        ac_b_init = int(ac_b) if ac_b is not None else int(base_brightness)
+
+        try:
+            batt_b = getattr(self.config, "battery_lighting_brightness", None)
+        except Exception:
+            batt_b = None
+        if batt_b is not None:
+            batt_b_init = int(batt_b)
+        else:
+            batt_b_init = int(bs_brightness) if bs_enabled else int(base_brightness)
+
+        self.var_ac_enabled = tk.BooleanVar(value=bool(getattr(self.config, "ac_lighting_enabled", True)))
+        self.var_battery_enabled = tk.BooleanVar(value=bool(getattr(self.config, "battery_lighting_enabled", True)))
+        self.var_ac_brightness = tk.DoubleVar(value=float(max(0, min(50, ac_b_init))))
+        self.var_battery_brightness = tk.DoubleVar(value=float(max(0, min(50, batt_b_init))))
+
         self.chk_enabled = ttk.Checkbutton(
-            main,
+            left,
             text="Enable power management",
             variable=self.var_enabled,
             command=self._on_toggle,
@@ -217,7 +263,7 @@ class PowerSettingsGUI:
         self.chk_enabled.pack(anchor="w", pady=(0, 8))
 
         self.chk_off_suspend = ttk.Checkbutton(
-            main,
+            left,
             text="Turn off on suspend",
             variable=self.var_off_suspend,
             command=self._on_toggle,
@@ -225,7 +271,7 @@ class PowerSettingsGUI:
         self.chk_off_suspend.pack(anchor="w")
 
         self.chk_restore_resume = ttk.Checkbutton(
-            main,
+            left,
             text="Restore on resume",
             variable=self.var_restore_resume,
             command=self._on_toggle,
@@ -233,7 +279,7 @@ class PowerSettingsGUI:
         self.chk_restore_resume.pack(anchor="w")
 
         self.chk_off_lid = ttk.Checkbutton(
-            main,
+            left,
             text="Turn off on lid close",
             variable=self.var_off_lid,
             command=self._on_toggle,
@@ -241,20 +287,101 @@ class PowerSettingsGUI:
         self.chk_off_lid.pack(anchor="w", pady=(8, 0))
 
         self.chk_restore_lid = ttk.Checkbutton(
-            main,
+            left,
             text="Restore on lid open",
             variable=self.var_restore_lid,
             command=self._on_toggle,
         )
         self.chk_restore_lid.pack(anchor="w")
 
-        ttk.Separator(main).pack(fill="x", pady=(14, 10))
+        ttk.Separator(left).pack(fill="x", pady=(14, 10))
 
-        as_title = ttk.Label(main, text="Autostart", font=("Sans", 11, "bold"))
+        ps_title = ttk.Label(left, text="Plugged In vs Battery", font=("Sans", 11, "bold"))
+        ps_title.pack(anchor="w", pady=(0, 6))
+
+        ps_desc = ttk.Label(
+            left,
+            text=(
+                "Choose whether the keyboard lighting should be on/off and what\n"
+                "brightness to use when plugged in vs running on battery."
+            ),
+            font=("Sans", 9),
+        )
+        ps_desc.pack(anchor="w", pady=(0, 10))
+
+        def _set_label_int(lbl: ttk.Label, v: float | str) -> None:
+            try:
+                lbl.configure(text=str(int(float(v))))
+            except Exception:
+                lbl.configure(text="?")
+
+        # AC row
+        ac_row = ttk.Frame(left)
+        ac_row.pack(fill="x", pady=(0, 10))
+        ac_head = ttk.Frame(ac_row)
+        ac_head.pack(fill="x")
+
+        self.chk_ac_enabled = ttk.Checkbutton(
+            ac_head,
+            text="When plugged in (AC): enable lighting",
+            variable=self.var_ac_enabled,
+            command=self._on_toggle,
+        )
+        self.chk_ac_enabled.pack(side="left", anchor="w")
+
+        self.lbl_ac_brightness_val = ttk.Label(ac_head, text=str(int(self.var_ac_brightness.get())), font=("Sans", 9))
+        self.lbl_ac_brightness_val.pack(side="right")
+        ttk.Label(ac_head, text="Brightness", font=("Sans", 9)).pack(side="right", padx=(0, 6))
+
+        self.scale_ac_brightness = ttk.Scale(
+            ac_row,
+            from_=0,
+            to=50,
+            orient="horizontal",
+            variable=self.var_ac_brightness,
+            command=lambda v: _set_label_int(self.lbl_ac_brightness_val, v),
+        )
+        self.scale_ac_brightness.pack(fill="x", pady=(6, 0))
+        self.scale_ac_brightness.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
+
+        # Battery row
+        batt_row = ttk.Frame(left)
+        batt_row.pack(fill="x")
+        batt_head = ttk.Frame(batt_row)
+        batt_head.pack(fill="x")
+
+        self.chk_battery_enabled = ttk.Checkbutton(
+            batt_head,
+            text="On battery: enable lighting",
+            variable=self.var_battery_enabled,
+            command=self._on_toggle,
+        )
+        self.chk_battery_enabled.pack(side="left", anchor="w")
+
+        self.lbl_battery_brightness_val = ttk.Label(
+            batt_head, text=str(int(self.var_battery_brightness.get())), font=("Sans", 9)
+        )
+        self.lbl_battery_brightness_val.pack(side="right")
+        ttk.Label(batt_head, text="Brightness", font=("Sans", 9)).pack(side="right", padx=(0, 6))
+
+        self.scale_battery_brightness = ttk.Scale(
+            batt_row,
+            from_=0,
+            to=50,
+            orient="horizontal",
+            variable=self.var_battery_brightness,
+            command=lambda v: _set_label_int(self.lbl_battery_brightness_val, v),
+        )
+        self.scale_battery_brightness.pack(fill="x", pady=(6, 0))
+        self.scale_battery_brightness.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
+
+        ttk.Separator(right).pack(fill="x", pady=(0, 10))
+
+        as_title = ttk.Label(right, text="Autostart", font=("Sans", 11, "bold"))
         as_title.pack(anchor="w", pady=(0, 6))
 
         as_desc = ttk.Label(
-            main,
+            right,
             text=(
                 "Control what happens when KeyRGB launches, and whether it\n"
                 "starts automatically when you log in."
@@ -264,7 +391,7 @@ class PowerSettingsGUI:
         as_desc.pack(anchor="w", pady=(0, 8))
 
         self.chk_autostart = ttk.Checkbutton(
-            main,
+            right,
             text="Start lighting on launch",
             variable=self.var_autostart,
             command=self._on_toggle,
@@ -272,20 +399,20 @@ class PowerSettingsGUI:
         self.chk_autostart.pack(anchor="w")
 
         self.chk_os_autostart = ttk.Checkbutton(
-            main,
+            right,
             text="Start KeyRGB on login",
             variable=self.var_os_autostart,
             command=self._on_toggle,
         )
         self.chk_os_autostart.pack(anchor="w", pady=(6, 0))
 
-        ttk.Separator(main).pack(fill="x", pady=(14, 10))
+        ttk.Separator(right).pack(fill="x", pady=(14, 10))
 
-        diag_title = ttk.Label(main, text="Diagnostics", font=("Sans", 11, "bold"))
+        diag_title = ttk.Label(right, text="Diagnostics", font=("Sans", 11, "bold"))
         diag_title.pack(anchor="w", pady=(0, 6))
 
         diag_desc = ttk.Label(
-            main,
+            right,
             text=(
                 "Collect read-only system information to include in bug reports.\n"
                 "This works even if hardware detection fails."
@@ -294,7 +421,7 @@ class PowerSettingsGUI:
         )
         diag_desc.pack(anchor="w", pady=(0, 8))
 
-        diag_btn_row = ttk.Frame(main)
+        diag_btn_row = ttk.Frame(right)
         diag_btn_row.pack(fill="x", pady=(0, 8))
 
         self.btn_run_diagnostics = ttk.Button(diag_btn_row, text="Run diagnostics", command=self._run_diagnostics)
@@ -306,7 +433,7 @@ class PowerSettingsGUI:
         self._diagnostics_json: str = ""
 
         self.txt_diagnostics = scrolledtext.ScrolledText(
-            main,
+            right,
             height=8,
             wrap="word",
             background=bg_color,
@@ -314,7 +441,7 @@ class PowerSettingsGUI:
             insertbackground=fg_color,
         )
         # Keep a stable initial size; the window itself (and content area) is scrollable.
-        self.txt_diagnostics.pack(fill="x")
+        self.txt_diagnostics.pack(fill="both", expand=True)
         self.txt_diagnostics.insert(
             "1.0",
             "Click 'Run diagnostics' then 'Copy output' and paste into a GitHub issue.\n",
@@ -376,6 +503,10 @@ class PowerSettingsGUI:
             self.chk_restore_resume,
             self.chk_off_lid,
             self.chk_restore_lid,
+            self.chk_ac_enabled,
+            self.chk_battery_enabled,
+            self.scale_ac_brightness,
+            self.scale_battery_brightness,
         ):
             w.configure(state=state)
 
@@ -527,6 +658,18 @@ class PowerSettingsGUI:
         self.config.power_restore_on_lid_open = bool(self.var_restore_lid.get())
         self.config.autostart = bool(self.var_autostart.get())
 
+        # Plugged-in vs battery lighting profile.
+        try:
+            self.config.ac_lighting_enabled = bool(self.var_ac_enabled.get())
+            self.config.battery_lighting_enabled = bool(self.var_battery_enabled.get())
+
+            ac_b = int(float(self.var_ac_brightness.get()))
+            batt_b = int(float(self.var_battery_brightness.get()))
+            self.config.ac_lighting_brightness = max(0, min(50, ac_b))
+            self.config.battery_lighting_brightness = max(0, min(50, batt_b))
+        except Exception:
+            pass
+
         # Best-effort OS autostart (XDG). If it fails, revert the checkbox.
         desired_os_autostart = bool(self.var_os_autostart.get())
         try:
@@ -581,7 +724,6 @@ class PowerSettingsGUI:
 
     def run(self) -> None:
         self.root.mainloop()
-
 
 def main() -> None:
     PowerSettingsGUI().run()
