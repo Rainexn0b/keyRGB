@@ -415,6 +415,20 @@ class PowerSettingsGUI:
                         expected_holder_pids.add(int(tray_pid))
                 except Exception:
                     expected_holder_pids = set()
+
+                # Fallback: if the tray didn't set KEYRGB_TRAY_PID (older build)
+                # and Settings was launched as a subprocess, the parent PID is
+                # typically the tray. Treat parent 'keyrgb' as expected.
+                try:
+                    if not expected_holder_pids:
+                        ppid = int(os.getppid())
+                        comm_path = Path(f"/proc/{ppid}/comm")
+                        if comm_path.exists():
+                            parent_comm = comm_path.read_text(encoding="utf-8", errors="ignore").strip()
+                            if parent_comm == "keyrgb":
+                                expected_holder_pids.add(ppid)
+                except Exception:
+                    pass
                 try:
                     usb_devices = payload.get("usb_devices")
                     if isinstance(usb_devices, list):
