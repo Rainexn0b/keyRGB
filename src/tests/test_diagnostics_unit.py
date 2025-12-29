@@ -45,6 +45,7 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     assert isinstance(diag.backends, dict)
     assert isinstance(diag.usb_devices, list)
     assert isinstance(diag.config, dict)
+    assert isinstance(diag.process, dict)
 
     text = format_diagnostics_text(diag)
     assert "DMI:" in text

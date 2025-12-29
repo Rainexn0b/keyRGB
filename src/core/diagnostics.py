@@ -149,7 +149,7 @@ def _proc_open_holders(target_path: Path, *, limit: int = 10, pid_limit: int = 5
             if not matched:
                 continue
 
-            info: dict[str, Any] = {"pid": pid}
+            info: dict[str, Any] = {"pid": pid, "is_self": (pid == os.getpid())}
             comm = _read_text(child / "comm")
             if comm:
                 info["comm"] = comm
@@ -157,6 +157,20 @@ def _proc_open_holders(target_path: Path, *, limit: int = 10, pid_limit: int = 5
                 exe = child / "exe"
                 if exe.exists():
                     info["exe"] = str(exe.resolve())
+            except Exception:
+                pass
+
+            # Best-effort command line (may be empty for kernel threads).
+            try:
+                cmdline_path = child / "cmdline"
+                if cmdline_path.exists():
+                    raw = cmdline_path.read_bytes()
+                    # NUL-separated argv.
+                    parts = [p.decode("utf-8", errors="ignore") for p in raw.split(b"\x00") if p]
+                    if parts:
+                        # Keep it short to avoid overly verbose diagnostics.
+                        joined = " ".join(parts)
+                        info["cmdline"] = joined[:300]
             except Exception:
                 pass
 
@@ -232,6 +246,9 @@ def _usb_devices_snapshot(target_ids: list[tuple[int, int]]) -> list[dict[str, A
                         holders = _proc_open_holders(devnode)
                         if holders:
                             entry["devnode_open_by"] = holders
+                            others = [h for h in holders if isinstance(h, dict) and not bool(h.get("is_self"))]
+                            if others:
+                                entry["devnode_open_by_others"] = others
                     else:
                         entry["devnode_exists"] = False
                 except Exception:
@@ -467,6 +484,7 @@ class Diagnostics:
     backends: dict[str, Any]
     usb_devices: list[dict[str, Any]]
     config: dict[str, Any]
+    process: dict[str, Any]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -483,6 +501,7 @@ class Diagnostics:
             "backends": dict(self.backends),
             "usb_devices": list(self.usb_devices),
             "config": dict(self.config),
+            "process": dict(self.process),
         }
 
 
@@ -652,6 +671,19 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
     usb_devices = _usb_devices_snapshot(usb_targets)
     config_snapshot = _config_snapshot()
 
+    process: dict[str, Any] = {}
+    try:
+        process["pid"] = int(os.getpid())
+        process["euid"] = int(os.geteuid())
+        process["egid"] = int(os.getegid())
+        # Keep group IDs numeric to avoid leaking usernames.
+        try:
+            process["groups"] = [int(g) for g in os.getgroups()]
+        except Exception:
+            pass
+    except Exception:
+        process = {}
+
     return Diagnostics(
         dmi=dmi,
         leds=leds,
@@ -666,6 +698,7 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
         backends=backends,
         usb_devices=usb_devices,
         config=config_snapshot,
+        process=process,
     )
 
 
@@ -753,7 +786,27 @@ def format_diagnostics_text(diag: Diagnostics) -> str:
                     for h in holders:
                         if not isinstance(h, dict):
                             continue
-                        lines.append(f"        - pid={h.get('pid')} comm={h.get('comm', '')} exe={h.get('exe', '')}".rstrip())
+                    extra = ""
+                    if h.get("is_self"):
+                        extra = " (self)"
+                    lines.append(
+                        f"        - pid={h.get('pid')} comm={h.get('comm', '')} exe={h.get('exe', '')}{extra}".rstrip()
+                    )
+                    if h.get("cmdline"):
+                        lines.append(f"          cmdline: {h.get('cmdline')}")
+
+            others = dev.get("devnode_open_by_others")
+            if isinstance(others, list) and others:
+                lines.append("      devnode_open_by_others:")
+                for h in others:
+                    if not isinstance(h, dict):
+                        continue
+                    lines.append(f"        - pid={h.get('pid')} comm={h.get('comm', '')} exe={h.get('exe', '')}".rstrip())
+
+    if diag.process:
+        lines.append("Process:")
+        for k in sorted(diag.process.keys()):
+            lines.append(f"  {k}: {diag.process[k]}")
 
     if diag.config:
         lines.append("Config:")
