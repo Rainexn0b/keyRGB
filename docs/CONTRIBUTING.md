@@ -77,3 +77,11 @@ When filing issues, include:
 - Output of `lsusb | grep 048d` (or your device’s vendor/product)
 - Distro + DE + kernel version
 - Whether you are running other RGB tools (OpenRGB, vendor daemons)
+
+## Tech debt / maintainability
+
+We track maintainability hot spots and refactor ideas in `docs/tech-debt/`:
+
+- `docs/tech-debt/README.md`
+- `docs/tech-debt/hotspots.md`
+- `docs/tech-debt/tracking.md`
