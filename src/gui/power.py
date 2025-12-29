@@ -13,11 +13,14 @@ Settings are persisted in the shared `~/.config/keyrgb/config.json` via
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
+from threading import Thread
 
 import tkinter as tk
+from tkinter import scrolledtext
 from tkinter import ttk
 
 try:
@@ -32,7 +35,7 @@ class PowerSettingsGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("KeyRGB - Settings")
-        self.root.geometry("420x520")
+        self.root.geometry("520x680")
         # Allow vertical resize for systems with larger fonts / window chrome.
         self.root.resizable(False, True)
 
@@ -156,6 +159,47 @@ class PowerSettingsGUI:
         )
         self.chk_os_autostart.pack(anchor="w", pady=(6, 0))
 
+        ttk.Separator(main).pack(fill="x", pady=(14, 10))
+
+        diag_title = ttk.Label(main, text="Diagnostics", font=("Sans", 11, "bold"))
+        diag_title.pack(anchor="w", pady=(0, 6))
+
+        diag_desc = ttk.Label(
+            main,
+            text=(
+                "Collect read-only system information to include in bug reports.\n"
+                "This works even if hardware detection fails."
+            ),
+            font=("Sans", 9),
+        )
+        diag_desc.pack(anchor="w", pady=(0, 8))
+
+        diag_btn_row = ttk.Frame(main)
+        diag_btn_row.pack(fill="x", pady=(0, 8))
+
+        self.btn_run_diagnostics = ttk.Button(diag_btn_row, text="Run diagnostics", command=self._run_diagnostics)
+        self.btn_run_diagnostics.pack(side="left")
+
+        self.btn_copy_diagnostics = ttk.Button(diag_btn_row, text="Copy output", command=self._copy_diagnostics)
+        self.btn_copy_diagnostics.pack(side="left", padx=(8, 0))
+
+        self._diagnostics_json: str = ""
+
+        self.txt_diagnostics = scrolledtext.ScrolledText(
+            main,
+            height=8,
+            wrap="word",
+            background=bg_color,
+            foreground=fg_color,
+            insertbackground=fg_color,
+        )
+        self.txt_diagnostics.pack(fill="x")
+        self.txt_diagnostics.insert(
+            "1.0",
+            "Click 'Run diagnostics' then 'Copy output' and paste into a GitHub issue.\n",
+        )
+        self.txt_diagnostics.configure(state="disabled")
+
         btn_row = ttk.Frame(main)
         btn_row.pack(fill="x", pady=(16, 0))
 
@@ -166,6 +210,7 @@ class PowerSettingsGUI:
         self.status.pack(anchor="w", pady=(8, 0))
 
         self._apply_enabled_state()
+        self._apply_diagnostics_state()
 
         # Center window
         self.root.update_idletasks()
@@ -183,6 +228,59 @@ class PowerSettingsGUI:
             self.chk_restore_lid,
         ):
             w.configure(state=state)
+
+    def _apply_diagnostics_state(self) -> None:
+        # Copy is only useful once we have JSON content.
+        self.btn_copy_diagnostics.configure(state="normal" if self._diagnostics_json else "disabled")
+
+    def _set_diagnostics_text(self, text: str) -> None:
+        self.txt_diagnostics.configure(state="normal")
+        self.txt_diagnostics.delete("1.0", "end")
+        self.txt_diagnostics.insert("1.0", text)
+        self.txt_diagnostics.configure(state="disabled")
+
+    def _run_diagnostics(self) -> None:
+        # Collect in a background thread to keep the UI responsive.
+        self.status.configure(text="Collecting diagnostics…")
+        self.btn_run_diagnostics.configure(state="disabled")
+        self.btn_copy_diagnostics.configure(state="disabled")
+
+        def worker() -> None:
+            try:
+                try:
+                    from src.core.diagnostics import collect_diagnostics
+                except Exception:
+                    # Fallback for direct execution.
+                    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+                    from src.core.diagnostics import collect_diagnostics
+
+                diag = collect_diagnostics(include_usb=True)
+                text = json.dumps(diag.to_dict(), indent=2, sort_keys=True)
+            except Exception as e:
+                text = f"Failed to collect diagnostics: {e}"
+
+            def on_done() -> None:
+                self._diagnostics_json = text if text.strip().startswith("{") else ""
+                self._set_diagnostics_text(text)
+                self.btn_run_diagnostics.configure(state="normal")
+                self._apply_diagnostics_state()
+                self.status.configure(text="✓ Diagnostics ready")
+                self.root.after(2000, lambda: self.status.configure(text=""))
+
+            self.root.after(0, on_done)
+
+        Thread(target=worker, daemon=True).start()
+
+    def _copy_diagnostics(self) -> None:
+        if not self._diagnostics_json:
+            self.status.configure(text="Run diagnostics first")
+            self.root.after(1500, lambda: self.status.configure(text=""))
+            return
+
+        self.root.clipboard_clear()
+        self.root.clipboard_append(self._diagnostics_json)
+        self.status.configure(text="✓ Copied to clipboard")
+        self.root.after(1500, lambda: self.status.configure(text=""))
 
     def _on_toggle(self) -> None:
         self.config.power_management_enabled = bool(self.var_enabled.get())
