@@ -17,6 +17,7 @@ from typing import Optional
 
 from .acpi_monitoring import monitor_acpi_events
 from .lid_monitoring import start_sysfs_lid_monitoring
+from .power_source_policy import compute_power_source_policy
 from src.legacy.config import Config
 
 logger = logging.getLogger(__name__)
@@ -139,7 +140,13 @@ class PowerManager:
                 ac_brightness_override = getattr(self._config, "ac_lighting_brightness", None)
                 batt_brightness_override = getattr(self._config, "battery_lighting_brightness", None)
 
-                desired_enabled = ac_enabled if bool(on_ac) else batt_enabled
+                desired_enabled, desired_brightness = compute_power_source_policy(
+                    on_ac=bool(on_ac),
+                    ac_enabled=ac_enabled,
+                    battery_enabled=batt_enabled,
+                    ac_brightness_override=ac_brightness_override,
+                    battery_brightness_override=batt_brightness_override,
+                )
 
                 # Apply on/off on transitions (or when the desired enabled flag changes).
                 if last_desired_enabled is None or bool(desired_enabled) != bool(last_desired_enabled):
@@ -159,21 +166,6 @@ class PowerManager:
                 if not bool(desired_enabled):
                     time.sleep(poll_interval_s)
                     continue
-
-                # Explicit brightness overrides (AC and/or battery).
-                desired_brightness: Optional[int] = None
-                if bool(on_ac):
-                    if ac_brightness_override is not None:
-                        try:
-                            desired_brightness = max(0, min(50, int(ac_brightness_override)))
-                        except Exception:
-                            desired_brightness = None
-                else:
-                    if batt_brightness_override is not None:
-                        try:
-                            desired_brightness = max(0, min(50, int(batt_brightness_override)))
-                        except Exception:
-                            desired_brightness = None
 
                 if desired_brightness is not None:
                     # Apply only when it actually changes.

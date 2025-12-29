@@ -35,7 +35,7 @@ def launch_power_gui() -> None:
     # Settings runs in a separate process; tell it the tray PID so it can
     # avoid flagging the tray as an "other" USB holder.
     env["KEYRGB_TRAY_PID"] = str(os.getpid())
-    subprocess.Popen([sys.executable, "-m", "src.gui.power"], cwd=parent_path, env=env)
+    subprocess.Popen([sys.executable, "-m", "src.gui.settings"], cwd=parent_path, env=env)
 
 
 def launch_tcc_profiles_gui() -> None:
