@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import logging
 from typing import Dict, Tuple
+
+from src.core.logging_utils import log_throttled
+
+
+logger = logging.getLogger(__name__)
 
 
 def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, int]]:
@@ -11,7 +17,15 @@ def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, i
 
         cfg = Config()
         return dict(getattr(cfg, "per_key_colors", {}) or {})
-    except Exception:
+    except Exception as exc:
+        log_throttled(
+            logger,
+            "legacy.perkey_animation.load_config",
+            interval_s=120,
+            level=logging.DEBUG,
+            msg="Failed to load per-key colors from config",
+            exc=exc,
+        )
         return {}
 
 
@@ -33,7 +47,7 @@ def build_full_color_grid(
         try:
             rr, gg, bb = rgb
             full[(int(row), int(col))] = (int(rr), int(gg), int(bb))
-        except Exception:
+        except (TypeError, ValueError):
             continue
 
     return full

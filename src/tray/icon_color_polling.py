@@ -9,6 +9,7 @@ def start_icon_color_polling(tray) -> None:
 
     def poll_icon_color():
         last_sig = None
+        last_error_at = 0.0
         while True:
             try:
                 sig = (
@@ -24,8 +25,14 @@ def start_icon_color_polling(tray) -> None:
                 if dynamic or sig != last_sig:
                     tray._update_icon()
                     last_sig = sig
-            except Exception:
-                pass
+            except Exception as exc:
+                now = time.monotonic()
+                if now - last_error_at > 60:
+                    last_error_at = now
+                    try:
+                        tray._log_exception("Icon color polling error: %s", exc)
+                    except (OSError, RuntimeError, ValueError):
+                        return
 
             time.sleep(0.8)
 

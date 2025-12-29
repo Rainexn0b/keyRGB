@@ -1,29 +1,22 @@
-s//Single Line Commit Precedure:
+Single-line release procedure:
 
-git add .
-git commit -m "comment"
-# Update `pyproject.toml` version or use `bump2version/poetry` then:
-git tag -a vX.Y.Z -m "release vX.Y.Z"
-git push --follow-tags
-python -m pip install --user --upgrade build
-python -m build
+1) Run tests
+	pytest -q
 
-//Detailed Commit Procedure:
+2) Bump versions
+	- pyproject.toml: [project].version
+	- packaging/rpm/keyrgb.spec: Version + %changelog (if you ship RPM)
+	- packaging/rpm/README.md: VERSION example (optional)
 
-git add -p
-# Commit with prepared release notes (use -F to supply the prepared changelog file)
-git commit -F docs/architecture/00-commit.md
-git tag -a vX.Y.Z -m "release v0.0.1"
-git push --follow-tags
-# Build source+wheel artifacts
-python -m pip install --user --upgrade build
-python -m build
+3) Commit + tag
+	git add -A
+	git commit -m "Release vX.Y.Z"
+	git tag -a vX.Y.Z -m "release vX.Y.Z"
 
-/file commit procedure (commit.md)
+4) Build artifacts (sdist + wheel)
+	python3 -m pip install --user --upgrade build
+	python3 -m build
 
-git add .
-git commit -F docs/architecture/00-commit.md
-git tag -a vX.Y.Z -m "release vX.Y.Z"
-git push --follow-tags
-python -m pip install --user --upgrade build
-python -m build
+5) Push (when ready)
+	git push
+	git push --tags

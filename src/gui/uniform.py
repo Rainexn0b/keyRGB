@@ -5,6 +5,7 @@ Uniform Color GUI - Simple color wheel for selecting a single keyboard color.
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 import time
@@ -13,25 +14,21 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
 
+from src.core.backends.registry import select_backend
+from src.core.imports import ensure_repo_root_on_sys_path
+
+
+logger = logging.getLogger(__name__)
+
 try:
     from .widgets.color_wheel import ColorWheel
     from src.legacy.config import Config
-except Exception:
+except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/uniform.py`).
+    ensure_repo_root_on_sys_path(Path(__file__))
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     from src.gui.widgets.color_wheel import ColorWheel
     from src.legacy.config import Config
-
-try:
-    from ite8291r3_ctl.ite8291r3 import get
-except Exception:
-    # Repo fallback if dependency wasn't installed.
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    vendored = repo_root / "ite8291r3-ctl"
-    if vendored.exists():
-        sys.path.insert(0, str(vendored))
-    from ite8291r3_ctl.ite8291r3 import get
-
 
 class UniformColorGUI:
     """Simple GUI for selecting a uniform keyboard color."""
@@ -63,7 +60,8 @@ class UniformColorGUI:
         # Try to acquire device for standalone mode; if tray app owns it, we'll defer.
         self.kb = None
         try:
-            self.kb = get()
+            backend = select_backend()
+            self.kb = backend.get_device() if backend is not None else None
         except Exception:
             # Likely "resource busy" because the tray app already owns the USB device.
             self.kb = None
@@ -164,10 +162,16 @@ class UniformColorGUI:
             if getattr(e, "errno", None) == 16:
                 self.kb = None
                 return "deferred"
-            print(f"Error setting color: {e}")
+            if os.environ.get("KEYRGB_DEBUG"):
+                logger.exception("Error setting color")
+            else:
+                logger.error("Error setting color: %s", e)
             return False
         except Exception as e:
-            print(f"Error setting color: {e}")
+            if os.environ.get("KEYRGB_DEBUG"):
+                logger.exception("Error setting color")
+            else:
+                logger.error("Error setting color: %s", e)
             return False
     
     def _on_color_release(self, r, g, b):
@@ -239,6 +243,8 @@ class UniformColorGUI:
 
 
 def main():
+    level = logging.DEBUG if os.environ.get("KEYRGB_DEBUG") else logging.INFO
+    logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
     app = UniformColorGUI()
     app.run()
 

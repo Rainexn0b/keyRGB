@@ -30,12 +30,19 @@ class Config:
         'brightness': 25,  # 0-50 hardware scale
         'color': [255, 0, 0],  # RGB for static/custom effects
         'autostart': True,
+        # OS session autostart (XDG ~/.config/autostart). When enabled, KeyRGB tray
+        # should be started automatically on login.
+        'os_autostart': False,
         # Power management (lid/suspend)
         'power_management_enabled': True,
         'power_off_on_suspend': True,
         'power_off_on_lid_close': True,
         'power_restore_on_resume': True,
         'power_restore_on_lid_open': True,
+        # Battery saver (dim on AC unplug)
+        'battery_saver_enabled': False,
+        # Uses the same brightness scale as `brightness`.
+        'battery_saver_brightness': 25,
         # Per-key colors stored as {"row,col": [r,g,b]}
         'per_key_colors': {}
     }
@@ -150,6 +157,15 @@ class Config:
     @autostart.setter
     def autostart(self, value: bool):
         self._settings['autostart'] = value
+        self._save()
+
+    @property
+    def os_autostart(self) -> bool:
+        return bool(self._settings.get('os_autostart', False))
+
+    @os_autostart.setter
+    def os_autostart(self, value: bool):
+        self._settings['os_autostart'] = bool(value)
         self._save()
 
     @property

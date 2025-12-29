@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keyrgb"
-version = "1.1.4"
+version = "0.1.5"
 description = "Minimal RGB keyboard controller for ITE 8291 keyboards"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -55,6 +55,7 @@ keyrgb = "src.gui.tray:main"
 keyrgb-perkey = "src.gui.perkey:main"
 keyrgb-uniform = "src.gui.uniform:main"
 keyrgb-calibrate = "src.gui.calibrator:main"
+keyrgb-diagnostics = "src.core.diagnostics:main"
 
 [tool.setuptools]
 include-package-data = true

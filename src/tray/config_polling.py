@@ -11,15 +11,25 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
     config_path = Path(tray.config.CONFIG_FILE)
     last_mtime = None
     last_applied = None
+    last_apply_warn_at = 0.0
 
     def apply_from_config():
         nonlocal last_applied
+        nonlocal last_apply_warn_at
 
         perkey_sig = None
         if tray.config.effect == 'perkey':
             try:
                 perkey_sig = tuple(sorted(tray.config.per_key_colors.items()))
-            except Exception:
+            except Exception as exc:
+                # Signature is best-effort; avoid breaking reload on odd types.
+                now = time.monotonic()
+                if now - last_apply_warn_at > 60:
+                    last_apply_warn_at = now
+                    try:
+                        tray._log_exception("Error computing perkey signature: %s", exc)
+                    except (OSError, RuntimeError, ValueError):
+                        pass
                 perkey_sig = None
 
         current = (
@@ -41,8 +51,14 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
         if tray.config.brightness == 0:
             try:
                 tray.engine.turn_off()
-            except Exception:
-                pass
+            except Exception as exc:
+                now = time.monotonic()
+                if now - last_apply_warn_at > 60:
+                    last_apply_warn_at = now
+                    try:
+                        tray._log_exception("Failed to turn off engine: %s", exc)
+                    except (OSError, RuntimeError, ValueError):
+                        pass
             tray.is_off = True
             last_applied = current
             tray._update_icon()
@@ -64,7 +80,11 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                             color_map.setdefault((r, c), base)
 
                 with tray.engine.kb_lock:
-                    tray.engine.kb.set_key_colors(color_map, brightness=tray.config.brightness, enable_user_mode=True)
+                    tray.engine.kb.set_key_colors(
+                        color_map,
+                        brightness=tray.config.brightness,
+                        enable_user_mode=True,
+                    )
 
             elif tray.config.effect == 'none':
                 tray.engine.stop()
@@ -75,6 +95,20 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                 tray._start_current_effect()
 
         except Exception as e:
+            # Device disconnects can happen at any time. Mark unavailable to avoid
+            # spamming errors until a reconnect succeeds.
+            errno = getattr(e, "errno", None)
+            if errno == 19 or "No such device" in str(e):
+                try:
+                    tray.engine.mark_device_unavailable()
+                except Exception as exc:
+                    now = time.monotonic()
+                    if now - last_apply_warn_at > 60:
+                        last_apply_warn_at = now
+                        try:
+                            tray._log_exception("Failed to mark device unavailable: %s", exc)
+                        except (OSError, RuntimeError, ValueError):
+                            pass
             tray._log_exception("Error applying config change: %s", e)
 
         last_applied = current
@@ -84,6 +118,8 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
     def poll_config():
         nonlocal last_mtime
 
+        last_startup_error_at = 0.0
+
         try:
             last_mtime = config_path.stat().st_mtime
         except FileNotFoundError:
@@ -92,8 +128,15 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
         try:
             tray.config.reload()
             apply_from_config()
-        except Exception:
-            pass
+        except Exception as exc:
+            # Don't crash the polling thread; but also don't silently eat errors.
+            now = time.monotonic()
+            if now - last_startup_error_at > 30:
+                last_startup_error_at = now
+                try:
+                    tray._log_exception("Error loading config on startup: %s", exc)
+                except (OSError, RuntimeError, ValueError):
+                    pass
 
         while True:
             try:

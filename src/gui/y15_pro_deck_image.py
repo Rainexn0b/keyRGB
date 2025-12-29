@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -7,6 +8,10 @@ from typing import Optional
 from PIL import Image
 
 from src.core import profiles
+from src.core.logging_utils import log_throttled
+
+
+logger = logging.getLogger(__name__)
 
 
 def load_y15_pro_deck_image(*, profile_name: str | None) -> Optional[Image.Image]:
@@ -27,8 +32,15 @@ def load_y15_pro_deck_image(*, profile_name: str | None) -> Optional[Image.Image
         if prof:
             p = profiles.paths_for(prof).backdrop_image
             candidates.append(str(p))
-    except Exception:
-        pass
+    except Exception as exc:
+        log_throttled(
+            logger,
+            "gui.y15_pro_deck_image.profile_backdrop",
+            interval_s=120,
+            level=logging.DEBUG,
+            msg="Failed to resolve per-profile backdrop image",
+            exc=exc,
+        )
 
     repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
     candidates.append(os.path.join(repo_root, "assets", "y15-pro-deck.png"))
@@ -39,7 +51,15 @@ def load_y15_pro_deck_image(*, profile_name: str | None) -> Optional[Image.Image
         try:
             if os.path.exists(path):
                 return Image.open(path)
-        except Exception:
+        except OSError as exc:
+            log_throttled(
+                logger,
+                "gui.y15_pro_deck_image.open_failed",
+                interval_s=120,
+                level=logging.DEBUG,
+                msg=f"Failed to open deck image: {path}",
+                exc=exc,
+            )
             continue
 
     return None

@@ -18,7 +18,7 @@ sudo dnf install -y rpmdevtools rpmlint python3-devel python3-setuptools python3
 From the repo root, create the source tarball (matches `Source0:` in the spec):
 
 ```bash
-VERSION=1.0.0
+VERSION=0.1.5
 git archive --format=tar.gz --prefix=keyrgb-$VERSION/ -o keyrgb-$VERSION.tar.gz HEAD
 ```
 
@@ -30,6 +30,13 @@ rpmdev-setuptree
 
 # Copy Source0 into rpmbuild SOURCES
 cp -f keyrgb-$VERSION.tar.gz ~/rpmbuild/SOURCES/
+
+# Copy Patch1 into rpmbuild SOURCES
+cp -f packaging/rpm/ite8291r3-ctl-wootbook-support.patch ~/rpmbuild/SOURCES/
+
+# Fetch Source1 (upstream ite8291r3-ctl tarball) into rpmbuild SOURCES
+# (required because rpmbuild does not automatically download remote sources)
+spectool -g -R packaging/rpm/keyrgb.spec -C ~/rpmbuild/SOURCES/
 
 # Copy the spec into rpmbuild SPECS
 cp -f packaging/rpm/keyrgb.spec ~/rpmbuild/SPECS/
@@ -60,5 +67,5 @@ sudo dnf install -y keyrgb
 ```
 
 Notes:
-- Fedora has guidelines around bundling vendored code. This spec installs the vendored `ite8291r3-ctl` module from this repo.
+- Fedora has guidelines around bundling. This spec bundles upstream `ite8291r3-ctl` as `Source1` and applies a tiny patch for Wootbook (`0x600B`).
 - For official Fedora packaging you would typically package `ite8291r3-ctl` separately.

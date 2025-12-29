@@ -10,26 +10,34 @@ temporary activation (matching the TCC tray behavior).
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
+import json
 
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
+
+from src.core.logging_utils import log_throttled
 
 try:
     from src.core import tcc_power_profiles
-except Exception:
+except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/tcc_profiles.py`).
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     from src.core import tcc_power_profiles
+
+
+logger = logging.getLogger(__name__)
 
 
 class TccProfilesGUI:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Power Profiles")
-        self.root.geometry("520x360")
-        self.root.resizable(False, False)
+        self.root.geometry("760x560")
+        self.root.minsize(720, 520)
+        self.root.resizable(True, True)
 
         style = ttk.Style()
         style.theme_use("clam")
@@ -64,7 +72,7 @@ class TccProfilesGUI:
 
         self.listbox = tk.Listbox(
             list_frame,
-            height=10,
+            height=9,
             activestyle="dotbox",
             exportselection=False,
         )
@@ -78,17 +86,35 @@ class TccProfilesGUI:
         self.profile_desc = ttk.Label(main, text="", font=("Sans", 9))
         self.profile_desc.pack(anchor="w", pady=(10, 0))
 
-        btn_row = ttk.Frame(main)
-        btn_row.pack(fill="x", pady=(16, 0))
+        btn_row_top = ttk.Frame(main)
+        btn_row_top.pack(fill="x", pady=(16, 0))
 
-        self.btn_activate = ttk.Button(btn_row, text="Activate Temporarily", command=self._on_activate)
+        self.btn_activate = ttk.Button(btn_row_top, text="Activate Temporarily", command=self._on_activate)
         self.btn_activate.pack(side="left")
 
-        self.btn_refresh = ttk.Button(btn_row, text="Refresh", command=self._refresh)
+        self.btn_refresh = ttk.Button(btn_row_top, text="Refresh", command=self._refresh)
         self.btn_refresh.pack(side="left", padx=(8, 0))
 
-        self.btn_close = ttk.Button(btn_row, text="Close", command=self.root.destroy)
+        self.btn_close = ttk.Button(btn_row_top, text="Close", command=self.root.destroy)
         self.btn_close.pack(side="right")
+
+        btn_row_bottom = ttk.Frame(main)
+        btn_row_bottom.pack(fill="x", pady=(8, 0))
+
+        self.btn_new = ttk.Button(btn_row_bottom, text="New…", command=self._on_new)
+        self.btn_new.pack(side="left")
+
+        self.btn_duplicate = ttk.Button(btn_row_bottom, text="Duplicate…", command=self._on_duplicate)
+        self.btn_duplicate.pack(side="left", padx=(8, 0))
+
+        self.btn_rename = ttk.Button(btn_row_bottom, text="Rename…", command=self._on_rename)
+        self.btn_rename.pack(side="left", padx=(8, 0))
+
+        self.btn_edit = ttk.Button(btn_row_bottom, text="Edit…", command=self._on_edit)
+        self.btn_edit.pack(side="left", padx=(8, 0))
+
+        self.btn_delete = ttk.Button(btn_row_bottom, text="Delete", command=self._on_delete)
+        self.btn_delete.pack(side="left", padx=(8, 0))
 
         self.status = ttk.Label(main, text="", font=("Sans", 9))
         self.status.pack(anchor="w", pady=(8, 0))
@@ -143,6 +169,27 @@ class TccProfilesGUI:
             self.profile_desc.configure(text="No profiles returned by tccd.")
             self.btn_activate.configure(state="disabled")
 
+        self._update_crud_buttons()
+
+    def _update_crud_buttons(self) -> None:
+        idx = self._selected_index()
+        if idx is None or idx < 0 or idx >= len(self._profiles):
+            for b in (self.btn_duplicate, self.btn_rename, self.btn_edit, self.btn_delete):
+                b.configure(state="disabled")
+            return
+
+        pid = self._profiles[idx].id
+        is_legacy = pid.startswith("__legacy_")
+        is_default_custom = pid == "__default_custom_profile__"
+
+        can_edit = (not is_legacy) and tcc_power_profiles.is_custom_profile_id(pid)
+        can_delete = (not is_legacy) and (not is_default_custom) and (not pid.startswith("__"))
+
+        self.btn_duplicate.configure(state="normal" if can_edit else "disabled")
+        self.btn_rename.configure(state="normal" if can_edit else "disabled")
+        self.btn_edit.configure(state="normal" if can_edit else "disabled")
+        self.btn_delete.configure(state="normal" if can_delete else "disabled")
+
     def _selected_index(self) -> int | None:
         sel = self.listbox.curselection()
         if not sel:
@@ -169,6 +216,155 @@ class TccProfilesGUI:
             self.profile_desc.configure(text="")
             return
         self._update_desc(idx)
+        self._update_crud_buttons()
+
+    def _on_new(self) -> None:
+        name = simpledialog.askstring("New Profile", "Profile name:", parent=self.root)
+        if name is None:
+            return
+        name = name.strip()
+        if not name:
+            return
+        try:
+            tcc_power_profiles.create_custom_profile(name)
+            self._set_status("✓ Created")
+        except Exception as exc:
+            messagebox.showerror("Create failed", str(exc))
+            return
+        self._refresh()
+
+    def _on_duplicate(self) -> None:
+        idx = self._selected_index()
+        if idx is None or idx < 0 or idx >= len(self._profiles):
+            return
+        src = self._profiles[idx]
+        if src.id.startswith("__legacy_"):
+            return
+        name = simpledialog.askstring("Duplicate Profile", "New profile name:", parent=self.root)
+        if name is None:
+            return
+        name = name.strip()
+        if not name:
+            return
+        try:
+            tcc_power_profiles.duplicate_custom_profile(src.id, name)
+            self._set_status("✓ Duplicated")
+        except Exception as exc:
+            messagebox.showerror("Duplicate failed", str(exc))
+            return
+        self._refresh()
+
+    def _on_rename(self) -> None:
+        idx = self._selected_index()
+        if idx is None or idx < 0 or idx >= len(self._profiles):
+            return
+        prof = self._profiles[idx]
+        if prof.id.startswith("__legacy_"):
+            return
+        name = simpledialog.askstring("Rename Profile", "New name:", initialvalue=prof.name, parent=self.root)
+        if name is None:
+            return
+        name = name.strip()
+        if not name:
+            return
+        try:
+            tcc_power_profiles.rename_custom_profile(prof.id, name)
+            self._set_status("✓ Renamed")
+        except Exception as exc:
+            messagebox.showerror("Rename failed", str(exc))
+            return
+        self._refresh()
+
+    def _on_delete(self) -> None:
+        idx = self._selected_index()
+        if idx is None or idx < 0 or idx >= len(self._profiles):
+            return
+        prof = self._profiles[idx]
+        if prof.id.startswith("__"):
+            return
+        if not messagebox.askyesno("Delete Profile", f"Delete '{prof.name}'?", parent=self.root):
+            return
+        try:
+            tcc_power_profiles.delete_custom_profile(prof.id)
+            self._set_status("✓ Deleted")
+        except Exception as exc:
+            messagebox.showerror("Delete failed", str(exc))
+            return
+        self._refresh()
+
+    def _on_edit(self) -> None:
+        idx = self._selected_index()
+        if idx is None or idx < 0 or idx >= len(self._profiles):
+            return
+        prof = self._profiles[idx]
+        if prof.id.startswith("__legacy_"):
+            return
+
+        payload = None
+        try:
+            payload = tcc_power_profiles.get_custom_profile_payload(prof.id)
+        except Exception:
+            payload = None
+
+        if not isinstance(payload, dict):
+            messagebox.showerror("Edit failed", "Could not load editable profile payload from tccd.")
+            return
+
+        win = tk.Toplevel(self.root)
+        win.title(f"Edit Profile - {prof.name}")
+        win.geometry("720x520")
+        win.minsize(640, 420)
+
+        frame = ttk.Frame(win, padding=12)
+        frame.pack(fill="both", expand=True)
+
+        info = ttk.Label(
+            frame,
+            text=(
+                "Edit the profile JSON. Saving will update tccd's on-disk profiles and may prompt for admin permissions.\n"
+                "Tip: keep the 'id' field unchanged."
+            ),
+            font=("Sans", 9),
+        )
+        info.pack(anchor="w", pady=(0, 8))
+
+        text = tk.Text(frame, wrap="none", height=18)
+        text.pack(fill="both", expand=True)
+
+        yscroll = ttk.Scrollbar(frame, orient="vertical", command=text.yview)
+        yscroll.place(in_=text, relx=1.0, rely=0, relheight=1.0, anchor="ne")
+        text.configure(yscrollcommand=yscroll.set)
+
+        xscroll = ttk.Scrollbar(frame, orient="horizontal", command=text.xview)
+        xscroll.pack(fill="x")
+        text.configure(xscrollcommand=xscroll.set)
+
+        text.insert("1.0", json.dumps(payload, indent=2, ensure_ascii=False) + "\n")
+
+        btns = ttk.Frame(frame)
+        btns.pack(fill="x", pady=(10, 0))
+
+        def _save() -> None:
+            raw = text.get("1.0", "end").strip()
+            try:
+                obj = json.loads(raw)
+            except Exception as exc:
+                messagebox.showerror("Invalid JSON", str(exc), parent=win)
+                return
+            if not isinstance(obj, dict):
+                messagebox.showerror("Invalid JSON", "Top-level JSON must be an object", parent=win)
+                return
+            try:
+                tcc_power_profiles.update_custom_profile(prof.id, obj)
+            except Exception as exc:
+                messagebox.showerror("Save failed", str(exc), parent=win)
+                return
+            win.destroy()
+            self._set_status("✓ Saved")
+            self._refresh()
+
+        ttk.Button(btns, text="Save", command=_save).pack(side="right")
+        ttk.Button(btns, text="Cancel", command=win.destroy).pack(side="right", padx=(0, 8))
 
     def _on_activate(self) -> None:
         idx = self._selected_index()
@@ -192,8 +388,15 @@ class TccProfilesGUI:
         # Refresh so the active checkmark follows what tccd reports.
         try:
             self._refresh()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "tcc_profiles.refresh_after_activate",
+                interval_s=60,
+                level=logging.DEBUG,
+                msg="Failed to refresh profiles after activation",
+                exc=exc,
+            )
 
     def run(self) -> None:
         self.root.mainloop()

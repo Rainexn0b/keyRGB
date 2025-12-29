@@ -1,0 +1,73 @@
+name: Bug report (supported hardware)
+description: Report a problem when your keyboard is already at least partially supported.
+title: "Bug: <short summary>"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please include enough info to reproduce. If this is a *new laptop model*, use **Hardware support / diagnostics** instead.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: What did you do, and what did you expect to happen?
+      placeholder: |
+        Steps:
+        1.
+        2.
+
+        Expected:
+        Actual:
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: KeyRGB version / install method
+      description: e.g. git commit, tag, RPM version, or `pip show keyrgb`.
+      placeholder: "e.g. v0.x.y, commit abc1234, RPM keyrgb-0.x.y-1"
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS + desktop + kernel.
+      placeholder: |
+        - Distro:
+        - Desktop session:
+        - Kernel:
+    validations:
+      required: false
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (recommended)
+      description: Paste `keyrgb-diagnostics` output. If you prefer, you may redact DMI strings.
+      render: json
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Paste `KEYRGB_DEBUG=1 keyrgb` output around the failure.
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Quick checks
+      options:
+        - label: I stopped other RGB tools (OpenRGB, Tuxedo tools) before reproducing.
+          required: false
+        - label: I confirm this report contains no secrets.
+          required: true

@@ -15,6 +15,8 @@ import os
 import sys
 
 from src.core import tcc_power_profiles
+from src.core.backends.registry import select_backend
+from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
 
 from .dependencies import load_tray_dependencies
 from .effect_selection import apply_effect_selection
@@ -41,6 +43,13 @@ class KeyRGBTray:
         self.is_off = False
         self._power_forced_off = False
         self._last_brightness = 25
+
+        # Backend selection is used for capability-driven UI gating.
+        self.backend = select_backend()
+        try:
+            self.backend_caps = self.backend.capabilities() if self.backend is not None else None
+        except Exception:
+            self.backend_caps = None
 
         self._ite_rows, self._ite_cols = load_ite_dimensions()
 
@@ -221,6 +230,36 @@ class KeyRGBTray:
         if not self.is_off:
             self._start_current_effect()
 
+    def apply_brightness_from_power_policy(self, brightness: int) -> None:
+        """Best-effort brightness apply used by PowerManager battery-saver.
+
+        This must never crash the tray.
+        """
+
+        try:
+            brightness = int(brightness)
+        except Exception:
+            return
+
+        if brightness < 0:
+            return
+
+        # If the user explicitly turned the keyboard off, don't fight it.
+        if self.is_off:
+            return
+
+        try:
+            if brightness > 0:
+                self._last_brightness = brightness
+            self.config.brightness = brightness
+            self.engine.set_brightness(self.config.brightness)
+            self._start_current_effect()
+            self._update_menu()
+            self._update_icon()
+        except Exception:
+            # Best-effort only.
+            return
+
     # ---- run
 
     def run(self):
@@ -245,6 +284,14 @@ def main():
         if not logging.getLogger().handlers:
             level = logging.DEBUG if os.environ.get('KEYRGB_DEBUG') else logging.INFO
             logging.basicConfig(level=level, format='%(levelname)s %(name)s: %(message)s')
+
+        if os.environ.get("KEYRGB_DEBUG"):
+            try:
+                diag = collect_diagnostics(include_usb=True)
+                logger.debug("Startup diagnostics (Tongfang):\n%s", format_diagnostics_text(diag))
+            except Exception:
+                # Best-effort; never fail startup because of diagnostics.
+                pass
 
         if not runtime.acquire_single_instance_lock():
             logger.error("KeyRGB is already running (lock held). Not starting a second instance.")

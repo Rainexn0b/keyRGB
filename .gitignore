@@ -59,4 +59,4 @@ scripts/build/
 *.old
 
 # Upstream reference clones (not shipped)
-vendor/tuxedo-control-center/
+vendor/

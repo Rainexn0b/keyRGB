@@ -1,48 +1,44 @@
 from __future__ import annotations
 
-import os
-import sys
-from pathlib import Path
+"""Legacy compatibility wrapper for the ITE backend.
+
+This module exists to preserve the historical import surface used by
+`src/legacy/effects.py` while the codebase migrates to the new backend
+registry/selection architecture.
+
+Exports kept stable:
+- `get()`
+- `NUM_ROWS`, `NUM_COLS`
+- `hw_effects`, `hw_colors`
+"""
+
+from src.core.backends.registry import select_backend
 
 
-def _prefer_vendored_ite() -> None:
-    """Prefer the vendored ite8291r3-ctl checkout when present.
-
-    This repo carries local modifications/pending PRs. Allow opting into the
-    installed dependency with `KEYRGB_USE_INSTALLED_ITE=1`.
-
-    If an installed `ite8291r3_ctl` was already imported earlier in the same
-    interpreter session, force a re-import from the vendored path.
-    """
-
-    if os.environ.get("KEYRGB_USE_INSTALLED_ITE") == "1":
-        return
-
-    repo_root = Path(__file__).resolve().parent.parent.parent
-    candidates = [
-        repo_root / "ite8291r3-ctl",
-        repo_root / "vendor" / "ite8291r3-ctl",
-    ]
-    vendored = next((p for p in candidates if p.exists()), None)
-    if vendored is None:
-        return
-
-    sys.path.insert(0, str(vendored))
-
-    existing = sys.modules.get("ite8291r3_ctl")
-    try:
-        existing_file = Path(getattr(existing, "__file__", "")).resolve()
-    except Exception:
-        existing_file = None
-
-    if existing_file and vendored not in existing_file.parents:
-        for name in list(sys.modules.keys()):
-            if name == "ite8291r3_ctl" or name.startswith("ite8291r3_ctl."):
-                sys.modules.pop(name, None)
+def _select_backend():
+    # Note: selection is intentionally import-based for now (no hardware probe).
+    return select_backend()
 
 
-_prefer_vendored_ite()
+_backend = _select_backend()
 
-from ite8291r3_ctl.ite8291r3 import NUM_COLS, NUM_ROWS, colors as hw_colors, effects as hw_effects, get
+
+def get():
+    if _backend is None:
+        raise FileNotFoundError("No keyboard backend available")
+    return _backend.get_device()
+
+
+try:
+    if _backend is None:
+        raise RuntimeError("No backend")
+    NUM_ROWS, NUM_COLS = _backend.dimensions()
+    hw_effects = _backend.effects()
+    hw_colors = _backend.colors()
+except Exception:
+    # Keep legacy defaults so imports don't crash when no dependency/hardware.
+    NUM_ROWS, NUM_COLS = 6, 21
+    hw_effects = {}
+    hw_colors = {}
 
 __all__ = ["get", "hw_effects", "hw_colors", "NUM_ROWS", "NUM_COLS"]

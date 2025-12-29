@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 import os
 import tkinter as tk
 from PIL import Image, ImageTk
 from typing import TYPE_CHECKING, Optional
+
+from src.core.logging_utils import log_throttled
 
 from src.core.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
 from src.gui.y15_pro_deck_image import load_y15_pro_deck_image
@@ -19,6 +22,9 @@ from .overlay_drag import OverlayDragController
 
 if TYPE_CHECKING:
     from .editor import PerKeyEditor
+
+
+logger = logging.getLogger(__name__)
 
 class KeyboardCanvas(tk.Canvas):
     def __init__(self, parent, editor: PerKeyEditor, **kwargs):
@@ -133,8 +139,15 @@ class KeyboardCanvas(tk.Canvas):
         if self._resize_job is not None:
             try:
                 self.after_cancel(self._resize_job)
-            except Exception:
-                pass
+            except Exception as exc:
+                log_throttled(
+                    logger,
+                    "perkey.canvas.after_cancel",
+                    interval_s=60,
+                    level=logging.DEBUG,
+                    msg="after_cancel failed",
+                    exc=exc,
+                )
         self._resize_job = self.after(40, self._redraw_callback)
 
     def _redraw_callback(self):
@@ -196,13 +209,26 @@ class KeyboardCanvas(tk.Canvas):
             else:
                 self.configure(cursor="")
         except Exception:
-            pass
+            log_throttled(
+                logger,
+                "perkey.canvas.on_motion",
+                interval_s=60,
+                level=logging.DEBUG,
+                msg="Error in perkey hover handling",
+            )
 
     def _on_leave(self, _event):
         try:
             self.configure(cursor="")
-        except Exception:
-            pass
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "perkey.canvas.on_leave",
+                interval_s=60,
+                level=logging.DEBUG,
+                msg="Error resetting cursor",
+                exc=exc,
+            )
 
     def _resize_edges_for_point(self, key_id: str, cx: float, cy: float) -> str:
         """Return which edges should resize based on pointer proximity.
@@ -301,8 +327,15 @@ class KeyboardCanvas(tk.Canvas):
                     if t.startswith("pkey_"):
                         self.editor.select_key_id(t.removeprefix("pkey_"))
                         return
-        except Exception:
-            pass
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "perkey.canvas.on_click",
+                interval_s=60,
+                level=logging.DEBUG,
+                msg="Error handling click",
+                exc=exc,
+            )
 
         kid = self._hit_test_key_id(float(event.x), float(event.y))
         if kid is not None:

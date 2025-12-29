@@ -66,8 +66,8 @@ def save_config_settings_atomic(*, config_dir: Path, config_file: Path, settings
             try:
                 if os.path.exists(tmp_path):
                     os.unlink(tmp_path)
-            except Exception:
-                pass
+            except OSError as exc:
+                logger.debug("Failed to remove temp config file %s: %s", tmp_path, exc)
 
     except Exception as e:
         logger.warning("Failed to save config: %s", e)

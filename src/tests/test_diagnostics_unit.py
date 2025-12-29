@@ -1,0 +1,45 @@
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
+from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
+
+
+def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    # Fake DMI
+    dmi_root = tmp_path / "sys" / "class" / "dmi" / "id"
+    dmi_root.mkdir(parents=True)
+    (dmi_root / "sys_vendor").write_text("TONGFANG\n", encoding="utf-8")
+    (dmi_root / "product_name").write_text("GM5\n", encoding="utf-8")
+
+    # Fake LEDs
+    leds_root = tmp_path / "sys" / "class" / "leds"
+    (leds_root / "tongfang::kbd_backlight").mkdir(parents=True)
+    (leds_root / "tongfang::kbd_backlight" / "brightness").write_text("1\n", encoding="utf-8")
+    (leds_root / "tongfang::kbd_backlight" / "max_brightness").write_text("10\n", encoding="utf-8")
+
+    monkeypatch.setenv("KEYRGB_SYSFS_DMI_ROOT", str(dmi_root))
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(leds_root))
+
+    diag = collect_diagnostics()
+    assert diag.dmi.get("sys_vendor") == "TONGFANG"
+    assert diag.dmi.get("product_name") == "GM5"
+    assert any(e.get("name") == "tongfang::kbd_backlight" for e in diag.leds)
+
+    text = format_diagnostics_text(diag)
+    assert "DMI:" in text
+    assert "Sysfs LEDs:" in text
+
+
+def test_format_empty_diagnostics() -> None:
+    # If sysfs doesn't exist, collector may return empties. Formatter should be stable.
+    diag = collect_diagnostics()
+    assert isinstance(format_diagnostics_text(diag), str)

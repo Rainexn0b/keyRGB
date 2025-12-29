@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import logging
 import json
 import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.core.logging_utils import log_throttled
 from src.legacy.config import Config
 
 
 DEFAULT_PROFILE_NAME = "default"
+
+
+logger = logging.getLogger(__name__)
 
 
 def safe_profile_name(name: str) -> str:
@@ -36,8 +41,16 @@ def get_active_profile() -> str:
             raw = json.loads(p.read_text(encoding="utf-8"))
             if isinstance(raw, dict) and isinstance(raw.get("name"), str):
                 return safe_profile_name(raw["name"])
-        except Exception:
-            pass
+        except Exception as exc:
+            # Best-effort: fall back to default and log only occasionally.
+            log_throttled(
+                logger,
+                "profile_paths.get_active_profile",
+                interval_s=60,
+                level=logging.DEBUG,
+                msg="Failed to read active profile; using default",
+                exc=exc,
+            )
     return DEFAULT_PROFILE_NAME
 
 

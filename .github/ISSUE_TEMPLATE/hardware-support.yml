@@ -1,0 +1,63 @@
+name: Hardware support / diagnostics
+description: Report a new laptop/keyboard so KeyRGB can add support or quirks.
+title: "Hardware support: <brand/model> (<USB ID if known>)"
+labels: ["hardware", "support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve KeyRGB hardware support.
+
+        Please paste the outputs below. These are *read-only* commands.
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What works / what doesn't
+      description: Tell us what you tried (tray, uniform UI, per-key UI) and what happened.
+      placeholder: |
+        - Distro/DE:
+        - Tray starts:
+        - Uniform color works:
+        - Brightness works:
+        - Per-key works:
+        - Any flicker / fighting with other tools:
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: keyrgb-diagnostics output (JSON)
+      description: Run `keyrgb-diagnostics` and paste the full JSON.
+      render: json
+      placeholder: "{ ... }"
+    validations:
+      required: true
+
+  - type: textarea
+    id: debug_logs
+    attributes:
+      label: Debug logs
+      description: Run `KEYRGB_DEBUG=1 keyrgb` and paste relevant output (especially any errors).
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: lsusb
+    attributes:
+      label: USB IDs (optional)
+      description: Paste `lsusb | grep -i 048d` (or full `lsusb` if nothing matches).
+      render: text
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy
+      description: Diagnostics do not include usernames or home paths. If you prefer, you may redact DMI strings, but please keep the structure.
+      options:
+        - label: I confirm this report contains no secrets.
+          required: true

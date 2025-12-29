@@ -26,9 +26,16 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-          python -m pip install pytest
+          python -m pip install pytest pytest-cov
+          python -m pip install -e .
 
       - name: Buildpython CI profile
         env:
           KEYRGB_HW_TESTS: "0"
         run: python -m buildpython --profile=ci
+
+      - name: Run unit tests
+        env:
+          KEYRGB_HW_TESTS: "0"
+        run: |
+          pytest -q

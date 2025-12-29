@@ -69,7 +69,7 @@ def _iter_py_files() -> list[Path]:
             files.append(p)
 
     # top-level scripts
-    for p in [root / "keyrgb", root / "keyrgb-tuxedo", root / "keyrgb-tray.py"]:
+    for p in [root / "keyrgb", root / "keyrgb-tuxedo"]:
         if p.exists() and p.is_file():
             files.append(p)
 

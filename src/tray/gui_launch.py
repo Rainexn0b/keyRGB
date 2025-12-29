@@ -27,7 +27,7 @@ def launch_uniform_gui() -> None:
 
 
 def launch_power_gui() -> None:
-    """Launch the power management settings GUI as a subprocess."""
+    """Launch the Settings GUI (power rules + autostart) as a subprocess."""
 
     parent_path = _repo_root_dir()
     subprocess.Popen([sys.executable, "-m", "src.gui.power"], cwd=parent_path)

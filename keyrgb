@@ -2,4 +2,5 @@
 # KeyRGB launcher script
 
 cd "$(dirname "$0")"
-exec python3 -m src.gui.tray
+# -B avoids stale __pycache__ bytecode issues when iterating in-place.
+exec python3 -B -m src.gui.tray

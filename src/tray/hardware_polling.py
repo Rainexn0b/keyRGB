@@ -10,6 +10,7 @@ def start_hardware_polling(tray) -> None:
     def poll_hardware():
         last_brightness = None
         last_off_state = None
+        last_error_at = 0.0
 
         while True:
             try:
@@ -52,8 +53,23 @@ def start_hardware_polling(tray) -> None:
                 last_brightness = current_brightness
                 last_off_state = current_off
 
-            except Exception:
-                pass
+            except Exception as exc:
+                # Device disconnects can happen at any time.
+                errno = getattr(exc, "errno", None)
+                if errno == 19 or "No such device" in str(exc):
+                    try:
+                        tray.engine.mark_device_unavailable()
+                    except (OSError, RuntimeError, ValueError):
+                        # Best-effort; continue polling.
+                        continue
+
+                now = time.monotonic()
+                if now - last_error_at > 30:
+                    last_error_at = now
+                    try:
+                        tray._log_exception("Hardware polling error: %s", exc)
+                    except (OSError, RuntimeError, ValueError):
+                        continue
 
             time.sleep(2)
 

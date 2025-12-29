@@ -4,6 +4,15 @@
 RGB effects for ITE 8291 keyboards using ite8291r3-ctl library.
 """
 
+from __future__ import annotations
+
+import logging
+import colorsys
+import math
+import time
+from threading import Event, RLock, Thread
+from typing import Dict, Optional, Tuple
+
 from src.legacy.ite_backend import NUM_COLS, NUM_ROWS, get, hw_colors, hw_effects
 from src.legacy.perkey_animation import (
     build_full_color_grid,
@@ -12,11 +21,10 @@ from src.legacy.perkey_animation import (
     scaled_color_map,
 )
 
-import time
-import math
-import colorsys
-from threading import Thread, Event, RLock
-from typing import Optional, Dict, Tuple
+from src.core.logging_utils import log_throttled
+
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -89,13 +97,27 @@ class EffectsEngine:
             self.device_available = True
             return True
         except FileNotFoundError:
-            self.device_available = False
-            self.kb = _NullKeyboard()
+            self.mark_device_unavailable()
             return False
-        except Exception:
-            self.device_available = False
-            self.kb = _NullKeyboard()
+        except Exception as exc:
+            # Avoid log spam, but do surface the root cause in debug logs.
+            log_throttled(
+                logger,
+                "effects.ensure_device_available",
+                interval_s=60,
+                level=logging.DEBUG,
+                msg="Failed to acquire keyboard device; falling back to NullKeyboard",
+                exc=exc,
+            )
+            self.mark_device_unavailable()
             return False
+
+    def mark_device_unavailable(self) -> None:
+        """Force the engine into a safe 'no device' mode."""
+
+        self.device_available = False
+        with self.kb_lock:
+            self.kb = _NullKeyboard()
     
     def stop(self):
         """Stop current effect"""
@@ -197,8 +219,15 @@ class EffectsEngine:
                 args = mapping.get("args")
                 if isinstance(args, dict):
                     return set(args.keys())
-            except Exception:
-                pass
+            except Exception as exc:
+                log_throttled(
+                    logger,
+                    "legacy.effects.allowed_keys",
+                    interval_s=120,
+                    level=logging.DEBUG,
+                    msg="Failed to introspect hardware effect args",
+                    exc=exc,
+                )
             return set()
 
         # The controller's speed scale is inverted compared to the UX:
@@ -223,7 +252,13 @@ class EffectsEngine:
                     self.kb.set_palette_color(palette_slot, tuple(self.current_color))
             except Exception:
                 # If palette programming fails, we'll still request the slot.
-                pass
+                log_throttled(
+                    logger,
+                    "legacy.effects.palette_color",
+                    interval_s=120,
+                    level=logging.DEBUG,
+                    msg="Failed to program palette slot for breathing effect",
+                )
             hw_kwargs["color"] = palette_slot
 
         allowed = _allowed_keys(effect_func)

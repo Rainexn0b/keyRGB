@@ -7,9 +7,13 @@ Handles lid close/open, suspend/resume events to control keyboard backlight
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
 
 from .acpi_monitoring import monitor_acpi_events
 from .lid_monitoring import start_sysfs_lid_monitoring
@@ -32,7 +36,9 @@ class PowerManager:
         self._config = config or Config()
         self.monitoring = False
         self.monitor_thread = None
+        self._battery_thread = None
         self._saved_state = None
+        self._battery_policy = BatterySaverPolicy()
 
     def _is_enabled(self) -> bool:
         try:
@@ -59,13 +65,96 @@ class PowerManager:
         self.monitoring = True
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
         self.monitor_thread.start()
+
+        self._battery_thread = threading.Thread(target=self._battery_saver_loop, daemon=True)
+        self._battery_thread.start()
         
     def stop_monitoring(self):
         """Stop monitoring power events"""
         self.monitoring = False
         if self.monitor_thread:
             self.monitor_thread.join(timeout=2)
-            
+        if self._battery_thread:
+            self._battery_thread.join(timeout=2)
+
+    # ---- battery saver (dim on AC unplug)
+
+    def _battery_saver_loop(self) -> None:
+        """Poll AC online state and apply a simple dim/restore policy.
+
+        Requirements:
+        - no root required
+        - debounce rapid toggling
+        - don't fight manual brightness changes while on battery
+        """
+
+        poll_interval_s = 2.0
+        last_on_ac: Optional[bool] = None
+
+        while self.monitoring:
+            try:
+                on_ac = _read_on_ac_power()
+                if on_ac is None:
+                    time.sleep(poll_interval_s)
+                    continue
+
+                # Update config every tick so toggling works without restart.
+                self._config.reload()
+
+                enabled = bool(getattr(self._config, "battery_saver_enabled", False))
+                target = int(getattr(self._config, "battery_saver_brightness", 25) or 0)
+                self._battery_policy.configure(enabled=enabled, target_brightness=int(target))
+
+                # Determine current brightness and whether user explicitly turned off.
+                try:
+                    current_brightness = int(getattr(self._config, "brightness", 0) or 0)
+                except Exception:
+                    current_brightness = 0
+
+                is_off = bool(getattr(self.kb_controller, "is_off", False))
+
+                action = self._battery_policy.update(
+                    on_ac=bool(on_ac),
+                    current_brightness=current_brightness,
+                    is_off=is_off,
+                    now=time.monotonic(),
+                )
+
+                if action is not None and last_on_ac is not None:
+                    self._apply_brightness_policy(action)
+
+                last_on_ac = bool(on_ac)
+
+            except Exception as exc:
+                logger.exception("Battery saver monitoring error: %s", exc)
+
+            time.sleep(poll_interval_s)
+
+    def _apply_brightness_policy(self, brightness: int) -> None:
+        """Best-effort brightness change driven by power policy."""
+
+        if brightness < 0:
+            return
+
+        try:
+            # Prefer a dedicated hook on the controller if present.
+            apply_fn = getattr(self.kb_controller, "apply_brightness_from_power_policy", None)
+            if callable(apply_fn):
+                apply_fn(int(brightness))
+                return
+
+            # Fallback: try a few known patterns.
+            if hasattr(self.kb_controller, "engine"):
+                try:
+                    self._config.brightness = int(brightness)
+                except Exception:
+                    pass
+                self.kb_controller.engine.set_brightness(int(brightness))
+        except Exception as exc:
+            logger.exception("Battery saver brightness apply failed: %s", exc)
+
+    # ---- lid/suspend monitoring
+
     def _monitor_loop(self):
         """Main monitoring loop - watches for lid and suspend events"""
         # Use dbus-monitor to watch systemd-logind signals
@@ -76,9 +165,9 @@ class PowerManager:
                 '--system',
                 "type='signal',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'",
             ]
-            
+
             logger.info("Power monitoring started using dbus-monitor")
-            
+
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -89,15 +178,15 @@ class PowerManager:
 
             # For type-checkers: stdout is only None if stdout=DEVNULL/None.
             assert process.stdout is not None
-            
+
             # Also monitor lid switch using a separate method
             self._start_lid_monitor()
-            
+
             while self.monitoring:
                 line = process.stdout.readline()
                 if not line:
                     break
-                    
+
                 # Detect prepare for sleep (suspend)
                 if 'PrepareForSleep' in line:
                     # Read the next line to see if it's true (going to sleep) or false (waking up)
@@ -108,13 +197,13 @@ class PowerManager:
                     elif 'boolean false' in next_line:
                         logger.info("Detected: System resuming")
                         self._on_resume()
-                        
+
         except FileNotFoundError:
             logger.warning("dbus-monitor not available, trying alternative method")
             self._monitor_acpi_events()
         except Exception as e:
             logger.exception("Power monitoring error: %s", e)
-            
+
     def _start_lid_monitor(self):
         """Start a separate thread to monitor lid switch via sysfs"""
         start_sysfs_lid_monitoring(
@@ -123,7 +212,7 @@ class PowerManager:
             on_lid_open=self._on_lid_open,
             logger=logger,
         )
-            
+
     def _monitor_acpi_events(self):
         """Fallback method using acpi_listen for lid events"""
         monitor_acpi_events(
@@ -132,7 +221,7 @@ class PowerManager:
             on_lid_open=self._on_lid_open,
             logger=logger,
         )
-            
+
     def _on_suspend(self):
         """Called when system is about to suspend"""
         if not self._is_enabled():
@@ -141,7 +230,7 @@ class PowerManager:
             return
         logger.info("System suspending - turning off keyboard backlight")
         self._save_and_turn_off()
-        
+
     def _on_resume(self):
         """Called when system resumes from suspend"""
         if not self._is_enabled():
@@ -151,7 +240,7 @@ class PowerManager:
         logger.info("System resumed - restoring keyboard backlight")
         time.sleep(0.5)  # Give hardware time to wake up
         self._restore()
-        
+
     def _on_lid_close(self):
         """Called when lid is closed"""
         if not self._is_enabled():
@@ -160,7 +249,7 @@ class PowerManager:
             return
         logger.info("Lid closed - turning off keyboard backlight")
         self._save_and_turn_off()
-        
+
     def _on_lid_open(self):
         """Called when lid is opened"""
         if not self._is_enabled():
@@ -169,7 +258,7 @@ class PowerManager:
             return
         logger.info("Lid opened - restoring keyboard backlight")
         self._restore()
-        
+
     def _save_and_turn_off(self):
         """Save current state and turn off keyboard"""
         try:
@@ -181,7 +270,7 @@ class PowerManager:
                 else:
                     self._saved_state = {'was_off': False}
                 logger.debug("Saved state: %s", self._saved_state)
-                
+
             # Turn off keyboard
             if hasattr(self.kb_controller, 'turn_off'):
                 self.kb_controller.turn_off()
@@ -189,7 +278,7 @@ class PowerManager:
                 self.kb_controller.kb.turn_off()
         except Exception as e:
             logger.exception("Error turning off keyboard: %s", e)
-            
+
     def _restore(self):
         """Restore keyboard to previous state"""
         try:
@@ -205,6 +294,137 @@ class PowerManager:
                 self._saved_state = None
         except Exception as e:
             logger.exception("Error restoring keyboard: %s", e)
+
+
+def _iter_ac_online_files(power_supply_root: Path) -> list[Path]:
+    files: list[Path] = []
+    try:
+        for child in sorted(power_supply_root.iterdir()):
+            if not child.is_dir():
+                continue
+            online = child / "online"
+            if not online.exists():
+                continue
+            # Prefer devices that identify as Mains.
+            typ = None
+            try:
+                typ = (child / "type").read_text(errors="ignore").strip().lower()
+            except Exception:
+                typ = None
+            if typ == "mains":
+                files.append(online)
+
+        if files:
+            return files
+    except Exception:
+        pass
+
+    # Fallback: common names like AC/ACAD/AC0
+    try:
+        for online in sorted(power_supply_root.glob("AC*/online")):
+            files.append(online)
+    except Exception:
+        pass
+
+    return files
+
+
+def _read_on_ac_power() -> Optional[bool]:
+    root = Path(os.environ.get("KEYRGB_SYSFS_POWER_SUPPLY_ROOT", "/sys/class/power_supply"))
+    candidates = _iter_ac_online_files(root)
+    if not candidates:
+        return None
+
+    for online_path in candidates:
+        try:
+            raw = online_path.read_text(errors="ignore").strip()
+            if raw in ("1", "0"):
+                return raw == "1"
+        except Exception:
+            continue
+    return None
+
+
+@dataclass
+class BatterySaverPolicy:
+    """State machine for dim-on-battery and restore-on-AC.
+
+    This is designed to be unit-testable (no threads, no IO).
+    """
+
+    enabled: bool = False
+    target_brightness: int = 25
+    debounce_seconds: float = 3.0
+
+    _last_state: Optional[bool] = None
+    _last_change_ts: float = 0.0
+    _saved_ac_brightness: Optional[int] = None
+    _applied_battery_brightness: Optional[int] = None
+    _manual_override_on_battery: bool = False
+
+    def configure(self, *, enabled: bool, target_brightness: int) -> None:
+        self.enabled = bool(enabled)
+        self.target_brightness = int(target_brightness)
+
+    def update(self, *, on_ac: bool, current_brightness: int, is_off: bool, now: float) -> Optional[int]:
+        """Process current inputs and return a brightness to apply, if any."""
+
+        on_ac = bool(on_ac)
+        current_brightness = int(current_brightness)
+
+        # Track manual overrides while on battery (user brightness differs from what we set).
+        if self._last_state is False and self._applied_battery_brightness is not None:
+            if current_brightness != int(self._applied_battery_brightness):
+                self._manual_override_on_battery = True
+
+        if self._last_state is None:
+            self._last_state = on_ac
+            self._last_change_ts = float(now)
+            return None
+
+        if on_ac == self._last_state:
+            return None
+
+        # Debounce flapping.
+        if float(now) - float(self._last_change_ts) < float(self.debounce_seconds):
+            return None
+
+        self._last_state = on_ac
+        self._last_change_ts = float(now)
+
+        if not self.enabled:
+            # Clear any pending restore state to avoid surprise restores later.
+            self._saved_ac_brightness = None
+            self._applied_battery_brightness = None
+            self._manual_override_on_battery = False
+            return None
+
+        if is_off:
+            # User explicitly turned the keyboard off; do not fight it.
+            return None
+
+        if not on_ac:
+            # AC -> Battery: dim.
+            target = max(0, int(self.target_brightness))
+            if current_brightness <= 0:
+                return None
+
+            # Only act if we would actually reduce brightness.
+            if 0 < target < current_brightness:
+                self._saved_ac_brightness = current_brightness
+                self._applied_battery_brightness = target
+                self._manual_override_on_battery = False
+                return target
+            return None
+
+        # Battery -> AC: restore.
+        restore = self._saved_ac_brightness
+        self._saved_ac_brightness = None
+        self._applied_battery_brightness = None
+        self._manual_override_on_battery = False
+        if restore is None:
+            return None
+        return int(restore)
 
 
 if __name__ == '__main__':

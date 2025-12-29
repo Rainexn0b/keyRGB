@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""
-KeyRGB Per-Key Editor
-GUI for setting individual key colors with proper keyboard layout
+"""KeyRGB Per-Key Editor.
+
+GUI for setting individual key colors with proper keyboard layout.
 """
 
+import logging
+import os
 import sys
 from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 # Prefer the installed dependency. If running from a repo checkout without
 # installing dependencies, fall back to the vendored copy.
@@ -13,9 +18,14 @@ try:
     from ite8291r3_ctl.ite8291r3 import get, NUM_ROWS, NUM_COLS
 except Exception:
     repo_root = Path(__file__).resolve().parent.parent
-    vendored = repo_root / "ite8291r3-ctl"
-    if vendored.exists():
-        sys.path.insert(0, str(vendored))
+    vendored_candidates = [
+        repo_root / "vendor" / "ite8291r3-ctl",
+        repo_root / "ite8291r3-ctl",  # legacy layout
+    ]
+    for vendored in vendored_candidates:
+        if vendored.exists():
+            sys.path.insert(0, str(vendored))
+            break
     from ite8291r3_ctl.ite8291r3 import get, NUM_ROWS, NUM_COLS
 
 import tkinter as tk
@@ -281,7 +291,10 @@ class PerKeyEditor:
             self.kb.set_key_colors(self.colors, brightness=25, save=False)
             print("Colors applied successfully")
         except Exception as e:
-            print(f"Error applying colors: {e}")
+            if os.environ.get("KEYRGB_DEBUG"):
+                logger.exception("Error applying colors")
+            else:
+                logger.error("Error applying colors: %s", e)
     
     def run(self):
         """Run the editor"""
@@ -290,13 +303,16 @@ class PerKeyEditor:
 
 def main():
     """Main entry point"""
+    level = logging.DEBUG if os.environ.get("KEYRGB_DEBUG") else logging.INFO
+    logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
     try:
         editor = PerKeyEditor()
         editor.run()
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        import traceback
-        traceback.print_exc()
+        if os.environ.get("KEYRGB_DEBUG"):
+            logger.exception("Unhandled error")
+        else:
+            logger.error("Unhandled error: %s", e)
         sys.exit(1)
 
 
