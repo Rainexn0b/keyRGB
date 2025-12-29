@@ -405,7 +405,49 @@ class PowerSettingsGUI:
                     from src.core.diagnostics import collect_diagnostics
 
                 diag = collect_diagnostics(include_usb=True)
-                text = json.dumps(diag.to_dict(), indent=2, sort_keys=True)
+                payload = diag.to_dict()
+
+                warnings: list[str] = []
+                try:
+                    usb_devices = payload.get("usb_devices")
+                    if isinstance(usb_devices, list):
+                        for dev in usb_devices:
+                            if not isinstance(dev, dict):
+                                continue
+                            others = dev.get("devnode_open_by_others")
+                            if not isinstance(others, list) or not others:
+                                continue
+                            devnode = dev.get("devnode") or dev.get("sysfs_path") or "(unknown)"
+                            summaries: list[str] = []
+                            for h in others:
+                                if not isinstance(h, dict):
+                                    continue
+                                pid = h.get("pid")
+                                comm = h.get("comm")
+                                exe = h.get("exe")
+                                parts = []
+                                if pid is not None:
+                                    parts.append(f"pid={pid}")
+                                if comm:
+                                    parts.append(f"comm={comm}")
+                                if exe:
+                                    parts.append(f"exe={exe}")
+                                if parts:
+                                    summaries.append(" ".join(parts))
+
+                            if summaries:
+                                warnings.append(
+                                    f"Device busy: {devnode} is open by other process(es): " + "; ".join(summaries)
+                                )
+                            else:
+                                warnings.append(f"Device busy: {devnode} is open by other process(es)")
+                except Exception:
+                    pass
+
+                if warnings:
+                    payload["warnings"] = warnings
+
+                text = json.dumps(payload, indent=2, sort_keys=True)
             except Exception as e:
                 text = f"Failed to collect diagnostics: {e}"
 
@@ -414,7 +456,10 @@ class PowerSettingsGUI:
                 self._set_diagnostics_text(text)
                 self.btn_run_diagnostics.configure(state="normal")
                 self._apply_diagnostics_state()
-                self.status.configure(text="✓ Diagnostics ready")
+                if '"warnings"' in text:
+                    self.status.configure(text="⚠ Diagnostics ready (warnings)")
+                else:
+                    self.status.configure(text="✓ Diagnostics ready")
                 self.root.after(2000, lambda: self.status.configure(text=""))
 
             self.root.after(0, on_done)
