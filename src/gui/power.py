@@ -35,7 +35,8 @@ class PowerSettingsGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("KeyRGB - Settings")
-        self.root.geometry("520x680")
+        self.root.geometry("520x820")
+        self.root.minsize(520, 760)
         # Allow vertical resize for systems with larger fonts / window chrome.
         self.root.resizable(False, True)
 
@@ -193,7 +194,7 @@ class PowerSettingsGUI:
             foreground=fg_color,
             insertbackground=fg_color,
         )
-        self.txt_diagnostics.pack(fill="x")
+        self.txt_diagnostics.pack(fill="both", expand=True)
         self.txt_diagnostics.insert(
             "1.0",
             "Click 'Run diagnostics' then 'Copy output' and paste into a GitHub issue.\n",
