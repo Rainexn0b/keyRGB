@@ -100,6 +100,73 @@ def _parse_hex_int(text: str) -> Optional[int]:
         return None
 
 
+def _proc_open_holders(target_path: Path, *, limit: int = 10, pid_limit: int = 5000) -> list[dict[str, Any]]:
+    """Best-effort scan of /proc/*/fd to find processes holding a file open.
+
+    This is useful for diagnosing "device detected but can't control" issues
+    caused by other software holding the USB device node.
+    """
+
+    proc_root = Path("/proc")
+    holders: list[dict[str, Any]] = []
+
+    try:
+        target_str = str(target_path)
+        target_real = str(target_path.resolve()) if target_path.exists() else target_str
+
+        if not proc_root.exists():
+            return []
+
+        checked = 0
+        for child in proc_root.iterdir():
+            if len(holders) >= limit or checked >= pid_limit:
+                break
+
+            if not child.is_dir() or not child.name.isdigit():
+                continue
+            checked += 1
+
+            pid = int(child.name)
+            fd_dir = child / "fd"
+            if not fd_dir.exists():
+                continue
+
+            matched = False
+            try:
+                for fd in fd_dir.iterdir():
+                    try:
+                        link = os.readlink(fd)
+                    except Exception:
+                        continue
+                    if link == target_str or link == target_real:
+                        matched = True
+                        break
+            except PermissionError:
+                continue
+            except Exception:
+                continue
+
+            if not matched:
+                continue
+
+            info: dict[str, Any] = {"pid": pid}
+            comm = _read_text(child / "comm")
+            if comm:
+                info["comm"] = comm
+            try:
+                exe = child / "exe"
+                if exe.exists():
+                    info["exe"] = str(exe.resolve())
+            except Exception:
+                pass
+
+            holders.append(info)
+
+        return holders
+    except Exception:
+        return holders
+
+
 def _usb_devices_snapshot(target_ids: list[tuple[int, int]]) -> list[dict[str, Any]]:
     """Collect best-effort USB device details from sysfs.
 
@@ -162,6 +229,9 @@ def _usb_devices_snapshot(target_ids: list[tuple[int, int]]) -> list[dict[str, A
                             "read": bool(os.access(devnode, os.R_OK)),
                             "write": bool(os.access(devnode, os.W_OK)),
                         }
+                        holders = _proc_open_holders(devnode)
+                        if holders:
+                            entry["devnode_open_by"] = holders
                     else:
                         entry["devnode_exists"] = False
                 except Exception:
@@ -677,6 +747,13 @@ def format_diagnostics_text(diag: Diagnostics) -> str:
             acc = dev.get("devnode_access")
             if isinstance(acc, dict):
                 lines.append(f"      devnode_access: read={acc.get('read')} write={acc.get('write')}")
+                holders = dev.get("devnode_open_by")
+                if isinstance(holders, list) and holders:
+                    lines.append("      devnode_open_by:")
+                    for h in holders:
+                        if not isinstance(h, dict):
+                            continue
+                        lines.append(f"        - pid={h.get('pid')} comm={h.get('comm', '')} exe={h.get('exe', '')}".rstrip())
 
     if diag.config:
         lines.append("Config:")
