@@ -35,10 +35,9 @@ class PowerSettingsGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("KeyRGB - Settings")
-        self.root.geometry("520x820")
-        self.root.minsize(520, 760)
-        # Allow vertical resize for systems with larger fonts / window chrome.
-        self.root.resizable(False, True)
+        # Layout is content-driven; initial size is computed after widgets are created.
+        self.root.minsize(480, 520)
+        self.root.resizable(True, True)
 
         # Match the existing dark-ish styling used by other KeyRGB Tk windows.
         style = ttk.Style()
@@ -62,8 +61,128 @@ class PowerSettingsGUI:
 
         self.config = Config()
 
-        main = ttk.Frame(self.root, padding=16)
-        main.pack(fill="both", expand=True)
+        outer = ttk.Frame(self.root)
+        outer.pack(fill="both", expand=True)
+
+        # Scrollable content area (prevents sections from being cut off on smaller screens)
+        # with a fixed bottom bar for Close/status.
+        content_area = ttk.Frame(outer)
+        content_area.pack(fill="both", expand=True)
+
+        self._canvas = tk.Canvas(content_area, highlightthickness=0, bg=bg_color)
+        self._vscroll = ttk.Scrollbar(content_area, orient="vertical", command=self._canvas.yview)
+        self._canvas.configure(yscrollcommand=self._vscroll.set)
+
+        self._canvas.pack(side="left", fill="both", expand=True)
+        # Scrollbar is conditionally shown based on content height.
+        self._vscroll_visible = True
+        self._vscroll.pack(side="right", fill="y")
+
+        main = ttk.Frame(self._canvas, padding=16)
+        self._main_window_id = self._canvas.create_window((0, 0), window=main, anchor="nw")
+
+        def _sync_scrollregion(_event=None) -> None:
+            try:
+                self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+            except Exception:
+                pass
+
+            _update_scrollbar_visibility()
+
+        def _sync_content_width(event) -> None:
+            # Keep content frame width in sync with the canvas, avoiding horizontal scrolling.
+            try:
+                self._canvas.itemconfigure(self._main_window_id, width=event.width)
+            except Exception:
+                pass
+
+            _update_scrollbar_visibility()
+
+        def _content_needs_scroll() -> bool:
+            try:
+                bbox = self._canvas.bbox("all")
+                if not bbox:
+                    return False
+                content_h = bbox[3] - bbox[1]
+                canvas_h = self._canvas.winfo_height()
+                return content_h > max(1, canvas_h)
+            except Exception:
+                return False
+
+        def _update_scrollbar_visibility() -> None:
+            # Hide the scrollbar when everything fits.
+            try:
+                needs_scroll = _content_needs_scroll()
+
+                if needs_scroll and not self._vscroll_visible:
+                    self._vscroll.pack(side="right", fill="y")
+                    self._vscroll_visible = True
+                elif (not needs_scroll) and self._vscroll_visible:
+                    self._vscroll.pack_forget()
+                    self._vscroll_visible = False
+            except Exception:
+                pass
+
+        main.bind("<Configure>", _sync_scrollregion)
+        self._canvas.bind("<Configure>", _sync_content_width)
+
+        def _is_descendant(widget: tk.Misc, ancestor: tk.Misc) -> bool:
+            cur = widget
+            while cur is not None:
+                if cur == ancestor:
+                    return True
+                try:
+                    cur = cur.master  # type: ignore[assignment]
+                except Exception:
+                    break
+            return False
+
+        def _on_mousewheel(event) -> str | None:
+            # Handle scrolling reliably without depending on fragile Enter/Leave bindings.
+            try:
+                # Only act if the pointer is over this window.
+                x_root = getattr(event, "x_root", None)
+                y_root = getattr(event, "y_root", None)
+                if x_root is None or y_root is None:
+                    return None
+
+                target = self.root.winfo_containing(x_root, y_root)
+                if target is None or target.winfo_toplevel() != self.root:
+                    return None
+
+                # Determine scroll direction/amount.
+                units: int | None = None
+                if getattr(event, "num", None) == 4:
+                    units = -1
+                elif getattr(event, "num", None) == 5:
+                    units = 1
+                elif hasattr(event, "delta") and event.delta:
+                    units = int(-1 * (event.delta / 120))
+
+                if not units:
+                    return None
+
+                # Prefer scrolling the diagnostics text box if the pointer is over it.
+                if _is_descendant(target, self.txt_diagnostics):
+                    try:
+                        self.txt_diagnostics.yview_scroll(units, "units")
+                        return "break"
+                    except Exception:
+                        return None
+
+                # Otherwise scroll the main canvas if content overflows.
+                if _content_needs_scroll():
+                    self._canvas.yview_scroll(units, "units")
+                    return "break"
+
+                return None
+            except Exception:
+                return None
+
+        # Bind wheel globally within this Tk app, but filter to this toplevel + pointer location.
+        self.root.bind_all("<MouseWheel>", _on_mousewheel)
+        self.root.bind_all("<Button-4>", _on_mousewheel)
+        self.root.bind_all("<Button-5>", _on_mousewheel)
 
         title = ttk.Label(main, text="Settings", font=("Sans", 14, "bold"))
         title.pack(anchor="w", pady=(0, 8))
@@ -194,30 +313,60 @@ class PowerSettingsGUI:
             foreground=fg_color,
             insertbackground=fg_color,
         )
-        self.txt_diagnostics.pack(fill="both", expand=True)
+        # Keep a stable initial size; the window itself (and content area) is scrollable.
+        self.txt_diagnostics.pack(fill="x")
         self.txt_diagnostics.insert(
             "1.0",
             "Click 'Run diagnostics' then 'Copy output' and paste into a GitHub issue.\n",
         )
         self.txt_diagnostics.configure(state="disabled")
 
-        btn_row = ttk.Frame(main)
-        btn_row.pack(fill="x", pady=(16, 0))
+        bottom_bar = ttk.Frame(outer, padding=(16, 8, 16, 12))
+        bottom_bar.pack(fill="x")
 
-        close_btn = ttk.Button(btn_row, text="Close", command=self._on_close)
+        self.status = ttk.Label(bottom_bar, text="", font=("Sans", 9))
+        self.status.pack(side="left")
+
+        close_btn = ttk.Button(bottom_bar, text="Close", command=self._on_close)
         close_btn.pack(side="right")
-
-        self.status = ttk.Label(main, text="", font=("Sans", 9))
-        self.status.pack(anchor="w", pady=(8, 0))
 
         self._apply_enabled_state()
         self._apply_diagnostics_state()
 
-        # Center window
+        # Size-to-content, but clamp to the current screen so nothing is forced off-screen.
         self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() // 2) - (self.root.winfo_width() // 2)
-        y = (self.root.winfo_screenheight() // 2) - (self.root.winfo_height() // 2)
-        self.root.geometry(f"+{x}+{y}")
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+        req_w = outer.winfo_reqwidth()
+        req_h = outer.winfo_reqheight()
+
+        margin_w = 80
+        margin_h = 120
+        width = min(max(req_w, 520), max(320, screen_w - margin_w))
+        height = min(max(req_h, 640), max(320, screen_h - margin_h))
+
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (screen_h - height) // 2)
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
+
+        # Ensure scroll region is correct after the final geometry.
+        self.root.update_idletasks()
+        try:
+            self._canvas.configure(scrollregion=self._canvas.bbox("all"))
+        except Exception:
+            pass
+
+        # Ensure scrollbar visibility matches initial geometry.
+        try:
+            bbox = self._canvas.bbox("all")
+            if bbox:
+                content_h = bbox[3] - bbox[1]
+                needs_scroll = content_h > max(1, self._canvas.winfo_height())
+                if not needs_scroll and self._vscroll_visible:
+                    self._vscroll.pack_forget()
+                    self._vscroll_visible = False
+        except Exception:
+            pass
 
     def _apply_enabled_state(self) -> None:
         enabled = bool(self.var_enabled.get())
