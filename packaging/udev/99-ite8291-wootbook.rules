@@ -1,2 +1,6 @@
-# Allow user access to ITE 8291 USB device via uaccess
-SUBSYSTEM=="usb", ATTR{idVendor}=="048d", ATTR{idProduct}=="600b", TAG+="uaccess"
+# Allow user access to ITE 8291 USB device.
+#
+# Use seat-based ACLs (uaccess) instead of making the device world-writable.
+# Some setups only apply the ACL reliably when explicitly invoking the uaccess
+# builtin.
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="600b", TAG+="uaccess", RUN{builtin}+="uaccess"

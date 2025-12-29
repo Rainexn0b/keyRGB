@@ -99,6 +99,15 @@ class Ite8291r3Backend(KeyboardBackend):
         try:
             return ite8291r3.get()
         except Exception as exc:
+            # Common failure mode: user lacks rw access to /dev/bus/usb/... for the keyboard.
+            # After distro updates, udev rules can be removed/reset.
+            msg = str(exc).lower()
+            errno = getattr(exc, "errno", None)
+            if isinstance(exc, PermissionError) or errno == 13 or "permission denied" in msg or "access denied" in msg:
+                raise PermissionError(
+                    "Permission denied opening the ITE 8291 USB device. "
+                    "Install the udev rule (packaging/udev/99-ite8291-wootbook.rules), then reload udev rules and reboot/log out/in."
+                ) from exc
             if os.environ.get("KEYRGB_DEBUG"):
                 logger.exception("Failed to open ite8291r3 device")
             raise

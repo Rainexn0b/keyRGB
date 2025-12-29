@@ -227,6 +227,43 @@ echo "📦 Installing KeyRGB..."
 python3 -m pip install --user -e "$REPO_DIR"
 echo "✓ KeyRGB installed"
 
+install_udev_rule() {
+    local src_rule="$REPO_DIR/packaging/udev/99-ite8291-wootbook.rules"
+    local dst_rule="/etc/udev/rules.d/99-ite8291-wootbook.rules"
+
+    if ! [ -f "$src_rule" ]; then
+        echo "⚠️  udev rule file not found: $src_rule"
+        return 0
+    fi
+
+    if ! command -v udevadm &> /dev/null; then
+        echo "⚠️  udevadm not found; cannot install udev rule automatically."
+        echo "   To fix permissions manually, copy: $src_rule -> $dst_rule"
+        return 0
+    fi
+
+    echo
+    echo "🔐 Installing udev rule for non-root USB access..."
+    echo "   (This enables access to 048d:600b without running KeyRGB as root.)"
+    echo "   (This may prompt for your sudo password.)"
+
+    # Only overwrite if changed.
+    if [ -f "$dst_rule" ] && cmp -s "$src_rule" "$dst_rule"; then
+        echo "✓ udev rule already installed: $dst_rule"
+    else
+        sudo install -D -m 0644 "$src_rule" "$dst_rule"
+        echo "✓ Installed udev rule: $dst_rule"
+    fi
+
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
+    echo "✓ Reloaded udev rules"
+    echo "  If KeyRGB is already running, quit and re-open it."
+    echo "  If it still says permission denied, reboot once."
+}
+
+install_udev_rule
+
 # Many distros don't include ~/.local/bin on PATH by default.
 USER_BIN="$HOME/.local/bin"
 if ! echo ":$PATH:" | grep -q ":$USER_BIN:"; then
@@ -239,18 +276,6 @@ if ! echo ":$PATH:" | grep -q ":$USER_BIN:"; then
     echo
     echo "   Then restart your terminal (or log out/in)."
 fi
-
-# Create udev rule for non-root access
-echo
-echo "🔐 Setting up udev rules for USB access..."
-UDEV_RULE='SUBSYSTEM=="usb", ATTR{idVendor}=="048d", ATTR{idProduct}=="600b", TAG+="uaccess"'
-echo "$UDEV_RULE" | sudo tee /etc/udev/rules.d/99-ite8291-wootbook.rules > /dev/null
-
-sudo udevadm control --reload
-sudo udevadm trigger
-
-echo "✓ Udev rules installed"
-echo "  Note: If access still fails, log out/in or reboot so uaccess applies."
 
 # Make scripts executable
 echo

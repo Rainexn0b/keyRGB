@@ -1,211 +1,30 @@
 from __future__ import annotations
 
-import logging
 import json
+import logging
 import os
 import random
-import shutil
-import subprocess
 import tempfile
-from dataclasses import dataclass
 from typing import Any, Optional
 
 from src.core.logging_utils import log_throttled
 
-
-@dataclass(frozen=True)
-class TccProfile:
-    id: str
-    name: str
-    description: str = ""
-
-
-class TccProfileWriteError(RuntimeError):
-    pass
+from .busctl import _busctl_call, _parse_busctl_bool_reply, _parse_busctl_string_reply
+from .json_api import (
+    get_active_profile_json,
+    get_custom_profiles_json,
+    get_default_values_profile_json,
+    get_profiles_json,
+    get_settings_json,
+    is_tccd_available,
+    list_custom_profiles,
+    list_profiles,
+)
+from .models import TccProfile, TccProfileWriteError
+from .root_apply import _apply_new_profiles_file, _apply_new_settings_file, _run_root_command, _tccd_binary
 
 
 logger = logging.getLogger(__name__)
-
-
-_TCCD_BUS_NAME = "com.tuxedocomputers.tccd"
-_TCCD_OBJECT_PATH = "/com/tuxedocomputers/tccd"
-_TCCD_INTERFACE = "com.tuxedocomputers.tccd"
-
-
-_DEFAULT_TCCD_BIN = "/opt/tuxedo-control-center/resources/dist/tuxedo-control-center/data/service/tccd"
-
-
-def _tccd_binary() -> str:
-    return os.environ.get("KEYRGB_TCCD_BIN", _DEFAULT_TCCD_BIN)
-
-
-def _busctl_call(*args: str) -> Optional[str]:
-    """Call busctl and return stdout on success.
-
-    Uses system bus because TCC daemon is system service.
-    """
-
-    cmd = [
-        "busctl",
-        "--system",
-        "call",
-        _TCCD_BUS_NAME,
-        _TCCD_OBJECT_PATH,
-        _TCCD_INTERFACE,
-        *args,
-    ]
-
-    try:
-        cp = subprocess.run(cmd, check=False, capture_output=True, text=True)
-    except FileNotFoundError:
-        return None
-
-    if cp.returncode != 0:
-        return None
-
-    return cp.stdout.strip()
-
-
-def _parse_busctl_string_reply(stdout: str) -> Optional[str]:
-    """Parse busctl output for methods that return a single string.
-
-    Example output: `s "{...}"`
-    """
-
-    if not stdout:
-        return None
-
-    # busctl formats as: <type> <value>
-    # for strings: s "..."
-    parts = stdout.split(" ", 1)
-    if len(parts) != 2:
-        return None
-
-    sig, rest = parts
-    if sig != "s":
-        return None
-
-    rest = rest.strip()
-    if rest.startswith('"') and rest.endswith('"') and len(rest) >= 2:
-        rest = rest[1:-1]
-
-    # busctl keeps C-style escapes; json.loads handles standard escapes.
-    try:
-        return bytes(rest, "utf-8").decode("unicode_escape")
-    except Exception:
-        return rest
-
-
-def _parse_busctl_bool_reply(stdout: str) -> Optional[bool]:
-    if not stdout:
-        return None
-    parts = stdout.split(" ", 1)
-    if len(parts) != 2:
-        return None
-    sig, rest = parts
-    if sig != "b":
-        return None
-    rest = rest.strip().lower()
-    if rest in ("true", "1"):
-        return True
-    if rest in ("false", "0"):
-        return False
-    return None
-
-
-def is_tccd_available() -> bool:
-    """Return True if we can talk to the TCC daemon via DBus."""
-
-    # A cheap call; if this fails, nothing else will work.
-    return get_profiles_json() is not None
-
-
-def get_profiles_json() -> Optional[str]:
-    stdout = _busctl_call("GetProfilesJSON")
-    if stdout is None:
-        return None
-    return _parse_busctl_string_reply(stdout)
-
-
-def get_custom_profiles_json() -> Optional[str]:
-    stdout = _busctl_call("GetCustomProfilesJSON")
-    if stdout is None:
-        return None
-    return _parse_busctl_string_reply(stdout)
-
-
-def get_default_values_profile_json() -> Optional[str]:
-    stdout = _busctl_call("GetDefaultValuesProfileJSON")
-    if stdout is None:
-        return None
-    return _parse_busctl_string_reply(stdout)
-
-
-def get_settings_json() -> Optional[str]:
-    stdout = _busctl_call("GetSettingsJSON")
-    if stdout is None:
-        return None
-    return _parse_busctl_string_reply(stdout)
-
-
-def get_active_profile_json() -> Optional[str]:
-    stdout = _busctl_call("GetActiveProfileJSON")
-    if stdout is None:
-        return None
-    return _parse_busctl_string_reply(stdout)
-
-
-def list_profiles() -> list[TccProfile]:
-    raw = get_profiles_json()
-    if not raw:
-        return []
-
-    try:
-        payload = json.loads(raw)
-    except Exception:
-        return []
-
-    if not isinstance(payload, list):
-        return []
-
-    out: list[TccProfile] = []
-    for item in payload:
-        if not isinstance(item, dict):
-            continue
-        pid = item.get("id")
-        name = item.get("name")
-        if not isinstance(pid, str) or not isinstance(name, str):
-            continue
-        desc = item.get("description")
-        out.append(TccProfile(id=pid, name=name, description=str(desc) if desc is not None else ""))
-
-    return out
-
-
-def _list_profiles_from_json(raw: Optional[str]) -> list[TccProfile]:
-    if not raw:
-        return []
-    try:
-        payload = json.loads(raw)
-    except Exception:
-        return []
-    if not isinstance(payload, list):
-        return []
-    out: list[TccProfile] = []
-    for item in payload:
-        if not isinstance(item, dict):
-            continue
-        pid = item.get("id")
-        name = item.get("name")
-        if not isinstance(pid, str) or not isinstance(name, str):
-            continue
-        desc = item.get("description")
-        out.append(TccProfile(id=pid, name=name, description=str(desc) if desc is not None else ""))
-    return out
-
-
-def list_custom_profiles() -> list[TccProfile]:
-    return _list_profiles_from_json(get_custom_profiles_json())
 
 
 def _load_custom_profiles_payload() -> list[dict[str, Any]]:
@@ -273,33 +92,6 @@ def _write_temp_json(payload: Any, *, prefix: str) -> str:
     return path
 
 
-def _run_root_command(argv: list[str]) -> subprocess.CompletedProcess[str]:
-    if os.geteuid() == 0:
-        return subprocess.run(argv, check=False, capture_output=True, text=True)
-
-    pkexec = shutil.which("pkexec")
-    if pkexec:
-        return subprocess.run([pkexec, *argv], check=False, capture_output=True, text=True)
-
-    sudo = shutil.which("sudo")
-    if sudo:
-        # Will prompt in terminal if needed.
-        return subprocess.run([sudo, *argv], check=False, capture_output=True, text=True)
-
-    raise TccProfileWriteError("Need root privileges to write TCC profiles/settings (pkexec or sudo not found)")
-
-
-def _apply_new_profiles_file(path: str) -> None:
-    tccd = _tccd_binary()
-    if not os.path.exists(tccd):
-        raise TccProfileWriteError(f"tccd binary not found at {tccd}")
-
-    cp = _run_root_command([tccd, "--new_profiles", path])
-    if cp.returncode != 0:
-        msg = (cp.stderr or cp.stdout or "").strip()
-        raise TccProfileWriteError(f"tccd --new_profiles failed: {msg or 'unknown error'}")
-
-
 def get_custom_profile_payload(profile_id: str) -> Optional[dict[str, Any]]:
     """Return a deep-copied payload dict for a custom profile, or None if not found."""
 
@@ -348,17 +140,6 @@ def update_custom_profile(profile_id: str, new_payload: dict[str, Any]) -> None:
         _apply_new_profiles_file(tmp)
     finally:
         _unlink_tmp(tmp, key="tcc_power_profiles.update_custom_profile.cleanup")
-
-
-def _apply_new_settings_file(path: str) -> None:
-    tccd = _tccd_binary()
-    if not os.path.exists(tccd):
-        raise TccProfileWriteError(f"tccd binary not found at {tccd}")
-
-    cp = _run_root_command([tccd, "--new_settings", path])
-    if cp.returncode != 0:
-        msg = (cp.stderr or cp.stdout or "").strip()
-        raise TccProfileWriteError(f"tccd --new_settings failed: {msg or 'unknown error'}")
 
 
 def is_custom_profile_id(profile_id: str) -> bool:
