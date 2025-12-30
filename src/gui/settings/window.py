@@ -25,6 +25,7 @@ from tkinter import ttk
 from .diagnostics_runner import collect_diagnostics_text
 from .os_autostart import detect_os_autostart_enabled, set_os_autostart
 from .scrollable_area import ScrollableArea
+from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
 
 try:
     from src.legacy.config import Config
@@ -61,6 +62,8 @@ class PowerSettingsGUI:
 
         self.config = Config()
 
+        values = load_settings_values(config=self.config, os_autostart_enabled=detect_os_autostart_enabled())
+
         outer = ttk.Frame(self.root)
         outer.pack(fill="both", expand=True)
 
@@ -95,50 +98,18 @@ class PowerSettingsGUI:
         )
         desc.pack(anchor="w", pady=(0, 12))
 
-        self.var_enabled = tk.BooleanVar(value=bool(getattr(self.config, "power_management_enabled", True)))
-        self.var_off_suspend = tk.BooleanVar(value=bool(getattr(self.config, "power_off_on_suspend", True)))
-        self.var_off_lid = tk.BooleanVar(value=bool(getattr(self.config, "power_off_on_lid_close", True)))
-        self.var_restore_resume = tk.BooleanVar(value=bool(getattr(self.config, "power_restore_on_resume", True)))
-        self.var_restore_lid = tk.BooleanVar(value=bool(getattr(self.config, "power_restore_on_lid_open", True)))
-        self.var_autostart = tk.BooleanVar(value=bool(getattr(self.config, "autostart", True)))
-        self.var_os_autostart = tk.BooleanVar(value=detect_os_autostart_enabled())
+        self.var_enabled = tk.BooleanVar(value=bool(values.power_management_enabled))
+        self.var_off_suspend = tk.BooleanVar(value=bool(values.power_off_on_suspend))
+        self.var_off_lid = tk.BooleanVar(value=bool(values.power_off_on_lid_close))
+        self.var_restore_resume = tk.BooleanVar(value=bool(values.power_restore_on_resume))
+        self.var_restore_lid = tk.BooleanVar(value=bool(values.power_restore_on_lid_open))
+        self.var_autostart = tk.BooleanVar(value=bool(values.autostart))
+        self.var_os_autostart = tk.BooleanVar(value=bool(values.os_autostart_enabled))
 
-        # Power-source lighting defaults: if no explicit overrides exist, seed UI with
-        # effective current values so saving doesn't change behavior unexpectedly.
-        try:
-            base_brightness = int(getattr(self.config, "brightness", 25) or 0)
-        except Exception:
-            base_brightness = 25
-
-        try:
-            bs_enabled = bool(getattr(self.config, "battery_saver_enabled", False))
-        except Exception:
-            bs_enabled = False
-
-        try:
-            bs_brightness = int(getattr(self.config, "battery_saver_brightness", 25) or 0)
-        except Exception:
-            bs_brightness = 25
-
-        try:
-            ac_b = getattr(self.config, "ac_lighting_brightness", None)
-        except Exception:
-            ac_b = None
-        ac_b_init = int(ac_b) if ac_b is not None else int(base_brightness)
-
-        try:
-            batt_b = getattr(self.config, "battery_lighting_brightness", None)
-        except Exception:
-            batt_b = None
-        if batt_b is not None:
-            batt_b_init = int(batt_b)
-        else:
-            batt_b_init = int(bs_brightness) if bs_enabled else int(base_brightness)
-
-        self.var_ac_enabled = tk.BooleanVar(value=bool(getattr(self.config, "ac_lighting_enabled", True)))
-        self.var_battery_enabled = tk.BooleanVar(value=bool(getattr(self.config, "battery_lighting_enabled", True)))
-        self.var_ac_brightness = tk.DoubleVar(value=float(max(0, min(50, ac_b_init))))
-        self.var_battery_brightness = tk.DoubleVar(value=float(max(0, min(50, batt_b_init))))
+        self.var_ac_enabled = tk.BooleanVar(value=bool(values.ac_lighting_enabled))
+        self.var_battery_enabled = tk.BooleanVar(value=bool(values.battery_lighting_enabled))
+        self.var_ac_brightness = tk.DoubleVar(value=float(values.ac_lighting_brightness))
+        self.var_battery_brightness = tk.DoubleVar(value=float(values.battery_lighting_brightness))
 
         self.chk_enabled = ttk.Checkbutton(
             left,
@@ -456,22 +427,23 @@ class PowerSettingsGUI:
         self.root.after(2000, lambda: self.status.configure(text=""))
 
     def _on_toggle(self) -> None:
-        self.config.power_management_enabled = bool(self.var_enabled.get())
-        self.config.power_off_on_suspend = bool(self.var_off_suspend.get())
-        self.config.power_off_on_lid_close = bool(self.var_off_lid.get())
-        self.config.power_restore_on_resume = bool(self.var_restore_resume.get())
-        self.config.power_restore_on_lid_open = bool(self.var_restore_lid.get())
-        self.config.autostart = bool(self.var_autostart.get())
-
         try:
-            self.config.ac_lighting_enabled = bool(self.var_ac_enabled.get())
-            self.config.battery_lighting_enabled = bool(self.var_battery_enabled.get())
-
-            ac_b = int(float(self.var_ac_brightness.get()))
-            batt_b = int(float(self.var_battery_brightness.get()))
-            self.config.ac_lighting_brightness = max(0, min(50, ac_b))
-            self.config.battery_lighting_brightness = max(0, min(50, batt_b))
+            values = SettingsValues(
+                power_management_enabled=bool(self.var_enabled.get()),
+                power_off_on_suspend=bool(self.var_off_suspend.get()),
+                power_off_on_lid_close=bool(self.var_off_lid.get()),
+                power_restore_on_resume=bool(self.var_restore_resume.get()),
+                power_restore_on_lid_open=bool(self.var_restore_lid.get()),
+                autostart=bool(self.var_autostart.get()),
+                ac_lighting_enabled=bool(self.var_ac_enabled.get()),
+                battery_lighting_enabled=bool(self.var_battery_enabled.get()),
+                ac_lighting_brightness=int(float(self.var_ac_brightness.get())),
+                battery_lighting_brightness=int(float(self.var_battery_brightness.get())),
+                os_autostart_enabled=bool(self.var_os_autostart.get()),
+            )
+            apply_settings_values_to_config(config=self.config, values=values)
         except Exception:
+            # Keep best-effort behavior identical to the previous inline implementation.
             pass
 
         desired_os_autostart = bool(self.var_os_autostart.get())
