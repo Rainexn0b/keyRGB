@@ -107,12 +107,16 @@ def on_brightness_clicked(tray: Any, item: Any) -> None:
 
 
 def turn_off(tray: Any) -> None:
+    tray._user_forced_off = True
+    tray._idle_forced_off = False
     tray.engine.turn_off()
     tray.is_off = True
     tray._refresh_ui()
 
 
 def turn_on(tray: Any) -> None:
+    tray._user_forced_off = False
+    tray._idle_forced_off = False
     tray.is_off = False
 
     if tray.config.brightness == 0:
@@ -129,6 +133,7 @@ def turn_on(tray: Any) -> None:
 
 def power_turn_off(tray: Any) -> None:
     tray._power_forced_off = True
+    tray._idle_forced_off = False
     tray.is_off = True
     tray.engine.turn_off()
     tray._refresh_ui()
@@ -137,6 +142,7 @@ def power_turn_off(tray: Any) -> None:
 def power_restore(tray: Any) -> None:
     if tray._power_forced_off:
         tray._power_forced_off = False
+        tray._idle_forced_off = False
         tray.is_off = False
 
         if tray.config.brightness == 0:
@@ -162,7 +168,11 @@ def apply_brightness_from_power_policy(tray: Any, brightness: int) -> None:
         return
 
     # If the user explicitly turned the keyboard off, don't fight it.
-    if tray.is_off:
+    if bool(getattr(tray, "_user_forced_off", False)):
+        return
+
+    # If lighting is forced off due to power/idle policy, don't fight it.
+    if bool(getattr(tray, "_power_forced_off", False)) or bool(getattr(tray, "_idle_forced_off", False)):
         return
 
     try:

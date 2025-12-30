@@ -199,6 +199,17 @@ If you don’t see the tray icon, launch from a terminal to see logs:
 KEYRGB_DEBUG=1 keyrgb
 ```
 
+## 5a) Power management: sync with screen dim
+
+On KDE Plasma (Wayland), KeyRGB can sync keyboard lighting to the desktop's **screen dimming** behavior:
+
+- When the display dims, KeyRGB turns the keyboard LEDs off.
+- When the display undims (user activity), KeyRGB restores lighting.
+
+This uses `/sys/class/backlight` brightness changes and does not require access to `/dev/input`.
+
+Configure the dim timeout in **System Settings → Power Management → Dim automatically**.
+
 ## 6) Per-key setup (first-time calibration)
 
 Per-key control requires a keymap calibration for your laptop model/revision.

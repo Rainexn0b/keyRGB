@@ -30,7 +30,12 @@ def _apply_polled_hardware_state(
         else:
             tray.config.brightness = current_brightness
             if last_brightness == 0:
-                tray.is_off = False
+                if (
+                    not bool(getattr(tray, "_user_forced_off", False))
+                    and not bool(getattr(tray, "_power_forced_off", False))
+                    and not bool(getattr(tray, "_idle_forced_off", False))
+                ):
+                    tray.is_off = False
 
         tray._refresh_ui()
         return current_brightness, current_off
@@ -39,7 +44,16 @@ def _apply_polled_hardware_state(
         if tray._power_forced_off and current_off:
             return current_brightness, current_off
 
-        tray.is_off = current_off
+        if current_off:
+            tray.is_off = True
+        else:
+            # Avoid overriding explicit forced-off states.
+            if (
+                not bool(getattr(tray, "_user_forced_off", False))
+                and not bool(getattr(tray, "_power_forced_off", False))
+                and not bool(getattr(tray, "_idle_forced_off", False))
+            ):
+                tray.is_off = False
         tray._refresh_ui()
         return current_brightness, current_off
 

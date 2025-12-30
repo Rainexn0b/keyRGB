@@ -9,6 +9,7 @@
 ## 2025-12-30
 
 - Internal: refactors tray code into smaller modules (startup, lighting control, menu sections, polling wrapper) and consolidates UI refresh.
+- Tray: syncs keyboard lighting with display dimming (turn off when the display dims; restore when it undims).
 - Internal: extracts sysfs AC-power detection into a focused module to reduce platform IO inside `src/core/power.py`.
 - Internal: extracts logind (login1) PrepareForSleep monitoring into a focused helper module to reduce DBus parsing/process management inside `src/core/power.py`.
 - Internal: extracts the `BatterySaverPolicy` state machine into a focused module to further shrink the `src/core/power.py` hotspot.
@@ -25,4 +26,5 @@
 - Effects: avoids unintended full-black frames during transitions to reduce brief "keyboard off" blinks when starting/stopping effects or switching to per-key.
 - Brightness: avoids persisting transient brightness=0 reads from hardware polling (prevents random brightness resets).
 - Per-key: best-effort persists user-mode when applying per-key colors so per-key lighting stays on while typing.
+- Docs: documents KDE screen-dim synced lighting behavior.
 - Docs: updates tech-debt tracking/hotspots and documents legacy boundaries.

@@ -43,7 +43,11 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
         if current == last_applied:
             return
 
-        if tray.is_off:
+        if tray.is_off and (
+            bool(getattr(tray, "_user_forced_off", False))
+            or bool(getattr(tray, "_power_forced_off", False))
+            or bool(getattr(tray, "_idle_forced_off", False))
+        ):
             last_applied = current
             tray._update_menu()
             return
