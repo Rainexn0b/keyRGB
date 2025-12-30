@@ -7,7 +7,6 @@ Handles lid close/open, suspend/resume events to control keyboard backlight
 from __future__ import annotations
 
 import logging
-import subprocess
 import threading
 import time
 from dataclasses import dataclass
@@ -15,6 +14,7 @@ from typing import Optional
 
 from .acpi_monitoring import monitor_acpi_events
 from .lid_monitoring import start_sysfs_lid_monitoring
+from .login1_monitoring import monitor_prepare_for_sleep
 from .power_supply_sysfs import read_on_ac_power
 from .power_source_policy import compute_power_source_policy
 from src.legacy.config import Config
@@ -227,44 +227,14 @@ class PowerManager:
         """Main monitoring loop - watches for lid and suspend events"""
         # Use dbus-monitor to watch systemd-logind signals
         try:
-            # Monitor both PrepareForSleep (suspend/resume) and Lid switch
-            cmd = [
-                'dbus-monitor',
-                '--system',
-                "type='signal',interface='org.freedesktop.login1.Manager',member='PrepareForSleep'",
-            ]
-
             logger.info("Power monitoring started using dbus-monitor")
 
-            process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                universal_newlines=True,
-                bufsize=1
+            monitor_prepare_for_sleep(
+                is_running=lambda: self.monitoring,
+                on_started=self._start_lid_monitor,
+                on_suspend=self._on_suspend,
+                on_resume=self._on_resume,
             )
-
-            # For type-checkers: stdout is only None if stdout=DEVNULL/None.
-            assert process.stdout is not None
-
-            # Also monitor lid switch using a separate method
-            self._start_lid_monitor()
-
-            while self.monitoring:
-                line = process.stdout.readline()
-                if not line:
-                    break
-
-                # Detect prepare for sleep (suspend)
-                if 'PrepareForSleep' in line:
-                    # Read the next line to see if it's true (going to sleep) or false (waking up)
-                    next_line = process.stdout.readline()
-                    if 'boolean true' in next_line:
-                        logger.info("Detected: System suspending")
-                        self._on_suspend()
-                    elif 'boolean false' in next_line:
-                        logger.info("Detected: System resuming")
-                        self._on_resume()
 
         except FileNotFoundError:
             logger.warning("dbus-monitor not available, trying alternative method")
