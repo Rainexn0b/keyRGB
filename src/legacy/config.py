@@ -53,7 +53,16 @@ class Config:
         'battery_lighting_enabled': True,
         'battery_lighting_brightness': None,
         # Per-key colors stored as {"row,col": [r,g,b]}
-        'per_key_colors': {}
+        'per_key_colors': {},
+
+        # Screen dim sync (best-effort, DE-specific). When enabled, KeyRGB will
+        # react to desktop-driven display dimming by either turning keyboard
+        # LEDs off, or dimming them to a temporary brightness.
+        'screen_dim_sync_enabled': True,
+        # 'off' | 'temp'
+        'screen_dim_sync_mode': 'off',
+        # 1-50 (same brightness scale as `brightness`). Used when mode == 'temp'.
+        'screen_dim_temp_brightness': 5,
     }
 
     @staticmethod
@@ -309,4 +318,44 @@ class Config:
     @per_key_colors.setter
     def per_key_colors(self, value: dict):
         self._settings['per_key_colors'] = self._serialize_per_key_colors(value or {})
+        self._save()
+
+    # ---- screen dim sync
+
+    @property
+    def screen_dim_sync_enabled(self) -> bool:
+        return bool(self._settings.get('screen_dim_sync_enabled', True))
+
+    @screen_dim_sync_enabled.setter
+    def screen_dim_sync_enabled(self, value: bool):
+        self._settings['screen_dim_sync_enabled'] = bool(value)
+        self._save()
+
+    @property
+    def screen_dim_sync_mode(self) -> str:
+        mode = str(self._settings.get('screen_dim_sync_mode', 'off') or 'off').strip().lower()
+        return mode if mode in {'off', 'temp'} else 'off'
+
+    @screen_dim_sync_mode.setter
+    def screen_dim_sync_mode(self, value: str):
+        mode = str(value or 'off').strip().lower()
+        self._settings['screen_dim_sync_mode'] = mode if mode in {'off', 'temp'} else 'off'
+        self._save()
+
+    @property
+    def screen_dim_temp_brightness(self) -> int:
+        try:
+            v = int(self._settings.get('screen_dim_temp_brightness', 5) or 0)
+        except Exception:
+            v = 5
+        # Temp brightness is intended to be non-zero; allow 1..50.
+        return max(1, min(50, v))
+
+    @screen_dim_temp_brightness.setter
+    def screen_dim_temp_brightness(self, value: int):
+        try:
+            v = int(value)
+        except Exception:
+            v = 5
+        self._settings['screen_dim_temp_brightness'] = max(1, min(50, v))
         self._save()

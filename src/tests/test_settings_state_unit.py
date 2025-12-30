@@ -6,6 +6,7 @@ from src.gui.settings.settings_state import (
     SettingsValues,
     apply_settings_values_to_config,
     clamp_brightness,
+    clamp_nonzero_brightness,
     load_settings_values,
 )
 
@@ -37,6 +38,9 @@ def test_load_settings_defaults_without_overrides() -> None:
     assert values.ac_lighting_brightness == 30
     assert values.battery_lighting_brightness == 30
     assert values.os_autostart_enabled is False
+    assert values.screen_dim_sync_enabled is True
+    assert values.screen_dim_sync_mode in {"off", "temp"}
+    assert clamp_nonzero_brightness(values.screen_dim_temp_brightness) == values.screen_dim_temp_brightness
 
 
 def test_load_settings_battery_defaults_to_battery_saver_when_enabled() -> None:
@@ -79,6 +83,10 @@ def test_apply_settings_values_to_config() -> None:
         battery_lighting_enabled=False,
         ac_lighting_brightness=49,
         battery_lighting_brightness=51,
+
+        screen_dim_sync_enabled=False,
+        screen_dim_sync_mode="temp",
+        screen_dim_temp_brightness=1,
         os_autostart_enabled=True,
     )
 
@@ -96,3 +104,7 @@ def test_apply_settings_values_to_config() -> None:
     assert cfg.battery_lighting_enabled is False
     assert cfg.ac_lighting_brightness == 49
     assert cfg.battery_lighting_brightness == 50
+
+    assert cfg.screen_dim_sync_enabled is False
+    assert cfg.screen_dim_sync_mode == "temp"
+    assert cfg.screen_dim_temp_brightness == 1

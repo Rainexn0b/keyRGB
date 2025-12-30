@@ -9,7 +9,7 @@
 ## 2025-12-30
 
 - Internal: refactors tray code into smaller modules (startup, lighting control, menu sections, polling wrapper) and consolidates UI refresh.
-- Tray: syncs keyboard lighting with display dimming (turn off when the display dims; restore when it undims).
+- Tray: syncs keyboard lighting with display dimming; configurable to turn off, dim to a temporary brightness, or disable.
 - Internal: extracts sysfs AC-power detection into a focused module to reduce platform IO inside `src/core/power.py`.
 - Internal: extracts logind (login1) PrepareForSleep monitoring into a focused helper module to reduce DBus parsing/process management inside `src/core/power.py`.
 - Internal: extracts the `BatterySaverPolicy` state machine into a focused module to further shrink the `src/core/power.py` hotspot.

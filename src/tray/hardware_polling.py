@@ -12,6 +12,12 @@ def _apply_polled_hardware_state(
     last_brightness,
     last_off_state,
 ):
+    # If we're temporarily forcing brightness due to screen dim sync, do not
+    # persist that brightness back into config.json (it would become a user
+    # setting). Still allow off/on transitions to be detected.
+    dim_temp_active = bool(getattr(tray, "_dim_temp_active", False))
+    dim_temp_target = getattr(tray, "_dim_temp_target_brightness", None)
+
     if current_brightness > 0:
         tray._last_brightness = current_brightness
 
@@ -19,6 +25,15 @@ def _apply_polled_hardware_state(
         current_off = True
 
     if last_brightness is not None and current_brightness != last_brightness:
+        if dim_temp_active and dim_temp_target is not None:
+            try:
+                if int(current_brightness) == int(dim_temp_target):
+                    # Update the tracked last_brightness so we don't repeatedly
+                    # enter this branch; but do not write to config.
+                    return int(current_brightness), bool(current_off)
+            except Exception:
+                pass
+
         if tray._power_forced_off and current_brightness == 0:
             return current_brightness, current_off
 

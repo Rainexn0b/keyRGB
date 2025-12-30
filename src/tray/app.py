@@ -53,6 +53,8 @@ class KeyRGBTray:
         self._power_forced_off = False
         self._user_forced_off = False
         self._idle_forced_off = False
+        self._dim_temp_active = False
+        self._dim_temp_target_brightness = None
         self._last_brightness = 25
 
         # Backend selection is used for capability-driven UI gating.

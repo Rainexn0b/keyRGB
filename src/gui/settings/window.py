@@ -111,6 +111,10 @@ class PowerSettingsGUI:
         self.var_ac_brightness = tk.DoubleVar(value=float(values.ac_lighting_brightness))
         self.var_battery_brightness = tk.DoubleVar(value=float(values.battery_lighting_brightness))
 
+        self.var_dim_sync_enabled = tk.BooleanVar(value=bool(values.screen_dim_sync_enabled))
+        self.var_dim_sync_mode = tk.StringVar(value=str(values.screen_dim_sync_mode or "off"))
+        self.var_dim_temp_brightness = tk.DoubleVar(value=float(values.screen_dim_temp_brightness))
+
         self.chk_enabled = ttk.Checkbutton(
             left,
             text="Enable power management",
@@ -150,6 +154,67 @@ class PowerSettingsGUI:
             command=self._on_toggle,
         )
         self.chk_restore_lid.pack(anchor="w")
+
+        ttk.Separator(left).pack(fill="x", pady=(14, 10))
+
+        dim_title = ttk.Label(left, text="Screen dim sync", font=("Sans", 11, "bold"))
+        dim_title.pack(anchor="w", pady=(0, 6))
+
+        dim_desc = ttk.Label(
+            left,
+            text=(
+                "Optionally react to your desktop's screen dimming by either\n"
+                "turning keyboard LEDs off or dimming them to a temporary brightness."
+            ),
+            font=("Sans", 9),
+        )
+        dim_desc.pack(anchor="w", pady=(0, 10))
+
+        self.chk_dim_sync = ttk.Checkbutton(
+            left,
+            text="Sync keyboard lighting with screen dimming",
+            variable=self.var_dim_sync_enabled,
+            command=self._on_toggle,
+        )
+        self.chk_dim_sync.pack(anchor="w", pady=(0, 8))
+
+        dim_mode = ttk.Frame(left)
+        dim_mode.pack(fill="x")
+
+        self.rb_dim_off = ttk.Radiobutton(
+            dim_mode,
+            text="When dimmed: turn off",
+            value="off",
+            variable=self.var_dim_sync_mode,
+            command=self._on_toggle,
+        )
+        self.rb_dim_off.pack(anchor="w")
+
+        dim_temp_row = ttk.Frame(dim_mode)
+        dim_temp_row.pack(fill="x", pady=(6, 0))
+
+        self.rb_dim_temp = ttk.Radiobutton(
+            dim_temp_row,
+            text="When dimmed: set brightness to",
+            value="temp",
+            variable=self.var_dim_sync_mode,
+            command=self._on_toggle,
+        )
+        self.rb_dim_temp.pack(side="left", anchor="w")
+
+        self.lbl_dim_temp_val = ttk.Label(dim_temp_row, text=str(int(self.var_dim_temp_brightness.get())), font=("Sans", 9))
+        self.lbl_dim_temp_val.pack(side="right")
+
+        self.scale_dim_temp = ttk.Scale(
+            dim_mode,
+            from_=1,
+            to=50,
+            orient="horizontal",
+            variable=self.var_dim_temp_brightness,
+            command=lambda v: _set_label_int(self.lbl_dim_temp_val, v),
+        )
+        self.scale_dim_temp.pack(fill="x", pady=(6, 0))
+        self.scale_dim_temp.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
 
         ttk.Separator(left).pack(fill="x", pady=(14, 10))
 
@@ -358,12 +423,22 @@ class PowerSettingsGUI:
             self.chk_restore_resume,
             self.chk_off_lid,
             self.chk_restore_lid,
+            self.chk_dim_sync,
+            self.rb_dim_off,
+            self.rb_dim_temp,
+            self.scale_dim_temp,
             self.chk_ac_enabled,
             self.chk_battery_enabled,
             self.scale_ac_brightness,
             self.scale_battery_brightness,
         ):
             w.configure(state=state)
+
+        # Additional gating: dim temp brightness scale only makes sense in temp mode.
+        if enabled and bool(self.var_dim_sync_enabled.get()) and str(self.var_dim_sync_mode.get()) == "temp":
+            self.scale_dim_temp.configure(state="normal")
+        else:
+            self.scale_dim_temp.configure(state="disabled")
 
     def _apply_diagnostics_state(self) -> None:
         self.btn_copy_diagnostics.configure(state="normal" if self._diagnostics_json else "disabled")
@@ -439,6 +514,10 @@ class PowerSettingsGUI:
                 battery_lighting_enabled=bool(self.var_battery_enabled.get()),
                 ac_lighting_brightness=int(float(self.var_ac_brightness.get())),
                 battery_lighting_brightness=int(float(self.var_battery_brightness.get())),
+
+                screen_dim_sync_enabled=bool(self.var_dim_sync_enabled.get()),
+                screen_dim_sync_mode=str(self.var_dim_sync_mode.get() or "off"),
+                screen_dim_temp_brightness=int(float(self.var_dim_temp_brightness.get())),
                 os_autostart_enabled=bool(self.var_os_autostart.get()),
             )
             apply_settings_values_to_config(config=self.config, values=values)

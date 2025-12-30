@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Literal, Optional
 
 
-IdleAction = Optional[Literal["turn_off", "restore"]]
+IdleAction = Optional[Literal["turn_off", "restore", "dim_to_temp", "restore_brightness"]]
 
 
 def _compute_idle_action(
@@ -16,13 +16,25 @@ def _compute_idle_action(
     dimmed: Optional[bool],
     is_off: bool,
     idle_forced_off: bool,
+    dim_temp_active: bool,
     idle_timeout_s: float,
     power_management_enabled: bool,
+    screen_dim_sync_enabled: bool,
+    screen_dim_sync_mode: str,
+    screen_dim_temp_brightness: int,
     brightness: int,
     user_forced_off: bool,
     power_forced_off: bool,
 ) -> IdleAction:
     if not power_management_enabled:
+        return None
+
+    if not screen_dim_sync_enabled:
+        # If the feature is disabled, do not force off on dim events.
+        # Still allow restoring lighting if it is unexpectedly off.
+        if dimmed is None:
+            if is_off and (not idle_forced_off):
+                return "restore"
         return None
 
     if user_forced_off or power_forced_off:
@@ -31,21 +43,33 @@ def _compute_idle_action(
     if int(brightness) <= 0:
         return None
 
-    # When we can't determine dim state, be conservative: don't force off, but
-    # still allow restoring lighting if it is unexpectedly off.
+    # When we can't determine dim state, be conservative: don't force off and
+    # don't restore temp brightness, but still allow restoring lighting if it is
+    # unexpectedly off.
     if dimmed is None:
+        if dim_temp_active:
+            return None
         if is_off and (not idle_forced_off):
             return "restore"
         return None
 
     if dimmed is True:
+        mode = str(screen_dim_sync_mode or "off").strip().lower()
+        if mode == "temp":
+            if not is_off:
+                return "dim_to_temp"
+            return None
+
         if not is_off:
             return "turn_off"
         return None
 
-    # Not dimmed: restore if lighting is off (either we forced it off due to
-    # dimming, or firmware/EC did something odd).
     if dimmed is False:
+        if dim_temp_active:
+            return "restore_brightness"
+
+        # Not dimmed: restore if lighting is off (either we forced it off due to
+        # dimming, or firmware/EC did something odd).
         if is_off:
             return "restore"
         return None
@@ -62,6 +86,10 @@ def _ensure_idle_state(tray: Any) -> None:
         tray._power_forced_off = False
     if not hasattr(tray, "_dim_backlight_baselines"):
         tray._dim_backlight_baselines = {}
+    if not hasattr(tray, "_dim_temp_active"):
+        tray._dim_temp_active = False
+    if not hasattr(tray, "_dim_temp_target_brightness"):
+        tray._dim_temp_target_brightness = None
 
 
 def _read_int(path: Path) -> Optional[int]:
@@ -259,6 +287,16 @@ def start_idle_power_polling(
             try:
                 _ensure_idle_state(tray)
 
+                # Always reload config here as well (best-effort). While the tray
+                # has a dedicated config polling thread, reloading in this loop
+                # ensures settings changes (especially screen-dim sync mode) take
+                # effect even if the config polling thread is delayed or not
+                # running for some reason.
+                try:
+                    tray.config.reload()
+                except Exception:
+                    pass
+
                 dimmed = _read_dimmed_state(tray)
 
                 # Coarse fallback when we can't infer dim state from backlight.
@@ -269,22 +307,40 @@ def start_idle_power_polling(
                 try:
                     power_mgmt_enabled = bool(getattr(tray.config, "power_management_enabled", True))
                     brightness = int(getattr(tray.config, "brightness", 0) or 0)
+
+                    dim_sync_enabled = bool(getattr(tray.config, "screen_dim_sync_enabled", True))
+                    dim_sync_mode = str(getattr(tray.config, "screen_dim_sync_mode", "off") or "off")
+                    dim_temp_brightness = int(getattr(tray.config, "screen_dim_temp_brightness", 5) or 5)
                 except Exception:
                     power_mgmt_enabled = True
                     brightness = 0
+                    dim_sync_enabled = True
+                    dim_sync_mode = "off"
+                    dim_temp_brightness = 5
+
+                if dim_temp_brightness < 1:
+                    dim_temp_brightness = 1
+                if dim_temp_brightness > 50:
+                    dim_temp_brightness = 50
 
                 action = _compute_idle_action(
                     dimmed=dimmed,
                     idle_timeout_s=float(idle_timeout_s),
                     is_off=bool(getattr(tray, "is_off", False)),
                     idle_forced_off=bool(getattr(tray, "_idle_forced_off", False)),
+                    dim_temp_active=bool(getattr(tray, "_dim_temp_active", False)),
                     power_management_enabled=bool(power_mgmt_enabled),
+                    screen_dim_sync_enabled=bool(dim_sync_enabled),
+                    screen_dim_sync_mode=str(dim_sync_mode),
+                    screen_dim_temp_brightness=int(dim_temp_brightness),
                     brightness=int(brightness),
                     user_forced_off=bool(getattr(tray, "_user_forced_off", False)),
                     power_forced_off=bool(getattr(tray, "_power_forced_off", False)),
                 )
 
                 if action == "turn_off":
+                    tray._dim_temp_active = False
+                    tray._dim_temp_target_brightness = None
                     try:
                         tray.engine.stop()
                     except Exception:
@@ -301,11 +357,38 @@ def start_idle_power_polling(
                     except Exception:
                         pass
 
+                elif action == "dim_to_temp":
+                    # Do not fight explicit user/power forced off (already gated).
+                    # Do not turn on lighting if it's currently off.
+                    if not bool(getattr(tray, "is_off", False)):
+                        tray._dim_temp_active = True
+                        tray._dim_temp_target_brightness = int(dim_temp_brightness)
+                        try:
+                            tray.engine.set_brightness(int(dim_temp_brightness))
+                        except Exception:
+                            pass
+
+                elif action == "restore_brightness":
+                    tray._dim_temp_active = False
+                    tray._dim_temp_target_brightness = None
+                    # Restore to current config brightness (it may have been changed while dimmed).
+                    try:
+                        target = int(getattr(tray.config, "brightness", 0) or 0)
+                    except Exception:
+                        target = 0
+                    if target > 0 and not bool(getattr(tray, "is_off", False)):
+                        try:
+                            tray.engine.set_brightness(int(target))
+                        except Exception:
+                            pass
+
                 elif action == "restore":
                     # Only auto-restore if this wasn't an explicit user off.
                     if not bool(getattr(tray, "_user_forced_off", False)) and not bool(
                         getattr(tray, "_power_forced_off", False)
                     ):
+                        tray._dim_temp_active = False
+                        tray._dim_temp_target_brightness = None
                         _restore_from_idle(tray)
 
                 time.sleep(0.5)
