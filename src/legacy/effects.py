@@ -391,6 +391,65 @@ class EffectsEngine:
 
         return steps
 
+    @staticmethod
+    def _avoid_full_black(
+        *,
+        rgb: tuple[int, int, int],
+        target_rgb: tuple[int, int, int],
+        brightness: int,
+    ) -> tuple[int, int, int]:
+        """Avoid writing a full-black frame during transitions.
+
+        Some firmware/backends interpret (0,0,0) as "off" and will visually
+        blink the keyboard off between effect transitions. If the user actually
+        requested black/off, we keep it.
+        """
+
+        if int(brightness) <= 0:
+            return rgb
+        if tuple(target_rgb) == (0, 0, 0):
+            return rgb
+        if tuple(rgb) != (0, 0, 0):
+            return rgb
+
+        tr, tg, tb = (int(target_rgb[0]), int(target_rgb[1]), int(target_rgb[2]))
+        r = 1 if tr > 0 else 0
+        g = 1 if tg > 0 else 0
+        b = 1 if tb > 0 else 0
+        if (r, g, b) == (0, 0, 0):
+            # Target is non-black but all channels are 0? Be defensive.
+            return (1, 0, 0)
+        return (r, g, b)
+
+    def _scaled_color_map_nonzero(
+        self,
+        full_colors: Dict[Tuple[int, int], Tuple[int, int, int]],
+        *,
+        scale: float,
+    ) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+        """Scale per-key colors without collapsing non-black keys to full black."""
+
+        s = float(scale)
+        out: Dict[Tuple[int, int], Tuple[int, int, int]] = {}
+        for (row, col), (r0, g0, b0) in full_colors.items():
+            r0, g0, b0 = int(r0), int(g0), int(b0)
+            if (r0, g0, b0) == (0, 0, 0):
+                out[(row, col)] = (0, 0, 0)
+                continue
+
+            r = max(0, min(255, int(r0 * s)))
+            g = max(0, min(255, int(g0 * s)))
+            b = max(0, min(255, int(b0 * s)))
+            if (r, g, b) == (0, 0, 0) and s > 0 and int(self.brightness) > 0:
+                # Keep at least a tiny visible hint of the original color.
+                r = 1 if r0 > 0 else 0
+                g = 1 if g0 > 0 else 0
+                b = 1 if b0 > 0 else 0
+
+            out[(row, col)] = (r, g, b)
+
+        return out
+
     def _fade_uniform_color(
         self,
         *,
@@ -425,6 +484,12 @@ class EffectsEngine:
                 r = int(round(fr + (tr - fr) * t))
                 g = int(round(fg + (tg - fg) * t))
                 b = int(round(fb + (tb - fb) * t))
+
+                r, g, b = self._avoid_full_black(
+                    rgb=(r, g, b),
+                    target_rgb=(tr, tg, tb),
+                    brightness=effective_brightness,
+                )
                 with self.kb_lock:
                     self.kb.set_color((r, g, b), brightness=effective_brightness)
                 if dt > 0:
@@ -455,9 +520,9 @@ class EffectsEngine:
 
             for i in range(1, steps + 1):
                 scale = float(i) / float(steps)
-                color_map = scaled_color_map(full_colors, scale=scale)
+                color_map = self._scaled_color_map_nonzero(full_colors, scale=scale)
                 with self.kb_lock:
-                    self.kb.set_key_colors(color_map, enable_user_mode=False)
+                    self.kb.set_key_colors(color_map, brightness=int(self.brightness), enable_user_mode=False)
                 time.sleep(dt)
         except Exception:
             return
@@ -554,6 +619,10 @@ class EffectsEngine:
                 int(random.random() * 255 * factor),
             )
 
+            # Avoid a full-black random frame (reads as a blink-off).
+            if int(self.brightness) > 0 and tuple(target) == (0, 0, 0):
+                target = (1, 0, 0)
+
             if prev is None:
                 prev = target
 
@@ -569,6 +638,12 @@ class EffectsEngine:
                 r = int(round(pr + (tr - pr) * t))
                 g = int(round(pg + (tg - pg) * t))
                 b = int(round(pb + (tb - pb) * t))
+
+                r, g, b = self._avoid_full_black(
+                    rgb=(r, g, b),
+                    target_rgb=(tr, tg, tb),
+                    brightness=int(self.brightness),
+                )
                 with self.kb_lock:
                     self.kb.set_color((r, g, b), brightness=self.brightness)
                 self.stop_event.wait(dt)
@@ -617,7 +692,7 @@ class EffectsEngine:
             color_map = scaled_color_map(full_colors, scale=breath)
             
             with self.kb_lock:
-                self.kb.set_key_colors(color_map, enable_user_mode=False)
+                self.kb.set_key_colors(color_map, brightness=int(self.brightness), enable_user_mode=False)
             
             phase += 0.08
             self.stop_event.wait(interval)
@@ -656,7 +731,7 @@ class EffectsEngine:
             color_map = scaled_color_map(full_colors, scale=pulse)
             
             with self.kb_lock:
-                self.kb.set_key_colors(color_map, enable_user_mode=False)
+                self.kb.set_key_colors(color_map, brightness=int(self.brightness), enable_user_mode=False)
             
             phase += 0.15
             self.stop_event.wait(interval)

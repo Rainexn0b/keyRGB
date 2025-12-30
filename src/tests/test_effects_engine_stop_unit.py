@@ -55,3 +55,31 @@ def test_static_effect_fades_between_colors() -> None:
     # Fade should produce multiple intermediate frames and end at the target color.
     assert len(spy.calls) >= 2
     assert spy.calls[-1][0] == (0, 0, 255)
+
+    def test_fade_to_non_black_never_writes_full_black() -> None:
+        class SpyKeyboard(_NullKeyboard):
+            def __init__(self):
+                self.calls: list[tuple[tuple[int, int, int], int]] = []
+
+            def set_color(self, color, *, brightness: int):
+                r, g, b = color
+                self.calls.append(((int(r), int(g), int(b)), int(brightness)))
+
+        engine = EffectsEngine()
+
+        spy = SpyKeyboard()
+        engine.kb = spy
+        engine.device_available = True
+        engine.brightness = 25
+
+        engine._fade_uniform_color(
+            from_color=(0, 0, 0),
+            to_color=(255, 0, 0),
+            brightness=25,
+            duration_s=0.02,
+            steps=8,
+        )
+
+        assert spy.calls
+        for (rgb, _brightness) in spy.calls:
+            assert rgb != (0, 0, 0)
