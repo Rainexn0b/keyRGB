@@ -20,7 +20,7 @@ If OpenRGB doesn't support your device (or is painful to operate), KeyRGB aims t
 
 ![Tray menu](assets/screenshots/tray.png)
 
-![Settings](assets/screenshots/settings.png)
+![Settings](assets/screenshots/settings.png?raw=1&v=0.4.0)
 
 ![Per-key editor](assets/screenshots/perkeyux.png)
 
