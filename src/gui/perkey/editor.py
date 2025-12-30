@@ -23,6 +23,7 @@ from .profile_management import activate_profile, delete_profile, save_profile
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
 from .color_map_ops import clear_all, ensure_full_map, fill_all
+from .color_apply_ops import apply_color_to_map
 
 
 class PerKeyEditor:
@@ -234,16 +235,21 @@ class PerKeyEditor:
         if color != (0, 0, 0):
             self._last_non_black_color = color
 
+        if (not self.apply_all_keys.get()) and (self.selected_cell is None or not self.selected_key_id):
+            return
+
+        self.colors = apply_color_to_map(
+            colors=dict(self.colors),
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+            color=color,
+            apply_all_keys=bool(self.apply_all_keys.get()),
+            selected_cell=self.selected_cell,
+        )
+
         if self.apply_all_keys.get():
-            for row in range(NUM_ROWS):
-                for col in range(NUM_COLS):
-                    self.colors[(row, col)] = color
             self.canvas.redraw()
         else:
-            if self.selected_cell is None or not self.selected_key_id:
-                return
-            row, col = self.selected_cell
-            self.colors[(row, col)] = color
             self.canvas.update_key_visual(self.selected_key_id, color)
         self._commit(force=False)
 
@@ -252,16 +258,21 @@ class PerKeyEditor:
         if color != (0, 0, 0):
             self._last_non_black_color = color
 
+        if (not self.apply_all_keys.get()) and (self.selected_cell is None or not self.selected_key_id):
+            return
+
+        self.colors = apply_color_to_map(
+            colors=dict(self.colors),
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+            color=color,
+            apply_all_keys=bool(self.apply_all_keys.get()),
+            selected_cell=self.selected_cell,
+        )
+
         if self.apply_all_keys.get():
-            for row in range(NUM_ROWS):
-                for col in range(NUM_COLS):
-                    self.colors[(row, col)] = color
             self.canvas.redraw()
         else:
-            if self.selected_cell is None or not self.selected_key_id:
-                return
-            row, col = self.selected_cell
-            self.colors[(row, col)] = color
             self.canvas.update_key_visual(self.selected_key_id, color)
         self._commit(force=True)
         if self.apply_all_keys.get():
