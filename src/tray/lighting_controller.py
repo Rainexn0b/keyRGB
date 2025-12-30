@@ -35,6 +35,16 @@ def start_current_effect(tray: Any) -> None:
                 return
 
             with tray.engine.kb_lock:
+                if hasattr(tray.engine.kb, "enable_user_mode"):
+                    try:
+                        tray.engine.kb.enable_user_mode(brightness=tray.config.brightness, save=True)
+                    except TypeError:
+                        try:
+                            tray.engine.kb.enable_user_mode(brightness=tray.config.brightness)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
                 tray.engine.kb.set_key_colors(
                     tray.config.per_key_colors,
                     brightness=tray.config.brightness,

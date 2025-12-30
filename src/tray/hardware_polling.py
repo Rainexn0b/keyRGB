@@ -4,6 +4,48 @@ import threading
 import time
 
 
+def _apply_polled_hardware_state(
+    tray,
+    *,
+    current_brightness: int,
+    current_off: bool,
+    last_brightness,
+    last_off_state,
+):
+    if current_brightness > 0:
+        tray._last_brightness = current_brightness
+
+    if current_brightness == 0:
+        current_off = True
+
+    if last_brightness is not None and current_brightness != last_brightness:
+        if tray._power_forced_off and current_brightness == 0:
+            return current_brightness, current_off
+
+        # Never persist brightness=0 from hardware polling. Some backends can
+        # transiently report 0 during mode transitions; persisting it resets the
+        # user's configured brightness to 0 (and writes it to disk).
+        if current_brightness == 0:
+            tray.is_off = True
+        else:
+            tray.config.brightness = current_brightness
+            if last_brightness == 0:
+                tray.is_off = False
+
+        tray._refresh_ui()
+        return current_brightness, current_off
+
+    if last_off_state is not None and current_off != last_off_state:
+        if tray._power_forced_off and current_off:
+            return current_brightness, current_off
+
+        tray.is_off = current_off
+        tray._refresh_ui()
+        return current_brightness, current_off
+
+    return current_brightness, current_off
+
+
 def start_hardware_polling(tray) -> None:
     """Poll keyboard hardware state to detect physical button changes."""
 
@@ -18,38 +60,13 @@ def start_hardware_polling(tray) -> None:
                     current_brightness = tray.engine.kb.get_brightness()
                     current_off = tray.engine.kb.is_off()
 
-                if current_brightness > 0:
-                    tray._last_brightness = current_brightness
-
-                if current_brightness == 0:
-                    current_off = True
-
-                if last_brightness is not None and current_brightness != last_brightness:
-                    if tray._power_forced_off and current_brightness == 0:
-                        last_brightness = current_brightness
-                        last_off_state = current_off
-                        continue
-
-                    tray.config.brightness = current_brightness
-
-                    if current_brightness == 0:
-                        tray.is_off = True
-                    elif last_brightness == 0:
-                        tray.is_off = False
-
-                    tray._refresh_ui()
-
-                elif last_off_state is not None and current_off != last_off_state:
-                    if tray._power_forced_off and current_off:
-                        last_brightness = current_brightness
-                        last_off_state = current_off
-                        continue
-
-                    tray.is_off = current_off
-                    tray._refresh_ui()
-
-                last_brightness = current_brightness
-                last_off_state = current_off
+                last_brightness, last_off_state = _apply_polled_hardware_state(
+                    tray,
+                    current_brightness=int(current_brightness),
+                    current_off=bool(current_off),
+                    last_brightness=last_brightness,
+                    last_off_state=last_off_state,
+                )
 
             except Exception as exc:
                 # Device disconnects can happen at any time.

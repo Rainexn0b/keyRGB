@@ -20,6 +20,18 @@ def push_per_key_colors(
         return None
 
     try:
+        if enable_user_mode and hasattr(kb, "enable_user_mode"):
+            try:
+                kb.enable_user_mode(brightness=brightness, save=True)
+            except TypeError:
+                # Some backends may expose enable_user_mode without a save kwarg.
+                try:
+                    kb.enable_user_mode(brightness=brightness)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
         kb.set_key_colors(
             colors,
             brightness=brightness,

@@ -14,10 +14,15 @@
 - Internal: extracts the `BatterySaverPolicy` state machine into a focused module to further shrink the `src/core/power.py` hotspot.
 - Internal: extracts Settings UI config/state logic into a testable helper module to reduce complexity in the Tk settings window.
 - Internal: extracts per-key editor color-map operations into a focused helper module to reduce UI coupling.
+- Internal: extracts per-key editor color-apply logic into a focused helper module to reduce UI coupling.
 - Tests: adds a small unit test to lock in tray UI refresh behavior.
 - Tests: adds unit tests for sysfs power-supply probing.
 - Tests: adds a small unit test to lock in logind PrepareForSleep parsing.
 - Tests: adds unit tests for Settings UI state loading/apply behavior.
 - Tests: adds unit tests for per-key editor color-map operations.
+- Tests: adds unit tests for per-key color-apply behavior.
 - Effects: slows down and smooths software effects (more interpolation steps and less abrupt transitions) for a more organic feel at low speeds.
+- Effects: avoids unintended full-black frames during transitions to reduce brief "keyboard off" blinks when starting/stopping effects or switching to per-key.
+- Brightness: avoids persisting transient brightness=0 reads from hardware polling (prevents random brightness resets).
+- Per-key: best-effort persists user-mode when applying per-key colors so per-key lighting stays on while typing.
 - Docs: updates tech-debt tracking/hotspots and documents legacy boundaries.

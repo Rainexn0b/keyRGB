@@ -79,6 +79,16 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                             color_map.setdefault((r, c), base)
 
                 with tray.engine.kb_lock:
+                    if hasattr(tray.engine.kb, "enable_user_mode"):
+                        try:
+                            tray.engine.kb.enable_user_mode(brightness=tray.config.brightness, save=True)
+                        except TypeError:
+                            try:
+                                tray.engine.kb.enable_user_mode(brightness=tray.config.brightness)
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
                     tray.engine.kb.set_key_colors(
                         color_map,
                         brightness=tray.config.brightness,
