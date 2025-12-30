@@ -7,16 +7,15 @@ Handles lid close/open, suspend/resume events to control keyboard backlight
 from __future__ import annotations
 
 import logging
-import os
 import subprocess
 import threading
 import time
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Optional
 
 from .acpi_monitoring import monitor_acpi_events
 from .lid_monitoring import start_sysfs_lid_monitoring
+from .power_supply_sysfs import read_on_ac_power
 from .power_source_policy import compute_power_source_policy
 from src.legacy.config import Config
 
@@ -99,7 +98,7 @@ class PowerManager:
 
         while self.monitoring:
             try:
-                on_ac = _read_on_ac_power()
+                on_ac = read_on_ac_power()
                 if on_ac is None:
                     time.sleep(poll_interval_s)
                     continue
@@ -363,57 +362,6 @@ class PowerManager:
                 self._saved_state = None
         except Exception as e:
             logger.exception("Error restoring keyboard: %s", e)
-
-
-def _iter_ac_online_files(power_supply_root: Path) -> list[Path]:
-    files: list[Path] = []
-    try:
-        for child in sorted(power_supply_root.iterdir()):
-            if not child.is_dir():
-                continue
-            online = child / "online"
-            if not online.exists():
-                continue
-            # Prefer devices that identify as Mains.
-            typ = None
-            try:
-                typ = (child / "type").read_text(errors="ignore").strip().lower()
-            except Exception:
-                typ = None
-            if typ == "mains":
-                files.append(online)
-
-        if files:
-            return files
-    except Exception:
-        pass
-
-    # Fallback: common names like AC/ACAD/AC0
-    try:
-        for online in sorted(power_supply_root.glob("AC*/online")):
-            files.append(online)
-    except Exception:
-        pass
-
-    return files
-
-
-def _read_on_ac_power() -> Optional[bool]:
-    root = Path(os.environ.get("KEYRGB_SYSFS_POWER_SUPPLY_ROOT", "/sys/class/power_supply"))
-    candidates = _iter_ac_online_files(root)
-    if not candidates:
-        return None
-
-    for online_path in candidates:
-        try:
-            raw = online_path.read_text(errors="ignore").strip()
-            if raw in ("1", "0"):
-                return raw == "1"
-        except Exception:
-            continue
-    return None
-
-
 @dataclass
 class BatterySaverPolicy:
     """State machine for dim-on-battery and restore-on-AC.

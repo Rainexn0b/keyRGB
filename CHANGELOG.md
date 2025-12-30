@@ -9,5 +9,7 @@
 ## 2025-12-30
 
 - Internal: refactors tray code into smaller modules (startup, lighting control, menu sections, polling wrapper) and consolidates UI refresh.
+- Internal: extracts sysfs AC-power detection into a focused module to reduce platform IO inside `src/core/power.py`.
 - Tests: adds a small unit test to lock in tray UI refresh behavior.
+- Tests: adds unit tests for sysfs power-supply probing.
 - Docs: updates tech-debt tracking/hotspots and documents legacy boundaries.
