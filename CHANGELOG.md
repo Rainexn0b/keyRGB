@@ -5,3 +5,9 @@
 - Installer: reliably installs the ITE 8291 (048d:600b) udev rule and reloads udev so KeyRGB can access the device without running as root.
 - Permissions: improves the ITE 8291 backend error message when device access is denied.
 - Internal: refactors Tuxedo Control Center (TCC) power profiles code into a package while preserving the public API.
+
+## 2025-12-30
+
+- Internal: refactors tray code into smaller modules (startup, lighting control, menu sections, polling wrapper) and consolidates UI refresh.
+- Tests: adds a small unit test to lock in tray UI refresh behavior.
+- Docs: updates tech-debt tracking/hotspots and documents legacy boundaries.

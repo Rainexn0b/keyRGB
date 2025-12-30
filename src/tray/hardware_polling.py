@@ -37,8 +37,7 @@ def start_hardware_polling(tray) -> None:
                     elif last_brightness == 0:
                         tray.is_off = False
 
-                    tray._update_icon()
-                    tray._update_menu()
+                    tray._refresh_ui()
 
                 elif last_off_state is not None and current_off != last_off_state:
                     if tray._power_forced_off and current_off:
@@ -47,8 +46,7 @@ def start_hardware_polling(tray) -> None:
                         continue
 
                     tray.is_off = current_off
-                    tray._update_icon()
-                    tray._update_menu()
+                    tray._refresh_ui()
 
                 last_brightness = current_brightness
                 last_off_state = current_off

@@ -11,22 +11,31 @@ The heavy lifting lives here; legacy entrypoints delegate to avoid duplication.
 from __future__ import annotations
 
 import logging
-import os
 import sys
 
 from src.core import tcc_power_profiles
 from src.core.backends.registry import select_backend
-from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
 
 from .dependencies import load_tray_dependencies
 from .effect_selection import apply_effect_selection
 from .gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
 from .ite_dimensions import load_ite_dimensions
+from .lighting_controller import (
+    apply_brightness_from_power_policy,
+    on_brightness_clicked,
+    on_speed_clicked,
+    power_restore,
+    power_turn_off,
+    start_current_effect,
+    turn_off,
+    turn_on,
+)
 
 from . import icon as icon_mod
 from . import menu as menu_mod
 from . import polling
 from . import runtime
+from .startup import acquire_single_instance_or_exit, configure_logging, log_startup_diagnostics_if_debug
 
 logger = logging.getLogger(__name__)
 
@@ -56,9 +65,7 @@ class KeyRGBTray:
         self.power_manager = PowerManager(self, config=self.config)
         self.power_manager.start_monitoring()
 
-        polling.start_hardware_polling(self)
-        polling.start_config_polling(self, ite_num_rows=self._ite_rows, ite_num_cols=self._ite_cols)
-        polling.start_icon_color_polling(self)
+        polling.start_all_polling(self, ite_num_rows=self._ite_rows, ite_num_cols=self._ite_cols)
 
         if getattr(self.config, "autostart", False) and not self.is_off:
             self._start_current_effect()
@@ -83,43 +90,19 @@ class KeyRGBTray:
             pystray, item = runtime.get_pystray()
             self.icon.menu = menu_mod.build_menu(self, pystray=pystray, item=item)
 
+    def _refresh_ui(self) -> None:
+        """Refresh both icon and menu.
+
+        Convenience wrapper to keep call sites small.
+        """
+
+        self._update_icon()
+        self._update_menu()
+
     # ---- effect application
 
     def _start_current_effect(self):
-        try:
-            if self.config.effect == 'perkey':
-                self.engine.stop()
-                if self.config.brightness == 0:
-                    self.engine.turn_off()
-                    self.is_off = True
-                    return
-
-                with self.engine.kb_lock:
-                    self.engine.kb.set_key_colors(self.config.per_key_colors, brightness=self.config.brightness, enable_user_mode=True)
-                self.is_off = False
-                return
-
-            if self.config.effect == 'none':
-                self.engine.stop()
-                if self.config.brightness == 0:
-                    self.engine.turn_off()
-                    self.is_off = True
-                    return
-
-                with self.engine.kb_lock:
-                    self.engine.kb.set_color(self.config.color, brightness=self.config.brightness)
-                self.is_off = False
-                return
-
-            self.engine.start_effect(
-                self.config.effect,
-                speed=self.config.speed,
-                brightness=self.config.brightness,
-                color=self.config.color,
-            )
-            self.is_off = False
-        except Exception as e:
-            self._log_exception("Error starting effect: %s", e)
+        start_current_effect(self)
 
     # ---- menu callbacks
 
@@ -128,56 +111,19 @@ class KeyRGBTray:
 
         apply_effect_selection(self, effect_name=effect_name)
 
-        self._update_icon()
-        self._update_menu()
+        self._refresh_ui()
 
     def _on_speed_clicked(self, _icon, item):
-        speed_str = str(item).replace('🔘', '').replace('⚪', '').strip()
-        try:
-            self.config.speed = int(speed_str)
-            if not self.is_off:
-                self._start_current_effect()
-            self._update_menu()
-        except ValueError:
-            pass
+        on_speed_clicked(self, item)
 
     def _on_brightness_clicked(self, _icon, item):
-        brightness_str = str(item).replace('🔘', '').replace('⚪', '').strip()
-        try:
-            brightness = int(brightness_str)
-            brightness_hw = brightness * 5
-
-            if brightness_hw > 0:
-                self._last_brightness = brightness_hw
-
-            self.config.brightness = brightness_hw
-            self.engine.set_brightness(self.config.brightness)
-            if not self.is_off:
-                self._start_current_effect()
-            self._update_menu()
-        except ValueError:
-            pass
+        on_brightness_clicked(self, item)
 
     def _on_off_clicked(self, _icon, _item):
-        self.engine.turn_off()
-        self.is_off = True
-        self._update_icon()
-        self._update_menu()
+        turn_off(self)
 
     def _on_turn_on_clicked(self, _icon, _item):
-        self.is_off = False
-
-        if self.config.brightness == 0:
-            self.config.brightness = self._last_brightness if self._last_brightness > 0 else 25
-
-        if self.config.effect == 'none':
-            with self.engine.kb_lock:
-                self.engine.kb.set_color(self.config.color, brightness=self.config.brightness)
-        else:
-            self._start_current_effect()
-
-        self._update_icon()
-        self._update_menu()
+        turn_on(self)
 
     def _on_perkey_clicked(self, _icon, _item):
         launch_perkey_gui()
@@ -208,27 +154,10 @@ class KeyRGBTray:
     # ---- power callbacks (called by power manager)
 
     def turn_off(self):
-        self._power_forced_off = True
-        self.is_off = True
-        self.engine.turn_off()
-        self._update_icon()
-        self._update_menu()
+        power_turn_off(self)
 
     def restore(self):
-        if self._power_forced_off:
-            self._power_forced_off = False
-            self.is_off = False
-
-            if self.config.brightness == 0:
-                self.config.brightness = self._last_brightness if self._last_brightness > 0 else 25
-
-            self._start_current_effect()
-            self._update_icon()
-            self._update_menu()
-            return
-
-        if not self.is_off:
-            self._start_current_effect()
+        power_restore(self)
 
     def apply_brightness_from_power_policy(self, brightness: int) -> None:
         """Best-effort brightness apply used by PowerManager battery-saver.
@@ -236,29 +165,7 @@ class KeyRGBTray:
         This must never crash the tray.
         """
 
-        try:
-            brightness = int(brightness)
-        except Exception:
-            return
-
-        if brightness < 0:
-            return
-
-        # If the user explicitly turned the keyboard off, don't fight it.
-        if self.is_off:
-            return
-
-        try:
-            if brightness > 0:
-                self._last_brightness = brightness
-            self.config.brightness = brightness
-            self.engine.set_brightness(self.config.brightness)
-            self._start_current_effect()
-            self._update_menu()
-            self._update_icon()
-        except Exception:
-            # Best-effort only.
-            return
+        apply_brightness_from_power_policy(self, brightness)
 
     # ---- run
 
@@ -281,21 +188,9 @@ class KeyRGBTray:
 
 def main():
     try:
-        if not logging.getLogger().handlers:
-            level = logging.DEBUG if os.environ.get('KEYRGB_DEBUG') else logging.INFO
-            logging.basicConfig(level=level, format='%(levelname)s %(name)s: %(message)s')
-
-        if os.environ.get("KEYRGB_DEBUG"):
-            try:
-                diag = collect_diagnostics(include_usb=True)
-                logger.debug("Startup diagnostics (Tongfang):\n%s", format_diagnostics_text(diag))
-            except Exception:
-                # Best-effort; never fail startup because of diagnostics.
-                pass
-
-        if not runtime.acquire_single_instance_lock():
-            logger.error("KeyRGB is already running (lock held). Not starting a second instance.")
-            sys.exit(0)
+        configure_logging()
+        log_startup_diagnostics_if_debug()
+        acquire_single_instance_or_exit()
 
         app = KeyRGBTray()
         app.run()

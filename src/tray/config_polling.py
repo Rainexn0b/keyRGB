@@ -61,8 +61,7 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                         pass
             tray.is_off = True
             last_applied = current
-            tray._update_icon()
-            tray._update_menu()
+            tray._refresh_ui()
             return
 
         if tray.config.brightness > 0:
@@ -112,8 +111,7 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
             tray._log_exception("Error applying config change: %s", e)
 
         last_applied = current
-        tray._update_icon()
-        tray._update_menu()
+        tray._refresh_ui()
 
     def poll_config():
         nonlocal last_mtime

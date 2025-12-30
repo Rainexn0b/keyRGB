@@ -13,6 +13,7 @@ This folder tracks known maintainability issues, refactor proposals, and “hot 
 - Start with [Hotspots](./hotspots.md) for the current “largest / riskiest” modules.
 - Use [Tracking](./tracking.md) as the living backlog of refactors.
 - Use [Refactor plan](./refactor-plan.md) for concrete suggested PR slices.
+- See [Legacy boundaries](./legacy-boundaries.md) for what is considered “legacy” in this repo.
 
 **Update cadence**
 
