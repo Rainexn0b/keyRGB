@@ -22,6 +22,7 @@ from .overlay_autosync import auto_sync_per_key_overlays
 from .profile_management import activate_profile, delete_profile, save_profile
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
+from .color_map_ops import clear_all, ensure_full_map, fill_all
 
 
 class PerKeyEditor:
@@ -299,30 +300,28 @@ class PerKeyEditor:
         r, g, b = self.color_wheel.get_color()
         color = (r, g, b)
 
-        for row in range(NUM_ROWS):
-            for col in range(NUM_COLS):
-                self.colors[(row, col)] = color
+        self.colors = fill_all(num_rows=NUM_ROWS, num_cols=NUM_COLS, color=color)
 
         self.canvas.redraw()
         self._commit(force=True)
         self.status_label.config(text=f"Filled all keys = RGB({r},{g},{b})")
 
     def _ensure_full_map(self):
-        if len(self.colors) >= (NUM_ROWS * NUM_COLS):
-            return
-
         # Use the last non-black wheel color as the base fill. This matches the
         # expected workflow: start from a unified color, then override a few keys
         # without blanking the rest of the keyboard.
         base = tuple(getattr(self, "_last_non_black_color", tuple(self.config.color)))
-        if base == (0, 0, 0):
-            base = tuple(self.config.color)
-        for row in range(NUM_ROWS):
-            for col in range(NUM_COLS):
-                self.colors.setdefault((row, col), base)
+        fallback = tuple(self.config.color)
+        self.colors = ensure_full_map(
+            colors=dict(self.colors),
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+            base_color=base,
+            fallback_color=fallback,
+        )
 
     def _clear_all(self):
-        self.colors = {(row, col): (0, 0, 0) for row in range(NUM_ROWS) for col in range(NUM_COLS)}
+        self.colors = clear_all(num_rows=NUM_ROWS, num_cols=NUM_COLS)
         self.canvas.redraw()
         self.config.effect = "perkey"
         self.config.per_key_colors = self.colors
