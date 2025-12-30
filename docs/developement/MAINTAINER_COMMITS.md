@@ -27,6 +27,35 @@ pytest -q -o addopts=
 - Update the version in `pyproject.toml` when you want a release tag.
 - Tag releases like `vX.Y.Z`.
 
+## Pushing tags safely
+
+Avoid using `git push --tags` unless you are 100% sure your local tag list is clean.
+
+Recommended flow:
+
+```bash
+# Create the release tag (example)
+git tag -a v0.4.0 -m "v0.4.0"
+
+# Push just the tag you intended
+git push origin v0.4.0
+```
+
+If you ever see “wrong” tags show up on GitHub, it’s usually because those tags still exist locally and got pushed later.
+You can list and delete stray tags locally:
+
+```bash
+git tag -l | sort
+git tag -d <bad-tag>
+```
+
+Also check whether your git is configured to push tags automatically:
+
+```bash
+git config --get push.followTags
+git config --global --get push.followTags
+```
+
 ## Autostart / installer expectations
 
 - `install.sh`:
