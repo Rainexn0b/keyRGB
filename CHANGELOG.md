@@ -2,10 +2,18 @@
 
 ## 0.4.0 (2025-12-30)
 
-- Tray: Screen Dim Sync supports `turn off` and `set brightness to` (temporary dim) modes.
-- Tray: when the display is powered off via DPMS (e.g. power button), temporary dim mode now turns the keyboard fully off and restores on wake.
-- Settings UI: window sizing adjusted so the full panel is visible (screenshot-friendly).
-- Docs: updated usage notes and refreshed Settings screenshot.
+This release note covers changes since `v0.2.1` (GitHub Releases were behind the tags).
+
+- Tray: adds Screen Dim Sync (turn off, temporary dim-to-brightness, or disabled).
+- Tray: when the display powers off via DPMS (e.g. power button), temporary dim mode now turns the keyboard fully off and restores on wake.
+- Settings: adds AC/battery lighting controls.
+- Settings: adds Diagnostics runner and expands diagnostics JSON (USB device holders/process info, power/config snapshots).
+- Settings: improves layout/scrolling and adjusts window sizing so the full panel is visible (screenshot-friendly).
+- Per-key: reduces random brightness resets and best-effort preserves user-mode so per-key lighting stays active while typing.
+- Effects: smoother timing/transition behavior; avoids brief full-black frames (“keyboard blink off”).
+- Installer: hardens udev rule installation/reload so KeyRGB can access the device without running as root.
+- Packaging: adds `uninstall.sh` for `install.sh` installs; updates local RPM/SRPM scripts/instructions.
+- Internal: refactors tray modules and power management helpers (logind PrepareForSleep, sysfs power-supply, BatterySaverPolicy, TCC profiles) and adds/expands unit tests.
 
 ## 2025-12-29
 
