@@ -126,9 +126,16 @@ class EffectsEngine:
             self.stop_event.set()
             if self.thread:
                 self.thread.join(timeout=2.0)
-            self.thread = None
-            self.current_effect = None
-            self.stop_event.clear()
+                if self.thread.is_alive():
+                    # Don't clear the stop event yet; the thread still needs to observe it.
+                    logger.warning("Effect thread did not stop within timeout")
+                else:
+                    self.thread = None
+                    self.current_effect = None
+                    self.stop_event.clear()
+            else:
+                self.current_effect = None
+                self.stop_event.clear()
     
     def turn_off(self):
         """Turn off all LEDs"""
@@ -146,6 +153,9 @@ class EffectsEngine:
     
     def start_effect(self, effect_name: str, speed: int = 5, brightness: int = 25, color: Optional[tuple] = None):
         """Start an effect (hardware or software)"""
+        prev_color = tuple(self.current_color)
+        prev_brightness = int(getattr(self, "brightness", 25) or 0)
+
         self.stop()
 
         # If no device is present, keep state but do not crash.
@@ -169,35 +179,68 @@ class EffectsEngine:
         
         # Software effects - run in thread
         elif effect_name == 'static':
-            with self.kb_lock:
-                self.kb.set_color(self.current_color, brightness=self.brightness)
+            self._fade_uniform_color(
+                from_color=prev_color,
+                to_color=tuple(self.current_color),
+                brightness=int(self.brightness),
+                duration_s=0.12,
+            )
         
         elif effect_name == 'pulse':
+            self._fade_uniform_color(
+                from_color=prev_color,
+                to_color=tuple(self.current_color),
+                brightness=int(self.brightness),
+                duration_s=0.10,
+            )
             self.running = True
             self.thread = Thread(target=self._effect_pulse, daemon=True)
             self.thread.start()
         
         elif effect_name == 'strobe':
+            # Ease into strobe so it doesn't feel like a harsh snap.
+            self._fade_uniform_color(
+                from_color=prev_color,
+                to_color=(255, 255, 255),
+                brightness=int(self.brightness),
+                duration_s=0.08,
+            )
             self.running = True
             self.thread = Thread(target=self._effect_strobe, daemon=True)
             self.thread.start()
         
         elif effect_name == 'fire':
+            # Start fire from a warm base tone.
+            self._fade_uniform_color(
+                from_color=prev_color,
+                to_color=(255, 80, 0),
+                brightness=int(self.brightness),
+                duration_s=0.08,
+            )
             self.running = True
             self.thread = Thread(target=self._effect_fire, daemon=True)
             self.thread.start()
         
         elif effect_name == 'random':
+            # Fade into the first random frame to reduce "flash".
+            self._fade_uniform_color(
+                from_color=prev_color,
+                to_color=tuple(self.current_color),
+                brightness=int(self.brightness),
+                duration_s=0.06,
+            )
             self.running = True
             self.thread = Thread(target=self._effect_random, daemon=True)
             self.thread.start()
         
         elif effect_name == 'perkey_breathing':
+            self._fade_in_per_key(duration_s=0.12)
             self.running = True
             self.thread = Thread(target=self._effect_perkey_breathing, daemon=True)
             self.thread.start()
         
         elif effect_name == 'perkey_pulse':
+            self._fade_in_per_key(duration_s=0.10)
             self.running = True
             self.thread = Thread(target=self._effect_perkey_pulse, daemon=True)
             self.thread.start()
@@ -297,9 +340,127 @@ class EffectsEngine:
         return (int(r * 255), int(g * 255), int(b * 255))
     
     def _get_interval(self, base_ms: int) -> float:
-        """Calculate interval based on speed (0-10, inverted for consistency)"""
-        speed_factor = (11 - self.speed) / 10.0  # Invert: 10=fast, 0=slow
-        return (base_ms * speed_factor) / 1000.0
+        """Calculate interval based on speed (0-10, 10 = fastest).
+
+        Historically the software effects were effectively capped near the base
+        interval even at low speeds. Use the full 1..11x multiplier so speed 0
+        is meaningfully slower.
+        """
+
+        speed_factor = max(1, min(11, 11 - int(self.speed)))
+
+        # Global slowdown for software effects.
+        # Tuned by feel: low UI speeds (e.g. 2) should be noticeably slow.
+        slowdown = 1.89
+
+        return (base_ms * float(speed_factor) * float(slowdown)) / 1000.0
+
+    def _clamped_interval(self, base_ms: int, *, min_s: float) -> float:
+        interval = self._get_interval(base_ms)
+        return max(float(min_s), float(interval))
+
+    def _choose_steps(
+        self,
+        *,
+        duration_s: float,
+        max_steps: int,
+        target_fps: float = 45.0,
+        min_dt_s: float = 0.015,
+    ) -> int:
+        """Choose an interpolation step count with a soft FPS cap.
+
+        Higher steps => smoother, but too many writes can hurt performance.
+        """
+
+        if duration_s <= 0:
+            return 1
+
+        max_steps = max(1, min(20, int(max_steps)))
+        target_fps = max(1.0, float(target_fps))
+        min_dt_s = max(0.001, float(min_dt_s))
+
+        # Prefer ~target_fps updates, but don't exceed max_steps.
+        steps = int(round(float(duration_s) * target_fps))
+        steps = max(2, min(max_steps, steps))
+
+        # Enforce a minimum dt to avoid tight loops.
+        dt = float(duration_s) / float(steps)
+        if dt < min_dt_s:
+            steps = int(float(duration_s) / float(min_dt_s))
+            steps = max(2, min(max_steps, steps))
+
+        return steps
+
+    def _fade_uniform_color(
+        self,
+        *,
+        from_color: tuple,
+        to_color: tuple,
+        brightness: int,
+        duration_s: float,
+        steps: int = 18,
+    ) -> None:
+        """Small cosmetic fade between uniform colors.
+
+        Best-effort only: never raises, never takes too long.
+        """
+
+        try:
+            if duration_s <= 0:
+                steps = 1
+                dt = 0.0
+            else:
+                steps = self._choose_steps(duration_s=float(duration_s), max_steps=int(steps))
+                dt = float(duration_s) / float(steps)
+
+            fr, fg, fb = (int(from_color[0]), int(from_color[1]), int(from_color[2]))
+            tr, tg, tb = (int(to_color[0]), int(to_color[1]), int(to_color[2]))
+            brightness = max(0, min(50, int(brightness)))
+
+            # Avoid brightness 0 during transitions (tray/hardware pollers may interpret it as "off").
+            effective_brightness = max(1, brightness) if brightness > 0 else 0
+
+            for i in range(1, steps + 1):
+                t = float(i) / float(steps)
+                r = int(round(fr + (tr - fr) * t))
+                g = int(round(fg + (tg - fg) * t))
+                b = int(round(fb + (tb - fb) * t))
+                with self.kb_lock:
+                    self.kb.set_color((r, g, b), brightness=effective_brightness)
+                if dt > 0:
+                    time.sleep(dt)
+        except Exception:
+            return
+
+    def _fade_in_per_key(self, *, duration_s: float, steps: int = 12) -> None:
+        """Fade in the current per-key map to reduce harsh transitions."""
+
+        try:
+            if duration_s <= 0:
+                return
+            if not self.per_key_colors:
+                return
+
+            steps = self._choose_steps(duration_s=float(duration_s), max_steps=int(steps), target_fps=50.0, min_dt_s=0.012)
+            dt = float(duration_s) / float(steps)
+
+            full_colors = build_full_color_grid(
+                base_color=tuple(int(x) for x in (self.current_color or (255, 0, 0))),
+                per_key_colors=self.per_key_colors,
+                num_rows=NUM_ROWS,
+                num_cols=NUM_COLS,
+            )
+
+            enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=self.brightness)
+
+            for i in range(1, steps + 1):
+                scale = float(i) / float(steps)
+                color_map = scaled_color_map(full_colors, scale=scale)
+                with self.kb_lock:
+                    self.kb.set_key_colors(color_map, enable_user_mode=False)
+                time.sleep(dt)
+        except Exception:
+            return
     
     def _brightness_factor(self) -> float:
         """Get brightness as 0-1 factor"""
@@ -308,9 +469,10 @@ class EffectsEngine:
     def _effect_pulse(self):
         """Pulse: Rhythmic brightness pulses with current color"""
         phase = 0.0
-        interval = self._get_interval(300)
+        # Keep pulse responsive at higher speeds but avoid tight spin-loops.
+        interval = self._clamped_interval(180, min_s=0.03)
         
-        while self.running:
+        while self.running and not self.stop_event.is_set():
             # Keep "user mode" on and modulate brightness rather than RGB to
             # avoid the library treating black as "off" and flipping state.
             pulse = (math.sin(phase) + 1) / 2  # 0-1
@@ -322,15 +484,16 @@ class EffectsEngine:
             with self.kb_lock:
                 self.kb.set_color(self.current_color, brightness=pulse_brightness)
 
-            phase += 0.1
-            time.sleep(interval)
+            # Smaller step for smoother motion.
+            phase += 0.055
+            self.stop_event.wait(interval)
     
     def _effect_strobe(self):
         """Strobe: Rapid on/off flashing"""
         on = False
-        interval = max(0.1, self._get_interval(100))
+        interval = self._clamped_interval(90, min_s=0.06)
         
-        while self.running:
+        while self.running and not self.stop_event.is_set():
             with self.kb_lock:
                 if on:
                     self.kb.set_color((255, 255, 255), brightness=self.brightness)
@@ -340,37 +503,77 @@ class EffectsEngine:
                     self.kb.set_color((0, 0, 0), brightness=max(1, self.brightness))
 
             on = not on
-            time.sleep(interval)
+            self.stop_event.wait(interval)
     
     def _effect_fire(self):
         """Fire: Flickering red/orange flames"""
         import random
-        interval = max(0.1, self._get_interval(200))
+        interval = self._clamped_interval(140, min_s=0.06)
         
-        while self.running:
+        prev = None
+        while self.running and not self.stop_event.is_set():
             factor = self._brightness_factor()
-            r = int((200 + random.random() * 55) * factor)
-            g = int((random.random() * 100) * factor)
-            b = 0
+            target = (
+                int((200 + random.random() * 55) * factor),
+                int((random.random() * 100) * factor),
+                0,
+            )
 
-            with self.kb_lock:
-                self.kb.set_color((r, g, b), brightness=self.brightness)
-            time.sleep(interval)
+            if prev is None:
+                prev = target
+
+            # Smooth flicker by interpolating to the next sample.
+            steps = self._choose_steps(duration_s=float(interval), max_steps=10, target_fps=40.0, min_dt_s=0.02)
+            dt = float(interval) / float(steps)
+            pr, pg, pb = prev
+            tr, tg, tb = target
+            for i in range(1, steps + 1):
+                if not self.running or self.stop_event.is_set():
+                    break
+                t = float(i) / float(steps)
+                r = int(round(pr + (tr - pr) * t))
+                g = int(round(pg + (tg - pg) * t))
+                b = int(round(pb + (tb - pb) * t))
+                with self.kb_lock:
+                    self.kb.set_color((r, g, b), brightness=self.brightness)
+                self.stop_event.wait(dt)
+
+            prev = target
     
     def _effect_random(self):
         """Random: Random color changes"""
         import random
-        interval = max(0.3, self._get_interval(800))
+        interval = self._clamped_interval(500, min_s=0.12)
         
-        while self.running:
+        prev = None
+        while self.running and not self.stop_event.is_set():
             factor = self._brightness_factor()
-            r = int(random.random() * 255 * factor)
-            g = int(random.random() * 255 * factor)
-            b = int(random.random() * 255 * factor)
+            target = (
+                int(random.random() * 255 * factor),
+                int(random.random() * 255 * factor),
+                int(random.random() * 255 * factor),
+            )
 
-            with self.kb_lock:
-                self.kb.set_color((r, g, b), brightness=self.brightness)
-            time.sleep(interval)
+            if prev is None:
+                prev = target
+
+            # Smoothly cross-fade to the next random color.
+            steps = self._choose_steps(duration_s=float(interval), max_steps=18, target_fps=45.0, min_dt_s=0.02)
+            dt = float(interval) / float(steps)
+            pr, pg, pb = prev
+            tr, tg, tb = target
+            for i in range(1, steps + 1):
+                if not self.running or self.stop_event.is_set():
+                    break
+                t = float(i) / float(steps)
+                r = int(round(pr + (tr - pr) * t))
+                g = int(round(pg + (tg - pg) * t))
+                b = int(round(pb + (tb - pb) * t))
+                with self.kb_lock:
+                    self.kb.set_color((r, g, b), brightness=self.brightness)
+                self.stop_event.wait(dt)
+
+            prev = target
     
     def _effect_perkey_breathing(self):
         """Per-Key Breathing: Breathing animation that preserves each key's individual color"""
@@ -378,7 +581,7 @@ class EffectsEngine:
         # Breathing should feel slow/smooth but still obviously animated.
         # Using a smaller base interval avoids the "looks static" problem at
         # mid/low UI speeds.
-        interval = max(0.03, self._get_interval(120))
+        interval = self._clamped_interval(90, min_s=0.04)
         
         # Load per-key colors if not already set
         if not self.per_key_colors:
@@ -404,7 +607,7 @@ class EffectsEngine:
 
         enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=self.brightness)
 
-        while self.running:
+        while self.running and not self.stop_event.is_set():
             # Calculate breathing factor (0.2 to 1.0 to avoid going too dim)
             breath = (math.sin(phase) + 1.0) / 2.0  # 0..1
             # Smooth curve (ease-in/out) so it feels like "breathing".
@@ -416,14 +619,14 @@ class EffectsEngine:
             with self.kb_lock:
                 self.kb.set_key_colors(color_map, enable_user_mode=False)
             
-            phase += 0.20
-            time.sleep(interval)
+            phase += 0.08
+            self.stop_event.wait(interval)
     
     def _effect_perkey_pulse(self):
         """Per-Key Pulse: Pulse animation that preserves each key's individual color"""
         phase = 0.0
         # Pulse is intentionally more "snappy" than breathing.
-        interval = max(0.02, self._get_interval(90))
+        interval = self._clamped_interval(70, min_s=0.03)
         
         # Load per-key colors if not already set
         if not self.per_key_colors:
@@ -443,7 +646,7 @@ class EffectsEngine:
 
         enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=self.brightness)
 
-        while self.running:
+        while self.running and not self.stop_event.is_set():
             # Calculate pulse factor (sharper than breathing)
             pulse = (math.sin(phase) + 1.0) / 2.0  # 0..1
             # Make it much sharper than breathing (quick "thump").
@@ -455,8 +658,8 @@ class EffectsEngine:
             with self.kb_lock:
                 self.kb.set_key_colors(color_map, enable_user_mode=False)
             
-            phase += 0.35
-            time.sleep(interval)
+            phase += 0.15
+            self.stop_event.wait(interval)
 
 
 if __name__ == '__main__':
