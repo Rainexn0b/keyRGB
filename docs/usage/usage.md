@@ -208,6 +208,11 @@ On KDE Plasma (Wayland), KeyRGB can sync keyboard lighting to the desktop's **sc
 
 This uses `/sys/class/backlight` brightness changes and does not require access to `/dev/input`.
 
+Notes:
+
+- If you select `When dimmed → set brightness to` (temporary dim mode), KeyRGB will still turn the keyboard **fully off** when the display is actually powered off (DPMS screen-off, e.g. via the power button), then restore lighting when the screen turns back on.
+	- On KDE Plasma this is detected via DRM connector state (e.g. `/sys/class/drm/card*-eDP-*/dpms`).
+
 Configure the dim timeout in **System Settings → Power Management → Dim automatically**.
 
 You can control this behavior in the KeyRGB Settings window:

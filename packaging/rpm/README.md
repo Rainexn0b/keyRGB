@@ -42,7 +42,7 @@ rpmbuild -ba ~/rpmbuild/SPECS/keyrgb.spec
 Note (build from local HEAD instead of the GitHub tag tarball):
 
 ```bash
-VERSION=0.2.1
+VERSION=0.4.0
 git archive --format=tar.gz --prefix=keyRGB-$VERSION/ -o keyrgb-$VERSION.tar.gz HEAD
 cp -f keyrgb-$VERSION.tar.gz ~/rpmbuild/SOURCES/
 ```

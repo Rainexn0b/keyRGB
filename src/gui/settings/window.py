@@ -70,8 +70,8 @@ class PowerSettingsGUI:
         content_area = ttk.Frame(outer)
         content_area.pack(fill="both", expand=True)
 
-        scroll = ScrollableArea(content_area, bg_color=bg_color, padding=16)
-        main = scroll.frame
+        self.scroll = ScrollableArea(content_area, bg_color=bg_color, padding=16)
+        main = self.scroll.frame
 
         title = ttk.Label(main, text="Settings", font=("Sans", 14, "bold"))
         title.pack(anchor="w", pady=(0, 8))
@@ -372,48 +372,64 @@ class PowerSettingsGUI:
         )
         self.txt_diagnostics.configure(state="disabled")
 
-        bottom_bar = ttk.Frame(outer, padding=(16, 8, 16, 12))
-        bottom_bar.pack(fill="x")
+        self.bottom_bar = ttk.Frame(outer, padding=(16, 8, 16, 12))
+        self.bottom_bar.pack(fill="x")
 
-        self.status = ttk.Label(bottom_bar, text="", font=("Sans", 9))
+        self.status = ttk.Label(self.bottom_bar, text="", font=("Sans", 9))
         self.status.pack(side="left")
 
-        close_btn = ttk.Button(bottom_bar, text="Close", command=self._on_close)
+        close_btn = ttk.Button(self.bottom_bar, text="Close", command=self._on_close)
         close_btn.pack(side="right")
 
         self._apply_enabled_state()
         self._apply_diagnostics_state()
 
         # Bind wheel globally within this Tk app, but filter to this toplevel + pointer location.
-        scroll.bind_mousewheel(self.root, priority_scroll_widget=self.txt_diagnostics)
+        self.scroll.bind_mousewheel(self.root, priority_scroll_widget=self.txt_diagnostics)
 
-        # Size-to-content, but clamp to the current screen so nothing is forced off-screen.
-        self.root.update_idletasks()
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
-        req_w = outer.winfo_reqwidth()
-        req_h = outer.winfo_reqheight()
-
-        margin_w = 80
-        margin_h = 120
-
-        default_w = 980
-        default_h = 720
-
-        width = min(max(req_w, default_w), max(320, screen_w - margin_w))
-        height = min(max(req_h, default_h), max(320, screen_h - margin_h))
-
-        x = max(0, (screen_w - width) // 2)
-        y = max(0, (screen_h - height) // 2)
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        # Initial geometry is applied via _apply_geometry after a short delay
+        # to ensure it overrides any window manager restoration/defaults.
 
         self.root.update_idletasks()
         try:
-            scroll.canvas.configure(scrollregion=scroll.canvas.bbox("all"))
+            self.scroll.canvas.configure(scrollregion=self.scroll.canvas.bbox("all"))
         except Exception:
             pass
 
-        scroll.finalize_initial_scrollbar_state()
+        self.scroll.finalize_initial_scrollbar_state()
+
+        # Defer geometry application to ensure it overrides any WM defaults
+        self.root.after(50, self._apply_geometry)
+
+    def _apply_geometry(self) -> None:
+        self.root.update_idletasks()
+        screen_w = self.root.winfo_screenwidth()
+        screen_h = self.root.winfo_screenheight()
+
+        # Calculate true content height from the inner frame + bottom bar
+        content_h = self.scroll.frame.winfo_reqheight()
+        footer_h = self.bottom_bar.winfo_reqheight()
+        # Add some padding for window chrome/margins
+        total_req_h = content_h + footer_h + 40
+
+        req_w = self.root.winfo_reqwidth()
+        
+        # Conservative defaults
+        default_w = 1100
+        default_h = 850
+
+        # Cap at 95% of screen size to ensure it fits
+        max_w = int(screen_w * 0.95)
+        max_h = int(screen_h * 0.95)
+
+        width = min(max(req_w, default_w), max_w)
+        # Use the calculated content height if it's larger than default, but still capped
+        height = min(max(total_req_h, default_h), max_h)
+
+        x = max(0, (screen_w - width) // 2)
+        y = max(0, (screen_h - height) // 2)
+
+        self.root.geometry(f"{width}x{height}+{x}+{y}")
 
     def _apply_enabled_state(self) -> None:
         enabled = bool(self.var_enabled.get())

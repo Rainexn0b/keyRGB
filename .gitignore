@@ -22,6 +22,10 @@ buildlog/
 # Packaging
 pip-wheel-metadata/
 
+# Locally-generated SRPM sources (should not be committed)
+keyrgb-*.tar.gz
+v*.tar.gz
+
 # Local tooling
 .cache/
 

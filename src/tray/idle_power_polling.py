@@ -14,6 +14,7 @@ IdleAction = Optional[Literal["turn_off", "restore", "dim_to_temp", "restore_bri
 def _compute_idle_action(
     *,
     dimmed: Optional[bool],
+    screen_off: bool,
     is_off: bool,
     idle_forced_off: bool,
     dim_temp_active: bool,
@@ -43,20 +44,29 @@ def _compute_idle_action(
     if int(brightness) <= 0:
         return None
 
+    # Some desktops turn the display off via DPMS without changing backlight
+    # brightness. Treat "screen off" as an effective dimmed signal.
+    dimmed_effective: Optional[bool] = True if bool(screen_off) else dimmed
+
     # When we can't determine dim state, be conservative: don't force off and
     # don't restore temp brightness, but still allow restoring lighting if it is
     # unexpectedly off.
-    if dimmed is None:
+    if dimmed_effective is None:
         if dim_temp_active:
             return None
         if is_off and (not idle_forced_off):
             return "restore"
         return None
 
-    if dimmed is True:
+    if dimmed_effective is True:
         mode = str(screen_dim_sync_mode or "off").strip().lower()
         if mode == "temp":
             if not is_off:
+                # In temp mode, dimming normally reduces to a temporary brightness.
+                # But if the display is actually off (backlight at 0), match it by
+                # turning the keyboard off.
+                if bool(screen_off):
+                    return "turn_off"
                 return "dim_to_temp"
             return None
 
@@ -64,7 +74,7 @@ def _compute_idle_action(
             return "turn_off"
         return None
 
-    if dimmed is False:
+    if dimmed_effective is False:
         if dim_temp_active:
             return "restore_brightness"
 
@@ -113,6 +123,7 @@ def _read_dimmed_state(tray: Any) -> Optional[bool]:
 
     baselines: dict[str, int] = getattr(tray, "_dim_backlight_baselines", {})
     dimmed_any: Optional[bool] = None
+    screen_off_any = False
 
     for child in base.iterdir():
         if not child.is_dir():
@@ -133,6 +144,9 @@ def _read_dimmed_state(tray: Any) -> Optional[bool]:
         baseline_i = int(baseline)
         current_i = int(current)
 
+        if current_i <= 0:
+            screen_off_any = True
+
         # Significant drop detection: at least 10% and at least 1 step.
         dimmed = (current_i <= int(baseline_i * 0.90)) and ((baseline_i - current_i) >= 1)
 
@@ -145,7 +159,87 @@ def _read_dimmed_state(tray: Any) -> Optional[bool]:
                 baselines[key] = current_i
 
     tray._dim_backlight_baselines = baselines
+    tray._dim_screen_off = bool(screen_off_any)
     return dimmed_any
+
+
+def _read_screen_off_state_drm() -> Optional[bool]:
+    """Best-effort: detect whether the active display is powered off via DPMS.
+
+    On some desktops (notably KDE), turning the screen off may not change
+    /sys/class/backlight brightness but will flip DRM connector DPMS state.
+    """
+
+    base = Path("/sys/class/drm")
+    if not base.exists():
+        return None
+
+    enabled_true = {"enabled", "1", "yes", "true"}
+    enabled_false = {"disabled", "0", "no", "false"}
+
+    connected: list[Path] = []
+    connected_edp: list[Path] = []
+    for child in base.iterdir():
+        if not child.is_dir():
+            continue
+
+        name = child.name
+        if not (name.startswith("card") and "-" in name):
+            continue
+
+        try:
+            status_s = (child / "status").read_text(encoding="utf-8").strip().lower()
+        except Exception:
+            continue
+        if status_s != "connected":
+            continue
+
+        connected.append(child)
+        if "edp" in name.lower():
+            connected_edp.append(child)
+
+    # Prefer internal panels: on some systems, when the display is powered off
+    # via DPMS, the eDP connector flips to enabled=disabled + dpms=Off.
+    candidates = connected_edp if connected_edp else connected
+    if not candidates:
+        return None
+
+    observed_any = 0
+    any_off = False
+
+    for child in candidates:
+        try:
+            dpms_s = (child / "dpms").read_text(encoding="utf-8").strip().lower()
+        except Exception:
+            dpms_s = ""
+
+        try:
+            enabled_s = (child / "enabled").read_text(encoding="utf-8").strip().lower()
+        except Exception:
+            enabled_s = ""
+
+        # If we don't have any useful signals, skip.
+        if (not dpms_s) and (not enabled_s):
+            continue
+
+        observed_any += 1
+
+        # For eDP: treat either dpms!=on OR enabled=false as screen-off.
+        is_edp = "edp" in child.name.lower()
+        if is_edp:
+            if (dpms_s and dpms_s != "on") or (enabled_s in enabled_false):
+                any_off = True
+            continue
+
+        # For external connectors: only consider those marked enabled/active.
+        if enabled_s and (enabled_s not in enabled_true):
+            continue
+        if dpms_s and dpms_s != "on":
+            any_off = True
+
+    if observed_any <= 0:
+        return None
+    return bool(any_off)
 
 
 def _run(argv: list[str], *, timeout_s: float = 1.0) -> Optional[str]:
@@ -298,6 +392,11 @@ def start_idle_power_polling(
                     pass
 
                 dimmed = _read_dimmed_state(tray)
+                # Screen-off can be inferred from backlight reaching 0, or from
+                # DRM DPMS state when the desktop powers the display down.
+                screen_off_backlight = bool(getattr(tray, "_dim_screen_off", False))
+                screen_off_drm = _read_screen_off_state_drm()
+                screen_off = bool(screen_off_backlight) or bool(screen_off_drm)
 
                 # Coarse fallback when we can't infer dim state from backlight.
                 if dimmed is None and session_id:
@@ -325,6 +424,7 @@ def start_idle_power_polling(
 
                 action = _compute_idle_action(
                     dimmed=dimmed,
+                    screen_off=bool(screen_off),
                     idle_timeout_s=float(idle_timeout_s),
                     is_off=bool(getattr(tray, "is_off", False)),
                     idle_forced_off=bool(getattr(tray, "_idle_forced_off", False)),

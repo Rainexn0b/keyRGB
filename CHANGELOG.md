@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.0 (2025-12-30)
+
+- Tray: Screen Dim Sync supports `turn off` and `set brightness to` (temporary dim) modes.
+- Tray: when the display is powered off via DPMS (e.g. power button), temporary dim mode now turns the keyboard fully off and restores on wake.
+- Settings UI: window sizing adjusted so the full panel is visible (screenshot-friendly).
+- Docs: updated usage notes and refreshed Settings screenshot.
+
 ## 2025-12-29
 
 - Installer: reliably installs the ITE 8291 (048d:600b) udev rule and reloads udev so KeyRGB can access the device without running as root.
@@ -10,6 +17,7 @@
 
 - Internal: refactors tray code into smaller modules (startup, lighting control, menu sections, polling wrapper) and consolidates UI refresh.
 - Tray: syncs keyboard lighting with display dimming; configurable to turn off, dim to a temporary brightness, or disable.
+- Tray: in temporary dim mode, turns the keyboard off when the display is powered off (DPMS screen-off), then restores on wake.
 - Internal: extracts sysfs AC-power detection into a focused module to reduce platform IO inside `src/core/power.py`.
 - Internal: extracts logind (login1) PrepareForSleep monitoring into a focused helper module to reduce DBus parsing/process management inside `src/core/power.py`.
 - Internal: extracts the `BatterySaverPolicy` state machine into a focused module to further shrink the `src/core/power.py` hotspot.

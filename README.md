@@ -58,6 +58,34 @@ Or install from the repo (useful for development):
 python3 -m pip install --user -e .
 ```
 
+### Want an RPM instead?
+
+If you prefer a local RPM (instead of `./install.sh`), you can build one from this repo checkout on Fedora/Nobara:
+
+```bash
+sudo dnf install -y rpmdevtools rpmlint python3-devel python3-setuptools python3-wheel pyproject-rpm-macros curl
+
+# Build a local SRPM from your current git checkout
+bash scripts/copr-build-srpm.sh
+
+# Rebuild to a binary RPM
+SRPM=$(ls -1t ~/rpmbuild/SRPMS/keyrgb-*.src.rpm | head -n 1)
+rpmbuild --rebuild "$SRPM"
+
+# Install
+sudo dnf install -y ~/rpmbuild/RPMS/noarch/keyrgb-*.rpm
+```
+
+More details: [packaging/rpm/README.md](packaging/rpm/README.md).
+
+### Uninstall
+
+If you installed via `./install.sh`, you can remove the user install with:
+
+```bash
+./uninstall.sh
+```
+
 ### Run
 
 Start the tray app:
@@ -96,12 +124,6 @@ Notes:
 
 - Today, `ite8291r3` is the primary backend.
 - If no backend is available, the tray/GUI should still launch (you’ll just have no hardware control).
-
-## Development note: package layout
-
-This repository currently ships its Python package as `src.*` (e.g. `src.gui.tray`).
-It works, but it’s non-standard; a future “breaking cleanup” may rename it to a proper `keyrgb.*` package.
-Until then, avoid relying on `src.*` imports as a stable external API.
 
 ## How per-key works
 
@@ -158,6 +180,7 @@ keyrgb-diagnostics
 The tray menu includes a **Settings** entry which opens a small GUI for:
 
 - **Power Management**: turn keyboard LEDs off/on on suspend/resume and lid close/open.
+- **Screen Dim Sync** (KDE Plasma / Wayland): sync keyboard lighting to screen dimming; can either turn off or dim to a temporary brightness, and will turn off when the screen is powered off.
 - **Autostart**:
 	- **Start lighting on launch** (KeyRGB behavior at startup)
 	- **Start KeyRGB on login** (OS session autostart via `~/.config/autostart/keyrgb.desktop`)

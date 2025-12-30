@@ -37,21 +37,47 @@ PY
 )"
 
 NAME="keyrgb"
-TAR="$ROOT/${NAME}-${VERSION}.tar.gz"
+SOURCE0_NAME="v${VERSION}.tar.gz"
+SOURCE1_NAME="master.tar.gz"
+PATCH1_NAME="ite8291r3-ctl-wootbook-support.patch"
+
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR"' EXIT
+
+TAR="$TMPDIR/${SOURCE0_NAME}"
 
 echo "Building SRPM for ${NAME} ${VERSION}"
 
 # Create Source0 tarball matching the spec
-rm -f "$TAR"
 (
   cd "$ROOT"
-  git archive --format=tar.gz --prefix="${NAME}-${VERSION}/" -o "$TAR" HEAD
+  # Spec expects: Source0 .../v<version>.tar.gz and %autosetup -n keyRGB-<version>
+  git archive --format=tar.gz --prefix="keyRGB-${VERSION}/" -o "$TAR" HEAD
 )
 
 rpmdev-setuptree >/dev/null
 
 cp -f "$TAR" "$HOME/rpmbuild/SOURCES/"
+cp -f "$ROOT/packaging/rpm/$PATCH1_NAME" "$HOME/rpmbuild/SOURCES/"
 cp -f "$SPEC" "$HOME/rpmbuild/SPECS/"
+
+# Source1 is a remote tarball in the spec; rpmbuild -bs requires it present.
+if [ ! -f "$HOME/rpmbuild/SOURCES/$SOURCE1_NAME" ]; then
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL -o "$HOME/rpmbuild/SOURCES/$SOURCE1_NAME" \
+      "https://github.com/pobrn/ite8291r3-ctl/archive/refs/heads/master.tar.gz"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO "$HOME/rpmbuild/SOURCES/$SOURCE1_NAME" \
+      "https://github.com/pobrn/ite8291r3-ctl/archive/refs/heads/master.tar.gz"
+  elif command -v spectool >/dev/null 2>&1; then
+    # Fallback: spectool fetches *all* remote sources and will fail if the
+    # Source0 GitHub tag tarball doesn't exist yet.
+    spectool -g -R "$SPEC" -C "$HOME/rpmbuild/SOURCES/" >/dev/null
+  else
+    echo "Missing $SOURCE1_NAME and neither spectool/curl/wget is available" >&2
+    exit 1
+  fi
+fi
 
 rpmbuild -bs "$HOME/rpmbuild/SPECS/keyrgb.spec"
 
