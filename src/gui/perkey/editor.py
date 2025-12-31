@@ -20,7 +20,6 @@ from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
 from .hardware import get_keyboard, NUM_ROWS, NUM_COLS
 from .overlay_autosync import auto_sync_per_key_overlays
-from .profile_management import activate_profile, delete_profile, save_profile
 from .profile_management import load_profile_colors
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
@@ -28,6 +27,7 @@ from .color_map_ops import clear_all, ensure_full_map, fill_all
 from .color_apply_ops import apply_color_to_map
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
+from .profile_actions_ui import activate_profile_ui, delete_profile_ui, save_profile_ui
 
 
 class PerKeyEditor:
@@ -345,58 +345,13 @@ class PerKeyEditor:
             self.overlay_controls.sync_vars_from_scope()
 
     def _activate_profile(self):
-        result = activate_profile(
-            self._profile_name_var.get(),
-            config=self.config,
-            current_colors=dict(getattr(self, "colors", {}) or {}),
-        )
-        self.profile_name = result.name
-        self._profile_name_var.set(result.name)
-
-        self.keymap = result.keymap
-        self.layout_tweaks = result.layout_tweaks
-        self.per_key_layout_tweaks = result.per_key_layout_tweaks
-        self.colors = result.colors
-
-        # Ensure we're applying a full map, then push it to hardware.
-        self._ensure_full_map()
-        self._commit(force=True)
-
-        self.overlay_controls.sync_vars_from_scope()
-        self.canvas.redraw()
-        self.status_label.config(text=f"Active profile: {self.profile_name}")
-
-        if self.selected_key_id:
-            self.select_key_id(self.selected_key_id)
+        activate_profile_ui(self)
 
     def _save_profile(self):
-        name = save_profile(
-            self._profile_name_var.get(),
-            config=self.config,
-            keymap=self.keymap,
-            layout_tweaks=self.layout_tweaks,
-            per_key_layout_tweaks=self.per_key_layout_tweaks,
-            colors=self.colors,
-        )
-        self.profile_name = name
-        self._profile_name_var.set(name)
-
-        # Persist + push the saved state immediately.
-        self._ensure_full_map()
-        self._commit(force=True)
-        self.status_label.config(text=f"Saved profile: {self.profile_name}")
+        save_profile_ui(self)
 
     def _delete_profile(self):
-        result = delete_profile(self._profile_name_var.get())
-        if not result.deleted:
-            if result.message:
-                self.status_label.config(text=result.message)
-            return
-
-        self.profile_name = result.active_profile
-        self._profile_name_var.set(result.active_profile)
-        self._profiles_combo.configure(values=profiles.list_profiles())
-        self.status_label.config(text=result.message)
+        delete_profile_ui(self)
 
     def _load_keymap(self) -> dict[str, tuple[int, int]]:
         return profiles.load_keymap(self.profile_name)
