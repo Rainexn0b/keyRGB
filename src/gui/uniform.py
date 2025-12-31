@@ -28,7 +28,6 @@ try:
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/uniform.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     from src.gui.widgets.color_wheel import ColorWheel
     from src.legacy.config import Config
 

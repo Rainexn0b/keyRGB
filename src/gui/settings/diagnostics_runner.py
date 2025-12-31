@@ -95,15 +95,7 @@ def _device_busy_warnings(payload: dict[str, Any], *, expected_holder_pids: set[
 
 
 def collect_diagnostics_text(*, include_usb: bool = True) -> str:
-    try:
-        from src.core.diagnostics import collect_diagnostics
-    except Exception:
-        # Allow execution when run outside installed env.
-        import sys
-
-        # Insert the repo root (directory that contains `src/`).
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-        from src.core.diagnostics import collect_diagnostics
+    from src.core.diagnostics import collect_diagnostics
 
     diag = collect_diagnostics(include_usb=include_usb)
     payload = diag.to_dict()

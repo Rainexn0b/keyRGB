@@ -30,12 +30,7 @@ from .os_autostart import detect_os_autostart_enabled, set_os_autostart
 from .scrollable_area import ScrollableArea
 from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
 
-try:
-    from src.legacy.config import Config
-except Exception:
-    # Fallback for direct execution (e.g. `python src/gui/settings/window.py`).
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
-    from src.legacy.config import Config
+from src.legacy.config import Config
 
 from src.core.version_check import compare_versions, normalize_version_text
 

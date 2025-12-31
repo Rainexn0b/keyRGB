@@ -21,13 +21,7 @@ from tkinter import messagebox, simpledialog, ttk
 from src.core.logging_utils import log_throttled
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
-
-try:
-    from src.core import tcc_power_profiles
-except ImportError:
-    # Fallback for direct execution (e.g. `python src/gui/tcc_profiles.py`).
-    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-    from src.core import tcc_power_profiles
+from src.core import tcc_power_profiles
 
 
 logger = logging.getLogger(__name__)
