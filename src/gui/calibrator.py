@@ -24,6 +24,8 @@ from src.gui.calibrator_profile_storage import (
     save_keymap,
 )
 
+from src.gui.window_icon import apply_keyrgb_window_icon
+
 
 MATRIX_ROWS = 6
 MATRIX_COLS = 21
@@ -74,6 +76,7 @@ class KeymapCalibrator(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("KeyRGB - Keymap Calibrator (Y15 Pro)")
+        apply_keyrgb_window_icon(self)
 
         style = ttk.Style()
         style.theme_use("clam")

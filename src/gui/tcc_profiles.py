@@ -19,6 +19,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
 from src.core.logging_utils import log_throttled
+from src.gui.window_icon import apply_keyrgb_window_icon
 
 try:
     from src.core import tcc_power_profiles
@@ -35,6 +36,7 @@ class TccProfilesGUI:
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Power Profiles")
+        apply_keyrgb_window_icon(self.root)
         self.root.geometry("760x560")
         self.root.minsize(720, 520)
         self.root.resizable(True, True)

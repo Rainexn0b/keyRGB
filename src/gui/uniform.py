@@ -16,6 +16,7 @@ from tkinter import ttk
 
 from src.core.backends.registry import select_backend
 from src.core.imports import ensure_repo_root_on_sys_path
+from src.gui.window_icon import apply_keyrgb_window_icon
 
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ class UniformColorGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title('KeyRGB - Uniform Color')
+        apply_keyrgb_window_icon(self.root)
         self.root.geometry('450x550')
         self.root.resizable(False, False)
         

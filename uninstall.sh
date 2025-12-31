@@ -57,11 +57,13 @@ echo
 
 APP_FILE="$HOME/.local/share/applications/keyrgb.desktop"
 AUTOSTART_FILE="$HOME/.config/autostart/keyrgb.desktop"
+ICON_FILE="$HOME/.local/share/icons/keyrgb.jpg"
 
 if confirm "Remove desktop launcher + autostart entries?"; then
   rm -f "$APP_FILE" || true
   rm -f "$AUTOSTART_FILE" || true
-  echo "✓ Removed desktop entries (if present)"
+  rm -f "$ICON_FILE" || true
+  echo "✓ Removed desktop entries + icon (if present)"
 else
   echo "↷ Skipped removing desktop entries"
 fi

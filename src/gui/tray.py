@@ -16,9 +16,7 @@ from src.core.imports import ensure_repo_root_on_sys_path
 
 
 def _ensure_repo_root_on_syspath() -> None:
-    repo_root = ensure_repo_root_on_sys_path(Path(__file__))
-    if str(repo_root) not in sys.path:
-        sys.path.insert(0, str(repo_root))
+    ensure_repo_root_on_sys_path(Path(__file__))
 
 
 _ensure_repo_root_on_syspath()

@@ -39,11 +39,14 @@ except Exception:
 
 from src.core.version_check import compare_versions, normalize_version_text
 
+from src.gui.window_icon import apply_keyrgb_window_icon
+
 
 class PowerSettingsGUI:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("KeyRGB - Settings")
+        apply_keyrgb_window_icon(self.root)
         self.root.minsize(760, 560)
         self.root.resizable(True, True)
 

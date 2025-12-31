@@ -293,8 +293,15 @@ class ColorWheel(ttk.Frame):
 
 if __name__ == '__main__':
     # Test the color wheel
+    try:
+        from src.gui.window_icon import apply_keyrgb_window_icon
+    except Exception:
+        apply_keyrgb_window_icon = None
+
     root = tk.Tk()
     root.title('Color Wheel Test')
+    if apply_keyrgb_window_icon is not None:
+        apply_keyrgb_window_icon(root)
     root.geometry('400x500')
     
     def on_color_change(r, g, b):

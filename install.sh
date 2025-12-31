@@ -294,6 +294,22 @@ echo "✓ Scripts are executable"
 # Create app launcher entry (so KeyRGB can be started again without a terminal)
 echo
 echo "🧷 Installing application launcher entry..."
+
+ICON_SRC="$REPO_DIR/assets/logo-keyrgb.jpg"
+ICON_DIR="$HOME/.local/share/icons"
+ICON_FILE="$ICON_DIR/keyrgb.jpg"
+
+ICON_REF="preferences-desktop-keyboard"
+if [ -f "$ICON_SRC" ]; then
+    mkdir -p "$ICON_DIR"
+    install -m 0644 "$ICON_SRC" "$ICON_FILE"
+    ICON_REF="$ICON_FILE"
+    echo "✓ Installed icon: $ICON_FILE"
+else
+    echo "⚠️  Logo not found: $ICON_SRC"
+    echo "   Using fallback icon: $ICON_REF"
+fi
+
 APP_DIR="$HOME/.local/share/applications"
 APP_FILE="$APP_DIR/keyrgb.desktop"
 
@@ -305,7 +321,7 @@ Type=Application
 Name=KeyRGB
 Comment=RGB Keyboard Controller
 Exec=keyrgb
-Icon=preferences-desktop-keyboard
+Icon=$ICON_REF
 Terminal=false
 Categories=Utility;System;
 StartupNotify=false
@@ -333,7 +349,7 @@ Type=Application
 Name=KeyRGB
 Comment=RGB Keyboard Controller
 Exec=$KEYRGB_EXEC
-Icon=preferences-desktop-keyboard
+Icon=$ICON_REF
 Terminal=false
 Categories=Utility;System;
 X-KDE-autostart-after=plasma-workspace

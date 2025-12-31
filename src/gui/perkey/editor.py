@@ -14,6 +14,7 @@ from src.core.layout import Y15_PRO_KEYS
 from src.core import profiles
 from src.gui.profile_backdrop_storage import reset_backdrop_image, save_backdrop_image
 from src.gui.launch_keymap_calibrator import launch_keymap_calibrator
+from src.gui.window_icon import apply_keyrgb_window_icon
 
 from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
@@ -37,6 +38,7 @@ class PerKeyEditor:
 
         self.root = tk.Tk()
         self.root.title("KeyRGB - Per-Key Colors")
+        apply_keyrgb_window_icon(self.root)
         self.root.update_idletasks()
 
         keyboard_w = (self._key_margin * 2) + (NUM_COLS * self._key_size) + ((NUM_COLS - 1) * self._key_gap)

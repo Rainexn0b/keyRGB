@@ -24,8 +24,6 @@ def load_tray_dependencies():
         # Fallback for alternate layouts / direct execution.
         with suppress(Exception):
             ensure_repo_root_on_sys_path(Path(__file__))
-        with suppress(Exception):
-            sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
         from src.legacy.effects import EffectsEngine
         from src.legacy.config import Config

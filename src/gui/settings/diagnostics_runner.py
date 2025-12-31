@@ -101,7 +101,8 @@ def collect_diagnostics_text(*, include_usb: bool = True) -> str:
         # Allow execution when run outside installed env.
         import sys
 
-        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+        # Insert the repo root (directory that contains `src/`).
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
         from src.core.diagnostics import collect_diagnostics
 
     diag = collect_diagnostics(include_usb=include_usb)
