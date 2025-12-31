@@ -22,10 +22,12 @@ from .overlay import OverlayControls
 from .hardware import get_keyboard, NUM_ROWS, NUM_COLS
 from .overlay_autosync import auto_sync_per_key_overlays
 from .profile_management import activate_profile, delete_profile, save_profile
+from .profile_management import load_profile_colors
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
 from .color_map_ops import clear_all, ensure_full_map, fill_all
 from .color_apply_ops import apply_color_to_map
+from .window_geometry import apply_perkey_editor_geometry
 
 
 class PerKeyEditor:
@@ -42,25 +44,16 @@ class PerKeyEditor:
         apply_keyrgb_window_icon(self.root)
         self.root.update_idletasks()
 
-        keyboard_w = (self._key_margin * 2) + (NUM_COLS * self._key_size) + ((NUM_COLS - 1) * self._key_gap)
-        keyboard_h = (self._key_margin * 2) + (NUM_ROWS * self._key_size) + ((NUM_ROWS - 1) * self._key_gap)
-
-        chrome_w = 16 * 2 + 16
-        chrome_h = 16 * 2 + 80
-
-        w0 = keyboard_w + self._right_panel_width + chrome_w
-        h0 = max(keyboard_h + chrome_h, self._wheel_size + 420)
-
-        screen_w = int(self.root.winfo_screenwidth())
-        screen_h = int(self.root.winfo_screenheight())
-        max_w = int(screen_w * 0.92)
-        max_h = int(screen_h * 0.92)
-
-        w = min(int(w0 * 1.5), max_w)
-        h = min(int(h0 * 1.5), max_h)
-
-        self.root.geometry(f"{w}x{h}")
-        self.root.minsize(min(w0, max_w), min(h0, max_h))
+        apply_perkey_editor_geometry(
+            self.root,
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+            key_margin=self._key_margin,
+            key_size=self._key_size,
+            key_gap=self._key_gap,
+            right_panel_width=self._right_panel_width,
+            wheel_size=self._wheel_size,
+        )
 
         style = ttk.Style()
         self.bg_color, self.fg_color = apply_clam_dark_theme(self.root)
@@ -82,16 +75,12 @@ class PerKeyEditor:
 
         # Prefer profile-stored per-key colors over whatever happens to be in
         # config.json (e.g., the calibrator probe state).
-        prof_colors = profiles.load_per_key_colors(self.profile_name)
-        if prof_colors:
-            self.colors = dict(prof_colors)
-        else:
-            self.colors = dict(self.config.per_key_colors)
+        self.colors = load_profile_colors(name=self.profile_name, config=self.config, current_colors={})
 
         self.keymap: dict[str, tuple[int, int]] = self._load_keymap()
         self.layout_tweaks = self._load_layout_tweaks()
         self.per_key_layout_tweaks: dict[str, dict[str, float]] = self._load_per_key_layout_tweaks()
-        
+
         self.overlay_scope = tk.StringVar(value="global")  # global | key
         self.apply_all_keys = tk.BooleanVar(value=False)
         self._profiles_visible = False
