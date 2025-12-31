@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Tuple
 
-from .color_map_ops import ensure_full_map
+from .ops.color_map_ops import ensure_full_map
 
 Color = Tuple[int, int, int]
 Cell = Tuple[int, int]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.perkey.color_map_ops import clear_all, ensure_full_map, fill_all
+from src.gui.perkey.ops.color_map_ops import clear_all, ensure_full_map, fill_all
 
 
 def test_fill_all_builds_full_grid() -> None:

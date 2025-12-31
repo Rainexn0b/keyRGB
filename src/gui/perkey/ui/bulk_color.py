@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from ..color_map_ops import clear_all, fill_all
+from ..ops.color_map_ops import clear_all, fill_all
 from ..keyboard_apply import push_per_key_colors
 from .status import cleared_all_keys, filled_all_keys_rgb, set_status
 

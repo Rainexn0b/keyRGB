@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.perkey.color_apply_ops import apply_color_to_map
+from src.gui.perkey.ops.color_apply_ops import apply_color_to_map
 
 
 def test_apply_color_to_map_updates_selected_cell_only() -> None:
