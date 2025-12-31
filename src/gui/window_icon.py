@@ -11,6 +11,7 @@ def _candidate_logo_paths() -> list[Path]:
     # install.sh installs a user icon here.
     try:
         home = Path.home()
+        paths.append(home / ".local/share/icons/hicolor/256x256/apps/keyrgb.png")
         paths.append(home / ".local/share/icons/keyrgb.png")
     except Exception:
         pass

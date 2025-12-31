@@ -296,7 +296,7 @@ echo
 echo "🧷 Installing application launcher entry..."
 
 ICON_SRC="$REPO_DIR/assets/logo-keyrgb.png"
-ICON_DIR="$HOME/.local/share/icons"
+ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
 ICON_FILE="$ICON_DIR/keyrgb.png"
 
 if ! [ -f "$ICON_SRC" ]; then
@@ -308,7 +308,7 @@ mkdir -p "$ICON_DIR"
 install -m 0644 "$ICON_SRC" "$ICON_FILE"
 echo "✓ Installed icon: $ICON_FILE"
 
-ICON_REF="$ICON_FILE"
+ICON_REF="keyrgb"
 
 APP_DIR="$HOME/.local/share/applications"
 APP_FILE="$APP_DIR/keyrgb.desktop"
