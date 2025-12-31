@@ -15,14 +15,11 @@ from __future__ import annotations
 
 import os
 import sys
-import webbrowser
-from threading import Thread
 
 import tkinter as tk
-from tkinter import scrolledtext
 from tkinter import ttk
 
-from .diagnostics_runner import collect_diagnostics_text
+from .diagnostics_panel import DiagnosticsPanel
 from .os_autostart import detect_os_autostart_enabled, set_os_autostart
 from .scrollable_area import ScrollableArea
 from .version_panel import VersionPanel
@@ -326,47 +323,13 @@ class PowerSettingsGUI:
 
         ttk.Separator(right).pack(fill="x", pady=(14, 10))
 
-        diag_title = ttk.Label(right, text="Diagnostics", font=("Sans", 11, "bold"))
-        diag_title.pack(anchor="w", pady=(0, 6))
-
-        diag_desc = ttk.Label(
+        self.diagnostics_panel = DiagnosticsPanel(
             right,
-            text=(
-                "Collect read-only system information to include in bug reports.\n"
-                "This works even if hardware detection fails."
-            ),
-            font=("Sans", 9),
+            root=self.root,
+            get_status_label=lambda: self.status,
+            bg_color=bg_color,
+            fg_color=fg_color,
         )
-        diag_desc.pack(anchor="w", pady=(0, 8))
-
-        diag_btn_row = ttk.Frame(right)
-        diag_btn_row.pack(fill="x", pady=(0, 8))
-
-        self.btn_run_diagnostics = ttk.Button(diag_btn_row, text="Run diagnostics", command=self._run_diagnostics)
-        self.btn_run_diagnostics.pack(side="left")
-
-        self.btn_copy_diagnostics = ttk.Button(diag_btn_row, text="Copy output", command=self._copy_diagnostics)
-        self.btn_copy_diagnostics.pack(side="left", padx=(8, 0))
-
-        self.btn_open_issue = ttk.Button(diag_btn_row, text="Open issue", command=self._open_issue_form)
-        self.btn_open_issue.pack(side="left", padx=(8, 0))
-
-        self._diagnostics_json: str = ""
-
-        self.txt_diagnostics = scrolledtext.ScrolledText(
-            right,
-            height=8,
-            wrap="word",
-            background=bg_color,
-            foreground=fg_color,
-            insertbackground=fg_color,
-        )
-        self.txt_diagnostics.pack(fill="both", expand=True)
-        self.txt_diagnostics.insert(
-            "1.0",
-            "Click 'Run diagnostics', then use 'Copy output' or 'Open issue'.\n",
-        )
-        self.txt_diagnostics.configure(state="disabled")
 
         self.bottom_bar = ttk.Frame(outer, padding=(16, 8, 16, 12))
         self.bottom_bar.pack(fill="x")
@@ -378,10 +341,10 @@ class PowerSettingsGUI:
         close_btn.pack(side="right")
 
         self._apply_enabled_state()
-        self._apply_diagnostics_state()
+        self.diagnostics_panel.apply_state()
 
         # Bind wheel globally within this Tk app, but filter to this toplevel + pointer location.
-        self.scroll.bind_mousewheel(self.root, priority_scroll_widget=self.txt_diagnostics)
+        self.scroll.bind_mousewheel(self.root, priority_scroll_widget=self.diagnostics_panel.txt_diagnostics)
 
         # Initial geometry is applied via _apply_geometry after a short delay
         # to ensure it overrides any window manager restoration/defaults.
@@ -451,67 +414,6 @@ class PowerSettingsGUI:
             self.scale_dim_temp.configure(state="normal")
         else:
             self.scale_dim_temp.configure(state="disabled")
-
-    def _apply_diagnostics_state(self) -> None:
-        self.btn_copy_diagnostics.configure(state="normal" if self._diagnostics_json else "disabled")
-
-    def _set_diagnostics_text(self, text: str) -> None:
-        self.txt_diagnostics.configure(state="normal")
-        self.txt_diagnostics.delete("1.0", "end")
-        self.txt_diagnostics.insert("1.0", text)
-        self.txt_diagnostics.configure(state="disabled")
-
-    def _run_diagnostics(self) -> None:
-        self.status.configure(text="Collecting diagnostics…")
-        self.btn_run_diagnostics.configure(state="disabled")
-        self.btn_copy_diagnostics.configure(state="disabled")
-
-        def worker() -> None:
-            try:
-                text = collect_diagnostics_text(include_usb=True)
-            except Exception as e:
-                text = f"Failed to collect diagnostics: {e}"
-
-            def on_done() -> None:
-                self._diagnostics_json = text if text.strip().startswith("{") else ""
-                self._set_diagnostics_text(text)
-                self.btn_run_diagnostics.configure(state="normal")
-                self._apply_diagnostics_state()
-                if '"warnings"' in text:
-                    self.status.configure(text="⚠ Diagnostics ready (warnings)")
-                else:
-                    self.status.configure(text="✓ Diagnostics ready")
-                self.root.after(2000, lambda: self.status.configure(text=""))
-
-            self.root.after(0, on_done)
-
-        Thread(target=worker, daemon=True).start()
-
-    def _copy_diagnostics(self) -> None:
-        if not self._diagnostics_json:
-            self.status.configure(text="Run diagnostics first")
-            self.root.after(1500, lambda: self.status.configure(text=""))
-            return
-
-        self.root.clipboard_clear()
-        self.root.clipboard_append(self._diagnostics_json)
-        self.status.configure(text="✓ Copied to clipboard")
-        self.root.after(1500, lambda: self.status.configure(text=""))
-
-    def _open_issue_form(self) -> None:
-        url = "https://github.com/Rainexn0b/keyRGB/issues/new/choose"
-        try:
-            ok = bool(webbrowser.open(url, new=2))
-        except Exception:
-            ok = False
-
-        if ok:
-            self.status.configure(text="Opened issue form")
-        else:
-            self.root.clipboard_clear()
-            self.root.clipboard_append(url)
-            self.status.configure(text="Couldn't open browser (URL copied)")
-        self.root.after(2000, lambda: self.status.configure(text=""))
 
     def _on_toggle(self) -> None:
         try:
