@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import time
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
@@ -28,6 +27,7 @@ from .editor_ui import build_editor_ui
 from .color_map_ops import clear_all, ensure_full_map, fill_all
 from .color_apply_ops import apply_color_to_map
 from .window_geometry import apply_perkey_editor_geometry
+from .commit_pipeline import PerKeyCommitPipeline
 
 
 class PerKeyEditor:
@@ -89,8 +89,7 @@ class PerKeyEditor:
         self.selected_key_id: str | None = None
         self.selected_cell: tuple[int, int] | None = None
 
-        self._last_commit_ts = 0.0
-        self._commit_interval = 0.06
+        self._commit_pipeline = PerKeyCommitPipeline(commit_interval_s=0.06)
 
         self.kb = None
         self.kb = get_keyboard()
@@ -193,24 +192,19 @@ class PerKeyEditor:
         self.canvas.redraw()
 
     def _commit(self, *, force: bool = False):
-        now = time.monotonic()
-        if not force and (now - self._last_commit_ts) < self._commit_interval:
-            return
-        self._last_commit_ts = now
-
         self._ensure_full_map()
-
-        if self.config.brightness == 0:
-            self.config.brightness = 25
-
-        self.config.effect = "perkey"
-        self.config.per_key_colors = self.colors
-
-        self.kb = push_per_key_colors(
-            self.kb,
-            self.colors,
-            brightness=int(self.config.brightness),
-            enable_user_mode=True,
+        base = tuple(getattr(self, "_last_non_black_color", tuple(self.config.color)))
+        fallback = tuple(self.config.color)
+        self.kb, self.colors = self._commit_pipeline.commit(
+            kb=self.kb,
+            colors=dict(self.colors),
+            config=self.config,
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+            base_color=(int(base[0]), int(base[1]), int(base[2])),
+            fallback_color=(int(fallback[0]), int(fallback[1]), int(fallback[2])),
+            push_fn=push_per_key_colors,
+            force=bool(force),
         )
 
     def _on_color_change(self, r: int, g: int, b: int):
