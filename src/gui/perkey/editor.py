@@ -5,13 +5,12 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
-from tkinter import filedialog
 
 from src.gui.widgets.color_wheel import ColorWheel
 from src.legacy.config import Config
 from src.core.layout import Y15_PRO_KEYS
 from src.core import profiles
-from src.gui.profile_backdrop_storage import reset_backdrop_image, save_backdrop_image
+from .backdrop_ui import reset_backdrop_ui, set_backdrop_ui
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
 
@@ -267,29 +266,10 @@ class PerKeyEditor:
             set_status(self, saved_key_rgb(self.selected_key_id, r, g, b))
 
     def _set_backdrop(self):
-        path = filedialog.askopenfilename(
-            title="Select keyboard backdrop image",
-            filetypes=[
-                ("Image files", "*.png *.jpg *.jpeg *.bmp *.webp"),
-                ("All files", "*.*"),
-            ],
-        )
-        if not path:
-            return
-        try:
-            save_backdrop_image(profile_name=self.profile_name, source_path=path)
-            self.canvas.reload_backdrop_image()
-            set_status(self, backdrop_updated())
-        except Exception:
-            set_status(self, backdrop_update_failed())
+        set_backdrop_ui(self)
 
     def _reset_backdrop(self):
-        try:
-            reset_backdrop_image(self.profile_name)
-            self.canvas.reload_backdrop_image()
-            set_status(self, backdrop_reset())
-        except Exception:
-            set_status(self, backdrop_reset_failed())
+        reset_backdrop_ui(self)
 
     def _fill_all(self):
         r, g, b = self.color_wheel.get_color()
