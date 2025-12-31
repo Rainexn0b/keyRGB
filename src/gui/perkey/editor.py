@@ -28,6 +28,30 @@ from .color_apply_ops import apply_color_to_map
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
 from .profile_actions_ui import activate_profile_ui, delete_profile_ui, save_profile_ui
+from .status_ui import (
+    active_profile,
+    auto_synced_overlay_tweaks,
+    backdrop_reset,
+    backdrop_reset_failed,
+    backdrop_update_failed,
+    backdrop_updated,
+    calibrator_failed,
+    calibrator_started,
+    cleared_all_keys,
+    filled_all_keys_rgb,
+    keymap_reloaded,
+    no_keymap_found,
+    no_keymap_found_initial,
+    reset_overlay_tweaks_for_key,
+    reset_overlay_tweaks_global,
+    saved_all_keys_rgb,
+    saved_key_rgb,
+    saved_overlay_tweaks_for_key,
+    saved_overlay_tweaks_global,
+    selected_mapped,
+    selected_unmapped,
+    set_status,
+)
 
 
 class PerKeyEditor:
@@ -98,7 +122,7 @@ class PerKeyEditor:
         self.canvas.redraw()
 
         if not self.keymap:
-            self.status_label.config(text="No keymap found — click 'Run Keymap Calibrator'")
+            set_status(self, no_keymap_found_initial())
 
         self.root.bind("<FocusIn>", lambda _e: self._reload_keymap())
 
@@ -118,7 +142,7 @@ class PerKeyEditor:
             self.overlay_controls.sync_vars_from_scope()
 
         if self.selected_cell is None:
-            self.status_label.config(text=f"Selected {key_id} (unmapped) — run keymap calibrator")
+            set_status(self, selected_unmapped(key_id))
             self.canvas.redraw()
             return
 
@@ -133,7 +157,7 @@ class PerKeyEditor:
         else:
             self._last_non_black_color = (int(color[0]), int(color[1]), int(color[2]))
             self.color_wheel.set_color(*color)
-        self.status_label.config(text=f"Selected {key_id} -> {row},{col}")
+        set_status(self, selected_mapped(key_id, row, col))
         self.canvas.redraw()
 
     def sync_overlay_vars(self):
@@ -142,23 +166,23 @@ class PerKeyEditor:
     def save_layout_tweaks(self):
         if self.overlay_scope.get() == "key" and self.selected_key_id:
             profiles.save_layout_per_key(self.per_key_layout_tweaks, self.profile_name)
-            self.status_label.config(text=f"Saved overlay tweaks for {self.selected_key_id}")
+            set_status(self, saved_overlay_tweaks_for_key(self.selected_key_id))
         else:
             profiles.save_layout_global(self.layout_tweaks, self.profile_name)
-            self.status_label.config(text="Saved global overlay alignment tweaks")
+            set_status(self, saved_overlay_tweaks_global())
 
     def reset_layout_tweaks(self):
         if self.overlay_scope.get() == "key" and self.selected_key_id:
             self.per_key_layout_tweaks.pop(self.selected_key_id, None)
             self.overlay_controls.sync_vars_from_scope()
             self.canvas.redraw()
-            self.status_label.config(text=f"Reset overlay tweaks for {self.selected_key_id}")
+            set_status(self, reset_overlay_tweaks_for_key(self.selected_key_id))
             return
 
         self.layout_tweaks = {"dx": 0.0, "dy": 0.0, "sx": 1.0, "sy": 1.0, "inset": 0.06}
         self.overlay_controls.sync_vars_from_scope()
         self.canvas.redraw()
-        self.status_label.config(text="Reset global overlay alignment tweaks")
+        set_status(self, reset_overlay_tweaks_global())
 
     def auto_sync_per_key_overlays(self):
         auto_sync_per_key_overlays(
@@ -170,14 +194,14 @@ class PerKeyEditor:
         if self._overlay_visible:
             self.overlay_controls.sync_vars_from_scope()
         self.canvas.redraw()
-        self.status_label.config(text="Auto-synced overlay tweaks")
+        set_status(self, auto_synced_overlay_tweaks())
 
     def _run_calibrator(self):
         try:
             launch_keymap_calibrator()
-            self.status_label.config(text="Calibrator started — map keys then Save")
+            set_status(self, calibrator_started())
         except Exception:
-            self.status_label.config(text="Failed to start calibrator")
+            set_status(self, calibrator_failed())
 
     def _reload_keymap(self):
         old = dict(self.keymap)
@@ -186,9 +210,9 @@ class PerKeyEditor:
             self.selected_cell = self.keymap.get(self.selected_key_id)
         if old != self.keymap:
             if self.keymap:
-                self.status_label.config(text="Keymap reloaded")
+                set_status(self, keymap_reloaded())
             else:
-                self.status_label.config(text="No keymap found — run keymap calibrator")
+                set_status(self, no_keymap_found())
         self.canvas.redraw()
 
     def _commit(self, *, force: bool = False):
@@ -252,9 +276,9 @@ class PerKeyEditor:
             self.canvas.update_key_visual(self.selected_key_id, color)
         self._commit(force=True)
         if self.apply_all_keys.get():
-            self.status_label.config(text=f"Saved all keys = RGB({r},{g},{b})")
+            set_status(self, saved_all_keys_rgb(r, g, b))
         elif self.selected_key_id is not None and self.selected_cell is not None:
-            self.status_label.config(text=f"Saved {self.selected_key_id} = RGB({r},{g},{b})")
+            set_status(self, saved_key_rgb(self.selected_key_id, r, g, b))
 
     def _set_backdrop(self):
         path = filedialog.askopenfilename(
@@ -269,17 +293,17 @@ class PerKeyEditor:
         try:
             save_backdrop_image(profile_name=self.profile_name, source_path=path)
             self.canvas.reload_backdrop_image()
-            self.status_label.config(text="Backdrop updated")
+            set_status(self, backdrop_updated())
         except Exception:
-            self.status_label.config(text="Failed to set backdrop")
+            set_status(self, backdrop_update_failed())
 
     def _reset_backdrop(self):
         try:
             reset_backdrop_image(self.profile_name)
             self.canvas.reload_backdrop_image()
-            self.status_label.config(text="Backdrop reset")
+            set_status(self, backdrop_reset())
         except Exception:
-            self.status_label.config(text="Failed to reset backdrop")
+            set_status(self, backdrop_reset_failed())
 
     def _fill_all(self):
         r, g, b = self.color_wheel.get_color()
@@ -289,7 +313,7 @@ class PerKeyEditor:
 
         self.canvas.redraw()
         self._commit(force=True)
-        self.status_label.config(text=f"Filled all keys = RGB({r},{g},{b})")
+        set_status(self, filled_all_keys_rgb(r, g, b))
 
     def _ensure_full_map(self):
         # Use the last non-black wheel color as the base fill. This matches the
@@ -318,7 +342,7 @@ class PerKeyEditor:
             enable_user_mode=True,
         )
 
-        self.status_label.config(text="Cleared all keys")
+        set_status(self, cleared_all_keys())
 
     def _load_layout_tweaks(self) -> dict[str, float]:
         return profiles.load_layout_global(self.profile_name)

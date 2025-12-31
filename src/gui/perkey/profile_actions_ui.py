@@ -11,6 +11,7 @@ from typing import Any
 from src.core import profiles
 
 from .profile_management import activate_profile, delete_profile, save_profile
+from .status_ui import active_profile, saved_profile, set_status
 
 
 def activate_profile_ui(editor: Any) -> None:
@@ -33,7 +34,7 @@ def activate_profile_ui(editor: Any) -> None:
 
     editor.overlay_controls.sync_vars_from_scope()
     editor.canvas.redraw()
-    editor.status_label.config(text=f"Active profile: {editor.profile_name}")
+    set_status(editor, active_profile(editor.profile_name))
 
     if editor.selected_key_id:
         editor.select_key_id(editor.selected_key_id)
@@ -54,17 +55,17 @@ def save_profile_ui(editor: Any) -> None:
     # Persist + push the saved state immediately.
     editor._ensure_full_map()
     editor._commit(force=True)
-    editor.status_label.config(text=f"Saved profile: {editor.profile_name}")
+    set_status(editor, saved_profile(editor.profile_name))
 
 
 def delete_profile_ui(editor: Any) -> None:
     result = delete_profile(editor._profile_name_var.get())
     if not result.deleted:
         if result.message:
-            editor.status_label.config(text=result.message)
+            set_status(editor, result.message)
         return
 
     editor.profile_name = result.active_profile
     editor._profile_name_var.set(result.active_profile)
     editor._profiles_combo.configure(values=profiles.list_profiles())
-    editor.status_label.config(text=result.message)
+    set_status(editor, result.message)
