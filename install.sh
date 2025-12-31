@@ -295,20 +295,20 @@ echo "✓ Scripts are executable"
 echo
 echo "🧷 Installing application launcher entry..."
 
-ICON_SRC="$REPO_DIR/assets/logo-keyrgb.jpg"
+ICON_SRC="$REPO_DIR/assets/logo-keyrgb.png"
 ICON_DIR="$HOME/.local/share/icons"
-ICON_FILE="$ICON_DIR/keyrgb.jpg"
+ICON_FILE="$ICON_DIR/keyrgb.png"
 
-ICON_REF="preferences-desktop-keyboard"
-if [ -f "$ICON_SRC" ]; then
-    mkdir -p "$ICON_DIR"
-    install -m 0644 "$ICON_SRC" "$ICON_FILE"
-    ICON_REF="$ICON_FILE"
-    echo "✓ Installed icon: $ICON_FILE"
-else
-    echo "⚠️  Logo not found: $ICON_SRC"
-    echo "   Using fallback icon: $ICON_REF"
+if ! [ -f "$ICON_SRC" ]; then
+    echo "❌ Logo not found: $ICON_SRC" >&2
+    exit 1
 fi
+
+mkdir -p "$ICON_DIR"
+install -m 0644 "$ICON_SRC" "$ICON_FILE"
+echo "✓ Installed icon: $ICON_FILE"
+
+ICON_REF="$ICON_FILE"
 
 APP_DIR="$HOME/.local/share/applications"
 APP_FILE="$APP_DIR/keyrgb.desktop"

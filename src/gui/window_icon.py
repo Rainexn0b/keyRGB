@@ -11,14 +11,14 @@ def _candidate_logo_paths() -> list[Path]:
     # install.sh installs a user icon here.
     try:
         home = Path.home()
-        paths.append(home / ".local/share/icons/keyrgb.jpg")
+        paths.append(home / ".local/share/icons/keyrgb.png")
     except Exception:
         pass
 
     # Repo checkout (and editable installs) typically keep assets/ alongside src/.
     start = Path(__file__).resolve()
     for parent in [start] + list(start.parents):
-        cand = parent / "assets" / "logo-keyrgb.jpg"
+        cand = parent / "assets" / "logo-keyrgb.png"
         if cand not in paths:
             paths.append(cand)
 
@@ -38,7 +38,7 @@ def find_keyrgb_logo_path() -> Path | None:
 def apply_keyrgb_window_icon(window: tk.Misc) -> None:
     """Best-effort: set KeyRGB icon for a Tk window.
 
-    Uses the JPEG logo from install.sh (preferred) or from repo assets.
+    Uses the PNG logo from install.sh (preferred) or from repo assets.
     Safe to call on any Tk root/toplevel; does nothing on failure.
     """
 
