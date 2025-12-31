@@ -21,13 +21,14 @@ from .overlay_autosync import auto_sync_per_key_overlays
 from .profile_management import load_profile_colors
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
-from .color_map_ops import clear_all, ensure_full_map, fill_all
+from .color_map_ops import ensure_full_map
 from .color_apply_ops import apply_color_to_map
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
 from .profile_actions_ui import activate_profile_ui, delete_profile_ui, save_profile_ui
 from .calibrator_ui import run_keymap_calibrator_ui
 from .keymap_ui import reload_keymap_ui
+from .bulk_color_ui import clear_all_ui, fill_all_ui
 from .status_ui import (
     active_profile,
     auto_synced_overlay_tweaks,
@@ -272,14 +273,7 @@ class PerKeyEditor:
         reset_backdrop_ui(self)
 
     def _fill_all(self):
-        r, g, b = self.color_wheel.get_color()
-        color = (r, g, b)
-
-        self.colors = fill_all(num_rows=NUM_ROWS, num_cols=NUM_COLS, color=color)
-
-        self.canvas.redraw()
-        self._commit(force=True)
-        set_status(self, filled_all_keys_rgb(r, g, b))
+        fill_all_ui(self, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _ensure_full_map(self):
         # Use the last non-black wheel color as the base fill. This matches the
@@ -296,19 +290,7 @@ class PerKeyEditor:
         )
 
     def _clear_all(self):
-        self.colors = clear_all(num_rows=NUM_ROWS, num_cols=NUM_COLS)
-        self.canvas.redraw()
-        self.config.effect = "perkey"
-        self.config.per_key_colors = self.colors
-
-        self.kb = push_per_key_colors(
-            self.kb,
-            self.colors,
-            brightness=int(self.config.brightness),
-            enable_user_mode=True,
-        )
-
-        set_status(self, cleared_all_keys())
+        clear_all_ui(self, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _load_layout_tweaks(self) -> dict[str, float]:
         return profiles.load_layout_global(self.profile_name)
