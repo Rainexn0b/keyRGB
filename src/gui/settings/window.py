@@ -40,6 +40,7 @@ except Exception:
 from src.core.version_check import compare_versions, normalize_version_text
 
 from src.gui.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_dark_theme
 
 
 class PowerSettingsGUI:
@@ -50,23 +51,11 @@ class PowerSettingsGUI:
         self.root.minsize(760, 560)
         self.root.resizable(True, True)
 
-        style = ttk.Style()
-        style.theme_use("clam")
-
-        bg_color = "#2b2b2b"
-        fg_color = "#e0e0e0"
-
-        self.root.configure(bg=bg_color)
-        style.configure("TFrame", background=bg_color)
-        style.configure("TLabel", background=bg_color, foreground=fg_color)
-        style.configure("TCheckbutton", background=bg_color, foreground=fg_color)
-        style.map(
-            "TCheckbutton",
-            background=[("disabled", bg_color), ("active", bg_color)],
-            foreground=[("disabled", "#777777"), ("!disabled", fg_color)],
+        bg_color, fg_color = apply_clam_dark_theme(
+            self.root,
+            include_checkbuttons=True,
+            map_checkbutton_state=True,
         )
-        style.configure("TButton", background="#404040", foreground=fg_color)
-        style.map("TButton", background=[("active", "#505050")])
 
         self.config = Config()
 

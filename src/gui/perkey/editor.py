@@ -15,6 +15,7 @@ from src.core import profiles
 from src.gui.profile_backdrop_storage import reset_backdrop_image, save_backdrop_image
 from src.gui.launch_keymap_calibrator import launch_keymap_calibrator
 from src.gui.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_dark_theme
 
 from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
@@ -62,16 +63,7 @@ class PerKeyEditor:
         self.root.minsize(min(w0, max_w), min(h0, max_h))
 
         style = ttk.Style()
-        style.theme_use("clam")
-
-        self.bg_color = "#2b2b2b"
-        self.fg_color = "#e0e0e0"
-
-        self.root.configure(bg=self.bg_color)
-        style.configure("TFrame", background=self.bg_color)
-        style.configure("TLabel", background=self.bg_color, foreground=self.fg_color)
-        style.configure("TButton", background="#404040", foreground=self.fg_color)
-        style.map("TButton", background=[("active", "#505050")])
+        self.bg_color, self.fg_color = apply_clam_dark_theme(self.root)
         style.configure("TCheckbutton", background=self.bg_color, foreground=self.fg_color)
 
         self.config = Config()

@@ -20,6 +20,7 @@ from tkinter import messagebox, simpledialog, ttk
 
 from src.core.logging_utils import log_throttled
 from src.gui.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_dark_theme
 
 try:
     from src.core import tcc_power_profiles
@@ -41,17 +42,7 @@ class TccProfilesGUI:
         self.root.minsize(720, 520)
         self.root.resizable(True, True)
 
-        style = ttk.Style()
-        style.theme_use("clam")
-
-        bg_color = "#2b2b2b"
-        fg_color = "#e0e0e0"
-
-        self.root.configure(bg=bg_color)
-        style.configure("TFrame", background=bg_color)
-        style.configure("TLabel", background=bg_color, foreground=fg_color)
-        style.configure("TButton", background="#404040", foreground=fg_color)
-        style.map("TButton", background=[("active", "#505050")])
+        apply_clam_dark_theme(self.root)
 
         main = ttk.Frame(self.root, padding=16)
         main.pack(fill="both", expand=True)

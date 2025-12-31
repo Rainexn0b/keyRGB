@@ -17,6 +17,7 @@ from tkinter import ttk
 from src.core.backends.registry import select_backend
 from src.core.imports import ensure_repo_root_on_sys_path
 from src.gui.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_dark_theme
 
 
 logger = logging.getLogger(__name__)
@@ -40,21 +41,8 @@ class UniformColorGUI:
         apply_keyrgb_window_icon(self.root)
         self.root.geometry('450x550')
         self.root.resizable(False, False)
-        
-        # Dark theme
-        style = ttk.Style()
-        style.theme_use('clam')
-        
-        # Configure colors
-        bg_color = '#2b2b2b'
-        fg_color = '#e0e0e0'
-        
-        self.root.configure(bg=bg_color)
-        style.configure('TFrame', background=bg_color)
-        style.configure('TLabel', background=bg_color, foreground=fg_color)
-        style.configure('TButton', background='#404040', foreground=fg_color)
-        style.map('TButton',
-                  background=[('active', '#505050')])
+
+        apply_clam_dark_theme(self.root)
         
         # Initialize config (tray app will apply changes if it's running)
         self.config = Config()

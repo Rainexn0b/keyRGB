@@ -25,6 +25,7 @@ from src.gui.calibrator_profile_storage import (
 )
 
 from src.gui.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_dark_theme
 
 
 MATRIX_ROWS = 6
@@ -78,15 +79,7 @@ class KeymapCalibrator(tk.Tk):
         self.title("KeyRGB - Keymap Calibrator (Y15 Pro)")
         apply_keyrgb_window_icon(self)
 
-        style = ttk.Style()
-        style.theme_use("clam")
-        self.bg_color = "#2b2b2b"
-        self.fg_color = "#e0e0e0"
-        self.configure(bg=self.bg_color)
-        style.configure("TFrame", background=self.bg_color)
-        style.configure("TLabel", background=self.bg_color, foreground=self.fg_color)
-        style.configure("TButton", background="#404040", foreground=self.fg_color)
-        style.map("TButton", background=[("active", "#505050")])
+        self.bg_color, self.fg_color = apply_clam_dark_theme(self)
 
         self.cfg = Config()
         self.preview = KeyboardPreviewSession(self.cfg, rows=MATRIX_ROWS, cols=MATRIX_COLS)
