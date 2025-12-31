@@ -28,6 +28,7 @@ from .color_apply_ops import apply_color_to_map
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
 from .profile_actions_ui import activate_profile_ui, delete_profile_ui, save_profile_ui
+from .keymap_ui import reload_keymap_ui
 from .status_ui import (
     active_profile,
     auto_synced_overlay_tweaks,
@@ -39,8 +40,6 @@ from .status_ui import (
     calibrator_started,
     cleared_all_keys,
     filled_all_keys_rgb,
-    keymap_reloaded,
-    no_keymap_found,
     no_keymap_found_initial,
     reset_overlay_tweaks_for_key,
     reset_overlay_tweaks_global,
@@ -204,16 +203,7 @@ class PerKeyEditor:
             set_status(self, calibrator_failed())
 
     def _reload_keymap(self):
-        old = dict(self.keymap)
-        self.keymap = self._load_keymap()
-        if self.selected_key_id is not None:
-            self.selected_cell = self.keymap.get(self.selected_key_id)
-        if old != self.keymap:
-            if self.keymap:
-                set_status(self, keymap_reloaded())
-            else:
-                set_status(self, no_keymap_found())
-        self.canvas.redraw()
+        reload_keymap_ui(self)
 
     def _commit(self, *, force: bool = False):
         base = tuple(getattr(self, "_last_non_black_color", tuple(self.config.color)))
