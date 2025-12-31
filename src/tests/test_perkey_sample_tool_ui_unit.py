@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.sample_tool_ui import on_key_clicked_ui, on_sample_tool_toggled_ui
+from src.gui.perkey.ui.sample_tool import on_key_clicked_ui, on_sample_tool_toggled_ui
 
 
 class DummyLabel:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .status_ui import keymap_reloaded, no_keymap_found, set_status
+from .status import keymap_reloaded, no_keymap_found, set_status
 
 
 def reload_keymap_ui(editor: Any) -> None:

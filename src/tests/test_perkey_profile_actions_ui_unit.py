@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import src.gui.perkey.profile_actions_ui as actions
+import src.gui.perkey.ui.profile_actions as actions
 from src.gui.perkey.profile_management import ActivatedProfile, DeleteProfileResult
 
 

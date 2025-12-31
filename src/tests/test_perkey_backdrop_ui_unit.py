@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.backdrop_ui import reset_backdrop_ui, set_backdrop_ui
+from src.gui.perkey.ui.backdrop import reset_backdrop_ui, set_backdrop_ui
 
 
 class DummyLabel:

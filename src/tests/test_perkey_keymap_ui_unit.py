@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.keymap_ui import reload_keymap_ui
+from src.gui.perkey.ui.keymap import reload_keymap_ui
 
 
 class DummyLabel:

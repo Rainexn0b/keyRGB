@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from .color_apply_ops import apply_color_to_map
-from .status_ui import saved_all_keys_rgb, saved_key_rgb, set_status
+from ..color_apply_ops import apply_color_to_map
+from .status import saved_all_keys_rgb, saved_key_rgb, set_status
 
 
 def on_wheel_color_change_ui(

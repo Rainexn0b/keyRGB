@@ -10,10 +10,10 @@ from typing import Any
 
 from src.core import profiles
 
-from .full_map_ui import ensure_full_map_ui
-from .hardware import NUM_COLS, NUM_ROWS
-from .profile_management import activate_profile, delete_profile, save_profile
-from .status_ui import active_profile, saved_profile, set_status
+from .full_map import ensure_full_map_ui
+from ..hardware import NUM_COLS, NUM_ROWS
+from ..profile_management import activate_profile, delete_profile, save_profile
+from .status import active_profile, saved_profile, set_status
 
 
 def activate_profile_ui(editor: Any) -> None:

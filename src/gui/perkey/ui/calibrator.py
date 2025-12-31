@@ -4,7 +4,7 @@ from typing import Any, Callable
 
 from src.gui.launch_keymap_calibrator import launch_keymap_calibrator
 
-from .status_ui import calibrator_failed, calibrator_started, set_status
+from .status import calibrator_failed, calibrator_started, set_status
 
 
 def run_keymap_calibrator_ui(editor: Any, *, launch_fn: Callable[[], None] = launch_keymap_calibrator) -> None:

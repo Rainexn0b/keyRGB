@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.wheel_apply_ui import on_wheel_color_change_ui, on_wheel_color_release_ui
+from src.gui.perkey.ui.wheel_apply import on_wheel_color_change_ui, on_wheel_color_release_ui
 
 
 class DummyLabel:

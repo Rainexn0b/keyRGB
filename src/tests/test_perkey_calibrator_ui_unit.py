@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.calibrator_ui import run_keymap_calibrator_ui
+from src.gui.perkey.ui.calibrator import run_keymap_calibrator_ui
 
 
 class DummyLabel:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.perkey.status_ui import (
+from src.gui.perkey.ui.status import (
     active_profile,
     action_failed,
     backdrop_reset,

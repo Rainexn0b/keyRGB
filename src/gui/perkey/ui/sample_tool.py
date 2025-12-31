@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from .wheel_apply_ui import on_wheel_color_release_ui
-from .status_ui import (
+from .wheel_apply import on_wheel_color_release_ui
+from .status import (
     sample_tool_pick_a_key,
     sample_tool_sampled_color,
     sample_tool_unmapped_key,

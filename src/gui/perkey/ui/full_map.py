@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from .color_map_ops import ensure_full_map
+from ..color_map_ops import ensure_full_map
 
 
 def ensure_full_map_ui(

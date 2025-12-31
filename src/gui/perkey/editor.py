@@ -10,9 +10,10 @@ from src.gui.widgets.color_wheel import ColorWheel
 from src.legacy.config import Config
 from src.core.layout import Y15_PRO_KEYS
 from src.core import profiles
-from .backdrop_ui import reset_backdrop_ui, set_backdrop_ui
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
+
+from .ui.backdrop import reset_backdrop_ui, set_backdrop_ui
 
 from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
@@ -23,14 +24,15 @@ from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
-from .profile_actions_ui import activate_profile_ui, delete_profile_ui, save_profile_ui
-from .calibrator_ui import run_keymap_calibrator_ui
-from .keymap_ui import reload_keymap_ui
-from .bulk_color_ui import clear_all_ui, fill_all_ui
-from .wheel_apply_ui import on_wheel_color_change_ui, on_wheel_color_release_ui
-from .full_map_ui import ensure_full_map_ui
-from .sample_tool_ui import on_key_clicked_ui, on_sample_tool_toggled_ui
-from .status_ui import (
+
+from .ui.profile_actions import activate_profile_ui, delete_profile_ui, save_profile_ui
+from .ui.calibrator import run_keymap_calibrator_ui
+from .ui.keymap import reload_keymap_ui
+from .ui.bulk_color import clear_all_ui, fill_all_ui
+from .ui.wheel_apply import on_wheel_color_change_ui, on_wheel_color_release_ui
+from .ui.full_map import ensure_full_map_ui
+from .ui.sample_tool import on_key_clicked_ui, on_sample_tool_toggled_ui
+from .ui.status import (
     active_profile,
     auto_synced_overlay_tweaks,
     backdrop_reset,

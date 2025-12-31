@@ -6,7 +6,7 @@ from tkinter import filedialog
 
 from src.gui.profile_backdrop_storage import reset_backdrop_image, save_backdrop_image
 
-from .status_ui import (
+from .status import (
     backdrop_reset,
     backdrop_reset_failed,
     backdrop_update_failed,
