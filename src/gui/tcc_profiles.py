@@ -21,6 +21,7 @@ from tkinter import messagebox, simpledialog, ttk
 from src.core.logging_utils import log_throttled
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
+from src.gui.window_centering import center_window_on_screen
 from src.gui.tcc_profile_editor import open_profile_json_editor
 from src.core import tcc_power_profiles
 
@@ -120,11 +121,7 @@ class TccProfilesGUI:
 
         self._refresh()
 
-        # Center window.
-        self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() // 2) - (self.root.winfo_width() // 2)
-        y = (self.root.winfo_screenheight() // 2) - (self.root.winfo_height() // 2)
-        self.root.geometry(f"+{x}+{y}")
+        center_window_on_screen(self.root)
 
     def _set_status(self, text: str) -> None:
         self.status.configure(text=text)

@@ -17,6 +17,7 @@ from tkinter import ttk
 from src.core.backends.registry import select_backend
 from src.core.imports import ensure_repo_root_on_sys_path
 from src.gui.window_icon import apply_keyrgb_window_icon
+from src.gui.window_centering import center_window_on_screen
 from src.gui.theme import apply_clam_dark_theme
 
 
@@ -103,11 +104,7 @@ class UniformColorGUI:
         )
         self.status_label.pack()
         
-        # Center window
-        self.root.update_idletasks()
-        x = (self.root.winfo_screenwidth() // 2) - (self.root.winfo_width() // 2)
-        y = (self.root.winfo_screenheight() // 2) - (self.root.winfo_height() // 2)
-        self.root.geometry(f'+{x}+{y}')
+        center_window_on_screen(self.root)
 
         self._pending_color = None
         self._last_drag_commit_ts = 0.0
