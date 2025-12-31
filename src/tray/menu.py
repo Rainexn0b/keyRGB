@@ -5,7 +5,7 @@ from typing import Any
 
 from src.core import tcc_power_profiles
 
-from .menu_sections import (
+from .ui.menu_sections import (
     build_perkey_profiles_menu,
     build_tcc_profiles_menu,
     keyboard_status_text,
