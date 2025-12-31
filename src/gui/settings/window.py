@@ -23,6 +23,7 @@ from .autostart_panel import AutostartPanel
 from .diagnostics_panel import DiagnosticsPanel
 from .dim_sync_panel import DimSyncPanel
 from .os_autostart import detect_os_autostart_enabled, set_os_autostart
+from .power_source_panel import PowerSourcePanel
 from .scrollable_area import ScrollableArea
 from .version_panel import VersionPanel
 from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
@@ -154,84 +155,14 @@ class PowerSettingsGUI:
 
         ttk.Separator(left).pack(fill="x", pady=(14, 10))
 
-        ps_title = ttk.Label(left, text="Plugged In vs Battery", font=("Sans", 11, "bold"))
-        ps_title.pack(anchor="w", pady=(0, 6))
-
-        ps_desc = ttk.Label(
+        self.power_source_panel = PowerSourcePanel(
             left,
-            text=(
-                "Choose whether the keyboard lighting should be on/off and what\n"
-                "brightness to use when plugged in vs running on battery."
-            ),
-            font=("Sans", 9),
+            var_ac_enabled=self.var_ac_enabled,
+            var_battery_enabled=self.var_battery_enabled,
+            var_ac_brightness=self.var_ac_brightness,
+            var_battery_brightness=self.var_battery_brightness,
+            on_toggle=self._on_toggle,
         )
-        ps_desc.pack(anchor="w", pady=(0, 10))
-
-        def _set_label_int(lbl: ttk.Label, v: float | str) -> None:
-            try:
-                lbl.configure(text=str(int(float(v))))
-            except Exception:
-                lbl.configure(text="?")
-
-        # AC row
-        ac_row = ttk.Frame(left)
-        ac_row.pack(fill="x", pady=(0, 10))
-        ac_head = ttk.Frame(ac_row)
-        ac_head.pack(fill="x")
-
-        self.chk_ac_enabled = ttk.Checkbutton(
-            ac_head,
-            text="When plugged in (AC): enable lighting",
-            variable=self.var_ac_enabled,
-            command=self._on_toggle,
-        )
-        self.chk_ac_enabled.pack(side="left", anchor="w")
-
-        self.lbl_ac_brightness_val = ttk.Label(ac_head, text=str(int(self.var_ac_brightness.get())), font=("Sans", 9))
-        self.lbl_ac_brightness_val.pack(side="right")
-        ttk.Label(ac_head, text="Brightness", font=("Sans", 9)).pack(side="right", padx=(0, 6))
-
-        self.scale_ac_brightness = ttk.Scale(
-            ac_row,
-            from_=0,
-            to=50,
-            orient="horizontal",
-            variable=self.var_ac_brightness,
-            command=lambda v: _set_label_int(self.lbl_ac_brightness_val, v),
-        )
-        self.scale_ac_brightness.pack(fill="x", pady=(6, 0))
-        self.scale_ac_brightness.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
-
-        # Battery row
-        batt_row = ttk.Frame(left)
-        batt_row.pack(fill="x")
-        batt_head = ttk.Frame(batt_row)
-        batt_head.pack(fill="x")
-
-        self.chk_battery_enabled = ttk.Checkbutton(
-            batt_head,
-            text="On battery: enable lighting",
-            variable=self.var_battery_enabled,
-            command=self._on_toggle,
-        )
-        self.chk_battery_enabled.pack(side="left", anchor="w")
-
-        self.lbl_battery_brightness_val = ttk.Label(
-            batt_head, text=str(int(self.var_battery_brightness.get())), font=("Sans", 9)
-        )
-        self.lbl_battery_brightness_val.pack(side="right")
-        ttk.Label(batt_head, text="Brightness", font=("Sans", 9)).pack(side="right", padx=(0, 6))
-
-        self.scale_battery_brightness = ttk.Scale(
-            batt_row,
-            from_=0,
-            to=50,
-            orient="horizontal",
-            variable=self.var_battery_brightness,
-            command=lambda v: _set_label_int(self.lbl_battery_brightness_val, v),
-        )
-        self.scale_battery_brightness.pack(fill="x", pady=(6, 0))
-        self.scale_battery_brightness.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
 
         ttk.Separator(right).pack(fill="x", pady=(0, 10))
 
@@ -327,14 +258,11 @@ class PowerSettingsGUI:
             self.chk_restore_resume,
             self.chk_off_lid,
             self.chk_restore_lid,
-            self.chk_ac_enabled,
-            self.chk_battery_enabled,
-            self.scale_ac_brightness,
-            self.scale_battery_brightness,
         ):
             w.configure(state=state)
 
         self.dim_sync_panel.apply_enabled_state(power_management_enabled=enabled)
+        self.power_source_panel.apply_enabled_state(power_management_enabled=enabled)
 
     def _on_toggle(self) -> None:
         try:
