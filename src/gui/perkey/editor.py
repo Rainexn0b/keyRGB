@@ -12,7 +12,6 @@ from src.legacy.config import Config
 from src.core.layout import Y15_PRO_KEYS
 from src.core import profiles
 from src.gui.profile_backdrop_storage import reset_backdrop_image, save_backdrop_image
-from src.gui.launch_keymap_calibrator import launch_keymap_calibrator
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
 
@@ -28,6 +27,7 @@ from .color_apply_ops import apply_color_to_map
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
 from .profile_actions_ui import activate_profile_ui, delete_profile_ui, save_profile_ui
+from .calibrator_ui import run_keymap_calibrator_ui
 from .keymap_ui import reload_keymap_ui
 from .status_ui import (
     active_profile,
@@ -196,11 +196,7 @@ class PerKeyEditor:
         set_status(self, auto_synced_overlay_tweaks())
 
     def _run_calibrator(self):
-        try:
-            launch_keymap_calibrator()
-            set_status(self, calibrator_started())
-        except Exception:
-            set_status(self, calibrator_failed())
+        run_keymap_calibrator_ui(self)
 
     def _reload_keymap(self):
         reload_keymap_ui(self)
