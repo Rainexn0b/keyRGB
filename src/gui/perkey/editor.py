@@ -21,7 +21,6 @@ from .overlay_autosync import auto_sync_per_key_overlays
 from .profile_management import load_profile_colors
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
-from .color_map_ops import ensure_full_map
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
 from .profile_actions_ui import activate_profile_ui, delete_profile_ui, save_profile_ui
@@ -29,6 +28,7 @@ from .calibrator_ui import run_keymap_calibrator_ui
 from .keymap_ui import reload_keymap_ui
 from .bulk_color_ui import clear_all_ui, fill_all_ui
 from .wheel_apply_ui import on_wheel_color_change_ui, on_wheel_color_release_ui
+from .full_map_ui import ensure_full_map_ui
 from .status_ui import (
     active_profile,
     auto_synced_overlay_tweaks,
@@ -232,18 +232,7 @@ class PerKeyEditor:
         fill_all_ui(self, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _ensure_full_map(self):
-        # Use the last non-black wheel color as the base fill. This matches the
-        # expected workflow: start from a unified color, then override a few keys
-        # without blanking the rest of the keyboard.
-        base = tuple(getattr(self, "_last_non_black_color", tuple(self.config.color)))
-        fallback = tuple(self.config.color)
-        self.colors = ensure_full_map(
-            colors=dict(self.colors),
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
-            base_color=base,
-            fallback_color=fallback,
-        )
+        ensure_full_map_ui(self, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _clear_all(self):
         clear_all_ui(self, num_rows=NUM_ROWS, num_cols=NUM_COLS)
