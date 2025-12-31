@@ -22,13 +22,13 @@ from .profile_management import load_profile_colors
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
 from .color_map_ops import ensure_full_map
-from .color_apply_ops import apply_color_to_map
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
 from .profile_actions_ui import activate_profile_ui, delete_profile_ui, save_profile_ui
 from .calibrator_ui import run_keymap_calibrator_ui
 from .keymap_ui import reload_keymap_ui
 from .bulk_color_ui import clear_all_ui, fill_all_ui
+from .wheel_apply_ui import on_wheel_color_change_ui, on_wheel_color_release_ui
 from .status_ui import (
     active_profile,
     auto_synced_overlay_tweaks,
@@ -217,54 +217,10 @@ class PerKeyEditor:
         )
 
     def _on_color_change(self, r: int, g: int, b: int):
-        color = (r, g, b)
-        if color != (0, 0, 0):
-            self._last_non_black_color = color
-
-        if (not self.apply_all_keys.get()) and (self.selected_cell is None or not self.selected_key_id):
-            return
-
-        self.colors = apply_color_to_map(
-            colors=dict(self.colors),
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
-            color=color,
-            apply_all_keys=bool(self.apply_all_keys.get()),
-            selected_cell=self.selected_cell,
-        )
-
-        if self.apply_all_keys.get():
-            self.canvas.redraw()
-        else:
-            self.canvas.update_key_visual(self.selected_key_id, color)
-        self._commit(force=False)
+        on_wheel_color_change_ui(self, r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _on_color_release(self, r: int, g: int, b: int):
-        color = (r, g, b)
-        if color != (0, 0, 0):
-            self._last_non_black_color = color
-
-        if (not self.apply_all_keys.get()) and (self.selected_cell is None or not self.selected_key_id):
-            return
-
-        self.colors = apply_color_to_map(
-            colors=dict(self.colors),
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
-            color=color,
-            apply_all_keys=bool(self.apply_all_keys.get()),
-            selected_cell=self.selected_cell,
-        )
-
-        if self.apply_all_keys.get():
-            self.canvas.redraw()
-        else:
-            self.canvas.update_key_visual(self.selected_key_id, color)
-        self._commit(force=True)
-        if self.apply_all_keys.get():
-            set_status(self, saved_all_keys_rgb(r, g, b))
-        elif self.selected_key_id is not None and self.selected_cell is not None:
-            set_status(self, saved_key_rgb(self.selected_key_id, r, g, b))
+        on_wheel_color_release_ui(self, r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _set_backdrop(self):
         set_backdrop_ui(self)
