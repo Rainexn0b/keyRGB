@@ -192,7 +192,6 @@ class PerKeyEditor:
         self.canvas.redraw()
 
     def _commit(self, *, force: bool = False):
-        self._ensure_full_map()
         base = tuple(getattr(self, "_last_non_black_color", tuple(self.config.color)))
         fallback = tuple(self.config.color)
         self.kb, self.colors = self._commit_pipeline.commit(
@@ -269,8 +268,7 @@ class PerKeyEditor:
             return
         try:
             save_backdrop_image(profile_name=self.profile_name, source_path=path)
-            self.canvas._load_deck_image()
-            self.canvas.redraw()
+            self.canvas.reload_backdrop_image()
             self.status_label.config(text="Backdrop updated")
         except Exception:
             self.status_label.config(text="Failed to set backdrop")
@@ -278,8 +276,7 @@ class PerKeyEditor:
     def _reset_backdrop(self):
         try:
             reset_backdrop_image(self.profile_name)
-            self.canvas._load_deck_image()
-            self.canvas.redraw()
+            self.canvas.reload_backdrop_image()
             self.status_label.config(text="Backdrop reset")
         except Exception:
             self.status_label.config(text="Failed to reset backdrop")

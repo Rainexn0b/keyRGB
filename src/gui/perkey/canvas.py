@@ -53,6 +53,12 @@ class KeyboardCanvas(tk.Canvas):
         prof = getattr(self.editor, "profile_name", None)
         self._deck_img = load_y15_pro_deck_image(profile_name=str(prof) if isinstance(prof, str) else None)
 
+    def reload_backdrop_image(self) -> None:
+        """Reload the backdrop image for the current profile and redraw."""
+
+        self._load_deck_image()
+        self.redraw()
+
     def redraw(self):
         self.delete("all")
         self._draw_deck_background()
