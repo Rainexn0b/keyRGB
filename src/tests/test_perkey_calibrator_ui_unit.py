@@ -37,4 +37,5 @@ def test_run_keymap_calibrator_ui_sets_failed_message_on_exception() -> None:
 
     run_keymap_calibrator_ui(ed, launch_fn=boom)
 
-    assert ed.status_label.text == "Failed to start calibrator"
+    assert ed.status_label.text.startswith("Failed to start calibrator")
+    assert "Try:" in ed.status_label.text

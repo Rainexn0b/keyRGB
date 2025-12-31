@@ -15,7 +15,16 @@ class ColorWheel(ttk.Frame):
     A circular color wheel widget for intuitive color selection.
     """
     
-    def __init__(self, parent, size=300, initial_color=(255, 0, 0), callback=None, release_callback=None):
+    def __init__(
+        self,
+        parent,
+        size=300,
+        initial_color=(255, 0, 0),
+        callback=None,
+        release_callback=None,
+        *,
+        show_rgb_label: bool = True,
+    ):
         """
         Initialize the color wheel.
         
@@ -33,6 +42,7 @@ class ColorWheel(ttk.Frame):
         self.callback = callback
         self.release_callback = release_callback
         self.current_color = initial_color
+        self.show_rgb_label = bool(show_rgb_label)
         
         # Convert RGB to HSV for positioning
         r, g, b = [x / 255.0 for x in initial_color]
@@ -100,8 +110,35 @@ class ColorWheel(ttk.Frame):
         # Fixed-size preview to avoid geometry changes during drag
         self.preview_canvas.pack(side='left')
         
-        self.rgb_label = ttk.Label(preview_frame, text='', width=14)
-        self.rgb_label.pack(side='left', padx=(10, 0))
+        self.rgb_label = None
+        if self.show_rgb_label:
+            self.rgb_label = ttk.Label(preview_frame, text='', width=16)
+            self.rgb_label.pack(side='left', padx=(10, 0))
+
+        # Manual RGB input (useful for copying exact values).
+        manual_frame = ttk.Frame(self)
+        manual_frame.pack(fill='x', padx=20, pady=(0, 10))
+
+        ttk.Label(manual_frame, text='RGB:').pack(side='left', padx=(0, 8))
+
+        self._rgb_entry_syncing = False
+        self.rgb_r_var = tk.StringVar(value=str(int(self.current_color[0])))
+        self.rgb_g_var = tk.StringVar(value=str(int(self.current_color[1])))
+        self.rgb_b_var = tk.StringVar(value=str(int(self.current_color[2])))
+
+        self.rgb_r_entry = ttk.Entry(manual_frame, textvariable=self.rgb_r_var, width=4)
+        self.rgb_g_entry = ttk.Entry(manual_frame, textvariable=self.rgb_g_var, width=4)
+        self.rgb_b_entry = ttk.Entry(manual_frame, textvariable=self.rgb_b_var, width=4)
+        self.rgb_r_entry.pack(side='left')
+        ttk.Label(manual_frame, text=',').pack(side='left', padx=(2, 2))
+        self.rgb_g_entry.pack(side='left')
+        ttk.Label(manual_frame, text=',').pack(side='left', padx=(2, 2))
+        self.rgb_b_entry.pack(side='left')
+
+        ttk.Button(manual_frame, text='Set', command=self._on_manual_rgb_set).pack(side='left', padx=(10, 0))
+
+        for ent in (self.rgb_r_entry, self.rgb_g_entry, self.rgb_b_entry):
+            ent.bind('<Return>', lambda _e: self._on_manual_rgb_set())
         
         self._update_preview()
         
@@ -263,7 +300,19 @@ class ColorWheel(ttk.Frame):
             outline=''
         )
         
-        self.rgb_label.config(text=f'RGB({r}, {g}, {b})')
+        if self.rgb_label is not None:
+            # No spaces to keep it compact.
+            self.rgb_label.config(text=f'RGB({r},{g},{b})')
+
+        # Keep manual entry fields in sync with the current color.
+        if hasattr(self, "_rgb_entry_syncing") and not self._rgb_entry_syncing:
+            try:
+                self._rgb_entry_syncing = True
+                self.rgb_r_var.set(str(int(r)))
+                self.rgb_g_var.set(str(int(g)))
+                self.rgb_b_var.set(str(int(b)))
+            finally:
+                self._rgb_entry_syncing = False
         
     def get_color(self):
         """Get the current selected color as (r, g, b) tuple."""
@@ -289,6 +338,28 @@ class ColorWheel(ttk.Frame):
         
         self._update_selection()
         self._update_preview()
+
+    def _on_manual_rgb_set(self) -> None:
+        """Apply a manually entered RGB value and fire callbacks."""
+
+        def _parse(v: str) -> int:
+            try:
+                return int(str(v).strip())
+            except Exception:
+                return 0
+
+        r = max(0, min(255, _parse(self.rgb_r_var.get())))
+        g = max(0, min(255, _parse(self.rgb_g_var.get())))
+        b = max(0, min(255, _parse(self.rgb_b_var.get())))
+
+        # Update wheel visuals without triggering external callbacks.
+        self.set_color(r, g, b)
+
+        # Manual set should behave like a "commit": notify listeners.
+        if self.callback:
+            self.callback(r, g, b)
+        if self.release_callback:
+            self.release_callback(r, g, b)
 
 
 if __name__ == '__main__':

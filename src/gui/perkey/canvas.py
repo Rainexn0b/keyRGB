@@ -117,7 +117,7 @@ class KeyboardCanvas(tk.Canvas):
             self.tag_bind(
                 f"pkey_{key.key_id}",
                 "<Button-1>",
-                lambda _e, kid=key.key_id: self.editor.select_key_id(kid),
+                lambda _e, kid=key.key_id: self.editor.on_key_clicked(kid),
             )
 
     def _draw_deck_background(self):
@@ -331,7 +331,7 @@ class KeyboardCanvas(tk.Canvas):
                 tags = self.gettags(current[0])
                 for t in tags:
                     if t.startswith("pkey_"):
-                        self.editor.select_key_id(t.removeprefix("pkey_"))
+                        self.editor.on_key_clicked(t.removeprefix("pkey_"))
                         return
         except Exception as exc:
             log_throttled(
@@ -345,7 +345,7 @@ class KeyboardCanvas(tk.Canvas):
 
         kid = self._hit_test_key_id(float(event.x), float(event.y))
         if kid is not None:
-            self.editor.select_key_id(kid)
+            self.editor.on_key_clicked(kid)
 
     def update_key_visual(self, key_id: str, color: tuple[int, int, int]):
         if not key_id:

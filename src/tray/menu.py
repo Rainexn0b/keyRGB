@@ -8,7 +8,9 @@ from src.core import tcc_power_profiles
 from .menu_sections import (
     build_perkey_profiles_menu,
     build_tcc_profiles_menu,
+    keyboard_status_text,
     probe_device_available,
+    tray_lighting_mode_text,
 )
 
 
@@ -130,18 +132,12 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     perkey_menu = build_perkey_profiles_menu(tray, pystray=pystray, item=item, per_key_supported=per_key_supported)
 
     return [
-        *(
-            [
-                item(
-                    '⚠ Keyboard device not detected',
-                    lambda _icon, _item: None,
-                    enabled=False,
-                ),
-                pystray.Menu.SEPARATOR,
-            ]
-            if not device_available
-            else []
+        item(
+            keyboard_status_text(tray),
+            lambda _icon, _item: None,
+            enabled=False,
         ),
+        pystray.Menu.SEPARATOR,
         # Effects section (speed is effect-specific)
         *([item('🎨 Hardware Effects', hw_effects_menu)] if hw_effects_supported else []),
         item('💫 Software Effects', sw_effects_menu),
@@ -150,7 +146,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
         # Lighting section (brightness + per-key/uniform)
         item('💡 Brightness', brightness_menu),
-        *([item('🎹 Per-Key Colors', perkey_menu)] if perkey_menu is not None else []),
+        *([item('🎹 Per-key Colors', perkey_menu)] if perkey_menu is not None else []),
         item('🌈 Uniform Color', tray._on_tuxedo_gui_clicked),
         pystray.Menu.SEPARATOR,
 
@@ -163,6 +159,11 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             '🔌 Off' if not tray.is_off else '✅ Turn On',
             tray._on_off_clicked if not tray.is_off else tray._on_turn_on_clicked,
             checked=lambda _i: tray.is_off,
+        ),
+        item(
+            tray_lighting_mode_text(tray),
+            lambda _icon, _item: None,
+            enabled=False,
         ),
         item('❌ Quit', tray._on_quit_clicked),
     ]

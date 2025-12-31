@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import tkinter as tk
 from tkinter import ttk
 
@@ -24,6 +25,18 @@ def apply_clam_dark_theme(
 
     style = ttk.Style()
     style.theme_use("clam")
+
+    # Optional DPI/font robustness smoke-testing.
+    # Tk uses a global scaling factor; allowing override makes it easy to validate
+    # layout behavior at 125%/150% without changing system settings.
+    scaling_raw = os.environ.get("KEYRGB_TK_SCALING")
+    if scaling_raw:
+        try:
+            scaling = float(scaling_raw)
+            if scaling > 0:
+                root.tk.call("tk", "scaling", scaling)
+        except Exception:
+            pass
 
     bg_color = _BG_COLOR
     fg_color = _FG_COLOR

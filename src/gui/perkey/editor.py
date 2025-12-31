@@ -29,6 +29,7 @@ from .keymap_ui import reload_keymap_ui
 from .bulk_color_ui import clear_all_ui, fill_all_ui
 from .wheel_apply_ui import on_wheel_color_change_ui, on_wheel_color_release_ui
 from .full_map_ui import ensure_full_map_ui
+from .sample_tool_ui import on_key_clicked_ui, on_sample_tool_toggled_ui
 from .status_ui import (
     active_profile,
     auto_synced_overlay_tweaks,
@@ -50,6 +51,7 @@ from .status_ui import (
     selected_mapped,
     selected_unmapped,
     set_status,
+    hardware_write_paused,
 )
 
 
@@ -63,7 +65,7 @@ class PerKeyEditor:
         self._resize_job = None
 
         self.root = tk.Tk()
-        self.root.title("KeyRGB - Per-Key Colors")
+        self.root.title("KeyRGB - Per-key Colors")
         apply_keyrgb_window_icon(self.root)
         self.root.update_idletasks()
 
@@ -106,6 +108,8 @@ class PerKeyEditor:
 
         self.overlay_scope = tk.StringVar(value="global")  # global | key
         self.apply_all_keys = tk.BooleanVar(value=False)
+        self.sample_tool_enabled = tk.BooleanVar(value=False)
+        self._sample_tool_has_sampled = False
         self._profiles_visible = False
         self._overlay_visible = False
         self._profile_name_var = tk.StringVar(value=self.profile_name)
@@ -159,6 +163,12 @@ class PerKeyEditor:
         set_status(self, selected_mapped(key_id, row, col))
         self.canvas.redraw()
 
+    def _on_sample_tool_toggled(self) -> None:
+        on_sample_tool_toggled_ui(self)
+
+    def on_key_clicked(self, key_id: str) -> None:
+        on_key_clicked_ui(self, key_id, num_rows=NUM_ROWS, num_cols=NUM_COLS)
+
     def sync_overlay_vars(self):
         self.overlay_controls.sync_vars_from_scope()
 
@@ -202,6 +212,7 @@ class PerKeyEditor:
         reload_keymap_ui(self)
 
     def _commit(self, *, force: bool = False):
+        prev_kb = self.kb
         base = tuple(getattr(self, "_last_non_black_color", tuple(self.config.color)))
         fallback = tuple(self.config.color)
         self.kb, self.colors = self._commit_pipeline.commit(
@@ -215,6 +226,10 @@ class PerKeyEditor:
             push_fn=push_per_key_colors,
             force=bool(force),
         )
+
+        # If hardware writes get paused (e.g., device busy), tell the user what to do next.
+        if prev_kb is not None and self.kb is None:
+            set_status(self, hardware_write_paused())
 
     def _on_color_change(self, r: int, g: int, b: int):
         on_wheel_color_change_ui(self, r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)

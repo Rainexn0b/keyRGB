@@ -1,5 +1,5 @@
 Name:           keyrgb
-Version:        0.4.0
+Version:        0.5.1
 Release:        1%{?dist}
 Summary:        Minimal RGB keyboard controller for ITE 8291 keyboards
 
@@ -80,8 +80,8 @@ install -D -m 0644 packaging/udev/99-ite8291-wootbook.rules %{buildroot}%{_udevr
 %{python3_sitelib}/ite8291r3_ctl*
 
 %changelog
-* Tue Dec 30 2025 KeyRGB Contributors - 0.4.0-1
-- Release v0.4.0
+* Thu Jan 01 2026 KeyRGB Contributors - 0.5.1-1
+- Release v0.5.1
 
 * Mon Dec 29 2025 KeyRGB Contributors - 0.2.1-1
 - Docs/screenshots update

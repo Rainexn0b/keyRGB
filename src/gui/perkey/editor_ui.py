@@ -14,6 +14,34 @@ def build_editor_ui(editor) -> None:
     main = ttk.Frame(editor.root, padding=16)
     main.pack(fill="both", expand=True)
 
+    # Status row (full-width) so messages don't get clipped by the right panel.
+    status_row = ttk.Frame(main)
+    status_row.pack(fill="x", pady=(0, 10))
+
+    editor.status_label = ttk.Label(
+        status_row,
+        text="Click a key to start",
+        font=("Sans", 9),
+        anchor="w",
+        justify="left",
+    )
+    editor.status_label.pack(fill="x")
+
+    def _sync_status_wrap(_e=None) -> None:
+        try:
+            # Wrap to the available width, accounting for padding.
+            w = int(status_row.winfo_width())
+            editor.status_label.configure(wraplength=max(200, w - 8))
+        except Exception:
+            return
+
+    # Ensure wrapping stays correct when the window is resized.
+    try:
+        editor.root.bind("<Configure>", _sync_status_wrap, add=True)
+    except Exception:
+        pass
+    editor.root.after(0, _sync_status_wrap)
+
     content = ttk.Frame(main)
     content.pack(fill="both", expand=True)
     content.columnconfigure(0, weight=1)
@@ -50,9 +78,6 @@ def build_editor_ui(editor) -> None:
         side="left", fill="x", expand=True
     )
 
-    editor.status_label = ttk.Label(right, text="Click a key to start", font=("Sans", 9), width=32)
-    editor.status_label.pack(pady=(0, 8))
-
     initial = editor._last_non_black_color
     editor.color_wheel = ColorWheel(
         right,
@@ -60,6 +85,7 @@ def build_editor_ui(editor) -> None:
         initial_color=initial,
         callback=editor._on_color_change,
         release_callback=editor._on_color_release,
+        show_rgb_label=False,
     )
     editor.color_wheel.pack()
 
@@ -71,15 +97,31 @@ def build_editor_ui(editor) -> None:
         variable=editor.apply_all_keys,
     ).pack(anchor="w")
 
+    ttk.Checkbutton(
+        apply_row,
+        text="Sample tool",
+        variable=editor.sample_tool_enabled,
+        command=editor._on_sample_tool_toggled,
+    ).pack(anchor="w", pady=(6, 0))
+
     btns = ttk.Frame(right)
     btns.pack(fill="x", pady=12)
+
+    def _divider(parent: ttk.Frame, title: str) -> None:
+        row = ttk.Frame(parent)
+        row.pack(fill="x", pady=(4, 6))
+        ttk.Label(row, text=title, font=("Sans", 9)).pack(side="left")
+        ttk.Separator(row, orient="horizontal").pack(side="left", fill="x", expand=True, padx=(8, 0))
+
+    _divider(btns, "Config")
+    ttk.Button(btns, text="Profiles", command=editor._toggle_profiles).pack(fill="x", pady=(0, 6))
     ttk.Button(btns, text="Fill All", command=editor._fill_all).pack(fill="x", pady=(0, 6))
     ttk.Button(btns, text="Clear All", command=editor._clear_all).pack(fill="x", pady=(0, 6))
-    ttk.Button(btns, text="Run Keymap Calibrator", command=editor._run_calibrator).pack(fill="x", pady=(0, 6))
-    ttk.Button(btns, text="Reload Keymap", command=editor._reload_keymap).pack(fill="x", pady=(0, 6))
-    ttk.Button(btns, text="Overlay", command=editor._toggle_overlay).pack(fill="x", pady=(0, 6))
-    ttk.Button(btns, text="Profiles", command=editor._toggle_profiles).pack(fill="x", pady=(0, 6))
-    ttk.Button(btns, text="Close", command=editor.root.destroy).pack(fill="x")
+
+    _divider(btns, "Setup")
+    ttk.Button(btns, text="Overlay Editor", command=editor._toggle_overlay).pack(fill="x", pady=(0, 6))
+    ttk.Button(btns, text="Keymap Calibrator", command=editor._run_calibrator).pack(fill="x", pady=(0, 6))
+    ttk.Button(btns, text="Reload Keymap", command=editor._reload_keymap).pack(fill="x")
 
     extras = ttk.Frame(left)
     extras.grid(row=1, column=0, sticky="ew", pady=(12, 0))

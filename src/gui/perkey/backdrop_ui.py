@@ -41,8 +41,8 @@ def set_backdrop_ui(
         save_fn(profile_name=editor.profile_name, source_path=path)
         editor.canvas.reload_backdrop_image()
         set_status(editor, backdrop_updated())
-    except Exception:
-        set_status(editor, backdrop_update_failed())
+    except Exception as exc:
+        set_status(editor, backdrop_update_failed(exc))
 
 
 def reset_backdrop_ui(
@@ -60,5 +60,5 @@ def reset_backdrop_ui(
         reset_fn(editor.profile_name)
         editor.canvas.reload_backdrop_image()
         set_status(editor, backdrop_reset())
-    except Exception:
-        set_status(editor, backdrop_reset_failed())
+    except Exception as exc:
+        set_status(editor, backdrop_reset_failed(exc))

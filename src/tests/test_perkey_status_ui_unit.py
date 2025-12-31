@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.gui.perkey.status_ui import (
     active_profile,
+    action_failed,
     backdrop_reset,
     backdrop_reset_failed,
     backdrop_update_failed,
@@ -10,6 +11,7 @@ from src.gui.perkey.status_ui import (
     calibrator_started,
     cleared_all_keys,
     filled_all_keys_rgb,
+    hardware_write_paused,
     keymap_reloaded,
     no_keymap_found,
     no_keymap_found_initial,
@@ -46,11 +48,11 @@ def test_set_status_sets_label_text() -> None:
 
 
 def test_messages_match_existing_strings() -> None:
-    assert no_keymap_found_initial() == "No keymap found — click 'Run Keymap Calibrator'"
-    assert no_keymap_found() == "No keymap found — run keymap calibrator"
+    assert no_keymap_found_initial() == "No keymap found — click 'Keymap Calibrator'"
+    assert no_keymap_found() == "No keymap found — run Keymap Calibrator"
     assert keymap_reloaded() == "Keymap reloaded"
 
-    assert selected_unmapped("K") == "Selected K (unmapped) — run keymap calibrator"
+    assert selected_unmapped("K") == "Selected K (unmapped) — run Keymap Calibrator"
     assert selected_mapped("K", 1, 2) == "Selected K -> 1,2"
 
     assert saved_overlay_tweaks_for_key("K") == "Saved overlay tweaks for K"
@@ -59,18 +61,33 @@ def test_messages_match_existing_strings() -> None:
     assert reset_overlay_tweaks_global() == "Reset global overlay alignment tweaks"
 
     assert calibrator_started() == "Calibrator started — map keys then Save"
-    assert calibrator_failed() == "Failed to start calibrator"
+    assert "Failed to start calibrator" in calibrator_failed()
+    assert "Try:" in calibrator_failed()
 
     assert saved_all_keys_rgb(1, 2, 3) == "Saved all keys = RGB(1,2,3)"
     assert saved_key_rgb("K", 1, 2, 3) == "Saved K = RGB(1,2,3)"
 
     assert backdrop_updated() == "Backdrop updated"
-    assert backdrop_update_failed() == "Failed to set backdrop"
+    assert "Failed to set backdrop" in backdrop_update_failed()
+    assert "Try:" in backdrop_update_failed()
     assert backdrop_reset() == "Backdrop reset"
-    assert backdrop_reset_failed() == "Failed to reset backdrop"
+    assert "Failed to reset backdrop" in backdrop_reset_failed()
+    assert "Try:" in backdrop_reset_failed()
 
     assert filled_all_keys_rgb(1, 2, 3) == "Filled all keys = RGB(1,2,3)"
     assert cleared_all_keys() == "Cleared all keys"
 
     assert active_profile("p") == "Active profile: p"
     assert saved_profile("p") == "Saved profile: p"
+
+
+def test_action_failed_includes_next_steps() -> None:
+    msg = action_failed("do something")
+    assert msg.startswith("Failed to do something — ")
+    assert "Try:" in msg
+
+
+def test_hardware_write_paused_is_actionable() -> None:
+    msg = hardware_write_paused()
+    assert "Keyboard" in msg
+    assert "Try:" in msg

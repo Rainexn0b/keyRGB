@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.1 (2026-01-01)
+
+- Per-key editor: status bar uses full-width wrapping; clearer, more actionable error messages.
+- Per-key editor: adds a sample tool (pick a key color, then paint other keys).
+- Color wheel: adds manual RGB input and optional compact label mode.
+- Tray: adds a keyboard/device status header and an “Active:” mode indicator.
+- Theme: optional Tk scaling override via `KEYRGB_TK_SCALING` (for DPI/layout testing).
+
 ## 0.4.0 (2025-12-30)
 
 This release note covers changes since `v0.2.1` (GitHub Releases were behind the tags).

@@ -67,7 +67,7 @@ def test_reload_keymap_ui_sets_no_keymap_status_when_keymap_becomes_empty() -> N
 
     assert ed.keymap == {}
     assert ed.selected_cell is None
-    assert ed.status_label.text == "No keymap found — run keymap calibrator"
+    assert ed.status_label.text == "No keymap found — run Keymap Calibrator"
     assert ed.canvas.redraw_calls == 1
 
 

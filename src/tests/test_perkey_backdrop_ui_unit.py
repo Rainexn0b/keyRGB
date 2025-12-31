@@ -78,7 +78,8 @@ def test_set_backdrop_ui_sets_failed_status_on_exception() -> None:
     set_backdrop_ui(ed, askopenfilename=ask, save_fn=save_fn)
 
     assert ed.canvas.reload_calls == 0
-    assert ed.status_label.text == "Failed to set backdrop"
+    assert ed.status_label.text.startswith("Failed to set backdrop")
+    assert "Try:" in ed.status_label.text
 
 
 def test_reset_backdrop_ui_sets_status_and_reloads_on_success() -> None:
@@ -105,4 +106,5 @@ def test_reset_backdrop_ui_sets_failed_status_on_exception() -> None:
     reset_backdrop_ui(ed, reset_fn=reset_fn)
 
     assert ed.canvas.reload_calls == 0
-    assert ed.status_label.text == "Failed to reset backdrop"
+    assert ed.status_label.text.startswith("Failed to reset backdrop")
+    assert "Try:" in ed.status_label.text

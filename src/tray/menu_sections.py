@@ -8,6 +8,46 @@ from src.core.logging_utils import log_throttled
 logger = logging.getLogger(__name__)
 
 
+def _format_hex_id(val: str) -> str:
+    s = (str(val or "").strip().lower() if val is not None else "")
+    if s.startswith("0x"):
+        s = s[2:]
+    return s
+
+
+def keyboard_status_text(tray: Any) -> str:
+    """Return a single-line keyboard/device status label for the tray menu.
+
+    Intended for a read-only, always-visible header line.
+    """
+
+    device_available = probe_device_available(tray)
+    if not device_available:
+        return "⚠ Keyboard device not detected"
+
+    backend = getattr(tray, "backend", None)
+    backend_name = str(getattr(backend, "name", "unknown"))
+
+    probe = getattr(tray, "backend_probe", None)
+    identifiers = getattr(probe, "identifiers", None) if probe is not None else None
+    identifiers = dict(identifiers or {})
+
+    usb_vid = identifiers.get("usb_vid")
+    usb_pid = identifiers.get("usb_pid")
+    if usb_vid and usb_pid:
+        vid = _format_hex_id(usb_vid)
+        pid = _format_hex_id(usb_pid)
+        if vid and pid:
+            return f"✅ Keyboard: {backend_name} ({vid}:{pid})"
+
+    # Sysfs backend: show which LED file is being used.
+    brightness_path = identifiers.get("brightness")
+    if brightness_path:
+        return f"✅ Keyboard: {backend_name} ({brightness_path})"
+
+    return f"✅ Keyboard: {backend_name}"
+
+
 def probe_device_available(tray: Any) -> bool:
     """Best-effort device availability probe.
 
@@ -30,6 +70,60 @@ def probe_device_available(tray: Any) -> bool:
         )
 
     return bool(getattr(getattr(tray, "engine", None), "device_available", True))
+
+
+def tray_lighting_mode_text(tray: Any) -> str:
+    """Return a single-line status indicator for the tray menu.
+
+    Placed near the bottom of the menu so users can quickly see what is active
+    (uniform/per-key profile, and whether a HW/SW effect is running).
+    """
+
+    # Off is the highest priority state.
+    if bool(getattr(tray, "is_off", False)) or int(getattr(getattr(tray, "config", None), "brightness", 0) or 0) == 0:
+        return "🔎 Active: Off"
+
+    cfg = getattr(tray, "config", None)
+    effect = str(getattr(cfg, "effect", "none") or "none")
+
+    hw_effects = {"rainbow", "breathing", "wave", "ripple", "marquee", "raindrop", "aurora", "fireworks"}
+    sw_effects = {"static", "pulse", "strobe", "fire", "random", "perkey_breathing", "perkey_pulse"}
+
+    def _title(name: str) -> str:
+        return str(name).replace("_", " ").strip().title()
+
+    def _perkey_sw_suffix(effect_name: str) -> str:
+        # These are per-key software effects; avoid repeating "Per-key" in the suffix.
+        if effect_name == "perkey_breathing":
+            return "Breathing"
+        if effect_name == "perkey_pulse":
+            return "Pulse"
+        return _title(effect_name)
+
+    # Per-key mode is a first-class state.
+    if effect in {"perkey", "perkey_breathing", "perkey_pulse"}:
+        try:
+            from src.core import profiles
+
+            active_profile = str(profiles.get_active_profile())
+        except Exception:
+            active_profile = "(unknown)"
+
+        if effect == "perkey":
+            return f"🔎 Active: Per-key ({active_profile})"
+        return f"🔎 Active: Per-key ({active_profile}) — SW {_perkey_sw_suffix(effect)}"
+
+    # Uniform color is represented by no effect.
+    if effect == "none":
+        return "🔎 Active: Uniform"
+
+    # Effects.
+    if effect in hw_effects:
+        return f"🔎 Active: HW {_title(effect)}"
+    if effect in sw_effects:
+        return f"🔎 Active: SW {_title(effect)}"
+
+    return f"🔎 Active: {_title(effect)}"
 
 
 def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> Optional[Any]:

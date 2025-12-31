@@ -59,6 +59,13 @@ class KeyRGBTray:
 
         # Backend selection is used for capability-driven UI gating.
         self.backend = select_backend()
+        self.backend_probe = None
+        try:
+            probe_fn = getattr(self.backend, "probe", None) if self.backend is not None else None
+            if callable(probe_fn):
+                self.backend_probe = probe_fn()
+        except Exception:
+            self.backend_probe = None
         try:
             self.backend_caps = self.backend.capabilities() if self.backend is not None else None
         except Exception:

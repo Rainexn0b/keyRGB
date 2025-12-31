@@ -26,7 +26,9 @@ def apply_perkey_editor_geometry(
     chrome_h = 16 * 2 + 80
 
     w0 = keyboard_w + right_panel_width + chrome_w
-    h0 = max(keyboard_h + chrome_h, wheel_size + 420)
+    # Right panel height includes the wheel + controls/buttons beneath it.
+    # Keep a bit of slack so bottom buttons don't get clipped on common DPI/font combos.
+    h0 = max(keyboard_h + chrome_h, wheel_size + 480)
 
     screen_w = int(root.winfo_screenwidth())
     screen_h = int(root.winfo_screenheight())
