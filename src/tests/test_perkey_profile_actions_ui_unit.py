@@ -63,17 +63,12 @@ class DummyEditor:
     canvas: DummyCanvas
     status_label: DummyLabel
     _profiles_combo: DummyCombo
-
-    ensure_calls: int = 0
     commit_calls: int = 0
     select_calls: list[str] = None  # type: ignore[assignment]
 
     def __post_init__(self):
         if self.select_calls is None:
             self.select_calls = []
-
-    def _ensure_full_map(self) -> None:
-        self.ensure_calls += 1
 
     def _commit(self, *, force: bool = False) -> None:
         self.commit_calls += 1
@@ -93,6 +88,15 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
         )
 
     monkeypatch.setattr(actions, "activate_profile", fake_activate_profile)
+
+    full_map_calls = {"n": 0}
+
+    def fake_ensure_full_map_ui(_editor, *, num_rows: int, num_cols: int) -> None:
+        assert num_rows > 0
+        assert num_cols > 0
+        full_map_calls["n"] += 1
+
+    monkeypatch.setattr(actions, "ensure_full_map_ui", fake_ensure_full_map_ui)
 
     ed = DummyEditor(
         _profile_name_var=DummyVar("p1"),
@@ -115,7 +119,7 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
     assert ed._profile_name_var.get() == "p2"
     assert ed.keymap == {"K": (0, 0)}
     assert ed.colors == {(0, 0): (1, 2, 3)}
-    assert ed.ensure_calls == 1
+    assert full_map_calls["n"] == 1
     assert ed.commit_calls == 1
     assert ed.overlay_controls.sync_calls == 1
     assert ed.canvas.redraw_calls == 1

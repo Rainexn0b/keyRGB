@@ -10,6 +10,8 @@ from typing import Any
 
 from src.core import profiles
 
+from .full_map_ui import ensure_full_map_ui
+from .hardware import NUM_COLS, NUM_ROWS
 from .profile_management import activate_profile, delete_profile, save_profile
 from .status_ui import active_profile, saved_profile, set_status
 
@@ -29,7 +31,7 @@ def activate_profile_ui(editor: Any) -> None:
     editor.colors = result.colors
 
     # Ensure we're applying a full map, then push it to hardware.
-    editor._ensure_full_map()
+    ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
 
     editor.overlay_controls.sync_vars_from_scope()
@@ -53,7 +55,7 @@ def save_profile_ui(editor: Any) -> None:
     editor._profile_name_var.set(name)
 
     # Persist + push the saved state immediately.
-    editor._ensure_full_map()
+    ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
     set_status(editor, saved_profile(editor.profile_name))
 
