@@ -23,6 +23,7 @@ from .autostart_panel import AutostartPanel
 from .diagnostics_panel import DiagnosticsPanel
 from .dim_sync_panel import DimSyncPanel
 from .os_autostart import detect_os_autostart_enabled, set_os_autostart
+from .power_management_panel import PowerManagementPanel
 from .power_source_panel import PowerSourcePanel
 from .scrollable_area import ScrollableArea
 from .version_panel import VersionPanel
@@ -73,19 +74,6 @@ class PowerSettingsGUI:
         right = ttk.Frame(cols)
         right.pack(side="left", fill="both", expand=True, padx=(18, 0))
 
-        pm_title = ttk.Label(left, text="Power Management", font=("Sans", 11, "bold"))
-        pm_title.pack(anchor="w", pady=(0, 6))
-
-        desc = ttk.Label(
-            left,
-            text=(
-                "Control whether KeyRGB turns the keyboard LEDs off/on\n"
-                "when the lid closes/opens or the system suspends/resumes."
-            ),
-            font=("Sans", 9),
-        )
-        desc.pack(anchor="w", pady=(0, 12))
-
         self.var_enabled = tk.BooleanVar(value=bool(values.power_management_enabled))
         self.var_off_suspend = tk.BooleanVar(value=bool(values.power_off_on_suspend))
         self.var_off_lid = tk.BooleanVar(value=bool(values.power_off_on_lid_close))
@@ -103,45 +91,15 @@ class PowerSettingsGUI:
         self.var_dim_sync_mode = tk.StringVar(value=str(values.screen_dim_sync_mode or "off"))
         self.var_dim_temp_brightness = tk.DoubleVar(value=float(values.screen_dim_temp_brightness))
 
-        self.chk_enabled = ttk.Checkbutton(
+        self.power_management_panel = PowerManagementPanel(
             left,
-            text="Enable power management",
-            variable=self.var_enabled,
-            command=self._on_toggle,
+            var_enabled=self.var_enabled,
+            var_off_suspend=self.var_off_suspend,
+            var_restore_resume=self.var_restore_resume,
+            var_off_lid=self.var_off_lid,
+            var_restore_lid=self.var_restore_lid,
+            on_toggle=self._on_toggle,
         )
-        self.chk_enabled.pack(anchor="w", pady=(0, 8))
-
-        self.chk_off_suspend = ttk.Checkbutton(
-            left,
-            text="Turn off on suspend",
-            variable=self.var_off_suspend,
-            command=self._on_toggle,
-        )
-        self.chk_off_suspend.pack(anchor="w")
-
-        self.chk_restore_resume = ttk.Checkbutton(
-            left,
-            text="Restore on resume",
-            variable=self.var_restore_resume,
-            command=self._on_toggle,
-        )
-        self.chk_restore_resume.pack(anchor="w")
-
-        self.chk_off_lid = ttk.Checkbutton(
-            left,
-            text="Turn off on lid close",
-            variable=self.var_off_lid,
-            command=self._on_toggle,
-        )
-        self.chk_off_lid.pack(anchor="w", pady=(8, 0))
-
-        self.chk_restore_lid = ttk.Checkbutton(
-            left,
-            text="Restore on lid open",
-            variable=self.var_restore_lid,
-            command=self._on_toggle,
-        )
-        self.chk_restore_lid.pack(anchor="w")
 
         ttk.Separator(left).pack(fill="x", pady=(14, 10))
 
@@ -252,15 +210,8 @@ class PowerSettingsGUI:
 
     def _apply_enabled_state(self) -> None:
         enabled = bool(self.var_enabled.get())
-        state = "normal" if enabled else "disabled"
-        for w in (
-            self.chk_off_suspend,
-            self.chk_restore_resume,
-            self.chk_off_lid,
-            self.chk_restore_lid,
-        ):
-            w.configure(state=state)
 
+        self.power_management_panel.apply_enabled_state()
         self.dim_sync_panel.apply_enabled_state(power_management_enabled=enabled)
         self.power_source_panel.apply_enabled_state(power_management_enabled=enabled)
 
