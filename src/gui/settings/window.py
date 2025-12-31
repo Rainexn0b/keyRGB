@@ -19,6 +19,7 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
+from .autostart_panel import AutostartPanel
 from .diagnostics_panel import DiagnosticsPanel
 from .os_autostart import detect_os_autostart_enabled, set_os_autostart
 from .scrollable_area import ScrollableArea
@@ -292,34 +293,12 @@ class PowerSettingsGUI:
 
         ttk.Separator(right).pack(fill="x", pady=(14, 10))
 
-        as_title = ttk.Label(right, text="Autostart", font=("Sans", 11, "bold"))
-        as_title.pack(anchor="w", pady=(0, 6))
-
-        as_desc = ttk.Label(
+        self.autostart_panel = AutostartPanel(
             right,
-            text=(
-                "Control what happens when KeyRGB launches, and whether it\n"
-                "starts automatically when you log in."
-            ),
-            font=("Sans", 9),
+            var_autostart=self.var_autostart,
+            var_os_autostart=self.var_os_autostart,
+            on_toggle=self._on_toggle,
         )
-        as_desc.pack(anchor="w", pady=(0, 8))
-
-        self.chk_autostart = ttk.Checkbutton(
-            right,
-            text="Start lighting on launch",
-            variable=self.var_autostart,
-            command=self._on_toggle,
-        )
-        self.chk_autostart.pack(anchor="w")
-
-        self.chk_os_autostart = ttk.Checkbutton(
-            right,
-            text="Start KeyRGB on login",
-            variable=self.var_os_autostart,
-            command=self._on_toggle,
-        )
-        self.chk_os_autostart.pack(anchor="w", pady=(6, 0))
 
         ttk.Separator(right).pack(fill="x", pady=(14, 10))
 
