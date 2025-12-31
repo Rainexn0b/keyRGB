@@ -115,6 +115,23 @@ class UniformColorGUI:
 
         # Throttle config writes while dragging (seconds)
         self._drag_commit_interval = 0.06
+
+    def _set_status(self, msg: str, *, ok: bool) -> None:
+        color = "#00ff00" if ok else "#ff0000"
+        self.status_label.config(text=msg, foreground=color)
+        self.root.after(2000, lambda: self.status_label.config(text=""))
+
+    def _ensure_brightness_nonzero(self) -> int:
+        brightness = int(self.config.brightness)
+        if brightness == 0:
+            brightness = 25
+            self.config.brightness = brightness  # Auto-saves
+        return brightness
+
+    def _commit_color_to_config(self, r: int, g: int, b: int) -> None:
+        # Stop any running effects first, then save the color (auto-saves)
+        self.config.effect = "none"
+        self.config.color = (r, g, b)
         
     def _on_color_change(self, r, g, b):
         """Handle color wheel changes (during drag)."""
@@ -165,15 +182,8 @@ class UniformColorGUI:
     
     def _on_color_release(self, r, g, b):
         """Handle color wheel release (apply and save)."""
-        # Get current brightness, use config value or default to 25 if it's 0
-        brightness = self.config.brightness
-        if brightness == 0:
-            brightness = 25
-            self.config.brightness = brightness  # Auto-saves
-        
-        # Stop any running effects first, then save the color (auto-saves)
-        self.config.effect = 'none'
-        self.config.color = (r, g, b)
+        brightness = self._ensure_brightness_nonzero()
+        self._commit_color_to_config(r, g, b)
 
         self._last_drag_committed_color = (r, g, b)
         self._last_drag_commit_ts = time.monotonic()
@@ -181,46 +191,27 @@ class UniformColorGUI:
         # Apply to keyboard (or defer to tray app if it's running)
         result = self._apply_color(r, g, b, brightness)
         if result is True:
-            msg = f'✓ Applied RGB({r}, {g}, {b})'
-            color = '#00ff00'
+            self._set_status(f"✓ Applied RGB({r}, {g}, {b})", ok=True)
         elif result == "deferred":
-            msg = f'✓ Saved RGB({r}, {g}, {b})'
-            color = '#00ff00'
+            self._set_status(f"✓ Saved RGB({r}, {g}, {b})", ok=True)
         else:
-            msg = '✗ Error applying color'
-            color = '#ff0000'
-
-        self.status_label.config(text=msg, foreground=color)
-        self.root.after(2000, lambda: self.status_label.config(text=''))
+            self._set_status("✗ Error applying color", ok=False)
         
     def _on_apply(self):
         """Apply the selected color to the keyboard."""
         r, g, b = self.color_wheel.get_color()
-        
-        # Get current brightness, use config value or default to 25 if it's 0
-        brightness = self.config.brightness
-        if brightness == 0:
-            brightness = 25
-            self.config.brightness = brightness  # Auto-saves
-        
-        # Stop any running effects first, then save the color (auto-saves)
-        self.config.effect = 'none'
-        self.config.color = (r, g, b)
+
+        brightness = self._ensure_brightness_nonzero()
+        self._commit_color_to_config(r, g, b)
 
         # Apply to keyboard (or defer to tray app if it's running)
         result = self._apply_color(r, g, b, brightness)
         if result is True:
-            msg = f'✓ Applied RGB({r}, {g}, {b})'
-            color = '#00ff00'
+            self._set_status(f"✓ Applied RGB({r}, {g}, {b})", ok=True)
         elif result == "deferred":
-            msg = f'✓ Saved RGB({r}, {g}, {b})'
-            color = '#00ff00'
+            self._set_status(f"✓ Saved RGB({r}, {g}, {b})", ok=True)
         else:
-            msg = '✗ Error applying color'
-            color = '#ff0000'
-
-        self.status_label.config(text=msg, foreground=color)
-        self.root.after(2000, lambda: self.status_label.config(text=''))
+            self._set_status("✗ Error applying color", ok=False)
             
     def _on_close(self):
         """Close the window."""
