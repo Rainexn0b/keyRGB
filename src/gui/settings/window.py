@@ -27,6 +27,7 @@ from .power_management_panel import PowerManagementPanel
 from .power_source_panel import PowerSourcePanel
 from .scrollable_area import ScrollableArea
 from .version_panel import VersionPanel
+from .window_geometry import compute_centered_window_geometry
 from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
 
 from src.legacy.config import Config
@@ -180,33 +181,17 @@ class PowerSettingsGUI:
 
     def _apply_geometry(self) -> None:
         self.root.update_idletasks()
-        screen_w = self.root.winfo_screenwidth()
-        screen_h = self.root.winfo_screenheight()
-
-        # Calculate true content height from the inner frame + bottom bar
-        content_h = self.scroll.frame.winfo_reqheight()
-        footer_h = self.bottom_bar.winfo_reqheight()
-        # Add some padding for window chrome/margins
-        total_req_h = content_h + footer_h + 40
-
-        req_w = self.root.winfo_reqwidth()
-        
-        # Conservative defaults
-        default_w = 1100
-        default_h = 850
-
-        # Cap at 95% of screen size to ensure it fits
-        max_w = int(screen_w * 0.95)
-        max_h = int(screen_h * 0.95)
-
-        width = min(max(req_w, default_w), max_w)
-        # Use the calculated content height if it's larger than default, but still capped
-        height = min(max(total_req_h, default_h), max_h)
-
-        x = max(0, (screen_w - width) // 2)
-        y = max(0, (screen_h - height) // 2)
-
-        self.root.geometry(f"{width}x{height}+{x}+{y}")
+        geometry = compute_centered_window_geometry(
+            self.root,
+            content_height_px=int(self.scroll.frame.winfo_reqheight()),
+            content_width_px=int(self.root.winfo_reqwidth()),
+            footer_height_px=int(self.bottom_bar.winfo_reqheight()),
+            chrome_padding_px=40,
+            default_w=1100,
+            default_h=850,
+            screen_ratio_cap=0.95,
+        )
+        self.root.geometry(geometry)
 
     def _apply_enabled_state(self) -> None:
         enabled = bool(self.var_enabled.get())
