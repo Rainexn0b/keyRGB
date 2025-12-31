@@ -19,6 +19,7 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
+from .bottom_bar_panel import BottomBarPanel
 from .autostart_panel import AutostartPanel
 from .diagnostics_panel import DiagnosticsPanel
 from .dim_sync_panel import DimSyncPanel
@@ -57,8 +58,13 @@ class PowerSettingsGUI:
         outer = ttk.Frame(self.root)
         outer.pack(fill="both", expand=True)
 
+        self.bottom_bar_panel = BottomBarPanel(outer, on_close=self._on_close)
+        self.bottom_bar = self.bottom_bar_panel.frame
+        self.bottom_bar.pack(side="bottom", fill="x")
+        self.status = self.bottom_bar_panel.status
+
         content_area = ttk.Frame(outer)
-        content_area.pack(fill="both", expand=True)
+        content_area.pack(side="top", fill="both", expand=True)
 
         self.scroll = ScrollableArea(content_area, bg_color=bg_color, padding=16)
         main = self.scroll.frame
@@ -149,15 +155,6 @@ class PowerSettingsGUI:
             bg_color=bg_color,
             fg_color=fg_color,
         )
-
-        self.bottom_bar = ttk.Frame(outer, padding=(16, 8, 16, 12))
-        self.bottom_bar.pack(fill="x")
-
-        self.status = ttk.Label(self.bottom_bar, text="", font=("Sans", 9))
-        self.status.pack(side="left")
-
-        close_btn = ttk.Button(self.bottom_bar, text="Close", command=self._on_close)
-        close_btn.pack(side="right")
 
         self._apply_enabled_state()
         self.diagnostics_panel.apply_state()
