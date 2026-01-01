@@ -8,19 +8,13 @@ from __future__ import annotations
 
 import logging
 
-from src.core import tcc_power_profiles
-
 from .backend import select_backend_with_introspection
-from .controllers.effect_selection import apply_effect_selection
+from . import callbacks
 from .controllers.lighting_controller import (
     apply_brightness_from_power_policy,
-    on_brightness_clicked,
-    on_speed_clicked,
     power_restore,
     power_turn_off,
     start_current_effect,
-    turn_off,
-    turn_on,
 )
 from .hw.ite_dimensions import load_ite_dimensions
 from .integrations.dependencies import load_tray_dependencies
@@ -31,7 +25,6 @@ from .ui import menu as menu_mod
 from .ui.refresh import refresh_ui as refresh_tray_ui
 from .ui.refresh import update_icon as update_tray_icon
 from .ui.refresh import update_menu as update_tray_menu
-from .ui.gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
 
 logger = logging.getLogger(__name__)
 
@@ -93,44 +86,34 @@ class KeyRGBTray:
     # ---- menu callbacks
 
     def _on_effect_clicked(self, _icon, item):
-        effect_name = menu_mod.normalize_effect_label(item)
-
-        apply_effect_selection(self, effect_name=effect_name)
-
-        self._refresh_ui()
+        callbacks.on_effect_clicked(self, item)
 
     def _on_speed_clicked(self, _icon, item):
-        on_speed_clicked(self, item)
+        callbacks.on_speed_clicked_cb(self, item)
 
     def _on_brightness_clicked(self, _icon, item):
-        on_brightness_clicked(self, item)
+        callbacks.on_brightness_clicked_cb(self, item)
 
     def _on_off_clicked(self, _icon, _item):
-        turn_off(self)
+        callbacks.on_off_clicked(self)
 
     def _on_turn_on_clicked(self, _icon, _item):
-        turn_on(self)
+        callbacks.on_turn_on_clicked(self)
 
     def _on_perkey_clicked(self, _icon, _item):
-        launch_perkey_gui()
+        callbacks.on_perkey_clicked()
 
     def _on_tuxedo_gui_clicked(self, _icon, _item):
-        launch_uniform_gui()
+        callbacks.on_uniform_gui_clicked()
 
     def _on_power_settings_clicked(self, _icon, _item):
-        launch_power_gui()
+        callbacks.on_power_settings_clicked()
 
     def _on_tcc_profiles_gui_clicked(self, _icon, _item):
-        launch_tcc_profiles_gui()
+        callbacks.on_tcc_profiles_gui_clicked()
 
     def _on_tcc_profile_clicked(self, profile_id: str) -> None:
-        """Switch TUXEDO Control Center power profile (temporary) via DBus."""
-
-        try:
-            tcc_power_profiles.set_temp_profile_by_id(profile_id)
-        finally:
-            # Reflect updated active profile state.
-            self._update_menu()
+        callbacks.on_tcc_profile_clicked(self, profile_id)
 
     def _on_quit_clicked(self, icon, _item):
         self.power_manager.stop_monitoring()
