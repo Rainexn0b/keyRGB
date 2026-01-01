@@ -18,7 +18,7 @@ from src.gui.y15_pro_overlay_geometry import (
     transform_from_drawn_bbox,
 )
 
-from .overlay_drag import OverlayDragController
+from .overlay import OverlayDragController
 
 if TYPE_CHECKING:
     from .editor import PerKeyEditor

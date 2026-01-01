@@ -18,7 +18,7 @@ from .ui.backdrop import reset_backdrop_ui, set_backdrop_ui
 from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
 from .hardware import get_keyboard, NUM_ROWS, NUM_COLS
-from .overlay_autosync import auto_sync_per_key_overlays
+from .overlay import auto_sync_per_key_overlays
 from .profile_management import load_profile_colors
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui

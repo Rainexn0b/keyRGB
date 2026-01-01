@@ -4,7 +4,7 @@ from tkinter import ttk
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .editor import PerKeyEditor
+    from ..editor import PerKeyEditor
 
 class OverlayControls(ttk.LabelFrame):
     def __init__(self, parent, editor: PerKeyEditor, **kwargs):
