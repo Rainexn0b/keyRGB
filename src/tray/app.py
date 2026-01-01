@@ -17,10 +17,10 @@ from src.core import tcc_power_profiles
 from src.core.backends.registry import select_backend
 
 from .integrations.dependencies import load_tray_dependencies
-from .effect_selection import apply_effect_selection
+from .controllers.effect_selection import apply_effect_selection
 from .ui.gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
 from .ite_dimensions import load_ite_dimensions
-from .lighting_controller import (
+from .controllers.lighting_controller import (
     apply_brightness_from_power_policy,
     on_brightness_clicked,
     on_speed_clicked,
