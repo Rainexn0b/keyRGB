@@ -73,6 +73,17 @@ def select_backend(*, requested: Optional[str] = None, specs: Optional[Iterable[
     Returns None if nothing is available.
     """
 
+    # Safety: under pytest, never auto-select real hardware backends by default.
+    # Unit tests that want to exercise selection logic should pass explicit `specs`.
+    # Hardware smoke tests should opt-in via KEYRGB_ALLOW_HARDWARE=1 or KEYRGB_HW_TESTS=1.
+    if specs is None and os.environ.get("PYTEST_CURRENT_TEST"):
+        allow_hardware = (
+            os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1"
+            or os.environ.get("KEYRGB_HW_TESTS") == "1"
+        )
+        if not allow_hardware:
+            return None
+
     req = (requested or os.environ.get("KEYRGB_BACKEND") or "auto").strip().lower()
     backends = iter_backends(specs=specs)
 

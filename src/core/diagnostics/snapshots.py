@@ -76,6 +76,12 @@ def usb_ids_snapshot(*, include_usb: bool) -> list[str]:
     if not include_usb:
         return []
 
+    if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
+        # Under pytest, USB scans can have unintended side effects on some
+        # keyboard controllers (e.g., backlight resets). Avoid importing pyusb
+        # unless the user explicitly opted in.
+        return []
+
     usb_ids: list[str] = []
     try:
         import usb.core  # type: ignore

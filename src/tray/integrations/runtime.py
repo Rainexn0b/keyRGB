@@ -51,7 +51,16 @@ def acquire_single_instance_lock() -> bool:
     except Exception:
         return True
 
-    lock_dir = Path.home() / ".config" / "keyrgb"
+    lock_dir = None
+    cfg = os.environ.get("KEYRGB_CONFIG_DIR")
+    if cfg:
+        lock_dir = Path(cfg)
+    else:
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        if xdg:
+            lock_dir = Path(xdg) / "keyrgb"
+        else:
+            lock_dir = Path.home() / ".config" / "keyrgb"
     with suppress(Exception):
         lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / "keyrgb.lock"

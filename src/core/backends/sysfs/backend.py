@@ -10,7 +10,35 @@ from ..base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeRe
 
 def _leds_root() -> Path:
     # Test hook: allow overriding the sysfs root.
-    return Path(os.environ.get("KEYRGB_SYSFS_LEDS_ROOT", "/sys/class/leds"))
+    root = os.environ.get("KEYRGB_SYSFS_LEDS_ROOT")
+
+    # Safety: under pytest, never probe the real sysfs tree unless explicitly allowed.
+    # Tests that want to exercise this backend should set KEYRGB_SYSFS_LEDS_ROOT to a temp dir.
+    if root is None and os.environ.get("PYTEST_CURRENT_TEST") and not _hardware_allowed():
+        return Path("/nonexistent-keyrgb-test-sysfs-leds")
+
+    return Path(root or "/sys/class/leds")
+
+
+def _hardware_allowed() -> bool:
+    return os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
+
+
+def _is_real_sysfs_path(path: Path) -> bool:
+    try:
+        real = os.path.realpath(str(path))
+        return real.startswith("/sys/")
+    except Exception:
+        return False
+
+
+def _safe_write_text(path: Path, content: str) -> None:
+    # Safety: tests must not mutate real hardware state by writing sysfs.
+    if os.environ.get("PYTEST_CURRENT_TEST") and not _hardware_allowed() and _is_real_sysfs_path(path):
+        if os.environ.get("KEYRGB_TEST_HARDWARE_TRIPWIRE") == "1":
+            raise RuntimeError(f"Refusing to write real sysfs path under pytest: {path}")
+        return
+    path.write_text(content, encoding="utf-8")
 
 
 def _is_candidate_led(name: str) -> bool:
@@ -34,7 +62,7 @@ def _read_int(path: Path) -> int:
 
 
 def _write_int(path: Path, value: int) -> None:
-    path.write_text(f"{int(value)}\n", encoding="utf-8")
+    _safe_write_text(path, f"{int(value)}\n")
 
 
 @dataclass
@@ -91,7 +119,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         if self._supports_multicolor():
             r, g, b = color
             multi_intensity_path = self.led_dir / "multi_intensity"
-            multi_intensity_path.write_text(f"{r} {g} {b}\n", encoding="utf-8")
+            _safe_write_text(multi_intensity_path, f"{r} {g} {b}\n")
             self.set_brightness(brightness)
             return
 
@@ -100,7 +128,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
             r, g, b = color
             hex_color = f"{r:02x}{g:02x}{b:02x}"
             color_path = self.led_dir / "color"
-            color_path.write_text(f"{hex_color}\n", encoding="utf-8")
+            _safe_write_text(color_path, f"{hex_color}\n")
             self.set_brightness(brightness)
             return
 

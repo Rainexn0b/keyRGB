@@ -56,9 +56,9 @@ class Ite8291r3Backend(KeyboardBackend):
         # If we cannot (or do not want to) scan USB, fall back to a lower-confidence
         # "importable" availability so users can still force it.
 
-        # Test hook: allow disabling USB scanning in unit tests to keep probe
-        # deterministic without importing real pyusb/libusb.
-        if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1" and os.environ.get("PYTEST_CURRENT_TEST"):
+        # Respect global USB-scan disable flag (primarily used to keep unit tests
+        # deterministic and to avoid unintended controller side effects).
+        if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=True,
                 reason="importable but usb scan disabled",

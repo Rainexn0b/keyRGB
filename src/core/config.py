@@ -7,6 +7,7 @@ Persists settings to JSON file
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from .config_file_storage import load_config_settings, save_config_settings_atomic
@@ -16,11 +17,46 @@ from .config_perkey_colors import deserialize_per_key_colors, serialize_per_key_
 logger = logging.getLogger(__name__)
 
 
+def config_dir() -> Path:
+    """Return the directory used for KeyRGB configuration.
+
+    Priority:
+    - KEYRGB_CONFIG_DIR
+    - XDG_CONFIG_HOME/keyrgb
+    - ~/.config/keyrgb
+    """
+
+    p = os.environ.get("KEYRGB_CONFIG_DIR")
+    if p:
+        return Path(p)
+
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        return Path(xdg) / "keyrgb"
+
+    return Path.home() / ".config" / "keyrgb"
+
+
+def config_file_path() -> Path:
+    """Return the KeyRGB config.json path.
+
+    Priority:
+    - KEYRGB_CONFIG_PATH (explicit file override)
+    - config_dir()/config.json
+    """
+
+    p = os.environ.get("KEYRGB_CONFIG_PATH")
+    if p:
+        return Path(p)
+    return config_dir() / "config.json"
+
+
 class Config:
     """Configuration manager for KeyRGB"""
-    
-    CONFIG_DIR = Path.home() / '.config' / 'keyrgb'
-    CONFIG_FILE = CONFIG_DIR / 'config.json'
+
+    # Kept for backward compatibility with existing callers.
+    CONFIG_DIR = config_dir()
+    CONFIG_FILE = config_file_path()
     
     DEFAULTS = {
         'effect': 'rainbow',
@@ -75,6 +111,9 @@ class Config:
     
     def __init__(self):
         """Load configuration"""
+        # Recompute at runtime so test harnesses can set env vars in conftest.
+        self.CONFIG_DIR = config_dir()
+        self.CONFIG_FILE = config_file_path()
         self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         loaded = self._load()
         self._settings = loaded if loaded is not None else self.DEFAULTS.copy()

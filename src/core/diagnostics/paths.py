@@ -29,4 +29,15 @@ def config_file_path() -> Path:
     p = os.environ.get("KEYRGB_CONFIG_PATH")
     if p:
         return Path(p)
+
+    # Allow overriding the directory, primarily for tests.
+    d = os.environ.get("KEYRGB_CONFIG_DIR")
+    if d:
+        return Path(d) / "config.json"
+
+    # Respect XDG base dir if set.
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    if xdg:
+        return Path(xdg) / "keyrgb" / "config.json"
+
     return Path.home() / ".config" / "keyrgb" / "config.json"
