@@ -16,7 +16,7 @@ import sys
 from src.core import tcc_power_profiles
 from src.core.backends.registry import select_backend
 
-from .dependencies import load_tray_dependencies
+from .integrations.dependencies import load_tray_dependencies
 from .effect_selection import apply_effect_selection
 from .gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
 from .ite_dimensions import load_ite_dimensions
@@ -34,7 +34,7 @@ from .lighting_controller import (
 from . import icon as icon_mod
 from . import menu as menu_mod
 from .pollers import polling
-from . import runtime
+from .integrations import runtime
 from .startup import acquire_single_instance_or_exit, configure_logging, log_startup_diagnostics_if_debug
 
 logger = logging.getLogger(__name__)
