@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.6.0 (2026-01-01)
+
+- Internal: reorganizes tray modules by purpose (controllers, pollers, startup, UI, integrations) while keeping import compatibility.
+- Internal: reorganizes core helpers by purpose (monitoring, profile, power policies, resources/runtime helpers) while keeping import compatibility.
+- Devices: improves sysfs LED backend detection and adds best-effort support for multi-color sysfs drivers (`multi_intensity`/`color`).
+- Devices: expands ITE USB probing fallbacks (additional 0x048d product IDs).
+
+Notes:
+- This release is primarily a maintenance/refactor + device-coverage step; user-facing UI changes are mostly captured in 0.5.1.
+
 ## 0.5.1 (2026-01-01)
 
 - Per-key editor: status bar uses full-width wrapping; clearer, more actionable error messages.
