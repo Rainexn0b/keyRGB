@@ -144,6 +144,13 @@ def _bundle_python_runtime(*, appdir: Path) -> None:
             lib_dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(lib_src, lib_dst)
 
+            # Also place a copy in usr/lib so the dynamic loader can find it
+            # via our simpler LD_LIBRARY_PATH.
+            flat_dst = appdir / "usr" / "lib" / lib_src.name
+            if flat_dst != lib_dst:
+                flat_dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(lib_src, flat_dst)
+
 
 def build_appimage() -> Path:
     root = repo_root()
@@ -236,7 +243,7 @@ def build_appimage() -> Path:
             'export PYTHONHOME="$HERE/usr"',
             'export PYTHONNOUSERSITE="1"',
             'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
-            'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
+            'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
             'exec "$HERE/usr/bin/python3" -B -m src.tray "$@"',
             "",
         ]
