@@ -28,6 +28,9 @@ from .integrations import runtime
 from .lifecycle import maybe_autostart_effect, start_all_polling, start_power_monitoring
 from .ui import icon as icon_mod
 from .ui import menu as menu_mod
+from .ui.refresh import refresh_ui as refresh_tray_ui
+from .ui.refresh import update_icon as update_tray_icon
+from .ui.refresh import update_menu as update_tray_menu
 from .ui.gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
 
 logger = logging.getLogger(__name__)
@@ -67,17 +70,12 @@ class KeyRGBTray:
     # ---- icon
 
     def _update_icon(self):
-        if self.icon:
-            color = icon_mod.representative_color(config=self.config, is_off=self.is_off)
-            self.icon.icon = icon_mod.create_icon(color)
+        update_tray_icon(self)
 
     # ---- menu
 
     def _update_menu(self):
-        if self.icon:
-            self.config.reload()
-            pystray, item = runtime.get_pystray()
-            self.icon.menu = menu_mod.build_menu(self, pystray=pystray, item=item)
+        update_tray_menu(self)
 
     def _refresh_ui(self) -> None:
         """Refresh both icon and menu.
@@ -85,8 +83,7 @@ class KeyRGBTray:
         Convenience wrapper to keep call sites small.
         """
 
-        self._update_icon()
-        self._update_menu()
+        refresh_tray_ui(self)
 
     # ---- effect application
 
