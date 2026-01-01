@@ -33,7 +33,7 @@ from .lighting_controller import (
 
 from . import icon as icon_mod
 from . import menu as menu_mod
-from . import polling
+from .pollers import polling
 from . import runtime
 from .startup import acquire_single_instance_or_exit, configure_logging, log_startup_diagnostics_if_debug
 

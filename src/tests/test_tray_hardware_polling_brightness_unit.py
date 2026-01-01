@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.tray.hardware_polling import _apply_polled_hardware_state
+from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
 
 @dataclass
