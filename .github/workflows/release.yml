@@ -21,15 +21,22 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install system deps
         run: |
           sudo apt-get update
           sudo apt-get install -y squashfs-tools
 
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pytest pytest-cov
+          python -m pip install -e .
+
       - name: Build AppImage (release profile)
         run: |
-          python -m pip install -U pip
           python -m buildpython --profile=release
 
       - name: Upload AppImage to GitHub Release
