@@ -4,9 +4,9 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .diagnostics_io import parse_hex_int, read_text
-from .diagnostics_paths import sysfs_usb_devices_root, usb_devnode_root
-from .diagnostics_proc import proc_open_holders
+from .io import parse_hex_int, read_text
+from .paths import sysfs_usb_devices_root, usb_devnode_root
+from .proc import proc_open_holders
 
 
 def usb_devices_snapshot(target_ids: list[tuple[int, int]]) -> list[dict[str, Any]]:

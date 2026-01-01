@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .diagnostics_collectors import (
+from .collectors import (
     app_snapshot as _app_snapshot,
     backend_probe_snapshot as _backend_probe_snapshot,
     config_snapshot as _config_snapshot,
@@ -16,13 +16,13 @@ from .diagnostics_collectors import (
     power_supply_snapshot as _power_supply_snapshot,
     system_snapshot as _system_snapshot,
 )
-from .diagnostics_formatting import format_diagnostics_text
-from .diagnostics_io import parse_hex_int as _parse_hex_int
-from .diagnostics_io import read_text as _read_text
-from .diagnostics_io import run_command as _run_command
-from .diagnostics_paths import sysfs_dmi_root as _sysfs_dmi_root
-from .diagnostics_paths import sysfs_leds_root as _sysfs_leds_root
-from .diagnostics_usb import usb_devices_snapshot as _usb_devices_snapshot
+from .formatting import format_diagnostics_text
+from .io import parse_hex_int as _parse_hex_int
+from .io import read_text as _read_text
+from .io import run_command as _run_command
+from .paths import sysfs_dmi_root as _sysfs_dmi_root
+from .paths import sysfs_leds_root as _sysfs_leds_root
+from .usb import usb_devices_snapshot as _usb_devices_snapshot
 
 
 @dataclass(frozen=True)

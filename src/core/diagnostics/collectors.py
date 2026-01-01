@@ -7,8 +7,8 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from .diagnostics_io import read_kv_file, read_text
-from .diagnostics_paths import config_file_path
+from .io import read_kv_file, read_text
+from .paths import config_file_path
 
 
 def config_snapshot() -> dict[str, Any]:

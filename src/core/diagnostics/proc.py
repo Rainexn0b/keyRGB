@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .diagnostics_io import read_text
+from .io import read_text
 
 
 def proc_open_holders(target_path: Path, *, limit: int = 10, pid_limit: int = 5000) -> list[dict[str, Any]]:
