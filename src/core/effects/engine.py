@@ -7,10 +7,10 @@ RGB effects for ITE 8291 keyboards using ite8291r3-ctl library.
 from __future__ import annotations
 
 import logging
-import colorsys
 from threading import Event, RLock, Thread
 from typing import Dict, Optional, Tuple
 
+from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.device import NullKeyboard, acquire_keyboard
 from src.core.effects.fades import fade_in_per_key, fade_uniform_color
 from src.core.effects.hw_payloads import build_hw_effect_payload
@@ -229,8 +229,7 @@ class EffectsEngine:
     
     def _hsv_to_rgb(self, h: float, s: float, v: float) -> tuple:
         """Convert HSV to RGB (h: 0-1, s: 0-1, v: 0-1)"""
-        r, g, b = colorsys.hsv_to_rgb(h, s, v)
-        return (int(r * 255), int(g * 255), int(b * 255))
+        return hsv_to_rgb(h, s, v)
     
     def _get_interval(self, base_ms: int) -> float:
         """Calculate interval based on speed (0-10, 10 = fastest).
