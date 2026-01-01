@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import colorsys
-import math
 import time
 from threading import Event, RLock, Thread
 from typing import Dict, Optional, Tuple
@@ -17,8 +16,6 @@ from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS, get, hw_colors, hw_
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
     enable_user_mode_once,
-    load_per_key_colors_from_config,
-    scaled_color_map,
 )
 from src.core.effects.software_loops import (
     run_fire,
