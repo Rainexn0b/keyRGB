@@ -125,7 +125,7 @@ else
 fi
 
 UDEV_DST="/etc/udev/rules.d/99-ite8291-wootbook.rules"
-UDEV_SRC="$REPO_DIR/packaging/udev/99-ite8291-wootbook.rules"
+UDEV_SRC="$REPO_DIR/udev/99-ite8291-wootbook.rules"
 
 if [ -f "$UDEV_DST" ]; then
   if [ -f "$UDEV_SRC" ] && cmp -s "$UDEV_SRC" "$UDEV_DST"; then

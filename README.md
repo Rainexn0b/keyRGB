@@ -47,7 +47,6 @@ Notes:
 Docs:
 
 - Fedora / step-by-step from a blank install: [docs/usage/usage.md](docs/usage/usage.md)
-- Fedora / RPM packaging: [packaging/rpm/README.md](packaging/rpm/README.md)
 - Tongfang keyboard support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
 
 On other distros, install the Python dependencies + ensure the udev rule is present (see the docs above).
@@ -57,26 +56,6 @@ Or install from the repo (useful for development):
 ```bash
 python3 -m pip install --user -e .
 ```
-
-### Want an RPM instead?
-
-If you prefer a local RPM (instead of `./install.sh`), you can build one from this repo checkout on Fedora/Nobara:
-
-```bash
-sudo dnf install -y rpmdevtools rpmlint python3-devel python3-setuptools python3-wheel pyproject-rpm-macros curl
-
-# Build a local SRPM from your current git checkout
-bash scripts/copr-build-srpm.sh
-
-# Rebuild to a binary RPM
-SRPM=$(ls -1t ~/rpmbuild/SRPMS/keyrgb-*.src.rpm | head -n 1)
-rpmbuild --rebuild "$SRPM"
-
-# Install
-sudo dnf install -y ~/rpmbuild/RPMS/noarch/keyrgb-*.rpm
-```
-
-More details: [packaging/rpm/README.md](packaging/rpm/README.md).
 
 ### Uninstall
 

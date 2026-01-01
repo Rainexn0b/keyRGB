@@ -360,7 +360,7 @@ install_udev_rule() {
     local tmp_rule=""
 
     if [ "$MODE" = "pip" ]; then
-        src_rule="$REPO_DIR/packaging/udev/99-ite8291-wootbook.rules"
+        src_rule="$REPO_DIR/udev/99-ite8291-wootbook.rules"
         if ! [ -f "$src_rule" ]; then
             echo "⚠️  udev rule file not found: $src_rule"
             return 0
@@ -370,7 +370,7 @@ install_udev_rule() {
         if [ -n "$KEYRGB_VERSION" ]; then
             raw_ref="$KEYRGB_VERSION"
         fi
-        local rule_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/packaging/udev/99-ite8291-wootbook.rules"
+        local rule_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/udev/99-ite8291-wootbook.rules"
         tmp_rule="$(mktemp)"
         echo "⬇️  Downloading udev rule: $rule_url"
         download_url "$rule_url" "$tmp_rule"

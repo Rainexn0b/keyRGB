@@ -107,7 +107,7 @@ class Ite8291r3Backend(KeyboardBackend):
             if isinstance(exc, PermissionError) or errno == 13 or "permission denied" in msg or "access denied" in msg:
                 raise PermissionError(
                     "Permission denied opening the ITE 8291 USB device. "
-                    "Install the udev rule (packaging/udev/99-ite8291-wootbook.rules), then reload udev rules and reboot/log out/in."
+                    "Install the udev rule (udev/99-ite8291-wootbook.rules), then reload udev rules and reboot/log out/in."
                 ) from exc
             if os.environ.get("KEYRGB_DEBUG"):
                 logger.exception("Failed to open ite8291r3 device")
