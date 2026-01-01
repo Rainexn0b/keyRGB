@@ -1,6 +1,13 @@
 # KeyRGB
 
-KeyRGB is a Linux tray app + per-key editor for laptop keyboards driven by ITE 8291 / ITE8291R3-style controllers (common on TongFang rebrands). It focuses on being practical:
+KeyRGB is a Linux tray app + per-key editor for laptop keyboard lighting.
+
+It supports multiple backends:
+
+- **USB (ITE 8291 / ITE8291R3 family)** on many TongFang rebrands (often per-key RGB).
+- **Sysfs LED backlight devices** (brightness-only or RGB, depending on what your kernel exposes).
+
+It focuses on being practical:
 
 - System tray controls (effects, brightness, speed, off)
 - Per-key coloring with a visual layout overlay
@@ -103,6 +110,7 @@ Examples:
 ```bash
 KEYRGB_BACKEND=auto keyrgb
 KEYRGB_BACKEND=ite8291r3 keyrgb
+KEYRGB_BACKEND=sysfs-leds keyrgb
 ```
 
 Notes:
@@ -140,12 +148,14 @@ Use the **Profiles** section in the per-key editor to Activate/Save/Delete.
 
 ## Hardware support
 
-This project is currently focused on ITE 8291 / ITE8291R3 based keyboards.
+KeyRGB supports multiple keyboard backlight backends.
 
-- Typical USB ID: `048d:600b`
-- Typical matrix: 6×21
+Common examples:
 
-Support is device/firmware dependent. If you want to contribute a new laptop revision, see [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md).
+- USB (ITE): typical USB IDs include `048d:600b`, `048d:6008`, `048d:6006`, etc.
+- Sysfs LED: looks for common `/sys/class/leds/*kbd*` patterns; capabilities vary by device.
+
+Support is device/firmware dependent. If you want to contribute a new laptop revision, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Troubleshooting
 
