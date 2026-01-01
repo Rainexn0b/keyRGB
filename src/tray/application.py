@@ -25,7 +25,7 @@ from .controllers.lighting_controller import (
 from .hw.ite_dimensions import load_ite_dimensions
 from .integrations.dependencies import load_tray_dependencies
 from .integrations import runtime
-from .pollers import polling
+from .lifecycle import maybe_autostart_effect, start_all_polling, start_power_monitoring
 from .ui import icon as icon_mod
 from .ui import menu as menu_mod
 from .ui.gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
@@ -55,13 +55,9 @@ class KeyRGBTray:
 
         self._ite_rows, self._ite_cols = load_ite_dimensions()
 
-        self.power_manager = PowerManager(self, config=self.config)
-        self.power_manager.start_monitoring()
-
-        polling.start_all_polling(self, ite_num_rows=self._ite_rows, ite_num_cols=self._ite_cols)
-
-        if getattr(self.config, "autostart", False) and not self.is_off:
-            self._start_current_effect()
+        self.power_manager = start_power_monitoring(self, power_manager_cls=PowerManager, config=self.config)
+        start_all_polling(self, ite_num_rows=self._ite_rows, ite_num_cols=self._ite_cols)
+        maybe_autostart_effect(self)
 
     # ---- logging helpers
 
