@@ -20,6 +20,14 @@ from src.core.effects.perkey_animation import (
     load_per_key_colors_from_config,
     scaled_color_map,
 )
+from src.core.effects.software_loops import (
+    run_fire,
+    run_perkey_breathing,
+    run_perkey_pulse,
+    run_pulse,
+    run_random,
+    run_strobe,
+)
 from src.core.effects.transitions import avoid_full_black, choose_steps, scaled_color_map_nonzero
 
 from src.core.logging_utils import log_throttled
@@ -443,208 +451,27 @@ class EffectsEngine:
     
     def _effect_pulse(self):
         """Pulse: Rhythmic brightness pulses with current color"""
-        phase = 0.0
-        # Keep pulse responsive at higher speeds but avoid tight spin-loops.
-        interval = self._clamped_interval(180, min_s=0.03)
-        
-        while self.running and not self.stop_event.is_set():
-            # Keep "user mode" on and modulate brightness rather than RGB to
-            # avoid the library treating black as "off" and flipping state.
-            pulse = (math.sin(phase) + 1) / 2  # 0-1
-            pulse_brightness = int(round(self.brightness * pulse))
-            # Avoid 0 during software animation: 0 is interpreted as "off" by
-            # the tray hardware poller and can cause flicker.
-            pulse_brightness = max(1, min(self.brightness, pulse_brightness))
-
-            with self.kb_lock:
-                self.kb.set_color(self.current_color, brightness=pulse_brightness)
-
-            # Smaller step for smoother motion.
-            phase += 0.055
-            self.stop_event.wait(interval)
+        run_pulse(self)
     
     def _effect_strobe(self):
         """Strobe: Rapid on/off flashing"""
-        on = False
-        interval = self._clamped_interval(90, min_s=0.06)
-        
-        while self.running and not self.stop_event.is_set():
-            with self.kb_lock:
-                if on:
-                    self.kb.set_color((255, 255, 255), brightness=self.brightness)
-                else:
-                    # Use black instead of turn_off() so we don't drive
-                    # hardware brightness to 0 (which the tray treats as "off").
-                    self.kb.set_color((0, 0, 0), brightness=max(1, self.brightness))
-
-            on = not on
-            self.stop_event.wait(interval)
+        run_strobe(self)
     
     def _effect_fire(self):
         """Fire: Flickering red/orange flames"""
-        import random
-        interval = self._clamped_interval(140, min_s=0.06)
-        
-        prev = None
-        while self.running and not self.stop_event.is_set():
-            factor = self._brightness_factor()
-            target = (
-                int((200 + random.random() * 55) * factor),
-                int((random.random() * 100) * factor),
-                0,
-            )
-
-            if prev is None:
-                prev = target
-
-            # Smooth flicker by interpolating to the next sample.
-            steps = choose_steps(duration_s=float(interval), max_steps=10, target_fps=40.0, min_dt_s=0.02)
-            dt = float(interval) / float(steps)
-            pr, pg, pb = prev
-            tr, tg, tb = target
-            for i in range(1, steps + 1):
-                if not self.running or self.stop_event.is_set():
-                    break
-                t = float(i) / float(steps)
-                r = int(round(pr + (tr - pr) * t))
-                g = int(round(pg + (tg - pg) * t))
-                b = int(round(pb + (tb - pb) * t))
-                with self.kb_lock:
-                    self.kb.set_color((r, g, b), brightness=self.brightness)
-                self.stop_event.wait(dt)
-
-            prev = target
+        run_fire(self)
     
     def _effect_random(self):
         """Random: Random color changes"""
-        import random
-        interval = self._clamped_interval(500, min_s=0.12)
-        
-        prev = None
-        while self.running and not self.stop_event.is_set():
-            factor = self._brightness_factor()
-            target = (
-                int(random.random() * 255 * factor),
-                int(random.random() * 255 * factor),
-                int(random.random() * 255 * factor),
-            )
-
-            # Avoid a full-black random frame (reads as a blink-off).
-            if int(self.brightness) > 0 and tuple(target) == (0, 0, 0):
-                target = (1, 0, 0)
-
-            if prev is None:
-                prev = target
-
-            # Smoothly cross-fade to the next random color.
-            steps = choose_steps(duration_s=float(interval), max_steps=18, target_fps=45.0, min_dt_s=0.02)
-            dt = float(interval) / float(steps)
-            pr, pg, pb = prev
-            tr, tg, tb = target
-            for i in range(1, steps + 1):
-                if not self.running or self.stop_event.is_set():
-                    break
-                t = float(i) / float(steps)
-                r = int(round(pr + (tr - pr) * t))
-                g = int(round(pg + (tg - pg) * t))
-                b = int(round(pb + (tb - pb) * t))
-
-                r, g, b = avoid_full_black(
-                    rgb=(r, g, b),
-                    target_rgb=(tr, tg, tb),
-                    brightness=int(self.brightness),
-                )
-                with self.kb_lock:
-                    self.kb.set_color((r, g, b), brightness=self.brightness)
-                self.stop_event.wait(dt)
-
-            prev = target
+        run_random(self)
     
     def _effect_perkey_breathing(self):
         """Per-Key Breathing: Breathing animation that preserves each key's individual color"""
-        phase = 0.0
-        # Breathing should feel slow/smooth but still obviously animated.
-        # Using a smaller base interval avoids the "looks static" problem at
-        # mid/low UI speeds.
-        interval = self._clamped_interval(90, min_s=0.04)
-        
-        # Load per-key colors if not already set
-        if not self.per_key_colors:
-            self.per_key_colors = load_per_key_colors_from_config()
-        
-        # If no per-key colors configured, fall back to uniform breathing
-        if not self.per_key_colors:
-            self._effect_pulse()
-            return
-        
-        # IMPORTANT:
-        # - `set_key_colors(..., enable_user_mode=True)` calls `enable_user_mode()` internally.
-        #   Doing that every frame causes visible flicker/flash on some firmware.
-        # - `set_key_colors()` writes a full 6x16 frame buffer. Any key missing from
-        #   `color_map` becomes black. If the saved per-key map is sparse, that looks
-        #   like erratic flashing. We therefore fill missing keys with the base color.
-        full_colors = build_full_color_grid(
-            base_color=tuple(int(x) for x in (self.current_color or (255, 0, 0))),
-            per_key_colors=self.per_key_colors,
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
-        )
-
-        enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=self.brightness)
-
-        while self.running and not self.stop_event.is_set():
-            # Calculate breathing factor (0.2 to 1.0 to avoid going too dim)
-            breath = (math.sin(phase) + 1.0) / 2.0  # 0..1
-            # Smooth curve (ease-in/out) so it feels like "breathing".
-            breath = breath * breath * (3.0 - 2.0 * breath)  # smoothstep
-            breath = 0.15 + breath * 0.85  # 0.15..1.0
-            
-            color_map = scaled_color_map(full_colors, scale=breath)
-            
-            with self.kb_lock:
-                self.kb.set_key_colors(color_map, brightness=int(self.brightness), enable_user_mode=False)
-            
-            phase += 0.08
-            self.stop_event.wait(interval)
+        run_perkey_breathing(self)
     
     def _effect_perkey_pulse(self):
         """Per-Key Pulse: Pulse animation that preserves each key's individual color"""
-        phase = 0.0
-        # Pulse is intentionally more "snappy" than breathing.
-        interval = self._clamped_interval(70, min_s=0.03)
-        
-        # Load per-key colors if not already set
-        if not self.per_key_colors:
-            self.per_key_colors = load_per_key_colors_from_config()
-        
-        # If no per-key colors configured, fall back to uniform pulse
-        if not self.per_key_colors:
-            self._effect_pulse()
-            return
-        
-        full_colors = build_full_color_grid(
-            base_color=tuple(int(x) for x in (self.current_color or (255, 0, 0))),
-            per_key_colors=self.per_key_colors,
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
-        )
-
-        enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=self.brightness)
-
-        while self.running and not self.stop_event.is_set():
-            # Calculate pulse factor (sharper than breathing)
-            pulse = (math.sin(phase) + 1.0) / 2.0  # 0..1
-            # Make it much sharper than breathing (quick "thump").
-            pulse = pulse ** 3
-            pulse = 0.08 + pulse * 0.92  # 0.08..1.0
-            
-            color_map = scaled_color_map(full_colors, scale=pulse)
-            
-            with self.kb_lock:
-                self.kb.set_key_colors(color_map, brightness=int(self.brightness), enable_user_mode=False)
-            
-            phase += 0.15
-            self.stop_event.wait(interval)
+        run_perkey_pulse(self)
 
 
 if __name__ == '__main__':
