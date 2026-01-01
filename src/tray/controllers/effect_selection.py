@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+try:
+    # Module-level import so tests (and callers) can monkeypatch `profiles`.
+    from src.core import profiles
+except Exception:  # pragma: no cover
+    profiles = None
+
 
 def _ensure_config_per_key_colors_loaded(config) -> None:
     """Ensure `config.per_key_colors` has a value, if possible.
@@ -16,10 +22,12 @@ def _ensure_config_per_key_colors_loaded(config) -> None:
         return
 
     try:
-        from src.core import profiles
+        prof = profiles
+        if prof is None:
+            from src.core import profiles as prof  # type: ignore[no-redef]
 
-        active = profiles.get_active_profile()
-        colors = profiles.load_per_key_colors(active)
+        active = prof.get_active_profile()
+        colors = prof.load_per_key_colors(active)
         if colors:
             config.per_key_colors = colors
     except Exception:

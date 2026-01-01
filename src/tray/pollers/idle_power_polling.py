@@ -187,6 +187,13 @@ def start_idle_power_polling(
     def poll_idle_power() -> None:
         last_error_at = 0.0
 
+        # Debounce dim/off signals to avoid rare transient false positives from
+        # sysfs/DRM reads (which can briefly report 0/Off during modesets).
+        dimmed_true_streak = 0
+        dimmed_false_streak = 0
+        screen_off_true_streak = 0
+        debounce_polls = 2
+
         session_id = _get_session_id()
 
         while True:
@@ -209,6 +216,31 @@ def start_idle_power_polling(
                 screen_off_backlight = bool(getattr(tray, "_dim_screen_off", False))
                 screen_off_drm = _read_screen_off_state_drm()
                 screen_off = bool(screen_off_backlight) or bool(screen_off_drm)
+
+                # Debounce dimmed/screen-off detection.
+                if dimmed is True:
+                    dimmed_true_streak += 1
+                    dimmed_false_streak = 0
+                elif dimmed is False:
+                    dimmed_false_streak += 1
+                    dimmed_true_streak = 0
+                else:
+                    dimmed_true_streak = 0
+                    dimmed_false_streak = 0
+
+                if bool(screen_off):
+                    screen_off_true_streak += 1
+                else:
+                    screen_off_true_streak = 0
+
+                if dimmed_true_streak >= debounce_polls:
+                    dimmed = True
+                elif dimmed_false_streak >= debounce_polls:
+                    dimmed = False
+                else:
+                    dimmed = None
+
+                screen_off = bool(screen_off_true_streak >= debounce_polls)
 
                 # Coarse fallback when we can't infer dim state from backlight.
                 if dimmed is None and session_id:
