@@ -248,7 +248,7 @@ def build_appimage() -> Path:
     if out.exists():
         out.unlink()
 
-    env = {"APPIMAGE_EXTRACT_AND_RUN": "1"}
+    env = {"APPIMAGE_EXTRACT_AND_RUN": "1", "ARCH": "x86_64"}
     _run_checked(
         [str(appimagetool), "--appimage-extract-and-run", str(appdir), str(out)],
         cwd=root,
