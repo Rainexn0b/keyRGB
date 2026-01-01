@@ -34,7 +34,7 @@ python3 -m buildpython --run-steps=2
 ### 4) Import Validation
 - Purpose: imports key “entry” modules to catch import-time errors.
 - Currently imports:
-  - `src.gui.tray`
+  - `src.tray.entrypoint`
   - `src.gui.perkey`
   - `src.gui.calibrator`
 

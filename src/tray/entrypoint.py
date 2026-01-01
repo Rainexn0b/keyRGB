@@ -2,9 +2,6 @@
 
 This module owns the startup sequence (logging, diagnostics, single-instance)
 and then launches the `KeyRGBTray` application.
-
-Kept separate from `src.tray.app` so the stable importable entrypoint can stay
-thin and re-export `main()`.
 """
 
 from __future__ import annotations

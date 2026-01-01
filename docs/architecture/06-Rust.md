@@ -12,7 +12,7 @@ This document summarizes whether rewriting KeyRGB in Rust would make sense, base
 
 ## Current architecture (relevant to the decision)
 
-- **Tray app**: Python `pystray` entrypoint `keyrgb = src.gui.tray:main`, delegating to the implementation in `src/tray/app.py`.
+- **Tray app**: Python `pystray` entrypoint `keyrgb = src.tray.entrypoint:main`, launching the implementation in `src/tray/application.py`.
 - **UI callbacks**: Menu actions call into effect/brightness/speed handlers (e.g. `src/tray/lighting_controller.py`).
 - **Hardware state polling**: Background polling thread reads brightness/off state roughly every 2 seconds and refreshes the UI (see `src/tray/hardware_polling.py`). This is I/O bound and already defensive about disconnects.
 - **Per-key/calibration/settings**: Implemented as Python GUIs with optional `PyQt6`.

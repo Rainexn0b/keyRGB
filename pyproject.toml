@@ -51,7 +51,7 @@ Issues = "https://github.com/Rainexn0b/keyRGB/issues"
 Repository = "https://github.com/Rainexn0b/keyRGB"
 
 [project.scripts]
-keyrgb = "src.gui.tray:main"
+keyrgb = "src.tray.entrypoint:main"
 keyrgb-perkey = "src.gui.perkey:main"
 keyrgb-uniform = "src.gui.uniform:main"
 keyrgb-calibrate = "src.gui.calibrator:main"

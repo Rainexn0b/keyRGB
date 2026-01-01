@@ -1,11 +1,9 @@
 """Tray application implementation.
 
 This package holds the KeyRGB system tray app logic. Historically the project
-had multiple tray entrypoints (e.g. `src/gui/tray.py`, `src/tray_app.py`).
-Those modules now delegate into this package to avoid duplication.
+had multiple tray entrypoints. The canonical launcher is now:
+
+- `keyrgb` -> `src.tray.entrypoint:main`
 """
 
-from .app import KeyRGBTray, main
-from .ui import menu
-
-__all__ = ["KeyRGBTray", "main", "menu"]
+__all__: list[str] = []

@@ -3,4 +3,4 @@
 
 cd "$(dirname "$0")"
 # -B avoids stale __pycache__ bytecode issues when iterating in-place.
-exec python3 -B -m src.gui.tray
+exec python3 -B -m src.tray

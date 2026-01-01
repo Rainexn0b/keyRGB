@@ -1,7 +1,6 @@
 """Tray application class.
 
-This module holds the `KeyRGBTray` class implementation. The importable
-entrypoint remains `src.tray.app` for backwards compatibility.
+This module holds the `KeyRGBTray` class implementation.
 """
 
 from __future__ import annotations
