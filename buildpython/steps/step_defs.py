@@ -43,6 +43,7 @@ def steps() -> list[Step]:
     from .step_pip import pip_check_runner
     from .step_import_scan import import_scan_runner
     from .step_repo_validation import repo_validation_runner
+    from .step_appimage import appimage_build_runner
 
     return [
         Step(
@@ -114,5 +115,12 @@ def steps() -> list[Step]:
             description="Validate repo packaging/install/metadata consistency",
             log_file=_log("step-10-repo-validation.log"),
             runner=repo_validation_runner,
+        ),
+        Step(
+            number=11,
+            name="AppImage",
+            description="Build keyrgb-x86_64.AppImage",
+            log_file=_log("step-11-appimage.log"),
+            runner=appimage_build_runner,
         ),
     ]

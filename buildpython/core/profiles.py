@@ -53,4 +53,17 @@ PROFILES: dict[str, Profile] = {
             "Repo Validation",
         ],
     ),
+    "release": Profile(
+        name="release",
+        description="Release build (CI checks + AppImage)",
+        include_steps=[
+            "Compile",
+            "Import Validation",
+            "Import Scan",
+            "Pip Check",
+            "Pytest",
+            "Repo Validation",
+            "AppImage",
+        ],
+    ),
 }

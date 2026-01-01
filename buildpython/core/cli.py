@@ -68,6 +68,21 @@ def _select_steps(run_steps: list[str] | None, skip_steps: list[str] | None, pro
     return uniq
 
 
+def _maybe_add_appimage(selected: list, *, enabled: bool):
+    if not enabled:
+        return selected
+
+    steps = all_steps()
+    appimage = next((s for s in steps if s.name.lower() == "appimage"), None)
+    if appimage is None:
+        raise SystemExit("AppImage step not found (step registry out of date)")
+
+    if any(s.name.lower() == "appimage" for s in selected):
+        return selected
+
+    return [*selected, appimage]
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("--profile", choices=sorted(PROFILES.keys()), help="Run a predefined profile")
@@ -77,6 +92,11 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("--skip-steps", help="Comma/space-separated list of step numbers or names")
     parser.add_argument("--verbose", action="store_true", help="Print stdout/stderr for steps")
     parser.add_argument("--continue-on-error", action="store_true", help="Run all steps even if one fails")
+    parser.add_argument(
+        "--with-appimage",
+        action="store_true",
+        help="Also build the AppImage after the selected steps",
+    )
 
     args = parser.parse_args(list(argv) if argv is not None else None)
 
@@ -93,6 +113,8 @@ def main(argv: Iterable[str] | None = None) -> int:
         skip_steps=_parse_csv(args.skip_steps),
         profile=args.profile,
     )
+
+    selected = _maybe_add_appimage(selected, enabled=args.with_appimage)
 
     if not selected:
         print("No steps selected.")
