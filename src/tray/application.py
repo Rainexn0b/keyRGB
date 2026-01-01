@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 
 from src.core import tcc_power_profiles
-from src.core.backends.registry import select_backend
 
+from .backend import select_backend_with_introspection
 from .controllers.effect_selection import apply_effect_selection
 from .controllers.lighting_controller import (
     apply_brightness_from_power_policy,
@@ -51,18 +51,7 @@ class KeyRGBTray:
         self._last_brightness = 25
 
         # Backend selection is used for capability-driven UI gating.
-        self.backend = select_backend()
-        self.backend_probe = None
-        try:
-            probe_fn = getattr(self.backend, "probe", None) if self.backend is not None else None
-            if callable(probe_fn):
-                self.backend_probe = probe_fn()
-        except Exception:
-            self.backend_probe = None
-        try:
-            self.backend_caps = self.backend.capabilities() if self.backend is not None else None
-        except Exception:
-            self.backend_caps = None
+        self.backend, self.backend_probe, self.backend_caps = select_backend_with_introspection()
 
         self._ite_rows, self._ite_cols = load_ite_dimensions()
 
