@@ -13,6 +13,7 @@ from threading import Event, RLock, Thread
 from typing import Dict, Optional, Tuple
 
 from src.core.effects.device import NullKeyboard, acquire_keyboard
+from src.core.effects.hw_payloads import build_hw_effect_payload
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS, hw_colors, hw_effects
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
@@ -213,83 +214,17 @@ class EffectsEngine:
         if not effect_func:
             raise ValueError(f"Hardware effect not found: {effect_name}")
 
-        def _allowed_keys(fn) -> set[str]:
-            """Best-effort introspection of ite8291r3-ctl's effect builders."""
-            try:
-                freevars = getattr(fn, "__code__").co_freevars
-                closure = getattr(fn, "__closure__")
-                if not freevars or not closure:
-                    return set()
-                mapping = dict(zip(freevars, [c.cell_contents for c in closure]))
-                args = mapping.get("args")
-                if isinstance(args, dict):
-                    return set(args.keys())
-            except Exception as exc:
-                log_throttled(
-                    logger,
-                    "legacy.effects.allowed_keys",
-                    interval_s=120,
-                    level=logging.DEBUG,
-                    msg="Failed to introspect hardware effect args",
-                    exc=exc,
-                )
-            return set()
-
-        # The controller's speed scale is inverted compared to the UX:
-        # UI: 10 = fastest, 0/1 = slowest
-        # HW: larger values slow the effect down
-        hw_speed = max(0, min(10, 11 - int(self.speed)))
-
-        # Build kwargs, then filter to what this effect actually supports.
-        hw_kwargs = {
-            "speed": hw_speed,
-            "brightness": self.brightness,
-        }
-
-        # For breathing, use the user's configured RGB.
-        # The controller expects a palette index, so we program a palette slot
-        # and then reference it.
-        if effect_name == "breathing":
-            palette_slot = hw_colors.get("red", 1)
-            try:
-                with self.kb_lock:
-                    # Slot must be 1..7 and takes an (r,g,b) tuple.
-                    self.kb.set_palette_color(palette_slot, tuple(self.current_color))
-            except Exception:
-                # If palette programming fails, we'll still request the slot.
-                log_throttled(
-                    logger,
-                    "legacy.effects.palette_color",
-                    interval_s=120,
-                    level=logging.DEBUG,
-                    msg="Failed to program palette slot for breathing effect",
-                )
-            hw_kwargs["color"] = palette_slot
-
-        allowed = _allowed_keys(effect_func)
-        if allowed:
-            hw_kwargs = {k: v for k, v in hw_kwargs.items() if k in allowed}
-
-        # Some vendored effects (e.g. rainbow) do not accept all common kwargs.
-        # If introspection fails or the effect builder changes, retry by removing
-        # the specific unsupported key mentioned in the error.
-        last_err = None
-        for _ in range(4):
-            try:
-                effect_data = effect_func(**hw_kwargs)
-                break
-            except ValueError as e:
-                msg = str(e)
-                last_err = e
-                # Expect errors like: "'speed' attr is not needed by effect"
-                if "attr is not needed" in msg and msg.startswith("'"):
-                    bad = msg.split("'", 2)[1]
-                    if bad in hw_kwargs:
-                        hw_kwargs.pop(bad, None)
-                        continue
-                raise
-        else:
-            raise RuntimeError("Failed to build hardware effect payload") from last_err
+        effect_data = build_hw_effect_payload(
+            effect_name=effect_name,
+            effect_func=effect_func,
+            ui_speed=int(self.speed),
+            brightness=int(self.brightness),
+            current_color=tuple(self.current_color),
+            hw_colors=hw_colors,
+            kb=self.kb,
+            kb_lock=self.kb_lock,
+            logger=logger,
+        )
         
         with self.kb_lock:
             self.kb.set_effect(effect_data)
