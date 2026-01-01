@@ -22,7 +22,6 @@ from .integrations import runtime
 from .lifecycle import maybe_autostart_effect, start_all_polling, start_power_monitoring
 from .ui import icon as icon_mod
 from .ui import menu as menu_mod
-from .ui.refresh import refresh_ui as refresh_tray_ui
 from .ui.refresh import update_icon as update_tray_icon
 from .ui.refresh import update_menu as update_tray_menu
 
@@ -76,7 +75,10 @@ class KeyRGBTray:
         Convenience wrapper to keep call sites small.
         """
 
-        refresh_tray_ui(self)
+        # Call the instance methods so unit tests can invoke this unbound on a
+        # dummy object (without requiring real tray/icon dependencies).
+        self._update_icon()
+        self._update_menu()
 
     # ---- effect application
 
