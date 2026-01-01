@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import sys
-from pathlib import Path
 from typing import Any
 
 from .collectors import (
@@ -17,11 +15,16 @@ from .collectors import (
 )
 from .formatting import format_diagnostics_text
 from .io import parse_hex_int as _parse_hex_int
-from .io import read_text as _read_text
-from .io import run_command as _run_command
-from .paths import sysfs_dmi_root as _sysfs_dmi_root
-from .paths import sysfs_leds_root as _sysfs_leds_root
 from .usb import usb_devices_snapshot as _usb_devices_snapshot
+
+from .snapshots import (
+    dmi_snapshot as _dmi_snapshot,
+    env_snapshot as _env_snapshot,
+    process_snapshot as _process_snapshot,
+    sysfs_leds_snapshot as _sysfs_leds_snapshot,
+    usb_ids_snapshot as _usb_ids_snapshot,
+    virt_snapshot as _virt_snapshot,
+)
 
 from .model import Diagnostics
 
@@ -32,94 +35,11 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
     This is intentionally read-only and should not require root.
     """
 
-    dmi_root = _sysfs_dmi_root()
-    dmi_keys = [
-        "sys_vendor",
-        "product_name",
-        "product_version",
-        "product_family",
-        "board_vendor",
-        "board_name",
-        "board_version",
-        "bios_vendor",
-        "bios_version",
-        "bios_date",
-    ]
-    dmi: dict[str, str] = {}
-    for key in dmi_keys:
-        val = _read_text(dmi_root / key)
-        if val:
-            dmi[key] = val
-
-    leds_root = _sysfs_leds_root()
-    all_leds: list[dict[str, str]] = []
-    leds: list[dict[str, str]] = []
-    try:
-        if leds_root.exists():
-            for child in sorted(leds_root.iterdir(), key=lambda p: p.name):
-                if not child.is_dir():
-                    continue
-                name = child.name
-                entry: dict[str, str] = {"name": name, "path": str(child)}
-                b = child / "brightness"
-                m = child / "max_brightness"
-                t = child / "trigger"
-                if b.exists():
-                    val = _read_text(b)
-                    if val is not None:
-                        entry["brightness"] = val
-                if m.exists():
-                    val = _read_text(m)
-                    if val is not None:
-                        entry["max_brightness"] = val
-                if t.exists():
-                    val = _read_text(t)
-                    if val is not None:
-                        entry["trigger"] = val
-
-                all_leds.append(entry)
-
-                lower = name.lower()
-                if "kbd" in lower or "keyboard" in lower:
-                    leds.append(entry)
-    except Exception:
-        # Best-effort.
-        all_leds = all_leds
-        leds = leds
-
-    usb_ids: list[str] = []
-    if include_usb:
-        try:
-            import usb.core  # type: ignore
-
-            for dev in usb.core.find(find_all=True) or []:  # pragma: no cover
-                try:
-                    vid = int(getattr(dev, "idVendor", 0))
-                    pid = int(getattr(dev, "idProduct", 0))
-                    usb_ids.append(f"{vid:04x}:{pid:04x}")
-                except Exception:
-                    continue
-            usb_ids = sorted(set(usb_ids))
-        except Exception:
-            usb_ids = []
-
-    env_keys = [
-        "KEYRGB_BACKEND",
-        "KEYRGB_USE_INSTALLED_ITE",
-        "KEYRGB_DEBUG",
-        "XDG_CURRENT_DESKTOP",
-        "DESKTOP_SESSION",
-    ]
-    env: dict[str, str] = {}
-    for k in env_keys:
-        v = os.environ.get(k)
-        if v:
-            env[k] = v
-
-    virt: dict[str, str] = {}
-    virt_val = _run_command(["systemd-detect-virt"])
-    if virt_val:
-        virt["systemd_detect_virt"] = virt_val
+    dmi = _dmi_snapshot()
+    all_leds, leds = _sysfs_leds_snapshot()
+    usb_ids = _usb_ids_snapshot(include_usb=include_usb)
+    env = _env_snapshot()
+    virt = _virt_snapshot()
 
     system: dict[str, Any] = _system_snapshot()
 
@@ -160,18 +80,7 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
     usb_devices = _usb_devices_snapshot(usb_targets)
     config_snapshot = _config_snapshot()
 
-    process: dict[str, Any] = {}
-    try:
-        process["pid"] = int(os.getpid())
-        process["euid"] = int(os.geteuid())
-        process["egid"] = int(os.getegid())
-        # Keep group IDs numeric to avoid leaking usernames.
-        try:
-            process["groups"] = [int(g) for g in os.getgroups()]
-        except Exception:
-            pass
-    except Exception:
-        process = {}
+    process: dict[str, Any] = _process_snapshot()
 
     return Diagnostics(
         dmi=dmi,
