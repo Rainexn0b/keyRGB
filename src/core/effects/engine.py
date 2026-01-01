@@ -28,6 +28,7 @@ from src.core.effects.software_loops import (
     run_random,
     run_strobe,
 )
+from src.core.effects.timing import brightness_factor, clamped_interval, get_interval
 from src.core.effects.transitions import choose_steps
 
 logger = logging.getLogger(__name__)
@@ -245,17 +246,10 @@ class EffectsEngine:
         is meaningfully slower.
         """
 
-        speed_factor = max(1, min(11, 11 - int(self.speed)))
-
-        # Global slowdown for software effects.
-        # Tuned by feel: low UI speeds (e.g. 2) should be noticeably slow.
-        slowdown = 1.89
-
-        return (base_ms * float(speed_factor) * float(slowdown)) / 1000.0
+        return get_interval(base_ms, speed=int(self.speed))
 
     def _clamped_interval(self, base_ms: int, *, min_s: float) -> float:
-        interval = self._get_interval(base_ms)
-        return max(float(min_s), float(interval))
+        return clamped_interval(base_ms, speed=int(self.speed), min_s=float(min_s))
 
     def _fade_uniform_color(
         self,
@@ -296,7 +290,7 @@ class EffectsEngine:
     
     def _brightness_factor(self) -> float:
         """Get brightness as 0-1 factor"""
-        return self.brightness / 50.0
+        return brightness_factor(int(self.brightness))
     
     def _effect_pulse(self):
         """Pulse: Rhythmic brightness pulses with current color"""
