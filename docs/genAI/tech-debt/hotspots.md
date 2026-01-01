@@ -9,37 +9,38 @@ The intent is not to “ban large files”, but to identify where responsibiliti
 Source command:
 
 ```bash
-find src -type f -name '*.py' -print0 | xargs -0 wc -l | sort -n | tail -n 15
+find src -type f -name '*.py' ! -path 'src/tests/*' -print0 | xargs -0 wc -l | sort -n | tail -n 15
 ```
 
-Snapshot (2025-12-30):
+Snapshot (2026-01-01):
 
 | LOC | File | Why it’s a hotspot |
 |---:|---|---|
-| 354 | `src/core/power_management/manager.py` (via `src/core/power.py`) | Power policy + polling + event monitoring + controller integration; mixed “policy” vs “platform IO”. |
-| 501 | `src/gui/settings/window.py` | Settings window still combines layout + state + integration points; next candidates are splitting view/state/services. |
-| 487 | `src/core/effects/engine.py` | Large effect engine surface; potential duplication vs new backends; hard to reason about side effects. |
-| 427 | `src/gui/perkey/editor.py` | Big UI + per-key editing state; likely candidates for splitting UI widgets vs persistence vs apply-to-hardware. |
-| 410 | `src/gui/tcc_profiles.py` | UI + service interactions + validation; can be split into view vs service layer. |
-| 359 | `src/gui/perkey/canvas.py` | Custom drawing/event handling gets large quickly; can be decomposed into smaller widgets/classes. |
-| 353 | `src/gui/calibrator.py` | Calibration workflow UI + storage + geometry; can be split into steps/state machine. |
-| 320 | `src/gui/perkey/editor.py` | Per-key UI is featureful and naturally large; consider further splitting UI/widgets/state. |
-| 319 | `src/core/tcc_power_profiles/__init__.py` | Still holds higher-level operations; submodules now isolate parsing/root-apply concerns. |
-| 312 | `src/tray/app.py` | Tray lifecycle, menu, backend selection, polling; already somewhat factored but still busy. |
-| 312 | `src/core/config.py` | Config persistence + defaults + schema evolution; should stay boring and well-tested. |
-| 290 | `src/tray/menu.py` | Menu building is sizeable; candidate for further separation. |
-| 259 | `src/core/diagnostics_collectors.py` | Main best-effort IO collectors live here; more splitting is possible if it grows again. |
-| 233 | `src/core/diagnostics.py` | Orchestrator wrapper around collectors/formatting; should stay relatively small. |
+| 384 | `src/gui/widgets/color_wheel.py` | Custom UI widget with non-trivial event handling + rendering. |
+| 379 | `src/core/config.py` | Config persistence + defaults + schema evolution; should stay boring and well-tested. |
+| 354 | `src/tray/pollers/idle_power_polling.py` | Idle detection + power policy glue; timing + polling logic can get subtle. |
+| 349 | `src/gui/calibrator/app.py` | Calibration workflow UI + storage + geometry; candidate for splitting into steps/state. |
+| 347 | `src/gui/tcc_profiles.py` | UI + service interactions + validation; can be split into view vs service layer. |
+| 345 | `src/gui/perkey/canvas.py` | Custom drawing/event handling; can be decomposed into smaller widgets/classes. |
+| 327 | `src/core/power_management/manager.py` | Power policy + polling + event monitoring + controller integration; mixed “policy” vs “platform IO”. |
+| 320 | `src/core/tcc_power_profiles/ops_write.py` | Complex write/apply logic; good candidate for more unit-testable helpers. |
+| 316 | `src/core/effects/engine.py` | Large effect engine surface; hard to reason about side effects. |
+| 300 | `src/gui/perkey/editor.py` | Big UI + per-key editing state; candidate for splitting UI widgets vs persistence vs apply-to-hardware. |
+| 289 | `src/core/resources/layout.py` | Layout model + transforms; easy to accrete responsibilities over time. |
+| 255 | `src/gui/settings/window.py` | Settings window combines layout + state + integration points. |
+| 239 | `src/tray/ui/menu_sections.py` | Menu building is sizeable; candidate for further separation. |
+| 234 | `src/core/backends/sysfs/backend.py` | Hardware-facing IO with multiple edge cases; keep defensive and well-tested. |
+| 231 | `src/gui/uniform.py` | UI + state + hardware operations; naturally grows as features expand. |
 
 ## Common maintainability smells in this repo
 
-- **“UI + business logic + IO” in one module** (most visible in `src/gui/power.py`).
+- **“UI + business logic + IO” in one module** (most visible in `src/gui/settings/window.py`).
 - **Many best-effort fallbacks** (diagnostics/power probing) without a structured abstraction can become hard to test.
 - **Policy vs mechanism mixed together** (power policy logic tied to polling threads and controller calls).
 - **Legacy vs new code overlap** (legacy effects/UI vs new tray/runtime architecture).
 
 ## Near-term priorities (suggested)
 
-1. Split `src/core/diagnostics.py` into a small orchestrator + focused collectors.
-2. Split `src/gui/power.py` into UI layout, state/persistence, diagnostics UI.
+1. Keep `src/core/diagnostics/` as a small orchestrator + focused collectors.
+2. Split `src/gui/settings/window.py` into UI layout, state/persistence, diagnostics UI.
 3. Extract “power policy” into a unit-testable component (similar to `BatterySaverPolicy`).

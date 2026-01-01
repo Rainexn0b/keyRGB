@@ -8,11 +8,11 @@ Principles:
 - Keep public behavior stable.
 - Add/extend unit tests where it’s cheap and high value.
 
-## 1) `src/core/diagnostics.py`
+## 1) Diagnostics (`src/core/diagnostics/`)
 
 **Problem**
 
-- One file contains: sysfs readers, /proc scanning, command execution, backend probing, config snapshotting, formatting, plus the dataclass model.
+- The diagnostics surface area spans: sysfs readers, /proc scanning, command execution, backend probing, config snapshotting, formatting, plus the dataclass model.
 
 **Proposed split**
 
@@ -33,7 +33,7 @@ Principles:
 - No change to output schema (unless explicitly documented).
 - Existing diagnostics tests still pass.
 
-## 2) `src/gui/power.py` (Settings window)
+## 2) Settings window (`src/gui/settings/window.py`)
 
 **Problem**
 
@@ -51,7 +51,7 @@ Principles:
 
 1. Extract scrollable canvas behavior into a reusable widget (`ScrollFrame`).
 2. Extract diagnostics panel to a separate class.
-3. Keep `src/gui/power.py` as a thin wrapper for backward compatibility (imports `SettingsWindow`).
+3. Avoid adding new wrapper modules; update callers to import from `src/gui/settings/` directly.
 
 **Acceptance**
 
@@ -69,7 +69,8 @@ Principles:
 - Introduce a pure, unit-testable policy object for power-source transitions, similar to `BatterySaverPolicy`.
 - Keep OS integration (dbus-monitor, sysfs lid monitoring) in `PowerManager`.
 
-Note: `src/core/power.py` remains as a thin compatibility wrapper exporting `PowerManager`.
+Update (2026-01): the `src/core/power.py` compatibility wrapper has been removed; import `PowerManager`
+from `src/core/power_management/`.
 
 **PR slices**
 
