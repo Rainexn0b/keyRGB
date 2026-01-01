@@ -11,11 +11,11 @@ from PIL import Image, ImageTk
 
 from src.legacy.config import Config
 from src.core.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
-from src.gui.calibrator_geometry import calc_transform, hit_test, key_canvas_bbox
-from src.gui.calibrator_probe import CalibrationProbeState
-from src.gui.calibrator_backdrop import load_backdrop_image, reset_backdrop_image, save_backdrop_image
-from src.gui.calibrator_keyboard_preview import KeyboardPreviewSession
-from src.gui.calibrator_profile_storage import (
+from .geometry import calc_transform, hit_test, key_canvas_bbox
+from .probe import CalibrationProbeState
+from .backdrop import load_backdrop_image, reset_backdrop_image, save_backdrop_image
+from .keyboard_preview import KeyboardPreviewSession
+from .profile_storage import (
     get_active_profile_name,
     keymap_path,
     load_keymap,
