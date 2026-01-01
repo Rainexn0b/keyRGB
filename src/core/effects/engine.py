@@ -12,7 +12,8 @@ import time
 from threading import Event, RLock, Thread
 from typing import Dict, Optional, Tuple
 
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS, get, hw_colors, hw_effects
+from src.core.effects.device import NullKeyboard, acquire_keyboard
+from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS, hw_colors, hw_effects
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
     enable_user_mode_once,
@@ -27,39 +28,10 @@ from src.core.effects.software_loops import (
 )
 from src.core.effects.transitions import avoid_full_black, choose_steps, scaled_color_map_nonzero
 
-from src.core.logging_utils import log_throttled
-
-
 logger = logging.getLogger(__name__)
 
-
-
-class _NullKeyboard:
-    """Fallback keyboard implementation used when no device is available."""
-
-    def turn_off(self) -> None:
-        return
-
-    def set_brightness(self, _brightness: int) -> None:
-        return
-
-    def set_color(self, _color, *, brightness: int):
-        return
-
-    def set_key_colors(self, _color_map, *, brightness: int, enable_user_mode: bool = True):
-        return
-
-    def set_effect(self, _effect_data) -> None:
-        return
-
-    def set_palette_color(self, _slot: int, _color) -> None:
-        return
-
-    def get_brightness(self) -> int:
-        return 0
-
-    def is_off(self) -> bool:
-        return True
+# Backwards-compatibility: older code/tests import `_NullKeyboard` from this module.
+_NullKeyboard = NullKeyboard
 
 
 
@@ -77,7 +49,7 @@ class EffectsEngine:
     def __init__(self):
         self.kb_lock = RLock()
         self.device_available = False
-        self.kb = _NullKeyboard()
+        self.kb = NullKeyboard()
 
         # Attempt to acquire a hardware device, but do not crash if unavailable.
         self._ensure_device_available()
@@ -94,36 +66,20 @@ class EffectsEngine:
     def _ensure_device_available(self) -> bool:
         """Best-effort attempt to connect to the keyboard device."""
 
-        if self.device_available and not isinstance(self.kb, _NullKeyboard):
+        if self.device_available and not isinstance(self.kb, NullKeyboard):
             return True
 
-        try:
-            with self.kb_lock:
-                self.kb = get()
-            self.device_available = True
-            return True
-        except FileNotFoundError:
-            self.mark_device_unavailable()
-            return False
-        except Exception as exc:
-            # Avoid log spam, but do surface the root cause in debug logs.
-            log_throttled(
-                logger,
-                "effects.ensure_device_available",
-                interval_s=60,
-                level=logging.DEBUG,
-                msg="Failed to acquire keyboard device; falling back to NullKeyboard",
-                exc=exc,
-            )
-            self.mark_device_unavailable()
-            return False
+        kb, available = acquire_keyboard(kb_lock=self.kb_lock, logger=logger)
+        self.kb = kb
+        self.device_available = bool(available)
+        return self.device_available
 
     def mark_device_unavailable(self) -> None:
         """Force the engine into a safe 'no device' mode."""
 
         self.device_available = False
         with self.kb_lock:
-            self.kb = _NullKeyboard()
+            self.kb = NullKeyboard()
     
     def stop(self):
         """Stop current effect"""
