@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.1 (2026-01-02)
+
+- Distribution: releases now ship a `keyrgb-x86_64.AppImage` asset.
+- Installer: `./install.sh` defaults to AppImage mode and installs a single binary to `~/.local/bin/keyrgb`.
+- Installer: `--pip` mode remains available for development (editable install via `pip --user -e .`).
+- Packaging: RPM packaging support has been removed.
+- Permissions: udev rule is now tracked at `udev/99-ite8291-wootbook.rules` and is installed by `install.sh`.
+
+- Build/CI: `buildpython` gained an AppImage build step and CI uploads the AppImage as an artifact.
+- Releases: tags now trigger a workflow that builds and attaches the AppImage to the GitHub Release.
+
+- Safety/testing: tests are hardened to avoid touching real hardware by default; hardware tests remain opt-in.
+- Maintenance: major internal refactor and shim removal to standardize canonical imports and tray entrypoints.
+
 ## 0.6.0 (2026-01-01)
 
 - Per-key editor: adds a sample tool (pick a key color, then paint other keys).
