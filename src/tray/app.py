@@ -18,7 +18,7 @@ from src.core.backends.registry import select_backend
 
 from .integrations.dependencies import load_tray_dependencies
 from .effect_selection import apply_effect_selection
-from .gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
+from .ui.gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
 from .ite_dimensions import load_ite_dimensions
 from .lighting_controller import (
     apply_brightness_from_power_policy,
@@ -31,7 +31,7 @@ from .lighting_controller import (
     turn_on,
 )
 
-from . import icon as icon_mod
+from .ui import icon as icon_mod
 from . import menu as menu_mod
 from .pollers import polling
 from .integrations import runtime
