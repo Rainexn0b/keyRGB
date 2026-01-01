@@ -12,6 +12,21 @@ Modes:
     --appimage  Install by downloading the AppImage. (default)
     --pip       Install from this repo via pip (-e). (dev / editable install)
 
+What gets installed (both modes):
+    - System dependencies (best-effort via dnf when available)
+    - Desktop launcher: ~/.local/share/applications/keyrgb.desktop
+    - Autostart entry:  ~/.config/autostart/keyrgb.desktop
+    - Icon:            ~/.local/share/icons/hicolor/256x256/apps/keyrgb.png
+    - udev rule:       /etc/udev/rules.d/99-ite8291-wootbook.rules (requires sudo)
+
+Mode details:
+    --appimage
+        - Downloads a single AppImage to: ~/.local/bin/keyrgb
+        - Does NOT install Python packages via pip
+    --pip
+        - Installs Python packages into your user site-packages (pip --user)
+        - Intended for development / editable installs
+
 AppImage options:
     --version <tag>  Git tag to download from (e.g. v0.6.0). If omitted, uses GitHub "latest".
     --asset <name>   AppImage asset filename (default: keyrgb-x86_64.AppImage).
@@ -68,6 +83,12 @@ if [ -z "$MODE" ]; then
 fi
 
 echo "Install mode: $MODE"
+
+if [ "$MODE" = "appimage" ]; then
+    echo "AppImage install target: $HOME/.local/bin/keyrgb"
+else
+    echo "Pip install target: user site-packages (pip --user)"
+fi
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then

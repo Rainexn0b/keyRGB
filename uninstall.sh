@@ -2,7 +2,8 @@
 # KeyRGB Uninstall Script
 #
 # Removes what install.sh installs:
-# - user-level pip installs of keyrgb + ite8291r3-ctl
+# - user-level pip installs of keyrgb + ite8291r3-ctl (pip install mode)
+# - AppImage binary at ~/.local/bin/keyrgb (AppImage mode)
 # - desktop launcher and autostart entries
 # - udev rule (with sudo) if it matches this repo's rule
 #
@@ -25,9 +26,13 @@ usage() {
   cat <<'EOF'
 Usage: ./uninstall.sh [--yes] [--purge-config] [--remove-appimage]
 
---yes          Do not prompt (best-effort).
---purge-config Also remove ~/.config/keyrgb (profiles/settings).
---remove-appimage Remove ~/.local/bin/keyrgb if it is an AppImage.
+--yes             Do not prompt (best-effort).
+--purge-config    Also remove ~/.config/keyrgb (profiles/settings).
+--remove-appimage Remove ~/.local/bin/keyrgb if it looks like an AppImage.
+
+Notes:
+  - This script removes both AppImage-mode and pip-mode installs (with prompts).
+  - It does NOT remove system packages installed via dnf.
 EOF
 }
 
