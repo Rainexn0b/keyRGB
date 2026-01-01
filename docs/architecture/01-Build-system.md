@@ -115,6 +115,6 @@ The `buildlog/` directory is ignored by git.
 GitHub Actions runs `python -m buildpython --profile=ci` as the single source of truth.
 
 More detail:
-- Step descriptions: `docs/architecture/02-Build-steps.md`
+- Step descriptions: `docs/architecture/01.1-Build-steps.md`
 - Log format: `docs/architecture/03-Build-logs.md`
 - CI overview: `docs/architecture/04-CI.md`

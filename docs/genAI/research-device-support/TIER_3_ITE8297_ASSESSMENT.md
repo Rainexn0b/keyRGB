@@ -234,7 +234,7 @@ pip3 install --user liquidctl
 
 If ITE 8297 requires different udev rules:
 ```bash
-# Add to packaging/udev/99-ite8291-wootbook.rules
+# Add to udev/99-ite8291-wootbook.rules
 # For 0x8297:
 SUBSYSTEM=="usb", ATTR{idVendor}=="048d", ATTR{idProduct}=="8297", MODE="0666"
 ```
