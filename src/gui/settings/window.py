@@ -19,15 +19,15 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
-from .bottom_bar_panel import BottomBarPanel
-from .autostart_panel import AutostartPanel
-from .diagnostics_panel import DiagnosticsPanel
-from .dim_sync_panel import DimSyncPanel
+from .panels.bottom_bar_panel import BottomBarPanel
+from .panels.autostart_panel import AutostartPanel
+from .panels.diagnostics_panel import DiagnosticsPanel
+from .panels.dim_sync_panel import DimSyncPanel
 from .os_autostart import detect_os_autostart_enabled, set_os_autostart
-from .power_management_panel import PowerManagementPanel
-from .power_source_panel import PowerSourcePanel
+from .panels.power_management_panel import PowerManagementPanel
+from .panels.power_source_panel import PowerSourcePanel
 from .scrollable_area import ScrollableArea
-from .version_panel import VersionPanel
+from .panels.version_panel import VersionPanel
 from .window_geometry import compute_centered_window_geometry
 from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
 

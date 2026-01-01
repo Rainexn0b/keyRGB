@@ -8,7 +8,7 @@ import tkinter as tk
 from tkinter import scrolledtext
 from tkinter import ttk
 
-from .diagnostics_runner import collect_diagnostics_text
+from ..diagnostics_runner import collect_diagnostics_text
 
 
 class DiagnosticsPanel:
