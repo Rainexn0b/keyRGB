@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import tkinter as tk
 from PIL import Image, ImageTk
 from typing import TYPE_CHECKING, Optional
@@ -16,6 +15,13 @@ from src.gui.y15_pro_overlay_geometry import (
     inset_bbox,
     key_canvas_rect,
     transform_from_drawn_bbox,
+)
+
+from .canvas_hit_testing import (
+    cursor_for_edges,
+    point_in_bbox,
+    point_near_bbox,
+    resize_edges_for_point_in_bbox,
 )
 
 from .overlay import OverlayDragController
@@ -236,13 +242,11 @@ class KeyboardCanvas(tk.Canvas):
                 exc=exc,
             )
 
+    def _keydef_by_id(self, key_id: str) -> KeyDef | None:
+        return next((k for k in Y15_PRO_KEYS if k.key_id == key_id), None)
+
     def _resize_edges_for_point(self, key_id: str, cx: float, cy: float) -> str:
-        """Return which edges should resize based on pointer proximity.
-
-        Returns a string containing any of: l, r, t, b.
-        """
-
-        kd = next((k for k in Y15_PRO_KEYS if k.key_id == key_id), None)
+        kd = self._keydef_by_id(key_id)
         if kd is None:
             return ""
         bbox = self._key_bbox_canvas(kd)
@@ -250,57 +254,33 @@ class KeyboardCanvas(tk.Canvas):
             return ""
         x1, y1, x2, y2 = bbox
 
-        # Only treat it as a resize if we're near the border.
-        # Slightly generous threshold helps corner grabs.
-        thresh = 8.0
-        edges = ""
-        if (y1 - thresh) <= cy <= (y2 + thresh):
-            if abs(cx - x1) <= thresh:
-                edges += "l"
-            if abs(cx - x2) <= thresh:
-                edges += "r"
-        if (x1 - thresh) <= cx <= (x2 + thresh):
-            if abs(cy - y1) <= thresh:
-                edges += "t"
-            if abs(cy - y2) <= thresh:
-                edges += "b"
-        return edges
+        return resize_edges_for_point_in_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy)
 
     def _cursor_for_edges(self, edges: str) -> str:
-        # Tk cursor names vary by platform; these work well on Linux.
-        if ("l" in edges or "r" in edges) and ("t" in edges or "b" in edges):
-            # Diagonal resize
-            if ("l" in edges and "t" in edges) or ("r" in edges and "b" in edges):
-                return "top_left_corner"
-            return "top_right_corner"
-        if "l" in edges or "r" in edges:
-            return "sb_h_double_arrow"
-        if "t" in edges or "b" in edges:
-            return "sb_v_double_arrow"
-        return ""
+        return cursor_for_edges(edges)
 
     def _point_in_key_bbox(self, key_id: str, cx: float, cy: float) -> bool:
-        kd = next((k for k in Y15_PRO_KEYS if k.key_id == key_id), None)
+        kd = self._keydef_by_id(key_id)
         if kd is None:
             return False
         bbox = self._key_bbox_canvas(kd)
         if bbox is None:
             return False
         x1, y1, x2, y2 = bbox
-        return x1 <= cx <= x2 and y1 <= cy <= y2
+        return point_in_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy)
 
     def _point_near_key_bbox(self, key_id: str, cx: float, cy: float, *, pad: float) -> bool:
-        kd = next((k for k in Y15_PRO_KEYS if k.key_id == key_id), None)
+        kd = self._keydef_by_id(key_id)
         if kd is None:
             return False
         bbox = self._key_bbox_canvas(kd)
         if bbox is None:
             return False
         x1, y1, x2, y2 = bbox
-        return (x1 - pad) <= cx <= (x2 + pad) and (y1 - pad) <= cy <= (y2 + pad)
+        return point_near_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy, pad=pad)
 
     def _key_rect_base_after_global(self, key_id: str) -> tuple[float, float, float, float] | None:
-        kd = next((k for k in Y15_PRO_KEYS if k.key_id == key_id), None)
+        kd = self._keydef_by_id(key_id)
         if kd is None:
             return None
         x, y, w, h = (float(v) for v in kd.rect)
@@ -320,7 +300,7 @@ class KeyboardCanvas(tk.Canvas):
             if bbox is None:
                 return None
             x1, y1, x2, y2 = bbox
-            if x1 <= cx <= x2 and y1 <= cy <= y2:
+            if point_in_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy):
                 return kd.key_id
         return None
 
