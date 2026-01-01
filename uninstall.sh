@@ -19,13 +19,15 @@ fi
 
 YES=0
 PURGE_CONFIG=0
+REMOVE_APPIMAGE=0
 
 usage() {
   cat <<'EOF'
-Usage: ./uninstall.sh [--yes] [--purge-config]
+Usage: ./uninstall.sh [--yes] [--purge-config] [--remove-appimage]
 
 --yes          Do not prompt (best-effort).
 --purge-config Also remove ~/.config/keyrgb (profiles/settings).
+--remove-appimage Remove ~/.local/bin/keyrgb if it is an AppImage.
 EOF
 }
 
@@ -33,6 +35,7 @@ for arg in "$@"; do
   case "$arg" in
     -y|--yes) YES=1 ;;
     --purge-config) PURGE_CONFIG=1 ;;
+    --remove-appimage) REMOVE_APPIMAGE=1 ;;
     -h|--help) usage; exit 0 ;;
     *)
       echo "Unknown argument: $arg" >&2
@@ -54,6 +57,44 @@ confirm() {
 
 echo "=== KeyRGB Uninstall ==="
 echo
+
+looks_like_appimage() {
+  local path="$1"
+  if ! [ -f "$path" ]; then
+    return 1
+  fi
+
+  python3 - "$path" <<'PY'
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+p = Path(sys.argv[1])
+data = p.read_bytes()
+
+if not data.startswith(b"\x7fELF"):
+    raise SystemExit(1)
+
+# Heuristic: many AppImages embed the string "AppImage" somewhere in the file.
+if b"AppImage" in data[:2_000_000]:
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
+APPIMAGE_BIN="$HOME/.local/bin/keyrgb"
+if [ "$REMOVE_APPIMAGE" -eq 1 ] && looks_like_appimage "$APPIMAGE_BIN"; then
+  rm -f "$APPIMAGE_BIN" || true
+  echo "✓ Removed AppImage binary: $APPIMAGE_BIN"
+elif looks_like_appimage "$APPIMAGE_BIN"; then
+  if confirm "Remove AppImage binary $APPIMAGE_BIN ?"; then
+    rm -f "$APPIMAGE_BIN" || true
+    echo "✓ Removed AppImage binary"
+  else
+    echo "↷ Skipped removing AppImage binary"
+  fi
+fi
 
 APP_FILE="$HOME/.local/share/applications/keyrgb.desktop"
 AUTOSTART_FILE="$HOME/.config/autostart/keyrgb.desktop"

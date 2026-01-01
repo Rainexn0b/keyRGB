@@ -3,6 +3,58 @@
 
 set -e
 
+usage() {
+        cat <<'EOF'
+Usage:
+    ./install.sh [--appimage] [--pip] [--version <tag>] [--asset <name>]
+
+Modes:
+    --pip       Install from this repo via pip (-e). (default when run inside repo)
+    --appimage  Install by downloading the AppImage. (default when run outside repo)
+
+AppImage options:
+    --version <tag>  Git tag to download from (e.g. v0.6.0). If omitted, uses GitHub "latest".
+    --asset <name>   AppImage asset filename (default: keyrgb-x86_64.AppImage).
+
+Env vars:
+    KEYRGB_INSTALL_TUXEDO=y|n  Non-interactive default for optional TCC integration.
+EOF
+}
+
+MODE=""
+KEYRGB_VERSION="${KEYRGB_VERSION:-}"
+KEYRGB_APPIMAGE_ASSET="${KEYRGB_APPIMAGE_ASSET:-keyrgb-x86_64.AppImage}"
+
+while [ "$#" -gt 0 ]; do
+        case "$1" in
+                --pip|--repo)
+                        MODE="pip"
+                        shift
+                        ;;
+                --appimage)
+                        MODE="appimage"
+                        shift
+                        ;;
+                --version)
+                        KEYRGB_VERSION="${2:-}"
+                        shift 2
+                        ;;
+                --asset)
+                        KEYRGB_APPIMAGE_ASSET="${2:-}"
+                        shift 2
+                        ;;
+                -h|--help)
+                        usage
+                        exit 0
+                        ;;
+                *)
+                        echo "Unknown argument: $1" >&2
+                        usage
+                        exit 2
+                        ;;
+        esac
+done
+
 # Always run relative to the repo root (where this script lives), even if invoked
 # from another working directory.
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,6 +62,16 @@ cd "$REPO_DIR"
 
 echo "=== KeyRGB Installation ==="
 echo
+
+if [ -z "$MODE" ]; then
+    if [ -f "$REPO_DIR/pyproject.toml" ] && [ -d "$REPO_DIR/src" ]; then
+        MODE="pip"
+    else
+        MODE="appimage"
+    fi
+fi
+
+echo "Install mode: $MODE"
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
@@ -109,30 +171,47 @@ else
     echo "   You may need: python3, python3-pip, python3-tkinter, usbutils, dbus-tools, and tray deps for pystray."
 fi
 
-# Check for Python 3
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is required but not installed"
-    exit 1
+if [ "$MODE" = "pip" ]; then
+    # Repo/pip install requires Python.
+    if ! command -v python3 &> /dev/null; then
+        echo "❌ Python 3 is required but not installed"
+        exit 1
+    fi
+    echo "✓ Python 3 found: $(python3 --version)"
+else
+    # AppImage install can use curl/wget (preferred) or python3 as a fallback.
+    if command -v curl &> /dev/null; then
+        echo "✓ Downloader found: curl"
+    elif command -v wget &> /dev/null; then
+        echo "✓ Downloader found: wget"
+    elif command -v python3 &> /dev/null; then
+        echo "✓ Downloader found: python3 ($(python3 --version))"
+    else
+        echo "❌ Need one of: curl, wget, or python3 (to download the AppImage)" >&2
+        exit 1
+    fi
 fi
-
-echo "✓ Python 3 found: $(python3 --version)"
 
 # Check for git (needed to fetch upstream ite8291r3-ctl)
-if ! command -v git &> /dev/null; then
-    echo "❌ git is required but not installed"
-    exit 1
+if [ "$MODE" = "pip" ]; then
+    if ! command -v git &> /dev/null; then
+        echo "❌ git is required but not installed"
+        exit 1
+    fi
 fi
 
-# Ensure pip is usable
-if ! python3 -m pip --version &> /dev/null; then
-    echo "❌ python3-pip is required but pip is not available"
-    exit 1
-fi
+if [ "$MODE" = "pip" ]; then
+    # Ensure pip is usable
+    if ! python3 -m pip --version &> /dev/null; then
+        echo "❌ python3-pip is required but pip is not available"
+        exit 1
+    fi
 
-echo
-echo "📦 Updating Python packaging tools..."
-python3 -m pip install --user -U pip setuptools wheel
-echo "✓ pip/setuptools/wheel updated"
+    echo
+    echo "📦 Updating Python packaging tools..."
+    python3 -m pip install --user -U pip setuptools wheel
+    echo "✓ pip/setuptools/wheel updated"
+fi
 
 # Check for USB device (048d:600b)
 if command -v lsusb &> /dev/null; then
@@ -144,19 +223,204 @@ else
     echo "⚠️  lsusb not found; skipping USB device detection check."
 fi
 
-# Install ite8291r3-ctl library (upstream + tiny local patch for Wootbook 0x600B)
-echo
-echo "📦 Installing ite8291r3-ctl library (upstream)..."
+download_url() {
+    local url="$1"
+    local dst="$2"
 
-TMPDIR="$(mktemp -d)"
-cleanup() {
-    rm -rf "$TMPDIR"
+    mkdir -p "$(dirname "$dst")"
+
+    if command -v curl &> /dev/null; then
+        curl -L --fail --silent --show-error -o "$dst" "$url"
+        return 0
+    fi
+
+    if command -v wget &> /dev/null; then
+        wget -q -O "$dst" "$url"
+        return 0
+    fi
+
+    if command -v python3 &> /dev/null; then
+        python3 - "$url" "$dst" <<'PY'
+from __future__ import annotations
+
+import shutil
+import sys
+import urllib.request
+from pathlib import Path
+
+url = sys.argv[1]
+dst = Path(sys.argv[2])
+dst.parent.mkdir(parents=True, exist_ok=True)
+
+with urllib.request.urlopen(url) as resp, dst.open("wb") as f:
+    shutil.copyfileobj(resp, f)
+PY
+        return 0
+    fi
+
+    echo "❌ No downloader available (need curl, wget, or python3)" >&2
+    return 1
 }
-trap cleanup EXIT
 
-git clone --depth 1 https://github.com/pobrn/ite8291r3-ctl.git "$TMPDIR/ite8291r3-ctl"
+install_appimage() {
+    echo
+    echo "📦 Installing KeyRGB AppImage..."
 
-python3 - "$TMPDIR/ite8291r3-ctl/ite8291r3_ctl/ite8291r3.py" << 'PY'
+    local user_bin="$HOME/.local/bin"
+    local app_dst="$user_bin/keyrgb"
+
+    mkdir -p "$user_bin"
+
+    local base
+    if [ -n "$KEYRGB_VERSION" ]; then
+        base="https://github.com/Rainexn0b/keyRGB/releases/download/$KEYRGB_VERSION"
+        echo "✓ Using release tag: $KEYRGB_VERSION"
+    else
+        base="https://github.com/Rainexn0b/keyRGB/releases/latest/download"
+        echo "✓ Using GitHub latest release"
+    fi
+
+    local url="$base/$KEYRGB_APPIMAGE_ASSET"
+    echo "⬇️  Downloading: $url"
+    download_url "$url" "$app_dst"
+    chmod +x "$app_dst"
+    echo "✓ Installed AppImage: $app_dst"
+}
+
+install_icon_and_desktop_entries() {
+    local icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
+    local icon_file="$icon_dir/keyrgb.png"
+    local app_dir="$HOME/.local/share/applications"
+    local app_file="$app_dir/keyrgb.desktop"
+    local autostart_dir="$HOME/.config/autostart"
+    local autostart_file="$autostart_dir/keyrgb.desktop"
+    local icon_ref="keyrgb"
+
+    mkdir -p "$icon_dir" "$app_dir" "$autostart_dir"
+
+    if [ "$MODE" = "pip" ]; then
+        local icon_src="$REPO_DIR/assets/logo-keyrgb.png"
+        if ! [ -f "$icon_src" ]; then
+            echo "❌ Logo not found: $icon_src" >&2
+            exit 1
+        fi
+        install -m 0644 "$icon_src" "$icon_file"
+    else
+        local raw_ref="main"
+        if [ -n "$KEYRGB_VERSION" ]; then
+            raw_ref="$KEYRGB_VERSION"
+        fi
+        local icon_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/assets/logo-keyrgb.png"
+        echo "⬇️  Downloading icon: $icon_url"
+        download_url "$icon_url" "$icon_file"
+    fi
+
+    echo "✓ Installed icon: $icon_file"
+
+    cat > "$app_file" << EOF
+[Desktop Entry]
+Type=Application
+Name=KeyRGB
+Comment=RGB Keyboard Controller
+Exec=keyrgb
+Icon=$icon_ref
+Terminal=false
+Categories=Utility;System;
+StartupNotify=false
+EOF
+
+    echo "✓ App launcher installed (KeyRGB will appear in your app menu)"
+
+    local keyrgb_exec
+    keyrgb_exec="$(command -v keyrgb || true)"
+    if [ -z "$keyrgb_exec" ]; then
+        # Fallback: when PATH doesn't include ~/.local/bin yet.
+        keyrgb_exec="$HOME/.local/bin/keyrgb"
+    fi
+
+    cat > "$autostart_file" << EOF
+[Desktop Entry]
+Type=Application
+Name=KeyRGB
+Comment=RGB Keyboard Controller
+Exec=$keyrgb_exec
+Icon=$icon_ref
+Terminal=false
+Categories=Utility;System;
+X-KDE-autostart-after=plasma-workspace
+X-KDE-StartupNotify=false
+EOF
+
+    echo "✓ Autostart configured"
+}
+
+install_udev_rule() {
+    local src_rule
+    local dst_rule="/etc/udev/rules.d/99-ite8291-wootbook.rules"
+    local tmp_rule=""
+
+    if [ "$MODE" = "pip" ]; then
+        src_rule="$REPO_DIR/packaging/udev/99-ite8291-wootbook.rules"
+        if ! [ -f "$src_rule" ]; then
+            echo "⚠️  udev rule file not found: $src_rule"
+            return 0
+        fi
+    else
+        local raw_ref="main"
+        if [ -n "$KEYRGB_VERSION" ]; then
+            raw_ref="$KEYRGB_VERSION"
+        fi
+        local rule_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/packaging/udev/99-ite8291-wootbook.rules"
+        tmp_rule="$(mktemp)"
+        echo "⬇️  Downloading udev rule: $rule_url"
+        download_url "$rule_url" "$tmp_rule"
+        src_rule="$tmp_rule"
+    fi
+
+    if ! command -v udevadm &> /dev/null; then
+        echo "⚠️  udevadm not found; cannot install udev rule automatically."
+        echo "   To fix permissions manually, copy a 99-ite8291-wootbook.rules into: $dst_rule"
+        return 0
+    fi
+
+    echo
+    echo "🔐 Installing udev rule for non-root USB access..."
+    echo "   (This enables access to 048d:600b without running KeyRGB as root.)"
+    echo "   (This may prompt for your sudo password.)"
+
+    # Only overwrite if changed.
+    if [ -f "$dst_rule" ] && cmp -s "$src_rule" "$dst_rule"; then
+        echo "✓ udev rule already installed: $dst_rule"
+    else
+        sudo install -D -m 0644 "$src_rule" "$dst_rule"
+        echo "✓ Installed udev rule: $dst_rule"
+    fi
+
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
+    echo "✓ Reloaded udev rules"
+    echo "  If KeyRGB is already running, quit and re-open it."
+    echo "  If it still says permission denied, reboot once."
+
+    if [ -n "$tmp_rule" ]; then
+        rm -f "$tmp_rule" 2>/dev/null || true
+    fi
+}
+
+if [ "$MODE" = "pip" ]; then
+    # Install ite8291r3-ctl library (upstream + tiny local patch for Wootbook 0x600B)
+    echo
+    echo "📦 Installing ite8291r3-ctl library (upstream)..."
+
+    TMPDIR="$(mktemp -d)"
+    cleanup() {
+        rm -rf "$TMPDIR"
+    }
+    trap cleanup EXIT
+
+    git clone --depth 1 https://github.com/pobrn/ite8291r3-ctl.git "$TMPDIR/ite8291r3-ctl"
+
+    python3 - "$TMPDIR/ite8291r3-ctl/ite8291r3_ctl/ite8291r3.py" << 'PY'
 from __future__ import annotations
 
 import re
@@ -211,57 +475,24 @@ path.write_text(text2, encoding="utf-8")
 print("✓ Patched ite8291r3-ctl: added 0x600B to PRODUCT_IDS")
 PY
 
-python3 -m pip install --user "$TMPDIR/ite8291r3-ctl"
+    python3 -m pip install --user "$TMPDIR/ite8291r3-ctl"
 
-echo "✓ ite8291r3-ctl installed (upstream + local patch)"
+    echo "✓ ite8291r3-ctl installed (upstream + local patch)"
 
-# Install Python dependencies
-echo
-echo "📦 Installing Python dependencies..."
-python3 -m pip install --user -r "$REPO_DIR/requirements.txt"
-echo "✓ Dependencies installed"
-
-# Install KeyRGB itself (provides the `keyrgb` console script)
-echo
-echo "📦 Installing KeyRGB..."
-python3 -m pip install --user -e "$REPO_DIR"
-echo "✓ KeyRGB installed"
-
-install_udev_rule() {
-    local src_rule="$REPO_DIR/packaging/udev/99-ite8291-wootbook.rules"
-    local dst_rule="/etc/udev/rules.d/99-ite8291-wootbook.rules"
-
-    if ! [ -f "$src_rule" ]; then
-        echo "⚠️  udev rule file not found: $src_rule"
-        return 0
-    fi
-
-    if ! command -v udevadm &> /dev/null; then
-        echo "⚠️  udevadm not found; cannot install udev rule automatically."
-        echo "   To fix permissions manually, copy: $src_rule -> $dst_rule"
-        return 0
-    fi
-
+    # Install Python dependencies
     echo
-    echo "🔐 Installing udev rule for non-root USB access..."
-    echo "   (This enables access to 048d:600b without running KeyRGB as root.)"
-    echo "   (This may prompt for your sudo password.)"
+    echo "📦 Installing Python dependencies..."
+    python3 -m pip install --user -r "$REPO_DIR/requirements.txt"
+    echo "✓ Dependencies installed"
 
-    # Only overwrite if changed.
-    if [ -f "$dst_rule" ] && cmp -s "$src_rule" "$dst_rule"; then
-        echo "✓ udev rule already installed: $dst_rule"
-    else
-        sudo install -D -m 0644 "$src_rule" "$dst_rule"
-        echo "✓ Installed udev rule: $dst_rule"
-    fi
-
-    sudo udevadm control --reload-rules
-    sudo udevadm trigger
-    echo "✓ Reloaded udev rules"
-    echo "  If KeyRGB is already running, quit and re-open it."
-    echo "  If it still says permission denied, reboot once."
-}
-
+    # Install KeyRGB itself (provides the `keyrgb` console script)
+    echo
+    echo "📦 Installing KeyRGB..."
+    python3 -m pip install --user -e "$REPO_DIR"
+    echo "✓ KeyRGB installed"
+else
+    install_appimage
+fi
 install_udev_rule
 
 # Many distros don't include ~/.local/bin on PATH by default.
@@ -277,86 +508,25 @@ if ! echo ":$PATH:" | grep -q ":$USER_BIN:"; then
     echo "   Then restart your terminal (or log out/in)."
 fi
 
-# Make scripts executable
-echo
-echo "🔧 Making scripts executable..."
-chmod +x "$REPO_DIR/keyrgb"
+if [ "$MODE" = "pip" ]; then
+    # Make scripts executable
+    echo
+    echo "🔧 Making scripts executable..."
+    chmod +x "$REPO_DIR/keyrgb"
 
-# Optional / legacy scripts (don't fail if absent)
-for f in keyrgb-editor.py keyrgb-editor-qt.py effects.py; do
-    if [ -f "$f" ]; then
-        chmod +x "$f"
-    fi
-done
+    # Optional / legacy scripts (don't fail if absent)
+    for f in keyrgb-editor.py keyrgb-editor-qt.py effects.py; do
+        if [ -f "$f" ]; then
+            chmod +x "$f"
+        fi
+    done
 
-echo "✓ Scripts are executable"
+    echo "✓ Scripts are executable"
+fi
 
-# Create app launcher entry (so KeyRGB can be started again without a terminal)
 echo
 echo "🧷 Installing application launcher entry..."
-
-ICON_SRC="$REPO_DIR/assets/logo-keyrgb.png"
-ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
-ICON_FILE="$ICON_DIR/keyrgb.png"
-
-if ! [ -f "$ICON_SRC" ]; then
-    echo "❌ Logo not found: $ICON_SRC" >&2
-    exit 1
-fi
-
-mkdir -p "$ICON_DIR"
-install -m 0644 "$ICON_SRC" "$ICON_FILE"
-echo "✓ Installed icon: $ICON_FILE"
-
-ICON_REF="keyrgb"
-
-APP_DIR="$HOME/.local/share/applications"
-APP_FILE="$APP_DIR/keyrgb.desktop"
-
-mkdir -p "$APP_DIR"
-
-cat > "$APP_FILE" << EOF
-[Desktop Entry]
-Type=Application
-Name=KeyRGB
-Comment=RGB Keyboard Controller
-Exec=keyrgb
-Icon=$ICON_REF
-Terminal=false
-Categories=Utility;System;
-StartupNotify=false
-EOF
-
-echo "✓ App launcher installed (KeyRGB will appear in your app menu)"
-
-# Create autostart entry
-echo
-echo "🚀 Setting up autostart..."
-AUTOSTART_DIR="$HOME/.config/autostart"
-AUTOSTART_FILE="$AUTOSTART_DIR/keyrgb.desktop"
-
-KEYRGB_EXEC="$(command -v keyrgb || true)"
-if [ -z "$KEYRGB_EXEC" ]; then
-    # Fallback: run from repo location (works as long as the folder isn't moved)
-    KEYRGB_EXEC="$REPO_DIR/keyrgb"
-fi
-
-mkdir -p "$AUTOSTART_DIR"
-
-cat > "$AUTOSTART_FILE" << EOF
-[Desktop Entry]
-Type=Application
-Name=KeyRGB
-Comment=RGB Keyboard Controller
-Exec=$KEYRGB_EXEC
-Icon=$ICON_REF
-Terminal=false
-Categories=Utility;System;
-X-KDE-autostart-after=plasma-workspace
-X-KDE-StartupNotify=false
-EOF
-
-echo "✓ Autostart configured"
+install_icon_and_desktop_entries
 
 echo
 echo "=== Installation Complete ==="
