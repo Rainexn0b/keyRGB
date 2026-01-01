@@ -6,7 +6,7 @@ import sys
 
 from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
 
-from .integrations import runtime
+from ..integrations import runtime
 
 
 logger = logging.getLogger(__name__)
