@@ -15,7 +15,18 @@ def _leds_root() -> Path:
 
 def _is_candidate_led(name: str) -> bool:
     n = name.lower()
-    return ("kbd" in n) or ("keyboard" in n)
+    return (
+        "kbd" in n
+        or "keyboard" in n
+        or "rgb:kbd" in n  # Tuxedo/Clevo multicolor
+        or "tuxedo::kbd" in n  # Tuxedo WMI
+        or "ite_8291_lb" in n  # ITE lightbar
+        or "hp_omen::kbd" in n  # HP Omen
+        or "dell::kbd" in n  # Dell
+        or "tpacpi::kbd" in n  # ThinkPad
+        or "asus::kbd" in n  # ASUS WMI
+        or "system76::kbd" in n  # System76
+    )
 
 
 def _read_int(path: Path) -> int:
@@ -30,6 +41,7 @@ def _write_int(path: Path, value: int) -> None:
 class SysfsLedKeyboardDevice(KeyboardDevice):
     brightness_path: Path
     max_brightness_path: Path
+    led_dir: Path
 
     def _max(self) -> int:
         try:
@@ -63,8 +75,36 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         sysfs_value = int(round((b / 50) * max_value))
         _write_int(self.brightness_path, sysfs_value)
 
+    def _supports_multicolor(self) -> bool:
+        """Check if device supports multi_intensity (Tuxedo/Clevo RGB)"""
+        multi_intensity_path = self.led_dir / "multi_intensity"
+        return multi_intensity_path.exists()
+
+    def _supports_color_attr(self) -> bool:
+        """Check if device uses kernel driver with color attribute"""
+        color_path = self.led_dir / "color"
+        return color_path.exists()
+
     def set_color(self, color, *, brightness: int):
-        # Brightness-only backend: ignore color and apply brightness.
+        """Enhanced color setting with multi_intensity and color attribute support"""
+        # Try multi_intensity first (Tuxedo/Clevo)
+        if self._supports_multicolor():
+            r, g, b = color
+            multi_intensity_path = self.led_dir / "multi_intensity"
+            multi_intensity_path.write_text(f"{r} {g} {b}\n", encoding="utf-8")
+            self.set_brightness(brightness)
+            return
+
+        # Try color attribute (ITE kernel driver)
+        if self._supports_color_attr():
+            r, g, b = color
+            hex_color = f"{r:02x}{g:02x}{b:02x}"
+            color_path = self.led_dir / "color"
+            color_path.write_text(f"{hex_color}\n", encoding="utf-8")
+            self.set_brightness(brightness)
+            return
+
+        # Fallback: brightness-only
         self.set_brightness(brightness)
 
     def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
@@ -81,7 +121,7 @@ class SysfsLedsBackend(KeyboardBackend):
     name: str = "sysfs-leds"
     priority: int = 80
 
-    def _find_led(self) -> Optional[tuple[Path, Path]]:
+    def _find_led(self) -> Optional[tuple[Path, Path, Path]]:
         root = _leds_root()
         if not root.exists():
             return None
@@ -101,7 +141,7 @@ class SysfsLedsBackend(KeyboardBackend):
             b = led_dir / "brightness"
             m = led_dir / "max_brightness"
             if b.exists() and m.exists():
-                return b, m
+                return b, m, led_dir
 
         return None
 
@@ -110,7 +150,7 @@ class SysfsLedsBackend(KeyboardBackend):
         if found is None:
             return ProbeResult(available=False, reason="no matching sysfs LED", confidence=0)
 
-        brightness_path, max_brightness_path = found
+        brightness_path, max_brightness_path, _ = found
         if not os.access(brightness_path, os.R_OK):
             return ProbeResult(
                 available=False,
@@ -147,8 +187,12 @@ class SysfsLedsBackend(KeyboardBackend):
         found = self._find_led()
         if found is None:
             raise FileNotFoundError("No sysfs LED keyboard backlight found")
-        brightness_path, max_brightness_path = found
-        return SysfsLedKeyboardDevice(brightness_path=brightness_path, max_brightness_path=max_brightness_path)
+        brightness_path, max_brightness_path, led_dir = found
+        return SysfsLedKeyboardDevice(
+            brightness_path=brightness_path,
+            max_brightness_path=max_brightness_path,
+            led_dir=led_dir,
+        )
 
     def dimensions(self) -> tuple[int, int]:
         # Not per-key. Return a common matrix size for legacy callers that assume

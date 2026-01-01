@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any
 
-from src.core.imports import ensure_ite8291r3_ctl_importable
+from src.core.runtime.imports import ensure_ite8291r3_ctl_importable
 
 from .base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeResult
 
@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 
 _FALLBACK_USB_IDS: list[tuple[int, int]] = [
     # WootBook / common Tongfang rebrands
-    (0x048D, 0x600B),
+    (0x048D, 0x6008),  # Generic ITE 8291 RGB Controller
+    (0x048D, 0x600B),  # Newer ITE 8291 (2023+ Tongfang iterations)
 ]
 
 
