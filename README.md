@@ -48,7 +48,7 @@ Docs:
 
 - Fedora / step-by-step from a blank install: [docs/usage/usage.md](docs/usage/usage.md)
 - Fedora / RPM packaging: [packaging/rpm/README.md](packaging/rpm/README.md)
-- Development / Tongfang keyboard support roadmap: [docs/developement/tongfang/00-index.md](docs/developement/tongfang/00-index.md)
+- Tongfang keyboard support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
 
 On other distros, install the Python dependencies + ensure the udev rule is present (see the docs above).
 

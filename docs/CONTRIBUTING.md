@@ -80,8 +80,8 @@ When filing issues, include:
 
 ## Tech debt / maintainability
 
-We track maintainability hot spots and refactor ideas in `docs/tech-debt/`:
+We track maintainability hot spots and refactor ideas in `docs/genAI/tech-debt/`:
 
-- `docs/tech-debt/README.md`
-- `docs/tech-debt/hotspots.md`
-- `docs/tech-debt/tracking.md`
+- `docs/genAI/tech-debt/README.md`
+- `docs/genAI/tech-debt/hotspots.md`
+- `docs/genAI/tech-debt/tracking.md`
