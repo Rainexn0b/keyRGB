@@ -13,9 +13,6 @@ Settings are persisted in the shared `~/.config/keyrgb/config.json` via
 
 from __future__ import annotations
 
-import os
-import sys
-
 import tkinter as tk
 from tkinter import ttk
 
@@ -54,7 +51,11 @@ class PowerSettingsGUI:
         self.config = Config()
 
         values = load_settings_values(config=self.config, os_autostart_enabled=detect_os_autostart_enabled())
-
+        self._init_layout(bg_color=bg_color)
+        self._init_vars(values)
+        self._init_panels(bg_color=bg_color, fg_color=fg_color)
+        self._finalize_layout()
+    def _init_layout(self, *, bg_color: str) -> None:
         outer = ttk.Frame(self.root)
         outer.pack(fill="both", expand=True)
 
@@ -75,12 +76,13 @@ class PowerSettingsGUI:
         cols = ttk.Frame(main)
         cols.pack(fill="both", expand=True)
 
-        left = ttk.Frame(cols)
-        left.pack(side="left", fill="both", expand=True)
+        self._left = ttk.Frame(cols)
+        self._left.pack(side="left", fill="both", expand=True)
 
-        right = ttk.Frame(cols)
-        right.pack(side="left", fill="both", expand=True, padx=(18, 0))
+        self._right = ttk.Frame(cols)
+        self._right.pack(side="left", fill="both", expand=True, padx=(18, 0))
 
+    def _init_vars(self, values: SettingsValues) -> None:
         self.var_enabled = tk.BooleanVar(value=bool(values.power_management_enabled))
         self.var_off_suspend = tk.BooleanVar(value=bool(values.power_off_on_suspend))
         self.var_off_lid = tk.BooleanVar(value=bool(values.power_off_on_lid_close))
@@ -97,6 +99,10 @@ class PowerSettingsGUI:
         self.var_dim_sync_enabled = tk.BooleanVar(value=bool(values.screen_dim_sync_enabled))
         self.var_dim_sync_mode = tk.StringVar(value=str(values.screen_dim_sync_mode or "off"))
         self.var_dim_temp_brightness = tk.DoubleVar(value=float(values.screen_dim_temp_brightness))
+
+    def _init_panels(self, *, bg_color: str, fg_color: str) -> None:
+        left = self._left
+        right = self._right
 
         self.power_management_panel = PowerManagementPanel(
             left,
@@ -156,6 +162,7 @@ class PowerSettingsGUI:
             fg_color=fg_color,
         )
 
+    def _finalize_layout(self) -> None:
         self._apply_enabled_state()
         self.diagnostics_panel.apply_state()
 
