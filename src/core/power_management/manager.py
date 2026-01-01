@@ -238,91 +238,93 @@ class PowerManager:
             logger=logger,
         )
 
+    def _handle_power_event(
+        self,
+        *,
+        enabled: bool,
+        action_enabled: bool,
+        log_message: str,
+        delay_s: float = 0.0,
+        policy_method,
+        expected_action_type,
+        kb_method_name: str,
+    ) -> None:
+        if not enabled or not action_enabled:
+            return
+
+        logger.info(log_message)
+        if delay_s > 0:
+            time.sleep(float(delay_s))
+
+        try:
+            result = policy_method(
+                PowerEventInputs(
+                    enabled=bool(enabled),
+                    action_enabled=bool(action_enabled),
+                    is_off=bool(getattr(self.kb_controller, "is_off", False)),
+                )
+            )
+        except Exception:
+            return
+
+        for action in getattr(result, "actions", []) or []:
+            if isinstance(action, expected_action_type):
+                try:
+                    fn = getattr(self.kb_controller, kb_method_name, None)
+                    if callable(fn):
+                        fn()
+                except Exception:
+                    pass
+
     def _on_suspend(self):
         """Called when system is about to suspend."""
         enabled = self._is_enabled()
         allow = self._flag("power_off_on_suspend", True)
-        if not enabled or not allow:
-            return
-        logger.info("System suspending - turning off keyboard backlight")
-        result = self._event_policy.handle_power_off_event(
-            PowerEventInputs(
-                enabled=bool(enabled),
-                action_enabled=bool(allow),
-                is_off=bool(getattr(self.kb_controller, "is_off", False)),
-            )
+        self._handle_power_event(
+            enabled=bool(enabled),
+            action_enabled=bool(allow),
+            log_message="System suspending - turning off keyboard backlight",
+            policy_method=self._event_policy.handle_power_off_event,
+            expected_action_type=TurnOffFromEvent,
+            kb_method_name="turn_off",
         )
-        for action in result.actions:
-            if isinstance(action, TurnOffFromEvent):
-                try:
-                    if hasattr(self.kb_controller, "turn_off"):
-                        self.kb_controller.turn_off()
-                except Exception:
-                    pass
 
     def _on_resume(self):
         """Called when system resumes from suspend."""
         enabled = self._is_enabled()
         allow = self._flag("power_restore_on_resume", True)
-        if not enabled or not allow:
-            return
-        logger.info("System resumed - restoring keyboard backlight")
-        time.sleep(0.5)  # Give hardware time to wake up
-        result = self._event_policy.handle_power_restore_event(
-            PowerEventInputs(
-                enabled=bool(enabled),
-                action_enabled=bool(allow),
-                is_off=bool(getattr(self.kb_controller, "is_off", False)),
-            )
+        self._handle_power_event(
+            enabled=bool(enabled),
+            action_enabled=bool(allow),
+            log_message="System resumed - restoring keyboard backlight",
+            delay_s=0.5,  # Give hardware time to wake up
+            policy_method=self._event_policy.handle_power_restore_event,
+            expected_action_type=RestoreFromEvent,
+            kb_method_name="restore",
         )
-        for action in result.actions:
-            if isinstance(action, RestoreFromEvent):
-                try:
-                    if hasattr(self.kb_controller, "restore"):
-                        self.kb_controller.restore()
-                except Exception:
-                    pass
 
     def _on_lid_close(self):
         """Called when lid is closed."""
         enabled = self._is_enabled()
         allow = self._flag("power_off_on_lid_close", True)
-        if not enabled or not allow:
-            return
-        logger.info("Lid closed - turning off keyboard backlight")
-        result = self._event_policy.handle_power_off_event(
-            PowerEventInputs(
-                enabled=bool(enabled),
-                action_enabled=bool(allow),
-                is_off=bool(getattr(self.kb_controller, "is_off", False)),
-            )
+        self._handle_power_event(
+            enabled=bool(enabled),
+            action_enabled=bool(allow),
+            log_message="Lid closed - turning off keyboard backlight",
+            policy_method=self._event_policy.handle_power_off_event,
+            expected_action_type=TurnOffFromEvent,
+            kb_method_name="turn_off",
         )
-        for action in result.actions:
-            if isinstance(action, TurnOffFromEvent):
-                try:
-                    if hasattr(self.kb_controller, "turn_off"):
-                        self.kb_controller.turn_off()
-                except Exception:
-                    pass
 
     def _on_lid_open(self):
         """Called when lid is opened."""
         enabled = self._is_enabled()
         allow = self._flag("power_restore_on_lid_open", True)
-        if not enabled or not allow:
-            return
-        logger.info("Lid opened - restoring keyboard backlight")
-        result = self._event_policy.handle_power_restore_event(
-            PowerEventInputs(
-                enabled=bool(enabled),
-                action_enabled=bool(allow),
-                is_off=bool(getattr(self.kb_controller, "is_off", False)),
-            )
+        self._handle_power_event(
+            enabled=bool(enabled),
+            action_enabled=bool(allow),
+            log_message="Lid opened - restoring keyboard backlight",
+            policy_method=self._event_policy.handle_power_restore_event,
+            expected_action_type=RestoreFromEvent,
+            kb_method_name="restore",
         )
-        for action in result.actions:
-            if isinstance(action, RestoreFromEvent):
-                try:
-                    if hasattr(self.kb_controller, "restore"):
-                        self.kb_controller.restore()
-                except Exception:
-                    pass
