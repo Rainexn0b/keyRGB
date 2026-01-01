@@ -13,7 +13,7 @@ def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, i
     """Best-effort load of per-key colors from the legacy config."""
 
     try:
-        from src.legacy.config import Config
+        from src.core.config import Config
 
         cfg = Config()
         return dict(getattr(cfg, "per_key_colors", {}) or {})

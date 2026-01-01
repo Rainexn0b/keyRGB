@@ -13,8 +13,8 @@ import time
 from threading import Event, RLock, Thread
 from typing import Dict, Optional, Tuple
 
-from src.legacy.ite_backend import NUM_COLS, NUM_ROWS, get, hw_colors, hw_effects
-from src.legacy.perkey_animation import (
+from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS, get, hw_colors, hw_effects
+from src.core.effects.perkey_animation import (
     build_full_color_grid,
     enable_user_mode_once,
     load_per_key_colors_from_config,

@@ -81,10 +81,10 @@ Note: `src/core/power.py` remains as a thin compatibility wrapper exporting `Pow
 
 **Problem**
 
-- Legacy modules (`src/legacy/*`) still contain large logic that can confuse contributors.
+- Legacy modules were removed; remaining logic was moved under `src/core/`.
 
 **Pragmatic approach**
 
 - Add documentation about what is legacy vs current.
-- Over time, move active code paths behind `src/core/*` and keep legacy modules stable.
+- Keep active code paths behind `src/core/*` and avoid reintroducing a legacy package.
 

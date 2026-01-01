@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.legacy.effects import EffectsEngine, _NullKeyboard
+from src.core.effects.engine import EffectsEngine, _NullKeyboard
 
 
 def test_perkey_fade_passes_brightness_kwarg() -> None:

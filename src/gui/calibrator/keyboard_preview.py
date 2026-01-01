@@ -7,7 +7,7 @@ import logging
 
 from src.core.logging_utils import log_throttled
 
-from src.legacy.config import Config
+from src.core.config import Config
 
 
 logger = logging.getLogger(__name__)

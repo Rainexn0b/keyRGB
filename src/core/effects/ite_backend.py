@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-"""Legacy compatibility wrapper for the ITE backend.
+"""ITE backend wrapper used by the effects engine.
 
-This module exists to preserve the historical import surface used by
-`src/legacy/effects.py` while the codebase migrates to the new backend
-registry/selection architecture.
+This module preserves the historical import surface used by the effects engine
+while the codebase migrates to the new backend registry/selection architecture.
 
 Exports kept stable:
 - `get()`

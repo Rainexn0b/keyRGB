@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from src.gui.widgets.color_wheel import ColorWheel
-from src.legacy.config import Config
+from src.core.config import Config
 from src.core.resources.layout import Y15_PRO_KEYS
 from src.core import profiles
 from src.gui.window_icon import apply_keyrgb_window_icon

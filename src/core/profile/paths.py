@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.core.logging_utils import log_throttled
-from src.legacy.config import Config
+from src.core.config import Config
 
 
 DEFAULT_PROFILE_NAME = "default"

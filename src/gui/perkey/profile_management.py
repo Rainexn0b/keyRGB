@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 from src.core import profiles
-from src.legacy.config import Config
+from src.core.config import Config
 
 
 PerKeyColors = Dict[Tuple[int, int], Tuple[int, int, int]]

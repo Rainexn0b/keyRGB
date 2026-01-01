@@ -15,8 +15,8 @@ def load_tray_dependencies():
     """
 
     try:
-        from src.legacy.effects import EffectsEngine
-        from src.legacy.config import Config
+        from src.core.effects.engine import EffectsEngine
+        from src.core.config import Config
         from src.core.power import PowerManager
 
         return EffectsEngine, Config, PowerManager
@@ -25,8 +25,8 @@ def load_tray_dependencies():
         with suppress(Exception):
             ensure_repo_root_on_sys_path(Path(__file__))
 
-        from src.legacy.effects import EffectsEngine
-        from src.legacy.config import Config
+        from src.core.effects.engine import EffectsEngine
+        from src.core.config import Config
         from src.core.power import PowerManager
 
         return EffectsEngine, Config, PowerManager

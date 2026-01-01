@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from src.legacy.effects import EffectsEngine, _NullKeyboard
+from src.core.effects.engine import EffectsEngine, _NullKeyboard
 
 
 def test_start_effect_stops_previous_software_thread() -> None:
@@ -56,30 +56,31 @@ def test_static_effect_fades_between_colors() -> None:
     assert len(spy.calls) >= 2
     assert spy.calls[-1][0] == (0, 0, 255)
 
-    def test_fade_to_non_black_never_writes_full_black() -> None:
-        class SpyKeyboard(_NullKeyboard):
-            def __init__(self):
-                self.calls: list[tuple[tuple[int, int, int], int]] = []
 
-            def set_color(self, color, *, brightness: int):
-                r, g, b = color
-                self.calls.append(((int(r), int(g), int(b)), int(brightness)))
+def test_fade_to_non_black_never_writes_full_black() -> None:
+    class SpyKeyboard(_NullKeyboard):
+        def __init__(self):
+            self.calls: list[tuple[tuple[int, int, int], int]] = []
 
-        engine = EffectsEngine()
+        def set_color(self, color, *, brightness: int):
+            r, g, b = color
+            self.calls.append(((int(r), int(g), int(b)), int(brightness)))
 
-        spy = SpyKeyboard()
-        engine.kb = spy
-        engine.device_available = True
-        engine.brightness = 25
+    engine = EffectsEngine()
 
-        engine._fade_uniform_color(
-            from_color=(0, 0, 0),
-            to_color=(255, 0, 0),
-            brightness=25,
-            duration_s=0.02,
-            steps=8,
-        )
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine.brightness = 25
 
-        assert spy.calls
-        for (rgb, _brightness) in spy.calls:
-            assert rgb != (0, 0, 0)
+    engine._fade_uniform_color(
+        from_color=(0, 0, 0),
+        to_color=(255, 0, 0),
+        brightness=25,
+        duration_s=0.02,
+        steps=8,
+    )
+
+    assert spy.calls
+    for (rgb, _brightness) in spy.calls:
+        assert rgb != (0, 0, 0)

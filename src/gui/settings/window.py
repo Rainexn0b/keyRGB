@@ -8,7 +8,7 @@ This is a small Tkinter window that controls how KeyRGB reacts to:
 And a basic autostart flag used by the tray runtime.
 
 Settings are persisted in the shared `~/.config/keyrgb/config.json` via
-`src.legacy.config.Config`.
+`src.core.config.Config`.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from .panels.version_panel import VersionPanel
 from .window_geometry import compute_centered_window_geometry
 from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
 
-from src.legacy.config import Config
+from src.core.config import Config
 
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme

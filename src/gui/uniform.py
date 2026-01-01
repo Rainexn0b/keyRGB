@@ -25,12 +25,12 @@ logger = logging.getLogger(__name__)
 
 try:
     from .widgets.color_wheel import ColorWheel
-    from src.legacy.config import Config
+    from src.core.config import Config
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/uniform.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
     from src.gui.widgets.color_wheel import ColorWheel
-    from src.legacy.config import Config
+    from src.core.config import Config
 
 class UniformColorGUI:
     """Simple GUI for selecting a uniform keyboard color."""

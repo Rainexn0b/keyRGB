@@ -26,7 +26,7 @@ from ..power_policies.power_source_loop_policy import (
     RestoreKeyboard,
     TurnOffKeyboard,
 )
-from src.legacy.config import Config
+from src.core.config import Config
 
 logger = logging.getLogger(__name__)
 
