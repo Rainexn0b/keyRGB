@@ -8,7 +8,7 @@ from tkinter import ttk
 
 from src.gui.widgets.color_wheel import ColorWheel
 from src.legacy.config import Config
-from src.core.layout import Y15_PRO_KEYS
+from src.core.resources.layout import Y15_PRO_KEYS
 from src.core import profiles
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme

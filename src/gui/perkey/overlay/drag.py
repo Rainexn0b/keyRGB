@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.core.layout import BASE_IMAGE_SIZE
+from src.core.resources.layout import BASE_IMAGE_SIZE
 
 
 @dataclass

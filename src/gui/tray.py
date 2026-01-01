@@ -12,7 +12,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from src.core.imports import ensure_repo_root_on_sys_path
+from src.core.runtime.imports import ensure_repo_root_on_sys_path
 
 
 def _ensure_repo_root_on_syspath() -> None:

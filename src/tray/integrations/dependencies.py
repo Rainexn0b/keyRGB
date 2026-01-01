@@ -4,7 +4,7 @@ import sys
 from contextlib import suppress
 from pathlib import Path
 
-from src.core.imports import ensure_repo_root_on_sys_path
+from src.core.runtime.imports import ensure_repo_root_on_sys_path
 
 
 def load_tray_dependencies():

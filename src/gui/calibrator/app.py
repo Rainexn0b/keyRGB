@@ -10,7 +10,7 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 
 from src.legacy.config import Config
-from src.core.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
+from src.core.resources.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
 from .geometry import calc_transform, hit_test, key_canvas_bbox
 from .probe import CalibrationProbeState
 from .backdrop import load_backdrop_image, reset_backdrop_image, save_backdrop_image

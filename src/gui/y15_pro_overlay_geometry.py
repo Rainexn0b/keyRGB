@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional, Tuple
 
-from src.core.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
+from src.core.resources.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
 
 
 @dataclass(frozen=True)

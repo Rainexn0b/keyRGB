@@ -5,7 +5,7 @@ from typing import Optional
 
 from PIL import Image
 
-from src.core.layout import BASE_IMAGE_SIZE
+from src.core.resources.layout import BASE_IMAGE_SIZE
 from src.core import profiles
 
 

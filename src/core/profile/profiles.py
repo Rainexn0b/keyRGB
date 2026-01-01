@@ -26,7 +26,7 @@ from .paths import (
     paths_for,
     set_active_profile,
 )
-from src.core.defaults import (
+from src.core.resources.defaults import (
     DEFAULT_COLORS,
     DEFAULT_KEYMAP,
     DEFAULT_LAYOUT_TWEAKS,

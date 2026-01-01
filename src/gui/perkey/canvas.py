@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Optional
 
 from src.core.logging_utils import log_throttled
 
-from src.core.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
+from src.core.resources.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
 from src.gui.y15_pro_deck_image import load_y15_pro_deck_image
 from src.gui.y15_pro_overlay_geometry import (
     apply_global_tweak,

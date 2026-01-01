@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, Optional, Tuple
 
-from src.core.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
+from src.core.resources.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
 from src.gui.y15_pro_overlay_geometry import CanvasTransform, calc_centered_transform, key_canvas_bbox_inset
 from src.gui import y15_pro_overlay_geometry
 
