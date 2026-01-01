@@ -8,18 +8,13 @@ from __future__ import annotations
 
 import logging
 import colorsys
-import time
 from threading import Event, RLock, Thread
 from typing import Dict, Optional, Tuple
 
 from src.core.effects.device import NullKeyboard, acquire_keyboard
 from src.core.effects.fades import fade_in_per_key, fade_uniform_color
 from src.core.effects.hw_payloads import build_hw_effect_payload
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS, hw_colors, hw_effects
-from src.core.effects.perkey_animation import (
-    build_full_color_grid,
-    enable_user_mode_once,
-)
+from src.core.effects.ite_backend import hw_colors, hw_effects
 from src.core.effects.software_loops import (
     run_fire,
     run_perkey_breathing,
@@ -29,7 +24,6 @@ from src.core.effects.software_loops import (
     run_strobe,
 )
 from src.core.effects.timing import brightness_factor, clamped_interval, get_interval
-from src.core.effects.transitions import choose_steps
 
 logger = logging.getLogger(__name__)
 
@@ -318,28 +312,6 @@ class EffectsEngine:
 
 
 if __name__ == '__main__':
-    # Test mode
-    print("KeyRGB Effects Test Mode")
-    print("Press Ctrl+C to exit")
-    
-    engine = EffectsEngine()
-    
-    try:
-        print("\nTesting hardware effects...")
-        for effect in ['rainbow', 'breathing', 'wave']:
-            print(f"  {effect}")
-            engine.start_effect(effect, speed=5, brightness=25)
-            time.sleep(4)
-        
-        print("\nTesting software effects...")
-        for effect in ['static', 'pulse', 'fire']:
-            print(f"  {effect}")
-            engine.start_effect(effect, speed=5, brightness=25, color=(255, 0, 0))
-            time.sleep(4)
-        
-    except KeyboardInterrupt:
-        print("\nStopping...")
-    finally:
-        engine.stop()
-        engine.turn_off()
-        print("Done!")
+    from src.core.effects.demo import run_demo
+
+    run_demo(EffectsEngine)
