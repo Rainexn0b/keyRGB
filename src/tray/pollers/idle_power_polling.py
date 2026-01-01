@@ -5,10 +5,9 @@ import subprocess
 import threading
 import time
 from pathlib import Path
-from typing import Any, Literal, Optional
+from typing import Any, Optional
 
-
-IdleAction = Optional[Literal["turn_off", "restore", "dim_to_temp", "restore_brightness"]]
+from .idle_power_policy import IdleAction, compute_idle_action
 
 
 def _compute_idle_action(
@@ -27,64 +26,22 @@ def _compute_idle_action(
     user_forced_off: bool,
     power_forced_off: bool,
 ) -> IdleAction:
-    if not power_management_enabled:
-        return None
-
-    if not screen_dim_sync_enabled:
-        # If the feature is disabled, do not force off on dim events.
-        # Still allow restoring lighting if it is unexpectedly off.
-        if dimmed is None:
-            if is_off and (not idle_forced_off):
-                return "restore"
-        return None
-
-    if user_forced_off or power_forced_off:
-        return None
-
-    if int(brightness) <= 0:
-        return None
-
-    # Some desktops turn the display off via DPMS without changing backlight
-    # brightness. Treat "screen off" as an effective dimmed signal.
-    dimmed_effective: Optional[bool] = True if bool(screen_off) else dimmed
-
-    # When we can't determine dim state, be conservative: don't force off and
-    # don't restore temp brightness, but still allow restoring lighting if it is
-    # unexpectedly off.
-    if dimmed_effective is None:
-        if dim_temp_active:
-            return None
-        if is_off and (not idle_forced_off):
-            return "restore"
-        return None
-
-    if dimmed_effective is True:
-        mode = str(screen_dim_sync_mode or "off").strip().lower()
-        if mode == "temp":
-            if not is_off:
-                # In temp mode, dimming normally reduces to a temporary brightness.
-                # But if the display is actually off (backlight at 0), match it by
-                # turning the keyboard off.
-                if bool(screen_off):
-                    return "turn_off"
-                return "dim_to_temp"
-            return None
-
-        if not is_off:
-            return "turn_off"
-        return None
-
-    if dimmed_effective is False:
-        if dim_temp_active:
-            return "restore_brightness"
-
-        # Not dimmed: restore if lighting is off (either we forced it off due to
-        # dimming, or firmware/EC did something odd).
-        if is_off:
-            return "restore"
-        return None
-
-    return None
+    # Compatibility wrapper: keep the long-standing internal import path stable.
+    return compute_idle_action(
+        dimmed=dimmed,
+        screen_off=screen_off,
+        is_off=is_off,
+        idle_forced_off=idle_forced_off,
+        dim_temp_active=dim_temp_active,
+        idle_timeout_s=idle_timeout_s,
+        power_management_enabled=power_management_enabled,
+        screen_dim_sync_enabled=screen_dim_sync_enabled,
+        screen_dim_sync_mode=screen_dim_sync_mode,
+        screen_dim_temp_brightness=screen_dim_temp_brightness,
+        brightness=brightness,
+        user_forced_off=user_forced_off,
+        power_forced_off=power_forced_off,
+    )
 
 
 def _ensure_idle_state(tray: Any) -> None:
