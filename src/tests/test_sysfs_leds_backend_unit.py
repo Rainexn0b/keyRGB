@@ -10,7 +10,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from src.core.backends.sysfs_leds import SysfsLedsBackend
+from src.core.backends.sysfs import SysfsLedsBackend
 
 
 def _make_led(tmp_path: Path, name: str, *, brightness: int, max_brightness: int) -> Path:

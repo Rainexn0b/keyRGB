@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-from src.core.backends.ite8291r3 import Ite8291r3Backend
+from src.core.backends.ite import Ite8291r3Backend
 
 
 def test_ite_probe_uses_declared_product_ids(monkeypatch: pytest.MonkeyPatch) -> None:

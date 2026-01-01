@@ -19,8 +19,8 @@ class BackendSpec:
 
 def _default_specs() -> list[BackendSpec]:
     # Keep this list small and lazy-importing.
-    from .ite8291r3 import Ite8291r3Backend
-    from .sysfs_leds import SysfsLedsBackend
+    from .ite import Ite8291r3Backend
+    from .sysfs import SysfsLedsBackend
 
     return [
         BackendSpec(name=Ite8291r3Backend().name, priority=Ite8291r3Backend().priority, factory=Ite8291r3Backend),
