@@ -2,13 +2,17 @@
 
 ## 0.6.0 (2026-01-01)
 
-- Internal: reorganizes tray modules by purpose (controllers, pollers, startup, UI, integrations) while keeping import compatibility.
-- Internal: reorganizes core helpers by purpose (monitoring, profile, power policies, resources/runtime helpers) while keeping import compatibility.
-- Devices: improves sysfs LED backend detection and adds best-effort support for multi-color sysfs drivers (`multi_intensity`/`color`).
-- Devices: expands ITE USB probing fallbacks (additional 0x048d product IDs).
+- Per-key editor: adds a sample tool (pick a key color, then paint other keys).
+- Per-key editor: status/messages are clearer and wrap better in the UI.
+- Color wheel: adds manual RGB input (precise values) and optional compact label mode.
+- Tray: adds clearer status UI (device header + “Active:” mode indicator).
+- Theme: optional Tk scaling override via `KEYRGB_TK_SCALING` (useful for DPI/layout quirks).
 
-Notes:
-- This release is primarily a maintenance/refactor + device-coverage step; user-facing UI changes are mostly captured in 0.5.1.
+- Devices: improves sysfs LED backend detection and adds best-effort multi-color support via `multi_intensity` / `color`.
+- Devices: expands ITE USB probing fallbacks (additional `0x048d:*` product IDs).
+
+- Maintainability: reorganizes tray modules by purpose (controllers, pollers, startup, UI, integrations) while keeping import compatibility.
+- Maintainability: reorganizes core helpers by purpose (monitoring, profile, power policies, resources/runtime helpers) while keeping import compatibility.
 
 ## 0.5.1 (2026-01-01)
 
