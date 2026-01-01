@@ -23,7 +23,7 @@ from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
 from src.gui.window_centering import center_window_on_screen
 from src.gui.tcc_profile_editor import open_profile_json_editor
-from src.core import tcc_power_profiles
+import src.core.tcc_power_profiles as tcc_power_profiles
 
 
 logger = logging.getLogger(__name__)

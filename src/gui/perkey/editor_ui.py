@@ -3,7 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from src.core import profiles
+from src.core.profile import profiles
 from src.gui.widgets.color_wheel import ColorWheel
 
 from .canvas import KeyboardCanvas

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.power import PowerManager
+from src.core.power_management import PowerManager
 
 
 def test_power_manager_has_expected_methods() -> None:

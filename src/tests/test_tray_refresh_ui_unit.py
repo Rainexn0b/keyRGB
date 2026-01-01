@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.tray.app import KeyRGBTray
+from src.tray.application import KeyRGBTray
 
 
 def test_tray_refresh_ui_calls_icon_and_menu() -> None:

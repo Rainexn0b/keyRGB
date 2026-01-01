@@ -6,7 +6,7 @@ from typing import Optional
 from PIL import Image
 
 from src.core.resources.layout import BASE_IMAGE_SIZE
-from src.core import profiles
+from src.core.profile import profiles
 
 
 def _default_backdrop_candidates(profile_name: str) -> list[Path]:

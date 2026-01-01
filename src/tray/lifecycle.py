@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from .pollers import polling
+from .pollers.config_polling import start_config_polling
+from .pollers.hardware_polling import start_hardware_polling
+from .pollers.icon_color_polling import start_icon_color_polling
+from .pollers.idle_power_polling import start_idle_power_polling
 
 
 def start_power_monitoring(tray: Any, *, power_manager_cls: type[Any], config: Any) -> Any:
@@ -26,7 +29,10 @@ def start_power_monitoring(tray: Any, *, power_manager_cls: type[Any], config: A
 def start_all_polling(tray: Any, *, ite_num_rows: int, ite_num_cols: int) -> None:
     """Start all pollers used by the tray UI."""
 
-    polling.start_all_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols)
+    start_hardware_polling(tray)
+    start_config_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols)
+    start_icon_color_polling(tray)
+    start_idle_power_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols)
 
 
 def maybe_autostart_effect(tray: Any) -> None:

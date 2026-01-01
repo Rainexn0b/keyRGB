@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.power_source_policy import compute_power_source_policy
+from src.core.power_policies.power_source_policy import compute_power_source_policy
 
 
 def test_policy_selects_enabled_flag_by_power_source() -> None:

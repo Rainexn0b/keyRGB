@@ -10,7 +10,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from src.tray import menu as tray_menu
+from src.tray.ui import menu as tray_menu
 
 
 class FakeMenu:
@@ -174,7 +174,7 @@ def test_tray_active_indicator_shows_perkey_profile(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
 
-    from src.core import profiles as core_profiles
+    from src.core.profile import profiles as core_profiles
 
     monkeypatch.setattr(core_profiles, "get_active_profile", lambda: "default")
 

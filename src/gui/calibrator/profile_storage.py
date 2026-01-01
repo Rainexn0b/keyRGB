@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Tuple
 
-from src.core import profiles
+from src.core.profile import profiles
 
 
 def get_active_profile_name() -> str:

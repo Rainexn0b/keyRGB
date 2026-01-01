@@ -29,7 +29,6 @@ def _compute_idle_action(
     user_forced_off: bool,
     power_forced_off: bool,
 ) -> IdleAction:
-    # Compatibility wrapper: keep the long-standing internal import path stable.
     return compute_idle_action(
         dimmed=dimmed,
         screen_off=screen_off,

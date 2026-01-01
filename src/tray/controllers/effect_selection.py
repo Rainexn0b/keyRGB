@@ -2,7 +2,7 @@ from __future__ import annotations
 
 try:
     # Module-level import so tests (and callers) can monkeypatch `profiles`.
-    from src.core import profiles
+    from src.core.profile import profiles
 except Exception:  # pragma: no cover
     profiles = None
 
@@ -24,7 +24,7 @@ def _ensure_config_per_key_colors_loaded(config) -> None:
     try:
         prof = profiles
         if prof is None:
-            from src.core import profiles as prof  # type: ignore[no-redef]
+            from src.core.profile import profiles as prof  # type: ignore[no-redef]
 
         active = prof.get_active_profile()
         colors = prof.load_per_key_colors(active)

@@ -110,7 +110,7 @@ def tray_lighting_mode_text(tray: Any) -> str:
     # Per-key mode is a first-class state.
     if effect in {"perkey", "perkey_breathing", "perkey_pulse"}:
         try:
-            from src.core import profiles
+            from src.core.profile import profiles
 
             active_profile = str(profiles.get_active_profile())
         except Exception:
@@ -188,7 +188,7 @@ def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_su
     def _make_perkey_profile_callback(profile_name: str):
         def _cb(_icon, _item):
             try:
-                from src.core import profiles as core_profiles
+                from src.core.profile import profiles as core_profiles
 
                 name = core_profiles.set_active_profile(profile_name)
                 colors = core_profiles.load_per_key_colors(name)
@@ -213,7 +213,7 @@ def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_su
         return _cb
 
     try:
-        from src.core import profiles as core_profiles
+        from src.core.profile import profiles as core_profiles
 
         perkey_profiles = core_profiles.list_profiles()
         active_profile = core_profiles.get_active_profile()

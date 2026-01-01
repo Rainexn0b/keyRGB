@@ -7,7 +7,7 @@ from typing import Optional
 
 from PIL import Image
 
-from src.core import profiles
+from src.core.profile import profiles
 from src.core.logging_utils import log_throttled
 
 

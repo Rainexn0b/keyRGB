@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from src.core.battery_saver_policy import BatterySaverPolicy
+from src.core.power_policies.battery_saver_policy import BatterySaverPolicy
 
 
 def test_battery_saver_dims_on_unplug_and_restores_on_ac() -> None:

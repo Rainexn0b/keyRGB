@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.login1_monitoring import iter_prepare_for_sleep_events
+from src.core.monitoring.login1_monitoring import iter_prepare_for_sleep_events
 
 
 def test_iter_prepare_for_sleep_events_emits_suspend_and_resume() -> None:

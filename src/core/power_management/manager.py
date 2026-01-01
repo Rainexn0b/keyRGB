@@ -1,7 +1,4 @@
-"""Power management.
-
-This package holds the implementation behind the legacy `src.core.power` entrypoint.
-"""
+"""Power management implementation."""
 
 from __future__ import annotations
 

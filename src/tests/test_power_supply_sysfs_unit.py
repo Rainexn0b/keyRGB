@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.core.power_supply_sysfs import iter_ac_online_files, read_on_ac_power
+from src.core.monitoring.power_supply_sysfs import iter_ac_online_files, read_on_ac_power
 
 
 def _write(path: Path, content: str) -> None:

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from src.core import tcc_power_profiles
+import src.core.tcc_power_profiles as tcc_power_profiles
 
 from .controllers.effect_selection import apply_effect_selection
 from .controllers.lighting_controller import on_brightness_clicked, on_speed_clicked, turn_off, turn_on

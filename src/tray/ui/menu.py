@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.core import tcc_power_profiles
+import src.core.tcc_power_profiles as tcc_power_profiles
 
 from .menu_sections import (
     build_perkey_profiles_menu,

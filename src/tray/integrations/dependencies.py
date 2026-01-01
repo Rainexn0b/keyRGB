@@ -17,7 +17,7 @@ def load_tray_dependencies():
     try:
         from src.core.effects.engine import EffectsEngine
         from src.core.config import Config
-        from src.core.power import PowerManager
+        from src.core.power_management import PowerManager
 
         return EffectsEngine, Config, PowerManager
     except ImportError:
@@ -27,6 +27,6 @@ def load_tray_dependencies():
 
         from src.core.effects.engine import EffectsEngine
         from src.core.config import Config
-        from src.core.power import PowerManager
+        from src.core.power_management import PowerManager
 
         return EffectsEngine, Config, PowerManager

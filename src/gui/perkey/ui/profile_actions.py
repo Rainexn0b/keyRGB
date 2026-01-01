@@ -8,7 +8,7 @@ profile-related behaviors.
 
 from typing import Any
 
-from src.core import profiles
+from src.core.profile import profiles
 
 from .full_map import ensure_full_map_ui
 from ..hardware import NUM_COLS, NUM_ROWS
