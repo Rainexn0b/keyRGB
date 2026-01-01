@@ -6,13 +6,11 @@ Persists settings to JSON file
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-import time
 from pathlib import Path
 
 from .config_file_storage import load_config_settings, save_config_settings_atomic
+from .config_perkey_colors import deserialize_per_key_colors, serialize_per_key_colors
 
 
 logger = logging.getLogger(__name__)
@@ -68,31 +66,12 @@ class Config:
     @staticmethod
     def _serialize_per_key_colors(color_map: dict) -> dict:
         """Convert {(row,col): (r,g,b)} -> {"row,col": [r,g,b]} for JSON."""
-        out = {}
-        for (row, col), color in color_map.items():
-            try:
-                r, g, b = color
-                out[f"{int(row)},{int(col)}"] = [int(r), int(g), int(b)]
-            except Exception:
-                continue
-        return out
+        return serialize_per_key_colors(color_map)
 
     @staticmethod
     def _deserialize_per_key_colors(data: dict) -> dict:
         """Convert {"row,col": [r,g,b]} -> {(row,col): (r,g,b)}."""
-        out = {}
-        if not isinstance(data, dict):
-            return out
-        for k, v in data.items():
-            try:
-                row_s, col_s = str(k).split(',', 1)
-                row = int(row_s.strip())
-                col = int(col_s.strip())
-                r, g, b = v
-                out[(row, col)] = (int(r), int(g), int(b))
-            except Exception:
-                continue
-        return out
+        return deserialize_per_key_colors(data)
     
     def __init__(self):
         """Load configuration"""
