@@ -61,18 +61,6 @@ Continue even if a step fails:
 python3 -m buildpython --profile=full --continue-on-error
 ```
 
-## Compatibility wrapper
-
-For historical reasons, there is a small wrapper script:
-
-- `scripts/keyrgb-build.py`
-
-It delegates to `buildpython` so older docs/aliases continue to work:
-
-```bash
-python3 scripts/keyrgb-build.py --profile=ci
-```
-
 ## Profiles
 
 - `ci`: compile + import validation + pip check + import scan + pytest
