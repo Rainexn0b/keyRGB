@@ -58,7 +58,7 @@ Principles:
 - UI looks the same and functions the same.
 - Still safe to launch as a subprocess from the tray.
 
-## 3) `src/core/power.py`
+## 3) Power management (`src/core/power_management/manager.py`)
 
 **Problem**
 
@@ -68,6 +68,8 @@ Principles:
 
 - Introduce a pure, unit-testable policy object for power-source transitions, similar to `BatterySaverPolicy`.
 - Keep OS integration (dbus-monitor, sysfs lid monitoring) in `PowerManager`.
+
+Note: `src/core/power.py` remains as a thin compatibility wrapper exporting `PowerManager`.
 
 **PR slices**
 

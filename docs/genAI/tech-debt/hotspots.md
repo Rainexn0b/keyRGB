@@ -16,7 +16,7 @@ Snapshot (2025-12-30):
 
 | LOC | File | Why it’s a hotspot |
 |---:|---|---|
-| 517 | `src/core/power.py` | Power policy + polling + event monitoring + controller integration; mixed “policy” vs “platform IO”. |
+| 354 | `src/core/power_management/manager.py` (via `src/core/power.py`) | Power policy + polling + event monitoring + controller integration; mixed “policy” vs “platform IO”. |
 | 501 | `src/gui/settings/window.py` | Settings window still combines layout + state + integration points; next candidates are splitting view/state/services. |
 | 487 | `src/legacy/effects.py` | Large effect engine surface; potential duplication vs new backends; hard to reason about side effects. |
 | 427 | `src/gui/perkey/editor.py` | Big UI + per-key editing state; likely candidates for splitting UI widgets vs persistence vs apply-to-hardware. |
