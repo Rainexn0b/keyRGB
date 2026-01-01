@@ -8,11 +8,39 @@ from src.core.logging_utils import log_throttled
 logger = logging.getLogger(__name__)
 
 
+HW_EFFECTS = {"rainbow", "breathing", "wave", "ripple", "marquee", "raindrop", "aurora", "fireworks"}
+SW_EFFECTS = {"static", "pulse", "strobe", "fire", "random", "perkey_breathing", "perkey_pulse"}
+
+
+def _log_menu_debug(key: str, msg: str, exc: Exception, *, interval_s: float = 60) -> None:
+    log_throttled(
+        logger,
+        key,
+        interval_s=interval_s,
+        level=logging.DEBUG,
+        msg=msg,
+        exc=exc,
+    )
+
+
 def _format_hex_id(val: str) -> str:
     s = (str(val or "").strip().lower() if val is not None else "")
     if s.startswith("0x"):
         s = s[2:]
     return s
+
+
+def _title(name: str) -> str:
+    return str(name).replace("_", " ").strip().title()
+
+
+def _perkey_sw_suffix(effect_name: str) -> str:
+    # These are per-key software effects; avoid repeating "Per-key" in the suffix.
+    if effect_name == "perkey_breathing":
+        return "Breathing"
+    if effect_name == "perkey_pulse":
+        return "Pulse"
+    return _title(effect_name)
 
 
 def keyboard_status_text(tray: Any) -> str:
@@ -60,14 +88,7 @@ def probe_device_available(tray: Any) -> bool:
         if callable(ensure):
             ensure()
     except Exception as exc:
-        log_throttled(
-            logger,
-            "tray.menu.ensure_device",
-            interval_s=60,
-            level=logging.DEBUG,
-            msg="Failed to ensure device availability",
-            exc=exc,
-        )
+        _log_menu_debug("tray.menu.ensure_device", "Failed to ensure device availability", exc, interval_s=60)
 
     return bool(getattr(getattr(tray, "engine", None), "device_available", True))
 
@@ -85,20 +106,6 @@ def tray_lighting_mode_text(tray: Any) -> str:
 
     cfg = getattr(tray, "config", None)
     effect = str(getattr(cfg, "effect", "none") or "none")
-
-    hw_effects = {"rainbow", "breathing", "wave", "ripple", "marquee", "raindrop", "aurora", "fireworks"}
-    sw_effects = {"static", "pulse", "strobe", "fire", "random", "perkey_breathing", "perkey_pulse"}
-
-    def _title(name: str) -> str:
-        return str(name).replace("_", " ").strip().title()
-
-    def _perkey_sw_suffix(effect_name: str) -> str:
-        # These are per-key software effects; avoid repeating "Per-key" in the suffix.
-        if effect_name == "perkey_breathing":
-            return "Breathing"
-        if effect_name == "perkey_pulse":
-            return "Pulse"
-        return _title(effect_name)
 
     # Per-key mode is a first-class state.
     if effect in {"perkey", "perkey_breathing", "perkey_pulse"}:
@@ -118,9 +125,9 @@ def tray_lighting_mode_text(tray: Any) -> str:
         return "🔎 Active: Uniform"
 
     # Effects.
-    if effect in hw_effects:
+    if effect in HW_EFFECTS:
         return f"🔎 Active: HW {_title(effect)}"
-    if effect in sw_effects:
+    if effect in SW_EFFECTS:
         return f"🔎 Active: SW {_title(effect)}"
 
     return f"🔎 Active: {_title(effect)}"
@@ -134,13 +141,11 @@ def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> 
             try:
                 tray._on_tcc_profile_clicked(profile_id)
             except Exception as exc:
-                log_throttled(
-                    logger,
+                _log_menu_debug(
                     "tray.menu.tcc_profile_click",
+                    "TCC profile activation callback failed",
+                    exc,
                     interval_s=60,
-                    level=logging.DEBUG,
-                    msg="TCC profile activation callback failed",
-                    exc=exc,
                 )
 
         return _cb
@@ -167,14 +172,7 @@ def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> 
             *profiles_items,
         )
     except Exception as exc:
-        log_throttled(
-            logger,
-            "tray.menu.tcc_profiles",
-            interval_s=120,
-            level=logging.DEBUG,
-            msg="Failed to populate TCC profiles menu",
-            exc=exc,
-        )
+        _log_menu_debug("tray.menu.tcc_profiles", "Failed to populate TCC profiles menu", exc, interval_s=120)
         return None
 
 
@@ -205,13 +203,11 @@ def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_su
                 tray._update_icon()
                 tray._update_menu()
             except Exception as exc:
-                log_throttled(
-                    logger,
+                _log_menu_debug(
                     "tray.menu.perkey_profile_click",
+                    "Per-key profile activation callback failed",
+                    exc,
                     interval_s=60,
-                    level=logging.DEBUG,
-                    msg="Per-key profile activation callback failed",
-                    exc=exc,
                 )
 
         return _cb
@@ -238,13 +234,6 @@ def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_su
             *profile_items,
         )
     except Exception as exc:
-        log_throttled(
-            logger,
-            "tray.menu.perkey_profiles",
-            interval_s=120,
-            level=logging.DEBUG,
-            msg="Failed to populate per-key profiles menu",
-            exc=exc,
-        )
+        _log_menu_debug("tray.menu.perkey_profiles", "Failed to populate per-key profiles menu", exc, interval_s=120)
         # Fallback: still allow opening the editor even if profiles list fails.
         return pystray.Menu(item("Open Color Editor…", tray._on_perkey_clicked))
