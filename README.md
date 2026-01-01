@@ -44,18 +44,17 @@ Notes:
 - It installs a desktop app launcher (so you can start KeyRGB from your app menu) and an autostart entry (so it starts on login).
 - TUXEDO Control Center (TCC) integration dependencies are optional; the installer will ask.
 
+Install modes:
+
+- Default (**recommended**): downloads a single AppImage from GitHub Releases and installs it to `~/.local/bin/keyrgb`.
+- Dev mode: `./install.sh --pip` installs from the current repo checkout via `pip --user -e .`.
+
 Docs:
 
 - Fedora / step-by-step from a blank install: [docs/usage/usage.md](docs/usage/usage.md)
 - Tongfang keyboard support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
 
-On other distros, install the Python dependencies + ensure the udev rule is present (see the docs above).
-
-Or install from the repo (useful for development):
-
-```bash
-python3 -m pip install --user -e .
-```
+On other distros, install the runtime deps + ensure the udev rule is present (see the docs above).
 
 ### Uninstall
 
@@ -63,6 +62,13 @@ If you installed via `./install.sh`, you can remove the user install with:
 
 ```bash
 ./uninstall.sh
+```
+
+If you installed the AppImage (default), this will prompt to remove `~/.local/bin/keyrgb`.
+For non-interactive removal:
+
+```bash
+./uninstall.sh --yes --remove-appimage
 ```
 
 ### Run
@@ -227,10 +233,6 @@ More troubleshooting and setup details are in [docs/usage/usage.md](docs/usage/u
 
 - `PyQt6` is used for optional slider dialogs in the tray UI. KeyRGB still runs without it.
 	- Install it with `python3 -m pip install --user "PyQt6>=6.10.0"` or `python3 -m pip install --user -e ".[qt]"`.
-
-## Legacy / archived
-
-This repo includes some older experiments and patches under [PRs](PRs).
 
 ## License
 
