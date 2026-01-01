@@ -12,11 +12,11 @@ import time
 from typing import Optional
 
 from .monitoring.acpi_monitoring import monitor_acpi_events
-from .battery_saver_policy import BatterySaverPolicy
+from .power_policies.battery_saver_policy import BatterySaverPolicy
 from .monitoring.lid_monitoring import start_sysfs_lid_monitoring
 from .monitoring.login1_monitoring import monitor_prepare_for_sleep
 from .monitoring.power_supply_sysfs import read_on_ac_power
-from .power_source_policy import compute_power_source_policy
+from .power_policies.power_source_policy import compute_power_source_policy
 from src.legacy.config import Config
 
 logger = logging.getLogger(__name__)
