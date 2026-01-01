@@ -6,6 +6,7 @@ import stat
 import subprocess
 import sys
 import urllib.request
+import json
 from pathlib import Path
 
 from ..utils.paths import repo_root
@@ -46,6 +47,104 @@ def _run_checked(args: list[str], *, cwd: Path, env: dict[str, str] | None = Non
         raise SystemExit(proc.returncode)
 
 
+def _python_runtime_manifest() -> dict[str, str]:
+    # Query the build-time interpreter. We'll bundle this runtime into the AppImage
+    # to avoid relying on the user's system python version.
+    code = """
+import json
+import sys
+import sysconfig
+
+paths = sysconfig.get_paths()
+
+out = {
+    "executable": sys.executable,
+    "prefix": sys.prefix,
+    "version": f"{sys.version_info.major}.{sys.version_info.minor}",
+    "stdlib": paths.get("stdlib") or "",
+    "platstdlib": paths.get("platstdlib") or "",
+    "libdir": sysconfig.get_config_var("LIBDIR") or "",
+    "ldlibrary": sysconfig.get_config_var("LDLIBRARY") or "",
+}
+
+print(json.dumps(out))
+"""
+    proc = subprocess.run(
+        [python_exe(), "-c", code],
+        cwd=str(repo_root()),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if proc.returncode != 0:
+        raise SystemExit(proc.returncode)
+    try:
+        data = json.loads(proc.stdout)
+    except Exception:
+        raise SystemExit(f"Failed to parse python runtime manifest: {proc.stdout}\n{proc.stderr}")
+
+    if not isinstance(data, dict):
+        raise SystemExit("Invalid python runtime manifest")
+    return {str(k): str(v) for k, v in data.items()}
+
+
+def _bundle_python_runtime(*, appdir: Path) -> None:
+    manifest = _python_runtime_manifest()
+    prefix = Path(manifest.get("prefix", ""))
+    version = manifest.get("version", "")
+    stdlib = Path(manifest.get("stdlib", ""))
+    platstdlib = Path(manifest.get("platstdlib", ""))
+    libdir = Path(manifest.get("libdir", ""))
+    ldlibrary = manifest.get("ldlibrary", "")
+
+    if not version or not stdlib.exists() or not prefix.exists():
+        raise SystemExit(f"Cannot bundle python runtime (stdlib missing): {stdlib}")
+
+    usr_bin = appdir / "usr" / "bin"
+    usr_lib = appdir / "usr" / "lib"
+    usr_bin.mkdir(parents=True, exist_ok=True)
+    usr_lib.mkdir(parents=True, exist_ok=True)
+
+    def rel_under_prefix(path: Path) -> Path:
+        try:
+            return path.relative_to(prefix)
+        except Exception:
+            # Fallback: keep our previous lib layout.
+            return Path("lib") / f"python{version}"
+
+    # Interpreter
+    py_src = Path(python_exe())
+    py_dst = usr_bin / "python3"
+    shutil.copy2(py_src, py_dst)
+    _chmod_x(py_dst)
+
+    # Standard library (pure + platform stdlib). Some distros use lib64.
+    # Place stdlib in the same relative location under prefix so the bundled
+    # interpreter can find it via PYTHONHOME.
+    std_rel = rel_under_prefix(stdlib)
+    dst_stdlib = appdir / "usr" / std_rel
+    if dst_stdlib.exists():
+        shutil.rmtree(dst_stdlib)
+    dst_stdlib.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(stdlib, dst_stdlib, symlinks=False)
+
+    if platstdlib != stdlib and platstdlib.exists():
+        plat_rel = rel_under_prefix(platstdlib)
+        dst_plat = appdir / "usr" / plat_rel
+        if not dst_plat.exists():
+            dst_plat.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(platstdlib, dst_plat, symlinks=False)
+
+    # libpython (if the interpreter is dynamically linked against it)
+    if ldlibrary and libdir.exists():
+        lib_src = libdir / ldlibrary
+        if lib_src.exists():
+            lib_rel = rel_under_prefix(lib_src)
+            lib_dst = appdir / "usr" / lib_rel
+            lib_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(lib_src, lib_dst)
+
+
 def build_appimage() -> Path:
     root = repo_root()
     dist = root / "dist"
@@ -68,6 +167,8 @@ def build_appimage() -> Path:
         _chmod_x(appimagetool)
 
     # Layout
+    _bundle_python_runtime(appdir=appdir)
+
     lib_root = appdir / "usr" / "lib" / "keyrgb"
     site_packages = lib_root / "site-packages"
     src_dst = lib_root / "src"
@@ -126,15 +227,17 @@ def build_appimage() -> Path:
         ),
     )
 
-    # AppRun: uses system python, but forces imports from bundled code + deps.
+    # AppRun: uses the bundled python to avoid system-python ABI mismatches.
     apprun = "\n".join(
         [
             "#!/bin/sh",
             "set -eu",
             'HERE="$(dirname "$(readlink -f "$0")")"',
+            'export PYTHONHOME="$HERE/usr"',
             'export PYTHONNOUSERSITE="1"',
             'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
-            'exec python3 -B -m src.tray "$@"',
+            'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
+            'exec "$HERE/usr/bin/python3" -B -m src.tray "$@"',
             "",
         ]
     )

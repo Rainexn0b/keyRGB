@@ -28,7 +28,7 @@ Mode details:
         - Intended for development / editable installs
 
 AppImage options:
-    --version <tag>  Git tag to download from (e.g. v0.6.0). If omitted, uses GitHub "latest".
+    --version <tag>  Git tag to download from (e.g. v0.6.0). If omitted, auto-detects the newest release containing the AppImage (including pre-releases).
     --asset <name>   AppImage asset filename (default: keyrgb-x86_64.AppImage).
 
 Env vars:
@@ -285,6 +285,46 @@ PY
     return 1
 }
 
+resolve_release_with_asset() {
+    # Prints: <tag>|<browser_download_url>|<is_prerelease>
+    # Returns non-zero if no matching release/asset was found.
+    local asset_name="$1"
+
+    python3 - "$asset_name" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+import urllib.request
+
+asset_name = sys.argv[1]
+
+req = urllib.request.Request(
+    "https://api.github.com/repos/Rainexn0b/keyRGB/releases",
+    headers={"Accept": "application/vnd.github+json", "User-Agent": "keyrgb-install"},
+)
+
+with urllib.request.urlopen(req, timeout=30) as resp:
+    data = json.loads(resp.read().decode("utf-8"))
+
+if not isinstance(data, list):
+    raise SystemExit(1)
+
+for rel in data:
+    assets = rel.get("assets") or []
+    for asset in assets:
+        if asset.get("name") == asset_name:
+            tag = rel.get("tag_name") or ""
+            url = asset.get("browser_download_url") or ""
+            prerelease = bool(rel.get("prerelease"))
+            if tag and url:
+                sys.stdout.write(f"{tag}|{url}|{'true' if prerelease else 'false'}")
+                raise SystemExit(0)
+
+raise SystemExit(2)
+PY
+}
+
 install_appimage() {
     echo
     echo "📦 Installing KeyRGB AppImage..."
@@ -294,16 +334,34 @@ install_appimage() {
 
     mkdir -p "$user_bin"
 
-    local base
+    local url=""
     if [ -n "$KEYRGB_VERSION" ]; then
-        base="https://github.com/Rainexn0b/keyRGB/releases/download/$KEYRGB_VERSION"
+        url="https://github.com/Rainexn0b/keyRGB/releases/download/$KEYRGB_VERSION/$KEYRGB_APPIMAGE_ASSET"
         echo "✓ Using release tag: $KEYRGB_VERSION"
     else
-        base="https://github.com/Rainexn0b/keyRGB/releases/latest/download"
-        echo "✓ Using GitHub latest release"
+        local resolved=""
+        resolved="$(resolve_release_with_asset "$KEYRGB_APPIMAGE_ASSET")" || true
+        if [ -n "$resolved" ]; then
+            local resolved_tag=""
+            local resolved_url=""
+            local resolved_prerelease=""
+            IFS='|' read -r resolved_tag resolved_url resolved_prerelease <<< "$resolved"
+
+            # Align icon/udev downloads to the same tag when auto-resolving.
+            KEYRGB_VERSION="$resolved_tag"
+            url="$resolved_url"
+
+            if [ "$resolved_prerelease" = "true" ]; then
+                echo "✓ Using release tag: $KEYRGB_VERSION (pre-release)"
+            else
+                echo "✓ Using release tag: $KEYRGB_VERSION"
+            fi
+        else
+            url="https://github.com/Rainexn0b/keyRGB/releases/latest/download/$KEYRGB_APPIMAGE_ASSET"
+            echo "✓ Using GitHub latest release"
+        fi
     fi
 
-    local url="$base/$KEYRGB_APPIMAGE_ASSET"
     echo "⬇️  Downloading: $url"
     download_url "$url" "$app_dst"
     chmod +x "$app_dst"
