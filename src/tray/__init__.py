@@ -6,5 +6,6 @@ Those modules now delegate into this package to avoid duplication.
 """
 
 from .app import KeyRGBTray, main
+from .ui import menu
 
-__all__ = ["KeyRGBTray", "main"]
+__all__ = ["KeyRGBTray", "main", "menu"]
