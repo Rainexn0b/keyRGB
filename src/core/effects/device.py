@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from threading import RLock
 from typing import Any, Tuple
 
@@ -44,6 +45,11 @@ def acquire_keyboard(*, kb_lock: RLock, logger: logging.Logger) -> Tuple[Any, bo
 
     Never raises.
     """
+
+    # Safety: unit tests must not touch real hardware by default.
+    # Allow opt-in for hardware tests via env var.
+    if os.environ.get("PYTEST_CURRENT_TEST") and os.environ.get("KEYRGB_ALLOW_HARDWARE") != "1":
+        return NullKeyboard(), False
 
     try:
         with kb_lock:
