@@ -9,8 +9,8 @@ Usage:
     ./install.sh [--appimage] [--pip] [--version <tag>] [--asset <name>]
 
 Modes:
-    --pip       Install from this repo via pip (-e). (default when run inside repo)
-    --appimage  Install by downloading the AppImage. (default when run outside repo)
+    --appimage  Install by downloading the AppImage. (default)
+    --pip       Install from this repo via pip (-e). (dev / editable install)
 
 AppImage options:
     --version <tag>  Git tag to download from (e.g. v0.6.0). If omitted, uses GitHub "latest".
@@ -64,11 +64,7 @@ echo "=== KeyRGB Installation ==="
 echo
 
 if [ -z "$MODE" ]; then
-    if [ -f "$REPO_DIR/pyproject.toml" ] && [ -d "$REPO_DIR/src" ]; then
-        MODE="pip"
-    else
-        MODE="appimage"
-    fi
+    MODE="appimage"
 fi
 
 echo "Install mode: $MODE"
@@ -141,16 +137,22 @@ install_system_deps_fedora() {
     # - dbus-tools: dbus-monitor used by power monitoring
     # - libappindicator-gtk3 + python3-gobject + gtk3: tray icon backends for pystray on Fedora
     # - polkit: pkexec for TCC profile writes (optional feature)
-    sudo dnf install -y \
-        git \
-        python3 \
-        python3-pip \
-        python3-tkinter \
-        usbutils \
-        dbus-tools \
-        libappindicator-gtk3 \
-        python3-gobject \
+    local pkgs=(
+        python3
+        python3-tkinter
+        usbutils
+        dbus-tools
+        libappindicator-gtk3
+        python3-gobject
         gtk3
+    )
+
+    # Only needed for repo/pip installs.
+    if [ "$MODE" = "pip" ]; then
+        pkgs+=(git python3-pip)
+    fi
+
+    sudo dnf install -y "${pkgs[@]}"
 
     if [ "$INSTALL_TUXEDO" = "y" ]; then
         sudo dnf install -y polkit
