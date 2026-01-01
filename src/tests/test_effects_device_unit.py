@@ -33,3 +33,17 @@ def test_acquire_keyboard_under_pytest_allows_opt_in(monkeypatch) -> None:
 
     assert kb is sentinel
     assert available is True
+
+
+def test_acquire_keyboard_under_pytest_allows_hw_tests_alias(monkeypatch) -> None:
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test::case (call)")
+    monkeypatch.delenv("KEYRGB_ALLOW_HARDWARE", raising=False)
+    monkeypatch.setenv("KEYRGB_HW_TESTS", "1")
+
+    sentinel = object()
+    monkeypatch.setattr(device, "get", lambda: sentinel)
+
+    kb, available = acquire_keyboard(kb_lock=RLock(), logger=logging.getLogger(__name__))
+
+    assert kb is sentinel
+    assert available is True
