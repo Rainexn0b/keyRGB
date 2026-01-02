@@ -65,6 +65,7 @@ out = {
     "platstdlib": paths.get("platstdlib") or "",
     "libdir": sysconfig.get_config_var("LIBDIR") or "",
     "ldlibrary": sysconfig.get_config_var("LDLIBRARY") or "",
+    "instsoname": sysconfig.get_config_var("INSTSONAME") or "",
 }
 
 print(json.dumps(out))
@@ -96,6 +97,7 @@ def _bundle_python_runtime(*, appdir: Path) -> None:
     platstdlib = Path(manifest.get("platstdlib", ""))
     libdir = Path(manifest.get("libdir", ""))
     ldlibrary = manifest.get("ldlibrary", "")
+    instsoname = manifest.get("instsoname", "")
 
     if not version or not stdlib.exists() or not prefix.exists():
         raise SystemExit(f"Cannot bundle python runtime (stdlib missing): {stdlib}")
@@ -136,20 +138,29 @@ def _bundle_python_runtime(*, appdir: Path) -> None:
             shutil.copytree(platstdlib, dst_plat, symlinks=False)
 
     # libpython (if the interpreter is dynamically linked against it)
-    if ldlibrary and libdir.exists():
-        lib_src = libdir / ldlibrary
-        if lib_src.exists():
-            lib_rel = rel_under_prefix(lib_src)
-            lib_dst = appdir / "usr" / lib_rel
-            lib_dst.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(lib_src, lib_dst)
+    # Prefer INSTSONAME (libpython3.x.so.1.0) over LDLIBRARY (libpython3.x.so)
+    # because the latter may be a missing symlink on some distros.
+    lib_candidates = [instsoname, ldlibrary] if instsoname else [ldlibrary]
+    lib_src: Path | None = None
+    for candidate in lib_candidates:
+        if candidate and libdir.exists():
+            maybe = libdir / candidate
+            if maybe.exists():
+                lib_src = maybe
+                break
 
-            # Also place a copy in usr/lib so the dynamic loader can find it
-            # via our simpler LD_LIBRARY_PATH.
-            flat_dst = appdir / "usr" / "lib" / lib_src.name
-            if flat_dst != lib_dst:
-                flat_dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(lib_src, flat_dst)
+    if lib_src is not None:
+        lib_rel = rel_under_prefix(lib_src)
+        lib_dst = appdir / "usr" / lib_rel
+        lib_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(lib_src, lib_dst)
+
+        # Also place a copy in usr/lib so the dynamic loader can find it
+        # via our simpler LD_LIBRARY_PATH.
+        flat_dst = appdir / "usr" / "lib" / lib_src.name
+        if flat_dst != lib_dst:
+            flat_dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(lib_src, flat_dst)
 
 
 def build_appimage() -> Path:
