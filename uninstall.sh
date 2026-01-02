@@ -6,8 +6,11 @@
 # - AppImage binary at ~/.local/bin/keyrgb (AppImage mode)
 # - desktop launcher and autostart entries
 # - udev rule (with sudo) if it matches this repo's rule
+# - power mode helper + polkit rule (with sudo) if they match this repo's files
+# - optionally: Tuxedo Control Center (dnf) ONLY if installed by KeyRGB (marker file)
 #
-# Does NOT remove system packages installed via dnf.
+# By default this script does NOT remove system packages installed via dnf.
+# The only exception is Tuxedo Control Center, and only when a KeyRGB marker file indicates KeyRGB installed it.
 
 set -euo pipefail
 
@@ -32,7 +35,7 @@ Usage: ./uninstall.sh [--yes] [--purge-config] [--remove-appimage]
 
 Notes:
   - This script removes both AppImage-mode and pip-mode installs (with prompts).
-  - It does NOT remove system packages installed via dnf.
+  - It does NOT remove system packages installed via dnf (except optional TCC removal when KeyRGB installed it).
 EOF
 }
 
@@ -59,6 +62,9 @@ confirm() {
   reply="${reply,,}"
   [[ "$reply" == "y" || "$reply" == "yes" ]]
 }
+
+STATE_DIR="$HOME/.local/share/keyrgb"
+TCC_MARKER="$STATE_DIR/tcc-installed-by-keyrgb"
 
 echo "=== KeyRGB Uninstall ==="
 echo
@@ -130,7 +136,7 @@ else
 fi
 
 UDEV_DST="/etc/udev/rules.d/99-ite8291-wootbook.rules"
-UDEV_SRC="$REPO_DIR/udev/99-ite8291-wootbook.rules"
+UDEV_SRC="$REPO_DIR/system/udev/99-ite8291-wootbook.rules"
 
 if [ -f "$UDEV_DST" ]; then
   if [ -f "$UDEV_SRC" ] && cmp -s "$UDEV_SRC" "$UDEV_DST"; then
@@ -149,6 +155,75 @@ if [ -f "$UDEV_DST" ]; then
   fi
 fi
 
+POWER_HELPER_DST="/usr/local/bin/keyrgb-power-helper"
+POWER_HELPER_SRC="$REPO_DIR/system/bin/keyrgb-power-helper"
+POLKIT_DST="/etc/polkit-1/rules.d/90-keyrgb-power-helper.rules"
+POLKIT_SRC="$REPO_DIR/system/polkit/90-keyrgb-power-helper.rules"
+
+if [ -f "$POWER_HELPER_DST" ] || [ -f "$POLKIT_DST" ]; then
+  # Only remove if the installed files match the repo versions.
+  helper_matches=0
+  rule_matches=0
+
+  if [ -f "$POWER_HELPER_DST" ] && [ -f "$POWER_HELPER_SRC" ] && cmp -s "$POWER_HELPER_SRC" "$POWER_HELPER_DST"; then
+    helper_matches=1
+  fi
+  if [ -f "$POLKIT_DST" ] && [ -f "$POLKIT_SRC" ] && cmp -s "$POLKIT_SRC" "$POLKIT_DST"; then
+    rule_matches=1
+  fi
+
+  if [ -f "$POWER_HELPER_DST" ] && [ "$helper_matches" -ne 1 ]; then
+    echo "⚠️  Power helper exists but does not match this repo's helper; not removing: $POWER_HELPER_DST"
+  fi
+  if [ -f "$POLKIT_DST" ] && [ "$rule_matches" -ne 1 ]; then
+    echo "⚠️  Polkit rule exists but does not match this repo's rule; not removing: $POLKIT_DST"
+  fi
+
+  if [ "$helper_matches" -eq 1 ] || [ "$rule_matches" -eq 1 ]; then
+    if confirm "Remove Power Mode helper + polkit rule (requires sudo)?"; then
+      if [ "$helper_matches" -eq 1 ]; then
+        sudo rm -f "$POWER_HELPER_DST"
+        echo "✓ Removed power helper: $POWER_HELPER_DST"
+      fi
+      if [ "$rule_matches" -eq 1 ]; then
+        sudo rm -f "$POLKIT_DST"
+        echo "✓ Removed polkit rule: $POLKIT_DST"
+      fi
+      echo "  Note: you may need to log out/in for polkit caches to refresh."
+    else
+      echo "↷ Skipped removing Power Mode helper"
+    fi
+  fi
+fi
+
+if [ -f "$TCC_MARKER" ]; then
+  if command -v dnf >/dev/null 2>&1; then
+    if rpm -q tuxedo-control-center >/dev/null 2>&1; then
+      if confirm "Uninstall Tuxedo Control Center (tuxedo-control-center) that was installed by KeyRGB (requires sudo)?"; then
+        set +e
+        sudo dnf remove -y tuxedo-control-center
+        rc=$?
+        set -e
+        if [ $rc -eq 0 ]; then
+          echo "✓ Removed tuxedo-control-center"
+          rm -f "$TCC_MARKER" || true
+        else
+          echo "⚠️  Failed to remove tuxedo-control-center via dnf (exit $rc)."
+          echo "   Marker file left in place: $TCC_MARKER"
+        fi
+      else
+        echo "↷ Skipped removing tuxedo-control-center"
+      fi
+    else
+      # Marker exists, but package isn't installed anymore.
+      rm -f "$TCC_MARKER" || true
+    fi
+  else
+    echo "⚠️  dnf not found; cannot remove tuxedo-control-center automatically."
+    echo "   Marker file: $TCC_MARKER"
+  fi
+fi
+
 if [ "$PURGE_CONFIG" -eq 1 ]; then
   if confirm "Remove ~/.config/keyrgb (profiles/settings)?"; then
     rm -rf "$HOME/.config/keyrgb" || true
@@ -160,4 +235,4 @@ fi
 
 echo
 echo "=== Uninstall complete ==="
-echo "Note: install.sh also installs system packages via dnf; those are not removed."
+echo "Note: install.sh also installs system packages via dnf; those are not removed by default."

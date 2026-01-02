@@ -13,6 +13,7 @@ Settings are persisted in the shared `~/.config/keyrgb/config.json` via
 
 from __future__ import annotations
 
+from threading import Thread
 import tkinter as tk
 from tkinter import ttk
 
@@ -55,6 +56,65 @@ class PowerSettingsGUI:
         self._init_vars(values)
         self._init_panels(bg_color=bg_color, fg_color=fg_color)
         self._finalize_layout()
+        self._start_footer_hardware_probe()
+
+    def _start_footer_hardware_probe(self) -> None:
+        """Populate the footer hardware hint (best-effort, read-only).
+
+        Goal: when a device is present but not supported (e.g. ITE 8297/5702),
+        show a clear hint to help users file actionable reports.
+        """
+
+        def extract_hint(backends_snapshot: dict) -> str:
+            probes = backends_snapshot.get("probes")
+            if not isinstance(probes, list):
+                return ""
+
+            unsupported: list[str] = []
+            for p in probes:
+                if not isinstance(p, dict):
+                    continue
+                reason = str(p.get("reason") or "")
+                ids = p.get("identifiers")
+                if not isinstance(ids, dict):
+                    continue
+
+                vid = ids.get("usb_vid")
+                pid = ids.get("usb_pid")
+                if not (isinstance(vid, str) and isinstance(pid, str)):
+                    continue
+
+                if "unsupported by ite8291r3 backend" in reason.lower():
+                    unsupported.append(f"{vid}:{pid}")
+
+            if not unsupported:
+                return ""
+
+            joined = ", ".join(unsupported)
+            return f"Detected unsupported RGB controller(s): {joined} (Tier 3 / Fusion 2)."
+
+        def worker() -> None:
+            text = ""
+            try:
+                from src.core.diagnostics.collectors_backends import backend_probe_snapshot
+
+                snap = backend_probe_snapshot()
+                text = extract_hint(snap)
+            except Exception:
+                text = ""
+
+            def apply() -> None:
+                try:
+                    # Only show the footer hint when we have something actionable.
+                    self.bottom_bar_panel.set_hardware_hint(text)
+                except Exception:
+                    pass
+
+            self.root.after(0, apply)
+
+        # Defer slightly so the window paints immediately.
+        self.root.after(100, lambda: Thread(target=worker, daemon=True).start())
+
     def _init_layout(self, *, bg_color: str) -> None:
         outer = ttk.Frame(self.root)
         outer.pack(fill="both", expand=True)

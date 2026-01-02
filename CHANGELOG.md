@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.0 (2026-01-02)
+
+- Power: adds lightweight “Power Mode” (Extreme Saver/Balanced/Performance) with a tray toggle; uses cpufreq sysfs and best-effort boost handling.
+- Power: optional passwordless switching via a small pkexec helper + polkit rule installed by `install.sh`.
+- Tray: adds “🔋 Power Mode” menu; renames TCC menu to “Power Profiles (TCC)” and avoids showing both power control systems at once.
+- Installer: adds interactive install mode selection (AppImage / clone / repo editable) and defaults to newest stable AppImage unless `--prerelease`.
+- Installer/Uninstaller: optional Tuxedo Control Center install/remove via `dnf` when TCC integration is selected.
+- Diagnostics: adds a system power-mode snapshot in `keyrgb-diagnostics`.
+- Safety: detects some ITE “Fusion 2” devices (048d:8297/5702) as detected-but-unsupported (fail-closed).
+- Devices: improves sysfs LED backend candidate selection reliability.
+
 ## 0.7.9 (2026-01-02)
 
 - Tray/AppImage: prefer the AppIndicator backend when available and bundle the needed `gi` + GI typelibs in the AppImage (fixes “square/blocky” and non-clickable tray icon behavior seen on some desktops with the GitHub-built AppImage).
@@ -20,7 +31,7 @@
 - Installer: `./install.sh` defaults to AppImage mode and installs a single binary to `~/.local/bin/keyrgb`.
 - Installer: `--pip` mode remains available for development (editable install via `pip --user -e .`).
 - Packaging: RPM packaging support has been removed.
-- Permissions: udev rule is now tracked at `udev/99-ite8291-wootbook.rules` and is installed by `install.sh`.
+- Permissions: udev rule is now tracked at `system/udev/99-ite8291-wootbook.rules` and is installed by `install.sh`.
 
 - Build/CI: `buildpython` gained an AppImage build step and CI uploads the AppImage as an artifact.
 - Releases: tags now trigger a workflow that builds and attaches the AppImage to the GitHub Release.

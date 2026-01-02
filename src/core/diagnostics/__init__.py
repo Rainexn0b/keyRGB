@@ -12,6 +12,7 @@ from .collectors import (
     list_platform_hints as _list_platform_hints,
     power_supply_snapshot as _power_supply_snapshot,
     system_snapshot as _system_snapshot,
+    system_power_mode_snapshot as _system_power_mode_snapshot,
 )
 from .formatting import format_diagnostics_text
 from .io import parse_hex_int as _parse_hex_int
@@ -42,6 +43,10 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
     virt = _virt_snapshot()
 
     system: dict[str, Any] = _system_snapshot()
+    try:
+        system["power_mode"] = _system_power_mode_snapshot()
+    except Exception:
+        pass
 
     hints: dict[str, Any] = {}
     platform_hints = _list_platform_hints()

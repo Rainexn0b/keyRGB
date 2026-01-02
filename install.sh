@@ -6,11 +6,13 @@ set -e
 usage() {
         cat <<'EOF'
 Usage:
-    ./install.sh [--appimage] [--pip] [--version <tag>] [--asset <name>] [--prerelease]
+    ./install.sh [--appimage] [--clone] [--clone-dir <path>] [--pip] [--version <tag>] [--asset <name>] [--prerelease]
 
 Modes:
     --appimage  Install by downloading the AppImage. (default)
     --pip       Install from this repo via pip (-e). (dev / editable install)
+    --clone     Clone the repo (source code) then install via pip (-e).
+               Use this if you want to modify the code for your machine.
 
 What gets installed (both modes):
     - System dependencies (best-effort via dnf when available)
@@ -23,6 +25,10 @@ Mode details:
     --appimage
         - Downloads a single AppImage to: ~/.local/bin/keyrgb
         - Does NOT install Python packages via pip
+    --clone
+        - Clones the KeyRGB repo into a user directory
+        - Installs packages into your user site-packages (pip --user -e)
+        - Intended for development / local modifications
     --pip
         - Installs Python packages into your user site-packages (pip --user)
         - Intended for development / editable installs
@@ -33,15 +39,26 @@ AppImage options:
     --prerelease     Allow installing from a prerelease if it is the newest matching release.
 
 Env vars:
-    KEYRGB_INSTALL_TUXEDO=y|n  Non-interactive default for optional TCC integration.
+    KEYRGB_INSTALL_MODE=appimage|clone|pip  Non-interactive mode selection (default: appimage).
+    KEYRGB_CLONE_DIR=<path>  Target directory for --clone (default: ~/.local/share/keyrgb-src).
+    KEYRGB_INSTALL_POWER_HELPER=y|n  Select the lightweight Power Mode helper.
+    KEYRGB_INSTALL_TUXEDO=y|n  Select optional TCC integration.
+    KEYRGB_INSTALL_TCC_APP=y|n  If TCC integration is selected, optionally install Tuxedo Control Center via dnf (best-effort).
+    Note: Power Mode helper and TCC integration are mutually exclusive; if both are set truthy, Power Mode is preferred.
     KEYRGB_ALLOW_PRERELEASE=y|n  Allow installing from prereleases (default: n).
 EOF
 }
 
 MODE=""
+KEYRGB_INSTALL_MODE="${KEYRGB_INSTALL_MODE:-}"
+KEYRGB_CLONE_DIR="${KEYRGB_CLONE_DIR:-$HOME/.local/share/keyrgb-src}"
 KEYRGB_VERSION="${KEYRGB_VERSION:-}"
 KEYRGB_APPIMAGE_ASSET="${KEYRGB_APPIMAGE_ASSET:-keyrgb-x86_64.AppImage}"
 KEYRGB_ALLOW_PRERELEASE="${KEYRGB_ALLOW_PRERELEASE:-n}"
+KEYRGB_INSTALL_TCC_APP="${KEYRGB_INSTALL_TCC_APP:-}"
+
+STATE_DIR="$HOME/.local/share/keyrgb"
+TCC_MARKER="$STATE_DIR/tcc-installed-by-keyrgb"
 
 while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -49,6 +66,14 @@ while [ "$#" -gt 0 ]; do
                         MODE="pip"
                         shift
                         ;;
+                --clone|--source)
+                    MODE="clone"
+                    shift
+                    ;;
+                --clone-dir)
+                    KEYRGB_CLONE_DIR="${2:-}"
+                    shift 2
+                    ;;
                 --appimage)
                         MODE="appimage"
                         shift
@@ -79,20 +104,55 @@ done
 
 # Always run relative to the repo root (where this script lives), even if invoked
 # from another working directory.
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$SCRIPT_DIR"
 cd "$REPO_DIR"
 
 echo "=== KeyRGB Installation ==="
 echo
 
-if [ -z "$MODE" ]; then
+select_install_mode() {
+    if [ -n "$MODE" ]; then
+        return 0
+    fi
+
+    # Allow non-interactive selection via env var.
+    if [ -n "$KEYRGB_INSTALL_MODE" ]; then
+        case "${KEYRGB_INSTALL_MODE,,}" in
+            appimage|pip|clone) MODE="${KEYRGB_INSTALL_MODE,,}"; return 0 ;;
+        esac
+    fi
+
+    # Interactive prompt when possible.
+    if [ -t 0 ]; then
+        echo "Choose install mode:"
+        echo "  1) AppImage (recommended)"
+        echo "  2) Source code (clone repo + editable install)"
+        echo "  3) Repo editable install (use current folder)"
+        local reply
+        read -r -p "Select [1-3] (default: 1): " reply || reply=""
+        reply="${reply:-1}"
+        case "$reply" in
+            2) MODE="clone" ;;
+            3) MODE="pip" ;;
+            *) MODE="appimage" ;;
+        esac
+        return 0
+    fi
+
+    # Default for non-interactive runs.
     MODE="appimage"
-fi
+}
+
+select_install_mode
 
 echo "Install mode: $MODE"
 
 if [ "$MODE" = "appimage" ]; then
     echo "AppImage install target: $HOME/.local/bin/keyrgb"
+elif [ "$MODE" = "clone" ]; then
+    echo "Clone target: $KEYRGB_CLONE_DIR"
+    echo "Pip install target: user site-packages (pip --user)"
 else
     echo "Pip install target: user site-packages (pip --user)"
 fi
@@ -104,17 +164,23 @@ if [ "$EUID" -eq 0 ]; then
 fi
 
 INSTALL_TUXEDO="n"
+INSTALL_TCC_APP="n"
+INSTALL_POWER_HELPER="y"
 
 ask_yes_no() {
     local prompt="$1"
     local default="$2"  # y|n
+    local envvar_name="${3:-}"
 
-    # Allow CI/non-interactive override.
-    if [ -n "${KEYRGB_INSTALL_TUXEDO:-}" ]; then
-        case "${KEYRGB_INSTALL_TUXEDO,,}" in
-            y|yes|1|true) echo "y"; return 0 ;;
-            n|no|0|false) echo "n"; return 0 ;;
-        esac
+    # Allow CI/non-interactive override via a specific env var.
+    if [ -n "$envvar_name" ]; then
+        local envval="${!envvar_name:-}"
+        if [ -n "$envval" ]; then
+            case "${envval,,}" in
+                y|yes|1|true) echo "y"; return 0 ;;
+                n|no|0|false) echo "n"; return 0 ;;
+            esac
+        fi
     fi
 
     # Non-interactive: pick the default.
@@ -145,12 +211,80 @@ ask_yes_no() {
 
 echo
 echo "Optional components:"
-echo "  - Tuxedo Control Center (TCC) integration: shows 'Power Profiles' if TCC is installed."
-INSTALL_TUXEDO="$(ask_yes_no "Enable optional TCC integration dependencies?" "n")"
+echo "Choose ONE power integration (to avoid collisions):"
+echo "  1) Lightweight Power Mode toggle (recommended)"
+echo "     - Adds 'Extreme Saver/Balanced/Performance' tray menu"
+echo "     - Installs a helper + polkit rule for passwordless switching"
+echo "  2) Tuxedo Control Center (TCC) integration (advanced)"
+echo "     - Enables the existing 'Power Profiles (TCC)' UI if TCC is installed"
+
+# Non-interactive env var handling (exclusive):
+# - If both are set to y, prefer Power Mode to avoid collisions.
+if [ "${KEYRGB_INSTALL_POWER_HELPER:-}" != "" ] || [ "${KEYRGB_INSTALL_TUXEDO:-}" != "" ]; then
+    ph="$(ask_yes_no "" "y" "KEYRGB_INSTALL_POWER_HELPER")"
+    tc="$(ask_yes_no "" "n" "KEYRGB_INSTALL_TUXEDO")"
+    if [ "$ph" = "y" ]; then
+        INSTALL_POWER_HELPER="y"
+        INSTALL_TUXEDO="n"
+    elif [ "$tc" = "y" ]; then
+        INSTALL_POWER_HELPER="n"
+        INSTALL_TUXEDO="y"
+    else
+        INSTALL_POWER_HELPER="n"
+        INSTALL_TUXEDO="n"
+    fi
+else
+    if [ -t 0 ]; then
+        read -r -p "Select [1-2] (default: 1): " power_choice || power_choice=""
+        power_choice="${power_choice:-1}"
+    else
+        power_choice="1"
+    fi
+
+    case "$power_choice" in
+        2)
+            INSTALL_POWER_HELPER="n"
+            INSTALL_TUXEDO="y"
+            ;;
+        *)
+            INSTALL_POWER_HELPER="y"
+            INSTALL_TUXEDO="n"
+            ;;
+    esac
+fi
+
+# Optional: if TCC integration is selected, offer to install the TCC application via dnf.
+# This is best-effort because the package may not be available in the user's configured repos.
+if [ "$INSTALL_TUXEDO" = "y" ]; then
+    if [ "${KEYRGB_INSTALL_TCC_APP:-}" != "" ]; then
+        if [ "${KEYRGB_INSTALL_TCC_APP,,}" = "y" ] || [ "${KEYRGB_INSTALL_TCC_APP,,}" = "yes" ] || [ "${KEYRGB_INSTALL_TCC_APP,,}" = "1" ] || [ "${KEYRGB_INSTALL_TCC_APP,,}" = "true" ]; then
+            INSTALL_TCC_APP="y"
+        else
+            INSTALL_TCC_APP="n"
+        fi
+    elif [ -t 0 ]; then
+        echo
+        echo "TCC integration was selected."
+        ans="$(ask_yes_no "Install Tuxedo Control Center via dnf (best-effort, may not be available in your repos)?" "n")"
+        if [ "$ans" = "y" ]; then
+            INSTALL_TCC_APP="y"
+        fi
+    fi
+fi
+
+if [ "$INSTALL_POWER_HELPER" = "y" ]; then
+    echo "✓ Power Mode helper will be installed"
+else
+    echo "✓ Skipping Power Mode helper"
+fi
 if [ "$INSTALL_TUXEDO" = "y" ]; then
     echo "✓ TCC integration deps will be installed (best-effort)"
 else
     echo "✓ Skipping TCC integration deps"
+fi
+
+if [ "$INSTALL_TCC_APP" = "y" ]; then
+    echo "✓ Tuxedo Control Center will be installed via dnf (best-effort)"
 fi
 
 install_system_deps_fedora() {
@@ -164,7 +298,7 @@ install_system_deps_fedora() {
     # - usbutils: lsusb (device check)
     # - dbus-tools: dbus-monitor used by power monitoring
     # - libappindicator-gtk3 + python3-gobject + gtk3: tray icon backends for pystray on Fedora
-    # - polkit: pkexec for TCC profile writes (optional feature)
+    # - polkit: pkexec for privileged helpers (power mode helper + optional TCC features)
     local pkgs=(
         python3
         python3-tkinter
@@ -175,15 +309,35 @@ install_system_deps_fedora() {
         gtk3
     )
 
-    # Only needed for repo/pip installs.
-    if [ "$MODE" = "pip" ]; then
+    # Only needed for source installs.
+    if [ "$MODE" = "pip" ] || [ "$MODE" = "clone" ]; then
         pkgs+=(git python3-pip)
     fi
 
     sudo dnf install -y "${pkgs[@]}"
 
-    if [ "$INSTALL_TUXEDO" = "y" ]; then
+    if [ "$INSTALL_TUXEDO" = "y" ] || [ "$INSTALL_POWER_HELPER" = "y" ]; then
         sudo dnf install -y polkit
+    fi
+
+    if [ "$INSTALL_TCC_APP" = "y" ]; then
+        echo
+        echo "🧩 Installing Tuxedo Control Center via dnf (best-effort)..."
+        mkdir -p "$STATE_DIR" || true
+
+        set +e
+        sudo dnf install -y tuxedo-control-center
+        rc=$?
+        set -e
+
+        if [ $rc -eq 0 ]; then
+            echo "✓ Installed tuxedo-control-center"
+            printf '%s\n' "tuxedo-control-center" > "$TCC_MARKER" 2>/dev/null || true
+        else
+            echo "⚠️  Failed to install tuxedo-control-center via dnf (exit $rc)."
+            echo "   This package may not be available in your enabled repos."
+            echo "   You can install TCC separately, then KeyRGB will enable the TCC integration UI."
+        fi
     fi
 
     echo "✓ System dependencies installed"
@@ -200,6 +354,55 @@ else
     echo "⚠️  dnf not found; skipping system package installation."
     echo "   You may need: python3, python3-pip, python3-tkinter, usbutils, dbus-tools, and tray deps for pystray."
 fi
+
+# Clone mode: fetch source into a user directory, then continue as pip mode.
+maybe_clone_source_repo() {
+    if [ "$MODE" != "clone" ]; then
+        return 0
+    fi
+
+    if ! command -v git &> /dev/null; then
+        echo "❌ git is required for --clone mode but not installed"
+        exit 1
+    fi
+    if ! command -v python3 &> /dev/null; then
+        echo "❌ Python 3 is required for --clone mode but not installed"
+        exit 1
+    fi
+
+    local clone_dir="$KEYRGB_CLONE_DIR"
+    if [ -z "$clone_dir" ]; then
+        echo "❌ --clone-dir (or KEYRGB_CLONE_DIR) is empty" >&2
+        exit 2
+    fi
+
+    echo
+    echo "📥 Source install: cloning KeyRGB into: $clone_dir"
+
+    if [ -d "$clone_dir/.git" ]; then
+        echo "✓ Using existing clone (won't auto-update): $clone_dir"
+    else
+        mkdir -p "$(dirname "$clone_dir")"
+        git clone --depth 1 https://github.com/Rainexn0b/keyRGB.git "$clone_dir"
+        echo "✓ Cloned repo"
+    fi
+
+    REPO_DIR="$clone_dir"
+    cd "$REPO_DIR"
+
+    # Optional: checkout a specific tag/branch if requested.
+    if [ -n "$KEYRGB_VERSION" ]; then
+        echo "↪ Checking out: $KEYRGB_VERSION"
+        git fetch --tags --force >/dev/null 2>&1 || true
+        if ! git checkout "$KEYRGB_VERSION" >/dev/null 2>&1; then
+            echo "⚠️  Could not checkout '$KEYRGB_VERSION'; continuing with current branch" >&2
+        fi
+    fi
+
+    MODE="pip"
+}
+
+maybe_clone_source_repo
 
 if [ "$MODE" = "pip" ]; then
     # Repo/pip install requires Python.
@@ -453,7 +656,7 @@ install_udev_rule() {
     local tmp_rule=""
 
     if [ "$MODE" = "pip" ]; then
-        src_rule="$REPO_DIR/udev/99-ite8291-wootbook.rules"
+        src_rule="$REPO_DIR/system/udev/99-ite8291-wootbook.rules"
         if ! [ -f "$src_rule" ]; then
             echo "⚠️  udev rule file not found: $src_rule"
             return 0
@@ -463,7 +666,7 @@ install_udev_rule() {
         if [ -n "$KEYRGB_VERSION" ]; then
             raw_ref="$KEYRGB_VERSION"
         fi
-        local rule_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/udev/99-ite8291-wootbook.rules"
+        local rule_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/system/udev/99-ite8291-wootbook.rules"
         tmp_rule="$(mktemp)"
         echo "⬇️  Downloading udev rule: $rule_url"
         download_url "$rule_url" "$tmp_rule"
@@ -495,6 +698,67 @@ install_udev_rule() {
     echo "  If KeyRGB is already running, quit and re-open it."
     echo "  If it still says permission denied, reboot once."
 
+    if [ -n "$tmp_rule" ]; then
+        rm -f "$tmp_rule" 2>/dev/null || true
+    fi
+}
+
+install_power_mode_helper() {
+    if [ "$INSTALL_POWER_HELPER" != "y" ]; then
+        return 0
+    fi
+
+    local src_helper
+    local src_rule
+    local dst_helper="/usr/local/bin/keyrgb-power-helper"
+    local dst_rule="/etc/polkit-1/rules.d/90-keyrgb-power-helper.rules"
+    local tmp_helper=""
+    local tmp_rule=""
+
+    if [ "$MODE" = "pip" ]; then
+        src_helper="$REPO_DIR/system/bin/keyrgb-power-helper"
+        src_rule="$REPO_DIR/system/polkit/90-keyrgb-power-helper.rules"
+        if ! [ -f "$src_helper" ]; then
+            echo "⚠️  Power helper file not found: $src_helper"
+            return 0
+        fi
+        if ! [ -f "$src_rule" ]; then
+            echo "⚠️  Polkit rule file not found: $src_rule"
+            return 0
+        fi
+    else
+        local raw_ref="main"
+        if [ -n "$KEYRGB_VERSION" ]; then
+            raw_ref="$KEYRGB_VERSION"
+        fi
+        local helper_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/system/bin/keyrgb-power-helper"
+        local rule_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/system/polkit/90-keyrgb-power-helper.rules"
+
+        tmp_helper="$(mktemp)"
+        tmp_rule="$(mktemp)"
+        echo "⬇️  Downloading power helper: $helper_url"
+        download_url "$helper_url" "$tmp_helper"
+        echo "⬇️  Downloading polkit rule: $rule_url"
+        download_url "$rule_url" "$tmp_rule"
+
+        src_helper="$tmp_helper"
+        src_rule="$tmp_rule"
+    fi
+
+    echo
+    echo "🔋 Installing lightweight Power Mode helper (no-password via polkit when available)..."
+    echo "   (This may prompt for your sudo password.)"
+
+    sudo install -D -m 0755 "$src_helper" "$dst_helper"
+    sudo install -D -m 0644 "$src_rule" "$dst_rule"
+
+    echo "✓ Installed helper: $dst_helper"
+    echo "✓ Installed polkit rule: $dst_rule"
+    echo "  If pkexec still prompts for a password, try logging out/in or rebooting once."
+
+    if [ -n "$tmp_helper" ]; then
+        rm -f "$tmp_helper" 2>/dev/null || true
+    fi
     if [ -n "$tmp_rule" ]; then
         rm -f "$tmp_rule" 2>/dev/null || true
     fi
@@ -587,6 +851,7 @@ else
     install_appimage
 fi
 install_udev_rule
+install_power_mode_helper
 
 # Many distros don't include ~/.local/bin on PATH by default.
 USER_BIN="$HOME/.local/bin"

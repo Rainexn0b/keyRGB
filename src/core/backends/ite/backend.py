@@ -17,6 +17,17 @@ _FALLBACK_USB_IDS: list[tuple[int, int]] = [
     (0x048D, 0x600B),  # Newer ITE 8291 (2023+ Tongfang iterations)
 ]
 
+# Known ITE controllers seen in the wild that appear to be a different protocol
+# family (often referred to as "Fusion 2" in community tooling).
+#
+# Safety: we must NOT claim support for these by adding them to PRODUCT_IDS,
+# otherwise auto-selection may pick this backend and attempt to talk the wrong
+# protocol to the device.
+_KNOWN_UNSUPPORTED_USB_IDS: list[tuple[int, int]] = [
+    (0x048D, 0x8297),  # ITE 8297 (Gigabyte/Tongfang)
+    (0x048D, 0x5702),  # ITE 5702 (Gigabyte)
+]
+
 
 @dataclass
 class Ite8291r3Backend(KeyboardBackend):
@@ -73,6 +84,21 @@ class Ite8291r3Backend(KeyboardBackend):
                 if int(vid) == vendor_id and int(pid) not in product_ids:
                     product_ids.append(int(pid))
 
+            # If we detect an ITE controller known to be a different protocol
+            # family, return a *negative* probe with identifiers so debug logs
+            # can guide future expansion without risking accidental usage.
+            for vid, pid in _KNOWN_UNSUPPORTED_USB_IDS:
+                if int(vid) != vendor_id:
+                    continue
+                dev = usb.core.find(idVendor=vendor_id, idProduct=int(pid))
+                if dev is not None:
+                    return ProbeResult(
+                        available=False,
+                        reason=f"usb device present but unsupported by ite8291r3 backend (0x{vendor_id:04x}:0x{int(pid):04x})",
+                        confidence=0,
+                        identifiers={"usb_vid": f"0x{vendor_id:04x}", "usb_pid": f"0x{int(pid):04x}"},
+                    )
+
             for pid in product_ids:
                 dev = usb.core.find(idVendor=vendor_id, idProduct=int(pid))
                 if dev is not None:
@@ -107,7 +133,7 @@ class Ite8291r3Backend(KeyboardBackend):
             if isinstance(exc, PermissionError) or errno == 13 or "permission denied" in msg or "access denied" in msg:
                 raise PermissionError(
                     "Permission denied opening the ITE 8291 USB device. "
-                    "Install the udev rule (udev/99-ite8291-wootbook.rules), then reload udev rules and reboot/log out/in."
+                    "Install the udev rule (system/udev/99-ite8291-wootbook.rules), then reload udev rules and reboot/log out/in."
                 ) from exc
             if os.environ.get("KEYRGB_DEBUG"):
                 logger.exception("Failed to open ite8291r3 device")

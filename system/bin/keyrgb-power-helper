@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import argparse
+import os
+from pathlib import Path
+
+
+CPUFREQ_ROOT_DEFAULT = Path("/sys/devices/system/cpu/cpufreq")
+
+
+def _cpufreq_root() -> Path:
+    # Keep a test hook, but default to real sysfs.
+    root = os.environ.get("KEYRGB_CPUFREQ_ROOT")
+    return Path(root) if root else CPUFREQ_ROOT_DEFAULT
+
+
+def _read_int(path: Path) -> int | None:
+    try:
+        return int(path.read_text(encoding="utf-8").strip())
+    except Exception:
+        return None
+
+
+def _write(path: Path, text: str) -> None:
+    path.write_text(text, encoding="utf-8")
+
+
+def _policy_dirs(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    out: list[Path] = []
+    for child in root.iterdir():
+        if child.is_dir() and child.name.startswith("policy"):
+            out.append(child)
+    return sorted(out, key=lambda p: p.name)
+
+
+def _set_boost(enabled: bool) -> None:
+    p = Path("/sys/devices/system/cpu/intel_pstate/no_turbo")
+    if p.exists():
+        _write(p, "0\n" if enabled else "1\n")
+        return
+
+    p = Path("/sys/devices/system/cpu/cpufreq/boost")
+    if p.exists():
+        _write(p, "1\n" if enabled else "0\n")
+        return
+
+
+def apply_mode(mode: str) -> None:
+    mode = (mode or "").strip().lower()
+    if mode not in {"extreme-saver", "balanced", "performance"}:
+        raise SystemExit(f"Unknown mode: {mode}")
+
+    root = _cpufreq_root()
+    policies = _policy_dirs(root)
+    if not policies:
+        raise SystemExit(f"No cpufreq policies under {root}")
+
+    extreme_cap_khz = 800_000
+
+    for pol in policies:
+        max_path = pol / "scaling_max_freq"
+        if not max_path.exists():
+            continue
+
+        min_khz = _read_int(pol / "cpuinfo_min_freq") or 0
+        max_khz = _read_int(pol / "cpuinfo_max_freq")
+
+        if mode == "extreme-saver":
+            target = extreme_cap_khz
+            if min_khz:
+                target = max(target, min_khz)
+            if max_khz:
+                target = min(target, max_khz)
+            _write(max_path, f"{int(target)}\n")
+
+            gov = pol / "scaling_governor"
+            if gov.exists():
+                try:
+                    _write(gov, "powersave\n")
+                except Exception:
+                    pass
+
+        else:
+            if max_khz is not None:
+                _write(max_path, f"{int(max_khz)}\n")
+
+            gov = pol / "scaling_governor"
+            if gov.exists():
+                try:
+                    _write(gov, "performance\n" if mode == "performance" else "schedutil\n")
+                except Exception:
+                    pass
+
+    if mode == "extreme-saver":
+        try:
+            _set_boost(False)
+        except Exception:
+            pass
+    else:
+        try:
+            _set_boost(True)
+        except Exception:
+            pass
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(prog="keyrgb-power-helper")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    a = sub.add_parser("apply", help="Apply a power mode")
+    a.add_argument("mode", help="extreme-saver | balanced | performance")
+
+    ns = ap.parse_args()
+
+    if os.geteuid() != 0:
+        raise SystemExit("keyrgb-power-helper must run as root")
+
+    if ns.cmd == "apply":
+        apply_mode(ns.mode)
+        return 0
+
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

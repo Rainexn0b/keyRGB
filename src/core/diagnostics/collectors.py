@@ -11,6 +11,7 @@ from .collectors_system import (
     list_platform_hints,
     power_supply_snapshot,
     system_snapshot,
+    system_power_mode_snapshot,
 )
 from .paths import config_file_path
 
@@ -83,4 +84,5 @@ __all__ = [
     "list_platform_hints",
     "power_supply_snapshot",
     "system_snapshot",
+    "system_power_mode_snapshot",
 ]

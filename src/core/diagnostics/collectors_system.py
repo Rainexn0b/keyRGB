@@ -141,3 +141,23 @@ def system_snapshot() -> dict[str, Any]:
         system["os_release"] = {k: os_release[k] for k in keep_keys if k in os_release}
 
     return system
+
+
+def system_power_mode_snapshot() -> dict[str, Any]:
+    """Collect a tiny snapshot of KeyRGB's lightweight system power mode.
+
+    Read-only and best-effort: reads sysfs cpufreq policies and helper presence.
+    """
+
+    try:
+        from src.core.system_power import get_status
+
+        st = get_status()
+        return {
+            "supported": bool(st.supported),
+            "mode": str(st.mode.value),
+            "reason": str(st.reason),
+            "identifiers": dict(st.identifiers or {}),
+        }
+    except Exception as exc:
+        return {"supported": False, "mode": "unknown", "reason": "error", "error": str(exc)}

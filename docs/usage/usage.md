@@ -170,7 +170,7 @@ You can either run the repo installer:
 Or install just the udev rule manually:
 
 ```bash
-sudo install -D -m 0644 udev/99-ite8291-wootbook.rules \
+sudo install -D -m 0644 system/udev/99-ite8291-wootbook.rules \
 	/etc/udev/rules.d/99-ite8291-wootbook.rules
 
 sudo udevadm control --reload

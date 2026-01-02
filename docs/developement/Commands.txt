@@ -12,8 +12,13 @@ Single-line release procedure:
 	git commit -m "Release vX.Y.Z"
 	git tag -a vX.Y.Z -m "release vX.Y.Z"
 
-4) Build artifacts (sdist + wheel)
-	python -m buildpython --profile=release
+4) Build artifacts
+	# Build + validate the release AppImage (outputs: dist/keyrgb-x86_64.AppImage)
+	python3 -m buildpython --profile=release
+
+	# (Optional) Build Python packages (sdist + wheel)
+	python3 -m pip install --user -U build
+	python3 -m build
 
 5) Push (when ready)
 	git push

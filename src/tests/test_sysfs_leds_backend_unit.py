@@ -56,3 +56,72 @@ def test_sysfs_backend_probe_unavailable_when_no_leds(monkeypatch: pytest.Monkey
     backend = SysfsLedsBackend()
     probe = backend.probe()
     assert probe.available is False
+
+
+def test_sysfs_backend_prefers_multicolor_led(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    plain = _make_led(tmp_path, "white:kbd_backlight", brightness=1, max_brightness=10)
+    rgb = _make_led(tmp_path, "rgb:kbd_backlight", brightness=1, max_brightness=10)
+    (rgb / "multi_intensity").write_text("0 0 0\n", encoding="utf-8")
+
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
+
+    def fake_access(path: str | os.PathLike[str], mode: int) -> bool:
+        return True
+
+    monkeypatch.setattr(os, "access", fake_access)
+
+    backend = SysfsLedsBackend()
+    probe = backend.probe()
+    assert probe.available is True
+
+    brightness_path = Path(probe.identifiers["brightness"])
+    assert str(brightness_path).startswith(str(rgb))
+
+    # Sanity: the plain candidate exists but should not be selected.
+    assert (plain / "brightness").exists()
+
+
+def test_sysfs_backend_ignores_noise_lock_leds(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    good = _make_led(tmp_path, "white:kbd_backlight", brightness=1, max_brightness=10)
+    caps = _make_led(tmp_path, "white:kbd_backlight:capslock", brightness=1, max_brightness=10)
+    num = _make_led(tmp_path, "white:kbd_backlight:numlock", brightness=1, max_brightness=10)
+
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
+
+    def fake_access(path: str | os.PathLike[str], mode: int) -> bool:
+        return True
+
+    monkeypatch.setattr(os, "access", fake_access)
+
+    backend = SysfsLedsBackend()
+    probe = backend.probe()
+    assert probe.available is True
+
+    brightness_path = Path(probe.identifiers["brightness"])
+    assert str(brightness_path).startswith(str(good))
+
+    # Sanity: noise candidates exist but should not be selected.
+    assert (caps / "brightness").exists()
+    assert (num / "brightness").exists()
+
+
+def test_sysfs_backend_is_deterministic_on_ties(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    a = _make_led(tmp_path, "a::kbd_backlight", brightness=1, max_brightness=10)
+    b = _make_led(tmp_path, "b::kbd_backlight", brightness=1, max_brightness=10)
+
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
+
+    def fake_access(path: str | os.PathLike[str], mode: int) -> bool:
+        return True
+
+    monkeypatch.setattr(os, "access", fake_access)
+
+    backend = SysfsLedsBackend()
+    probe = backend.probe()
+    assert probe.available is True
+
+    brightness_path = Path(probe.identifiers["brightness"])
+    assert str(brightness_path).startswith(str(a))
+
+    # Sanity: both candidates exist and are equally viable.
+    assert (b / "brightness").exists()

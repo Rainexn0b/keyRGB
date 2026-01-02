@@ -4,6 +4,8 @@ import logging
 from typing import Any, Optional
 from src.core.logging_utils import log_throttled
 
+from src.core.system_power import PowerMode, get_status, set_mode
+
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +175,69 @@ def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> 
         )
     except Exception as exc:
         _log_menu_debug("tray.menu.tcc_profiles", "Failed to populate TCC profiles menu", exc, interval_s=120)
+        return None
+
+
+def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optional[Any]:
+    """Build a lightweight power mode submenu backed by cpufreq sysfs.
+
+    Returns None when unsupported.
+    """
+
+    try:
+        st = get_status()
+        if not st.supported:
+            return None
+        can_apply = (st.identifiers.get("can_apply") == "true")
+
+        def _make_cb(mode: PowerMode):
+            def _cb(_icon, _item):
+                try:
+                    ok = set_mode(mode)
+                    tray._system_power_last_ok = bool(ok)
+                except Exception as exc:
+                    tray._system_power_last_ok = False
+                    _log_menu_debug(
+                        "tray.menu.system_power.click",
+                        "System power mode activation failed",
+                        exc,
+                        interval_s=60,
+                    )
+                finally:
+                    if hasattr(tray, "_update_menu"):
+                        tray._update_menu()
+
+            return _cb
+
+        def _checked(mode: PowerMode):
+            return lambda _i, m=mode: (get_status().mode == m)
+
+        # Keep labels simple and user-facing.
+        return pystray.Menu(
+            item(
+                "Extreme Saver",
+                _make_cb(PowerMode.EXTREME_SAVER),
+                checked=_checked(PowerMode.EXTREME_SAVER),
+                enabled=can_apply,
+                radio=True,
+            ),
+            item(
+                "Balanced",
+                _make_cb(PowerMode.BALANCED),
+                checked=_checked(PowerMode.BALANCED),
+                enabled=can_apply,
+                radio=True,
+            ),
+            item(
+                "Performance",
+                _make_cb(PowerMode.PERFORMANCE),
+                checked=_checked(PowerMode.PERFORMANCE),
+                enabled=can_apply,
+                radio=True,
+            ),
+        )
+    except Exception as exc:
+        _log_menu_debug("tray.menu.system_power", "Failed to populate system power mode menu", exc, interval_s=120)
         return None
 
 

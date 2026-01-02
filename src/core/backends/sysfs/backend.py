@@ -57,6 +57,47 @@ def _is_candidate_led(name: str) -> bool:
     )
 
 
+def _score_led_dir(led_dir: Path) -> int:
+    """Score a sysfs LED directory for likelihood of being a keyboard backlight.
+
+    Many systems expose multiple LED class devices. We prefer candidates that:
+    - look like the keyboard backlight (name-based heuristics)
+    - support RGB (multi_intensity or color attribute)
+    - are writable
+    """
+
+    name = led_dir.name.lower()
+    score = 0
+
+    # Strong signals.
+    if "kbd_backlight" in name:
+        score += 40
+    if name.endswith("kbd_backlight"):
+        score += 10
+    if "keyboard" in name:
+        score += 5
+
+    # Prefer RGB-capable sysfs nodes.
+    if (led_dir / "multi_intensity").exists():
+        score += 50
+    if (led_dir / "color").exists():
+        score += 45
+
+    # De-prioritize "noise" LEDs that frequently contain kbd substrings.
+    for noisy in ("capslock", "numlock", "scrolllock", "micmute", "mute"):
+        if noisy in name:
+            score -= 60
+
+    b = led_dir / "brightness"
+    if b.exists():
+        if os.access(b, os.R_OK):
+            score += 3
+        if os.access(b, os.W_OK):
+            score += 7
+
+    return score
+
+
 def _read_int(path: Path) -> int:
     return int(path.read_text(encoding="utf-8").strip())
 
@@ -162,14 +203,20 @@ class SysfsLedsBackend(KeyboardBackend):
         except Exception:
             return None
 
-        # Prefer candidates that look like a keyboard backlight.
-        candidates.sort(key=lambda p: ("kbd" not in p.name.lower(), p.name))
-
+        viable: list[tuple[int, str, Path]] = []
         for led_dir in candidates:
             b = led_dir / "brightness"
             m = led_dir / "max_brightness"
             if b.exists() and m.exists():
-                return b, m, led_dir
+                viable.append((_score_led_dir(led_dir), led_dir.name, led_dir))
+
+        if not viable:
+            return None
+
+        # Highest score wins; name is a deterministic tie-breaker.
+        viable.sort(key=lambda t: (-t[0], t[1].lower()))
+        best = viable[0][2]
+        return best / "brightness", best / "max_brightness", best
 
         return None
 
@@ -178,13 +225,17 @@ class SysfsLedsBackend(KeyboardBackend):
         if found is None:
             return ProbeResult(available=False, reason="no matching sysfs LED", confidence=0)
 
-        brightness_path, max_brightness_path, _ = found
+        brightness_path, max_brightness_path, led_dir = found
         if not os.access(brightness_path, os.R_OK):
             return ProbeResult(
                 available=False,
                 reason="brightness not readable",
                 confidence=0,
-                identifiers={"brightness": str(brightness_path)},
+                identifiers={
+                    "brightness": str(brightness_path),
+                    "led": led_dir.name,
+                    "led_dir": str(led_dir),
+                },
             )
 
         if not os.access(brightness_path, os.W_OK):
@@ -192,7 +243,11 @@ class SysfsLedsBackend(KeyboardBackend):
                 available=False,
                 reason="brightness not writable (udev permissions missing?)",
                 confidence=0,
-                identifiers={"brightness": str(brightness_path)},
+                identifiers={
+                    "brightness": str(brightness_path),
+                    "led": led_dir.name,
+                    "led_dir": str(led_dir),
+                },
             )
 
         return ProbeResult(
@@ -202,6 +257,10 @@ class SysfsLedsBackend(KeyboardBackend):
             identifiers={
                 "brightness": str(brightness_path),
                 "max_brightness": str(max_brightness_path),
+                "led": led_dir.name,
+                "led_dir": str(led_dir),
+                "supports_multi_intensity": str((led_dir / "multi_intensity").exists()).lower(),
+                "supports_color_attr": str((led_dir / "color").exists()).lower(),
             },
         )
 

@@ -13,6 +13,23 @@
 
 ---
 
+## Repo Status (January 2026)
+
+- The existing `ite8291r3` backend safely probes by VID/PID without opening the device.
+- The sysfs backend already matches common `*kbd*` / `*kbd_backlight*` LED names and supports `multi_intensity` and `color` where present.
+- Keyrgb detects (but does **not** claim support for) likely “Fusion 2” devices:
+   - `0x048d:0x8297`
+   - `0x048d:0x5702`
+   This is intentionally fail-closed to prevent auto-selecting the wrong protocol.
+
+- Upstream status check (2026-01-02): the upstream `pobrn/ite8291r3-ctl` repository does not contain any references to `0x8297`, `0x5702`, or “Fusion 2”, suggesting no explicit support exists there yet.
+
+## Next Steps
+
+Use the ordered task list in [docs/genAI/research-device-support/HARDWARE_EXPANSION_ROADMAP.md](docs/genAI/research-device-support/HARDWARE_EXPANSION_ROADMAP.md).
+
+---
+
 ## Research Findings from Gemini Pro
 
 ### Device Information
@@ -234,7 +251,7 @@ pip3 install --user liquidctl
 
 If ITE 8297 requires different udev rules:
 ```bash
-# Add to udev/99-ite8291-wootbook.rules
+# Add to system/udev/99-ite8291-wootbook.rules
 # For 0x8297:
 SUBSYSTEM=="usb", ATTR{idVendor}=="048d", ATTR{idProduct}=="8297", MODE="0666"
 ```

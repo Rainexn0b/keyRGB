@@ -4,9 +4,11 @@ import logging
 from typing import Any
 
 import src.core.tcc_power_profiles as tcc_power_profiles
+from src.core.system_power import get_status as _system_power_status
 
 from .menu_sections import (
     build_perkey_profiles_menu,
+    build_system_power_mode_menu,
     build_tcc_profiles_menu,
     keyboard_status_text,
     probe_device_available,
@@ -129,6 +131,17 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     # TUXEDO Control Center power profiles (via DBus). If not available, hide the submenu.
     tcc_profiles_menu = build_tcc_profiles_menu(tray, pystray=pystray, item=item, tcc=tcc_power_profiles)
 
+    # Lightweight system power mode toggle (cpufreq sysfs). If not available, hide.
+    system_power_menu = build_system_power_mode_menu(tray, pystray=pystray, item=item)
+
+    # Avoid collisions: only show one power-control menu.
+    system_power_can_apply = False
+    try:
+        st = _system_power_status()
+        system_power_can_apply = bool(st.supported and st.identifiers.get("can_apply") == "true")
+    except Exception:
+        system_power_can_apply = False
+
     perkey_menu = build_perkey_profiles_menu(tray, pystray=pystray, item=item, per_key_supported=per_key_supported)
 
     return [
@@ -151,7 +164,16 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         pystray.Menu.SEPARATOR,
 
         # Power section
-        *([item('🧩 Power Profiles', tcc_profiles_menu)] if tcc_profiles_menu is not None else []),
+        *(
+            [item('🔋 Power Mode', system_power_menu)]
+            if (system_power_menu is not None and system_power_can_apply)
+            else ([] if tcc_profiles_menu is not None else ([item('🔋 Power Mode', system_power_menu)] if system_power_menu is not None else []))
+        ),
+        *(
+            [item('🧩 Power Profiles (TCC)', tcc_profiles_menu)]
+            if (tcc_profiles_menu is not None and not system_power_can_apply)
+            else []
+        ),
         item('⚙ Settings', tray._on_power_settings_clicked),
         pystray.Menu.SEPARATOR,
 

@@ -1,0 +1,28 @@
+// Allow KeyRGB to change CPU power limits without a password prompt.
+//
+// This grants permission for locally-active users to run the KeyRGB helper
+// via pkexec. The helper performs narrowly-scoped sysfs writes.
+//
+// Installed by KeyRGB's install.sh to: /etc/polkit-1/rules.d/90-keyrgb-power-helper.rules
+
+polkit.addRule(function(action, subject) {
+    try {
+        if (action.id !== "org.freedesktop.policykit.exec") {
+            return null;
+        }
+
+        var program = action.lookup("program");
+        if (program !== "/usr/local/bin/keyrgb-power-helper") {
+            return null;
+        }
+
+        // Only allow for local, active sessions.
+        if (subject && subject.active && subject.local) {
+            return polkit.Result.YES;
+        }
+
+        return null;
+    } catch (e) {
+        return null;
+    }
+});
