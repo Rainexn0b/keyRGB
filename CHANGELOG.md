@@ -2,18 +2,17 @@
 
 ## 0.7.9 (2026-01-02)
 
-- AppImage: bundle PyGObject (`gi`) + GI typelibs and prefer the AppIndicator tray backend (fixes “square/blocky” and non-clickable tray icon issues on some desktops).
-- CI/Release: install the needed GI/AppIndicator packages in GitHub Actions so the published AppImage includes the tray dependencies.
+- Tray/AppImage: prefer the AppIndicator backend when available and bundle the needed `gi` + GI typelibs in the AppImage (fixes “square/blocky” and non-clickable tray icon behavior seen on some desktops with the GitHub-built AppImage).
 
 ## 0.7.8 (2026-01-02)
 
-- AppImage: fixes a crash on startup on some systems where a non-PyGObject `gi` module is present; KeyRGB now falls back to the Xorg tray backend instead of failing.
+- Tray/AppImage: fixes a startup crash on some systems where a non-PyGObject `gi` module is present; KeyRGB now falls back to the Xorg tray backend instead of failing.
 
 ## 0.7.7 (2026-01-02)
 
-- Desktop integration: launcher uses an absolute `Exec=` path so starting from the app menu works reliably.
-- Assets: backdrop/keyboard image fallback no longer depends on the current working directory; the default deck image is bundled into the AppImage.
-- Per-key editor: “Open Color Editor…” launches reliably (fixes incorrect working directory in subprocess).
+- Desktop integration: starting KeyRGB from the app menu works more reliably (desktop launcher `Exec=` path fix).
+- Per-key editor: “Open Color Editor…” launches reliably (fixes subprocess working directory).
+- Assets: backdrop/keyboard image lookup no longer depends on the current working directory; the default deck image is bundled into the AppImage.
 
 ## 0.7.1 (2026-01-02)
 

@@ -6,7 +6,7 @@ set -e
 usage() {
         cat <<'EOF'
 Usage:
-    ./install.sh [--appimage] [--pip] [--version <tag>] [--asset <name>]
+    ./install.sh [--appimage] [--pip] [--version <tag>] [--asset <name>] [--prerelease]
 
 Modes:
     --appimage  Install by downloading the AppImage. (default)
@@ -28,17 +28,20 @@ Mode details:
         - Intended for development / editable installs
 
 AppImage options:
-    --version <tag>  Git tag to download from (e.g. v0.6.0). If omitted, auto-detects the newest release containing the AppImage (including pre-releases).
+    --version <tag>  Git tag to download from (e.g. v0.7.9). If omitted, auto-detects the newest stable release containing the AppImage.
     --asset <name>   AppImage asset filename (default: keyrgb-x86_64.AppImage).
+    --prerelease     Allow installing from a prerelease if it is the newest matching release.
 
 Env vars:
     KEYRGB_INSTALL_TUXEDO=y|n  Non-interactive default for optional TCC integration.
+    KEYRGB_ALLOW_PRERELEASE=y|n  Allow installing from prereleases (default: n).
 EOF
 }
 
 MODE=""
 KEYRGB_VERSION="${KEYRGB_VERSION:-}"
 KEYRGB_APPIMAGE_ASSET="${KEYRGB_APPIMAGE_ASSET:-keyrgb-x86_64.AppImage}"
+KEYRGB_ALLOW_PRERELEASE="${KEYRGB_ALLOW_PRERELEASE:-n}"
 
 while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -58,6 +61,10 @@ while [ "$#" -gt 0 ]; do
                         KEYRGB_APPIMAGE_ASSET="${2:-}"
                         shift 2
                         ;;
+                --prerelease)
+                    KEYRGB_ALLOW_PRERELEASE="y"
+                    shift
+                    ;;
                 -h|--help)
                         usage
                         exit 0
@@ -289,8 +296,9 @@ resolve_release_with_asset() {
     # Prints: <tag>|<browser_download_url>|<is_prerelease>
     # Returns non-zero if no matching release/asset was found.
     local asset_name="$1"
+    local allow_prerelease="$2"
 
-    python3 - "$asset_name" <<'PY'
+    python3 - "$asset_name" "$allow_prerelease" <<'PY'
 from __future__ import annotations
 
 import json
@@ -298,6 +306,7 @@ import sys
 import urllib.request
 
 asset_name = sys.argv[1]
+allow_prerelease = (sys.argv[2] or "").strip().lower() in ("y", "yes", "1", "true")
 
 req = urllib.request.Request(
     "https://api.github.com/repos/Rainexn0b/keyRGB/releases",
@@ -311,6 +320,8 @@ if not isinstance(data, list):
     raise SystemExit(1)
 
 for rel in data:
+    if not allow_prerelease and bool(rel.get("prerelease")):
+        continue
     assets = rel.get("assets") or []
     for asset in assets:
         if asset.get("name") == asset_name:
@@ -340,7 +351,7 @@ install_appimage() {
         echo "✓ Using release tag: $KEYRGB_VERSION"
     else
         local resolved=""
-        resolved="$(resolve_release_with_asset "$KEYRGB_APPIMAGE_ASSET")" || true
+        resolved="$(resolve_release_with_asset "$KEYRGB_APPIMAGE_ASSET" "$KEYRGB_ALLOW_PRERELEASE")" || true
         if [ -n "$resolved" ]; then
             local resolved_tag=""
             local resolved_url=""

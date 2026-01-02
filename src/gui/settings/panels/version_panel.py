@@ -31,7 +31,7 @@ class VersionPanel:
             parent,
             text=(
                 "Shows your installed KeyRGB version and checks GitHub to see\n"
-                "whether you're on the latest tag."
+                "whether you're on the latest stable release (and also shows the latest pre-release)."
             ),
             font=("Sans", 9),
         )
@@ -44,9 +44,13 @@ class VersionPanel:
         self.lbl_installed_version = ttk.Label(grid, text="?", font=("Sans", 9))
         self.lbl_installed_version.grid(row=0, column=1, sticky="w", padx=(10, 0))
 
-        ttk.Label(grid, text="Latest", font=("Sans", 9)).grid(row=1, column=0, sticky="w", pady=(4, 0))
-        self.lbl_latest_version = ttk.Label(grid, text="Checking…", font=("Sans", 9))
-        self.lbl_latest_version.grid(row=1, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
+        ttk.Label(grid, text="Latest (stable)", font=("Sans", 9)).grid(row=1, column=0, sticky="w", pady=(4, 0))
+        self.lbl_latest_stable_version = ttk.Label(grid, text="Checking…", font=("Sans", 9))
+        self.lbl_latest_stable_version.grid(row=1, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
+
+        ttk.Label(grid, text="Latest (pre-release)", font=("Sans", 9)).grid(row=2, column=0, sticky="w", pady=(4, 0))
+        self.lbl_latest_prerelease_version = ttk.Label(grid, text="Checking…", font=("Sans", 9))
+        self.lbl_latest_prerelease_version.grid(row=2, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
 
         self.lbl_update_status = ttk.Label(parent, text="", font=("Sans", 9))
         self.lbl_update_status.pack(anchor="w", pady=(0, 8))
@@ -59,15 +63,16 @@ class VersionPanel:
 
         self._installed_version = self._installed_version_text()
         self.lbl_installed_version.configure(text=self._installed_version)
-        self.lbl_latest_version.configure(text="Checking…")
+        self.lbl_latest_stable_version.configure(text="Checking…")
+        self.lbl_latest_prerelease_version.configure(text="Checking…")
         self.lbl_update_status.configure(text="")
 
         self.start_latest_version_check()
 
     def start_latest_version_check(self) -> None:
         def worker() -> None:
-            latest = self._fetch_latest_github_tag()
-            self._root.after(0, lambda: self._apply_latest_version_result(latest))
+            stable, prerelease = self._fetch_latest_github_versions()
+            self._root.after(0, lambda: self._apply_latest_version_result(stable, prerelease))
 
         Thread(target=worker, daemon=True).start()
 
@@ -80,59 +85,83 @@ class VersionPanel:
         v_norm = normalize_version_text(v) or str(v).strip()
         return f"v{v_norm}" if not str(v).strip().lower().startswith("v") else str(v).strip()
 
-    def _fetch_latest_github_tag(self) -> str | None:
-        # Best-effort: releases can be behind, so prefer tags.
-        urls = [
-            "https://api.github.com/repos/Rainexn0b/keyRGB/tags?per_page=1",
-            "https://api.github.com/repos/Rainexn0b/keyRGB/releases/latest",
-        ]
+    def _fetch_latest_github_versions(self) -> tuple[str | None, str | None]:
+        """Return (latest_stable_tag, latest_prerelease_tag)."""
 
+        url = "https://api.github.com/repos/Rainexn0b/keyRGB/releases?per_page=30"
         headers = {
             "Accept": "application/vnd.github+json",
             "User-Agent": "keyrgb",
         }
 
-        for url in urls:
-            try:
-                req = Request(url, headers=headers)
-                with urlopen(req, timeout=3.0) as resp:
-                    raw = resp.read().decode("utf-8", errors="replace")
-                data = json.loads(raw)
+        try:
+            req = Request(url, headers=headers)
+            with urlopen(req, timeout=5.0) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw)
+        except Exception:
+            return None, None
 
-                if isinstance(data, list) and data:
-                    first = data[0]
-                    name = first.get("name") if isinstance(first, dict) else None
-                    if isinstance(name, str) and name.strip():
-                        return name.strip()
+        if not isinstance(data, list):
+            return None, None
 
-                if isinstance(data, dict):
-                    tag_name = data.get("tag_name")
-                    if isinstance(tag_name, str) and tag_name.strip():
-                        return tag_name.strip()
-            except Exception:
+        stable: str | None = None
+        prerelease: str | None = None
+
+        for rel in data:
+            if not isinstance(rel, dict):
+                continue
+            if rel.get("draft"):
+                continue
+            tag = rel.get("tag_name")
+            if not isinstance(tag, str) or not tag.strip():
                 continue
 
-        return None
+            if rel.get("prerelease") and prerelease is None:
+                prerelease = tag.strip()
+            if not rel.get("prerelease") and stable is None:
+                stable = tag.strip()
 
-    def _apply_latest_version_result(self, latest_tag: str | None) -> None:
-        if not latest_tag:
-            self.lbl_latest_version.configure(text="Unknown")
+            if stable is not None and prerelease is not None:
+                break
+
+        return stable, prerelease
+
+    def _apply_latest_version_result(self, stable_tag: str | None, prerelease_tag: str | None) -> None:
+        if not stable_tag and not prerelease_tag:
+            self.lbl_latest_stable_version.configure(text="Unknown")
+            self.lbl_latest_prerelease_version.configure(text="Unknown")
             self.lbl_update_status.configure(text="Couldn't check GitHub")
             return
 
-        latest_norm = normalize_version_text(latest_tag) or latest_tag
-        latest_display = f"v{latest_norm}" if not str(latest_tag).lower().startswith("v") else str(latest_tag)
-        self.lbl_latest_version.configure(text=latest_display)
+        if stable_tag:
+            stable_norm = normalize_version_text(stable_tag) or stable_tag
+            stable_display = f"v{stable_norm}" if not str(stable_tag).lower().startswith("v") else str(stable_tag)
+            self.lbl_latest_stable_version.configure(text=stable_display)
+        else:
+            stable_display = None
+            self.lbl_latest_stable_version.configure(text="Unknown")
 
-        cmp = compare_versions(self._installed_version, latest_display)
+        if prerelease_tag:
+            pre_norm = normalize_version_text(prerelease_tag) or prerelease_tag
+            pre_display = f"v{pre_norm}" if not str(prerelease_tag).lower().startswith("v") else str(prerelease_tag)
+            self.lbl_latest_prerelease_version.configure(text=pre_display)
+        else:
+            self.lbl_latest_prerelease_version.configure(text="None")
+
+        if stable_display is None:
+            self.lbl_update_status.configure(text="Couldn't compare versions")
+            return
+
+        cmp = compare_versions(self._installed_version, stable_display)
         if cmp is None:
             self.lbl_update_status.configure(text="Couldn't compare versions")
         elif cmp == 0:
-            self.lbl_update_status.configure(text="✓ You are on the latest version")
+            self.lbl_update_status.configure(text="✓ You are on the latest stable version")
         elif cmp < 0:
-            self.lbl_update_status.configure(text=f"Update available: {latest_display}")
+            self.lbl_update_status.configure(text=f"Update available (stable): {stable_display}")
         else:
-            self.lbl_update_status.configure(text="You are ahead of the latest tag")
+            self.lbl_update_status.configure(text="You are ahead of the latest stable release")
 
     def _open_repo(self) -> None:
         url = "https://github.com/Rainexn0b/keyRGB"
