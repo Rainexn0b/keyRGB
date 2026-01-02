@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.7.8 (2026-01-02)
+
+- AppImage: fixes a crash on startup on some systems where a non-PyGObject `gi` module is present; KeyRGB now falls back to the Xorg tray backend instead of failing.
+
 ## 0.7.7 (2026-01-02)
 
 - AppImage: significantly more reliable launches across distros by bundling a Python runtime + stdlib (avoids system-Python ABI mismatches, e.g. Pillow).
