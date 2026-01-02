@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sys
+import importlib
 from dataclasses import dataclass
 from contextlib import suppress
 from pathlib import Path
@@ -68,9 +69,13 @@ def _gi_is_working() -> bool:
     `require_version`, which breaks pystray's AppIndicator backend.
     """
 
+    # Avoid a static `import gi` so build/import scanning tools don't treat it as
+    # a hard dependency. We only need gi when the AppIndicator backend is viable.
     try:
-        import gi  # type: ignore
-
+        spec = importlib.util.find_spec("gi")
+        if spec is None:
+            return False
+        gi = importlib.import_module("gi")
         return hasattr(gi, "require_version")
     except Exception:
         return False

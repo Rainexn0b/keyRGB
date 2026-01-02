@@ -200,6 +200,15 @@ print(json.dumps({
         if v:
             candidates.append(Path(v))
 
+    # Also consider system Python dist-packages. On Ubuntu runners we install
+    # python3-gi via apt which lives here (and matches the system CPython ABI).
+    candidates.extend(
+        [
+            Path("/usr/lib/python3/dist-packages"),
+            Path("/usr/lib/python3.12/dist-packages"),
+        ]
+    )
+
     gi_src: Path | None = None
     for base in candidates:
         maybe = base / "gi"
