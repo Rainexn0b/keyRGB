@@ -7,7 +7,10 @@ from pathlib import Path
 
 
 def _repo_root_dir() -> str:
-    return str(Path(__file__).resolve().parents[2])
+    # We want the directory that *contains* the `src/` package.
+    # - Source checkout: <repo>/src/tray/ui/gui_launch.py -> parents[3] == <repo>
+    # - AppImage:        .../usr/lib/keyrgb/src/tray/ui/gui_launch.py -> parents[3] == .../usr/lib/keyrgb
+    return str(Path(__file__).resolve().parents[3])
 
 
 def launch_perkey_gui() -> None:

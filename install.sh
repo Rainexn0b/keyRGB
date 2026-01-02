@@ -398,12 +398,20 @@ install_icon_and_desktop_entries() {
 
     echo "✓ Installed icon: $icon_file"
 
+    # Desktop environments frequently do not include ~/.local/bin in PATH
+    # for .desktop Exec resolution. Use an absolute path.
+    local keyrgb_exec
+    keyrgb_exec="$(command -v keyrgb || true)"
+    if [ -z "$keyrgb_exec" ]; then
+        keyrgb_exec="$HOME/.local/bin/keyrgb"
+    fi
+
     cat > "$app_file" << EOF
 [Desktop Entry]
 Type=Application
 Name=KeyRGB
 Comment=RGB Keyboard Controller
-Exec=keyrgb
+Exec=$keyrgb_exec
 Icon=$icon_ref
 Terminal=false
 Categories=Utility;System;
@@ -411,13 +419,6 @@ StartupNotify=false
 EOF
 
     echo "✓ App launcher installed (KeyRGB will appear in your app menu)"
-
-    local keyrgb_exec
-    keyrgb_exec="$(command -v keyrgb || true)"
-    if [ -z "$keyrgb_exec" ]; then
-        # Fallback: when PATH doesn't include ~/.local/bin yet.
-        keyrgb_exec="$HOME/.local/bin/keyrgb"
-    fi
 
     cat > "$autostart_file" << EOF
 [Desktop Entry]

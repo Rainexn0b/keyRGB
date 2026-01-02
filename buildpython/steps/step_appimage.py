@@ -193,6 +193,15 @@ def build_appimage() -> Path:
 
     shutil.copytree(root / "src", src_dst)
 
+    # Bundle GUI assets that are loaded from repo-relative paths.
+    # The GUI resolves `assets/...` relative to `usr/lib/keyrgb` inside the AppImage.
+    assets_dst = lib_root / "assets"
+    assets_dst.mkdir(parents=True, exist_ok=True)
+
+    deck_src = root / "assets" / "y15-pro-deck.png"
+    if deck_src.exists():
+        shutil.copy2(deck_src, assets_dst / deck_src.name)
+
     # Bundle python deps (pip wheels) into the AppDir.
     # We still use the system python interpreter at runtime.
     site_packages.mkdir(parents=True, exist_ok=True)
@@ -246,6 +255,8 @@ def build_appimage() -> Path:
     )
 
     # AppRun: uses the bundled python to avoid system-python ABI mismatches.
+    # Prefer system AppIndicator/Gtk backends when available by exposing system
+    # `gi` to the bundled interpreter (we do not bundle PyGObject).
     apprun = "\n".join(
         [
             "#!/bin/sh",
@@ -255,6 +266,14 @@ def build_appimage() -> Path:
             'export PYTHONNOUSERSITE="1"',
             'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
             'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
+            "# If system gi (PyGObject) exists, expose it to the bundled Python.",
+            'SYS_GI_PATH=""',
+            'for p in /usr/lib/python*/site-packages /usr/lib64/python*/site-packages /usr/lib/*/python*/site-packages /usr/lib64/*/python*/site-packages; do',
+            '  if [ -d "$p/gi" ]; then SYS_GI_PATH="$p"; break; fi',
+            'done',
+            'if [ -n "$SYS_GI_PATH" ]; then',
+            '  export PYTHONPATH="$PYTHONPATH:$SYS_GI_PATH"',
+            'fi',
             'exec "$HERE/usr/bin/python3" -B -m src.tray "$@"',
             "",
         ]

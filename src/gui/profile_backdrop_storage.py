@@ -10,10 +10,11 @@ from src.core.profile import profiles
 
 
 def _default_backdrop_candidates(profile_name: str) -> list[Path]:
+    repo_root = Path(__file__).resolve().parents[2]
     return [
         profiles.paths_for(profile_name).backdrop_image,
-        # Repo / dev-run fallback.
-        Path.cwd() / "assets" / "y15-pro-deck.png",
+        # Repo/AppImage fallback: locate bundled assets regardless of cwd.
+        repo_root / "assets" / "y15-pro-deck.png",
     ]
 
 
