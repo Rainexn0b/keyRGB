@@ -7,14 +7,7 @@ It supports multiple backends:
 - **USB (ITE 8291 / ITE8291R3 family)** on many TongFang rebrands (often per-key RGB).
 - **Sysfs LED backlight devices** (brightness-only or RGB, depending on what your kernel exposes).
 
-It focuses on being practical:
-
-- System tray controls (effects, brightness, speed, off)
-- Per-key coloring with a visual layout overlay
-- A keymap calibrator that maps the keyboard's LED matrix to the visual keys
-- Profile support (so different layouts/revisions can coexist)
-
-If OpenRGB doesn't support your device (or is painful to operate), KeyRGB aims to be the missing tool.
+If OpenRGB doesn’t support your device (or is painful to operate), KeyRGB aims to be a practical alternative.
 
 ## Status
 
@@ -25,15 +18,13 @@ If OpenRGB doesn't support your device (or is painful to operate), KeyRGB aims t
 
 ## Screenshots
 
-![Tray menu](assets/screenshots/tray.png)
+![Tray menu (effects)](assets/screenshots/trayeffects.png)
 
-![Settings](assets/screenshots/settings.png?raw=1&v=0.4.0)
+![Tray menu (power)](assets/screenshots/traypp.png)
+
+![Settings](assets/screenshots/settings.png)
 
 ![Per-key editor](assets/screenshots/perkeyux.png)
-
-![Uniform color](assets/screenshots/uniformcolorux.png)
-
-![Keymap calibrator](assets/screenshots/keymapcalux.png)
 
 ## Quickstart
 
@@ -45,16 +36,13 @@ On Fedora (including Nobara), the recommended path is:
 ./install.sh
 ```
 
-Notes:
+The installer:
 
-- The installer can be run from any working directory (it will switch to the repo root internally).
-- It installs a desktop app launcher (so you can start KeyRGB from your app menu) and an autostart entry (so it starts on login).
-- TUXEDO Control Center (TCC) integration dependencies are optional; the installer will ask.
+- Can be run from any working directory (it switches to the repo root internally).
+- Installs a desktop launcher + autostart entry.
+- Installs the udev rule for USB devices (asks for sudo).
 
-Install modes:
-
-- Default (**recommended**): downloads a single AppImage from GitHub Releases and installs it to `~/.local/bin/keyrgb`.
-- Dev mode: `./install.sh --pip` installs from the current repo checkout via `pip --user -e .`.
+Default mode (**recommended**) installs the AppImage to `~/.local/bin/keyrgb`.
 
 Docs:
 
@@ -97,6 +85,65 @@ Open the per-key editor:
 ```bash
 keyrgb-perkey
 ```
+
+Run diagnostics (for bug reports):
+
+```bash
+keyrgb-diagnostics
+```
+
+## Commands and arguments
+
+### Commands
+
+| Command | What it does |
+| --- | --- |
+| `keyrgb` | Start the tray app. |
+| `keyrgb-perkey` | Open the per-key editor. |
+| `keyrgb-uniform` | Open the uniform color UI. |
+| `keyrgb-calibrate` | Launch the keymap calibrator UI. |
+| `keyrgb-diagnostics` | Print diagnostics JSON to stdout. |
+| `./install.sh` | Install KeyRGB (AppImage/clone/pip). |
+| `./uninstall.sh` | Remove a KeyRGB install created by `install.sh`. |
+
+### `install.sh` arguments
+
+| Argument | Meaning |
+| --- | --- |
+| `--appimage` | Install by downloading the AppImage (default). |
+| `--pip` | Install from the current repo via `pip --user` (editable/dev). |
+| `--clone` | Clone the repo, then install via `pip --user -e` (for local modifications). |
+| `--clone-dir <path>` | Where to clone when using `--clone` (default: `~/.local/share/keyrgb-src`). |
+| `--version <tag>` | Download a specific Git tag (e.g. `v0.8.0`). |
+| `--asset <name>` | AppImage asset filename (default: `keyrgb-x86_64.AppImage`). |
+| `--prerelease` | Allow auto-resolving a prerelease when it contains the newest matching AppImage (useful for debugging). |
+
+### `install.sh` env vars
+
+| Env var | Meaning |
+| --- | --- |
+| `KEYRGB_INSTALL_MODE=appimage\|clone\|pip` | Non-interactive install-mode selection. |
+| `KEYRGB_CLONE_DIR=<path>` | Clone target for `--clone`. |
+| `KEYRGB_ALLOW_PRERELEASE=y\|n` | Allow prereleases when auto-resolving the AppImage tag (default: `n`). |
+| `KEYRGB_INSTALL_POWER_HELPER=y\|n` | Install the lightweight Power Mode helper + polkit rule. |
+| `KEYRGB_INSTALL_TUXEDO=y\|n` | Enable TCC integration deps (mutually exclusive with power helper). |
+| `KEYRGB_INSTALL_TCC_APP=y\|n` | If TCC integration is selected, also attempt `dnf install tuxedo-control-center` (best-effort). |
+
+### `uninstall.sh` arguments
+
+| Argument | Meaning |
+| --- | --- |
+| `--yes` | Don’t prompt (best-effort). |
+| `--purge-config` | Also remove `~/.config/keyrgb`. |
+| `--remove-appimage` | Remove `~/.local/bin/keyrgb` if it looks like an AppImage. |
+
+### Runtime env vars
+
+| Env var | Meaning |
+| --- | --- |
+| `KEYRGB_BACKEND=auto\|ite8291r3\|sysfs-leds` | Force a specific backend (default: auto-detect). |
+| `KEYRGB_DEBUG=1` | Enable verbose debug logging. |
+| `KEYRGB_TK_SCALING=<float>` | Override Tk scaling (useful for DPI/layout quirks). |
 
 ## Backend selection (multi-vendor)
 
@@ -163,12 +210,6 @@ Support is device/firmware dependent. If you want to contribute a new laptop rev
 - **Permission denied / cannot open device**: ensure the udev rule is installed and replug/reboot.
 - **Effects “fight” or flicker**: stop other RGB tools (`openrgb`, Tuxedo tools) so there is a single owner.
 - **Per-key does nothing**: you need a keymap. Open `keyrgb-perkey` and click **Run Keymap Calibrator**.
-
-Diagnostics (for bug reports):
-
-```bash
-keyrgb-diagnostics
-```
 
 ## Settings
 

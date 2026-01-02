@@ -157,6 +157,24 @@ else
     echo "Pip install target: user site-packages (pip --user)"
 fi
 
+# AppImage installs can auto-resolve the newest release that contains the AppImage asset.
+# For interactive debugging, allow opting into prereleases.
+if [ "$MODE" = "appimage" ] && [ -z "${KEYRGB_VERSION:-}" ] && [ -t 0 ]; then
+    # Only prompt if the user didn't already choose via flag/env.
+    if [ "${KEYRGB_ALLOW_PRERELEASE:-}" = "" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "n" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "no" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "0" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "false" ]; then
+        echo
+        echo "Choose AppImage release channel:"
+        echo "  1) Latest stable release (recommended)"
+        echo "  2) Latest including prereleases (debugging)"
+        read -r -p "Select [1-2] (default: 1): " _relchan || _relchan=""
+        _relchan="${_relchan:-1}"
+        case "$_relchan" in
+            2) KEYRGB_ALLOW_PRERELEASE="y" ;;
+            *) KEYRGB_ALLOW_PRERELEASE="n" ;;
+        esac
+    fi
+fi
+
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
     echo "❌ Please run without sudo (script will ask for password when needed)"
