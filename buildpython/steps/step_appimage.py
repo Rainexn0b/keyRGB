@@ -163,6 +163,90 @@ def _bundle_python_runtime(*, appdir: Path) -> None:
             shutil.copy2(lib_src, flat_dst)
 
 
+def _bundle_pygobject(*, appdir: Path, site_packages: Path) -> None:
+    """Best-effort bundle of PyGObject (gi) for tray/AppIndicator support.
+
+    We do not attempt to fully vendor GTK; instead we bundle the Python bindings
+    plus typelibs so pystray can use AppIndicator on desktop environments.
+    """
+
+    code = r"""
+import json
+import sysconfig
+paths = sysconfig.get_paths()
+print(json.dumps({
+    "purelib": paths.get("purelib") or "",
+    "platlib": paths.get("platlib") or "",
+}))
+"""
+    proc = subprocess.run(
+        [python_exe(), "-c", code],
+        cwd=str(repo_root()),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if proc.returncode != 0:
+        return
+
+    try:
+        data = json.loads(proc.stdout)
+    except Exception:
+        return
+
+    candidates: list[Path] = []
+    for k in ("purelib", "platlib"):
+        v = str(data.get(k, "") or "")
+        if v:
+            candidates.append(Path(v))
+
+    gi_src: Path | None = None
+    for base in candidates:
+        maybe = base / "gi"
+        if maybe.exists() and maybe.is_dir():
+            gi_src = maybe
+            break
+
+    if gi_src is None:
+        # No PyGObject in the build env.
+        return
+
+    gi_dst = site_packages / "gi"
+    if gi_dst.exists():
+        shutil.rmtree(gi_dst)
+    shutil.copytree(gi_src, gi_dst, symlinks=False)
+
+    # Bundle typelibs (girepository). Prefer the multiarch path when present.
+    # This is necessary for Gtk/AppIndicator introspection at runtime.
+    typelib_src_candidates = [
+        Path("/usr/lib/x86_64-linux-gnu/girepository-1.0"),
+        Path("/usr/lib64/girepository-1.0"),
+        Path("/usr/lib/girepository-1.0"),
+    ]
+    typelib_src = next((p for p in typelib_src_candidates if p.exists()), None)
+    if typelib_src is not None:
+        typelib_dst = appdir / "usr" / "lib" / "girepository-1.0"
+        typelib_dst.mkdir(parents=True, exist_ok=True)
+        # Copy a focused subset to keep size reasonable.
+        for name in typelib_src.glob("*.typelib"):
+            if name.name.startswith(
+                (
+                    "Gtk-",
+                    "Gdk-",
+                    "GdkPixbuf-",
+                    "Gio-",
+                    "GLib-",
+                    "GObject-",
+                    "Pango-",
+                    "PangoCairo-",
+                    "cairo-",
+                    "AppIndicator3-",
+                    "AyatanaAppIndicator3-",
+                )
+            ):
+                shutil.copy2(name, typelib_dst / name.name)
+
+
 def build_appimage() -> Path:
     root = repo_root()
     dist = root / "dist"
@@ -229,6 +313,10 @@ def build_appimage() -> Path:
             cwd=root,
         )
 
+    # Bundle PyGObject (gi) when available in the build env so pystray can use
+    # AppIndicator without relying on the user's system Python packages.
+    _bundle_pygobject(appdir=appdir, site_packages=site_packages)
+
     # Desktop + icon expected by appimagetool.
     icon_src = root / "assets" / "logo-keyrgb.png"
     if not icon_src.exists():
@@ -255,8 +343,8 @@ def build_appimage() -> Path:
     )
 
     # AppRun: uses the bundled python to avoid system-python ABI mismatches.
-    # Prefer system AppIndicator/Gtk backends when available by exposing system
-    # `gi` to the bundled interpreter (we do not bundle PyGObject).
+    # Prefer AppIndicator/Gtk when possible; we bundle PyGObject (gi) when
+    # available at build time and provide typelibs via GI_TYPELIB_PATH.
     apprun = "\n".join(
         [
             "#!/bin/sh",
@@ -266,14 +354,7 @@ def build_appimage() -> Path:
             'export PYTHONNOUSERSITE="1"',
             'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
             'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
-            "# If system gi (PyGObject) exists, expose it to the bundled Python.",
-            'SYS_GI_PATH=""',
-            'for p in /usr/lib/python*/site-packages /usr/lib64/python*/site-packages /usr/lib/*/python*/site-packages /usr/lib64/*/python*/site-packages; do',
-            '  if [ -d "$p/gi" ]; then SYS_GI_PATH="$p"; break; fi',
-            'done',
-            'if [ -n "$SYS_GI_PATH" ]; then',
-            '  export PYTHONPATH="$PYTHONPATH:$SYS_GI_PATH"',
-            'fi',
+            'export GI_TYPELIB_PATH="$HERE/usr/lib/girepository-1.0${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"',
             'exec "$HERE/usr/bin/python3" -B -m src.tray "$@"',
             "",
         ]

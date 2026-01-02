@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from contextlib import suppress
 from pathlib import Path
@@ -55,6 +56,32 @@ def _force_pystray_backend_xorg() -> None:
     os.environ.setdefault("PYSTRAY_BACKEND", "xorg")
 
 
+def _set_pystray_backend_xorg_for_retry() -> None:
+    # Used for automatic fallback when we previously set appindicator.
+    os.environ["PYSTRAY_BACKEND"] = "xorg"
+
+
+def _gi_is_working() -> bool:
+    """Return True if PyGObject appears usable.
+
+    Some environments have a shadowing/broken `gi` module which lacks
+    `require_version`, which breaks pystray's AppIndicator backend.
+    """
+
+    try:
+        import gi  # type: ignore
+
+        return hasattr(gi, "require_version")
+    except Exception:
+        return False
+
+
+def _clear_failed_import(name: str) -> None:
+    # If an import fails, Python may leave a partially-initialized module around.
+    # Clear it so a backend retry gets a clean import attempt.
+    sys.modules.pop(name, None)
+
+
 def get_pystray():
     """Import pystray only when the tray UI is actually needed.
 
@@ -70,22 +97,38 @@ def get_pystray():
 
     import importlib
 
-    try:
-        _pystray_mod = importlib.import_module("pystray")
-    except Exception as exc:  # pragma: no cover (depends on desktop env)
-        failure = _classify_pystray_import_error(exc)
-        if failure and failure.reason == "broken-gi":
-            # If a non-PyGObject `gi` module (or a partial/broken install) is found,
-            # pystray's AppIndicator backend raises AttributeError during import and
-            # does not fall back to other backends. Force Xorg and retry once.
-            _force_pystray_backend_xorg()
+    # Backend selection strategy:
+    # - Respect explicit user choice via PYSTRAY_BACKEND.
+    # - If PyGObject is usable, prefer AppIndicator first (best UX on modern desktops).
+    # - Fall back to Xorg if AppIndicator import fails.
+    explicit_backend = "PYSTRAY_BACKEND" in os.environ
+
+    if not explicit_backend and _gi_is_working():
+        os.environ["PYSTRAY_BACKEND"] = "appindicator"
+        try:
             _pystray_mod = importlib.import_module("pystray")
-        else:
-            raise RuntimeError(
-                "pystray could not be initialized. The tray app requires a desktop "
-                "session (X11/Wayland). In CI/headless environments, importing the "
-                "module is supported but running the tray is not."
-            ) from exc
+        except Exception:
+            _clear_failed_import("pystray")
+            _set_pystray_backend_xorg_for_retry()
+            _pystray_mod = importlib.import_module("pystray")
+    else:
+        try:
+            _pystray_mod = importlib.import_module("pystray")
+        except Exception as exc:  # pragma: no cover (depends on desktop env)
+            failure = _classify_pystray_import_error(exc)
+            if failure and failure.reason == "broken-gi":
+                # If a non-PyGObject `gi` module (or a partial/broken install) is found,
+                # pystray's AppIndicator backend raises AttributeError during import and
+                # does not fall back to other backends. Force Xorg and retry once.
+                _clear_failed_import("pystray")
+                _force_pystray_backend_xorg()
+                _pystray_mod = importlib.import_module("pystray")
+            else:
+                raise RuntimeError(
+                    "pystray could not be initialized. The tray app requires a desktop "
+                    "session (X11/Wayland). In CI/headless environments, importing the "
+                    "module is supported but running the tray is not."
+                ) from exc
 
     _pystray_item = getattr(_pystray_mod, "MenuItem")
     return _pystray_mod, _pystray_item

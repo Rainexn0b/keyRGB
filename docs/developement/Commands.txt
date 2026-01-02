@@ -5,8 +5,7 @@ Single-line release procedure:
 
 2) Bump versions
 	- pyproject.toml: [project].version
-	- packaging/rpm/keyrgb.spec: Version + %changelog (if you ship RPM)
-	- packaging/rpm/README.md: VERSION example (optional)
+	- CHANGELOG.md: add a release entry
 
 3) Commit + tag
 	git add -A
@@ -14,8 +13,7 @@ Single-line release procedure:
 	git tag -a vX.Y.Z -m "release vX.Y.Z"
 
 4) Build artifacts (sdist + wheel)
-	python3 -m pip install --user --upgrade build
-	python3 -m build
+	python -m buildpython --profile=release
 
 5) Push (when ready)
 	git push
