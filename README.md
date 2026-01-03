@@ -49,38 +49,38 @@ KeyRGB is a lightweight Linux tray app and per-key editor for laptop keyboard li
 </table>
 
 <details>
-	<summary><b>More screenshots</b></summary>
-	<br>
+<summary><b>More screenshots</b></summary>
 
-	<table>
-		<tr>
-			<td width="50%">
-				<b>Tray Menu (Software Effects)</b><br>
-				<img src="assets/screenshots/trayeffectssw.png" alt="Tray menu software effects">
-			</td>
-			<td width="50%">
-				<b>Tray Menu (Keyboard / Profiles)</b><br>
-				<img src="assets/screenshots/traykbp.png" alt="Tray menu keyboard and profiles">
-			</td>
-		</tr>
-		<tr>
-			<td width="50%">
-				<b>Uniform Color UI</b><br>
-				<img src="assets/screenshots/uniformcolorux.png" alt="Uniform color UI">
-			</td>
-			<td width="50%">
-				<b>Per-Key Calibrator</b><br>
-				<img src="assets/screenshots/perkeycalux.png" alt="Per-key calibrator">
-			</td>
-		</tr>
-		<tr>
-			<td width="50%">
-				<b>Keymap Calibration</b><br>
-				<img src="assets/screenshots/keymapcalux.png" alt="Keymap calibration">
-			</td>
-			<td width="50%"></td>
-		</tr>
-	</table>
+<table>
+	<tr>
+		<td width="50%">
+			<b>Tray Menu (Software Effects)</b><br>
+			<img src="assets/screenshots/trayeffectssw.png" alt="Tray menu software effects">
+		</td>
+		<td width="50%">
+			<b>Tray Menu (Keyboard / Profiles)</b><br>
+			<img src="assets/screenshots/traykbp.png" alt="Tray menu keyboard and profiles">
+		</td>
+	</tr>
+	<tr>
+		<td width="50%">
+			<b>Uniform Color UI</b><br>
+			<img src="assets/screenshots/uniformcolorux.png" alt="Uniform color UI">
+		</td>
+		<td width="50%">
+			<b>Per-Key Calibrator</b><br>
+			<img src="assets/screenshots/perkeycalux.png" alt="Per-key calibrator">
+		</td>
+	</tr>
+	<tr>
+		<td width="50%">
+			<b>Keymap Calibration</b><br>
+			<img src="assets/screenshots/keymapcalux.png" alt="Keymap calibration">
+		</td>
+		<td width="50%"></td>
+	</tr>
+</table>
+
 </details>
 
 ## Quickstart
