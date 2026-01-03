@@ -1,290 +1,160 @@
 # KeyRGB
 
-KeyRGB is a Linux tray app + per-key editor for laptop keyboard lighting.
+KeyRGB is a lightweight Linux tray app and per-key editor for laptop keyboard lighting. It serves as a practical, focused alternative to OpenRGB for supported devices.
 
-It supports multiple backends:
+## Supported backends
 
-- **USB (ITE 8291 / ITE8291R3 family)** on many TongFang rebrands (often per-key RGB).
-- **Sysfs LED backlight devices** (brightness-only or RGB, depending on what your kernel exposes).
-
-If OpenRGB doesn’t support your device (or is painful to operate), KeyRGB aims to be a practical alternative.
+- **USB (ITE 8291 / 8291R3 family)**: common on TongFang rebrands (XMG, Tuxedo, Wootbook, Eluktronics). Supports per-key RGB.
+- **Sysfs LED**: universal Linux backend (brightness-only or basic RGB, depending on kernel drivers).
 
 ## Status
 
-- **Beta project**: versioning follows **0.x.y** tags until the first stable release.
-- **Linux-only**: primarily developed/tested on Fedora-family distros (Fedora / Nobara).
-- **Hardware-specific**: support depends on your keyboard controller + firmware.
-- **Per-key requires calibration**: you must build a keymap before per-key effects work.
+- **Beta**: versioning follows **0.x.y**.
+- Developed primarily for Fedora / Nobara.
+- Support depends entirely on your specific keyboard controller and firmware.
 
 ## Screenshots
 
-![Tray menu (effects)](assets/screenshots/trayeffects.png)
-
-![Tray menu (power)](assets/screenshots/traypp.png)
-
-![Settings](assets/screenshots/settings.png)
-
-![Per-key editor](assets/screenshots/perkeyux.png)
+<table>
+	<tr>
+		<td width="50%">
+			<b>Tray Menu (Effects)</b><br>
+			<img src="assets/screenshots/trayeffects.png" alt="Tray menu effects">
+		</td>
+		<td width="50%">
+			<b>Power Management</b><br>
+			<img src="assets/screenshots/traypp.png" alt="Tray power menu">
+		</td>
+	</tr>
+	<tr>
+		<td width="50%">
+			<b>Per-Key Editor</b><br>
+			<img src="assets/screenshots/perkeyux.png" alt="Per-key editor">
+		</td>
+		<td width="50%">
+			<b>Settings</b><br>
+			<img src="assets/screenshots/settings.png" alt="Settings UI">
+		</td>
+	</tr>
+</table>
 
 ## Quickstart
 
 ### Install
 
-On Fedora (including Nobara), the recommended path is:
+On Fedora / Nobara (recommended):
 
 ```bash
 ./install.sh
 ```
 
-The installer:
-
-- Can be run from any working directory (it switches to the repo root internally).
-- Installs a desktop launcher + autostart entry.
-- Installs the udev rule for USB devices (asks for sudo).
-
-Default mode (**recommended**) installs the AppImage to `~/.local/bin/keyrgb`.
+This installs the AppImage to `~/.local/bin/keyrgb`, sets up the desktop launcher, and installs necessary udev rules for hardware access.
 
 Docs:
 
-- Fedora / step-by-step from a blank install: [docs/usage/usage.md](docs/usage/usage.md)
-- Tongfang keyboard support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
-
-On other distros, install the runtime deps + ensure the udev rule is present (see the docs above).
+- Step-by-step from a blank install: [docs/usage/usage.md](docs/usage/usage.md)
+- Architecture / TongFang support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
 
 ### Uninstall
 
-If you installed via `./install.sh`, you can remove the user install with:
-
 ```bash
+# Interactive removal
 ./uninstall.sh
-```
 
-If you installed the AppImage (default), this will prompt to remove `~/.local/bin/keyrgb`.
-For non-interactive removal:
-
-```bash
+# Non-interactive (scripted)
 ./uninstall.sh --yes --remove-appimage
 ```
 
 ### Run
 
-Start the tray app:
-
-```bash
-keyrgb
-```
-
-Dev/repo mode (runs attached to your terminal):
-
-```bash
-./keyrgb
-```
-
-Open the per-key editor:
-
-```bash
-keyrgb-perkey
-```
-
-Run diagnostics (for bug reports):
-
-```bash
-keyrgb-diagnostics
-```
-
-## Commands and arguments
-
-### Commands
-
-| Command | What it does |
+| Command | Description |
 | --- | --- |
-| `keyrgb` | Start the tray app. |
+| `keyrgb` | Start the tray app (background). |
+| `./keyrgb` | Run attached to terminal (dev mode). |
 | `keyrgb-perkey` | Open the per-key editor. |
-| `keyrgb-uniform` | Open the uniform color UI. |
-| `keyrgb-calibrate` | Launch the keymap calibrator UI. |
-| `keyrgb-diagnostics` | Print diagnostics JSON to stdout. |
-| `./install.sh` | Install KeyRGB (AppImage/clone/pip). |
-| `./uninstall.sh` | Remove a KeyRGB install created by `install.sh`. |
+| `keyrgb-diagnostics` | Print hardware diagnostics JSON. |
 
-### `install.sh` arguments
+## Configuration
 
-| Argument | Meaning |
-| --- | --- |
-| `--appimage` | Install by downloading the AppImage (default). |
-| `--pip` | Install from the current repo via `pip --user` (editable/dev). |
-| `--clone` | Clone the repo, then install via `pip --user -e` (for local modifications). |
-| `--clone-dir <path>` | Where to clone when using `--clone` (default: `~/.local/share/keyrgb-src`). |
-| `--version <tag>` | Download a specific Git tag (e.g. `v0.9.2`). |
-| `--asset <name>` | AppImage asset filename (default: `keyrgb-x86_64.AppImage`). |
-| `--prerelease` | Allow auto-resolving a prerelease when it contains the newest matching AppImage (useful for debugging). |
+### Settings and autostart
 
-### `install.sh` env vars
+Access **Settings** via the tray menu to configure:
 
-| Env var | Meaning |
-| --- | --- |
-| `KEYRGB_INSTALL_MODE=appimage\|clone\|pip` | Non-interactive install-mode selection. |
-| `KEYRGB_CLONE_DIR=<path>` | Clone target for `--clone`. |
-| `KEYRGB_ALLOW_PRERELEASE=y\|n` | Allow prereleases when auto-resolving the AppImage tag (default: `n`). |
-| `KEYRGB_INSTALL_POWER_HELPER=y\|n` | Install the lightweight Power Mode helper + polkit rule. |
-| `KEYRGB_INSTALL_TUXEDO=y\|n` | Enable TCC integration deps (mutually exclusive with power helper). |
-| `KEYRGB_INSTALL_TCC_APP=y\|n` | If TCC integration is selected, also attempt `dnf install tuxedo-control-center` (best-effort). |
+- **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
+- **Screen Dim Sync**: sync keyboard brightness with screen dimming (KDE Plasma / Wayland).
+- **Autostart**: enable “Start KeyRGB on login”.
 
-### `uninstall.sh` arguments
+### Profiles
 
-| Argument | Meaning |
-| --- | --- |
-| `--yes` | Don’t prompt (best-effort). |
-| `--purge-config` | Also remove `~/.config/keyrgb`. |
-| `--remove-appimage` | Remove `~/.local/bin/keyrgb` if it looks like an AppImage. |
+Profiles are stored in:
 
-### Runtime env vars
+`~/.config/keyrgb/profiles/`
 
-| Env var | Meaning |
-| --- | --- |
-| `KEYRGB_BACKEND=auto\|ite8291r3\|sysfs-leds` | Force a specific backend (default: auto-detect). |
-| `KEYRGB_DEBUG=1` | Enable verbose debug logging. |
-| `KEYRGB_TK_SCALING=<float>` | Override Tk scaling (useful for DPI/layout quirks). |
+Each profile contains the keymap (calibration), global overlay tweaks, and per-key color data. Manage these via the Per-Key Editor.
 
-## Backend selection (multi-vendor)
+### Per-key calibration
 
-KeyRGB is moving toward a multi-backend architecture so additional keyboard controllers/vendors can be supported over time.
+Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to your physical layout:
 
-- Auto select (default): no env vars needed.
-- Force a specific backend: set `KEYRGB_BACKEND`.
-
-Examples:
-
-```bash
-KEYRGB_BACKEND=auto keyrgb
-KEYRGB_BACKEND=ite8291r3 keyrgb
-KEYRGB_BACKEND=sysfs-leds keyrgb
-```
-
-Notes:
-
-- Today, `ite8291r3` is the primary backend.
-- If no backend is available, the tray/GUI should still launch (you’ll just have no hardware control).
-
-## How per-key works
-
-Most of these controllers expose a fixed LED matrix (often 6×21). The physical key at `(row, col)` is device-specific.
-
-KeyRGB solves this by calibration:
-
-1. Run the calibrator.
-2. It lights one matrix cell at a time.
-3. You click the corresponding key on the on-screen image.
+1. Open `keyrgb-perkey`.
+2. Click **Run Keymap Calibrator**.
+3. Click the corresponding key on-screen as each physical LED lights up.
 4. Save the keymap.
-
-After calibration, the per-key editor and effects use that mapping.
-
-## Profiles
-
-Profiles live under:
-
-`~/.config/keyrgb/profiles/<profile>/`
-
-Each profile groups:
-
-- The keymap
-- Global overlay alignment tweaks
-- Per-key overlay tweaks
-- Per-key colors
-
-Use the **Profiles** section in the per-key editor to Activate/Save/Delete.
-
-## Hardware support
-
-KeyRGB supports multiple keyboard backlight backends.
-
-Common examples:
-
-- USB (ITE): typical USB IDs include `048d:600b`, `048d:6008`, `048d:6006`, etc.
-- Sysfs LED: looks for common `/sys/class/leds/*kbd*` patterns; capabilities vary by device.
-
-Support is device/firmware dependent. If you want to contribute a new laptop revision, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Troubleshooting
 
-- **No tray icon / nothing happens**: run `keyrgb` from a terminal and check logs.
-- **Permission denied / cannot open device**: ensure the udev rule is installed and replug/reboot.
-- **Effects “fight” or flicker**: stop other RGB tools (`openrgb`, Tuxedo tools) so there is a single owner.
-- **Per-key does nothing**: you need a keymap. Open `keyrgb-perkey` and click **Run Keymap Calibrator**.
+| Issue | Solution |
+| --- | --- |
+| No tray icon | Run `keyrgb` from a terminal to see errors. Check if the system tray extension is enabled (GNOME). |
+| Permission denied | Ensure udev rules are installed. Try replugging the device or rebooting. |
+| Flickering effects | Ensure other tools (OpenRGB, TCC) are not running. KeyRGB needs exclusive access. |
+| Per-key not working | You likely need to run the Keymap Calibrator first. |
 
-## Settings
+## Advanced usage
 
-The tray menu includes a **Settings** entry which opens a small GUI for:
+### Installer arguments
 
-- **Power Management**: turn keyboard LEDs off/on on suspend/resume and lid close/open.
-- **Screen Dim Sync** (KDE Plasma / Wayland): sync keyboard lighting to screen dimming; can either turn off or dim to a temporary brightness, and will turn off when the screen is powered off.
-- **Autostart**:
-	- **Start lighting on launch** (KeyRGB behavior at startup)
-	- **Start KeyRGB on login** (OS session autostart via `~/.config/autostart/keyrgb.desktop`)
+| Argument | Meaning |
+| --- | --- |
+| `--appimage` | Download AppImage (default). |
+| `--pip` | Install via `pip --user` (dev/editable). |
+| `--clone` | Clone repo and install via pip (source). |
+| `--version <tag>` | Install specific tag (e.g. `v0.9.2`). |
 
-If you quit the tray during a session, you can re-open it from your desktop app menu by searching for **KeyRGB**.
+### Environment variables
 
-## Getting your hardware supported
+| Variable | Usage |
+| --- | --- |
+| `KEYRGB_BACKEND` | Force backend: `auto` (default), `ite8291r3`, or `sysfs-leds`. |
+| `KEYRGB_DEBUG=1` | Enable verbose debug logging for bug reports. |
+| `KEYRGB_TK_SCALING` | Float override for UI scaling (fixes High-DPI quirks). |
 
-If KeyRGB doesn’t control your keyboard yet (or behaves oddly), please open a GitHub issue and include the information below.
-This is the fastest way to let us map your laptop revision to the right backend/quirks.
+## Hardware support and contributing
 
-Open an issue here:
+If KeyRGB detects your device but behaves oddly, or if you have a new laptop model (TongFang/Clevo/etc.), please help us support it.
 
-- [GitHub Issues (new issue)](../../issues/new/choose)
-
-Choose **Hardware support / diagnostics** for new laptop models, or **Bug report** for problems on already-supported hardware.
-
-### 1) Run diagnostics
-
-Run:
+1) Run diagnostics:
 
 ```bash
 keyrgb-diagnostics
 ```
 
-Paste the full JSON output into the issue.
+2) Open an issue:
 
-What it includes (read-only):
+- https://github.com/Rainexn0b/keyRGB/issues/new/choose
 
-- DMI identity (`sys_vendor`, `product_name`, `board_name`)
-- Candidate sysfs LED nodes (keyboard backlight paths)
-- USB IDs (best-effort enumeration)
+Select **Hardware support / diagnostics** and paste the JSON output from step 1.
 
-### 2) Run KeyRGB with debug logs
+3) Include details:
 
-```bash
-KEYRGB_DEBUG=1 keyrgb
-```
-
-Then:
-
-- Describe what you clicked (tray menu items, GUI actions)
-- Paste any errors/warnings from the terminal
-
-### 3) If USB is involved, also paste this
-
-```bash
-lsusb | grep -i "048d:" || true
-```
-
-### 4) What to mention in plain English
-
-- Laptop brand + model name you bought (e.g. WootBook / Tuxedo / XMG)
-- What works vs what doesn’t (brightness, effects, per-key)
-- Any quirks (e.g. “after resume it switches to rainbow and ignores settings”)
+- Laptop model (e.g., XMG Core 15, Tuxedo InfinityBook)
+- USB ID (run `lsusb | grep -i "048d:"`)
+- Description of what works vs. what fails
 
 ### Privacy note
 
-`keyrgb-diagnostics` does not include usernames or home directory paths.
-If you still prefer to redact, you can replace DMI values with `REDACTED` while keeping their *presence* and structure.
-
-More troubleshooting and setup details are in [docs/usage/usage.md](docs/usage/usage.md).
-
-## Optional dependencies
-
-- `PyQt6` is used for optional slider dialogs in the tray UI. KeyRGB still runs without it.
-	- Install it with `python3 -m pip install --user "PyQt6>=6.10.0"` or `python3 -m pip install --user -e ".[qt]"`.
+`keyrgb-diagnostics` attempts to sanitize output, but please review the JSON before posting to ensure no personal paths/names are included.
 
 ## License
 
-GPL-2.0-or-later. See [LICENSE](LICENSE).
+GPL-2.0-or-later.
