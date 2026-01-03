@@ -8,7 +8,23 @@ running actual effect loops or depending on hardware/threading.
 from __future__ import annotations
 
 import math
-from unittest.mock import MagicMock
+
+
+def test_speed_mapping_has_strong_top_end() -> None:
+    from src.core.effects.software_loops import _pace
+
+    class E:
+        def __init__(self, speed: int):
+            self.speed = speed
+
+    p0 = _pace(E(0))
+    p5 = _pace(E(5))
+    p10 = _pace(E(10))
+
+    assert p0 > 0.0
+    assert p10 > p5
+    # The top end should be meaningfully faster.
+    assert p10 >= (p5 * 2.5)
 
 
 class TestPulseCalculation:
@@ -57,73 +73,10 @@ class TestPulseCalculation:
         assert 45 <= pulse_brightness <= 55  # ~50 with rounding tolerance
 
 
-class TestFireColorGeneration:
-    """Test fire effect color range logic."""
-
-    def test_fire_generates_red_dominant_colors(self):
-        """Fire colors should have red component stronger than green."""
-        # Simulate fire color generation (red: 200-255, green: 0-100, blue: 0)
-        for _ in range(20):
-            # Using fixed seed-like values for deterministic testing
-            red_base = 200
-            red_random = 27.5  # midpoint of 0-55
-            green_random = 50  # midpoint of 0-100
-
-            red = int((red_base + red_random))
-            green = int(green_random)
-            blue = 0
-
-            assert red > green, f"Fire should be red-dominant: R={red} G={green}"
-            assert blue == 0, "Fire should have no blue component"
-
-    def test_fire_respects_brightness_factor(self):
-        """Fire colors should scale with brightness factor."""
-        brightness = 50  # 50%
-        factor = brightness / 100.0
-
-        red_raw = 255
-        green_raw = 100
-
-        red_scaled = int(red_raw * factor)
-        green_scaled = int(green_raw * factor)
-
-        assert red_scaled == 127  # 255 * 0.5
-        assert green_scaled == 50  # 100 * 0.5
-
-
-class TestRandomColorGeneration:
-    """Test random effect color generation and cross-fade logic."""
-
-    def test_random_generates_full_spectrum_colors(self):
-        """Random colors should span the full RGB spectrum."""
-        factor = 1.0  # Full brightness
-
-        # Simulate random color generation
-        colors = [
-            (int(0.0 * 255 * factor), int(1.0 * 255 * factor), int(0.5 * 255 * factor)),
-            (int(1.0 * 255 * factor), int(0.0 * 255 * factor), int(0.0 * 255 * factor)),
-            (int(0.3 * 255 * factor), int(0.7 * 255 * factor), int(0.9 * 255 * factor)),
-        ]
-
-        for r, g, b in colors:
-            assert 0 <= r <= 255
-            assert 0 <= g <= 255
-            assert 0 <= b <= 255
-
-    def test_random_avoids_black_at_positive_brightness(self):
-        """Random effect should avoid (0,0,0) at positive brightness."""
-        brightness = 80
-        target = (0, 0, 0)
-
-        # Simulate the avoid_full_black check
-        if brightness > 0 and target == (0, 0, 0):
-            target = (1, 0, 0)
-
-        assert target != (0, 0, 0)
-        assert target == (1, 0, 0)
+class TestCrossFadeMath:
+    """Basic lerp sanity checks used by multiple effects."""
 
     def test_cross_fade_linear_interpolation_at_midpoint(self):
-        """Cross-fade at t=0.5 should produce midpoint color."""
         prev = (100, 0, 200)
         target = (200, 100, 0)
         t = 0.5
@@ -135,39 +88,9 @@ class TestRandomColorGeneration:
         g = int(round(pg + (tg - pg) * t))
         b = int(round(pb + (tb - pb) * t))
 
-        assert r == 150  # (100 + 200) / 2
-        assert g == 50   # (0 + 100) / 2
-        assert b == 100  # (200 + 0) / 2
-
-    def test_cross_fade_at_start_equals_previous(self):
-        """Cross-fade at t=0 should equal previous color."""
-        prev = (100, 50, 200)
-        target = (200, 100, 0)
-        t = 0.0
-
-        pr, pg, pb = prev
-        tr, tg, tb = target
-
-        r = int(round(pr + (tr - pr) * t))
-        g = int(round(pg + (tg - pg) * t))
-        b = int(round(pb + (tb - pb) * t))
-
-        assert (r, g, b) == prev
-
-    def test_cross_fade_at_end_equals_target(self):
-        """Cross-fade at t=1.0 should equal target color."""
-        prev = (100, 50, 200)
-        target = (200, 100, 0)
-        t = 1.0
-
-        pr, pg, pb = prev
-        tr, tg, tb = target
-
-        r = int(round(pr + (tr - pr) * t))
-        g = int(round(pg + (tg - pg) * t))
-        b = int(round(pb + (tb - pb) * t))
-
-        assert (r, g, b) == target
+        assert r == 150
+        assert g == 50
+        assert b == 100
 
 
 class TestStrobeToggling:
@@ -204,6 +127,25 @@ class TestStrobeToggling:
 
         assert off_brightness == 80
         assert off_color == (0, 0, 0)
+
+
+class TestReactiveKeyMapping:
+    def test_evdev_key_name_to_key_id_letters_digits(self):
+        from src.core.effects.software_loops import _evdev_key_name_to_key_id
+
+        assert _evdev_key_name_to_key_id("KEY_A") == "a"
+        assert _evdev_key_name_to_key_id("KEY_1") == "1"
+        assert _evdev_key_name_to_key_id("A") == "a"
+
+    def test_evdev_key_name_to_key_id_specials(self):
+        from src.core.effects.software_loops import _evdev_key_name_to_key_id
+
+        assert _evdev_key_name_to_key_id("KEY_LEFTSHIFT") == "lshift"
+        assert _evdev_key_name_to_key_id("KEY_RIGHTALT") == "ralt"
+        assert _evdev_key_name_to_key_id("KEY_BACKSLASH") == "bslash"
+        assert _evdev_key_name_to_key_id("KEY_LEFTBRACE") == "lbracket"
+        assert _evdev_key_name_to_key_id("KEY_KP1") == "num1"
+        assert _evdev_key_name_to_key_id("KEY_KPDOT") == "numdot"
 
 
 class TestBrightnessFactorCalculation:

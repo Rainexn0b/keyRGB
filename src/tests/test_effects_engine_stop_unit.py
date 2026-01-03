@@ -13,12 +13,12 @@ def test_start_effect_stops_previous_software_thread() -> None:
     engine.device_available = False
     engine._ensure_device_available = lambda: True  # type: ignore[assignment]
 
-    engine.start_effect("pulse", speed=0, brightness=25, color=(255, 0, 0))
+    engine.start_effect("rainbow_wave", speed=0, brightness=25, color=(255, 0, 0))
     first_thread = engine.thread
     assert first_thread is not None
 
     # Immediately switch effects; the first thread must not keep running.
-    engine.start_effect("fire", speed=0, brightness=25, color=(255, 0, 0))
+    engine.start_effect("spectrum_cycle", speed=0, brightness=25, color=(255, 0, 0))
     second_thread = engine.thread
     assert second_thread is not None
     assert second_thread is not first_thread
@@ -33,7 +33,7 @@ def test_start_effect_stops_previous_software_thread() -> None:
     engine.stop()
 
 
-def test_static_effect_fades_between_colors() -> None:
+def test_software_effect_fades_between_colors() -> None:
     class SpyKeyboard(_NullKeyboard):
         def __init__(self):
             self.calls: list[tuple[tuple[int, int, int], int]] = []
@@ -50,11 +50,12 @@ def test_static_effect_fades_between_colors() -> None:
     engine._ensure_device_available = lambda: True  # type: ignore[assignment]
 
     engine.current_color = (255, 0, 0)
-    engine.start_effect("static", speed=5, brightness=25, color=(0, 0, 255))
+    engine.start_effect("strobe", speed=5, brightness=25, color=(0, 0, 255))
 
-    # Fade should produce multiple intermediate frames and end at the target color.
+    # Fade should produce multiple intermediate frames and include the target color.
     assert len(spy.calls) >= 2
-    assert spy.calls[-1][0] == (0, 0, 255)
+    assert (0, 0, 255) in [rgb for (rgb, _b) in spy.calls]
+    engine.stop()
 
 
 def test_fade_to_non_black_never_writes_full_black() -> None:

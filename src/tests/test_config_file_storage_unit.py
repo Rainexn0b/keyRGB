@@ -74,6 +74,21 @@ class TestLoadConfigSettings:
 
         assert result["effect"] == "breathe"
 
+    def test_load_normalizes_return_effect_after_effect_to_lowercase(self, temp_config_dir):
+        """If return_effect_after_effect is present, it should be lowercased."""
+        from src.core.config_file_storage import load_config_settings
+
+        config_file = temp_config_dir / "config.json"
+        config_file.write_text(json.dumps({"return_effect_after_effect": "PERKEY"}))
+
+        result = load_config_settings(
+            config_file=config_file,
+            defaults={},
+            logger=logging.getLogger(),
+        )
+
+        assert result["return_effect_after_effect"] == "perkey"
+
     def test_load_retries_on_json_decode_error(self, temp_config_dir):
         """If JSON is malformed, load should retry and eventually return None."""
         from src.core.config_file_storage import load_config_settings

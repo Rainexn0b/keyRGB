@@ -53,20 +53,42 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     }
 
     sw_effect_icons = {
-        'static': '⚫',
-        'pulse': '💗',
+        'rainbow_wave': '🌈',
+        'rainbow_swirl': '🌀',
+        'spectrum_cycle': '🌈',
+        'color_cycle': '🎨',
+        'chase': '🏃',
+        'twinkle': '✨',
         'strobe': '⚡',
-        'fire': '🔥',
-        'random': '🎲',
-        'perkey_breathing': '🌬️',
-        'perkey_pulse': '💓',
+        'reactive_fade': '⚡',
+        'reactive_ripple': '💧',
+        'reactive_rainbow': '🌈',
+        'reactive_snake': '🐍',
     }
+
+    def _checked_effect(effect: str):
+        def _checked(_item):
+            return tray.config.effect == effect and not tray.is_off
+
+        return _checked
+
+    def _checked_speed(speed: int):
+        def _checked(_item):
+            return tray.config.speed == speed
+
+        return _checked
+
+    def _checked_brightness(brightness: int):
+        def _checked(_item):
+            return tray.config.brightness == brightness
+
+        return _checked
 
     hw_effects_menu = pystray.Menu(
         item(
             "⏹️ None",
             tray._on_effect_clicked,
-            checked=lambda _i: tray.config.effect == 'none' and not tray.is_off,
+            checked=_checked_effect('none'),
             radio=True,
         ),
         pystray.Menu.SEPARATOR,
@@ -74,34 +96,93 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             item(
                 f"{hw_effect_icons.get(effect, '•')} {effect.capitalize()}",
                 tray._on_effect_clicked,
-                checked=lambda _i, e=effect: tray.config.effect == e and not tray.is_off,
+                checked=_checked_effect(effect),
                 radio=True,
             )
             for effect in ['rainbow', 'breathing', 'wave', 'ripple', 'marquee', 'raindrop', 'aurora', 'fireworks']
         ],
     )
 
-    sw_effect_names = ['static', 'pulse', 'strobe', 'fire', 'random']
-    if per_key_supported:
-        sw_effect_names += ['perkey_breathing', 'perkey_pulse']
+    def _sw_cb(effect: str):
+        def _action(_icon, _item):
+            tray._on_effect_key_clicked(effect)
+
+        return _action
 
     sw_effects_menu = pystray.Menu(
         item(
             "⏹️ None",
-            tray._on_effect_clicked,
-            checked=lambda _i: tray.config.effect == 'none' and not tray.is_off,
+            _sw_cb('none'),
+            checked=_checked_effect('none'),
             radio=True,
         ),
         pystray.Menu.SEPARATOR,
-        *[
-            item(
-                f"{sw_effect_icons.get(effect, '•')} {effect.replace('_', ' ').title()}",
-                tray._on_effect_clicked,
-                checked=lambda _i, e=effect: tray.config.effect == e and not tray.is_off,
-                radio=True,
-            )
-            for effect in sw_effect_names
-        ],
+        item(
+            f"{sw_effect_icons.get('rainbow_wave', '•')} Rainbow Wave",
+            _sw_cb('rainbow_wave'),
+            checked=_checked_effect('rainbow_wave'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('rainbow_swirl', '•')} Rainbow Swirl",
+            _sw_cb('rainbow_swirl'),
+            checked=_checked_effect('rainbow_swirl'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('spectrum_cycle', '•')} Spectrum Cycle",
+            _sw_cb('spectrum_cycle'),
+            checked=_checked_effect('spectrum_cycle'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('color_cycle', '•')} Color Cycle",
+            _sw_cb('color_cycle'),
+            checked=_checked_effect('color_cycle'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('chase', '•')} Chase",
+            _sw_cb('chase'),
+            checked=_checked_effect('chase'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('twinkle', '•')} Twinkle",
+            _sw_cb('twinkle'),
+            checked=_checked_effect('twinkle'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('strobe', '•')} Strobe",
+            _sw_cb('strobe'),
+            checked=_checked_effect('strobe'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('reactive_fade', '•')} Reactive Fade",
+            _sw_cb('reactive_fade'),
+            checked=_checked_effect('reactive_fade'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('reactive_ripple', '•')} Reactive Ripple",
+            _sw_cb('reactive_ripple'),
+            checked=_checked_effect('reactive_ripple'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('reactive_rainbow', '•')} Reactive Rainbow",
+            _sw_cb('reactive_rainbow'),
+            checked=_checked_effect('reactive_rainbow'),
+            radio=True,
+        ),
+        item(
+            f"{sw_effect_icons.get('reactive_snake', '•')} Reactive Snake",
+            _sw_cb('reactive_snake'),
+            checked=_checked_effect('reactive_snake'),
+            radio=True,
+        ),
     )
 
     speed_menu = pystray.Menu(
@@ -109,7 +190,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             item(
                 f"{'🔘' if tray.config.speed == speed else '⚪'} {speed}",
                 tray._on_speed_clicked,
-                checked=lambda _i, s=speed: tray.config.speed == s,
+                checked=_checked_speed(speed),
                 radio=True,
             )
             for speed in range(0, 11)
@@ -121,7 +202,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             item(
                 f"{'🔘' if tray.config.brightness == brightness * 5 else '⚪'} {brightness}",
                 tray._on_brightness_clicked,
-                checked=lambda _i, b=brightness: tray.config.brightness == b * 5,
+                checked=_checked_brightness(brightness * 5),
                 radio=True,
             )
             for brightness in range(0, 11)

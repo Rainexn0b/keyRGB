@@ -1,0 +1,9 @@
+# Allow active local user session to read keyboard input events for reactive effects.
+#
+# SECURITY WARNING:
+#   Access to /dev/input/event* allows observing keypresses. This rule uses
+#   seat-based ACLs (uaccess) so only the active local desktop user gets access.
+#
+# On some distros, input devices do not get uaccess by default; without this,
+# reactive typing effects may fall back to a synthetic animation.
+SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_INPUT_KEYBOARD}=="1", TAG+="uaccess", RUN{builtin}+="uaccess"

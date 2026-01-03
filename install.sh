@@ -44,6 +44,7 @@ Env vars:
     KEYRGB_INSTALL_POWER_HELPER=y|n  Select the lightweight Power Mode helper.
     KEYRGB_INSTALL_TUXEDO=y|n  Select optional TCC integration.
     KEYRGB_INSTALL_TCC_APP=y|n  If TCC integration is selected, optionally install Tuxedo Control Center via dnf (best-effort).
+    KEYRGB_INSTALL_INPUT_UDEV=y|n  Install udev rule for Reactive Typing to read keypress events via /dev/input (uaccess; security-sensitive; default: n).
     Note: Power Mode helper and TCC integration are mutually exclusive; if both are set truthy, Power Mode is preferred.
     KEYRGB_ALLOW_PRERELEASE=y|n  Allow installing from prereleases (default: n).
 EOF
@@ -56,6 +57,7 @@ KEYRGB_VERSION="${KEYRGB_VERSION:-}"
 KEYRGB_APPIMAGE_ASSET="${KEYRGB_APPIMAGE_ASSET:-keyrgb-x86_64.AppImage}"
 KEYRGB_ALLOW_PRERELEASE="${KEYRGB_ALLOW_PRERELEASE:-n}"
 KEYRGB_INSTALL_TCC_APP="${KEYRGB_INSTALL_TCC_APP:-}"
+KEYRGB_INSTALL_INPUT_UDEV="${KEYRGB_INSTALL_INPUT_UDEV:-}"
 
 STATE_DIR="$HOME/.local/share/keyrgb"
 TCC_MARKER="$STATE_DIR/tcc-installed-by-keyrgb"
@@ -303,6 +305,28 @@ fi
 
 if [ "$INSTALL_TCC_APP" = "y" ]; then
     echo "✓ Tuxedo Control Center will be installed via dnf (best-effort)"
+fi
+
+# Optional permissions: reactive typing keypress capture.
+if [ "${KEYRGB_INSTALL_INPUT_UDEV:-}" != "" ]; then
+    # Normalize env var to y/n for consistent behavior.
+    KEYRGB_INSTALL_INPUT_UDEV="$(ask_yes_no "" "n" "KEYRGB_INSTALL_INPUT_UDEV")"
+elif [ -t 0 ]; then
+    echo
+    echo "Optional permissions:"
+    echo "Reactive Typing effects (Fade/Ripple) can react to real keypress events."
+    echo "This requires read access to /dev/input/event* (security-sensitive)."
+    echo "KeyRGB can install a seat-based uaccess udev rule so only the active local user gets access."
+    KEYRGB_INSTALL_INPUT_UDEV="$(ask_yes_no "Enable Reactive Typing keypress detection (install uaccess rule for keyboard input devices)?" "n")"
+else
+    # Non-interactive default: do not install the rule.
+    KEYRGB_INSTALL_INPUT_UDEV="n"
+fi
+
+if [ "${KEYRGB_INSTALL_INPUT_UDEV,,}" = "y" ]; then
+    echo "✓ Reactive Typing keypress detection will be enabled (uaccess rule)"
+else
+    echo "✓ Reactive Typing keypress detection will be disabled (synthetic fallback)"
 fi
 
 install_system_deps_fedora() {
@@ -721,6 +745,43 @@ install_udev_rule() {
     fi
 }
 
+install_input_udev_rule() {
+    local src_rule="$REPO_DIR/system/udev/99-keyrgb-input-uaccess.rules"
+    local dst_rule="/etc/udev/rules.d/99-keyrgb-input-uaccess.rules"
+
+    if [ "${KEYRGB_INSTALL_INPUT_UDEV,,}" = "n" ] || [ "${KEYRGB_INSTALL_INPUT_UDEV,,}" = "no" ] || [ "${KEYRGB_INSTALL_INPUT_UDEV,,}" = "0" ] || [ "${KEYRGB_INSTALL_INPUT_UDEV,,}" = "false" ]; then
+        return 0
+    fi
+
+    if ! command -v udevadm &> /dev/null; then
+        echo "⚠️  udevadm not found; cannot install input udev rule automatically."
+        echo "   If you want reactive typing to use real keypress events, copy: $src_rule"
+        echo "   into: $dst_rule"
+        return 0
+    fi
+
+    if [ ! -f "$src_rule" ]; then
+        echo "⚠️  input udev rule file not found: $src_rule"
+        return 0
+    fi
+
+    echo
+    echo "🔐 Installing input udev rule for Reactive Typing (uaccess)..."
+    echo "   (This allows the active local user session to read keyboard input events.)"
+    echo "   (This may prompt for your sudo password.)"
+
+    if [ -f "$dst_rule" ] && cmp -s "$src_rule" "$dst_rule"; then
+        echo "✓ input udev rule already installed: $dst_rule"
+    else
+        sudo install -D -m 0644 "$src_rule" "$dst_rule"
+        echo "✓ Installed input udev rule: $dst_rule"
+    fi
+
+    sudo udevadm control --reload-rules
+    sudo udevadm trigger
+    echo "✓ Reloaded udev rules"
+}
+
 install_power_mode_helper() {
     if [ "$INSTALL_POWER_HELPER" != "y" ]; then
         return 0
@@ -869,6 +930,7 @@ else
     install_appimage
 fi
 install_udev_rule
+install_input_udev_rule
 install_power_mode_helper
 
 # Many distros don't include ~/.local/bin on PATH by default.

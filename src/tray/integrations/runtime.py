@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import importlib
+import logging
 from dataclasses import dataclass
 from contextlib import suppress
 from pathlib import Path
@@ -15,6 +16,9 @@ if TYPE_CHECKING:
 _pystray_mod = None
 _pystray_item = None
 _instance_lock_fh = None
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -110,14 +114,18 @@ def get_pystray():
 
     if not explicit_backend and _gi_is_working():
         os.environ["PYSTRAY_BACKEND"] = "appindicator"
+        logger.info("pystray backend: appindicator (auto)")
         try:
             _pystray_mod = importlib.import_module("pystray")
         except Exception:
             _clear_failed_import("pystray")
             _set_pystray_backend_xorg_for_retry()
+            logger.info("pystray backend: xorg (fallback)")
             _pystray_mod = importlib.import_module("pystray")
     else:
         try:
+            if explicit_backend:
+                logger.info("pystray backend: %s (explicit)", os.environ.get("PYSTRAY_BACKEND"))
             _pystray_mod = importlib.import_module("pystray")
         except Exception as exc:  # pragma: no cover (depends on desktop env)
             failure = _classify_pystray_import_error(exc)
@@ -127,6 +135,7 @@ def get_pystray():
                 # does not fall back to other backends. Force Xorg and retry once.
                 _clear_failed_import("pystray")
                 _force_pystray_backend_xorg()
+                logger.info("pystray backend: xorg (broken-gi fallback)")
                 _pystray_mod = importlib.import_module("pystray")
             else:
                 raise RuntimeError(

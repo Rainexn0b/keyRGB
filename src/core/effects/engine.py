@@ -10,18 +10,25 @@ import logging
 from threading import Event, RLock, Thread
 from typing import Dict, Optional, Tuple
 
+import traceback
+
 from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.device import NullKeyboard, acquire_keyboard
 from src.core.effects.fades import fade_in_per_key, fade_uniform_color
 from src.core.effects.hw_payloads import build_hw_effect_payload
 from src.core.effects.ite_backend import hw_colors, hw_effects
 from src.core.effects.software_loops import (
-    run_fire,
-    run_perkey_breathing,
-    run_perkey_pulse,
-    run_pulse,
-    run_random,
+    run_chase,
+    run_color_cycle,
+    run_rainbow_wave,
+    run_rainbow_swirl,
+    run_reactive_fade,
+    run_reactive_ripple,
+    run_reactive_rainbow,
+    run_reactive_snake,
+    run_spectrum_cycle,
     run_strobe,
+    run_twinkle,
 )
 from src.core.effects.timing import brightness_factor, clamped_interval, get_interval
 
@@ -38,8 +45,20 @@ class EffectsEngine:
     # Hardware effects (built into the controller)
     HW_EFFECTS = ['rainbow', 'breathing', 'wave', 'ripple', 'marquee', 'raindrop', 'aurora', 'fireworks']
     
-    # Custom software effects
-    SW_EFFECTS = ['static', 'pulse', 'strobe', 'fire', 'random', 'perkey_breathing', 'perkey_pulse']
+    # Custom software effects (OpenRGB-style)
+    SW_EFFECTS = [
+        'rainbow_wave',
+        'rainbow_swirl',
+        'spectrum_cycle',
+        'color_cycle',
+        'chase',
+        'twinkle',
+        'strobe',
+        'reactive_fade',
+        'reactive_ripple',
+        'reactive_rainbow',
+        'reactive_snake',
+    ]
     
     ALL_EFFECTS = HW_EFFECTS + SW_EFFECTS
     
@@ -137,71 +156,159 @@ class EffectsEngine:
             self._start_hw_effect(effect_name)
         
         # Software effects - run in thread
-        elif effect_name == 'static':
-            self._fade_uniform_color(
-                from_color=prev_color,
-                to_color=tuple(self.current_color),
-                brightness=int(self.brightness),
-                duration_s=0.12,
-            )
-        
-        elif effect_name == 'pulse':
-            self._fade_uniform_color(
-                from_color=prev_color,
-                to_color=tuple(self.current_color),
-                brightness=int(self.brightness),
-                duration_s=0.10,
-            )
+        elif effect_name == 'rainbow_wave':
+            # Rainbow wave does not depend on current_color; fade in gently.
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=(255, 0, 0),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
             self.running = True
-            self.thread = Thread(target=self._effect_pulse, daemon=True)
+            self.thread = Thread(target=self._effect_rainbow_wave, daemon=True)
             self.thread.start()
-        
+
+        elif effect_name == 'rainbow_swirl':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=(255, 0, 0),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
+            self.running = True
+            self.thread = Thread(target=self._effect_rainbow_swirl, daemon=True)
+            self.thread.start()
+
+        elif effect_name == 'spectrum_cycle':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=(255, 0, 0),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
+            self.running = True
+            self.thread = Thread(target=self._effect_spectrum_cycle, daemon=True)
+            self.thread.start()
+
+        elif effect_name == 'color_cycle':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=(255, 0, 0),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
+            self.running = True
+            self.thread = Thread(target=self._effect_color_cycle, daemon=True)
+            self.thread.start()
+
+        elif effect_name == 'chase':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=tuple(self.current_color),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
+            self.running = True
+            self.thread = Thread(target=self._effect_chase, daemon=True)
+            self.thread.start()
+
+        elif effect_name == 'twinkle':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=tuple(self.current_color),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
+            self.running = True
+            self.thread = Thread(target=self._effect_twinkle, daemon=True)
+            self.thread.start()
+
         elif effect_name == 'strobe':
-            # Ease into strobe so it doesn't feel like a harsh snap.
-            self._fade_uniform_color(
-                from_color=prev_color,
-                to_color=(255, 255, 255),
-                brightness=int(self.brightness),
-                duration_s=0.08,
-            )
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=tuple(self.current_color),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
             self.running = True
             self.thread = Thread(target=self._effect_strobe, daemon=True)
             self.thread.start()
-        
-        elif effect_name == 'fire':
-            # Start fire from a warm base tone.
-            self._fade_uniform_color(
-                from_color=prev_color,
-                to_color=(255, 80, 0),
-                brightness=int(self.brightness),
-                duration_s=0.08,
-            )
+
+        elif effect_name == 'reactive_fade':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=tuple(self.current_color),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
             self.running = True
-            self.thread = Thread(target=self._effect_fire, daemon=True)
+            self.thread = Thread(target=self._effect_reactive_fade, daemon=True)
             self.thread.start()
-        
-        elif effect_name == 'random':
-            # Fade into the first random frame to reduce "flash".
-            self._fade_uniform_color(
-                from_color=prev_color,
-                to_color=tuple(self.current_color),
-                brightness=int(self.brightness),
-                duration_s=0.06,
-            )
+
+        elif effect_name == 'reactive_ripple':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=tuple(self.current_color),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
             self.running = True
-            self.thread = Thread(target=self._effect_random, daemon=True)
+            self.thread = Thread(target=self._effect_reactive_ripple, daemon=True)
             self.thread.start()
-        
-        elif effect_name == 'perkey_breathing':
-            self._fade_in_per_key(duration_s=0.12)
+
+        elif effect_name == 'reactive_rainbow':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=(255, 0, 0),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
             self.running = True
-            self.thread = Thread(target=self._effect_perkey_breathing, daemon=True)
+            self.thread = Thread(target=self._effect_reactive_rainbow, daemon=True)
             self.thread.start()
-        
-        elif effect_name == 'perkey_pulse':
-            self._fade_in_per_key(duration_s=0.10)
+
+        elif effect_name == 'reactive_snake':
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+            else:
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=tuple(self.current_color),
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
             self.running = True
-            self.thread = Thread(target=self._effect_perkey_pulse, daemon=True)
+            self.thread = Thread(target=self._effect_reactive_snake, daemon=True)
             self.thread.start()
     
     def _start_hw_effect(self, effect_name: str):
@@ -284,30 +391,62 @@ class EffectsEngine:
     def _brightness_factor(self) -> float:
         """Get brightness as 0-1 factor"""
         return brightness_factor(int(self.brightness))
-    
-    def _effect_pulse(self):
-        """Pulse: Rhythmic brightness pulses with current color"""
-        run_pulse(self)
-    
+
+    def _effect_rainbow_wave(self):
+        """Rainbow Wave (SW): classic rainbow wave across the keyboard."""
+        run_rainbow_wave(self)
+
+    def _effect_rainbow_swirl(self):
+        """Rainbow Swirl (SW): swirl around the keyboard center."""
+        run_rainbow_swirl(self)
+
+    def _effect_spectrum_cycle(self):
+        """Spectrum Cycle (SW): uniform hue cycling."""
+        run_spectrum_cycle(self)
+
+    def _effect_color_cycle(self):
+        """Color Cycle (SW): smooth RGB cycling."""
+        run_color_cycle(self)
+
+    def _effect_chase(self):
+        """Chase (SW): moving highlight band."""
+        run_chase(self)
+
+    def _effect_twinkle(self):
+        """Twinkle (SW): random sparkles."""
+        run_twinkle(self)
+
     def _effect_strobe(self):
-        """Strobe: Rapid on/off flashing"""
+        """Strobe (SW): rapid flashing."""
         run_strobe(self)
-    
-    def _effect_fire(self):
-        """Fire: Flickering red/orange flames"""
-        run_fire(self)
-    
-    def _effect_random(self):
-        """Random: Random color changes"""
-        run_random(self)
-    
-    def _effect_perkey_breathing(self):
-        """Per-Key Breathing: Breathing animation that preserves each key's individual color"""
-        run_perkey_breathing(self)
-    
-    def _effect_perkey_pulse(self):
-        """Per-Key Pulse: Pulse animation that preserves each key's individual color"""
-        run_perkey_pulse(self)
+
+    def _effect_reactive_fade(self):
+        """Reactive Typing (Fade): Best-effort keypress reactive."""
+        try:
+            run_reactive_fade(self)
+        except Exception:
+            logger.error("Reactive Fade thread crashed:\n%s", traceback.format_exc())
+
+    def _effect_reactive_ripple(self):
+        """Reactive Typing (Ripple): Best-effort keypress reactive."""
+        try:
+            run_reactive_ripple(self)
+        except Exception:
+            logger.error("Reactive Ripple thread crashed:\n%s", traceback.format_exc())
+
+    def _effect_reactive_rainbow(self):
+        """Reactive Rainbow: Each keypress spawns a cycling rainbow pulse."""
+        try:
+            run_reactive_rainbow(self)
+        except Exception:
+            logger.error("Reactive Rainbow thread crashed:\n%s", traceback.format_exc())
+
+    def _effect_reactive_snake(self):
+        """Reactive Snake: Typing leaves a trailing snake effect."""
+        try:
+            run_reactive_snake(self)
+        except Exception:
+            logger.error("Reactive Snake thread crashed:\n%s", traceback.format_exc())
 
 
 if __name__ == '__main__':

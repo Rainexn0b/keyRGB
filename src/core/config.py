@@ -63,6 +63,10 @@ class Config:
         'speed': 4,  # 0-10 UI scale (10 = fastest)
         'brightness': 25,  # 0-50 hardware scale
         'color': [255, 0, 0],  # RGB for static/custom effects
+        # When a non-per-key effect is started from a per-key state, we can remember
+        # which per-key mode to restore when the user stops the effect.
+        # None | 'perkey'
+        'return_effect_after_effect': None,
         'autostart': True,
         # OS session autostart (XDG ~/.config/autostart). When enabled, KeyRGB tray
         # should be started automatically on login.
@@ -157,6 +161,32 @@ class Config:
     @effect.setter
     def effect(self, value: str):
         self._settings['effect'] = value.lower()
+        self._save()
+
+    @property
+    def return_effect_after_effect(self) -> str | None:
+        v = self._settings.get('return_effect_after_effect', None)
+        if v is None:
+            return None
+        try:
+            s = str(v).strip().lower()
+        except Exception:
+            return None
+        if not s:
+            return None
+        # Backward compatibility: older versions stored per-key animations as
+        # distinct modes. Those software effects are now removed, but the safest
+        # restore behavior is to return to plain per-key.
+        if s in {'perkey', 'perkey_breathing', 'perkey_pulse'}:
+            return 'perkey'
+        return None
+
+    @return_effect_after_effect.setter
+    def return_effect_after_effect(self, value: str | None):
+        if value is None:
+            self._settings['return_effect_after_effect'] = None
+        else:
+            self._settings['return_effect_after_effect'] = str(value).strip().lower() or None
         self._save()
     
     @property

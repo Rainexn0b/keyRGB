@@ -74,5 +74,19 @@ def scaled_color_map(
 def enable_user_mode_once(*, kb, kb_lock, brightness: int) -> None:
     """Enable user mode once without saving, to avoid flicker."""
 
-    with kb_lock:
-        kb.enable_user_mode(brightness=brightness, save=False)
+    fn = getattr(kb, "enable_user_mode", None)
+    if not callable(fn):
+        return
+
+    try:
+        with kb_lock:
+            fn(brightness=brightness, save=False)
+    except Exception as exc:
+        log_throttled(
+            logger,
+            "perkey_animation.enable_user_mode_once",
+            interval_s=120,
+            level=logging.DEBUG,
+            msg="Failed to enable per-key user mode",
+            exc=exc,
+        )

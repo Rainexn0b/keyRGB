@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Final
 
-DEFAULT_SOFTWARE_SLOWDOWN: Final[float] = 1.89
+# Baseline multiplier for software loops.
+# Historically this was intentionally slow; software effects now aim to feel closer
+# to hardware effects (snappier) while still allowing the speed slider to slow
+# things down when desired.
+DEFAULT_SOFTWARE_SLOWDOWN: Final[float] = 0.8
 
 
 def get_interval(base_ms: int, *, speed: int, slowdown: float = DEFAULT_SOFTWARE_SLOWDOWN) -> float:

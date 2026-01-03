@@ -37,6 +37,19 @@ def load_config_settings(
             if "effect" in loaded and isinstance(loaded["effect"], str):
                 loaded["effect"] = loaded["effect"].lower()
 
+            # Removed/legacy software effects: keep config safe by falling back
+            # to a supported mode instead of crashing when starting an unknown effect.
+            legacy_effect = loaded.get("effect")
+            if legacy_effect in {"static", "pulse"}:
+                loaded["effect"] = "none"
+            elif legacy_effect in {"breathing_sw", "fire", "random", "rain"}:
+                loaded["effect"] = "none"
+            elif legacy_effect in {"perkey_breathing", "perkey_pulse"}:
+                loaded["effect"] = "perkey"
+
+            if "return_effect_after_effect" in loaded and isinstance(loaded["return_effect_after_effect"], str):
+                loaded["return_effect_after_effect"] = loaded["return_effect_after_effect"].lower()
+
             return {**defaults, **loaded}
         except json.JSONDecodeError as e:
             last_error = e

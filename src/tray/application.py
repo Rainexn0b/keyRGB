@@ -89,6 +89,9 @@ class KeyRGBTray:
     def _on_effect_clicked(self, _icon, item):
         callbacks.on_effect_clicked(self, item)
 
+    def _on_effect_key_clicked(self, effect_name: str) -> None:
+        callbacks.on_effect_key_clicked(self, effect_name)
+
     def _on_speed_clicked(self, _icon, item):
         callbacks.on_speed_clicked_cb(self, item)
 

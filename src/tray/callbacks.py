@@ -26,6 +26,18 @@ def on_effect_clicked(tray: Any, item: Any) -> None:
         tray._refresh_ui()
 
 
+def on_effect_key_clicked(tray: Any, effect_name: str) -> None:
+    """Apply a specific effect key (already normalized).
+
+    This avoids relying on parsing menu labels and allows menus to show
+    user-friendly labels while using stable internal effect identifiers.
+    """
+
+    apply_effect_selection(tray, effect_name=str(effect_name or "none").strip().lower())
+    if hasattr(tray, "_refresh_ui"):
+        tray._refresh_ui()
+
+
 def on_speed_clicked_cb(tray: Any, item: Any) -> None:
     on_speed_clicked(tray, item)
 

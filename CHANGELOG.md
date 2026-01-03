@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0 (2026-01-03)
+
+- Effects: replaces/expands software effect suite with OpenRGB-style animations (Rainbow Wave/Swirl, Spectrum Cycle, Color Cycle, Chase, Twinkle, Strobe).
+- Effects: adds reactive typing effects (Reactive Fade/Ripple/Rainbow/Snake) with calibrated per-profile key mapping.
+- Effects: adjusts speed mapping so speed=10 is significantly faster.
+- Permissions: adds an optional udev `uaccess` rule install path to allow safe keypress capture via evdev (without adding the user to the `input` group).
+- Tray: updates effect menus to include the new software/reactive effects and reduces fragile/dynamic tray icon updates for SW effects.
+
 ## 0.8.0 (2026-01-02)
 
 - Power: adds lightweight “Power Mode” (Extreme Saver/Balanced/Performance) with a tray toggle; uses cpufreq sysfs and best-effort boost handling.

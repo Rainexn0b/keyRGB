@@ -138,8 +138,8 @@ class TestApplyEffectSelection:
         assert mock_tray.config.effect == "perkey"
         mock_tray._start_current_effect.assert_called_once()
 
-    def test_perkey_breathing_converts_to_underscored_name(self):
-        """'perkey breathing' should be converted to 'perkey_breathing'."""
+    def test_perkey_breathing_alias_maps_to_perkey(self):
+        """Legacy 'perkey breathing' should behave like plain 'perkey'."""
         from src.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
@@ -148,12 +148,12 @@ class TestApplyEffectSelection:
 
         apply_effect_selection(mock_tray, effect_name="perkey breathing")
 
-        assert mock_tray.config.effect == "perkey_breathing"
+        assert mock_tray.config.effect == "perkey"
         assert mock_tray.engine.per_key_colors == {(0, 0): (0, 255, 0)}
         mock_tray._start_current_effect.assert_called_once()
 
-    def test_perkey_pulse_converts_to_underscored_name(self):
-        """'perkey pulse' should be converted to 'perkey_pulse'."""
+    def test_perkey_pulse_alias_maps_to_perkey(self):
+        """Legacy 'perkey pulse' should behave like plain 'perkey'."""
         from src.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
@@ -162,7 +162,7 @@ class TestApplyEffectSelection:
 
         apply_effect_selection(mock_tray, effect_name="perkey pulse")
 
-        assert mock_tray.config.effect == "perkey_pulse"
+        assert mock_tray.config.effect == "perkey"
         assert mock_tray.engine.per_key_colors == {(1, 1): (0, 0, 255)}
 
     def test_regular_effect_starts_engine_normally(self):
@@ -204,3 +204,32 @@ class TestApplyEffectSelection:
         for effect in hw_effects:
             apply_effect_selection(mock_tray, effect_name=effect)
             assert mock_tray.config.effect == "none", f"{effect} should be blocked"
+
+    def test_stop_restores_perkey_after_nonperkey_effect(self):
+        """Stopping an effect should restore per-key if it was active beforehand."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
+
+        # Start from per-key.
+        mock_tray.config.effect = "perkey"
+        mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
+
+        # Start a non-per-key effect.
+        apply_effect_selection(mock_tray, effect_name="wave")
+        assert getattr(mock_tray.config, "return_effect_after_effect", None) == "perkey"
+
+        # Stop effects; should restore per-key rather than forcing uniform.
+        mock_tray.engine.stop.reset_mock()
+        mock_tray.engine.kb.set_color.reset_mock()
+        mock_tray._start_current_effect.reset_mock()
+
+        apply_effect_selection(mock_tray, effect_name="none")
+
+        mock_tray.engine.stop.assert_called_once()
+        mock_tray.engine.kb.set_color.assert_not_called()
+        assert mock_tray.config.effect == "perkey"
+        mock_tray._start_current_effect.assert_called_once()
+        assert getattr(mock_tray.config, "return_effect_after_effect", None) is None

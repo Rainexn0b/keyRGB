@@ -20,7 +20,11 @@ def start_icon_color_polling(tray) -> None:
                     tuple(getattr(tray.config, "color", (0, 0, 0)) or (0, 0, 0)),
                 )
 
-                dynamic = sig[1] in {"rainbow", "random", "aurora", "fireworks", "wave", "marquee"}
+                # NOTE: On some desktop environments, mutating `pystray.Icon.icon`
+                # from a background thread can make the tray icon stop reacting
+                # to clicks. Keep the periodic repaint limited to hardware
+                # effects only.
+                dynamic = sig[1] in {"rainbow", "aurora", "fireworks", "wave", "marquee"}
 
                 if dynamic or sig != last_sig:
                     tray._update_icon()

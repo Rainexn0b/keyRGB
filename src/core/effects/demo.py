@@ -27,7 +27,7 @@ def run_demo(engine_factory: _EngineFactory) -> None:
             time.sleep(4)
 
         print("\nTesting software effects...")
-        for effect in ["static", "pulse", "fire"]:
+        for effect in ["rainbow_wave", "rainbow_swirl", "spectrum_cycle", "twinkle"]:
             print(f"  {effect}")
             engine.start_effect(effect, speed=5, brightness=25, color=(255, 0, 0))
             time.sleep(4)

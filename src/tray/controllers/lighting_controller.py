@@ -27,12 +27,26 @@ def start_current_effect(tray: Any) -> None:
     """
 
     try:
+        # Best-effort: if the device was unplugged/replugged, try to reacquire.
+        try:
+            ensure = getattr(tray.engine, "_ensure_device_available", None)
+            if callable(ensure):
+                ensure()
+        except Exception:
+            pass
+
         if tray.config.effect == "perkey":
             tray.engine.stop()
             if tray.config.brightness == 0:
                 tray.engine.turn_off()
                 tray.is_off = True
                 return
+
+            # Record per-key mode so software effects can respect it later.
+            try:
+                tray.engine.per_key_colors = dict(getattr(tray.config, "per_key_colors", {}) or {})
+            except Exception:
+                tray.engine.per_key_colors = None
 
             with tray.engine.kb_lock:
                 if hasattr(tray.engine.kb, "enable_user_mode"):
@@ -60,6 +74,12 @@ def start_current_effect(tray: Any) -> None:
                 tray.is_off = True
                 return
 
+            # Record uniform mode so software effects don't accidentally reuse per-key.
+            try:
+                tray.engine.per_key_colors = None
+            except Exception:
+                pass
+
             with tray.engine.kb_lock:
                 tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
             tray.is_off = False
@@ -73,6 +93,19 @@ def start_current_effect(tray: Any) -> None:
         )
         tray.is_off = False
     except Exception as exc:
+        # If the USB device disappeared, mark it unavailable and avoid a scary traceback.
+        try:
+            from usb.core import USBError  # type: ignore
+
+            if isinstance(exc, USBError) and getattr(exc, "errno", None) == 19:
+                try:
+                    tray.engine.mark_device_unavailable()
+                except Exception:
+                    pass
+                logger.warning("Keyboard device unavailable: %s", exc)
+                return
+        except Exception:
+            pass
         try:
             tray._log_exception("Error starting effect: %s", exc)
         except Exception:

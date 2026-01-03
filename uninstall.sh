@@ -6,6 +6,7 @@
 # - AppImage binary at ~/.local/bin/keyrgb (AppImage mode)
 # - desktop launcher and autostart entries
 # - udev rule (with sudo) if it matches this repo's rule
+# - optional: input udev rule for Reactive Typing (/dev/input access) if it matches this repo's rule
 # - power mode helper + polkit rule (with sudo) if they match this repo's files
 # - optionally: Tuxedo Control Center (dnf) ONLY if installed by KeyRGB (marker file)
 #
@@ -138,6 +139,9 @@ fi
 UDEV_DST="/etc/udev/rules.d/99-ite8291-wootbook.rules"
 UDEV_SRC="$REPO_DIR/system/udev/99-ite8291-wootbook.rules"
 
+INPUT_UDEV_DST="/etc/udev/rules.d/99-keyrgb-input-uaccess.rules"
+INPUT_UDEV_SRC="$REPO_DIR/system/udev/99-keyrgb-input-uaccess.rules"
+
 if [ -f "$UDEV_DST" ]; then
   if [ -f "$UDEV_SRC" ] && cmp -s "$UDEV_SRC" "$UDEV_DST"; then
     if confirm "Remove udev rule $UDEV_DST (requires sudo)?"; then
@@ -152,6 +156,24 @@ if [ -f "$UDEV_DST" ]; then
     fi
   else
     echo "⚠️  udev rule exists but does not match this repo's rule; not removing: $UDEV_DST"
+  fi
+fi
+
+if [ -f "$INPUT_UDEV_DST" ]; then
+  if [ -f "$INPUT_UDEV_SRC" ] && cmp -s "$INPUT_UDEV_SRC" "$INPUT_UDEV_DST"; then
+    if confirm "Remove Reactive Typing input udev rule $INPUT_UDEV_DST (requires sudo)?"; then
+      sudo rm -f "$INPUT_UDEV_DST"
+      if command -v udevadm >/dev/null 2>&1; then
+        sudo udevadm control --reload-rules || true
+        sudo udevadm trigger || true
+      fi
+      echo "✓ Removed Reactive Typing input udev rule"
+      echo "  Note: you may need to log out/in for ACLs to refresh."
+    else
+      echo "↷ Skipped removing Reactive Typing input udev rule"
+    fi
+  else
+    echo "⚠️  Reactive Typing input udev rule exists but does not match this repo's rule; not removing: $INPUT_UDEV_DST"
   fi
 fi
 

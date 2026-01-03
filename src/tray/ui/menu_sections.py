@@ -11,7 +11,19 @@ logger = logging.getLogger(__name__)
 
 
 HW_EFFECTS = {"rainbow", "breathing", "wave", "ripple", "marquee", "raindrop", "aurora", "fireworks"}
-SW_EFFECTS = {"static", "pulse", "strobe", "fire", "random", "perkey_breathing", "perkey_pulse"}
+SW_EFFECTS = {
+    "rainbow_wave",
+    "rainbow_swirl",
+    "spectrum_cycle",
+    "color_cycle",
+    "chase",
+    "twinkle",
+    "strobe",
+    "reactive_fade",
+    "reactive_ripple",
+    "reactive_rainbow",
+    "reactive_snake",
+}
 
 
 def _log_menu_debug(key: str, msg: str, exc: Exception, *, interval_s: float = 60) -> None:
@@ -33,15 +45,27 @@ def _format_hex_id(val: str) -> str:
 
 
 def _title(name: str) -> str:
-    return str(name).replace("_", " ").strip().title()
+    n = str(name)
+    if n == "reactive_fade":
+        return "Reactive Typing (Fade)"
+    if n == "reactive_ripple":
+        return "Reactive Typing (Ripple)"
+    if n == "reactive_rainbow":
+        return "Reactive Rainbow"
+    if n == "reactive_snake":
+        return "Reactive Snake"
+    if n == "rainbow_wave":
+        return "Rainbow Wave"
+    if n == "rainbow_swirl":
+        return "Rainbow Swirl"
+    if n == "spectrum_cycle":
+        return "Spectrum Cycle"
+    if n == "color_cycle":
+        return "Color Cycle"
+    return n.replace("_", " ").strip().title()
 
 
 def _perkey_sw_suffix(effect_name: str) -> str:
-    # These are per-key software effects; avoid repeating "Per-key" in the suffix.
-    if effect_name == "perkey_breathing":
-        return "Breathing"
-    if effect_name == "perkey_pulse":
-        return "Pulse"
     return _title(effect_name)
 
 
@@ -110,7 +134,7 @@ def tray_lighting_mode_text(tray: Any) -> str:
     effect = str(getattr(cfg, "effect", "none") or "none")
 
     # Per-key mode is a first-class state.
-    if effect in {"perkey", "perkey_breathing", "perkey_pulse"}:
+    if effect == "perkey":
         try:
             from src.core.profile import profiles
 
@@ -118,9 +142,7 @@ def tray_lighting_mode_text(tray: Any) -> str:
         except Exception:
             active_profile = "(unknown)"
 
-        if effect == "perkey":
-            return f"🔎 Active: Per-key ({active_profile})"
-        return f"🔎 Active: Per-key ({active_profile}) — SW {_perkey_sw_suffix(effect)}"
+        return f"🔎 Active: Per-key ({active_profile})"
 
     # Uniform color is represented by no effect.
     if effect == "none":
