@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 """UI action helpers for the per-key editor.
 
 These functions keep `editor.py` focused on UI wiring by grouping cohesive
 profile-related behaviors.
 """
+
+from __future__ import annotations
 
 from typing import Any
 
@@ -68,6 +68,45 @@ def save_profile_ui(editor: Any) -> None:
     ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
     set_status(editor, saved_profile(editor.profile_name))
+
+
+def new_profile_ui(editor: Any) -> None:
+    """Create a new profile with a default name."""
+    from tkinter import simpledialog
+
+    existing_profiles = profiles.list_profiles()
+    new_name = simpledialog.askstring(
+        "New Profile", "Enter profile name:", parent=editor.root, initialvalue="new_profile"
+    )
+
+    if not new_name:
+        return  # User cancelled
+
+    new_name = new_name.strip()
+    if not new_name:
+        set_status(editor, "Profile name cannot be empty")
+        return
+
+    if new_name in existing_profiles:
+        set_status(editor, f"Profile '{new_name}' already exists")
+        return
+
+    # Create the new profile by saving current state
+    name = save_profile(
+        new_name,
+        config=editor.config,
+        keymap=editor.keymap,
+        layout_tweaks=editor.layout_tweaks,
+        per_key_layout_tweaks=editor.per_key_layout_tweaks,
+        colors=editor.colors,
+    )
+    editor.profile_name = name
+    editor._profile_name_var.set(name)
+    editor._profiles_combo.configure(values=profiles.list_profiles())
+
+    ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
+    editor._commit(force=True)
+    set_status(editor, f"Created profile '{name}'")
 
 
 def delete_profile_ui(editor: Any) -> None:

@@ -84,5 +84,5 @@ def test_fade_to_non_black_never_writes_full_black() -> None:
     )
 
     assert spy.calls
-    for (rgb, _brightness) in spy.calls:
+    for rgb, _brightness in spy.calls:
         assert rgb != (0, 0, 0)

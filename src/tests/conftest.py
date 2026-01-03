@@ -59,7 +59,7 @@ def _install_tripwire() -> None:
             # Allow tests that inject fakes via sys.modules.
             if fullname in sys.modules:
                 return None
-            if fullname == "usb" or fullname.startswith("usb.") or fullname == "ite8291r3_ctl" or fullname.startswith("ite8291r3_ctl."):
+            if any(fullname == prefix or fullname.startswith(f"{prefix}.") for prefix in blocked_prefixes):
                 raise RuntimeError(
                     "Tripwire: attempted to import a hardware/USB module during pytest: "
                     f"{fullname}\n\n" + "".join(traceback.format_stack(limit=50))

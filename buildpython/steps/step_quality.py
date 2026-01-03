@@ -77,9 +77,7 @@ def code_markers_runner() -> RunResult:
 
             if _COMMENTED_CODE_RE.match(line):
                 if len(commented_code_hits) < 200:
-                    commented_code_hits.append(
-                        f"{file.relative_to(repo_root())}:{idx}: {line.strip()}"
-                    )
+                    commented_code_hits.append(f"{file.relative_to(repo_root())}:{idx}: {line.strip()}")
 
     ref_files: list[str] = []
     root = repo_root()

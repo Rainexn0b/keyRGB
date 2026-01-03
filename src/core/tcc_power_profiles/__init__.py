@@ -17,11 +17,42 @@ from .json_api import (
 )
 from .models import TccProfile, TccProfileWriteError
 from .root_apply import _apply_new_profiles_file, _apply_new_settings_file, _run_root_command, _tccd_binary
+
 _load_custom_profiles_payload = _ops_write._load_custom_profiles_payload
 _load_settings_payload = _ops_write._load_settings_payload
 _generate_profile_id = _ops_write._generate_profile_id
 _unlink_tmp = _ops_write._unlink_tmp
 _write_temp_json = _ops_write._write_temp_json
+
+__all__ = [
+    "TccProfile",
+    "TccProfileWriteError",
+    "create_custom_profile",
+    "delete_custom_profile",
+    "duplicate_custom_profile",
+    "get_active_profile",
+    "get_active_profile_json",
+    "get_custom_profile_payload",
+    "get_custom_profiles_json",
+    "get_default_values_profile_json",
+    "get_profiles_json",
+    "get_settings_json",
+    "is_custom_profile_id",
+    "is_tccd_available",
+    "list_custom_profiles",
+    "list_profiles",
+    "rename_custom_profile",
+    "set_temp_profile_by_id",
+    "update_custom_profile",
+    # Intentionally re-export internal helpers used by the tray UI and tests.
+    "_apply_new_profiles_file",
+    "_apply_new_settings_file",
+    "_busctl_call",
+    "_parse_busctl_bool_reply",
+    "_parse_busctl_string_reply",
+    "_run_root_command",
+    "_tccd_binary",
+]
 
 
 def get_custom_profile_payload(profile_id: str) -> Optional[dict[str, Any]]:

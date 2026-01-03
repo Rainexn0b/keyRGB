@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-from pathlib import Path
 
 from .model import Step, StepOutcome
 from .summary import BuildSummary, StepSummary, write_summary

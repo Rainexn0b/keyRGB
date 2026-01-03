@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Iterable
 
 
 @dataclass(frozen=True)
@@ -47,8 +46,6 @@ def write_summary(buildlog_dir: Path, summary: BuildSummary) -> None:
     lines.append("|---:|---|---|---:|---:|")
 
     for s in summary.steps:
-        lines.append(
-            f"| {s.number} | {s.name} | {s.status} | {s.duration_s:.1f}s | {s.exit_code} |"
-        )
+        lines.append(f"| {s.number} | {s.name} | {s.status} | {s.duration_s:.1f}s | {s.exit_code} |")
 
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -6,24 +6,37 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..editor import PerKeyEditor
 
+
 class OverlayControls(ttk.LabelFrame):
     def __init__(self, parent, editor: PerKeyEditor, **kwargs):
         super().__init__(parent, text="Overlay alignment", padding=10, **kwargs)
         self.editor = editor
-        
+
         self.dx_var = tk.DoubleVar()
         self.dy_var = tk.DoubleVar()
         self.sx_var = tk.DoubleVar()
         self.sy_var = tk.DoubleVar()
         self.inset_var = tk.DoubleVar()
-        
+
         self._build_ui()
 
     def _build_ui(self):
         scope_row = ttk.Frame(self)
         scope_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
-        ttk.Radiobutton(scope_row, text="Global", variable=self.editor.overlay_scope, value="global", command=self.sync_vars_from_scope).pack(side="left")
-        ttk.Radiobutton(scope_row, text="Selected key", variable=self.editor.overlay_scope, value="key", command=self.sync_vars_from_scope).pack(side="left", padx=(10, 0))
+        ttk.Radiobutton(
+            scope_row,
+            text="Global",
+            variable=self.editor.overlay_scope,
+            value="global",
+            command=self.sync_vars_from_scope,
+        ).pack(side="left")
+        ttk.Radiobutton(
+            scope_row,
+            text="Selected key",
+            variable=self.editor.overlay_scope,
+            value="key",
+            command=self.sync_vars_from_scope,
+        ).pack(side="left", padx=(10, 0))
 
         def add_row(row: int, label: str, var: tk.DoubleVar):
             ttk.Label(self, text=label, width=6).grid(row=row, column=0, sticky="w")
@@ -45,11 +58,15 @@ class OverlayControls(ttk.LabelFrame):
         overlay_btns.columnconfigure(1, weight=1)
         overlay_btns.columnconfigure(2, weight=1)
 
-        ttk.Button(overlay_btns, text="Apply", command=self.apply_from_vars).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        ttk.Button(overlay_btns, text="Apply", command=self.apply_from_vars).grid(
+            row=0, column=0, sticky="ew", padx=(0, 6)
+        )
         ttk.Button(overlay_btns, text="Save", command=self.save_tweaks).grid(row=0, column=1, sticky="ew", padx=(0, 6))
         ttk.Button(overlay_btns, text="Reset", command=self.reset_tweaks).grid(row=0, column=2, sticky="ew")
 
-        ttk.Button(self, text="Auto Sync", command=self.auto_sync).grid(row=7, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        ttk.Button(self, text="Auto Sync", command=self.auto_sync).grid(
+            row=7, column=0, columnspan=2, sticky="ew", pady=(8, 0)
+        )
 
     def sync_vars_from_scope(self):
         if self.editor.overlay_scope.get() == "key" and self.editor.selected_key_id:

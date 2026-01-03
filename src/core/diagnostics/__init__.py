@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any
 
 from .collectors import (
@@ -28,6 +27,12 @@ from .snapshots import (
 )
 
 from .model import Diagnostics
+
+__all__ = [
+    "Diagnostics",
+    "collect_diagnostics",
+    "format_diagnostics_text",
+]
 
 
 def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:

@@ -277,7 +277,6 @@ class PowerSettingsGUI:
                 battery_lighting_enabled=bool(self.var_battery_enabled.get()),
                 ac_lighting_brightness=int(float(self.var_ac_brightness.get())),
                 battery_lighting_brightness=int(float(self.var_battery_brightness.get())),
-
                 screen_dim_sync_enabled=bool(self.var_dim_sync_enabled.get()),
                 screen_dim_sync_mode=str(self.var_dim_sync_mode.get() or "off"),
                 screen_dim_temp_brightness=int(float(self.var_dim_temp_brightness.get())),

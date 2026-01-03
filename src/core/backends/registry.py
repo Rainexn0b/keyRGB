@@ -30,7 +30,7 @@ def _default_specs() -> list[BackendSpec]:
 
 def iter_backends(*, specs: Optional[Iterable[BackendSpec]] = None) -> list[KeyboardBackend]:
     out: list[KeyboardBackend] = []
-    for spec in (list(specs) if specs is not None else _default_specs()):
+    for spec in list(specs) if specs is not None else _default_specs():
         try:
             out.append(spec.factory())
         except Exception:
@@ -61,7 +61,9 @@ def _probe_backend(backend: KeyboardBackend) -> ProbeResult:
         return ProbeResult(available=False, reason=f"is_available exception: {exc}", confidence=0)
 
 
-def select_backend(*, requested: Optional[str] = None, specs: Optional[Iterable[BackendSpec]] = None) -> Optional[KeyboardBackend]:
+def select_backend(
+    *, requested: Optional[str] = None, specs: Optional[Iterable[BackendSpec]] = None
+) -> Optional[KeyboardBackend]:
     """Select a backend.
 
     Order of precedence:
@@ -77,10 +79,7 @@ def select_backend(*, requested: Optional[str] = None, specs: Optional[Iterable[
     # Unit tests that want to exercise selection logic should pass explicit `specs`.
     # Hardware smoke tests should opt-in via KEYRGB_ALLOW_HARDWARE=1 or KEYRGB_HW_TESTS=1.
     if specs is None and os.environ.get("PYTEST_CURRENT_TEST"):
-        allow_hardware = (
-            os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1"
-            or os.environ.get("KEYRGB_HW_TESTS") == "1"
-        )
+        allow_hardware = os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
         if not allow_hardware:
             return None
 
@@ -101,7 +100,13 @@ def select_backend(*, requested: Optional[str] = None, specs: Optional[Iterable[
     candidates: list[tuple[ProbeResult, KeyboardBackend]] = []
     for backend in backends:
         result = _probe_backend(backend)
-        logger.debug("Backend probe: %s -> available=%s confidence=%s reason=%s", backend.name, result.available, result.confidence, result.reason)
+        logger.debug(
+            "Backend probe: %s -> available=%s confidence=%s reason=%s",
+            backend.name,
+            result.available,
+            result.confidence,
+            result.reason,
+        )
         if result.available:
             candidates.append((result, backend))
 

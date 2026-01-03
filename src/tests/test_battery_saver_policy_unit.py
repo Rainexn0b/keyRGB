@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import time
 
 from src.core.power_policies.battery_saver_policy import BatterySaverPolicy
 

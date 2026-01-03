@@ -7,8 +7,6 @@ Tests JSON load/save round-trips, malformed data handling, and validation/clampi
 from __future__ import annotations
 
 import json
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -77,7 +75,6 @@ class TestKeymapLoadSave:
 
         loaded = profiles.load_keymap("test_profile")
         # Should return the DEFAULT_KEYMAP (which has tuples as values)
-        from src.core.resources.defaults import DEFAULT_KEYMAP
 
         # DEFAULT_KEYMAP values are tuples, not strings
         assert isinstance(loaded, dict)

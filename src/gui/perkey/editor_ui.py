@@ -164,10 +164,12 @@ def build_editor_ui(editor) -> None:
     pbtns.columnconfigure(0, weight=1)
     pbtns.columnconfigure(1, weight=1)
     pbtns.columnconfigure(2, weight=1)
+    pbtns.columnconfigure(3, weight=1)
 
-    ttk.Button(pbtns, text="Activate", command=editor._activate_profile).grid(row=0, column=0, sticky="ew", padx=(0, 6))
-    ttk.Button(pbtns, text="Save", command=editor._save_profile).grid(row=0, column=1, sticky="ew", padx=(0, 6))
-    ttk.Button(pbtns, text="Delete", command=editor._delete_profile).grid(row=0, column=2, sticky="ew")
+    ttk.Button(pbtns, text="New", command=editor._new_profile).grid(row=0, column=0, sticky="ew", padx=(0, 3))
+    ttk.Button(pbtns, text="Activate", command=editor._activate_profile).grid(row=0, column=1, sticky="ew", padx=(3, 3))
+    ttk.Button(pbtns, text="Save", command=editor._save_profile).grid(row=0, column=2, sticky="ew", padx=(3, 3))
+    ttk.Button(pbtns, text="Delete", command=editor._delete_profile).grid(row=0, column=3, sticky="ew", padx=(3, 0))
 
     editor.overlay_controls = OverlayControls(extras_overlay, editor=editor)
     editor.overlay_controls.grid(row=0, column=0, sticky="nsew")

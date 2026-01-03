@@ -99,7 +99,6 @@ def load_settings_values(*, config: Any, os_autostart_enabled: bool) -> Settings
         battery_lighting_enabled=_safe_bool(config, "battery_lighting_enabled", True),
         ac_lighting_brightness=clamp_brightness(ac_brightness),
         battery_lighting_brightness=clamp_brightness(batt_brightness),
-
         screen_dim_sync_enabled=_safe_bool(config, "screen_dim_sync_enabled", True),
         screen_dim_sync_mode=str(getattr(config, "screen_dim_sync_mode", "off") or "off").strip().lower(),
         screen_dim_temp_brightness=clamp_nonzero_brightness(

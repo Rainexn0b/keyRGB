@@ -18,10 +18,7 @@ class AutostartPanel:
 
         as_desc = ttk.Label(
             parent,
-            text=(
-                "Control what happens when KeyRGB launches, and whether it\n"
-                "starts automatically when you log in."
-            ),
+            text=("Control what happens when KeyRGB launches, and whether it\nstarts automatically when you log in."),
             font=("Sans", 9),
         )
         as_desc.pack(anchor="w", pady=(0, 8))

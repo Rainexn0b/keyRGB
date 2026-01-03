@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 class TestPowerManagerBrightnessPolicyApplication:
     """Test _apply_brightness_policy dispatch logic."""

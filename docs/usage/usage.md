@@ -5,6 +5,8 @@ This document describes how to install and run KeyRGB **from a blank Fedora inst
 
 KeyRGB is a Python tray app + GUIs (Tkinter) for ITE 8291 / ITE8291R3 laptop keyboards (typical USB ID: `048d:600b`).
 
+For a quick reference of entrypoints and environment variables, see: [docs/usage/commands.md](docs/usage/commands.md)
+
 ## 0) Assumptions
 
 - You are on Fedora Workstation (GNOME or KDE) or a desktop with an X11 or later tray.

@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class KeyboardCanvas(tk.Canvas):
     def __init__(self, parent, editor: PerKeyEditor, **kwargs):
         super().__init__(parent, **kwargs)
@@ -41,7 +42,7 @@ class KeyboardCanvas(tk.Canvas):
         self._deck_drawn_bbox: Optional[tuple[int, int, int, int]] = None
         self._overlay_drag = OverlayDragController(self)
         self._resize_job: Optional[str] = None
-        
+
         self.key_rects: dict[str, int] = {}
         self.key_texts: dict[str, int] = {}
 
@@ -104,8 +105,15 @@ class KeyboardCanvas(tk.Canvas):
             dash = () if mapped else (3,)
 
             rect_id = self.create_rectangle(
-                x1, y1, x2, y2,
-                fill=fill, stipple=stipple, outline=outline, width=width, dash=dash,
+                x1,
+                y1,
+                x2,
+                y2,
+                fill=fill,
+                stipple=stipple,
+                outline=outline,
+                width=width,
+                dash=dash,
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )
             self.key_rects[key.key_id] = rect_id
@@ -114,8 +122,11 @@ class KeyboardCanvas(tk.Canvas):
             key_h = max(1, int(y2 - y1))
             font_size = max(7, min(11, int(min(key_w, key_h) * 0.30)))
             text_id = self.create_text(
-                (x1 + x2) / 2, (y1 + y2) / 2,
-                text=key.label, fill=text_fill, font=("TkDefaultFont", font_size),
+                (x1 + x2) / 2,
+                (y1 + y2) / 2,
+                text=key.label,
+                fill=text_fill,
+                font=("TkDefaultFont", font_size),
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )
             self.key_texts[key.key_id] = text_id
@@ -165,7 +176,7 @@ class KeyboardCanvas(tk.Canvas):
                 pass
 
         self._deck_img_tk = ImageTk.PhotoImage(resized)
-        self.create_image(x0, y0, image=self._deck_img_tk, anchor='nw')
+        self.create_image(x0, y0, image=self._deck_img_tk, anchor="nw")
         self._deck_drawn_bbox = (x0, y0, dw, dh)
 
     def _on_resize(self, _event):
@@ -198,7 +209,9 @@ class KeyboardCanvas(tk.Canvas):
             image_size=BASE_IMAGE_SIZE,
         )
 
-    def _apply_per_key_tweak(self, key_id: str, x: float, y: float, w: float, h: float) -> tuple[float, float, float, float, float]:
+    def _apply_per_key_tweak(
+        self, key_id: str, x: float, y: float, w: float, h: float
+    ) -> tuple[float, float, float, float, float]:
         inset_default = float(self.editor.layout_tweaks.get("inset", 0.06))
         return apply_per_key_tweak(
             key_id=str(key_id),

@@ -83,7 +83,6 @@ def test_apply_settings_values_to_config() -> None:
         battery_lighting_enabled=False,
         ac_lighting_brightness=49,
         battery_lighting_brightness=51,
-
         screen_dim_sync_enabled=False,
         screen_dim_sync_mode="temp",
         screen_dim_temp_brightness=1,

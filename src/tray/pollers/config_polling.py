@@ -34,7 +34,7 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
         nonlocal last_apply_warn_at
 
         perkey_sig = None
-        if tray.config.effect == 'perkey':
+        if tray.config.effect == "perkey":
             try:
                 perkey_sig = tuple(sorted(tray.config.per_key_colors.items()))
             except Exception as exc:
@@ -121,7 +121,7 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
             tray._last_brightness = tray.config.brightness
 
         try:
-            if tray.config.effect == 'perkey':
+            if tray.config.effect == "perkey":
                 if callable(log_event):
                     try:
                         log_event(
@@ -159,7 +159,7 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                         enable_user_mode=True,
                     )
 
-            elif tray.config.effect == 'none':
+            elif tray.config.effect == "none":
                 if callable(log_event):
                     try:
                         log_event(

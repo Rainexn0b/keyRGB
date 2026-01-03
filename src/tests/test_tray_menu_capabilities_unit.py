@@ -166,7 +166,7 @@ def test_menu_includes_active_mode_indicator_between_off_and_quit(monkeypatch: p
 
     assert items[-3]["text"].lower().startswith("turn ")
     assert items[-2]["enabled"] is False
-    assert "active:" in items[-2]["text"].lower()
+    assert "mode:" in items[-2]["text"].lower()
     assert items[-1]["text"] == "Quit"
 
 
@@ -183,5 +183,8 @@ def test_tray_active_indicator_shows_perkey_profile(monkeypatch: pytest.MonkeyPa
     tray.is_off = False
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    assert "per-key" in items[-2]["text"].lower()
-    assert "default" in items[-2]["text"].lower()
+    # Mode indicator should show "software" and the profile name
+    mode_text = items[-2]["text"].lower()
+    assert "mode:" in mode_text
+    assert "software" in mode_text
+    assert "default" in mode_text

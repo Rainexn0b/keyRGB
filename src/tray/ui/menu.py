@@ -5,12 +5,21 @@ import re
 from typing import Any
 
 import src.core.tcc_power_profiles as tcc_power_profiles
+from src.core.effects.catalog import (
+    HW_EFFECTS,
+    REACTIVE_EFFECTS,
+    SOFTWARE_EFFECTS,
+    normalize_effect_name,
+    title_for_effect,
+)
 from src.core.system_power import get_status as _system_power_status
 
 from .menu_sections import (
     build_perkey_profiles_menu,
     build_system_power_mode_menu,
     build_tcc_profiles_menu,
+    is_hardware_mode,
+    is_software_mode,
     keyboard_status_text,
     probe_device_available,
     tray_lighting_mode_text,
@@ -35,7 +44,7 @@ def normalize_effect_label(label: str) -> str:
     s = s.lower()
     # Convert human label spacing to effect_key style.
     s = re.sub(r"\s+", "_", s)
-    return s
+    return normalize_effect_name(s)
 
 
 def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
@@ -46,6 +55,10 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
 
     probe_device_available(tray)
+
+    # Determine current mode for lockdown logic
+    sw_mode = is_software_mode(tray)
+    hw_mode = is_hardware_mode(tray)
 
     def _checked_effect(effect: str):
         def _checked(_item):
@@ -65,22 +78,26 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
         return _checked
 
+    # HW effects menu - "None" always enabled (switches to uniform color mode),
+    # animated effects locked when in SW mode
     hw_effects_menu = pystray.Menu(
         item(
-            "None",
+            "None (use uniform color)",
             tray._on_effect_clicked,
-            checked=_checked_effect('none'),
+            checked=_checked_effect("none"),
             radio=True,
+            # Always enabled - this is how user switches back to HW uniform mode
         ),
         pystray.Menu.SEPARATOR,
         *[
             item(
-                effect.replace("_", " ").strip().title(),
+                title_for_effect(effect),
                 tray._on_effect_clicked,
                 checked=_checked_effect(effect),
                 radio=True,
+                enabled=hw_mode,  # Grey out animated effects when in SW mode
             )
-            for effect in ['rainbow', 'breathing', 'wave', 'ripple', 'marquee', 'raindrop', 'aurora', 'fireworks']
+            for effect in HW_EFFECTS
         ],
     )
 
@@ -90,81 +107,43 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
         return _action
 
-    sw_effects_menu = pystray.Menu(
+    # SW effects work best with per-key colors loaded
+    # "None" here means static per-key display, other SW effects locked when in HW mode
+    def _checked_perkey(_item):
+        return tray.config.effect == "perkey" and not tray.is_off
+
+    sw_items = [
         item(
-            "None",
-            _sw_cb('none'),
-            checked=_checked_effect('none'),
+            "None (static per-key)",
+            _sw_cb("perkey"),
+            checked=_checked_perkey,
             radio=True,
         ),
         pystray.Menu.SEPARATOR,
-        item(
-            "Rainbow Wave",
-            _sw_cb('rainbow_wave'),
-            checked=_checked_effect('rainbow_wave'),
-            radio=True,
-        ),
-        item(
-            "Rainbow Swirl",
-            _sw_cb('rainbow_swirl'),
-            checked=_checked_effect('rainbow_swirl'),
-            radio=True,
-        ),
-        item(
-            "Spectrum Cycle",
-            _sw_cb('spectrum_cycle'),
-            checked=_checked_effect('spectrum_cycle'),
-            radio=True,
-        ),
-        item(
-            "Color Cycle",
-            _sw_cb('color_cycle'),
-            checked=_checked_effect('color_cycle'),
-            radio=True,
-        ),
-        item(
-            "Chase",
-            _sw_cb('chase'),
-            checked=_checked_effect('chase'),
-            radio=True,
-        ),
-        item(
-            "Twinkle",
-            _sw_cb('twinkle'),
-            checked=_checked_effect('twinkle'),
-            radio=True,
-        ),
-        item(
-            "Strobe",
-            _sw_cb('strobe'),
-            checked=_checked_effect('strobe'),
-            radio=True,
-        ),
-        item(
-            "Reactive Typing (Fade)",
-            _sw_cb('reactive_fade'),
-            checked=_checked_effect('reactive_fade'),
-            radio=True,
-        ),
-        item(
-            "Reactive Typing (Ripple)",
-            _sw_cb('reactive_ripple'),
-            checked=_checked_effect('reactive_ripple'),
-            radio=True,
-        ),
-        item(
-            "Reactive Rainbow",
-            _sw_cb('reactive_rainbow'),
-            checked=_checked_effect('reactive_rainbow'),
-            radio=True,
-        ),
-        item(
-            "Reactive Snake",
-            _sw_cb('reactive_snake'),
-            checked=_checked_effect('reactive_snake'),
-            radio=True,
-        ),
-    )
+        *[
+            item(
+                title_for_effect(effect),
+                _sw_cb(effect),
+                checked=_checked_effect(effect),
+                radio=True,
+                enabled=sw_mode,
+            )
+            for effect in SOFTWARE_EFFECTS
+        ],
+        pystray.Menu.SEPARATOR,
+        *[
+            item(
+                title_for_effect(effect),
+                _sw_cb(effect),
+                checked=_checked_effect(effect),
+                radio=True,
+                enabled=sw_mode,
+            )
+            for effect in REACTIVE_EFFECTS
+        ],
+    ]
+
+    sw_effects_menu = pystray.Menu(*sw_items)
 
     speed_menu = pystray.Menu(
         *[
@@ -222,26 +201,42 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             lambda _icon, _item: None,
             enabled=False,
         ),
-        # (keyboard detection)
-        *([item('Hardware Effects', hw_effects_menu)] if hw_effects_supported else []),
-        item('Software Effects', sw_effects_menu),
-        item('Effect Speed', speed_menu),
         pystray.Menu.SEPARATOR,
-
-        # Hardware color / per-key color / brightness override
-        item('Hardware Color', tray._on_tuxedo_gui_clicked),
-        *([item('Software Color Editor', perkey_menu)] if perkey_menu is not None else []),
-        item('Brightness Override', brightness_menu),
+        # === HARDWARE MODE ===
+        # HW effects + uniform color picker
+        *(
+            [
+                item(
+                    "Hardware Effects",
+                    hw_effects_menu,
+                    # Menu always enabled, individual animated effects locked when in SW mode
+                )
+            ]
+            if hw_effects_supported
+            else []
+        ),
+        item(
+            "Hardware Color",
+            tray._on_tuxedo_gui_clicked,
+            # Always enabled - this is how user switches to HW uniform color mode
+        ),
         pystray.Menu.SEPARATOR,
-
+        # === SOFTWARE MODE ===
+        # Per-key profiles + SW effects
+        *([item("Software Color Editor", perkey_menu)] if perkey_menu is not None else []),
+        item("Software Effects", sw_effects_menu),
+        pystray.Menu.SEPARATOR,
+        # === COMMON CONTROLS ===
+        item("Effect Speed", speed_menu),
+        item("Brightness Override", brightness_menu),
+        pystray.Menu.SEPARATOR,
         # power mode / settings
-        *([item('Power Mode', power_menu)] if power_menu is not None else []),
-        item('Settings', tray._on_power_settings_clicked),
+        *([item("Power Mode", power_menu)] if power_menu is not None else []),
+        item("Settings", tray._on_power_settings_clicked),
         pystray.Menu.SEPARATOR,
-
         # off/on / (active mode) / quit
         item(
-            'Turn Off' if not tray.is_off else 'Turn On',
+            "Turn Off" if not tray.is_off else "Turn On",
             tray._on_off_clicked if not tray.is_off else tray._on_turn_on_clicked,
             checked=lambda _i: tray.is_off,
         ),
@@ -250,7 +245,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             lambda _icon, _item: None,
             enabled=False,
         ),
-        item('Quit', tray._on_quit_clicked),
+        item("Quit", tray._on_quit_clicked),
     ]
 
 

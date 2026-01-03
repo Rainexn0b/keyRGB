@@ -12,14 +12,18 @@ from typing import Dict, Optional, Tuple
 
 import traceback
 from src.core.effects.device import NullKeyboard, acquire_keyboard
+from src.core.effects.catalog import (
+    ALL_EFFECTS as _ALL_EFFECTS,
+    HW_EFFECTS as _HW_EFFECTS,
+    SW_EFFECTS as _SW_EFFECTS,
+    normalize_effect_name,
+)
 from src.core.effects.fades import fade_in_per_key, fade_uniform_color
 from src.core.effects.hw_payloads import build_hw_effect_payload
 from src.core.effects.ite_backend import hw_colors, hw_effects
 from src.core.effects.reactive.effects import (
     run_reactive_fade,
-    run_reactive_rainbow,
     run_reactive_ripple,
-    run_reactive_snake,
 )
 from src.core.effects.software.effects import (
     run_chase,
@@ -34,28 +38,14 @@ from src.core.effects.timing import clamped_interval, get_interval
 
 logger = logging.getLogger(__name__)
 
+
 class EffectsEngine:
     """RGB effects engine with hardware and custom effects"""
-    
-    # Hardware effects (built into the controller)
-    HW_EFFECTS = ['rainbow', 'breathing', 'wave', 'ripple', 'marquee', 'raindrop', 'aurora', 'fireworks']
-    
-    # Custom software effects (OpenRGB-style)
-    SW_EFFECTS = [
-        'rainbow_wave',
-        'rainbow_swirl',
-        'spectrum_cycle',
-        'color_cycle',
-        'chase',
-        'twinkle',
-        'strobe',
-        'reactive_fade',
-        'reactive_ripple',
-        'reactive_rainbow',
-        'reactive_snake',
-    ]
-    
-    ALL_EFFECTS = HW_EFFECTS + SW_EFFECTS
+
+    # Canonical effect lists are defined in src.core.effects.catalog.
+    HW_EFFECTS = _HW_EFFECTS
+    SW_EFFECTS = _SW_EFFECTS
+    ALL_EFFECTS = _ALL_EFFECTS
 
     _SW_START_SPECS = {
         # Effect name -> (method_name, fade_to)
@@ -69,10 +59,8 @@ class EffectsEngine:
         "strobe": ("_effect_strobe", "current"),
         "reactive_fade": ("_effect_reactive_fade", "current"),
         "reactive_ripple": ("_effect_reactive_ripple", "current"),
-        "reactive_rainbow": ("_effect_reactive_rainbow", (255, 0, 0)),
-        "reactive_snake": ("_effect_reactive_snake", "current"),
     }
-    
+
     def __init__(self):
         self.kb_lock = RLock()
         self.device_available = False
@@ -83,7 +71,7 @@ class EffectsEngine:
         self.running = False
         self.thread: Optional[Thread] = None
         self.stop_event = Event()
-        
+
         self.current_effect: Optional[str] = None
         self.speed = 4  # 0-10 (UI speed scale; 10 = fastest)
         self.brightness = 25  # 0-50 (hardware brightness scale)
@@ -107,7 +95,7 @@ class EffectsEngine:
         self.device_available = False
         with self.kb_lock:
             self.kb = NullKeyboard()
-    
+
     def stop(self):
         """Stop current effect"""
         # Be robust to concurrent callers: treat `self.thread` as a shared
@@ -133,21 +121,21 @@ class EffectsEngine:
                 return
 
         self.stop_event.clear()
-    
+
     def turn_off(self):
         """Turn off all LEDs"""
         self.stop()
         self._ensure_device_available()
         with self.kb_lock:
             self.kb.turn_off()
-    
+
     def set_brightness(self, brightness: int):
         """Set brightness (0-50 hardware scale)"""
         self.brightness = max(0, min(50, brightness))
         self._ensure_device_available()
         with self.kb_lock:
             self.kb.set_brightness(self.brightness)
-    
+
     def start_effect(self, effect_name: str, speed: int = 5, brightness: int = 25, color: Optional[tuple] = None):
         """Start an effect (hardware or software)"""
         prev_color = tuple(self.current_color)
@@ -156,19 +144,19 @@ class EffectsEngine:
 
         # If no device is present, keep state but do not crash.
         self._ensure_device_available()
-        
-        effect_name = effect_name.lower()
-        
+
+        effect_name = normalize_effect_name(effect_name)
+
         if effect_name not in self.ALL_EFFECTS:
             raise ValueError(f"Unknown effect: {effect_name}. Valid: {', '.join(self.ALL_EFFECTS)}")
-        
+
         self.current_effect = effect_name
         self.speed = max(0, min(10, speed))
         self.brightness = max(0, min(50, brightness))
-        
+
         if color:
             self.current_color = color
-        
+
         # Hardware effects - delegate to controller
         if effect_name in self.HW_EFFECTS:
             self._start_hw_effect(effect_name)
@@ -213,7 +201,7 @@ class EffectsEngine:
         self.running = True
         self.thread = Thread(target=target, daemon=True)
         self.thread.start()
-    
+
     def _start_hw_effect(self, effect_name: str):
         """Start hardware effect"""
         effect_func = hw_effects.get(effect_name)
@@ -231,12 +219,12 @@ class EffectsEngine:
             kb_lock=self.kb_lock,
             logger=logger,
         )
-        
+
         with self.kb_lock:
             self.kb.set_effect(effect_data)
-    
+
     # ===== SOFTWARE EFFECTS =====
-    
+
     def _get_interval(self, base_ms: int) -> float:
         """Calculate interval based on speed (0-10, 10 = fastest).
 
@@ -286,7 +274,7 @@ class EffectsEngine:
             duration_s=duration_s,
             steps=steps,
         )
-    
+
     def _effect_rainbow_wave(self):
         """Rainbow Wave (SW): classic rainbow wave across the keyboard."""
         run_rainbow_wave(self)
@@ -329,22 +317,8 @@ class EffectsEngine:
         except Exception:
             logger.error("Reactive Ripple thread crashed:\n%s", traceback.format_exc())
 
-    def _effect_reactive_rainbow(self):
-        """Reactive Rainbow: Each keypress spawns a cycling rainbow pulse."""
-        try:
-            run_reactive_rainbow(self)
-        except Exception:
-            logger.error("Reactive Rainbow thread crashed:\n%s", traceback.format_exc())
 
-    def _effect_reactive_snake(self):
-        """Reactive Snake: Typing leaves a trailing snake effect."""
-        try:
-            run_reactive_snake(self)
-        except Exception:
-            logger.error("Reactive Snake thread crashed:\n%s", traceback.format_exc())
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     from src.core.effects.demo import run_demo
 
     run_demo(EffectsEngine)

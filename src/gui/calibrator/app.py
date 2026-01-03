@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import tkinter as tk
@@ -10,6 +11,7 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 
 from src.core.config import Config
+from src.core.profile import profiles
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 from .geometry import calc_transform, hit_test, key_canvas_bbox
 from .probe import CalibrationProbeState
@@ -138,12 +140,20 @@ class KeymapCalibrator(tk.Tk):
         ttk.Button(btns, text="Prev", command=self._prev).grid(row=0, column=0, sticky="ew", padx=(0, 6))
         ttk.Button(btns, text="Next", command=self._next).grid(row=0, column=1, sticky="ew")
 
-        ttk.Button(side, text="Assign selected key", command=self._assign).grid(row=4, column=0, sticky="ew", pady=(10, 0))
+        ttk.Button(side, text="Assign selected key", command=self._assign).grid(
+            row=4, column=0, sticky="ew", pady=(10, 0)
+        )
         ttk.Button(side, text="Skip (nothing lit)", command=self._skip).grid(row=5, column=0, sticky="ew", pady=(6, 0))
-        ttk.Button(side, text="Set Backdrop...", command=self._set_backdrop).grid(row=6, column=0, sticky="ew", pady=(18, 0))
-        ttk.Button(side, text="Reset Backdrop", command=self._reset_backdrop).grid(row=7, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(side, text="Set Backdrop...", command=self._set_backdrop).grid(
+            row=6, column=0, sticky="ew", pady=(18, 0)
+        )
+        ttk.Button(side, text="Reset Backdrop", command=self._reset_backdrop).grid(
+            row=7, column=0, sticky="ew", pady=(6, 0)
+        )
         ttk.Button(side, text="Save", command=self._save).grid(row=8, column=0, sticky="ew", pady=(18, 0))
-        ttk.Button(side, text="Save && Close", command=self._save_and_close).grid(row=9, column=0, sticky="ew", pady=(6, 0))
+        ttk.Button(side, text="Save && Close", command=self._save_and_close).grid(
+            row=9, column=0, sticky="ew", pady=(6, 0)
+        )
 
         # Keyboard shortcuts.
         self.bind("<Return>", lambda _e: self._assign())
@@ -272,7 +282,7 @@ class KeymapCalibrator(tk.Tk):
                 image_size=BASE_IMAGE_SIZE,
             )
             mapped = self.keymap.get(key.key_id)
-            selected = (self.probe.selected_key_id == key.key_id)
+            selected = self.probe.selected_key_id == key.key_id
 
             if mapped is None:
                 fill = ""
@@ -291,7 +301,10 @@ class KeymapCalibrator(tk.Tk):
                 outline = "#00ffff"
 
             self.canvas.create_rectangle(
-                x1, y1, x2, y2,
+                x1,
+                y1,
+                x2,
+                y2,
                 outline=outline,
                 width=3 if selected else 2,
                 fill=fill,
@@ -320,7 +333,9 @@ class KeymapCalibrator(tk.Tk):
         else:
             self.probe.selected_key_id = hit.key_id
             mapped = self.keymap.get(hit.key_id)
-            self.lbl_status.configure(text=f"Selected {hit.label}" + (f" (mapped {mapped})" if mapped else " (unmapped)"))
+            self.lbl_status.configure(
+                text=f"Selected {hit.label}" + (f" (mapped {mapped})" if mapped else " (unmapped)")
+            )
         self._redraw()
 
     def _hit_test(self, x: int, y: int) -> Optional[KeyDef]:

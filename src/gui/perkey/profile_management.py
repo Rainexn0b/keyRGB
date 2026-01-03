@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, Tuple
 
 from src.core.profile import profiles
 from src.core.config import Config
@@ -98,7 +98,9 @@ def delete_profile(requested_name: str) -> DeleteProfileResult:
         return DeleteProfileResult(deleted=False, active_profile=profiles.get_active_profile(), message="")
 
     if not profiles.delete_profile(name):
-        return DeleteProfileResult(deleted=False, active_profile=profiles.get_active_profile(), message="Cannot delete 'default'")
+        return DeleteProfileResult(
+            deleted=False, active_profile=profiles.get_active_profile(), message="Cannot delete 'default'"
+        )
 
     safe = profiles._safe_name(name)
     if profiles.get_active_profile() == safe:

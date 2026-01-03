@@ -9,8 +9,6 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 
 class TestEnsureConfigPerKeyColorsLoaded:
     """Test _ensure_config_per_key_colors_loaded helper."""
@@ -125,45 +123,93 @@ class TestApplyEffectSelection:
         mock_tray.engine.stop.assert_called_once()
         assert mock_tray.config.effect == "none"
 
-    def test_perkey_effect_loads_colors_when_supported(self):
-        """Per-key effect should load colors when capability is available."""
+    def test_perkey_effect_loads_colors_when_supported(self, monkeypatch):
+        """Per-key effect should explicitly load colors from profile when per-key is supported."""
+        from src.tray.controllers import effect_selection
         from src.tray.controllers.effect_selection import apply_effect_selection
+
+        # Mock profile loading
+        expected_colors = {(0, 0): (255, 0, 0)}
+        load_spy = MagicMock(return_value=expected_colors)
+        monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", load_spy)
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(per_key=True)
-        mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
+        mock_tray.config.per_key_colors = {}
 
         apply_effect_selection(mock_tray, effect_name="perkey")
 
         assert mock_tray.config.effect == "perkey"
+        load_spy.assert_called_once()
+        assert mock_tray.config.per_key_colors == expected_colors
         mock_tray._start_current_effect.assert_called_once()
 
-    def test_perkey_breathing_alias_maps_to_perkey(self):
+    def test_perkey_breathing_alias_maps_to_perkey(self, monkeypatch):
         """Legacy 'perkey breathing' should behave like plain 'perkey'."""
+        from src.tray.controllers import effect_selection
         from src.tray.controllers.effect_selection import apply_effect_selection
+
+        # Mock profile loading to return specific colors
+        expected_colors = {(0, 0): (0, 255, 0)}
+        load_spy = MagicMock(return_value=expected_colors)
+        monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", load_spy)
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(per_key=True)
-        mock_tray.config.per_key_colors = {(0, 0): (0, 255, 0)}
+        mock_tray.config.per_key_colors = {}  # Start empty
 
         apply_effect_selection(mock_tray, effect_name="perkey breathing")
 
         assert mock_tray.config.effect == "perkey"
-        assert mock_tray.engine.per_key_colors == {(0, 0): (0, 255, 0)}
+        # Verify profile loading was called for perkey
+        load_spy.assert_called_once()
+        assert mock_tray.config.per_key_colors == expected_colors
         mock_tray._start_current_effect.assert_called_once()
 
-    def test_perkey_pulse_alias_maps_to_perkey(self):
+    def test_perkey_pulse_alias_maps_to_perkey(self, monkeypatch):
         """Legacy 'perkey pulse' should behave like plain 'perkey'."""
+        from src.tray.controllers import effect_selection
         from src.tray.controllers.effect_selection import apply_effect_selection
+
+        # Mock profile loading to return specific colors
+        expected_colors = {(1, 1): (0, 0, 255)}
+        load_spy = MagicMock(return_value=expected_colors)
+        monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", load_spy)
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(per_key=True)
-        mock_tray.config.per_key_colors = {(1, 1): (0, 0, 255)}
+        mock_tray.config.per_key_colors = {}  # Start empty
 
         apply_effect_selection(mock_tray, effect_name="perkey pulse")
 
         assert mock_tray.config.effect == "perkey"
-        assert mock_tray.engine.per_key_colors == {(1, 1): (0, 0, 255)}
+        # Verify profile loading was called for perkey
+        load_spy.assert_called_once()
+        assert mock_tray.config.per_key_colors == expected_colors
+
+    def test_reactive_rainbow_alias_maps_to_reactive_ripple(self):
+        """Legacy 'reactive_rainbow' should behave like 'reactive_ripple'."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+
+        apply_effect_selection(mock_tray, effect_name="reactive_rainbow")
+
+        assert mock_tray.config.effect == "reactive_ripple"
+        mock_tray._start_current_effect.assert_called_once()
+
+    def test_reactive_snake_alias_maps_to_reactive_ripple(self):
+        """Removed 'reactive_snake' should map to 'reactive_ripple' (old config compatibility)."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+
+        apply_effect_selection(mock_tray, effect_name="reactive_snake")
+
+        assert mock_tray.config.effect == "reactive_ripple"
+        mock_tray._start_current_effect.assert_called_once()
 
     def test_regular_effect_starts_engine_normally(self):
         """Regular supported effects should start the engine normally."""
@@ -205,31 +251,42 @@ class TestApplyEffectSelection:
             apply_effect_selection(mock_tray, effect_name=effect)
             assert mock_tray.config.effect == "none", f"{effect} should be blocked"
 
-    def test_stop_restores_perkey_after_nonperkey_effect(self):
-        """Stopping an effect should restore per-key if it was active beforehand."""
+    def test_stop_sets_uniform_color(self):
+        """Stopping an effect should set uniform color when no per-key colors."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
+        mock_tray.config.color = (255, 0, 0)
+        mock_tray.config.brightness = 100
+
+        # Start from no per-key colors.
+        mock_tray.config.effect = "wave"
+        mock_tray.config.per_key_colors = {}  # Empty = hardware mode
+
+        # Stop effects; should set uniform color.
+        apply_effect_selection(mock_tray, effect_name="none")
+
+        mock_tray.engine.stop.assert_called()
+        mock_tray.engine.kb.set_color.assert_called_with((255, 0, 0), brightness=100)
+        assert mock_tray.config.effect == "none"
+
+    def test_stop_stays_in_software_mode_if_perkey_colors_exist(self):
+        """Stopping an effect should stay in software mode if per-key colors exist."""
         from src.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
 
-        # Start from per-key.
-        mock_tray.config.effect = "perkey"
+        # Start from per-key with colors loaded.
+        mock_tray.config.effect = "reactive_fade"
         mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
 
-        # Start a non-per-key effect.
-        apply_effect_selection(mock_tray, effect_name="wave")
-        assert getattr(mock_tray.config, "return_effect_after_effect", None) == "perkey"
-
-        # Stop effects; should restore per-key rather than forcing uniform.
-        mock_tray.engine.stop.reset_mock()
-        mock_tray.engine.kb.set_color.reset_mock()
-        mock_tray._start_current_effect.reset_mock()
-
+        # Stop effects; should stay in software mode with static per-key.
         apply_effect_selection(mock_tray, effect_name="none")
 
-        mock_tray.engine.stop.assert_called_once()
-        mock_tray.engine.kb.set_color.assert_not_called()
+        mock_tray.engine.stop.assert_called()
         assert mock_tray.config.effect == "perkey"
         mock_tray._start_current_effect.assert_called_once()
-        assert getattr(mock_tray.config, "return_effect_after_effect", None) is None

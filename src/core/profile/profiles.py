@@ -19,11 +19,12 @@ from typing import Dict, Tuple
 from .json_storage import read_json, write_json_atomic
 from .paths import (
     DEFAULT_PROFILE_NAME,
-    ProfilePaths,
     delete_profile,
     get_active_profile,
     list_profiles,
     paths_for,
+    profiles_root,
+    safe_profile_name,
     set_active_profile,
 )
 from src.core.resources.defaults import (
@@ -35,6 +36,30 @@ from src.core.resources.defaults import (
 
 # Backwards-compatible constant
 _DEFAULT_PROFILE = DEFAULT_PROFILE_NAME
+
+
+__all__ = [
+    "DEFAULT_PROFILE_NAME",
+    "_DEFAULT_PROFILE",
+    "apply_profile_to_config",
+    "delete_profile",
+    "get_active_profile",
+    "list_profiles",
+    "load_backdrop_transparency",
+    "load_keymap",
+    "load_layout_global",
+    "load_layout_per_key",
+    "load_per_key_colors",
+    "paths_for",
+    "profiles_root",
+    "safe_profile_name",
+    "save_backdrop_transparency",
+    "save_keymap",
+    "save_layout_global",
+    "save_layout_per_key",
+    "save_per_key_colors",
+    "set_active_profile",
+]
 
 
 def load_keymap(name: str | None = None) -> Dict[str, Tuple[int, int]]:

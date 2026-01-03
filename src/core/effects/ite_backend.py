@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """ITE backend wrapper used by the effects engine.
 
 This module preserves the historical import surface used by the effects engine
@@ -10,6 +8,8 @@ Exports kept stable:
 - `NUM_ROWS`, `NUM_COLS`
 - `hw_effects`, `hw_colors`
 """
+
+from __future__ import annotations
 
 from src.core.backends.registry import select_backend
 

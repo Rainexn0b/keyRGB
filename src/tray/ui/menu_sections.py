@@ -4,26 +4,46 @@ import logging
 from typing import Any, Optional
 from src.core.logging_utils import log_throttled
 
+from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
+from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+from src.core.effects.catalog import title_for_effect
 from src.core.system_power import PowerMode, get_status, set_mode
 
 
 logger = logging.getLogger(__name__)
 
 
-HW_EFFECTS = {"rainbow", "breathing", "wave", "ripple", "marquee", "raindrop", "aurora", "fireworks"}
-SW_EFFECTS = {
-    "rainbow_wave",
-    "rainbow_swirl",
-    "spectrum_cycle",
-    "color_cycle",
-    "chase",
-    "twinkle",
-    "strobe",
-    "reactive_fade",
-    "reactive_ripple",
-    "reactive_rainbow",
-    "reactive_snake",
-}
+def is_software_mode(tray: Any) -> bool:
+    """Return True if we're in software/per-key mode (SW effects available).
+
+    Software mode is active when:
+    - effect is 'perkey', OR
+    - effect is a SW effect, OR
+    - per_key_colors are loaded in config
+    """
+    cfg = getattr(tray, "config", None)
+    effect = str(getattr(cfg, "effect", "none") or "none")
+
+    if effect == "perkey" or effect in SW_EFFECTS:
+        return True
+
+    # Check if per-key colors are loaded (even if current effect is 'none')
+    try:
+        per_key = getattr(cfg, "per_key_colors", None) or None
+        if per_key and len(per_key) > 0:
+            return True
+    except Exception:
+        pass
+
+    return False
+
+
+def is_hardware_mode(tray: Any) -> bool:
+    """Return True if we're in hardware mode (HW effects available).
+
+    Hardware mode is active when NOT in software mode.
+    """
+    return not is_software_mode(tray)
 
 
 def _log_menu_debug(key: str, msg: str, exc: Exception, *, interval_s: float = 60) -> None:
@@ -38,31 +58,14 @@ def _log_menu_debug(key: str, msg: str, exc: Exception, *, interval_s: float = 6
 
 
 def _format_hex_id(val: str) -> str:
-    s = (str(val or "").strip().lower() if val is not None else "")
+    s = str(val or "").strip().lower() if val is not None else ""
     if s.startswith("0x"):
         s = s[2:]
     return s
 
 
 def _title(name: str) -> str:
-    n = str(name)
-    if n == "reactive_fade":
-        return "Reactive Typing (Fade)"
-    if n == "reactive_ripple":
-        return "Reactive Typing (Ripple)"
-    if n == "reactive_rainbow":
-        return "Reactive Rainbow"
-    if n == "reactive_snake":
-        return "Reactive Snake"
-    if n == "rainbow_wave":
-        return "Rainbow Wave"
-    if n == "rainbow_swirl":
-        return "Rainbow Swirl"
-    if n == "spectrum_cycle":
-        return "Spectrum Cycle"
-    if n == "color_cycle":
-        return "Color Cycle"
-    return n.replace("_", " ").strip().title()
+    return title_for_effect(name)
 
 
 def _perkey_sw_suffix(effect_name: str) -> str:
@@ -133,6 +136,8 @@ def tray_lighting_mode_text(tray: Any) -> str:
     cfg = getattr(tray, "config", None)
     effect = str(getattr(cfg, "effect", "none") or "none")
 
+    sw_mode = is_software_mode(tray)
+
     # Per-key mode is a first-class state.
     if effect == "perkey":
         try:
@@ -142,19 +147,25 @@ def tray_lighting_mode_text(tray: Any) -> str:
         except Exception:
             active_profile = "(unknown)"
 
-        return f"Active: Per-key ({active_profile})"
+        return f"Mode: Software ({active_profile})"
+
+    # Software effects with per-key backdrop
+    if effect in SW_EFFECTS:
+        if sw_mode:
+            return f"Mode: Software + {_title(effect)}"
+        return f"Mode: {_title(effect)}"
+
+    # Hardware effects
+    if effect in HW_EFFECTS:
+        return f"Mode: Hardware + {_title(effect)}"
 
     # Uniform color is represented by no effect.
     if effect == "none":
-        return "Active: Uniform"
+        if sw_mode:
+            return "Mode: Software (static)"
+        return "Mode: Hardware (uniform)"
 
-    # Effects.
-    if effect in HW_EFFECTS:
-        return f"Active: HW {_title(effect)}"
-    if effect in SW_EFFECTS:
-        return f"Active: SW {_title(effect)}"
-
-    return f"Active: {_title(effect)}"
+    return f"Mode: {_title(effect)}"
 
 
 def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> Optional[Any]:
@@ -210,7 +221,7 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
         st = get_status()
         if not st.supported:
             return None
-        can_apply = (st.identifiers.get("can_apply") == "true")
+        can_apply = st.identifiers.get("can_apply") == "true"
 
         def _make_cb(mode: PowerMode):
             def _cb(_icon, _item):

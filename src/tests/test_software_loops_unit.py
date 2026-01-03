@@ -41,7 +41,7 @@ class TestPulseCalculation:
     def test_pulse_brightness_clamped_to_max_brightness(self):
         """Pulse brightness should never exceed max brightness."""
         max_brightness = 80
-        
+
         # Test at peak (phase where sin = 1)
         phase = math.pi / 2  # sin(π/2) = 1
         pulse = (math.sin(phase) + 1) / 2  # = 1.0
@@ -53,7 +53,7 @@ class TestPulseCalculation:
     def test_pulse_brightness_has_minimum_of_one(self):
         """Pulse brightness should never go below 1."""
         max_brightness = 80
-        
+
         # Test at trough (phase where sin = -1)
         phase = 3 * math.pi / 2  # sin(3π/2) = -1
         pulse = (math.sin(phase) + 1) / 2  # = 0.0
@@ -99,7 +99,6 @@ class TestStrobeToggling:
     def test_strobe_alternates_white_and_black(self):
         """Strobe should alternate between white and black."""
         on = False
-        brightness = 80
 
         states = []
         for _ in range(4):

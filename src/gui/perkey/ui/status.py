@@ -1,10 +1,10 @@
-from __future__ import annotations
-
 """Status label helpers for the per-key editor.
 
 Keeps message formatting consistent and keeps UI modules from sprinkling direct
 `status_label.config(...)` calls everywhere.
 """
+
+from __future__ import annotations
 
 from typing import Any
 

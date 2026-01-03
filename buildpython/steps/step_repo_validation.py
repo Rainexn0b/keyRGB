@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..utils.paths import repo_root, buildlog_dir
+from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
 

@@ -28,7 +28,6 @@ DEFAULTS: dict = {
     "battery_saver_enabled": False,
     # Uses the same brightness scale as `brightness`.
     "battery_saver_brightness": 25,
-
     # Power-source lighting profiles (AC vs battery)
     # These default to "enabled" with no brightness override (None).
     # When brightness is None, KeyRGB will keep using the current brightness
@@ -39,7 +38,6 @@ DEFAULTS: dict = {
     "battery_lighting_brightness": None,
     # Per-key colors stored as {"row,col": [r,g,b]}
     "per_key_colors": {},
-
     # Screen dim sync (best-effort, DE-specific). When enabled, KeyRGB will
     # react to desktop-driven display dimming by either turning keyboard
     # LEDs off, or dimming them to a temporary brightness.

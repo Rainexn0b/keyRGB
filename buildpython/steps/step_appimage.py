@@ -4,7 +4,6 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 import urllib.request
 import json
 from pathlib import Path
@@ -13,10 +12,7 @@ from ..utils.paths import repo_root
 from ..utils.subproc import RunResult, python_exe, run
 
 
-APPIMAGETOOL_URL = (
-    "https://github.com/AppImage/AppImageKit/releases/download/continuous/"
-    "appimagetool-x86_64.AppImage"
-)
+APPIMAGETOOL_URL = "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
 
 
 def _download(url: str, dst: Path) -> None:

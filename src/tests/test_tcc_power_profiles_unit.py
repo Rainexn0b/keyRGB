@@ -16,8 +16,8 @@ import src.core.tcc_power_profiles as tcc_power_profiles
 @pytest.mark.parametrize(
     "stdout, expected",
     [
-        ("s \"{\\\"a\\\": 1}\"", '{"a": 1}'),
-        ("s \"hello\"", "hello"),
+        ('s "{\\"a\\": 1}"', '{"a": 1}'),
+        ('s "hello"', "hello"),
         ("", None),
         ("b true", None),
     ],
@@ -33,7 +33,7 @@ def test_parse_busctl_string_reply(stdout: str, expected: str | None) -> None:
         ("b false", False),
         ("b 1", True),
         ("b 0", False),
-        ("s \"x\"", None),
+        ('s "x"', None),
         ("", None),
     ],
 )

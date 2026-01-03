@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import colorsys
 import time
-from typing import Any, Mapping
+from typing import Any
 
 from PIL import Image, ImageDraw
 

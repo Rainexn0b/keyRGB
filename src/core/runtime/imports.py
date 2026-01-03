@@ -76,6 +76,7 @@ def ensure_ite8291r3_ctl_importable(anchor: str | Path) -> Optional[Path]:
     if os.environ.get("PYTEST_CURRENT_TEST"):
         try:
             import ite8291r3_ctl  # noqa: F401
+
             return None
         except ImportError:
             root = repo_root_from(anchor)

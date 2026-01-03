@@ -210,6 +210,7 @@ class TestBuildHwEffectPayload:
             args = {"speed": None}  # Only speed is allowed
 
             def effect_func(**kwargs):
+                _ = args  # ensure `args` exists in the closure for introspection
                 return kwargs
 
             return effect_func

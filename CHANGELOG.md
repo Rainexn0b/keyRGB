@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.3 (2026-01-04)
+
+- Effects: removes Reactive Snake; legacy `reactive_snake`/`reactive_rainbow` now normalize to `reactive_ripple` for backward compatibility.
+- Tray: tight HW vs SW mode lockdown (incompatible menu items are greyed out), and software effects can run without forcing a profile load (“loose” uniform color state).
+- Per-key editor: adds a “New profile” workflow and improves profile ergonomics.
+- Maintenance: centralizes effect catalog/labels and effect-name normalization to reduce drift between engine and tray; general cleanup + lint/format.
+- Docs: adds a dedicated commands doc and repo layout notes; refreshes screenshots.
+
 ## 0.9.2 (2026-01-03)
 
 - Tray: refreshed menu layout and labeling for a more native desktop feel (emoji-free, clearer section ordering).

@@ -6,7 +6,6 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from src.gui.widgets.color_wheel import ColorWheel
 from src.core.config import Config
 from src.core.resources.layout import REFERENCE_DEVICE_KEYS
 from src.core.profile import profiles
@@ -15,8 +14,6 @@ from src.gui.theme import apply_clam_dark_theme
 
 from .ui.backdrop import reset_backdrop_ui, set_backdrop_ui
 
-from .canvas import KeyboardCanvas
-from .overlay import OverlayControls
 from .hardware import get_keyboard, NUM_ROWS, NUM_COLS
 from .overlay import auto_sync_per_key_overlays
 from .profile_management import load_profile_colors
@@ -25,7 +22,7 @@ from .editor_ui import build_editor_ui
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
 
-from .ui.profile_actions import activate_profile_ui, delete_profile_ui, save_profile_ui
+from .ui.profile_actions import activate_profile_ui, delete_profile_ui, new_profile_ui, save_profile_ui
 from .ui.calibrator import run_keymap_calibrator_ui
 from .ui.keymap import reload_keymap_ui
 from .ui.bulk_color import clear_all_ui, fill_all_ui
@@ -33,21 +30,10 @@ from .ui.wheel_apply import on_wheel_color_change_ui, on_wheel_color_release_ui
 from .ui.full_map import ensure_full_map_ui
 from .ui.sample_tool import on_key_clicked_ui, on_sample_tool_toggled_ui
 from .ui.status import (
-    active_profile,
     auto_synced_overlay_tweaks,
-    backdrop_reset,
-    backdrop_reset_failed,
-    backdrop_update_failed,
-    backdrop_updated,
-    calibrator_failed,
-    calibrator_started,
-    cleared_all_keys,
-    filled_all_keys_rgb,
     no_keymap_found_initial,
     reset_overlay_tweaks_for_key,
     reset_overlay_tweaks_global,
-    saved_all_keys_rgb,
-    saved_key_rgb,
     saved_overlay_tweaks_for_key,
     saved_overlay_tweaks_global,
     selected_mapped,
@@ -106,9 +92,7 @@ class PerKeyEditor:
             else (255, 0, 0)
         )
         self._last_non_black_color: tuple[int, int, int] = (
-            (int(base_color[0]), int(base_color[1]), int(base_color[2]))
-            if base_color != (0, 0, 0)
-            else (255, 0, 0)
+            (int(base_color[0]), int(base_color[1]), int(base_color[2])) if base_color != (0, 0, 0) else (255, 0, 0)
         )
 
         # Prefer profile-stored per-key colors over whatever happens to be in
@@ -330,6 +314,9 @@ class PerKeyEditor:
             self._overlay_visible = True
             self.overlay_controls.sync_vars_from_scope()
 
+    def _new_profile(self):
+        new_profile_ui(self)
+
     def _activate_profile(self):
         activate_profile_ui(self)
 
@@ -345,8 +332,10 @@ class PerKeyEditor:
     def run(self):
         self.root.mainloop()
 
+
 def main():
     PerKeyEditor().run()
+
 
 if __name__ == "__main__":
     main()

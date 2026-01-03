@@ -48,10 +48,7 @@ def acquire_keyboard(*, kb_lock: RLock, logger: logging.Logger) -> Tuple[Any, bo
 
     # Safety: unit tests must not touch real hardware by default.
     # Allow opt-in for hardware tests via env var.
-    allow_hardware = (
-        os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1"
-        or os.environ.get("KEYRGB_HW_TESTS") == "1"
-    )
+    allow_hardware = os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
 
     if os.environ.get("PYTEST_CURRENT_TEST") and not allow_hardware:
         return NullKeyboard(), False

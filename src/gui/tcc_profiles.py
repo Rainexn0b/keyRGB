@@ -11,9 +11,6 @@ temporary activation (matching the TCC tray behavior).
 from __future__ import annotations
 
 import logging
-import os
-import sys
-import json
 
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk

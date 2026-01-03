@@ -100,7 +100,7 @@ def on_key_clicked_ui(
         r, g, b = int(r), int(g), int(b)
     except Exception:
         # Fallback to last known non-black color.
-        r, g, b = (getattr(editor, "_last_non_black_color", (255, 0, 0)) or (255, 0, 0))
+        r, g, b = getattr(editor, "_last_non_black_color", (255, 0, 0)) or (255, 0, 0)
         r, g, b = int(r), int(g), int(b)
 
     apply_release_fn(editor, r, g, b, num_rows=num_rows, num_cols=num_cols)

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    import pystray as _pystray
+    pass
 
 
 _pystray_mod = None

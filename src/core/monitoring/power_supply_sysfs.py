@@ -40,9 +40,7 @@ def iter_ac_online_files(power_supply_root: Path) -> list[Path]:
 
 def read_on_ac_power(*, power_supply_root: Optional[Path] = None) -> Optional[bool]:
     if power_supply_root is None:
-        power_supply_root = Path(
-            os.environ.get("KEYRGB_SYSFS_POWER_SUPPLY_ROOT", "/sys/class/power_supply")
-        )
+        power_supply_root = Path(os.environ.get("KEYRGB_SYSFS_POWER_SUPPLY_ROOT", "/sys/class/power_supply"))
 
     candidates = iter_ac_online_files(power_supply_root)
     if not candidates:

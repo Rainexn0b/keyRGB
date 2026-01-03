@@ -98,6 +98,7 @@ This installs the AppImage to `~/.local/bin/keyrgb`, sets up the desktop launche
 Docs:
 
 - Step-by-step from a blank install: [docs/usage/usage.md](docs/usage/usage.md)
+- Commands / entrypoints / env vars: [docs/usage/commands.md](docs/usage/commands.md)
 - Architecture / TongFang support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
 
 ### Uninstall
@@ -117,6 +118,8 @@ Docs:
 | `keyrgb` | Start the tray app (background). |
 | `./keyrgb` | Run attached to terminal (dev mode). |
 | `keyrgb-perkey` | Open the per-key editor. |
+| `keyrgb-uniform` | Open the uniform-color GUI. |
+| `keyrgb-calibrate` | Open the keymap calibrator UI. |
 | `keyrgb-diagnostics` | Print hardware diagnostics JSON. |
 
 ## Configuration
@@ -164,7 +167,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | `--appimage` | Download AppImage (default). |
 | `--pip` | Install via `pip --user` (dev/editable). |
 | `--clone` | Clone repo and install via pip (source). |
-| `--version <tag>` | Install specific tag (e.g. `v0.9.2`). |
+| `--version <tag>` | Install specific tag (e.g. `v0.9.3`). |
 
 ### Environment variables
 
