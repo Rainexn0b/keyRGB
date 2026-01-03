@@ -186,6 +186,8 @@ def start_idle_power_polling(
     def poll_idle_power() -> None:
         last_error_at = 0.0
 
+        last_action_key: Optional[str] = None
+
         # Debounce dim/off signals to avoid rare transient false positives from
         # sysfs/DRM reads (which can briefly report 0/Off during modesets).
         dimmed_true_streak = 0
@@ -280,6 +282,39 @@ def start_idle_power_polling(
                     user_forced_off=bool(getattr(tray, "_user_forced_off", False)),
                     power_forced_off=bool(getattr(tray, "_power_forced_off", False)),
                 )
+
+                action_key = None
+                try:
+                    action_key = (
+                        f"{action}|dimmed={dimmed}|screen_off={bool(screen_off)}|"
+                        f"bri={int(brightness)}|dim_mode={str(dim_sync_mode)}|dim_tmp={int(dim_temp_brightness)}"
+                    )
+                except Exception:
+                    action_key = str(action)
+
+                is_real_action = bool(action) and str(action) != "none"
+                if action_key is not None and action_key != last_action_key and is_real_action:
+                    last_action_key = action_key
+                    log_event = getattr(tray, "_log_event", None)
+                    if callable(log_event):
+                        try:
+                            log_event(
+                                "idle_power",
+                                str(action),
+                                dimmed=dimmed,
+                                screen_off=bool(screen_off),
+                                config_brightness=int(brightness),
+                                dim_sync_enabled=bool(dim_sync_enabled),
+                                dim_sync_mode=str(dim_sync_mode),
+                                dim_temp_brightness=int(dim_temp_brightness),
+                                is_off=bool(getattr(tray, "is_off", False)),
+                                user_forced_off=bool(getattr(tray, "_user_forced_off", False)),
+                                power_forced_off=bool(getattr(tray, "_power_forced_off", False)),
+                                idle_forced_off=bool(getattr(tray, "_idle_forced_off", False)),
+                                dim_temp_active=bool(getattr(tray, "_dim_temp_active", False)),
+                            )
+                        except Exception:
+                            pass
 
                 if action == "turn_off":
                     tray._dim_temp_active = False

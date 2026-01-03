@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, Optional, Tuple
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
-from src.gui.y15_pro_overlay_geometry import CanvasTransform, calc_centered_transform, key_canvas_bbox_inset
-from src.gui import y15_pro_overlay_geometry
+from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
+from src.gui.reference_overlay_geometry import CanvasTransform, calc_centered_transform, key_canvas_bbox_inset
+from src.gui import reference_overlay_geometry
 
 
 def calc_transform(
@@ -42,10 +42,10 @@ def hit_test(
     y: int,
     layout_tweaks: Dict[str, float],
     per_key_layout_tweaks: Dict[str, Dict[str, float]],
-    keys: Iterable[KeyDef] = Y15_PRO_KEYS,
+    keys: Iterable[KeyDef] = REFERENCE_DEVICE_KEYS,
     image_size: tuple[int, int] = BASE_IMAGE_SIZE,
 ) -> Optional[KeyDef]:
-    return y15_pro_overlay_geometry.hit_test(
+    return reference_overlay_geometry.hit_test(
         transform=transform,
         x=x,
         y=y,

@@ -49,6 +49,13 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
     except Exception:
         effect_name = "none"
 
+    log_event = getattr(tray, "_log_event", None)
+    if callable(log_event):
+        try:
+            log_event("menu", "select_effect", old=str(prev_effect), new=str(effect_name))
+        except Exception:
+            pass
+
     # Backward compatibility: these legacy per-key software animations were removed.
     # Treat any selection or persisted value as plain per-key mode.
     perkey_aliases = {"perkey breathing", "perkey pulse", "perkey_breathing", "perkey_pulse"}

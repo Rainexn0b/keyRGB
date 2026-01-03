@@ -78,6 +78,16 @@ def build_editor_ui(editor) -> None:
         side="left", fill="x", expand=True
     )
 
+    ttk.Label(right, text="Backdrop transparency", font=("Sans", 9)).pack(anchor="w", pady=(0, 4))
+    ttk.Scale(
+        right,
+        from_=0,
+        to=100,
+        orient="horizontal",
+        variable=editor.backdrop_transparency,
+        command=editor._on_backdrop_transparency_changed,
+    ).pack(fill="x", pady=(0, 10))
+
     initial = editor._last_non_black_color
     editor.color_wheel = ColorWheel(
         right,

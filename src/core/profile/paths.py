@@ -17,6 +17,35 @@ DEFAULT_PROFILE_NAME = "default"
 logger = logging.getLogger(__name__)
 
 
+def _migrate_profile_file(*, root: Path, new_name: str, old_name: str) -> Path:
+    """Return the preferred path and migrate legacy names when safe.
+
+    If the new path already exists, it wins.
+    If only the legacy path exists, we attempt to rename it to the new path.
+    On failure, fall back to the legacy path.
+    """
+
+    new_path = root / new_name
+    old_path = root / old_name
+
+    if new_path.exists() or not old_path.exists():
+        return new_path
+
+    try:
+        old_path.rename(new_path)
+        return new_path
+    except Exception as exc:
+        log_throttled(
+            logger,
+            "profile_paths.migrate_legacy_file",
+            interval_s=60,
+            level=logging.DEBUG,
+            msg=f"Failed to migrate {old_path.name} -> {new_path.name}",
+            exc=exc,
+        )
+        return old_path
+
+
 def safe_profile_name(name: str) -> str:
     name = (name or "").strip()
     if not name:
@@ -101,6 +130,7 @@ class ProfilePaths:
     layout_per_key: Path
     per_key_colors: Path
     backdrop_image: Path
+    backdrop_settings: Path
 
 
 def paths_for(name: str | None = None) -> ProfilePaths:
@@ -108,11 +138,33 @@ def paths_for(name: str | None = None) -> ProfilePaths:
         name = get_active_profile()
     name = safe_profile_name(name)
     root = ensure_profile(name)
+
+    # New, device-agnostic filenames.
+    # We also support legacy Y15 Pro-named files and migrate them in-place.
+    keymap = _migrate_profile_file(root=root, new_name="keymap.json", old_name="keymap_y15_pro.json")
+    layout_global = _migrate_profile_file(
+        root=root,
+        new_name="layout_tweaks.json",
+        old_name="layout_tweaks_y15_pro.json",
+    )
+    layout_per_key = _migrate_profile_file(
+        root=root,
+        new_name="layout_tweaks_per_key.json",
+        old_name="layout_tweaks_y15_pro_perkey.json",
+    )
+    backdrop_image = _migrate_profile_file(root=root, new_name="backdrop.png", old_name="backdrop_y15_pro.png")
+    backdrop_settings = _migrate_profile_file(
+        root=root,
+        new_name="backdrop_settings.json",
+        old_name="backdrop_settings_y15_pro.json",
+    )
+
     return ProfilePaths(
         root=root,
-        keymap=root / "keymap_y15_pro.json",
-        layout_global=root / "layout_tweaks_y15_pro.json",
-        layout_per_key=root / "layout_tweaks_y15_pro_perkey.json",
+        keymap=keymap,
+        layout_global=layout_global,
+        layout_per_key=layout_per_key,
         per_key_colors=root / "per_key_colors.json",
-        backdrop_image=root / "backdrop_y15_pro.png",
+        backdrop_image=backdrop_image,
+        backdrop_settings=backdrop_settings,
     )

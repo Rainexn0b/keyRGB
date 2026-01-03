@@ -13,7 +13,23 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
     last_applied = None
     last_apply_warn_at = 0.0
 
-    def apply_from_config():
+    def _state_for_log(state_tuple):
+        if not state_tuple:
+            return None
+        try:
+            eff, spd, bri, col, perkey_sig = state_tuple
+            perkey_keys = 0 if perkey_sig is None else len(perkey_sig)
+            return {
+                "effect": eff,
+                "speed": spd,
+                "brightness": bri,
+                "color": tuple(col) if col is not None else None,
+                "perkey_keys": perkey_keys,
+            }
+        except Exception:
+            return None
+
+    def apply_from_config(*, cause: str) -> None:
         nonlocal last_applied
         nonlocal last_apply_warn_at
 
@@ -43,16 +59,49 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
         if current == last_applied:
             return
 
+        log_event = getattr(tray, "_log_event", None)
+        if callable(log_event):
+            try:
+                old_state = _state_for_log(last_applied)
+                new_state = _state_for_log(current)
+                log_event(
+                    "config",
+                    "detected_change",
+                    cause=str(cause or "unknown"),
+                    old=old_state,
+                    new=new_state,
+                )
+            except Exception:
+                pass
+
         if tray.is_off and (
             bool(getattr(tray, "_user_forced_off", False))
             or bool(getattr(tray, "_power_forced_off", False))
             or bool(getattr(tray, "_idle_forced_off", False))
         ):
+            if callable(log_event):
+                try:
+                    log_event(
+                        "config",
+                        "skipped_forced_off",
+                        cause=str(cause or "unknown"),
+                        is_off=True,
+                        user_forced_off=bool(getattr(tray, "_user_forced_off", False)),
+                        power_forced_off=bool(getattr(tray, "_power_forced_off", False)),
+                        idle_forced_off=bool(getattr(tray, "_idle_forced_off", False)),
+                    )
+                except Exception:
+                    pass
             last_applied = current
             tray._update_menu()
             return
 
         if tray.config.brightness == 0:
+            if callable(log_event):
+                try:
+                    log_event("config", "apply_turn_off", cause=str(cause or "unknown"), brightness=0)
+                except Exception:
+                    pass
             try:
                 tray.engine.turn_off()
             except Exception as exc:
@@ -73,6 +122,17 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
 
         try:
             if tray.config.effect == 'perkey':
+                if callable(log_event):
+                    try:
+                        log_event(
+                            "config",
+                            "apply_perkey",
+                            cause=str(cause or "unknown"),
+                            brightness=int(tray.config.brightness),
+                            perkey_keys=int(len(getattr(tray.config, "per_key_colors", {}) or {})),
+                        )
+                    except Exception:
+                        pass
                 tray.engine.stop()
                 color_map = dict(tray.config.per_key_colors)
 
@@ -100,11 +160,35 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                     )
 
             elif tray.config.effect == 'none':
+                if callable(log_event):
+                    try:
+                        log_event(
+                            "config",
+                            "apply_uniform",
+                            cause=str(cause or "unknown"),
+                            brightness=int(tray.config.brightness),
+                            color=tuple(tray.config.color),
+                        )
+                    except Exception:
+                        pass
                 tray.engine.stop()
                 with tray.engine.kb_lock:
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
 
             else:
+                if callable(log_event):
+                    try:
+                        log_event(
+                            "config",
+                            "apply_effect",
+                            cause=str(cause or "unknown"),
+                            effect=str(tray.config.effect),
+                            speed=int(tray.config.speed),
+                            brightness=int(tray.config.brightness),
+                            color=tuple(tray.config.color),
+                        )
+                    except Exception:
+                        pass
                 tray._start_current_effect()
 
         except Exception as e:
@@ -139,7 +223,7 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
 
         try:
             tray.config.reload()
-            apply_from_config()
+            apply_from_config(cause="startup")
         except Exception as exc:
             # Don't crash the polling thread; but also don't silently eat errors.
             now = time.monotonic()
@@ -160,7 +244,7 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                 last_mtime = mtime
                 try:
                     tray.config.reload()
-                    apply_from_config()
+                    apply_from_config(cause="mtime_change")
                 except Exception as e:
                     tray._log_exception("Error reloading config: %s", e)
 

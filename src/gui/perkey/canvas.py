@@ -7,9 +7,9 @@ from typing import TYPE_CHECKING, Optional
 
 from src.core.logging_utils import log_throttled
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
-from src.gui.y15_pro_deck_image import load_y15_pro_deck_image
-from src.gui.y15_pro_overlay_geometry import (
+from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
+from src.gui.reference_deck_image import load_reference_deck_image
+from src.gui.reference_overlay_geometry import (
     apply_global_tweak,
     apply_per_key_tweak,
     inset_bbox,
@@ -57,7 +57,7 @@ class KeyboardCanvas(tk.Canvas):
 
     def _load_deck_image(self):
         prof = getattr(self.editor, "profile_name", None)
-        self._deck_img = load_y15_pro_deck_image(profile_name=str(prof) if isinstance(prof, str) else None)
+        self._deck_img = load_reference_deck_image(profile_name=str(prof) if isinstance(prof, str) else None)
 
     def reload_backdrop_image(self) -> None:
         """Reload the backdrop image for the current profile and redraw."""
@@ -74,7 +74,7 @@ class KeyboardCanvas(tk.Canvas):
         if self._deck_drawn_bbox is None:
             return
 
-        for key in Y15_PRO_KEYS:
+        for key in REFERENCE_DEVICE_KEYS:
             rect = self._key_rect_canvas(key)
             if rect is None:
                 return
@@ -143,6 +143,27 @@ class KeyboardCanvas(tk.Canvas):
         y0 = (ch - dh) // 2
 
         resized = self._deck_img.resize((dw, dh), Image.Resampling.LANCZOS)
+
+        # Backdrop transparency is a user-facing percentage:
+        # 0 = opaque, 100 = fully transparent.
+        try:
+            t = float(getattr(self.editor, "backdrop_transparency", 0).get())
+        except Exception:
+            try:
+                t = float(getattr(self.editor, "backdrop_transparency", 0) or 0)
+            except Exception:
+                t = 0.0
+        t = max(0.0, min(100.0, float(t)))
+        if t > 0.0:
+            alpha_mul = max(0.0, min(1.0, (100.0 - t) / 100.0))
+            try:
+                a = resized.getchannel("A")
+                a = a.point(lambda px: int(px * alpha_mul))
+                resized.putalpha(a)
+            except Exception:
+                # Best-effort: if alpha manipulation fails, keep original.
+                pass
+
         self._deck_img_tk = ImageTk.PhotoImage(resized)
         self.create_image(x0, y0, image=self._deck_img_tk, anchor='nw')
         self._deck_drawn_bbox = (x0, y0, dw, dh)
@@ -243,7 +264,7 @@ class KeyboardCanvas(tk.Canvas):
             )
 
     def _keydef_by_id(self, key_id: str) -> KeyDef | None:
-        return next((k for k in Y15_PRO_KEYS if k.key_id == key_id), None)
+        return next((k for k in REFERENCE_DEVICE_KEYS if k.key_id == key_id), None)
 
     def _resize_edges_for_point(self, key_id: str, cx: float, cy: float) -> str:
         kd = self._keydef_by_id(key_id)
@@ -295,7 +316,7 @@ class KeyboardCanvas(tk.Canvas):
         return (x1 + inset, y1 + inset, x2 - inset, y2 - inset)
 
     def _hit_test_key_id(self, cx: float, cy: float) -> str | None:
-        for kd in Y15_PRO_KEYS:
+        for kd in REFERENCE_DEVICE_KEYS:
             bbox = self._key_bbox_canvas(kd)
             if bbox is None:
                 return None

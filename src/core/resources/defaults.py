@@ -1,8 +1,13 @@
-"""Default profile data for Y15 Pro.
+"""Built-in reference profile data.
+
+Historically, KeyRGB started as a personal driver for the WootBook Y15 Pro, so
+the built-in reference keymap/layout defaults are based on that model.
+
+These defaults are used as a fallback and for first-run UX; users are expected
+to calibrate their own keymap/backdrop for best accuracy.
 
 This module intentionally keeps the *API surface* stable (the exported constants
-remain the same), while moving the huge data blobs into a JSON resource file to
-make the codebase easier to maintain.
+remain the same), while keeping the large data blobs in a JSON resource file.
 """
 
 from __future__ import annotations
@@ -12,7 +17,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-_DEFAULTS_PATH = Path(__file__).resolve().parents[1] / "defaults_y15_pro.json"
+_DEFAULTS_PATH = Path(__file__).resolve().parent / "reference_defaults_wootbook_y15_pro.json"
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:

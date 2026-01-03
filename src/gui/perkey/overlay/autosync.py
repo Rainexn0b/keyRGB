@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from typing import Dict, Iterable
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
+from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 
 
 def auto_sync_per_key_overlays(
     *,
     layout_tweaks: Dict[str, float],
     per_key_layout_tweaks: Dict[str, Dict[str, float]],
-    keys: Iterable[KeyDef] = Y15_PRO_KEYS,
+    keys: Iterable[KeyDef] = REFERENCE_DEVICE_KEYS,
     base_image_size: tuple[int, int] = BASE_IMAGE_SIZE,
 ) -> None:
     """Normalize per-key overlay tweaks after manual adjustments.

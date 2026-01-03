@@ -8,7 +8,7 @@ from tkinter import ttk
 
 from src.gui.widgets.color_wheel import ColorWheel
 from src.core.config import Config
-from src.core.resources.layout import Y15_PRO_KEYS
+from src.core.resources.layout import REFERENCE_DEVICE_KEYS
 from src.core.profile import profiles
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
@@ -89,6 +89,10 @@ class PerKeyEditor:
         self.config = Config()
         self.profile_name = profiles.get_active_profile()
 
+        self.backdrop_transparency = tk.DoubleVar(value=float(profiles.load_backdrop_transparency(self.profile_name)))
+        self._backdrop_transparency_save_job: str | None = None
+        self._backdrop_transparency_redraw_job: str | None = None
+
         base_color = (
             tuple(self.config.color)
             if isinstance(self.config.color, (list, tuple)) and len(self.config.color) == 3
@@ -131,10 +135,52 @@ class PerKeyEditor:
 
         self.root.bind("<FocusIn>", lambda _e: self._reload_keymap())
 
-        for kd in Y15_PRO_KEYS:
+        for kd in REFERENCE_DEVICE_KEYS:
             if kd.key_id in self.keymap:
                 self.select_key_id(kd.key_id)
                 break
+
+    def _on_backdrop_transparency_changed(self, value: str) -> None:
+        try:
+            t = int(round(float(value)))
+        except Exception:
+            t = 0
+        t = max(0, min(100, t))
+
+        try:
+            self.backdrop_transparency.set(float(t))
+        except Exception:
+            pass
+
+        # Throttle redraw while dragging.
+        if self._backdrop_transparency_redraw_job is not None:
+            try:
+                self.root.after_cancel(self._backdrop_transparency_redraw_job)
+            except Exception:
+                pass
+        self._backdrop_transparency_redraw_job = self.root.after(30, self._apply_backdrop_transparency_redraw)
+
+        # Throttle disk writes while dragging.
+        if self._backdrop_transparency_save_job is not None:
+            try:
+                self.root.after_cancel(self._backdrop_transparency_save_job)
+            except Exception:
+                pass
+        self._backdrop_transparency_save_job = self.root.after(250, self._persist_backdrop_transparency)
+
+    def _apply_backdrop_transparency_redraw(self) -> None:
+        self._backdrop_transparency_redraw_job = None
+        try:
+            self.canvas.redraw()
+        except Exception:
+            return
+
+    def _persist_backdrop_transparency(self) -> None:
+        self._backdrop_transparency_save_job = None
+        try:
+            profiles.save_backdrop_transparency(int(round(float(self.backdrop_transparency.get()))), self.profile_name)
+        except Exception:
+            return
 
     def _build_ui(self):
         build_editor_ui(self)

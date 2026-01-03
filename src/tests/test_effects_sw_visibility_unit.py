@@ -6,7 +6,8 @@ import threading
 import time
 
 from src.core.effects.engine import EffectsEngine
-from src.core.effects.software_loops import run_chase, run_reactive_fade
+from src.core.effects.reactive.effects import run_reactive_fade
+from src.core.effects.software.effects import run_chase
 
 
 class UniformOnlyKeyboard:

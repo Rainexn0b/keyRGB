@@ -6,6 +6,7 @@ This module holds the `KeyRGBTray` class implementation.
 from __future__ import annotations
 
 import logging
+import time
 
 from .backend import select_backend_with_introspection
 from . import callbacks
@@ -44,6 +45,9 @@ class KeyRGBTray:
         self._dim_temp_target_brightness = None
         self._last_brightness = 25
 
+        # Event log throttling state (key -> last log monotonic time).
+        self._event_last_at: dict[str, float] = {}
+
         # Backend selection is used for capability-driven UI gating.
         self.backend, self.backend_probe, self.backend_caps = select_backend_with_introspection()
 
@@ -57,6 +61,49 @@ class KeyRGBTray:
 
     def _log_exception(self, msg: str, exc: Exception):
         logger.exception(msg, exc)
+
+    def _log_event(self, source: str, action: str, **fields) -> None:
+        """Log a human-readable event cause.
+
+        Intended to help diagnose flicker by showing *why* brightness/off/effect
+        changes are being applied (menu vs. pollers vs. power policy, etc.).
+        """
+
+        try:
+            src = str(source)
+            act = str(action)
+        except Exception:
+            return
+
+        parts: list[str] = []
+        try:
+            for k in sorted(fields.keys()):
+                v = fields.get(k)
+                try:
+                    parts.append(f"{k}={v}")
+                except Exception:
+                    parts.append(f"{k}=<unrepr>")
+        except Exception:
+            parts = []
+
+        msg = f"EVENT {src}:{act}"
+        if parts:
+            msg = f"{msg} " + " ".join(parts)
+
+        # Throttle identical messages to avoid poller spam.
+        try:
+            now = time.monotonic()
+            last = float(self._event_last_at.get(msg, 0.0) or 0.0)
+            if now - last < 1.0:
+                return
+            self._event_last_at[msg] = now
+        except Exception:
+            pass
+
+        try:
+            logger.info("%s", msg)
+        except Exception:
+            return
 
     # ---- icon
 

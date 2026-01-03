@@ -1,12 +1,23 @@
 # Changelog
 
+## 0.9.1 (2026-01-03)
+
+- Brightness: tray brightness selection now persists cleanly across restarts (brightness is normalized to the 0..50 step grid the tray exposes).
+- Brightness: hardware polling no longer overwrites `config.json` brightness values (prevents “no selection”/scale mismatch issues).
+- Power: clarifies and stabilizes brightness semantics between baseline (AC/battery policies) vs temporary overrides (tray + screen-dim sync).
+- Screen Dim Sync: temporary dim-to-brightness no longer clobbers user/baseline settings; restore behavior is more consistent.
+- Diagnostics: adds INFO-level `EVENT ...` logs for menu actions, config apply decisions, idle/power actions, and hardware brightness changes.
+- Maintenance: groups config modules under `src/core/config/` with backward-compatible shims for older import paths.
+
 ## 0.9.0 (2026-01-03)
 
-- Effects: replaces/expands software effect suite with OpenRGB-style animations (Rainbow Wave/Swirl, Spectrum Cycle, Color Cycle, Chase, Twinkle, Strobe).
+- Reworked software effects engine.
+- Effects: replaces/expands software effect suite with new animations (Rainbow Wave/Swirl, Spectrum Cycle, Color Cycle, Chase, Twinkle, Strobe).
 - Effects: adds reactive typing effects (Reactive Fade/Ripple/Rainbow/Snake) with calibrated per-profile key mapping.
 - Effects: adjusts speed mapping so speed=10 is significantly faster.
 - Permissions: adds an optional udev `uaccess` rule install path to allow safe keypress capture via evdev (without adding the user to the `input` group).
 - Tray: updates effect menus to include the new software/reactive effects and reduces fragile/dynamic tray icon updates for SW effects.
+- Fixed a bug where the wrong color mode would be selected when an effect was activated
 
 ## 0.8.0 (2026-01-02)
 

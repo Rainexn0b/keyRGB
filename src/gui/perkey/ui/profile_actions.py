@@ -30,6 +30,16 @@ def activate_profile_ui(editor: Any) -> None:
     editor.per_key_layout_tweaks = result.per_key_layout_tweaks
     editor.colors = result.colors
 
+    # Reload per-profile backdrop state.
+    try:
+        editor.backdrop_transparency.set(float(profiles.load_backdrop_transparency(editor.profile_name)))
+    except Exception:
+        pass
+    try:
+        editor.canvas.reload_backdrop_image()
+    except Exception:
+        pass
+
     # Ensure we're applying a full map, then push it to hardware.
     ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)

@@ -117,6 +117,13 @@ def on_speed_clicked(tray: Any, item: Any) -> None:
     if speed is None:
         return
 
+    log_event = getattr(tray, "_log_event", None)
+    if callable(log_event):
+        try:
+            log_event("menu", "set_speed", old=int(getattr(tray.config, "speed", 0) or 0), new=int(speed))
+        except Exception:
+            pass
+
     tray.config.speed = speed
     if not tray.is_off:
         start_current_effect(tray)
@@ -132,6 +139,18 @@ def on_brightness_clicked(tray: Any, item: Any) -> None:
     if brightness_hw > 0:
         tray._last_brightness = brightness_hw
 
+    log_event = getattr(tray, "_log_event", None)
+    if callable(log_event):
+        try:
+            log_event(
+                "menu",
+                "set_brightness",
+                old=int(getattr(tray.config, "brightness", 0) or 0),
+                new=int(brightness_hw),
+            )
+        except Exception:
+            pass
+
     tray.config.brightness = brightness_hw
     tray.engine.set_brightness(tray.config.brightness)
     if not tray.is_off:
@@ -140,6 +159,12 @@ def on_brightness_clicked(tray: Any, item: Any) -> None:
 
 
 def turn_off(tray: Any) -> None:
+    log_event = getattr(tray, "_log_event", None)
+    if callable(log_event):
+        try:
+            log_event("menu", "turn_off")
+        except Exception:
+            pass
     tray._user_forced_off = True
     tray._idle_forced_off = False
     tray.engine.turn_off()
@@ -148,6 +173,12 @@ def turn_off(tray: Any) -> None:
 
 
 def turn_on(tray: Any) -> None:
+    log_event = getattr(tray, "_log_event", None)
+    if callable(log_event):
+        try:
+            log_event("menu", "turn_on")
+        except Exception:
+            pass
     tray._user_forced_off = False
     tray._idle_forced_off = False
     tray.is_off = False
@@ -165,6 +196,12 @@ def turn_on(tray: Any) -> None:
 
 
 def power_turn_off(tray: Any) -> None:
+    log_event = getattr(tray, "_log_event", None)
+    if callable(log_event):
+        try:
+            log_event("power", "turn_off")
+        except Exception:
+            pass
     tray._power_forced_off = True
     tray._idle_forced_off = False
     tray.is_off = True
@@ -174,6 +211,12 @@ def power_turn_off(tray: Any) -> None:
 
 def power_restore(tray: Any) -> None:
     if tray._power_forced_off:
+        log_event = getattr(tray, "_log_event", None)
+        if callable(log_event):
+            try:
+                log_event("power", "restore")
+            except Exception:
+                pass
         tray._power_forced_off = False
         tray._idle_forced_off = False
         tray.is_off = False
@@ -211,9 +254,26 @@ def apply_brightness_from_power_policy(tray: Any, brightness: int) -> None:
     try:
         if brightness_int > 0:
             tray._last_brightness = brightness_int
+
+        log_event = getattr(tray, "_log_event", None)
+        if callable(log_event):
+            try:
+                log_event(
+                    "power_policy",
+                    "apply_brightness",
+                    old=int(getattr(tray.config, "brightness", 0) or 0),
+                    new=int(brightness_int),
+                )
+            except Exception:
+                pass
+
+        # Power-source policy defines the baseline. Persist into config so the
+        # tray UI reflects the effective brightness after plug/unplug (and on
+        # startup).
         tray.config.brightness = brightness_int
         tray.engine.set_brightness(tray.config.brightness)
-        start_current_effect(tray)
+        if not bool(getattr(tray, "is_off", False)):
+            start_current_effect(tray)
         tray._refresh_ui()
     except Exception:
         return

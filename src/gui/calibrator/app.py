@@ -10,10 +10,10 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 
 from src.core.config import Config
-from src.core.resources.layout import BASE_IMAGE_SIZE, Y15_PRO_KEYS, KeyDef
+from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 from .geometry import calc_transform, hit_test, key_canvas_bbox
 from .probe import CalibrationProbeState
-from .backdrop import load_backdrop_image, reset_backdrop_image, save_backdrop_image
+from src.gui.profile_backdrop_storage import load_backdrop_image, reset_backdrop_image, save_backdrop_image
 from .keyboard_preview import KeyboardPreviewSession
 from .profile_storage import (
     get_active_profile_name,
@@ -76,7 +76,7 @@ class _CanvasTransform:
 class KeymapCalibrator(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("KeyRGB - Keymap Calibrator (Y15 Pro)")
+        self.title("KeyRGB - Keymap Calibrator")
         apply_keyrgb_window_icon(self)
 
         self.bg_color, self.fg_color = apply_clam_dark_theme(self)
@@ -263,7 +263,7 @@ class KeymapCalibrator(tk.Tk):
             self.canvas.create_image(self._transform.x0, self._transform.y0, anchor="nw", image=self._deck_tk)
 
         # Draw key rectangles (similar styling to the per-key editor)
-        for key in Y15_PRO_KEYS:
+        for key in REFERENCE_DEVICE_KEYS:
             x1, y1, x2, y2 = key_canvas_bbox(
                 transform=self._transform,
                 key=key,
@@ -333,7 +333,7 @@ class KeymapCalibrator(tk.Tk):
             y=y,
             layout_tweaks=self.layout_tweaks,
             per_key_layout_tweaks=self.per_key_layout_tweaks,
-            keys=Y15_PRO_KEYS,
+            keys=REFERENCE_DEVICE_KEYS,
             image_size=BASE_IMAGE_SIZE,
         )
 

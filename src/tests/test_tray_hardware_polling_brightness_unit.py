@@ -43,7 +43,7 @@ def test_hardware_polling_does_not_persist_zero_brightness() -> None:
     assert tray.refresh_count == 1
 
 
-def test_hardware_polling_persists_nonzero_brightness_and_clears_off() -> None:
+def test_hardware_polling_does_not_persist_nonzero_brightness_and_clears_off() -> None:
     tray = _DummyTray(brightness=25, is_off=True)
 
     last_brightness, last_off = _apply_polled_hardware_state(
@@ -56,7 +56,9 @@ def test_hardware_polling_persists_nonzero_brightness_and_clears_off() -> None:
 
     assert last_brightness == 15
     assert last_off is False
-    assert tray.config.brightness == 15
+    # Brightness reads from hardware should not overwrite the user's persisted
+    # tray selection.
+    assert tray.config.brightness == 25
     assert tray.is_off is False
     assert tray.refresh_count == 1
 
@@ -78,3 +80,61 @@ def test_hardware_polling_ignores_forced_off_zero_changes() -> None:
     # Don't fight forced-off state; also do not refresh.
     assert tray.config.brightness == 25
     assert tray.refresh_count == 0
+
+
+def test_hardware_polling_does_not_convert_small_brightness_values() -> None:
+    tray = _DummyTray(brightness=25, is_off=False)
+
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=7,
+        current_off=False,
+        last_brightness=25,
+        last_off_state=False,
+    )
+
+    # No scale conversion; value is used as-is (within 0..50 range).
+    assert last_brightness == 7
+    assert last_off is False
+    # But do not persist into config.
+    assert tray.config.brightness == 25
+    assert tray.refresh_count == 1
+
+
+def test_hardware_polling_clamps_over_50_brightness_values() -> None:
+    tray = _DummyTray(brightness=25, is_off=False)
+
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=80,
+        current_off=False,
+        last_brightness=25,
+        last_off_state=False,
+    )
+
+    # No scale conversion; clamp into 0..50.
+    assert last_brightness == 50
+    assert last_off is False
+
+
+def test_hardware_polling_does_not_scale_up_when_config_expects_low_value() -> None:
+    """Regression: values 1..10 can be valid on the 0..50 scale.
+
+    If the backend reports 10 and the config is already 10, we must not treat it
+    as a 0..10 scale value and rewrite it to 50.
+    """
+
+    tray = _DummyTray(brightness=10, is_off=False)
+
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=10,
+        current_off=False,
+        last_brightness=15,
+        last_off_state=False,
+    )
+
+    assert tray.config.brightness == 10
+    assert last_brightness == 10
+    assert last_off is False
+    assert tray.refresh_count == 1

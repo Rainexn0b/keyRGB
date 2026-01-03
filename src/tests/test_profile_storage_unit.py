@@ -39,6 +39,7 @@ class TestKeymapLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -69,6 +70,7 @@ class TestKeymapLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -114,6 +116,7 @@ class TestKeymapLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -141,6 +144,7 @@ class TestLayoutGlobalLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -169,6 +173,7 @@ class TestLayoutGlobalLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -191,6 +196,7 @@ class TestLayoutGlobalLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -216,6 +222,7 @@ class TestLayoutPerKeyLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -247,6 +254,7 @@ class TestLayoutPerKeyLoadSave:
                 layout_per_key=layout_file,
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -272,6 +280,7 @@ class TestPerKeyColorsLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -301,6 +310,7 @@ class TestPerKeyColorsLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=temp_profile_dir / "nonexistent_colors.json",
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -338,6 +348,7 @@ class TestPerKeyColorsLoadSave:
                 layout_per_key=temp_profile_dir / "layout_per_key.json",
                 per_key_colors=colors_file,
                 backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
             )
 
         monkeypatch.setattr(profiles, "paths_for", mock_paths)
@@ -381,3 +392,53 @@ class TestApplyProfileToConfig:
 
         assert cfg.brightness == 50
         assert cfg.effect == "perkey"
+
+
+class TestBackdropTransparency:
+    def test_defaults_to_zero_when_missing(self, temp_profile_dir, monkeypatch) -> None:
+        from src.core.profile import profiles
+
+        def mock_paths(name):
+            from src.core.profile.paths import ProfilePaths
+
+            return ProfilePaths(
+                root=temp_profile_dir,
+                keymap=temp_profile_dir / "keymap.json",
+                layout_global=temp_profile_dir / "layout.json",
+                layout_per_key=temp_profile_dir / "layout_per_key.json",
+                per_key_colors=temp_profile_dir / "colors.json",
+                backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "missing_backdrop_settings.json",
+            )
+
+        monkeypatch.setattr(profiles, "paths_for", mock_paths)
+        assert profiles.load_backdrop_transparency("test_profile") == 0
+
+    def test_roundtrips_and_clamps(self, temp_profile_dir, monkeypatch) -> None:
+        from src.core.profile import profiles
+
+        settings_file = temp_profile_dir / "backdrop_settings.json"
+
+        def mock_paths(name):
+            from src.core.profile.paths import ProfilePaths
+
+            return ProfilePaths(
+                root=temp_profile_dir,
+                keymap=temp_profile_dir / "keymap.json",
+                layout_global=temp_profile_dir / "layout.json",
+                layout_per_key=temp_profile_dir / "layout_per_key.json",
+                per_key_colors=temp_profile_dir / "colors.json",
+                backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=settings_file,
+            )
+
+        monkeypatch.setattr(profiles, "paths_for", mock_paths)
+
+        profiles.save_backdrop_transparency(42, "test_profile")
+        assert profiles.load_backdrop_transparency("test_profile") == 42
+
+        profiles.save_backdrop_transparency(999, "test_profile")
+        assert profiles.load_backdrop_transparency("test_profile") == 100
+
+        profiles.save_backdrop_transparency(-10, "test_profile")
+        assert profiles.load_backdrop_transparency("test_profile") == 0

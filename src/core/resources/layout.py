@@ -1,7 +1,7 @@
-"""Y15 Pro keyboard layout definitions.
+"""Reference keyboard layout definitions.
 
-This is a *visual* layout used to draw clickable key hitboxes on top of
-assets/y15-pro-deck.png.
+This is a *visual* layout used to draw clickable key hitboxes on top of the
+bundled reference deck image (historically the WootBook Y15 Pro image).
 
 Important: The ITE controller exposes a 6×21 LED matrix (row,col). The mapping
 between a physical key and a matrix coordinate is device-specific and must be
@@ -69,7 +69,7 @@ def _units_row_with_spacers(
 
 
 def build_layout() -> List[KeyDef]:
-    """Return a full-size-with-numpad key layout for the Y15 Pro deck image."""
+    """Return the built-in reference layout (full-size-with-numpad)."""
 
     unit = 40
     gap = 6
@@ -286,4 +286,4 @@ def build_layout() -> List[KeyDef]:
     return keys
 
 
-Y15_PRO_KEYS: List[KeyDef] = build_layout()
+REFERENCE_DEVICE_KEYS: List[KeyDef] = build_layout()

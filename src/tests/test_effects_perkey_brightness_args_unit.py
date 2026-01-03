@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from src.core.effects.engine import EffectsEngine, _NullKeyboard
+from src.core.effects.device import NullKeyboard
+from src.core.effects.engine import EffectsEngine
 
 
 def test_perkey_fade_passes_brightness_kwarg() -> None:
-    class SpyKeyboard(_NullKeyboard):
+    class SpyKeyboard(NullKeyboard):
         def __init__(self):
             self.calls: list[dict] = []
 

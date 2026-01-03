@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import time
 
-from src.core.effects.engine import EffectsEngine, _NullKeyboard
+from src.core.effects.device import NullKeyboard
+from src.core.effects.engine import EffectsEngine
 
 
 def test_start_effect_stops_previous_software_thread() -> None:
     engine = EffectsEngine()
 
     # Avoid touching real hardware.
-    engine.kb = _NullKeyboard()
+    engine.kb = NullKeyboard()
     engine.device_available = False
     engine._ensure_device_available = lambda: True  # type: ignore[assignment]
 
@@ -34,7 +35,7 @@ def test_start_effect_stops_previous_software_thread() -> None:
 
 
 def test_software_effect_fades_between_colors() -> None:
-    class SpyKeyboard(_NullKeyboard):
+    class SpyKeyboard(NullKeyboard):
         def __init__(self):
             self.calls: list[tuple[tuple[int, int, int], int]] = []
 
@@ -59,7 +60,7 @@ def test_software_effect_fades_between_colors() -> None:
 
 
 def test_fade_to_non_black_never_writes_full_black() -> None:
-    class SpyKeyboard(_NullKeyboard):
+    class SpyKeyboard(NullKeyboard):
         def __init__(self):
             self.calls: list[tuple[tuple[int, int, int], int]] = []
 

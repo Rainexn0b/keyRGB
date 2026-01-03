@@ -174,3 +174,38 @@ def apply_profile_to_config(cfg, colors: Dict[Tuple[int, int], Tuple[int, int, i
         cfg.brightness = 50
     cfg.effect = "perkey"
     cfg.per_key_colors = colors
+
+
+def load_backdrop_transparency(name: str | None = None) -> int:
+    """Load backdrop transparency setting for a profile.
+
+    Stored as an integer percent where:
+    - 0   = fully opaque backdrop
+    - 100 = fully transparent backdrop
+    """
+
+    p = paths_for(name).backdrop_settings
+    raw = read_json(p)
+    if raw is None:
+        return 0
+
+    if isinstance(raw, dict):
+        v = raw.get("transparency", 0)
+    else:
+        v = 0
+
+    try:
+        out = int(v)
+    except Exception:
+        out = 0
+    return max(0, min(100, out))
+
+
+def save_backdrop_transparency(transparency: int, name: str | None = None) -> None:
+    p = paths_for(name).backdrop_settings
+    try:
+        t = int(transparency)
+    except Exception:
+        t = 0
+    t = max(0, min(100, t))
+    write_json_atomic(p, {"transparency": t})

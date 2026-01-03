@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Unit tests for core/effects/software_loops.py - effect algorithm calculations.
+"""Unit tests for effect helper calculations.
 
-Tests focus on the mathematical/algorithmic logic of software effects without
-running actual effect loops or depending on hardware/threading.
+Tests focus on the mathematical/algorithmic logic without running the actual
+effect loops or depending on hardware/threading.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ import math
 
 
 def test_speed_mapping_has_strong_top_end() -> None:
-    from src.core.effects.software_loops import _pace
+    from src.core.effects.software.base import pace as _pace
 
     class E:
         def __init__(self, speed: int):
@@ -131,14 +131,14 @@ class TestStrobeToggling:
 
 class TestReactiveKeyMapping:
     def test_evdev_key_name_to_key_id_letters_digits(self):
-        from src.core.effects.software_loops import _evdev_key_name_to_key_id
+        from src.core.effects.reactive.input import evdev_key_name_to_key_id as _evdev_key_name_to_key_id
 
         assert _evdev_key_name_to_key_id("KEY_A") == "a"
         assert _evdev_key_name_to_key_id("KEY_1") == "1"
         assert _evdev_key_name_to_key_id("A") == "a"
 
     def test_evdev_key_name_to_key_id_specials(self):
-        from src.core.effects.software_loops import _evdev_key_name_to_key_id
+        from src.core.effects.reactive.input import evdev_key_name_to_key_id as _evdev_key_name_to_key_id
 
         assert _evdev_key_name_to_key_id("KEY_LEFTSHIFT") == "lshift"
         assert _evdev_key_name_to_key_id("KEY_RIGHTALT") == "ralt"
