@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.9.2 (2026-01-03)
+
+- Tray: refreshed menu layout and labeling for a more native desktop feel (emoji-free, clearer section ordering).
+- Per-key editor: Profiles are always visible and the bottom panel space is split evenly (overlay editor appears without window resizing).
+- UI: improves dark-theme styling for per-key editor panels and common input widgets.
+
 ## 0.9.1 (2026-01-03)
 
 - Brightness: tray brightness selection now persists cleanly across restarts (brightness is normalized to the 0..50 step grid the tray exposes).

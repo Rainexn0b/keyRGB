@@ -114,7 +114,7 @@ keyrgb-diagnostics
 | `--pip` | Install from the current repo via `pip --user` (editable/dev). |
 | `--clone` | Clone the repo, then install via `pip --user -e` (for local modifications). |
 | `--clone-dir <path>` | Where to clone when using `--clone` (default: `~/.local/share/keyrgb-src`). |
-| `--version <tag>` | Download a specific Git tag (e.g. `v0.9.1`). |
+| `--version <tag>` | Download a specific Git tag (e.g. `v0.9.2`). |
 | `--asset <name>` | AppImage asset filename (default: `keyrgb-x86_64.AppImage`). |
 | `--prerelease` | Allow auto-resolving a prerelease when it contains the newest matching AppImage (useful for debugging). |
 

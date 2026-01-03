@@ -124,7 +124,6 @@ def build_editor_ui(editor) -> None:
         ttk.Separator(row, orient="horizontal").pack(side="left", fill="x", expand=True, padx=(8, 0))
 
     _divider(btns, "Config")
-    ttk.Button(btns, text="Profiles", command=editor._toggle_profiles).pack(fill="x", pady=(0, 6))
     ttk.Button(btns, text="Fill All", command=editor._fill_all).pack(fill="x", pady=(0, 6))
     ttk.Button(btns, text="Clear All", command=editor._clear_all).pack(fill="x", pady=(0, 6))
 
@@ -135,19 +134,20 @@ def build_editor_ui(editor) -> None:
 
     extras = ttk.Frame(left)
     extras.grid(row=1, column=0, sticky="ew", pady=(12, 0))
-    extras.columnconfigure(0, weight=1)
-    extras.columnconfigure(1, weight=0)
-    extras.columnconfigure(2, weight=0)
+    extras.rowconfigure(0, weight=1)
+    extras.columnconfigure(0, weight=1, uniform="perkey_bottom")
+    extras.columnconfigure(1, weight=1, uniform="perkey_bottom")
 
     extras_profiles = ttk.Frame(extras)
-    extras_profiles.grid(row=0, column=1, sticky="ns", padx=(0, 16))
+    extras_profiles.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
     extras_overlay = ttk.Frame(extras)
-    extras_overlay.grid(row=0, column=2, sticky="ne")
+    extras_overlay.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+
+    extras_profiles.columnconfigure(0, weight=1)
+    extras_overlay.columnconfigure(0, weight=1)
 
     editor._profiles_frame = ttk.LabelFrame(extras_profiles, text="Profiles", padding=10)
-    editor._profiles_frame.grid(row=0, column=0, sticky="ns")
-    editor._profiles_frame.grid_remove()
-    extras_profiles.columnconfigure(0, weight=1)
+    editor._profiles_frame.grid(row=0, column=0, sticky="nsew")
     editor._profiles_frame.columnconfigure(1, weight=1)
 
     ttk.Label(editor._profiles_frame, text="Profile").grid(row=0, column=0, sticky="w")
@@ -170,7 +170,7 @@ def build_editor_ui(editor) -> None:
     ttk.Button(pbtns, text="Delete", command=editor._delete_profile).grid(row=0, column=2, sticky="ew")
 
     editor.overlay_controls = OverlayControls(extras_overlay, editor=editor)
-    editor.overlay_controls.grid(row=0, column=0, sticky="ne")
+    editor.overlay_controls.grid(row=0, column=0, sticky="nsew")
     # Hidden by default (toggled by the Overlay button)
     editor.overlay_controls.grid_remove()
     editor.overlay_controls.sync_vars_from_scope()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import src.core.tcc_power_profiles as tcc_power_profiles
@@ -19,17 +20,22 @@ from .menu_sections import (
 logger = logging.getLogger(__name__)
 
 
-_EFFECT_EMOJIS = [
-    '🌈', '💨', '🌊', '💧', '✨', '🌧️', '🌌', '🎆',
-    '⚫', '💗', '⚡', '🔥', '🎲', '⏹️', '🌬️', '💓',
-]
-
-
 def normalize_effect_label(label: str) -> str:
-    name = str(label).lower()
-    for emoji in _EFFECT_EMOJIS:
-        name = name.replace(emoji, '').strip()
-    return name
+    """Normalize a user-visible menu label into a stable effect key.
+
+    Historically, menu labels included decorative glyphs/emojis. We now keep
+    labels plain, but still accept older label formats for compatibility.
+    """
+
+    s = str(label or "")
+    # Remove variation selectors often present in older glyph labels.
+    s = s.replace("\ufe0f", "")
+    # Drop leading non-word glyphs (bullets, icons, etc).
+    s = re.sub(r"^\W+", "", s, flags=re.UNICODE).strip()
+    s = s.lower()
+    # Convert human label spacing to effect_key style.
+    s = re.sub(r"\s+", "_", s)
+    return s
 
 
 def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
@@ -39,32 +45,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     per_key_supported = bool(getattr(caps, "per_key", True)) if caps is not None else True
     hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
 
-    device_available = probe_device_available(tray)
-
-    hw_effect_icons = {
-        'rainbow': '🌈',
-        'breathing': '💨',
-        'wave': '🌊',
-        'ripple': '💧',
-        'marquee': '✨',
-        'raindrop': '🌧️',
-        'aurora': '🌌',
-        'fireworks': '🎆',
-    }
-
-    sw_effect_icons = {
-        'rainbow_wave': '🌈',
-        'rainbow_swirl': '🌀',
-        'spectrum_cycle': '🌈',
-        'color_cycle': '🎨',
-        'chase': '🏃',
-        'twinkle': '✨',
-        'strobe': '⚡',
-        'reactive_fade': '⚡',
-        'reactive_ripple': '💧',
-        'reactive_rainbow': '🌈',
-        'reactive_snake': '🐍',
-    }
+    probe_device_available(tray)
 
     def _checked_effect(effect: str):
         def _checked(_item):
@@ -86,7 +67,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
     hw_effects_menu = pystray.Menu(
         item(
-            "⏹️ None",
+            "None",
             tray._on_effect_clicked,
             checked=_checked_effect('none'),
             radio=True,
@@ -94,7 +75,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         pystray.Menu.SEPARATOR,
         *[
             item(
-                f"{hw_effect_icons.get(effect, '•')} {effect.capitalize()}",
+                effect.replace("_", " ").strip().title(),
                 tray._on_effect_clicked,
                 checked=_checked_effect(effect),
                 radio=True,
@@ -111,74 +92,74 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
     sw_effects_menu = pystray.Menu(
         item(
-            "⏹️ None",
+            "None",
             _sw_cb('none'),
             checked=_checked_effect('none'),
             radio=True,
         ),
         pystray.Menu.SEPARATOR,
         item(
-            f"{sw_effect_icons.get('rainbow_wave', '•')} Rainbow Wave",
+            "Rainbow Wave",
             _sw_cb('rainbow_wave'),
             checked=_checked_effect('rainbow_wave'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('rainbow_swirl', '•')} Rainbow Swirl",
+            "Rainbow Swirl",
             _sw_cb('rainbow_swirl'),
             checked=_checked_effect('rainbow_swirl'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('spectrum_cycle', '•')} Spectrum Cycle",
+            "Spectrum Cycle",
             _sw_cb('spectrum_cycle'),
             checked=_checked_effect('spectrum_cycle'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('color_cycle', '•')} Color Cycle",
+            "Color Cycle",
             _sw_cb('color_cycle'),
             checked=_checked_effect('color_cycle'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('chase', '•')} Chase",
+            "Chase",
             _sw_cb('chase'),
             checked=_checked_effect('chase'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('twinkle', '•')} Twinkle",
+            "Twinkle",
             _sw_cb('twinkle'),
             checked=_checked_effect('twinkle'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('strobe', '•')} Strobe",
+            "Strobe",
             _sw_cb('strobe'),
             checked=_checked_effect('strobe'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('reactive_fade', '•')} Reactive Fade",
+            "Reactive Typing (Fade)",
             _sw_cb('reactive_fade'),
             checked=_checked_effect('reactive_fade'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('reactive_ripple', '•')} Reactive Ripple",
+            "Reactive Typing (Ripple)",
             _sw_cb('reactive_ripple'),
             checked=_checked_effect('reactive_ripple'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('reactive_rainbow', '•')} Reactive Rainbow",
+            "Reactive Rainbow",
             _sw_cb('reactive_rainbow'),
             checked=_checked_effect('reactive_rainbow'),
             radio=True,
         ),
         item(
-            f"{sw_effect_icons.get('reactive_snake', '•')} Reactive Snake",
+            "Reactive Snake",
             _sw_cb('reactive_snake'),
             checked=_checked_effect('reactive_snake'),
             radio=True,
@@ -188,7 +169,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     speed_menu = pystray.Menu(
         *[
             item(
-                f"{'🔘' if tray.config.speed == speed else '⚪'} {speed}",
+                str(speed),
                 tray._on_speed_clicked,
                 checked=_checked_speed(speed),
                 radio=True,
@@ -200,7 +181,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     brightness_menu = pystray.Menu(
         *[
             item(
-                f"{'🔘' if tray.config.brightness == brightness * 5 else '⚪'} {brightness}",
+                str(brightness),
                 tray._on_brightness_clicked,
                 checked=_checked_brightness(brightness * 5),
                 radio=True,
@@ -225,41 +206,42 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
     perkey_menu = build_perkey_profiles_menu(tray, pystray=pystray, item=item, per_key_supported=per_key_supported)
 
+    # Choose which power menu to show as "Power Mode".
+    # Prefer system power when it can apply; otherwise fall back to TCC if present.
+    power_menu = None
+    if system_power_menu is not None and system_power_can_apply:
+        power_menu = system_power_menu
+    elif tcc_profiles_menu is not None:
+        power_menu = tcc_profiles_menu
+    elif system_power_menu is not None:
+        power_menu = system_power_menu
+
     return [
         item(
             keyboard_status_text(tray),
             lambda _icon, _item: None,
             enabled=False,
         ),
-        pystray.Menu.SEPARATOR,
-        # Effects section (speed is effect-specific)
-        *([item('🎨 Hardware Effects', hw_effects_menu)] if hw_effects_supported else []),
-        item('💫 Software Effects', sw_effects_menu),
-        item('⚡ Speed', speed_menu),
-        pystray.Menu.SEPARATOR,
-
-        # Lighting section (brightness + per-key/uniform)
-        item('💡 Brightness', brightness_menu),
-        *([item('🎹 Per-key Colors', perkey_menu)] if perkey_menu is not None else []),
-        item('🌈 Uniform Color', tray._on_tuxedo_gui_clicked),
+        # (keyboard detection)
+        *([item('Hardware Effects', hw_effects_menu)] if hw_effects_supported else []),
+        item('Software Effects', sw_effects_menu),
+        item('Effect Speed', speed_menu),
         pystray.Menu.SEPARATOR,
 
-        # Power section
-        *(
-            [item('🔋 Power Mode', system_power_menu)]
-            if (system_power_menu is not None and system_power_can_apply)
-            else ([] if tcc_profiles_menu is not None else ([item('🔋 Power Mode', system_power_menu)] if system_power_menu is not None else []))
-        ),
-        *(
-            [item('🧩 Power Profiles (TCC)', tcc_profiles_menu)]
-            if (tcc_profiles_menu is not None and not system_power_can_apply)
-            else []
-        ),
-        item('⚙ Settings', tray._on_power_settings_clicked),
+        # Hardware color / per-key color / brightness override
+        item('Hardware Color', tray._on_tuxedo_gui_clicked),
+        *([item('Software Color Editor', perkey_menu)] if perkey_menu is not None else []),
+        item('Brightness Override', brightness_menu),
         pystray.Menu.SEPARATOR,
 
+        # power mode / settings
+        *([item('Power Mode', power_menu)] if power_menu is not None else []),
+        item('Settings', tray._on_power_settings_clicked),
+        pystray.Menu.SEPARATOR,
+
+        # off/on / (active mode) / quit
         item(
-            '🔌 Off' if not tray.is_off else '✅ Turn On',
+            'Turn Off' if not tray.is_off else 'Turn On',
             tray._on_off_clicked if not tray.is_off else tray._on_turn_on_clicked,
             checked=lambda _i: tray.is_off,
         ),
@@ -268,7 +250,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             lambda _icon, _item: None,
             enabled=False,
         ),
-        item('❌ Quit', tray._on_quit_clicked),
+        item('Quit', tray._on_quit_clicked),
     ]
 
 

@@ -108,8 +108,8 @@ def test_menu_hides_items_when_capabilities_disabled(monkeypatch: pytest.MonkeyP
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     labels = [i["text"] for i in items if isinstance(i, dict)]
 
-    assert "🎨 Hardware Effects" not in labels
-    assert "🎹 Per-key Colors" not in labels
+    assert "Hardware Effects" not in labels
+    assert "Software Color Editor" not in labels
 
 
 def test_menu_includes_keyboard_status_header(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -164,10 +164,10 @@ def test_menu_includes_active_mode_indicator_between_off_and_quit(monkeypatch: p
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
 
-    assert items[-3]["text"].startswith("🔌")
+    assert items[-3]["text"].lower().startswith("turn ")
     assert items[-2]["enabled"] is False
     assert "active:" in items[-2]["text"].lower()
-    assert items[-1]["text"] == "❌ Quit"
+    assert items[-1]["text"] == "Quit"
 
 
 def test_tray_active_indicator_shows_perkey_profile(monkeypatch: pytest.MonkeyPatch) -> None:

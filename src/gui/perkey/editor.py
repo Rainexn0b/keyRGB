@@ -85,6 +85,13 @@ class PerKeyEditor:
         style = ttk.Style()
         self.bg_color, self.fg_color = apply_clam_dark_theme(self.root)
         style.configure("TCheckbutton", background=self.bg_color, foreground=self.fg_color)
+        style.configure("TLabelframe", background=self.bg_color, foreground=self.fg_color)
+        style.configure("TLabelframe.Label", background=self.bg_color, foreground=self.fg_color)
+        style.configure("TRadiobutton", background=self.bg_color, foreground=self.fg_color)
+
+        # Improve dark-mode consistency for common input widgets used in the bottom panels.
+        style.configure("TEntry", fieldbackground="#3a3a3a", foreground=self.fg_color)
+        style.configure("TCombobox", fieldbackground="#3a3a3a", foreground=self.fg_color)
 
         self.config = Config()
         self.profile_name = profiles.get_active_profile()
@@ -116,7 +123,7 @@ class PerKeyEditor:
         self.apply_all_keys = tk.BooleanVar(value=False)
         self.sample_tool_enabled = tk.BooleanVar(value=False)
         self._sample_tool_has_sampled = False
-        self._profiles_visible = False
+        self._profiles_visible = True
         self._overlay_visible = False
         self._profile_name_var = tk.StringVar(value=self.profile_name)
         self.selected_key_id: str | None = None
@@ -307,13 +314,12 @@ class PerKeyEditor:
         return profiles.load_layout_per_key(self.profile_name)
 
     def _toggle_profiles(self):
-        if self._profiles_visible:
-            self._profiles_frame.grid_remove()
-            self._profiles_visible = False
-        else:
+        # Profiles are now always visible; keep this method for compatibility.
+        try:
             self._profiles_combo.configure(values=profiles.list_profiles())
-            self._profiles_frame.grid()
-            self._profiles_visible = True
+            self._profiles_combo.focus_set()
+        except Exception:
+            return
 
     def _toggle_overlay(self):
         if self._overlay_visible:

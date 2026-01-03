@@ -77,7 +77,7 @@ def keyboard_status_text(tray: Any) -> str:
 
     device_available = probe_device_available(tray)
     if not device_available:
-        return "⚠ Keyboard device not detected"
+        return "Keyboard: not detected"
 
     backend = getattr(tray, "backend", None)
     backend_name = str(getattr(backend, "name", "unknown"))
@@ -92,14 +92,14 @@ def keyboard_status_text(tray: Any) -> str:
         vid = _format_hex_id(usb_vid)
         pid = _format_hex_id(usb_pid)
         if vid and pid:
-            return f"✅ Keyboard: {backend_name} ({vid}:{pid})"
+            return f"Keyboard: {backend_name} ({vid}:{pid})"
 
     # Sysfs backend: show which LED file is being used.
     brightness_path = identifiers.get("brightness")
     if brightness_path:
-        return f"✅ Keyboard: {backend_name} ({brightness_path})"
+        return f"Keyboard: {backend_name} ({brightness_path})"
 
-    return f"✅ Keyboard: {backend_name}"
+    return f"Keyboard: {backend_name}"
 
 
 def probe_device_available(tray: Any) -> bool:
@@ -128,7 +128,7 @@ def tray_lighting_mode_text(tray: Any) -> str:
 
     # Off is the highest priority state.
     if bool(getattr(tray, "is_off", False)) or int(getattr(getattr(tray, "config", None), "brightness", 0) or 0) == 0:
-        return "🔎 Active: Off"
+        return "Active: Off"
 
     cfg = getattr(tray, "config", None)
     effect = str(getattr(cfg, "effect", "none") or "none")
@@ -142,19 +142,19 @@ def tray_lighting_mode_text(tray: Any) -> str:
         except Exception:
             active_profile = "(unknown)"
 
-        return f"🔎 Active: Per-key ({active_profile})"
+        return f"Active: Per-key ({active_profile})"
 
     # Uniform color is represented by no effect.
     if effect == "none":
-        return "🔎 Active: Uniform"
+        return "Active: Uniform"
 
     # Effects.
     if effect in HW_EFFECTS:
-        return f"🔎 Active: HW {_title(effect)}"
+        return f"Active: HW {_title(effect)}"
     if effect in SW_EFFECTS:
-        return f"🔎 Active: SW {_title(effect)}"
+        return f"Active: SW {_title(effect)}"
 
-    return f"🔎 Active: {_title(effect)}"
+    return f"Active: {_title(effect)}"
 
 
 def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> Optional[Any]:

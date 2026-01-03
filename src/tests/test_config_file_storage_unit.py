@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for config_file_storage (core/config_file_storage.py).
+"""Unit tests for config file storage (core/config/file_storage.py).
 
 Tests atomic writes, retry logic on partial failures, and exception handling.
 """
@@ -28,7 +28,7 @@ class TestLoadConfigSettings:
 
     def test_load_returns_defaults_when_file_missing(self, temp_config_dir):
         """If config file doesn't exist, return defaults."""
-        from src.core.config_file_storage import load_config_settings
+        from src.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "missing.json"
         defaults = {"brightness": 50, "effect": "breathe"}
@@ -43,7 +43,7 @@ class TestLoadConfigSettings:
 
     def test_load_merges_defaults_with_loaded_data(self, temp_config_dir):
         """Loaded config should be merged with defaults (loaded wins)."""
-        from src.core.config_file_storage import load_config_settings
+        from src.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"brightness": 75, "new_key": "value"}))
@@ -61,7 +61,7 @@ class TestLoadConfigSettings:
 
     def test_load_normalizes_effect_to_lowercase(self, temp_config_dir):
         """If effect is present, it should be lowercased."""
-        from src.core.config_file_storage import load_config_settings
+        from src.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"effect": "BREATHE"}))
@@ -76,7 +76,7 @@ class TestLoadConfigSettings:
 
     def test_load_normalizes_return_effect_after_effect_to_lowercase(self, temp_config_dir):
         """If return_effect_after_effect is present, it should be lowercased."""
-        from src.core.config_file_storage import load_config_settings
+        from src.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"return_effect_after_effect": "PERKEY"}))
@@ -91,7 +91,7 @@ class TestLoadConfigSettings:
 
     def test_load_retries_on_json_decode_error(self, temp_config_dir):
         """If JSON is malformed, load should retry and eventually return None."""
-        from src.core.config_file_storage import load_config_settings
+        from src.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text("{this is: not valid json")
@@ -109,7 +109,7 @@ class TestLoadConfigSettings:
 
     def test_load_returns_none_on_persistent_io_error(self, temp_config_dir):
         """If file exists but raises OSError, return None."""
-        from src.core.config_file_storage import load_config_settings
+        from src.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"brightness": 50}))
@@ -126,7 +126,7 @@ class TestLoadConfigSettings:
 
     def test_load_treats_non_dict_json_as_empty(self, temp_config_dir):
         """If JSON loads but isn't a dict, treat as empty dict."""
-        from src.core.config_file_storage import load_config_settings
+        from src.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps([1, 2, 3]))  # array, not dict
@@ -146,7 +146,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_creates_config_dir_if_missing(self, tmp_path):
         """save should create the config directory if it doesn't exist."""
-        from src.core.config_file_storage import save_config_settings_atomic
+        from src.core.config.file_storage import save_config_settings_atomic
 
         config_dir = tmp_path / "nonexistent" / "config"
         config_file = config_dir / "config.json"
@@ -166,7 +166,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_uses_atomic_replace(self, temp_config_dir):
         """save should write to temp file then replace original."""
-        from src.core.config_file_storage import save_config_settings_atomic
+        from src.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"old": "data"}))
@@ -188,7 +188,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_cleans_up_temp_file_on_success(self, temp_config_dir):
         """After successful save, temp file should be removed."""
-        from src.core.config_file_storage import save_config_settings_atomic
+        from src.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         settings = {"brightness": 50}
@@ -206,7 +206,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_handles_write_exception_gracefully(self, temp_config_dir):
         """If write fails, save should not crash."""
-        from src.core.config_file_storage import save_config_settings_atomic
+        from src.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         settings = {"brightness": 50}
@@ -226,7 +226,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_attempts_temp_cleanup_even_on_failure(self, temp_config_dir):
         """Even if os.replace fails, save should try to clean up temp file."""
-        from src.core.config_file_storage import save_config_settings_atomic
+        from src.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         settings = {"brightness": 50}

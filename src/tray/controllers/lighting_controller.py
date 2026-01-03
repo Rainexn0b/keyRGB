@@ -10,7 +10,8 @@ logger = logging.getLogger(__name__)
 def _parse_menu_int(item: Any) -> Optional[int]:
     """Parse an integer from a pystray radio label.
 
-    Current menu labels include leading marker glyphs like "🔘" / "⚪".
+    Historically, menu labels included leading marker glyphs. We accept both
+    plain integers ("5") and older formats.
     """
 
     s = str(item).replace("🔘", "").replace("⚪", "").strip()
