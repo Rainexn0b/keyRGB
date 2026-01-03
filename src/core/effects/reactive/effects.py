@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import colorsys
+import math
 import random
+from collections import deque
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
@@ -15,6 +18,71 @@ if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
 
 
+def _srgb_channel_to_linear(c: float) -> float:
+    c = max(0.0, min(1.0, c))
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(rgb: Color) -> float:
+    r, g, b = rgb
+    rl = _srgb_channel_to_linear(r / 255.0)
+    gl = _srgb_channel_to_linear(g / 255.0)
+    bl = _srgb_channel_to_linear(b / 255.0)
+    return 0.2126 * rl + 0.7152 * gl + 0.0722 * bl
+
+
+def _contrast_ratio(a: Color, b: Color) -> float:
+    la = _relative_luminance(a)
+    lb = _relative_luminance(b)
+    lighter = max(la, lb)
+    darker = min(la, lb)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _pick_contrasting_highlight(*, base_rgb: Color, preferred_rgb: Color) -> Color:
+    """Pick a highlight that stays visible over the base.
+
+    We prefer the user's chosen color when it has enough contrast; otherwise fall
+    back to a high-contrast alternative.
+    """
+
+    # If the preferred highlight already stands out, keep it.
+    if _contrast_ratio(base_rgb, preferred_rgb) >= 2.2:
+        return preferred_rgb
+
+    inv = (255 - preferred_rgb[0], 255 - preferred_rgb[1], 255 - preferred_rgb[2])
+    candidates: List[Color] = [preferred_rgb, inv, (255, 255, 255), (0, 0, 0)]
+
+    best = preferred_rgb
+    best_ratio = 0.0
+    for c in candidates:
+        ratio = _contrast_ratio(base_rgb, c)
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best = c
+    return best
+
+
+def _rgb_to_hsv01(rgb: Color) -> tuple[float, float, float]:
+    r, g, b = rgb
+    return colorsys.rgb_to_hsv(float(r) / 255.0, float(g) / 255.0, float(b) / 255.0)
+
+
+def _tone_shift_from_base(*, base_rgb: Color, hue_shift: float = 0.085, sat_boost: float = 0.25, val_boost: float = 0.35) -> Color:
+    """Generate a visible pulse color by shifting the base key's tone.
+
+    This is intended for per-key backdrops: the ripple/snake should preserve the
+    user's pre-set per-key colors, and just "push" the hue/value a bit as the
+    wave passes through.
+    """
+
+    h, s, v = _rgb_to_hsv01(base_rgb)
+    h = (h + float(hue_shift)) % 1.0
+    s = min(1.0, float(s) + float(sat_boost))
+    v = min(1.0, float(v) + float(val_boost))
+    return hsv_to_rgb(h, s, v)
+
+
 @dataclass
 class _Pulse:
     row: int
@@ -23,10 +91,30 @@ class _Pulse:
     ttl_s: float
 
 
+def _ripple_weight(*, d: int, radius: float, intensity: float, band: float) -> float:
+    """Compute an expanding-ring ripple weight.
+
+    `d` is a Manhattan distance from the pulse center.
+    """
+
+    if band <= 0.0:
+        return 0.0
+    return max(0.0, float(intensity) * (1.0 - (abs(float(d) - float(radius)) / float(band))))
+
+
+def _ripple_radius(*, age_s: float, ttl_s: float, min_radius: float = 0.0, max_radius: float = 8.0) -> float:
+    if ttl_s <= 0.0:
+        return float(min_radius)
+    t = max(0.0, min(1.0, float(age_s) / float(ttl_s)))
+    return float(min_radius + (max_radius - min_radius) * t)
+
+
 def _reactive_loop(engine: "EffectsEngine", *, mode: str) -> None:
     base = base_color_map(engine)
     dt = frame_dt_s()
     p = pace(engine)
+
+    per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
 
     react_color_src = getattr(engine, "current_color", None) or (255, 255, 255)
     react_color = (int(react_color_src[0]), int(react_color_src[1]), int(react_color_src[2]))
@@ -83,17 +171,31 @@ def _reactive_loop(engine: "EffectsEngine", *, mode: str) -> None:
                 continue
 
             intensity = 1.0 - (pulse.age_s / pulse.ttl_s)
-            radius = int(round(1 + 5 * (pulse.age_s / pulse.ttl_s)))
-            for dr in range(-radius, radius + 1):
-                for dc in range(-radius, radius + 1):
+
+            # Prefer an expanding *ring* instead of a filled diamond, otherwise
+            # it reads too much like a local fade (especially on per-key
+            # backdrops).
+            radius_f = _ripple_radius(age_s=pulse.age_s, ttl_s=pulse.ttl_s, min_radius=0.0, max_radius=8.0)
+            band = 1.35
+            radius_i = int(math.ceil(radius_f + band))
+
+            for dr in range(-radius_i, radius_i + 1):
+                for dc in range(-radius_i, radius_i + 1):
                     r = pulse.row + dr
                     c = pulse.col + dc
                     if r < 0 or r >= NUM_ROWS or c < 0 or c >= NUM_COLS:
                         continue
                     d = abs(dr) + abs(dc)
-                    if d > radius:
+                    if d > radius_i:
                         continue
-                    w = max(0.0, intensity * (1.0 - (d / max(1.0, float(radius)))))
+
+                    ring_w = _ripple_weight(d=d, radius=radius_f, intensity=intensity, band=band)
+
+                    # Add a small center flash early so the origin key still
+                    # reads as the source of the ripple.
+                    disk_w = max(0.0, float(intensity) * (1.0 - (float(d) / max(1.0, float(radius_i)))))
+                    w = max(ring_w, 0.22 * disk_w)
+
                     k = (r, c)
                     overlay[k] = max(overlay.get(k, 0.0), w)
 
@@ -104,7 +206,8 @@ def _reactive_loop(engine: "EffectsEngine", *, mode: str) -> None:
             bs = sum(c[2] for c in base.values())
             n = max(1, len(base))
             avg_base = (int(rs / n), int(gs / n), int(bs / n))
-            rgb = mix(avg_base, react_color, t=min(1.0, global_w))
+            pulse_rgb = _pick_contrasting_highlight(base_rgb=avg_base, preferred_rgb=react_color)
+            rgb = mix(avg_base, pulse_rgb, t=min(1.0, global_w))
             rgb = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(engine.brightness))
             with engine.kb_lock:
                 engine.kb.set_color(rgb, brightness=int(engine.brightness))
@@ -114,7 +217,11 @@ def _reactive_loop(engine: "EffectsEngine", *, mode: str) -> None:
         color_map: Dict[Key, Color] = {}
         for k, base_rgb in base.items():
             w = overlay.get(k, 0.0)
-            color_map[k] = mix(base_rgb, react_color, t=min(1.0, w))
+            if per_key_backdrop_active and mode in {"ripple", "fade"}:
+                pulse_rgb = _tone_shift_from_base(base_rgb=base_rgb)
+            else:
+                pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb, preferred_rgb=react_color)
+            color_map[k] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
 
         render(engine, color_map=color_map)
         engine.stop_event.wait(dt)
@@ -235,6 +342,8 @@ def run_reactive_snake(engine: "EffectsEngine") -> None:
     dt = frame_dt_s()
     p = pace(engine)
 
+    per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
+
     react_color_src = getattr(engine, "current_color", None) or (0, 255, 255)
     react_color = (int(react_color_src[0]), int(react_color_src[1]), int(react_color_src[2]))
 
@@ -248,15 +357,13 @@ def run_reactive_snake(engine: "EffectsEngine") -> None:
     spawn_interval_s = max(0.10, 0.45 / max(0.1, p))
     keymap = load_active_profile_keymap()
 
-    @dataclass
-    class _SnakeSegment:
-        row: int
-        col: int
-        age_s: float
+    # A continuously moving snake that resets to the pressed key (reactive).
+    max_len = 12
+    tail: deque[Key] = deque(maxlen=max_len)
 
-    trail: List[_SnakeSegment] = []
-    max_trail_len = 12
-    segment_ttl_s = 1.2 / p
+    head_idx = random.randrange(NUM_ROWS * NUM_COLS)
+    move_acc = 0.0
+    move_interval_s = max(0.02, 0.12 / max(0.1, p))
 
     while engine.running and not engine.stop_event.is_set():
         pressed_key_id = poll_keypress_key_id(devices)
@@ -276,28 +383,30 @@ def run_reactive_snake(engine: "EffectsEngine") -> None:
 
             if rc is not None:
                 rr, cc = int(rc[0]), int(rc[1])
+                rr = max(0, min(NUM_ROWS - 1, rr))
+                cc = max(0, min(NUM_COLS - 1, cc))
             else:
                 rr = random.randrange(NUM_ROWS)
                 cc = random.randrange(NUM_COLS)
 
-            trail.append(_SnakeSegment(row=rr, col=cc, age_s=0.0))
-            if len(trail) > max_trail_len:
-                trail.pop(0)
+            head_idx = rr * NUM_COLS + cc
+            tail.clear()
 
-        new_trail: List[_SnakeSegment] = []
-        for seg in trail:
-            seg.age_s += dt
-            if seg.age_s <= segment_ttl_s:
-                new_trail.append(seg)
-        trail = new_trail
+        move_acc += dt
+        while move_acc >= move_interval_s:
+            move_acc -= move_interval_s
+            head_idx = (head_idx + 1) % (NUM_ROWS * NUM_COLS)
+            rr = head_idx // NUM_COLS
+            cc = head_idx % NUM_COLS
+            tail.append((rr, cc))
 
         overlay: Dict[Key, float] = {}
-        for idx, seg in enumerate(trail):
-            position_factor = (idx + 1) / max(1, len(trail))
-            age_factor = 1.0 - (seg.age_s / segment_ttl_s)
-            intensity = position_factor * age_factor
-            k = (seg.row, seg.col)
-            overlay[k] = max(overlay.get(k, 0.0), intensity)
+        if tail:
+            n = len(tail)
+            for i, k in enumerate(tail):
+                # Head is the newest element (right side) -> brightest.
+                position_factor = float(i + 1) / float(n)
+                overlay[k] = max(overlay.get(k, 0.0), position_factor)
 
         if not has_per_key(engine):
             global_w = max(overlay.values(), default=0.0)
@@ -306,7 +415,8 @@ def run_reactive_snake(engine: "EffectsEngine") -> None:
             bs = sum(c[2] for c in base.values())
             n = max(1, len(base))
             avg_base = (int(rs / n), int(gs / n), int(bs / n))
-            rgb = mix(avg_base, react_color, t=min(1.0, global_w))
+            pulse_rgb = _pick_contrasting_highlight(base_rgb=avg_base, preferred_rgb=react_color)
+            rgb = mix(avg_base, pulse_rgb, t=min(1.0, global_w))
             rgb = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(engine.brightness))
             with engine.kb_lock:
                 engine.kb.set_color(rgb, brightness=int(engine.brightness))
@@ -316,7 +426,11 @@ def run_reactive_snake(engine: "EffectsEngine") -> None:
         color_map: Dict[Key, Color] = {}
         for k, base_rgb in base.items():
             w = overlay.get(k, 0.0)
-            color_map[k] = mix(base_rgb, react_color, t=min(1.0, w))
+            if per_key_backdrop_active:
+                pulse_rgb = _tone_shift_from_base(base_rgb=base_rgb)
+            else:
+                pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb, preferred_rgb=react_color)
+            color_map[k] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
 
         render(engine, color_map=color_map)
         engine.stop_event.wait(dt)
