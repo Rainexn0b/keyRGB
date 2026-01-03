@@ -131,7 +131,7 @@ class PowerSettingsGUI:
         main = self.scroll.frame
 
         title = ttk.Label(main, text="Settings", font=("Sans", 14, "bold"))
-        title.pack(anchor="w", pady=(0, 8))
+        title.pack(anchor="w", pady=(4, 8))
 
         cols = ttk.Frame(main)
         cols.pack(fill="both", expand=True)
@@ -248,7 +248,7 @@ class PowerSettingsGUI:
         geometry = compute_centered_window_geometry(
             self.root,
             content_height_px=int(self.scroll.frame.winfo_reqheight()),
-            content_width_px=int(self.root.winfo_reqwidth()),
+            content_width_px=int(self.scroll.frame.winfo_reqwidth()),
             footer_height_px=int(self.bottom_bar.winfo_reqheight()),
             chrome_padding_px=40,
             default_w=1100,

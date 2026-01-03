@@ -116,4 +116,5 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
 
     r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(engine.brightness))
     with engine.kb_lock:
+        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
         engine.kb.set_color((r, g, b), brightness=int(engine.brightness))

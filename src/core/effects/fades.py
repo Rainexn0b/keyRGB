@@ -39,6 +39,9 @@ def fade_uniform_color(
         # Avoid brightness 0 during transitions (tray/hardware pollers may interpret it as "off").
         effective_brightness = max(1, brightness) if brightness > 0 else 0
 
+        # Ensure we are in software/user mode before attempting uniform writes.
+        enable_user_mode_once(kb=kb, kb_lock=kb_lock, brightness=effective_brightness)
+
         for i in range(1, steps + 1):
             t = float(i) / float(steps)
             r = int(round(fr + (tr - fr) * t))
