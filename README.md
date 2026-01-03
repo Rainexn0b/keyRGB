@@ -36,6 +36,16 @@ KeyRGB is a lightweight Linux tray app and per-key editor for laptop keyboard li
 			<img src="assets/screenshots/settings.png" alt="Settings UI">
 		</td>
 	</tr>
+	<tr>
+		<td width="50%">
+			<b>Tray Menu (Brightness)</b><br>
+			<img src="assets/screenshots/traybo.png" alt="Tray menu brightness">
+		</td>
+		<td width="50%">
+			<b>Rust Support (WIP)</b><br>
+			<img src="assets/screenshots/rsusage.png" alt="Rust usage">
+		</td>
+	</tr>
 </table>
 
 ## Quickstart
