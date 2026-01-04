@@ -1,8 +1,29 @@
 #!/bin/bash
 # KeyRGB Installation Script
 
+# -----------------------------------------------------------------------------
+# Navigation
+#
+# This installer is intentionally a single file for copy/paste reliability.
+# It is organized into sections using "# region" / "# endregion" markers.
+# In VS Code, these enable code folding for easier navigation.
+#
+# Sections:
+#   - Package manager helpers
+#   - CLI usage + argument parsing
+#   - Repo root setup
+#   - User choices (interactive prompts)
+#   - System dependency installation
+#   - Clone/source mode setup
+#   - Environment checks
+#   - Download helpers + AppImage install
+#   - Optional components (udev, power helper, kernel drivers)
+#   - Main install flow
+# -----------------------------------------------------------------------------
+
 set -e
 
+# region Package manager helpers
 PKG_MGR=""  # dnf|apt|pacman|zypper|apk
 APT_UPDATED=0
 
@@ -80,6 +101,9 @@ pkg_install_best_effort() {
     return $rc
 }
 
+# endregion Package manager helpers
+
+# region CLI usage + argument parsing
 usage() {
         cat <<'EOF'
 Usage:
@@ -188,6 +212,9 @@ while [ "$#" -gt 0 ]; do
         esac
 done
 
+    # endregion CLI usage + argument parsing
+
+    # region Repo root setup
 # Always run relative to the repo root (where this script lives), even if invoked
 # from another working directory.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -197,6 +224,9 @@ cd "$REPO_DIR"
 echo "=== KeyRGB Installation ==="
 echo
 
+# endregion Repo root setup
+
+# region User choices (interactive prompts)
 select_install_mode() {
     if [ -n "$MODE" ]; then
         return 0
@@ -434,6 +464,9 @@ else
     echo "✓ Reactive Typing keypress detection will be disabled (synthetic fallback)"
 fi
 
+# endregion User choices (interactive prompts)
+
+# region System dependency installation
 install_system_deps_best_effort() {
     echo
     echo "🔧 Installing system dependencies (best-effort)..."
@@ -519,6 +552,9 @@ else
     fi
 fi
 
+# endregion System dependency installation
+
+# region Clone/source mode setup
 # Clone mode: fetch source into a user directory, then continue as pip mode.
 maybe_clone_source_repo() {
     if [ "$MODE" != "clone" ]; then
@@ -568,6 +604,9 @@ maybe_clone_source_repo() {
 
 maybe_clone_source_repo
 
+# endregion Clone/source mode setup
+
+# region Environment checks
 if [ "$MODE" = "pip" ]; then
     # Repo/pip install requires Python.
     if ! command -v python3 &> /dev/null; then
@@ -621,6 +660,9 @@ else
     echo "⚠️  lsusb not found; skipping USB device detection check."
 fi
 
+# endregion Environment checks
+
+# region Download helpers + AppImage install
 download_url() {
     local url="$1"
     local dst="$2"
@@ -823,6 +865,9 @@ install_appimage() {
     echo "✓ Installed AppImage: $app_dst"
 }
 
+# endregion Download helpers + AppImage install
+
+# region Desktop integration
 install_icon_and_desktop_entries() {
     local icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
     local icon_file="$icon_dir/keyrgb.png"
@@ -890,6 +935,10 @@ EOF
 
     echo "✓ Autostart configured"
 }
+
+# endregion Desktop integration
+
+# region Optional components
 
 install_udev_rule() {
     local src_rule
@@ -1122,6 +1171,10 @@ install_kernel_drivers() {
     fi
 }
 
+# endregion Optional components
+
+# region Main install flow
+
 if [ "$MODE" = "pip" ]; then
     # Install ite8291r3-ctl library (upstream + tiny local patch for Wootbook 0x600B)
     echo
@@ -1265,3 +1318,5 @@ echo "  - If icon doesn't appear, check terminal for errors"
 echo "  - If keyboard doesn't light up, check USB device: lsusb | grep 048d"
 echo "  - Per-key editor: Right-click tray icon → Per-Key Editor"
 echo
+
+# endregion Main install flow
