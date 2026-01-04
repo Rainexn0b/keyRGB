@@ -689,8 +689,11 @@ url = sys.argv[1]
 dst = Path(sys.argv[2])
 dst.parent.mkdir(parents=True, exist_ok=True)
 
-with urllib.request.urlopen(url) as resp, dst.open("wb") as f:
-    shutil.copyfileobj(resp, f)
+try:
+    with urllib.request.urlopen(url, timeout=60) as resp, dst.open("wb") as f:
+        shutil.copyfileobj(resp, f)
+except Exception:
+    raise SystemExit(1)
 PY
         rc=$?
         if [ "$rc" -eq 0 ]; then
@@ -727,8 +730,11 @@ req = urllib.request.Request(
     headers={"Accept": "application/vnd.github+json", "User-Agent": "keyrgb-install"},
 )
 
-with urllib.request.urlopen(req, timeout=30) as resp:
-    data = json.loads(resp.read().decode("utf-8"))
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+except Exception:
+    raise SystemExit(1)
 
 if not isinstance(data, list):
     raise SystemExit(1)
@@ -765,7 +771,7 @@ install_appimage() {
         echo "✓ Using release tag: $KEYRGB_VERSION"
     else
         local resolved=""
-        resolved="$(resolve_release_with_asset "$KEYRGB_APPIMAGE_ASSET" "$KEYRGB_ALLOW_PRERELEASE")" || true
+        resolved="$(resolve_release_with_asset "$KEYRGB_APPIMAGE_ASSET" "$KEYRGB_ALLOW_PRERELEASE" 2>/dev/null)" || true
         if [ -n "$resolved" ]; then
             local resolved_tag=""
             local resolved_url=""
@@ -783,6 +789,9 @@ install_appimage() {
             fi
         else
             url="https://github.com/Rainexn0b/keyRGB/releases/latest/download/$KEYRGB_APPIMAGE_ASSET"
+            if [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "y" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "yes" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "1" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "true" ]; then
+                echo "⚠️  Could not query GitHub releases (network/DNS?). Falling back to latest stable release URL."
+            fi
             echo "✓ Using GitHub latest release"
         fi
     fi
