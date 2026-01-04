@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.10.0 (2026-01-04)
+
+- Installer: adds an optional kernel driver installation step to `install.sh` to help install `tuxedo-drivers` / `tuxedo-keyboard` and `clevo-xsm-wmi` packages (best-effort) for safer, kernel-level keyboard control.
+- Backends: Sysfs backend is preferred (higher priority) over the ITE USB userspace driver when kernel interfaces are available, avoiding USB-level conflicts and improving reliability.
+- Sysfs improvements: expanded detection for Clevo/Tuxedo/System76 naming patterns and added System76 multi-zone color file support (`color_left`, `color_center`, `color_right`, `color_extra`).
+- Tray: device header now shows friendly names ("Kernel Driver" vs "ITE 8291 (USB)") and reports LED names or USB VID:PID for clearer diagnostics.
+- Docs: README, usage, and architecture docs updated to document multi-backend priority, kernel driver support, and installer options.
+- Tests: added unit tests for sysfs detection, System76 color zones, and tray display formatting.
+
 ## 0.9.4 (2026-01-04)
 
 - UI: completes dark-theme styling for common ttk widgets in Settings (removes bright/white default blocks).
