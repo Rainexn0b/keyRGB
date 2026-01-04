@@ -16,12 +16,11 @@ Backends live under `src/core/backends/`.
 
 - `base.py`: backend interface + `BackendCapabilities`
 - `registry.py`: backend enumeration + selection (`KEYRGB_BACKEND`)
-- `ite8291r3.py`: first backend adapter
+- `ite8291r3/`: ITE 8291r3 USB backend (protocol-scoped package)
 
-Compatibility shims:
+Notes:
 
 - Tray dimensions route through backend selection.
-- Legacy ITE imports are preserved via a wrapper module.
 
 ## Backend contract (stable surface)
 

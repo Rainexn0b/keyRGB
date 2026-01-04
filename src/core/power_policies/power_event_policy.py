@@ -43,16 +43,22 @@ class PowerEventPolicy:
         self._saved_was_off: Optional[bool] = None
 
     def handle_power_off_event(self, inputs: PowerEventInputs) -> PowerEventResult:
-        if not bool(inputs.enabled) or not bool(inputs.action_enabled):
+        # Even if the action is disabled ("don't turn off on suspend"), we still
+        # want to remember whether the keyboard was already off so we can decide
+        # whether to restore on the matching resume/open event.
+        if not bool(inputs.enabled):
             return PowerEventResult(actions=())
 
         if self._saved_was_off is None:
             self._saved_was_off = bool(inputs.is_off)
 
+        if not bool(inputs.action_enabled):
+            return PowerEventResult(actions=())
+
         return PowerEventResult(actions=(TurnOffKeyboard(),))
 
     def handle_power_restore_event(self, inputs: PowerEventInputs) -> PowerEventResult:
-        if not bool(inputs.enabled) or not bool(inputs.action_enabled):
+        if not bool(inputs.enabled):
             return PowerEventResult(actions=())
 
         if self._saved_was_off is None:
@@ -62,6 +68,9 @@ class PowerEventPolicy:
         self._saved_was_off = None
 
         if saved_was_off:
+            return PowerEventResult(actions=())
+
+        if not bool(inputs.action_enabled):
             return PowerEventResult(actions=())
 
         return PowerEventResult(actions=(RestoreKeyboard(),))

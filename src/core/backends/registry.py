@@ -19,13 +19,16 @@ class BackendSpec:
 
 def _default_specs() -> list[BackendSpec]:
     # Keep this list small and lazy-importing.
-    from .ite import Ite8291r3Backend
+    from .ite8291r3 import Ite8291r3Backend
+    from .ite8297 import Ite8297Backend
     from .sysfs import SysfsLedsBackend
 
     return [
         BackendSpec(name=Ite8291r3Backend().name, priority=Ite8291r3Backend().priority, factory=Ite8291r3Backend),
+        BackendSpec(name=Ite8297Backend().name, priority=Ite8297Backend().priority, factory=Ite8297Backend),
         BackendSpec(name=SysfsLedsBackend().name, priority=SysfsLedsBackend().priority, factory=SysfsLedsBackend),
     ]
+
 
 
 def iter_backends(*, specs: Optional[Iterable[BackendSpec]] = None) -> list[KeyboardBackend]:

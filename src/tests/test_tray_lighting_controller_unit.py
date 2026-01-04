@@ -275,11 +275,13 @@ class TestPowerTurnOffRestore:
         assert mock_tray.is_off is True
         mock_tray.engine.turn_off.assert_called_once()
 
-    def test_power_restore_only_restores_if_power_forced(self):
-        """power_restore should only act if _power_forced_off was True."""
+    def test_power_restore_restores_when_power_forced(self):
+        """power_restore should restore when _power_forced_off was True."""
         from src.tray.controllers.lighting_controller import power_restore
 
         mock_tray = MagicMock()
+        mock_tray._user_forced_off = False
+        mock_tray._idle_forced_off = False
         mock_tray._power_forced_off = True
         mock_tray.is_off = True
         mock_tray.config.brightness = 0
@@ -293,3 +295,37 @@ class TestPowerTurnOffRestore:
         assert mock_tray.is_off is False
         assert mock_tray.config.brightness == 50
         mock_start.assert_called_once_with(mock_tray)
+
+    def test_power_restore_restores_when_off_due_to_hardware_reset(self):
+        """If the tray is off but not user-forced, restore should reapply state."""
+        from src.tray.controllers.lighting_controller import power_restore
+
+        mock_tray = MagicMock()
+        mock_tray._power_forced_off = False
+        mock_tray._idle_forced_off = False
+        mock_tray._user_forced_off = False
+        mock_tray.is_off = True
+        mock_tray.config.brightness = 25
+        mock_tray.config.effect = "none"
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            power_restore(mock_tray)
+
+        assert mock_tray.is_off is False
+        mock_start.assert_called_once_with(mock_tray)
+
+    def test_power_restore_does_not_fight_user_forced_off(self):
+        """If the user explicitly turned off lighting, restore is a no-op."""
+        from src.tray.controllers.lighting_controller import power_restore
+
+        mock_tray = MagicMock()
+        mock_tray._user_forced_off = True
+        mock_tray._idle_forced_off = False
+        mock_tray._power_forced_off = False
+        mock_tray.is_off = True
+        mock_tray.config.brightness = 25
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            power_restore(mock_tray)
+
+        mock_start.assert_not_called()

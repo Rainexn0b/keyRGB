@@ -1,20 +1,25 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
 from dataclasses import dataclass
 from typing import Any
 
 from src.core.runtime.imports import ensure_ite8291r3_ctl_importable
 
-from ..base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeResult
+from ..base import BackendCapabilities, KeyboardBackend, KeyboardDevice, ProbeResult
 
 logger = logging.getLogger(__name__)
 
 _FALLBACK_USB_IDS: list[tuple[int, int]] = [
     # WootBook / common Tongfang rebrands
+    # Also includes the upstream ite8291r3-ctl set (6004/6006/600b/ce00) so we
+    # can still probe correctly even if a distro-packaged version is older.
+    (0x048D, 0x6004),
+    (0x048D, 0x6006),
     (0x048D, 0x6008),  # Generic ITE 8291 RGB Controller
     (0x048D, 0x600B),  # Newer ITE 8291 (2023+ Tongfang iterations)
+    (0x048D, 0xCE00),
 ]
 
 # Known ITE controllers seen in the wild that appear to be a different protocol
@@ -26,6 +31,10 @@ _FALLBACK_USB_IDS: list[tuple[int, int]] = [
 _KNOWN_UNSUPPORTED_USB_IDS: list[tuple[int, int]] = [
     (0x048D, 0x8297),  # ITE 8297 (Gigabyte/Tongfang)
     (0x048D, 0x5702),  # ITE 5702 (Gigabyte)
+    # Reported in the wild as an ITE 8297/8176-family controller using a
+    # different HID report dialect than 8291r3. Treat as unsupported until we
+    # have a dedicated backend + hardware confirmation.
+    (0x048D, 0xC966),
 ]
 
 
@@ -58,19 +67,10 @@ class Ite8291r3Backend(KeyboardBackend):
         - tries to detect a known USB VID/PID without opening the device
         """
 
-        # If a safer kernel driver is available (Sysfs backend), we should have
-        # been preempted by priority. If we are running, it means no kernel
-        # driver was found.
-        # We could log a suggestion here, but for now we just proceed.
-
         try:
             ite8291r3 = self._import()
         except Exception as exc:
             return ProbeResult(available=False, reason=f"import failed: {exc}", confidence=0)
-
-        # If we can scan USB, only claim availability when a matching device exists.
-        # If we cannot (or do not want to) scan USB, fall back to a lower-confidence
-        # "importable" availability so users can still force it.
 
         # Respect global USB-scan disable flag (primarily used to keep unit tests
         # deterministic and to avoid unintended controller side effects).
@@ -80,6 +80,7 @@ class Ite8291r3Backend(KeyboardBackend):
                 reason="importable but usb scan disabled",
                 confidence=60,
             )
+
         try:
             import usb.core  # type: ignore
 
@@ -99,7 +100,10 @@ class Ite8291r3Backend(KeyboardBackend):
                 if dev is not None:
                     return ProbeResult(
                         available=False,
-                        reason=f"usb device present but unsupported by ite8291r3 backend (0x{vendor_id:04x}:0x{int(pid):04x})",
+                        reason=(
+                            "usb device present but unsupported by ite8291r3 backend "
+                            f"(0x{vendor_id:04x}:0x{int(pid):04x})"
+                        ),
                         confidence=0,
                         identifiers={"usb_vid": f"0x{vendor_id:04x}", "usb_pid": f"0x{int(pid):04x}"},
                     )
@@ -131,8 +135,6 @@ class Ite8291r3Backend(KeyboardBackend):
         try:
             return ite8291r3.get()
         except Exception as exc:
-            # Common failure mode: user lacks rw access to /dev/bus/usb/... for the keyboard.
-            # After distro updates, udev rules can be removed/reset.
             msg = str(exc).lower()
             errno = getattr(exc, "errno", None)
             if isinstance(exc, PermissionError) or errno == 13 or "permission denied" in msg or "access denied" in msg:

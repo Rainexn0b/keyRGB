@@ -25,7 +25,7 @@ Key principle: the tray/GUI should stay stable while we add new hardware support
 - Backend registry exists under src/core/backends.
 - Env override supported: `KEYRGB_BACKEND`.
 - Tray dimension loading uses backend selection.
-- Legacy ITE shim delegates through the registry.
+- ITE 8291r3 USB backend is implemented under `src/core/backends/ite8291r3/`.
 
 ## Near-term sequencing (recommended)
 

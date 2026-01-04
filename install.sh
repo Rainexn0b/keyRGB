@@ -610,10 +610,11 @@ if [ "$MODE" = "pip" ]; then
     echo "✓ pip/setuptools/wheel updated"
 fi
 
-# Check for USB device (048d:600b)
+# Check for USB device (common supported ITE 8291r3 IDs)
 if command -v lsusb &> /dev/null; then
-    if ! lsusb | grep -q "048d:600b"; then
-        echo "⚠️  Warning: ITE 8291 device (048d:600b) not found"
+    if ! lsusb | grep -Eqi "048d:(6004|6006|6008|600b|ce00)"; then
+        echo "⚠️  Warning: supported ITE 8291r3 USB device not detected"
+        echo "   Expected one of: 048d:6004, 048d:6006, 048d:6008, 048d:600b, 048d:ce00"
         echo "   Please make sure your keyboard is connected"
     fi
 else
@@ -891,7 +892,7 @@ install_udev_rule() {
 
     echo
     echo "🔐 Installing udev rule for non-root USB access..."
-    echo "   (This enables access to 048d:600b without running KeyRGB as root.)"
+    echo "   (This enables access to common ITE 8291 USB VID:PID pairs without running KeyRGB as root.)"
     echo "   (This may prompt for your sudo password.)"
 
     # Only overwrite if changed.

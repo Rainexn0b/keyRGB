@@ -246,13 +246,11 @@ class PowerManager:
         expected_action_type,
         kb_method_name: str,
     ) -> None:
-        if not enabled or not action_enabled:
+        if not enabled:
             return
 
-        logger.info(log_message)
-        if delay_s > 0:
-            time.sleep(float(delay_s))
-
+        # Always feed events into the policy so it can record pre-event state
+        # even when actions are disabled via configuration.
         try:
             result = policy_method(
                 PowerEventInputs(
@@ -264,14 +262,30 @@ class PowerManager:
         except Exception:
             return
 
+        did_delay = False
+        did_log = False
+
         for action in getattr(result, "actions", []) or []:
-            if isinstance(action, expected_action_type):
-                try:
-                    fn = getattr(self.kb_controller, kb_method_name, None)
-                    if callable(fn):
-                        fn()
-                except Exception:
-                    pass
+            if not isinstance(action, expected_action_type):
+                continue
+
+            if not bool(action_enabled):
+                continue
+
+            if not did_log:
+                did_log = True
+                logger.info(log_message)
+
+            if delay_s > 0 and not did_delay:
+                did_delay = True
+                time.sleep(float(delay_s))
+
+            try:
+                fn = getattr(self.kb_controller, kb_method_name, None)
+                if callable(fn):
+                    fn()
+            except Exception:
+                pass
 
     def _on_suspend(self):
         """Called when system is about to suspend."""

@@ -211,7 +211,15 @@ def power_turn_off(tray: Any) -> None:
 
 
 def power_restore(tray: Any) -> None:
-    if tray._power_forced_off:
+    # Never fight explicit user off.
+    if bool(getattr(tray, "_user_forced_off", False)):
+        return
+
+    # If lighting is intentionally forced off by idle policy, don't restore.
+    if bool(getattr(tray, "_idle_forced_off", False)):
+        return
+
+    if bool(getattr(tray, "_power_forced_off", False)):
         log_event = getattr(tray, "_log_event", None)
         if callable(log_event):
             try:
@@ -220,17 +228,20 @@ def power_restore(tray: Any) -> None:
                 pass
         tray._power_forced_off = False
         tray._idle_forced_off = False
-        tray.is_off = False
 
-        if tray.config.brightness == 0:
+        # If we forced off, ensure we have a usable brightness to restore.
+        if int(getattr(tray.config, "brightness", 0) or 0) == 0:
             tray.config.brightness = tray._last_brightness if tray._last_brightness > 0 else 25
 
-        start_current_effect(tray)
-        tray._refresh_ui()
+    # If the user explicitly configured brightness=0, treat that as off.
+    if int(getattr(tray.config, "brightness", 0) or 0) == 0:
+        tray.is_off = True
         return
 
-    if not tray.is_off:
-        start_current_effect(tray)
+    # Common restore path: hardware may have reset to off across suspend.
+    tray.is_off = False
+    start_current_effect(tray)
+    tray._refresh_ui()
 
 
 def apply_brightness_from_power_policy(tray: Any, brightness: int) -> None:

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.11.0 (2026-01-05)
+
+- Backends: renamed the ITE USB backend package to `ite8291r3` (protocol-scoped) and removed the legacy `ite` shim.
+- Backends: expanded safe USB ID handling (allowlist + explicit denylist for known other protocol families, including `048d:c966`).
+- Backends: added a dormant `ite8297` backend scaffold (disabled by default; requires confirmed IDs + implementation).
+- Power/Tray: fixes resume behavior where some keyboards come back dark until the user clicks “Turn On”.
+- Permissions: udev uaccess rule covers common supported ITE 8291r3 USB IDs.
+- Docs: added a contributor workflow for safely verifying a new VID:PID before submitting a PR.
+
 ## 0.10.2 (2026-01-04)
 
 - Installer: improve AppImage download reliability by downloading to a temporary file, adding clearer diagnostics on write failures, and falling back from `curl` → `wget` → `python3` when needed.

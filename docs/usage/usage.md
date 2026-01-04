@@ -158,11 +158,11 @@ At this point you should have the entrypoints:
 
 To control the keyboard without running as root, install the udev rule.
 
-This repo’s installer uses:
+This repo’s installer uses the uaccess rule file at:
 
-```text
-SUBSYSTEM=="usb", ATTR{idVendor}=="048d", ATTR{idProduct}=="600b", TAG+="uaccess"
-```
+- `system/udev/99-ite8291-wootbook.rules`
+
+It covers the common ITE 8291 USB VID/PID pairs used by supported models.
 
 You can either run the repo installer:
 
