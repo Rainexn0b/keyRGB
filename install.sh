@@ -648,10 +648,24 @@ download_url() {
     local tmp
     tmp="$(mktemp "${dst}.tmp.XXXXXX")" || return 2
 
+    # Show progress only in interactive terminals.
+    local is_tty="n"
+    if [ -t 1 ]; then
+        is_tty="y"
+    fi
+
     if command -v curl &> /dev/null; then
-        if curl -L --fail --silent --show-error -o "$tmp" "$url"; then
-            mv -f "$tmp" "$dst"
-            return 0
+        if [ "$is_tty" = "y" ]; then
+            # -# shows a compact progress bar.
+            if curl -L --fail --show-error -# -o "$tmp" "$url"; then
+                mv -f "$tmp" "$dst"
+                return 0
+            fi
+        else
+            if curl -L --fail --silent --show-error -o "$tmp" "$url"; then
+                mv -f "$tmp" "$dst"
+                return 0
+            fi
         fi
         rc=$?
         echo "⚠️  curl failed (exit $rc) while downloading: $url" >&2
@@ -667,9 +681,16 @@ download_url() {
     fi
 
     if command -v wget &> /dev/null; then
-        if wget -q -O "$tmp" "$url"; then
-            mv -f "$tmp" "$dst"
-            return 0
+        if [ "$is_tty" = "y" ]; then
+            if wget --progress=bar:force:noscroll -O "$tmp" "$url"; then
+                mv -f "$tmp" "$dst"
+                return 0
+            fi
+        else
+            if wget -q -O "$tmp" "$url"; then
+                mv -f "$tmp" "$dst"
+                return 0
+            fi
         fi
         rc=$?
         echo "⚠️  wget failed (exit $rc) while downloading: $url" >&2
