@@ -19,7 +19,8 @@ KeyRGB uses a priority-based system to select the best driver for your hardware:
 ## Status
 
 - **Beta**: versioning follows **0.x.y**.
-- Developed primarily for Fedora / Nobara.
+- Developed primarily on Fedora / Nobara.
+- Installer support is **best-effort** on other distros via common package managers (dnf/apt/pacman/zypper/apk).
 - Support depends entirely on your specific keyboard controller and firmware.
 
 ## Screenshots
@@ -102,6 +103,18 @@ On Fedora / Nobara (recommended):
 ./install.sh
 ```
 
+On other Linux distros (best-effort):
+
+```bash
+./install.sh
+```
+
+If you don't want the installer to attempt system package installs (no sudo / minimal / immutable OS):
+
+```bash
+./install.sh --no-system-deps
+```
+
 This installs the AppImage to `~/.local/bin/keyrgb`, sets up the desktop launcher, and installs necessary udev rules for hardware access.
 
 Docs:
@@ -177,6 +190,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | `--pip` | Install via `pip --user` (dev/editable). |
 | `--clone` | Clone repo and install via pip (source). |
 | `--version <tag>` | Install specific tag (e.g. `v0.9.3`). |
+| `--no-system-deps` | Skip best-effort system dependency installation. |
 
 ### Environment variables
 

@@ -3,10 +3,87 @@
 
 set -e
 
+PKG_MGR=""  # dnf|apt|pacman|zypper|apk
+APT_UPDATED=0
+
+detect_pkg_manager() {
+    if command -v dnf >/dev/null 2>&1; then
+        PKG_MGR="dnf"
+        return 0
+    fi
+    if command -v apt-get >/dev/null 2>&1; then
+        PKG_MGR="apt"
+        return 0
+    fi
+    if command -v pacman >/dev/null 2>&1; then
+        PKG_MGR="pacman"
+        return 0
+    fi
+    if command -v zypper >/dev/null 2>&1; then
+        PKG_MGR="zypper"
+        return 0
+    fi
+    if command -v apk >/dev/null 2>&1; then
+        PKG_MGR="apk"
+        return 0
+    fi
+    PKG_MGR=""
+    return 1
+}
+
+pkg_install_best_effort() {
+    # Best-effort: do not fail the overall install if system package install fails.
+    local pkgs=("$@");
+    if [ ${#pkgs[@]} -eq 0 ]; then
+        return 0
+    fi
+
+    local had_errexit=0
+    case "$-" in
+        *e*) had_errexit=1 ;;
+    esac
+
+    detect_pkg_manager || true
+    if [ -z "${PKG_MGR:-}" ]; then
+        echo "⚠️  No supported package manager found; skipping system package installation."
+        return 0
+    fi
+
+    set +e
+    case "$PKG_MGR" in
+        dnf)
+            sudo dnf install -y "${pkgs[@]}" ;;
+        apt)
+            if [ "${APT_UPDATED:-0}" -ne 1 ]; then
+                sudo apt-get update >/dev/null 2>&1 || true
+                APT_UPDATED=1
+            fi
+            sudo apt-get install -y "${pkgs[@]}" ;;
+        pacman)
+            # Avoid full system upgrades; install only what we need.
+            sudo pacman -S --noconfirm --needed "${pkgs[@]}" ;;
+        zypper)
+            sudo zypper --non-interactive install --no-recommends "${pkgs[@]}" ;;
+        apk)
+            sudo apk add "${pkgs[@]}" ;;
+        *)
+            echo "⚠️  Unsupported package manager '$PKG_MGR'; skipping system package installation." ;;
+    esac
+    rc=$?
+
+    if [ "$had_errexit" -eq 1 ]; then
+        set -e
+    else
+        set +e
+    fi
+
+    return $rc
+}
+
 usage() {
         cat <<'EOF'
 Usage:
-    ./install.sh [--appimage] [--clone] [--clone-dir <path>] [--pip] [--version <tag>] [--asset <name>] [--prerelease]
+    ./install.sh [--appimage] [--clone] [--clone-dir <path>] [--pip] [--version <tag>] [--asset <name>] [--prerelease] [--no-system-deps]
 
 Modes:
     --appimage  Install by downloading the AppImage. (default)
@@ -15,7 +92,7 @@ Modes:
                Use this if you want to modify the code for your machine.
 
 What gets installed (both modes):
-    - System dependencies (best-effort via dnf when available)
+    - System dependencies (best-effort via your package manager when available)
     - Desktop launcher: ~/.local/share/applications/keyrgb.desktop
     - Autostart entry:  ~/.config/autostart/keyrgb.desktop
     - Icon:            ~/.local/share/icons/hicolor/256x256/apps/keyrgb.png
@@ -43,10 +120,11 @@ Env vars:
     KEYRGB_CLONE_DIR=<path>  Target directory for --clone (default: ~/.local/share/keyrgb-src).
     KEYRGB_INSTALL_POWER_HELPER=y|n  Select the lightweight Power Mode helper.
     KEYRGB_INSTALL_TUXEDO=y|n  Select optional TCC integration.
-    KEYRGB_INSTALL_TCC_APP=y|n  If TCC integration is selected, optionally install Tuxedo Control Center via dnf (best-effort).
+    KEYRGB_INSTALL_TCC_APP=y|n  If TCC integration is selected, optionally install Tuxedo Control Center via your package manager (best-effort).
     KEYRGB_INSTALL_INPUT_UDEV=y|n  Install udev rule for Reactive Typing to read keypress events via /dev/input (uaccess; security-sensitive; default: n).
     Note: Power Mode helper and TCC integration are mutually exclusive; if both are set truthy, Power Mode is preferred.
     KEYRGB_ALLOW_PRERELEASE=y|n  Allow installing from prereleases (default: n).
+    KEYRGB_SKIP_SYSTEM_DEPS=y|n  Skip best-effort system dependency installation (default: n).
 EOF
 }
 
@@ -58,6 +136,7 @@ KEYRGB_APPIMAGE_ASSET="${KEYRGB_APPIMAGE_ASSET:-keyrgb-x86_64.AppImage}"
 KEYRGB_ALLOW_PRERELEASE="${KEYRGB_ALLOW_PRERELEASE:-n}"
 KEYRGB_INSTALL_TCC_APP="${KEYRGB_INSTALL_TCC_APP:-}"
 KEYRGB_INSTALL_INPUT_UDEV="${KEYRGB_INSTALL_INPUT_UDEV:-}"
+KEYRGB_SKIP_SYSTEM_DEPS="${KEYRGB_SKIP_SYSTEM_DEPS:-n}"
 
 STATE_DIR="$HOME/.local/share/keyrgb"
 TCC_MARKER="$STATE_DIR/tcc-installed-by-keyrgb"
@@ -91,6 +170,10 @@ while [ "$#" -gt 0 ]; do
                         ;;
                 --prerelease)
                     KEYRGB_ALLOW_PRERELEASE="y"
+                    shift
+                    ;;
+                --no-system-deps)
+                    KEYRGB_SKIP_SYSTEM_DEPS="y"
                     shift
                     ;;
                 -h|--help)
@@ -287,7 +370,7 @@ if [ "$INSTALL_TUXEDO" = "y" ]; then
     elif [ -t 0 ]; then
         echo
         echo "TCC integration was selected."
-        ans="$(ask_yes_no "Install Tuxedo Control Center via dnf (best-effort, may not be available in your repos)?" "n")"
+        ans="$(ask_yes_no "Install Tuxedo Control Center app (best-effort, may not be available in your repos)?" "n")"
         if [ "$ans" = "y" ]; then
             INSTALL_TCC_APP="y"
         fi
@@ -306,7 +389,7 @@ else
 fi
 
 if [ "$INSTALL_TCC_APP" = "y" ]; then
-    echo "✓ Tuxedo Control Center will be installed via dnf (best-effort)"
+    echo "✓ Tuxedo Control Center will be installed (best-effort)"
 fi
 
 # Optional: Kernel drivers for better hardware support
@@ -351,46 +434,61 @@ else
     echo "✓ Reactive Typing keypress detection will be disabled (synthetic fallback)"
 fi
 
-install_system_deps_fedora() {
+install_system_deps_best_effort() {
     echo
-    echo "🔧 Installing system dependencies (Fedora / dnf)..."
+    echo "🔧 Installing system dependencies (best-effort)..."
     echo "   (This may prompt for your sudo password.)"
 
-    # Minimal runtime deps:
-    # - python3/pip: run KeyRGB
-    # - python3-tkinter: GUI windows
-    # - usbutils: lsusb (device check)
-    # - dbus-tools: dbus-monitor used by power monitoring
-    # - libappindicator-gtk3 + python3-gobject + gtk3: tray icon backends for pystray on Fedora
-    # - polkit: pkexec for privileged helpers (power mode helper + optional TCC features)
-    local pkgs=(
-        python3
-        python3-tkinter
-        usbutils
-        dbus-tools
-        libappindicator-gtk3
-        python3-gobject
-        gtk3
-    )
+    detect_pkg_manager || true
+
+    # Minimal common deps.
+    local pkgs=()
+    case "${PKG_MGR:-}" in
+        dnf)
+            pkgs+=(python3 python3-tkinter usbutils dbus-tools libappindicator-gtk3 python3-gobject gtk3)
+            ;;
+        apt)
+            pkgs+=(python3 python3-tk usbutils dbus)
+            # Tray deps vary by distro/desktop; try common packages when present.
+            pkgs+=(python3-gi gir1.2-appindicator3-0.1)
+            ;;
+        pacman)
+            pkgs+=(python tk usbutils dbus)
+            pkgs+=(libappindicator-gtk3 python-gobject gtk3)
+            ;;
+        zypper)
+            pkgs+=(python3 python3-tk usbutils dbus-1 dbus-1-tools)
+            pkgs+=(python3-gobject gtk3 typelib-1_0-AppIndicator3-0_1)
+            ;;
+        apk)
+            pkgs+=(python3 py3-tkinter usbutils dbus)
+            ;;
+        *)
+            pkgs+=(python3 usbutils)
+            ;;
+    esac
 
     # Only needed for source installs.
     if [ "$MODE" = "pip" ] || [ "$MODE" = "clone" ]; then
-        pkgs+=(git python3-pip)
+        case "${PKG_MGR:-}" in
+            pacman) pkgs+=(git python-pip) ;;
+            *) pkgs+=(git python3-pip) ;;
+        esac
     fi
 
-    sudo dnf install -y "${pkgs[@]}"
+    pkg_install_best_effort "${pkgs[@]}" || true
 
     if [ "$INSTALL_TUXEDO" = "y" ] || [ "$INSTALL_POWER_HELPER" = "y" ]; then
-        sudo dnf install -y polkit
+        pkg_install_best_effort polkit || true
     fi
 
     if [ "$INSTALL_TCC_APP" = "y" ]; then
         echo
-        echo "🧩 Installing Tuxedo Control Center via dnf (best-effort)..."
+        echo "🧩 Installing Tuxedo Control Center (best-effort)..."
         mkdir -p "$STATE_DIR" || true
 
         set +e
-        sudo dnf install -y tuxedo-control-center
+        pkg_install_best_effort tuxedo-control-center
         rc=$?
         set -e
 
@@ -398,25 +496,27 @@ install_system_deps_fedora() {
             echo "✓ Installed tuxedo-control-center"
             printf '%s\n' "tuxedo-control-center" > "$TCC_MARKER" 2>/dev/null || true
         else
-            echo "⚠️  Failed to install tuxedo-control-center via dnf (exit $rc)."
+            echo "⚠️  Failed to install tuxedo-control-center (best-effort)."
             echo "   This package may not be available in your enabled repos."
             echo "   You can install TCC separately, then KeyRGB will enable the TCC integration UI."
         fi
     fi
 
-    echo "✓ System dependencies installed"
+    echo "✓ System dependencies installed (best-effort)"
     echo "  Note: KDE Plasma typically shows tray icons out of the box."
-    echo "        GNOME may require the AppIndicator extension to show tray icons:"
-    echo "        sudo dnf install -y gnome-shell-extension-appindicator"
-    echo "        then log out/in (or reboot)."
+    echo "        GNOME may require an AppIndicator extension/package to show tray icons."
 }
 
 # Best-effort system dependency installation.
-if command -v dnf &> /dev/null; then
-    install_system_deps_fedora
+if [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "y" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "yes" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "1" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "true" ]; then
+    echo "ℹ️  Skipping system dependency installation (KEYRGB_SKIP_SYSTEM_DEPS / --no-system-deps)."
 else
-    echo "⚠️  dnf not found; skipping system package installation."
-    echo "   You may need: python3, python3-pip, python3-tkinter, usbutils, dbus-tools, and tray deps for pystray."
+    if detect_pkg_manager; then
+        install_system_deps_best_effort
+    else
+        echo "⚠️  No supported package manager found; skipping system package installation."
+        echo "   You may need: python3, pip, tkinter, usbutils, dbus, and tray deps for pystray."
+    fi
 fi
 
 # Clone mode: fetch source into a user directory, then continue as pip mode.

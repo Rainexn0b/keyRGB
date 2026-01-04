@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.1 (2026-01-04)
+
+- Installer: expands best-effort system dependency installation beyond Fedora/Nobara via common package managers (dnf/apt/pacman/zypper/apk).
+- Installer: adds `--no-system-deps` / `KEYRGB_SKIP_SYSTEM_DEPS=1` to skip system package installation (useful for minimal/immutable setups).
+- Docs: updates README to clarify best-effort cross-distro installer support and the new skip-deps option.
+
 ## 0.10.0 (2026-01-04)
 
 - Installer: adds an optional kernel driver installation step to `install.sh` to help install `tuxedo-drivers` / `tuxedo-keyboard` and `clevo-xsm-wmi` packages (best-effort) for safer, kernel-level keyboard control.

@@ -8,9 +8,9 @@
 # - udev rule (with sudo) if it matches this repo's rule
 # - optional: input udev rule for Reactive Typing (/dev/input access) if it matches this repo's rule
 # - power mode helper + polkit rule (with sudo) if they match this repo's files
-# - optionally: Tuxedo Control Center (dnf) ONLY if installed by KeyRGB (marker file)
+# - optionally: Tuxedo Control Center ONLY if installed by KeyRGB (marker file)
 #
-# By default this script does NOT remove system packages installed via dnf.
+# By default this script does NOT remove system packages installed by install.sh.
 # The only exception is Tuxedo Control Center, and only when a KeyRGB marker file indicates KeyRGB installed it.
 
 set -euo pipefail
@@ -36,8 +36,51 @@ Usage: ./uninstall.sh [--yes] [--purge-config] [--remove-appimage]
 
 Notes:
   - This script removes both AppImage-mode and pip-mode installs (with prompts).
-  - It does NOT remove system packages installed via dnf (except optional TCC removal when KeyRGB installed it).
+  - It does NOT remove system packages installed by install.sh (except optional TCC removal when KeyRGB installed it).
 EOF
+}
+
+PKG_MGR=""  # dnf|apt|pacman|zypper|apk
+
+detect_pkg_manager() {
+  if command -v dnf >/dev/null 2>&1; then PKG_MGR="dnf"; return 0; fi
+  if command -v apt-get >/dev/null 2>&1; then PKG_MGR="apt"; return 0; fi
+  if command -v pacman >/dev/null 2>&1; then PKG_MGR="pacman"; return 0; fi
+  if command -v zypper >/dev/null 2>&1; then PKG_MGR="zypper"; return 0; fi
+  if command -v apk >/dev/null 2>&1; then PKG_MGR="apk"; return 0; fi
+  PKG_MGR=""; return 1
+}
+
+pkg_is_installed() {
+  local pkg="$1"
+  detect_pkg_manager || return 1
+  case "$PKG_MGR" in
+    dnf) rpm -q "$pkg" >/dev/null 2>&1 ;;
+    apt) dpkg -s "$pkg" >/dev/null 2>&1 ;;
+    pacman) pacman -Qi "$pkg" >/dev/null 2>&1 ;;
+    zypper) rpm -q "$pkg" >/dev/null 2>&1 ;;
+    apk) apk info -e "$pkg" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
+pkg_remove_best_effort() {
+  local pkg="$1"
+  detect_pkg_manager || return 1
+
+  set +e
+  case "$PKG_MGR" in
+    dnf) sudo dnf remove -y "$pkg" ;;
+    apt) sudo apt-get remove -y "$pkg" ;;
+    pacman) sudo pacman -R --noconfirm "$pkg" ;;
+    zypper) sudo zypper --non-interactive remove "$pkg" ;;
+    apk) sudo apk del "$pkg" ;;
+    *) echo "⚠️  No supported package manager found to remove $pkg" ;;
+  esac
+  rc=$?
+  set -e
+
+  return $rc
 }
 
 for arg in "$@"; do
@@ -220,18 +263,14 @@ if [ -f "$POWER_HELPER_DST" ] || [ -f "$POLKIT_DST" ]; then
 fi
 
 if [ -f "$TCC_MARKER" ]; then
-  if command -v dnf >/dev/null 2>&1; then
-    if rpm -q tuxedo-control-center >/dev/null 2>&1; then
+  if detect_pkg_manager; then
+    if pkg_is_installed tuxedo-control-center; then
       if confirm "Uninstall Tuxedo Control Center (tuxedo-control-center) that was installed by KeyRGB (requires sudo)?"; then
-        set +e
-        sudo dnf remove -y tuxedo-control-center
-        rc=$?
-        set -e
-        if [ $rc -eq 0 ]; then
+        if pkg_remove_best_effort tuxedo-control-center; then
           echo "✓ Removed tuxedo-control-center"
           rm -f "$TCC_MARKER" || true
         else
-          echo "⚠️  Failed to remove tuxedo-control-center via dnf (exit $rc)."
+          echo "⚠️  Failed to remove tuxedo-control-center (exit $?)."
           echo "   Marker file left in place: $TCC_MARKER"
         fi
       else
@@ -242,7 +281,7 @@ if [ -f "$TCC_MARKER" ]; then
       rm -f "$TCC_MARKER" || true
     fi
   else
-    echo "⚠️  dnf not found; cannot remove tuxedo-control-center automatically."
+    echo "⚠️  No supported package manager found; cannot remove tuxedo-control-center automatically."
     echo "   Marker file: $TCC_MARKER"
   fi
 fi
@@ -256,15 +295,9 @@ if [ -f "$KERNEL_DRIVERS_MARKER" ]; then
     
     if confirm "Uninstall kernel driver '$pkg' (requires sudo)?"; then
       echo "   Removing $pkg..."
-      set +e
-      if command -v dnf >/dev/null 2>&1; then
-          sudo dnf remove -y "$pkg"
-      elif command -v apt-get >/dev/null 2>&1; then
-          sudo apt-get remove -y "$pkg"
-      else
-          echo "⚠️  No supported package manager found to remove $pkg"
+      if ! pkg_remove_best_effort "$pkg"; then
+        echo "⚠️  Failed to remove $pkg (best-effort)."
       fi
-      set -e
     else
       echo "↷ Skipped removing $pkg"
     fi
@@ -299,4 +332,4 @@ fi
 
 echo
 echo "=== Uninstall complete ==="
-echo "Note: install.sh also installs system packages via dnf; those are not removed by default."
+echo "Note: install.sh may install system packages via your package manager; those are not removed by default."
