@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.2 (2026-01-04)
+
+- Installer: improve AppImage download reliability by downloading to a temporary file, adding clearer diagnostics on write failures, and falling back from `curl` → `wget` → `python3` when needed.
+- Installer: better diagnostics for local write issues (disk full, permission denied) when AppImage download fails.
+- Uninstall: preserve `kernel-drivers-installed-by-keyrgb` marker when removals were skipped or failed so follow-up uninstalls can retry only remaining packages.
+- Docs: minor README/CHANGELOG clarifications.
+
 ## 0.10.1 (2026-01-04)
 
 - Installer: expands best-effort system dependency installation beyond Fedora/Nobara via common package managers (dnf/apt/pacman/zypper/apk).

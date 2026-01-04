@@ -289,36 +289,34 @@ fi
 if [ -f "$KERNEL_DRIVERS_MARKER" ]; then
   echo
   echo "Found kernel drivers installed by KeyRGB:"
-  # Read unique lines from marker file
-  sort -u "$KERNEL_DRIVERS_MARKER" | while read -r pkg; do
-    if [ -z "$pkg" ]; then continue; fi
-    
-    if confirm "Uninstall kernel driver '$pkg' (requires sudo)?"; then
-      echo "   Removing $pkg..."
-      if ! pkg_remove_best_effort "$pkg"; then
-        echo "⚠️  Failed to remove $pkg (best-effort)."
+  # Read unique, non-empty lines from marker file.
+  mapfile -t driver_pkgs < <(sort -u "$KERNEL_DRIVERS_MARKER" | sed '/^$/d')
+
+  if [ ${#driver_pkgs[@]} -eq 0 ]; then
+    rm -f "$KERNEL_DRIVERS_MARKER" || true
+  else
+    remaining_pkgs=()
+    for pkg in "${driver_pkgs[@]}"; do
+      if confirm "Uninstall kernel driver '$pkg' (requires sudo)?"; then
+        echo "   Removing $pkg..."
+        if pkg_remove_best_effort "$pkg"; then
+          :
+        else
+          echo "⚠️  Failed to remove $pkg (best-effort)."
+          remaining_pkgs+=("$pkg")
+        fi
+      else
+        echo "↷ Skipped removing $pkg"
+        remaining_pkgs+=("$pkg")
       fi
+    done
+
+    if [ ${#remaining_pkgs[@]} -eq 0 ]; then
+      rm -f "$KERNEL_DRIVERS_MARKER" || true
     else
-      echo "↷ Skipped removing $pkg"
+      printf '%s\n' "${remaining_pkgs[@]}" > "$KERNEL_DRIVERS_MARKER" 2>/dev/null || true
     fi
-  done
-  
-  # We don't remove the marker file here because we might have skipped some.
-  # But if we want to be clean, we could rewrite it with only the skipped ones.
-  # For simplicity, let's just remove it if the user said yes to everything? 
-  # Or just leave it. The user can manually remove it.
-  # Actually, let's just remove it if we are done. 
-  # But since we are in a loop, it's hard to know if we skipped any without complex logic.
-  # Let's just leave it or remove it if we want to be aggressive.
-  # Given this is an uninstall script, maybe we should just remove it at the end if we processed it?
-  # No, better to keep it if we skipped.
-  
-  # Let's just try to remove the marker file if the user asked to purge config?
-  # No, that's unrelated.
-  
-  # Let's just remove the marker file if we attempted removal.
-  # If the user skipped, they probably know what they are doing.
-  rm -f "$KERNEL_DRIVERS_MARKER" || true
+  fi
 fi
 
 if [ "$PURGE_CONFIG" -eq 1 ]; then
