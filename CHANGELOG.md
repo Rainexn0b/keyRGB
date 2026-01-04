@@ -9,6 +9,15 @@
 - Docs: README, usage, and architecture docs updated to document multi-backend priority, kernel driver support, and installer options.
 - Tests: added unit tests for sysfs detection, System76 color zones, and tray display formatting.
 
+- UI: completes dark-theme styling for Settings panels to match the color editor (removes bright/white blocks) and improves cursor/state affordances in overlay editors.
+- Tray: fixes HW/SW mode switching so selecting Hardware Color reliably unlocks hardware effects and locks software effects.
+- Performance: significantly speeds up uniform and per-key UI startup by caching the color wheel as a single raster image and deferring initial render.
+- Maintenance: extracts shared helpers to improve maintainability and reduce duplication (`src/gui/tk_async.py`, `src/gui/key_draw_style.py`, `src/gui/perkey/color_utils.py`), consolidates geometry calculations (`calc_centered_drawn_bbox`/transform helpers), and centralizes overlay hit-testing/geometry in the per-key canvas to simplify the overlay drag controller.
+- Maintenance: refactors per-key canvas and calibrator geometry to ensure consistent rounding, transform creation, and backdrop centering; small pure helper extraction across the per-key modules reduced duplicated logic.
+- Testing/Quality: Ruff configuration and repeated pytest gating applied during refactors; all tests pass after these changes.
+- Release prep: finalizes changes intended for the `0.10.0` update (see below for tagging/commit).
+
+
 ## 0.9.4 (2026-01-04)
 
 - UI: completes dark-theme styling for common ttk widgets in Settings (removes bright/white default blocks).

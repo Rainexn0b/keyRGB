@@ -2,10 +2,19 @@
 
 KeyRGB is a lightweight Linux tray app and per-key editor for laptop keyboard lighting. It serves as a practical, focused alternative to OpenRGB for supported devices.
 
-## Supported backends
+## Supported Backends & Devices
 
-- **USB (ITE 8291 / 8291R3 family)**: common on TongFang rebrands (XMG, Tuxedo, Wootbook, Eluktronics). Supports per-key RGB.
-- **Sysfs LED**: universal Linux backend (brightness-only or basic RGB, depending on kernel drivers).
+KeyRGB uses a priority-based system to select the best driver for your hardware:
+
+1.  **Kernel Driver (Preferred)**: Uses safe, native Linux kernel interfaces (`/sys/class/leds`).
+    *   **Clevo / Tuxedo**: Full RGB support via `tuxedo-drivers` or `clevo-xsm-wmi`.
+    *   **System76**: Full RGB support via standard ACPI drivers.
+    *   **Universal**: Brightness control for almost any laptop (Dell, ASUS, HP, etc.).
+
+2.  **USB Direct (Fallback)**: Uses the `ite8291r3` userspace driver.
+    *   **TongFang**: Supports per-key RGB on devices without kernel drivers (XMG, Wootbook, Eluktronics, older Tuxedo models).
+
+*The installer (`install.sh`) can optionally help you install the necessary kernel modules for Clevo/Tuxedo laptops.*
 
 ## Status
 

@@ -10,7 +10,7 @@ For a quick reference of entrypoints and environment variables, see: [docs/usage
 ## 0) Assumptions
 
 - You are on Fedora Workstation (GNOME or KDE) or a desktop with an X11 or later tray.
-- You have an ITE 8291 compatible keyboard connected (or you just want the app to start even if it is absent).
+- You have a supported keyboard (Clevo, Tuxedo, Tongfang/ITE, System76, or generic sysfs-capable laptop).
 - You are installing from this repo checkout.
 
 ## 1) System dependencies (dnf)
@@ -21,7 +21,7 @@ If you're on Fedora (including Nobara) and you just want it working quickly, you
 ./install.sh
 ```
 
-`install.sh` installs the needed Fedora packages (Python, pip, Tkinter, tray deps, etc.) via `dnf` and then installs the Python packages.
+`install.sh` installs the needed Fedora packages (Python, pip, Tkinter, tray deps, etc.), installs the Python packages, and **optionally installs kernel drivers** for Clevo/Tuxedo laptops.
 
 Use the steps below only if you prefer to install dependencies manually.
 
@@ -83,10 +83,11 @@ The simplest install path is:
 That script:
 
 - Installs Fedora system dependencies (via `dnf`)
+- Optionally installs kernel drivers (`tuxedo-drivers`, `clevo-xsm-wmi`) for better hardware support
 - Installs upstream `ite8291r3-ctl` (and applies the one-line Wootbook `0x600B` patch if upstream hasn't merged it yet)
 - Installs KeyRGB's Python dependencies
 - Installs KeyRGB itself
-- Sets up the udev rule for non-root USB access
+- Sets up the udev rule for non-root USB access (for the ITE fallback backend)
 
 If you prefer to do it manually (useful for development), follow the steps below.
 

@@ -44,6 +44,30 @@ def calc_centered_transform(
     return CanvasTransform(x0=x0, y0=y0, sx=s, sy=s)
 
 
+def calc_centered_drawn_bbox(
+    *,
+    canvas_w: int,
+    canvas_h: int,
+    image_size: tuple[int, int] = BASE_IMAGE_SIZE,
+) -> tuple[int, int, int, int, float]:
+    """Return the drawn image bbox for a centered, aspect-preserving fit.
+
+    Returns `(x0, y0, draw_w, draw_h, scale)` where x0/y0/draw_w/draw_h
+    are integers using the same rounding rules as Tk canvas draw calls.
+    """
+
+    cw = max(1, int(canvas_w))
+    ch = max(1, int(canvas_h))
+    iw, ih = image_size
+
+    s = min(cw / iw, ch / ih)
+    draw_w = max(1, int(iw * s))
+    draw_h = max(1, int(ih * s))
+    x0 = (cw - draw_w) // 2
+    y0 = (ch - draw_h) // 2
+    return x0, y0, draw_w, draw_h, float(s)
+
+
 def transform_from_drawn_bbox(
     *,
     x0: int,

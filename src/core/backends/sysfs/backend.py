@@ -48,6 +48,7 @@ def _is_candidate_led(name: str) -> bool:
         or "keyboard" in n
         or "rgb:kbd" in n  # Tuxedo/Clevo multicolor
         or "tuxedo::kbd" in n  # Tuxedo WMI
+        or "clevo::kbd" in n  # Clevo WMI
         or "ite_8291_lb" in n  # ITE lightbar
         or "hp_omen::kbd" in n  # HP Omen
         or "dell::kbd" in n  # Dell
@@ -154,6 +155,16 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         color_path = self.led_dir / "color"
         return color_path.exists()
 
+    def _get_system76_color_paths(self) -> list[Path]:
+        """Return list of writable System76 color paths if present"""
+        paths = []
+        # System76 ACPI driver often exposes these for multi-zone RGB
+        for name in ("color_left", "color_center", "color_right", "color_extra"):
+            p = self.led_dir / name
+            if p.exists():
+                paths.append(p)
+        return paths
+
     def set_color(self, color, *, brightness: int):
         """Enhanced color setting with multi_intensity and color attribute support"""
         # Try multi_intensity first (Tuxedo/Clevo)
@@ -173,6 +184,16 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
             self.set_brightness(brightness)
             return
 
+        # Try System76 color paths
+        s76_paths = self._get_system76_color_paths()
+        if s76_paths:
+            r, g, b = color
+            hex_color = f"{r:02X}{g:02X}{b:02X}"
+            for p in s76_paths:
+                _safe_write_text(p, f"{hex_color}\n")
+            self.set_brightness(brightness)
+            return
+
         # Fallback: brightness-only
         self.set_brightness(brightness)
 
@@ -188,7 +209,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
 @dataclass
 class SysfsLedsBackend(KeyboardBackend):
     name: str = "sysfs-leds"
-    priority: int = 80
+    priority: int = 150
 
     def _find_led(self) -> Optional[tuple[Path, Path, Path]]:
         root = _leds_root()

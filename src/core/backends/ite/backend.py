@@ -58,6 +58,11 @@ class Ite8291r3Backend(KeyboardBackend):
         - tries to detect a known USB VID/PID without opening the device
         """
 
+        # If a safer kernel driver is available (Sysfs backend), we should have
+        # been preempted by priority. If we are running, it means no kernel
+        # driver was found.
+        # We could log a suggestion here, but for now we just proceed.
+
         try:
             ite8291r3 = self._import()
         except Exception as exc:

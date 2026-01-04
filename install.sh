@@ -61,6 +61,7 @@ KEYRGB_INSTALL_INPUT_UDEV="${KEYRGB_INSTALL_INPUT_UDEV:-}"
 
 STATE_DIR="$HOME/.local/share/keyrgb"
 TCC_MARKER="$STATE_DIR/tcc-installed-by-keyrgb"
+KERNEL_DRIVERS_MARKER="$STATE_DIR/kernel-drivers-installed-by-keyrgb"
 
 while [ "$#" -gt 0 ]; do
         case "$1" in
@@ -186,6 +187,7 @@ fi
 INSTALL_TUXEDO="n"
 INSTALL_TCC_APP="n"
 INSTALL_POWER_HELPER="y"
+INSTALL_KERNEL_DRIVERS="n"
 
 ask_yes_no() {
     local prompt="$1"
@@ -305,6 +307,26 @@ fi
 
 if [ "$INSTALL_TCC_APP" = "y" ]; then
     echo "✓ Tuxedo Control Center will be installed via dnf (best-effort)"
+fi
+
+# Optional: Kernel drivers for better hardware support
+if [ "${KEYRGB_INSTALL_KERNEL_DRIVERS:-}" != "" ]; then
+    KEYRGB_INSTALL_KERNEL_DRIVERS="$(ask_yes_no "" "n" "KEYRGB_INSTALL_KERNEL_DRIVERS")"
+elif [ -t 0 ]; then
+    echo
+    echo "Kernel Drivers (Advanced):"
+    echo "KeyRGB works best with kernel-level drivers for Clevo/Tuxedo laptops."
+    echo "These provide safer and more reliable keyboard control than the USB fallback."
+    KEYRGB_INSTALL_KERNEL_DRIVERS="$(ask_yes_no "Install/Update kernel drivers (tuxedo-drivers, clevo-xsm-wmi) if available?" "n")"
+else
+    KEYRGB_INSTALL_KERNEL_DRIVERS="n"
+fi
+
+if [ "${KEYRGB_INSTALL_KERNEL_DRIVERS,,}" = "y" ]; then
+    INSTALL_KERNEL_DRIVERS="y"
+    echo "✓ Kernel drivers will be installed (best-effort)"
+else
+    echo "✓ Skipping kernel drivers"
 fi
 
 # Optional permissions: reactive typing keypress capture.
@@ -843,6 +865,86 @@ install_power_mode_helper() {
     fi
 }
 
+install_kernel_drivers() {
+    if [ "$INSTALL_KERNEL_DRIVERS" != "y" ]; then
+        return 0
+    fi
+
+    echo
+    echo "🔧 Installing kernel drivers (best-effort)..."
+    echo "   (This may prompt for your sudo password.)"
+
+    # Prepare marker file
+    mkdir -p "$STATE_DIR" || true
+    # We append to the marker file in case multiple runs add different things, 
+    # but we should probably clear it if we are doing a full re-install logic. 
+    # For now, let's just ensure the directory exists. 
+    # Actually, let's clear it for this run to avoid duplicates if the user re-runs install.sh
+    # But wait, if they installed one driver previously and now install another, we want both.
+    # Let's just append and handle duplicates in uninstall or just let them be.
+    # Better: clear it if we are about to try installing.
+    # But if we fail to install one, we don't want to lose the record of the other?
+    # Let's just append. `sort -u` in uninstall could handle it.
+    
+    if command -v dnf &> /dev/null; then
+        # Fedora
+        echo "   Detected Fedora (dnf)."
+        # Try to install tuxedo-drivers. It might be in a COPR or standard repo depending on setup.
+        # We can try to install it.
+        set +e
+        if sudo dnf install -y tuxedo-drivers; then
+            echo "✓ Installed tuxedo-drivers"
+            echo "tuxedo-drivers" >> "$KERNEL_DRIVERS_MARKER"
+        else
+            echo "⚠️  Could not install 'tuxedo-drivers' via dnf."
+            echo "   You may need to enable a COPR repository first."
+            echo "   See: https://github.com/tuxedocomputers/tuxedo-drivers"
+        fi
+        
+        # clevo-xsm-wmi is usually not in standard repos.
+        if sudo dnf install -y clevo-xsm-wmi; then
+             echo "✓ Installed clevo-xsm-wmi"
+             echo "clevo-xsm-wmi" >> "$KERNEL_DRIVERS_MARKER"
+        else
+             echo "ℹ️  'clevo-xsm-wmi' package not found in dnf repos (expected)."
+        fi
+        set -e
+
+    elif command -v apt-get &> /dev/null; then
+        # Debian/Ubuntu
+        echo "   Detected Debian/Ubuntu (apt)."
+        # Tuxedo computers have their own repo.
+        set +e
+        if sudo apt-get install -y tuxedo-keyboard; then
+            echo "✓ Installed tuxedo-keyboard"
+            echo "tuxedo-keyboard" >> "$KERNEL_DRIVERS_MARKER"
+        else
+            echo "⚠️  Could not install 'tuxedo-keyboard'."
+            echo "   You may need to add the Tuxedo Computers repository."
+            echo "   See: https://www.tuxedocomputers.com/en/Infos/Help-Support/Instructions/Add-TUXEDO-Computers-software-package-sources.tuxedo"
+        fi
+        
+        # clevo-xsm-wmi
+        if sudo apt-get install -y clevo-xsm-wmi; then
+            echo "✓ Installed clevo-xsm-wmi"
+            echo "clevo-xsm-wmi" >> "$KERNEL_DRIVERS_MARKER"
+        else
+             echo "ℹ️  'clevo-xsm-wmi' package not found in apt repos."
+        fi
+        set -e
+
+    elif command -v pacman &> /dev/null; then
+        # Arch
+        echo "   Detected Arch Linux."
+        echo "⚠️  Arch Linux detected. Please install drivers via AUR:"
+        echo "   - tuxedo-drivers-dkms"
+        echo "   - clevo-xsm-wmi-dkms"
+        echo "   (KeyRGB installer does not handle AUR packages automatically.)"
+    else
+        echo "⚠️  Unknown package manager. Please install 'tuxedo-drivers' or 'clevo-xsm-wmi' manually."
+    fi
+}
+
 if [ "$MODE" = "pip" ]; then
     # Install ite8291r3-ctl library (upstream + tiny local patch for Wootbook 0x600B)
     echo
@@ -932,6 +1034,7 @@ fi
 install_udev_rule
 install_input_udev_rule
 install_power_mode_helper
+install_kernel_drivers
 
 # Many distros don't include ~/.local/bin on PATH by default.
 USER_BIN="$HOME/.local/bin"

@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import webbrowser
 from importlib import metadata
-from threading import Thread
 from typing import Callable
 from urllib.request import Request, urlopen
 
@@ -11,6 +10,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from src.core.version_check import compare_versions, normalize_version_text
+from src.gui.tk_async import run_in_thread
 
 
 class VersionPanel:
@@ -70,11 +70,14 @@ class VersionPanel:
         self.start_latest_version_check()
 
     def start_latest_version_check(self) -> None:
-        def worker() -> None:
-            stable, prerelease = self._fetch_latest_github_versions()
-            self._root.after(0, lambda: self._apply_latest_version_result(stable, prerelease))
+        def work() -> tuple[str | None, str | None]:
+            return self._fetch_latest_github_versions()
 
-        Thread(target=worker, daemon=True).start()
+        def on_done(result: tuple[str | None, str | None]) -> None:
+            stable, prerelease = result
+            self._apply_latest_version_result(stable, prerelease)
+
+        run_in_thread(self._root, work, on_done)
 
     def _installed_version_text(self) -> str:
         try:

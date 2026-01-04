@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
@@ -11,9 +10,8 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 
 from src.core.config import Config
-from src.core.profile import profiles
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
-from .geometry import calc_transform, hit_test, key_canvas_bbox
+from .geometry import hit_test, key_canvas_bbox
 from .probe import CalibrationProbeState
 from src.gui.profile_backdrop_storage import load_backdrop_image, reset_backdrop_image, save_backdrop_image
 from .keyboard_preview import KeyboardPreviewSession
@@ -28,6 +26,12 @@ from .profile_storage import (
 
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
+from src.gui.key_draw_style import key_draw_style
+from src.gui.reference_overlay_geometry import (
+    CanvasTransform,
+    calc_centered_drawn_bbox,
+    transform_from_drawn_bbox,
+)
 
 
 MATRIX_ROWS = 6
@@ -39,42 +43,9 @@ def _keymap_path() -> Path:
     return keymap_path(get_active_profile_name())
 
 
-def _layout_tweaks_path() -> Path:
-    # Store overlay alignment tweaks per active profile.
-    return profiles.paths_for(get_active_profile_name()).layout_global
-
-
-def _load_layout_tweaks() -> Dict[str, float]:
-    # Use shared loader which already provides sensible defaults.
-    return load_layout_global(get_active_profile_name())
-
-
-def _load_keymap() -> Dict[str, Tuple[int, int]]:
-    # Delegate to profiles module so defaults are respected and loading logic is shared.
-    return load_keymap(get_active_profile_name())
-
-
 def _save_keymap(keymap: Dict[str, Tuple[int, int]]) -> None:
     # Use shared saver to keep behavior consistent with per-key UI.
     save_keymap(get_active_profile_name(), keymap)
-
-
-@dataclass
-class _CanvasTransform:
-    x0: float
-    y0: float
-    sx: float
-    sy: float
-
-    def to_canvas(self, rect: Tuple[int, int, int, int]) -> Tuple[float, float, float, float]:
-        x, y, w, h = rect
-        x1 = self.x0 + x * self.sx
-        y1 = self.y0 + y * self.sy
-        x2 = self.x0 + (x + w) * self.sx
-        y2 = self.y0 + (y + h) * self.sy
-        return x1, y1, x2, y2
-
-
 class KeymapCalibrator(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -96,7 +67,7 @@ class KeymapCalibrator(tk.Tk):
 
         self._deck_pil: Optional[Image.Image] = None
         self._deck_tk: Optional[ImageTk.PhotoImage] = None
-        self._transform: Optional[_CanvasTransform] = None
+        self._transform: Optional[CanvasTransform] = None
 
         self.columnconfigure(0, weight=1)
         self.rowconfigure(0, weight=1)
@@ -252,25 +223,18 @@ class KeymapCalibrator(tk.Tk):
         self._restore_original_config()
         self.destroy()
 
-    def _calc_transform(self) -> _CanvasTransform:
-        t = calc_transform(
-            canvas_w=max(1, self.canvas.winfo_width()),
-            canvas_h=max(1, self.canvas.winfo_height()),
-            image_size=BASE_IMAGE_SIZE,
-        )
-        return _CanvasTransform(x0=t.x0, y0=t.y0, sx=t.sx, sy=t.sy)
-
     def _redraw(self) -> None:
         self.canvas.delete("all")
-        self._transform = self._calc_transform()
+
+        cw = max(1, int(self.canvas.winfo_width()))
+        ch = max(1, int(self.canvas.winfo_height()))
+        x0, y0, dw, dh, _scale = calc_centered_drawn_bbox(canvas_w=cw, canvas_h=ch, image_size=BASE_IMAGE_SIZE)
+        self._transform = transform_from_drawn_bbox(x0=x0, y0=y0, draw_w=dw, draw_h=dh, image_size=BASE_IMAGE_SIZE)
 
         if self._deck_pil is not None:
-            # Resize deck image to current scale
-            s = self._transform.sx
-            iw, ih = BASE_IMAGE_SIZE
-            resized = self._deck_pil.resize((int(iw * s), int(ih * s)), Image.Resampling.LANCZOS)
+            resized = self._deck_pil.resize((dw, dh), Image.Resampling.LANCZOS)
             self._deck_tk = ImageTk.PhotoImage(resized)
-            self.canvas.create_image(self._transform.x0, self._transform.y0, anchor="nw", image=self._deck_tk)
+            self.canvas.create_image(x0, y0, anchor="nw", image=self._deck_tk)
 
         # Draw key rectangles (similar styling to the per-key editor)
         for key in REFERENCE_DEVICE_KEYS:
@@ -284,39 +248,25 @@ class KeymapCalibrator(tk.Tk):
             mapped = self.keymap.get(key.key_id)
             selected = self.probe.selected_key_id == key.key_id
 
-            if mapped is None:
-                fill = ""
-                stipple = ""
-                text_fill = "#cfcfcf"
-                outline = "#8a8a8a"
-                dash = (3,)
-            else:
-                fill = "#000000"
-                stipple = "gray75"
-                text_fill = "#e0e0e0"
-                outline = "#777777"
-                dash = ()
-
-            if selected:
-                outline = "#00ffff"
+            style = key_draw_style(mapped=mapped is not None, selected=selected)
 
             self.canvas.create_rectangle(
                 x1,
                 y1,
                 x2,
                 y2,
-                outline=outline,
-                width=3 if selected else 2,
-                fill=fill,
-                stipple=stipple,
-                dash=dash,
+                outline=style.outline,
+                width=style.width,
+                fill=style.fill,
+                stipple=style.stipple,
+                dash=style.dash,
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )
             self.canvas.create_text(
                 (x1 + x2) / 2,
                 (y1 + y2) / 2,
                 text=key.label,
-                fill=text_fill,
+                fill=style.text_fill,
                 font=("TkDefaultFont", 9),
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )

@@ -13,7 +13,6 @@ Settings are persisted in the shared `~/.config/keyrgb/config.json` via
 
 from __future__ import annotations
 
-from threading import Thread
 import tkinter as tk
 from tkinter import ttk
 
@@ -28,11 +27,13 @@ from .scrollable_area import ScrollableArea
 from .panels.version_panel import VersionPanel
 from .window_geometry import compute_centered_window_geometry
 from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
+from .hardware_hint import extract_unsupported_rgb_controllers_hint
 
 from src.core.config import Config
 
 from src.gui.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_dark_theme
+from src.gui.tk_async import run_in_thread
 
 
 class PowerSettingsGUI:
@@ -65,55 +66,24 @@ class PowerSettingsGUI:
         show a clear hint to help users file actionable reports.
         """
 
-        def extract_hint(backends_snapshot: dict) -> str:
-            probes = backends_snapshot.get("probes")
-            if not isinstance(probes, list):
-                return ""
-
-            unsupported: list[str] = []
-            for p in probes:
-                if not isinstance(p, dict):
-                    continue
-                reason = str(p.get("reason") or "")
-                ids = p.get("identifiers")
-                if not isinstance(ids, dict):
-                    continue
-
-                vid = ids.get("usb_vid")
-                pid = ids.get("usb_pid")
-                if not (isinstance(vid, str) and isinstance(pid, str)):
-                    continue
-
-                if "unsupported by ite8291r3 backend" in reason.lower():
-                    unsupported.append(f"{vid}:{pid}")
-
-            if not unsupported:
-                return ""
-
-            joined = ", ".join(unsupported)
-            return f"Detected unsupported RGB controller(s): {joined} (Tier 3 / Fusion 2)."
-
-        def worker() -> None:
-            text = ""
+        def work() -> str:
             try:
                 from src.core.diagnostics.collectors_backends import backend_probe_snapshot
 
                 snap = backend_probe_snapshot()
-                text = extract_hint(snap)
+                return extract_unsupported_rgb_controllers_hint(snap)
             except Exception:
-                text = ""
+                return ""
 
-            def apply() -> None:
-                try:
-                    # Only show the footer hint when we have something actionable.
-                    self.bottom_bar_panel.set_hardware_hint(text)
-                except Exception:
-                    pass
-
-            self.root.after(0, apply)
+        def on_done(text: str) -> None:
+            try:
+                # Only show the footer hint when we have something actionable.
+                self.bottom_bar_panel.set_hardware_hint(text)
+            except Exception:
+                pass
 
         # Defer slightly so the window paints immediately.
-        self.root.after(100, lambda: Thread(target=worker, daemon=True).start())
+        run_in_thread(self.root, work, on_done, delay_ms=100)
 
     def _init_layout(self, *, bg_color: str) -> None:
         outer = ttk.Frame(self.root)

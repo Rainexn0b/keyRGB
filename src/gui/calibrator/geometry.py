@@ -3,17 +3,7 @@ from __future__ import annotations
 from typing import Dict, Iterable, Optional, Tuple
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
-from src.gui.reference_overlay_geometry import CanvasTransform, calc_centered_transform, key_canvas_bbox_inset
-from src.gui import reference_overlay_geometry
-
-
-def calc_transform(
-    *,
-    canvas_w: int,
-    canvas_h: int,
-    image_size: tuple[int, int] = BASE_IMAGE_SIZE,
-) -> CanvasTransform:
-    return calc_centered_transform(canvas_w=canvas_w, canvas_h=canvas_h, image_size=image_size)
+from src.gui.reference_overlay_geometry import CanvasTransform, hit_test as _hit_test, key_canvas_bbox_inset
 
 
 def key_canvas_bbox(
@@ -45,7 +35,8 @@ def hit_test(
     keys: Iterable[KeyDef] = REFERENCE_DEVICE_KEYS,
     image_size: tuple[int, int] = BASE_IMAGE_SIZE,
 ) -> Optional[KeyDef]:
-    return reference_overlay_geometry.hit_test(
+    # Calibrator expects inset to be fractional and clamped.
+    return _hit_test(
         transform=transform,
         x=x,
         y=y,

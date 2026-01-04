@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.core.resources.layout import BASE_IMAGE_SIZE
-
 
 @dataclass
 class _OverlayDragContext:
@@ -40,37 +38,26 @@ class OverlayDragController:
         if e.overlay_scope.get() != "key":
             self._ctx = None
             return
-        if not e.selected_key_id or c._deck_drawn_bbox is None:
+        if not e.selected_key_id or c._canvas_transform() is None:
             self._ctx = None
             return
 
         cx = float(event.x)
         cy = float(event.y)
 
-        edges = c._resize_edges_for_point(e.selected_key_id, cx, cy)
-        if edges:
-            if not c._point_near_key_bbox(e.selected_key_id, cx, cy, pad=6.0):
-                self._ctx = None
-                return
-        else:
-            kid = c._hit_test_key_id(cx, cy)
-            if kid != e.selected_key_id:
-                self._ctx = None
-                return
+        press = c._overlay_press_mode(selected_key_id=e.selected_key_id, cx=cx, cy=cy, pad=6.0)
+        if press is None:
+            self._ctx = None
+            return
+        mode, edges = press
 
         kt = e.per_key_layout_tweaks.get(e.selected_key_id, {})
 
-        mode = "resize" if edges else "move"
-
-        base_rect = c._key_rect_base_after_global(e.selected_key_id)
-        if base_rect is None:
+        geom = c._overlay_drag_geometry(e.selected_key_id)
+        if geom is None:
             self._ctx = None
             return
-        gx, gy, gw, gh = base_rect
-
-        x2, y2, w2, h2, _inset = c._apply_per_key_tweak(e.selected_key_id, gx, gy, gw, gh)
-        l0, r0 = x2, x2 + w2
-        t0, b0 = y2, y2 + h2
+        gx, gy, gw, gh, l0, r0, t0, b0 = geom
 
         self._ctx = _OverlayDragContext(
             kid=e.selected_key_id,
@@ -96,17 +83,19 @@ class OverlayDragController:
         c = self._canvas
         e = c.editor
 
-        if self._ctx is None or c._deck_drawn_bbox is None:
+        if self._ctx is None:
+            return
+
+        t = c._canvas_transform()
+        if t is None:
             return
 
         kid = self._ctx.kid
         if not kid:
             return
 
-        x0, y0, dw, dh = c._deck_drawn_bbox
-        iw, ih = BASE_IMAGE_SIZE
-        csx = dw / max(1, iw)
-        csy = dh / max(1, ih)
+        csx = float(t.sx)
+        csy = float(t.sy)
         if csx <= 0 or csy <= 0:
             return
 

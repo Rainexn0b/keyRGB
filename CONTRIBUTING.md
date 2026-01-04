@@ -4,7 +4,7 @@ Thanks for your interest in contributing.
 
 ## What this project is
 
-KeyRGB targets laptop keyboards driven by ITE 8291 / ITE8291R3-style controllers on Linux. The goal is a practical tray app + per-key editor with a calibration-based key mapping workflow.
+KeyRGB targets laptop keyboards on Linux. It prioritizes safe kernel interfaces (Clevo, Tuxedo, System76) while providing a robust userspace fallback for ITE 8291 controllers (Tongfang). The goal is a practical tray app + per-key editor with a calibration-based key mapping workflow.
 
 ## Development setup
 

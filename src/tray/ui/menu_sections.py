@@ -85,6 +85,13 @@ def keyboard_status_text(tray: Any) -> str:
     backend = getattr(tray, "backend", None)
     backend_name = str(getattr(backend, "name", "unknown"))
 
+    # Friendly names for backends
+    display_name = backend_name
+    if backend_name == "sysfs-leds":
+        display_name = "Kernel Driver"
+    elif backend_name == "ite8291r3":
+        display_name = "ITE 8291 (USB)"
+
     probe = getattr(tray, "backend_probe", None)
     identifiers = getattr(probe, "identifiers", None) if probe is not None else None
     identifiers = dict(identifiers or {})
@@ -95,14 +102,18 @@ def keyboard_status_text(tray: Any) -> str:
         vid = _format_hex_id(usb_vid)
         pid = _format_hex_id(usb_pid)
         if vid and pid:
-            return f"Keyboard: {backend_name} ({vid}:{pid})"
+            return f"Keyboard: {display_name} ({vid}:{pid})"
 
     # Sysfs backend: show which LED file is being used.
+    led_name = identifiers.get("led")
+    if led_name:
+        return f"Keyboard: {display_name} ({led_name})"
+
     brightness_path = identifiers.get("brightness")
     if brightness_path:
-        return f"Keyboard: {backend_name} ({brightness_path})"
+        return f"Keyboard: {display_name} ({brightness_path})"
 
-    return f"Keyboard: {backend_name}"
+    return f"Keyboard: {display_name}"
 
 
 def probe_device_available(tray: Any) -> bool:

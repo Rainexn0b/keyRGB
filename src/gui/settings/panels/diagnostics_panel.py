@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import webbrowser
-from threading import Thread
 from typing import Callable
 
 import tkinter as tk
@@ -9,6 +8,7 @@ from tkinter import scrolledtext
 from tkinter import ttk
 
 from ..diagnostics_runner import collect_diagnostics_text
+from src.gui.tk_async import run_in_thread
 
 
 class DiagnosticsPanel:
@@ -92,29 +92,27 @@ class DiagnosticsPanel:
         self.btn_run_diagnostics.configure(state="disabled")
         self.btn_copy_diagnostics.configure(state="disabled")
 
-        def worker() -> None:
+        def work() -> str:
             try:
-                text = collect_diagnostics_text(include_usb=True)
+                return collect_diagnostics_text(include_usb=True)
             except Exception as e:
-                text = f"Failed to collect diagnostics: {e}"
+                return f"Failed to collect diagnostics: {e}"
 
-            def on_done() -> None:
-                self._diagnostics_json = text if text.strip().startswith("{") else ""
-                self._set_text(text)
-                self.btn_run_diagnostics.configure(state="normal")
-                self.apply_state()
+        def on_done(text: str) -> None:
+            self._diagnostics_json = text if text.strip().startswith("{") else ""
+            self._set_text(text)
+            self.btn_run_diagnostics.configure(state="normal")
+            self.apply_state()
 
-                status2 = self._status()
-                if status2 is not None:
-                    if '"warnings"' in text:
-                        status2.configure(text="⚠ Diagnostics ready (warnings)")
-                    else:
-                        status2.configure(text="✓ Diagnostics ready")
-                    self._root.after(2000, lambda: status2.configure(text=""))
+            status2 = self._status()
+            if status2 is not None:
+                if '"warnings"' in text:
+                    status2.configure(text="⚠ Diagnostics ready (warnings)")
+                else:
+                    status2.configure(text="✓ Diagnostics ready")
+                self._root.after(2000, lambda: status2.configure(text=""))
 
-            self._root.after(0, on_done)
-
-        Thread(target=worker, daemon=True).start()
+        run_in_thread(self._root, work, on_done)
 
     def copy_output(self) -> None:
         status = self._status()

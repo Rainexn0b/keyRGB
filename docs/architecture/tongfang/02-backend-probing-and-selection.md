@@ -39,15 +39,17 @@ ProbeResult {
 
 This makes selection explainable and easier to debug.
 
-## Auto-selection algorithm (recommended)
+## Auto-selection algorithm (Implemented)
 
 1. Build a list of backends (registry).
 2. For each backend:
    - run probe
    - keep only `available=True`
 3. Choose winner by:
-   - highest `confidence`, then
-   - highest `priority`
+   - highest `priority` (e.g. Sysfs=150 > ITE=100)
+   - (tie-breaker: highest `confidence`)
+
+This ensures that if a kernel driver is present (Sysfs), it takes precedence over the userspace driver (ITE), avoiding conflicts and using the safer interface.
 
 ## Env override behavior
 

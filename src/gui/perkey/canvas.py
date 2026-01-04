@@ -10,12 +10,15 @@ from src.core.logging_utils import log_throttled
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 from src.gui.reference_deck_image import load_reference_deck_image
 from src.gui.reference_overlay_geometry import (
+    CanvasTransform,
     apply_global_tweak,
     apply_per_key_tweak,
+    calc_centered_drawn_bbox,
     inset_bbox,
     key_canvas_rect,
     transform_from_drawn_bbox,
 )
+from src.gui.key_draw_style import key_draw_style
 
 from .canvas_hit_testing import (
     cursor_for_edges,
@@ -31,6 +34,9 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+
+KEYDEF_BY_ID: dict[str, KeyDef] = {k.key_id: k for k in REFERENCE_DEVICE_KEYS}
 
 
 class KeyboardCanvas(tk.Canvas):
@@ -72,14 +78,18 @@ class KeyboardCanvas(tk.Canvas):
         self.key_rects = {}
         self.key_texts = {}
 
-        if self._deck_drawn_bbox is None:
+        t = self._canvas_transform()
+        if t is None:
             return
 
         for key in REFERENCE_DEVICE_KEYS:
-            rect = self._key_rect_canvas(key)
-            if rect is None:
-                return
-            x1, y1, x2, y2, inset_value = rect
+            x1, y1, x2, y2, inset_value = key_canvas_rect(
+                transform=t,
+                key=key,
+                layout_tweaks=self.editor.layout_tweaks,
+                per_key_layout_tweaks=self.editor.per_key_layout_tweaks,
+                image_size=BASE_IMAGE_SIZE,
+            )
 
             inset = self._inset_pixels(x2 - x1, y2 - y1, inset_value)
             x1 += inset
@@ -87,33 +97,21 @@ class KeyboardCanvas(tk.Canvas):
             x2 -= inset
             y2 -= inset
 
-            mapped = self.editor.keymap.get(key.key_id)
-            color = self.editor.colors.get(mapped) if mapped else None
-            if color is None:
-                fill = "" if mapped is None else "#000000"
-                stipple = "" if mapped is None else "gray75"
-                text_fill = "#cfcfcf" if mapped is None else "#e0e0e0"
-            else:
-                r, g, b = color
-                fill = f"#{r:02x}{g:02x}{b:02x}"
-                brightness = (r * 299 + g * 587 + b * 114) / 1000
-                text_fill = "#000000" if brightness > 128 else "#ffffff"
-                stipple = "gray50"
-
-            outline = "#00ffff" if self.editor.selected_key_id == key.key_id else ("#777777" if mapped else "#8a8a8a")
-            width = 3 if self.editor.selected_key_id == key.key_id else 2
-            dash = () if mapped else (3,)
+            mapped_cell = self.editor.keymap.get(key.key_id)
+            mapped = mapped_cell is not None
+            color = self.editor.colors.get(mapped_cell) if mapped_cell is not None else None
+            style = key_draw_style(mapped=mapped, selected=self.editor.selected_key_id == key.key_id, color=color)
 
             rect_id = self.create_rectangle(
                 x1,
                 y1,
                 x2,
                 y2,
-                fill=fill,
-                stipple=stipple,
-                outline=outline,
-                width=width,
-                dash=dash,
+                fill=style.fill,
+                stipple=style.stipple,
+                outline=style.outline,
+                width=style.width,
+                dash=style.dash,
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )
             self.key_rects[key.key_id] = rect_id
@@ -125,7 +123,7 @@ class KeyboardCanvas(tk.Canvas):
                 (x1 + x2) / 2,
                 (y1 + y2) / 2,
                 text=key.label,
-                fill=text_fill,
+                fill=style.text_fill,
                 font=("TkDefaultFont", font_size),
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )
@@ -145,13 +143,11 @@ class KeyboardCanvas(tk.Canvas):
         cw = max(1, int(self.winfo_width()))
         ch = max(1, int(self.winfo_height()))
 
-        iw, ih = self._deck_img.size
-        scale = min(cw / iw, ch / ih)
-        dw = max(1, int(iw * scale))
-        dh = max(1, int(ih * scale))
-
-        x0 = (cw - dw) // 2
-        y0 = (ch - dh) // 2
+        x0, y0, dw, dh, _scale = calc_centered_drawn_bbox(
+            canvas_w=cw,
+            canvas_h=ch,
+            image_size=self._deck_img.size,
+        )
 
         resized = self._deck_img.resize((dw, dh), Image.Resampling.LANCZOS)
 
@@ -221,11 +217,9 @@ class KeyboardCanvas(tk.Canvas):
         )
 
     def _key_rect_canvas(self, key: KeyDef) -> tuple[float, float, float, float, float] | None:
-        if self._deck_drawn_bbox is None:
+        t = self._canvas_transform()
+        if t is None:
             return None
-
-        x0, y0, dw, dh = self._deck_drawn_bbox
-        t = transform_from_drawn_bbox(x0=x0, y0=y0, draw_w=dw, draw_h=dh, image_size=BASE_IMAGE_SIZE)
         x1, y1, x2, y2, inset_value = key_canvas_rect(
             transform=t,
             key=key,
@@ -234,6 +228,12 @@ class KeyboardCanvas(tk.Canvas):
             image_size=BASE_IMAGE_SIZE,
         )
         return x1, y1, x2, y2, inset_value
+
+    def _canvas_transform(self) -> CanvasTransform | None:
+        if self._deck_drawn_bbox is None:
+            return None
+        x0, y0, dw, dh = self._deck_drawn_bbox
+        return transform_from_drawn_bbox(x0=x0, y0=y0, draw_w=dw, draw_h=dh, image_size=BASE_IMAGE_SIZE)
 
     def _on_motion(self, event):
         # Cursor affordances for overlay move/resize.
@@ -277,7 +277,7 @@ class KeyboardCanvas(tk.Canvas):
             )
 
     def _keydef_by_id(self, key_id: str) -> KeyDef | None:
-        return next((k for k in REFERENCE_DEVICE_KEYS if k.key_id == key_id), None)
+        return KEYDEF_BY_ID.get(key_id)
 
     def _resize_edges_for_point(self, key_id: str, cx: float, cy: float) -> str:
         kd = self._keydef_by_id(key_id)
@@ -328,15 +328,60 @@ class KeyboardCanvas(tk.Canvas):
         inset = self._inset_pixels(x2 - x1, y2 - y1, inset_value)
         return (x1 + inset, y1 + inset, x2 - inset, y2 - inset)
 
+    def _overlay_drag_geometry(self, key_id: str) -> tuple[float, float, float, float, float, float, float, float] | None:
+        """Return (gx, gy, gw, gh, l0, r0, t0, b0) for the selected key overlay.
+
+        gx/gy/gw/gh is the base rect after global tweak. l0/r0/t0/b0 is the per-key
+        tweaked rect bounds in base-image coordinates.
+        """
+
+        base_rect = self._key_rect_base_after_global(key_id)
+        if base_rect is None:
+            return None
+        gx, gy, gw, gh = base_rect
+
+        x2, y2, w2, h2, _inset = self._apply_per_key_tweak(key_id, gx, gy, gw, gh)
+        l0, r0 = x2, x2 + w2
+        t0, b0 = y2, y2 + h2
+        return float(gx), float(gy), float(gw), float(gh), float(l0), float(r0), float(t0), float(b0)
+
     def _hit_test_key_id(self, cx: float, cy: float) -> str | None:
+        t = self._canvas_transform()
+        if t is None:
+            return None
         for kd in REFERENCE_DEVICE_KEYS:
-            bbox = self._key_bbox_canvas(kd)
-            if bbox is None:
-                return None
-            x1, y1, x2, y2 = bbox
+            x1, y1, x2, y2, inset_value = key_canvas_rect(
+                transform=t,
+                key=kd,
+                layout_tweaks=self.editor.layout_tweaks,
+                per_key_layout_tweaks=self.editor.per_key_layout_tweaks,
+                image_size=BASE_IMAGE_SIZE,
+            )
+            inset = self._inset_pixels(x2 - x1, y2 - y1, inset_value)
+            x1, y1, x2, y2 = (x1 + inset, y1 + inset, x2 - inset, y2 - inset)
             if point_in_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy):
                 return kd.key_id
         return None
+
+    def _overlay_press_mode(self, *, selected_key_id: str, cx: float, cy: float, pad: float = 6.0) -> tuple[str, str] | None:
+        """Return (mode, edges) for an overlay press, or None if not applicable.
+
+        Mode is either "move" or "resize". Edges is a subset of "lrtb".
+        """
+
+        if not selected_key_id:
+            return None
+
+        edges = self._resize_edges_for_point(selected_key_id, cx, cy)
+        if edges:
+            if not self._point_near_key_bbox(selected_key_id, cx, cy, pad=float(pad)):
+                return None
+            return "resize", edges
+
+        kid = self._hit_test_key_id(cx, cy)
+        if kid != selected_key_id:
+            return None
+        return "move", ""
 
     def _on_click(self, event):
         try:

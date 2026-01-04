@@ -18,9 +18,11 @@ Probe for candidate sysfs nodes:
 
 Some naming patterns seen in the wild (kernel/driver dependent):
 
-- `/sys/class/leds/tuxedo::kbd_backlight/`
-- `/sys/class/leds/white:kbd_backlight/`
-- `/sys/class/leds/ite_8291_lb:kbd_backlight/`
+- `/sys/class/leds/tuxedo::kbd_backlight/` (Tuxedo)
+- `/sys/class/leds/clevo::kbd_backlight/` (Clevo)
+- `/sys/class/leds/system76_acpi::kbd_backlight/` (System76)
+- `/sys/class/leds/white:kbd_backlight/` (Generic)
+- `/sys/class/leds/ite_8291_lb:kbd_backlight/` (ITE Lightbar)
 
 - Known Tongfang patterns if discovered (document per model)
 
@@ -41,7 +43,7 @@ The tray should still support:
 
 - off/on
 - brightness
-- uniform color *only if RGB is exposed* (many sysfs keyboard backlights are white-only)
+- uniform color *if RGB is exposed* (supported on Clevo, Tuxedo, System76 via `multi_intensity`, `color`, or `color_*` attributes)
 
 ## Device API mapping
 

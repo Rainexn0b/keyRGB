@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from src.core.config import Config
+from src.core.resources.defaults import DEFAULT_LAYOUT_TWEAKS
 from src.core.resources.layout import REFERENCE_DEVICE_KEYS
 from src.core.profile import profiles
 from src.gui.window_icon import apply_keyrgb_window_icon
@@ -21,6 +22,7 @@ from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
 from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
+from .color_utils import initial_last_non_black_color, rgb_ints
 
 from .ui.profile_actions import activate_profile_ui, delete_profile_ui, new_profile_ui, save_profile_ui
 from .ui.calibrator import run_keymap_calibrator_ui
@@ -86,14 +88,7 @@ class PerKeyEditor:
         self._backdrop_transparency_save_job: str | None = None
         self._backdrop_transparency_redraw_job: str | None = None
 
-        base_color = (
-            tuple(self.config.color)
-            if isinstance(self.config.color, (list, tuple)) and len(self.config.color) == 3
-            else (255, 0, 0)
-        )
-        self._last_non_black_color: tuple[int, int, int] = (
-            (int(base_color[0]), int(base_color[1]), int(base_color[2])) if base_color != (0, 0, 0) else (255, 0, 0)
-        )
+        self._last_non_black_color = initial_last_non_black_color(self.config.color)
 
         # Prefer profile-stored per-key colors over whatever happens to be in
         # config.json (e.g., the calibrator probe state).
@@ -227,7 +222,7 @@ class PerKeyEditor:
             set_status(self, reset_overlay_tweaks_for_key(self.selected_key_id))
             return
 
-        self.layout_tweaks = {"dx": 0.0, "dy": 0.0, "sx": 1.0, "sy": 1.0, "inset": 0.06}
+        self.layout_tweaks = dict(DEFAULT_LAYOUT_TWEAKS)
         self.overlay_controls.sync_vars_from_scope()
         self.canvas.redraw()
         set_status(self, reset_overlay_tweaks_global())
@@ -260,8 +255,8 @@ class PerKeyEditor:
             config=self.config,
             num_rows=NUM_ROWS,
             num_cols=NUM_COLS,
-            base_color=(int(base[0]), int(base[1]), int(base[2])),
-            fallback_color=(int(fallback[0]), int(fallback[1]), int(fallback[2])),
+            base_color=rgb_ints(base),
+            fallback_color=rgb_ints(fallback),
             push_fn=push_per_key_colors,
             force=bool(force),
         )
