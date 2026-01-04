@@ -62,6 +62,16 @@ def on_uniform_gui_clicked() -> None:
     launch_uniform_gui()
 
 
+def on_hardware_color_clicked(tray: Any) -> None:
+    """Switch to hardware uniform mode, then open the uniform color GUI."""
+
+    apply_effect_selection(tray, effect_name="hw_uniform")
+    if hasattr(tray, "_refresh_ui"):
+        tray._refresh_ui()
+
+    launch_uniform_gui()
+
+
 def on_power_settings_clicked() -> None:
     launch_power_gui()
 

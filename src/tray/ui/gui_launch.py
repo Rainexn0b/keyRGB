@@ -17,10 +17,7 @@ def launch_perkey_gui() -> None:
     """Launch the per-key editor GUI as a subprocess."""
 
     parent_path = _repo_root_dir()
-    try:
-        subprocess.Popen([sys.executable, "-m", "src.gui.perkey"], cwd=parent_path)
-    except FileNotFoundError:
-        subprocess.Popen([sys.executable, "-m", "src.gui_perkey_legacy"], cwd=parent_path)
+    subprocess.Popen([sys.executable, "-m", "src.gui.perkey"], cwd=parent_path)
 
 
 def launch_uniform_gui() -> None:

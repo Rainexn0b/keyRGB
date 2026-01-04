@@ -44,8 +44,7 @@ def load_config_settings(
                 loaded["effect"] = "none"
             elif legacy_effect in {"breathing_sw", "fire", "random", "rain"}:
                 loaded["effect"] = "none"
-            elif legacy_effect in {"perkey_breathing", "perkey_pulse"}:
-                loaded["effect"] = "perkey"
+
 
             if "return_effect_after_effect" in loaded and isinstance(loaded["return_effect_after_effect"], str):
                 loaded["return_effect_after_effect"] = loaded["return_effect_after_effect"].lower()

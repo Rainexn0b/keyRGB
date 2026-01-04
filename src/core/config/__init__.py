@@ -5,8 +5,7 @@ This package groups the config manager and related helpers.
 
 Backward compatibility:
 - `from src.core.config import Config` continues to work.
-- Legacy module paths like `src.core.config_defaults` remain available via
-  thin wrappers.
+
 """
 
 from __future__ import annotations

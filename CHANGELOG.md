@@ -1,8 +1,15 @@
 # Changelog
 
+## 0.9.4 (2026-01-04)
+
+- UI: completes dark-theme styling for common ttk widgets in Settings (removes bright/white default blocks).
+- Tray: fixes HW/SW mode switching so selecting Hardware Color reliably unlocks HW effects and locks SW effects.
+- Performance: significantly speeds up uniform/per-key GUI startup by caching the color wheel as a single image and deferring heavy rendering.
+- Maintenance: removes legacy effect aliases/normalization (`reactive_snake`/`reactive_rainbow`, old per-key names) and prunes unused compatibility shims/fallbacks.
+- Docs: updates commands/effects notes to match current supported effect set.
+
 ## 0.9.3 (2026-01-04)
 
-- Effects: removes Reactive Snake; legacy `reactive_snake`/`reactive_rainbow` now normalize to `reactive_ripple` for backward compatibility.
 - Tray: tight HW vs SW mode lockdown (incompatible menu items are greyed out), and software effects can run without forcing a profile load (“loose” uniform color state).
 - Per-key editor: adds a “New profile” workflow and improves profile ergonomics.
 - Maintenance: centralizes effect catalog/labels and effect-name normalization to reduce drift between engine and tray; general cleanup + lint/format.

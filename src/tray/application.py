@@ -157,6 +157,9 @@ class KeyRGBTray:
     def _on_tuxedo_gui_clicked(self, _icon, _item):
         callbacks.on_uniform_gui_clicked()
 
+    def _on_hardware_color_clicked(self, _icon, _item):
+        callbacks.on_hardware_color_clicked(self)
+
     def _on_power_settings_clicked(self, _icon, _item):
         callbacks.on_power_settings_clicked()
 

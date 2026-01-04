@@ -80,6 +80,9 @@ class DummyTray:
     def _on_tuxedo_gui_clicked(self, *_a, **_k):
         return
 
+    def _on_hardware_color_clicked(self, *_a, **_k):
+        return
+
     def _on_off_clicked(self, *_a, **_k):
         return
 

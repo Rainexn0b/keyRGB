@@ -112,6 +112,25 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
     except Exception:
         effect_name = "none"
 
+    # === FORCE MODE SWITCHES ===
+
+    # Force hardware uniform color mode (used by the tray's "Hardware Color" entry
+    # and "None (use uniform color)" under Hardware Effects). This must override
+    # any existing per-key state so HW effects unlock and SW effects lock.
+    if effect_name in {"hw_uniform", "hardware_uniform"}:
+        tray.engine.stop()
+        try:
+            tray.config.per_key_colors = {}
+        except Exception:
+            pass
+
+        tray.config.effect = "none"
+        _ensure_hardware_mode(tray)
+        with tray.engine.kb_lock:
+            tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+        tray.is_off = False
+        return
+
     # === HANDLE SPECIAL CASES ===
 
     # "none" or "stop" -> go to static color (respects current mode)
@@ -171,6 +190,10 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
             return
 
         # Switch to hardware mode
+        try:
+            tray.config.per_key_colors = {}
+        except Exception:
+            pass
         _ensure_hardware_mode(tray)
         tray.config.effect = effect_name
         tray._start_current_effect()

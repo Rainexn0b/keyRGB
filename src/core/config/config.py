@@ -153,10 +153,7 @@ class Config:
             return None
         if not s:
             return None
-        # Backward compatibility: older versions stored per-key animations as
-        # distinct modes. Those software effects are now removed, but the safest
-        # restore behavior is to return to plain per-key.
-        if s in {"perkey", "perkey_breathing", "perkey_pulse"}:
+        if s == "perkey":
             return "perkey"
         return None
 

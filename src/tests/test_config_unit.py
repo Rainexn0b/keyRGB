@@ -25,4 +25,4 @@ def test_return_effect_after_effect_sanitizes_invalid_values(tmp_path, monkeypat
     assert cfg.return_effect_after_effect == "perkey"
 
     cfg._settings["return_effect_after_effect"] = "perkey_pulse"
-    assert cfg.return_effect_after_effect == "perkey"
+    assert cfg.return_effect_after_effect is None

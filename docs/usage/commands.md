@@ -32,5 +32,3 @@ These are the effect names stored in `~/.config/keyrgb/config.json` under the `e
 - Per-key static map: `perkey`
 
 Notes:
-- `reactive_rainbow` is treated as an alias of `reactive_ripple` for backward compatibility.
-- `reactive_snake` is treated as an alias of `reactive_ripple` for backward compatibility.

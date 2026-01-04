@@ -60,6 +60,12 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     sw_mode = is_software_mode(tray)
     hw_mode = is_hardware_mode(tray)
 
+    def _hw_cb(effect: str):
+        def _action(_icon, _item):
+            tray._on_effect_key_clicked(effect)
+
+        return _action
+
     def _checked_effect(effect: str):
         def _checked(_item):
             return tray.config.effect == effect and not tray.is_off
@@ -83,8 +89,8 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     hw_effects_menu = pystray.Menu(
         item(
             "None (use uniform color)",
-            tray._on_effect_clicked,
-            checked=_checked_effect("none"),
+            _hw_cb("hw_uniform"),
+            checked=lambda _i: (tray.config.effect == "none" and hw_mode and not tray.is_off),
             radio=True,
             # Always enabled - this is how user switches back to HW uniform mode
         ),
@@ -92,7 +98,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         *[
             item(
                 title_for_effect(effect),
-                tray._on_effect_clicked,
+                _hw_cb(effect),
                 checked=_checked_effect(effect),
                 radio=True,
                 enabled=hw_mode,  # Grey out animated effects when in SW mode
@@ -217,7 +223,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         ),
         item(
             "Hardware Color",
-            tray._on_tuxedo_gui_clicked,
+            tray._on_hardware_color_clicked,
             # Always enabled - this is how user switches to HW uniform color mode
         ),
         pystray.Menu.SEPARATOR,

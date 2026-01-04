@@ -55,18 +55,7 @@ SW_EFFECTS_SET: Final[frozenset[str]] = frozenset(SW_EFFECTS)
 ALL_EFFECTS_SET: Final[frozenset[str]] = frozenset(ALL_EFFECTS)
 
 
-# Backward-compat effect aliases.
-_EFFECT_ALIASES: Final[dict[str, str]] = {
-    # reactive_rainbow was merged into reactive_ripple.
-    "reactive_rainbow": "reactive_ripple",
-    # reactive_snake was removed; map old configs to the closest remaining option.
-    "reactive_snake": "reactive_ripple",
-    # Legacy per-key animation names -> plain perkey.
-    "perkey breathing": "perkey",
-    "perkey pulse": "perkey",
-    "perkey_breathing": "perkey",
-    "perkey_pulse": "perkey",
-}
+_EFFECT_ALIASES: Final[dict[str, str]] = {}
 
 
 _EFFECT_TITLES: Final[dict[str, str]] = {

@@ -144,73 +144,6 @@ class TestApplyEffectSelection:
         assert mock_tray.config.per_key_colors == expected_colors
         mock_tray._start_current_effect.assert_called_once()
 
-    def test_perkey_breathing_alias_maps_to_perkey(self, monkeypatch):
-        """Legacy 'perkey breathing' should behave like plain 'perkey'."""
-        from src.tray.controllers import effect_selection
-        from src.tray.controllers.effect_selection import apply_effect_selection
-
-        # Mock profile loading to return specific colors
-        expected_colors = {(0, 0): (0, 255, 0)}
-        load_spy = MagicMock(return_value=expected_colors)
-        monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", load_spy)
-
-        mock_tray = MagicMock()
-        mock_tray.backend_caps = MagicMock(per_key=True)
-        mock_tray.config.per_key_colors = {}  # Start empty
-
-        apply_effect_selection(mock_tray, effect_name="perkey breathing")
-
-        assert mock_tray.config.effect == "perkey"
-        # Verify profile loading was called for perkey
-        load_spy.assert_called_once()
-        assert mock_tray.config.per_key_colors == expected_colors
-        mock_tray._start_current_effect.assert_called_once()
-
-    def test_perkey_pulse_alias_maps_to_perkey(self, monkeypatch):
-        """Legacy 'perkey pulse' should behave like plain 'perkey'."""
-        from src.tray.controllers import effect_selection
-        from src.tray.controllers.effect_selection import apply_effect_selection
-
-        # Mock profile loading to return specific colors
-        expected_colors = {(1, 1): (0, 0, 255)}
-        load_spy = MagicMock(return_value=expected_colors)
-        monkeypatch.setattr(effect_selection, "_load_per_key_colors_from_profile", load_spy)
-
-        mock_tray = MagicMock()
-        mock_tray.backend_caps = MagicMock(per_key=True)
-        mock_tray.config.per_key_colors = {}  # Start empty
-
-        apply_effect_selection(mock_tray, effect_name="perkey pulse")
-
-        assert mock_tray.config.effect == "perkey"
-        # Verify profile loading was called for perkey
-        load_spy.assert_called_once()
-        assert mock_tray.config.per_key_colors == expected_colors
-
-    def test_reactive_rainbow_alias_maps_to_reactive_ripple(self):
-        """Legacy 'reactive_rainbow' should behave like 'reactive_ripple'."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
-
-        mock_tray = MagicMock()
-        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
-
-        apply_effect_selection(mock_tray, effect_name="reactive_rainbow")
-
-        assert mock_tray.config.effect == "reactive_ripple"
-        mock_tray._start_current_effect.assert_called_once()
-
-    def test_reactive_snake_alias_maps_to_reactive_ripple(self):
-        """Removed 'reactive_snake' should map to 'reactive_ripple' (old config compatibility)."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
-
-        mock_tray = MagicMock()
-        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
-
-        apply_effect_selection(mock_tray, effect_name="reactive_snake")
-
-        assert mock_tray.config.effect == "reactive_ripple"
-        mock_tray._start_current_effect.assert_called_once()
-
     def test_regular_effect_starts_engine_normally(self):
         """Regular supported effects should start the engine normally."""
         from src.tray.controllers.effect_selection import apply_effect_selection
@@ -290,3 +223,25 @@ class TestApplyEffectSelection:
         mock_tray.engine.stop.assert_called()
         assert mock_tray.config.effect == "perkey"
         mock_tray._start_current_effect.assert_called_once()
+
+    def test_hw_uniform_forces_hardware_mode_even_if_perkey_colors_exist(self):
+        """Selecting hardware uniform should clear per-key gating and unlock HW mode."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
+
+        # Start from software mode with per-key colors loaded.
+        mock_tray.config.effect = "perkey"
+        mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
+
+        apply_effect_selection(mock_tray, effect_name="hw_uniform")
+
+        mock_tray.engine.stop.assert_called()
+        assert mock_tray.config.effect == "none"
+        assert mock_tray.config.per_key_colors == {}
+        mock_tray.engine.kb.set_color.assert_called_once_with(
+            mock_tray.config.color, brightness=mock_tray.config.brightness
+        )
+        assert mock_tray.is_off is False

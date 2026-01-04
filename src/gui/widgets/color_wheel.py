@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
-"""
-Simple color wheel widget for selecting RGB colors.
+"""Simple color wheel widget for selecting RGB colors.
+
 Reusable component for both uniform and per-key color selection.
+
+Performance note:
+The original implementation drew tens of thousands of tiny polygons on a Canvas.
+That is very slow on many systems (especially in power-saver modes). This widget
+now renders the wheel as a single image (cached on disk), and draws only the
+selector overlay on top.
 """
+
+from __future__ import annotations
+
+import colorsys
+import base64
+import math
+import os
+from pathlib import Path
 
 import tkinter as tk
 from tkinter import ttk
-import colorsys
-import math
 
 
 class ColorWheel(ttk.Frame):
@@ -52,8 +64,15 @@ class ColorWheel(ttk.Frame):
         self.current_value = v
 
         self._create_widgets()
+        self._wheel_image: tk.PhotoImage | None = None
+        self._wheel_ready = False
+        # Defer heavy render work so the window can appear immediately.
+        self.after(1, self._render_initial)
+
+    def _render_initial(self) -> None:
         self._draw_wheel()
         self._update_selection()
+        self._wheel_ready = True
 
     def _create_widgets(self):
         """Create the canvas and brightness slider."""
@@ -133,54 +152,162 @@ class ColorWheel(ttk.Frame):
         self._update_preview()
 
     def _draw_wheel(self):
-        """Draw the HSV color wheel."""
+        """Draw the HSV color wheel as a single cached image."""
+
         self.canvas.delete("wheel")
 
-        # Draw color wheel using HSV color space
-        for angle in range(360):
-            # Calculate positions for a wedge
-            rad1 = math.radians(angle)
-            rad2 = math.radians(angle + 1)
-
-            # Draw from center to edge with saturation gradient
-            steps = self.radius
-            for step in range(steps):
-                saturation = step / steps
-
-                # Convert HSV to RGB
-                hue = angle / 360.0
-                r, g, b = colorsys.hsv_to_rgb(hue, saturation, 1.0)
-                color = f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
-
-                # Calculate arc position
-                inner_radius = step
-                outer_radius = step + 1
-
-                x1_inner = self.radius + inner_radius * math.cos(rad1)
-                y1_inner = self.radius + inner_radius * math.sin(rad1)
-                x2_inner = self.radius + inner_radius * math.cos(rad2)
-                y2_inner = self.radius + inner_radius * math.sin(rad2)
-
-                x1_outer = self.radius + outer_radius * math.cos(rad1)
-                y1_outer = self.radius + outer_radius * math.sin(rad1)
-                x2_outer = self.radius + outer_radius * math.cos(rad2)
-                y2_outer = self.radius + outer_radius * math.sin(rad2)
-
-                # Draw small polygon for this segment
-                points = [x1_inner, y1_inner, x2_inner, y2_inner, x2_outer, y2_outer, x1_outer, y1_outer]
-                self.canvas.create_polygon(points, fill=color, outline=color, tags="wheel")
-
-        # Draw center white circle
+        # Keep the background consistent with the rest of the app theme.
+        bg_rgb = (0x2B, 0x2B, 0x2B)
         center_size = 20
+
+        wheel_path = self._wheel_cache_path(size=self.size)
+        ppm_bytes: bytes | None = None
+
+        try:
+            if not wheel_path.exists() or wheel_path.stat().st_size < 16:
+                wheel_path.parent.mkdir(parents=True, exist_ok=True)
+                ppm_bytes = self._build_wheel_ppm_bytes(
+                    size=self.size,
+                    bg_rgb=bg_rgb,
+                    center_size=center_size,
+                )
+                self._write_bytes_atomic(wheel_path, ppm_bytes)
+        except Exception:
+            # Cache path may be unwritable (restricted envs, sandboxing, etc).
+            ppm_bytes = self._build_wheel_ppm_bytes(
+                size=self.size,
+                bg_rgb=bg_rgb,
+                center_size=center_size,
+            )
+
+        # PhotoImage needs to be held on the instance to avoid GC.
+        if ppm_bytes is not None:
+            # Tk's PhotoImage `data` expects a base64-encoded string.
+            self._wheel_image = tk.PhotoImage(data=base64.b64encode(ppm_bytes).decode("ascii"), format="PPM")
+        else:
+            self._wheel_image = tk.PhotoImage(file=str(wheel_path))
+        self.canvas.create_image(0, 0, anchor="nw", image=self._wheel_image, tags="wheel")
+
+        # Center outline helps readability (matches older look).
         self.canvas.create_oval(
             self.radius - center_size,
             self.radius - center_size,
             self.radius + center_size,
             self.radius + center_size,
-            fill="white",
+            fill="",
             outline="#888888",
             tags="wheel",
         )
+
+    @staticmethod
+    def _wheel_cache_path(*, size: int) -> Path:
+        xdg = os.environ.get("XDG_CACHE_HOME")
+        cache_root = Path(xdg) if xdg else (Path.home() / ".cache")
+        return cache_root / "keyrgb" / f"color_wheel_{int(size)}.ppm"
+
+    @staticmethod
+    def _write_wheel_ppm(
+        path: Path,
+        *,
+        size: int,
+        bg_rgb: tuple[int, int, int],
+        center_size: int,
+    ) -> None:
+        """Generate and write a PPM (P6) image for the wheel.
+
+        PPM keeps dependencies minimal (no Pillow) and loads quickly via Tk.
+        """
+
+        radius = size // 2
+        max_distance = max(1.0, float(radius - center_size))
+        two_pi = 2.0 * math.pi
+
+        bg_r, bg_g, bg_b = (int(bg_rgb[0]) & 0xFF, int(bg_rgb[1]) & 0xFF, int(bg_rgb[2]) & 0xFF)
+
+        data = bytearray(size * size * 3)
+        idx = 0
+        for y in range(size):
+            dy = (y + 0.5) - radius
+            for x in range(size):
+                dx = (x + 0.5) - radius
+                dist = math.hypot(dx, dy)
+
+                if dist > radius:
+                    r8, g8, b8 = bg_r, bg_g, bg_b
+                elif dist < center_size:
+                    r8, g8, b8 = 255, 255, 255
+                else:
+                    angle = math.atan2(dy, dx)
+                    if angle < 0:
+                        angle += two_pi
+                    hue = angle / two_pi
+                    sat = min(dist / max_distance, 1.0)
+                    r, g, b = colorsys.hsv_to_rgb(hue, sat, 1.0)
+                    r8, g8, b8 = int(r * 255), int(g * 255), int(b * 255)
+
+                data[idx] = r8
+                data[idx + 1] = g8
+                data[idx + 2] = b8
+                idx += 3
+
+        header = f"P6\n{size} {size}\n255\n".encode("ascii")
+        path.write_bytes(header + bytes(data))
+
+    @staticmethod
+    def _build_wheel_ppm_bytes(
+        *,
+        size: int,
+        bg_rgb: tuple[int, int, int],
+        center_size: int,
+    ) -> bytes:
+        # Reuse the existing generator by writing into memory.
+        radius = size // 2
+        max_distance = max(1.0, float(radius - center_size))
+        two_pi = 2.0 * math.pi
+
+        bg_r, bg_g, bg_b = (int(bg_rgb[0]) & 0xFF, int(bg_rgb[1]) & 0xFF, int(bg_rgb[2]) & 0xFF)
+
+        data = bytearray(size * size * 3)
+        idx = 0
+        for y in range(size):
+            dy = (y + 0.5) - radius
+            for x in range(size):
+                dx = (x + 0.5) - radius
+                dist = math.hypot(dx, dy)
+
+                if dist > radius:
+                    r8, g8, b8 = bg_r, bg_g, bg_b
+                elif dist < center_size:
+                    r8, g8, b8 = 255, 255, 255
+                else:
+                    angle = math.atan2(dy, dx)
+                    if angle < 0:
+                        angle += two_pi
+                    hue = angle / two_pi
+                    sat = min(dist / max_distance, 1.0)
+                    r, g, b = colorsys.hsv_to_rgb(hue, sat, 1.0)
+                    r8, g8, b8 = int(r * 255), int(g * 255), int(b * 255)
+
+                data[idx] = r8
+                data[idx + 1] = g8
+                data[idx + 2] = b8
+                idx += 3
+
+        header = f"P6\n{size} {size}\n255\n".encode("ascii")
+        return header + bytes(data)
+
+    @staticmethod
+    def _write_bytes_atomic(path: Path, data: bytes) -> None:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        try:
+            tmp.write_bytes(data)
+            os.replace(tmp, path)
+        finally:
+            try:
+                if tmp.exists():
+                    tmp.unlink(missing_ok=True)
+            except Exception:
+                pass
 
     def _update_selection(self):
         """Update the selection indicator on the wheel."""
@@ -200,14 +327,20 @@ class ColorWheel(ttk.Frame):
 
     def _on_click(self, event):
         """Handle mouse click on the color wheel."""
+        if not self._wheel_ready:
+            return
         self._select_color_at(event.x, event.y)
 
     def _on_drag(self, event):
         """Handle mouse drag on the color wheel."""
+        if not self._wheel_ready:
+            return
         self._select_color_at(event.x, event.y)
 
     def _on_release(self, event):
         """Handle mouse release on the color wheel."""
+        if not self._wheel_ready:
+            return
         if self.release_callback:
             self.release_callback(*self.current_color)
 
