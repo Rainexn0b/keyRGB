@@ -624,20 +624,59 @@ download_url() {
     local url="$1"
     local dst="$2"
 
+    if [ -z "$dst" ]; then
+        echo "❌ download_url: destination path is empty" >&2
+        return 2
+    fi
+
     mkdir -p "$(dirname "$dst")"
 
+    local parent
+    parent="$(dirname "$dst")"
+    if ! [ -d "$parent" ]; then
+        echo "❌ Download destination folder does not exist: $parent" >&2
+        return 2
+    fi
+    if ! [ -w "$parent" ]; then
+        echo "❌ No write permission to: $parent" >&2
+        echo "   Fix: ensure it's writable, or choose a different HOME." >&2
+        return 2
+    fi
+
+    # Download to a temp file and move into place, to avoid leaving a partial dst.
+    local tmp
+    tmp="$(mktemp "${dst}.tmp.XXXXXX")" || return 2
+
     if command -v curl &> /dev/null; then
-        curl -L --fail --silent --show-error -o "$dst" "$url"
-        return 0
+        if curl -L --fail --silent --show-error -o "$tmp" "$url"; then
+            mv -f "$tmp" "$dst"
+            return 0
+        fi
+        rc=$?
+        echo "⚠️  curl failed (exit $rc) while downloading: $url" >&2
+        if [ "$rc" -eq 23 ]; then
+            echo "   curl write error (often: disk full or permission issue)." >&2
+            echo "   Target: $dst" >&2
+            echo "   Folder: $parent" >&2
+            ls -ld "$parent" "$dst" 2>/dev/null || true
+            df -h "$parent" 2>/dev/null || true
+        fi
+        rm -f "$tmp" 2>/dev/null || true
+        # Fall through to try other downloaders.
     fi
 
     if command -v wget &> /dev/null; then
-        wget -q -O "$dst" "$url"
-        return 0
+        if wget -q -O "$tmp" "$url"; then
+            mv -f "$tmp" "$dst"
+            return 0
+        fi
+        rc=$?
+        echo "⚠️  wget failed (exit $rc) while downloading: $url" >&2
+        rm -f "$tmp" 2>/dev/null || true
     fi
 
     if command -v python3 &> /dev/null; then
-        python3 - "$url" "$dst" <<'PY'
+        python3 - "$url" "$tmp" <<'PY'
 from __future__ import annotations
 
 import shutil
@@ -652,9 +691,16 @@ dst.parent.mkdir(parents=True, exist_ok=True)
 with urllib.request.urlopen(url) as resp, dst.open("wb") as f:
     shutil.copyfileobj(resp, f)
 PY
-        return 0
+        rc=$?
+        if [ "$rc" -eq 0 ]; then
+            mv -f "$tmp" "$dst"
+            return 0
+        fi
+        echo "⚠️  python3 download failed (exit $rc) while downloading: $url" >&2
+        rm -f "$tmp" 2>/dev/null || true
     fi
 
+    rm -f "$tmp" 2>/dev/null || true
     echo "❌ No downloader available (need curl, wget, or python3)" >&2
     return 1
 }
