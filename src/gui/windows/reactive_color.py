@@ -44,8 +44,8 @@ class ReactiveColorGUI:
         apply_keyrgb_window_icon(self.root)
         # This window includes extra explanatory text + a toggle above the shared
         # ColorWheel widget; keep it tall enough to avoid clipping.
-        self.root.geometry("520x770")
-        self.root.minsize(520, 770)
+        self.root.geometry("520x847")
+        self.root.minsize(520, 847)
         self.root.resizable(True, True)
 
         apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
