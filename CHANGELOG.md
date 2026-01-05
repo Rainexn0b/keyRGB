@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.5 (2026-01-05)
+
+- Profiles/Per-key editor: add built-in `dark` profile preset (all keys off) to better showcase reactive typing effects.
+- Profiles/Per-key editor: change built-in `default` profile colors to all-white.
+- Diagnostics: when running from a source checkout, report the repo version from `pyproject.toml` (and include the installed dist version separately).
+
 ## 0.11.4 (2026-01-05)
 
 - Installer: add `--update-appimage` for non-interactive AppImage updates (reuses the last saved release channel selection).
