@@ -47,6 +47,20 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     assert isinstance(diag.config, dict)
     assert isinstance(diag.process, dict)
 
+    # Backend diagnostics should include tier/provider/priority metadata.
+    probes = diag.backends.get("probes")
+    assert isinstance(probes, list)
+    assert any(isinstance(p, dict) and p.get("name") == "sysfs-leds" for p in probes)
+    sysfs_probe = next(p for p in probes if isinstance(p, dict) and p.get("name") == "sysfs-leds")
+    assert sysfs_probe.get("tier") == 1
+    assert sysfs_probe.get("provider") == "kernel-sysfs"
+    assert isinstance(sysfs_probe.get("priority"), int)
+
+    # Sysfs candidate snapshot should exist (root is sanitized when overridden).
+    sysfs_cand = diag.backends.get("sysfs_led_candidates")
+    assert isinstance(sysfs_cand, dict)
+    assert "exists" in sysfs_cand
+
     text = format_diagnostics_text(diag)
     assert "DMI:" in text
     assert "Sysfs LEDs:" in text

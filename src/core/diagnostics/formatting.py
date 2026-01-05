@@ -134,6 +134,14 @@ def format_diagnostics_text(diag: "Diagnostics") -> str:
 
     if diag.dmi:
         lines.append("DMI:")
+
+        selection = diag.backends.get("selection")
+        if isinstance(selection, dict):
+            pol = selection.get("policy")
+            if pol:
+                lines.append(f"  policy: {pol}")
+            if selection.get("blocked"):
+                lines.append(f"  selection_blocked: {selection.get('blocked_reason')}")
         for k in sorted(diag.dmi.keys()):
             lines.append(f"  {k}: {diag.dmi[k]}")
 
@@ -148,11 +156,34 @@ def format_diagnostics_text(diag: "Diagnostics") -> str:
             if entry.get("trigger"):
                 lines.append(f"      trigger: {entry['trigger']}")
 
+                extra = []
+                if p.get("tier") is not None:
+                    extra.append(f"tier={p.get('tier')}")
+                if p.get("provider") is not None:
+                    extra.append(f"provider={p.get('provider')}")
+                if p.get("priority") is not None:
+                    extra.append(f"priority={p.get('priority')}")
+                if extra:
+                    lines.append(f"      {' '.join(extra)}")
     if diag.leds and diag.sysfs_leds != diag.leds:
         lines.append("Keyboard LEDs (filtered):")
         for entry in diag.leds:
             lines.append(f"  - {entry.get('name')} ({entry.get('path')})")
 
+
+        sysfs_cand = diag.backends.get("sysfs_led_candidates")
+        if isinstance(sysfs_cand, dict) and sysfs_cand:
+            lines.append("  sysfs_led_candidates:")
+            for k in ("root", "exists", "candidates_count"):
+                if k in sysfs_cand:
+                    lines.append(f"    {k}: {sysfs_cand.get(k)}")
+            top = sysfs_cand.get("top")
+            if isinstance(top, list) and top:
+                lines.append("    top:")
+                for e in top[:5]:
+                    if not isinstance(e, dict):
+                        continue
+                    lines.append(f"      - {e.get('name')} score={e.get('score')}")
     if diag.usb_ids:
         lines.append("USB IDs (best-effort):")
         for usb_id in diag.usb_ids:
