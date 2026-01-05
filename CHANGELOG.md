@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.2 (2026-01-05)
+
+- Settings: Version panel shows the source checkout version in dev mode (avoids stale pip-installed version confusion).
+- UI/Docs: clarify “Screen dim/brightness sync” wording and behavior (e.g. KDE brightness slider).
+- Installer: kernel driver install respects `--no-system-deps` / `KEYRGB_SKIP_SYSTEM_DEPS=1` and uses shared package-manager helpers.
+- README: Quickstart cleanup, with one-line interactive install/uninstall commands that fetch the latest scripts (no clone).
+- Docs: reorganize and refresh architecture/maintainer docs (CI/build logs + maintainer workflows).
+
 ## 0.11.1 (2026-01-05)
 
 - Installer: improved AppImage download UX (shows a progress bar in interactive shells).

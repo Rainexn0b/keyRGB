@@ -21,14 +21,15 @@ class DimSyncPanel:
         self.var_dim_temp_brightness = var_dim_temp_brightness
         self._on_toggle = on_toggle
 
-        dim_title = ttk.Label(parent, text="Screen dim sync", font=("Sans", 11, "bold"))
+        dim_title = ttk.Label(parent, text="Screen dim/brightness sync", font=("Sans", 11, "bold"))
         dim_title.pack(anchor="w", pady=(0, 6))
 
         dim_desc = ttk.Label(
             parent,
             text=(
-                "Optionally react to your desktop's screen dimming by either\n"
-                "turning keyboard LEDs off or dimming them to a temporary brightness."
+                "Optionally react to your desktop's screen dimming/brightness changes\n"
+                "(e.g. KDE brightness slider) by turning keyboard LEDs off or dimming\n"
+                "them to a temporary brightness."
             ),
             font=("Sans", 9),
         )
@@ -36,7 +37,7 @@ class DimSyncPanel:
 
         self.chk_dim_sync = ttk.Checkbutton(
             parent,
-            text="Sync keyboard lighting with screen dimming",
+            text="Sync keyboard lighting with screen dimming/brightness",
             variable=self.var_dim_sync_enabled,
             command=self._on_toggle,
         )

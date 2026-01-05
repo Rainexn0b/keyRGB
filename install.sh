@@ -1096,79 +1096,89 @@ install_kernel_drivers() {
         return 0
     fi
 
+    if [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "y" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "yes" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "1" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "true" ]; then
+        echo
+        echo "↷ Skipping kernel drivers because --no-system-deps / KEYRGB_SKIP_SYSTEM_DEPS=1 was set."
+        return 0
+    fi
+
     echo
     echo "🔧 Installing kernel drivers (best-effort)..."
     echo "   (This may prompt for your sudo password.)"
 
     # Prepare marker file
     mkdir -p "$STATE_DIR" || true
-    # We append to the marker file in case multiple runs add different things, 
-    # but we should probably clear it if we are doing a full re-install logic. 
-    # For now, let's just ensure the directory exists. 
-    # Actually, let's clear it for this run to avoid duplicates if the user re-runs install.sh
-    # But wait, if they installed one driver previously and now install another, we want both.
-    # Let's just append and handle duplicates in uninstall or just let them be.
-    # Better: clear it if we are about to try installing.
-    # But if we fail to install one, we don't want to lose the record of the other?
-    # Let's just append. `sort -u` in uninstall could handle it.
-    
-    if command -v dnf &> /dev/null; then
-        # Fedora
-        echo "   Detected Fedora (dnf)."
-        # Try to install tuxedo-drivers. It might be in a COPR or standard repo depending on setup.
-        # We can try to install it.
-        set +e
-        if sudo dnf install -y tuxedo-drivers; then
-            echo "✓ Installed tuxedo-drivers"
-            echo "tuxedo-drivers" >> "$KERNEL_DRIVERS_MARKER"
-        else
-            echo "⚠️  Could not install 'tuxedo-drivers' via dnf."
-            echo "   You may need to enable a COPR repository first."
-            echo "   See: https://github.com/tuxedocomputers/tuxedo-drivers"
-        fi
-        
-        # clevo-xsm-wmi is usually not in standard repos.
-        if sudo dnf install -y clevo-xsm-wmi; then
-             echo "✓ Installed clevo-xsm-wmi"
-             echo "clevo-xsm-wmi" >> "$KERNEL_DRIVERS_MARKER"
-        else
-             echo "ℹ️  'clevo-xsm-wmi' package not found in dnf repos (expected)."
-        fi
-        set -e
 
-    elif command -v apt-get &> /dev/null; then
-        # Debian/Ubuntu
-        echo "   Detected Debian/Ubuntu (apt)."
-        # Tuxedo computers have their own repo.
-        set +e
-        if sudo apt-get install -y tuxedo-keyboard; then
-            echo "✓ Installed tuxedo-keyboard"
-            echo "tuxedo-keyboard" >> "$KERNEL_DRIVERS_MARKER"
-        else
-            echo "⚠️  Could not install 'tuxedo-keyboard'."
-            echo "   You may need to add the Tuxedo Computers repository."
-            echo "   See: https://www.tuxedocomputers.com/en/Infos/Help-Support/Instructions/Add-TUXEDO-Computers-software-package-sources.tuxedo"
-        fi
-        
-        # clevo-xsm-wmi
-        if sudo apt-get install -y clevo-xsm-wmi; then
-            echo "✓ Installed clevo-xsm-wmi"
-            echo "clevo-xsm-wmi" >> "$KERNEL_DRIVERS_MARKER"
-        else
-             echo "ℹ️  'clevo-xsm-wmi' package not found in apt repos."
-        fi
-        set -e
+    detect_pkg_manager || true
+    case "${PKG_MGR:-}" in
+        dnf)
+            echo "   Detected Fedora/RHEL family (dnf)."
+            if pkg_install_best_effort tuxedo-drivers; then
+                echo "✓ Installed tuxedo-drivers"
+                echo "tuxedo-drivers" >> "$KERNEL_DRIVERS_MARKER"
+            else
+                echo "⚠️  Could not install 'tuxedo-drivers' via dnf."
+                echo "   You may need to enable a COPR repository first."
+                echo "   See: https://github.com/tuxedocomputers/tuxedo-drivers"
+            fi
 
-    elif command -v pacman &> /dev/null; then
-        # Arch
-        echo "   Detected Arch Linux."
-        echo "⚠️  Arch Linux detected. Please install drivers via AUR:"
-        echo "   - tuxedo-drivers-dkms"
-        echo "   - clevo-xsm-wmi-dkms"
-        echo "   (KeyRGB installer does not handle AUR packages automatically.)"
-    else
-        echo "⚠️  Unknown package manager. Please install 'tuxedo-drivers' or 'clevo-xsm-wmi' manually."
-    fi
+            if pkg_install_best_effort clevo-xsm-wmi; then
+                echo "✓ Installed clevo-xsm-wmi"
+                echo "clevo-xsm-wmi" >> "$KERNEL_DRIVERS_MARKER"
+            else
+                echo "ℹ️  'clevo-xsm-wmi' package not found in dnf repos (often expected)."
+            fi
+            ;;
+        apt)
+            echo "   Detected Debian/Ubuntu family (apt)."
+            if pkg_install_best_effort tuxedo-keyboard; then
+                echo "✓ Installed tuxedo-keyboard"
+                echo "tuxedo-keyboard" >> "$KERNEL_DRIVERS_MARKER"
+            else
+                echo "⚠️  Could not install 'tuxedo-keyboard'."
+                echo "   You may need to add the Tuxedo Computers repository."
+                echo "   See: https://www.tuxedocomputers.com/en/Infos/Help-Support/Instructions/Add-TUXEDO-Computers-software-package-sources.tuxedo"
+            fi
+
+            if pkg_install_best_effort clevo-xsm-wmi; then
+                echo "✓ Installed clevo-xsm-wmi"
+                echo "clevo-xsm-wmi" >> "$KERNEL_DRIVERS_MARKER"
+            else
+                echo "ℹ️  'clevo-xsm-wmi' package not found in apt repos."
+            fi
+            ;;
+        pacman)
+            echo "   Detected Arch Linux (pacman)."
+            echo "⚠️  Please install drivers via AUR (KeyRGB does not install AUR packages):"
+            echo "   - tuxedo-drivers-dkms"
+            echo "   - clevo-xsm-wmi-dkms"
+            ;;
+        zypper)
+            echo "   Detected openSUSE (zypper)."
+            if pkg_install_best_effort tuxedo-keyboard; then
+                echo "✓ Installed tuxedo-keyboard"
+                echo "tuxedo-keyboard" >> "$KERNEL_DRIVERS_MARKER"
+            else
+                echo "ℹ️  'tuxedo-keyboard' not available via zypper repos."
+            fi
+            if pkg_install_best_effort clevo-xsm-wmi; then
+                echo "✓ Installed clevo-xsm-wmi"
+                echo "clevo-xsm-wmi" >> "$KERNEL_DRIVERS_MARKER"
+            else
+                echo "ℹ️  'clevo-xsm-wmi' not available via zypper repos."
+            fi
+            ;;
+        apk)
+            echo "   Detected Alpine (apk)."
+            echo "⚠️  Kernel driver packages are typically not available via apk repos."
+            echo "   Please install kernel modules manually if needed."
+            ;;
+        *)
+            echo "⚠️  Unknown package manager. Please install kernel drivers manually if needed:"
+            echo "   - tuxedo-drivers / tuxedo-keyboard"
+            echo "   - clevo-xsm-wmi"
+            ;;
+    esac
 }
 
 # endregion Optional components

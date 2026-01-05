@@ -97,25 +97,33 @@ KeyRGB uses a priority-based system to select the best driver for your hardware:
 
 ### Install
 
-On Fedora / Nobara (recommended):
+#### Option A: One-line interactive install (recommended)
+
+Downloads and runs the latest installer script (no clone). By default, the installer auto-selects the latest stable AppImage.
 
 ```bash
-./install.sh
-```
-
-On other Linux distros (best-effort):
-
-```bash
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh
 ```
 
 If you don't want the installer to attempt system package installs (no sudo / minimal / immutable OS):
 
 ```bash
-./install.sh --no-system-deps
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --no-system-deps
 ```
 
-This installs the AppImage to `~/.local/bin/keyrgb`, sets up the desktop launcher, and installs necessary udev rules for hardware access.
+#### Option B: Install from a local checkout (dev / local mods)
+
+If you already cloned the repo:
+
+```bash
+./install.sh
+```
+
+Notes:
+
+- Fedora / Nobara is the primary supported target.
+- Other distros are best-effort via common package managers (dnf/apt/pacman/zypper/apk).
+- The installer installs the app launcher + autostart, and may prompt for sudo to install udev rules needed for hardware access.
 
 Docs:
 
@@ -124,6 +132,16 @@ Docs:
 - Architecture / TongFang support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
 
 ### Uninstall
+
+#### One-line uninstall (no clone)
+
+Downloads and runs the latest uninstaller script:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/uninstall.sh -o uninstall.sh && bash uninstall.sh
+```
+
+#### Uninstall from a local checkout
 
 ```bash
 # Interactive removal
@@ -134,6 +152,8 @@ Docs:
 ```
 
 ### Run
+
+If you installed via the installer, run KeyRGB from your app menu or start it from a terminal:
 
 | Command | Description |
 | --- | --- |
@@ -151,7 +171,7 @@ Docs:
 Access **Settings** via the tray menu to configure:
 
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
-- **Screen Dim Sync**: sync keyboard brightness with screen dimming (KDE Plasma / Wayland).
+- **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
 - **Autostart**: enable “Start KeyRGB on login”.
 
 ### Profiles

@@ -39,8 +39,9 @@ DEFAULTS: dict = {
     # Per-key colors stored as {"row,col": [r,g,b]}
     "per_key_colors": {},
     # Screen dim sync (best-effort, DE-specific). When enabled, KeyRGB will
-    # react to desktop-driven display dimming by either turning keyboard
-    # LEDs off, or dimming them to a temporary brightness.
+    # react to desktop-driven display dimming/brightness changes (usually via
+    # /sys/class/backlight, plus DPMS screen-off detection) by either turning
+    # keyboard LEDs off, or dimming them to a temporary brightness.
     "screen_dim_sync_enabled": True,
     # 'off' | 'temp'
     "screen_dim_sync_mode": "off",

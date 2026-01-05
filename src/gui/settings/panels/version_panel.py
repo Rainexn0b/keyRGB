@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import webbrowser
 from importlib import metadata
+from pathlib import Path
 from typing import Callable
 from urllib.request import Request, urlopen
 
 import tkinter as tk
 from tkinter import ttk
 
+from src.core.runtime.imports import repo_root_from
 from src.core.version_check import compare_versions, normalize_version_text
 from src.gui.tk_async import run_in_thread
 
@@ -30,7 +32,7 @@ class VersionPanel:
         desc = ttk.Label(
             parent,
             text=(
-                "Shows your installed KeyRGB version and checks GitHub to see\n"
+                "Shows the KeyRGB version you're running and checks GitHub to see\n"
                 "whether you're on the latest stable release (and also shows the latest pre-release)."
             ),
             font=("Sans", 9),
@@ -80,6 +82,12 @@ class VersionPanel:
         run_in_thread(self._root, work, on_done)
 
     def _installed_version_text(self) -> str:
+        repo_version = self._repo_version_text()
+        if repo_version:
+            v_norm = normalize_version_text(repo_version) or str(repo_version).strip()
+            display = f"v{v_norm}" if not str(repo_version).strip().lower().startswith("v") else str(repo_version).strip()
+            return f"{display} (dev)"
+
         try:
             v = metadata.version("keyrgb")
         except Exception:
@@ -87,6 +95,31 @@ class VersionPanel:
 
         v_norm = normalize_version_text(v) or str(v).strip()
         return f"v{v_norm}" if not str(v).strip().lower().startswith("v") else str(v).strip()
+
+    @staticmethod
+    def _repo_version_text() -> str | None:
+        """Best-effort: if we're running from a source checkout, read version from pyproject.toml."""
+
+        try:
+            root = repo_root_from(__file__)
+        except Exception:
+            return None
+
+        pyproject = Path(root) / "pyproject.toml"
+        if not pyproject.exists():
+            return None
+
+        try:
+            import tomllib  # py3.11+
+
+            data = tomllib.loads(pyproject.read_bytes())
+            project = data.get("project") if isinstance(data, dict) else None
+            if not isinstance(project, dict):
+                return None
+            version = project.get("version")
+            return str(version).strip() if version else None
+        except Exception:
+            return None
 
     def _fetch_latest_github_versions(self) -> tuple[str | None, str | None]:
         """Return (latest_stable_tag, latest_prerelease_tag)."""
