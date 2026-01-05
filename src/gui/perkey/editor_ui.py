@@ -169,10 +169,6 @@ def build_editor_ui(editor) -> None:
         if win is None:
             return
         try:
-            win.grab_release()
-        except Exception:
-            pass
-        try:
             win.destroy()
         except Exception:
             pass
@@ -198,12 +194,6 @@ def build_editor_ui(editor) -> None:
         popup.withdraw()
         popup.overrideredirect(True)
         popup.transient(editor.root)
-
-        # Keep the popup above other windows while it's open.
-        try:
-            popup.attributes("-topmost", True)
-        except Exception:
-            pass
 
         bg = getattr(editor, "bg_color", "#2b2b2b")
         fg = getattr(editor, "fg_color", "#ffffff")
@@ -257,13 +247,6 @@ def build_editor_ui(editor) -> None:
         lb.bind("<Return>", _commit_from_listbox)
         lb.bind("<Escape>", _close_profiles_popup)
 
-        # Grab keeps the popup from immediately dismissing due to focus quirks
-        # with overrideredirect windows on some WMs.
-        try:
-            popup.grab_set()
-        except Exception:
-            pass
-
         popup.update_idletasks()
 
         # Position above the combobox.
@@ -280,11 +263,24 @@ def build_editor_ui(editor) -> None:
         popup.geometry(f"{max(60, w)}x{h}+{x}+{y_above}")
         popup.deiconify()
         popup.lift()
+        # Ensure the popup can receive focus; then close it when focus leaves.
+        # Binding focus-out *after* focusing avoids immediate dismissal.
         try:
-            popup.attributes("-topmost", True)
+            popup.focus_force()
         except Exception:
             pass
         lb.focus_set()
+
+        def _bind_focus_out() -> None:
+            try:
+                popup.bind("<FocusOut>", _close_profiles_popup)
+            except Exception:
+                return
+
+        try:
+            popup.after(0, _bind_focus_out)
+        except Exception:
+            pass
 
         editor._profiles_popup["win"] = popup
         return "break"
