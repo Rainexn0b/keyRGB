@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.11.3 (2026-01-05)
+
+- Fix: Version panel no longer requires Python 3.11+ `tomllib` and now reads `pyproject.toml` with a small, dependency-free parser so Import Scan works on older Python runtimes (fixes CI import-scan failure).
+
 ## 0.11.2 (2026-01-05)
 
 - Settings: Version panel shows the source checkout version in dev mode (avoids stale pip-installed version confusion).

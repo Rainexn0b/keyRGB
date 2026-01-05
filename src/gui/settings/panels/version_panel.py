@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import webbrowser
 from importlib import metadata
 from pathlib import Path
@@ -110,14 +111,34 @@ class VersionPanel:
             return None
 
         try:
-            import tomllib  # py3.11+
+            # Avoid depending on TOML parsing libraries here. This panel is UI-only
+            # and should work even on older Python runtimes used by some build systems.
+            text = pyproject.read_text(encoding="utf-8", errors="replace")
 
-            data = tomllib.loads(pyproject.read_bytes())
-            project = data.get("project") if isinstance(data, dict) else None
-            if not isinstance(project, dict):
-                return None
-            version = project.get("version")
-            return str(version).strip() if version else None
+            in_project = False
+            for raw in text.splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#"):
+                    continue
+
+                # Section header
+                if line.startswith("[") and line.endswith("]"):
+                    in_project = line == "[project]"
+                    continue
+
+                if not in_project:
+                    continue
+
+                # Strip trailing comments (good enough for version=...)
+                line = line.split("#", 1)[0].strip()
+                if not line:
+                    continue
+
+                m = re.match(r"^version\s*=\s*(['\"])(?P<v>[^'\"]+)\1\s*$", line)
+                if m:
+                    return m.group("v").strip() or None
+
+            return None
         except Exception:
             return None
 
