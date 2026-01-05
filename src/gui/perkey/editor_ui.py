@@ -169,6 +169,10 @@ def build_editor_ui(editor) -> None:
         if win is None:
             return
         try:
+            win.grab_release()
+        except Exception:
+            pass
+        try:
             win.destroy()
         except Exception:
             pass
@@ -195,15 +199,25 @@ def build_editor_ui(editor) -> None:
         popup.overrideredirect(True)
         popup.transient(editor.root)
 
+        bg = getattr(editor, "bg_color", "#2b2b2b")
+        fg = getattr(editor, "fg_color", "#ffffff")
+        try:
+            popup.configure(bg=bg)
+        except Exception:
+            pass
+
         lb = tk.Listbox(
             popup,
             exportselection=False,
             activestyle="none",
             height=min(len(values), 10),
-            background=getattr(editor, "bg_color", "#2b2b2b"),
-            foreground=getattr(editor, "fg_color", "#ffffff"),
-            selectbackground=getattr(editor, "bg_color", "#2b2b2b"),
-            selectforeground=getattr(editor, "fg_color", "#ffffff"),
+            bg=bg,
+            fg=fg,
+            selectbackground=bg,
+            selectforeground=fg,
+            highlightthickness=1,
+            relief="solid",
+            borderwidth=1,
         )
         lb.pack(fill="both", expand=True)
 
@@ -237,8 +251,12 @@ def build_editor_ui(editor) -> None:
         lb.bind("<Return>", _commit_from_listbox)
         lb.bind("<Escape>", _close_profiles_popup)
 
-        # Close when focus is lost.
-        popup.bind("<FocusOut>", _close_profiles_popup)
+        # Grab keeps the popup from immediately dismissing due to focus quirks
+        # with overrideredirect windows on some WMs.
+        try:
+            popup.grab_set()
+        except Exception:
+            pass
 
         popup.update_idletasks()
 
@@ -256,10 +274,6 @@ def build_editor_ui(editor) -> None:
         popup.geometry(f"{max(60, w)}x{h}+{x}+{y_above}")
         popup.deiconify()
         popup.lift()
-        try:
-            popup.focus_force()
-        except Exception:
-            pass
         lb.focus_set()
 
         editor._profiles_popup["win"] = popup
