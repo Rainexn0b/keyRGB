@@ -37,6 +37,8 @@ class _UpwardListboxDropdown:
         win = self._win
         if win is None:
             return
+        # Mark closed early to avoid re-entrancy issues (e.g. multiple FocusOut / clicks).
+        self._win = None
         try:
             win.grab_release()
         except Exception:
@@ -45,7 +47,6 @@ class _UpwardListboxDropdown:
             win.destroy()
         except Exception:
             pass
-        self._win = None
 
     def open(self, _e=None) -> str:
         if self._win is not None:
@@ -168,6 +169,12 @@ class _UpwardListboxDropdown:
                 self.close()
 
         popup.bind("<Button-1>", _check_click_outside)
+
+        # If the app is closing while the popup is open, ensure we release the grab cleanly.
+        try:
+            self._root.bind("<Destroy>", self.close, add=True)
+        except Exception:
+            pass
 
         self._win = popup
         return "break"
