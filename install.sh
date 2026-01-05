@@ -1307,8 +1307,8 @@ echo
 echo "Next steps:"
 echo "  1. Run 'keyrgb' to start the tray app"
 echo "     (Dev/repo mode: you can also run './keyrgb' from the repo folder.)"
-echo "  2. Look for the pink/magenta keyboard icon in your system tray"
-echo "  3. Right-click the icon to access effects, speed, and brightness"
+echo "  2. Look for the color-changing keyboard icon in your system tray"
+echo "  3. click the icon to access effects, speed, and brightness"
 echo "  4. KeyRGB will auto-start on next login"
 echo "  5. If 'keyrgb' isn't found, ensure ~/.local/bin is on PATH"
 echo "  6. If you quit the tray, you can re-open it from your app menu (KeyRGB)"
@@ -1318,5 +1318,7 @@ echo "  - If icon doesn't appear, check terminal for errors"
 echo "  - If keyboard doesn't light up, check USB device: lsusb | grep 048d"
 echo "  - Per-key editor: Right-click tray icon → Per-Key Editor"
 echo
+echo "If you found KeyRGB useful, please consider giving the repo a Star! ⭐"
+echo "If you did not or have any issues, please consider opening an issue on GitHub."
 
 # endregion Main install flow
