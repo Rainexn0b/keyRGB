@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.1 (2026-01-05)
+
+- Fix: Installer: restore interactive stable/prerelease AppImage channel prompt for normal installs (keeps `--update-appimage` non-interactive and preserves saved selection).
+- Fix: GUI: increase Reactive Typing Color window height to avoid clipping the bottom controls.
+- Fix: Tray: avoid brief hardware/uniform color flashes when adjusting effect brightness in software mode (update engine brightness in-place without issuing a hardware brightness write or restarting software effects).
+- Tests: updated unit tests to reflect the new brightness behavior.
+
 ## 0.12.0 (beta) (2026-01-05)
 
 - GUI: refactor theme logic into a dedicated `src/gui/theme/` package while keeping the public import path stable (`from src.gui.theme import apply_clam_theme`).
