@@ -86,6 +86,15 @@ class PerKeyEditor:
         # Improve dark-mode consistency for common input widgets used in the bottom panels.
         style.configure("TEntry", fieldbackground="#3a3a3a", foreground=self.fg_color)
         style.configure("TCombobox", fieldbackground="#3a3a3a", foreground=self.fg_color)
+        # ttk Combobox uses state-specific mapping; ensure readonly stays readable.
+        try:
+            style.map(
+                "TCombobox",
+                fieldbackground=[("readonly", "#3a3a3a"), ("disabled", "#3a3a3a")],
+                foreground=[("readonly", self.fg_color), ("disabled", self.fg_color)],
+            )
+        except Exception:
+            pass
 
         self.config = Config()
         self.profile_name = profiles.get_active_profile()

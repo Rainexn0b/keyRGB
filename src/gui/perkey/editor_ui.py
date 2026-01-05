@@ -200,6 +200,10 @@ def build_editor_ui(editor) -> None:
             exportselection=False,
             activestyle="none",
             height=min(len(values), 10),
+            background=getattr(editor, "bg_color", "#2b2b2b"),
+            foreground=getattr(editor, "fg_color", "#ffffff"),
+            selectbackground=getattr(editor, "bg_color", "#2b2b2b"),
+            selectforeground=getattr(editor, "fg_color", "#ffffff"),
         )
         lb.pack(fill="both", expand=True)
 
