@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from .io import read_kv_file, read_text
+from src.core.runtime.imports import repo_root_from
 
 
 def list_platform_hints() -> list[str]:
@@ -94,17 +95,70 @@ def power_supply_snapshot() -> dict[str, Any]:
         return {}
 
 
+def _repo_version_text(anchor: str | Path) -> str | None:
+    """Best-effort: if running from a source checkout, read version from pyproject.toml.
+
+    Avoids `tomllib` so it works on older runtimes.
+    """
+
+    try:
+        root = repo_root_from(anchor)
+        pyproject = root / "pyproject.toml"
+        if not pyproject.exists():
+            return None
+
+        # Minimal parser: look only inside the [project] section.
+        in_project = False
+        version_re = re.compile(r'^\s*version\s*=\s*"([^"]+)"\s*$')
+
+        for raw_line in pyproject.read_text(encoding="utf-8", errors="ignore").splitlines():
+            line = raw_line.strip()
+            if line == "[project]":
+                in_project = True
+                continue
+            if in_project and line.startswith("[") and line.endswith("]"):
+                break
+            if not in_project:
+                continue
+
+            # Strip trailing comments (good enough for version=...)
+            line = raw_line.split("#", 1)[0].strip()
+            m = version_re.match(line)
+            if m:
+                return m.group(1).strip()
+
+        return None
+    except Exception:
+        return None
+
+
 def app_snapshot() -> dict[str, Any]:
     app: dict[str, Any] = {}
 
-    # Best-effort version reporting. Distribution name may vary, so try a couple.
-    for dist_name in ("keyrgb", "Keyrgb", "KeyRGB"):
-        try:
-            app["version"] = metadata.version(dist_name)
-            app["dist"] = dist_name
-            break
-        except Exception:
-            continue
+    repo_version = _repo_version_text(__file__)
+    if repo_version:
+        app["version"] = repo_version
+        app["version_source"] = "pyproject"
+
+        # Also report the installed distribution version (if any), since dev/source
+        # runs can accidentally pick up a stale site-packages install.
+        for dist_name in ("keyrgb", "Keyrgb", "KeyRGB"):
+            try:
+                app["dist_name"] = dist_name
+                app["dist_version"] = metadata.version(dist_name)
+                break
+            except Exception:
+                continue
+    else:
+        # Best-effort version reporting. Distribution name may vary, so try a couple.
+        for dist_name in ("keyrgb", "Keyrgb", "KeyRGB"):
+            try:
+                app["version"] = metadata.version(dist_name)
+                app["dist"] = dist_name
+                app["version_source"] = "dist"
+                break
+            except Exception:
+                continue
 
     # Optional helper library used on some hardware.
     for dist_name in ("ite8291r3-ctl", "ite8291r3_ctl"):
