@@ -70,8 +70,8 @@ for _key_id, _tweaks in _per_key.items():
         DEFAULT_PER_KEY_TWEAKS[_key_id] = _out
 
 
-# Generate default colors (all blue)
-DEFAULT_COLORS = {(r, c): (25, 0, 255) for r in range(6) for c in range(21)}
+# Generate default colors (all white)
+DEFAULT_COLORS = {(r, c): (255, 255, 255) for r in range(6) for c in range(21)}
 
 
 __all__ = [

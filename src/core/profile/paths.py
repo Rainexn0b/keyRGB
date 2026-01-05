@@ -13,6 +13,10 @@ from src.core.config import Config
 
 DEFAULT_PROFILE_NAME = "default"
 
+# Built-in profiles are always shown in the per-key editor, even if the user has
+# not created them yet.
+BUILTIN_PROFILE_NAMES = (DEFAULT_PROFILE_NAME, "dark")
+
 
 logger = logging.getLogger(__name__)
 
@@ -101,19 +105,21 @@ def set_active_profile(name: str) -> str:
 def list_profiles() -> list[str]:
     root = profiles_root()
     if not root.exists():
-        return [DEFAULT_PROFILE_NAME]
+        return list(BUILTIN_PROFILE_NAMES)
+
     out: list[str] = []
     for child in root.iterdir():
         if child.is_dir():
             out.append(child.name)
-    if DEFAULT_PROFILE_NAME not in out:
-        out.append(DEFAULT_PROFILE_NAME)
-    return sorted(set(out))
+
+    # Stable ordering: built-ins first, then any custom profiles sorted.
+    custom = sorted({n for n in out if n not in BUILTIN_PROFILE_NAMES})
+    return list(BUILTIN_PROFILE_NAMES) + custom
 
 
 def delete_profile(name: str) -> bool:
     name = safe_profile_name(name)
-    if name == DEFAULT_PROFILE_NAME:
+    if name in BUILTIN_PROFILE_NAMES:
         return False
     root = profiles_root() / name
     if not root.exists():

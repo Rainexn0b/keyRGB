@@ -318,6 +318,31 @@ class TestPerKeyColorsLoadSave:
 
         assert loaded == DEFAULT_COLORS
 
+    def test_load_colors_dark_profile_defaults_to_black(self, temp_profile_dir, monkeypatch):
+        """Built-in 'dark' profile should default to all keys off/black."""
+        from src.core.profile import profiles
+
+        def mock_paths(name):
+            from src.core.profile.paths import ProfilePaths
+
+            return ProfilePaths(
+                root=temp_profile_dir,
+                keymap=temp_profile_dir / "keymap.json",
+                layout_global=temp_profile_dir / "layout.json",
+                layout_per_key=temp_profile_dir / "layout_per_key.json",
+                per_key_colors=temp_profile_dir / "nonexistent_colors.json",
+                backdrop_image=temp_profile_dir / "backdrop.png",
+                backdrop_settings=temp_profile_dir / "backdrop_settings.json",
+            )
+
+        monkeypatch.setattr(profiles, "paths_for", mock_paths)
+
+        loaded = profiles.load_per_key_colors("dark")
+
+        from src.core.resources.defaults import DEFAULT_COLORS
+
+        assert loaded == {k: (0, 0, 0) for k in DEFAULT_COLORS.keys()}
+
     def test_load_colors_skips_invalid_entries(self, temp_profile_dir, monkeypatch):
         """load_per_key_colors should skip entries with bad coords or RGB values."""
         from src.core.profile import profiles

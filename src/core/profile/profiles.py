@@ -164,6 +164,11 @@ def load_per_key_colors(name: str | None = None) -> Dict[Tuple[int, int], Tuple[
     p = paths_for(name).per_key_colors
     raw = read_json(p)
     if raw is None:
+        # Built-in presets: allow a profile to have a meaningful default even
+        # before the user has saved any colors.
+        prof = safe_profile_name(name or "")
+        if prof == "dark":
+            return {k: (0, 0, 0) for k in DEFAULT_COLORS.keys()}
         return DEFAULT_COLORS.copy()
 
     out: Dict[Tuple[int, int], Tuple[int, int, int]] = {}
