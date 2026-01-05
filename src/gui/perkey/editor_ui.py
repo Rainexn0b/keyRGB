@@ -199,6 +199,12 @@ def build_editor_ui(editor) -> None:
         popup.overrideredirect(True)
         popup.transient(editor.root)
 
+        # Keep the popup above other windows while it's open.
+        try:
+            popup.attributes("-topmost", True)
+        except Exception:
+            pass
+
         bg = getattr(editor, "bg_color", "#2b2b2b")
         fg = getattr(editor, "fg_color", "#ffffff")
         try:
@@ -274,6 +280,10 @@ def build_editor_ui(editor) -> None:
         popup.geometry(f"{max(60, w)}x{h}+{x}+{y_above}")
         popup.deiconify()
         popup.lift()
+        try:
+            popup.attributes("-topmost", True)
+        except Exception:
+            pass
         lb.focus_set()
 
         editor._profiles_popup["win"] = popup
