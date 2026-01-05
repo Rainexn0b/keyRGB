@@ -360,21 +360,28 @@ else
 fi
 
 # AppImage installs can auto-resolve the newest release that contains the AppImage asset.
-# For interactive debugging, allow opting into prereleases.
-if [ "$MODE" = "appimage" ] && [ -z "${KEYRGB_VERSION:-}" ] && [ -t 0 ] && [ "$UPDATE_APPIMAGE_ONLY" -ne 1 ] && [ "$KEYRGB_ALLOW_PRERELEASE_SET" -ne 1 ] && [ "$KEYRGB_ALLOW_PRERELEASE_FROM_STATE" -ne 1 ]; then
-    # Only prompt if the user didn't already choose via flag/env.
-    if [ "${KEYRGB_ALLOW_PRERELEASE:-}" = "" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "n" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "no" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "0" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "false" ]; then
-        echo
-        echo "Choose AppImage release channel:"
-        echo "  1) Latest stable release (recommended)"
-        echo "  2) Latest including prereleases (debugging)"
-        read -r -p "Select [1-2] (default: 1): " _relchan || _relchan=""
-        _relchan="${_relchan:-1}"
-        case "$_relchan" in
-            2) KEYRGB_ALLOW_PRERELEASE="y" ;;
-            *) KEYRGB_ALLOW_PRERELEASE="n" ;;
-        esac
+#
+# Release channel selection:
+# - Normal interactive installs should offer stable vs prerelease.
+# - If the user has a saved preference, use it as the default.
+# - `--update-appimage` stays non-interactive and uses the saved preference.
+if [ "$MODE" = "appimage" ] && [ -z "${KEYRGB_VERSION:-}" ] && [ -t 0 ] && [ "$UPDATE_APPIMAGE_ONLY" -ne 1 ] && [ "$KEYRGB_ALLOW_PRERELEASE_SET" -ne 1 ]; then
+    echo
+    echo "Choose AppImage release channel:"
+    echo "  1) Latest stable release (recommended)"
+    echo "  2) Latest including prereleases (beta)"
+
+    _relchan_default="1"
+    if [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "y" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "yes" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "1" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "true" ]; then
+        _relchan_default="2"
     fi
+
+    read -r -p "Select [1-2] (default: ${_relchan_default}): " _relchan || _relchan=""
+    _relchan="${_relchan:-${_relchan_default}}"
+    case "$_relchan" in
+        2) KEYRGB_ALLOW_PRERELEASE="y" ;;
+        *) KEYRGB_ALLOW_PRERELEASE="n" ;;
+    esac
 fi
 
 # Check if running as root
