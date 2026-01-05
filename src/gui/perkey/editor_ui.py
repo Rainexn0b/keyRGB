@@ -169,6 +169,10 @@ def build_editor_ui(editor) -> None:
         if win is None:
             return
         try:
+            win.grab_release()
+        except Exception:
+            pass
+        try:
             win.destroy()
         except Exception:
             pass
@@ -192,8 +196,15 @@ def build_editor_ui(editor) -> None:
 
         popup = tk.Toplevel(editor.root)
         popup.withdraw()
-        popup.overrideredirect(True)
+        # Use transient to keep it on top of the app but minimize with it.
         popup.transient(editor.root)
+        popup.overrideredirect(True)
+        
+        # Hint to the WM that this is a combo/dropdown (helps with z-order/focus on Linux).
+        try:
+            popup.attributes("-type", "combo")
+        except Exception:
+            pass
 
         bg = getattr(editor, "bg_color", "#2b2b2b")
         fg = getattr(editor, "fg_color", "#ffffff")
@@ -246,6 +257,9 @@ def build_editor_ui(editor) -> None:
         lb.bind("<ButtonRelease-1>", _commit_from_listbox)
         lb.bind("<Return>", _commit_from_listbox)
         lb.bind("<Escape>", _close_profiles_popup)
+        
+        # Close if focus leaves the listbox (e.g. Alt-Tab or click outside).
+        lb.bind("<FocusOut>", lambda e: _close_profiles_popup())
 
         popup.update_idletasks()
 
@@ -263,24 +277,30 @@ def build_editor_ui(editor) -> None:
         popup.geometry(f"{max(60, w)}x{h}+{x}+{y_above}")
         popup.deiconify()
         popup.lift()
-        # Ensure the popup can receive focus; then close it when focus leaves.
-        # Binding focus-out *after* focusing avoids immediate dismissal.
+        
+        # Grab to capture clicks outside the popup (within the app).
+        try:
+            popup.grab_set()
+        except Exception:
+            pass
+
         try:
             popup.focus_force()
         except Exception:
             pass
         lb.focus_set()
-
-        def _bind_focus_out() -> None:
+        
+        # Handle clicks outside the popup bounds (while grab is active).
+        def _check_click_outside(event):
             try:
-                popup.bind("<FocusOut>", _close_profiles_popup)
+                # If the click is in the listbox, ignore (handled by listbox bindings).
+                if event.widget == lb:
+                    return
+                _close_profiles_popup()
             except Exception:
-                return
+                _close_profiles_popup()
 
-        try:
-            popup.after(0, _bind_focus_out)
-        except Exception:
-            pass
+        popup.bind("<Button-1>", _check_click_outside)
 
         editor._profiles_popup["win"] = popup
         return "break"
