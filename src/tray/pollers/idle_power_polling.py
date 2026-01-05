@@ -4,6 +4,8 @@ import threading
 import time
 from typing import Any, Optional
 
+from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+
 from .idle_power_policy import IdleAction, compute_idle_action
 from .idle_power_sensors import (
     get_session_id as _get_session_id_impl,
@@ -342,7 +344,9 @@ def start_idle_power_polling(
                         tray._dim_temp_active = True
                         tray._dim_temp_target_brightness = int(dim_temp_brightness)
                         try:
-                            tray.engine.set_brightness(int(dim_temp_brightness))
+                            effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
+                            is_sw_effect = effect == "perkey" or effect in SW_EFFECTS
+                            tray.engine.set_brightness(int(dim_temp_brightness), apply_to_hardware=not is_sw_effect)
                         except Exception:
                             pass
 
@@ -356,7 +360,9 @@ def start_idle_power_polling(
                         target = 0
                     if target > 0 and not bool(getattr(tray, "is_off", False)):
                         try:
-                            tray.engine.set_brightness(int(target))
+                            effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
+                            is_sw_effect = effect == "perkey" or effect in SW_EFFECTS
+                            tray.engine.set_brightness(int(target), apply_to_hardware=not is_sw_effect)
                         except Exception:
                             pass
 

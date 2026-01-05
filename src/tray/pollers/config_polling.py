@@ -4,6 +4,8 @@ import threading
 import time
 from pathlib import Path
 
+from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+
 
 def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
     """Poll config file for external changes and apply them."""
@@ -91,6 +93,34 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                 try:
                     tray.engine.reactive_use_manual_color = bool(new_use_manual)
                     tray.engine.reactive_color = tuple(new_rcol)
+                except Exception:
+                    pass
+                last_applied = current
+                tray._refresh_ui()
+                return
+
+        # If only brightness changed for a running software effect, update engine
+        # state without restarting the effect loop (prevents a brief uniform-color
+        # flash during the engine's restart fade).
+        if last_applied is not None:
+            try:
+                old_eff, old_spd, old_bri, old_col, old_perkey_sig, old_use_manual, old_rcol = last_applied
+                new_eff, new_spd, new_bri, new_col, new_perkey_sig, new_use_manual, new_rcol = current
+                only_brightness_changed = (
+                    old_eff == new_eff
+                    and old_spd == new_spd
+                    and old_col == new_col
+                    and old_perkey_sig == new_perkey_sig
+                    and old_use_manual == new_use_manual
+                    and old_rcol == new_rcol
+                    and old_bri != new_bri
+                )
+            except Exception:
+                only_brightness_changed = False
+
+            if only_brightness_changed and str(new_eff) in SW_EFFECTS and bool(getattr(tray.engine, "running", False)):
+                try:
+                    tray.engine.set_brightness(int(new_bri), apply_to_hardware=False)
                 except Exception:
                     pass
                 last_applied = current

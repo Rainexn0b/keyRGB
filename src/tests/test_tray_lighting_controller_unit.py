@@ -176,7 +176,7 @@ class TestOnBrightnessClicked:
 
         # 20 * 5 = 100
         assert mock_tray.config.brightness == 100
-        mock_tray.engine.set_brightness.assert_called_once_with(100)
+        mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=True)
         mock_start.assert_called_once_with(mock_tray)
 
     def test_on_brightness_clicked_saves_nonzero_to_last_brightness(self):

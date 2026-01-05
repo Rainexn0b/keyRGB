@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Optional
 
+from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 
 logger = logging.getLogger(__name__)
 
@@ -155,8 +156,17 @@ def on_brightness_clicked(tray: Any, item: Any) -> None:
             pass
 
     tray.config.brightness = brightness_hw
-    tray.engine.set_brightness(tray.config.brightness)
-    if not tray.is_off:
+    # In software effect mode, avoid restarting the effect loop (which does a
+    # brief uniform-color fade) and avoid issuing a separate hardware brightness
+    # command (which can flash on some devices). The running loop reads
+    # engine.brightness on each frame.
+    try:
+        is_sw_effect = str(getattr(tray.config, "effect", "none") or "none") in SW_EFFECTS
+    except Exception:
+        is_sw_effect = False
+
+    tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_sw_effect)
+    if not tray.is_off and not is_sw_effect:
         start_current_effect(tray)
     tray._update_menu()
 
@@ -285,8 +295,14 @@ def apply_brightness_from_power_policy(tray: Any, brightness: int) -> None:
         # tray UI reflects the effective brightness after plug/unplug (and on
         # startup).
         tray.config.brightness = brightness_int
-        tray.engine.set_brightness(tray.config.brightness)
-        if not bool(getattr(tray, "is_off", False)):
+
+        try:
+            is_sw_effect = str(getattr(tray.config, "effect", "none") or "none") in SW_EFFECTS
+        except Exception:
+            is_sw_effect = False
+
+        tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_sw_effect)
+        if not bool(getattr(tray, "is_off", False)) and not is_sw_effect:
             start_current_effect(tray)
         tray._refresh_ui()
     except Exception:

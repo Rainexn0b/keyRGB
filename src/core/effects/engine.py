@@ -132,9 +132,17 @@ class EffectsEngine:
         with self.kb_lock:
             self.kb.turn_off()
 
-    def set_brightness(self, brightness: int):
-        """Set brightness (0-50 hardware scale)"""
-        self.brightness = max(0, min(50, brightness))
+    def set_brightness(self, brightness: int, *, apply_to_hardware: bool = True):
+        """Set brightness (0-50 hardware scale).
+
+        In software/per-key mode, callers may want to update the engine's
+        brightness state without issuing a separate hardware brightness command,
+        which can cause a brief flash on some devices.
+        """
+
+        self.brightness = max(0, min(50, int(brightness)))
+        if not apply_to_hardware:
+            return
         self._ensure_device_available()
         with self.kb_lock:
             self.kb.set_brightness(self.brightness)
