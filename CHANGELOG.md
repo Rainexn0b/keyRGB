@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.1 (2026-01-05)
+
+- Installer: improved AppImage download UX (shows a progress bar in interactive shells).
+- Installer: avoid Python traceback on GitHub API failures; now fails quietly and falls back to the latest stable release URL.
+- Installer: add navigation headers and VS Code folding regions to make `install.sh` easier to navigate.
+- Installer: small messaging tweaks and friendly prompts (Star the project / open an issue if you found a problem).
+
 ## 0.11.0 (2026-01-05)
 
 - Backends: renamed the ITE USB backend package to `ite8291r3` (protocol-scoped) and removed the legacy `ite` shim.
