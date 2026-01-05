@@ -156,8 +156,114 @@ def build_editor_ui(editor) -> None:
         textvariable=editor._profile_name_var,
         values=profiles.list_profiles(),
         width=22,
+        state="readonly",
     )
     editor._profiles_combo.grid(row=0, column=1, sticky="ew", padx=(8, 0))
+
+    # The default ttk Combobox popdown opens downward, which often gets clipped
+    # by the bottom panel. Use a small popup list that opens upwards.
+    editor._profiles_popup = {"win": None}
+
+    def _close_profiles_popup(_e=None) -> None:
+        win = editor._profiles_popup.get("win")
+        if win is None:
+            return
+        try:
+            win.destroy()
+        except Exception:
+            pass
+        editor._profiles_popup["win"] = None
+
+    def _apply_profile_selection(value: str) -> None:
+        try:
+            editor._profile_name_var.set(value)
+        except Exception:
+            return
+
+    def _open_profiles_popup(_e=None) -> str:
+        # Toggle
+        if editor._profiles_popup.get("win") is not None:
+            _close_profiles_popup()
+            return "break"
+
+        values = list(profiles.list_profiles())
+        if not values:
+            return "break"
+
+        popup = tk.Toplevel(editor.root)
+        popup.withdraw()
+        popup.overrideredirect(True)
+        popup.transient(editor.root)
+
+        lb = tk.Listbox(
+            popup,
+            exportselection=False,
+            activestyle="none",
+            height=min(len(values), 10),
+        )
+        lb.pack(fill="both", expand=True)
+
+        for v in values:
+            lb.insert("end", v)
+
+        current = (editor._profile_name_var.get() or "").strip()
+        if current in values:
+            idx = values.index(current)
+            try:
+                lb.selection_set(idx)
+                lb.activate(idx)
+                lb.see(idx)
+            except Exception:
+                pass
+
+        def _commit_from_listbox(_event=None) -> None:
+            try:
+                sel = lb.curselection()
+                if not sel:
+                    _close_profiles_popup()
+                    return
+                chosen = str(lb.get(sel[0]))
+            except Exception:
+                _close_profiles_popup()
+                return
+            _apply_profile_selection(chosen)
+            _close_profiles_popup()
+
+        lb.bind("<ButtonRelease-1>", _commit_from_listbox)
+        lb.bind("<Return>", _commit_from_listbox)
+        lb.bind("<Escape>", _close_profiles_popup)
+
+        # Close when focus is lost.
+        popup.bind("<FocusOut>", _close_profiles_popup)
+
+        popup.update_idletasks()
+
+        # Position above the combobox.
+        x = editor._profiles_combo.winfo_rootx()
+        y = editor._profiles_combo.winfo_rooty()
+        w = editor._profiles_combo.winfo_width()
+        h = popup.winfo_reqheight()
+
+        y_above = y - h
+        if y_above < 0:
+            # Fallback below if we're too close to the top of the screen.
+            y_above = y + editor._profiles_combo.winfo_height()
+
+        popup.geometry(f"{max(60, w)}x{h}+{x}+{y_above}")
+        popup.deiconify()
+        popup.lift()
+        try:
+            popup.focus_force()
+        except Exception:
+            pass
+        lb.focus_set()
+
+        editor._profiles_popup["win"] = popup
+        return "break"
+
+    # Intercept the default popdown.
+    editor._profiles_combo.bind("<Button-1>", _open_profiles_popup)
+    editor._profiles_combo.bind("<Down>", _open_profiles_popup)
 
     pbtns = ttk.Frame(editor._profiles_frame)
     pbtns.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 0))
