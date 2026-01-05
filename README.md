@@ -111,6 +111,14 @@ If you don't want the installer to attempt system package installs (no sudo / mi
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --no-system-deps
 ```
 
+#### Automated AppImage update (non-interactive)
+
+Updates an existing AppImage install by replacing `~/.local/bin/keyrgb` with the newest matching release. Uses the last saved release channel (stable vs prerelease) unless overridden.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage
+```
+
 #### Option B: Install from a local checkout (dev / local mods)
 
 If you already cloned the repo:
@@ -211,6 +219,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | `--clone` | Clone repo and install via pip (source). |
 | `--version <tag>` | Install specific tag (e.g. `v0.9.3`). |
 | `--no-system-deps` | Skip best-effort system dependency installation. |
+| `--update-appimage` | Non-interactive: update an existing AppImage install (downloads latest and replaces `~/.local/bin/keyrgb`). |
 
 ### Environment variables
 

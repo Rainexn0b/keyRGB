@@ -107,13 +107,17 @@ pkg_install_best_effort() {
 usage() {
         cat <<'EOF'
 Usage:
-    ./install.sh [--appimage] [--clone] [--clone-dir <path>] [--pip] [--version <tag>] [--asset <name>] [--prerelease] [--no-system-deps]
+    ./install.sh [--appimage] [--clone] [--clone-dir <path>] [--pip] [--version <tag>] [--asset <name>] [--prerelease] [--no-system-deps] [--update-appimage]
 
 Modes:
     --appimage  Install by downloading the AppImage. (default)
     --pip       Install from this repo via pip (-e). (dev / editable install)
     --clone     Clone the repo (source code) then install via pip (-e).
                Use this if you want to modify the code for your machine.
+    --update-appimage
+               Non-interactive: update an existing AppImage install by downloading the newest matching release
+               and replacing ~/.local/bin/keyrgb. Uses the last saved release channel (stable vs prerelease)
+               unless overridden by --prerelease.
 
 What gets installed (both modes):
     - System dependencies (best-effort via your package manager when available)
@@ -153,10 +157,21 @@ EOF
 }
 
 MODE=""
+UPDATE_APPIMAGE_ONLY=0
 KEYRGB_INSTALL_MODE="${KEYRGB_INSTALL_MODE:-}"
 KEYRGB_CLONE_DIR="${KEYRGB_CLONE_DIR:-$HOME/.local/share/keyrgb-src}"
 KEYRGB_VERSION="${KEYRGB_VERSION:-}"
+KEYRGB_APPIMAGE_ASSET_SET=0
+if [ -n "${KEYRGB_APPIMAGE_ASSET+x}" ]; then
+    KEYRGB_APPIMAGE_ASSET_SET=1
+fi
 KEYRGB_APPIMAGE_ASSET="${KEYRGB_APPIMAGE_ASSET:-keyrgb-x86_64.AppImage}"
+
+KEYRGB_ALLOW_PRERELEASE_SET=0
+KEYRGB_ALLOW_PRERELEASE_FROM_STATE=0
+if [ -n "${KEYRGB_ALLOW_PRERELEASE+x}" ]; then
+    KEYRGB_ALLOW_PRERELEASE_SET=1
+fi
 KEYRGB_ALLOW_PRERELEASE="${KEYRGB_ALLOW_PRERELEASE:-n}"
 KEYRGB_INSTALL_TCC_APP="${KEYRGB_INSTALL_TCC_APP:-}"
 KEYRGB_INSTALL_INPUT_UDEV="${KEYRGB_INSTALL_INPUT_UDEV:-}"
@@ -166,8 +181,69 @@ STATE_DIR="$HOME/.local/share/keyrgb"
 TCC_MARKER="$STATE_DIR/tcc-installed-by-keyrgb"
 KERNEL_DRIVERS_MARKER="$STATE_DIR/kernel-drivers-installed-by-keyrgb"
 
+INSTALLER_STATE_FILE="$STATE_DIR/installer-state"
+
+load_saved_appimage_prefs() {
+    if ! [ -f "$INSTALLER_STATE_FILE" ]; then
+        return 0
+    fi
+
+    # Format: key=value (one per line). Only accept known keys and safe values.
+    local line key val
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            ""|\#*) continue ;;
+        esac
+        key="${line%%=*}"
+        val="${line#*=}"
+
+        case "$key" in
+            allow_prerelease)
+                if [ "$KEYRGB_ALLOW_PRERELEASE_SET" -eq 0 ]; then
+                    case "${val,,}" in
+                        y|yes|1|true)
+                            KEYRGB_ALLOW_PRERELEASE="y"
+                            KEYRGB_ALLOW_PRERELEASE_FROM_STATE=1
+                            ;;
+                        n|no|0|false)
+                            KEYRGB_ALLOW_PRERELEASE="n"
+                            KEYRGB_ALLOW_PRERELEASE_FROM_STATE=1
+                            ;;
+                    esac
+                fi
+                ;;
+            appimage_asset)
+                if [ "$KEYRGB_APPIMAGE_ASSET_SET" -eq 0 ]; then
+                    # Very small safety filter (avoid spaces/path traversal).
+                    if echo "$val" | grep -Eq '^[A-Za-z0-9._-]+$'; then
+                        KEYRGB_APPIMAGE_ASSET="$val"
+                    fi
+                fi
+                ;;
+        esac
+    done < "$INSTALLER_STATE_FILE"
+}
+
+save_appimage_prefs() {
+    mkdir -p "$STATE_DIR" 2>/dev/null || true
+    {
+        echo "# KeyRGB installer state (best-effort)"
+        echo "install_mode=appimage"
+        echo "allow_prerelease=${KEYRGB_ALLOW_PRERELEASE:-n}"
+        echo "appimage_asset=${KEYRGB_APPIMAGE_ASSET:-keyrgb-x86_64.AppImage}"
+        if [ -n "${KEYRGB_VERSION:-}" ]; then
+            echo "last_tag=${KEYRGB_VERSION}"
+        fi
+    } > "$INSTALLER_STATE_FILE" 2>/dev/null || true
+}
+
 while [ "$#" -gt 0 ]; do
         case "$1" in
+        --update-appimage|--update)
+            UPDATE_APPIMAGE_ONLY=1
+            MODE="appimage"
+            shift
+            ;;
                 --pip|--repo)
                         MODE="pip"
                         shift
@@ -190,10 +266,12 @@ while [ "$#" -gt 0 ]; do
                         ;;
                 --asset)
                         KEYRGB_APPIMAGE_ASSET="${2:-}"
+                        KEYRGB_APPIMAGE_ASSET_SET=1
                         shift 2
                         ;;
                 --prerelease)
                     KEYRGB_ALLOW_PRERELEASE="y"
+                    KEYRGB_ALLOW_PRERELEASE_SET=1
                     shift
                     ;;
                 --no-system-deps)
@@ -260,7 +338,15 @@ select_install_mode() {
     MODE="appimage"
 }
 
-select_install_mode
+if [ "$UPDATE_APPIMAGE_ONLY" -eq 1 ]; then
+    MODE="appimage"
+else
+    select_install_mode
+fi
+
+if [ "$MODE" = "appimage" ]; then
+    load_saved_appimage_prefs
+fi
 
 echo "Install mode: $MODE"
 
@@ -275,7 +361,7 @@ fi
 
 # AppImage installs can auto-resolve the newest release that contains the AppImage asset.
 # For interactive debugging, allow opting into prereleases.
-if [ "$MODE" = "appimage" ] && [ -z "${KEYRGB_VERSION:-}" ] && [ -t 0 ]; then
+if [ "$MODE" = "appimage" ] && [ -z "${KEYRGB_VERSION:-}" ] && [ -t 0 ] && [ "$UPDATE_APPIMAGE_ONLY" -ne 1 ] && [ "$KEYRGB_ALLOW_PRERELEASE_SET" -ne 1 ] && [ "$KEYRGB_ALLOW_PRERELEASE_FROM_STATE" -ne 1 ]; then
     # Only prompt if the user didn't already choose via flag/env.
     if [ "${KEYRGB_ALLOW_PRERELEASE:-}" = "" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "n" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "no" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "0" ] || [ "${KEYRGB_ALLOW_PRERELEASE,,}" = "false" ]; then
         echo
@@ -296,6 +382,8 @@ if [ "$EUID" -eq 0 ]; then
     echo "❌ Please run without sudo (script will ask for password when needed)"
     exit 1
 fi
+
+if [ "$UPDATE_APPIMAGE_ONLY" -ne 1 ]; then
 
 INSTALL_TUXEDO="n"
 INSTALL_TCC_APP="n"
@@ -466,6 +554,8 @@ fi
 
 # endregion User choices (interactive prompts)
 
+fi  # UPDATE_APPIMAGE_ONLY
+
 # region System dependency installation
 install_system_deps_best_effort() {
     echo
@@ -541,14 +631,16 @@ install_system_deps_best_effort() {
 }
 
 # Best-effort system dependency installation.
-if [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "y" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "yes" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "1" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "true" ]; then
-    echo "ℹ️  Skipping system dependency installation (KEYRGB_SKIP_SYSTEM_DEPS / --no-system-deps)."
-else
-    if detect_pkg_manager; then
-        install_system_deps_best_effort
+if [ "$UPDATE_APPIMAGE_ONLY" -ne 1 ]; then
+    if [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "y" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "yes" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "1" ] || [ "${KEYRGB_SKIP_SYSTEM_DEPS,,}" = "true" ]; then
+        echo "ℹ️  Skipping system dependency installation (KEYRGB_SKIP_SYSTEM_DEPS / --no-system-deps)."
     else
-        echo "⚠️  No supported package manager found; skipping system package installation."
-        echo "   You may need: python3, pip, tkinter, usbutils, dbus, and tray deps for pystray."
+        if detect_pkg_manager; then
+            install_system_deps_best_effort
+        else
+            echo "⚠️  No supported package manager found; skipping system package installation."
+            echo "   You may need: python3, pip, tkinter, usbutils, dbus, and tray deps for pystray."
+        fi
     fi
 fi
 
@@ -602,7 +694,9 @@ maybe_clone_source_repo() {
     MODE="pip"
 }
 
-maybe_clone_source_repo
+if [ "$UPDATE_APPIMAGE_ONLY" -ne 1 ]; then
+    maybe_clone_source_repo
+fi
 
 # endregion Clone/source mode setup
 
@@ -650,14 +744,16 @@ if [ "$MODE" = "pip" ]; then
 fi
 
 # Check for USB device (common supported ITE 8291r3 IDs)
-if command -v lsusb &> /dev/null; then
-    if ! lsusb | grep -Eqi "048d:(6004|6006|6008|600b|ce00)"; then
-        echo "⚠️  Warning: supported ITE 8291r3 USB device not detected"
-        echo "   Expected one of: 048d:6004, 048d:6006, 048d:6008, 048d:600b, 048d:ce00"
-        echo "   Please make sure your keyboard is connected"
+if [ "$UPDATE_APPIMAGE_ONLY" -ne 1 ]; then
+    if command -v lsusb &> /dev/null; then
+        if ! lsusb | grep -Eqi "048d:(6004|6006|6008|600b|ce00)"; then
+            echo "⚠️  Warning: supported ITE 8291r3 USB device not detected"
+            echo "   Expected one of: 048d:6004, 048d:6006, 048d:6008, 048d:600b, 048d:ce00"
+            echo "   Please make sure your keyboard is connected"
+        fi
+    else
+        echo "⚠️  lsusb not found; skipping USB device detection check."
     fi
-else
-    echo "⚠️  lsusb not found; skipping USB device detection check."
 fi
 
 # endregion Environment checks
@@ -863,6 +959,9 @@ install_appimage() {
     download_url "$url" "$app_dst"
     chmod +x "$app_dst"
     echo "✓ Installed AppImage: $app_dst"
+
+    # Save channel/asset/tag so future updates can reuse the same selection.
+    save_appimage_prefs
 }
 
 # endregion Download helpers + AppImage install
@@ -1184,6 +1283,15 @@ install_kernel_drivers() {
 # endregion Optional components
 
 # region Main install flow
+
+if [ "$UPDATE_APPIMAGE_ONLY" -eq 1 ]; then
+    echo
+    echo "🔄 Updating KeyRGB AppImage (non-interactive)..."
+    install_appimage
+    echo
+    echo "✓ AppImage update complete"
+    exit 0
+fi
 
 if [ "$MODE" = "pip" ]; then
     # Install ite8291r3-ctl library (upstream + tiny local patch for Wootbook 0x600B)
