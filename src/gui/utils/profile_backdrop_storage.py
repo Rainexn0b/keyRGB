@@ -5,12 +5,12 @@ from typing import Optional
 
 from PIL import Image
 
-from src.core.resources.layout import BASE_IMAGE_SIZE
 from src.core.profile import profiles
+from src.core.resources.layout import BASE_IMAGE_SIZE
 
 
 def _default_backdrop_candidates(profile_name: str) -> list[Path]:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[3]
     return [
         profiles.paths_for(profile_name).backdrop_image,
         # Repo/AppImage fallback: locate bundled assets regardless of cwd.

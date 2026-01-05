@@ -91,6 +91,8 @@ def start_current_effect(tray: Any) -> None:
             speed=tray.config.speed,
             brightness=tray.config.brightness,
             color=tray.config.color,
+            reactive_color=getattr(tray.config, "reactive_color", None),
+            reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
         )
         tray.is_off = False
     except Exception as exc:

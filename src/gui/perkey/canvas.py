@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Optional
 from src.core.logging_utils import log_throttled
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
-from src.gui.reference_deck_image import load_reference_deck_image
-from src.gui.reference_overlay_geometry import (
+from src.gui.reference.deck_image import load_reference_deck_image
+from src.gui.reference.overlay_geometry import (
     CanvasTransform,
     apply_global_tweak,
     apply_per_key_tweak,
@@ -18,7 +18,7 @@ from src.gui.reference_overlay_geometry import (
     key_canvas_rect,
     transform_from_drawn_bbox,
 )
-from src.gui.key_draw_style import key_draw_style
+from src.gui.utils.key_draw_style import key_draw_style
 
 from .canvas_hit_testing import (
     cursor_for_edges,

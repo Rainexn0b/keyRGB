@@ -10,8 +10,8 @@ from src.core.config import Config
 from src.core.resources.defaults import DEFAULT_LAYOUT_TWEAKS
 from src.core.resources.layout import REFERENCE_DEVICE_KEYS
 from src.core.profile import profiles
-from src.gui.window_icon import apply_keyrgb_window_icon
-from src.gui.theme import apply_clam_dark_theme
+from src.gui.utils.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_theme
 
 from .ui.backdrop import reset_backdrop_ui, set_backdrop_ui
 
@@ -77,20 +77,21 @@ class PerKeyEditor:
         )
 
         style = ttk.Style()
-        self.bg_color, self.fg_color = apply_clam_dark_theme(self.root)
+        self.bg_color, self.fg_color = apply_clam_theme(self.root)
         style.configure("TCheckbutton", background=self.bg_color, foreground=self.fg_color)
         style.configure("TLabelframe", background=self.bg_color, foreground=self.fg_color)
         style.configure("TLabelframe.Label", background=self.bg_color, foreground=self.fg_color)
         style.configure("TRadiobutton", background=self.bg_color, foreground=self.fg_color)
 
-        # Improve dark-mode consistency for common input widgets used in the bottom panels.
-        style.configure("TEntry", fieldbackground="#3a3a3a", foreground=self.fg_color)
-        style.configure("TCombobox", fieldbackground="#3a3a3a", foreground=self.fg_color)
-        # ttk Combobox uses state-specific mapping; ensure readonly stays readable.
+        # Keep input widgets readable. Colors come from the active theme,
+        # so this works for both dark and light system preferences.
+        field_bg = style.lookup("TEntry", "fieldbackground") or "#3a3a3a"
+        style.configure("TEntry", fieldbackground=field_bg, foreground=self.fg_color)
+        style.configure("TCombobox", fieldbackground=field_bg, foreground=self.fg_color)
         try:
             style.map(
                 "TCombobox",
-                fieldbackground=[("readonly", "#3a3a3a"), ("disabled", "#3a3a3a")],
+                fieldbackground=[("readonly", field_bg), ("disabled", field_bg)],
                 foreground=[("readonly", self.fg_color), ("disabled", self.fg_color)],
             )
         except Exception:

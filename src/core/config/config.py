@@ -193,6 +193,57 @@ class Config:
         self._save()
 
     @property
+    def reactive_color(self) -> tuple[int, int, int]:
+        raw = self._settings.get("reactive_color", None)
+        if raw is None:
+            try:
+                raw = self.DEFAULTS.get("reactive_color", [255, 255, 255])
+            except Exception:
+                raw = [255, 255, 255]
+        try:
+            r, g, b = raw
+        except Exception:
+            r, g, b = 255, 255, 255
+
+        def _clamp(x: object) -> int:
+            try:
+                v = int(x)
+            except Exception:
+                return 0
+            return max(0, min(255, v))
+
+        return (_clamp(r), _clamp(g), _clamp(b))
+
+    @reactive_color.setter
+    def reactive_color(self, value: tuple[int, int, int] | tuple):
+        try:
+            r, g, b = value
+        except Exception:
+            return
+
+        def _clamp(x: object) -> int:
+            try:
+                v = int(x)
+            except Exception:
+                return 0
+            return max(0, min(255, v))
+
+        self._settings["reactive_color"] = [_clamp(r), _clamp(g), _clamp(b)]
+        self._save()
+
+    @property
+    def reactive_use_manual_color(self) -> bool:
+        try:
+            return bool(self._settings.get("reactive_use_manual_color", False))
+        except Exception:
+            return False
+
+    @reactive_use_manual_color.setter
+    def reactive_use_manual_color(self, value: bool):
+        self._settings["reactive_use_manual_color"] = bool(value)
+        self._save()
+
+    @property
     def autostart(self) -> bool:
         return self._settings["autostart"]
 

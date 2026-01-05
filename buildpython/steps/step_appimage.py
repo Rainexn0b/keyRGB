@@ -15,6 +15,11 @@ from ..utils.subproc import RunResult, python_exe, run
 APPIMAGETOOL_URL = "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
 
 
+def _env_flag(name: str) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    return raw in {"1", "true", "yes", "y", "on"}
+
+
 def _download(url: str, dst: Path) -> None:
     dst.parent.mkdir(parents=True, exist_ok=True)
 
@@ -263,6 +268,13 @@ def build_appimage() -> Path:
 
     appimagetool = tools / "appimagetool-x86_64.AppImage"
 
+    # Some environments (especially bleeding-edge Python builds) can't build
+    # native deps like `evdev` without kernel headers, which blocks full
+    # AppImage construction. These flags let us still refresh the staged AppDir
+    # (and therefore bundled sources/launchers) for local testing.
+    staging_only = _env_flag("KEYRGB_APPIMAGE_STAGING_ONLY")
+    skip_deps = staging_only or _env_flag("KEYRGB_APPIMAGE_SKIP_DEPS")
+
     if appdir.exists():
         shutil.rmtree(appdir)
     work.mkdir(parents=True, exist_ok=True)
@@ -295,32 +307,33 @@ def build_appimage() -> Path:
     # We still use the system python interpreter at runtime.
     site_packages.mkdir(parents=True, exist_ok=True)
 
-    req = root / "requirements.txt"
-    if req.exists():
-        _run_checked(
-            [python_exe(), "-m", "pip", "install", "-r", str(req), "--target", str(site_packages)],
-            cwd=root,
-        )
+    if not skip_deps:
+        req = root / "requirements.txt"
+        if req.exists():
+            _run_checked(
+                [python_exe(), "-m", "pip", "install", "-r", str(req), "--target", str(site_packages)],
+                cwd=root,
+            )
 
-    vendor_ite = root / "vendor" / "ite8291r3-ctl"
-    if vendor_ite.exists():
-        _run_checked(
-            [
-                python_exe(),
-                "-m",
-                "pip",
-                "install",
-                "--no-deps",
-                str(vendor_ite),
-                "--target",
-                str(site_packages),
-            ],
-            cwd=root,
-        )
+        vendor_ite = root / "vendor" / "ite8291r3-ctl"
+        if vendor_ite.exists():
+            _run_checked(
+                [
+                    python_exe(),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--no-deps",
+                    str(vendor_ite),
+                    "--target",
+                    str(site_packages),
+                ],
+                cwd=root,
+            )
 
-    # Bundle PyGObject (gi) when available in the build env so pystray can use
-    # AppIndicator without relying on the user's system Python packages.
-    _bundle_pygobject(appdir=appdir, site_packages=site_packages)
+        # Bundle PyGObject (gi) when available in the build env so pystray can use
+        # AppIndicator without relying on the user's system Python packages.
+        _bundle_pygobject(appdir=appdir, site_packages=site_packages)
 
     # Desktop + icon expected by appimagetool.
     icon_src = root / "assets" / "logo-keyrgb.png"
@@ -366,6 +379,10 @@ def build_appimage() -> Path:
     )
     _write_text(appdir / "AppRun", apprun)
     _chmod_x(appdir / "AppRun")
+
+    if staging_only:
+        print(f"Prepared AppDir (staging-only): {appdir}")
+        return appdir
 
     # Build the AppImage.
     if out.exists():

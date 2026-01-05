@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.12.0 (beta) (2026-01-05)
+
+- GUI: refactor theme logic into a dedicated `src/gui/theme/` package while keeping the public import path stable (`from src.gui.theme import apply_clam_theme`).
+- GUI: add a dedicated reactive typing color UI (`keyrgb-reactive-color`) to set a manual highlight color for `reactive_fade` / `reactive_ripple`.
+- Tray: config polling can apply reactive manual-color changes live without restarting the running effect.
+- GUI: consolidate GUI modules into clearer packages (`src/gui/windows/`, `src/gui/utils/`, `src/gui/reference/`, `src/gui/tcc/`) and remove remaining legacy GUI shims.
+- GUI: move calibrator launcher into `src/gui/calibrator/launch.py` and keep the `keyrgb-calibrate` entrypoint working.
+- Build/AppImage: add `KEYRGB_APPIMAGE_STAGING_ONLY` and `KEYRGB_APPIMAGE_SKIP_DEPS` to regenerate the AppDir when dependency builds are unavailable, and refresh the staged AppDir to match the new module layout.
+- Docs: update README + usage docs to reflect current entrypoints and GUI locations.
+- Tests: add/update unit tests covering the reactive typing color config + related tray/controller behaviors.
+
 ## 0.11.5 (2026-01-05)
 
 - Profiles/Per-key editor: add built-in `dark` profile preset (all keys off) to better showcase reactive typing effects.

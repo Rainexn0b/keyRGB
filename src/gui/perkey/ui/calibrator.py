@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from src.gui.launch_keymap_calibrator import launch_keymap_calibrator
+from src.gui.calibrator.launch import launch_keymap_calibrator
 
 from .status import calibrator_failed, calibrator_started, set_status
 

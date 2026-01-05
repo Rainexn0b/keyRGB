@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keyrgb"
-version = "0.11.5"
+version = "0.12.0"
 description = "Minimal RGB keyboard controller for ITE 8291 keyboards"
 readme = "README.md"
 requires-python = ">=3.8"
@@ -55,8 +55,11 @@ Repository = "https://github.com/Rainexn0b/keyRGB"
 [project.scripts]
 keyrgb = "src.tray.entrypoint:main"
 keyrgb-perkey = "src.gui.perkey:main"
-keyrgb-uniform = "src.gui.uniform:main"
+keyrgb-uniform = "src.gui.windows.uniform:main"
+keyrgb-reactive-color = "src.gui.windows.reactive_color:main"
 keyrgb-calibrate = "src.gui.calibrator:main"
+keyrgb-settings = "src.gui.settings:main"
+keyrgb-tcc-profiles = "src.gui.tcc.profiles:main"
 keyrgb-diagnostics = "src.core.diagnostics:main"
 
 [tool.setuptools]

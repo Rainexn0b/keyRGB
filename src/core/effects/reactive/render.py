@@ -89,11 +89,18 @@ def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
 
 
 def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
+    # Brightness is on the 0..50 hardware scale (shared across uniform + per-key writes).
+    try:
+        brightness_hw = int(getattr(engine, "brightness", 25) or 0)
+    except Exception:
+        brightness_hw = 25
+    brightness_hw = max(0, min(50, brightness_hw))
+
     if has_per_key(engine):
         try:
-            enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
+            enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
             with engine.kb_lock:
-                engine.kb.set_key_colors(color_map, brightness=int(engine.brightness), enable_user_mode=False)
+                engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)
             return
         except Exception as exc:
             log_throttled(
@@ -114,7 +121,7 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
         n = max(1, len(color_map))
         rgb = (int(rs / n), int(gs / n), int(bs / n))
 
-    r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(engine.brightness))
+    r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))
     with engine.kb_lock:
-        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
-        engine.kb.set_color((r, g, b), brightness=int(engine.brightness))
+        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
+        engine.kb.set_color((r, g, b), brightness=int(brightness_hw))

@@ -4,7 +4,7 @@ from typing import Any, Callable
 
 from tkinter import filedialog
 
-from src.gui.profile_backdrop_storage import reset_backdrop_image, save_backdrop_image
+from src.gui.utils.profile_backdrop_storage import reset_backdrop_image, save_backdrop_image
 
 from .status import (
     backdrop_reset,

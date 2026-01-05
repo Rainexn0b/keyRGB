@@ -13,7 +13,7 @@ from tkinter import ttk
 
 from src.core.runtime.imports import repo_root_from
 from src.core.version_check import compare_versions, normalize_version_text
-from src.gui.tk_async import run_in_thread
+from src.gui.utils.tk_async import run_in_thread
 
 
 class VersionPanel:

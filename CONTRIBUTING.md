@@ -21,7 +21,10 @@ Run locally:
 
 ```bash
 keyrgb
+keyrgb-settings
 keyrgb-perkey
+keyrgb-uniform
+keyrgb-reactive-color
 keyrgb-calibrate
 ```
 

@@ -130,6 +130,38 @@ class TestPowerManagerEventHandlers:
     """Test lid/suspend event handlers."""
 
     @patch("src.core.power_management.manager.PowerEventPolicy")
+    def test_suspend_records_intent_off_not_transient_is_off(self, mock_policy_cls):
+        """Suspend should report user intent, not transient tray.is_off.
+
+        If the keyboard is temporarily off due to idle/screen-off policy, we
+        still want suspend/resume restore decisions to reflect user intent.
+        """
+
+        from src.core.power_management.manager import PowerManager, TurnOffFromEvent
+
+        mock_kb = MagicMock()
+        # Transiently off (e.g., idle policy), but not user-forced off.
+        mock_kb.is_off = True
+        mock_kb._user_forced_off = False
+        mock_kb.turn_off = MagicMock()
+
+        mock_policy_instance = MagicMock()
+        mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
+        mock_policy_cls.return_value = mock_policy_instance
+
+        pm = PowerManager(mock_kb)
+        pm._config.power_management_enabled = True
+        pm._config.power_off_on_suspend = True
+        pm._config.brightness = 25
+
+        pm._on_suspend()
+
+        # Ensure the policy saw 'not intentionally off' even though is_off was True.
+        args, _kwargs = mock_policy_instance.handle_power_off_event.call_args
+        inputs = args[0]
+        assert inputs.is_off is False
+
+    @patch("src.core.power_management.manager.PowerEventPolicy")
     def test_on_suspend_calls_turn_off_when_enabled(self, mock_policy_cls):
         """_on_suspend should call kb.turn_off() when flags allow."""
         from src.core.power_management.manager import (

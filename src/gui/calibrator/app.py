@@ -13,7 +13,7 @@ from src.core.config import Config
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 from .geometry import hit_test, key_canvas_bbox
 from .probe import CalibrationProbeState
-from src.gui.profile_backdrop_storage import load_backdrop_image, reset_backdrop_image, save_backdrop_image
+from src.gui.utils.profile_backdrop_storage import load_backdrop_image, reset_backdrop_image, save_backdrop_image
 from .keyboard_preview import KeyboardPreviewSession
 from .profile_storage import (
     get_active_profile_name,
@@ -24,10 +24,10 @@ from .profile_storage import (
     save_keymap,
 )
 
-from src.gui.window_icon import apply_keyrgb_window_icon
-from src.gui.theme import apply_clam_dark_theme
-from src.gui.key_draw_style import key_draw_style
-from src.gui.reference_overlay_geometry import (
+from src.gui.utils.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_theme
+from src.gui.utils.key_draw_style import key_draw_style
+from src.gui.reference.overlay_geometry import (
     CanvasTransform,
     calc_centered_drawn_bbox,
     transform_from_drawn_bbox,
@@ -52,7 +52,7 @@ class KeymapCalibrator(tk.Tk):
         self.title("KeyRGB - Keymap Calibrator")
         apply_keyrgb_window_icon(self)
 
-        self.bg_color, self.fg_color = apply_clam_dark_theme(self)
+        self.bg_color, self.fg_color = apply_clam_theme(self)
 
         self.cfg = Config()
         self.preview = KeyboardPreviewSession(self.cfg, rows=MATRIX_ROWS, cols=MATRIX_COLS)

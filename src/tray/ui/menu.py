@@ -120,6 +120,11 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
     sw_items = [
         item(
+            "Reactive Typing Color…",
+            tray._on_reactive_color_clicked,
+        ),
+        pystray.Menu.SEPARATOR,
+        item(
             "None (static per-key)",
             _sw_cb("perkey"),
             checked=_checked_perkey,

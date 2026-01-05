@@ -48,16 +48,54 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
                         pass
                 perkey_sig = None
 
+        # Reactive typing manual color (may be unused unless enabled).
+        try:
+            reactive_use_manual = bool(getattr(tray.config, "reactive_use_manual_color", False))
+        except Exception:
+            reactive_use_manual = False
+        try:
+            reactive_color = tuple(getattr(tray.config, "reactive_color", (255, 255, 255)))
+        except Exception:
+            reactive_color = (255, 255, 255)
+
         current = (
             tray.config.effect,
             tray.config.speed,
             tray.config.brightness,
             tuple(tray.config.color),
             perkey_sig,
+            reactive_use_manual,
+            reactive_color,
         )
 
         if current == last_applied:
             return
+
+        # If only the reactive manual color/toggle changed, don't restart effects.
+        if last_applied is not None:
+            try:
+                old_eff, old_spd, old_bri, old_col, old_perkey_sig, old_use_manual, old_rcol = last_applied
+                new_eff, new_spd, new_bri, new_col, new_perkey_sig, new_use_manual, new_rcol = current
+                only_reactive_changed = (
+                    old_eff == new_eff
+                    and old_spd == new_spd
+                    and old_bri == new_bri
+                    and old_col == new_col
+                    and old_perkey_sig == new_perkey_sig
+                    and (old_use_manual != new_use_manual or old_rcol != new_rcol)
+                )
+            except Exception:
+                only_reactive_changed = False
+
+            if only_reactive_changed:
+                try:
+                    tray.engine.reactive_use_manual_color = bool(new_use_manual)
+                    tray.engine.reactive_color = tuple(new_rcol)
+                except Exception:
+                    pass
+                last_applied = current
+                tray._refresh_ui()
+                return
 
         log_event = getattr(tray, "_log_event", None)
         if callable(log_event):
@@ -119,6 +157,14 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
 
         if tray.config.brightness > 0:
             tray._last_brightness = tray.config.brightness
+
+        # Always keep the engine's reactive color settings in sync so a running
+        # reactive loop can pick up changes without requiring a restart.
+        try:
+            tray.engine.reactive_use_manual_color = bool(reactive_use_manual)
+            tray.engine.reactive_color = tuple(reactive_color)
+        except Exception:
+            pass
 
         try:
             if tray.config.effect == "perkey":

@@ -16,10 +16,10 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
 from src.core.logging_utils import log_throttled
-from src.gui.window_icon import apply_keyrgb_window_icon
-from src.gui.theme import apply_clam_dark_theme
-from src.gui.window_centering import center_window_on_screen
-from src.gui.tcc_profile_editor import open_profile_json_editor
+from src.gui.utils.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_theme
+from src.gui.utils.window_centering import center_window_on_screen
+from src.gui.tcc.profile_editor import open_profile_json_editor
 import src.core.tcc_power_profiles as tcc_power_profiles
 
 
@@ -35,7 +35,7 @@ class TccProfilesGUI:
         self.root.minsize(720, 520)
         self.root.resizable(True, True)
 
-        apply_clam_dark_theme(self.root)
+        apply_clam_theme(self.root)
 
         main = ttk.Frame(self.root, padding=16)
         main.pack(fill="both", expand=True)

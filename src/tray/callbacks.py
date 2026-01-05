@@ -14,7 +14,13 @@ import src.core.tcc_power_profiles as tcc_power_profiles
 from .controllers.effect_selection import apply_effect_selection
 from .controllers.lighting_controller import on_brightness_clicked, on_speed_clicked, turn_off, turn_on
 from .ui import menu as menu_mod
-from .ui.gui_launch import launch_perkey_gui, launch_power_gui, launch_tcc_profiles_gui, launch_uniform_gui
+from .ui.gui_launch import (
+    launch_perkey_gui,
+    launch_power_gui,
+    launch_reactive_color_gui,
+    launch_tcc_profiles_gui,
+    launch_uniform_gui,
+)
 
 
 def on_effect_clicked(tray: Any, item: Any) -> None:
@@ -60,6 +66,10 @@ def on_perkey_clicked() -> None:
 
 def on_uniform_gui_clicked() -> None:
     launch_uniform_gui()
+
+
+def on_reactive_color_gui_clicked() -> None:
+    launch_reactive_color_gui()
 
 
 def on_hardware_color_clicked(tray: Any) -> None:

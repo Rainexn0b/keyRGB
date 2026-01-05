@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Uniform Color GUI - Simple color wheel for selecting a single keyboard color.
-"""
+"""Uniform Color GUI - Simple color wheel for selecting a single keyboard color."""
 
 from __future__ import annotations
 
@@ -15,18 +13,18 @@ from tkinter import ttk
 
 from src.core.backends.registry import select_backend
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
-from src.gui.window_icon import apply_keyrgb_window_icon
-from src.gui.window_centering import center_window_on_screen
-from src.gui.theme import apply_clam_dark_theme
+from src.gui.utils.window_icon import apply_keyrgb_window_icon
+from src.gui.utils.window_centering import center_window_on_screen
+from src.gui.theme import apply_clam_theme
 
 
 logger = logging.getLogger(__name__)
 
 try:
-    from .widgets.color_wheel import ColorWheel
+    from src.gui.widgets.color_wheel import ColorWheel
     from src.core.config import Config
 except ImportError:
-    # Fallback for direct execution (e.g. `python src/gui/uniform.py`).
+    # Fallback for direct execution (e.g. `python src/gui/windows/uniform.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
     from src.gui.widgets.color_wheel import ColorWheel
     from src.core.config import Config
@@ -43,7 +41,7 @@ class UniformColorGUI:
         self.root.minsize(520, 610)
         self.root.resizable(True, True)
 
-        apply_clam_dark_theme(self.root)
+        apply_clam_theme(self.root)
 
         # Initialize config (tray app will apply changes if it's running)
         self.config = Config()
@@ -57,15 +55,12 @@ class UniformColorGUI:
             # Likely "resource busy" because the tray app already owns the USB device.
             self.kb = None
 
-        # Main container
         main_frame = ttk.Frame(self.root, padding=20)
         main_frame.pack(fill="both", expand=True)
 
-        # Title
         title = ttk.Label(main_frame, text="Select Uniform Keyboard Color", font=("Sans", 14, "bold"))
         title.pack(pady=(0, 10))
 
-        # Color wheel
         self.color_wheel = ColorWheel(
             main_frame,
             size=350,
@@ -75,7 +70,6 @@ class UniformColorGUI:
         )
         self.color_wheel.pack()
 
-        # Buttons
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(pady=20, fill="x")
 
@@ -85,7 +79,6 @@ class UniformColorGUI:
         close_btn = ttk.Button(button_frame, text="Close", command=self._on_close)
         close_btn.pack(side="left", fill="x", expand=True)
 
-        # Status label
         self.status_label = ttk.Label(main_frame, text="", font=("Sans", 9))
         self.status_label.pack()
 
@@ -117,19 +110,15 @@ class UniformColorGUI:
 
     def _on_color_change(self, r, g, b):
         """Handle color wheel changes (during drag)."""
-        # Apply in real-time while dragging by writing config.
-        # The tray app owns the hardware device, so it will pick up config changes.
         color = (r, g, b)
         self._pending_color = color
 
         now = time.monotonic()
         if self._last_drag_committed_color == color and (now - self._last_drag_commit_ts) < self._drag_commit_interval:
             return
-
         if (now - self._last_drag_commit_ts) < self._drag_commit_interval:
             return
 
-        # Ensure we're in static mode so animations don't overwrite the chosen color.
         if self.config.effect != "none":
             self.config.effect = "none"
 
@@ -170,7 +159,6 @@ class UniformColorGUI:
         self._last_drag_committed_color = (r, g, b)
         self._last_drag_commit_ts = time.monotonic()
 
-        # Apply to keyboard (or defer to tray app if it's running)
         result = self._apply_color(r, g, b, brightness)
         if result is True:
             self._set_status(f"✓ Applied RGB({r}, {g}, {b})", ok=True)
@@ -186,7 +174,6 @@ class UniformColorGUI:
         brightness = self._ensure_brightness_nonzero()
         self._commit_color_to_config(r, g, b)
 
-        # Apply to keyboard (or defer to tray app if it's running)
         result = self._apply_color(r, g, b, brightness)
         if result is True:
             self._set_status(f"✓ Applied RGB({r}, {g}, {b})", ok=True)
@@ -196,19 +183,16 @@ class UniformColorGUI:
             self._set_status("✗ Error applying color", ok=False)
 
     def _on_close(self):
-        """Close the window."""
         self.root.destroy()
 
     def run(self):
-        """Start the GUI."""
         self.root.mainloop()
 
 
-def main():
+def main() -> None:
     level = logging.DEBUG if os.environ.get("KEYRGB_DEBUG") else logging.INFO
     logging.basicConfig(level=level, format="%(levelname)s %(name)s: %(message)s")
-    app = UniformColorGUI()
-    app.run()
+    UniformColorGUI().run()
 
 
 if __name__ == "__main__":

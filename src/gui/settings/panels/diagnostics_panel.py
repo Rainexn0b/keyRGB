@@ -8,7 +8,7 @@ from tkinter import scrolledtext
 from tkinter import ttk
 
 from ..diagnostics_runner import collect_diagnostics_text
-from src.gui.tk_async import run_in_thread
+from src.gui.utils.tk_async import run_in_thread
 
 
 class DiagnosticsPanel:

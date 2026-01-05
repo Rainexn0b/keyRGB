@@ -76,6 +76,9 @@ class EffectsEngine:
         self.speed = 4  # 0-10 (UI speed scale; 10 = fastest)
         self.brightness = 25  # 0-50 (hardware brightness scale)
         self.current_color = (255, 0, 0)  # For static/custom effects
+        # Manual highlight color for reactive typing effects.
+        self.reactive_color: Optional[tuple] = None
+        self.reactive_use_manual_color: bool = False
         self.per_key_colors: Optional[Dict[Tuple[int, int], Tuple[int, int, int]]] = None  # For perkey effects
 
     def _ensure_device_available(self) -> bool:
@@ -136,7 +139,15 @@ class EffectsEngine:
         with self.kb_lock:
             self.kb.set_brightness(self.brightness)
 
-    def start_effect(self, effect_name: str, speed: int = 5, brightness: int = 25, color: Optional[tuple] = None):
+    def start_effect(
+        self,
+        effect_name: str,
+        speed: int = 5,
+        brightness: int = 25,
+        color: Optional[tuple] = None,
+        reactive_color: Optional[tuple] = None,
+        reactive_use_manual_color: Optional[bool] = None,
+    ):
         """Start an effect (hardware or software)"""
         prev_color = tuple(self.current_color)
 
@@ -156,6 +167,12 @@ class EffectsEngine:
 
         if color:
             self.current_color = color
+
+        if reactive_color is not None:
+            self.reactive_color = reactive_color
+
+        if reactive_use_manual_color is not None:
+            self.reactive_use_manual_color = bool(reactive_use_manual_color)
 
         # Hardware effects - delegate to controller
         if effect_name in self.HW_EFFECTS:

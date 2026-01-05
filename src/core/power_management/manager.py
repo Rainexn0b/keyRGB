@@ -249,6 +249,39 @@ class PowerManager:
         if not enabled:
             return
 
+        def _is_intentionally_off() -> bool:
+            """Return whether lighting is *intentionally* off.
+
+            The tray's `is_off` can be transiently true due to idle/screen-off
+            policies. For suspend/resume restore decisions we want to reflect
+            user intent (explicit off toggle or configured brightness=0).
+            """
+
+            # Prefer explicit user intent flags if present on the controller.
+            try:
+                if getattr(self.kb_controller, "user_forced_off", False) is True:
+                    return True
+            except Exception:
+                pass
+
+            try:
+                if getattr(self.kb_controller, "_user_forced_off", False) is True:
+                    return True
+            except Exception:
+                pass
+
+            # If the user explicitly configured brightness=0, treat it as off.
+            try:
+                if int(getattr(self._config, "brightness", 0) or 0) == 0:
+                    return True
+            except Exception:
+                pass
+
+
+            # Do not fall back to the controller's `is_off`.
+            # That state can be transiently true due to idle/screen-off policies.
+            return False
+
         # Always feed events into the policy so it can record pre-event state
         # even when actions are disabled via configuration.
         try:
@@ -256,7 +289,7 @@ class PowerManager:
                 PowerEventInputs(
                     enabled=bool(enabled),
                     action_enabled=bool(action_enabled),
-                    is_off=bool(getattr(self.kb_controller, "is_off", False)),
+                    is_off=_is_intentionally_off(),
                 )
             )
         except Exception:

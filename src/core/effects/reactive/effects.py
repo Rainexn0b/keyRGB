@@ -140,18 +140,20 @@ def _ripple_radius(*, age_s: float, ttl_s: float, min_radius: float = 0.0, max_r
 
 
 def _reactive_fade_loop(engine: "EffectsEngine") -> None:
-    base = base_color_map(engine)
     dt = frame_dt_s()
     p = pace(engine)
 
-    per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
-
-    react_color_src = getattr(engine, "current_color", None) or (255, 255, 255)
-    react_color = (int(react_color_src[0]), int(react_color_src[1]), int(react_color_src[2]))
-
-    if not (getattr(engine, "per_key_colors", None) or None):
-        background = scale(react_color, 0.06)
-        base = {(r, c): background for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+    def _get_reactive_color() -> Color:
+        # When manual mode is enabled, prefer the configured reactive_color.
+        if bool(getattr(engine, "reactive_use_manual_color", False)):
+            src = getattr(engine, "reactive_color", None)
+            if src is not None:
+                try:
+                    return (int(src[0]), int(src[1]), int(src[2]))
+                except Exception:
+                    pass
+        src = getattr(engine, "current_color", None) or (255, 255, 255)
+        return (int(src[0]), int(src[1]), int(src[2]))
 
     devices = try_open_evdev_keyboards()
     press = _PressSource(
@@ -164,6 +166,9 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
 
     pulses: List[_Pulse] = []
     while engine.running and not engine.stop_event.is_set():
+        per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
+        react_color = _get_reactive_color()
+
         pressed_key_id = press.poll_key_id(dt=dt)
         if pressed_key_id is not None:
             if pressed_key_id:
@@ -193,12 +198,21 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
             intensity = 1.0 - (pulse.age_s / pulse.ttl_s)
             overlay[(pulse.row, pulse.col)] = max(overlay.get((pulse.row, pulse.col), 0.0), intensity)
 
-        # Build the color map for this frame
-        # render() will handle fallback to uniform if per-key HW isn't available
+        # Build the base map for this frame.
+        # - With per-key backdrop: use existing per-key colors.
+        # - Without backdrop: use a very dim background derived from the reactive color.
+        if per_key_backdrop_active:
+            base = base_color_map(engine)
+        else:
+            background = scale(react_color, 0.06)
+            base = {(r, c): background for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+
         color_map: Dict[Key, Color] = {}
         for k, base_rgb in base.items():
             w = overlay.get(k, 0.0)
-            if per_key_backdrop_active:
+            if bool(getattr(engine, "reactive_use_manual_color", False)):
+                pulse_rgb = react_color
+            elif per_key_backdrop_active:
                 # Use brightness boost for visible flash on any color
                 pulse_rgb = _brightness_boost_pulse(base_rgb=base_rgb)
             else:
@@ -222,6 +236,17 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
     p = pace(engine)
 
     per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
+
+    def _get_manual_color() -> Color | None:
+        if not bool(getattr(engine, "reactive_use_manual_color", False)):
+            return None
+        src = getattr(engine, "reactive_color", None)
+        if src is None:
+            return None
+        try:
+            return (int(src[0]), int(src[1]), int(src[2]))
+        except Exception:
+            return None
 
     if not (getattr(engine, "per_key_colors", None) or None):
         background = (5, 5, 5)
@@ -299,15 +324,22 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
                     if k not in overlay or w > overlay[k][0]:
                         overlay[k] = (w, hue)
 
+        manual = _get_manual_color()
+
         # Build the color map for this frame
         # render() will handle fallback to uniform if per-key HW isn't available
         color_map: Dict[Key, Color] = {}
         for k, base_rgb in base.items():
             if k in overlay:
                 w, hue = overlay[k]
-                pulse_rgb = hsv_to_rgb(hue / 360.0, 1.0, 1.0)
-                if per_key_backdrop_active:
-                    pulse_rgb = _brightness_boost_pulse(base_rgb=pulse_rgb)
+                if manual is not None:
+                    pulse_rgb = manual
+                else:
+                    pulse_rgb = hsv_to_rgb(hue / 360.0, 1.0, 1.0)
+                if per_key_backdrop_active and manual is None:
+                    # Preserve the rainbow default, but ensure it stays visible
+                    # over the current per-key backdrop.
+                    pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb, preferred_rgb=pulse_rgb)
                 color_map[k] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
             else:
                 color_map[k] = base_rgb

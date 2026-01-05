@@ -169,7 +169,10 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | `./keyrgb` | Run attached to terminal (dev mode). |
 | `keyrgb-perkey` | Open the per-key editor. |
 | `keyrgb-uniform` | Open the uniform-color GUI. |
+| `keyrgb-reactive-color` | Open the reactive typing color GUI. |
 | `keyrgb-calibrate` | Open the keymap calibrator UI. |
+| `keyrgb-settings` | Open the settings GUI. |
+| `keyrgb-tcc-profiles` | Open the TCC power profiles GUI (if `tccd` is available). |
 | `keyrgb-diagnostics` | Print hardware diagnostics JSON. |
 
 ## Configuration

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 from typing import Optional
 
 from PIL import Image
@@ -40,7 +41,8 @@ def load_reference_deck_image(*, profile_name: str | None) -> Optional[Image.Ima
             exc=exc,
         )
 
-    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+    # File lives at: <repo>/src/gui/reference/deck_image.py
+    repo_root = str(Path(__file__).resolve().parents[3])
     candidates.append(os.path.join(repo_root, "assets", "y15-pro-deck.png"))
 
     candidates.append(os.path.join(os.getcwd(), "assets", "y15-pro-deck.png"))

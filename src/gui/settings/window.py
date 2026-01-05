@@ -25,15 +25,15 @@ from .panels.power_management_panel import PowerManagementPanel
 from .panels.power_source_panel import PowerSourcePanel
 from .scrollable_area import ScrollableArea
 from .panels.version_panel import VersionPanel
-from .window_geometry import compute_centered_window_geometry
+from src.gui.utils.window_geometry import compute_centered_window_geometry
 from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
 from .hardware_hint import extract_unsupported_rgb_controllers_hint
 
 from src.core.config import Config
 
-from src.gui.window_icon import apply_keyrgb_window_icon
-from src.gui.theme import apply_clam_dark_theme
-from src.gui.tk_async import run_in_thread
+from src.gui.utils.window_icon import apply_keyrgb_window_icon
+from src.gui.theme import apply_clam_theme
+from src.gui.utils.tk_async import run_in_thread
 
 
 class PowerSettingsGUI:
@@ -44,7 +44,7 @@ class PowerSettingsGUI:
         self.root.minsize(760, 560)
         self.root.resizable(True, True)
 
-        bg_color, fg_color = apply_clam_dark_theme(
+        bg_color, fg_color = apply_clam_theme(
             self.root,
             include_checkbuttons=True,
             map_checkbutton_state=True,

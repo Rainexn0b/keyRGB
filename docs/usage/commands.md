@@ -10,7 +10,10 @@ This page documents KeyRGB’s installed entrypoints and common environment vari
 | `./keyrgb` | Run the tray app attached to the terminal (dev mode, repo checkout). |
 | `keyrgb-perkey` | Open the per-key editor. |
 | `keyrgb-uniform` | Open the uniform-color GUI. |
+| `keyrgb-reactive-color` | Open the reactive typing color GUI. |
 | `keyrgb-calibrate` | Open the keymap calibrator UI (usually launched from per-key editor). |
+| `keyrgb-settings` | Open the settings GUI. |
+| `keyrgb-tcc-profiles` | Open the TCC power profiles GUI (requires `tccd`). |
 | `keyrgb-diagnostics` | Print hardware diagnostics JSON (useful for bug reports). |
 
 ## Environment variables

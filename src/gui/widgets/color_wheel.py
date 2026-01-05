@@ -13,6 +13,7 @@ selector overlay on top.
 import base64
 import colorsys
 import math
+from typing import Any, Callable
 
 import tkinter as tk
 from tkinter import ttk
@@ -30,10 +31,11 @@ class ColorWheel(ttk.Frame):
         parent,
         size=300,
         initial_color=(255, 0, 0),
-        callback=None,
-        release_callback=None,
+        callback: Callable[..., Any] | None = None,
+        release_callback: Callable[..., Any] | None = None,
         *,
         show_rgb_label: bool = True,
+        brightness_label_text: str = "Brightness:",
     ):
         """
         Initialize the color wheel.
@@ -49,16 +51,19 @@ class ColorWheel(ttk.Frame):
 
         self.size = size
         self.radius = size // 2
-        self.callback = callback
-        self.release_callback = release_callback
-        self.current_color = initial_color
+        # RGB is always on the 0..255 per-channel scale.
+        self.callback: Callable[..., Any] | None = callback
+        self.release_callback: Callable[..., Any] | None = release_callback
+        self.current_color: tuple[int, int, int] = (int(initial_color[0]), int(initial_color[1]), int(initial_color[2]))
         self.show_rgb_label = bool(show_rgb_label)
+        self._brightness_label_text = str(brightness_label_text or "Brightness:")
 
         # Convert RGB to HSV for positioning
-        r, g, b = [x / 255.0 for x in initial_color]
+        r, g, b = [float(x) / 255.0 for x in self.current_color]
         h, s, v = colorsys.rgb_to_hsv(r, g, b)
         self.current_hue = h
         self.current_saturation = s
+        # Stored as 0..1, but displayed/communicated as percent (0..100).
         self.current_value = v
 
         self._create_widgets()
@@ -87,7 +92,8 @@ class ColorWheel(ttk.Frame):
         brightness_frame = ttk.Frame(self)
         brightness_frame.pack(fill="x", padx=20, pady=10)
 
-        ttk.Label(brightness_frame, text="Brightness:").pack(side="left", padx=(0, 10))
+        self.brightness_title_label = ttk.Label(brightness_frame, text=self._brightness_label_text)
+        self.brightness_title_label.pack(side="left", padx=(0, 10))
 
         self.brightness_var = tk.DoubleVar(value=self.current_value * 100)
         self.brightness_slider = ttk.Scale(
@@ -112,7 +118,12 @@ class ColorWheel(ttk.Frame):
         ttk.Label(preview_frame, text="Selected Color:").pack(side="left", padx=(0, 10))
 
         self.preview_canvas = tk.Canvas(
-            preview_frame, width=100, height=30, highlightthickness=1, highlightbackground="#666666"
+            preview_frame,
+            width=100,
+            height=30,
+            highlightthickness=1,
+            highlightbackground="#666666",
+            bg="#2b2b2b",
         )
         # Fixed-size preview to avoid geometry changes during drag
         self.preview_canvas.pack(side="left")
@@ -148,6 +159,21 @@ class ColorWheel(ttk.Frame):
             ent.bind("<Return>", lambda _e: self._on_manual_rgb_set())
 
         self._update_preview()
+
+    def set_brightness_label_text(self, text: str) -> None:
+        """Update the brightness label text (UI clarity).
+
+        This does not change behavior, only the label shown to the user.
+        """
+
+        self._brightness_label_text = str(text or "")
+        if not self._brightness_label_text:
+            self._brightness_label_text = "Brightness:"
+        if hasattr(self, "brightness_title_label"):
+            try:
+                self.brightness_title_label.config(text=self._brightness_label_text)
+            except Exception:
+                pass
 
     def _draw_wheel(self):
         """Draw the HSV color wheel as a single cached image."""
@@ -205,26 +231,31 @@ class ColorWheel(ttk.Frame):
         self.canvas.create_oval(x - size, y - size, x + size, y + size, outline="white", width=3, tags="selector")
         self.canvas.create_oval(x - size, y - size, x + size, y + size, outline="black", width=1, tags="selector")
 
-    def _on_click(self, event):
+    def _on_click(self, event) -> None:
         """Handle mouse click on the color wheel."""
         if not self._wheel_ready:
             return
         self._select_color_at(event.x, event.y)
 
-    def _on_drag(self, event):
+    def _on_drag(self, event) -> None:
         """Handle mouse drag on the color wheel."""
         if not self._wheel_ready:
             return
         self._select_color_at(event.x, event.y)
 
-    def _on_release(self, event):
+    def _on_release(self, event) -> None:
         """Handle mouse release on the color wheel."""
         if not self._wheel_ready:
             return
         if self.release_callback:
-            self.release_callback(*self.current_color)
+            self._invoke_callback(
+                self.release_callback,
+                *self.current_color,
+                source="wheel_release",
+                brightness_percent=float(self.current_value * 100.0),
+            )
 
-    def _select_color_at(self, x, y):
+    def _select_color_at(self, x: int, y: int) -> None:
         """Select color at the given canvas coordinates."""
         # Calculate distance and angle from center
         dx = x - self.radius
@@ -248,19 +279,45 @@ class ColorWheel(ttk.Frame):
             self.current_hue = angle / (2 * math.pi)
             self.current_saturation = min(distance / max_distance, 1.0)
 
-        self._update_color()
+        self._update_color(source="wheel")
 
-    def _on_brightness_change(self, value):
-        """Handle brightness slider change."""
-        self.current_value = float(value) / 100.0
-        self.brightness_label.config(text=f"{int(float(value))}%")
-        self._update_color()
+    def _on_brightness_change(self, value: str | float) -> None:
+        """Handle brightness slider change.
 
-        # Also trigger release callback when brightness changes
+        `ttk.Scale` passes the value as a string on many Tk builds.
+        The value is interpreted as a percent on the 0..100 UI scale.
+        """
+
+        pct = float(value)
+        self.current_value = pct / 100.0
+        self.brightness_label.config(text=f"{int(pct)}%")
+        self._update_color(source="brightness")
+
+        # Also trigger release callback when brightness changes (treat as a commit)
         if self.release_callback:
-            self.release_callback(*self.current_color)
+            self._invoke_callback(
+                self.release_callback,
+                *self.current_color,
+                source="brightness",
+                brightness_percent=float(pct),
+            )
 
-    def _update_color(self):
+    @staticmethod
+    def _invoke_callback(cb, *args, **kwargs) -> None:
+        """Invoke a callback, preserving backwards compatibility.
+
+        Older callbacks in this codebase expect exactly three positional args
+        (r, g, b). Newer code may accept optional keyword metadata.
+        """
+
+        if cb is None:
+            return
+        try:
+            cb(*args, **kwargs)
+        except TypeError:
+            cb(*args)
+
+    def _update_color(self, *, source: str = "wheel"):
         """Update the current color based on HSV values."""
         # Convert HSV to RGB
         r, g, b = colorsys.hsv_to_rgb(self.current_hue, self.current_saturation, self.current_value)
@@ -271,7 +328,12 @@ class ColorWheel(ttk.Frame):
         self._update_preview()
 
         if self.callback:
-            self.callback(*self.current_color)
+            self._invoke_callback(
+                self.callback,
+                *self.current_color,
+                source=str(source or "wheel"),
+                brightness_percent=float(self.current_value * 100.0),
+            )
 
     def _update_preview(self):
         """Update the color preview box."""
@@ -295,16 +357,16 @@ class ColorWheel(ttk.Frame):
             finally:
                 self._rgb_entry_syncing = False
 
-    def get_color(self):
-        """Get the current selected color as (r, g, b) tuple."""
+    def get_color(self) -> tuple[int, int, int]:
+        """Get the current selected color as (r, g, b) tuple (0..255 each)."""
         return self.current_color
 
-    def set_color(self, r, g, b):
+    def set_color(self, r: int, g: int, b: int) -> None:
         """Set the color programmatically."""
-        self.current_color = (r, g, b)
+        self.current_color = (int(r), int(g), int(b))
 
         # Convert to HSV
-        r_norm, g_norm, b_norm = r / 255.0, g / 255.0, b / 255.0
+        r_norm, g_norm, b_norm = float(r) / 255.0, float(g) / 255.0, float(b) / 255.0
         h, s, v = colorsys.rgb_to_hsv(r_norm, g_norm, b_norm)
 
         self.current_hue = h
@@ -338,15 +400,22 @@ class ColorWheel(ttk.Frame):
 
         # Manual set should behave like a "commit": notify listeners.
         if self.callback:
-            self.callback(r, g, b)
+            self._invoke_callback(self.callback, r, g, b, source="manual", brightness_percent=float(self.current_value * 100.0))
         if self.release_callback:
-            self.release_callback(r, g, b)
+            self._invoke_callback(
+                self.release_callback,
+                r,
+                g,
+                b,
+                source="manual",
+                brightness_percent=float(self.current_value * 100.0),
+            )
 
 
 if __name__ == "__main__":
     # Test the color wheel
     try:
-        from src.gui.window_icon import apply_keyrgb_window_icon
+        from src.gui.utils.window_icon import apply_keyrgb_window_icon
     except Exception:
         apply_keyrgb_window_icon = None
 

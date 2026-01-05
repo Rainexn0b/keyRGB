@@ -10,6 +10,10 @@ DEFAULTS: dict = {
     "speed": 4,  # 0-10 UI scale (10 = fastest)
     "brightness": 25,  # 0-50 hardware scale
     "color": [255, 0, 0],  # RGB for static/custom effects
+    # Manual highlight color for reactive typing effects.
+    # When disabled, reactive effects use their built-in coloring.
+    "reactive_use_manual_color": False,
+    "reactive_color": [255, 255, 255],
     # When a non-per-key effect is started from a per-key state, we can remember
     # which per-key mode to restore when the user stops the effect.
     # None | 'perkey'

@@ -152,7 +152,10 @@ At this point you should have the entrypoints:
 - `keyrgb` (tray)
 - `keyrgb-perkey` (per-key editor)
 - `keyrgb-uniform` (uniform-color GUI)
+- `keyrgb-reactive-color` (reactive typing color GUI)
 - `keyrgb-calibrate` (keymap calibrator)
+- `keyrgb-settings` (settings GUI)
+- `keyrgb-tcc-profiles` (TCC power profiles GUI)
 
 ## 4) USB permissions (udev rule)
 

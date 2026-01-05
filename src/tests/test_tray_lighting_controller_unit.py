@@ -88,6 +88,8 @@ class TestStartCurrentEffect:
         mock_tray.config.brightness = 100
         mock_tray.config.speed = 3
         mock_tray.config.color = (0, 255, 0)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
 
         start_current_effect(mock_tray)
 
@@ -96,6 +98,8 @@ class TestStartCurrentEffect:
             speed=3,
             brightness=100,
             color=(0, 255, 0),
+            reactive_color=None,
+            reactive_use_manual_color=False,
         )
         assert mock_tray.is_off is False
 
