@@ -208,6 +208,11 @@ def build_editor_ui(editor) -> None:
 
         bg = getattr(editor, "bg_color", "#2b2b2b")
         fg = getattr(editor, "fg_color", "#ffffff")
+        
+        # Selection color for hover feedback
+        sel_bg = "#4a4a4a" if bg == "#2b2b2b" else "#3399ff"
+        sel_fg = "#ffffff"
+
         try:
             popup.configure(bg=bg)
         except Exception:
@@ -220,13 +225,25 @@ def build_editor_ui(editor) -> None:
             height=min(len(values), 10),
             bg=bg,
             fg=fg,
-            selectbackground=bg,
-            selectforeground=fg,
+            selectbackground=sel_bg,
+            selectforeground=sel_fg,
             highlightthickness=1,
             relief="solid",
             borderwidth=1,
         )
         lb.pack(fill="both", expand=True)
+
+        # Hover effect: select item under mouse
+        def _on_motion(event):
+            try:
+                index = lb.nearest(event.y)
+                if index >= 0:
+                    lb.selection_clear(0, "end")
+                    lb.selection_set(index)
+                    lb.activate(index)
+            except Exception:
+                pass
+        lb.bind("<Motion>", _on_motion)
 
         for v in values:
             lb.insert("end", v)
