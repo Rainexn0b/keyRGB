@@ -67,6 +67,42 @@ def active_profile_path() -> Path:
     return Config.CONFIG_DIR / "active_profile.json"
 
 
+def default_profile_path() -> Path:
+    return Config.CONFIG_DIR / "default_profile.json"
+
+
+def get_default_profile() -> str:
+    """Return the configured default profile name.
+
+    Used as a fallback when no last active profile is remembered.
+    """
+
+    p = default_profile_path()
+    if p.exists():
+        try:
+            raw = json.loads(p.read_text(encoding="utf-8"))
+            if isinstance(raw, dict) and isinstance(raw.get("name"), str):
+                return safe_profile_name(raw["name"])
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "profile_paths.get_default_profile",
+                interval_s=60,
+                level=logging.DEBUG,
+                msg="Failed to read default profile; using built-in default",
+                exc=exc,
+            )
+    return DEFAULT_PROFILE_NAME
+
+
+def set_default_profile(name: str) -> str:
+    name = safe_profile_name(name)
+    Config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    default_profile_path().write_text(json.dumps({"name": name}, indent=2), encoding="utf-8")
+    ensure_profile(name)
+    return name
+
+
 def get_active_profile() -> str:
     p = active_profile_path()
     if p.exists():
@@ -84,7 +120,9 @@ def get_active_profile() -> str:
                 msg="Failed to read active profile; using default",
                 exc=exc,
             )
-    return DEFAULT_PROFILE_NAME
+    # If we don't have a remembered last active profile, fall back to a
+    # user-chosen default profile if configured.
+    return get_default_profile()
 
 
 def ensure_profile(name: str) -> Path:

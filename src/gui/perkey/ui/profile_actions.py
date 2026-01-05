@@ -13,7 +13,7 @@ from src.core.profile import profiles
 from .full_map import ensure_full_map_ui
 from ..hardware import NUM_COLS, NUM_ROWS
 from ..profile_management import activate_profile, delete_profile, save_profile
-from .status import active_profile, saved_profile, set_status
+from .status import active_profile, default_profile_set, saved_profile, set_status
 
 
 def activate_profile_ui(editor: Any) -> None:
@@ -120,3 +120,9 @@ def delete_profile_ui(editor: Any) -> None:
     editor._profile_name_var.set(result.active_profile)
     editor._profiles_combo.configure(values=profiles.list_profiles())
     set_status(editor, result.message)
+
+
+def set_default_profile_ui(editor: Any) -> None:
+    name = profiles.set_default_profile(editor._profile_name_var.get())
+    editor._profile_name_var.set(name)
+    set_status(editor, default_profile_set(name))

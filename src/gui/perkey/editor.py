@@ -24,7 +24,13 @@ from .window_geometry import apply_perkey_editor_geometry
 from .commit_pipeline import PerKeyCommitPipeline
 from .color_utils import initial_last_non_black_color, rgb_ints
 
-from .ui.profile_actions import activate_profile_ui, delete_profile_ui, new_profile_ui, save_profile_ui
+from .ui.profile_actions import (
+    activate_profile_ui,
+    delete_profile_ui,
+    new_profile_ui,
+    save_profile_ui,
+    set_default_profile_ui,
+)
 from .ui.calibrator import run_keymap_calibrator_ui
 from .ui.keymap import reload_keymap_ui
 from .ui.bulk_color import clear_all_ui, fill_all_ui
@@ -320,6 +326,9 @@ class PerKeyEditor:
 
     def _delete_profile(self):
         delete_profile_ui(self)
+
+    def _set_default_profile(self):
+        set_default_profile_ui(self)
 
     def _load_keymap(self) -> dict[str, tuple[int, int]]:
         return profiles.load_keymap(self.profile_name)

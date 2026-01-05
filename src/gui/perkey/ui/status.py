@@ -144,6 +144,10 @@ def saved_profile(name: str) -> str:
     return f"Saved profile: {name}"
 
 
+def default_profile_set(name: str) -> str:
+    return f"Default profile: {name}"
+
+
 def sample_tool_pick_a_key() -> str:
     return "Sample tool: click a key to pick its color"
 

@@ -18,14 +18,17 @@ from typing import Dict, Tuple
 
 from .json_storage import read_json, write_json_atomic
 from .paths import (
+    default_profile_path,
     DEFAULT_PROFILE_NAME,
     delete_profile,
+    get_default_profile,
     get_active_profile,
     list_profiles,
     paths_for,
     profiles_root,
     safe_profile_name,
     set_active_profile,
+    set_default_profile,
 )
 from src.core.resources.defaults import (
     DEFAULT_COLORS,
@@ -41,8 +44,10 @@ _DEFAULT_PROFILE = DEFAULT_PROFILE_NAME
 __all__ = [
     "DEFAULT_PROFILE_NAME",
     "_DEFAULT_PROFILE",
+    "default_profile_path",
     "apply_profile_to_config",
     "delete_profile",
+    "get_default_profile",
     "get_active_profile",
     "list_profiles",
     "load_backdrop_transparency",
@@ -59,6 +64,7 @@ __all__ = [
     "save_layout_per_key",
     "save_per_key_colors",
     "set_active_profile",
+    "set_default_profile",
 ]
 
 
