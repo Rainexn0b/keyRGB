@@ -36,37 +36,60 @@ def scale(rgb: Color, s: float) -> Color:
     return (int(round(rgb[0] * ss)), int(round(rgb[1] * ss)), int(round(rgb[2] * ss)))
 
 
-def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:
-    """Compute a factor to keep a per-key backdrop dim under bright effects.
-
-    If a per-key profile/backdrop is active, we want to preserve the user's
-    chosen base (per-key) brightness while allowing reactive pulses/highlights
-    to render brighter. Since hardware brightness is global, we do this by:
-      - running the device at the effect brightness, and
-      - scaling the base RGB values down by base/effect.
+def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
+    """Resolve brightness levels for mixed-content rendering.
+    
+    Returns (base_hw, effect_hw, global_hw).
     """
-
     try:
-        base_hw = getattr(engine, "per_key_brightness", None)
-        if base_hw is None:
-            return 1.0
-        base_hw = int(base_hw)
+        eff = int(getattr(engine, "brightness", 25) or 0)
     except Exception:
-        return 1.0
+        eff = 25
+    eff = max(0, min(50, eff))
 
+    base = 0
     try:
-        eff_hw = int(effect_brightness_hw)
+        if getattr(engine, "per_key_colors", None):
+            base = int(getattr(engine, "per_key_brightness", 0) or 0)
     except Exception:
-        return 1.0
+        pass
+    base = max(0, min(50, base))
+    
+    return base, eff, max(base, eff)
 
-    base_hw = max(0, min(50, base_hw))
-    eff_hw = max(0, min(50, eff_hw))
 
-    if eff_hw <= 0:
+def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:
+    """Compute scaling factor to keep the backdrop at its target brightness.
+    
+    If the global hardware brightness is driven higher (by the effect brightness),
+    we scale the backdrop down.
+    """
+    base, _, global_hw = _resolve_brightness(engine)
+    
+    if global_hw <= 0:
+        return 0.0
+        
+    if base >= global_hw:
         return 1.0
-    if base_hw >= eff_hw:
+        
+    return float(base) / float(global_hw)
+
+
+def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
+    """Compute scaling factor to keep pulses at their target brightness.
+    
+    If the global hardware brightness is driven higher (by the base brightness),
+    we scale the pulses down.
+    """
+    _, eff, global_hw = _resolve_brightness(engine)
+    
+    if global_hw <= 0:
+        return 0.0
+        
+    if eff >= global_hw:
         return 1.0
-    return float(base_hw) / float(eff_hw)
+        
+    return float(eff) / float(global_hw)
 
 
 def apply_backdrop_brightness_scale(color_map: Dict[Key, Color], *, factor: float) -> Dict[Key, Color]:
@@ -134,12 +157,8 @@ def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
 
 
 def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
-    # Brightness is on the 0..50 hardware scale (shared across uniform + per-key writes).
-    try:
-        brightness_hw = int(getattr(engine, "brightness", 25) or 0)
-    except Exception:
-        brightness_hw = 25
-    brightness_hw = max(0, min(50, brightness_hw))
+    # Determine proper hardware brightness scaling
+    _, _, brightness_hw = _resolve_brightness(engine)
 
     if has_per_key(engine):
         try:

@@ -19,6 +19,7 @@ from .render import (
     frame_dt_s,
     mix,
     pace,
+    pulse_brightness_scale_factor,
     render,
     scale,
 )
@@ -221,6 +222,8 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
             base_unscaled = {(r, c): background for r in range(NUM_ROWS) for c in range(NUM_COLS)}
             base = dict(base_unscaled)
 
+        pulse_scale = pulse_brightness_scale_factor(engine)
+
         color_map: Dict[Key, Color] = {}
         for k, base_rgb in base.items():
             base_rgb_unscaled = base_unscaled.get(k, base_rgb)
@@ -233,6 +236,10 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
             else:
                 # Use contrasting highlight for uniform backgrounds
                 pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb_unscaled, preferred_rgb=react_color)
+            
+            if pulse_scale < 0.999:
+                pulse_rgb = scale(pulse_rgb, pulse_scale)
+
             color_map[k] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
 
         render(engine, color_map=color_map)
@@ -346,6 +353,7 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
                         overlay[k] = (w, hue)
 
         manual = _get_manual_color()
+        pulse_scale = pulse_brightness_scale_factor(engine)
 
         # Build the color map for this frame
         # render() will handle fallback to uniform if per-key HW isn't available
@@ -362,6 +370,10 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
                     # Preserve the rainbow default, but ensure it stays visible
                     # over the current per-key backdrop.
                     pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb_unscaled, preferred_rgb=pulse_rgb)
+                
+                if pulse_scale < 0.999:
+                     pulse_rgb = scale(pulse_rgb, pulse_scale)
+                
                 color_map[k] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
             else:
                 color_map[k] = base_rgb
