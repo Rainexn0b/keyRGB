@@ -3,6 +3,8 @@ from __future__ import annotations
 import threading
 import time
 
+from src.core.utils.exceptions import is_device_disconnected
+
 
 def _normalize_brightness_to_config_scale(brightness: int, *, expected: int | None = None) -> int:
     """Clamp brightness into KeyRGB's expected 0..50 range.
@@ -126,8 +128,7 @@ def _apply_polled_hardware_state(
 
 def _handle_hardware_polling_exception(tray, exc: Exception, *, last_error_at: float) -> float:
     # Device disconnects can happen at any time.
-    errno = getattr(exc, "errno", None)
-    if errno == 19 or "No such device" in str(exc):
+    if is_device_disconnected(exc):
         try:
             tray.engine.mark_device_unavailable()
         except (OSError, RuntimeError, ValueError):

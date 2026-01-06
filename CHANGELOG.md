@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.12.3 (2026-01-06)
+
+- Fix: reduce likelihood of crashes after a USB disconnect by aggressively stopping further USB I/O and marking the device unavailable.
+- Maintenance: centralize USB error classification (device disconnected/busy) to reduce duplicated, inconsistent errno/string checks across tray/effects/GUI.
+
 ## 0.12.2 (2026-01-06)
 
 - Fix: Screen dim/brightness sync now reliably dims the keyboard in per-key mode and detects gradual/stepwise backlight dimming.

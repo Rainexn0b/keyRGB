@@ -175,6 +175,9 @@ def load_per_key_colors(name: str | None = None) -> Dict[Tuple[int, int], Tuple[
         prof = safe_profile_name(name or "")
         if prof == "dark":
             return {k: (0, 0, 0) for k in DEFAULT_COLORS.keys()}
+        if prof == "dim":
+            # Low-light typing preset: a faint white backlight.
+            return {k: (255, 255, 255) for k in DEFAULT_COLORS.keys()}
         return DEFAULT_COLORS.copy()
 
     out: Dict[Tuple[int, int], Tuple[int, int, int]] = {}
@@ -205,9 +208,31 @@ def save_per_key_colors(colors: Dict[Tuple[int, int], Tuple[int, int, int]], nam
 
 
 def apply_profile_to_config(cfg, colors: Dict[Tuple[int, int], Tuple[int, int, int]]) -> None:
+    # Profile-specific defaults.
+    try:
+        prof = safe_profile_name(get_active_profile())
+    except Exception:
+        prof = ""
+
     # Ensure visible when activating a per-key profile.
-    if getattr(cfg, "brightness", 0) <= 0:
-        cfg.brightness = 50
+    try:
+        perkey_bri = int(getattr(cfg, "perkey_brightness", getattr(cfg, "brightness", 0)) or 0)
+    except Exception:
+        perkey_bri = 0
+
+    if perkey_bri <= 0:
+        if hasattr(cfg, "perkey_brightness"):
+            cfg.perkey_brightness = 50
+        else:
+            # Backward-compat for callers that pass in a stub config.
+            cfg.brightness = 50
+
+    # Low-light typing preset should default to ~10% brightness (0..50 scale).
+    if prof == "dim":
+        if hasattr(cfg, "perkey_brightness"):
+            cfg.perkey_brightness = 5
+        else:
+            cfg.brightness = 5
     cfg.effect = "perkey"
     cfg.per_key_colors = colors
 

@@ -129,10 +129,10 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
 
 def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
     def fake_delete_profile(_name: str) -> DeleteProfileResult:
-        return DeleteProfileResult(deleted=True, active_profile="default", message="Deleted profile: p2")
+        return DeleteProfileResult(deleted=True, active_profile="light", message="Deleted profile: p2")
 
     monkeypatch.setattr(actions, "delete_profile", fake_delete_profile)
-    monkeypatch.setattr(actions.profiles, "list_profiles", lambda: ["default", "p3"])  # type: ignore[attr-defined]
+    monkeypatch.setattr(actions.profiles, "list_profiles", lambda: ["light", "p3"])  # type: ignore[attr-defined]
 
     ed = DummyEditor(
         _profile_name_var=DummyVar("p2"),
@@ -151,7 +151,7 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
 
     actions.delete_profile_ui(ed)
 
-    assert ed.profile_name == "default"
-    assert ed._profile_name_var.get() == "default"
-    assert ed._profiles_combo.values == ["default", "p3"]
+    assert ed.profile_name == "light"
+    assert ed._profile_name_var.get() == "light"
+    assert ed._profiles_combo.values == ["light", "p3"]
     assert ed.status_label.text == "Deleted profile: p2"

@@ -8,6 +8,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.core.utils.exceptions import is_device_busy
+
 
 def set_status(editor: Any, text: str) -> None:
     try:
@@ -32,7 +34,7 @@ def _next_steps_for_exception(exc: Exception | None) -> str:
         if errno in (1, 13):
             return "Try: run KeyRGB with elevated permissions or install udev rules"
         # 16 is commonly "Device or resource busy".
-        if errno == 16:
+        if is_device_busy(exc):
             return "Try: close other RGB apps and unplug/replug the keyboard"
 
     if isinstance(exc, FileNotFoundError):

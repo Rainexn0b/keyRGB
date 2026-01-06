@@ -8,7 +8,11 @@ from __future__ import annotations
 DEFAULTS: dict = {
     "effect": "rainbow",
     "speed": 4,  # 0-10 UI scale (10 = fastest)
-    "brightness": 25,  # 0-50 hardware scale
+    # Effect/uniform brightness (0-50 hardware scale).
+    "brightness": 25,
+    # Per-key mode brightness (0-50 hardware scale). Kept separate so per-key
+    # edits don't overwrite the effect brightness (and vice versa).
+    "perkey_brightness": 25,
     "color": [255, 0, 0],  # RGB for static/custom effects
     # Manual highlight color for reactive typing effects.
     # When disabled, reactive effects use their built-in coloring.

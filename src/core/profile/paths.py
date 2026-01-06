@@ -11,11 +11,16 @@ from src.core.logging_utils import log_throttled
 from src.core.config import Config
 
 
-DEFAULT_PROFILE_NAME = "default"
+DEFAULT_PROFILE_NAME = "light"
+
+# Backward compatibility: historical profile name used by older versions.
+_LEGACY_PROFILE_ALIASES = {
+    "default": DEFAULT_PROFILE_NAME,
+}
 
 # Built-in profiles are always shown in the per-key editor, even if the user has
 # not created them yet.
-BUILTIN_PROFILE_NAMES = (DEFAULT_PROFILE_NAME, "dark")
+BUILTIN_PROFILE_NAMES = (DEFAULT_PROFILE_NAME, "dark", "dim")
 
 
 logger = logging.getLogger(__name__)
@@ -56,7 +61,8 @@ def safe_profile_name(name: str) -> str:
         return DEFAULT_PROFILE_NAME
     name = re.sub(r"\s+", "_", name)
     name = re.sub(r"[^A-Za-z0-9_.-]", "", name)
-    return name or DEFAULT_PROFILE_NAME
+    name = name or DEFAULT_PROFILE_NAME
+    return _LEGACY_PROFILE_ALIASES.get(name, name)
 
 
 def profiles_root() -> Path:
@@ -127,7 +133,37 @@ def get_active_profile() -> str:
 
 def ensure_profile(name: str) -> Path:
     name = safe_profile_name(name)
-    root = profiles_root() / name
+    root_dir = profiles_root()
+
+    # Migrate legacy built-in directory name to the new name when safe.
+    legacy = None
+    for old, new in _LEGACY_PROFILE_ALIASES.items():
+        if new == name:
+            legacy = old
+            break
+    if legacy is not None:
+        new_root = root_dir / name
+        old_root = root_dir / legacy
+        if not new_root.exists() and old_root.exists():
+            try:
+                old_root.rename(new_root)
+            except Exception as exc:
+                log_throttled(
+                    logger,
+                    "profile_paths.migrate_legacy_dir",
+                    interval_s=60,
+                    level=logging.DEBUG,
+                    msg=f"Failed to migrate {old_root.name} -> {new_root.name}",
+                    exc=exc,
+                )
+                root = old_root
+            else:
+                root = new_root
+        else:
+            root = new_root
+    else:
+        root = root_dir / name
+
     root.mkdir(parents=True, exist_ok=True)
     return root
 

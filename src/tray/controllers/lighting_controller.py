@@ -4,6 +4,7 @@ import logging
 from typing import Any, Optional
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+from src.core.utils.exceptions import is_device_disconnected
 
 logger = logging.getLogger(__name__)
 
@@ -98,18 +99,13 @@ def start_current_effect(tray: Any) -> None:
         tray.is_off = False
     except Exception as exc:
         # If the USB device disappeared, mark it unavailable and avoid a scary traceback.
-        try:
-            from usb.core import USBError  # type: ignore
-
-            if isinstance(exc, USBError) and getattr(exc, "errno", None) == 19:
-                try:
-                    tray.engine.mark_device_unavailable()
-                except Exception:
-                    pass
-                logger.warning("Keyboard device unavailable: %s", exc)
-                return
-        except Exception:
-            pass
+        if is_device_disconnected(exc):
+            try:
+                tray.engine.mark_device_unavailable()
+            except Exception:
+                pass
+            logger.warning("Keyboard device unavailable: %s", exc)
+            return
         try:
             tray._log_exception("Error starting effect: %s", exc)
         except Exception:

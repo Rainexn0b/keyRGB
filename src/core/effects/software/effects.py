@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.transitions import scaled_color_map_nonzero
 
 from .base import (
     Color,
@@ -292,12 +293,27 @@ def run_strobe(engine: "EffectsEngine") -> None:
     """Strobe (SW): rapid on/off flashing (OpenRGB-style)."""
 
     base = base_color_map(engine)
+    try:
+        brightness = int(getattr(engine, "brightness", 25) or 0)
+    except Exception:
+        brightness = 0
+
+    # If the base is fully black but brightness is non-zero, the effect would
+    # otherwise appear "stuck off". Fall back to a visible base.
+    if brightness > 0 and not any(rgb != (0, 0, 0) for rgb in base.values()):
+        base = {(r, c): (255, 255, 255) for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+
+    # Avoid writing a full-black frame: some devices/backends interpret
+    # (0,0,0) as an "off" latch and won't recover smoothly. Instead, render a
+    # dimmed version of the base.
+    off_map = scaled_color_map_nonzero(base, scale=0.08, brightness=brightness)
     dt = frame_dt_s()
     p = pace(engine)
 
     half_period_s = max(0.04, 0.38 / p)
     elapsed = 0.0
-    on = False
+    # Start "on" so selecting the effect doesn't immediately blank the keyboard.
+    on = True
 
     while engine.running and not engine.stop_event.is_set():
         elapsed += dt
@@ -305,10 +321,7 @@ def run_strobe(engine: "EffectsEngine") -> None:
             elapsed = 0.0
             on = not on
 
-        if on:
-            color_map = dict(base)
-        else:
-            color_map = {k: (0, 0, 0) for k in base.keys()}
+        color_map = dict(base) if on else dict(off_map)
 
         render(engine, color_map=color_map)
         engine.stop_event.wait(dt)
@@ -322,9 +335,18 @@ def run_chase(engine: "EffectsEngine") -> None:
     dt = frame_dt_s()
     p = pace(engine)
 
-    highlight_src = getattr(engine, "current_color", None) or (255, 0, 0)
+    highlight_src = getattr(engine, "current_color", None)
+    if highlight_src is None:
+        highlight_src = (255, 0, 0)
     highlight = (int(highlight_src[0]), int(highlight_src[1]), int(highlight_src[2]))
-    background = scale(highlight, 0.06)
+    if highlight == (0, 0, 0):
+        # When the current uniform color is black (common in per-key mode),
+        # still provide a visible chase highlight.
+        highlight = (255, 0, 0)
+
+    # Use the per-key base as the background when available; otherwise use
+    # a dim version of the highlight.
+    background_uniform = scale(highlight, 0.06)
 
     pos = 0.0
     width = 1.6
@@ -334,21 +356,21 @@ def run_chase(engine: "EffectsEngine") -> None:
         if not per_key_ok:
             phase = float(pos) / float(max(1, NUM_COLS))
             pulse = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(2.0 * math.pi * phase))
-            rgb = mix(background, highlight, t=pulse)
+            rgb = mix(background_uniform, highlight, t=pulse)
             color_map = {(r, c): rgb for r in range(NUM_ROWS) for c in range(NUM_COLS)}
             render(engine, color_map=color_map)
             engine.stop_event.wait(dt)
             continue
 
         color_map: Dict[Key, Color] = {}
-        for (r, c), _base_rgb in base.items():
+        for (r, c), base_rgb in base.items():
             d = abs(float(c) - pos)
             d = min(d, float(NUM_COLS) - d)
             if d <= width:
                 w = 1.0 - (d / max(1e-6, width))
-                color_map[(r, c)] = mix(background, highlight, t=w)
+                color_map[(r, c)] = mix(base_rgb, highlight, t=w)
             else:
-                color_map[(r, c)] = background
+                color_map[(r, c)] = base_rgb
 
         render(engine, color_map=color_map)
         engine.stop_event.wait(dt)

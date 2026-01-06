@@ -182,7 +182,7 @@ def test_tray_active_indicator_shows_perkey_profile(monkeypatch: pytest.MonkeyPa
 
     from src.core.profile import profiles as core_profiles
 
-    monkeypatch.setattr(core_profiles, "get_active_profile", lambda: "default")
+    monkeypatch.setattr(core_profiles, "get_active_profile", lambda: "light")
 
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=False))
     tray.config.effect = "perkey"
@@ -193,4 +193,4 @@ def test_tray_active_indicator_shows_perkey_profile(monkeypatch: pytest.MonkeyPa
     mode_text = items[-2]["text"].lower()
     assert "mode:" in mode_text
     assert "software" in mode_text
-    assert "default" in mode_text
+    assert "light" in mode_text

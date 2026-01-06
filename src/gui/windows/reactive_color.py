@@ -151,7 +151,12 @@ class ReactiveColorGUI:
         # Config stores brightness on the 0..50 hardware scale.
         hw = int(round(pct / 2.0))
         try:
-            self.config.brightness = hw
+            # Always persist the effect/uniform brightness, even if the user
+            # happens to currently be in per-key mode.
+            if hasattr(self.config, "effect_brightness"):
+                self.config.effect_brightness = hw
+            else:
+                self.config.brightness = hw
         except Exception as exc:
             logger.debug("Failed to save brightness", exc_info=exc)
             return None

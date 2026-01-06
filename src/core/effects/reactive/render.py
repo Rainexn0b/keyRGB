@@ -7,6 +7,7 @@ from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import build_full_color_grid, enable_user_mode_once
 from src.core.effects.transitions import avoid_full_black
 from src.core.logging_utils import log_throttled
+from src.core.utils.exceptions import is_device_disconnected
 
 logger = logging.getLogger(__name__)
 
@@ -98,10 +99,19 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
 
     if has_per_key(engine):
         try:
-            enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
             with engine.kb_lock:
-                engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)
-            return
+                enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
+                try:
+                    engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)
+                    return
+                except Exception as exc:
+                    if is_device_disconnected(exc):
+                        try:
+                            engine.mark_device_unavailable()
+                        except Exception:
+                            pass
+                        return
+                    raise
         except Exception as exc:
             log_throttled(
                 logger,

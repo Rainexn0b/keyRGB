@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+from src.core.utils.exceptions import is_device_disconnected
 
 
 @dataclass(frozen=True)
@@ -335,8 +336,7 @@ def _apply_from_config_once(
     except Exception as e:
         # Device disconnects can happen at any time. Mark unavailable to avoid
         # spamming errors until a reconnect succeeds.
-        errno = getattr(e, "errno", None)
-        if errno == 19 or "No such device" in str(e):
+        if is_device_disconnected(e):
             try:
                 tray.engine.mark_device_unavailable()
             except Exception as exc:

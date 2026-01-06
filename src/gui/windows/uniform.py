@@ -13,6 +13,7 @@ from tkinter import ttk
 
 from src.core.backends.registry import select_backend
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
+from src.core.utils.exceptions import is_device_busy
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.utils.window_centering import center_window_on_screen
 from src.gui.theme import apply_clam_theme
@@ -136,7 +137,7 @@ class UniformColorGUI:
             return True
         except OSError as e:
             # Device owned by another process (tray)
-            if getattr(e, "errno", None) == 16:
+            if is_device_busy(e):
                 self.kb = None
                 return "deferred"
             if os.environ.get("KEYRGB_DEBUG"):

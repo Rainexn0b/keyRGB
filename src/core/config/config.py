@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
-"""KeyRGB Config implementation.
-
-This module contains the `Config` class implementation. The package
-`src.core.config` re-exports `Config` for backward compatibility.
-"""
+"""KeyRGB Config implementation."""
 
 from __future__ import annotations
 
 import logging
-
+import json
+from typing import Any
 from .defaults import DEFAULTS as _DEFAULTS
 from .file_storage import load_config_settings, save_config_settings_atomic
 from .paths import config_dir, config_file_path
 from .perkey_colors import deserialize_per_key_colors, serialize_per_key_colors
+from ._props import bool_prop, int_prop, enum_prop, optional_brightness_prop
 
 logger = logging.getLogger(__name__)
 
@@ -37,8 +35,6 @@ class Config:
         return deserialize_per_key_colors(data)
 
     def __init__(self):
-        """Load configuration."""
-
         # Recompute at runtime so test harnesses can set env vars in conftest.
         self.CONFIG_DIR = config_dir()
         self.CONFIG_FILE = config_file_path()
@@ -64,16 +60,12 @@ class Config:
         )
 
     def reload(self):
-        """Reload settings from file (e.g., after external changes)."""
-
         loaded = self._load()
         # If the file was transiently unreadable, keep the previous in-memory settings.
         if loaded is not None:
             self._settings = loaded
 
     def _save(self):
-        """Save settings to file."""
-
         save_config_settings_atomic(
             config_dir=self.CONFIG_DIR,
             config_file=self.CONFIG_FILE,
@@ -112,11 +104,40 @@ class Config:
         try:
             changed = False
 
+            # Detect whether the on-disk config.json explicitly contains the
+            # perkey_brightness field. The loader merges defaults into the
+            # loaded dict, so we can't rely on `get("perkey_brightness") is None`
+            # to decide whether migration is needed.
+            perkey_present_on_disk = False
+            try:
+                with open(self.CONFIG_FILE, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                if isinstance(raw, dict) and "perkey_brightness" in raw:
+                    perkey_present_on_disk = True
+            except Exception:
+                perkey_present_on_disk = False
+
             before = self._settings.get("brightness", None)
             after = self._normalize_brightness_value(before if before is not None else 0)
             if before != after:
                 self._settings["brightness"] = after
                 changed = True
+
+            # Per-key brightness: keep separate from effect brightness so users
+            # can use different levels and switching modes doesn't overwrite.
+            perkey_before = self._settings.get("perkey_brightness", None)
+            if perkey_before is None or not perkey_present_on_disk:
+                # Backward-compatible migration: older configs had only
+                # "brightness". When the loader merges defaults, missing keys
+                # appear as the default value, so we also gate on the key being
+                # absent from the on-disk JSON.
+                self._settings["perkey_brightness"] = int(after)
+                changed = True
+            else:
+                perkey_after = self._normalize_brightness_value(perkey_before)
+                if perkey_before != perkey_after:
+                    self._settings["perkey_brightness"] = int(perkey_after)
+                    changed = True
 
             # Normalize stored power-source brightness overrides when present.
             for key in ("ac_lighting_brightness", "battery_lighting_brightness"):
@@ -176,11 +197,49 @@ class Config:
 
     @property
     def brightness(self) -> int:
-        return self._settings["brightness"]
+        # Active brightness depends on mode: per-key brightness is independent
+        # from effect/uniform brightness.
+        try:
+            if str(self._settings.get("effect", "none") or "none") == "perkey":
+                return int(self._settings.get("perkey_brightness", self._settings.get("brightness", 0)) or 0)
+        except Exception:
+            pass
+        return int(self._settings.get("brightness", 0) or 0)
 
     @brightness.setter
     def brightness(self, value: int):
+        # Preserve the other mode's brightness.
+        try:
+            is_perkey = str(self._settings.get("effect", "none") or "none") == "perkey"
+        except Exception:
+            is_perkey = False
+
+        if is_perkey:
+            self._settings["perkey_brightness"] = self._normalize_brightness_value(value)
+        else:
+            self._settings["brightness"] = self._normalize_brightness_value(value)
+        self._save()
+
+    @property
+    def effect_brightness(self) -> int:
+        """Brightness used for non-per-key effects (0..50 hardware scale)."""
+
+        return int(self._settings.get("brightness", 0) or 0)
+
+    @effect_brightness.setter
+    def effect_brightness(self, value: int):
         self._settings["brightness"] = self._normalize_brightness_value(value)
+        self._save()
+
+    @property
+    def perkey_brightness(self) -> int:
+        """Brightness used for per-key mode (0..50 hardware scale)."""
+
+        return int(self._settings.get("perkey_brightness", self._settings.get("brightness", 0)) or 0)
+
+    @perkey_brightness.setter
+    def perkey_brightness(self, value: int):
+        self._settings["perkey_brightness"] = self._normalize_brightness_value(value)
         self._save()
 
     @property
@@ -205,7 +264,7 @@ class Config:
         except Exception:
             r, g, b = 255, 255, 255
 
-        def _clamp(x: object) -> int:
+        def _clamp(x: Any) -> int:
             try:
                 v = int(x)
             except Exception:
@@ -221,7 +280,7 @@ class Config:
         except Exception:
             return
 
-        def _clamp(x: object) -> int:
+        def _clamp(x: Any) -> int:
             try:
                 v = int(x)
             except Exception:
@@ -233,6 +292,8 @@ class Config:
 
     @property
     def reactive_use_manual_color(self) -> bool:
+        # Kept explicit (historically used by reactive GUI); semantics are the
+        # same as a normal bool setting.
         try:
             return bool(self._settings.get("reactive_use_manual_color", False))
         except Exception:
@@ -243,147 +304,23 @@ class Config:
         self._settings["reactive_use_manual_color"] = bool(value)
         self._save()
 
-    @property
-    def autostart(self) -> bool:
-        return self._settings["autostart"]
+    # ---- common boolean/int settings
 
-    @autostart.setter
-    def autostart(self, value: bool):
-        self._settings["autostart"] = value
-        self._save()
+    autostart = bool_prop("autostart", default=True)
+    os_autostart = bool_prop("os_autostart", default=False)
+    power_management_enabled = bool_prop("power_management_enabled", default=True)
+    power_off_on_suspend = bool_prop("power_off_on_suspend", default=True)
+    power_off_on_lid_close = bool_prop("power_off_on_lid_close", default=True)
+    power_restore_on_resume = bool_prop("power_restore_on_resume", default=True)
+    power_restore_on_lid_open = bool_prop("power_restore_on_lid_open", default=True)
 
-    @property
-    def os_autostart(self) -> bool:
-        return bool(self._settings.get("os_autostart", False))
+    # Battery saver (legacy)
+    battery_saver_enabled = bool_prop("battery_saver_enabled", default=False)
+    battery_saver_brightness = int_prop("battery_saver_brightness", default=25, min_v=0, max_v=50)
 
-    @os_autostart.setter
-    def os_autostart(self, value: bool):
-        self._settings["os_autostart"] = bool(value)
-        self._save()
-
-    @property
-    def power_management_enabled(self) -> bool:
-        return bool(self._settings.get("power_management_enabled", True))
-
-    @power_management_enabled.setter
-    def power_management_enabled(self, value: bool):
-        self._settings["power_management_enabled"] = bool(value)
-        self._save()
-
-    @property
-    def power_off_on_suspend(self) -> bool:
-        return bool(self._settings.get("power_off_on_suspend", True))
-
-    @power_off_on_suspend.setter
-    def power_off_on_suspend(self, value: bool):
-        self._settings["power_off_on_suspend"] = bool(value)
-        self._save()
-
-    @property
-    def power_off_on_lid_close(self) -> bool:
-        return bool(self._settings.get("power_off_on_lid_close", True))
-
-    @power_off_on_lid_close.setter
-    def power_off_on_lid_close(self, value: bool):
-        self._settings["power_off_on_lid_close"] = bool(value)
-        self._save()
-
-    @property
-    def power_restore_on_resume(self) -> bool:
-        return bool(self._settings.get("power_restore_on_resume", True))
-
-    @power_restore_on_resume.setter
-    def power_restore_on_resume(self, value: bool):
-        self._settings["power_restore_on_resume"] = bool(value)
-        self._save()
-
-    @property
-    def power_restore_on_lid_open(self) -> bool:
-        return bool(self._settings.get("power_restore_on_lid_open", True))
-
-    @power_restore_on_lid_open.setter
-    def power_restore_on_lid_open(self, value: bool):
-        self._settings["power_restore_on_lid_open"] = bool(value)
-        self._save()
-
-    # ---- battery saver (legacy)
-
-    @property
-    def battery_saver_enabled(self) -> bool:
-        return bool(self._settings.get("battery_saver_enabled", False))
-
-    @battery_saver_enabled.setter
-    def battery_saver_enabled(self, value: bool):
-        self._settings["battery_saver_enabled"] = bool(value)
-        self._save()
-
-    @property
-    def battery_saver_brightness(self) -> int:
-        try:
-            return max(0, min(50, int(self._settings.get("battery_saver_brightness", 25) or 0)))
-        except Exception:
-            return 25
-
-    @battery_saver_brightness.setter
-    def battery_saver_brightness(self, value: int):
-        self._settings["battery_saver_brightness"] = max(0, min(50, int(value)))
-        self._save()
-
-    # ---- power-source lighting profiles
-
-    @property
-    def ac_lighting_enabled(self) -> bool:
-        return bool(self._settings.get("ac_lighting_enabled", True))
-
-    @ac_lighting_enabled.setter
-    def ac_lighting_enabled(self, value: bool):
-        self._settings["ac_lighting_enabled"] = bool(value)
-        self._save()
-
-    @property
-    def ac_lighting_brightness(self) -> int | None:
-        v = self._settings.get("ac_lighting_brightness", None)
-        if v is None:
-            return None
-        try:
-            return self._normalize_brightness_value(v)
-        except Exception:
-            return None
-
-    @ac_lighting_brightness.setter
-    def ac_lighting_brightness(self, value: int | None):
-        if value is None:
-            self._settings["ac_lighting_brightness"] = None
-        else:
-            self._settings["ac_lighting_brightness"] = self._normalize_brightness_value(value)
-        self._save()
-
-    @property
-    def battery_lighting_enabled(self) -> bool:
-        return bool(self._settings.get("battery_lighting_enabled", True))
-
-    @battery_lighting_enabled.setter
-    def battery_lighting_enabled(self, value: bool):
-        self._settings["battery_lighting_enabled"] = bool(value)
-        self._save()
-
-    @property
-    def battery_lighting_brightness(self) -> int | None:
-        v = self._settings.get("battery_lighting_brightness", None)
-        if v is None:
-            return None
-        try:
-            return self._normalize_brightness_value(v)
-        except Exception:
-            return None
-
-    @battery_lighting_brightness.setter
-    def battery_lighting_brightness(self, value: int | None):
-        if value is None:
-            self._settings["battery_lighting_brightness"] = None
-        else:
-            self._settings["battery_lighting_brightness"] = self._normalize_brightness_value(value)
-        self._save()
+    # Power-source lighting profiles
+    ac_lighting_enabled = bool_prop("ac_lighting_enabled", default=True)
+    battery_lighting_enabled = bool_prop("battery_lighting_enabled", default=True)
 
     @property
     def per_key_colors(self) -> dict:
@@ -395,42 +332,14 @@ class Config:
         self._settings["per_key_colors"] = self._serialize_per_key_colors(value or {})
         self._save()
 
+    # ---- power-source lighting brightness overrides (optional)
+
+    ac_lighting_brightness = optional_brightness_prop("ac_lighting_brightness")
+    battery_lighting_brightness = optional_brightness_prop("battery_lighting_brightness")
+
     # ---- screen dim sync
 
-    @property
-    def screen_dim_sync_enabled(self) -> bool:
-        return bool(self._settings.get("screen_dim_sync_enabled", True))
-
-    @screen_dim_sync_enabled.setter
-    def screen_dim_sync_enabled(self, value: bool):
-        self._settings["screen_dim_sync_enabled"] = bool(value)
-        self._save()
-
-    @property
-    def screen_dim_sync_mode(self) -> str:
-        mode = str(self._settings.get("screen_dim_sync_mode", "off") or "off").strip().lower()
-        return mode if mode in {"off", "temp"} else "off"
-
-    @screen_dim_sync_mode.setter
-    def screen_dim_sync_mode(self, value: str):
-        mode = str(value or "off").strip().lower()
-        self._settings["screen_dim_sync_mode"] = mode if mode in {"off", "temp"} else "off"
-        self._save()
-
-    @property
-    def screen_dim_temp_brightness(self) -> int:
-        try:
-            v = int(self._settings.get("screen_dim_temp_brightness", 5) or 0)
-        except Exception:
-            v = 5
-        # Temp brightness is intended to be non-zero; allow 1..50.
-        return max(1, min(50, v))
-
-    @screen_dim_temp_brightness.setter
-    def screen_dim_temp_brightness(self, value: int):
-        try:
-            v = int(value)
-        except Exception:
-            v = 5
-        self._settings["screen_dim_temp_brightness"] = max(1, min(50, v))
-        self._save()
+    screen_dim_sync_enabled = bool_prop("screen_dim_sync_enabled", default=True)
+    screen_dim_sync_mode = enum_prop("screen_dim_sync_mode", default="off", allowed=("off", "temp"))
+    # Temp brightness is intended to be non-zero; allow 1..50.
+    screen_dim_temp_brightness = int_prop("screen_dim_temp_brightness", default=5, min_v=1, max_v=50)

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Tuple
 
+from src.core.utils.exceptions import is_device_busy, is_device_disconnected
+
 
 def push_per_key_colors(
     kb: Any,
@@ -39,8 +41,9 @@ def push_per_key_colors(
         )
         return kb
     except OSError as e:
-        # errno=16 is commonly "Device or resource busy".
-        if getattr(e, "errno", None) == 16:
+        if is_device_busy(e):
+            return None
+        if is_device_disconnected(e):
             return None
         return kb
     except Exception:

@@ -99,12 +99,14 @@ def delete_profile(requested_name: str) -> DeleteProfileResult:
 
     if not profiles.delete_profile(name):
         return DeleteProfileResult(
-            deleted=False, active_profile=profiles.get_active_profile(), message="Cannot delete 'default'"
+            deleted=False,
+            active_profile=profiles.get_active_profile(),
+            message=f"Cannot delete '{profiles.DEFAULT_PROFILE_NAME}'",
         )
 
     safe = profiles._safe_name(name)
     if profiles.get_active_profile() == safe:
-        profiles.set_active_profile("default")
+        profiles.set_active_profile(profiles.DEFAULT_PROFILE_NAME)
 
     return DeleteProfileResult(
         deleted=True,
