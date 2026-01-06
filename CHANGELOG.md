@@ -1,12 +1,12 @@
 # Changelog
 
-## 0.12.4-rc1 (2026-01-07)
+## 0.13.0 (2026-01-07)
 
 - Refactor: Reduced cyclomatic complexity for radon E-rated hotspots by extracting helpers while preserving public interfaces and test behavior. Targeted items: `buildpython/steps/step_quality.py::code_markers_runner`, `src/core/diagnostics/collectors_backends.py::backend_probe_snapshot`, `src/gui/perkey/overlay/autosync.py::auto_sync_per_key_overlays`, `src/gui/theme/detect.py::detect_system_prefers_dark`.
 - Quality: Cyclomatic complexity re-run shows **E-rated blocks: 0**.
 - CI: Full build profile is green (Compile, Pytest, Ruff lint/format, Import Validation/Scan, Code Markers, File Size, LOC Check, Type Check).
 - Testing: Added/updated unit tests around affected behaviors; all tests pass locally.
-- Note: This is a pre-release staged for testing before promoting to the latest stable.
+- Notes: staged for testing and validation before promoting to later point releases.
 
 ## 0.12.3 (2026-01-06)
 
