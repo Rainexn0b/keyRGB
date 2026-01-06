@@ -311,7 +311,16 @@ def build_appimage() -> Path:
         req = root / "requirements.txt"
         if req.exists():
             _run_checked(
-                [python_exe(), "-m", "pip", "install", "-r", str(req), "--target", str(site_packages)],
+                [
+                    python_exe(),
+                    "-m",
+                    "pip",
+                    "install",
+                    "-r",
+                    str(req),
+                    "--target",
+                    str(site_packages),
+                ],
                 cwd=root,
             )
 

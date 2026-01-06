@@ -57,7 +57,11 @@ def file_size_runner() -> RunResult:
         write_json(
             report_json,
             {
-                "thresholds": {"warning": WARN_LINES, "critical": CRIT_LINES, "severe": SEVERE_LINES},
+                "thresholds": {
+                    "warning": WARN_LINES,
+                    "critical": CRIT_LINES,
+                    "severe": SEVERE_LINES,
+                },
                 "files": [],
             },
         )
@@ -82,24 +86,41 @@ def file_size_runner() -> RunResult:
         level = "SEVERE" if line_count >= SEVERE_LINES else "CRITICAL" if line_count >= CRIT_LINES else "WARN"
         stdout_lines.append(f"  [{level}] {line_count:4d}  {rel}")
 
+    files_json: list[dict[str, object]] = [
+        {
+            "lines": lc,
+            "level": ("SEVERE" if lc >= SEVERE_LINES else "CRITICAL" if lc >= CRIT_LINES else "WARN"),
+            "path": rel,
+        }
+        for lc, rel in rows
+    ]
+
     data = {
-        "thresholds": {"warning": WARN_LINES, "critical": CRIT_LINES, "severe": SEVERE_LINES},
-        "counts": {"warning": len(warn), "critical": len(critical), "severe": len(severe)},
-        "files": [
-            {
-                "lines": lc,
-                "level": "SEVERE" if lc >= SEVERE_LINES else "CRITICAL" if lc >= CRIT_LINES else "WARN",
-                "path": rel,
-            }
-            for lc, rel in rows
-        ],
+        "thresholds": {
+            "warning": WARN_LINES,
+            "critical": CRIT_LINES,
+            "severe": SEVERE_LINES,
+        },
+        "counts": {
+            "warning": len(warn),
+            "critical": len(critical),
+            "severe": len(severe),
+        },
+        "files": files_json,
     }
 
     write_json(report_json, data)
     write_csv(
         report_csv,
         ["lines", "level", "path"],
-        [[str(d["lines"]), str(d["level"]), str(d["path"])] for d in data["files"]],
+        [
+            [
+                str(lc),
+                ("SEVERE" if lc >= SEVERE_LINES else "CRITICAL" if lc >= CRIT_LINES else "WARN"),
+                rel,
+            ]
+            for lc, rel in rows
+        ],
     )
 
     md_lines: list[str] = [
@@ -112,8 +133,9 @@ def file_size_runner() -> RunResult:
         "| Lines | Level | Path |",
         "|---:|---|---|",
     ]
-    for d in data["files"][:200]:
-        md_lines.append(f"| {d['lines']} | {d['level']} | {d['path']} |")
+    for lc, rel in rows[:200]:
+        level = "SEVERE" if lc >= SEVERE_LINES else "CRITICAL" if lc >= CRIT_LINES else "WARN"
+        md_lines.append(f"| {lc} | {level} | {rel} |")
     write_md(report_md, md_lines)
 
     # Informational by default; do not fail.

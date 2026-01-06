@@ -50,7 +50,8 @@ def _select_steps(run_steps: list[str] | None, skip_steps: list[str] | None, pro
         include = {n.lower() for n in prof.include_steps}
         selected = [s for s in steps if s.name.lower() in include]
     else:
-        selected = steps
+        # Default run: keep black opt-in via --with-black.
+        selected = [s for s in steps if s.name.lower() != "black"]
 
     if skip_steps:
         skip = {t.lower() for t in skip_steps}
@@ -83,6 +84,21 @@ def _maybe_add_appimage(selected: list, *, enabled: bool):
     return [*selected, appimage]
 
 
+def _maybe_add_black(selected: list, *, enabled: bool):
+    if not enabled:
+        return selected
+
+    steps = all_steps()
+    black = next((s for s in steps if s.name.lower() == "black"), None)
+    if black is None:
+        raise SystemExit("Black step not found (step registry out of date)")
+
+    if any(s.name.lower() == "black" for s in selected):
+        return selected
+
+    return [*selected, black]
+
+
 def main(argv: Iterable[str] | None = None) -> int:
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument("--profile", choices=sorted(PROFILES.keys()), help="Run a predefined profile")
@@ -91,11 +107,20 @@ def main(argv: Iterable[str] | None = None) -> int:
     parser.add_argument("--run-steps", help="Comma/space-separated list of step numbers or names")
     parser.add_argument("--skip-steps", help="Comma/space-separated list of step numbers or names")
     parser.add_argument("--verbose", action="store_true", help="Print stdout/stderr for steps")
-    parser.add_argument("--continue-on-error", action="store_true", help="Run all steps even if one fails")
+    parser.add_argument(
+        "--continue-on-error",
+        action="store_true",
+        help="Run all steps even if one fails",
+    )
     parser.add_argument(
         "--with-appimage",
         action="store_true",
         help="Also build the AppImage after the selected steps",
+    )
+    parser.add_argument(
+        "--with-black",
+        action="store_true",
+        help="Also run black formatting check after the selected steps",
     )
 
     args = parser.parse_args(list(argv) if argv is not None else None)
@@ -114,6 +139,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         profile=args.profile,
     )
 
+    selected = _maybe_add_black(selected, enabled=args.with_black)
     selected = _maybe_add_appimage(selected, enabled=args.with_appimage)
 
     if not selected:

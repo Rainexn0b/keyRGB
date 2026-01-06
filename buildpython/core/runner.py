@@ -8,7 +8,14 @@ from ..utils.log_format import StepLogRecord, format_standard_log
 from ..utils.paths import buildlog_dir
 
 
-def _write_log(step: Step, command: str, stdout: str, stderr: str, exit_code: int, duration_s: float) -> None:
+def _write_log(
+    step: Step,
+    command: str,
+    stdout: str,
+    stderr: str,
+    exit_code: int,
+    duration_s: float,
+) -> None:
     buildlog_dir().mkdir(parents=True, exist_ok=True)
     step.log_file.parent.mkdir(parents=True, exist_ok=True)
 
@@ -37,14 +44,69 @@ def run_step(step: Step, *, verbose: bool) -> StepOutcome:
     # Optional step gating
     if step.name in {"Ruff", "Ruff Format"} and not _is_module_available("ruff"):
         duration = time.time() - start
-        _write_log(step, "python -m ruff ...", "(skipped: ruff not installed)\n", "", 0, duration)
+        _write_log(
+            step,
+            "python -m ruff ...",
+            "(skipped: ruff not installed)\n",
+            "",
+            0,
+            duration,
+        )
         print(f"[{step.number}] {step.name}: SKIPPED")
-        return StepOutcome(status="skipped", exit_code=0, duration_s=duration, message="ruff not installed")
+        return StepOutcome(
+            status="skipped",
+            exit_code=0,
+            duration_s=duration,
+            message="ruff not installed",
+        )
+
+    if step.name == "Black" and not _is_module_available("black"):
+        duration = time.time() - start
+        _write_log(
+            step,
+            "python -m black ...",
+            "(skipped: black not installed)\n",
+            "",
+            0,
+            duration,
+        )
+        print(f"[{step.number}] {step.name}: SKIPPED")
+        return StepOutcome(
+            status="skipped",
+            exit_code=0,
+            duration_s=duration,
+            message="black not installed",
+        )
+
+    if step.name == "Type Check" and not _is_module_available("mypy"):
+        duration = time.time() - start
+        _write_log(
+            step,
+            "python -m mypy ...",
+            "(skipped: mypy not installed)\n",
+            "",
+            0,
+            duration,
+        )
+        print(f"[{step.number}] {step.name}: SKIPPED")
+        return StepOutcome(
+            status="skipped",
+            exit_code=0,
+            duration_s=duration,
+            message="mypy not installed",
+        )
 
     result = step.runner()
     duration = time.time() - start
 
-    _write_log(step, result.command_str, result.stdout, result.stderr, result.exit_code, duration)
+    _write_log(
+        step,
+        result.command_str,
+        result.stdout,
+        result.stderr,
+        result.exit_code,
+        duration,
+    )
 
     status = "OK" if result.exit_code == 0 else "FAIL"
     print(f"[{step.number}] {step.name}: {status} ({duration:.1f}s)")

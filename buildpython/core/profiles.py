@@ -50,6 +50,8 @@ PROFILES: dict[str, Profile] = {
             "Ruff Format",
             "Code Markers",
             "File Size",
+            "LOC Check",
+            "Type Check",
             "Repo Validation",
         ],
     ),

@@ -44,6 +44,9 @@ def steps() -> list[Step]:
     from .step_import_scan import import_scan_runner
     from .step_repo_validation import repo_validation_runner
     from .step_appimage import appimage_build_runner
+    from .step_black import black_check_runner
+    from .step_type_check import mypy_runner
+    from .step_loc_check import loc_over_400_runner
 
     return [
         Step(
@@ -118,9 +121,30 @@ def steps() -> list[Step]:
         ),
         Step(
             number=11,
+            name="Black",
+            description="Check formatting with black (optional)",
+            log_file=_log("step-11-black.log"),
+            runner=black_check_runner,
+        ),
+        Step(
+            number=12,
+            name="LOC Check",
+            description="Report Python files >= 400 lines (refactor flag)",
+            log_file=_log("step-12-loc-check.log"),
+            runner=loc_over_400_runner,
+        ),
+        Step(
+            number=13,
+            name="Type Check",
+            description="Run mypy type checking (optional)",
+            log_file=_log("step-13-type-check.log"),
+            runner=mypy_runner,
+        ),
+        Step(
+            number=14,
             name="AppImage",
             description="Build keyrgb-x86_64.AppImage",
-            log_file=_log("step-11-appimage.log"),
+            log_file=_log("step-14-appimage.log"),
             runner=appimage_build_runner,
         ),
     ]
