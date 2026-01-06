@@ -6,6 +6,17 @@ import time
 from collections.abc import Callable
 
 
+def _parse_lid_state(content: str | None) -> str | None:
+    if not content:
+        return None
+    s = str(content).strip().lower()
+    if "open" in s:
+        return "open"
+    if "closed" in s:
+        return "closed"
+    return None
+
+
 def start_sysfs_lid_monitoring(
     *,
     is_running: Callable[[], bool],
@@ -29,13 +40,8 @@ def start_sysfs_lid_monitoring(
         while is_running():
             try:
                 with open(lid_file) as f:
-                    content = f.read().strip()
-                    if "open" in content.lower():
-                        state = "open"
-                    elif "closed" in content.lower():
-                        state = "closed"
-                    else:
-                        state = None
+                    content = f.read()
+                    state = _parse_lid_state(content)
 
                 if state and state != last_state:
                     logger.info("Lid state changed: %s -> %s", last_state, state)
@@ -86,12 +92,14 @@ def poll_lid_state_paths(
     while is_running():
         try:
             with open(lid_path) as f:
-                state = f.read().strip()
+                state = f.read()
+
+            parsed = _parse_lid_state(state)
 
             if state != last_state:
-                if "closed" in state.lower():
+                if parsed == "closed":
                     on_lid_close()
-                elif "open" in state.lower():
+                elif parsed == "open":
                     on_lid_open()
                 last_state = state
 

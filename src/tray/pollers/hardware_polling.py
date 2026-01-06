@@ -124,6 +124,27 @@ def _apply_polled_hardware_state(
     return current_brightness, current_off
 
 
+def _handle_hardware_polling_exception(tray, exc: Exception, *, last_error_at: float) -> float:
+    # Device disconnects can happen at any time.
+    errno = getattr(exc, "errno", None)
+    if errno == 19 or "No such device" in str(exc):
+        try:
+            tray.engine.mark_device_unavailable()
+        except (OSError, RuntimeError, ValueError):
+            # Best-effort; continue polling.
+            pass
+        return float(last_error_at)
+
+    now = time.monotonic()
+    if now - float(last_error_at) > 30:
+        last_error_at = now
+        try:
+            tray._log_exception("Hardware polling error: %s", exc)
+        except (OSError, RuntimeError, ValueError):
+            pass
+    return float(last_error_at)
+
+
 def start_hardware_polling(tray) -> None:
     """Poll keyboard hardware state to detect physical button changes."""
 
@@ -148,22 +169,11 @@ def start_hardware_polling(tray) -> None:
                 )
 
             except Exception as exc:
-                # Device disconnects can happen at any time.
-                errno = getattr(exc, "errno", None)
-                if errno == 19 or "No such device" in str(exc):
-                    try:
-                        tray.engine.mark_device_unavailable()
-                    except (OSError, RuntimeError, ValueError):
-                        # Best-effort; continue polling.
-                        continue
-
-                now = time.monotonic()
-                if now - last_error_at > 30:
-                    last_error_at = now
-                    try:
-                        tray._log_exception("Hardware polling error: %s", exc)
-                    except (OSError, RuntimeError, ValueError):
-                        continue
+                last_error_at = _handle_hardware_polling_exception(
+                    tray,
+                    exc,
+                    last_error_at=last_error_at,
+                )
 
             time.sleep(2)
 

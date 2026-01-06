@@ -13,7 +13,7 @@ def _read_int(path: Path) -> Optional[int]:
         return None
 
 
-def read_dimmed_state(tray: Any) -> Optional[bool]:
+def read_dimmed_state(tray: Any, *, backlight_base: Path | None = None) -> Optional[bool]:
     """Best-effort: infer 'dimmed' from kernel backlight brightness drops.
 
     Some systems expose multiple backlight devices (e.g., hybrid graphics). KDE
@@ -24,7 +24,7 @@ def read_dimmed_state(tray: Any) -> Optional[bool]:
         - Updates tray._dim_backlight_baselines and tray._dim_screen_off.
     """
 
-    base = Path("/sys/class/backlight")
+    base = backlight_base or Path("/sys/class/backlight")
     if not base.exists():
         return None
 
@@ -61,8 +61,13 @@ def read_dimmed_state(tray: Any) -> Optional[bool]:
             dimmed_any = True
         else:
             dimmed_any = False if dimmed_any is None else dimmed_any
-            # Follow manual brightness changes while not dimmed.
-            if current_i != baseline_i:
+            # Follow brightness increases while not dimmed.
+            #
+            # Do not update the baseline on decreases: some desktops dim the
+            # backlight in small steps/animations. If we "chase" the baseline
+            # downward, we can miss the cumulative 10% drop and never report
+            # dimmed=True.
+            if current_i > baseline_i:
                 baselines[key] = current_i
 
     tray._dim_backlight_baselines = baselines
@@ -70,14 +75,14 @@ def read_dimmed_state(tray: Any) -> Optional[bool]:
     return dimmed_any
 
 
-def read_screen_off_state_drm() -> Optional[bool]:
+def read_screen_off_state_drm(*, drm_base: Path | None = None) -> Optional[bool]:
     """Best-effort: detect whether the active display is powered off via DPMS.
 
     On some desktops (notably KDE), turning the screen off may not change
     /sys/class/backlight brightness but will flip DRM connector DPMS state.
     """
 
-    base = Path("/sys/class/drm")
+    base = drm_base or Path("/sys/class/drm")
     if not base.exists():
         return None
 

@@ -163,6 +163,142 @@ def _restore_from_idle(tray: Any) -> None:
         pass
 
 
+def _apply_idle_action(
+    tray: Any,
+    *,
+    action: IdleAction,
+    dim_temp_brightness: int,
+) -> None:
+    if action == "turn_off":
+        tray._dim_temp_active = False
+        tray._dim_temp_target_brightness = None
+        try:
+            tray.engine.stop()
+        except Exception:
+            pass
+        try:
+            tray.engine.turn_off()
+        except Exception:
+            pass
+
+        tray.is_off = True
+        tray._idle_forced_off = True
+        try:
+            tray._refresh_ui()
+        except Exception:
+            pass
+
+    elif action == "dim_to_temp":
+        # Do not fight explicit user/power forced off (already gated).
+        # Do not turn on lighting if it's currently off.
+        if not bool(getattr(tray, "is_off", False)):
+            tray._dim_temp_active = True
+            tray._dim_temp_target_brightness = int(dim_temp_brightness)
+            try:
+                effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
+                # Only treat the canonical SW effects as software loops.
+                #
+                # Note: the tray's "perkey" mode is a hardware per-key apply
+                # path (not part of src.core.effects.catalog), and needs a real
+                # hardware brightness write for dim-sync to actually dim the
+                # keyboard.
+                is_sw_effect = effect in SW_EFFECTS
+                tray.engine.set_brightness(int(dim_temp_brightness), apply_to_hardware=not is_sw_effect)
+            except Exception:
+                pass
+
+    elif action == "restore_brightness":
+        tray._dim_temp_active = False
+        tray._dim_temp_target_brightness = None
+        # Restore to current config brightness (it may have been changed while dimmed).
+        try:
+            target = int(getattr(tray.config, "brightness", 0) or 0)
+        except Exception:
+            target = 0
+        if target > 0 and not bool(getattr(tray, "is_off", False)):
+            try:
+                effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
+                is_sw_effect = effect in SW_EFFECTS
+                tray.engine.set_brightness(int(target), apply_to_hardware=not is_sw_effect)
+            except Exception:
+                pass
+
+    elif action == "restore":
+        # Only auto-restore if this wasn't an explicit user off.
+        if not bool(getattr(tray, "_user_forced_off", False)) and not bool(getattr(tray, "_power_forced_off", False)):
+            tray._dim_temp_active = False
+            tray._dim_temp_target_brightness = None
+            _restore_from_idle(tray)
+
+
+def _debounce_dim_and_screen_off(
+    *,
+    dimmed_raw: Optional[bool],
+    screen_off_raw: bool,
+    dimmed_true_streak: int,
+    dimmed_false_streak: int,
+    screen_off_true_streak: int,
+    debounce_polls: int,
+) -> tuple[Optional[bool], bool, int, int, int]:
+    """Debounce dimmed/screen-off signals.
+
+    Returns:
+        (dimmed, screen_off, dimmed_true_streak, dimmed_false_streak, screen_off_true_streak)
+    """
+
+    if dimmed_raw is True:
+        dimmed_true_streak += 1
+        dimmed_false_streak = 0
+    elif dimmed_raw is False:
+        dimmed_false_streak += 1
+        dimmed_true_streak = 0
+    else:
+        dimmed_true_streak = 0
+        dimmed_false_streak = 0
+
+    if bool(screen_off_raw):
+        screen_off_true_streak += 1
+    else:
+        screen_off_true_streak = 0
+
+    if dimmed_true_streak >= debounce_polls:
+        dimmed = True
+    elif dimmed_false_streak >= debounce_polls:
+        dimmed = False
+    else:
+        dimmed = None
+
+    screen_off = bool(screen_off_true_streak >= debounce_polls)
+    return dimmed, screen_off, dimmed_true_streak, dimmed_false_streak, screen_off_true_streak
+
+
+def _build_idle_action_key(
+    *,
+    action: IdleAction,
+    dimmed: Optional[bool],
+    screen_off: bool,
+    brightness: int,
+    dim_sync_mode: str,
+    dim_temp_brightness: int,
+) -> str:
+    try:
+        return (
+            f"{action}|dimmed={dimmed}|screen_off={bool(screen_off)}|"
+            f"bri={int(brightness)}|dim_mode={str(dim_sync_mode)}|dim_tmp={int(dim_temp_brightness)}"
+        )
+    except Exception:
+        return str(action)
+
+
+def _should_log_idle_action(*, action: IdleAction, action_key: str, last_action_key: Optional[str]) -> bool:
+    is_real_action = bool(action) and str(action) != "none"
+    if not is_real_action:
+        return False
+    if last_action_key is None:
+        return True
+    return bool(action_key != last_action_key)
+
+
 def start_idle_power_polling(
     tray: Any,
     *,
@@ -220,30 +356,16 @@ def start_idle_power_polling(
                 screen_off_drm = _read_screen_off_state_drm()
                 screen_off = bool(screen_off_backlight) or bool(screen_off_drm)
 
-                # Debounce dimmed/screen-off detection.
-                if dimmed is True:
-                    dimmed_true_streak += 1
-                    dimmed_false_streak = 0
-                elif dimmed is False:
-                    dimmed_false_streak += 1
-                    dimmed_true_streak = 0
-                else:
-                    dimmed_true_streak = 0
-                    dimmed_false_streak = 0
-
-                if bool(screen_off):
-                    screen_off_true_streak += 1
-                else:
-                    screen_off_true_streak = 0
-
-                if dimmed_true_streak >= debounce_polls:
-                    dimmed = True
-                elif dimmed_false_streak >= debounce_polls:
-                    dimmed = False
-                else:
-                    dimmed = None
-
-                screen_off = bool(screen_off_true_streak >= debounce_polls)
+                dimmed, screen_off, dimmed_true_streak, dimmed_false_streak, screen_off_true_streak = (
+                    _debounce_dim_and_screen_off(
+                        dimmed_raw=dimmed,
+                        screen_off_raw=bool(screen_off),
+                        dimmed_true_streak=dimmed_true_streak,
+                        dimmed_false_streak=dimmed_false_streak,
+                        screen_off_true_streak=screen_off_true_streak,
+                        debounce_polls=debounce_polls,
+                    )
+                )
 
                 # Coarse fallback when we can't infer dim state from backlight.
                 if dimmed is None and session_id:
@@ -286,16 +408,16 @@ def start_idle_power_polling(
                 )
 
                 action_key = None
-                try:
-                    action_key = (
-                        f"{action}|dimmed={dimmed}|screen_off={bool(screen_off)}|"
-                        f"bri={int(brightness)}|dim_mode={str(dim_sync_mode)}|dim_tmp={int(dim_temp_brightness)}"
-                    )
-                except Exception:
-                    action_key = str(action)
+                action_key = _build_idle_action_key(
+                    action=action,
+                    dimmed=dimmed,
+                    screen_off=bool(screen_off),
+                    brightness=int(brightness),
+                    dim_sync_mode=str(dim_sync_mode),
+                    dim_temp_brightness=int(dim_temp_brightness),
+                )
 
-                is_real_action = bool(action) and str(action) != "none"
-                if action_key is not None and action_key != last_action_key and is_real_action:
+                if _should_log_idle_action(action=action, action_key=action_key, last_action_key=last_action_key):
                     last_action_key = action_key
                     log_event = getattr(tray, "_log_event", None)
                     if callable(log_event):
@@ -318,62 +440,7 @@ def start_idle_power_polling(
                         except Exception:
                             pass
 
-                if action == "turn_off":
-                    tray._dim_temp_active = False
-                    tray._dim_temp_target_brightness = None
-                    try:
-                        tray.engine.stop()
-                    except Exception:
-                        pass
-                    try:
-                        tray.engine.turn_off()
-                    except Exception:
-                        pass
-
-                    tray.is_off = True
-                    tray._idle_forced_off = True
-                    try:
-                        tray._refresh_ui()
-                    except Exception:
-                        pass
-
-                elif action == "dim_to_temp":
-                    # Do not fight explicit user/power forced off (already gated).
-                    # Do not turn on lighting if it's currently off.
-                    if not bool(getattr(tray, "is_off", False)):
-                        tray._dim_temp_active = True
-                        tray._dim_temp_target_brightness = int(dim_temp_brightness)
-                        try:
-                            effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
-                            is_sw_effect = effect == "perkey" or effect in SW_EFFECTS
-                            tray.engine.set_brightness(int(dim_temp_brightness), apply_to_hardware=not is_sw_effect)
-                        except Exception:
-                            pass
-
-                elif action == "restore_brightness":
-                    tray._dim_temp_active = False
-                    tray._dim_temp_target_brightness = None
-                    # Restore to current config brightness (it may have been changed while dimmed).
-                    try:
-                        target = int(getattr(tray.config, "brightness", 0) or 0)
-                    except Exception:
-                        target = 0
-                    if target > 0 and not bool(getattr(tray, "is_off", False)):
-                        try:
-                            effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
-                            is_sw_effect = effect == "perkey" or effect in SW_EFFECTS
-                            tray.engine.set_brightness(int(target), apply_to_hardware=not is_sw_effect)
-                        except Exception:
-                            pass
-
-                elif action == "restore":
-                    # Only auto-restore if this wasn't an explicit user off.
-                    if not bool(getattr(tray, "_user_forced_off", False)) and not bool(
-                        getattr(tray, "_power_forced_off", False)
-                    ):
-                        tray._dim_temp_active = False
-                        tray._dim_temp_target_brightness = None
-                        _restore_from_idle(tray)
+                _apply_idle_action(tray, action=action, dim_temp_brightness=int(dim_temp_brightness))
 
                 time.sleep(0.5)
 

@@ -137,3 +137,21 @@ def test_ite_probe_denylists_known_other_protocol_families() -> None:
     assert (0x048D, 0x5702) in deny
     assert (0x048D, 0xC966) in deny
 
+
+def test_ite_probe_fallback_usb_ids_cover_known_devices() -> None:
+    """Lock in KeyRGB's own fallback USB IDs.
+
+    This test is intentionally independent of upstream `ite8291r3_ctl` drift.
+    """
+
+    from src.core.backends.ite8291r3 import backend as ite_backend
+
+    allow = set(getattr(ite_backend, "_FALLBACK_USB_IDS", []) or [])
+
+    # Known ITE 8291r3 family IDs (includes Wootbook 0x600B) + generic 0x6008.
+    assert (0x048D, 0x6004) in allow
+    assert (0x048D, 0x6006) in allow
+    assert (0x048D, 0x6008) in allow
+    assert (0x048D, 0x600B) in allow
+    assert (0x048D, 0xCE00) in allow
+

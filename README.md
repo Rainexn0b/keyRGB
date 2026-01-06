@@ -135,8 +135,8 @@ Notes:
 
 Docs:
 
-- Step-by-step from a blank install: [docs/usage/usage.md](docs/usage/usage.md)
-- Commands / entrypoints / env vars: [docs/usage/commands.md](docs/usage/commands.md)
+- Quickstart & install instructions: see the **Quickstart** section above.
+- Commands / entrypoints / environment variables: see **Run** and **Environment variables** sections above.
 - Architecture / TongFang support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
 
 ### Uninstall
@@ -174,6 +174,24 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | `keyrgb-settings` | Open the settings GUI. |
 | `keyrgb-tcc-profiles` | Open the TCC power profiles GUI (if `tccd` is available). |
 | `keyrgb-diagnostics` | Print hardware diagnostics JSON. |
+
+### Environment variables
+
+| Variable | Usage |
+| --- | --- |
+| `KEYRGB_BACKEND` | Force backend: `auto` (default), `ite8291r3`, or `sysfs-leds`. |
+| `KEYRGB_DEBUG=1` | Enable verbose debug logging. |
+| `KEYRGB_TK_SCALING` | Float override for UI scaling (High-DPI / fractional scaling). |
+| `KEYRGB_TCCD_BIN` | Override the `tccd` helper path for TCC integration. |
+
+### Tray effects (names)
+
+These are the effect names stored in `~/.config/keyrgb/config.json` under the `effect` key.
+
+- Hardware (firmware) effects: `rainbow`, `breathing`, `wave`, `ripple`, `marquee`, `raindrop`, `aurora`, `fireworks`
+- Software effects: `rainbow_wave`, `rainbow_swirl`, `spectrum_cycle`, `color_cycle`, `chase`, `twinkle`, `strobe`
+- Reactive typing: `reactive_fade`, `reactive_ripple`
+- Per-key static map: `perkey`
 
 ## Configuration
 

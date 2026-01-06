@@ -10,12 +10,21 @@ Key idea: **USB IDs tell you what device is present, not what protocol it speaks
 
 ### 1) Upstream ITE userspace driver (best source)
 
-The vendored `ite8291r3_ctl` module defines the canonical ITE 8291r3 family product IDs.
+The upstream `ite8291r3_ctl` module defines the canonical ITE 8291r3 family product IDs.
 
-- Driver constants live in:
-  - [vendor/ite8291r3-ctl/ite8291r3_ctl/ite8291r3.py](../../vendor/ite8291r3-ctl/ite8291r3_ctl/ite8291r3.py)
+KeyRGB vendors a copy for reproducible builds, and the installer may apply a tiny patch
+on-the-fly for missing IDs (notably `0x600B` for Wootbook/Tongfang rebrands) while waiting
+for upstream to merge.
+
+- Driver constants (vendored copy used by KeyRGB source/AppImage builds) live in:
+   - [vendor/ite8291r3-ctl/ite8291r3_ctl/ite8291r3.py](../../vendor/ite8291r3-ctl/ite8291r3_ctl/ite8291r3.py)
+
+- Installer patching logic (for upstream clones missing known IDs) lives in:
+   - [install.sh](../../install.sh)
 
 This is the safest place to “mine” IDs from because it is already protocol-scoped.
+When evaluating a new ID, prefer upstream first, then confirm whether KeyRGB’s vendored
+copy and installer patching already cover it.
 
 ### 2) KeyRGB backend allowlist + denylist
 
@@ -23,6 +32,10 @@ KeyRGB layers a small allowlist/denylist around the upstream driver to:
 
 - remain compatible with older packaged versions of `ite8291r3_ctl` (fallback IDs)
 - **fail closed** on known incompatible controllers (“Fusion 2” family)
+
+Important nuance: KeyRGB’s probe path merges its `_FALLBACK_USB_IDS` into whatever
+`ite8291r3_ctl` exposes at runtime, so older distro-packaged versions can still detect
+common devices even if their `PRODUCT_IDS` list is behind.
 
 - Backend implementation:
    - [src/core/backends/ite8291r3/backend.py](../../src/core/backends/ite8291r3/backend.py)

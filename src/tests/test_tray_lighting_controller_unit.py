@@ -179,6 +179,23 @@ class TestOnBrightnessClicked:
         mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=True)
         mock_start.assert_called_once_with(mock_tray)
 
+    def test_on_brightness_clicked_does_not_restart_software_effect(self):
+        """Software effects should update brightness in-place (no restart)."""
+        from src.tray.controllers.lighting_controller import on_brightness_clicked
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        mock_tray.config.effect = "rainbow_wave"  # software effect
+        mock_tray.config.brightness = 25
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            on_brightness_clicked(mock_tray, "🔘 20")
+
+        # 20 * 5 = 100
+        assert mock_tray.config.brightness == 100
+        mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=False)
+        mock_start.assert_not_called()
+
     def test_on_brightness_clicked_saves_nonzero_to_last_brightness(self):
         """Non-zero brightness should be saved to _last_brightness."""
         from src.tray.controllers.lighting_controller import on_brightness_clicked
@@ -332,4 +349,44 @@ class TestPowerTurnOffRestore:
         with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             power_restore(mock_tray)
 
+        mock_start.assert_not_called()
+
+
+class TestApplyBrightnessFromPowerPolicy:
+    """Test apply_brightness_from_power_policy behavior."""
+
+    def test_apply_brightness_from_power_policy_restarts_non_software_effect(self):
+        from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        mock_tray._user_forced_off = False
+        mock_tray._idle_forced_off = False
+        mock_tray._power_forced_off = False
+        mock_tray.config.effect = "breathe"  # not a software effect
+        mock_tray.config.brightness = 50
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            apply_brightness_from_power_policy(mock_tray, 25)
+
+        assert mock_tray.config.brightness == 25
+        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=True)
+        mock_start.assert_called_once_with(mock_tray)
+
+    def test_apply_brightness_from_power_policy_does_not_restart_software_effect(self):
+        from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        mock_tray._user_forced_off = False
+        mock_tray._idle_forced_off = False
+        mock_tray._power_forced_off = False
+        mock_tray.config.effect = "rainbow_wave"  # software effect
+        mock_tray.config.brightness = 50
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            apply_brightness_from_power_policy(mock_tray, 25)
+
+        assert mock_tray.config.brightness == 25
+        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=False)
         mock_start.assert_not_called()

@@ -6,6 +6,19 @@ from collections.abc import Callable
 from .lid_monitoring import poll_lid_state_paths
 
 
+def _parse_acpi_lid_event(line: str | None) -> str | None:
+    if not line:
+        return None
+    s = str(line).strip().lower()
+    if "button/lid" not in s:
+        return None
+    if "close" in s:
+        return "closed"
+    if "open" in s:
+        return "open"
+    return None
+
+
 def monitor_acpi_events(
     *,
     is_running: Callable[[], bool],
@@ -34,11 +47,11 @@ def monitor_acpi_events(
             if not line:
                 break
 
-            if "button/lid" in line.lower():
-                if "close" in line.lower():
-                    on_lid_close()
-                elif "open" in line.lower():
-                    on_lid_open()
+            event = _parse_acpi_lid_event(line)
+            if event == "closed":
+                on_lid_close()
+            elif event == "open":
+                on_lid_open()
 
     except FileNotFoundError:
         poll_lid_state_paths(

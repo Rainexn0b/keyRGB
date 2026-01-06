@@ -1,6 +1,13 @@
 # Changelog
 
-## 0.12.1 (2026-01-05)
+## 0.12.2 (2026-01-06)
+
+- Fix: Screen dim/brightness sync now reliably dims the keyboard in per-key mode and detects gradual/stepwise backlight dimming.
+- Docs: consolidate end-user usage/reference into `README.md` and update repo layout docs.
+- Tests: add extensive non-brittle unit coverage across tray startup/runtime/pollers and core power monitoring/backends.
+- Tests: make direct `pytest` invocations reliably import the `src` package by adding the repo root to pytest's `pythonpath`.
+
+## 0.12.1 (beta) (2026-01-05)
 
 - Fix: Installer: restore interactive stable/prerelease AppImage channel prompt for normal installs (keeps `--update-appimage` non-interactive and preserves saved selection).
 - Fix: GUI: increase Reactive Typing Color window height to avoid clipping the bottom controls.

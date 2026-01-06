@@ -10,7 +10,7 @@ This page documents the *repository* directory structure (as opposed to runtime 
 ## Documentation
 
 - `docs/` — project documentation
-  - `docs/usage/` — end-user usage docs
+  - `README.md` — end-user docs (install, run, common options)
   - `docs/architecture/` — technical architecture notes
   - `docs/development/` — contributor/process notes
   - `docs/developement/` — legacy spelling (kept as a redirect for compatibility)
