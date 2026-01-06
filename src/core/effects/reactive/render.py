@@ -36,6 +36,50 @@ def scale(rgb: Color, s: float) -> Color:
     return (int(round(rgb[0] * ss)), int(round(rgb[1] * ss)), int(round(rgb[2] * ss)))
 
 
+def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:
+    """Compute a factor to keep a per-key backdrop dim under bright effects.
+
+    If a per-key profile/backdrop is active, we want to preserve the user's
+    chosen base (per-key) brightness while allowing reactive pulses/highlights
+    to render brighter. Since hardware brightness is global, we do this by:
+      - running the device at the effect brightness, and
+      - scaling the base RGB values down by base/effect.
+    """
+
+    try:
+        base_hw = getattr(engine, "per_key_brightness", None)
+        if base_hw is None:
+            return 1.0
+        base_hw = int(base_hw)
+    except Exception:
+        return 1.0
+
+    try:
+        eff_hw = int(effect_brightness_hw)
+    except Exception:
+        return 1.0
+
+    base_hw = max(0, min(50, base_hw))
+    eff_hw = max(0, min(50, eff_hw))
+
+    if eff_hw <= 0:
+        return 1.0
+    if base_hw >= eff_hw:
+        return 1.0
+    return float(base_hw) / float(eff_hw)
+
+
+def apply_backdrop_brightness_scale(color_map: Dict[Key, Color], *, factor: float) -> Dict[Key, Color]:
+    """Return a scaled copy of a per-key base map."""
+
+    f = float(factor)
+    if f >= 0.999:
+        return dict(color_map)
+    if f <= 0.0:
+        return {k: (0, 0, 0) for k in color_map.keys()}
+    return {k: scale(rgb, f) for k, rgb in color_map.items()}
+
+
 def frame_dt_s() -> float:
     return 1.0 / 60.0
 

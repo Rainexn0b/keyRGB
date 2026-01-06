@@ -10,7 +10,18 @@ from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
 
 from .input import load_active_profile_keymap, poll_keypress_key_id, try_open_evdev_keyboards
-from .render import Color, Key, base_color_map, frame_dt_s, mix, pace, render, scale
+from .render import (
+    Color,
+    Key,
+    apply_backdrop_brightness_scale,
+    backdrop_brightness_scale_factor,
+    base_color_map,
+    frame_dt_s,
+    mix,
+    pace,
+    render,
+    scale,
+)
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -202,22 +213,26 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
         # - With per-key backdrop: use existing per-key colors.
         # - Without backdrop: use a very dim background derived from the reactive color.
         if per_key_backdrop_active:
-            base = base_color_map(engine)
+            base_unscaled = base_color_map(engine)
+            factor = backdrop_brightness_scale_factor(engine, effect_brightness_hw=int(getattr(engine, "brightness", 25) or 0))
+            base = apply_backdrop_brightness_scale(base_unscaled, factor=factor)
         else:
             background = scale(react_color, 0.06)
-            base = {(r, c): background for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+            base_unscaled = {(r, c): background for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+            base = dict(base_unscaled)
 
         color_map: Dict[Key, Color] = {}
         for k, base_rgb in base.items():
+            base_rgb_unscaled = base_unscaled.get(k, base_rgb)
             w = overlay.get(k, 0.0)
             if bool(getattr(engine, "reactive_use_manual_color", False)):
                 pulse_rgb = react_color
             elif per_key_backdrop_active:
                 # Use brightness boost for visible flash on any color
-                pulse_rgb = _brightness_boost_pulse(base_rgb=base_rgb)
+                pulse_rgb = _brightness_boost_pulse(base_rgb=base_rgb_unscaled)
             else:
                 # Use contrasting highlight for uniform backgrounds
-                pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb, preferred_rgb=react_color)
+                pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb_unscaled, preferred_rgb=react_color)
             color_map[k] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
 
         render(engine, color_map=color_map)
@@ -231,11 +246,8 @@ def run_reactive_fade(engine: "EffectsEngine") -> None:
 def run_reactive_ripple(engine: "EffectsEngine") -> None:
     # Ripple implementation: an expanding ring wave that reads clearly across
     # the keyboard.
-    base = base_color_map(engine)
     dt = frame_dt_s()
     p = pace(engine)
-
-    per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
 
     def _get_manual_color() -> Color | None:
         if not bool(getattr(engine, "reactive_use_manual_color", False)):
@@ -248,9 +260,8 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
         except Exception:
             return None
 
-    if not (getattr(engine, "per_key_colors", None) or None):
-        background = (5, 5, 5)
-        base = {(r, c): background for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+    # Base map is built per-frame so changes to per-key backdrop/brightness
+    # are reflected immediately.
 
     devices = try_open_evdev_keyboards()
     press = _PressSource(
@@ -272,6 +283,16 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
     global_hue = 0.0
 
     while engine.running and not engine.stop_event.is_set():
+        per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
+        if per_key_backdrop_active:
+            base_unscaled = base_color_map(engine)
+            factor = backdrop_brightness_scale_factor(engine, effect_brightness_hw=int(getattr(engine, "brightness", 25) or 0))
+            base = apply_backdrop_brightness_scale(base_unscaled, factor=factor)
+        else:
+            background = (5, 5, 5)
+            base_unscaled = {(r, c): background for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+            base = dict(base_unscaled)
+
         pressed_key_id = press.poll_key_id(dt=dt)
         if pressed_key_id is not None:
             if pressed_key_id:
@@ -330,6 +351,7 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
         # render() will handle fallback to uniform if per-key HW isn't available
         color_map: Dict[Key, Color] = {}
         for k, base_rgb in base.items():
+            base_rgb_unscaled = base_unscaled.get(k, base_rgb)
             if k in overlay:
                 w, hue = overlay[k]
                 if manual is not None:
@@ -339,7 +361,7 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
                 if per_key_backdrop_active and manual is None:
                     # Preserve the rainbow default, but ensure it stays visible
                     # over the current per-key backdrop.
-                    pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb, preferred_rgb=pulse_rgb)
+                    pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb_unscaled, preferred_rgb=pulse_rgb)
                 color_map[k] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
             else:
                 color_map[k] = base_rgb

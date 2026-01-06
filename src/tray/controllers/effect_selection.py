@@ -82,6 +82,17 @@ def _ensure_software_mode(tray) -> None:
     except Exception:
         pass
 
+    # Also sync a per-key base brightness when a per-key backdrop is active.
+    # This allows reactive typing effects to keep the backdrop dim while
+    # rendering pulses/highlights brighter.
+    try:
+        tray.engine.per_key_brightness = int(getattr(config, "perkey_brightness", None) or 0) if existing else None
+    except Exception:
+        try:
+            tray.engine.per_key_brightness = None
+        except Exception:
+            pass
+
 
 def _ensure_hardware_mode(tray) -> None:
     """Ensure we're in hardware mode (clear per-key state).
@@ -90,6 +101,10 @@ def _ensure_hardware_mode(tray) -> None:
     """
     try:
         tray.engine.per_key_colors = None
+    except Exception:
+        pass
+    try:
+        tray.engine.per_key_brightness = None
     except Exception:
         pass
 

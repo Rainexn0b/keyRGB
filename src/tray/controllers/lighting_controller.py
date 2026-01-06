@@ -50,6 +50,10 @@ def start_current_effect(tray: Any) -> None:
                 tray.engine.per_key_colors = dict(getattr(tray.config, "per_key_colors", {}) or {})
             except Exception:
                 tray.engine.per_key_colors = None
+            try:
+                tray.engine.per_key_brightness = int(getattr(tray.config, "perkey_brightness", tray.config.brightness) or 0)
+            except Exception:
+                tray.engine.per_key_brightness = None
 
             with tray.engine.kb_lock:
                 if hasattr(tray.engine.kb, "enable_user_mode"):
@@ -80,6 +84,10 @@ def start_current_effect(tray: Any) -> None:
             # Record uniform mode so software effects don't accidentally reuse per-key.
             try:
                 tray.engine.per_key_colors = None
+            except Exception:
+                pass
+            try:
+                tray.engine.per_key_brightness = None
             except Exception:
                 pass
 

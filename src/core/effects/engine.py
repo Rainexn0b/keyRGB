@@ -80,6 +80,10 @@ class EffectsEngine:
         self.reactive_color: Optional[tuple] = None
         self.reactive_use_manual_color: bool = False
         self.per_key_colors: Optional[Dict[Tuple[int, int], Tuple[int, int, int]]] = None  # For perkey effects
+        # When a per-key profile/backdrop is active, this stores the user's
+        # preferred base brightness (0..50). Reactive/software effects can
+        # then keep the base dim while rendering pulses/highlights brighter.
+        self.per_key_brightness: Optional[int] = None
 
     def _ensure_device_available(self) -> bool:
         """Best-effort attempt to connect to the keyboard device."""
