@@ -358,7 +358,11 @@ def build_editor_ui(editor) -> None:
     ttk.Button(pbtns, text="Save", command=editor._save_profile).grid(row=0, column=2, sticky="ew", padx=(3, 3))
     ttk.Button(pbtns, text="Delete", command=editor._delete_profile).grid(row=0, column=3, sticky="ew", padx=(3, 0))
 
-    ttk.Button(editor._profiles_frame, text="Set as Default", command=editor._set_default_profile).grid(
+    ttk.Button(
+        editor._profiles_frame,
+        text="Set as Default",
+        command=editor._set_default_profile,
+    ).grid(
         row=2,
         column=0,
         columnspan=2,

@@ -6,6 +6,117 @@ import subprocess
 from shutil import which
 
 
+def _detect_theme_override() -> bool | None:
+    override = os.environ.get("KEYRGB_THEME", "").strip().lower()
+    if override in {"dark", "light"}:
+        return override == "dark"
+    return None
+
+
+def _detect_gtk_theme_env() -> bool | None:
+    gtk_theme = os.environ.get("GTK_THEME", "")
+    if not gtk_theme:
+        return None
+    low = gtk_theme.lower()
+    if ":dark" in low or low.endswith("dark") or "dark" in low:
+        return True
+    return None
+
+
+def _detect_gsettings_color_scheme() -> bool | None:
+    if not which("gsettings"):
+        return None
+    try:
+        out = (
+            subprocess.run(
+                ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=0.25,
+            )
+            .stdout.strip()
+            .lower()
+        )
+        if "dark" in out:
+            return True
+        if "light" in out:
+            return False
+    except Exception:
+        return None
+    return None
+
+
+def _read_kde_colorscheme_from_kreadconfig(kdeglobals: str) -> str | None:
+    if not os.path.exists(kdeglobals):
+        return None
+    for tool in ("kreadconfig6", "kreadconfig5"):
+        if not which(tool):
+            continue
+        try:
+            out = (
+                subprocess.run(
+                    [
+                        tool,
+                        "--file",
+                        kdeglobals,
+                        "--group",
+                        "General",
+                        "--key",
+                        "ColorScheme",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=0.25,
+                )
+                .stdout.strip()
+                .lower()
+            )
+            if out:
+                return out
+        except Exception:
+            continue
+    return None
+
+
+def _read_kde_colorscheme_from_ini(kdeglobals: str) -> str | None:
+    if not os.path.exists(kdeglobals):
+        return None
+    try:
+        in_general = False
+        with open(kdeglobals, "r", encoding="utf-8", errors="ignore") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line or line.startswith("#") or line.startswith(";"):
+                    continue
+                if line.startswith("[") and line.endswith("]"):
+                    in_general = line.lower() == "[general]"
+                    continue
+                if not in_general:
+                    continue
+                if "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                if key.strip().lower() == "colorscheme":
+                    return value.strip().lower() or None
+    except Exception:
+        return None
+    return None
+
+
+def _detect_kde_prefers_dark() -> bool | None:
+    desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+    if "kde" not in desktop and "plasma" not in desktop:
+        return None
+
+    kdeglobals = os.path.expanduser("~/.config/kdeglobals")
+    scheme = _read_kde_colorscheme_from_kreadconfig(kdeglobals) or _read_kde_colorscheme_from_ini(kdeglobals)
+    if not scheme:
+        return None
+    return _kde_colorscheme_prefers_dark(scheme)
+
+
 def detect_system_prefers_dark() -> bool | None:
     """Best-effort detection of whether the desktop prefers a dark color scheme.
 
@@ -21,92 +132,20 @@ def detect_system_prefers_dark() -> bool | None:
           default to avoid surprising users.
     """
 
-    override = os.environ.get("KEYRGB_THEME", "").strip().lower()
-    if override in {"dark", "light"}:
-        return override == "dark"
+    providers = (
+        _detect_theme_override,
+        _detect_gtk_theme_env,
+        _detect_gsettings_color_scheme,
+        _detect_kde_prefers_dark,
+    )
 
-    gtk_theme = os.environ.get("GTK_THEME", "")
-    if gtk_theme:
-        low = gtk_theme.lower()
-        if ":dark" in low or low.endswith("dark") or "dark" in low:
-            return True
-
-    # GNOME / GTK portal-compatible settings.
-    if which("gsettings"):
+    for provider in providers:
         try:
-            out = subprocess.run(
-                ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
-                check=False,
-                capture_output=True,
-                text=True,
-                timeout=0.25,
-            ).stdout.strip().lower()
-            if "dark" in out:
-                return True
-            if "light" in out:
-                return False
+            val = provider()
         except Exception:
-            pass
-
-    # KDE Plasma: infer from the configured color scheme.
-    try:
-        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
-        if "kde" in desktop or "plasma" in desktop:
-            kdeglobals = os.path.expanduser("~/.config/kdeglobals")
-
-            # Prefer KDE's own config reader if present.
-            for tool in ("kreadconfig6", "kreadconfig5"):
-                if which(tool) and os.path.exists(kdeglobals):
-                    try:
-                        out = subprocess.run(
-                            [
-                                tool,
-                                "--file",
-                                kdeglobals,
-                                "--group",
-                                "General",
-                                "--key",
-                                "ColorScheme",
-                            ],
-                            check=False,
-                            capture_output=True,
-                            text=True,
-                            timeout=0.25,
-                        ).stdout.strip().lower()
-                        if out:
-                            scheme = out
-                            prefers_dark = _kde_colorscheme_prefers_dark(scheme)
-                            if prefers_dark is not None:
-                                return prefers_dark
-                    except Exception:
-                        pass
-
-            # Fallback: parse ~/.config/kdeglobals as an INI-ish file.
-            if os.path.exists(kdeglobals):
-                in_general = False
-                scheme: str | None = None
-                with open(kdeglobals, "r", encoding="utf-8", errors="ignore") as f:
-                    for raw in f:
-                        line = raw.strip()
-                        if not line or line.startswith("#") or line.startswith(";"):
-                            continue
-                        if line.startswith("[") and line.endswith("]"):
-                            in_general = line.lower() == "[general]"
-                            continue
-                        if not in_general:
-                            continue
-                        if "=" not in line:
-                            continue
-                        key, value = line.split("=", 1)
-                        if key.strip().lower() == "colorscheme":
-                            scheme = value.strip().lower()
-                            break
-                if scheme:
-                    prefers_dark = _kde_colorscheme_prefers_dark(scheme)
-                    if prefers_dark is not None:
-                        return prefers_dark
-    except Exception:
-        pass
+            val = None
+        if val is not None:
+            return val
 
     return None
 

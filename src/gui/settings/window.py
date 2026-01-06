@@ -26,7 +26,11 @@ from .panels.power_source_panel import PowerSourcePanel
 from .scrollable_area import ScrollableArea
 from .panels.version_panel import VersionPanel
 from src.gui.utils.window_geometry import compute_centered_window_geometry
-from .settings_state import SettingsValues, apply_settings_values_to_config, load_settings_values
+from .settings_state import (
+    SettingsValues,
+    apply_settings_values_to_config,
+    load_settings_values,
+)
 from .hardware_hint import extract_unsupported_rgb_controllers_hint
 
 from src.core.config import Config
@@ -68,7 +72,9 @@ class PowerSettingsGUI:
 
         def work() -> str:
             try:
-                from src.core.diagnostics.collectors_backends import backend_probe_snapshot
+                from src.core.diagnostics.collectors_backends import (
+                    backend_probe_snapshot,
+                )
 
                 snap = backend_probe_snapshot()
                 return extract_unsupported_rgb_controllers_hint(snap)

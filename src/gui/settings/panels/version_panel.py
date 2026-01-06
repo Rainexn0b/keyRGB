@@ -86,7 +86,9 @@ class VersionPanel:
         repo_version = self._repo_version_text()
         if repo_version:
             v_norm = normalize_version_text(repo_version) or str(repo_version).strip()
-            display = f"v{v_norm}" if not str(repo_version).strip().lower().startswith("v") else str(repo_version).strip()
+            display = (
+                f"v{v_norm}" if not str(repo_version).strip().lower().startswith("v") else str(repo_version).strip()
+            )
             return f"{display} (dev)"
 
         try:

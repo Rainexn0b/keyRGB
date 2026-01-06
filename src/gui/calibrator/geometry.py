@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Dict, Iterable, Optional, Tuple
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
-from src.gui.reference.overlay_geometry import CanvasTransform, hit_test as _hit_test, key_canvas_bbox_inset
+from src.gui.reference.overlay_geometry import (
+    CanvasTransform,
+    hit_test as _hit_test,
+    key_canvas_bbox_inset,
+)
 
 
 def key_canvas_bbox(

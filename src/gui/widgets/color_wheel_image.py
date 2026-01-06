@@ -25,7 +25,11 @@ def build_wheel_ppm_bytes(*, size: int, bg_rgb: tuple[int, int, int], center_siz
     max_distance = max(1.0, float(radius - int(center_size)))
     two_pi = 2.0 * math.pi
 
-    bg_r, bg_g, bg_b = (int(bg_rgb[0]) & 0xFF, int(bg_rgb[1]) & 0xFF, int(bg_rgb[2]) & 0xFF)
+    bg_r, bg_g, bg_b = (
+        int(bg_rgb[0]) & 0xFF,
+        int(bg_rgb[1]) & 0xFF,
+        int(bg_rgb[2]) & 0xFF,
+    )
 
     data = bytearray(int(size) * int(size) * 3)
     idx = 0

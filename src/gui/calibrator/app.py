@@ -13,7 +13,11 @@ from src.core.config import Config
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 from .geometry import hit_test, key_canvas_bbox
 from .probe import CalibrationProbeState
-from src.gui.utils.profile_backdrop_storage import load_backdrop_image, reset_backdrop_image, save_backdrop_image
+from src.gui.utils.profile_backdrop_storage import (
+    load_backdrop_image,
+    reset_backdrop_image,
+    save_backdrop_image,
+)
 from .keyboard_preview import KeyboardPreviewSession
 from .profile_storage import (
     get_active_profile_name,
@@ -46,6 +50,8 @@ def _keymap_path() -> Path:
 def _save_keymap(keymap: Dict[str, Tuple[int, int]]) -> None:
     # Use shared saver to keep behavior consistent with per-key UI.
     save_keymap(get_active_profile_name(), keymap)
+
+
 class KeymapCalibrator(tk.Tk):
     def __init__(self) -> None:
         super().__init__()

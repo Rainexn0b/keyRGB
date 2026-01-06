@@ -11,7 +11,11 @@ from .window_centering import center_window_on_screen
 from .window_geometry import compute_centered_window_geometry
 from .window_icon import apply_keyrgb_window_icon, find_keyrgb_logo_path
 from .key_draw_style import KeyDrawStyle, key_draw_style
-from .profile_backdrop_storage import load_backdrop_image, reset_backdrop_image, save_backdrop_image
+from .profile_backdrop_storage import (
+    load_backdrop_image,
+    reset_backdrop_image,
+    save_backdrop_image,
+)
 
 __all__ = [
     "apply_keyrgb_window_icon",

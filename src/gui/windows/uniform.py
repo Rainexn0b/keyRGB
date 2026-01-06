@@ -65,7 +65,7 @@ class UniformColorGUI:
         self.color_wheel = ColorWheel(
             main_frame,
             size=350,
-            initial_color=tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color,
+            initial_color=(tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color),
             callback=self._on_color_change,
             release_callback=self._on_color_release,
         )

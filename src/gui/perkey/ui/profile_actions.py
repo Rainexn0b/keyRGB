@@ -76,7 +76,10 @@ def new_profile_ui(editor: Any) -> None:
 
     existing_profiles = profiles.list_profiles()
     new_name = simpledialog.askstring(
-        "New Profile", "Enter profile name:", parent=editor.root, initialvalue="new_profile"
+        "New Profile",
+        "Enter profile name:",
+        parent=editor.root,
+        initialvalue="new_profile",
     )
 
     if not new_name:

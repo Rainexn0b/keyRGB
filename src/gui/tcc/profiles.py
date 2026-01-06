@@ -156,7 +156,12 @@ class TccProfilesGUI:
     def _update_crud_buttons(self) -> None:
         idx = self._selected_index()
         if idx is None or idx < 0 or idx >= len(self._profiles):
-            for b in (self.btn_duplicate, self.btn_rename, self.btn_edit, self.btn_delete):
+            for b in (
+                self.btn_duplicate,
+                self.btn_rename,
+                self.btn_edit,
+                self.btn_delete,
+            ):
                 b.configure(state="disabled")
             return
 
