@@ -181,7 +181,10 @@ def _read_led_snapshot() -> dict[str, str]:
     backlight_root = Path("/sys/class/backlight")
     if backlight_root.exists():
         try:
-            for bl_dir in sorted([p for p in backlight_root.iterdir() if p.is_dir()], key=lambda p: p.name):
+            for bl_dir in sorted(
+                [p for p in backlight_root.iterdir() if p.is_dir()],
+                key=lambda p: p.name,
+            ):
                 for rel in (
                     "brightness",
                     "actual_brightness",
@@ -238,14 +241,62 @@ def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> 
 
 _install_tripwire()
 
+
+@pytest.fixture
+def temp_profile_dir(tmp_path: Path) -> Path:
+    """Create a temporary profile directory structure."""
+    profile_dir = tmp_path / "profiles" / "test_profile"
+    profile_dir.mkdir(parents=True)
+    return profile_dir
+
+
+@pytest.fixture
+def profile_paths_factory():
+    """Factory to build ProfilePaths rooted at a temp profile dir."""
+
+    def _make(
+        root: Path,
+        *,
+        keymap: Path | None = None,
+        layout_global: Path | None = None,
+        layout_per_key: Path | None = None,
+        per_key_colors: Path | None = None,
+        backdrop_image: Path | None = None,
+        backdrop_settings: Path | None = None,
+    ):
+        from src.core.profile.paths import ProfilePaths
+
+        return ProfilePaths(
+            root=root,
+            keymap=keymap or (root / "keymap.json"),
+            layout_global=layout_global or (root / "layout.json"),
+            layout_per_key=layout_per_key or (root / "layout_per_key.json"),
+            per_key_colors=per_key_colors or (root / "colors.json"),
+            backdrop_image=backdrop_image or (root / "backdrop.png"),
+            backdrop_settings=backdrop_settings or (root / "backdrop_settings.json"),
+        )
+
+    return _make
+
+
 # A small set of recently-added suites that are useful but not required
 # for debugging hardware side-effects.
 _AGENT_ADDED_TEST_FILES = {
     "test_config_file_storage_unit.py",
     "test_effect_selection_unit.py",
     "test_hw_payloads_unit.py",
-    "test_power_manager_unit.py",
-    "test_profile_storage_unit.py",
+    "test_power_manager_battery_saver_loop_unit.py",
+    "test_power_manager_brightness_unit.py",
+    "test_power_manager_config_gating_unit.py",
+    "test_power_manager_event_handlers_unit.py",
+    "test_power_manager_monitoring_unit.py",
+    "test_power_manager_shape_unit.py",
+    "test_profile_storage_apply_profile_unit.py",
+    "test_profile_storage_backdrop_transparency_unit.py",
+    "test_profile_storage_keymap_unit.py",
+    "test_profile_storage_layout_global_unit.py",
+    "test_profile_storage_layout_per_key_unit.py",
+    "test_profile_storage_per_key_colors_unit.py",
     "test_software_loops_unit.py",
     "test_tray_lighting_controller_unit.py",
 }

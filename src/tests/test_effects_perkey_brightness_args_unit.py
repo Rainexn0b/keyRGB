@@ -10,7 +10,13 @@ def test_perkey_fade_passes_brightness_kwarg() -> None:
             self.calls: list[dict] = []
 
         def enable_user_mode(self, *, brightness: int, save: bool):
-            self.calls.append({"fn": "enable_user_mode", "brightness": int(brightness), "save": bool(save)})
+            self.calls.append(
+                {
+                    "fn": "enable_user_mode",
+                    "brightness": int(brightness),
+                    "save": bool(save),
+                }
+            )
 
         def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
             # This signature matches the core backend protocol.

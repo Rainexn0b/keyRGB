@@ -130,14 +130,18 @@ class TestStrobeToggling:
 
 class TestReactiveKeyMapping:
     def test_evdev_key_name_to_key_id_letters_digits(self):
-        from src.core.effects.reactive.input import evdev_key_name_to_key_id as _evdev_key_name_to_key_id
+        from src.core.effects.reactive.input import (
+            evdev_key_name_to_key_id as _evdev_key_name_to_key_id,
+        )
 
         assert _evdev_key_name_to_key_id("KEY_A") == "a"
         assert _evdev_key_name_to_key_id("KEY_1") == "1"
         assert _evdev_key_name_to_key_id("A") == "a"
 
     def test_evdev_key_name_to_key_id_specials(self):
-        from src.core.effects.reactive.input import evdev_key_name_to_key_id as _evdev_key_name_to_key_id
+        from src.core.effects.reactive.input import (
+            evdev_key_name_to_key_id as _evdev_key_name_to_key_id,
+        )
 
         assert _evdev_key_name_to_key_id("KEY_LEFTSHIFT") == "lshift"
         assert _evdev_key_name_to_key_id("KEY_RIGHTALT") == "ralt"

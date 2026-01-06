@@ -105,7 +105,9 @@ class DummyTray:
         return
 
 
-def test_menu_hides_items_when_capabilities_disabled(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_menu_hides_items_when_capabilities_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     # Avoid DBus/TCC calls in the menu builder.
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
@@ -149,7 +151,9 @@ def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) ->
     assert "048d:600b" in items[0]["text"].lower()
 
 
-def test_keyboard_status_shows_warning_when_not_detected(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_keyboard_status_shows_warning_when_not_detected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
 
@@ -160,7 +164,9 @@ def test_keyboard_status_shows_warning_when_not_detected(monkeypatch: pytest.Mon
     assert "not detected" in items[0]["text"].lower()
 
 
-def test_menu_includes_active_mode_indicator_between_off_and_quit(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_menu_includes_active_mode_indicator_between_off_and_quit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
 
@@ -176,7 +182,9 @@ def test_menu_includes_active_mode_indicator_between_off_and_quit(monkeypatch: p
     assert items[-1]["text"] == "Quit"
 
 
-def test_tray_active_indicator_shows_perkey_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_tray_active_indicator_shows_perkey_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
     monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
 

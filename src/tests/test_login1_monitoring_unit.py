@@ -44,7 +44,9 @@ def test_iter_prepare_for_sleep_events_ignores_missing_value_line() -> None:
     assert list(iter_prepare_for_sleep_events(lines)) == []
 
 
-def test_monitor_prepare_for_sleep_calls_on_started_and_emits_callbacks(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_monitor_prepare_for_sleep_calls_on_started_and_emits_callbacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from src.core.monitoring import login1_monitoring
 
     fake = _FakeProcess(
@@ -88,7 +90,9 @@ def test_monitor_prepare_for_sleep_calls_on_started_and_emits_callbacks(monkeypa
     assert popen_calls and popen_calls[0][0] == "dbus-monitor"
 
 
-def test_monitor_prepare_for_sleep_ignores_unexpected_boolean_value(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_monitor_prepare_for_sleep_ignores_unexpected_boolean_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from src.core.monitoring import login1_monitoring
 
     fake = _FakeProcess(

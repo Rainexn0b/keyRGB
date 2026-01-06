@@ -16,7 +16,14 @@ def test_commit_pipeline_throttles_unless_forced() -> None:
     calls: list[dict[str, object]] = []
 
     def push_fn(kb, colors, *, brightness: int, enable_user_mode: bool = True):
-        calls.append({"kb": kb, "colors": dict(colors), "brightness": brightness, "enable_user_mode": enable_user_mode})
+        calls.append(
+            {
+                "kb": kb,
+                "colors": dict(colors),
+                "brightness": brightness,
+                "enable_user_mode": enable_user_mode,
+            }
+        )
         return kb
 
     t = 1000.0

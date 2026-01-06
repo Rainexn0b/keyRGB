@@ -41,7 +41,9 @@ def test_parse_busctl_bool_reply(stdout: str, expected: bool | None) -> None:
     assert tcc_power_profiles._parse_busctl_bool_reply(stdout) == expected
 
 
-def test_update_custom_profile_preserves_id_and_strips_name(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_update_custom_profile_preserves_id_and_strips_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     stored: dict[str, object] = {}
 
     def fake_load_custom_profiles_payload():
@@ -60,7 +62,11 @@ def test_update_custom_profile_preserves_id_and_strips_name(monkeypatch: pytest.
     def fake_apply_new_profiles_file(path: str) -> None:
         stored["applied"] = path
 
-    monkeypatch.setattr(tcc_power_profiles, "_load_custom_profiles_payload", fake_load_custom_profiles_payload)
+    monkeypatch.setattr(
+        tcc_power_profiles,
+        "_load_custom_profiles_payload",
+        fake_load_custom_profiles_payload,
+    )
     monkeypatch.setattr(tcc_power_profiles, "_write_temp_json", fake_write_temp_json)
     monkeypatch.setattr(tcc_power_profiles, "_apply_new_profiles_file", fake_apply_new_profiles_file)
 
@@ -77,7 +83,9 @@ def test_update_custom_profile_preserves_id_and_strips_name(monkeypatch: pytest.
     assert payload[1]["id"] == "def"
 
 
-def test_update_custom_profile_rejects_empty_name(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_update_custom_profile_rejects_empty_name(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(
         tcc_power_profiles,
         "_load_custom_profiles_payload",

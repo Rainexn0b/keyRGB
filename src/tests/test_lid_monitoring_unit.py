@@ -27,7 +27,9 @@ def test_parse_lid_state_handles_open_closed_and_unknown() -> None:
     assert lid_monitoring._parse_lid_state(None) is None
 
 
-def test_start_sysfs_lid_monitoring_warns_when_no_lid_files(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_sysfs_lid_monitoring_warns_when_no_lid_files(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: [])
 
     # The implementation always starts the thread; the thread should exit
@@ -49,9 +51,15 @@ def test_start_sysfs_lid_monitoring_warns_when_no_lid_files(monkeypatch: pytest.
     logger.warning.assert_called_once()
 
 
-def test_start_sysfs_lid_monitoring_emits_callbacks_on_state_change(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_sysfs_lid_monitoring_emits_callbacks_on_state_change(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/state"])
-    monkeypatch.setattr(lid_monitoring.threading, "Thread", lambda *, target, daemon: _ImmediateThread(target=target, daemon=daemon))
+    monkeypatch.setattr(
+        lid_monitoring.threading,
+        "Thread",
+        lambda *, target, daemon: _ImmediateThread(target=target, daemon=daemon),
+    )
     monkeypatch.setattr(lid_monitoring.time, "sleep", lambda _: None)
 
     states = [
@@ -93,7 +101,9 @@ def test_start_sysfs_lid_monitoring_emits_callbacks_on_state_change(monkeypatch:
     on_close.assert_called_once()
 
 
-def test_poll_lid_state_paths_picks_first_readable_path_and_emits_callbacks(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_poll_lid_state_paths_picks_first_readable_path_and_emits_callbacks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setattr(lid_monitoring.time, "sleep", lambda _: None)
 
     chosen_path = "/proc/acpi/button/lid/LID/state"

@@ -15,7 +15,9 @@ def test_load_tray_dependencies_primary_import_succeeds() -> None:
     assert PowerManager.__name__ == "PowerManager"
 
 
-def test_load_tray_dependencies_falls_back_to_repo_root_on_importerror(monkeypatch) -> None:
+def test_load_tray_dependencies_falls_back_to_repo_root_on_importerror(
+    monkeypatch,
+) -> None:
     import src.tray.integrations.dependencies as deps
 
     ensure = MagicMock()

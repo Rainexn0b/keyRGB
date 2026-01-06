@@ -16,7 +16,11 @@ def test_update_icon_sets_icon_image(monkeypatch) -> None:
     calls = {"n": 0}
 
     monkeypatch.setattr(refresh.icon_mod, "representative_color", lambda *, config, is_off: (1, 2, 3))
-    monkeypatch.setattr(refresh.icon_mod, "create_icon", lambda color: (calls.__setitem__("n", calls["n"] + 1) or f"icon:{color}"))
+    monkeypatch.setattr(
+        refresh.icon_mod,
+        "create_icon",
+        lambda color: (calls.__setitem__("n", calls["n"] + 1) or f"icon:{color}"),
+    )
 
     tray = SimpleNamespace(icon=SimpleNamespace(icon=None), config=SimpleNamespace(), is_off=True)
 
@@ -49,8 +53,16 @@ def test_refresh_ui_calls_both(monkeypatch) -> None:
 
     calls = {"icon": 0, "menu": 0}
 
-    monkeypatch.setattr(refresh, "update_icon", lambda _tray: calls.__setitem__("icon", calls["icon"] + 1))
-    monkeypatch.setattr(refresh, "update_menu", lambda _tray: calls.__setitem__("menu", calls["menu"] + 1))
+    monkeypatch.setattr(
+        refresh,
+        "update_icon",
+        lambda _tray: calls.__setitem__("icon", calls["icon"] + 1),
+    )
+    monkeypatch.setattr(
+        refresh,
+        "update_menu",
+        lambda _tray: calls.__setitem__("menu", calls["menu"] + 1),
+    )
 
     refresh.refresh_ui(SimpleNamespace())
     assert calls == {"icon": 1, "menu": 1}

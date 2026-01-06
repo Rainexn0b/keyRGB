@@ -10,7 +10,10 @@ def test_on_effect_clicked_normalizes_and_refreshes() -> None:
     tray._refresh_ui = MagicMock()
 
     with (
-        patch("src.tray.callbacks.menu_mod.normalize_effect_label", return_value="Wave") as norm,
+        patch(
+            "src.tray.callbacks.menu_mod.normalize_effect_label",
+            return_value="Wave",
+        ) as norm,
         patch("src.tray.callbacks.apply_effect_selection") as apply,
     ):
         on_effect_clicked(tray, item=object())
@@ -39,10 +42,7 @@ def test_speed_and_brightness_callbacks_delegate() -> None:
     tray = MagicMock()
     item = object()
 
-    with (
-        patch("src.tray.callbacks.on_speed_clicked") as sp,
-        patch("src.tray.callbacks.on_brightness_clicked") as br,
-    ):
+    with patch("src.tray.callbacks.on_speed_clicked") as sp, patch("src.tray.callbacks.on_brightness_clicked") as br:
         on_speed_clicked_cb(tray, item)
         on_brightness_clicked_cb(tray, item)
 
@@ -55,10 +55,7 @@ def test_on_off_and_on_turn_on_delegate() -> None:
 
     tray = MagicMock()
 
-    with (
-        patch("src.tray.callbacks.turn_off") as off,
-        patch("src.tray.callbacks.turn_on") as on,
-    ):
+    with patch("src.tray.callbacks.turn_off") as off, patch("src.tray.callbacks.turn_on") as on:
         on_off_clicked(tray)
         on_turn_on_clicked(tray)
 

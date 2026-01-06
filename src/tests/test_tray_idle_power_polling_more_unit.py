@@ -104,7 +104,9 @@ def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
     assert calls["refresh"] == 1
 
 
-def test_apply_idle_action_dim_to_temp_respects_is_off_and_sw_effect(monkeypatch) -> None:
+def test_apply_idle_action_dim_to_temp_respects_is_off_and_sw_effect(
+    monkeypatch,
+) -> None:
     import src.tray.pollers.idle_power_polling as ipp
 
     engine_calls = {"n": 0, "apply_to_hardware": None}
@@ -155,7 +157,11 @@ def test_apply_idle_action_restore_branch_gated_by_forced_off(monkeypatch) -> No
 
     called = {"n": 0}
 
-    monkeypatch.setattr(ipp, "_restore_from_idle", lambda _tray: called.__setitem__("n", called["n"] + 1))
+    monkeypatch.setattr(
+        ipp,
+        "_restore_from_idle",
+        lambda _tray: called.__setitem__("n", called["n"] + 1),
+    )
 
     tray = SimpleNamespace(_user_forced_off=True, _power_forced_off=False)
     ipp._apply_idle_action(tray, action="restore", dim_temp_brightness=5)

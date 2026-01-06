@@ -7,12 +7,14 @@ from src.core.effects.reactive.render import (
     _resolve_brightness,
 )
 
+
 class FakeEngine:
     def __init__(self, eff=25, base=None, per_key_colors=None):
         self.brightness = eff
         self.per_key_brightness = base
         # Simulate active per-key colors if dict provided
         self.per_key_colors = per_key_colors
+
 
 def test_resolve_brightness() -> None:
     # Case 1: Dim Profile (Base=5), Bright Effect (Eff=50)
@@ -44,11 +46,11 @@ def test_resolve_brightness() -> None:
 def test_scaling_factors_dim_base_bright_effect() -> None:
     # Base=5, Eff=50 -> Global=50
     engine = FakeEngine(eff=50, base=5, per_key_colors={(0, 0): (0, 0, 0)})
-    
+
     # Backdrop scale: 5/50 = 0.1
     b_factor = backdrop_brightness_scale_factor(engine, effect_brightness_hw=50)
     assert abs(b_factor - 0.1) < 1e-9
-    
+
     # Pulse scale: 50/50 = 1.0
     p_factor = pulse_brightness_scale_factor(engine)
     assert abs(p_factor - 1.0) < 1e-9
@@ -57,11 +59,11 @@ def test_scaling_factors_dim_base_bright_effect() -> None:
 def test_scaling_factors_bright_base_dim_effect() -> None:
     # Base=50, Eff=5 -> Global=50
     engine = FakeEngine(eff=5, base=50, per_key_colors={(0, 0): (0, 0, 0)})
-    
+
     # Backdrop scale: 50/50 = 1.0
     b_factor = backdrop_brightness_scale_factor(engine, effect_brightness_hw=5)
     assert abs(b_factor - 1.0) < 1e-9
-    
+
     # Pulse scale: 5/50 = 0.1
     p_factor = pulse_brightness_scale_factor(engine)
     assert abs(p_factor - 0.1) < 1e-9

@@ -80,6 +80,15 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
     def _checked_brightness(brightness: int):
         def _checked(_item):
+            try:
+                effect = str(getattr(tray.config, "effect", "") or "")
+            except Exception:
+                effect = ""
+            if effect in REACTIVE_EFFECTS:
+                try:
+                    return int(getattr(tray.config, "perkey_brightness", tray.config.brightness) or 0) == brightness
+                except Exception:
+                    return tray.config.brightness == brightness
             return tray.config.brightness == brightness
 
         return _checked

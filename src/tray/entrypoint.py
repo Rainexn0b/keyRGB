@@ -10,7 +10,11 @@ import logging
 import sys
 
 from .application import KeyRGBTray
-from .startup import acquire_single_instance_or_exit, configure_logging, log_startup_diagnostics_if_debug
+from .startup import (
+    acquire_single_instance_or_exit,
+    configure_logging,
+    log_startup_diagnostics_if_debug,
+)
 
 logger = logging.getLogger(__name__)
 

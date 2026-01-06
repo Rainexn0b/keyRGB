@@ -36,7 +36,9 @@ def test_ite_probe_uses_declared_product_ids(monkeypatch: pytest.MonkeyPatch) ->
     assert res.identifiers["usb_pid"] == "0xce00"
 
 
-def test_ite_probe_unavailable_when_no_matching_device(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ite_probe_unavailable_when_no_matching_device(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
 
     fake_ite = types.SimpleNamespace(VENDOR_ID=0x048D, PRODUCT_IDS=[0x600B])
@@ -58,7 +60,9 @@ def test_ite_probe_unavailable_when_no_matching_device(monkeypatch: pytest.Monke
     assert res.confidence == 0
 
 
-def test_ite_probe_low_confidence_when_usb_scan_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ite_probe_low_confidence_when_usb_scan_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     fake_ite = types.SimpleNamespace(VENDOR_ID=0x048D, PRODUCT_IDS=[0x600B])
     fake_pkg = types.SimpleNamespace(ite8291r3=fake_ite)
     monkeypatch.setitem(sys.modules, "ite8291r3_ctl", fake_pkg)
@@ -71,7 +75,9 @@ def test_ite_probe_low_confidence_when_usb_scan_unavailable(monkeypatch: pytest.
     assert res.confidence == 60
 
 
-def test_ite_probe_detects_ite8297_as_unsupported(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ite_probe_detects_ite8297_as_unsupported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
 
     fake_ite = types.SimpleNamespace(VENDOR_ID=0x048D, PRODUCT_IDS=[0x600B])
@@ -98,7 +104,9 @@ def test_ite_probe_detects_ite8297_as_unsupported(monkeypatch: pytest.MonkeyPatc
     assert res.identifiers["usb_pid"] == "0x8297"
 
 
-def test_ite_probe_uses_keyrgb_fallback_product_ids(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_ite_probe_uses_keyrgb_fallback_product_ids(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Even if ite8291r3_ctl is older, KeyRGB should still probe known devices."""
 
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
@@ -154,4 +162,3 @@ def test_ite_probe_fallback_usb_ids_cover_known_devices() -> None:
     assert (0x048D, 0x6008) in allow
     assert (0x048D, 0x600B) in allow
     assert (0x048D, 0xCE00) in allow
-

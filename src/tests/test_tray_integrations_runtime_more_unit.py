@@ -116,7 +116,11 @@ def test_get_pystray_returns_cached_without_import():
 
 def test_get_pystray_explicit_backend_does_not_probe_gi(monkeypatch):
     monkeypatch.setenv("PYSTRAY_BACKEND", "xorg")
-    monkeypatch.setattr(runtime, "_gi_is_working", lambda: (_ for _ in ()).throw(AssertionError("probed gi")))
+    monkeypatch.setattr(
+        runtime,
+        "_gi_is_working",
+        lambda: (_ for _ in ()).throw(AssertionError("probed gi")),
+    )
 
     calls = {"import": 0, "log": []}
 
@@ -223,5 +227,3 @@ def test_acquire_single_instance_lock_uses_home_fallback(monkeypatch, tmp_path):
 
     assert runtime.acquire_single_instance_lock() is True
     assert (tmp_path / "home" / ".config" / "keyrgb" / "keyrgb.lock").exists()
-
-

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import builtins
-import os
 from pathlib import Path
 
 
-def test_acquire_single_instance_lock_returns_true_when_fcntl_missing(monkeypatch) -> None:
+def test_acquire_single_instance_lock_returns_true_when_fcntl_missing(
+    monkeypatch,
+) -> None:
     import src.tray.integrations.runtime as runtime
 
     orig_import = builtins.__import__

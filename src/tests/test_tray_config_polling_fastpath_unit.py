@@ -112,7 +112,9 @@ def test_fastpath_brightness_change_not_taken_if_engine_not_running() -> None:
     tray.engine.set_brightness.assert_not_called()
 
 
-def test_fastpath_brightness_change_not_taken_for_non_sw_effect(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_fastpath_brightness_change_not_taken_for_non_sw_effect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tray = _mk_tray(engine_running=True)
 
     last = ConfigApplyState(

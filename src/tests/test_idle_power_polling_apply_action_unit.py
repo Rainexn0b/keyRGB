@@ -56,7 +56,7 @@ def test_dim_to_temp_does_nothing_if_tray_is_off() -> None:
     "effect,expected_apply_to_hardware",
     [
         ("rainbow_wave", False),
-            ("perkey", True),
+        ("perkey", True),
         ("wave", True),
     ],
 )
@@ -82,6 +82,32 @@ def test_restore_brightness_clears_dim_temp_and_updates_engine_for_running_sw_ef
     tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False)
 
 
+def test_dim_to_temp_for_reactive_effect_also_updates_perkey_brightness() -> None:
+    tray = _mk_tray(effect="reactive_fade", brightness=25)
+    tray.config.perkey_brightness = 50
+
+    _apply_idle_action(tray, action="dim_to_temp", dim_temp_brightness=7)
+
+    assert tray._dim_temp_active is True
+    assert tray._dim_temp_target_brightness == 7
+    tray.engine.set_brightness.assert_called_once_with(7, apply_to_hardware=False)
+    assert tray.engine.per_key_brightness == 7
+
+
+def test_restore_brightness_for_reactive_effect_restores_perkey_brightness() -> None:
+    tray = _mk_tray(effect="reactive_ripple", brightness=30)
+    tray.config.perkey_brightness = 55
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 5
+
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
+
+    assert tray._dim_temp_active is False
+    assert tray._dim_temp_target_brightness is None
+    tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False)
+    assert tray.engine.per_key_brightness == 55
+
+
 def test_restore_brightness_does_nothing_if_tray_is_off() -> None:
     tray = _mk_tray(effect="wave", brightness=30)
     tray.is_off = True
@@ -96,7 +122,9 @@ def test_restore_brightness_does_nothing_if_tray_is_off() -> None:
     tray.engine.set_brightness.assert_not_called()
 
 
-def test_restore_does_not_restore_when_user_forced_off(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_restore_does_not_restore_when_user_forced_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from src.tray.pollers import idle_power_polling as module
 
     tray = _mk_tray(effect="wave", brightness=25)
@@ -110,7 +138,9 @@ def test_restore_does_not_restore_when_user_forced_off(monkeypatch: pytest.Monke
     restore.assert_not_called()
 
 
-def test_restore_does_restore_when_not_forced_off(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_restore_does_restore_when_not_forced_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from src.tray.pollers import idle_power_polling as module
 
     tray = _mk_tray(effect="wave", brightness=25)

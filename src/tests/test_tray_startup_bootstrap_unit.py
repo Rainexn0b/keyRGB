@@ -111,14 +111,22 @@ def test_log_startup_diagnostics_logs_when_debug(monkeypatch):
 def test_log_startup_diagnostics_swallow_exceptions(monkeypatch):
     monkeypatch.setenv("KEYRGB_DEBUG", "1")
 
-    monkeypatch.setattr(bootstrap, "collect_diagnostics", lambda **_k: (_ for _ in ()).throw(RuntimeError("no")))
+    monkeypatch.setattr(
+        bootstrap,
+        "collect_diagnostics",
+        lambda **_k: (_ for _ in ()).throw(RuntimeError("no")),
+    )
     # Should not raise
     bootstrap.log_startup_diagnostics_if_debug()
 
 
 def test_acquire_single_instance_or_exit_returns_when_lock_acquired(monkeypatch):
     monkeypatch.setattr(bootstrap.runtime, "acquire_single_instance_lock", lambda: True)
-    monkeypatch.setattr(bootstrap.sys, "exit", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("exit")))
+    monkeypatch.setattr(
+        bootstrap.sys,
+        "exit",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("exit")),
+    )
 
     bootstrap.acquire_single_instance_or_exit()
 
@@ -127,7 +135,11 @@ def test_acquire_single_instance_or_exit_exits_0_when_lock_held(monkeypatch):
     monkeypatch.setattr(bootstrap.runtime, "acquire_single_instance_lock", lambda: False)
 
     calls = {"error": 0, "exit": []}
-    monkeypatch.setattr(bootstrap.logger, "error", lambda *_a, **_k: calls.__setitem__("error", calls["error"] + 1))
+    monkeypatch.setattr(
+        bootstrap.logger,
+        "error",
+        lambda *_a, **_k: calls.__setitem__("error", calls["error"] + 1),
+    )
     monkeypatch.setattr(bootstrap.sys, "exit", lambda code: calls["exit"].append(code))
 
     bootstrap.acquire_single_instance_or_exit()

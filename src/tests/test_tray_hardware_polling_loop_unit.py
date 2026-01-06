@@ -21,7 +21,9 @@ def test_normalize_brightness_invalid_returns_zero() -> None:
     assert _normalize_brightness_to_config_scale("nope") == 0  # type: ignore[arg-type]
 
 
-def test_apply_polled_state_logs_brightness_change_but_swallows_log_errors(monkeypatch) -> None:
+def test_apply_polled_state_logs_brightness_change_but_swallows_log_errors(
+    monkeypatch,
+) -> None:
     from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
     tray = SimpleNamespace(
@@ -114,7 +116,9 @@ def test_apply_polled_state_off_state_change_branch_and_forced_off_gate() -> Non
     assert refreshed["n"] == 0
 
 
-def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(monkeypatch) -> None:
+def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(
+    monkeypatch,
+) -> None:
     import src.tray.pollers.hardware_polling as hp
 
     created = {}

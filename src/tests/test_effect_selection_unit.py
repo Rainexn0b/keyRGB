@@ -15,7 +15,9 @@ class TestEnsureConfigPerKeyColorsLoaded:
 
     def test_does_nothing_if_colors_already_loaded(self):
         """Should not load from profile if colors already exist."""
-        from src.tray.controllers.effect_selection import _ensure_config_per_key_colors_loaded
+        from src.tray.controllers.effect_selection import (
+            _ensure_config_per_key_colors_loaded,
+        )
 
         mock_config = MagicMock()
         mock_config.per_key_colors = {(0, 0): (255, 0, 0)}
@@ -27,7 +29,9 @@ class TestEnsureConfigPerKeyColorsLoaded:
 
     def test_loads_from_active_profile_if_colors_empty(self, monkeypatch):
         """Should load from active profile when per_key_colors is empty."""
-        from src.tray.controllers.effect_selection import _ensure_config_per_key_colors_loaded
+        from src.tray.controllers.effect_selection import (
+            _ensure_config_per_key_colors_loaded,
+        )
 
         mock_config = MagicMock()
         mock_config.per_key_colors = {}
@@ -38,14 +42,20 @@ class TestEnsureConfigPerKeyColorsLoaded:
         mock_profiles.load_per_key_colors.return_value = {(0, 0): (0, 255, 0)}
 
         with monkeypatch.context() as m:
-            m.setattr("src.tray.controllers.effect_selection.profiles", mock_profiles, raising=False)
+            m.setattr(
+                "src.tray.controllers.effect_selection.profiles",
+                mock_profiles,
+                raising=False,
+            )
             _ensure_config_per_key_colors_loaded(mock_config)
 
         assert mock_config.per_key_colors == {(0, 0): (0, 255, 0)}
 
     def test_handles_import_error_gracefully(self, monkeypatch):
         """Should not crash if profiles module import fails."""
-        from src.tray.controllers.effect_selection import _ensure_config_per_key_colors_loaded
+        from src.tray.controllers.effect_selection import (
+            _ensure_config_per_key_colors_loaded,
+        )
 
         mock_config = MagicMock()
         mock_config.per_key_colors = {}
@@ -178,7 +188,16 @@ class TestApplyEffectSelection:
         mock_tray.backend_caps = MagicMock(hardware_effects=False, per_key=True)
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
 
-        hw_effects = ["rainbow", "breathing", "wave", "ripple", "marquee", "raindrop", "aurora", "fireworks"]
+        hw_effects = [
+            "rainbow",
+            "breathing",
+            "wave",
+            "ripple",
+            "marquee",
+            "raindrop",
+            "aurora",
+            "fireworks",
+        ]
 
         for effect in hw_effects:
             apply_effect_selection(mock_tray, effect_name=effect)

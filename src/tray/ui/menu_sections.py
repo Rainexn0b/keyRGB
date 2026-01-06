@@ -128,7 +128,12 @@ def probe_device_available(tray: Any) -> bool:
         if callable(ensure):
             ensure()
     except Exception as exc:
-        _log_menu_debug("tray.menu.ensure_device", "Failed to ensure device availability", exc, interval_s=60)
+        _log_menu_debug(
+            "tray.menu.ensure_device",
+            "Failed to ensure device availability",
+            exc,
+            interval_s=60,
+        )
 
     return bool(getattr(getattr(tray, "engine", None), "device_available", True))
 
@@ -218,7 +223,12 @@ def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> 
             *profiles_items,
         )
     except Exception as exc:
-        _log_menu_debug("tray.menu.tcc_profiles", "Failed to populate TCC profiles menu", exc, interval_s=120)
+        _log_menu_debug(
+            "tray.menu.tcc_profiles",
+            "Failed to populate TCC profiles menu",
+            exc,
+            interval_s=120,
+        )
         return None
 
 
@@ -281,7 +291,12 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
             ),
         )
     except Exception as exc:
-        _log_menu_debug("tray.menu.system_power", "Failed to populate system power mode menu", exc, interval_s=120)
+        _log_menu_debug(
+            "tray.menu.system_power",
+            "Failed to populate system power mode menu",
+            exc,
+            interval_s=120,
+        )
         return None
 
 
@@ -343,6 +358,11 @@ def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_su
             *profile_items,
         )
     except Exception as exc:
-        _log_menu_debug("tray.menu.perkey_profiles", "Failed to populate per-key profiles menu", exc, interval_s=120)
+        _log_menu_debug(
+            "tray.menu.perkey_profiles",
+            "Failed to populate per-key profiles menu",
+            exc,
+            interval_s=120,
+        )
         # Fallback: still allow opening the editor even if profiles list fails.
         return pystray.Menu(item("Open Color Editor…", tray._on_perkey_clicked))

@@ -10,6 +10,7 @@ When switching modes, the appropriate state is set up automatically.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
@@ -17,9 +18,11 @@ from src.core.effects.catalog import normalize_effect_name
 
 logger = logging.getLogger(__name__)
 
+profiles: Any
+
 try:
     # Module-level import so tests (and callers) can monkeypatch `profiles`.
-    from src.core.profile import profiles
+    from src.core.profile import profiles as profiles
 except Exception:  # pragma: no cover
     profiles = None
 

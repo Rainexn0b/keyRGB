@@ -7,7 +7,9 @@ import src.core.effects.device as device
 from src.core.effects.device import NullKeyboard, acquire_keyboard
 
 
-def test_acquire_keyboard_under_pytest_disables_hardware_by_default(monkeypatch) -> None:
+def test_acquire_keyboard_under_pytest_disables_hardware_by_default(
+    monkeypatch,
+) -> None:
     monkeypatch.setenv("PYTEST_CURRENT_TEST", "test::case (call)")
     monkeypatch.delenv("KEYRGB_ALLOW_HARDWARE", raising=False)
 

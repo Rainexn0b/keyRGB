@@ -29,7 +29,9 @@ def test_parse_acpi_lid_event_recognizes_open_close() -> None:
     assert acpi_monitoring._parse_acpi_lid_event("") is None
 
 
-def test_monitor_acpi_events_emits_callbacks_for_lid_events(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_monitor_acpi_events_emits_callbacks_for_lid_events(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     fake = _FakeProcess(
         [
             "ac_adapter ACPI0003:00 00000080 00000001\n",
@@ -61,7 +63,9 @@ def test_monitor_acpi_events_emits_callbacks_for_lid_events(monkeypatch: pytest.
     assert on_open.call_count == 1
 
 
-def test_monitor_acpi_events_falls_back_when_acpi_listen_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_monitor_acpi_events_falls_back_when_acpi_listen_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     def _raise(*args, **kwargs):
         raise FileNotFoundError("acpi_listen")
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, patch
 
@@ -170,7 +169,11 @@ def test_apply_from_config_once_logs_signature_exception_throttled() -> None:
     tray = _mk_tray_base(effect="rainbow_wave", brightness=25)
 
     with (
-        patch.object(config_polling, "_compute_config_apply_state", side_effect=RuntimeError("boom")),
+        patch.object(
+            config_polling,
+            "_compute_config_apply_state",
+            side_effect=RuntimeError("boom"),
+        ),
         patch.object(config_polling.time, "monotonic", side_effect=[100.0, 120.0, 200.0]),
     ):
         # First call should log and bump warn_at.
@@ -332,7 +335,11 @@ def test_start_config_polling_runs_startup_and_mtime_reload_paths_without_thread
     tray.config.reload = MagicMock()
 
     # Make apply_from_config_once observable but deterministic.
-    with patch.object(config_polling, "_apply_from_config_once", wraps=config_polling._apply_from_config_once) as apply_once:
+    with patch.object(
+        config_polling,
+        "_apply_from_config_once",
+        wraps=config_polling._apply_from_config_once,
+    ) as apply_once:
         captured = {}
 
         def _fake_thread(*, target, daemon):
@@ -370,7 +377,11 @@ def test_start_config_polling_runs_startup_and_mtime_reload_paths_without_thread
 
         with (
             patch.object(config_polling, "Path", _FakePath),
-            patch.object(config_polling.threading, "Thread", side_effect=_fake_thread),
+            patch.object(
+                config_polling.threading,
+                "Thread",
+                side_effect=_fake_thread,
+            ),
             patch.object(config_polling.time, "sleep", side_effect=_sleep),
         ):
             start_config_polling(tray, ite_num_rows=6, ite_num_cols=21)
@@ -414,9 +425,17 @@ def test_start_config_polling_logs_startup_reload_exception_throttled() -> None:
 
     with (
         patch.object(config_polling, "Path", _FakePath),
-        patch.object(config_polling.threading, "Thread", side_effect=_fake_thread),
+        patch.object(
+            config_polling.threading,
+            "Thread",
+            side_effect=_fake_thread,
+        ),
         patch.object(config_polling.time, "sleep", side_effect=_sleep),
-        patch.object(config_polling.time, "monotonic", return_value=100.0),
+        patch.object(
+            config_polling.time,
+            "monotonic",
+            return_value=100.0,
+        ),
     ):
         start_config_polling(tray, ite_num_rows=6, ite_num_cols=21)
         with pytest.raises(StopIteration):

@@ -1,4 +1,8 @@
-from src.core.version_check import compare_versions, normalize_version_text, parse_version
+from src.core.version_check import (
+    compare_versions,
+    normalize_version_text,
+    parse_version,
+)
 
 
 def test_normalize_version_text_strips_v() -> None:

@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.ui.wheel_apply import on_wheel_color_change_ui, on_wheel_color_release_ui
+from src.gui.perkey.ui.wheel_apply import (
+    on_wheel_color_change_ui,
+    on_wheel_color_release_ui,
+)
 
 
 class DummyLabel:
@@ -87,7 +90,15 @@ def test_on_wheel_color_change_ui_updates_single_key_and_commits_soft() -> None:
         commit_calls=[],
     )
 
-    def apply_fn(*, colors, num_rows: int, num_cols: int, color, apply_all_keys: bool, selected_cell):
+    def apply_fn(
+        *,
+        colors,
+        num_rows: int,
+        num_cols: int,
+        color,
+        apply_all_keys: bool,
+        selected_cell,
+    ):
         assert (num_rows, num_cols) == (3, 4)
         assert apply_all_keys is False
         assert selected_cell == (0, 0)

@@ -1,5 +1,3 @@
-import pytest
-
 import src.tray.entrypoint as entry
 
 
@@ -13,7 +11,11 @@ def test_main_happy_path_wires_startup_and_runs(monkeypatch):
         "exit": [],
     }
 
-    monkeypatch.setattr(entry, "configure_logging", lambda: calls.__setitem__("logging", calls["logging"] + 1))
+    monkeypatch.setattr(
+        entry,
+        "configure_logging",
+        lambda: calls.__setitem__("logging", calls["logging"] + 1),
+    )
     monkeypatch.setattr(
         entry,
         "log_startup_diagnostics_if_debug",
@@ -57,7 +59,11 @@ def test_main_keyboard_interrupt_exits_0(monkeypatch):
         raise KeyboardInterrupt()
 
     monkeypatch.setattr(entry, "acquire_single_instance_or_exit", _lock)
-    monkeypatch.setattr(entry.logger, "info", lambda *_a, **_k: calls.__setitem__("info", calls["info"] + 1))
+    monkeypatch.setattr(
+        entry.logger,
+        "info",
+        lambda *_a, **_k: calls.__setitem__("info", calls["info"] + 1),
+    )
     monkeypatch.setattr(entry.sys, "exit", lambda code: calls["exit"].append(code))
 
     entry.main()
@@ -73,7 +79,11 @@ def test_main_unhandled_exception_exits_1_and_logs(monkeypatch):
         raise RuntimeError("fail")
 
     monkeypatch.setattr(entry, "configure_logging", _boom)
-    monkeypatch.setattr(entry.logger, "exception", lambda *_a, **_k: calls.__setitem__("exc", calls["exc"] + 1))
+    monkeypatch.setattr(
+        entry.logger,
+        "exception",
+        lambda *_a, **_k: calls.__setitem__("exc", calls["exc"] + 1),
+    )
     monkeypatch.setattr(entry.sys, "exit", lambda code: calls["exit"].append(code))
 
     entry.main()

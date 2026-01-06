@@ -11,7 +11,11 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from src.core.backends.sysfs import SysfsLedsBackend
-from src.core.backends.sysfs.backend import SysfsLedKeyboardDevice, _leds_root, _safe_write_text
+from src.core.backends.sysfs.backend import (
+    SysfsLedKeyboardDevice,
+    _leds_root,
+    _safe_write_text,
+)
 
 
 def _make_led(tmp_path: Path, name: str, *, brightness: int, max_brightness: int) -> Path:
@@ -128,7 +132,9 @@ def test_sysfs_backend_is_deterministic_on_ties(monkeypatch: pytest.MonkeyPatch,
     assert (b / "brightness").exists()
 
 
-def test_leds_root_defaults_to_nonexistent_under_pytest(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_leds_root_defaults_to_nonexistent_under_pytest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("KEYRGB_SYSFS_LEDS_ROOT", raising=False)
     monkeypatch.delenv("KEYRGB_ALLOW_HARDWARE", raising=False)
     monkeypatch.delenv("KEYRGB_HW_TESTS", raising=False)
@@ -137,7 +143,9 @@ def test_leds_root_defaults_to_nonexistent_under_pytest(monkeypatch: pytest.Monk
     assert str(root).endswith("/nonexistent-keyrgb-test-sysfs-leds")
 
 
-def test_safe_write_text_tripwire_refuses_real_sysfs_under_pytest(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_safe_write_text_tripwire_refuses_real_sysfs_under_pytest(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("KEYRGB_ALLOW_HARDWARE", raising=False)
     monkeypatch.delenv("KEYRGB_HW_TESTS", raising=False)
     monkeypatch.setenv("KEYRGB_TEST_HARDWARE_TRIPWIRE", "1")
@@ -146,7 +154,9 @@ def test_safe_write_text_tripwire_refuses_real_sysfs_under_pytest(monkeypatch: p
         _safe_write_text(Path("/sys/class/leds/keyrgb-test/brightness"), "1\n")
 
 
-def test_safe_write_text_is_noop_for_real_sysfs_without_tripwire(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_safe_write_text_is_noop_for_real_sysfs_without_tripwire(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.delenv("KEYRGB_ALLOW_HARDWARE", raising=False)
     monkeypatch.delenv("KEYRGB_HW_TESTS", raising=False)
     monkeypatch.delenv("KEYRGB_TEST_HARDWARE_TRIPWIRE", raising=False)

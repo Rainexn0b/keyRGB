@@ -50,25 +50,13 @@ def test_build_idle_action_key_changes_when_inputs_change() -> None:
 
 
 def test_should_log_idle_action_rejects_none_action():
-    assert (
-        ipp._should_log_idle_action(action="none", action_key="x", last_action_key=None)
-        is False
-    )
+    assert ipp._should_log_idle_action(action="none", action_key="x", last_action_key=None) is False
 
 
 def test_should_log_idle_action_logs_first_real_action():
-    assert (
-        ipp._should_log_idle_action(action="turn_off", action_key="k1", last_action_key=None)
-        is True
-    )
+    assert ipp._should_log_idle_action(action="turn_off", action_key="k1", last_action_key=None) is True
 
 
 def test_should_log_idle_action_dedupes_by_action_key():
-    assert (
-        ipp._should_log_idle_action(action="turn_off", action_key="k1", last_action_key="k1")
-        is False
-    )
-    assert (
-        ipp._should_log_idle_action(action="turn_off", action_key="k2", last_action_key="k1")
-        is True
-    )
+    assert ipp._should_log_idle_action(action="turn_off", action_key="k1", last_action_key="k1") is False
+    assert ipp._should_log_idle_action(action="turn_off", action_key="k2", last_action_key="k1") is True

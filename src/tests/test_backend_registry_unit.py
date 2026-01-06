@@ -43,11 +43,25 @@ class DummyBackend:
         raise NotImplementedError
 
 
-def test_select_backend_auto_picks_highest_priority_available(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_backend_auto_picks_highest_priority_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     specs = [
-        BackendSpec(name="low", priority=10, factory=lambda: DummyBackend("low", 10, True, confidence=50)),
-        BackendSpec(name="high", priority=50, factory=lambda: DummyBackend("high", 50, True, confidence=50)),
-        BackendSpec(name="missing", priority=999, factory=lambda: DummyBackend("missing", 999, False, confidence=0)),
+        BackendSpec(
+            name="low",
+            priority=10,
+            factory=lambda: DummyBackend("low", 10, True, confidence=50),
+        ),
+        BackendSpec(
+            name="high",
+            priority=50,
+            factory=lambda: DummyBackend("high", 50, True, confidence=50),
+        ),
+        BackendSpec(
+            name="missing",
+            priority=999,
+            factory=lambda: DummyBackend("missing", 999, False, confidence=0),
+        ),
     ]
 
     monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
@@ -57,10 +71,20 @@ def test_select_backend_auto_picks_highest_priority_available(monkeypatch: pytes
     assert backend.name == "high"
 
 
-def test_select_backend_auto_prefers_higher_confidence_over_priority(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_backend_auto_prefers_higher_confidence_over_priority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     specs = [
-        BackendSpec(name="prio", priority=100, factory=lambda: DummyBackend("prio", 100, True, confidence=10)),
-        BackendSpec(name="conf", priority=1, factory=lambda: DummyBackend("conf", 1, True, confidence=90)),
+        BackendSpec(
+            name="prio",
+            priority=100,
+            factory=lambda: DummyBackend("prio", 100, True, confidence=10),
+        ),
+        BackendSpec(
+            name="conf",
+            priority=1,
+            factory=lambda: DummyBackend("conf", 1, True, confidence=90),
+        ),
     ]
 
     monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
@@ -71,8 +95,16 @@ def test_select_backend_auto_prefers_higher_confidence_over_priority(monkeypatch
 
 def test_select_backend_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     specs = [
-        BackendSpec(name="a", priority=1, factory=lambda: DummyBackend("a", 1, True, confidence=50)),
-        BackendSpec(name="b", priority=2, factory=lambda: DummyBackend("b", 2, True, confidence=50)),
+        BackendSpec(
+            name="a",
+            priority=1,
+            factory=lambda: DummyBackend("a", 1, True, confidence=50),
+        ),
+        BackendSpec(
+            name="b",
+            priority=2,
+            factory=lambda: DummyBackend("b", 2, True, confidence=50),
+        ),
     ]
 
     monkeypatch.setenv("KEYRGB_BACKEND", "a")
@@ -81,10 +113,20 @@ def test_select_backend_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
     assert backend.name == "a"
 
 
-def test_select_backend_requested_overrides_env(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_backend_requested_overrides_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     specs = [
-        BackendSpec(name="a", priority=1, factory=lambda: DummyBackend("a", 1, True, confidence=50)),
-        BackendSpec(name="b", priority=2, factory=lambda: DummyBackend("b", 2, True, confidence=50)),
+        BackendSpec(
+            name="a",
+            priority=1,
+            factory=lambda: DummyBackend("a", 1, True, confidence=50),
+        ),
+        BackendSpec(
+            name="b",
+            priority=2,
+            factory=lambda: DummyBackend("b", 2, True, confidence=50),
+        ),
     ]
 
     monkeypatch.setenv("KEYRGB_BACKEND", "a")
@@ -93,18 +135,30 @@ def test_select_backend_requested_overrides_env(monkeypatch: pytest.MonkeyPatch)
     assert backend.name == "b"
 
 
-def test_select_backend_returns_none_when_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_backend_returns_none_when_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     specs = [
-        BackendSpec(name="a", priority=1, factory=lambda: DummyBackend("a", 1, False, confidence=0)),
+        BackendSpec(
+            name="a",
+            priority=1,
+            factory=lambda: DummyBackend("a", 1, False, confidence=0),
+        ),
     ]
 
     monkeypatch.setenv("KEYRGB_BACKEND", "a")
     assert select_backend(specs=specs) is None
 
 
-def test_select_backend_returns_none_when_unknown_requested(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_backend_returns_none_when_unknown_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     specs = [
-        BackendSpec(name="a", priority=1, factory=lambda: DummyBackend("a", 1, True, confidence=50)),
+        BackendSpec(
+            name="a",
+            priority=1,
+            factory=lambda: DummyBackend("a", 1, True, confidence=50),
+        ),
     ]
 
     monkeypatch.setenv("KEYRGB_BACKEND", "does-not-exist")

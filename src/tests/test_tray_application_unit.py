@@ -127,7 +127,11 @@ def test_log_event_formats_fields_sorted_and_throttles(monkeypatch):
 
 def test_log_event_bails_out_if_source_action_not_stringable(monkeypatch):
     tray = SimpleNamespace(_event_last_at={})
-    monkeypatch.setattr(app.logger, "info", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("logged")))
+    monkeypatch.setattr(
+        app.logger,
+        "info",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("logged")),
+    )
 
     class BadStr:
         def __str__(self):
@@ -220,7 +224,11 @@ def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
     monkeypatch.setattr(app.icon_mod, "create_icon", _create_icon)
     monkeypatch.setattr(app.menu_mod, "build_menu", _build_menu)
 
-    tray = SimpleNamespace(config=SimpleNamespace(effect="perkey", speed=4, brightness=5), is_off=False, icon=None)
+    tray = SimpleNamespace(
+        config=SimpleNamespace(effect="perkey", speed=4, brightness=5),
+        is_off=False,
+        icon=None,
+    )
 
     app.KeyRGBTray.run(tray)
 
@@ -250,8 +258,16 @@ def test_update_icon_and_menu_delegate_to_refresh_helpers(monkeypatch):
     calls = {"icon": 0, "menu": 0}
     tray = SimpleNamespace()
 
-    monkeypatch.setattr(app, "update_tray_icon", lambda _self: calls.__setitem__("icon", calls["icon"] + 1))
-    monkeypatch.setattr(app, "update_tray_menu", lambda _self: calls.__setitem__("menu", calls["menu"] + 1))
+    monkeypatch.setattr(
+        app,
+        "update_tray_icon",
+        lambda _self: calls.__setitem__("icon", calls["icon"] + 1),
+    )
+    monkeypatch.setattr(
+        app,
+        "update_tray_menu",
+        lambda _self: calls.__setitem__("menu", calls["menu"] + 1),
+    )
 
     app.KeyRGBTray._update_icon(tray)
     app.KeyRGBTray._update_menu(tray)
@@ -262,9 +278,17 @@ def test_effect_and_power_wrappers_delegate(monkeypatch):
     calls = {"start": 0, "off": 0, "restore": 0, "policy": []}
     tray = SimpleNamespace()
 
-    monkeypatch.setattr(app, "start_current_effect", lambda _self: calls.__setitem__("start", calls["start"] + 1))
+    monkeypatch.setattr(
+        app,
+        "start_current_effect",
+        lambda _self: calls.__setitem__("start", calls["start"] + 1),
+    )
     monkeypatch.setattr(app, "power_turn_off", lambda _self: calls.__setitem__("off", calls["off"] + 1))
-    monkeypatch.setattr(app, "power_restore", lambda _self: calls.__setitem__("restore", calls["restore"] + 1))
+    monkeypatch.setattr(
+        app,
+        "power_restore",
+        lambda _self: calls.__setitem__("restore", calls["restore"] + 1),
+    )
     monkeypatch.setattr(
         app,
         "apply_brightness_from_power_policy",

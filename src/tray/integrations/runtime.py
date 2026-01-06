@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import importlib
+import importlib.util
 import logging
 from dataclasses import dataclass
 from contextlib import suppress

@@ -101,7 +101,9 @@ def test_compute_idle_action_restore_brightness_when_undimmed_and_dim_temp_activ
 
 
 @pytest.mark.parametrize("forced_flag", ["user", "power"])
-def test_compute_idle_action_does_not_restore_brightness_if_forced_off(forced_flag: str) -> None:
+def test_compute_idle_action_does_not_restore_brightness_if_forced_off(
+    forced_flag: str,
+) -> None:
     action = compute_idle_action(
         dimmed=False,
         screen_off=False,
