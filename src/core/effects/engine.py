@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from threading import Event, RLock, Thread
-from typing import Dict, Optional, Tuple
+from typing import Dict, Final, Literal, Optional, Tuple
 
 import traceback
 from src.core.effects.device import NullKeyboard, acquire_keyboard
@@ -47,7 +47,7 @@ class EffectsEngine:
     SW_EFFECTS = _SW_EFFECTS
     ALL_EFFECTS = _ALL_EFFECTS
 
-    _SW_START_SPECS = {
+    _SW_START_SPECS: Final[dict[str, tuple[str, Literal["current"] | Tuple[int, int, int]]]] = {
         # Effect name -> (method_name, fade_to)
         # fade_to: "current" uses self.current_color; otherwise a literal RGB tuple.
         "rainbow_wave": ("_effect_rainbow_wave", (255, 0, 0)),

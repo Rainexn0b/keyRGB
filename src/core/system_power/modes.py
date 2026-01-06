@@ -230,7 +230,10 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path) -> None:
             gov = pol / "scaling_governor"
             if gov.exists():
                 try:
-                    _write_text(gov, "performance\n" if mode == PowerMode.PERFORMANCE else "schedutil\n")
+                    _write_text(
+                        gov,
+                        ("performance\n" if mode == PowerMode.PERFORMANCE else "schedutil\n"),
+                    )
                 except Exception:
                     pass
 
@@ -262,7 +265,7 @@ def _run_privileged_helper(mode: PowerMode) -> bool:
 
     sudo = shutil.which("sudo")
     if sudo:
-        cp = subprocess.run([sudo, *argv], check=False)
+        cp = subprocess.run([sudo, *argv], check=False, capture_output=True, text=True)
         return cp.returncode == 0
 
     return False

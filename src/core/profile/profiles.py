@@ -166,7 +166,9 @@ def save_layout_per_key(per_key: Dict[str, Dict[str, float]], name: str | None =
     write_json_atomic(p, payload)
 
 
-def load_per_key_colors(name: str | None = None) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+def load_per_key_colors(
+    name: str | None = None,
+) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
     p = paths_for(name).per_key_colors
     raw = read_json(p)
     if raw is None:

@@ -38,7 +38,11 @@ def build_full_color_grid(
 ) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
     """Fill the full matrix with base_color, then overlay per-key values."""
 
-    base: Tuple[int, int, int] = (int(base_color[0]), int(base_color[1]), int(base_color[2]))
+    base: Tuple[int, int, int] = (
+        int(base_color[0]),
+        int(base_color[1]),
+        int(base_color[2]),
+    )
     full: Dict[Tuple[int, int], Tuple[int, int, int]] = {
         (r, c): base for r in range(int(num_rows)) for c in range(int(num_cols))
     }

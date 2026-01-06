@@ -5,8 +5,15 @@ from threading import RLock
 from typing import Any, Dict, Tuple
 
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
-from src.core.effects.perkey_animation import build_full_color_grid, enable_user_mode_once
-from src.core.effects.transitions import avoid_full_black, choose_steps, scaled_color_map_nonzero
+from src.core.effects.perkey_animation import (
+    build_full_color_grid,
+    enable_user_mode_once,
+)
+from src.core.effects.transitions import (
+    avoid_full_black,
+    choose_steps,
+    scaled_color_map_nonzero,
+)
 
 
 def fade_uniform_color(
@@ -79,11 +86,20 @@ def fade_in_per_key(
         if not per_key_colors:
             return
 
-        steps = choose_steps(duration_s=float(duration_s), max_steps=int(steps), target_fps=50.0, min_dt_s=0.012)
+        steps = choose_steps(
+            duration_s=float(duration_s),
+            max_steps=int(steps),
+            target_fps=50.0,
+            min_dt_s=0.012,
+        )
         dt = float(duration_s) / float(steps)
 
         base_color_src = current_color or (255, 0, 0)
-        base_color = (int(base_color_src[0]), int(base_color_src[1]), int(base_color_src[2]))
+        base_color = (
+            int(base_color_src[0]),
+            int(base_color_src[1]),
+            int(base_color_src[2]),
+        )
 
         full_colors = build_full_color_grid(
             base_color=base_color,

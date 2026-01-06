@@ -24,11 +24,22 @@ def _default_specs() -> list[BackendSpec]:
     from .sysfs import SysfsLedsBackend
 
     return [
-        BackendSpec(name=Ite8291r3Backend().name, priority=Ite8291r3Backend().priority, factory=Ite8291r3Backend),
-        BackendSpec(name=Ite8297Backend().name, priority=Ite8297Backend().priority, factory=Ite8297Backend),
-        BackendSpec(name=SysfsLedsBackend().name, priority=SysfsLedsBackend().priority, factory=SysfsLedsBackend),
+        BackendSpec(
+            name=Ite8291r3Backend().name,
+            priority=Ite8291r3Backend().priority,
+            factory=Ite8291r3Backend,
+        ),
+        BackendSpec(
+            name=Ite8297Backend().name,
+            priority=Ite8297Backend().priority,
+            factory=Ite8297Backend,
+        ),
+        BackendSpec(
+            name=SysfsLedsBackend().name,
+            priority=SysfsLedsBackend().priority,
+            factory=SysfsLedsBackend,
+        ),
     ]
-
 
 
 def iter_backends(*, specs: Optional[Iterable[BackendSpec]] = None) -> list[KeyboardBackend]:
@@ -94,7 +105,11 @@ def select_backend(
             if backend.name.lower() == req:
                 result = _probe_backend(backend)
                 if not result.available:
-                    logger.debug("Backend '%s' requested but unavailable: %s", backend.name, result.reason)
+                    logger.debug(
+                        "Backend '%s' requested but unavailable: %s",
+                        backend.name,
+                        result.reason,
+                    )
                     return None
                 logger.debug("Backend '%s' selected (requested).", backend.name)
                 return backend

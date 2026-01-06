@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
@@ -89,20 +90,11 @@ def _sysfs_led_candidates_snapshot() -> dict[str, Any]:
     return out
 
 
-def backend_probe_snapshot() -> dict[str, Any]:
-    """Collect backend probe results (best-effort)."""
-
-    try:
-        # Diagnostics is a subpackage under src/core, so backends live one level up.
-        from ..backends.registry import iter_backends, select_backend
-    except Exception:
-        return {}
-
-    # Safety: when diagnostics are collected under pytest, avoid any real USB scanning.
-    # This prevents tests from triggering side effects (some controllers reset or turn off
-    # lighting when poked via libusb).
+@contextmanager
+def _disable_usb_scan_under_pytest_if_needed():
     did_override_usb_scan = False
     restore_disable_usb_scan: str | None = None
+
     if (
         os.environ.get("PYTEST_CURRENT_TEST")
         and os.environ.get("KEYRGB_ALLOW_HARDWARE") != "1"
@@ -112,82 +104,77 @@ def backend_probe_snapshot() -> dict[str, Any]:
         os.environ["KEYRGB_DISABLE_USB_SCAN"] = "1"
         did_override_usb_scan = True
 
-    probes: list[dict[str, Any]] = []
     try:
-        for backend in iter_backends():
-            try:
-                probe_fn = getattr(backend, "probe", None)
-                if callable(probe_fn):
-                    result = probe_fn()
-                    available = bool(getattr(result, "available", False))
-                    reason = str(getattr(result, "reason", ""))
-                    confidence = int(getattr(result, "confidence", 0) or 0)
-                    identifiers = getattr(result, "identifiers", None)
-                else:
-                    available = bool(backend.is_available())
-                    reason = "is_available"
-                    confidence = 50 if available else 0
-                    identifiers = None
-            except Exception as exc:
-                available = False
-                reason = f"probe exception: {exc}"
-                confidence = 0
-                identifiers = None
-
-            entry: dict[str, Any] = {
-                "name": getattr(backend, "name", backend.__class__.__name__),
-                "available": available,
-                "confidence": confidence,
-                "reason": reason,
-            }
-
-            # Expose selection-relevant metadata.
-            try:
-                entry["priority"] = int(getattr(backend, "priority", 0) or 0)
-            except Exception:
-                entry["priority"] = 0
-
-            tier = _tier_for_backend_name(str(entry.get("name") or ""))
-            if tier is not None:
-                entry["tier"] = tier
-            provider = _provider_for_backend_name(str(entry.get("name") or ""))
-            if provider is not None:
-                entry["provider"] = provider
-
-            if identifiers:
-                entry["identifiers"] = dict(identifiers)
-            probes.append(entry)
+        yield
     finally:
-        if did_override_usb_scan:
-            if restore_disable_usb_scan is None:
-                os.environ.pop("KEYRGB_DISABLE_USB_SCAN", None)
-            else:
-                os.environ["KEYRGB_DISABLE_USB_SCAN"] = restore_disable_usb_scan
+        if not did_override_usb_scan:
+            return
+        if restore_disable_usb_scan is None:
+            os.environ.pop("KEYRGB_DISABLE_USB_SCAN", None)
+        else:
+            os.environ["KEYRGB_DISABLE_USB_SCAN"] = restore_disable_usb_scan
 
-    requested = (os.environ.get("KEYRGB_BACKEND") or "auto")
 
-    # Mirror backend registry safety rules: under pytest, selection may be intentionally disabled.
-    selection_blocked = False
-    selection_blocked_reason: str | None = None
-    if os.environ.get("PYTEST_CURRENT_TEST"):
-        allow_hardware = os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
-        if not allow_hardware:
-            selection_blocked = True
-            selection_blocked_reason = "selection disabled under pytest unless KEYRGB_ALLOW_HARDWARE=1"
-
-    selected = None
+def _probe_backend(backend: Any) -> dict[str, Any]:
     try:
-        if not selection_blocked:
-            selected_backend = select_backend()
-            selected = getattr(selected_backend, "name", None) if selected_backend is not None else None
-    except Exception:
-        selected = None
+        probe_fn = getattr(backend, "probe", None)
+        if callable(probe_fn):
+            result = probe_fn()
+            available = bool(getattr(result, "available", False))
+            reason = str(getattr(result, "reason", ""))
+            confidence = int(getattr(result, "confidence", 0) or 0)
+            identifiers = getattr(result, "identifiers", None)
+        else:
+            available = bool(backend.is_available())
+            reason = "is_available"
+            confidence = 50 if available else 0
+            identifiers = None
+    except Exception as exc:
+        available = False
+        reason = f"probe exception: {exc}"
+        confidence = 0
+        identifiers = None
 
-    # Provide the auto-selection ordering for debugging.
+    entry: dict[str, Any] = {
+        "name": getattr(backend, "name", backend.__class__.__name__),
+        "available": available,
+        "confidence": confidence,
+        "reason": reason,
+    }
+
+    try:
+        entry["priority"] = int(getattr(backend, "priority", 0) or 0)
+    except Exception:
+        entry["priority"] = 0
+
+    tier = _tier_for_backend_name(str(entry.get("name") or ""))
+    if tier is not None:
+        entry["tier"] = tier
+    provider = _provider_for_backend_name(str(entry.get("name") or ""))
+    if provider is not None:
+        entry["provider"] = provider
+
+    if identifiers:
+        try:
+            entry["identifiers"] = dict(identifiers)
+        except Exception:
+            pass
+
+    return entry
+
+
+def _selection_is_blocked_under_pytest() -> tuple[bool, str | None]:
+    if not os.environ.get("PYTEST_CURRENT_TEST"):
+        return False, None
+    allow_hardware = os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
+    if allow_hardware:
+        return False, None
+    return True, "selection disabled under pytest unless KEYRGB_ALLOW_HARDWARE=1"
+
+
+def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     available_candidates: list[dict[str, Any]] = []
     for p in probes:
-        if not isinstance(p, dict):
-            continue
         if not p.get("available"):
             continue
         available_candidates.append(
@@ -212,6 +199,37 @@ def backend_probe_snapshot() -> dict[str, Any]:
         )
     except Exception:
         pass
+
+    return available_candidates
+
+
+def backend_probe_snapshot() -> dict[str, Any]:
+    """Collect backend probe results (best-effort)."""
+
+    try:
+        # Diagnostics is a subpackage under src/core, so backends live one level up.
+        from ..backends.registry import iter_backends, select_backend
+    except Exception:
+        return {}
+
+    probes: list[dict[str, Any]] = []
+    with _disable_usb_scan_under_pytest_if_needed():
+        for backend in iter_backends():
+            probes.append(_probe_backend(backend))
+
+    requested = os.environ.get("KEYRGB_BACKEND") or "auto"
+
+    selection_blocked, selection_blocked_reason = _selection_is_blocked_under_pytest()
+
+    selected = None
+    try:
+        if not selection_blocked:
+            selected_backend = select_backend()
+            selected = getattr(selected_backend, "name", None) if selected_backend is not None else None
+    except Exception:
+        selected = None
+
+    available_candidates = _collect_available_candidates(probes)
 
     return {
         "selected": selected,

@@ -82,7 +82,14 @@ def power_supply_snapshot() -> dict[str, Any]:
                 continue
 
             entry: dict[str, str] = {}
-            for key in ("type", "status", "online", "capacity", "charge_now", "energy_now"):
+            for key in (
+                "type",
+                "status",
+                "online",
+                "capacity",
+                "charge_now",
+                "energy_now",
+            ):
                 val = read_text(dev / key)
                 if val is not None and val != "":
                     entry[key] = val
@@ -214,4 +221,9 @@ def system_power_mode_snapshot() -> dict[str, Any]:
             "identifiers": dict(st.identifiers or {}),
         }
     except Exception as exc:
-        return {"supported": False, "mode": "unknown", "reason": "error", "error": str(exc)}
+        return {
+            "supported": False,
+            "mode": "unknown",
+            "reason": "error",
+            "error": str(exc),
+        }

@@ -45,7 +45,6 @@ def load_config_settings(
             elif legacy_effect in {"breathing_sw", "fire", "random", "rain"}:
                 loaded["effect"] = "none"
 
-
             if "return_effect_after_effect" in loaded and isinstance(loaded["return_effect_after_effect"], str):
                 loaded["return_effect_after_effect"] = loaded["return_effect_after_effect"].lower()
 

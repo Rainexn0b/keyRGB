@@ -2,7 +2,18 @@
 
 from __future__ import annotations
 
-from .base import Color, Key, base_color_map, clamp01, frame_dt_s, has_per_key, mix, pace, render, scale
+from .base import (
+    Color,
+    Key,
+    base_color_map,
+    clamp01,
+    frame_dt_s,
+    has_per_key,
+    mix,
+    pace,
+    render,
+    scale,
+)
 from .effects import (
     run_breathing,
     run_chase,

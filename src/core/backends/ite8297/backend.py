@@ -23,7 +23,6 @@ logger = logging.getLogger(__name__)
 _ITE8297_USB_IDS: list[tuple[int, int]] = []
 
 
-
 @dataclass
 class Ite8297Backend(KeyboardBackend):
     """Placeholder backend for the IT8297/8176-family HID dialect.
@@ -64,12 +63,19 @@ class Ite8297Backend(KeyboardBackend):
                         available=True,
                         reason=f"usb device present (0x{int(vid):04x}:0x{int(pid):04x})",
                         confidence=80,
-                        identifiers={"usb_vid": f"0x{int(vid):04x}", "usb_pid": f"0x{int(pid):04x}"},
+                        identifiers={
+                            "usb_vid": f"0x{int(vid):04x}",
+                            "usb_pid": f"0x{int(pid):04x}",
+                        },
                     )
 
             return ProbeResult(available=False, reason="no matching usb device", confidence=0)
         except Exception as exc:
-            return ProbeResult(available=True, reason=f"enabled but usb scan unavailable: {exc}", confidence=40)
+            return ProbeResult(
+                available=True,
+                reason=f"enabled but usb scan unavailable: {exc}",
+                confidence=40,
+            )
 
     def capabilities(self) -> BackendCapabilities:
         # Unknown until implemented; keep conservative.

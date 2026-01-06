@@ -277,7 +277,6 @@ class PowerManager:
             except Exception:
                 pass
 
-
             # Do not fall back to the controller's `is_off`.
             # That state can be transiently true due to idle/screen-off policies.
             return False

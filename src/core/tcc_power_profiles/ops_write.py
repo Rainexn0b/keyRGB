@@ -9,7 +9,11 @@ from typing import Any, Optional
 
 from src.core.logging_utils import log_throttled
 
-from .json_api import get_custom_profiles_json, get_default_values_profile_json, get_settings_json
+from .json_api import (
+    get_custom_profiles_json,
+    get_default_values_profile_json,
+    get_settings_json,
+)
 from .models import TccProfileWriteError
 from .root_apply import _apply_new_profiles_file, _apply_new_settings_file
 

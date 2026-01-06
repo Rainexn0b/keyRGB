@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import time
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from src.core.effects.engine import EffectsEngine
 
 
 class _EngineFactory(Protocol):
-    def __call__(self) -> object: ...
+    def __call__(self) -> "EffectsEngine": ...
 
 
 def run_demo(engine_factory: _EngineFactory) -> None:

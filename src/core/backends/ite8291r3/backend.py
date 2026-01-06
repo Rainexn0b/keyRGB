@@ -105,7 +105,10 @@ class Ite8291r3Backend(KeyboardBackend):
                             f"(0x{vendor_id:04x}:0x{int(pid):04x})"
                         ),
                         confidence=0,
-                        identifiers={"usb_vid": f"0x{vendor_id:04x}", "usb_pid": f"0x{int(pid):04x}"},
+                        identifiers={
+                            "usb_vid": f"0x{vendor_id:04x}",
+                            "usb_pid": f"0x{int(pid):04x}",
+                        },
                     )
 
             for pid in product_ids:
@@ -115,7 +118,10 @@ class Ite8291r3Backend(KeyboardBackend):
                         available=True,
                         reason=f"usb device present (0x{vendor_id:04x}:0x{int(pid):04x})",
                         confidence=90,
-                        identifiers={"usb_vid": f"0x{vendor_id:04x}", "usb_pid": f"0x{int(pid):04x}"},
+                        identifiers={
+                            "usb_vid": f"0x{vendor_id:04x}",
+                            "usb_pid": f"0x{int(pid):04x}",
+                        },
                     )
 
             return ProbeResult(available=False, reason="no matching usb device", confidence=0)

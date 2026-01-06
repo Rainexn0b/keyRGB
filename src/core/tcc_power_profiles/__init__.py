@@ -16,7 +16,12 @@ from .json_api import (
     list_profiles,
 )
 from .models import TccProfile, TccProfileWriteError
-from .root_apply import _apply_new_profiles_file, _apply_new_settings_file, _run_root_command, _tccd_binary
+from .root_apply import (
+    _apply_new_profiles_file,
+    _apply_new_settings_file,
+    _run_root_command,
+    _tccd_binary,
+)
 
 _load_custom_profiles_payload = _ops_write._load_custom_profiles_payload
 _load_settings_payload = _ops_write._load_settings_payload

@@ -250,7 +250,11 @@ def build_layout() -> List[KeyDef]:
     ax0 = 642
     ay0 = r4 + 10
     keys += [
-        KeyDef("up", "↑", (ax0 + arrow_unit + 6, ay0 - arrow_unit - 6, arrow_unit, arrow_unit)),
+        KeyDef(
+            "up",
+            "↑",
+            (ax0 + arrow_unit + 6, ay0 - arrow_unit - 6, arrow_unit, arrow_unit),
+        ),
         KeyDef("left", "←", (ax0, ay0, arrow_unit, arrow_unit)),
         KeyDef("down", "↓", (ax0 + arrow_unit + 6, ay0, arrow_unit, arrow_unit)),
         KeyDef("right", "→", (ax0 + 2 * (arrow_unit + 6), ay0, arrow_unit, arrow_unit)),

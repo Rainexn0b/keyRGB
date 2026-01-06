@@ -99,7 +99,11 @@ def try_open_evdev_keyboards() -> Optional[list]:
     try:
         import os
 
-        if str(os.environ.get("KEYRGB_DISABLE_EVDEV", "")).strip().lower() in {"1", "true", "yes"}:
+        if str(os.environ.get("KEYRGB_DISABLE_EVDEV", "")).strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }:
             return None
     except Exception:
         pass
@@ -119,7 +123,6 @@ def try_open_evdev_keyboards() -> Optional[list]:
         try:
             caps = dev.capabilities(verbose=False)
             if evdev.ecodes.EV_KEY in caps:
-                dev.grab = getattr(dev, "grab", None)
                 out.append(dev)
         except Exception:
             continue

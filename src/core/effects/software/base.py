@@ -4,7 +4,10 @@ import logging
 from typing import TYPE_CHECKING, Dict, Tuple
 
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
-from src.core.effects.perkey_animation import build_full_color_grid, enable_user_mode_once
+from src.core.effects.perkey_animation import (
+    build_full_color_grid,
+    enable_user_mode_once,
+)
 from src.core.effects.transitions import avoid_full_black
 from src.core.logging_utils import log_throttled
 from src.core.utils.exceptions import is_device_disconnected
@@ -56,7 +59,11 @@ def has_per_key(engine: "EffectsEngine") -> bool:
 
 def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
     base_color_src = getattr(engine, "current_color", None) or (255, 0, 0)
-    base_color = (int(base_color_src[0]), int(base_color_src[1]), int(base_color_src[2]))
+    base_color = (
+        int(base_color_src[0]),
+        int(base_color_src[1]),
+        int(base_color_src[2]),
+    )
 
     per_key = getattr(engine, "per_key_colors", None) or None
     if not per_key:
@@ -95,9 +102,17 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
     if has_per_key(engine):
         try:
             with engine.kb_lock:
-                enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
+                enable_user_mode_once(
+                    kb=engine.kb,
+                    kb_lock=engine.kb_lock,
+                    brightness=int(engine.brightness),
+                )
                 try:
-                    engine.kb.set_key_colors(color_map, brightness=int(engine.brightness), enable_user_mode=False)
+                    engine.kb.set_key_colors(
+                        color_map,
+                        brightness=int(engine.brightness),
+                        enable_user_mode=False,
+                    )
                     return
                 except Exception as exc:
                     # On USB disconnect, attempting a fallback uniform write can trigger

@@ -4,7 +4,10 @@ import logging
 from typing import TYPE_CHECKING, Dict, Tuple
 
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
-from src.core.effects.perkey_animation import build_full_color_grid, enable_user_mode_once
+from src.core.effects.perkey_animation import (
+    build_full_color_grid,
+    enable_user_mode_once,
+)
 from src.core.effects.transitions import avoid_full_black
 from src.core.logging_utils import log_throttled
 from src.core.utils.exceptions import is_device_disconnected
@@ -38,7 +41,7 @@ def scale(rgb: Color, s: float) -> Color:
 
 def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
     """Resolve brightness levels for mixed-content rendering.
-    
+
     Returns (base_hw, effect_hw, global_hw).
     """
     try:
@@ -54,41 +57,41 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
     except Exception:
         pass
     base = max(0, min(50, base))
-    
+
     return base, eff, max(base, eff)
 
 
 def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:
     """Compute scaling factor to keep the backdrop at its target brightness.
-    
+
     If the global hardware brightness is driven higher (by the effect brightness),
     we scale the backdrop down.
     """
     base, _, global_hw = _resolve_brightness(engine)
-    
+
     if global_hw <= 0:
         return 0.0
-        
+
     if base >= global_hw:
         return 1.0
-        
+
     return float(base) / float(global_hw)
 
 
 def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
     """Compute scaling factor to keep pulses at their target brightness.
-    
+
     If the global hardware brightness is driven higher (by the base brightness),
     we scale the pulses down.
     """
     _, eff, global_hw = _resolve_brightness(engine)
-    
+
     if global_hw <= 0:
         return 0.0
-        
+
     if eff >= global_hw:
         return 1.0
-        
+
     return float(eff) / float(global_hw)
 
 
@@ -137,7 +140,11 @@ def has_per_key(engine: "EffectsEngine") -> bool:
 
 def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
     base_color_src = getattr(engine, "current_color", None) or (255, 0, 0)
-    base_color = (int(base_color_src[0]), int(base_color_src[1]), int(base_color_src[2]))
+    base_color = (
+        int(base_color_src[0]),
+        int(base_color_src[1]),
+        int(base_color_src[2]),
+    )
 
     per_key = getattr(engine, "per_key_colors", None) or None
     if not per_key:
