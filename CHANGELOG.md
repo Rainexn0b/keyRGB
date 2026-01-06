@@ -3,10 +3,14 @@
 ## 0.13.0 (2026-01-07)
 
 - Refactor: Reduced cyclomatic complexity for radon E-rated hotspots by extracting helpers while preserving public interfaces and test behavior. Targeted items: `buildpython/steps/step_quality.py::code_markers_runner`, `src/core/diagnostics/collectors_backends.py::backend_probe_snapshot`, `src/gui/perkey/overlay/autosync.py::auto_sync_per_key_overlays`, `src/gui/theme/detect.py::detect_system_prefers_dark`.
-- Quality: Cyclomatic complexity re-run shows **E-rated blocks: 0**.
-- CI: Full build profile is green (Compile, Pytest, Ruff lint/format, Import Validation/Scan, Code Markers, File Size, LOC Check, Type Check).
-- Testing: Added/updated unit tests around affected behaviors; all tests pass locally.
-- Notes: staged for testing and validation before promoting to later point releases.
+- Build: Added build-time check steps and runners (`black` check, LOC check, `mypy` type check) and updated the build runner steps to include them.
+- Core: Refactored diagnostics, backend probing, effects engine/fades, per-key animation, and profile loading; added `src/core/utils/exceptions.py` and new software effects modules for better isolation and testability.
+- GUI: Extracted and simplified UI helpers (per-key canvas drawing/events, color wheel UI), updated reactive color/uniform windows, and improved layout/geometry helpers.
+- Tray: Refactored controllers and pollers (split `config_polling` into core/helpers, added idle-power helpers/actions and lighting-controller helpers) to improve testability and reduce complexity.
+- Tests: Added and reorganized numerous unit tests covering power manager, profile storage, config polling, idle/power polling, and reactive/backdrop behaviors; tests pass locally and are included in CI.
+- Quality: Cyclomatic complexity re-run shows **E-rated blocks: 0** and the full build profile is green (Compile, Pytest, Ruff lint/format, Import Validation/Scan, Code Markers, File Size, LOC Check, Type Check, AppImage build).
+- Release: Tagged as `v0.13.0` (beta) and published as a GitHub prerelease; AppImage for `v0.13.0` is available and the installer uses this prerelease by default when selecting the beta channel.
+- Notes: This release groups multiple refactors and test coverage improvements; see individual commits and the release notes for file-level details and test lists.
 
 ## 0.12.3 (2026-01-06)
 
