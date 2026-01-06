@@ -3,7 +3,13 @@
 ## 0.12.3 (2026-01-06)
 
 - Fix: reduce likelihood of crashes after a USB disconnect by aggressively stopping further USB I/O and marking the device unavailable.
-- Maintenance: centralize USB error classification (device disconnected/busy) to reduce duplicated, inconsistent errno/string checks across tray/effects/GUI.
+- Fix: ensure per-key disconnect handling marks the device unavailable while holding the device lock to reduce race windows that could lead to libusb crashes.
+- Maintenance: centralize USB error classification (device disconnected/busy) to reduce duplicated, inconsistent errno/string checks across tray/effects/GUI (`src/core/utils/exceptions.py`).
+- Refactor: extract config property factory helpers into `src/core/config/_props.py` and simplify `src/core/config/config.py` (reduced LOC and clearer property helpers).
+- Tests: add unit tests to cover brightness-split behavior, disconnect-safe effect rendering, and software-effects visibility (`src/tests/test_brightness_split_unit.py`, `src/tests/test_effects_render_disconnect_unit.py`, `src/tests/test_software_effects_visibility_unit.py`).
+- Fix: correct a syntax/indentation regression in `src/gui/windows/uniform.py` caught by `py_compile`.
+- Misc: additional small cleanups and test coverage improvements across tray/pollers/effects/GUI.
+
 
 ## 0.12.2 (2026-01-06)
 
