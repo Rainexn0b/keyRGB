@@ -96,6 +96,28 @@ def start_current_effect(tray: Any) -> None:
             tray.is_off = False
             return
 
+        # Prepare per-key state in case the effect is a software effect that needs it.
+        # This handles cases like 'reactive_ripple' running on startup where the menu logic hasn't run.
+        if tray.config.effect in SW_EFFECTS:
+            try:
+                tray.engine.per_key_colors = dict(getattr(tray.config, "per_key_colors", {}) or {})
+            except Exception:
+                tray.engine.per_key_colors = None
+            try:
+                tray.engine.per_key_brightness = int(getattr(tray.config, "perkey_brightness", 0) or 0)
+            except Exception:
+                tray.engine.per_key_brightness = None
+        else:
+            # Hardware effects - clear per-key state
+            try:
+                tray.engine.per_key_colors = None
+            except Exception:
+                pass
+            try:
+                tray.engine.per_key_brightness = None
+            except Exception:
+                pass
+
         tray.engine.start_effect(
             tray.config.effect,
             speed=tray.config.speed,
