@@ -15,7 +15,7 @@ import logging
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
-from src.core.logging_utils import log_throttled
+from src.core.utils.logging_utils import log_throttled
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_theme
 from src.gui.utils.window_centering import center_window_on_screen

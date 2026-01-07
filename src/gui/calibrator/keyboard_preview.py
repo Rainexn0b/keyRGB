@@ -5,7 +5,7 @@ from typing import Dict, Tuple
 
 import logging
 
-from src.core.logging_utils import log_throttled
+from src.core.utils.logging_utils import log_throttled
 
 from src.core.config import Config
 

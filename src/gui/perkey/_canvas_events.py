@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from src.core.logging_utils import log_throttled
+from src.core.utils.logging_utils import log_throttled
 
 
 logger = logging.getLogger(__name__)

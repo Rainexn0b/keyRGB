@@ -4,7 +4,7 @@ import logging
 from threading import RLock
 from typing import Any, Callable, Dict, Optional
 
-from src.core.logging_utils import log_throttled
+from src.core.utils.logging_utils import log_throttled
 
 
 def allowed_hw_effect_keys(effect_func: Callable[..., Any], *, logger: logging.Logger) -> set[str]:

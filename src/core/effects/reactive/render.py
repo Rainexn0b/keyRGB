@@ -9,7 +9,7 @@ from src.core.effects.perkey_animation import (
     enable_user_mode_once,
 )
 from src.core.effects.transitions import avoid_full_black
-from src.core.logging_utils import log_throttled
+from src.core.utils.logging_utils import log_throttled
 from src.core.utils.exceptions import is_device_disconnected
 
 logger = logging.getLogger(__name__)

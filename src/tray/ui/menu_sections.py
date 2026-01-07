@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional
-from src.core.logging_utils import log_throttled
+from src.core.utils.logging_utils import log_throttled
 
 from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS

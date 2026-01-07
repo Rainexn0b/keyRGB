@@ -7,7 +7,7 @@ import random
 import tempfile
 from typing import Any, Optional
 
-from src.core.logging_utils import log_throttled
+from src.core.utils.logging_utils import log_throttled
 
 from .json_api import (
     get_custom_profiles_json,

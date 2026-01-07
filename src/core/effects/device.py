@@ -6,7 +6,7 @@ from threading import RLock
 from typing import Any, Tuple
 
 from src.core.effects.ite_backend import get
-from src.core.logging_utils import log_throttled
+from src.core.utils.logging_utils import log_throttled
 
 
 class NullKeyboard:
