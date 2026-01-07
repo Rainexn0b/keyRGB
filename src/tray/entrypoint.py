@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from .application import KeyRGBTray
+from .app.application import KeyRGBTray
 from .startup import (
     acquire_single_instance_or_exit,
     configure_logging,

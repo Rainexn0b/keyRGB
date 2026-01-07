@@ -10,20 +10,20 @@ import time
 
 from .backend import select_backend_with_introspection
 from . import callbacks
-from .controllers.lighting_controller import (
+from ..controllers.lighting_controller import (
     apply_brightness_from_power_policy,
     power_restore,
     power_turn_off,
     start_current_effect,
 )
-from .hw.ite_dimensions import load_ite_dimensions
-from .integrations.dependencies import load_tray_dependencies
-from .integrations import runtime
+from ..hw.ite_dimensions import load_ite_dimensions
+from ..integrations.dependencies import load_tray_dependencies
+from ..integrations import runtime
 from .lifecycle import maybe_autostart_effect, start_all_polling, start_power_monitoring
-from .ui import icon as icon_mod
-from .ui import menu as menu_mod
-from .ui.refresh import update_icon as update_tray_icon
-from .ui.refresh import update_menu as update_tray_menu
+from ..ui import icon as icon_mod
+from ..ui import menu as menu_mod
+from ..ui.refresh import update_icon as update_tray_icon
+from ..ui.refresh import update_menu as update_tray_menu
 
 logger = logging.getLogger(__name__)
 

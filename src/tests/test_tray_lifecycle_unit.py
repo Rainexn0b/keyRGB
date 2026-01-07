@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 
 def test_start_power_monitoring_constructs_and_starts() -> None:
-    from src.tray.lifecycle import start_power_monitoring
+    from src.tray.app.lifecycle import start_power_monitoring
 
     tray = MagicMock()
     config = MagicMock()
@@ -20,15 +20,15 @@ def test_start_power_monitoring_constructs_and_starts() -> None:
 
 
 def test_start_all_polling_wires_pollers() -> None:
-    from src.tray.lifecycle import start_all_polling
+    from src.tray.app.lifecycle import start_all_polling
 
     tray = MagicMock()
 
     with (
-        patch("src.tray.lifecycle.start_hardware_polling") as hw,
-        patch("src.tray.lifecycle.start_config_polling") as cfg,
-        patch("src.tray.lifecycle.start_icon_color_polling") as icon,
-        patch("src.tray.lifecycle.start_idle_power_polling") as idle,
+        patch("src.tray.app.lifecycle.start_hardware_polling") as hw,
+        patch("src.tray.app.lifecycle.start_config_polling") as cfg,
+        patch("src.tray.app.lifecycle.start_icon_color_polling") as icon,
+        patch("src.tray.app.lifecycle.start_idle_power_polling") as idle,
     ):
         start_all_polling(tray, ite_num_rows=6, ite_num_cols=21)
 
@@ -39,7 +39,7 @@ def test_start_all_polling_wires_pollers() -> None:
 
 
 def test_maybe_autostart_effect_calls_start_when_enabled_and_not_off() -> None:
-    from src.tray.lifecycle import maybe_autostart_effect
+    from src.tray.app.lifecycle import maybe_autostart_effect
 
     tray = MagicMock()
     tray.config = MagicMock(autostart=True)
@@ -51,7 +51,7 @@ def test_maybe_autostart_effect_calls_start_when_enabled_and_not_off() -> None:
 
 
 def test_maybe_autostart_effect_skips_when_off_or_disabled() -> None:
-    from src.tray.lifecycle import maybe_autostart_effect
+    from src.tray.app.lifecycle import maybe_autostart_effect
 
     tray = MagicMock()
     tray.config = MagicMock(autostart=True)

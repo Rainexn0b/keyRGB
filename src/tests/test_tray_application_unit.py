@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.tray.application as app
+import src.tray.app.application as app
 
 
 def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
