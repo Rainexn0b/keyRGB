@@ -49,14 +49,6 @@ __all__ = [
     "rename_custom_profile",
     "set_temp_profile_by_id",
     "update_custom_profile",
-    # Intentionally re-export internal helpers used by the tray UI and tests.
-    "_apply_new_profiles_file",
-    "_apply_new_settings_file",
-    "_busctl_call",
-    "_parse_busctl_bool_reply",
-    "_parse_busctl_string_reply",
-    "_run_root_command",
-    "_tccd_binary",
 ]
 
 

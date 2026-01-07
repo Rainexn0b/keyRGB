@@ -11,6 +11,10 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import src.core.tcc_power_profiles as tcc_power_profiles
+from src.core.tcc_power_profiles.busctl import (
+    _parse_busctl_string_reply,
+    _parse_busctl_bool_reply,
+)
 
 
 @pytest.mark.parametrize(
@@ -23,7 +27,7 @@ import src.core.tcc_power_profiles as tcc_power_profiles
     ],
 )
 def test_parse_busctl_string_reply(stdout: str, expected: str | None) -> None:
-    assert tcc_power_profiles._parse_busctl_string_reply(stdout) == expected
+    assert _parse_busctl_string_reply(stdout) == expected
 
 
 @pytest.mark.parametrize(
@@ -38,7 +42,7 @@ def test_parse_busctl_string_reply(stdout: str, expected: str | None) -> None:
     ],
 )
 def test_parse_busctl_bool_reply(stdout: str, expected: bool | None) -> None:
-    assert tcc_power_profiles._parse_busctl_bool_reply(stdout) == expected
+    assert _parse_busctl_bool_reply(stdout) == expected
 
 
 def test_update_custom_profile_preserves_id_and_strips_name(
