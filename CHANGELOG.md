@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.1 (2026-01-07)
+
+- Fix: Avoid brief brightness flashes/flicker when restoring from screen dim/suspend by ensuring the effects engine starts fades from black instead of a stale color.
+- Tests: Add unit tests to assert restore clears previous color and prevents transient hardware brightness writes.
+- Maintenance: Stop re-exporting underscore internal helpers from `src.core.tcc_power_profiles` and update tests to import them directly.
+
 ## 0.13.0 (2026-01-07)
 
 - Refactor: Reduced cyclomatic complexity for radon E-rated hotspots by extracting helpers while preserving public interfaces and test behavior. Targeted items: `buildpython/steps/step_quality.py::code_markers_runner`, `src/core/diagnostics/collectors_backends.py::backend_probe_snapshot`, `src/gui/perkey/overlay/autosync.py::auto_sync_per_key_overlays`, `src/gui/theme/detect.py::detect_system_prefers_dark`.
