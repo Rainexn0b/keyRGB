@@ -10,68 +10,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 
-class TestEnsureConfigPerKeyColorsLoaded:
-    """Test _ensure_config_per_key_colors_loaded helper."""
-
-    def test_does_nothing_if_colors_already_loaded(self):
-        """Should not load from profile if colors already exist."""
-        from src.tray.controllers.effect_selection import (
-            _ensure_config_per_key_colors_loaded,
-        )
-
-        mock_config = MagicMock()
-        mock_config.per_key_colors = {(0, 0): (255, 0, 0)}
-
-        _ensure_config_per_key_colors_loaded(mock_config)
-
-        # Should not change existing colors
-        assert mock_config.per_key_colors == {(0, 0): (255, 0, 0)}
-
-    def test_loads_from_active_profile_if_colors_empty(self, monkeypatch):
-        """Should load from active profile when per_key_colors is empty."""
-        from src.tray.controllers.effect_selection import (
-            _ensure_config_per_key_colors_loaded,
-        )
-
-        mock_config = MagicMock()
-        mock_config.per_key_colors = {}
-
-        # Mock the profiles module
-        mock_profiles = MagicMock()
-        mock_profiles.get_active_profile.return_value = "test_profile"
-        mock_profiles.load_per_key_colors.return_value = {(0, 0): (0, 255, 0)}
-
-        with monkeypatch.context() as m:
-            m.setattr(
-                "src.tray.controllers.effect_selection.profiles",
-                mock_profiles,
-                raising=False,
-            )
-            _ensure_config_per_key_colors_loaded(mock_config)
-
-        assert mock_config.per_key_colors == {(0, 0): (0, 255, 0)}
-
-    def test_handles_import_error_gracefully(self, monkeypatch):
-        """Should not crash if profiles module import fails."""
-        from src.tray.controllers.effect_selection import (
-            _ensure_config_per_key_colors_loaded,
-        )
-
-        mock_config = MagicMock()
-        mock_config.per_key_colors = {}
-
-        # Simulate import failure
-        def fake_import(name, *args, **kwargs):
-            if "profiles" in name:
-                raise ImportError("Module not found")
-            return __import__(name, *args, **kwargs)
-
-        with monkeypatch.context() as m:
-            m.setattr("builtins.__import__", fake_import)
-            # Should not raise
-            _ensure_config_per_key_colors_loaded(mock_config)
-
-
 class TestApplyEffectSelection:
     """Test apply_effect_selection decision logic."""
 

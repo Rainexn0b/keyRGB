@@ -21,12 +21,6 @@ from src.core.utils.exceptions import is_device_disconnected
 logger = logging.getLogger(__name__)
 
 
-def _parse_menu_int(item: Any) -> Optional[int]:
-    """Back-compat wrapper for tests/older imports."""
-
-    return parse_menu_int(item)
-
-
 def start_current_effect(tray: Any) -> None:
     """Start the currently selected effect.
 
@@ -77,7 +71,7 @@ def start_current_effect(tray: Any) -> None:
 
 
 def on_speed_clicked(tray: Any, item: Any) -> None:
-    speed = _parse_menu_int(item)
+    speed = parse_menu_int(item)
     if speed is None:
         return
 
@@ -96,7 +90,7 @@ def on_speed_clicked(tray: Any, item: Any) -> None:
 
 
 def on_brightness_clicked(tray: Any, item: Any) -> None:
-    brightness = _parse_menu_int(item)
+    brightness = parse_menu_int(item)
     if brightness is None:
         return
 

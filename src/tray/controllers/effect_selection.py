@@ -45,25 +45,6 @@ def _load_per_key_colors_from_profile(config) -> dict:
         return {}
 
 
-def _ensure_config_per_key_colors_loaded(config) -> None:
-    """Ensure config.per_key_colors has a value, if possible.
-
-    Used when switching into per-key effects so the keyboard isn't left blank.
-    This is a compatibility shim for existing code that calls this function.
-    """
-    try:
-        existing = dict(getattr(config, "per_key_colors", {}) or {})
-    except Exception:
-        existing = {}
-
-    if existing:
-        return
-
-    colors = _load_per_key_colors_from_profile(config)
-    if colors:
-        config.per_key_colors = colors
-
-
 def _ensure_software_mode(tray) -> None:
     """Ensure we're in software mode.
 

@@ -9,23 +9,23 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 
-class TestParseMenInt:
-    """Test _parse_menu_int helper."""
+class TestParseMenuInt:
+    """Test parse_menu_int helper."""
 
     def test_parse_menu_int_strips_radio_markers(self):
         """Should strip radio button markers and parse int."""
-        from src.tray.controllers.lighting_controller import _parse_menu_int
+        from src.tray.controllers._lighting_controller_helpers import parse_menu_int
 
-        assert _parse_menu_int("🔘 50") == 50
-        assert _parse_menu_int("⚪ 75") == 75
-        assert _parse_menu_int("100") == 100
+        assert parse_menu_int("🔘 50") == 50
+        assert parse_menu_int("⚪ 75") == 75
+        assert parse_menu_int("100") == 100
 
     def test_parse_menu_int_returns_none_on_invalid(self):
         """Should return None if string isn't parseable as int."""
-        from src.tray.controllers.lighting_controller import _parse_menu_int
+        from src.tray.controllers._lighting_controller_helpers import parse_menu_int
 
-        assert _parse_menu_int("not a number") is None
-        assert _parse_menu_int("🔘 abc") is None
+        assert parse_menu_int("not a number") is None
+        assert parse_menu_int("🔘 abc") is None
 
 
 class TestStartCurrentEffect:
