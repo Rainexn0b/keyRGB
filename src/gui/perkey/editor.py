@@ -308,14 +308,6 @@ class PerKeyEditor:
     def _load_per_key_layout_tweaks(self) -> dict[str, dict[str, float]]:
         return profiles.load_layout_per_key(self.profile_name)
 
-    def _toggle_profiles(self):
-        # Profiles are now always visible; keep this method for compatibility.
-        try:
-            self._profiles_combo.configure(values=profiles.list_profiles())
-            self._profiles_combo.focus_set()
-        except Exception:
-            return
-
     def _toggle_overlay(self):
         if self._overlay_visible:
             self.overlay_controls.grid_remove()
