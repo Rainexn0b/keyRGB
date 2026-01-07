@@ -13,10 +13,10 @@ from src.gui.reference.overlay_geometry import (
     transform_from_drawn_bbox,
 )
 
-from ._canvas_drawing import _KeyboardCanvasDrawingMixin
-from ._canvas_events import _KeyboardCanvasEventMixin
+from .canvas_impl._canvas_drawing import _KeyboardCanvasDrawingMixin
+from .canvas_impl._canvas_events import _KeyboardCanvasEventMixin
 
-from .canvas_hit_testing import (
+from .canvas_impl.canvas_hit_testing import (
     cursor_for_edges,
     point_in_bbox,
     point_near_bbox,

@@ -96,4 +96,4 @@ class _KeyboardCanvasEventMixin:
 # These imports are only for type checkers.
 # They keep the mixin self-contained without causing runtime import cycles.
 if False:  # pragma: no cover
-    from .canvas import KeyboardCanvas  # noqa: F401
+    from ..canvas import KeyboardCanvas  # noqa: F401
