@@ -204,6 +204,11 @@ def power_restore(tray: Any) -> None:
         return
 
     # Common restore path: hardware may have reset to off across suspend.
+    # Avoid a visible flash from fading from a stale prior color.
+    try:
+        tray.engine.current_color = (0, 0, 0)
+    except Exception:
+        pass
     tray.is_off = False
     start_current_effect(tray)
     tray._refresh_ui()

@@ -76,23 +76,29 @@ def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
 
     calls = {"start": 0, "refresh": 0, "log": 0}
 
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        config=SimpleNamespace(brightness=0),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _log_exception=None,
+        _start_current_effect=None,
+        _refresh_ui=None,
+    )
+
     def boom_start():
         calls["start"] += 1
+        assert tray.engine.current_color == (0, 0, 0)
         raise RuntimeError("boom")
 
     def boom_log(*_a, **_kw):
         calls["log"] += 1
         raise RuntimeError("boom")
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        config=SimpleNamespace(brightness=0),
-        _start_current_effect=boom_start,
-        _log_exception=boom_log,
-        _refresh_ui=lambda: calls.__setitem__("refresh", calls["refresh"] + 1),
-    )
+    tray._start_current_effect = boom_start
+    tray._log_exception = boom_log
+    tray._refresh_ui = lambda: calls.__setitem__("refresh", calls["refresh"] + 1)
 
     ipp._restore_from_idle(tray)
 

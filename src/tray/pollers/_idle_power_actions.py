@@ -7,6 +7,15 @@ def restore_from_idle(tray: Any) -> None:
     tray.is_off = False
     tray._idle_forced_off = False
 
+    # When restoring from an off state (screen dim sync / DPMS), avoid using a stale
+    # previous color as the fade start. Some devices visibly flash if the first
+    # restored frame briefly jumps to the last saved color at full brightness.
+    try:
+        if hasattr(tray, "engine"):
+            tray.engine.current_color = (0, 0, 0)
+    except Exception:
+        pass
+
     # Best-effort: if brightness is 0, fall back to last brightness.
     try:
         if int(getattr(tray.config, "brightness", 0) or 0) == 0:

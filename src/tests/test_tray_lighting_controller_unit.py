@@ -333,6 +333,7 @@ class TestPowerTurnOffRestore:
         assert mock_tray._power_forced_off is False
         assert mock_tray.is_off is False
         assert mock_tray.config.brightness == 50
+        assert mock_tray.engine.current_color == (0, 0, 0)
         mock_start.assert_called_once_with(mock_tray)
 
     def test_power_restore_restores_when_off_due_to_hardware_reset(self):
@@ -351,6 +352,7 @@ class TestPowerTurnOffRestore:
             power_restore(mock_tray)
 
         assert mock_tray.is_off is False
+        assert mock_tray.engine.current_color == (0, 0, 0)
         mock_start.assert_called_once_with(mock_tray)
 
     def test_power_restore_does_not_fight_user_forced_off(self):
