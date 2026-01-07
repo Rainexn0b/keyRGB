@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.2 (2026-01-07)
+
+- Fix: Prevent brief brightness flashes when restoring from screen dim/suspend by synchronizing brightness updates and render-time brightness resolution; this eliminates one-frame stale or mixed brightness frames on restore and at startup for reactive effects.
+- Fix: Make reactive idle-power updates atomic (update `engine.per_key_brightness` and call `engine.set_brightness()` together under the engine device lock) to avoid mixed-state intermediate frames.
+- Tests: Add unit tests and logging for brightness behavior and idle-power actions; tests assert no stale-brightness frames and verify device call logging under `KEYRGB_DEBUG_BRIGHTNESS=1`.
+- Docs: Document `KEYRGB_DEBUG_BRIGHTNESS` debug logging and how to capture brightness traces for troubleshooting.
+
 ## 0.13.1 (2026-01-07)
 
 - Fix: Avoid brief brightness flashes/flicker when restoring from screen dim/suspend by ensuring the effects engine starts fades from black instead of a stale color.
