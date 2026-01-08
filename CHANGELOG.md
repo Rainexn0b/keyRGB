@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.3 (2026-01-08)
+
+- Fix: Reduce remaining dim-time flashing by minimizing lock hold time and pre-reading config values before applying restore brightness; this removes the extra one-frame delay on restore after screen-dim events.
+- Perf: Optimize `dim_to_temp` and `restore_brightness` paths to acquire the engine device lock for the shortest possible window and perform per-key/main brightness updates atomically.
+- Tests: Update unit tests to reflect atomic reactive brightness updates and add traces to validate single-frame transitions.
+- Docs: Clarify troubleshooting steps for brightness traces and the `KEYRGB_DEBUG_BRIGHTNESS` capture process.
+
 ## 0.13.2 (2026-01-07)
 
 - Fix: Prevent brief brightness flashes when restoring from screen dim/suspend by synchronizing brightness updates and render-time brightness resolution; this eliminates one-frame stale or mixed brightness frames on restore and at startup for reactive effects.
