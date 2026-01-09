@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from ..base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeResult
 
@@ -104,6 +107,13 @@ def _read_int(path: Path) -> int:
 
 
 def _write_int(path: Path, value: int) -> None:
+    try:
+        # When KEYRGB_DEBUG_BRIGHTNESS=1, emit a log for every sysfs write
+        # performed by the backend (helps diagnose flash / transient writes).
+        if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
+            logger.info("sysfs.write %s <- %s", path, int(value))
+    except Exception:
+        pass
     _safe_write_text(path, f"{int(value)}\n")
 
 
@@ -143,6 +153,17 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         b = max(0, min(50, int(brightness)))
         max_value = self._max()
         sysfs_value = int(round((b / 50) * max_value))
+        try:
+            if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
+                logger.info(
+                    "backend.sysfs.set_brightness kb=%s sysfs=%s path=%s max=%s",
+                    b,
+                    sysfs_value,
+                    self.brightness_path,
+                    max_value,
+                )
+        except Exception:
+            pass
         _write_int(self.brightness_path, sysfs_value)
 
     def _supports_multicolor(self) -> bool:
@@ -167,6 +188,12 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
 
     def set_color(self, color, *, brightness: int):
         """Enhanced color setting with multi_intensity and color attribute support"""
+        try:
+            if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
+                r, g, b = color
+                logger.info("backend.sysfs.set_color rgb=(%s,%s,%s) brightness=%s path=%s", r, g, b, brightness, self.led_dir)
+        except Exception:
+            pass
         # Try multi_intensity first (Tuxedo/Clevo)
         if self._supports_multicolor():
             r, g, b = color

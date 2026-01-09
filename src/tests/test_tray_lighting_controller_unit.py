@@ -434,6 +434,9 @@ class TestApplyBrightnessFromPowerPolicy:
         with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             apply_brightness_from_power_policy(mock_tray, 25)
 
+        # For reactive effects, both perkey_brightness and main brightness should
+        # be updated to ensure dim-sync and power policy work correctly.
         assert mock_tray.config.perkey_brightness == 25
-        mock_tray.engine.set_brightness.assert_not_called()
+        assert mock_tray.config.brightness == 25
+        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=False)
         mock_start.assert_not_called()

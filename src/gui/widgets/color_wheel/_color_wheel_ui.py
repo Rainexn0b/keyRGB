@@ -14,8 +14,10 @@ from tkinter import ttk
 class _ColorWheelUIMixin:
     def _create_widgets(self):
         """Create the canvas, brightness slider, preview, and manual RGB inputs."""
+        bg = getattr(self, "_theme_bg_hex", None) or "#2b2b2b"
+        border = getattr(self, "_theme_border_hex", None) or "#666666"
         # Canvas for the color wheel
-        self.canvas = tk.Canvas(self, width=self.size, height=self.size, highlightthickness=0, bg="#2b2b2b")
+        self.canvas = tk.Canvas(self, width=self.size, height=self.size, highlightthickness=0, bg=bg)
         self.canvas.pack(pady=10)
 
         # Bind mouse events
@@ -57,8 +59,8 @@ class _ColorWheelUIMixin:
             width=100,
             height=30,
             highlightthickness=1,
-            highlightbackground="#666666",
-            bg="#2b2b2b",
+            highlightbackground=border,
+            bg=bg,
         )
         # Fixed-size preview to avoid geometry changes during drag
         self.preview_canvas.pack(side="left")

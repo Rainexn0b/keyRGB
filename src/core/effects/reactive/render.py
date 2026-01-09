@@ -164,12 +164,14 @@ def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
 
 
 def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
-    # Determine proper hardware brightness scaling
-    _, _, brightness_hw = _resolve_brightness(engine)
+    # Determine proper hardware brightness scaling. Keep resolution under the
+    # same lock used by device I/O so a tray-initiated dim/restore can't race
+    # a frame and produce a one-frame stale brightness write.
 
     if has_per_key(engine):
         try:
             with engine.kb_lock:
+                _, _, brightness_hw = _resolve_brightness(engine)
                 enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
                 try:
                     engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)
@@ -201,7 +203,8 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
         n = max(1, len(color_map))
         rgb = (int(rs / n), int(gs / n), int(bs / n))
 
-    r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))
     with engine.kb_lock:
+        _, _, brightness_hw = _resolve_brightness(engine)
+        r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))
         enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
         engine.kb.set_color((r, g, b), brightness=int(brightness_hw))

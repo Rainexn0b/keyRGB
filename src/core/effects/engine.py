@@ -144,11 +144,44 @@ class EffectsEngine:
         which can cause a brief flash on some devices.
         """
 
-        self.brightness = max(0, min(50, int(brightness)))
-        if not apply_to_hardware:
-            return
-        self._ensure_device_available()
+        # Synchronize with per-frame device writes.
+        #
+        # Software/reactive effects render frames under `kb_lock` and pass the
+        # brightness alongside each write. If brightness is updated concurrently
+        # (e.g., tray dim/restore), we can end up with a single frame rendered
+        # at the stale brightness. Updating brightness while holding the same
+        # lock used for the I/O side makes the read->write path consistent.
         with self.kb_lock:
+            prev = int(self.brightness)
+            self.brightness = max(0, min(50, int(brightness)))
+
+            # Conditional verbose logging enabled by environment variable for
+            # on-device investigations: `KEYRGB_DEBUG_BRIGHTNESS=1`.
+            try:
+                import os
+
+                if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
+                    logger.info(
+                        "engine.set_brightness: prev=%s new=%s apply_to_hardware=%s device_available=%s",
+                        prev,
+                        self.brightness,
+                        bool(apply_to_hardware),
+                        self.device_available,
+                    )
+            except Exception:
+                pass
+
+            if not apply_to_hardware:
+                return
+
+            self._ensure_device_available()
+            try:
+                import os
+
+                if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
+                    logger.info("engine -> kb.set_brightness: %s", self.brightness)
+            except Exception:
+                pass
             self.kb.set_brightness(self.brightness)
 
     def start_effect(

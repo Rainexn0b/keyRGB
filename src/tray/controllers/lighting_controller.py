@@ -253,9 +253,20 @@ def apply_brightness_from_power_policy(tray: Any, brightness: int) -> None:
         # tray UI reflects the effective brightness after plug/unplug (and on
         # startup).
         if is_reactive:
+            # For reactive effects, update both the per-key brightness and the
+            # main/backdrop brightness so that dim-sync and power policy work
+            # correctly. This mirrors the dim_to_temp logic.
             tray.config.perkey_brightness = brightness_int
+            tray.config.brightness = brightness_int
             try:
-                tray.engine.per_key_brightness = brightness_int
+                # Keep the update atomic relative to the render loop to
+                # avoid a one-frame mix of old/new brightness inputs.
+                with tray.engine.kb_lock:
+                    try:
+                        tray.engine.per_key_brightness = brightness_int
+                    except Exception:
+                        pass
+                    tray.engine.set_brightness(brightness_int, apply_to_hardware=False)
             except Exception:
                 pass
             tray._refresh_ui()

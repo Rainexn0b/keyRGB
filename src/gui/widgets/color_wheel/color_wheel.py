@@ -54,6 +54,10 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         """
         super().__init__(parent)
 
+        self._theme_bg_hex = self._resolve_theme_bg_hex()
+        self._theme_bg_rgb = self._hex_to_rgb(self._theme_bg_hex)
+        self._theme_border_hex = self._derive_border_hex(self._theme_bg_rgb)
+
         self.size = size
         self.radius = size // 2
         # RGB is always on the 0..255 per-channel scale.
@@ -92,10 +96,10 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self.canvas.delete("wheel")
 
         # Keep the background consistent with the rest of the app theme.
-        bg_rgb = (0x2B, 0x2B, 0x2B)
+        bg_rgb = self._theme_bg_rgb
         center_size = 20
 
-        wheel_path = wheel_cache_path(size=self.size)
+        wheel_path = wheel_cache_path(size=self.size, bg_rgb=bg_rgb, center_size=center_size)
         ppm_bytes: bytes | None = None
 
         try:
@@ -122,9 +126,69 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
             self.radius + center_size,
             self.radius + center_size,
             fill="",
-            outline="#888888",
+            outline=self._theme_border_hex,
             tags="wheel",
         )
+
+    @staticmethod
+    def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+        s = str(hex_color or "").strip()
+        if not s:
+            return (0x2B, 0x2B, 0x2B)
+        if s.startswith("#"):
+            s = s[1:]
+        if len(s) == 3:
+            s = "".join([c * 2 for c in s])
+        if len(s) != 6:
+            return (0x2B, 0x2B, 0x2B)
+        try:
+            return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
+        except Exception:
+            return (0x2B, 0x2B, 0x2B)
+
+    @staticmethod
+    def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
+        r, g, b = (int(rgb[0]) & 0xFF, int(rgb[1]) & 0xFF, int(rgb[2]) & 0xFF)
+        return f"#{r:02x}{g:02x}{b:02x}"
+
+    def _resolve_theme_bg_hex(self) -> str:
+        """Best-effort resolve a background color that matches ttk theme."""
+
+        try:
+            style = ttk.Style()
+            bg = style.lookup("TFrame", "background") or style.lookup(".", "background")
+            if bg:
+                return str(bg)
+        except Exception:
+            pass
+
+        # Fallback: use this widget's Tk background if available.
+        try:
+            bg = str(self.cget("background"))
+            if bg:
+                return bg
+        except Exception:
+            pass
+
+        # Historical default (dark)
+        return "#2b2b2b"
+
+    def _derive_border_hex(self, bg_rgb: tuple[int, int, int]) -> str:
+        """Derive a subtle border color from background for both themes."""
+
+        r, g, b = (float(bg_rgb[0]), float(bg_rgb[1]), float(bg_rgb[2]))
+        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+        if lum >= 160.0:
+            # Light background: darken for border
+            rr, gg, bb = (int(r * 0.75), int(g * 0.75), int(b * 0.75))
+        else:
+            # Dark background: lighten for border
+            rr = int(r + (255.0 - r) * 0.35)
+            gg = int(g + (255.0 - g) * 0.35)
+            bb = int(b + (255.0 - b) * 0.35)
+
+        return self._rgb_to_hex((rr, gg, bb))
 
     def _update_selection(self):
         """Update the selection indicator on the wheel."""

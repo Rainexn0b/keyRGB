@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.13.4 (2026-01-09)
+
+- Tray: Replace the placeholder tray icon with the branded KeyRGB logo while keeping the “only the K changes color” illusion via a mask-based compositing pipeline (with theme-aware outline inversion).
+- Tray: Improve representative-color selection for multi-color/per-key/rainbow-like effects with low CPU cost and caching.
+- Tray: Reduce config polling noise by skipping no-op rewrites and improve apply-event cause propagation in logs.
+- GUI: Production polish pass for sizing and theming (theme-safe ColorWheel rendering, responsive layouts, and improved per-key editor selection visibility).
+- Packaging: Expand tray logo discovery paths and ensure the AppImage build bundles the tray logo asset.
+
 ## 0.13.3 (2026-01-08)
 
 - Fix: Reduce remaining dim-time flashing by minimizing lock hold time and pre-reading config values before applying restore brightness; this removes the extra one-frame delay on restore after screen-dim events.

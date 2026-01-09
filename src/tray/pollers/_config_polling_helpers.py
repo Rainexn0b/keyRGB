@@ -108,13 +108,13 @@ def _sync_reactive(tray: Any, current) -> None:
         pass
 
 
-def _apply_perkey(tray: Any, current, ite_num_rows: int, ite_num_cols: int) -> None:
+def _apply_perkey(tray: Any, current, ite_num_rows: int, ite_num_cols: int, *, cause: str) -> None:
     if callable(getattr(tray, "_log_event", None)):
         try:
             tray._log_event(
                 "config",
                 "apply_perkey",
-                cause=str("unknown"),
+                cause=str(cause or "unknown"),
                 brightness=int(tray.config.brightness),
                 perkey_keys=int(len(getattr(tray.config, "per_key_colors", {}) or {})),
             )
@@ -147,13 +147,13 @@ def _apply_perkey(tray: Any, current, ite_num_rows: int, ite_num_cols: int) -> N
         )
 
 
-def _apply_uniform(tray: Any) -> None:
+def _apply_uniform(tray: Any, *, cause: str) -> None:
     if callable(getattr(tray, "_log_event", None)):
         try:
             tray._log_event(
                 "config",
                 "apply_uniform",
-                cause=str("unknown"),
+                cause=str(cause or "unknown"),
                 brightness=int(tray.config.brightness),
                 color=tuple(tray.config.color),
             )
@@ -164,13 +164,13 @@ def _apply_uniform(tray: Any) -> None:
         tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
 
 
-def _apply_effect(tray: Any) -> None:
+def _apply_effect(tray: Any, *, cause: str) -> None:
     if callable(getattr(tray, "_log_event", None)):
         try:
             tray._log_event(
                 "config",
                 "apply_effect",
-                cause=str("unknown"),
+                cause=str(cause or "unknown"),
                 effect=str(tray.config.effect),
                 speed=int(tray.config.speed),
                 brightness=int(tray.config.brightness),

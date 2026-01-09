@@ -38,8 +38,13 @@ class UniformColorGUI:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Uniform Color")
         apply_keyrgb_window_icon(self.root)
-        self.root.geometry("520x610")
-        self.root.minsize(520, 610)
+        desired_w, desired_h = 520, 610
+        max_w = int(self.root.winfo_screenwidth() * 0.95)
+        max_h = int(self.root.winfo_screenheight() * 0.95)
+        w = min(desired_w, max_w)
+        h = min(desired_h, max_h)
+        self.root.geometry(f"{w}x{h}")
+        self.root.minsize(w, h)
         self.root.resizable(True, True)
 
         apply_clam_theme(self.root)

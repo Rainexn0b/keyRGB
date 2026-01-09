@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 from pathlib import Path
@@ -67,8 +68,19 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
 
     config_path = Path(tray.config.CONFIG_FILE)
     last_mtime = None
+    last_digest: str | None = None
     last_applied: ConfigApplyState | None = None
     last_apply_warn_at = 0.0
+
+    def _file_digest(path: Path) -> str | None:
+        try:
+            data = path.read_bytes()
+        except Exception:
+            return None
+        try:
+            return hashlib.blake2s(data, digest_size=16).hexdigest()
+        except Exception:
+            return None
 
     def apply_from_config(*, cause: str) -> None:
         nonlocal last_applied
@@ -84,13 +96,16 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
 
     def poll_config():
         nonlocal last_mtime
+        nonlocal last_digest
 
         last_startup_error_at = 0.0
 
         try:
             last_mtime = config_path.stat().st_mtime
+            last_digest = _file_digest(config_path)
         except FileNotFoundError:
             last_mtime = None
+            last_digest = None
 
         try:
             tray.config.reload()
@@ -114,6 +129,12 @@ def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
             if mtime != last_mtime:
                 last_mtime = mtime
                 try:
+                    # Avoid noisy reload/apply cycles when the file is rewritten
+                    # without any content change (e.g., redundant saves).
+                    digest = _file_digest(config_path) if mtime is not None else None
+                    if digest is not None and digest == last_digest:
+                        continue
+                    last_digest = digest
                     tray.config.reload()
                     apply_from_config(cause="mtime_change")
                 except Exception as e:

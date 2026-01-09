@@ -44,8 +44,13 @@ class ReactiveColorGUI:
         apply_keyrgb_window_icon(self.root)
         # This window includes extra explanatory text + a toggle above the shared
         # ColorWheel widget; keep it tall enough to avoid clipping.
-        self.root.geometry("629x847")
-        self.root.minsize(629, 847)
+        desired_w, desired_h = 629, 847
+        max_w = int(self.root.winfo_screenwidth() * 0.95)
+        max_h = int(self.root.winfo_screenheight() * 0.95)
+        w = min(desired_w, max_w)
+        h = min(desired_h, max_h)
+        self.root.geometry(f"{w}x{h}")
+        self.root.minsize(w, h)
         self.root.resizable(True, True)
 
         apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
@@ -68,9 +73,20 @@ class ReactiveColorGUI:
             ),
             font=("Sans", 9),
             justify="left",
-            wraplength=581,
+            wraplength=max(200, w - 48),
         )
         desc.pack(pady=(0, 10), fill="x")
+
+        def _sync_desc_wrap(_event=None) -> None:
+            try:
+                ww = int(main.winfo_width())
+                if ww > 1:
+                    desc.configure(wraplength=max(200, ww - 8))
+            except Exception:
+                pass
+
+        main.bind("<Configure>", _sync_desc_wrap)
+        self.root.after(0, _sync_desc_wrap)
 
         self._use_manual_var = tk.BooleanVar(value=bool(getattr(self.config, "reactive_use_manual_color", False)))
         ttk.Checkbutton(

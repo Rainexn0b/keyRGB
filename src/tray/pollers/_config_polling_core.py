@@ -226,13 +226,13 @@ def apply_from_config_once(
         from ._config_polling_helpers import _apply_perkey, _apply_uniform, _apply_effect
 
         if tray.config.effect == "perkey":
-            _apply_perkey(tray, current, ite_num_rows, ite_num_cols)
+            _apply_perkey(tray, current, ite_num_rows, ite_num_cols, cause=cause)
 
         elif tray.config.effect == "none":
-            _apply_uniform(tray)
+            _apply_uniform(tray, cause=cause)
 
         else:
-            _apply_effect(tray)
+            _apply_effect(tray, cause=cause)
 
     except Exception as exc:
         # Device disconnects can happen at any time. Mark unavailable to avoid

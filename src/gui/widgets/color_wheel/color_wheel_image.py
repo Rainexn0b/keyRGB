@@ -12,10 +12,16 @@ import os
 from pathlib import Path
 
 
-def wheel_cache_path(*, size: int) -> Path:
+def wheel_cache_path(*, size: int, bg_rgb: tuple[int, int, int], center_size: int) -> Path:
     xdg = os.environ.get("XDG_CACHE_HOME")
     cache_root = Path(xdg) if xdg else (Path.home() / ".cache")
-    return cache_root / "keyrgb" / f"color_wheel_{int(size)}.ppm"
+    bg_r, bg_g, bg_b = (
+        int(bg_rgb[0]) & 0xFF,
+        int(bg_rgb[1]) & 0xFF,
+        int(bg_rgb[2]) & 0xFF,
+    )
+    bg_hex = f"{bg_r:02x}{bg_g:02x}{bg_b:02x}"
+    return cache_root / "keyrgb" / f"color_wheel_{int(size)}_{bg_hex}_{int(center_size)}.ppm"
 
 
 def build_wheel_ppm_bytes(*, size: int, bg_rgb: tuple[int, int, int], center_size: int) -> bytes:

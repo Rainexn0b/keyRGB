@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from src.core.profile import profiles
+from src.gui.theme import detect_system_prefers_dark
 from src.gui.widgets.color_wheel import ColorWheel
 
 from .canvas import KeyboardCanvas
@@ -74,7 +75,8 @@ class _UpwardListboxDropdown:
             pass
 
         # Selection color for hover feedback
-        sel_bg = "#4a4a4a" if self._bg == "#2b2b2b" else "#3399ff"
+        prefers_dark = detect_system_prefers_dark()
+        sel_bg = "#4a4a4a" if prefers_dark is not False else "#3399ff"
         sel_fg = "#ffffff"
 
         lb = tk.Listbox(

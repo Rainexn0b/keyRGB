@@ -303,6 +303,10 @@ def build_appimage() -> Path:
     if deck_src.exists():
         shutil.copy2(deck_src, assets_dst / deck_src.name)
 
+    tray_logo_src = root / "assets" / "logo-tray.png"
+    if tray_logo_src.exists():
+        shutil.copy2(tray_logo_src, assets_dst / tray_logo_src.name)
+
     # Bundle python deps (pip wheels) into the AppDir.
     # We still use the system python interpreter at runtime.
     site_packages.mkdir(parents=True, exist_ok=True)

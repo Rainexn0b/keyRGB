@@ -72,8 +72,12 @@ def apply_idle_action(
         if not bool(getattr(tray, "is_off", False)):
             tray._dim_temp_active = True
             tray._dim_temp_target_brightness = int(dim_temp_brightness)
+            # Pre-read effect outside the lock to minimize lock hold time
             try:
                 effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
+            except Exception:
+                effect = "none"
+            try:
                 # Only treat the canonical SW effects as software loops.
                 #
                 # Note: the tray's "perkey" mode is a hardware per-key apply
@@ -86,11 +90,13 @@ def apply_idle_action(
                 # reactive effect brightness so the global hardware brightness
                 # can drop.
                 if effect in reactive_effects_set:
-                    try:
-                        tray.engine.per_key_brightness = int(dim_temp_brightness)
-                    except Exception:
-                        pass
-                tray.engine.set_brightness(int(dim_temp_brightness), apply_to_hardware=not is_sw_effect)
+                    # Keep the update atomic relative to the render loop to
+                    # avoid a one-frame mix of old/new brightness inputs.
+                    with tray.engine.kb_lock:
+                        tray.engine.per_key_brightness = dim_temp_brightness
+                        tray.engine.set_brightness(dim_temp_brightness, apply_to_hardware=False)
+                else:
+                    tray.engine.set_brightness(dim_temp_brightness, apply_to_hardware=not is_sw_effect)
             except Exception:
                 pass
         return
@@ -99,20 +105,27 @@ def apply_idle_action(
         tray._dim_temp_active = False
         tray._dim_temp_target_brightness = None
         # Restore to current config brightness (it may have been changed while dimmed).
+        # Pre-read all config values outside the lock to minimize lock hold time
+        # and reduce latency before the brightness change takes effect.
         try:
             target = int(getattr(tray.config, "brightness", 0) or 0)
+            perkey_target = int(getattr(tray.config, "perkey_brightness", 0) or 0)
+            effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
         except Exception:
             target = 0
+            perkey_target = 0
+            effect = "none"
         if target > 0 and not bool(getattr(tray, "is_off", False)):
             try:
-                effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
                 is_sw_effect = effect in sw_effects_set
                 if effect in reactive_effects_set:
-                    try:
-                        tray.engine.per_key_brightness = int(getattr(tray.config, "perkey_brightness", 0) or 0)
-                    except Exception:
-                        pass
-                tray.engine.set_brightness(int(target), apply_to_hardware=not is_sw_effect)
+                    # Keep the update atomic relative to the render loop to
+                    # avoid a one-frame mix of old/new brightness inputs.
+                    with tray.engine.kb_lock:
+                        tray.engine.per_key_brightness = perkey_target
+                        tray.engine.set_brightness(target, apply_to_hardware=False)
+                else:
+                    tray.engine.set_brightness(target, apply_to_hardware=not is_sw_effect)
             except Exception:
                 pass
         return

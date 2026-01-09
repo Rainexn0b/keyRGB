@@ -183,6 +183,7 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | `KEYRGB_DEBUG=1` | Enable verbose debug logging. |
 | `KEYRGB_TK_SCALING` | Float override for UI scaling (High-DPI / fractional scaling). |
 | `KEYRGB_TCCD_BIN` | Override the `tccd` helper path for TCC integration. |
+| `KEYRGB_DEBUG_BRIGHTNESS` | When set to `1`, emits detailed logs for brightness actions and sysfs writes (useful when investigating flashes when restoring from dim). Example: `KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb dev state` |
 
 ### Tray effects (names)
 

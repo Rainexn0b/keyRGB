@@ -30,6 +30,25 @@ class BottomBarPanel:
         self.close_btn = ttk.Button(self.frame, text="Close", command=on_close)
         self.close_btn.pack(side="right")
 
+        def _sync_wraplength(_e=None) -> None:
+            try:
+                # Reserve space for the Close button + status, plus padding.
+                w = int(self.frame.winfo_width())
+                if w <= 1:
+                    return
+                self.hardware_hint.configure(wraplength=max(200, w - 260))
+            except Exception:
+                return
+
+        try:
+            self.frame.bind("<Configure>", _sync_wraplength)
+        except Exception:
+            pass
+        try:
+            self.frame.after(0, _sync_wraplength)
+        except Exception:
+            pass
+
     def set_hardware_hint(self, text: str) -> None:
         text = text or ""
         if text.strip():
