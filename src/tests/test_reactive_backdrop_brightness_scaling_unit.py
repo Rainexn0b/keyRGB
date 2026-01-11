@@ -9,7 +9,15 @@ from src.core.effects.reactive.render import (
 
 
 class FakeEngine:
-    def __init__(self, *, global_hw=25, eff=25, base=None, per_key_colors=None):
+    def __init__(
+        self,
+        *,
+        global_hw=25,
+        eff=25,
+        base=None,
+        per_key_colors=None,
+        dim_temp_active: bool = False,
+    ):
         # Global hardware brightness cap (profile/policy).
         self.brightness = global_hw
         # Reactive typing pulse/highlight target brightness.
@@ -17,43 +25,58 @@ class FakeEngine:
         self.per_key_brightness = base
         # Simulate active per-key colors if dict provided
         self.per_key_colors = per_key_colors
+        self._dim_temp_active = dim_temp_active
 
 
 def test_resolve_brightness() -> None:
     # Case 1: Dim Profile (Global=5, Base=5), Bright Effect (Eff=50)
-    # Global is the profile/policy cap (5).
+    # When not temp-dimmed, resolved hardware brightness can rise to the effect.
     engine = FakeEngine(global_hw=5, eff=50, base=5, per_key_colors={(0, 0): (0, 0, 0)})
-    base, eff, glob = _resolve_brightness(engine)
+    base, eff, hw = _resolve_brightness(engine)
     assert base == 5
     assert eff == 50
-    assert glob == 5
+    assert hw == 50
 
     # Case 2: Bright Profile (Global=50, Base=50), Dim Effect (Eff=5)
     engine = FakeEngine(global_hw=50, eff=5, base=50, per_key_colors={(0, 0): (0, 0, 0)})
-    base, eff, glob = _resolve_brightness(engine)
+    base, eff, hw = _resolve_brightness(engine)
     assert base == 50
     assert eff == 5
-    assert glob == 50
+    assert hw == 50
 
     # Case 3: No backdrop (per_key_colors None)
     # Global should ignore base (base becomes 0).
     engine = FakeEngine(global_hw=25, eff=25, base=50, per_key_colors=None)
-    base, eff, glob = _resolve_brightness(engine)
+    base, eff, hw = _resolve_brightness(engine)
     # Base defaults to 0 because per_key_colors is None
     assert base == 0
     assert eff == 25
-    assert glob == 25
+    assert hw == 25
+
+
+def test_resolve_brightness_temp_dim_caps_to_profile() -> None:
+    engine = FakeEngine(
+        global_hw=5,
+        eff=50,
+        base=50,
+        per_key_colors={(0, 0): (0, 0, 0)},
+        dim_temp_active=True,
+    )
+    base, eff, hw = _resolve_brightness(engine)
+    assert base == 50
+    assert eff == 50
+    assert hw == 5
 
 
 def test_scaling_factors_dim_base_bright_effect() -> None:
-    # Global=5 caps everything (pulses can't exceed global).
+    # Not temp-dimmed: effect can raise hardware brightness.
     engine = FakeEngine(global_hw=5, eff=50, base=5, per_key_colors={(0, 0): (0, 0, 0)})
 
-    # Backdrop scale: base/global = 5/5 = 1.0
+    # Backdrop scale: base/hw = 5/50 = 0.1
     b_factor = backdrop_brightness_scale_factor(engine, effect_brightness_hw=50)
-    assert abs(b_factor - 1.0) < 1e-9
+    assert abs(b_factor - 0.1) < 1e-9
 
-    # Pulse scale: eff>=global => 1.0
+    # Pulse scale: eff>=hw => 1.0
     p_factor = pulse_brightness_scale_factor(engine)
     assert abs(p_factor - 1.0) < 1e-9
 

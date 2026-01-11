@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.1 (2026-01-11)
+
+- Fix: Restore Reactive Typing brightness slider functionality (fixed regression where 1-100% looked identical).
+- Fix: Allow reactive pulses to exceed dim profile brightness by raising hardware brightness when needed (pulses no longer capped to a dim backdrop).
+- Fix: Ensure reactive pulses are suppressed when `reactive_brightness` is set to 0.
+- Fix: Improve reactive animation visibility for uniform-only (non-per-key) backends by using representative peak-color mixing.
+- Tests: Updated reactive rendering unit tests to cover new brightness-raising policy and temp-dim capping.
+
 ## 0.14.0 (2026-01-11)
 
 - Fix: Prevent random brightness flashes around screen-dim by adding hysteresis to backlight dim detection and no-op guards in temp-dim policy/actions to stop repeated dim↔restore cycling.
@@ -9,7 +17,6 @@
 - Improvement: Smoother fades for dim/undim and fade-in on restore; tuned durations so 'off' is quick and 'dim' is gradual.
 - GUI: Per-key and calibrator UI sizing/label wrapping fixes and prevent tiny startup geometry flashes.
 - Tests: Add unit tests covering hysteresis, temp-mode non-repeat, tray icon color selection, and reactive brightness behavior; full test suite passing.
-- Docs: Documented brightness debug logging (`KEYRGB_DEBUG_BRIGHTNESS`) and added troubleshooting notes.
 
 ## 0.13.4 (2026-01-09)
 

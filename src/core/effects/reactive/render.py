@@ -42,7 +42,7 @@ def scale(rgb: Color, s: float) -> Color:
 def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
     """Resolve brightness levels for mixed-content rendering.
 
-    Returns (base_hw, effect_hw, global_hw).
+    Returns (base_hw, effect_hw, hw_brightness).
     """
     # Pulse/highlight target brightness for reactive effects.
     # This is separate from the hardware brightness (`engine.brightness`).
@@ -52,7 +52,7 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
         eff = 25
     eff = max(0, min(50, eff))
 
-    # Hardware brightness cap (policies dim/undim this).
+    # Profile/policy-selected hardware brightness.
     try:
         global_hw = int(getattr(engine, "brightness", 25) or 0)
     except Exception:
@@ -67,18 +67,19 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
         pass
     base = max(0, min(50, base))
 
-    # Treat `engine.brightness` as a global cap for reactive rendering.
+    # For reactive typing, users expect pulses/highlights to be able to exceed a
+    # dim base/profile brightness (e.g. dim backdrop + bright keypress flashes).
     #
-    # Historically we used `global_hw = max(base, eff)` so either channel could
-    # drive the hardware brightness upward and we would scale the other channel
-    # down. In practice, users often set per-key backdrop brightness high for
-    # reactive typing, and then policy-driven dim/undim would momentarily jump
-    # the hardware brightness to 100% (visible flash) even when the selected
-    # profile brightness is low.
-    #
-    # Keeping the hardware brightness capped to `global_hw` prevents flashes and
-    # makes dim/undim transitions stable.
-    return base, eff, global_hw
+    # However, during screen-dim sync (temp-dim mode), we must NOT raise the
+    # hardware brightness above the policy cap or we'll fight dim/restore.
+    dim_temp_active = bool(getattr(engine, "_dim_temp_active", False))
+    if dim_temp_active:
+        hw = global_hw
+    else:
+        hw = max(global_hw, base, eff)
+
+    hw = max(0, min(50, int(hw)))
+    return base, eff, hw
 
 
 def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:
@@ -87,32 +88,34 @@ def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightne
     If the global hardware brightness is driven higher (by the effect brightness),
     we scale the backdrop down.
     """
-    base, _, global_hw = _resolve_brightness(engine)
+    base, _, hw = _resolve_brightness(engine)
 
-    if global_hw <= 0:
+    if hw <= 0:
         return 0.0
 
-    if base >= global_hw:
+    if base >= hw:
         return 1.0
 
-    return float(base) / float(global_hw)
+    return float(base) / float(hw)
 
 
 def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
     """Compute scaling factor to keep pulses at their target brightness.
 
-    If the global hardware brightness is driven higher (by the base brightness),
-    we scale the pulses down.
+    This is expressed relative to the resolved hardware brightness used for
+    rendering. When not temp-dimmed, the renderer can raise the hardware
+    brightness to make bright pulses possible over a dim backdrop.
     """
-    _, eff, global_hw = _resolve_brightness(engine)
 
-    if global_hw <= 0:
+    _, eff, hw = _resolve_brightness(engine)
+
+    if hw <= 0:
         return 0.0
 
-    if eff >= global_hw:
+    if eff >= hw:
         return 1.0
 
-    return float(eff) / float(global_hw)
+    return float(eff) / float(hw)
 
 
 def apply_backdrop_brightness_scale(color_map: Dict[Key, Color], *, factor: float) -> Dict[Key, Color]:

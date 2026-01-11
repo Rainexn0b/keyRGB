@@ -224,6 +224,11 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
 
     pulses: List[_Pulse] = []
     while engine.running and not engine.stop_event.is_set():
+        try:
+            eff_hw = int(getattr(engine, "reactive_brightness", 0) or 0)
+        except Exception:
+            eff_hw = 0
+
         react_color = _get_engine_reactive_color(engine)
         manual = _get_engine_manual_reactive_color(engine)
 
@@ -255,7 +260,50 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
             engine, background_rgb=scale(react_color, 0.06)
         )
 
+        # When reactive brightness is 0, treat reactive typing as disabled.
+        # Keep the current background/backdrop rendering but suppress pulses.
+        if eff_hw <= 0:
+            render(engine, color_map=base)
+            engine.stop_event.wait(dt)
+            continue
+
         pulse_scale = pulse_brightness_scale_factor(engine)
+
+        # Uniform-only backends cannot display per-key pulses; averaging a full
+        # keyboard map dilutes highlights too much to be visibly animated.
+        # Render a representative mixed color instead.
+        if not bool(getattr(engine.kb, "set_key_colors", None)):
+            w_global = 0.0
+            if overlay:
+                try:
+                    w_global = max(float(v) for v in overlay.values())
+                except Exception:
+                    w_global = 0.0
+
+            # Pick representative base colors.
+            try:
+                base_rgb = next(iter(base.values()))
+            except Exception:
+                base_rgb = (0, 0, 0)
+            try:
+                base_rgb_unscaled = next(iter(base_unscaled.values()))
+            except Exception:
+                base_rgb_unscaled = base_rgb
+
+            if manual is not None:
+                pulse_rgb = react_color
+            elif per_key_backdrop_active:
+                pulse_rgb = _brightness_boost_pulse(base_rgb=base_rgb_unscaled)
+            else:
+                pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb_unscaled, preferred_rgb=react_color)
+
+            if pulse_scale < 0.999:
+                pulse_rgb = scale(pulse_rgb, pulse_scale)
+
+            rgb = mix(base_rgb, pulse_rgb, t=min(1.0, w_global))
+            render(engine, color_map={(0, 0): rgb})
+            engine.stop_event.wait(dt)
+            continue
 
         color_map: Dict[Key, Color] = {}
         for k, base_rgb in base.items():
@@ -367,7 +415,17 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
     global_hue = 0.0
 
     while engine.running and not engine.stop_event.is_set():
+        try:
+            eff_hw = int(getattr(engine, "reactive_brightness", 0) or 0)
+        except Exception:
+            eff_hw = 0
+
         per_key_backdrop_active, base_unscaled, base = _build_frame_base_maps(engine, background_rgb=(5, 5, 5))
+
+        if eff_hw <= 0:
+            render(engine, color_map=base)
+            engine.stop_event.wait(dt)
+            continue
 
         pressed_key_id = press.poll_key_id(dt=dt)
         if pressed_key_id is not None:
@@ -392,6 +450,38 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
 
         manual = _get_engine_manual_reactive_color(engine)
         pulse_scale = pulse_brightness_scale_factor(engine)
+
+        if not bool(getattr(engine.kb, "set_key_colors", None)):
+            best_w = 0.0
+            best_hue = 0.0
+            for _k, (w, hue) in overlay.items():
+                if float(w) > float(best_w):
+                    best_w = float(w)
+                    best_hue = float(hue)
+
+            # Representative base color (average backdrop if present).
+            if base:
+                rs = sum(c[0] for c in base.values())
+                gs = sum(c[1] for c in base.values())
+                bs = sum(c[2] for c in base.values())
+                n = max(1, len(base))
+                base_rgb = (int(rs / n), int(gs / n), int(bs / n))
+            else:
+                base_rgb = (0, 0, 0)
+
+            if manual is not None:
+                pulse_rgb = manual
+            else:
+                pulse_rgb = hsv_to_rgb(best_hue / 360.0, 1.0, 1.0)
+
+            if pulse_scale < 0.999:
+                pulse_rgb = scale(pulse_rgb, pulse_scale)
+
+            rgb = mix(base_rgb, pulse_rgb, t=min(1.0, best_w))
+            render(engine, color_map={(0, 0): rgb})
+            global_hue = (global_hue + 2.0 * p) % 360.0
+            engine.stop_event.wait(dt)
+            continue
 
         color_map = _build_color_map(
             base=base,

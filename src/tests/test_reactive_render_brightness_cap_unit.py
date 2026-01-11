@@ -33,12 +33,13 @@ def test_reactive_render_caps_hw_brightness_to_engine_brightness() -> None:
         kb=kb,
         kb_lock=_DummyLock(),
         brightness=5,
+        _dim_temp_active=True,
         per_key_colors={(0, 0): (255, 0, 0)},
         per_key_brightness=50,
     )
 
     render(engine, color_map={(0, 0): (255, 255, 255)})
 
-    # Both calls should use brightness=engine.brightness (5), not max(base, eff)=50.
+    # In temp-dim mode, both calls should use brightness=engine.brightness (5).
     assert ("enable_user_mode", 5) in kb.calls
     assert ("set_key_colors", 5) in kb.calls
