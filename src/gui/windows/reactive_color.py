@@ -68,8 +68,7 @@ class ReactiveColorGUI:
             text=(
                 "Sets a manual highlight color used by Reactive Typing effects.\n"
                 "This does not stop the current effect; the tray will pick up changes automatically.\n"
-                "Note: when 'Use manual color for reactive typing' is unchecked, the Brightness slider controls the overall effect brightness;"
-                " when checked, it adjusts the manual color's brightness."
+                "The slider below controls Reactive Typing brightness (pulse/highlight intensity) and is independent from the manual color override."
             ),
             font=("Sans", 9),
             justify="left",
@@ -103,10 +102,58 @@ class ReactiveColorGUI:
             initial_color=tuple(initial),
             callback=self._on_color_change,
             release_callback=self._on_color_release,
+            show_brightness_slider=False,
         )
         self.color_wheel.pack()
 
-        self._sync_brightness_label()
+        # Divider + independent reactive brightness slider.
+        ttk.Separator(main, orient="horizontal").pack(fill="x", pady=(18, 12))
+
+        self._reactive_brightness_var = tk.DoubleVar(value=100.0)
+        brightness_frame = ttk.Frame(main)
+        brightness_frame.pack(fill="x", padx=10)
+
+        ttk.Label(brightness_frame, text="Reactive typing brightness:").pack(side="left", padx=(0, 10))
+
+        self._reactive_brightness_scale = ttk.Scale(
+            brightness_frame,
+            from_=0,
+            to=100,
+            orient="horizontal",
+            variable=self._reactive_brightness_var,
+            command=self._on_reactive_brightness_change,
+        )
+        self._reactive_brightness_scale.pack(side="left", fill="x", expand=True)
+
+        self._reactive_brightness_label = ttk.Label(brightness_frame, text="100%")
+        self._reactive_brightness_label.configure(width=5)
+        self._reactive_brightness_label.pack(side="left", padx=(10, 5))
+
+        # Commit on mouse release as well.
+        try:
+            self._reactive_brightness_scale.bind("<ButtonRelease-1>", self._on_reactive_brightness_release)
+        except Exception:
+            pass
+
+        # Initialize slider from persisted reactive brightness (0..50 -> 0..100%).
+        try:
+            hw = int(getattr(self.config, "reactive_brightness", getattr(self.config, "brightness", 0)) or 0)
+            pct = max(0, min(100, int(round(hw * 2))))
+            self._reactive_brightness_var.set(float(pct))
+            self._reactive_brightness_label.config(text=f"{pct}%")
+        except Exception:
+            pass
+
+        # Initialize the brightness slider from the persisted reactive brightness
+        # when manual mode is disabled. Otherwise (manual mode enabled), the
+        # slider reflects the manual color brightness.
+        try:
+            if not bool(self._use_manual_var.get()):
+                hw = int(getattr(self.config, "reactive_brightness", getattr(self.config, "brightness", 0)) or 0)
+                pct = max(0, min(100, int(round(hw * 2))))
+                self.color_wheel.set_brightness_percent(pct)
+        except Exception:
+            pass
 
         # Lightweight feedback for manual RGB entry / release.
         self.status_label = ttk.Label(main, text="", font=("Sans", 9))
@@ -151,11 +198,7 @@ class ReactiveColorGUI:
             logger.debug("Failed to save reactive_color", exc_info=exc)
 
     def _commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None:
-        """Persist overall effect brightness without enabling manual reactive color.
-
-        The GUI exposes brightness as a percent (0..100). KeyRGB stores brightness
-        in config on the hardware scale (0..50).
-        """
+        """Persist reactive typing brightness (pulse/highlight intensity)."""
         if brightness_percent is None:
             return None
         try:
@@ -167,12 +210,7 @@ class ReactiveColorGUI:
         # Config stores brightness on the 0..50 hardware scale.
         hw = int(round(pct / 2.0))
         try:
-            # Always persist the effect/uniform brightness, even if the user
-            # happens to currently be in per-key mode.
-            if hasattr(self.config, "effect_brightness"):
-                self.config.effect_brightness = hw
-            else:
-                self.config.brightness = hw
+            self.config.reactive_brightness = hw
         except Exception as exc:
             logger.debug("Failed to save brightness", exc_info=exc)
             return None
@@ -183,36 +221,50 @@ class ReactiveColorGUI:
             self.config.reactive_use_manual_color = bool(self._use_manual_var.get())
         except Exception as exc:
             logger.debug("Failed to save reactive_use_manual_color", exc_info=exc)
-        self._sync_brightness_label()
 
-    def _sync_brightness_label(self) -> None:
-        # Clarify what the shared brightness slider controls.
-        if bool(self._use_manual_var.get()):
-            label = "Manual color brightness:"
-        else:
-            label = "Effect brightness:"
+    def _on_reactive_brightness_change(self, value: str | float) -> None:
+        """Handle reactive brightness slider changes (0..100 UI scale)."""
+
         try:
-            self.color_wheel.set_brightness_label_text(label)
+            pct = float(value)
+        except Exception:
+            pct = 0.0
+        pct = max(0.0, min(100.0, pct))
+
+        try:
+            self._reactive_brightness_label.config(text=f"{int(pct)}%")
         except Exception:
             pass
+
+        now = time.monotonic()
+        if (now - self._last_drag_commit_ts) < self._drag_commit_interval:
+            return
+
+        hw = self._commit_brightness_to_config(pct)
+        if hw is not None:
+            self._last_drag_commit_ts = now
+            self._last_drag_committed_brightness = int(round(hw * 2))
+
+    def _on_reactive_brightness_release(self, _event=None) -> None:
+        try:
+            pct = float(self._reactive_brightness_var.get())
+        except Exception:
+            pct = 0.0
+        pct = max(0.0, min(100.0, pct))
+
+        hw = self._commit_brightness_to_config(pct)
+        if hw is None:
+            self._set_status("✗ Failed to save reactive brightness", ok=False)
+            return
+
+        pct_i = int(round(hw * 2))
+        self._last_drag_commit_ts = time.monotonic()
+        self._last_drag_committed_brightness = pct_i
+        self._set_status(f"✓ Saved reactive brightness {pct_i}%", ok=True)
 
     def _on_color_change(self, r: int, g: int, b: int, **meta: Any) -> None:
         color = (int(r), int(g), int(b))
         source = str(meta.get("source") or "")
-        brightness_percent = meta.get("brightness_percent", None)
-
-        manual_enabled = bool(self._use_manual_var.get())
-        if not manual_enabled and source == "brightness":
-            now = time.monotonic()
-            if (now - self._last_drag_commit_ts) < self._drag_commit_interval:
-                return
-
-            hw = self._commit_brightness_to_config(brightness_percent)
-            if hw is not None:
-                pct = int(round(hw * 2))
-                self._last_drag_commit_ts = now
-                self._last_drag_committed_brightness = pct
-            return
 
         now = time.monotonic()
         if self._last_drag_committed_color == color and (now - self._last_drag_commit_ts) < self._drag_commit_interval:
@@ -227,19 +279,6 @@ class ReactiveColorGUI:
     def _on_color_release(self, r: int, g: int, b: int, **meta: Any) -> None:
         color = (int(r), int(g), int(b))
         source = str(meta.get("source") or "")
-        brightness_percent = meta.get("brightness_percent", None)
-
-        manual_enabled = bool(self._use_manual_var.get())
-        if not manual_enabled and source == "brightness":
-            hw = self._commit_brightness_to_config(brightness_percent)
-            if hw is None:
-                self._set_status("✗ Failed to save brightness", ok=False)
-                return
-            pct = int(round(hw * 2))
-            self._last_drag_commit_ts = time.monotonic()
-            self._last_drag_committed_brightness = pct
-            self._set_status(f"✓ Saved brightness {pct}%", ok=True)
-            return
 
         self._commit_color_to_config(color)
         self._last_drag_committed_color = color

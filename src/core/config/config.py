@@ -243,6 +243,26 @@ class Config:
         self._save()
 
     @property
+    def reactive_brightness(self) -> int:
+        """Brightness used for reactive typing pulses/highlights (0..50).
+
+        Kept separate from `brightness` so power policies can dim the keyboard
+        without overwriting the user's reactive intensity preference.
+
+        Falls back to `brightness` for backward compatibility.
+        """
+
+        try:
+            return int(self._settings.get("reactive_brightness", self._settings.get("brightness", 0)) or 0)
+        except Exception:
+            return int(self._settings.get("brightness", 0) or 0)
+
+    @reactive_brightness.setter
+    def reactive_brightness(self, value: int):
+        self._settings["reactive_brightness"] = self._normalize_brightness_value(value)
+        self._save()
+
+    @property
     def color(self) -> tuple:
         return tuple(self._settings["color"])
 

@@ -56,12 +56,20 @@ def compute_idle_action(
     if dimmed_effective is True:
         mode = str(screen_dim_sync_mode or "off").strip().lower()
         if mode == "temp":
-            if not is_off:
-                # In temp mode, dimming normally reduces to a temporary brightness.
-                # But if the display is actually off (backlight at 0), match it by
-                # turning the keyboard off.
-                if bool(screen_off):
+            # In temp mode, dimming normally reduces to a temporary brightness.
+            # But if the display is actually off (backlight at 0), match it by
+            # turning the keyboard off.
+            if bool(screen_off):
+                if not is_off:
                     return "turn_off"
+                return None
+
+            # Already in temporary-dim state: do not keep re-applying the action.
+            # Re-applying can restart fades and cause visible flicker.
+            if bool(dim_temp_active):
+                return None
+
+            if not is_off:
                 return "dim_to_temp"
             return None
 

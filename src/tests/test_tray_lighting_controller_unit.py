@@ -197,21 +197,23 @@ class TestOnBrightnessClicked:
         mock_start.assert_not_called()
 
     def test_on_brightness_clicked_updates_perkey_brightness_for_reactive_effect(self):
-        """Reactive typing effects should treat brightness override as base/per-key brightness."""
+        """Reactive typing effects use the same base brightness menu."""
         from src.tray.controllers.lighting_controller import on_brightness_clicked
 
         mock_tray = MagicMock()
         mock_tray.is_off = False
         mock_tray.config.effect = "reactive_fade"
-        mock_tray.config.brightness = 200  # effect brightness remains unchanged
+        mock_tray.config.brightness = 25
+        mock_tray.config.reactive_brightness = 25
         mock_tray.config.perkey_brightness = 25
 
         with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             on_brightness_clicked(mock_tray, "🔘 20")
 
         # 20 * 5 = 100
-        assert mock_tray.config.perkey_brightness == 100
-        mock_tray.engine.set_brightness.assert_not_called()
+        assert mock_tray.config.brightness == 100
+        assert mock_tray.config.reactive_brightness == 100
+        mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=False)
         mock_start.assert_not_called()
 
     def test_on_brightness_clicked_saves_nonzero_to_last_brightness(self):
@@ -278,7 +280,12 @@ class TestTurnOffOn:
         assert mock_tray._idle_forced_off is False
         assert mock_tray.is_off is False
         assert mock_tray.config.brightness == 75
-        mock_start.assert_called_once_with(mock_tray)
+        mock_start.assert_called_once_with(
+            mock_tray,
+            brightness_override=1,
+            fade_in=True,
+            fade_in_duration_s=0.25,
+        )
 
     def test_turn_on_uses_default_25_if_no_last_brightness(self):
         """If _last_brightness is also zero, use default 25."""
@@ -292,9 +299,16 @@ class TestTurnOffOn:
         mock_tray.config.color = (255, 255, 255)
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *args: None)
 
-        turn_on(mock_tray)
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            turn_on(mock_tray)
 
         assert mock_tray.config.brightness == 25
+        mock_start.assert_called_once_with(
+            mock_tray,
+            brightness_override=1,
+            fade_in=True,
+            fade_in_duration_s=0.25,
+        )
 
 
 class TestPowerTurnOffRestore:
@@ -312,7 +326,7 @@ class TestPowerTurnOffRestore:
         assert mock_tray._power_forced_off is True
         assert mock_tray._idle_forced_off is False
         assert mock_tray.is_off is True
-        mock_tray.engine.turn_off.assert_called_once()
+        mock_tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=0.12)
 
     def test_power_restore_restores_when_power_forced(self):
         """power_restore should restore when _power_forced_off was True."""
@@ -334,7 +348,12 @@ class TestPowerTurnOffRestore:
         assert mock_tray.is_off is False
         assert mock_tray.config.brightness == 50
         assert mock_tray.engine.current_color == (0, 0, 0)
-        mock_start.assert_called_once_with(mock_tray)
+        mock_start.assert_called_once_with(
+            mock_tray,
+            brightness_override=1,
+            fade_in=True,
+            fade_in_duration_s=0.25,
+        )
 
     def test_power_restore_restores_when_off_due_to_hardware_reset(self):
         """If the tray is off but not user-forced, restore should reapply state."""
@@ -353,7 +372,12 @@ class TestPowerTurnOffRestore:
 
         assert mock_tray.is_off is False
         assert mock_tray.engine.current_color == (0, 0, 0)
-        mock_start.assert_called_once_with(mock_tray)
+        mock_start.assert_called_once_with(
+            mock_tray,
+            brightness_override=1,
+            fade_in=True,
+            fade_in_duration_s=0.25,
+        )
 
     def test_power_restore_does_not_fight_user_forced_off(self):
         """If the user explicitly turned off lighting, restore is a no-op."""
@@ -392,7 +416,7 @@ class TestApplyBrightnessFromPowerPolicy:
             apply_brightness_from_power_policy(mock_tray, 25)
 
         assert mock_tray.config.brightness == 25
-        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=True)
+        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=True, fade=True, fade_duration_s=0.25)
         mock_start.assert_called_once_with(mock_tray)
 
     def test_apply_brightness_from_power_policy_does_not_restart_software_effect(self):
@@ -412,7 +436,12 @@ class TestApplyBrightnessFromPowerPolicy:
             apply_brightness_from_power_policy(mock_tray, 25)
 
         assert mock_tray.config.brightness == 25
-        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=False)
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            25,
+            apply_to_hardware=False,
+            fade=True,
+            fade_duration_s=0.25,
+        )
         mock_start.assert_not_called()
 
     def test_apply_brightness_from_power_policy_updates_perkey_brightness_for_reactive_effect(
@@ -438,5 +467,5 @@ class TestApplyBrightnessFromPowerPolicy:
         # be updated to ensure dim-sync and power policy work correctly.
         assert mock_tray.config.perkey_brightness == 25
         assert mock_tray.config.brightness == 25
-        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=False)
+        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=False, fade=True, fade_duration_s=0.25)
         mock_start.assert_not_called()

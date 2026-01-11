@@ -21,7 +21,13 @@ from src.core.utils.exceptions import is_device_disconnected
 logger = logging.getLogger(__name__)
 
 
-def start_current_effect(tray: Any) -> None:
+def start_current_effect(
+    tray: Any,
+    *,
+    brightness_override: Optional[int] = None,
+    fade_in: bool = False,
+    fade_in_duration_s: float = 0.25,
+) -> None:
     """Start the currently selected effect.
 
     This is best-effort and must never crash the tray.
@@ -30,13 +36,38 @@ def start_current_effect(tray: Any) -> None:
     try:
         ensure_device_best_effort(tray)
 
+        try:
+            target_brightness = int(getattr(tray.config, "brightness", 0) or 0)
+        except Exception:
+            target_brightness = 0
+        start_brightness = target_brightness
+        if brightness_override is not None:
+            try:
+                start_brightness = max(0, min(50, int(brightness_override)))
+            except Exception:
+                start_brightness = target_brightness
+
         effect = get_effect_name(tray)
         if effect == "perkey":
-            apply_perkey_mode(tray)
+            apply_perkey_mode(tray, brightness_override=start_brightness)
+            if fade_in and target_brightness > start_brightness and target_brightness > 0:
+                tray.engine.set_brightness(
+                    target_brightness,
+                    apply_to_hardware=True,
+                    fade=True,
+                    fade_duration_s=float(fade_in_duration_s),
+                )
             return
 
         if effect == "none":
-            apply_uniform_none_mode(tray)
+            apply_uniform_none_mode(tray, brightness_override=start_brightness)
+            if fade_in and target_brightness > start_brightness and target_brightness > 0:
+                tray.engine.set_brightness(
+                    target_brightness,
+                    apply_to_hardware=True,
+                    fade=True,
+                    fade_duration_s=float(fade_in_duration_s),
+                )
             return
 
         # Prepare per-key state in case the effect is a software effect that needs it.
@@ -49,12 +80,21 @@ def start_current_effect(tray: Any) -> None:
         tray.engine.start_effect(
             effect,
             speed=tray.config.speed,
-            brightness=tray.config.brightness,
+            brightness=start_brightness,
             color=tray.config.color,
             reactive_color=getattr(tray.config, "reactive_color", None),
             reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
         )
         tray.is_off = False
+
+        if fade_in and target_brightness > start_brightness and target_brightness > 0:
+            is_sw_effect = is_software_effect(effect)
+            tray.engine.set_brightness(
+                target_brightness,
+                apply_to_hardware=not is_sw_effect,
+                fade=True,
+                fade_duration_s=float(fade_in_duration_s),
+            )
     except Exception as exc:
         # If the USB device disappeared, mark it unavailable and avoid a scary traceback.
         if is_device_disconnected(exc):
@@ -102,28 +142,11 @@ def on_brightness_clicked(tray: Any, item: Any) -> None:
     is_sw_effect = is_software_effect(effect)
     is_reactive = is_reactive_effect(effect)
 
-    # "Brightness Override" maps to different channels depending on mode:
-    # - Reactive typing effects: override the base/backdrop brightness (per-key)
-    # - Everything else: override the effect/hardware brightness
-    if is_reactive:
-        try:
-            old_val = int(getattr(tray.config, "perkey_brightness", 0) or 0)
-        except Exception:
-            old_val = 0
-
-        try_log_event(tray, "menu", "set_brightness", old=int(old_val), new=int(brightness_hw))
-
-        try:
-            tray.config.perkey_brightness = brightness_hw
-        except Exception:
-            pass
-        try:
-            tray.engine.per_key_brightness = brightness_hw
-        except Exception:
-            pass
-
-        tray._update_menu()
-        return
+    # Any effect that runs a loop (software or reactive typing) reads
+    # `engine.brightness` on each frame. For these, avoid restarting the loop
+    # and avoid issuing an extra hardware brightness write (some firmware
+    # flashes on separate brightness commands).
+    is_loop_effect = bool(is_sw_effect or is_reactive)
 
     try_log_event(
         tray,
@@ -134,12 +157,23 @@ def on_brightness_clicked(tray: Any, item: Any) -> None:
     )
 
     tray.config.brightness = brightness_hw
-    # In software effect mode, avoid restarting the effect loop (which does a
-    # brief uniform-color fade) and avoid issuing a separate hardware brightness
-    # command (which can flash on some devices). The running loop reads
-    # engine.brightness on each frame.
-    tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_sw_effect)
-    if not tray.is_off and not is_sw_effect:
+
+    # For reactive typing effects, keep the tray brightness menu behaving like
+    # an "overall brightness" control so the user sees an immediate change.
+    # The dedicated reactive UI slider can still be used to set a different
+    # pulse intensity.
+    if is_reactive:
+        try:
+            tray.config.reactive_brightness = int(brightness_hw)
+        except Exception:
+            pass
+        try:
+            tray.engine.reactive_brightness = int(brightness_hw)
+        except Exception:
+            pass
+
+    tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_loop_effect)
+    if not tray.is_off and not is_loop_effect:
         start_current_effect(tray)
     tray._update_menu()
 
@@ -162,11 +196,8 @@ def turn_on(tray: Any) -> None:
     if tray.config.brightness == 0:
         tray.config.brightness = tray._last_brightness if tray._last_brightness > 0 else 25
 
-    if tray.config.effect == "none":
-        with tray.engine.kb_lock:
-            tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-    else:
-        start_current_effect(tray)
+    # Fade-in from a minimal brightness to reduce abrupt on/off transitions.
+    start_current_effect(tray, brightness_override=1, fade_in=True, fade_in_duration_s=0.25)
 
     tray._refresh_ui()
 
@@ -176,7 +207,7 @@ def power_turn_off(tray: Any) -> None:
     tray._power_forced_off = True
     tray._idle_forced_off = False
     tray.is_off = True
-    tray.engine.turn_off()
+    tray.engine.turn_off(fade=True, fade_duration_s=0.12)
     tray._refresh_ui()
 
 
@@ -210,7 +241,7 @@ def power_restore(tray: Any) -> None:
     except Exception:
         pass
     tray.is_off = False
-    start_current_effect(tray)
+    start_current_effect(tray, brightness_override=1, fade_in=True, fade_in_duration_s=0.25)
     tray._refresh_ui()
 
 
@@ -249,6 +280,13 @@ def apply_brightness_from_power_policy(tray: Any, brightness: int) -> None:
         is_sw_effect = is_software_effect(effect)
         is_reactive = is_reactive_effect(effect)
 
+        try:
+            prev_cfg_brightness = int(getattr(tray.config, "brightness", 0) or 0)
+        except Exception:
+            prev_cfg_brightness = 0
+        fade_down = bool(brightness_int < prev_cfg_brightness)
+        fade_s = 0.12 if int(brightness_int) <= 0 else 0.25
+
         # Power-source policy defines the baseline. Persist into config so the
         # tray UI reflects the effective brightness after plug/unplug (and on
         # startup).
@@ -266,14 +304,24 @@ def apply_brightness_from_power_policy(tray: Any, brightness: int) -> None:
                         tray.engine.per_key_brightness = brightness_int
                     except Exception:
                         pass
-                    tray.engine.set_brightness(brightness_int, apply_to_hardware=False)
+                    tray.engine.set_brightness(
+                        brightness_int,
+                        apply_to_hardware=False,
+                        fade=fade_down,
+                        fade_duration_s=fade_s,
+                    )
             except Exception:
                 pass
             tray._refresh_ui()
             return
 
         tray.config.brightness = brightness_int
-        tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_sw_effect)
+        tray.engine.set_brightness(
+            tray.config.brightness,
+            apply_to_hardware=not is_sw_effect,
+            fade=fade_down,
+            fade_duration_s=fade_s,
+        )
         if not bool(getattr(tray, "is_off", False)) and not is_sw_effect:
             start_current_effect(tray)
         tray._refresh_ui()

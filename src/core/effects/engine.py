@@ -7,6 +7,7 @@ RGB effects for ITE 8291 keyboards using ite8291r3-ctl library.
 from __future__ import annotations
 
 import logging
+import time
 from threading import Event, RLock, Thread
 from typing import Dict, Final, Literal, Optional, Tuple
 
@@ -35,6 +36,7 @@ from src.core.effects.software.effects import (
     run_twinkle,
 )
 from src.core.effects.timing import clamped_interval, get_interval
+from src.core.effects.transitions import choose_steps
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +77,10 @@ class EffectsEngine:
         self.current_effect: Optional[str] = None
         self.speed = 4  # 0-10 (UI speed scale; 10 = fastest)
         self.brightness = 25  # 0-50 (hardware brightness scale)
+        # Reactive typing pulse/highlight intensity (0..50). Separate from
+        # `brightness` so policies can dim the keyboard without changing the
+        # user's reactive preference.
+        self.reactive_brightness = 25
         self.current_color = (255, 0, 0)  # For static/custom effects
         # Manual highlight color for reactive typing effects.
         self.reactive_color: Optional[tuple] = None
@@ -84,6 +90,25 @@ class EffectsEngine:
         # preferred base brightness (0..50). Reactive/software effects can
         # then keep the base dim while rendering pulses/highlights brighter.
         self.per_key_brightness: Optional[int] = None
+
+        # Brightness fade cancellation token. Any new brightness change bumps
+        # this token so in-flight fades exit early.
+        self._brightness_fade_token: int = 0
+        self._brightness_fade_lock = RLock()
+
+    def _bump_brightness_fade_token(self) -> int:
+        try:
+            with self._brightness_fade_lock:
+                self._brightness_fade_token = int(self._brightness_fade_token) + 1
+                return int(self._brightness_fade_token)
+        except Exception:
+            # Best-effort: if anything goes wrong, return a value that won't
+            # match any in-flight fade.
+            try:
+                self._brightness_fade_token = int(self._brightness_fade_token) + 1
+                return int(self._brightness_fade_token)
+            except Exception:
+                return -1
 
     def _ensure_device_available(self) -> bool:
         """Best-effort attempt to connect to the keyboard device."""
@@ -129,14 +154,106 @@ class EffectsEngine:
 
         self.stop_event.clear()
 
-    def turn_off(self):
-        """Turn off all LEDs"""
+    def _fade_brightness(
+        self,
+        *,
+        start: int,
+        end: int,
+        apply_to_hardware: bool,
+        duration_s: float,
+        token: int,
+        max_steps: int = 30,
+    ) -> None:
+        """Best-effort brightness fade.
+
+        Uses small stepped updates to reduce abrupt off/dim transitions.
+        Never raises.
+        """
+
+        try:
+            s = max(0, min(50, int(start)))
+            e = max(0, min(50, int(end)))
+            if e == s:
+                return
+
+            if duration_s <= 0:
+                steps = 1
+                dt = 0.0
+            else:
+                steps = choose_steps(duration_s=float(duration_s), max_steps=int(max_steps), target_fps=60.0)
+                steps = max(2, int(steps))
+                dt = float(duration_s) / float(steps)
+
+            # Ensure we have a device before trying hardware writes.
+            if apply_to_hardware:
+                self._ensure_device_available()
+
+            # Generate intermediate values excluding the initial value.
+            for i in range(1, steps + 1):
+                try:
+                    if int(token) != int(self._brightness_fade_token):
+                        return
+                except Exception:
+                    return
+                t = float(i) / float(steps)
+                val = int(round(s + (e - s) * t))
+                # Avoid redundant writes.
+                if val == s:
+                    continue
+                with self.kb_lock:
+                    self.brightness = val
+                    if apply_to_hardware:
+                        self.kb.set_brightness(int(val))
+                if dt > 0:
+                    time.sleep(dt)
+        except Exception:
+            return
+
+    def turn_off(self, *, fade: bool = False, fade_duration_s: float = 0.18):
+        """Turn off all LEDs.
+
+        When `fade=True`, performs a short best-effort fade-down before turning
+        the keyboard off. This is intended for policy-driven off actions (lid,
+        screen-dim sync) to reduce abrupt transitions and potential flicker.
+        """
+
+        token = self._bump_brightness_fade_token()
+
         self.stop()
         self._ensure_device_available()
+
+        if fade:
+            try:
+                prev = int(self.brightness)
+            except Exception:
+                prev = 0
+
+            # Fade to a minimal non-zero brightness first, then hard-off.
+            if prev > 1:
+                self._fade_brightness(
+                    start=prev,
+                    end=1,
+                    apply_to_hardware=True,
+                    duration_s=float(fade_duration_s),
+                    token=token,
+                    max_steps=20,
+                )
+
         with self.kb_lock:
+            try:
+                self.brightness = 0
+            except Exception:
+                pass
             self.kb.turn_off()
 
-    def set_brightness(self, brightness: int, *, apply_to_hardware: bool = True):
+    def set_brightness(
+        self,
+        brightness: int,
+        *,
+        apply_to_hardware: bool = True,
+        fade: bool = False,
+        fade_duration_s: float = 0.18,
+    ):
         """Set brightness (0-50 hardware scale).
 
         In software/per-key mode, callers may want to update the engine's
@@ -151,9 +268,36 @@ class EffectsEngine:
         # (e.g., tray dim/restore), we can end up with a single frame rendered
         # at the stale brightness. Updating brightness while holding the same
         # lock used for the I/O side makes the read->write path consistent.
-        with self.kb_lock:
+        token = self._bump_brightness_fade_token()
+        target = max(0, min(50, int(brightness)))
+
+        try:
             prev = int(self.brightness)
-            self.brightness = max(0, min(50, int(brightness)))
+        except Exception:
+            prev = 0
+
+        # Optional fade (used for policy-driven dim/off and restore/turn-on).
+        if fade and target != prev:
+            # If we're fading to 0, avoid touching 0 until the final write.
+            end = 1 if target == 0 and prev > 1 else target
+            self._fade_brightness(
+                start=prev,
+                end=end,
+                apply_to_hardware=bool(apply_to_hardware),
+                duration_s=float(fade_duration_s),
+                token=token,
+                max_steps=30,
+            )
+
+        # Synchronize with per-frame device writes.
+        with self.kb_lock:
+            # Re-read after any fade steps to keep logging accurate.
+            try:
+                prev = int(self.brightness)
+            except Exception:
+                prev = prev
+
+            self.brightness = int(target)
 
             # Conditional verbose logging enabled by environment variable for
             # on-device investigations: `KEYRGB_DEBUG_BRIGHTNESS=1`.

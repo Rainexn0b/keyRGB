@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import ttk
 from tkinter import filedialog
 
@@ -58,6 +59,12 @@ class KeymapCalibrator(tk.Tk):
         self.title("KeyRGB - Keymap Calibrator")
         apply_keyrgb_window_icon(self)
 
+        # Avoid flashing a tiny default-sized window while widgets/images load.
+        try:
+            self.withdraw()
+        except Exception:
+            pass
+
         self.bg_color, self.fg_color = apply_clam_theme(self)
 
         self.cfg = Config()
@@ -90,13 +97,14 @@ class KeymapCalibrator(tk.Tk):
         self.canvas.bind("<Button-1>", self._on_click)
 
         side = ttk.Frame(root, padding=0)
-        side.grid(row=0, column=1, sticky="ns", padx=(16, 0))
+        side.grid(row=0, column=1, sticky="nsew", padx=(16, 0))
+        side.columnconfigure(0, weight=1)
 
-        title = ttk.Label(side, text="Keymap Calibrator", font=("Sans", 14, "bold"))
-        title.grid(row=0, column=0, sticky="w", pady=(0, 10))
+        title = ttk.Label(side, text="Keymap Calibrator", font=("Sans", 14, "bold"), anchor="w")
+        title.grid(row=0, column=0, sticky="ew", pady=(0, 10))
 
-        self.lbl_cell = ttk.Label(side, text="", font=("Sans", 9))
-        self.lbl_cell.grid(row=1, column=0, sticky="w", pady=(0, 8))
+        self.lbl_cell = ttk.Label(side, text="", font=("Sans", 9), anchor="w")
+        self.lbl_cell.grid(row=1, column=0, sticky="ew", pady=(0, 8))
 
         self.lbl_status = ttk.Label(
             side,
@@ -105,9 +113,23 @@ class KeymapCalibrator(tk.Tk):
                 "Step 2: click that key on the image\n"
                 "Step 3: click 'Assign selected key' (or press Enter)"
             ),
+            anchor="w",
             justify="left",
         )
-        self.lbl_status.grid(row=2, column=0, sticky="w", pady=(0, 12))
+        self.lbl_status.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+
+        def _sync_side_wrap(_e=None) -> None:
+            try:
+                w = int(side.winfo_width())
+                self.lbl_status.configure(wraplength=max(220, w - 8))
+            except Exception:
+                return
+
+        try:
+            side.bind("<Configure>", _sync_side_wrap, add=True)
+        except Exception:
+            pass
+        self.after(0, _sync_side_wrap)
 
         btns = ttk.Frame(side)
         btns.grid(row=3, column=0, sticky="ew")
@@ -143,14 +165,23 @@ class KeymapCalibrator(tk.Tk):
         self.update_idletasks()
         sw = int(self.winfo_screenwidth())
         sh = int(self.winfo_screenheight())
-        w = min(1200, int(sw * 0.92))
-        h = min(720, int(sh * 0.92))
+        w = min(1400, int(sw * 0.95))
+        h = min(860, int(sh * 0.95))
         self.geometry(f"{w}x{h}")
-        self.minsize(min(980, w), min(560, h))
+        self.minsize(min(1100, w), min(650, h))
 
-        self._load_deck_image()
-        self._apply_current_probe()
-        self._redraw()
+        def _finish_init() -> None:
+            self._load_deck_image()
+            self._apply_current_probe()
+            self._redraw()
+            try:
+                self.deiconify()
+                self.lift()
+            except Exception:
+                pass
+
+        # Defer image load/draw until after geometry is applied.
+        self.after(0, _finish_init)
 
     def _set_backdrop(self) -> None:
         path = filedialog.askopenfilename(
@@ -243,6 +274,7 @@ class KeymapCalibrator(tk.Tk):
             self.canvas.create_image(x0, y0, anchor="nw", image=self._deck_tk)
 
         # Draw key rectangles (similar styling to the per-key editor)
+        font_name = "TkDefaultFont"
         for key in REFERENCE_DEVICE_KEYS:
             x1, y1, x2, y2 = key_canvas_bbox(
                 transform=self._transform,
@@ -268,12 +300,35 @@ class KeymapCalibrator(tk.Tk):
                 dash=style.dash,
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )
+
+            key_w = max(1, int(x2 - x1))
+            key_h = max(1, int(y2 - y1))
+            font_size = max(7, min(11, int(min(key_w, key_h) * 0.30)))
+            max_text_w = max(1, key_w - 6)
+
+            label = key.label
+            try:
+                f = tkfont.Font(font=(font_name, font_size))
+                while font_size > 6 and f.measure(label) > max_text_w:
+                    font_size -= 1
+                    f.configure(size=font_size)
+                if f.measure(label) > max_text_w:
+                    ell = "…"
+                    if f.measure(ell) <= max_text_w:
+                        trimmed = label
+                        while trimmed and f.measure(trimmed + ell) > max_text_w:
+                            trimmed = trimmed[:-1]
+                        label = (trimmed + ell) if trimmed else ell
+            except Exception:
+                # Best-effort: if font measuring fails, render original label.
+                pass
+
             self.canvas.create_text(
                 (x1 + x2) / 2,
                 (y1 + y2) / 2,
-                text=key.label,
+                text=label,
                 fill=style.text_fill,
-                font=("TkDefaultFont", 9),
+                font=(font_name, font_size),
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )
 

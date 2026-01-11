@@ -29,8 +29,10 @@ def read_dimmed_state(tray: Any, *, backlight_base: Path | None = None) -> Optio
         return None
 
     baselines: dict[str, int] = getattr(tray, "_dim_backlight_baselines", {})
+    dimmed_states: dict[str, bool] = getattr(tray, "_dim_backlight_dimmed", {})
     dimmed_any: Optional[bool] = None
     screen_off_any = False
+    observed_any = 0
 
     for child in base.iterdir():
         if not child.is_dir():
@@ -41,10 +43,13 @@ def read_dimmed_state(tray: Any, *, backlight_base: Path | None = None) -> Optio
         if current is None or max_brightness is None or max_brightness <= 0:
             continue
 
+        observed_any += 1
+
         key = str(child)
         baseline = baselines.get(key)
         if baseline is None or baseline <= 0:
             baselines[key] = int(current)
+            dimmed_states[key] = False
             dimmed_any = False if dimmed_any is None else dimmed_any
             continue
 
@@ -54,8 +59,24 @@ def read_dimmed_state(tray: Any, *, backlight_base: Path | None = None) -> Optio
         if current_i <= 0:
             screen_off_any = True
 
-        # Significant drop detection: at least 10% and at least 1 step.
-        dimmed = (current_i <= int(baseline_i * 0.90)) and ((baseline_i - current_i) >= 1)
+        # Significant drop detection with hysteresis.
+        #
+        # Some desktops animate dim/undim transitions and can jitter around the
+        # threshold. Without hysteresis, that can cause repeated dim↔restore
+        # actions (visible as brightness flashes on some devices).
+        enter_dim_threshold = int(baseline_i * 0.90)
+        # Exit dim only when we're very close to baseline.
+        #
+        # Some desktops animate idle dimming by bouncing the backlight between
+        # a lower value and a mid value (still dimmed), which can cause our
+        # dim-sync to flap if the exit threshold is too low.
+        exit_dim_threshold = int(baseline_i * 0.98)
+        prev_dimmed = bool(dimmed_states.get(key, False))
+
+        enter_dim = (current_i <= enter_dim_threshold) and ((baseline_i - current_i) >= 1)
+        exit_dim = (current_i >= exit_dim_threshold) or (current_i >= baseline_i)
+        dimmed = (not exit_dim) if prev_dimmed else bool(enter_dim)
+        dimmed_states[key] = bool(dimmed)
 
         if dimmed:
             dimmed_any = True
@@ -70,7 +91,11 @@ def read_dimmed_state(tray: Any, *, backlight_base: Path | None = None) -> Optio
             if current_i > baseline_i:
                 baselines[key] = current_i
 
+    if observed_any <= 0:
+        return None
+
     tray._dim_backlight_baselines = baselines
+    tray._dim_backlight_dimmed = dimmed_states
     tray._dim_screen_off = bool(screen_off_any)
     return dimmed_any
 

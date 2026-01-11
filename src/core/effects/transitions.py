@@ -18,7 +18,9 @@ def choose_steps(
     if duration_s <= 0:
         return 1
 
-    max_steps = max(1, min(20, int(max_steps)))
+    # Keep a soft cap so we don't spam hardware writes, but allow smoother
+    # short fades (e.g. 0.12-0.30s) with more intermediate steps.
+    max_steps = max(1, min(60, int(max_steps)))
     target_fps = max(1.0, float(target_fps))
     min_dt_s = max(0.001, float(min_dt_s))
 

@@ -73,9 +73,14 @@ def clear_engine_perkey_state(tray: Any) -> None:
         pass
 
 
-def apply_perkey_mode(tray: Any) -> None:
+def apply_perkey_mode(tray: Any, *, brightness_override: Optional[int] = None) -> None:
     tray.engine.stop()
-    if int(getattr(tray.config, "brightness", 0) or 0) == 0:
+    effective_brightness = (
+        int(brightness_override)
+        if brightness_override is not None
+        else int(getattr(tray.config, "brightness", 0) or 0)
+    )
+    if int(effective_brightness) == 0:
         tray.engine.turn_off()
         tray.is_off = True
         return
@@ -93,26 +98,31 @@ def apply_perkey_mode(tray: Any) -> None:
     with tray.engine.kb_lock:
         if hasattr(tray.engine.kb, "enable_user_mode"):
             try:
-                tray.engine.kb.enable_user_mode(brightness=tray.config.brightness, save=True)
+                tray.engine.kb.enable_user_mode(brightness=effective_brightness, save=True)
             except TypeError:
                 try:
-                    tray.engine.kb.enable_user_mode(brightness=tray.config.brightness)
+                    tray.engine.kb.enable_user_mode(brightness=effective_brightness)
                 except Exception:
                     pass
             except Exception:
                 pass
         tray.engine.kb.set_key_colors(
             tray.config.per_key_colors,
-            brightness=tray.config.brightness,
+            brightness=effective_brightness,
             enable_user_mode=True,
         )
 
     tray.is_off = False
 
 
-def apply_uniform_none_mode(tray: Any) -> None:
+def apply_uniform_none_mode(tray: Any, *, brightness_override: Optional[int] = None) -> None:
     tray.engine.stop()
-    if int(getattr(tray.config, "brightness", 0) or 0) == 0:
+    effective_brightness = (
+        int(brightness_override)
+        if brightness_override is not None
+        else int(getattr(tray.config, "brightness", 0) or 0)
+    )
+    if int(effective_brightness) == 0:
         tray.engine.turn_off()
         tray.is_off = True
         return
@@ -120,6 +130,6 @@ def apply_uniform_none_mode(tray: Any) -> None:
     clear_engine_perkey_state(tray)
 
     with tray.engine.kb_lock:
-        tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+        tray.engine.kb.set_color(tray.config.color, brightness=effective_brightness)
 
     tray.is_off = False

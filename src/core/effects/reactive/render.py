@@ -44,11 +44,20 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
 
     Returns (base_hw, effect_hw, global_hw).
     """
+    # Pulse/highlight target brightness for reactive effects.
+    # This is separate from the hardware brightness (`engine.brightness`).
     try:
-        eff = int(getattr(engine, "brightness", 25) or 0)
+        eff = int(getattr(engine, "reactive_brightness", getattr(engine, "brightness", 25)) or 0)
     except Exception:
         eff = 25
     eff = max(0, min(50, eff))
+
+    # Hardware brightness cap (policies dim/undim this).
+    try:
+        global_hw = int(getattr(engine, "brightness", 25) or 0)
+    except Exception:
+        global_hw = 25
+    global_hw = max(0, min(50, global_hw))
 
     base = 0
     try:
@@ -58,7 +67,18 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
         pass
     base = max(0, min(50, base))
 
-    return base, eff, max(base, eff)
+    # Treat `engine.brightness` as a global cap for reactive rendering.
+    #
+    # Historically we used `global_hw = max(base, eff)` so either channel could
+    # drive the hardware brightness upward and we would scale the other channel
+    # down. In practice, users often set per-key backdrop brightness high for
+    # reactive typing, and then policy-driven dim/undim would momentarily jump
+    # the hardware brightness to 100% (visible flash) even when the selected
+    # profile brightness is low.
+    #
+    # Keeping the hardware brightness capped to `global_hw` prevents flashes and
+    # makes dim/undim transitions stable.
+    return base, eff, global_hw
 
 
 def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:

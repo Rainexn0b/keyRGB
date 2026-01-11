@@ -25,28 +25,29 @@ class _ColorWheelUIMixin:
         self.canvas.bind("<B1-Motion>", self._on_drag)
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
 
-        # Brightness/Value slider
-        brightness_frame = ttk.Frame(self)
-        brightness_frame.pack(fill="x", padx=20, pady=10)
+        if bool(getattr(self, "show_brightness_slider", True)):
+            # Brightness/Value slider
+            brightness_frame = ttk.Frame(self)
+            brightness_frame.pack(fill="x", padx=20, pady=10)
 
-        self.brightness_title_label = ttk.Label(brightness_frame, text=self._brightness_label_text)
-        self.brightness_title_label.pack(side="left", padx=(0, 10))
+            self.brightness_title_label = ttk.Label(brightness_frame, text=self._brightness_label_text)
+            self.brightness_title_label.pack(side="left", padx=(0, 10))
 
-        self.brightness_var = tk.DoubleVar(value=self.current_value * 100)
-        self.brightness_slider = ttk.Scale(
-            brightness_frame,
-            from_=0,
-            to=100,
-            orient="horizontal",
-            variable=self.brightness_var,
-            command=self._on_brightness_change,
-        )
-        self.brightness_slider.pack(side="left", fill="x", expand=True)
+            self.brightness_var = tk.DoubleVar(value=self.current_value * 100)
+            self.brightness_slider = ttk.Scale(
+                brightness_frame,
+                from_=0,
+                to=100,
+                orient="horizontal",
+                variable=self.brightness_var,
+                command=self._on_brightness_change,
+            )
+            self.brightness_slider.pack(side="left", fill="x", expand=True)
 
-        self.brightness_label = ttk.Label(brightness_frame, text=f"{int(self.current_value * 100)}%")
-        # Prevent label width changes from causing layout/geometry jitter and avoid clipping of the percent sign
-        self.brightness_label.configure(width=5)
-        self.brightness_label.pack(side="left", padx=(10, 5))
+            self.brightness_label = ttk.Label(brightness_frame, text=f"{int(self.current_value * 100)}%")
+            # Prevent label width changes from causing layout/geometry jitter and avoid clipping of the percent sign
+            self.brightness_label.configure(width=5)
+            self.brightness_label.pack(side="left", padx=(10, 5))
 
         # Color preview
         preview_frame = ttk.Frame(self)

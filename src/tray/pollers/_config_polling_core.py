@@ -3,6 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.core.effects.catalog import REACTIVE_EFFECTS
+
+
+REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
+
 
 @dataclass(frozen=True)
 class ConfigApplyState:
@@ -13,11 +18,19 @@ class ConfigApplyState:
     perkey_sig: tuple | None
     reactive_use_manual: bool
     reactive_color: tuple[int, int, int]
+    # Added later for reactive typing pulse intensity. Default keeps older
+    # call sites/tests compatible.
+    reactive_brightness: int = 0
 
 
 def compute_config_apply_state(tray: Any) -> ConfigApplyState:
+    try:
+        effect = str(getattr(tray.config, "effect", "none") or "none")
+    except Exception:
+        effect = "none"
+
     perkey_sig = None
-    if getattr(tray.config, "effect", None) == "perkey":
+    if effect == "perkey":
         try:
             perkey_sig = tuple(sorted(tray.config.per_key_colors.items()))
         except Exception:
@@ -33,19 +46,32 @@ def compute_config_apply_state(tray: Any) -> ConfigApplyState:
     except Exception:
         reactive_color = (255, 255, 255)
 
+    # Reactive typing pulse intensity is only relevant when a reactive effect
+    # is active. Keeping it stable for other effects prevents spurious state
+    # diffs that would defeat the "brightness-only" fast-path.
+    reactive_brightness = 0
+    if effect in REACTIVE_EFFECTS_SET:
+        try:
+            reactive_brightness = int(
+                getattr(tray.config, "reactive_brightness", getattr(tray.config, "brightness", 0)) or 0
+            )
+        except Exception:
+            reactive_brightness = int(getattr(tray.config, "brightness", 0) or 0)
+
     try:
         color = tuple(getattr(tray.config, "color", (255, 255, 255)))
     except Exception:
         color = (255, 255, 255)
 
     return ConfigApplyState(
-        effect=str(getattr(tray.config, "effect", "none") or "none"),
+        effect=str(effect),
         speed=int(getattr(tray.config, "speed", 0) or 0),
         brightness=int(getattr(tray.config, "brightness", 0) or 0),
         color=tuple(color),
         perkey_sig=perkey_sig,
         reactive_use_manual=bool(reactive_use_manual),
         reactive_color=tuple(reactive_color),
+        reactive_brightness=int(reactive_brightness),
     )
 
 
@@ -80,7 +106,7 @@ def maybe_apply_fast_path(
     if last_applied is None:
         return False, current
 
-    # If only the reactive manual color/toggle changed, don't restart effects.
+    # If only reactive settings changed, don't restart effects.
     try:
         only_reactive_changed = (
             last_applied.effect == current.effect
@@ -91,6 +117,7 @@ def maybe_apply_fast_path(
             and (
                 last_applied.reactive_use_manual != current.reactive_use_manual
                 or last_applied.reactive_color != current.reactive_color
+                or last_applied.reactive_brightness != current.reactive_brightness
             )
         )
     except Exception:
@@ -100,6 +127,7 @@ def maybe_apply_fast_path(
         try:
             tray.engine.reactive_use_manual_color = bool(current.reactive_use_manual)
             tray.engine.reactive_color = tuple(current.reactive_color)
+            tray.engine.reactive_brightness = int(current.reactive_brightness)
         except Exception:
             pass
         try:
@@ -118,6 +146,7 @@ def maybe_apply_fast_path(
             and last_applied.perkey_sig == current.perkey_sig
             and last_applied.reactive_use_manual == current.reactive_use_manual
             and last_applied.reactive_color == current.reactive_color
+            and last_applied.reactive_brightness == current.reactive_brightness
             and last_applied.brightness != current.brightness
         )
     except Exception:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from tkinter import font as tkfont
 
 from PIL import Image, ImageTk
 
@@ -74,13 +75,32 @@ class _KeyboardCanvasDrawingMixin:
 
             key_w = max(1, int(x2 - x1))
             key_h = max(1, int(y2 - y1))
+            font_name = "TkDefaultFont"
             font_size = max(7, min(11, int(min(key_w, key_h) * 0.30)))
+            max_text_w = max(1, key_w - 6)
+
+            label = key.label
+            try:
+                f = tkfont.Font(font=(font_name, font_size))
+                while font_size > 6 and f.measure(label) > max_text_w:
+                    font_size -= 1
+                    f.configure(size=font_size)
+                if f.measure(label) > max_text_w:
+                    ell = "…"
+                    if f.measure(ell) <= max_text_w:
+                        trimmed = label
+                        while trimmed and f.measure(trimmed + ell) > max_text_w:
+                            trimmed = trimmed[:-1]
+                        label = (trimmed + ell) if trimmed else ell
+            except Exception:
+                pass
+
             text_id = self.create_text(
                 (x1 + x2) / 2,
                 (y1 + y2) / 2,
-                text=key.label,
+                text=label,
                 fill=style.text_fill,
-                font=("TkDefaultFont", font_size),
+                font=(font_name, font_size),
                 tags=(f"pkey_{key.key_id}", "pkey"),
             )
             self.key_texts[key.key_id] = text_id

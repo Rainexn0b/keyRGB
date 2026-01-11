@@ -266,6 +266,14 @@ def representative_color(
     effect = str(getattr(config, "effect", "none") or "none")
     brightness = int(getattr(config, "brightness", 25) or 25)
 
+    # Reactive typing effects: the base color can be black while idle (which
+    # makes the tray icon disappear in dark mode). Prefer the reactive color
+    # when available and fall back to a visible accent color.
+    is_reactive = effect.startswith("reactive_")
+    # NOTE: For the tray icon we intentionally follow the profile/policy
+    # brightness (config.brightness). Reactive pulse intensity is tracked
+    # separately via config.reactive_brightness.
+
     # Per-key: average of configured colors
     if effect == "perkey":
         try:
@@ -346,10 +354,26 @@ def representative_color(
         base = (int(rr * 255), int(gg * 255), int(bb * 255))
 
     else:
-        base = tuple(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
+        if is_reactive:
+            base = tuple(
+                getattr(config, "reactive_color", None)
+                or getattr(config, "color", None)
+                or (255, 0, 128)
+            )
+            try:
+                if tuple(base) == (0, 0, 0):
+                    base = (255, 0, 128)
+            except Exception:
+                base = (255, 0, 128)
+        else:
+            base = tuple(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
 
-    # Scale by brightness (0..50). Keep a minimum so the icon stays visible.
-    scale = max(0.25, min(1.0, brightness / 50.0))
+    # Scale by brightness (0..50), but bias brighter than the keyboard so the
+    # tray icon stays readable in dark mode at low keyboard brightness.
+    #
+    # Ratio: approximately 1:3 (keyboard:icon), clamped to [0.25, 1.0].
+    icon_brightness = max(0, min(50, int(round(float(brightness) * 3.0))))
+    scale = max(0.25, min(1.0, icon_brightness / 50.0))
     return (
         int(max(0, min(255, base[0] * scale))),
         int(max(0, min(255, base[1] * scale))),

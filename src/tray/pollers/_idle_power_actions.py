@@ -3,6 +3,38 @@ from __future__ import annotations
 from typing import Any, Callable, Optional
 
 
+def _set_brightness_best_effort(
+    engine: Any,
+    brightness: int,
+    *,
+    apply_to_hardware: bool,
+    fade: bool,
+    fade_duration_s: float,
+) -> None:
+    """Call engine.set_brightness with compatibility fallbacks.
+
+    Some unit tests and alternate engine implementations only accept
+    (brightness, apply_to_hardware=...) and do not support fade kwargs.
+    """
+
+    try:
+        engine.set_brightness(
+            int(brightness),
+            apply_to_hardware=bool(apply_to_hardware),
+            fade=bool(fade),
+            fade_duration_s=float(fade_duration_s),
+        )
+        return
+    except TypeError:
+        # Retry without fade-related kwargs.
+        try:
+            engine.set_brightness(int(brightness), apply_to_hardware=bool(apply_to_hardware))
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+
 def restore_from_idle(tray: Any) -> None:
     tray.is_off = False
     tray._idle_forced_off = False
@@ -24,7 +56,18 @@ def restore_from_idle(tray: Any) -> None:
         pass
 
     try:
-        tray._start_current_effect()
+        # Use a fade-in when restoring from an off/idle state to avoid abrupt
+        # jumps on some firmware/backends.
+        start_fn = getattr(tray, "_start_current_effect", None)
+        if callable(start_fn):
+            try:
+                start_fn(brightness_override=1, fade_in=True, fade_in_duration_s=0.25)
+            except TypeError:
+                start_fn()
+        else:
+            from src.tray.controllers.lighting_controller import start_current_effect
+
+            start_current_effect(tray, brightness_override=1, fade_in=True, fade_in_duration_s=0.25)
     except Exception:
         try:
             tray._log_exception("Failed to restore lighting after idle", Exception("restore failed"))
@@ -54,7 +97,7 @@ def apply_idle_action(
         except Exception:
             pass
         try:
-            tray.engine.turn_off()
+            tray.engine.turn_off(fade=True, fade_duration_s=0.12)
         except Exception:
             pass
 
@@ -70,6 +113,13 @@ def apply_idle_action(
         # Do not fight explicit user/power forced off (already gated).
         # Do not turn on lighting if it's currently off.
         if not bool(getattr(tray, "is_off", False)):
+            try:
+                if bool(getattr(tray, "_dim_temp_active", False)) and int(
+                    getattr(tray, "_dim_temp_target_brightness", -1) or -1
+                ) == int(dim_temp_brightness):
+                    return
+            except Exception:
+                pass
             tray._dim_temp_active = True
             tray._dim_temp_target_brightness = int(dim_temp_brightness)
             # Pre-read effect outside the lock to minimize lock hold time
@@ -94,9 +144,21 @@ def apply_idle_action(
                     # avoid a one-frame mix of old/new brightness inputs.
                     with tray.engine.kb_lock:
                         tray.engine.per_key_brightness = dim_temp_brightness
-                        tray.engine.set_brightness(dim_temp_brightness, apply_to_hardware=False)
+                        _set_brightness_best_effort(
+                            tray.engine,
+                            dim_temp_brightness,
+                            apply_to_hardware=False,
+                            fade=True,
+                            fade_duration_s=0.25,
+                        )
                 else:
-                    tray.engine.set_brightness(dim_temp_brightness, apply_to_hardware=not is_sw_effect)
+                    _set_brightness_best_effort(
+                        tray.engine,
+                        dim_temp_brightness,
+                        apply_to_hardware=not is_sw_effect,
+                        fade=True,
+                        fade_duration_s=0.25,
+                    )
             except Exception:
                 pass
         return
@@ -123,9 +185,21 @@ def apply_idle_action(
                     # avoid a one-frame mix of old/new brightness inputs.
                     with tray.engine.kb_lock:
                         tray.engine.per_key_brightness = perkey_target
-                        tray.engine.set_brightness(target, apply_to_hardware=False)
+                        _set_brightness_best_effort(
+                            tray.engine,
+                            target,
+                            apply_to_hardware=False,
+                            fade=True,
+                            fade_duration_s=0.25,
+                        )
                 else:
-                    tray.engine.set_brightness(target, apply_to_hardware=not is_sw_effect)
+                    _set_brightness_best_effort(
+                        tray.engine,
+                        target,
+                        apply_to_hardware=not is_sw_effect,
+                        fade=True,
+                        fade_duration_s=0.25,
+                    )
             except Exception:
                 pass
         return

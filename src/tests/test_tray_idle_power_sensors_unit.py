@@ -72,6 +72,29 @@ def test_read_dimmed_state_detects_gradual_drop_without_chasing_baseline(tmp_pat
     assert sensors.read_dimmed_state(tray, backlight_base=base) is True
 
 
+def test_read_dimmed_state_uses_hysteresis_to_avoid_flapping(tmp_path):
+    base = tmp_path / "sys" / "class" / "backlight"
+    dev = base / "intel_backlight"
+    _write_text(dev / "max_brightness", "200\n")
+
+    tray = SimpleNamespace()
+
+    _write_text(dev / "brightness", "100\n")
+    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+
+    # Enter dim state at/below the 90% threshold.
+    _write_text(dev / "brightness", "90\n")
+    assert sensors.read_dimmed_state(tray, backlight_base=base) is True
+
+    # Small bounce above 90% should remain dimmed (hysteresis).
+    _write_text(dev / "brightness", "92\n")
+    assert sensors.read_dimmed_state(tray, backlight_base=base) is True
+
+    # Clear undim: above exit threshold.
+    _write_text(dev / "brightness", "99\n")
+    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+
+
 def test_read_dimmed_state_sets_screen_off_flag_when_any_device_zero(tmp_path):
     base = tmp_path / "sys" / "class" / "backlight"
     dev = base / "intel_backlight"

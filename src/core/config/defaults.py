@@ -18,6 +18,10 @@ DEFAULTS: dict = {
     # When disabled, reactive effects use their built-in coloring.
     "reactive_use_manual_color": False,
     "reactive_color": [255, 255, 255],
+    # Reactive typing pulse/highlight intensity (0..50). Kept separate from
+    # overall keyboard brightness so power policies can dim the keyboard
+    # without overriding the user's reactive intensity preference.
+    "reactive_brightness": 25,
     # When a non-per-key effect is started from a per-key state, we can remember
     # which per-key mode to restore when the user stops the effect.
     # None | 'perkey'

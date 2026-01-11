@@ -41,6 +41,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         *,
         show_rgb_label: bool = True,
         brightness_label_text: str = "Brightness:",
+        show_brightness_slider: bool = True,
     ):
         """
         Initialize the color wheel.
@@ -70,6 +71,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         )
         self.show_rgb_label = bool(show_rgb_label)
         self._brightness_label_text = str(brightness_label_text or "Brightness:")
+        self.show_brightness_slider = bool(show_brightness_slider)
 
         # Convert RGB to HSV for positioning
         r, g, b = [float(x) / 255.0 for x in self.current_color]
@@ -82,6 +84,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self._create_widgets()
         self._wheel_image: tk.PhotoImage | None = None
         self._wheel_ready = False
+        self._suspend_brightness_events = False
         # Defer heavy render work so the window can appear immediately.
         self.after(1, self._render_initial)
 
@@ -284,6 +287,9 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self.brightness_label.config(text=f"{int(pct)}%")
         self._update_color(source="brightness")
 
+        if self._suspend_brightness_events:
+            return
+
         # Also trigger release callback when brightness changes (treat as a commit)
         if self.release_callback:
             self._invoke_callback(
@@ -292,6 +298,28 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
                 source="brightness",
                 brightness_percent=float(pct),
             )
+
+    def set_brightness_percent(self, pct: float | int) -> None:
+        """Set the brightness slider programmatically (0..100) without callbacks."""
+
+        try:
+            pct_f = float(pct)
+        except Exception:
+            pct_f = 0.0
+        pct_f = max(0.0, min(100.0, pct_f))
+
+        try:
+            self._suspend_brightness_events = True
+            # Setting the variable updates the slider; some Tk builds will call
+            # the Scale command, so `_on_brightness_change` must be guarded.
+            self.brightness_var.set(pct_f)
+            # Ensure internal state and visuals match even if Tk doesn't invoke.
+            self.current_value = pct_f / 100.0
+            if hasattr(self, "brightness_label"):
+                self.brightness_label.config(text=f"{int(pct_f)}%")
+            self._update_color(source="brightness")
+        finally:
+            self._suspend_brightness_events = False
 
     @staticmethod
     def _invoke_callback(cb, *args, **kwargs) -> None:

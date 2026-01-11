@@ -81,6 +81,25 @@ def test_compute_idle_action_temp_dim_mode_screen_off_triggers_turn_off() -> Non
     assert action == "turn_off"
 
 
+def test_compute_idle_action_temp_dim_mode_dimmed_does_not_repeat_when_dim_temp_active() -> None:
+    action = compute_idle_action(
+        dimmed=True,
+        screen_off=False,
+        is_off=False,
+        idle_forced_off=False,
+        dim_temp_active=True,
+        idle_timeout_s=60.0,
+        power_management_enabled=True,
+        screen_dim_sync_enabled=True,
+        screen_dim_sync_mode="temp",
+        screen_dim_temp_brightness=5,
+        brightness=25,
+        user_forced_off=False,
+        power_forced_off=False,
+    )
+    assert action is None
+
+
 def test_compute_idle_action_restore_brightness_when_undimmed_and_dim_temp_active() -> None:
     action = compute_idle_action(
         dimmed=False,
