@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.14.0 (2026-01-11)
+
+- Fix: Prevent random brightness flashes around screen-dim by adding hysteresis to backlight dim detection and no-op guards in temp-dim policy/actions to stop repeated dim↔restore cycling.
+- Fix: Ensure `dim_to_temp` does not reapply when already active and avoid restarting fades; restore path uses fade-in to prevent abrupt jumps.
+- Fix: Tray icon brightness now follows base/profile brightness (not reactive pulse intensity) and avoids black icon on dim profiles; adjusted icon scaling mapping so icon remains visible at low brightness.
+- Fix: Reactive typing behavior improvements: split persisted `reactive_brightness` (pulse intensity) from base brightness, add dedicated UI slider for reactive brightness, and fix stale slider values and unexpected intensity-driven icon regressions.
+- Improvement: Smoother fades for dim/undim and fade-in on restore; tuned durations so 'off' is quick and 'dim' is gradual.
+- GUI: Per-key and calibrator UI sizing/label wrapping fixes and prevent tiny startup geometry flashes.
+- Tests: Add unit tests covering hysteresis, temp-mode non-repeat, tray icon color selection, and reactive brightness behavior; full test suite passing.
+- Docs: Documented brightness debug logging (`KEYRGB_DEBUG_BRIGHTNESS`) and added troubleshooting notes.
+
 ## 0.13.4 (2026-01-09)
 
 - Tray: Replace the placeholder tray icon with the branded KeyRGB logo while keeping the “only the K changes color” illusion via a mask-based compositing pipeline (with theme-aware outline inversion).
