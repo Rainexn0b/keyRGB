@@ -56,6 +56,13 @@ KeyRGB uses a priority-based system to select the best driver for your hardware:
 			<img src="assets/screenshots/ramusage.png" alt="RAM and CPU usage">
 		</td>
 	</tr>
+	<tr>
+		<td width="50%">
+			<b>Reactive Typing</b><br>
+			<img src="assets/screenshots/reactivekb.png" alt="Reactive typing">
+		</td>
+		<td width="50%"></td>
+	</tr>
 </table>
 
 <details>
