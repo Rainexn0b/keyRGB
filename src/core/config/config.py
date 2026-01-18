@@ -43,6 +43,14 @@ class Config:
         self._settings = loaded if loaded is not None else self.DEFAULTS.copy()
         self._coerce_loaded_settings()
 
+        # Cache mtime for reload() short-circuiting.
+        # Many pollers call reload() frequently; avoid re-reading JSON when the
+        # file hasn't changed.
+        try:
+            self._last_reload_mtime_ns: int | None = self.CONFIG_FILE.stat().st_mtime_ns
+        except Exception:
+            self._last_reload_mtime_ns = None
+
     def _load(self, *, retries: int = 3, retry_delay: float = 0.02):
         """Load settings from file.
 
@@ -60,10 +68,22 @@ class Config:
         )
 
     def reload(self):
+        try:
+            mtime_ns = self.CONFIG_FILE.stat().st_mtime_ns
+        except Exception:
+            mtime_ns = None
+
+        # If the config file hasn't changed since our last successful reload,
+        # skip disk I/O and JSON parsing.
+        if mtime_ns is not None and self._last_reload_mtime_ns is not None:
+            if int(mtime_ns) == int(self._last_reload_mtime_ns):
+                return
+
         loaded = self._load()
         # If the file was transiently unreadable, keep the previous in-memory settings.
         if loaded is not None:
             self._settings = loaded
+            self._last_reload_mtime_ns = mtime_ns
 
     def _save(self):
         save_config_settings_atomic(

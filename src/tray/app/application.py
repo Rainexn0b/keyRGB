@@ -44,6 +44,7 @@ class KeyRGBTray:
         self._dim_temp_active = False
         self._dim_temp_target_brightness = None
         self._last_brightness = 25
+        self._last_resume_at = 0.0
 
         # Event log throttling state (key -> last log monotonic time).
         self._event_last_at: dict[str, float] = {}
