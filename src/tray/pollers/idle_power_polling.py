@@ -43,6 +43,8 @@ def _compute_idle_action(
     brightness: int,
     user_forced_off: bool,
     power_forced_off: bool,
+    last_resume_at: float = 0.0,
+    now: float = 0.0,
 ) -> IdleAction:
     return compute_idle_action(
         dimmed=dimmed,
@@ -58,6 +60,8 @@ def _compute_idle_action(
         brightness=brightness,
         user_forced_off=user_forced_off,
         power_forced_off=power_forced_off,
+        last_resume_at=last_resume_at,
+        now=now,
     )
 
 
@@ -213,9 +217,13 @@ def start_idle_power_polling(
         # around the “dimmed” threshold while idle, which can cause repeated
         # dim↔restore brightness writes (visible as intermittent flicker on
         # USB-controlled devices).
-        debounce_polls_dimmed_true = 2
-        debounce_polls_dimmed_false = 4
-        debounce_polls_screen_off_true = 2
+        # NOTE: On some systems (notably KDE on certain AMD/NVIDIA setups),
+        # backlight/DRM state can briefly jitter during normal operation,
+        # which can cause visible keyboard "flashes" if we react too quickly.
+        # These values trade a small delay for much better stability.
+        debounce_polls_dimmed_true = 3
+        debounce_polls_dimmed_false = 6
+        debounce_polls_screen_off_true = 4
 
         session_id = _get_session_id()
 
@@ -295,6 +303,8 @@ def start_idle_power_polling(
                     brightness=int(brightness),
                     user_forced_off=bool(getattr(tray, "_user_forced_off", False)),
                     power_forced_off=bool(getattr(tray, "_power_forced_off", False)),
+                    last_resume_at=float(getattr(tray, "_last_resume_at", 0.0)),
+                    now=time.monotonic(),
                 )
 
                 action_key = _build_idle_action_key_impl(

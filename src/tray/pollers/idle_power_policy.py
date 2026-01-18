@@ -21,7 +21,16 @@ def compute_idle_action(
     brightness: int,
     user_forced_off: bool,
     power_forced_off: bool,
+    last_resume_at: float = 0.0,
+    now: float = 0.0,
 ) -> IdleAction:
+    # Resume grace period: ignore screen_off/dimmed for 3s after wake.
+    # On many systems, DRM/DPMS state takes time to update after resume, and
+    # we'd otherwise immediately turn the keyboard off again (undoing restore).
+    if now > 0 and last_resume_at > 0:
+        if (now - last_resume_at) < 3.0:
+            return None
+
     if not power_management_enabled:
         return None
 

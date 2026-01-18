@@ -212,6 +212,13 @@ def power_turn_off(tray: Any) -> None:
 
 
 def power_restore(tray: Any) -> None:
+    # Track resume time so idle polling can ignore stale screen-off state.
+    try:
+        import time
+        tray._last_resume_at = time.monotonic()
+    except Exception:
+        pass
+
     # Never fight explicit user off.
     if bool(getattr(tray, "_user_forced_off", False)):
         return
