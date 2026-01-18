@@ -65,3 +65,9 @@ scripts/build/
 
 # Upstream reference clones (not shipped)
 vendor/
+
+# Local kernel-module work dirs (not shipped)
+third_party/
+
+# Local debug logs
+keyrgb-debug.log
