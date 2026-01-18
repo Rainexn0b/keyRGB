@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.14.2 (2026-01-18)
+
+- Refactor: Installer modernization - split monolithic `install.sh` into modular scripts under `scripts/lib/` for improved maintainability and testability.
+- Installer: New `scripts/install_dev.sh` for developer installations (editable pip install mode).
+- Installer: New `scripts/install_user.sh` for end-user installations (AppImage mode).
+- Installer: New `scripts/uninstall.sh` for modular uninstall operations.
+- Installer: Modular library components in `scripts/lib/` (common_core, state, optional_components, privileged_helpers, user_integration, user_prompts).
+- Installer: Legacy monolithic installers preserved in `scripts/legacy/` for reference and backward compatibility testing.
+- Installer: Root `install.sh` and `uninstall.sh` now invoke modular scripts while maintaining backward compatibility.
+- Docs: Updated README screenshots for reactive typing feature.
+- Build: Updated `.gitignore` for installer state and temporary files.
+
 ## 0.14.1 (2026-01-11)
 
 - Fix: Restore Reactive Typing brightness slider functionality (fixed regression where 1-100% looked identical).
