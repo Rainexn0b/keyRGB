@@ -10,6 +10,8 @@
 - Installer: Legacy monolithic installers preserved in `scripts/legacy/` for reference and backward compatibility testing.
 - Installer: Root `install.sh` and `uninstall.sh` now invoke modular scripts while maintaining backward compatibility.
 - Docs: Updated README screenshots for reactive typing feature.
+- Improvement: Cache config file mtime to short-circuit frequent `reload()` calls and avoid unnecessary disk I/O from pollers.
+- Fix: Add resume grace period (ignore transient screen-off/dim for ~3s after resume) and increase idle dim debounce thresholds to reduce visible brightness flicker on some systems.
 - Build: Updated `.gitignore` for installer state and temporary files.
 
 ## 0.14.1 (2026-01-11)
