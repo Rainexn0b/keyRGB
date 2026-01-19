@@ -91,20 +91,30 @@ pkg_remove_best_effort() {
 }
 
 # --- Downloads ---
-download_url() {
-  local url="$1" dst="$2"
+_download_url_impl() {
+  local url="$1" dst="$2" progress_mode="${3:-auto}"
   [ -n "$dst" ] || die "download_url: destination path is empty"
   mkdir -p "$(dirname "$dst")"
 
   local tmp
   tmp="$(mktemp "${dst}.tmp.XXXXXX")" || die "Failed to create temp file"
 
-  local is_tty="n"
-  [ -t 1 ] && is_tty="y"
+  local show_progress="n"
+  if [ "$progress_mode" = "force" ]; then
+    show_progress="y"
+  elif [ "$progress_mode" = "quiet" ]; then
+    show_progress="n"
+  else
+    # auto: show progress only when stdout is a TTY
+    if [ -t 1 ]; then
+      show_progress="y"
+    fi
+  fi
 
   if have_cmd curl; then
-    if [ "$is_tty" = "y" ]; then
-      curl -L --fail --show-error -# -o "$tmp" "$url" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
+    if [ "$show_progress" = "y" ]; then
+      # --progress-bar is readable and keeps stderr quiet unless errors occur.
+      curl -L --fail --show-error --progress-bar -o "$tmp" "$url" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
     else
       curl -L --fail --silent --show-error -o "$tmp" "$url" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
     fi
@@ -112,7 +122,7 @@ download_url() {
   fi
 
   if have_cmd wget; then
-    if [ "$is_tty" = "y" ]; then
+    if [ "$show_progress" = "y" ]; then
       wget --progress=bar:force:noscroll -O "$tmp" "$url" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
     else
       wget -q -O "$tmp" "$url" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
@@ -142,6 +152,18 @@ PY
   rm -f "$tmp" 2>/dev/null || true
   die "No downloader available (need curl, wget, or python3)"
 }
+
+# download_url: default best-effort downloader.
+# - Shows a progress bar when stdout is a TTY.
+download_url() {
+  _download_url_impl "$1" "$2" "auto"
+}
+
+# download_url_quiet: always quiet, even in interactive terminals.
+download_url_quiet() {
+  _download_url_impl "$1" "$2" "quiet"
+}
+
 
 # --- GitHub release resolution (no jq dependency) ---
 resolve_release_with_asset() {

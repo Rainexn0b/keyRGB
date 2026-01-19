@@ -91,6 +91,19 @@ require_not_root
 
 log_info "=== KeyRGB Installation (User) ==="
 
+if [ "$UPDATE_ONLY" -eq 1 ]; then
+  log_info "=== KeyRGB AppImage Update ==="
+  log_info "Update-only mode: download a fresh AppImage and refresh udev + desktop integration."
+
+  # The release channel comes from saved prefs unless overridden via env/CLI.
+  if is_truthy "${KEYRGB_ALLOW_PRERELEASE:-n}"; then
+    log_info "Using saved release channel: include prereleases (beta)"
+  else
+    log_info "Using saved release channel: stable releases only"
+  fi
+  log_info "Tip: set --prerelease (or KEYRGB_ALLOW_PRERELEASE=y) to override."
+fi
+
 # Legacy parity: load saved AppImage prefs unless overridden via env/CLI.
 load_saved_appimage_prefs
 
@@ -124,7 +137,11 @@ if [ "$UPDATE_ONLY" -ne 1 ] && ! is_truthy "$KEYRGB_SKIP_SYSTEM_DEPS"; then
     install_kernel_drivers_best_effort
   fi
 else
-  log_info "Skipping system dependency installation (--no-system-deps / KEYRGB_SKIP_SYSTEM_DEPS)."
+  if [ "$UPDATE_ONLY" -eq 1 ]; then
+    log_info "Skipping system dependency installation (update-only)."
+  else
+    log_info "Skipping system dependency installation (--no-system-deps / KEYRGB_SKIP_SYSTEM_DEPS)."
+  fi
 fi
 
 APPIMAGE_DST="$HOME/.local/bin/keyrgb"

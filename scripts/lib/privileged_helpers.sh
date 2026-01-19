@@ -81,11 +81,11 @@ install_privileged_helpers_from_ref() {
     local rule_tmp="$tmp/$rule_name"
 
     log_info "Downloading privileged helper: $helper_url"
-    if ! download_url "$helper_url" "$helper_tmp"; then
+      if ! download_url_quiet "$helper_url" "$helper_tmp"; then
       if [ "$raw_ref" != "main" ]; then
         local helper_url_fallback="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/main/system/bin/${helper_name}"
         log_warn "Failed to download helper from ref '$raw_ref'; trying main: $helper_url_fallback"
-        download_url "$helper_url_fallback" "$helper_tmp" || { log_warn "Failed to download helper"; continue; }
+          download_url_quiet "$helper_url_fallback" "$helper_tmp" || { log_warn "Failed to download helper"; continue; }
       else
         log_warn "Failed to download helper: $helper_url"
         continue
@@ -93,11 +93,11 @@ install_privileged_helpers_from_ref() {
     fi
 
     log_info "Downloading polkit rule: $rule_url"
-    if ! download_url "$rule_url" "$rule_tmp"; then
+      if ! download_url_quiet "$rule_url" "$rule_tmp"; then
       if [ "$raw_ref" != "main" ]; then
         local rule_url_fallback="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/main/system/polkit/${rule_name}"
         log_warn "Failed to download polkit rule from ref '$raw_ref'; trying main: $rule_url_fallback"
-        download_url "$rule_url_fallback" "$rule_tmp" || { log_warn "Failed to download polkit rule"; continue; }
+          download_url_quiet "$rule_url_fallback" "$rule_tmp" || { log_warn "Failed to download polkit rule"; continue; }
       else
         log_warn "Failed to download polkit rule: $rule_url"
         continue

@@ -19,7 +19,7 @@ install_icon_and_desktop_entries() {
 
   local icon_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-keyrgb.png"
   log_info "Downloading icon: $icon_url"
-  download_url "$icon_url" "$icon_file"
+  download_url_quiet "$icon_url" "$icon_file"
   log_ok "Installed icon: $icon_file"
 
   cat >"$app_file" <<EOF
@@ -75,7 +75,7 @@ install_udev_rule_from_ref() {
 
   local rule_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/system/udev/99-ite8291-wootbook.rules"
   log_info "Downloading udev rule: $rule_url"
-  download_url "$rule_url" "$tmp_rule"
+  download_url_quiet "$rule_url" "$tmp_rule"
 
   log_info "Installing udev rule (requires sudo): $dst_rule"
   sudo install -D -m 0644 "$tmp_rule" "$dst_rule"
@@ -119,11 +119,11 @@ install_input_udev_rule_from_ref() {
 
   local rule_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/system/udev/99-keyrgb-input-uaccess.rules"
   log_info "Downloading input udev rule: $rule_url"
-  if ! download_url "$rule_url" "$tmp_rule"; then
+  if ! download_url_quiet "$rule_url" "$tmp_rule"; then
     if [ "$raw_ref" != "main" ]; then
       local rule_url_fallback="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/main/system/udev/99-keyrgb-input-uaccess.rules"
       log_warn "Failed to download input udev rule from ref '$raw_ref'; trying main: $rule_url_fallback"
-      if ! download_url "$rule_url_fallback" "$tmp_rule"; then
+      if ! download_url_quiet "$rule_url_fallback" "$tmp_rule"; then
         log_warn "Failed to download input udev rule"
         rm -f "$tmp_rule" 2>/dev/null || true
         return 0
@@ -147,6 +147,7 @@ appimage_install() {
   mkdir -p "$(dirname "$dst_path")"
 
   local url="" resolved_tag=""
+  local resolved_prerelease="false"
 
   if [ -n "$version_tag" ]; then
     url="https://github.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/releases/download/${version_tag}/${asset_name}"
@@ -155,8 +156,8 @@ appimage_install() {
     local resolved=""
     resolved="$(resolve_release_with_asset "$asset_name" "$allow_prerelease" 2>/dev/null)" || true
     if [ -n "$resolved" ]; then
-      local resolved_url _resolved_prerelease
-      IFS='|' read -r resolved_tag resolved_url _resolved_prerelease <<<"$resolved"
+      local resolved_url
+      IFS='|' read -r resolved_tag resolved_url resolved_prerelease <<<"$resolved"
       url="$resolved_url"
     else
       url="https://github.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/releases/latest/download/${asset_name}"
@@ -164,7 +165,15 @@ appimage_install() {
     fi
   fi
 
-  log_info "Downloading AppImage: $url"
+  if [ -n "$resolved_tag" ] && [ "$resolved_tag" != "main" ]; then
+    if [ "$resolved_prerelease" = "true" ]; then
+      log_info "Selected release: $resolved_tag (prerelease)"
+    else
+      log_info "Selected release: $resolved_tag"
+    fi
+  fi
+
+  log_info "Downloading AppImage (this may take a while): $url"
   download_url "$url" "$dst_path"
   chmod +x "$dst_path"
   log_ok "Installed AppImage: $dst_path"
