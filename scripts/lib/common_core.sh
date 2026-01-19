@@ -113,8 +113,8 @@ _download_url_impl() {
 
   if have_cmd curl; then
     if [ "$show_progress" = "y" ]; then
-      # --progress-bar is readable and keeps stderr quiet unless errors occur.
-      curl -L --fail --show-error --progress-bar -o "$tmp" "$url" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
+      # -# (hash meter) is widely supported and consistently visible in terminals.
+      curl -L --fail --show-error -# -o "$tmp" "$url" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
     else
       curl -L --fail --silent --show-error -o "$tmp" "$url" || { rm -f "$tmp" 2>/dev/null || true; return 1; }
     fi
