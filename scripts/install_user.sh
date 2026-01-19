@@ -155,6 +155,7 @@ if [ "$UPDATE_ONLY" -eq 0 ] \
   && [ -f "$APPIMAGE_DST" ] \
   && [ -x "$APPIMAGE_DST" ]; then
   log_info "AppImage already present; skipping download (set KEYRGB_FORCE_APPIMAGE_DOWNLOAD=y to force)."
+  log_info "No AppImage download performed, so no progress meter will be shown."
 
   # Still try to resolve a tag so icon/udev downloads can use a stable ref.
   resolved="$(resolve_release_with_asset "$KEYRGB_APPIMAGE_ASSET" "$KEYRGB_ALLOW_PRERELEASE" 2>/dev/null)" || true

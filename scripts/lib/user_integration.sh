@@ -174,7 +174,7 @@ appimage_install() {
   fi
 
   log_info "Downloading AppImage (this may take a while): $url"
-  download_url "$url" "$dst_path"
+  download_url_progress "$url" "$dst_path"
   chmod +x "$dst_path"
   log_ok "Installed AppImage: $dst_path"
 

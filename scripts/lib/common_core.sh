@@ -105,8 +105,9 @@ _download_url_impl() {
   elif [ "$progress_mode" = "quiet" ]; then
     show_progress="n"
   else
-    # auto: show progress only when stdout is a TTY
-    if [ -t 1 ]; then
+    # auto: show progress only when output is a TTY.
+    # curl renders its progress meter to stderr, so consider either stream.
+    if [ -t 1 ] || [ -t 2 ]; then
       show_progress="y"
     fi
   fi
@@ -157,6 +158,11 @@ PY
 # - Shows a progress bar when stdout is a TTY.
 download_url() {
   _download_url_impl "$1" "$2" "auto"
+}
+
+# download_url_progress: always show progress (when supported by the downloader).
+download_url_progress() {
+  _download_url_impl "$1" "$2" "force"
 }
 
 # download_url_quiet: always quiet, even in interactive terminals.
