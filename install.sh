@@ -36,6 +36,7 @@ EOF
 
 MODE="user"
 REF_OVERRIDE=""
+NEED_DEV_CLONE=0
 
 # Legacy parity: when run interactively with no args, offer a mode selection.
 # This keeps the dispatcher small and forwards to the modular scripts.
@@ -86,6 +87,25 @@ while [ $i -lt ${#args[@]} ]; do
             MODE="dev"
             unset 'args[$i]'
             ;;
+        --clone|--source)
+            MODE="dev"
+            NEED_DEV_CLONE=1
+            unset 'args[$i]'
+            ;;
+        --clone-dir)
+            MODE="dev"
+            NEED_DEV_CLONE=1
+            # keep --clone-dir and its value for install_dev.sh to consume
+            ;;
+        --pip|--repo)
+            MODE="dev"
+            # install_dev.sh doesn't accept --pip; it's implicit (editable install)
+            unset 'args[$i]'
+            ;;
+        --appimage)
+            MODE="user"
+            unset 'args[$i]'
+            ;;
         --ref)
             j=$((i+1))
             REF_OVERRIDE="${args[$j]:-}"
@@ -112,6 +132,21 @@ for a in "${args[@]}"; do
         NEW_ARGS+=("$a")
     fi
 done
+
+# If a legacy flag implied cloning but the caller didn't pass --dev, ensure the
+# dev installer actually performs the clone.
+if [ "$MODE" = "dev" ] && [ "$NEED_DEV_CLONE" -eq 1 ]; then
+    has_clone=0
+    for a in "${NEW_ARGS[@]}"; do
+        if [ "${a:-}" = "--clone" ]; then
+            has_clone=1
+            break
+        fi
+    done
+    if [ "$has_clone" -ne 1 ]; then
+        NEW_ARGS=("--clone" "${NEW_ARGS[@]}")
+    fi
+fi
 
 SCRIPT_SELF="${BASH_SOURCE[0]:-}"
 SCRIPT_DIR=""
@@ -170,4 +205,4 @@ fi
 
 exit 0
 
-# Legacy monolithic installer has been moved to scripts/install.legacy.sh
+# Legacy monolithic installer has been moved to scripts/legacy/install.legacy.sh

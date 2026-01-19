@@ -102,7 +102,7 @@ KeyRGB uses a priority-based system to select the best driver for your hardware:
 
 #### Option A: One-line interactive install (recommended)
 
-Downloads and runs the latest installer script (no clone). By default, the installer auto-selects the latest stable AppImage.
+Downloads and runs the latest installer script (no clone). By default, the installer recommends the latest stable AppImage and remembers your last stable/beta choice.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh
@@ -240,11 +240,16 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | Argument | Meaning |
 | --- | --- |
 | `--appimage` | Download AppImage (default). |
-| `--pip` | Install via `pip --user` (dev/editable). |
-| `--clone` | Clone repo and install via pip (source). |
+| `--dev` | Developer install (editable pip install mode). |
+| `--pip` | Legacy alias for dev editable install. |
+| `--clone` | Clone repo and install via editable pip (dev/source). |
+| `--clone-dir <path>` | Clone target directory (dev mode). |
 | `--version <tag>` | Install specific tag (e.g. `v0.9.3`). |
+| `--asset <name>` | Override AppImage filename (default: `keyrgb-x86_64.AppImage`). |
+| `--prerelease` | Allow picking prereleases when auto-resolving latest AppImage. |
 | `--no-system-deps` | Skip best-effort system dependency installation. |
 | `--update-appimage` | Non-interactive: update an existing AppImage install (downloads latest and replaces `~/.local/bin/keyrgb`). |
+| `--ref <git-ref>` | For curl installs: download installer modules from a specific git ref (default: `main`). |
 
 ### Environment variables
 
