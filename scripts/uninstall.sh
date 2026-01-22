@@ -49,6 +49,12 @@ confirm() {
   [[ "$reply" == "y" || "$reply" == "yes" ]]
 }
 
+file_has_marker() {
+  local path="$1" marker="$2"
+  [ -f "$path" ] || return 1
+  grep -Fqs -- "$marker" "$path" 2>/dev/null
+}
+
 STATE_DIR="$HOME/.local/share/keyrgb"
 TCC_MARKER="$STATE_DIR/tcc-installed-by-keyrgb"
 KERNEL_DRIVERS_MARKER="$STATE_DIR/kernel-drivers-installed-by-keyrgb"
@@ -129,7 +135,19 @@ POWER_POLKIT_DST="/etc/polkit-1/rules.d/90-keyrgb-power-helper.rules"
 POWER_POLKIT_SRC="$REPO_DIR/system/polkit/90-keyrgb-power-helper.rules"
 
 if [ -f "$UDEV_DST" ]; then
+  udev_matches_repo=0
   if [ -f "$UDEV_SRC" ] && cmp -s "$UDEV_SRC" "$UDEV_DST"; then
+    udev_matches_repo=1
+  fi
+  udev_looks_like_keyrgb=0
+  if file_has_marker "$UDEV_DST" "Allow user access to ITE 8291 USB device."; then
+    udev_looks_like_keyrgb=1
+  fi
+
+  if [ "$udev_matches_repo" -eq 1 ] || [ "$udev_looks_like_keyrgb" -eq 1 ]; then
+    if [ "$udev_matches_repo" -ne 1 ]; then
+      log_warn "udev rule does not match this repo version, but appears to be KeyRGB-managed: $UDEV_DST"
+    fi
     if confirm "Remove udev rule $UDEV_DST (requires sudo)?"; then
       sudo rm -f "$UDEV_DST"
       reload_udev_rules_best_effort
@@ -138,12 +156,24 @@ if [ -f "$UDEV_DST" ]; then
       log_info "Skipped removing udev rule"
     fi
   else
-    log_warn "udev rule exists but does not match this repo's rule; not removing: $UDEV_DST"
+    log_warn "udev rule exists but does not look KeyRGB-managed; not removing: $UDEV_DST"
   fi
 fi
 
 if [ -f "$INPUT_UDEV_DST" ]; then
+  input_matches_repo=0
   if [ -f "$INPUT_UDEV_SRC" ] && cmp -s "$INPUT_UDEV_SRC" "$INPUT_UDEV_DST"; then
+    input_matches_repo=1
+  fi
+  input_looks_like_keyrgb=0
+  if file_has_marker "$INPUT_UDEV_DST" "Reactive Typing effects"; then
+    input_looks_like_keyrgb=1
+  fi
+
+  if [ "$input_matches_repo" -eq 1 ] || [ "$input_looks_like_keyrgb" -eq 1 ]; then
+    if [ "$input_matches_repo" -ne 1 ]; then
+      log_warn "Reactive Typing input udev rule does not match this repo version, but appears KeyRGB-managed: $INPUT_UDEV_DST"
+    fi
     if confirm "Remove Reactive Typing input udev rule $INPUT_UDEV_DST (requires sudo)?"; then
       sudo rm -f "$INPUT_UDEV_DST"
       reload_udev_rules_best_effort
@@ -153,7 +183,7 @@ if [ -f "$INPUT_UDEV_DST" ]; then
       log_info "Skipped removing Reactive Typing input udev rule"
     fi
   else
-    log_warn "Reactive Typing input udev rule exists but does not match this repo's rule; not removing: $INPUT_UDEV_DST"
+    log_warn "Reactive Typing input udev rule exists but does not look KeyRGB-managed; not removing: $INPUT_UDEV_DST"
   fi
 fi
 
@@ -166,6 +196,8 @@ remove_helper_and_rule_if_match() {
 
   local helper_matches=0
   local rule_matches=0
+  local helper_looks_like_keyrgb=0
+  local rule_looks_like_keyrgb=0
 
   if [ -f "$helper_dst" ] && [ -f "$helper_src" ] && cmp -s "$helper_src" "$helper_dst"; then
     helper_matches=1
@@ -174,19 +206,32 @@ remove_helper_and_rule_if_match() {
     rule_matches=1
   fi
 
-  if [ -f "$helper_dst" ] && [ "$helper_matches" -ne 1 ]; then
-    log_warn "$label helper exists but does not match this repo's file; not removing: $helper_dst"
+  # Allow removing a KeyRGB-managed helper/rule even if the repo version differs.
+  if file_has_marker "$helper_dst" "KEYRGB_CPUFREQ_ROOT"; then
+    helper_looks_like_keyrgb=1
   fi
-  if [ -f "$rule_dst" ] && [ "$rule_matches" -ne 1 ]; then
-    log_warn "$label polkit rule exists but does not match this repo's file; not removing: $rule_dst"
+  if file_has_marker "$rule_dst" "Installed by KeyRGB's install.sh"; then
+    rule_looks_like_keyrgb=1
   fi
 
-  if [ "$helper_matches" -eq 1 ] || [ "$rule_matches" -eq 1 ]; then
+  if [ -f "$helper_dst" ] && [ "$helper_matches" -ne 1 ] && [ "$helper_looks_like_keyrgb" -ne 1 ]; then
+    log_warn "$label helper exists but does not look KeyRGB-managed; not removing: $helper_dst"
+  elif [ -f "$helper_dst" ] && [ "$helper_matches" -ne 1 ] && [ "$helper_looks_like_keyrgb" -eq 1 ]; then
+    log_warn "$label helper does not match this repo version, but appears KeyRGB-managed: $helper_dst"
+  fi
+
+  if [ -f "$rule_dst" ] && [ "$rule_matches" -ne 1 ] && [ "$rule_looks_like_keyrgb" -ne 1 ]; then
+    log_warn "$label polkit rule exists but does not look KeyRGB-managed; not removing: $rule_dst"
+  elif [ -f "$rule_dst" ] && [ "$rule_matches" -ne 1 ] && [ "$rule_looks_like_keyrgb" -eq 1 ]; then
+    log_warn "$label polkit rule does not match this repo version, but appears KeyRGB-managed: $rule_dst"
+  fi
+
+  if [ "$helper_matches" -eq 1 ] || [ "$rule_matches" -eq 1 ] || [ "$helper_looks_like_keyrgb" -eq 1 ] || [ "$rule_looks_like_keyrgb" -eq 1 ]; then
     if confirm "Remove $label helper + polkit rule (requires sudo)?"; then
-      if [ "$helper_matches" -eq 1 ]; then
+      if [ "$helper_matches" -eq 1 ] || [ "$helper_looks_like_keyrgb" -eq 1 ]; then
         sudo rm -f "$helper_dst" || true
       fi
-      if [ "$rule_matches" -eq 1 ]; then
+      if [ "$rule_matches" -eq 1 ] || [ "$rule_looks_like_keyrgb" -eq 1 ]; then
         sudo rm -f "$rule_dst" || true
       fi
       log_ok "Removed $label helper/polkit (best-effort)"
@@ -247,6 +292,15 @@ if [ "$PURGE_CONFIG" -eq 1 ]; then
     log_ok "Removed ~/.config/keyrgb"
   else
     log_info "Skipped removing ~/.config/keyrgb"
+  fi
+fi
+
+if [ -d "$STATE_DIR" ]; then
+  if confirm "Remove KeyRGB installer state ($STATE_DIR)?"; then
+    rm -rf "$STATE_DIR" || true
+    log_ok "Removed KeyRGB installer state"
+  else
+    log_info "Skipped removing KeyRGB installer state"
   fi
 fi
 
