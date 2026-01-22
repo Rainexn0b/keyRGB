@@ -13,6 +13,7 @@ load_saved_appimage_prefs() {
   # - KEYRGB_APPIMAGE_ASSET_SET (0/1)
   # - KEYRGB_ALLOW_PRERELEASE
   # - KEYRGB_APPIMAGE_ASSET
+  # - KEYRGB_LAST_TAG (best-effort)
 
   [ -f "$INSTALLER_STATE_FILE" ] || return 0
 
@@ -44,6 +45,13 @@ load_saved_appimage_prefs() {
           fi
         fi
         ;;
+      last_tag)
+        # Best-effort: record the last installed tag (if any) so we can
+        # detect when the on-disk AppImage is older than the latest release.
+        if printf '%s' "$val" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+          KEYRGB_LAST_TAG="$val"
+        fi
+        ;;
     esac
   done < "$INSTALLER_STATE_FILE"
 }
@@ -56,7 +64,9 @@ save_appimage_prefs_best_effort() {
     printf '%s\n' "install_mode=appimage"
     printf '%s\n' "allow_prerelease=${KEYRGB_ALLOW_PRERELEASE:-n}"
     printf '%s\n' "appimage_asset=${KEYRGB_APPIMAGE_ASSET:-keyrgb-x86_64.AppImage}"
-    if [ -n "${KEYRGB_VERSION:-}" ]; then
+    if [ -n "${KEYRGB_INSTALLED_TAG:-}" ]; then
+      printf '%s\n' "last_tag=${KEYRGB_INSTALLED_TAG}"
+    elif [ -n "${KEYRGB_VERSION:-}" ]; then
       printf '%s\n' "last_tag=${KEYRGB_VERSION}"
     fi
   } > "$INSTALLER_STATE_FILE" 2>/dev/null || true

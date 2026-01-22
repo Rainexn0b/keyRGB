@@ -147,6 +147,7 @@ fi
 APPIMAGE_DST="$HOME/.local/bin/keyrgb"
 
 resolved_ref=""
+KEYRGB_INSTALLED_TAG="${KEYRGB_INSTALLED_TAG:-}"
 
 # If KeyRGB is already installed, don't force a 100MB re-download on every run.
 # `--update-appimage` keeps the old behavior.
@@ -154,18 +155,41 @@ if [ "$UPDATE_ONLY" -eq 0 ] \
   && ! is_truthy "${KEYRGB_FORCE_APPIMAGE_DOWNLOAD:-n}" \
   && [ -f "$APPIMAGE_DST" ] \
   && [ -x "$APPIMAGE_DST" ]; then
-  log_info "AppImage already present; skipping download (set KEYRGB_FORCE_APPIMAGE_DOWNLOAD=y to force)."
-  log_info "No AppImage download performed, so no progress meter will be shown."
-
-  # Still try to resolve a tag so icon/udev downloads can use a stable ref.
+  # Resolve the latest tag even when a local AppImage exists, so we can detect
+  # and update stale installs.
   resolved="$(resolve_release_with_asset "$KEYRGB_APPIMAGE_ASSET" "$KEYRGB_ALLOW_PRERELEASE" 2>/dev/null)" || true
   if [ -n "${resolved:-}" ]; then
     IFS='|' read -r resolved_ref _resolved_url _resolved_prerelease <<<"$resolved"
   else
     resolved_ref="main"
   fi
+
+  # Only skip the download when we can confidently tell the on-disk AppImage
+  # matches the latest resolved release tag. If we don't have a record of the
+  # installed tag (older installer), or it differs, refresh.
+  if [ -n "${resolved_ref:-}" ] \
+    && [ "$resolved_ref" != "main" ] \
+    && { [ -z "${KEYRGB_LAST_TAG:-}" ] || [ "$KEYRGB_LAST_TAG" != "$resolved_ref" ]; }; then
+    if [ -n "${KEYRGB_LAST_TAG:-}" ]; then
+      log_info "AppImage present but outdated ($KEYRGB_LAST_TAG -> $resolved_ref); updating."
+    else
+      log_info "AppImage present but installed version unknown; updating to $resolved_ref."
+    fi
+    resolved_ref="$(appimage_install "$APPIMAGE_DST" "$KEYRGB_APPIMAGE_ASSET" "$resolved_ref" "$KEYRGB_ALLOW_PRERELEASE")"
+    KEYRGB_INSTALLED_TAG="$resolved_ref"
+  else
+    log_info "AppImage already present; skipping download (set KEYRGB_FORCE_APPIMAGE_DOWNLOAD=y to force)."
+    log_info "No AppImage download performed, so no progress meter will be shown."
+
+    # If we can infer a tag and it matches what we had recorded, treat it as
+    # current for state persistence.
+    if [ -n "${KEYRGB_LAST_TAG:-}" ] && [ -n "${resolved_ref:-}" ] && [ "$KEYRGB_LAST_TAG" = "$resolved_ref" ]; then
+      KEYRGB_INSTALLED_TAG="$resolved_ref"
+    fi
+  fi
 else
   resolved_ref="$(appimage_install "$APPIMAGE_DST" "$KEYRGB_APPIMAGE_ASSET" "$KEYRGB_VERSION" "$KEYRGB_ALLOW_PRERELEASE")"
+  KEYRGB_INSTALLED_TAG="$resolved_ref"
 fi
 
 # If we resolved a tag, use it for icon/udev. Otherwise fall back to main.
