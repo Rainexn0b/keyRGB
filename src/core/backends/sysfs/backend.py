@@ -10,243 +10,23 @@ logger = logging.getLogger(__name__)
 
 from ..base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeResult
 
-
-def _leds_root() -> Path:
-    # Test hook: allow overriding the sysfs root.
-    root = os.environ.get("KEYRGB_SYSFS_LEDS_ROOT")
-
-    # Safety: under pytest, never probe the real sysfs tree unless explicitly allowed.
-    # Tests that want to exercise this backend should set KEYRGB_SYSFS_LEDS_ROOT to a temp dir.
-    if root is None and os.environ.get("PYTEST_CURRENT_TEST") and not _hardware_allowed():
-        return Path("/nonexistent-keyrgb-test-sysfs-leds")
-
-    return Path(root or "/sys/class/leds")
-
-
-def _hardware_allowed() -> bool:
-    return os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
-
-
-def _is_real_sysfs_path(path: Path) -> bool:
-    try:
-        real = os.path.realpath(str(path))
-        return real.startswith("/sys/")
-    except Exception:
-        return False
-
-
-def _safe_write_text(path: Path, content: str) -> None:
-    # Safety: tests must not mutate real hardware state by writing sysfs.
-    if os.environ.get("PYTEST_CURRENT_TEST") and not _hardware_allowed() and _is_real_sysfs_path(path):
-        if os.environ.get("KEYRGB_TEST_HARDWARE_TRIPWIRE") == "1":
-            raise RuntimeError(f"Refusing to write real sysfs path under pytest: {path}")
-        return
-    path.write_text(content, encoding="utf-8")
-
-
-def _is_candidate_led(name: str) -> bool:
-    n = name.lower()
-    return (
-        "kbd" in n
-        or "keyboard" in n
-        or "rgb:kbd" in n  # Tuxedo/Clevo multicolor
-        or "tuxedo::kbd" in n  # Tuxedo WMI
-        or "clevo::kbd" in n  # Clevo WMI
-        or "ite_8291_lb" in n  # ITE lightbar
-        or "hp_omen::kbd" in n  # HP Omen
-        or "dell::kbd" in n  # Dell
-        or "tpacpi::kbd" in n  # ThinkPad
-        or "asus::kbd" in n  # ASUS WMI
-        or "system76::kbd" in n  # System76
-    )
-
-
-def _score_led_dir(led_dir: Path) -> int:
-    """Score a sysfs LED directory for likelihood of being a keyboard backlight.
-
-    Many systems expose multiple LED class devices. We prefer candidates that:
-    - look like the keyboard backlight (name-based heuristics)
-    - support RGB (multi_intensity or color attribute)
-    - are writable
-    """
-
-    name = led_dir.name.lower()
-    score = 0
-
-    # Strong signals.
-    if "kbd_backlight" in name:
-        score += 40
-    if name.endswith("kbd_backlight"):
-        score += 10
-    if "keyboard" in name:
-        score += 5
-
-    # Prefer RGB-capable sysfs nodes.
-    if (led_dir / "multi_intensity").exists():
-        score += 50
-    if (led_dir / "color").exists():
-        score += 45
-
-    # De-prioritize "noise" LEDs that frequently contain kbd substrings.
-    for noisy in ("capslock", "numlock", "scrolllock", "micmute", "mute"):
-        if noisy in name:
-            score -= 60
-
-    b = led_dir / "brightness"
-    if b.exists():
-        if os.access(b, os.R_OK):
-            score += 3
-        if os.access(b, os.W_OK):
-            score += 7
-
-    return score
-
-
-def _read_int(path: Path) -> int:
-    return int(path.read_text(encoding="utf-8").strip())
-
-
-def _write_int(path: Path, value: int) -> None:
-    try:
-        # When KEYRGB_DEBUG_BRIGHTNESS=1, emit a log for every sysfs write
-        # performed by the backend (helps diagnose flash / transient writes).
-        if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
-            logger.info("sysfs.write %s <- %s", path, int(value))
-    except Exception:
-        pass
-    _safe_write_text(path, f"{int(value)}\n")
-
-
-@dataclass
-class SysfsLedKeyboardDevice(KeyboardDevice):
-    brightness_path: Path
-    max_brightness_path: Path
-    led_dir: Path
-
-    def _max(self) -> int:
-        try:
-            m = _read_int(self.max_brightness_path)
-            return max(1, int(m))
-        except Exception:
-            return 1
-
-    def _read_sysfs_brightness(self) -> int:
-        try:
-            return max(0, int(_read_int(self.brightness_path)))
-        except Exception:
-            return 0
-
-    def turn_off(self) -> None:
-        self.set_brightness(0)
-
-    def is_off(self) -> bool:
-        return self.get_brightness() <= 0
-
-    def get_brightness(self) -> int:
-        # Normalize sysfs brightness into KeyRGB's "hardware" 0..50 scale.
-        sysfs_value = self._read_sysfs_brightness()
-        max_value = self._max()
-        return int(round((sysfs_value / max_value) * 50))
-
-    def set_brightness(self, brightness: int) -> None:
-        # Map KeyRGB's 0..50 brightness scale into sysfs range.
-        b = max(0, min(50, int(brightness)))
-        max_value = self._max()
-        sysfs_value = int(round((b / 50) * max_value))
-        try:
-            if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
-                logger.info(
-                    "backend.sysfs.set_brightness kb=%s sysfs=%s path=%s max=%s",
-                    b,
-                    sysfs_value,
-                    self.brightness_path,
-                    max_value,
-                )
-        except Exception:
-            pass
-        _write_int(self.brightness_path, sysfs_value)
-
-    def _supports_multicolor(self) -> bool:
-        """Check if device supports multi_intensity (Tuxedo/Clevo RGB)"""
-        multi_intensity_path = self.led_dir / "multi_intensity"
-        return multi_intensity_path.exists()
-
-    def _supports_color_attr(self) -> bool:
-        """Check if device uses kernel driver with color attribute"""
-        color_path = self.led_dir / "color"
-        return color_path.exists()
-
-    def _get_system76_color_paths(self) -> list[Path]:
-        """Return list of writable System76 color paths if present"""
-        paths = []
-        # System76 ACPI driver often exposes these for multi-zone RGB
-        for name in ("color_left", "color_center", "color_right", "color_extra"):
-            p = self.led_dir / name
-            if p.exists():
-                paths.append(p)
-        return paths
-
-    def set_color(self, color, *, brightness: int):
-        """Enhanced color setting with multi_intensity and color attribute support"""
-        try:
-            if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
-                r, g, b = color
-                logger.info("backend.sysfs.set_color rgb=(%s,%s,%s) brightness=%s path=%s", r, g, b, brightness, self.led_dir)
-        except Exception:
-            pass
-        # Try multi_intensity first (Tuxedo/Clevo)
-        if self._supports_multicolor():
-            r, g, b = color
-            multi_intensity_path = self.led_dir / "multi_intensity"
-            _safe_write_text(multi_intensity_path, f"{r} {g} {b}\n")
-            self.set_brightness(brightness)
-            return
-
-        # Try color attribute (ITE kernel driver)
-        if self._supports_color_attr():
-            r, g, b = color
-            hex_color = f"{r:02x}{g:02x}{b:02x}"
-            color_path = self.led_dir / "color"
-            _safe_write_text(color_path, f"{hex_color}\n")
-            self.set_brightness(brightness)
-            return
-
-        # Try System76 color paths
-        s76_paths = self._get_system76_color_paths()
-        if s76_paths:
-            r, g, b = color
-            hex_color = f"{r:02X}{g:02X}{b:02X}"
-            for p in s76_paths:
-                _safe_write_text(p, f"{hex_color}\n")
-            self.set_brightness(brightness)
-            return
-
-        # Fallback: brightness-only
-        self.set_brightness(brightness)
-
-    def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
-        # Not supported. No-op to avoid crashing if legacy code attempts per-key.
-        self.set_brightness(brightness)
-
-    def set_effect(self, effect_data) -> None:
-        # Not supported. No-op.
-        return
-
-
+from . import common
+from . import privileged
+from .device import SysfsLedKeyboardDevice
 @dataclass
 class SysfsLedsBackend(KeyboardBackend):
     name: str = "sysfs-leds"
     priority: int = 150
 
     def _find_led(self) -> Optional[tuple[Path, Path, Path]]:
-        root = _leds_root()
+        root = common._leds_root()
         if not root.exists():
             return None
 
         candidates: list[Path] = []
         try:
             for child in root.iterdir():
-                if child.is_dir() and _is_candidate_led(child.name):
+                if child.is_dir() and common._is_candidate_led(child.name):
                     candidates.append(child)
         except Exception:
             return None
@@ -256,7 +36,7 @@ class SysfsLedsBackend(KeyboardBackend):
             b = led_dir / "brightness"
             m = led_dir / "max_brightness"
             if b.exists() and m.exists():
-                viable.append((_score_led_dir(led_dir), led_dir.name, led_dir))
+                viable.append((common._score_led_dir(led_dir), led_dir.name, led_dir))
 
         if not viable:
             return None
@@ -287,9 +67,25 @@ class SysfsLedsBackend(KeyboardBackend):
             )
 
         if not os.access(brightness_path, os.W_OK):
+            # Many kernel LED class nodes are root-writable only. If the optional
+            # pkexec helper is present and supports LED writes, we can still
+            # drive the backlight safely without running the whole app as root.
+            if privileged.helper_supports_led_apply():
+                return ProbeResult(
+                    available=True,
+                    reason="sysfs LED present (brightness root-only; using helper)",
+                    confidence=70,
+                    identifiers={
+                        "brightness": str(brightness_path),
+                        "led": led_dir.name,
+                        "led_dir": str(led_dir),
+                        "helper": privileged.power_helper_path(),
+                    },
+                )
+
             return ProbeResult(
                 available=False,
-                reason="brightness not writable (udev permissions missing?)",
+                reason="brightness not writable (needs root or keyrgb-power-helper)",
                 confidence=0,
                 identifiers={
                     "brightness": str(brightness_path),

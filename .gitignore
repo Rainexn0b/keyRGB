@@ -64,7 +64,11 @@ scripts/build/
 *.old
 
 # Upstream reference clones (not shipped)
-vendor/
+# Keep vendor content ignored by default, but allow committing the vendored
+# tuxedo-drivers snapshot used for hardware investigation and regression tests.
+vendor/*
+!vendor/tuxedo-drivers-4.11.3/
+!vendor/tuxedo-drivers-4.11.3/**
 
 # Local kernel-module work dirs (not shipped)
 third_party/

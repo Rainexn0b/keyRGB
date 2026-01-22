@@ -3,16 +3,24 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 from pathlib import Path
 
 
 CPUFREQ_ROOT_DEFAULT = Path("/sys/devices/system/cpu/cpufreq")
+LEDS_ROOT_DEFAULT = Path("/sys/class/leds")
 
 
 def _cpufreq_root() -> Path:
     # Keep a test hook, but default to real sysfs.
     root = os.environ.get("KEYRGB_CPUFREQ_ROOT")
     return Path(root) if root else CPUFREQ_ROOT_DEFAULT
+
+
+def _leds_root() -> Path:
+    # Keep a test hook, but default to real sysfs.
+    root = os.environ.get("KEYRGB_LEDS_ROOT")
+    return Path(root) if root else LEDS_ROOT_DEFAULT
 
 
 def _read_int(path: Path) -> int | None:
@@ -24,6 +32,77 @@ def _read_int(path: Path) -> int | None:
 
 def _write(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
+
+
+_LED_NAME_RE = re.compile(r"^[A-Za-z0-9:_\-\.]+$")
+
+
+def _validate_led_name(name: str) -> str:
+    name = (name or "").strip()
+    if not name or "/" in name or "\\" in name:
+        raise SystemExit("Invalid LED name")
+    if not _LED_NAME_RE.match(name):
+        raise SystemExit("Invalid LED name")
+
+    # Safety: keep the privileged helper narrowly-scoped.
+    # Only allow common keyboard backlight LED nodes.
+    n = name.lower()
+    if "kbd_backlight" not in n:
+        raise SystemExit("Refusing non-keyboard LED")
+
+    return name
+
+
+def _clamp_int(value: int, *, lo: int, hi: int) -> int:
+    return max(int(lo), min(int(hi), int(value)))
+
+
+def _led_dir(led_name: str) -> Path:
+    root = _leds_root()
+    led_name = _validate_led_name(led_name)
+    p = (root / led_name)
+    try:
+        # Avoid path traversal via symlinks.
+        real = p.resolve(strict=False)
+        root_real = root.resolve(strict=False)
+        if not str(real).startswith(str(root_real) + "/") and str(real) != str(root_real):
+            raise SystemExit("Invalid LED path")
+    except Exception:
+        # If resolve fails, still allow existence checks to handle it.
+        pass
+    return p
+
+
+def _led_apply(led_name: str, *, brightness: int, rgb: tuple[int, int, int] | None) -> None:
+    led = _led_dir(led_name)
+    if not led.exists() or not led.is_dir():
+        raise SystemExit(f"LED not found: {led}")
+
+    max_path = led / "max_brightness"
+    max_b = _read_int(max_path) if max_path.exists() else None
+    if max_b is None:
+        max_b = 255
+    max_b = max(1, int(max_b))
+
+    b = _clamp_int(int(brightness), lo=0, hi=int(max_b))
+
+    # Optional RGB: prefer multi_intensity (Tuxedo/Clevo), then color.
+    if rgb is not None:
+        r, g, bch = [int(x) for x in rgb]
+        r = _clamp_int(r, lo=0, hi=255)
+        g = _clamp_int(g, lo=0, hi=255)
+        bch = _clamp_int(bch, lo=0, hi=255)
+
+        mi = led / "multi_intensity"
+        if mi.exists():
+            _write(mi, f"{r} {g} {bch}\n")
+        else:
+            c = led / "color"
+            if c.exists():
+                _write(c, f"{r:02x}{g:02x}{bch:02x}\n")
+
+    # Always set brightness last.
+    _write(led / "brightness", f"{int(b)}\n")
 
 
 def _policy_dirs(root: Path) -> list[Path]:
@@ -113,6 +192,14 @@ def main() -> int:
     a = sub.add_parser("apply", help="Apply a power mode")
     a.add_argument("mode", help="extreme-saver | balanced | performance")
 
+    l = sub.add_parser(
+        "led-apply",
+        help="Apply keyboard LED settings (brightness and optional RGB) via sysfs",
+    )
+    l.add_argument("led", help="LED name under /sys/class/leds (e.g. rgb:kbd_backlight)")
+    l.add_argument("--brightness", required=True, type=int, help="Raw sysfs brightness (0..max_brightness)")
+    l.add_argument("--rgb", nargs=3, type=int, metavar=("R", "G", "B"), help="RGB color 0..255")
+
     ns = ap.parse_args()
 
     if os.geteuid() != 0:
@@ -120,6 +207,11 @@ def main() -> int:
 
     if ns.cmd == "apply":
         apply_mode(ns.mode)
+        return 0
+
+    if ns.cmd == "led-apply":
+        rgb = tuple(ns.rgb) if ns.rgb is not None else None
+        _led_apply(str(ns.led), brightness=int(ns.brightness), rgb=rgb)  # type: ignore[arg-type]
         return 0
 
     return 2

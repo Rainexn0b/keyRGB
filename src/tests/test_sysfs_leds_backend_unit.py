@@ -11,11 +11,8 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from src.core.backends.sysfs import SysfsLedsBackend
-from src.core.backends.sysfs.backend import (
-    SysfsLedKeyboardDevice,
-    _leds_root,
-    _safe_write_text,
-)
+from src.core.backends.sysfs.device import SysfsLedKeyboardDevice
+from src.core.backends.sysfs.common import _leds_root, _safe_write_text
 
 
 def _make_led(tmp_path: Path, name: str, *, brightness: int, max_brightness: int) -> Path:
@@ -248,6 +245,32 @@ def test_sysfs_backend_probe_reports_permission_failures(monkeypatch: pytest.Mon
     probe2 = backend.probe()
     assert probe2.available is False
     assert "not writable" in (probe2.reason or "")
+
+
+def test_sysfs_backend_probe_allows_helper_when_not_writable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _make_led(tmp_path, "rgb:kbd_backlight", brightness=1, max_brightness=10)
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
+
+    # Readable but not writable.
+    def fake_access(path: str | os.PathLike[str], mode: int) -> bool:
+        if mode == os.R_OK:
+            return True
+        if mode == os.W_OK:
+            return False
+        return False
+
+    monkeypatch.setattr(os, "access", fake_access)
+
+    # Pretend helper supports LED apply.
+    import src.core.backends.sysfs.privileged as sysfs_privileged
+
+    monkeypatch.setattr(sysfs_privileged, "helper_supports_led_apply", lambda: True)
+
+    backend = SysfsLedsBackend()
+    probe = backend.probe()
+    assert probe.available is True
+    assert probe.confidence >= 60
+    assert "helper" in (probe.reason or "").lower()
 
 
 def test_sysfs_backend_api_methods_are_stable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

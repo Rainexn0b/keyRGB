@@ -31,7 +31,7 @@ def _sysfs_led_candidates_snapshot() -> dict[str, Any]:
     """
 
     try:
-        from ..backends.sysfs.backend import _leds_root, _is_candidate_led, _score_led_dir  # type: ignore
+        from ..backends.sysfs.common import _leds_root, _is_candidate_led, _score_led_dir  # type: ignore
     except Exception:
         return {}
 
@@ -73,6 +73,40 @@ def _sysfs_led_candidates_snapshot() -> dict[str, Any]:
 
     out["candidates_count"] = len(candidates)
     out["top"] = []
+
+    # Infer likely keyboard lighting zones from common sysfs naming patterns.
+    # Ex: rgb:kbd_backlight, rgb:kbd_backlight_1, rgb:kbd_backlight_2 -> 3 zones.
+    kbd_names: list[str] = []
+    for _, name, _led_dir in scored:
+        if "kbd_backlight" in (name or "").lower():
+            kbd_names.append(name)
+
+    groups: dict[str, list[str]] = {}
+    for name in kbd_names:
+        base = name
+        try:
+            left, suffix = name.rsplit("_", 1)
+            if suffix.isdigit() and "kbd_backlight" in left.lower():
+                base = left
+        except ValueError:
+            pass
+        groups.setdefault(base, []).append(name)
+
+    inferred_zone_count = 0
+    try:
+        inferred_zone_count = max((len(v) for v in groups.values()), default=0)
+    except Exception:
+        inferred_zone_count = 0
+
+    out["zones"] = {
+        "kbd_backlight_leds": kbd_names[:16],
+        "groups": [
+            {"base": base, "count": len(names), "names": sorted(names)[:16]}
+            for base, names in sorted(groups.items(), key=lambda kv: (-(len(kv[1])), kv[0].lower()))
+        ][:8],
+        "inferred_zone_count": int(inferred_zone_count),
+    }
+
     for score, name, led_dir in scored[:8]:
         entry: dict[str, Any] = {
             "name": name,
@@ -107,12 +141,11 @@ def _disable_usb_scan_under_pytest_if_needed():
     try:
         yield
     finally:
-        if not did_override_usb_scan:
-            return
-        if restore_disable_usb_scan is None:
-            os.environ.pop("KEYRGB_DISABLE_USB_SCAN", None)
-        else:
-            os.environ["KEYRGB_DISABLE_USB_SCAN"] = restore_disable_usb_scan
+        if did_override_usb_scan:
+            if restore_disable_usb_scan is None:
+                os.environ.pop("KEYRGB_DISABLE_USB_SCAN", None)
+            else:
+                os.environ["KEYRGB_DISABLE_USB_SCAN"] = restore_disable_usb_scan
 
 
 def _probe_backend(backend: Any) -> dict[str, Any]:

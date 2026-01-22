@@ -185,6 +185,16 @@ warn_if_no_usb_device_best_effort() {
   if ! have_cmd lsusb; then
     return 0
   fi
+
+  # Some supported laptops expose keyboard lighting via kernel sysfs LEDs (e.g.
+  # tuxedo_keyboard / clevo_wmi) and won't show an ITE USB controller in lsusb.
+  # Avoid a confusing warning in that case.
+  if [ -d /sys/class/leds ]; then
+    if ls /sys/class/leds 2>/dev/null | grep -Eqi "kbd_backlight"; then
+      return 0
+    fi
+  fi
+
   # Common supported ITE 8291r3 IDs.
   if ! lsusb | grep -Eqi "048d:(6004|6006|6008|600b|ce00)"; then
     log_warn "Supported ITE 8291 USB device not detected (best-effort check)."

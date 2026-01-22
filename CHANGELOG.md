@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.3 (2026-01-22)
+
+- Backends: Sysfs LED backend can operate on root-only `/sys/class/leds/*kbd_backlight*` via a privileged helper (pkexec/polkit), avoiding running the whole app as root.
+- Diagnostics: Sysfs LED snapshot now reports inferred keyboard lighting zones (e.g. `rgb:kbd_backlight`, `_1`, `_2`).
+- Effects: Unsupported hardware effects (e.g. `rainbow` on sysfs backends) fall back gracefully instead of raising.
+- Dev: Vendored driver reference added: `vendor/tuxedo-drivers-4.11.3` (unignored) with local ignore rules for build artifacts.
+
 ## 0.14.2 (2026-01-18)
 
 - Refactor: Installer modernization - split monolithic `install.sh` into modular scripts under `scripts/lib/` for improved maintainability and testability.

@@ -1,0 +1,23 @@
+# Ignore kernel build / DKMS artifacts inside the vendored tuxedo-drivers snapshot.
+
+# kbuild outputs
+*.o
+*.o.*
+*.ko
+*.ko.*
+*.mod
+*.mod.c
+*.mod.o
+*.cmd
+.*.cmd
+
+# symbol/version files
+Module.symvers
+modules.order
+
+# temporary directories
+.tmp_versions/
+
+# editor/OS noise
+*~
+.DS_Store
