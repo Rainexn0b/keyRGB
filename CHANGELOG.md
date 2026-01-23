@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.14.6 (2026-01-23)
+
+- Fix: Tray: Improve fallback to Xorg backend when AppIndicator libraries are missing, preventing startup crashes on systems without indicator libraries until the v0.14.5+ AppImage is deployed.
+- Tray: Add explicit error detection for missing `libayatana-indicator` / `app_indicator_new` to log clearer fallback reasons.
+
 ## 0.14.5 (2026-01-23)
 
 - Fix: AppImage: Bundle missing indicator dependencies (libayatana-indicator3, libindicator3, libdbusmenu-gtk3) so native tray icons work and the tray app no longer crashes on systems that don't provide these packages.

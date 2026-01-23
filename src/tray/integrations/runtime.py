@@ -118,10 +118,14 @@ def get_pystray():
         logger.info("pystray backend: appindicator (auto)")
         try:
             _pystray_mod = importlib.import_module("pystray")
-        except Exception:
+        except Exception as exc:
             _clear_failed_import("pystray")
+            # Catch GLib.GError indicating missing indicator libraries.
+            if "libayatana-indicator" in str(exc) or "app_indicator_new" in str(exc):
+                logger.info("pystray backend: xorg (missing indicator libs)")
+            else:
+                logger.info("pystray backend: xorg (fallback)")
             _set_pystray_backend_xorg_for_retry()
-            logger.info("pystray backend: xorg (fallback)")
             _pystray_mod = importlib.import_module("pystray")
     else:
         try:
