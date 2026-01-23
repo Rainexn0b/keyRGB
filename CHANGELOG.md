@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.14.4 (2026-01-23)
+
+- AppImage: Bundle tkinter native libraries (libtk8.6, libtcl8.6) directly into AppImage to eliminate system `python3-tk` dependency.
+- AppImage: Bundle libappindicator3/ayatana-appindicator3 for native tray icon support without requiring system packages.
+- AppImage: Now fully self-contained and portable - works out-of-the-box on any distro without system dependencies.
+- Installer: Updated installer state tracking to detect and auto-update stale AppImage versions (tracks `last_tag`).
+- Installer: Enhanced uninstaller parity - removes KeyRGB-managed files even when versions differ (uses content markers as fallback).
+- Docs: Clarified README install instructions - AppImage is truly standalone; system deps only needed for development/clone installs.
+
 ## 0.14.3 (2026-01-22)
 
 - Backends: Sysfs LED backend can operate on root-only `/sys/class/leds/*kbd_backlight*` via a privileged helper (pkexec/polkit), avoiding running the whole app as root.
