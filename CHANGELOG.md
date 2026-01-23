@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.14.7 (2026-01-23)
+
+- Release: CI builds and uploads the AppImage artifact for this tag so users can update directly via the installer or the release page.
+- Fix: Verified AppImage bundles indicator libraries (libayatana-indicator3, libindicator3, libappindicator3, libdbusmenu-gtk3) to avoid AppIndicator startup crashes when system packages are missing.
+- Fix: Installer: Remove stale temporary download files (`keyrgb.tmp.*`) before downloading and ensure cleanup on EXIT/INT/TERM to avoid leftover temp files after interrupted installs.
+- Fix: Tray: Add explicit detection for missing `libayatana-indicator` / `app_indicator_new` and gracefully fall back to the Xorg backend with clear logs.
+- Docs: Recommend updating to v0.14.7 to receive the bundled AppImage and installer robustness improvements.
+
 ## 0.14.6 (2026-01-23)
 
 - Fix: Tray: Improve fallback to Xorg backend when AppIndicator libraries are missing, preventing startup crashes on systems without indicator libraries until the v0.14.5+ AppImage is deployed.
