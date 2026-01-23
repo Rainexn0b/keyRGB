@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.8 (2026-01-23)
+
+- Fix: CI/AppImage: Install actual indicator library packages (`libayatana-indicator3-7`, `libappindicator3-1`, etc.) on Ubuntu CI so the bundling step can find and include them.
+- Fix: AppImage: Improve library bundling to properly handle symlink chains - recreate symlinks and copy all files in the chain so `libayatana-indicator3.so.7` and related versioned libraries are available at runtime.
+- Docs: The v0.14.7 AppImage from CI was missing bundled indicator libraries; v0.14.8 fixes this by installing library packages in CI and improving symlink handling.
+
 ## 0.14.7 (2026-01-23)
 
 - Release: CI builds and uploads the AppImage artifact for this tag so users can update directly via the installer or the release page.

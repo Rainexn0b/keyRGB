@@ -247,36 +247,57 @@ def _bundle_libappindicator(*, appdir: Path) -> None:
         "libdbusmenu-gtk3.so*",
     ]
 
-    def find_lib(patterns: list[str]) -> Path | None:
+    def find_and_bundle_lib(patterns: list[str]) -> bool:
+        """Find a library by pattern and bundle it with all symlink variants."""
         for search_path in lib_search_paths:
             if not search_path.exists():
                 continue
             for pattern in patterns:
                 matches = list(search_path.glob(pattern))
-                # Prefer versioned .so files (not symlinks ending in just .so)
+                if not matches:
+                    continue
+
+                # Collect all files in the symlink chain
+                bundled_files = set()
                 for candidate in matches:
-                    if candidate.is_file() and not candidate.is_symlink():
-                        return candidate
-                # Fallback: use any match including symlinks
-                if matches:
-                    return matches[0]
-        return None
+                    # Follow symlink chain and bundle both symlink and target
+                    current = candidate
+                    while current.exists():
+                        # Copy this file/symlink
+                        dst = usr_lib / current.name
+                        if current.name not in bundled_files:
+                            if current.is_symlink():
+                                # Recreate symlink pointing to the same target name
+                                link_target = os.readlink(current)
+                                # If relative path, keep it; if absolute, make it relative
+                                if os.path.isabs(link_target):
+                                    link_target = os.path.basename(link_target)
+                                if dst.exists() or dst.is_symlink():
+                                    dst.unlink()
+                                os.symlink(link_target, dst)
+                            else:
+                                # Copy actual file
+                                shutil.copy2(current, dst)
+                            bundled_files.add(current.name)
+
+                        # Follow symlink to next in chain
+                        if current.is_symlink():
+                            link_target = current.readlink()
+                            if link_target.is_absolute():
+                                current = link_target
+                            else:
+                                current = current.parent / link_target
+                        else:
+                            break  # Reached actual file
+
+                if bundled_files:
+                    return True
+        return False
 
     bundled_any = False
     for pattern in lib_patterns:
-        lib = find_lib([pattern])
-        if lib is None:
-            continue
-
-        # Copy the library into the AppImage usr/lib.
-        shutil.copy2(lib, usr_lib / lib.name)
-        bundled_any = True
-
-        # Also handle any immediate symlink dependencies.
-        if lib.is_symlink():
-            real = lib.resolve()
-            if real.exists() and real != lib:
-                shutil.copy2(real, usr_lib / real.name)
+        if find_and_bundle_lib([pattern]):
+            bundled_any = True
 
     if not bundled_any:
         # No indicator libraries found; AppImage will fall back to basic tray icon.
