@@ -96,8 +96,14 @@ _download_url_impl() {
   [ -n "$dst" ] || die "download_url: destination path is empty"
   mkdir -p "$(dirname "$dst")"
 
+  # Clean up any stale temp files from previous interrupted downloads
+  rm -f "${dst}".tmp.* 2>/dev/null || true
+
   local tmp
   tmp="$(mktemp "${dst}.tmp.XXXXXX")" || die "Failed to create temp file"
+
+  # Ensure cleanup on exit/interrupt
+  trap 'rm -f "$tmp" 2>/dev/null || true' EXIT INT TERM
 
   local show_progress="n"
   if [ "$progress_mode" = "force" ]; then

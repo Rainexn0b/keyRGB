@@ -220,7 +220,7 @@ def _bundle_tkinter(*, appdir: Path) -> None:
 
 
 def _bundle_libappindicator(*, appdir: Path) -> None:
-    """Bundle libappindicator native library into the AppImage.
+    """Bundle libappindicator native library + dependencies into the AppImage.
 
     libappindicator provides native tray icon support on Ubuntu/GNOME systems.
     We bundle it so the AppImage works without requiring system packages.
@@ -235,11 +235,16 @@ def _bundle_libappindicator(*, appdir: Path) -> None:
         Path("/usr/lib"),
     ]
 
-    # Look for libappindicator3 (GTK3 version) or ayatana-appindicator3.
-    # Prefer versioned .so files over unversioned symlinks.
-    appindicator_patterns = [
+    # Bundle the full indicator stack:
+    # - libappindicator3 / ayatana-appindicator3 (high-level API)
+    # - libayatana-indicator3 / libindicator3 (underlying indicator library)
+    # - libdbusmenu-gtk3 (menu protocol)
+    lib_patterns = [
         "libappindicator3.so*",
         "libayatana-appindicator3.so*",
+        "libayatana-indicator3.so*",
+        "libindicator3.so*",
+        "libdbusmenu-gtk3.so*",
     ]
 
     def find_lib(patterns: list[str]) -> Path | None:
@@ -257,20 +262,25 @@ def _bundle_libappindicator(*, appdir: Path) -> None:
                     return matches[0]
         return None
 
-    appindicator_lib = find_lib(appindicator_patterns)
+    bundled_any = False
+    for pattern in lib_patterns:
+        lib = find_lib([pattern])
+        if lib is None:
+            continue
 
-    if appindicator_lib is None:
-        # libappindicator not found; AppImage will fall back to basic tray icon.
+        # Copy the library into the AppImage usr/lib.
+        shutil.copy2(lib, usr_lib / lib.name)
+        bundled_any = True
+
+        # Also handle any immediate symlink dependencies.
+        if lib.is_symlink():
+            real = lib.resolve()
+            if real.exists() and real != lib:
+                shutil.copy2(real, usr_lib / real.name)
+
+    if not bundled_any:
+        # No indicator libraries found; AppImage will fall back to basic tray icon.
         return
-
-    # Copy the library into the AppImage usr/lib.
-    shutil.copy2(appindicator_lib, usr_lib / appindicator_lib.name)
-
-    # Also handle any immediate symlink dependencies.
-    if appindicator_lib.is_symlink():
-        real = appindicator_lib.resolve()
-        if real.exists() and real != appindicator_lib:
-            shutil.copy2(real, usr_lib / real.name)
 
 
 def _bundle_pygobject(*, appdir: Path, site_packages: Path) -> None:
