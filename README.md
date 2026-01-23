@@ -100,31 +100,33 @@ KeyRGB uses a priority-based system to select the best driver for your hardware:
 
 ### Install
 
-#### Option A: One-line interactive install (recommended)
+#### Standalone AppImage (recommended for most users)
 
-Downloads and runs the latest installer script (no clone). By default, the installer recommends the latest stable AppImage and remembers your last stable/beta choice.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh
-```
-
-If you don't want the installer to attempt system package installs (no sudo / minimal / immutable OS):
+Downloads the self-contained AppImage + sets up device permissions (udev rules + polkit helper). No system dependencies required.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --no-system-deps
 ```
 
-#### Automated AppImage update (non-interactive)
+The AppImage bundles all dependencies (Python, tkinter, libappindicator, libraries) for maximum portability. Works out-of-the-box on any distro.
 
-Updates an existing AppImage install by replacing `~/.local/bin/keyrgb` with the newest matching release. Uses the last saved release channel (stable vs prerelease) unless overridden.
+#### Update existing AppImage (non-interactive)
+
+Replaces `~/.local/bin/keyrgb` with the newest matching release. Reuses your last saved release channel (stable vs prerelease).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage
 ```
 
-#### Option B: Install from a local checkout (dev / local mods)
+#### Development install (local checkout)
 
-If you already cloned the repo:
+For development or local modifications. Clones the repository, installs system dependencies (Python 3.12+, pip, build tools, libgirepository dev headers, python3-tk, libappindicator), creates a virtual environment, and installs keyrgb in editable mode.
+
+```bash
+./install_dev.sh
+```
+
+Or if you already cloned the repo:
 
 ```bash
 ./install.sh
@@ -134,7 +136,7 @@ Notes:
 
 - Fedora / Nobara is the primary supported target.
 - Other distros are best-effort via common package managers (dnf/apt/pacman/zypper/apk).
-- The installer installs the app launcher + autostart, and may prompt for sudo to install udev rules needed for hardware access.
+- System dependencies are only needed for development installs; the AppImage bundles everything.
 
 Docs:
 

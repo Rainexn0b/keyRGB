@@ -219,6 +219,60 @@ def _bundle_tkinter(*, appdir: Path) -> None:
                 shutil.copy2(real, usr_lib / real.name)
 
 
+def _bundle_libappindicator(*, appdir: Path) -> None:
+    """Bundle libappindicator native library into the AppImage.
+
+    libappindicator provides native tray icon support on Ubuntu/GNOME systems.
+    We bundle it so the AppImage works without requiring system packages.
+    """
+    usr_lib = appdir / "usr" / "lib"
+    usr_lib.mkdir(parents=True, exist_ok=True)
+
+    # Common system library paths.
+    lib_search_paths = [
+        Path("/usr/lib/x86_64-linux-gnu"),
+        Path("/usr/lib64"),
+        Path("/usr/lib"),
+    ]
+
+    # Look for libappindicator3 (GTK3 version) or ayatana-appindicator3.
+    # Prefer versioned .so files over unversioned symlinks.
+    appindicator_patterns = [
+        "libappindicator3.so*",
+        "libayatana-appindicator3.so*",
+    ]
+
+    def find_lib(patterns: list[str]) -> Path | None:
+        for search_path in lib_search_paths:
+            if not search_path.exists():
+                continue
+            for pattern in patterns:
+                matches = list(search_path.glob(pattern))
+                # Prefer versioned .so files (not symlinks ending in just .so)
+                for candidate in matches:
+                    if candidate.is_file() and not candidate.is_symlink():
+                        return candidate
+                # Fallback: use any match including symlinks
+                if matches:
+                    return matches[0]
+        return None
+
+    appindicator_lib = find_lib(appindicator_patterns)
+
+    if appindicator_lib is None:
+        # libappindicator not found; AppImage will fall back to basic tray icon.
+        return
+
+    # Copy the library into the AppImage usr/lib.
+    shutil.copy2(appindicator_lib, usr_lib / appindicator_lib.name)
+
+    # Also handle any immediate symlink dependencies.
+    if appindicator_lib.is_symlink():
+        real = appindicator_lib.resolve()
+        if real.exists() and real != appindicator_lib:
+            shutil.copy2(real, usr_lib / real.name)
+
+
 def _bundle_pygobject(*, appdir: Path, site_packages: Path) -> None:
     """Best-effort bundle of PyGObject (gi) for tray/AppIndicator support.
 
@@ -343,6 +397,7 @@ def build_appimage() -> Path:
     # Layout
     _bundle_python_runtime(appdir=appdir)
     _bundle_tkinter(appdir=appdir)
+    _bundle_libappindicator(appdir=appdir)
 
     lib_root = appdir / "usr" / "lib" / "keyrgb"
     site_packages = lib_root / "site-packages"
