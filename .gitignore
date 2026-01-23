@@ -28,6 +28,7 @@ v*.tar.gz
 
 # Local tooling
 .cache/
+.claude/
 
 # Virtual environments
 venv/

@@ -65,7 +65,7 @@ def _load_tray_logo_alpha_64() -> Image.Image | None:
             # Keep a small transparent margin so the icon doesn't look like a
             # solid square in the tray (resizing a high-res asset directly to
             # 64×64 tends to eliminate edge transparency).
-            inner = img.resize(_ICON_INNER_SIZE, resampling)
+            inner = img.resize(_ICON_INNER_SIZE, resampling)  # type: ignore[arg-type]
             out = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
             ox = (_ICON_SIZE[0] - _ICON_INNER_SIZE[0]) // 2
             oy = (_ICON_SIZE[1] - _ICON_INNER_SIZE[1]) // 2

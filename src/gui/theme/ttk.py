@@ -34,7 +34,7 @@ def apply_clam_light_theme(
         fg_color = "#000000"
 
     try:
-        root.configure(bg=bg_color)
+        root.configure(bg=bg_color)  # type: ignore[call-arg]
     except Exception:
         pass
 
@@ -95,7 +95,7 @@ def apply_clam_dark_theme(
     fg_color = _FG_COLOR
 
     try:
-        root.configure(bg=bg_color)
+        root.configure(bg=bg_color)  # type: ignore[call-arg]
     except Exception:
         pass
 
