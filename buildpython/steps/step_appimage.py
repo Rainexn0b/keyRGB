@@ -164,6 +164,61 @@ def _bundle_python_runtime(*, appdir: Path) -> None:
             shutil.copy2(lib_src, flat_dst)
 
 
+def _bundle_tkinter(*, appdir: Path) -> None:
+    """Bundle Tkinter native libraries (libtk, libtcl) into the AppImage.
+
+    Tkinter is a core GUI dependency; we bundle the native libraries so the
+    AppImage doesn't depend on system-installed tk/tcl packages.
+    """
+    usr_lib = appdir / "usr" / "lib"
+    usr_lib.mkdir(parents=True, exist_ok=True)
+
+    # Common system library paths for tk/tcl shared libraries.
+    lib_search_paths = [
+        Path("/usr/lib/x86_64-linux-gnu"),
+        Path("/usr/lib64"),
+        Path("/usr/lib"),
+    ]
+
+    # Look for libtk and libtcl (we need both for tkinter to work).
+    # Prefer versioned .so files (e.g., libtk8.6.so) over unversioned symlinks.
+    tk_patterns = ["libtk8.*.so*", "libtk.so*"]
+    tcl_patterns = ["libtcl8.*.so*", "libtcl.so*"]
+
+    def find_lib(patterns: list[str]) -> Path | None:
+        for search_path in lib_search_paths:
+            if not search_path.exists():
+                continue
+            for pattern in patterns:
+                matches = list(search_path.glob(pattern))
+                # Prefer versioned .so files (not symlinks ending in just .so)
+                for candidate in matches:
+                    if candidate.is_file() and not candidate.is_symlink():
+                        return candidate
+                # Fallback: use any match including symlinks
+                if matches:
+                    return matches[0]
+        return None
+
+    tk_lib = find_lib(tk_patterns)
+    tcl_lib = find_lib(tcl_patterns)
+
+    if tk_lib is None or tcl_lib is None:
+        # Tkinter libraries not found; AppImage will require system tk/tcl.
+        return
+
+    # Copy both libraries into the AppImage usr/lib.
+    shutil.copy2(tk_lib, usr_lib / tk_lib.name)
+    shutil.copy2(tcl_lib, usr_lib / tcl_lib.name)
+
+    # Also handle any immediate symlink dependencies (e.g., libtk8.6.so -> libtk8.6.so.0)
+    for lib in [tk_lib, tcl_lib]:
+        if lib.is_symlink():
+            real = lib.resolve()
+            if real.exists() and real != lib:
+                shutil.copy2(real, usr_lib / real.name)
+
+
 def _bundle_pygobject(*, appdir: Path, site_packages: Path) -> None:
     """Best-effort bundle of PyGObject (gi) for tray/AppIndicator support.
 
@@ -287,6 +342,7 @@ def build_appimage() -> Path:
 
     # Layout
     _bundle_python_runtime(appdir=appdir)
+    _bundle_tkinter(appdir=appdir)
 
     lib_root = appdir / "usr" / "lib" / "keyrgb"
     site_packages = lib_root / "site-packages"
