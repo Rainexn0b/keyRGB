@@ -221,6 +221,11 @@ def test_sysfs_backend_probe_reports_permission_failures(monkeypatch: pytest.Mon
     led = _make_led(tmp_path, "tongfang::kbd_backlight", brightness=1, max_brightness=10)
     monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
 
+    # Pretend helper does NOT support LED apply for this test.
+    import src.core.backends.sysfs.privileged as sysfs_privileged
+
+    monkeypatch.setattr(sysfs_privileged, "helper_supports_led_apply", lambda: False)
+
     def fake_access(path: str | os.PathLike[str], mode: int) -> bool:
         p = str(path)
         if p.endswith(str(led / "brightness")) and mode == os.R_OK:

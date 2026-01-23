@@ -99,11 +99,11 @@ _download_url_impl() {
   # Clean up any stale temp files from previous interrupted downloads
   rm -f "${dst}".tmp.* 2>/dev/null || true
 
-  local tmp
+  local tmp=""
+  # Ensure cleanup on exit/interrupt (set trap before mktemp so it's always defined)
+  trap '[ -n "$tmp" ] && rm -f "$tmp" 2>/dev/null || true' EXIT INT TERM
+  
   tmp="$(mktemp "${dst}.tmp.XXXXXX")" || die "Failed to create temp file"
-
-  # Ensure cleanup on exit/interrupt
-  trap 'rm -f "$tmp" 2>/dev/null || true' EXIT INT TERM
 
   local show_progress="n"
   if [ "$progress_mode" = "force" ]; then
