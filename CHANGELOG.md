@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.9 (2026-01-23)
+
+- Fix: CI/AppImage: Add missing `libayatana-ido3-0.4-0` package (indicator display objects library) required by Ayatana AppIndicator stack.
+- Fix: AppImage: Bundle `libayatana-ido3-0.4.so*` to fix `app_indicator_new` lookup failure on systems without this GTK indicator widget library.
+- Note: The v0.14.8 AppImage was missing libayatana-ido3, causing "cannot open shared object file" errors on Fedora/Nobara systems.
+
 ## 0.14.8 (2026-01-23)
 
 - Fix: CI/AppImage: Install actual indicator library packages (`libayatana-indicator3-7`, `libappindicator3-1`, etc.) on Ubuntu CI so the bundling step can find and include them.

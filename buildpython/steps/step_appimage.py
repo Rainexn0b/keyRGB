@@ -238,12 +238,14 @@ def _bundle_libappindicator(*, appdir: Path) -> None:
     # Bundle the full indicator stack:
     # - libappindicator3 / ayatana-appindicator3 (high-level API)
     # - libayatana-indicator3 / libindicator3 (underlying indicator library)
+    # - libayatana-ido3 (indicator display objects - GTK widgets for indicators)
     # - libdbusmenu-gtk3 (menu protocol)
     lib_patterns = [
         "libappindicator3.so*",
         "libayatana-appindicator3.so*",
         "libayatana-indicator3.so*",
         "libindicator3.so*",
+        "libayatana-ido3-0.4.so*",
         "libdbusmenu-gtk3.so*",
     ]
 
