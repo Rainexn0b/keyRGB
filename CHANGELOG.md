@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.5 (2026-01-23)
+
+- Fix: AppImage: Bundle missing indicator dependencies (libayatana-indicator3, libindicator3, libdbusmenu-gtk3) so native tray icons work and the tray app no longer crashes on systems that don't provide these packages.
+- Fix: AppImage: Improve AppIndicator bundling to include the full dependency chain (not only top-level libappindicator) for reliable desktop integration.
+- Fix: Installer: Clean up stale temporary download files (`keyrgb.tmp.*`) before starting a new download, and add an EXIT/INT/TERM trap to ensure temp files are removed on interrupt.
+- Docs: Clarified that the AppImage bundles indicator libraries and that the installer updates the AppImage by downloading to a temporary file and atomically moving it into place.
+
 ## 0.14.4 (2026-01-23)
 
 - AppImage: Bundle tkinter native libraries (libtk8.6, libtcl8.6) directly into AppImage to eliminate system `python3-tk` dependency.
