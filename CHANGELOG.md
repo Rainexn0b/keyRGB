@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.10 (2026-01-23)
+
+- Fix: AppImage: Bundle Tcl/Tk script libraries (`tcl8.6/`, `tk8.6/` directories containing `init.tcl` and support scripts) required by tkinter at runtime.
+- Fix: AppImage: Set `TCL_LIBRARY` and `TK_LIBRARY` environment variables in AppRun so tkinter can locate bundled script libraries.
+- Note: v0.14.9 bundled only tkinter's native `.so` files but not the Tcl/Tk scripts, causing "Can't find a usable init.tcl" errors when opening GUI windows.
+
 ## 0.14.9 (2026-01-23)
 
 - Fix: CI/AppImage: Add missing `libayatana-ido3-0.4-0` package (indicator display objects library) required by Ayatana AppIndicator stack.

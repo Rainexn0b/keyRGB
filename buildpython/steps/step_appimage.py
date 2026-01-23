@@ -165,10 +165,10 @@ def _bundle_python_runtime(*, appdir: Path) -> None:
 
 
 def _bundle_tkinter(*, appdir: Path) -> None:
-    """Bundle Tkinter native libraries (libtk, libtcl) into the AppImage.
+    """Bundle Tkinter native libraries and Tcl/Tk script libraries into the AppImage.
 
-    Tkinter is a core GUI dependency; we bundle the native libraries so the
-    AppImage doesn't depend on system-installed tk/tcl packages.
+    Tkinter needs both native .so files AND the Tcl/Tk script directories
+    (containing init.tcl, tk.tcl, and other support scripts) to work.
     """
     usr_lib = appdir / "usr" / "lib"
     usr_lib.mkdir(parents=True, exist_ok=True)
@@ -217,6 +217,29 @@ def _bundle_tkinter(*, appdir: Path) -> None:
             real = lib.resolve()
             if real.exists() and real != lib:
                 shutil.copy2(real, usr_lib / real.name)
+
+    # Bundle Tcl/Tk script libraries (init.tcl and support files).
+    # These are required for tkinter to initialize properly.
+    script_search_paths = [
+        Path("/usr/share/tcltk"),
+        Path("/usr/share"),
+        Path("/usr/lib/x86_64-linux-gnu"),
+        Path("/usr/lib64"),
+        Path("/usr/lib"),
+    ]
+
+    for search_root in script_search_paths:
+        if not search_root.exists():
+            continue
+
+        # Look for tcl8.6 and tk8.6 directories
+        for script_dir_name in ["tcl8.6", "tk8.6"]:
+            script_dir = search_root / script_dir_name
+            if script_dir.exists() and script_dir.is_dir():
+                dst = usr_lib / script_dir_name
+                if not dst.exists():
+                    shutil.copytree(script_dir, dst, symlinks=False)
+                    print(f"Bundled {script_dir_name} scripts: {script_dir} -> {dst}")
 
 
 def _bundle_libappindicator(*, appdir: Path) -> None:
@@ -520,6 +543,7 @@ def build_appimage() -> Path:
     # AppRun: uses the bundled python to avoid system-python ABI mismatches.
     # Prefer AppIndicator/Gtk when possible; we bundle PyGObject (gi) when
     # available at build time and provide typelibs via GI_TYPELIB_PATH.
+    # Set TCL_LIBRARY and TK_LIBRARY so bundled tkinter can find init.tcl and support scripts.
     apprun = "\n".join(
         [
             "#!/bin/sh",
@@ -530,6 +554,8 @@ def build_appimage() -> Path:
             'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
             'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
             'export GI_TYPELIB_PATH="$HERE/usr/lib/girepository-1.0${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"',
+            'export TCL_LIBRARY="$HERE/usr/lib/tcl8.6"',
+            'export TK_LIBRARY="$HERE/usr/lib/tk8.6"',
             'exec "$HERE/usr/bin/python3" -B -m src.tray "$@"',
             "",
         ]
