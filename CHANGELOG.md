@@ -3,6 +3,7 @@
 ## 0.15.0 (2026-01-25)
 
 - Improvement: Add sysfs multi-zone support (virtual per-key zoning), GUI and tray stability fixes, improved tests, and AppImage packaging updates.
+- Refactor: Extract and simplify backend and tray modules (sysfs device, ITE backend, and lighting-controller helpers); refactor `SysfsLedKeyboardDevice` dataclass to use `primary_led_dir`/`all_led_dirs`, centralize per-key zoning logic, and reduce cyclomatic complexity to improve testability and maintainability.
 - Fix: Sysfs: Restore missing `_max()` helper, add explicit typing for `zone_lists`, and implement N-zone mapping (Left/Center/Right) with `primary_led_dir` and `all_led_dirs`.
 - Fix: Tests: Update `src/tests/test_sysfs_leds_backend_unit.py` to use the new `primary_led_dir` constructor and expand coverage for multi-zone behavior; update tray tests for controller edge cases.
 - Build: Add LOC and type checks, fix type annotation issues, and ensure the full build pipeline (Compile, Pytest, Type Check, AppImage) passes.
