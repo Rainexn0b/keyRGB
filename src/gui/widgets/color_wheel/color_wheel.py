@@ -10,9 +10,7 @@ now renders the wheel as a single image (cached on disk), and draws only the
 selector overlay on top.
 """
 
-import base64
 import colorsys
-import math
 from typing import Any, Callable
 
 import tkinter as tk
@@ -23,6 +21,13 @@ from .color_wheel_image import (
     build_wheel_ppm_bytes,
     wheel_cache_path,
     write_bytes_atomic,
+)
+from .utils import (
+    derive_border_hex,
+    hex_to_rgb,
+    hsv_to_xy,
+    invoke_callback,
+    xy_to_hsv,
 )
 
 
@@ -56,8 +61,8 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         super().__init__(parent)
 
         self._theme_bg_hex = self._resolve_theme_bg_hex()
-        self._theme_bg_rgb = self._hex_to_rgb(self._theme_bg_hex)
-        self._theme_border_hex = self._derive_border_hex(self._theme_bg_rgb)
+        self._theme_bg_rgb = hex_to_rgb(self._theme_bg_hex)
+        self._theme_border_hex = derive_border_hex(self._theme_bg_rgb)
 
         self.size = size
         self.radius = size // 2
@@ -117,6 +122,8 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         # PhotoImage needs to be held on the instance to avoid GC.
         if ppm_bytes is not None:
             # Tk's PhotoImage `data` expects a base64-encoded string.
+            import base64
+
             self._wheel_image = tk.PhotoImage(data=base64.b64encode(ppm_bytes).decode("ascii"), format="PPM")
         else:
             self._wheel_image = tk.PhotoImage(file=str(wheel_path))
@@ -132,27 +139,6 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
             outline=self._theme_border_hex,
             tags="wheel",
         )
-
-    @staticmethod
-    def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
-        s = str(hex_color or "").strip()
-        if not s:
-            return (0x2B, 0x2B, 0x2B)
-        if s.startswith("#"):
-            s = s[1:]
-        if len(s) == 3:
-            s = "".join([c * 2 for c in s])
-        if len(s) != 6:
-            return (0x2B, 0x2B, 0x2B)
-        try:
-            return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
-        except Exception:
-            return (0x2B, 0x2B, 0x2B)
-
-    @staticmethod
-    def _rgb_to_hex(rgb: tuple[int, int, int]) -> str:
-        r, g, b = (int(rgb[0]) & 0xFF, int(rgb[1]) & 0xFF, int(rgb[2]) & 0xFF)
-        return f"#{r:02x}{g:02x}{b:02x}"
 
     def _resolve_theme_bg_hex(self) -> str:
         """Best-effort resolve a background color that matches ttk theme."""
@@ -198,11 +184,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self.canvas.delete("selector")
 
         # Calculate position based on hue and saturation
-        angle = self.current_hue * 2 * math.pi
-        distance = self.current_saturation * (self.radius - 20)  # -20 for center circle
-
-        x = self.radius + distance * math.cos(angle)
-        y = self.radius + distance * math.sin(angle)
+        x, y = hsv_to_xy(self.current_hue, self.current_saturation, self.radius)
 
         # Draw selection circle
         size = 8
@@ -242,7 +224,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         if not self._wheel_ready:
             return
         if self.release_callback:
-            self._invoke_callback(
+            invoke_callback(
                 self.release_callback,
                 *self.current_color,
                 source="wheel_release",
@@ -251,27 +233,18 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
 
     def _select_color_at(self, x: int, y: int) -> None:
         """Select color at the given canvas coordinates."""
-        # Calculate distance and angle from center
-        dx = x - self.radius
-        dy = y - self.radius
-        distance = math.sqrt(dx * dx + dy * dy)
-
-        # Clamp to wheel radius (minus center circle)
-        max_distance = self.radius - 20
-        if distance > self.radius:
+        res = xy_to_hsv(x, y, self.radius)
+        if res is None:
             return  # Outside wheel
 
-        if distance < 20:
-            # In center circle - keep current hue but set saturation to 0
+        h, s = res
+        if h is None:
+            # Center circle
             self.current_saturation = 0
+            # Keep previous hue
         else:
-            # Calculate hue and saturation
-            angle = math.atan2(dy, dx)
-            if angle < 0:
-                angle += 2 * math.pi
-
-            self.current_hue = angle / (2 * math.pi)
-            self.current_saturation = min(distance / max_distance, 1.0)
+            self.current_hue = h
+            self.current_saturation = s
 
         self._update_color(source="wheel")
 
@@ -281,7 +254,6 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         `ttk.Scale` passes the value as a string on many Tk builds.
         The value is interpreted as a percent on the 0..100 UI scale.
         """
-
         pct = float(value)
         self.current_value = pct / 100.0
         self.brightness_label.config(text=f"{int(pct)}%")
@@ -292,7 +264,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
 
         # Also trigger release callback when brightness changes (treat as a commit)
         if self.release_callback:
-            self._invoke_callback(
+            invoke_callback(
                 self.release_callback,
                 *self.current_color,
                 source="brightness",
@@ -321,21 +293,6 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         finally:
             self._suspend_brightness_events = False
 
-    @staticmethod
-    def _invoke_callback(cb, *args, **kwargs) -> None:
-        """Invoke a callback, preserving backwards compatibility.
-
-        Older callbacks in this codebase expect exactly three positional args
-        (r, g, b). Newer code may accept optional keyword metadata.
-        """
-
-        if cb is None:
-            return
-        try:
-            cb(*args, **kwargs)
-        except TypeError:
-            cb(*args)
-
     def _update_color(self, *, source: str = "wheel"):
         """Update the current color based on HSV values."""
         # Convert HSV to RGB
@@ -347,7 +304,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self._update_preview()
 
         if self.callback:
-            self._invoke_callback(
+            invoke_callback(
                 self.callback,
                 *self.current_color,
                 source=str(source or "wheel"),
@@ -362,7 +319,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         """Set the color programmatically."""
         self.current_color = (int(r), int(g), int(b))
 
-        # Convert to HSV
+        # Coto HSV
         r_norm, g_norm, b_norm = float(r) / 255.0, float(g) / 255.0, float(b) / 255.0
         h, s, v = colorsys.rgb_to_hsv(r_norm, g_norm, b_norm)
 

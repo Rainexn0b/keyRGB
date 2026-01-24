@@ -264,7 +264,6 @@ class ReactiveColorGUI:
 
     def _on_color_change(self, r: int, g: int, b: int, **meta: Any) -> None:
         color = (int(r), int(g), int(b))
-        source = str(meta.get("source") or "")
 
         now = time.monotonic()
         if self._last_drag_committed_color == color and (now - self._last_drag_commit_ts) < self._drag_commit_interval:
@@ -278,7 +277,6 @@ class ReactiveColorGUI:
 
     def _on_color_release(self, r: int, g: int, b: int, **meta: Any) -> None:
         color = (int(r), int(g), int(b))
-        source = str(meta.get("source") or "")
 
         self._commit_color_to_config(color)
         self._last_drag_committed_color = color
