@@ -104,7 +104,10 @@ def _sync_reactive(tray: Any, current) -> None:
     try:
         tray.engine.reactive_use_manual_color = bool(current.reactive_use_manual)
         tray.engine.reactive_color = tuple(current.reactive_color)
-        tray.engine.reactive_brightness = int(getattr(current, "reactive_brightness", getattr(tray.config, "reactive_brightness", tray.config.brightness)) or 0)
+        tray.engine.reactive_brightness = int(
+            getattr(current, "reactive_brightness", getattr(tray.config, "reactive_brightness", tray.config.brightness))
+            or 0
+        )
     except Exception:
         pass
 

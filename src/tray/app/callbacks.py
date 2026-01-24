@@ -28,7 +28,6 @@ from ..ui.gui_launch import (
 )
 
 
-
 def on_effect_clicked(tray: Any, item: Any) -> None:
     effect_name = menu_mod.normalize_effect_label(item)
     apply_effect_selection(tray, effect_name=effect_name)

@@ -76,9 +76,7 @@ def clear_engine_perkey_state(tray: Any) -> None:
 def apply_perkey_mode(tray: Any, *, brightness_override: Optional[int] = None) -> None:
     tray.engine.stop()
     effective_brightness = (
-        int(brightness_override)
-        if brightness_override is not None
-        else int(getattr(tray.config, "brightness", 0) or 0)
+        int(brightness_override) if brightness_override is not None else int(getattr(tray.config, "brightness", 0) or 0)
     )
     if int(effective_brightness) == 0:
         tray.engine.turn_off()
@@ -118,9 +116,7 @@ def apply_perkey_mode(tray: Any, *, brightness_override: Optional[int] = None) -
 def apply_uniform_none_mode(tray: Any, *, brightness_override: Optional[int] = None) -> None:
     tray.engine.stop()
     effective_brightness = (
-        int(brightness_override)
-        if brightness_override is not None
-        else int(getattr(tray.config, "brightness", 0) or 0)
+        int(brightness_override) if brightness_override is not None else int(getattr(tray.config, "brightness", 0) or 0)
     )
     if int(effective_brightness) == 0:
         tray.engine.turn_off()

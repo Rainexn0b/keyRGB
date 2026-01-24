@@ -42,7 +42,10 @@ def test_speed_and_brightness_callbacks_delegate() -> None:
     tray = MagicMock()
     item = object()
 
-    with patch("src.tray.app.callbacks.on_speed_clicked") as sp, patch("src.tray.app.callbacks.on_brightness_clicked") as br:
+    with (
+        patch("src.tray.app.callbacks.on_speed_clicked") as sp,
+        patch("src.tray.app.callbacks.on_brightness_clicked") as br,
+    ):
         on_speed_clicked_cb(tray, item)
         on_brightness_clicked_cb(tray, item)
 

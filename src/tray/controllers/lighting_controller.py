@@ -215,6 +215,7 @@ def power_restore(tray: Any) -> None:
     # Track resume time so idle polling can ignore stale screen-off state.
     try:
         import time
+
         tray._last_resume_at = time.monotonic()
     except Exception:
         pass

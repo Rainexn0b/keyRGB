@@ -416,7 +416,9 @@ class TestApplyBrightnessFromPowerPolicy:
             apply_brightness_from_power_policy(mock_tray, 25)
 
         assert mock_tray.config.brightness == 25
-        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=True, fade=True, fade_duration_s=0.25)
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            25, apply_to_hardware=True, fade=True, fade_duration_s=0.25
+        )
         mock_start.assert_called_once_with(mock_tray)
 
     def test_apply_brightness_from_power_policy_does_not_restart_software_effect(self):
@@ -467,5 +469,7 @@ class TestApplyBrightnessFromPowerPolicy:
         # be updated to ensure dim-sync and power policy work correctly.
         assert mock_tray.config.perkey_brightness == 25
         assert mock_tray.config.brightness == 25
-        mock_tray.engine.set_brightness.assert_called_once_with(25, apply_to_hardware=False, fade=True, fade_duration_s=0.25)
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            25, apply_to_hardware=False, fade=True, fade_duration_s=0.25
+        )
         mock_start.assert_not_called()
