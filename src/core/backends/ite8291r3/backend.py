@@ -18,6 +18,7 @@ _FALLBACK_USB_IDS: list[tuple[int, int]] = [
     (0x048D, 0x6004),
     (0x048D, 0x6006),
     (0x048D, 0x6008),  # Generic ITE 8291 RGB Controller
+    (0x048D, 0x600A),  # ITE 8291 (Tuxedo/Clevo variants)
     (0x048D, 0x600B),  # Newer ITE 8291 (2023+ Tongfang iterations)
     (0x048D, 0xCE00),
 ]
@@ -49,6 +50,14 @@ class Ite8291r3Backend(KeyboardBackend):
             ensure_ite8291r3_ctl_importable(__file__)
 
         from ite8291r3_ctl import ite8291r3  # type: ignore
+
+        # Patch missing IDs into the library instance in-memory; this ensures get() works
+        # even if the underlying library is old or came from a distro package.
+        library_pids = getattr(ite8291r3, "PRODUCT_IDS", None)
+        if isinstance(library_pids, list):
+            for _, pid in _FALLBACK_USB_IDS:
+                if pid not in library_pids:
+                    library_pids.append(pid)
 
         return ite8291r3
 

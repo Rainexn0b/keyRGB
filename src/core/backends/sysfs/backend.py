@@ -6,22 +6,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
-
 from ..base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeResult
-
 from . import common
 from . import privileged
 from .device import SysfsLedKeyboardDevice
+
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class SysfsLedsBackend(KeyboardBackend):
     name: str = "sysfs-leds"
     priority: int = 150
 
-    def _find_led(self) -> Optional[tuple[Path, Path, Path]]:
+    def _find_leds(self) -> list[Path]:
         root = common._leds_root()
         if not root.exists():
-            return None
+            return []
 
         candidates: list[Path] = []
         try:
@@ -29,7 +30,7 @@ class SysfsLedsBackend(KeyboardBackend):
                 if child.is_dir() and common._is_candidate_led(child.name):
                     candidates.append(child)
         except Exception:
-            return None
+            return []
 
         viable: list[tuple[int, str, Path]] = []
         for led_dir in candidates:
@@ -39,21 +40,25 @@ class SysfsLedsBackend(KeyboardBackend):
                 viable.append((common._score_led_dir(led_dir), led_dir.name, led_dir))
 
         if not viable:
-            return None
+            return []
 
-        # Highest score wins; name is a deterministic tie-breaker.
+        # Highest score first; name is a deterministic tie-breaker.
         viable.sort(key=lambda t: (-t[0], t[1].lower()))
-        best = viable[0][2]
-        return best / "brightness", best / "max_brightness", best
-
-        return None
+        
+        # Filter out low-scoring candidates (e.g. noise like "micmute" that slipped through)
+        # 0 is the baseline for "neutral", negatives are explicit "bad matches".
+        return [t[2] for t in viable if t[0] >= 0]
 
     def probe(self) -> ProbeResult:
-        found = self._find_led()
-        if found is None:
+        found = self._find_leds()
+        if not found:
             return ProbeResult(available=False, reason="no matching sysfs LED", confidence=0)
 
-        brightness_path, max_brightness_path, led_dir = found
+        # Primary is the highest scoring one
+        led_dir = found[0]
+        brightness_path = led_dir / "brightness"
+        max_brightness_path = led_dir / "max_brightness"
+        
         if not os.access(brightness_path, os.R_OK):
             return ProbeResult(
                 available=False,
@@ -105,6 +110,7 @@ class SysfsLedsBackend(KeyboardBackend):
                 "led_dir": str(led_dir),
                 "supports_multi_intensity": str((led_dir / "multi_intensity").exists()).lower(),
                 "supports_color_attr": str((led_dir / "color").exists()).lower(),
+                "all_zones": str([p.name for p in found]),
             },
         )
 
@@ -115,14 +121,13 @@ class SysfsLedsBackend(KeyboardBackend):
         return BackendCapabilities(per_key=False, hardware_effects=False, palette=False)
 
     def get_device(self) -> KeyboardDevice:
-        found = self._find_led()
-        if found is None:
+        found = self._find_leds()
+        if not found:
             raise FileNotFoundError("No sysfs LED keyboard backlight found")
-        brightness_path, max_brightness_path, led_dir = found
+        
         return SysfsLedKeyboardDevice(
-            brightness_path=brightness_path,
-            max_brightness_path=max_brightness_path,
-            led_dir=led_dir,
+            primary_led_dir=found[0],
+            all_led_dirs=found,
         )
 
     def dimensions(self) -> tuple[int, int]:
