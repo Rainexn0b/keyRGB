@@ -168,9 +168,7 @@ def test_sysfs_device_set_color_multi_intensity(monkeypatch: pytest.MonkeyPatch,
     multi.write_text("0 0 0\n", encoding="utf-8")
 
     dev = SysfsLedKeyboardDevice(
-        brightness_path=led_dir / "brightness",
-        max_brightness_path=led_dir / "max_brightness",
-        led_dir=led_dir,
+        primary_led_dir=led_dir,
     )
 
     dev.set_color((1, 2, 3), brightness=25)
@@ -186,9 +184,7 @@ def test_sysfs_device_set_color_color_attr(monkeypatch: pytest.MonkeyPatch, tmp_
     color.write_text("000000\n", encoding="utf-8")
 
     dev = SysfsLedKeyboardDevice(
-        brightness_path=led_dir / "brightness",
-        max_brightness_path=led_dir / "max_brightness",
-        led_dir=led_dir,
+        primary_led_dir=led_dir,
     )
 
     dev.set_color((1, 2, 3), brightness=25)
@@ -205,9 +201,7 @@ def test_sysfs_device_set_color_system76_paths(monkeypatch: pytest.MonkeyPatch, 
     right.write_text("000000\n", encoding="utf-8")
 
     dev = SysfsLedKeyboardDevice(
-        brightness_path=led_dir / "brightness",
-        max_brightness_path=led_dir / "max_brightness",
-        led_dir=led_dir,
+        primary_led_dir=led_dir,
     )
 
     dev.set_color((0xAB, 0xCD, 0xEF), brightness=25)
