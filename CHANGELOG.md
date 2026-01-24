@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.15.0 (2026-01-25)
+
+- Improvement: Add sysfs multi-zone support (virtual per-key zoning), GUI and tray stability fixes, improved tests, and AppImage packaging updates.
+- Fix: Sysfs: Restore missing `_max()` helper, add explicit typing for `zone_lists`, and implement N-zone mapping (Left/Center/Right) with `primary_led_dir` and `all_led_dirs`.
+- Fix: Tests: Update `src/tests/test_sysfs_leds_backend_unit.py` to use the new `primary_led_dir` constructor and expand coverage for multi-zone behavior; update tray tests for controller edge cases.
+- Build: Add LOC and type checks, fix type annotation issues, and ensure the full build pipeline (Compile, Pytest, Type Check, AppImage) passes.
+- Misc: Add `system/udev/99-ite8291-wootbook.rules` for Wootbook ITE permissions and other minor docs/build improvements.
+
 ## 0.14.10 (2026-01-23)
 
 - Fix: AppImage: Bundle Tcl/Tk script libraries (`tcl8.6/`, `tk8.6/` directories containing `init.tcl` and support scripts) required by tkinter at runtime.
