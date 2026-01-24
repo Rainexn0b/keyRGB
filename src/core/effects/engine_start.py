@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from threading import Thread
-from typing import Any, Dict, Final, Literal, Optional, Tuple, cast
+from typing import Any, Final, Literal, Optional, Tuple, cast
 
 from src.core.effects.catalog import (
     ALL_EFFECTS as _ALL_EFFECTS,

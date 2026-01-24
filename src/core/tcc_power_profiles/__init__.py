@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from .busctl import _busctl_call, _parse_busctl_bool_reply, _parse_busctl_string_reply
+from .busctl import _busctl_call, _parse_busctl_bool_reply
 from . import ops_read as _ops_read
 from . import ops_write as _ops_write
 from .json_api import (
@@ -19,8 +19,6 @@ from .models import TccProfile, TccProfileWriteError
 from .root_apply import (
     _apply_new_profiles_file,
     _apply_new_settings_file,
-    _run_root_command,
-    _tccd_binary,
 )
 
 _load_custom_profiles_payload = _ops_write._load_custom_profiles_payload

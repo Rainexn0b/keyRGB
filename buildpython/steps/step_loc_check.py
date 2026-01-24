@@ -56,7 +56,10 @@ def loc_over_400_runner() -> RunResult:
 
         write_json(report_json, {"threshold": THRESHOLD_LINES, "files": []})
         write_csv(report_csv, ["lines", "path"], [])
-        write_md(report_md, ["# LOC check", "", f"Threshold: >= {THRESHOLD_LINES} lines", "", "No files exceed the threshold."])
+        write_md(
+            report_md,
+            ["# LOC check", "", f"Threshold: >= {THRESHOLD_LINES} lines", "", "No files exceed the threshold."],
+        )
 
         return RunResult(
             command_str="(internal) loc check",

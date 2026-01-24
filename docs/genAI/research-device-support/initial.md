@@ -18,6 +18,7 @@ If you see one of these in `keyrgb-diagnostics`, the ITE backend is a likely mat
 | `048d:6004` | ITE 829x series | Reported in newer 16"/17" chassis (XMG). |
 | `048d:6006` | ITE 829x series | Same family; Tuxedo Stellaris and similar high-end units. |
 | `048d:6008` | ITE 8291 (Generic) | Generic RGB controller; protocol identical to 0x6004. |
+| `048d:600a` | ITE 8291 (Tuxedo) | Tuxedo Stellaris / Polaris variants. |
 | `048d:600b` | ITE 8291 (rev 0.03) variant | WootBook/Tongfang rebrands; 2023+ iterations. |
 
 If you see `048d:....` with an unknown PID, it may still be ITE, but it might also be a different stack (e.g. sysfs `tuxedo_keyboard` style).
