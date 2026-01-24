@@ -2,6 +2,8 @@
 
 KeyRGB is a lightweight Linux tray app and per-key editor for laptop keyboard lighting. It serves as a practical, focused alternative to OpenRGB for supported devices.
 
+> LLM note: For a concise, LLM-optimized summary of supported hardware, backends, and repo-discovery hints, see `AGENTS.md`.
+
 ## Supported Backends & Devices
 
 KeyRGB uses a priority-based system to select the best driver for your hardware:
