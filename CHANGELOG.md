@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.15.5 (2026-01-26)
+
+- Fix: CI: Import Validation no longer requires tkinter on GitHub Actions Python 3.10 runners (AppImage smoke test still validates the bundled Tk runtime).
+
 ## 0.15.4 (2026-01-26)
 
 - Fix: AppImage/Tray: Avoid bundling incompatible `libfontconfig`/`libfreetype` copies that can break the AppIndicator backend on Fedora-like distros (fallback to Xorg tray on Wayland may produce no visible icon).
