@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .io import parse_hex_int
+
 if TYPE_CHECKING:
     from .model import Diagnostics
 
@@ -79,6 +81,92 @@ def _append_backends(lines: list[str], backends: object) -> None:
             if isinstance(ids, dict) and ids:
                 for k in sorted(ids.keys()):
                     lines.append(f"      {k}: {ids[k]}")
+
+
+def _append_support_hints(lines: list[str], backends: object, usb_devices: object) -> None:
+    if not isinstance(backends, dict) or not backends:
+        return
+
+    probes = backends.get("probes")
+    if not isinstance(probes, list) or not probes:
+        return
+
+    usb_label_by_id: dict[tuple[str, str], str] = {}
+    if isinstance(usb_devices, list):
+        for dev in usb_devices:
+            if not isinstance(dev, dict):
+                continue
+            vid = dev.get("idVendor")
+            pid = dev.get("idProduct")
+            if not isinstance(vid, str) or not isinstance(pid, str):
+                continue
+            product = dev.get("product")
+            label = str(product) if product else ""
+            usb_label_by_id[(vid.lower(), pid.lower())] = label
+
+    unsupported_usb: list[dict[str, str]] = []
+    for p in probes:
+        if not isinstance(p, dict):
+            continue
+        if bool(p.get("available")):
+            continue
+
+        ids = p.get("identifiers")
+        if not isinstance(ids, dict):
+            continue
+
+        vid_txt = ids.get("usb_vid")
+        pid_txt = ids.get("usb_pid")
+        if not isinstance(vid_txt, str) or not isinstance(pid_txt, str):
+            continue
+
+        reason = str(p.get("reason") or "")
+        reason_l = reason.lower()
+        # We only emit hints for cases that look like a detected, fail-closed
+        # device rather than general import/probe failures.
+        if "usb device present" not in reason_l or "unsupported" not in reason_l:
+            continue
+
+        backend_name = str(p.get("name") or "")
+        entry: dict[str, str] = {
+            "backend": backend_name,
+            "vid": vid_txt,
+            "pid": pid_txt,
+            "reason": reason,
+        }
+        label = usb_label_by_id.get((vid_txt.lower(), pid_txt.lower()))
+        if label:
+            entry["product"] = label
+        unsupported_usb.append(entry)
+
+    if not unsupported_usb:
+        return
+
+    lines.append("Support hints:")
+    lines.append(
+        "  One or more USB devices were detected but marked as unsupported (fail-closed) to avoid talking the wrong protocol."
+    )
+
+    for e in unsupported_usb[:6]:
+        product = e.get("product", "")
+        suffix = f" {product}" if product else ""
+        lines.append(
+            "  - {vid}:{pid}{suffix} (backend={backend})".format(
+                vid=e.get("vid"),
+                pid=e.get("pid"),
+                suffix=suffix,
+                backend=e.get("backend"),
+            )
+        )
+        lines.append(f"      reason: {e.get('reason')}")
+
+        vid_i = parse_hex_int(str(e.get("vid") or ""))
+        pid_i = parse_hex_int(str(e.get("pid") or ""))
+        if vid_i == 0x048D and pid_i in {0xC965, 0xC966, 0xC967, 0xC936}:
+            lines.append(
+                "      note: this VID/PID is commonly reported on Lenovo Legion / IdeaPad Gaming keyboard RGB controllers."
+            )
+            lines.append("      next: please open an issue and include this diagnostics output + your laptop model.")
 
 
 def _append_usb_devices(lines: list[str], usb_devices: object) -> None:
@@ -305,6 +393,7 @@ def format_diagnostics_text(diag: "Diagnostics") -> str:
     _append_app(lines, diag.app)
     _append_power_supply(lines, diag.power_supply)
     _append_backends(lines, diag.backends)
+    _append_support_hints(lines, diag.backends, diag.usb_devices)
     _append_usb_devices(lines, diag.usb_devices)
     _append_process(lines, diag.process)
     _append_config(lines, diag.config)

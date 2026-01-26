@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 from typing import Any
 
@@ -111,8 +112,27 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
 
 
 def main() -> None:
-    diag = collect_diagnostics(include_usb=True)
-    print(json.dumps(diag.to_dict(), indent=2, sort_keys=True))
+    parser = argparse.ArgumentParser(
+        prog="keyrgb-diagnostics",
+        description="Collect best-effort KeyRGB diagnostics (read-only).",
+    )
+    parser.add_argument(
+        "--text",
+        action="store_true",
+        help="Print human-readable diagnostics instead of JSON.",
+    )
+    parser.add_argument(
+        "--no-usb",
+        action="store_true",
+        help="Skip USB enumeration (avoids pyusb scans).",
+    )
+    args = parser.parse_args()
+
+    diag = collect_diagnostics(include_usb=not bool(args.no_usb))
+    if args.text:
+        print(format_diagnostics_text(diag))
+    else:
+        print(json.dumps(diag.to_dict(), indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":

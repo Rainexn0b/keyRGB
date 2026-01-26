@@ -11,6 +11,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
+from src.core.diagnostics.model import Diagnostics
 
 
 def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -70,3 +71,38 @@ def test_format_empty_diagnostics() -> None:
     # If sysfs doesn't exist, collector may return empties. Formatter should be stable.
     diag = collect_diagnostics()
     assert isinstance(format_diagnostics_text(diag), str)
+
+
+def test_format_support_hints_for_unsupported_usb_device() -> None:
+    diag = Diagnostics(
+        dmi={},
+        leds=[],
+        sysfs_leds=[],
+        usb_ids=[],
+        env={},
+        virt={},
+        system={},
+        hints={},
+        app={},
+        power_supply={},
+        backends={
+            "requested": "auto",
+            "selected": None,
+            "probes": [
+                {
+                    "name": "ite8291r3",
+                    "available": False,
+                    "confidence": 0,
+                    "reason": "usb device present but unsupported by ite8291r3 backend (0x048d:0xc966)",
+                    "identifiers": {"usb_vid": "0x048d", "usb_pid": "0xc966"},
+                }
+            ],
+        },
+        usb_devices=[{"idVendor": "0x048d", "idProduct": "0xc966", "product": "Legion keyboard"}],
+        config={},
+        process={},
+    )
+
+    text = format_diagnostics_text(diag)
+    assert "Support hints:" in text
+    assert "0x048d:0xc966" in text
