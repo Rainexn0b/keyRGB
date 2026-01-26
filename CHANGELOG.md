@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.15.6 (2026-01-26)
+
+- Fix: CI/AppImage: AppImage smoke test installs minimal system `libfontconfig`/`libfreetype` in the container (these are intentionally not bundled to avoid GTK/Pango symbol/version conflicts on some distros).
+
 ## 0.15.5 (2026-01-26)
 
 - Fix: CI: Import Validation no longer requires tkinter on GitHub Actions Python 3.10 runners (AppImage smoke test still validates the bundled Tk runtime).

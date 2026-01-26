@@ -64,6 +64,13 @@ def appimage_smoke_runner() -> RunResult:
     script = "\n".join(
         [
             "set -euo pipefail",
+            # We intentionally do NOT bundle libfontconfig/libfreetype to avoid
+            # system GTK/Pango symbol/version mismatches on some distros.
+            # The smoke test container is intentionally minimal, so install the
+            # small set of system libs we rely on for Tk to load.
+            "export DEBIAN_FRONTEND=noninteractive",
+            "apt-get update -qq",
+            "apt-get install -y --no-install-recommends libfontconfig1 libfreetype6 >/dev/null",
             "cp /dist/keyrgb-x86_64.AppImage ./keyrgb.AppImage",
             "chmod +x ./keyrgb.AppImage",
             "./keyrgb.AppImage --appimage-extract >/dev/null",
