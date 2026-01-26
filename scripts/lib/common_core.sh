@@ -100,11 +100,6 @@ _download_url_impl() {
   rm -f "${dst}".tmp.* 2>/dev/null || true
 
   local tmp=""
-  # Clean up temp file when this function returns.
-  # IMPORTANT: traps are global in bash; using EXIT here would persist beyond this
-  # function and may reference an out-of-scope local (triggering "unbound variable").
-  trap '[ -n "$tmp" ] && rm -f "$tmp" 2>/dev/null || true' RETURN
-  
   tmp="$(mktemp "${dst}.tmp.XXXXXX")" || die "Failed to create temp file"
 
   local show_progress="n"
@@ -140,7 +135,7 @@ _download_url_impl() {
   fi
 
   if have_cmd python3; then
-    python3 - "$url" "$tmp" <<'PY'
+    python3 - "$url" "$tmp" <<'PY' || { rm -f "$tmp" 2>/dev/null || true; return 1; }
 from __future__ import annotations
 
 import shutil
