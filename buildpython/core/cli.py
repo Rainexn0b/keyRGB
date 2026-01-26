@@ -75,13 +75,19 @@ def _maybe_add_appimage(selected: list, *, enabled: bool):
 
     steps = all_steps()
     appimage = next((s for s in steps if s.name.lower() == "appimage"), None)
+    smoke = next((s for s in steps if s.name.lower() == "appimage smoke"), None)
+
     if appimage is None:
         raise SystemExit("AppImage step not found (step registry out of date)")
+    if smoke is None:
+        raise SystemExit("AppImage Smoke step not found (step registry out of date)")
 
-    if any(s.name.lower() == "appimage" for s in selected):
-        return selected
-
-    return [*selected, appimage]
+    out = list(selected)
+    if not any(s.name.lower() == "appimage" for s in out):
+        out.append(appimage)
+    if not any(s.name.lower() == "appimage smoke" for s in out):
+        out.append(smoke)
+    return out
 
 
 def _maybe_add_black(selected: list, *, enabled: bool):

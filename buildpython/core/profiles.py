@@ -66,6 +66,7 @@ PROFILES: dict[str, Profile] = {
             "Pytest",
             "Repo Validation",
             "AppImage",
+            "AppImage Smoke",
         ],
     ),
 }

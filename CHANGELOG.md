@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+## 0.15.1 (2026-01-26)
+
+- Fix: Installer: Avoid `tmp: unbound variable` warnings by ensuring download temp-file cleanup traps don’t leak out of helper functions.
+- Fix: GUI: Restore ColorWheel callback invocation for manual RGB entry and make wheel image loading more robust on some Tk builds.
+
 ## 0.15.0 (2026-01-25)
 
 - Improvement: Add sysfs multi-zone support (virtual per-key zoning), GUI and tray stability fixes, improved tests, and AppImage packaging updates.

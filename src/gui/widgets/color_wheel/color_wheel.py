@@ -11,6 +11,8 @@ selector overlay on top.
 """
 
 import colorsys
+import os
+import tempfile
 from typing import Any, Callable
 
 import tkinter as tk
@@ -98,6 +100,9 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self._update_selection()
         self._wheel_ready = True
 
+    def _invoke_callback(self, cb: Callable[..., Any] | None, r: int, g: int, b: int, **kwargs: Any) -> None:
+        invoke_callback(cb, int(r), int(g), int(b), **kwargs)
+
     def _draw_wheel(self):
         """Draw the HSV color wheel as a single cached image."""
 
@@ -120,13 +125,26 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
             ppm_bytes = build_wheel_ppm_bytes(size=self.size, bg_rgb=bg_rgb, center_size=center_size)
 
         # PhotoImage needs to be held on the instance to avoid GC.
-        if ppm_bytes is not None:
-            # Tk's PhotoImage `data` expects a base64-encoded string.
-            import base64
-
-            self._wheel_image = tk.PhotoImage(data=base64.b64encode(ppm_bytes).decode("ascii"), format="PPM")
-        else:
+        # Prefer loading via a file path: it's more reliable across Tk builds than feeding
+        # a large base64 "data" payload (some systems intermittently fail to parse PPM data).
+        if wheel_path.exists() and wheel_path.stat().st_size >= 16:
             self._wheel_image = tk.PhotoImage(file=str(wheel_path))
+        else:
+            # If we couldn't write the cache file, fall back to a temp file for this session.
+            if ppm_bytes is None:
+                ppm_bytes = build_wheel_ppm_bytes(size=self.size, bg_rgb=bg_rgb, center_size=center_size)
+            tmp_path = ""
+            try:
+                with tempfile.NamedTemporaryFile(prefix="keyrgb_color_wheel_", suffix=".ppm", delete=False) as f:
+                    f.write(ppm_bytes)
+                    tmp_path = f.name
+                self._wheel_image = tk.PhotoImage(file=tmp_path)
+            finally:
+                if tmp_path:
+                    try:
+                        os.unlink(tmp_path)
+                    except Exception:
+                        pass
         self.canvas.create_image(0, 0, anchor="nw", image=self._wheel_image, tags="wheel")
 
         # Center outline helps readability (matches older look).

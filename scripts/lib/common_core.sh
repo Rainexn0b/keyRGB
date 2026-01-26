@@ -100,8 +100,10 @@ _download_url_impl() {
   rm -f "${dst}".tmp.* 2>/dev/null || true
 
   local tmp=""
-  # Ensure cleanup on exit/interrupt (set trap before mktemp so it's always defined)
-  trap '[ -n "$tmp" ] && rm -f "$tmp" 2>/dev/null || true' EXIT INT TERM
+  # Clean up temp file when this function returns.
+  # IMPORTANT: traps are global in bash; using EXIT here would persist beyond this
+  # function and may reference an out-of-scope local (triggering "unbound variable").
+  trap '[ -n "$tmp" ] && rm -f "$tmp" 2>/dev/null || true' RETURN
   
   tmp="$(mktemp "${dst}.tmp.XXXXXX")" || die "Failed to create temp file"
 

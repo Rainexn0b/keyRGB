@@ -44,6 +44,7 @@ def steps() -> list[Step]:
     from .step_import_scan import import_scan_runner
     from .step_repo_validation import repo_validation_runner
     from .step_appimage import appimage_build_runner
+    from .step_appimage_smoke import appimage_smoke_runner
     from .step_black import black_check_runner
     from .step_type_check import mypy_runner
     from .step_loc_check import loc_over_400_runner
@@ -146,5 +147,12 @@ def steps() -> list[Step]:
             description="Build keyrgb-x86_64.AppImage",
             log_file=_log("step-14-appimage.log"),
             runner=appimage_build_runner,
+        ),
+        Step(
+            number=15,
+            name="AppImage Smoke",
+            description="Smoke-test AppImage in minimal container (no system deps)",
+            log_file=_log("step-15-appimage-smoke.log"),
+            runner=appimage_smoke_runner,
         ),
     ]
