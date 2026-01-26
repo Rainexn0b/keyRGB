@@ -104,13 +104,42 @@ KeyRGB uses a priority-based system to select the best driver for your hardware:
 
 #### Standalone AppImage (recommended for most users)
 
-Downloads the self-contained AppImage + sets up device permissions (udev rules + polkit helper). No system dependencies required.
+KeyRGB's automated installer strategy is a **contained AppImage**:
+
+- Downloads the self-contained AppImage release asset
+- Installs it as `~/.local/bin/keyrgb` (plus desktop launcher + autostart)
+- Best-effort permissions/integration (udev rules + optional polkit helper)
+
+The AppImage bundles runtime dependencies (Python, tkinter, tray libraries) so the installer does **not** install Python/Tk/GUI runtime packages via your distro package manager.
+
+Standard install (default):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh
+```
+
+No system package changes (skip kernel drivers / TCC app / polkit installs):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --no-system-deps
 ```
 
-The AppImage bundles all dependencies (Python, tkinter, libappindicator, libraries) for maximum portability. Works out-of-the-box on any distro.
+Full install (non-interactive example: kernel drivers + Reactive Typing permissions + TCC integration):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && \
+  KEYRGB_INSTALL_KERNEL_DRIVERS=y \
+  KEYRGB_INSTALL_INPUT_UDEV=y \
+  KEYRGB_INSTALL_TUXEDO=y \
+  KEYRGB_INSTALL_TCC_APP=y \
+  bash install.sh
+```
+
+Notes:
+
+- Some integration steps may prompt for `sudo` (installing udev rules / polkit rules).
+- `--no-system-deps` only skips **system package changes**; it does not affect AppImage downloads.
+- To pin installs to a known release tag (instead of `main`), use both `--ref <tag>` and `--version <tag>`.
 
 #### Update existing AppImage (non-interactive)
 
@@ -122,16 +151,10 @@ curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o
 
 #### Development install (local checkout)
 
-For development or local modifications. Clones the repository, installs system dependencies (Python 3.12+, pip, build tools, libgirepository dev headers, python3-tk, libappindicator), creates a virtual environment, and installs keyrgb in editable mode.
+For development or local modifications. Installs system dependencies + installs KeyRGB in editable mode.
 
 ```bash
-./install_dev.sh
-```
-
-Or if you already cloned the repo:
-
-```bash
-./install.sh
+./install.sh --dev
 ```
 
 Notes:
@@ -154,6 +177,12 @@ Downloads and runs the latest uninstaller script:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/uninstall.sh -o uninstall.sh && bash uninstall.sh
+```
+
+Non-interactive uninstall (AppImage + desktop entries):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/uninstall.sh -o uninstall.sh && bash uninstall.sh --yes --remove-appimage
 ```
 
 #### Uninstall from a local checkout
@@ -251,7 +280,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | `--version <tag>` | Install specific tag (e.g. `v0.9.3`). |
 | `--asset <name>` | Override AppImage filename (default: `keyrgb-x86_64.AppImage`). |
 | `--prerelease` | Allow picking prereleases when auto-resolving latest AppImage. |
-| `--no-system-deps` | Skip best-effort system dependency installation. |
+| `--no-system-deps` | Skip system package changes (kernel drivers / TCC app / polkit). |
 | `--update-appimage` | Non-interactive: update an existing AppImage install (downloads latest and replaces `~/.local/bin/keyrgb`). |
 | `--ref <git-ref>` | For curl installs: download installer modules from a specific git ref (default: `main`). |
 
