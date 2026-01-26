@@ -27,6 +27,7 @@ from src.core.effects.reactive.effects import (
     run_reactive_ripple,
 )
 from src.core.effects.timing import clamped_interval, get_interval
+from src.core.utils.exceptions import is_device_disconnected, is_permission_denied
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,10 @@ class _EngineStart:
     reactive_use_manual_color: bool
     stop: Any
     _ensure_device_available: Any
+
+    # Optional callback invoked when hardware I/O fails due to permissions.
+    # Signature: cb(exc: Exception) -> None
+    _permission_error_cb: Any
 
     HW_EFFECTS = _HW_EFFECTS
     SW_EFFECTS = _SW_EFFECTS
@@ -153,8 +158,48 @@ class _EngineStart:
                 duration_s=0.06,
             )
 
+        def _run_target_best_effort() -> None:
+            try:
+                target()
+            except Exception as exc:
+                # Permission failures are common when udev/polkit rules are missing.
+                if is_permission_denied(exc):
+                    cb = getattr(self, "_permission_error_cb", None)
+                    if callable(cb):
+                        try:
+                            cb(exc)
+                        except Exception:
+                            pass
+                    try:
+                        logger.warning("Permission denied while applying effect: %s", exc)
+                    except Exception:
+                        pass
+                    return
+
+                # If the device vanished, stop issuing I/O until reacquired.
+                if is_device_disconnected(exc):
+                    try:
+                        mark = getattr(self, "mark_device_unavailable", None)
+                        if callable(mark):
+                            mark()
+                    except Exception:
+                        pass
+                    try:
+                        logger.warning("Keyboard device disconnected while applying effect: %s", exc)
+                    except Exception:
+                        pass
+                    return
+
+                logger.exception("Unhandled exception in effect thread")
+            finally:
+                # If the thread exits (error or normal), keep state consistent.
+                try:
+                    self.running = False
+                except Exception:
+                    pass
+
         self.running = True
-        self.thread = Thread(target=target, daemon=True)
+        self.thread = Thread(target=_run_target_best_effort, daemon=True)
         self.thread.start()
 
     def _start_hw_effect(self, effect_name: str):

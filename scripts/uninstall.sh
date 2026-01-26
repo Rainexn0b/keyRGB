@@ -306,3 +306,7 @@ fi
 
 log_ok "Uninstall complete"
 log_info "Note: system packages installed by install.sh are not removed by default."
+
+log_info "If you uninstalled because KeyRGB didn't work on your hardware, please consider opening an issue:"
+log_info "  https://github.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/issues"
+log_info "Include: distro/version, lsusb output, and KeyRGB diagnostics/logs (KEYRGB_DEBUG=1)."

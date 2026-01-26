@@ -15,6 +15,7 @@ from typing import Any
 from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import normalize_effect_name
+from src.core.utils.exceptions import is_permission_denied
 
 logger = logging.getLogger(__name__)
 
@@ -102,117 +103,117 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
     - Effect activation
     """
 
-    caps = getattr(tray, "backend_caps", None)
-    per_key_supported = bool(getattr(caps, "per_key", True)) if caps is not None else True
-    hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
-
     try:
-        effect_name = normalize_effect_name(effect_name)
-    except Exception:
-        effect_name = "none"
+        caps = getattr(tray, "backend_caps", None)
+        per_key_supported = bool(getattr(caps, "per_key", True)) if caps is not None else True
+        hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
 
-    # === FORCE MODE SWITCHES ===
-
-    # Force hardware uniform color mode (used by the tray's "Hardware Color" entry
-    # and "None (use uniform color)" under Hardware Effects). This must override
-    # any existing per-key state so HW effects unlock and SW effects lock.
-    if effect_name in {"hw_uniform", "hardware_uniform"}:
-        tray.engine.stop()
         try:
-            tray.config.per_key_colors = {}
+            effect_name = normalize_effect_name(effect_name)
         except Exception:
-            pass
+            effect_name = "none"
 
+        # === FORCE MODE SWITCHES ===
+
+        # Force hardware uniform color mode (used by the tray's "Hardware Color" entry
+        # and "None (use uniform color)" under Hardware Effects).
+        if effect_name in {"hw_uniform", "hardware_uniform"}:
+            tray.engine.stop()
+            try:
+                tray.config.per_key_colors = {}
+            except Exception:
+                pass
+
+            tray.config.effect = "none"
+            _ensure_hardware_mode(tray)
+            with tray.engine.kb_lock:
+                tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+            tray.is_off = False
+            return
+
+        # === HANDLE SPECIAL CASES ===
+
+        # "none" or "stop" -> go to static color (respects current mode)
+        if effect_name in {"none", "stop"}:
+            tray.engine.stop()
+
+            per_key = dict(getattr(tray.config, "per_key_colors", {}) or {})
+            if per_key and per_key_supported:
+                tray.config.effect = "perkey"
+                _ensure_software_mode(tray)
+                tray._start_current_effect()
+            else:
+                tray.config.effect = "none"
+                _ensure_hardware_mode(tray)
+                with tray.engine.kb_lock:
+                    tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+
+            tray.is_off = False
+            return
+
+        # "perkey" -> switch to software mode with static per-key colors
+        if effect_name == "perkey":
+            if not per_key_supported:
+                tray.engine.stop()
+                tray.config.effect = "none"
+                _ensure_hardware_mode(tray)
+                with tray.engine.kb_lock:
+                    tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+                tray.is_off = False
+                return
+
+            colors = _load_per_key_colors_from_profile(tray.config)
+            if colors:
+                tray.config.per_key_colors = colors
+
+            _ensure_software_mode(tray)
+            tray.config.effect = "perkey"
+            tray._start_current_effect()
+            tray.is_off = False
+            return
+
+        # === HARDWARE EFFECTS ===
+        if effect_name in HW_EFFECTS:
+            if not hw_effects_supported:
+                tray.engine.stop()
+                tray.config.effect = "none"
+                _ensure_hardware_mode(tray)
+                with tray.engine.kb_lock:
+                    tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+                tray.is_off = False
+                return
+
+            try:
+                tray.config.per_key_colors = {}
+            except Exception:
+                pass
+            _ensure_hardware_mode(tray)
+            tray.config.effect = effect_name
+            tray._start_current_effect()
+            tray.is_off = False
+            return
+
+        # === SOFTWARE EFFECTS ===
+        if effect_name in SW_EFFECTS:
+            _ensure_software_mode(tray)
+            tray.config.effect = effect_name
+            tray._start_current_effect()
+            tray.is_off = False
+            return
+
+        # Unknown effect -> treat as none
+        logger.warning("Unknown effect: %s, treating as 'none'", effect_name)
+        tray.engine.stop()
         tray.config.effect = "none"
-        _ensure_hardware_mode(tray)
         with tray.engine.kb_lock:
             tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
         tray.is_off = False
-        return
-
-    # === HANDLE SPECIAL CASES ===
-
-    # "none" or "stop" -> go to static color (respects current mode)
-    if effect_name in {"none", "stop"}:
-        tray.engine.stop()
-
-        # Check if we have per-key colors (software mode)
-        per_key = dict(getattr(tray.config, "per_key_colors", {}) or {})
-        if per_key and per_key_supported:
-            # Stay in software mode with static per-key
-            tray.config.effect = "perkey"
-            _ensure_software_mode(tray)
-            tray._start_current_effect()
-        else:
-            # Hardware mode with uniform color
-            tray.config.effect = "none"
-            _ensure_hardware_mode(tray)
-            with tray.engine.kb_lock:
-                tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-
-        tray.is_off = False
-        return
-
-    # "perkey" -> switch to software mode with static per-key colors
-    if effect_name == "perkey":
-        if not per_key_supported:
-            # Fall back to hardware uniform
-            tray.engine.stop()
-            tray.config.effect = "none"
-            _ensure_hardware_mode(tray)
-            with tray.engine.kb_lock:
-                tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-            tray.is_off = False
+    except Exception as exc:
+        if is_permission_denied(exc) and callable(getattr(tray, "_notify_permission_issue", None)):
+            try:
+                tray._notify_permission_issue(exc)
+            except Exception:
+                pass
             return
-
-        # Load per-key colors from profile for static per-key mode
-        colors = _load_per_key_colors_from_profile(tray.config)
-        if colors:
-            tray.config.per_key_colors = colors
-
-        _ensure_software_mode(tray)
-        tray.config.effect = "perkey"
-        tray._start_current_effect()
-        tray.is_off = False
+        logger.exception("Error applying effect selection")
         return
-
-    # === HARDWARE EFFECTS ===
-    if effect_name in HW_EFFECTS:
-        if not hw_effects_supported:
-            # Fall back to uniform color
-            tray.engine.stop()
-            tray.config.effect = "none"
-            _ensure_hardware_mode(tray)
-            with tray.engine.kb_lock:
-                tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-            tray.is_off = False
-            return
-
-        # Switch to hardware mode
-        try:
-            tray.config.per_key_colors = {}
-        except Exception:
-            pass
-        _ensure_hardware_mode(tray)
-        tray.config.effect = effect_name
-        tray._start_current_effect()
-        tray.is_off = False
-        return
-
-    # === SOFTWARE EFFECTS ===
-    if effect_name in SW_EFFECTS:
-        # Software effects work with both per-key colors (from profile)
-        # and uniform colors (loose mode). Don't force profile loading.
-        _ensure_software_mode(tray)
-        tray.config.effect = effect_name
-        tray._start_current_effect()
-        tray.is_off = False
-        return
-
-    # Unknown effect -> treat as none
-    logger.warning("Unknown effect: %s, treating as 'none'", effect_name)
-    tray.engine.stop()
-    tray.config.effect = "none"
-    with tray.engine.kb_lock:
-        tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
-    tray.is_off = False

@@ -17,6 +17,7 @@ from src.tray.controllers._lighting_controller_helpers import (
     try_log_event,
 )
 from src.core.utils.exceptions import is_device_disconnected
+from src.core.utils.exceptions import is_permission_denied
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,14 @@ def start_current_effect(
             except Exception:
                 pass
             logger.warning("Keyboard device unavailable: %s", exc)
+            return
+
+        # Missing permissions should be surfaced as a user-visible notification.
+        if is_permission_denied(exc) and callable(getattr(tray, "_notify_permission_issue", None)):
+            try:
+                tray._notify_permission_issue(exc)
+            except Exception:
+                pass
             return
         try:
             tray._log_exception("Error starting effect: %s", exc)

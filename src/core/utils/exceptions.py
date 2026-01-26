@@ -33,3 +33,27 @@ def is_device_busy(exc: Exception) -> bool:
         return False
 
     return "Device or resource busy" in msg
+
+
+def is_permission_denied(exc: Exception) -> bool:
+    """Best-effort check for permission/authorization failures.
+
+    Used to detect when hardware writes fail due to missing udev/polkit rules.
+    Keep this dependency-free and resilient: backends may raise PermissionError,
+    OSError with errno, or wrap errors with a descriptive message.
+    """
+
+    if isinstance(exc, PermissionError):
+        return True
+
+    errno = getattr(exc, "errno", None)
+    if errno in (1, 13):
+        # EPERM=1, EACCES=13
+        return True
+
+    try:
+        msg = str(exc).lower()
+    except Exception:
+        return False
+
+    return "permission denied" in msg or "access denied" in msg or "not permitted" in msg

@@ -101,3 +101,6 @@ python3 -m pip install --user -e "$REPO_DIR"
 
 log_ok "Dev installation complete"
 log_info "Next: run 'keyrgb' (ensure ~/.local/bin is on PATH)"
+
+log_info "If you found KeyRGB useful, please consider starring the repo:"
+log_info "  https://github.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}"

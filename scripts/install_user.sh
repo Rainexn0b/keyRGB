@@ -255,4 +255,7 @@ fi
 
 log_info "Next steps: run '$APPIMAGE_DST' (or add ~/.local/bin to PATH and run 'keyrgb')"
 
+log_info "If you found KeyRGB useful, please consider starring the repo:"
+log_info "  https://github.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}"
+
 success_hook
