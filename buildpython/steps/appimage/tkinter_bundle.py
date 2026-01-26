@@ -174,9 +174,18 @@ def _bundle_tk_shared_lib_deps(*, appdir: Path, usr_lib: Path, tk_lib: Path, tcl
             "libutil.so.1",
             "libgcc_s.so.1",
             "libstdc++.so.6",
+
+            # These are commonly provided by every distro and are frequently
+            # consumed by system GTK/Pango stacks. Bundling older copies can
+            # cause hard-to-debug symbol/version mismatches (notably breaking
+            # PyGObject/AppIndicator tray startup on Fedora-like distros).
+            "libfontconfig.so.1",
+            "libfreetype.so.6",
         }
 
         for soname, src in ldd_deps(binary).items():
+            if soname.startswith(("libfontconfig.so", "libfreetype.so")):
+                continue
             if soname in skip_names:
                 continue
             if not src.exists():
