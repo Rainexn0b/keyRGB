@@ -6,6 +6,10 @@ set -euo pipefail
 
 ensure_polkit_best_effort() {
   # Best-effort only; do not fail install.
+  # Most desktop distros already ship polkit; avoid touching the system if pkexec exists.
+  if have_cmd pkexec; then
+    return 0
+  fi
   pkg_install_best_effort polkit || true
 }
 

@@ -90,6 +90,17 @@ configure_optional_components() {
     return 0
   fi
 
+  # If the caller explicitly requested no system package changes, don't prompt
+  # for options that require package installs.
+  if is_truthy "${KEYRGB_SKIP_SYSTEM_DEPS:-n}"; then
+    if [ -t 0 ]; then
+      echo
+      echo "Note: --no-system-deps is set; skipping optional system package installs (kernel drivers / TCC app / polkit)."
+    fi
+    KEYRGB_INSTALL_TCC_APP="n"
+    KEYRGB_INSTALL_KERNEL_DRIVERS="n"
+  fi
+
   local install_power_helper="y"
   local install_tuxedo="n"
 
@@ -133,7 +144,7 @@ configure_optional_components() {
     KEYRGB_INSTALL_POWER_HELPER="n"
   fi
 
-  if [ "$install_tuxedo" = "y" ]; then
+  if [ "$install_tuxedo" = "y" ] && ! is_truthy "${KEYRGB_SKIP_SYSTEM_DEPS:-n}"; then
     if [ "${KEYRGB_INSTALL_TCC_APP:-}" = "" ] && [ -t 0 ]; then
       echo
       echo "TCC integration was selected."
@@ -147,7 +158,7 @@ configure_optional_components() {
     fi
   fi
 
-  if [ "${KEYRGB_INSTALL_KERNEL_DRIVERS:-}" = "" ] && [ -t 0 ]; then
+  if ! is_truthy "${KEYRGB_SKIP_SYSTEM_DEPS:-n}" && [ "${KEYRGB_INSTALL_KERNEL_DRIVERS:-}" = "" ] && [ -t 0 ]; then
     echo
     echo "Kernel Drivers (Advanced):"
     echo "KeyRGB works best with kernel-level drivers for Clevo/Tuxedo laptops."

@@ -27,7 +27,7 @@ Options:
   --asset <name>        AppImage filename (default: keyrgb-x86_64.AppImage)
   --prerelease          Allow picking prereleases when auto-resolving latest
   --update-appimage     Only update the AppImage (non-interactive); still refreshes desktop + udev
-  --no-system-deps      Skip best-effort system dependency install
+  --no-system-deps      Skip best-effort system package changes (kernel drivers / TCC app / polkit)
 
 Env vars:
   KEYRGB_ALLOW_PRERELEASE=y|n
@@ -111,25 +111,16 @@ maybe_prompt_release_channel
 configure_optional_components
 
 if [ "$UPDATE_ONLY" -ne 1 ] && ! is_truthy "$KEYRGB_SKIP_SYSTEM_DEPS"; then
-  log_info "Installing system dependencies (best-effort)..."
+  log_info "Installing system packages (best-effort)..."
+  log_info "Note: KeyRGB AppImage is self-contained (no Python/Tk system packages required)."
   detect_pkg_manager || true
-
-  # Keep this lightweight: runtime + tray deps only.
-  case "${PKG_MGR:-}" in
-    dnf) pkg_install_best_effort python3 python3-tkinter usbutils dbus-tools libappindicator-gtk3 python3-gobject gtk3 || true ;;
-    apt) pkg_install_best_effort python3 python3-tk usbutils dbus python3-gi gir1.2-appindicator3-0.1 || true ;;
-    pacman) pkg_install_best_effort python tk usbutils dbus libappindicator-gtk3 python-gobject gtk3 || true ;;
-    zypper) pkg_install_best_effort python3 python3-tk usbutils dbus-1 dbus-1-tools python3-gobject gtk3 typelib-1_0-AppIndicator3-0_1 || true ;;
-    apk) pkg_install_best_effort python3 py3-tkinter usbutils dbus || true ;;
-    *) pkg_install_best_effort python3 usbutils || true ;;
-  esac
 
   # If the user will use pkexec helpers, ensure polkit exists best-effort.
   if ! is_truthy "${KEYRGB_SKIP_PRIVILEGED_HELPERS:-n}"; then
     ensure_polkit_best_effort
   fi
 
-  # Optional legacy behaviors (off by default).
+  # Optional components that require system packages.
   if is_truthy "${KEYRGB_INSTALL_TCC_APP:-n}"; then
     install_tcc_app_best_effort
   fi
@@ -140,7 +131,7 @@ else
   if [ "$UPDATE_ONLY" -eq 1 ]; then
     log_info "Skipping system dependency installation (update-only)."
   else
-    log_info "Skipping system dependency installation (--no-system-deps / KEYRGB_SKIP_SYSTEM_DEPS)."
+    log_info "Skipping system package installation (--no-system-deps / KEYRGB_SKIP_SYSTEM_DEPS)."
   fi
 fi
 

@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Fix: Installer: Make udev reload/trigger more reliable on some distros by sending targeted `udevadm trigger --action=add` events and waiting for `udevadm settle` (helps on conservative udev stacks, e.g. some Ubuntu LTS setups).
+- Maintenance: Installer: AppImage installs no longer attempt to install Python/Tk/GUI runtime packages; system package changes are reserved for optional kernel drivers / TCC / polkit.
 
 ## 0.15.2 (2026-01-26)
 
