@@ -53,8 +53,18 @@ EOF
 reload_udev_rules_best_effort() {
   if have_cmd udevadm; then
     sudo udevadm control --reload-rules || true
-    sudo udevadm trigger || true
+    # Default is usually action=change; keep it explicit so behavior is stable.
+    sudo udevadm trigger --action=change || true
+
+    # Some systems (notably some Ubuntu LTS installs) can be conservative about
+    # reapplying ACLs for already-present internal devices. Send targeted add
+    # events as a best-effort nudge.
+    sudo udevadm trigger --action=add --subsystem-match=usb --attr-match=idVendor=048d || true
+    sudo udevadm trigger --action=add --subsystem-match=input --property-match=ID_INPUT_KEYBOARD=1 || true
+
+    sudo udevadm settle || true
     log_ok "Reloaded udev rules"
+    log_info "If permissions still don't update, try logging out/in or rebooting (some systems apply uaccess ACLs only at boot/login)."
   else
     log_warn "udevadm not found; cannot reload udev rules automatically"
   fi

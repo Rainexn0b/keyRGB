@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix: Installer: Make udev reload/trigger more reliable on some distros by sending targeted `udevadm trigger --action=add` events and waiting for `udevadm settle` (helps on conservative udev stacks, e.g. some Ubuntu LTS setups).
+
 ## 0.15.2 (2026-01-26)
 
 - Fix: Installer: Fix `tmp: unbound variable` during AppImage downloads by removing an unsafe RETURN trap in the downloader helper (affects `bash install.sh` installs under `set -u`).
