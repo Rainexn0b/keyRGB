@@ -238,6 +238,116 @@ def bundle_tkinter(*, appdir: Path) -> None:
                     shutil.copytree(script_dir, dst, symlinks=False)
                     print(f"Bundled {script_dir_name} scripts: {script_dir} -> {dst}")
 
+    # Bundle shared library deps needed by Tk / _tkinter (e.g. libXft.so.2) so the
+    # AppImage works on minimal systems without X11/font libs installed.
+    def _bundle_symlink_chain(src: Path) -> None:
+        """Copy a library and its symlink chain into usr/lib."""
+        current = src
+        seen: set[str] = set()
+
+        while current.exists() and current.name not in seen:
+            dst = usr_lib / current.name
+            if current.is_symlink():
+                link_target = os.readlink(current)
+                if os.path.isabs(link_target):
+                    link_target = os.path.basename(link_target)
+                if dst.exists() or dst.is_symlink():
+                    dst.unlink()
+                os.symlink(link_target, dst)
+                seen.add(current.name)
+
+                next_target = current.readlink()
+                if next_target.is_absolute():
+                    current = next_target
+                else:
+                    current = current.parent / next_target
+                continue
+
+            shutil.copy2(current, dst)
+            seen.add(current.name)
+            break
+
+    def _ldd_deps(binary: Path) -> dict[str, Path]:
+        """Return DT_NEEDED libs resolved by ldd as {soname: path}."""
+        try:
+            proc = subprocess.run(
+                ["ldd", str(binary)],
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                check=False,
+            )
+        except Exception:
+            return {}
+
+        if proc.returncode != 0:
+            return {}
+
+        out: dict[str, Path] = {}
+        for raw in (proc.stdout or "").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("linux-vdso"):
+                continue
+
+            # Formats:
+            #   libXft.so.2 => /usr/lib/x86_64-linux-gnu/libXft.so.2 (0x...)
+            #   /lib64/ld-linux-x86-64.so.2 (0x...)
+            if "=>" in line:
+                left, right = line.split("=>", 1)
+                soname = left.strip()
+                right = right.strip()
+                if not soname or right.startswith("not found"):
+                    continue
+                path_str = right.split("(", 1)[0].strip()
+                if not path_str.startswith("/"):
+                    continue
+                out[soname] = Path(path_str)
+                continue
+
+            if line.startswith("/"):
+                path_str = line.split("(", 1)[0].strip()
+                p = Path(path_str)
+                out[p.name] = p
+
+        return out
+
+    def _bundle_deps_for(binary: Path) -> None:
+        # Avoid bundling glibc/loader core libs.
+        skip_names = {
+            "ld-linux-x86-64.so.2",
+            "libc.so.6",
+            "libm.so.6",
+            "libpthread.so.0",
+            "libdl.so.2",
+            "librt.so.1",
+            "libutil.so.1",
+            "libgcc_s.so.1",
+            "libstdc++.so.6",
+        }
+
+        for soname, src in _ldd_deps(binary).items():
+            if soname in skip_names:
+                continue
+            if not src.exists():
+                continue
+            # Only pull from system library locations.
+            if not str(src).startswith(("/usr/lib", "/usr/lib64", "/lib", "/lib64")):
+                continue
+            # If we already have this soname in the AppDir, skip.
+            if (usr_lib / soname).exists() or (usr_lib / soname).is_symlink():
+                continue
+            _bundle_symlink_chain(src)
+
+    # Bundle deps for both Tk and the _tkinter extension (the latter is what
+    # triggers missing libXft errors on minimal systems).
+    _bundle_deps_for(tk_lib)
+    _bundle_deps_for(tcl_lib)
+
+    tk_dynload = list((appdir / "usr").glob("lib/python*/lib-dynload/_tkinter*.so"))
+    for ext in tk_dynload:
+        if ext.exists():
+            _bundle_deps_for(ext)
+
 
 def bundle_libappindicator(*, appdir: Path) -> None:
     """Bundle libappindicator native library + dependencies into the AppImage.
