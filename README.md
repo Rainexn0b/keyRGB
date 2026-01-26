@@ -21,6 +21,7 @@ KeyRGB uses a priority-based system to select the best driver for your hardware:
 ## Status
 
 - **Beta**: versioning follows **0.x.y**.
+- **Latest release:** v0.15.8 (2026-01-26)
 - Developed primarily on Fedora / Nobara.
 - Installer support is **best-effort** on other distros via common package managers (dnf/apt/pacman/zypper/apk).
 - Support depends entirely on your specific keyboard controller and firmware.

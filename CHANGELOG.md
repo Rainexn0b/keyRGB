@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.15.8 (2026-01-26)
+
+- Installer: Add “please consider giving the repo a Star” message to end of install flows.
+- Uninstall: Suggest opening an issue when uninstalling because KeyRGB didn't work; include diagnostic hints for logs/lsusb/KEYRGB_DEBUG=1.
+- Tray: Show a one-time notification when hardware writes fail due to missing permissions (udev/polkit); add permission-detection helpers and wire background effect threads to report permission issues so they no longer fail silently.
+
 ## 0.15.7 (2026-01-26)
 
 - Diagnostics/Sysfs: Include detailed sysfs LED permission metadata (mode/uid/gid/ACL), LED driver/module hints, and helper/pkexec/sudo availability to make "permission denied" reports immediately actionable.
