@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult, python_exe, run
-from .appimage_helpers import (
+from .appimage import (
     bundle_libappindicator,
     bundle_pygobject,
     bundle_python_runtime,
