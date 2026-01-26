@@ -76,4 +76,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: keyrgb-x86_64.AppImage
-          path: dist/keyrgb-x86_64.AppImage
+          path: dist/*.AppImage
+          if-no-files-found: error

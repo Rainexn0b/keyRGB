@@ -47,11 +47,17 @@ jobs:
         run: |
           python -m buildpython --profile=release
 
+      - name: Verify AppImage output
+        run: |
+          ls -la dist || true
+          test -f dist/keyrgb-x86_64.AppImage
+
       - name: Upload AppImage to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/keyrgb-x86_64.AppImage
+            dist/*.AppImage
+          fail_on_unmatched_files: true
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
