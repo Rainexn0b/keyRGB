@@ -7,6 +7,8 @@
 - Fix: Installer: Avoid `tmp: unbound variable` warnings by ensuring download temp-file cleanup traps don’t leak out of helper functions.
 - Fix: GUI: Restore ColorWheel callback invocation for manual RGB entry and make wheel image loading more robust on some Tk builds.
 - Fix: AppImage: Bundle Tk / `_tkinter` shared-library dependencies (e.g. `libXft.so.2`) so tkinter imports work on minimal systems.
+- Build: Refactor AppImage build helpers into focused modules under `buildpython/steps/appimage/`.
+- Maintenance: Remove the legacy AppImage helper shim (`appimage_helpers.py`) after migrating internal imports.
 
 ## 0.15.0 (2026-01-25)
 
