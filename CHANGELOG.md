@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix: Installer: Fix `tmp: unbound variable` during AppImage downloads by removing an unsafe RETURN trap in the downloader helper (affects `bash install.sh` installs under `set -u`).
+
 ## 0.15.1 (2026-01-26)
 
 - Fix: Installer: Avoid `tmp: unbound variable` warnings by ensuring download temp-file cleanup traps don’t leak out of helper functions.
