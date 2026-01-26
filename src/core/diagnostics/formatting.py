@@ -223,13 +223,52 @@ def _append_sysfs_leds(
             for k in ("root", "exists", "candidates_count"):
                 if k in sysfs_cand:
                     lines.append(f"    {k}: {sysfs_cand.get(k)}")
+
+            power_helper = sysfs_cand.get("power_helper")
+            if isinstance(power_helper, dict) and power_helper:
+                path = power_helper.get("path")
+                exists = power_helper.get("exists")
+                supports = power_helper.get("supports_led_apply")
+                extra = []
+                if "executable" in power_helper:
+                    extra.append(f"executable={power_helper.get('executable')}")
+                if power_helper.get("mode") is not None:
+                    extra.append(f"mode={power_helper.get('mode')}")
+                if power_helper.get("uid") is not None and power_helper.get("gid") is not None:
+                    extra.append(f"uid={power_helper.get('uid')} gid={power_helper.get('gid')}")
+                suffix = (" " + " ".join(extra)) if extra else ""
+                lines.append(f"    power_helper: path={path} exists={exists} supports_led_apply={supports}{suffix}")
+
+            if "pkexec_in_path" in sysfs_cand:
+                lines.append(f"    pkexec_in_path: {sysfs_cand.get('pkexec_in_path')}")
+            if "pkexec_path" in sysfs_cand:
+                lines.append(f"    pkexec_path: {sysfs_cand.get('pkexec_path')}")
+            if "sudo_in_path" in sysfs_cand:
+                lines.append(f"    sudo_in_path: {sysfs_cand.get('sudo_in_path')}")
+            if "sudo_path" in sysfs_cand:
+                lines.append(f"    sudo_path: {sysfs_cand.get('sudo_path')}")
+
             top = sysfs_cand.get("top")
             if isinstance(top, list) and top:
                 lines.append("    top:")
                 for e in top[:5]:
                     if not isinstance(e, dict):
                         continue
-                    lines.append(f"      - {e.get('name')} score={e.get('score')}")
+                    extra: list[str] = []
+                    if e.get("brightness_writable") is not None:
+                        extra.append(f"writable={e.get('brightness_writable')}")
+                    if e.get("brightness_mode") is not None:
+                        extra.append(f"mode={e.get('brightness_mode')}")
+                    if e.get("brightness_uid") is not None and e.get("brightness_gid") is not None:
+                        extra.append(f"uid={e.get('brightness_uid')} gid={e.get('brightness_gid')}")
+                    if e.get("brightness_acl") is not None:
+                        extra.append(f"acl={e.get('brightness_acl')}")
+                    if e.get("device_driver") is not None:
+                        extra.append(f"driver={e.get('device_driver')}")
+                    if e.get("device_module") is not None:
+                        extra.append(f"module={e.get('device_module')}")
+                    suffix = (" " + " ".join(extra)) if extra else ""
+                    lines.append(f"      - {e.get('name')} score={e.get('score')}{suffix}")
 
 
 def _append_usb_ids(lines: list[str], usb_ids: object) -> None:

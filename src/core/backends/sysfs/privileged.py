@@ -32,18 +32,41 @@ def run_led_apply(*, led: str, brightness: int, rgb: tuple[int, int, int] | None
         r, g, b = rgb
         argv += ["--rgb", str(int(r)), str(int(g)), str(int(b))]
 
+    def _log(cp: subprocess.CompletedProcess[str], *, via: str) -> None:
+        if not os.environ.get("KEYRGB_DEBUG"):
+            return
+        try:
+            stderr = (cp.stderr or "").strip().replace("\n", " | ")
+            if len(stderr) > 400:
+                stderr = stderr[:400] + "..."
+            stdout = (cp.stdout or "").strip().replace("\n", " | ")
+            if len(stdout) > 200:
+                stdout = stdout[:200] + "..."
+            logger.info(
+                "backend.sysfs.helper led-apply via=%s rc=%s stdout=%s stderr=%s",
+                via,
+                cp.returncode,
+                stdout,
+                stderr,
+            )
+        except Exception:
+            pass
+
     if os.geteuid() == 0:
         cp = subprocess.run(argv, check=False, capture_output=True, text=True)
+        _log(cp, via="root")
         return cp.returncode == 0
 
     pkexec = shutil.which("pkexec")
     if pkexec:
         cp = subprocess.run([pkexec, *argv], check=False, capture_output=True, text=True)
+        _log(cp, via="pkexec")
         return cp.returncode == 0
 
     sudo = shutil.which("sudo")
     if sudo:
         cp = subprocess.run([sudo, *argv], check=False, capture_output=True, text=True)
+        _log(cp, via="sudo")
         return cp.returncode == 0
 
     return False

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,44 @@ def _sysfs_led_candidates_snapshot() -> dict[str, Any]:
         "root_is_sysfs": root_is_sys,
         "exists": bool(root.exists()),
     }
+
+    # Best-effort privileged write path hints.
+    try:
+        from ..backends.sysfs import privileged  # type: ignore
+
+        helper_path = privileged.power_helper_path()
+        helper_entry: dict[str, Any] = {
+            "path": helper_path,
+            "exists": bool(Path(helper_path).exists()),
+            "supports_led_apply": bool(privileged.helper_supports_led_apply()),
+        }
+        try:
+            helper_entry["executable"] = bool(os.access(helper_path, os.X_OK))
+        except Exception:
+            pass
+        try:
+            st = os.stat(helper_path)
+            helper_entry["uid"] = int(st.st_uid)
+            helper_entry["gid"] = int(st.st_gid)
+            helper_entry["mode"] = f"{int(st.st_mode) & 0o777:04o}"
+        except Exception:
+            pass
+
+        out["power_helper"] = helper_entry
+    except Exception:
+        pass
+
+    try:
+        pkexec_path = shutil.which("pkexec")
+        sudo_path = shutil.which("sudo")
+        out["pkexec_in_path"] = bool(pkexec_path)
+        out["sudo_in_path"] = bool(sudo_path)
+        if pkexec_path:
+            out["pkexec_path"] = pkexec_path
+        if sudo_path:
+            out["sudo_path"] = sudo_path
+    except Exception:
+        pass
 
     if not root.exists():
         return out
@@ -108,14 +147,86 @@ def _sysfs_led_candidates_snapshot() -> dict[str, Any]:
     }
 
     for score, name, led_dir in scored[:8]:
+        brightness_path = led_dir / "brightness"
+
+        # Permission diagnostics: root-owned sysfs nodes are common; this makes it
+        # obvious whether the issue is udev/uaccess/ACL/polkit versus detection.
+        st: os.stat_result | None
+        try:
+            st = os.stat(brightness_path)
+        except Exception:
+            st = None
+
+        acl_present: bool | None = None
+        try:
+            if hasattr(os, "getxattr"):
+                # Presence check only; reading ACL contents requires extra parsing.
+                os.getxattr(brightness_path, "system.posix_acl_access")  # type: ignore[arg-type]
+                acl_present = True
+        except OSError:
+            acl_present = False
+        except Exception:
+            acl_present = None
+
+        access_r = bool(os.access(brightness_path, os.R_OK))
+        access_w = bool(os.access(brightness_path, os.W_OK))
+        access_r_eff: bool | None = None
+        access_w_eff: bool | None = None
+        try:
+            access_r_eff = bool(os.access(brightness_path, os.R_OK, effective_ids=True))
+            access_w_eff = bool(os.access(brightness_path, os.W_OK, effective_ids=True))
+        except TypeError:
+            # effective_ids isn't available on some platforms/Pythons.
+            pass
+        except Exception:
+            pass
+
         entry: dict[str, Any] = {
             "name": name,
             "score": int(score),
             "has_multi_intensity": bool((led_dir / "multi_intensity").exists()),
             "has_color": bool((led_dir / "color").exists()),
             "has_brightness": bool((led_dir / "brightness").exists()),
-            "brightness_writable": bool(os.access(led_dir / "brightness", os.W_OK)),
+            "brightness_readable": access_r,
+            "brightness_writable": access_w,
         }
+
+        # Identify the kernel driver/module behind the LED node (best-effort).
+        # This is extremely helpful to distinguish tuxedo/clevo/system76/etc.
+        try:
+            dev_link = led_dir / "device"
+            if dev_link.exists():
+                resolved_dev = str(dev_link.resolve())
+                if root_is_sys and resolved_dev.startswith("/sys/"):
+                    entry["device_path"] = resolved_dev
+                driver_link = dev_link / "driver"
+                if driver_link.exists():
+                    driver_name = driver_link.resolve().name
+                    if driver_name:
+                        entry["device_driver"] = driver_name
+                    module_link = driver_link / "module"
+                    if module_link.exists():
+                        module_name = module_link.resolve().name
+                        if module_name:
+                            entry["device_module"] = module_name
+        except Exception:
+            pass
+
+        if st is not None:
+            try:
+                entry["brightness_uid"] = int(st.st_uid)
+                entry["brightness_gid"] = int(st.st_gid)
+                entry["brightness_mode"] = f"{int(st.st_mode) & 0o777:04o}"
+            except Exception:
+                pass
+
+        if acl_present is not None:
+            entry["brightness_acl"] = acl_present
+        if access_r_eff is not None:
+            entry["brightness_readable_effective"] = access_r_eff
+        if access_w_eff is not None:
+            entry["brightness_writable_effective"] = access_w_eff
+
         # Only include full paths if they are clearly sysfs.
         if root_is_sys:
             entry["path"] = str(led_dir)

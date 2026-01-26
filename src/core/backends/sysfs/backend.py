@@ -58,17 +58,33 @@ class SysfsLedsBackend(KeyboardBackend):
         led_dir = found[0]
         brightness_path = led_dir / "brightness"
         max_brightness_path = led_dir / "max_brightness"
+
+        identifiers: dict[str, str] = {
+            "brightness": str(brightness_path),
+            "led": led_dir.name,
+            "led_dir": str(led_dir),
+        }
+
+        try:
+            st = os.stat(brightness_path)
+            identifiers["brightness_uid"] = str(int(st.st_uid))
+            identifiers["brightness_gid"] = str(int(st.st_gid))
+            identifiers["brightness_mode"] = f"{int(st.st_mode) & 0o777:04o}"
+        except Exception:
+            pass
+
+        try:
+            identifiers["brightness_readable"] = str(bool(os.access(brightness_path, os.R_OK))).lower()
+            identifiers["brightness_writable"] = str(bool(os.access(brightness_path, os.W_OK))).lower()
+        except Exception:
+            pass
         
         if not os.access(brightness_path, os.R_OK):
             return ProbeResult(
                 available=False,
                 reason="brightness not readable",
                 confidence=0,
-                identifiers={
-                    "brightness": str(brightness_path),
-                    "led": led_dir.name,
-                    "led_dir": str(led_dir),
-                },
+                identifiers=identifiers,
             )
 
         if not os.access(brightness_path, os.W_OK):
@@ -76,27 +92,22 @@ class SysfsLedsBackend(KeyboardBackend):
             # pkexec helper is present and supports LED writes, we can still
             # drive the backlight safely without running the whole app as root.
             if privileged.helper_supports_led_apply():
+                try:
+                    identifiers["helper"] = privileged.power_helper_path()
+                except Exception:
+                    pass
                 return ProbeResult(
                     available=True,
                     reason="sysfs LED present (brightness root-only; using helper)",
                     confidence=70,
-                    identifiers={
-                        "brightness": str(brightness_path),
-                        "led": led_dir.name,
-                        "led_dir": str(led_dir),
-                        "helper": privileged.power_helper_path(),
-                    },
+                    identifiers=identifiers,
                 )
 
             return ProbeResult(
                 available=False,
                 reason="brightness not writable (needs root or keyrgb-power-helper)",
                 confidence=0,
-                identifiers={
-                    "brightness": str(brightness_path),
-                    "led": led_dir.name,
-                    "led_dir": str(led_dir),
-                },
+                identifiers=identifiers,
             )
 
         return ProbeResult(

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.15.7 (2026-01-26)
+
+- Diagnostics/Sysfs: Include detailed sysfs LED permission metadata (mode/uid/gid/ACL), LED driver/module hints, and helper/pkexec/sudo availability to make "permission denied" reports immediately actionable.
+
 ## 0.15.6 (2026-01-26)
 
 - Fix: CI/AppImage: AppImage smoke test installs minimal system `libfontconfig`/`libfreetype` in the container (these are intentionally not bundled to avoid GTK/Pango symbol/version conflicts on some distros).
