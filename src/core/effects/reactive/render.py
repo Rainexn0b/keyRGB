@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Dict, Tuple
 
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
@@ -73,7 +74,17 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
     # However, during screen-dim sync (temp-dim mode), we must NOT raise the
     # hardware brightness above the policy cap or we'll fight dim/restore.
     dim_temp_active = bool(getattr(engine, "_dim_temp_active", False))
-    if dim_temp_active:
+    try:
+        restore_until = float(getattr(engine, "_dim_temp_restore_until", 0.0) or 0.0)
+    except Exception:
+        restore_until = 0.0
+
+    # Short grace period after a temp-dim restore: keep hardware brightness
+    # capped to the global brightness to avoid a visible jump from reactive
+    # pulse brightness before the fade-in completes.
+    restore_grace_active = bool(restore_until > 0.0 and time.monotonic() < restore_until)
+
+    if dim_temp_active or restore_grace_active:
         hw = global_hw
     else:
         hw = max(global_hw, base, eff)
