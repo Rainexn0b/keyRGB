@@ -218,13 +218,6 @@ def apply_idle_action(
                 if effect in reactive_effects_set:
                     try:
                         eng = tray.engine
-                        # Keep hardware brightness capped briefly after undim.
-                        try:
-                            import time
-
-                            eng._dim_temp_restore_until = float(time.monotonic() + 0.35)
-                        except Exception:
-                            pass
                         # Keep per-key brightness in sync with config for the backdrop.
                         try:
                             with eng.kb_lock:
@@ -247,6 +240,24 @@ def apply_idle_action(
                             saved = None
                         try:
                             with eng.kb_lock:
+                                # Smoothly ramp hardware brightness back up to allow
+                                # reactive pulses without a sudden flash.
+                                try:
+                                    import time
+
+                                    now = float(time.monotonic())
+                                    to_hw = max(
+                                        int(target),
+                                        int(perkey_target),
+                                        int(saved) if saved is not None else 0,
+                                    )
+                                    to_hw = max(0, min(50, int(to_hw)))
+                                    eng._dim_temp_restore_until = float(now + 0.55)
+                                    eng._dim_temp_restore_ramp_start_at = float(now)
+                                    eng._dim_temp_restore_ramp_end_at = float(now + 0.55)
+                                    eng._dim_temp_restore_ramp_to = int(to_hw)
+                                except Exception:
+                                    pass
                                 if saved is not None:
                                     try:
                                         eng.reactive_brightness = int(saved)
