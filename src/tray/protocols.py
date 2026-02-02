@@ -222,3 +222,37 @@ class ConfigPollingTrayProtocol(Protocol):
     def _log_exception(self, msg: str, exc: Exception) -> None: ...
 
     def _log_event(self, source: str, action: str, **fields: object) -> None: ...
+
+
+# ---------------------------------------------------------------------------
+# Minimal protocol for tray lighting controller
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class LightingTrayProtocol(Protocol):
+    """Minimal protocol for tray lighting controller functions."""
+
+    config: "Config"
+    engine: "EffectsEngine"
+
+    is_off: bool
+
+    _idle_forced_off: bool
+    _user_forced_off: bool
+    _power_forced_off: bool
+    _last_resume_at: float
+
+    @property
+    def _last_brightness(self) -> int: ...
+
+    @_last_brightness.setter
+    def _last_brightness(self, value: int) -> None: ...
+
+    def _refresh_ui(self) -> None: ...
+
+    def _update_menu(self) -> None: ...
+
+    def _log_exception(self, msg: str, exc: Exception) -> None: ...
+
+    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
