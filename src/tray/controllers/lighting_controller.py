@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.tray.controllers._lighting_controller_helpers import (
@@ -16,6 +16,7 @@ from src.tray.controllers._lighting_controller_helpers import (
     set_engine_perkey_from_config_for_sw_effect,
     try_log_event,
 )
+from src.tray.protocols import LightingTrayProtocol
 from src.core.utils.exceptions import is_device_disconnected
 from src.core.utils.exceptions import is_permission_denied
 
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def start_current_effect(
-    tray: Any,
+    tray: LightingTrayProtocol,
     *,
     brightness_override: Optional[int] = None,
     fade_in: bool = False,
@@ -107,9 +108,10 @@ def start_current_effect(
             return
 
         # Missing permissions should be surfaced as a user-visible notification.
-        if is_permission_denied(exc) and callable(getattr(tray, "_notify_permission_issue", None)):
+        notify_permission_issue = getattr(tray, "_notify_permission_issue", None)
+        if is_permission_denied(exc) and callable(notify_permission_issue):
             try:
-                tray._notify_permission_issue(exc)
+                notify_permission_issue(exc)
             except Exception:
                 pass
             return
@@ -119,7 +121,7 @@ def start_current_effect(
             logger.exception("Error starting effect")
 
 
-def on_speed_clicked(tray: Any, item: Any) -> None:
+def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:
     speed = parse_menu_int(item)
     if speed is None:
         return
@@ -138,7 +140,7 @@ def on_speed_clicked(tray: Any, item: Any) -> None:
     tray._update_menu()
 
 
-def on_brightness_clicked(tray: Any, item: Any) -> None:
+def on_brightness_clicked(tray: LightingTrayProtocol, item: object) -> None:
     brightness = parse_menu_int(item)
     if brightness is None:
         return
@@ -187,7 +189,7 @@ def on_brightness_clicked(tray: Any, item: Any) -> None:
     tray._update_menu()
 
 
-def turn_off(tray: Any) -> None:
+def turn_off(tray: LightingTrayProtocol) -> None:
     try_log_event(tray, "menu", "turn_off")
     tray._user_forced_off = True
     tray._idle_forced_off = False
@@ -196,7 +198,7 @@ def turn_off(tray: Any) -> None:
     tray._refresh_ui()
 
 
-def turn_on(tray: Any) -> None:
+def turn_on(tray: LightingTrayProtocol) -> None:
     try_log_event(tray, "menu", "turn_on")
     tray._user_forced_off = False
     tray._idle_forced_off = False
@@ -211,7 +213,7 @@ def turn_on(tray: Any) -> None:
     tray._refresh_ui()
 
 
-def power_turn_off(tray: Any) -> None:
+def power_turn_off(tray: LightingTrayProtocol) -> None:
     try_log_event(tray, "power", "turn_off")
     tray._power_forced_off = True
     tray._idle_forced_off = False
@@ -220,7 +222,7 @@ def power_turn_off(tray: Any) -> None:
     tray._refresh_ui()
 
 
-def power_restore(tray: Any) -> None:
+def power_restore(tray: LightingTrayProtocol) -> None:
     # Track resume time so idle polling can ignore stale screen-off state.
     try:
         import time
@@ -262,7 +264,7 @@ def power_restore(tray: Any) -> None:
     tray._refresh_ui()
 
 
-def apply_brightness_from_power_policy(tray: Any, brightness: int) -> None:
+def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: int) -> None:
     """Best-effort brightness apply used by PowerManager battery-saver."""
 
     try:
