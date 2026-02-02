@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, Optional
+from typing import Optional
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
+from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
+from src.tray.protocols import IdlePowerTrayProtocol
 from .idle_power_policy import IdleAction, compute_idle_action
 from .idle_power_sensors import (
     get_session_id as _get_session_id_impl,
@@ -65,22 +67,30 @@ def _compute_idle_action(
     )
 
 
-def _ensure_idle_state(tray: Any) -> None:
-    if not hasattr(tray, "_idle_forced_off"):
+def _ensure_idle_state(tray: IdlePowerTrayProtocol) -> None:
+    missing = object()
+
+    if getattr(tray, "_idle_forced_off", missing) is missing:
         tray._idle_forced_off = False
-    if not hasattr(tray, "_user_forced_off"):
+    if getattr(tray, "_user_forced_off", missing) is missing:
         tray._user_forced_off = False
-    if not hasattr(tray, "_power_forced_off"):
+    if getattr(tray, "_power_forced_off", missing) is missing:
         tray._power_forced_off = False
-    if not hasattr(tray, "_dim_backlight_baselines"):
+    if getattr(tray, "_dim_backlight_baselines", missing) is missing:
         tray._dim_backlight_baselines = {}
-    if not hasattr(tray, "_dim_temp_active"):
+    if getattr(tray, "_dim_backlight_dimmed", missing) is missing:
+        tray._dim_backlight_dimmed = {}
+    if getattr(tray, "_dim_temp_active", missing) is missing:
         tray._dim_temp_active = False
-    if not hasattr(tray, "_dim_temp_target_brightness"):
+    if getattr(tray, "_dim_temp_target_brightness", missing) is missing:
         tray._dim_temp_target_brightness = None
+    if getattr(tray, "_dim_screen_off", missing) is missing:
+        tray._dim_screen_off = False
+    if getattr(tray, "_last_resume_at", missing) is missing:
+        tray._last_resume_at = 0.0
 
 
-def _read_dimmed_state(tray: Any) -> Optional[bool]:
+def _read_dimmed_state(tray: IdlePowerTrayProtocol) -> Optional[bool]:
     return _read_dimmed_state_impl(tray)
 
 
@@ -104,12 +114,12 @@ def _read_logind_idle_seconds(*, session_id: str) -> Optional[float]:
     )
 
 
-def _restore_from_idle(tray: Any) -> None:
+def _restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     return _restore_from_idle_impl(tray)
 
 
 def _apply_idle_action(
-    tray: Any,
+    tray: IdlePowerTrayProtocol,
     *,
     action: IdleAction,
     dim_temp_brightness: int,
@@ -180,7 +190,7 @@ def _should_log_idle_action(
 
 
 def start_idle_power_polling(
-    tray: Any,
+    tray: IdlePowerTrayProtocol,
     *,
     ite_num_rows: int,
     ite_num_cols: int,
@@ -270,19 +280,12 @@ def start_idle_power_polling(
                     idle_s = _read_logind_idle_seconds(session_id=session_id)
                     dimmed = None if idle_s is None else (float(idle_s) >= float(idle_timeout_s))
 
-                try:
-                    power_mgmt_enabled = bool(getattr(tray.config, "power_management_enabled", True))
-                    brightness = int(getattr(tray.config, "brightness", 0) or 0)
+                power_mgmt_enabled = safe_bool_attr(tray.config, "power_management_enabled", default=True)
+                brightness = safe_int_attr(tray.config, "brightness", default=0)
 
-                    dim_sync_enabled = bool(getattr(tray.config, "screen_dim_sync_enabled", True))
-                    dim_sync_mode = str(getattr(tray.config, "screen_dim_sync_mode", "off") or "off")
-                    dim_temp_brightness = int(getattr(tray.config, "screen_dim_temp_brightness", 5) or 5)
-                except Exception:
-                    power_mgmt_enabled = True
-                    brightness = 0
-                    dim_sync_enabled = True
-                    dim_sync_mode = "off"
-                    dim_temp_brightness = 5
+                dim_sync_enabled = safe_bool_attr(tray.config, "screen_dim_sync_enabled", default=True)
+                dim_sync_mode = safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off"
+                dim_temp_brightness = safe_int_attr(tray.config, "screen_dim_temp_brightness", default=5)
 
                 if dim_temp_brightness < 1:
                     dim_temp_brightness = 1
