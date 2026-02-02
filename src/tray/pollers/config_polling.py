@@ -16,8 +16,10 @@ from ._config_polling_core import (
 from ._config_polling_core import maybe_apply_fast_path as _maybe_apply_fast_path_impl
 from ._config_polling_core import state_for_log as _state_for_log_impl
 
+from src.tray.protocols import ConfigPollingTrayProtocol
 
-def _compute_config_apply_state(tray) -> ConfigApplyState:
+
+def _compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
     return _compute_config_apply_state_impl(tray)
 
 
@@ -26,7 +28,7 @@ def _state_for_log(state: ConfigApplyState | None):
 
 
 def _maybe_apply_fast_path(
-    tray,
+    tray: ConfigPollingTrayProtocol,
     *,
     last_applied: ConfigApplyState | None,
     current: ConfigApplyState,
@@ -40,7 +42,7 @@ def _maybe_apply_fast_path(
 
 
 def _apply_from_config_once(
-    tray,
+    tray: ConfigPollingTrayProtocol,
     *,
     ite_num_rows: int,
     ite_num_cols: int,
@@ -63,7 +65,7 @@ def _apply_from_config_once(
     )
 
 
-def start_config_polling(tray, *, ite_num_rows: int, ite_num_cols: int) -> None:
+def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, ite_num_cols: int) -> None:
     """Poll config file for external changes and apply them."""
 
     config_path = Path(tray.config.CONFIG_FILE)
