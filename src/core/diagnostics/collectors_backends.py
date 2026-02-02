@@ -65,10 +65,10 @@ def _sysfs_led_candidates_snapshot() -> dict[str, Any]:
         except Exception:
             pass
         try:
-            st = os.stat(helper_path)
-            helper_entry["uid"] = int(st.st_uid)
-            helper_entry["gid"] = int(st.st_gid)
-            helper_entry["mode"] = f"{int(st.st_mode) & 0o777:04o}"
+            helper_st = os.stat(helper_path)
+            helper_entry["uid"] = int(helper_st.st_uid)
+            helper_entry["gid"] = int(helper_st.st_gid)
+            helper_entry["mode"] = f"{int(helper_st.st_mode) & 0o777:04o}"
         except Exception:
             pass
 

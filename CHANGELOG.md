@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.15.9 (2026-02-02)
+
+- Build: Add a Code Hygiene build step to detect dynamic attribute coupling, defensive conversions, and `Any` creep.
+- Maintenance: Add safe attribute access helpers (`safe_attrs`) with unit tests.
+- Maintenance: Add tray state Protocol scaffolding to support gradual typing improvements.
+- Fix: Resolve mypy typing issues in tray icon rendering and diagnostics formatting.
+
 ## 0.15.8 (2026-01-26)
 
 - Installer: Add “please consider giving the repo a Star” message to end of install flows.

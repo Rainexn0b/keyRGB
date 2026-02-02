@@ -68,7 +68,10 @@ def start_icon_color_polling(tray) -> None:
             try:
                 sig = _compute_icon_sig(tray)
                 if _should_update_icon(sig, last_sig):
-                    tray._update_icon()
+                    try:
+                        tray._update_icon(animate=False)
+                    except TypeError:
+                        tray._update_icon()
                     last_sig = sig
             except Exception as exc:
                 now = time.monotonic()

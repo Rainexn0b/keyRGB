@@ -48,6 +48,7 @@ def steps() -> list[Step]:
     from .step_black import black_check_runner
     from .step_type_check import mypy_runner
     from .step_loc_check import loc_over_400_runner
+    from .step_code_hygiene import code_hygiene_runner
 
     return [
         Step(
@@ -154,5 +155,12 @@ def steps() -> list[Step]:
             description="Smoke-test AppImage in minimal container (no system deps)",
             log_file=_log("step-15-appimage-smoke.log"),
             runner=appimage_smoke_runner,
+        ),
+        Step(
+            number=16,
+            name="Code Hygiene",
+            description="Check defensive patterns, type discipline, test naming",
+            log_file=_log("step-16-code-hygiene.log"),
+            runner=code_hygiene_runner,
         ),
     ]

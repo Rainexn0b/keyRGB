@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import colorsys
 from collections import deque
 from functools import lru_cache
 from pathlib import Path
@@ -197,3 +198,126 @@ def create_icon(color: tuple[int, int, int]) -> Image.Image:
             )
 
     return img
+
+
+def _clamp_u8(v: float) -> int:
+    return int(max(0, min(255, round(v))))
+
+
+def _scale_rgb(color: tuple[int, int, int], scale: float) -> tuple[int, int, int]:
+    s = float(max(0.0, min(1.0, scale)))
+    r, g, b = color
+    return (_clamp_u8(r * s), _clamp_u8(g * s), _clamp_u8(b * s))
+
+
+@lru_cache(maxsize=64)
+def _rainbow_gradient_64(phase_q: int) -> Image.Image:
+    """Small cached rainbow gradient image (RGBA) used for the 'K' cutout."""
+
+    phase_q = int(max(0, min(63, phase_q)))
+    phase = float(phase_q) / 64.0
+
+    w, h = _ICON_SIZE
+    img = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
+    px = img.load()
+    for x in range(w):
+        hue = (phase + (float(x) / float(max(1, w - 1)))) % 1.0
+        rr, gg, bb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+        r = int(rr * 255)
+        g = int(gg * 255)
+        b = int(bb * 255)
+        for y in range(h):
+            px[x, y] = (r, g, b, 255)
+    return img
+
+
+def create_icon_rainbow(*, scale: float = 1.0, phase: float = 0.0) -> Image.Image:
+    """Create tray icon where the 'K' cutout is filled with a rainbow gradient."""
+
+    logo = _tray_logo_outline(_outline_color_for_theme())
+    masks = _tray_logo_masks()
+    if logo is not None and masks is not None:
+        _silhouette_mask, cutout_mask = masks
+
+        phase_q = int(round((float(phase) % 1.0) * 63.0))
+        underlay = _rainbow_gradient_64(phase_q).copy()
+        if scale != 1.0:
+            # Apply brightness scaling to the underlay.
+            w, h = underlay.size
+            px = underlay.load()
+            for x in range(w):
+                for y in range(h):
+                    r, g, b, a = px[x, y]
+                    rr, gg, bb = _scale_rgb((r, g, b), scale)
+                    px[x, y] = (rr, gg, bb, a)
+
+        underlay.putalpha(cutout_mask)
+        out = underlay.copy()
+        out.alpha_composite(logo)
+        return out
+
+    # Fallback: approximate with a single representative rainbow color.
+    rr_f, gg_f, bb_f = colorsys.hsv_to_rgb(float(phase) % 1.0, 1.0, 1.0)
+    return create_icon(_scale_rgb((int(rr_f * 255), int(gg_f * 255), int(bb_f * 255)), scale))
+
+
+def create_icon_mosaic(
+    *,
+    colors_flat: tuple[tuple[int, int, int], ...],
+    rows: int,
+    cols: int,
+    scale: float = 1.0,
+) -> Image.Image:
+    """Create tray icon where the 'K' cutout shows a per-key color mosaic.
+
+    colors_flat is expected to be row-major with length rows*cols.
+    """
+
+    logo = _tray_logo_outline(_outline_color_for_theme())
+    masks = _tray_logo_masks()
+    if logo is not None and masks is not None:
+        _silhouette_mask, cutout_mask = masks
+
+        r_n = max(1, int(rows))
+        c_n = max(1, int(cols))
+        expected = r_n * c_n
+        if len(colors_flat) != expected:
+            # Fall back to a representative color if grid size mismatches.
+            base = (255, 0, 128)
+            if colors_flat:
+                try:
+                    base = (colors_flat[0][0], colors_flat[0][1], colors_flat[0][2])
+                except Exception:
+                    base = (255, 0, 128)
+            return create_icon(_scale_rgb(base, scale))
+
+        underlay = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
+        draw = ImageDraw.Draw(underlay)
+
+        w, h = _ICON_SIZE
+        cell_w = float(w) / float(c_n)
+        cell_h = float(h) / float(r_n)
+
+        for r in range(r_n):
+            y0 = int(round(r * cell_h))
+            y1 = int(round((r + 1) * cell_h))
+            for c in range(c_n):
+                x0 = int(round(c * cell_w))
+                x1 = int(round((c + 1) * cell_w))
+                rr, gg, bb = colors_flat[(r * c_n) + c]
+                cr, cg, cb = _scale_rgb((int(rr), int(gg), int(bb)), scale)
+                draw.rectangle((x0, y0, max(x0, x1 - 1), max(y0, y1 - 1)), fill=(cr, cg, cb, 255))
+
+        underlay.putalpha(cutout_mask)
+        out = underlay.copy()
+        out.alpha_composite(logo)
+        return out
+
+    # Fallback: pick first cell as representative.
+    base = (255, 0, 128)
+    if colors_flat:
+        try:
+            base = (colors_flat[0][0], colors_flat[0][1], colors_flat[0][2])
+        except Exception:
+            base = (255, 0, 128)
+    return create_icon(_scale_rgb(base, scale))

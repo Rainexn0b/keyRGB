@@ -207,8 +207,8 @@ class KeyRGBTray:
 
     # ---- icon
 
-    def _update_icon(self):
-        update_tray_icon(self)
+    def _update_icon(self, *, animate: bool = True):
+        update_tray_icon(self, animate=animate)
 
     # ---- menu
 

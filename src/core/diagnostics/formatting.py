@@ -134,9 +134,9 @@ def _append_support_hints(lines: list[str], backends: object, usb_devices: objec
             "pid": pid_txt,
             "reason": reason,
         }
-        label = usb_label_by_id.get((vid_txt.lower(), pid_txt.lower()))
-        if label:
-            entry["product"] = label
+        product_label = usb_label_by_id.get((vid_txt.lower(), pid_txt.lower()))
+        if product_label:
+            entry["product"] = product_label
         unsupported_usb.append(entry)
 
     if not unsupported_usb:
@@ -290,15 +290,15 @@ def _append_sysfs_leds(
             if entry.get("trigger"):
                 lines.append(f"      trigger: {entry['trigger']}")
 
-                extra: list[str] = []
+                trigger_extra: list[str] = []
                 if entry.get("tier") is not None:
-                    extra.append(f"tier={entry.get('tier')}")
+                    trigger_extra.append(f"tier={entry.get('tier')}")
                 if entry.get("provider") is not None:
-                    extra.append(f"provider={entry.get('provider')}")
+                    trigger_extra.append(f"provider={entry.get('provider')}")
                 if entry.get("priority") is not None:
-                    extra.append(f"priority={entry.get('priority')}")
-                if extra:
-                    lines.append(f"      {' '.join(extra)}")
+                    trigger_extra.append(f"priority={entry.get('priority')}")
+                if trigger_extra:
+                    lines.append(f"      {' '.join(trigger_extra)}")
 
     if isinstance(leds, list) and leds and sysfs_leds != leds:
         lines.append("Keyboard LEDs (filtered):")
@@ -342,20 +342,20 @@ def _append_sysfs_leds(
                 for e in top[:5]:
                     if not isinstance(e, dict):
                         continue
-                    extra: list[str] = []
+                    top_extra: list[str] = []
                     if e.get("brightness_writable") is not None:
-                        extra.append(f"writable={e.get('brightness_writable')}")
+                        top_extra.append(f"writable={e.get('brightness_writable')}")
                     if e.get("brightness_mode") is not None:
-                        extra.append(f"mode={e.get('brightness_mode')}")
+                        top_extra.append(f"mode={e.get('brightness_mode')}")
                     if e.get("brightness_uid") is not None and e.get("brightness_gid") is not None:
-                        extra.append(f"uid={e.get('brightness_uid')} gid={e.get('brightness_gid')}")
+                        top_extra.append(f"uid={e.get('brightness_uid')} gid={e.get('brightness_gid')}")
                     if e.get("brightness_acl") is not None:
-                        extra.append(f"acl={e.get('brightness_acl')}")
+                        top_extra.append(f"acl={e.get('brightness_acl')}")
                     if e.get("device_driver") is not None:
-                        extra.append(f"driver={e.get('device_driver')}")
+                        top_extra.append(f"driver={e.get('device_driver')}")
                     if e.get("device_module") is not None:
-                        extra.append(f"module={e.get('device_module')}")
-                    suffix = (" " + " ".join(extra)) if extra else ""
+                        top_extra.append(f"module={e.get('device_module')}")
+                    suffix = (" " + " ".join(top_extra)) if top_extra else ""
                     lines.append(f"      - {e.get('name')} score={e.get('score')}{suffix}")
 
 

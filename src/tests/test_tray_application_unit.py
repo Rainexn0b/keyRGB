@@ -261,7 +261,7 @@ def test_update_icon_and_menu_delegate_to_refresh_helpers(monkeypatch):
     monkeypatch.setattr(
         app,
         "update_tray_icon",
-        lambda _self: calls.__setitem__("icon", calls["icon"] + 1),
+        lambda _self, animate=True: calls.__setitem__("icon", calls["icon"] + 1),
     )
     monkeypatch.setattr(
         app,

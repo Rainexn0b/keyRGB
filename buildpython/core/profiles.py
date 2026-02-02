@@ -52,6 +52,7 @@ PROFILES: dict[str, Profile] = {
             "File Size",
             "LOC Check",
             "Type Check",
+            "Code Hygiene",
             "Repo Validation",
         ],
     ),
