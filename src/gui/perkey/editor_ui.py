@@ -11,7 +11,6 @@ from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
 
 
-
 def build_editor_ui(editor) -> None:
     main = ttk.Frame(editor.root, padding=16)
     main.pack(fill="both", expand=True)

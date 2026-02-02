@@ -258,8 +258,9 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
                         interval_s=60,
                     )
                 finally:
-                    if hasattr(tray, "_update_menu"):
-                        tray._update_menu()
+                    update_menu = getattr(tray, "_update_menu", None)
+                    if callable(update_menu):
+                        update_menu()
 
             return _cb
 
