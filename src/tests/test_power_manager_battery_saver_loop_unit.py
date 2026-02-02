@@ -116,3 +116,125 @@ class TestPowerManagerBatterySaverLoop:
             pm._battery_saver_loop()
 
         exc.assert_called_once()
+
+    def test_battery_saver_loop_ignores_ac_battery_overrides_for_dim_profile(self):
+        from src.core.power_management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        mock_kb.is_off = False
+
+        cfg = MagicMock()
+        cfg.reload = MagicMock()
+        cfg.brightness = 10
+        cfg.power_management_enabled = True
+
+        # Values that would normally be applied.
+        cfg.ac_lighting_enabled = False
+        cfg.battery_lighting_enabled = False
+        cfg.ac_lighting_brightness = 25
+        cfg.battery_lighting_brightness = 5
+
+        cfg.battery_saver_enabled = False
+        cfg.battery_saver_brightness = 25
+
+        pm = PowerManager(mock_kb, config=cfg)
+        pm.monitoring = True
+
+        fake_policy = MagicMock()
+        fake_policy.update.return_value = SimpleNamespace(skip=True, actions=[])
+
+        sleep_calls = {"n": 0}
+
+        def _sleep(_seconds):
+            sleep_calls["n"] += 1
+            pm.monitoring = False
+
+        with (
+            patch(
+                "src.core.power_management.manager.read_on_ac_power",
+                return_value=True,
+            ),
+            patch(
+                "src.core.power_management.manager.get_active_profile",
+                return_value="dim",
+            ),
+            patch(
+                "src.core.power_management.manager.PowerSourceLoopPolicy",
+                return_value=fake_policy,
+            ),
+            patch(
+                "src.core.power_management.manager.time.monotonic",
+                return_value=123.0,
+            ),
+            patch(
+                "src.core.power_management.manager.time.sleep",
+                side_effect=_sleep,
+            ),
+        ):
+            pm._battery_saver_loop()
+
+        # The policy should see neutralized overrides.
+        (inputs,), _kwargs = fake_policy.update.call_args
+        assert inputs.ac_enabled is True
+        assert inputs.battery_enabled is True
+        assert inputs.ac_brightness_override is None
+        assert inputs.battery_brightness_override is None
+
+    def test_battery_saver_loop_respects_ac_battery_overrides_for_light_profile(self):
+        from src.core.power_management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        mock_kb.is_off = False
+
+        cfg = MagicMock()
+        cfg.reload = MagicMock()
+        cfg.brightness = 10
+        cfg.power_management_enabled = True
+
+        cfg.ac_lighting_enabled = False
+        cfg.battery_lighting_enabled = True
+        cfg.ac_lighting_brightness = 25
+        cfg.battery_lighting_brightness = 5
+
+        cfg.battery_saver_enabled = False
+        cfg.battery_saver_brightness = 25
+
+        pm = PowerManager(mock_kb, config=cfg)
+        pm.monitoring = True
+
+        fake_policy = MagicMock()
+        fake_policy.update.return_value = SimpleNamespace(skip=True, actions=[])
+
+        def _sleep(_seconds):
+            pm.monitoring = False
+
+        with (
+            patch(
+                "src.core.power_management.manager.read_on_ac_power",
+                return_value=True,
+            ),
+            patch(
+                "src.core.power_management.manager.get_active_profile",
+                return_value="light",
+            ),
+            patch(
+                "src.core.power_management.manager.PowerSourceLoopPolicy",
+                return_value=fake_policy,
+            ),
+            patch(
+                "src.core.power_management.manager.time.monotonic",
+                return_value=123.0,
+            ),
+            patch(
+                "src.core.power_management.manager.time.sleep",
+                side_effect=_sleep,
+            ),
+        ):
+            pm._battery_saver_loop()
+
+        # The policy should see config values unchanged.
+        (inputs,), _kwargs = fake_policy.update.call_args
+        assert inputs.ac_enabled is False
+        assert inputs.battery_enabled is True
+        assert inputs.ac_brightness_override == 25
+        assert inputs.battery_brightness_override == 5
