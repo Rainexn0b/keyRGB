@@ -24,7 +24,6 @@ from ..power_policies.power_source_loop_policy import (
     TurnOffKeyboard,
 )
 from src.core.config import Config
-from src.core.profile.paths import get_active_profile
 
 logger = logging.getLogger(__name__)
 
@@ -129,18 +128,6 @@ class PowerManager:
 
                 ac_brightness_override = getattr(self._config, "ac_lighting_brightness", None)
                 batt_brightness_override = getattr(self._config, "battery_lighting_brightness", None)
-
-                # Built-in low-light profiles should not be affected by AC/battery overrides.
-                # These profiles are intended to be stable and intentionally dim.
-                try:
-                    active_profile = get_active_profile()
-                except Exception:
-                    active_profile = ""
-                if active_profile in {"dim", "dark"}:
-                    ac_enabled = True
-                    batt_enabled = True
-                    ac_brightness_override = None
-                    batt_brightness_override = None
 
                 enabled = bool(getattr(self._config, "battery_saver_enabled", False))
                 target = int(getattr(self._config, "battery_saver_brightness", 25) or 0)
