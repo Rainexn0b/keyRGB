@@ -77,49 +77,44 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
 
     desired = max(global_hw, base, eff)
 
-    # Generic per-frame hardware brightness ramp (used to smooth dim/restore
-    # transitions without fighting reactive pulses).
     now = time.monotonic()
     try:
-        ramp_start_at = float(getattr(engine, "_keyrgb_hw_ramp_start_at", 0.0) or 0.0)
+        restore_until = float(getattr(engine, "_dim_temp_restore_until", 0.0) or 0.0)
+    except Exception:
+        restore_until = 0.0
+
+    try:
+        ramp_start_at = float(getattr(engine, "_dim_temp_restore_ramp_start_at", 0.0) or 0.0)
     except Exception:
         ramp_start_at = 0.0
     try:
-        ramp_end_at = float(getattr(engine, "_keyrgb_hw_ramp_end_at", 0.0) or 0.0)
+        ramp_end_at = float(getattr(engine, "_dim_temp_restore_ramp_end_at", 0.0) or 0.0)
     except Exception:
         ramp_end_at = 0.0
     try:
-        ramp_from = getattr(engine, "_keyrgb_hw_ramp_from", None)
-    except Exception:
-        ramp_from = None
-    try:
-        ramp_to = getattr(engine, "_keyrgb_hw_ramp_to", None)
+        ramp_to = getattr(engine, "_dim_temp_restore_ramp_to", None)
     except Exception:
         ramp_to = None
 
+    restore_grace_active = bool(restore_until > 0.0 and now < restore_until)
     ramp_active = bool(ramp_start_at > 0.0 and ramp_end_at > ramp_start_at and ramp_start_at <= now < ramp_end_at)
 
     if dim_temp_active:
         hw = global_hw
-    else:
-        hw = desired
-
-    if ramp_active:
+    elif ramp_active:
         try:
-            from_hw = int(hw if ramp_from is None else ramp_from)
+            to_hw = int(desired if ramp_to is None else ramp_to)
         except Exception:
-            from_hw = int(hw)
-        try:
-            to_hw = int(hw if ramp_to is None else ramp_to)
-        except Exception:
-            to_hw = int(hw)
-
-        from_hw = max(0, min(50, int(from_hw)))
+            to_hw = int(desired)
         to_hw = max(0, min(50, int(to_hw)))
 
         denom = float(ramp_end_at - ramp_start_at)
         t = 1.0 if denom <= 0 else max(0.0, min(1.0, (now - float(ramp_start_at)) / denom))
-        hw = int(round(float(from_hw) + (float(to_hw) - float(from_hw)) * float(t)))
+        hw = int(round(float(global_hw) + (float(to_hw) - float(global_hw)) * float(t)))
+    elif restore_grace_active:
+        hw = global_hw
+    else:
+        hw = desired
 
     hw = max(0, min(50, int(hw)))
     return base, eff, hw
