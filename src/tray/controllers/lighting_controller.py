@@ -293,12 +293,6 @@ def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: i
             "apply_brightness",
             old=int(getattr(tray.config, "brightness", 0) or 0),
             new=int(brightness_int),
-            battery_saver_enabled=bool(getattr(tray.config, "battery_saver_enabled", False)),
-            battery_saver_brightness=int(getattr(tray.config, "battery_saver_brightness", 0) or 0),
-            ac_lighting_enabled=bool(getattr(tray.config, "ac_lighting_enabled", True)),
-            battery_lighting_enabled=bool(getattr(tray.config, "battery_lighting_enabled", True)),
-            ac_lighting_brightness=getattr(tray.config, "ac_lighting_brightness", None),
-            battery_lighting_brightness=getattr(tray.config, "battery_lighting_brightness", None),
         )
 
         effect = get_effect_name(tray)
