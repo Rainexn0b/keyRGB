@@ -153,37 +153,17 @@ def apply_idle_action(
                 # reactive effect brightness so the global hardware brightness
                 # can drop.
                 if effect in reactive_effects_set:
-                    # Do not hold kb_lock across the fade: for reactive effects
-                    # we rely on the render loop to apply brightness changes.
-                    # Holding the lock would block rendering and cause jumps.
-                    try:
-                        eng = tray.engine
-                        # Save + clamp reactive pulse brightness while temp-dimmed.
-                        try:
-                            if getattr(tray, "_dim_temp_saved_reactive_brightness", None) is None:
-                                tray._dim_temp_saved_reactive_brightness = int(
-                                    getattr(eng, "reactive_brightness", 0) or 0
-                                )
-                        except Exception:
-                            pass
-                        try:
-                            with eng.kb_lock:
-                                eng.per_key_brightness = int(dim_temp_brightness)
-                                try:
-                                    eng.reactive_brightness = int(dim_temp_brightness)
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
+                    # Keep the update atomic relative to the render loop to
+                    # avoid a one-frame mix of old/new brightness inputs.
+                    with tray.engine.kb_lock:
+                        tray.engine.per_key_brightness = dim_temp_brightness
                         _set_brightness_best_effort(
-                            eng,
-                            int(dim_temp_brightness),
+                            tray.engine,
+                            dim_temp_brightness,
                             apply_to_hardware=False,
                             fade=True,
                             fade_duration_s=0.25,
                         )
-                    except Exception:
-                        pass
                 else:
                     _set_brightness_best_effort(
                         tray.engine,
@@ -199,8 +179,7 @@ def apply_idle_action(
     if action == "restore_brightness":
         tray._dim_temp_active = False
         tray._dim_temp_target_brightness = None
-        # For reactive effects we keep engine._dim_temp_active true during the
-        # fade-up to avoid a full-brightness jump driven by reactive pulses.
+        _sync_engine_dim_temp_active(tray, False)
         # Restore to current config brightness (it may have been changed while dimmed).
         # Pre-read all config values outside the lock to minimize lock hold time
         # and reduce latency before the brightness change takes effect.
@@ -216,57 +195,18 @@ def apply_idle_action(
             try:
                 is_sw_effect = effect in sw_effects_set
                 if effect in reactive_effects_set:
-                    try:
-                        eng = tray.engine
-                        # Keep hardware brightness capped briefly after undim.
-                        try:
-                            import time
-
-                            eng._dim_temp_restore_until = float(time.monotonic() + 0.35)
-                        except Exception:
-                            pass
-                        # Keep per-key brightness in sync with config for the backdrop.
-                        try:
-                            with eng.kb_lock:
-                                eng.per_key_brightness = int(perkey_target)
-                        except Exception:
-                            pass
-
+                    # Keep the update atomic relative to the render loop to
+                    # avoid a one-frame mix of old/new brightness inputs.
+                    with tray.engine.kb_lock:
+                        tray.engine.per_key_brightness = perkey_target
                         _set_brightness_best_effort(
-                            eng,
-                            int(target),
+                            tray.engine,
+                            target,
                             apply_to_hardware=False,
                             fade=True,
                             fade_duration_s=0.25,
                         )
-
-                        # Restore pulse brightness and clear temp-dim flag after the fade.
-                        try:
-                            saved = getattr(tray, "_dim_temp_saved_reactive_brightness", None)
-                        except Exception:
-                            saved = None
-                        try:
-                            with eng.kb_lock:
-                                if saved is not None:
-                                    try:
-                                        eng.reactive_brightness = int(saved)
-                                    except Exception:
-                                        pass
-                                try:
-                                    tray._dim_temp_saved_reactive_brightness = None
-                                except Exception:
-                                    pass
-                                try:
-                                    eng._dim_temp_active = False
-                                except Exception:
-                                    pass
-                        except Exception:
-                            pass
-                    except Exception:
-                        # Best-effort: ensure we at least clear the flag.
-                        _sync_engine_dim_temp_active(tray, False)
                 else:
-                    _sync_engine_dim_temp_active(tray, False)
                     _set_brightness_best_effort(
                         tray.engine,
                         target,
