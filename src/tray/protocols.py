@@ -16,26 +16,28 @@ Migration path:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Callable, Optional, Protocol, runtime_checkable
 
 
 if TYPE_CHECKING:
     from src.core.config import Config
     from src.core.effects.engine import EffectsEngine
-    from src.tray.ui.icon import IconVisual
 
 
 # ---------------------------------------------------------------------------
 # Idle/Power state - replaces _idle_forced_off, _user_forced_off, etc.
 # ---------------------------------------------------------------------------
 
-
 @dataclass
 class IdlePowerState:
     """Typed state for idle/power management tracking.
 
-    Intended to replace scattered per-function initialization of private tray
-    attributes with a single typed state container.
+    Replaces the pattern:
+        if not hasattr(tray, "_idle_forced_off"):
+            tray._idle_forced_off = False
+
+    With:
+        tray.idle_power_state.idle_forced_off = False
     """
 
     idle_forced_off: bool = False
@@ -57,12 +59,11 @@ class IdlePowerState:
 # Tray icon state - replaces _tray_icon_visual, _tray_icon_animating
 # ---------------------------------------------------------------------------
 
-
 @dataclass
 class TrayIconState:
     """Typed state for tray icon appearance tracking."""
 
-    visual: Optional["IconVisual"] = None
+    visual: Optional[str] = None
     animating: bool = False
 
 
@@ -70,32 +71,31 @@ class TrayIconState:
 # Protocol for objects that have a config attribute
 # ---------------------------------------------------------------------------
 
-
 @runtime_checkable
 class HasConfig(Protocol):
     """Protocol for objects with a Config-like attribute."""
 
     @property
-    def config(self) -> "Config": ...
+    def config(self) -> "Config":
+        ...
 
 
 # ---------------------------------------------------------------------------
 # Protocol for objects with an engine attribute
 # ---------------------------------------------------------------------------
 
-
 @runtime_checkable
 class HasEngine(Protocol):
     """Protocol for objects with an EffectsEngine."""
 
     @property
-    def engine(self) -> "EffectsEngine": ...
+    def engine(self) -> "EffectsEngine":
+        ...
 
 
 # ---------------------------------------------------------------------------
 # Full tray protocol (for gradual adoption)
 # ---------------------------------------------------------------------------
-
 
 @runtime_checkable
 class TrayStateProtocol(Protocol):
@@ -114,21 +114,24 @@ class TrayStateProtocol(Protocol):
 
     # Last known brightness (for restore operations)
     @property
-    def _last_brightness(self) -> int: ...
+    def _last_brightness(self) -> int:
+        ...
 
     @_last_brightness.setter
-    def _last_brightness(self, value: int) -> None: ...
+    def _last_brightness(self, value: int) -> None:
+        ...
 
     # UI refresh hooks
-    def _refresh_ui(self) -> None: ...
+    def _refresh_ui(self) -> None:
+        ...
 
-    def _update_menu(self) -> None: ...
+    def _update_menu(self) -> None:
+        ...
 
 
 # ---------------------------------------------------------------------------
 # Minimal protocol for idle/power operations
 # ---------------------------------------------------------------------------
-
 
 @runtime_checkable
 class IdlePowerTrayProtocol(Protocol):
@@ -146,24 +149,13 @@ class IdlePowerTrayProtocol(Protocol):
     _user_forced_off: bool
     _power_forced_off: bool
     _dim_backlight_baselines: dict[str, int]
-    _dim_backlight_dimmed: dict[str, bool]
     _dim_temp_active: bool
     _dim_temp_target_brightness: Optional[int]
-    _dim_screen_off: bool
-
-    # Resume tracking
-    _last_resume_at: float
-
-    # Logging helpers (best-effort, but present on the real tray implementation)
-    def _log_exception(self, msg: str, exc: Exception) -> None: ...
-
-    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
 
 
 # ---------------------------------------------------------------------------
 # Helper to initialize idle power state on a tray object
 # ---------------------------------------------------------------------------
-
 
 def ensure_idle_power_state(tray: Any) -> None:
     """Initialize idle power state attributes if missing.
@@ -171,45 +163,23 @@ def ensure_idle_power_state(tray: Any) -> None:
     This is the migration helper - existing code can call this,
     new code should use IdlePowerState directly.
     """
-    missing = object()
-
-    if getattr(tray, "_idle_forced_off", missing) is missing:
+    if not hasattr(tray, "_idle_forced_off"):
         tray._idle_forced_off = False
-    if getattr(tray, "_user_forced_off", missing) is missing:
+    if not hasattr(tray, "_user_forced_off"):
         tray._user_forced_off = False
-    if getattr(tray, "_power_forced_off", missing) is missing:
+    if not hasattr(tray, "_power_forced_off"):
         tray._power_forced_off = False
-    if getattr(tray, "_dim_backlight_baselines", missing) is missing:
+    if not hasattr(tray, "_dim_backlight_baselines"):
         tray._dim_backlight_baselines = {}
-    if getattr(tray, "_dim_temp_active", missing) is missing:
+    if not hasattr(tray, "_dim_temp_active"):
         tray._dim_temp_active = False
-    if getattr(tray, "_dim_temp_target_brightness", missing) is missing:
+    if not hasattr(tray, "_dim_temp_target_brightness"):
         tray._dim_temp_target_brightness = None
 
 
-def ensure_tray_icon_state(tray: Any) -> TrayIconState:
-    """Ensure a tray has a `tray_icon_state` attribute and return it.
-
-    Uses a *public* attribute name to avoid private hasattr/setattr coupling.
-    Also migrates legacy `_tray_icon_*` values into the state object when present.
-    """
-
-    existing = getattr(tray, "tray_icon_state", None)
-    if isinstance(existing, TrayIconState):
-        return existing
-
-    try:
-        legacy_visual = getattr(tray, "_tray_icon_visual", None)
-    except Exception:
-        legacy_visual = None
-    try:
-        legacy_animating = bool(getattr(tray, "_tray_icon_animating", False))
-    except Exception:
-        legacy_animating = False
-
-    st = TrayIconState(visual=legacy_visual, animating=legacy_animating)
-    try:
-        setattr(tray, "tray_icon_state", st)
-    except Exception:
-        pass
-    return st
+def ensure_tray_icon_state(tray: Any) -> None:
+    """Initialize tray icon state attributes if missing."""
+    if not hasattr(tray, "_tray_icon_visual"):
+        tray._tray_icon_visual = None
+    if not hasattr(tray, "_tray_icon_animating"):
+        tray._tray_icon_animating = False

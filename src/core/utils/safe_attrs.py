@@ -22,9 +22,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 
-def safe_int_attr(
-    obj: Any, name: str, *, default: int = 0, min_v: Optional[int] = None, max_v: Optional[int] = None
-) -> int:
+def safe_int_attr(obj: Any, name: str, *, default: int = 0, min_v: Optional[int] = None, max_v: Optional[int] = None) -> int:
     """Safely get an integer attribute with explicit default.
 
     Handles:
@@ -89,9 +87,7 @@ def safe_bool_attr(obj: Any, name: str, *, default: bool = False) -> bool:
     return bool(raw)
 
 
-def safe_float_attr(
-    obj: Any, name: str, *, default: float = 0.0, min_v: Optional[float] = None, max_v: Optional[float] = None
-) -> float:
+def safe_float_attr(obj: Any, name: str, *, default: float = 0.0, min_v: Optional[float] = None, max_v: Optional[float] = None) -> float:
     """Safely get a float attribute with explicit default.
 
     Args:
@@ -147,9 +143,7 @@ def safe_str_attr(obj: Any, name: str, *, default: str = "") -> str:
     return str(raw)
 
 
-def safe_optional_int_attr(
-    obj: Any, name: str, *, min_v: Optional[int] = None, max_v: Optional[int] = None
-) -> Optional[int]:
+def safe_optional_int_attr(obj: Any, name: str, *, min_v: Optional[int] = None, max_v: Optional[int] = None) -> Optional[int]:
     """Safely get an optional integer attribute (preserves None).
 
     Unlike safe_int_attr, this returns None when the attribute is None or missing,

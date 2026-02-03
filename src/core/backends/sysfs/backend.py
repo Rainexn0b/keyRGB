@@ -4,7 +4,7 @@ import os
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 from ..base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeResult
 from . import common
@@ -44,7 +44,7 @@ class SysfsLedsBackend(KeyboardBackend):
 
         # Highest score first; name is a deterministic tie-breaker.
         viable.sort(key=lambda t: (-t[0], t[1].lower()))
-
+        
         # Filter out low-scoring candidates (e.g. noise like "micmute" that slipped through)
         # 0 is the baseline for "neutral", negatives are explicit "bad matches".
         return [t[2] for t in viable if t[0] >= 0]
@@ -78,7 +78,7 @@ class SysfsLedsBackend(KeyboardBackend):
             identifiers["brightness_writable"] = str(bool(os.access(brightness_path, os.W_OK))).lower()
         except Exception:
             pass
-
+        
         if not os.access(brightness_path, os.R_OK):
             return ProbeResult(
                 available=False,
@@ -135,7 +135,7 @@ class SysfsLedsBackend(KeyboardBackend):
         found = self._find_leds()
         if not found:
             raise FileNotFoundError("No sysfs LED keyboard backlight found")
-
+        
         return SysfsLedKeyboardDevice(
             primary_led_dir=found[0],
             all_led_dirs=found,

@@ -3,9 +3,7 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
-
-from src.tray.protocols import IdlePowerTrayProtocol
+from typing import Any, Optional
 
 
 def _read_int(path: Path) -> Optional[int]:
@@ -15,7 +13,7 @@ def _read_int(path: Path) -> Optional[int]:
         return None
 
 
-def read_dimmed_state(tray: IdlePowerTrayProtocol, *, backlight_base: Path | None = None) -> Optional[bool]:
+def read_dimmed_state(tray: Any, *, backlight_base: Path | None = None) -> Optional[bool]:
     """Best-effort: infer 'dimmed' from kernel backlight brightness drops.
 
     Some systems expose multiple backlight devices (e.g., hybrid graphics). KDE

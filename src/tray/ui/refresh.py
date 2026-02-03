@@ -6,7 +6,6 @@ import time
 from typing import Any
 
 from ..integrations import runtime
-from ..protocols import ensure_tray_icon_state
 from . import icon as icon_mod
 from . import menu as menu_mod
 
@@ -62,25 +61,34 @@ def update_icon(tray: Any, *, animate: bool = True) -> None:
     """Update the tray icon image based on current config state."""
 
     if getattr(tray, "icon", None):
-        st = ensure_tray_icon_state(tray)
         now = time.time()
         target = icon_mod.icon_visual(config=tray.config, is_off=tray.is_off, now=now)
 
-        last = st.visual
+        try:
+            last = getattr(tray, "_tray_icon_visual", None)
+        except Exception:
+            last = None
 
         # Fast path: no previous state, or animation disabled.
         if not animate or last is None or last == target:
             tray.icon.icon = _render_visual(target)
-            st.visual = target
+            try:
+                setattr(tray, "_tray_icon_visual", target)
+            except Exception:
+                pass
             return
 
         # Avoid overlapping animations (can happen when multiple pollers/menu actions
         # trigger close together). In that case, just snap to the latest target.
-        if st.animating:
+        try:
+            if bool(getattr(tray, "_tray_icon_animating", False)):
+                tray.icon.icon = _render_visual(target)
+                setattr(tray, "_tray_icon_visual", target)
+                return
+            setattr(tray, "_tray_icon_animating", True)
+        except Exception:
             tray.icon.icon = _render_visual(target)
-            st.visual = target
             return
-        st.animating = True
 
         try:
             frames = 8
@@ -99,9 +107,12 @@ def update_icon(tray: Any, *, animate: bool = True) -> None:
                 time.sleep(dt)
 
             tray.icon.icon = _render_visual(target)
-            st.visual = target
+            setattr(tray, "_tray_icon_visual", target)
         finally:
-            st.animating = False
+            try:
+                setattr(tray, "_tray_icon_animating", False)
+            except Exception:
+                pass
 
 
 def update_menu(tray: Any) -> None:

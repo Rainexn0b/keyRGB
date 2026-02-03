@@ -4,7 +4,6 @@ import colorsys
 from collections import deque
 from functools import lru_cache
 from pathlib import Path
-from typing import cast
 
 from PIL import Image, ImageDraw
 
@@ -221,8 +220,6 @@ def _rainbow_gradient_64(phase_q: int) -> Image.Image:
     w, h = _ICON_SIZE
     img = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
     px = img.load()
-    if px is None:
-        return img
     for x in range(w):
         hue = (phase + (float(x) / float(max(1, w - 1)))) % 1.0
         rr, gg, bb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
@@ -248,12 +245,11 @@ def create_icon_rainbow(*, scale: float = 1.0, phase: float = 0.0) -> Image.Imag
             # Apply brightness scaling to the underlay.
             w, h = underlay.size
             px = underlay.load()
-            if px is not None:
-                for x in range(w):
-                    for y in range(h):
-                        r, g, b, a = cast(tuple[int, int, int, int], px[x, y])
-                        rr, gg, bb = _scale_rgb((r, g, b), scale)
-                        px[x, y] = (rr, gg, bb, a)
+            for x in range(w):
+                for y in range(h):
+                    r, g, b, a = px[x, y]
+                    rr, gg, bb = _scale_rgb((r, g, b), scale)
+                    px[x, y] = (rr, gg, bb, a)
 
         underlay.putalpha(cutout_mask)
         out = underlay.copy()
