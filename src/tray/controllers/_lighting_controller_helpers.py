@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
-from src.tray.protocols import LightingTrayProtocol
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 
 
-def parse_menu_int(item: object) -> Optional[int]:
+def parse_menu_int(item: Any) -> Optional[int]:
     s = str(item).replace("🔘", "").replace("⚪", "").strip()
     try:
         return int(s)
@@ -17,7 +16,7 @@ def parse_menu_int(item: object) -> Optional[int]:
         return None
 
 
-def try_log_event(tray: LightingTrayProtocol, source: str, action: str, **fields: object) -> None:
+def try_log_event(tray: Any, source: str, action: str, **fields: Any) -> None:
     log_event = getattr(tray, "_log_event", None)
     if not callable(log_event):
         return
@@ -27,7 +26,7 @@ def try_log_event(tray: LightingTrayProtocol, source: str, action: str, **fields
         return
 
 
-def get_effect_name(tray: LightingTrayProtocol) -> str:
+def get_effect_name(tray: Any) -> str:
     try:
         return str(getattr(tray.config, "effect", "none") or "none")
     except Exception:
@@ -42,7 +41,7 @@ def is_reactive_effect(effect: str) -> bool:
     return effect in REACTIVE_EFFECTS_SET
 
 
-def ensure_device_best_effort(tray: LightingTrayProtocol) -> None:
+def ensure_device_best_effort(tray: Any) -> None:
     try:
         ensure = getattr(tray.engine, "_ensure_device_available", None)
         if callable(ensure):
@@ -51,7 +50,7 @@ def ensure_device_best_effort(tray: LightingTrayProtocol) -> None:
         return
 
 
-def set_engine_perkey_from_config_for_sw_effect(tray: LightingTrayProtocol) -> None:
+def set_engine_perkey_from_config_for_sw_effect(tray: Any) -> None:
     try:
         tray.engine.per_key_colors = dict(getattr(tray.config, "per_key_colors", {}) or {})
     except Exception:
@@ -63,7 +62,7 @@ def set_engine_perkey_from_config_for_sw_effect(tray: LightingTrayProtocol) -> N
         tray.engine.per_key_brightness = None
 
 
-def clear_engine_perkey_state(tray: LightingTrayProtocol) -> None:
+def clear_engine_perkey_state(tray: Any) -> None:
     try:
         tray.engine.per_key_colors = None
     except Exception:
@@ -74,7 +73,7 @@ def clear_engine_perkey_state(tray: LightingTrayProtocol) -> None:
         pass
 
 
-def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Optional[int] = None) -> None:
+def apply_perkey_mode(tray: Any, *, brightness_override: Optional[int] = None) -> None:
     tray.engine.stop()
     effective_brightness = (
         int(brightness_override) if brightness_override is not None else int(getattr(tray.config, "brightness", 0) or 0)
@@ -114,7 +113,7 @@ def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Option
     tray.is_off = False
 
 
-def apply_uniform_none_mode(tray: LightingTrayProtocol, *, brightness_override: Optional[int] = None) -> None:
+def apply_uniform_none_mode(tray: Any, *, brightness_override: Optional[int] = None) -> None:
     tray.engine.stop()
     effective_brightness = (
         int(brightness_override) if brightness_override is not None else int(getattr(tray.config, "brightness", 0) or 0)
