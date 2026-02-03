@@ -95,7 +95,7 @@ def test_dim_to_temp_for_reactive_effect_also_updates_perkey_brightness() -> Non
 
     assert tray._dim_temp_active is True
     assert tray._dim_temp_target_brightness == 7
-    tray.engine.set_brightness.assert_called_once_with(7, apply_to_hardware=False, fade=True, fade_duration_s=0.25)
+    tray.engine.set_brightness.assert_called_once_with(7, apply_to_hardware=False, fade=False, fade_duration_s=0.0)
     assert tray.engine.per_key_brightness == 7
     assert tray.engine._dim_temp_active is True
 
@@ -111,7 +111,7 @@ def test_restore_brightness_for_reactive_effect_restores_perkey_brightness() -> 
 
     assert tray._dim_temp_active is False
     assert tray._dim_temp_target_brightness is None
-    tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False, fade=True, fade_duration_s=0.25)
+    tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False, fade=False, fade_duration_s=0.0)
     assert tray.engine.per_key_brightness == 55
     assert tray.engine._dim_temp_active is False
 

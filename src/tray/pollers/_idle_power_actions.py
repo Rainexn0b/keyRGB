@@ -166,6 +166,25 @@ def apply_idle_action(
                                 )
                         except Exception:
                             pass
+
+                        # Smoothly ramp down from the currently-resolved hardware
+                        # brightness (often driven high by reactive pulses).
+                        try:
+                            import time
+
+                            now = float(time.monotonic())
+                            from_hw = max(
+                                int(getattr(eng, "brightness", 0) or 0),
+                                int(getattr(eng, "per_key_brightness", 0) or 0),
+                                int(getattr(eng, "reactive_brightness", 0) or 0),
+                            )
+                            from_hw = max(0, min(50, int(from_hw)))
+                            eng._keyrgb_hw_ramp_start_at = float(now)
+                            eng._keyrgb_hw_ramp_end_at = float(now + 0.25)
+                            eng._keyrgb_hw_ramp_from = int(from_hw)
+                            eng._keyrgb_hw_ramp_to = int(max(0, min(50, int(dim_temp_brightness))))
+                        except Exception:
+                            pass
                         try:
                             with eng.kb_lock:
                                 eng.per_key_brightness = int(dim_temp_brightness)
@@ -179,8 +198,8 @@ def apply_idle_action(
                             eng,
                             int(dim_temp_brightness),
                             apply_to_hardware=False,
-                            fade=True,
-                            fade_duration_s=0.25,
+                            fade=False,
+                            fade_duration_s=0.0,
                         )
                     except Exception:
                         pass
@@ -229,8 +248,8 @@ def apply_idle_action(
                             eng,
                             int(target),
                             apply_to_hardware=False,
-                            fade=True,
-                            fade_duration_s=0.25,
+                            fade=False,
+                            fade_duration_s=0.0,
                         )
 
                         # Restore pulse brightness and clear temp-dim flag after the fade.
@@ -252,10 +271,16 @@ def apply_idle_action(
                                         int(saved) if saved is not None else 0,
                                     )
                                     to_hw = max(0, min(50, int(to_hw)))
-                                    eng._dim_temp_restore_until = float(now + 0.55)
-                                    eng._dim_temp_restore_ramp_start_at = float(now)
-                                    eng._dim_temp_restore_ramp_end_at = float(now + 0.55)
-                                    eng._dim_temp_restore_ramp_to = int(to_hw)
+                                    try:
+                                        from_hw = int(getattr(eng, "brightness", 0) or 0)
+                                    except Exception:
+                                        from_hw = 0
+                                    from_hw = max(0, min(50, int(from_hw)))
+
+                                    eng._keyrgb_hw_ramp_start_at = float(now)
+                                    eng._keyrgb_hw_ramp_end_at = float(now + 0.75)
+                                    eng._keyrgb_hw_ramp_from = int(from_hw)
+                                    eng._keyrgb_hw_ramp_to = int(to_hw)
                                 except Exception:
                                     pass
                                 if saved is not None:
