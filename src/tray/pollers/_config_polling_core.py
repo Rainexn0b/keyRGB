@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from src.core.effects.catalog import REACTIVE_EFFECTS
-from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
@@ -40,6 +39,10 @@ def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplySt
 
     # Reactive typing manual color (may be unused unless enabled).
     try:
+        reactive_use_manual = bool(getattr(tray.config, "reactive_use_manual_color", False))
+    except Exception:
+        reactive_use_manual = False
+    try:
         reactive_color = tuple(getattr(tray.config, "reactive_color", (255, 255, 255)))
     except Exception:
         reactive_color = (255, 255, 255)
@@ -49,8 +52,12 @@ def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplySt
     # diffs that would defeat the "brightness-only" fast-path.
     reactive_brightness = 0
     if effect in REACTIVE_EFFECTS_SET:
-        base_brightness = safe_int_attr(tray.config, "brightness", default=0)
-        reactive_brightness = safe_int_attr(tray.config, "reactive_brightness", default=base_brightness)
+        try:
+            reactive_brightness = int(
+                getattr(tray.config, "reactive_brightness", getattr(tray.config, "brightness", 0)) or 0
+            )
+        except Exception:
+            reactive_brightness = int(getattr(tray.config, "brightness", 0) or 0)
 
     try:
         color = tuple(getattr(tray.config, "color", (255, 255, 255)))
@@ -59,11 +66,11 @@ def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplySt
 
     return ConfigApplyState(
         effect=str(effect),
-        speed=safe_int_attr(tray.config, "speed", default=0),
-        brightness=safe_int_attr(tray.config, "brightness", default=0),
+        speed=int(getattr(tray.config, "speed", 0) or 0),
+        brightness=int(getattr(tray.config, "brightness", 0) or 0),
         color=tuple(color),
         perkey_sig=perkey_sig,
-        reactive_use_manual=safe_bool_attr(tray.config, "reactive_use_manual_color", default=False),
+        reactive_use_manual=bool(reactive_use_manual),
         reactive_color=tuple(reactive_color),
         reactive_brightness=int(reactive_brightness),
     )

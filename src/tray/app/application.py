@@ -27,7 +27,6 @@ from ..ui import menu as menu_mod
 from ..ui.refresh import update_icon as update_tray_icon
 from ..ui.refresh import update_menu as update_tray_menu
 from src.core.utils.exceptions import is_permission_denied
-from src.core.utils.safe_attrs import safe_int_attr
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class KeyRGBTray:
         self._dim_temp_target_brightness = None
         self._last_brightness = 25
         try:
-            cfg_brightness = safe_int_attr(self.config, "brightness", default=0)
+            cfg_brightness = int(getattr(self.config, "brightness", 0) or 0)
             if cfg_brightness > 0:
                 self._last_brightness = cfg_brightness
         except Exception:

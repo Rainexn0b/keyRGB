@@ -19,7 +19,6 @@ from src.tray.controllers._lighting_controller_helpers import (
 from src.tray.protocols import LightingTrayProtocol
 from src.core.utils.exceptions import is_device_disconnected
 from src.core.utils.exceptions import is_permission_denied
-from src.core.utils.safe_attrs import safe_int_attr
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,10 @@ def start_current_effect(
     try:
         ensure_device_best_effort(tray)
 
-        target_brightness = safe_int_attr(tray.config, "brightness", default=0)
+        try:
+            target_brightness = int(getattr(tray.config, "brightness", 0) or 0)
+        except Exception:
+            target_brightness = 0
         start_brightness = target_brightness
         if brightness_override is not None:
             try:
@@ -128,7 +130,7 @@ def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:
         tray,
         "menu",
         "set_speed",
-        old=safe_int_attr(tray.config, "speed", default=0),
+        old=int(getattr(tray.config, "speed", 0) or 0),
         new=int(speed),
     )
 
@@ -161,7 +163,7 @@ def on_brightness_clicked(tray: LightingTrayProtocol, item: object) -> None:
         tray,
         "menu",
         "set_brightness",
-        old=safe_int_attr(tray.config, "brightness", default=0),
+        old=int(getattr(tray.config, "brightness", 0) or 0),
         new=int(brightness_hw),
     )
 
@@ -243,11 +245,11 @@ def power_restore(tray: LightingTrayProtocol) -> None:
         tray._idle_forced_off = False
 
         # If we forced off, ensure we have a usable brightness to restore.
-        if safe_int_attr(tray.config, "brightness", default=0) == 0:
+        if int(getattr(tray.config, "brightness", 0) or 0) == 0:
             tray.config.brightness = tray._last_brightness if tray._last_brightness > 0 else 25
 
     # If the user explicitly configured brightness=0, treat that as off.
-    if safe_int_attr(tray.config, "brightness", default=0) == 0:
+    if int(getattr(tray.config, "brightness", 0) or 0) == 0:
         tray.is_off = True
         return
 
@@ -282,8 +284,6 @@ def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: i
         return
 
     try:
-        prev_cfg_brightness = safe_int_attr(tray.config, "brightness", default=0)
-
         if brightness_int > 0:
             tray._last_brightness = brightness_int
 
@@ -291,10 +291,10 @@ def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: i
             tray,
             "power_policy",
             "apply_brightness",
-            old=prev_cfg_brightness,
+            old=int(getattr(tray.config, "brightness", 0) or 0),
             new=int(brightness_int),
             battery_saver_enabled=bool(getattr(tray.config, "battery_saver_enabled", False)),
-            battery_saver_brightness=safe_int_attr(tray.config, "battery_saver_brightness", default=0),
+            battery_saver_brightness=int(getattr(tray.config, "battery_saver_brightness", 0) or 0),
             ac_lighting_enabled=bool(getattr(tray.config, "ac_lighting_enabled", True)),
             battery_lighting_enabled=bool(getattr(tray.config, "battery_lighting_enabled", True)),
             ac_lighting_brightness=getattr(tray.config, "ac_lighting_brightness", None),
@@ -304,6 +304,11 @@ def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: i
         effect = get_effect_name(tray)
         is_sw_effect = is_software_effect(effect)
         is_reactive = is_reactive_effect(effect)
+
+        try:
+            prev_cfg_brightness = int(getattr(tray.config, "brightness", 0) or 0)
+        except Exception:
+            prev_cfg_brightness = 0
         fade_down = bool(brightness_int < prev_cfg_brightness)
         fade_s = 0.12 if int(brightness_int) <= 0 else 0.25
 
@@ -314,13 +319,8 @@ def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: i
             # For reactive effects, update both the per-key brightness and the
             # main/backdrop brightness so that dim-sync and power policy work
             # correctly. This mirrors the dim_to_temp logic.
-            try:
-                if safe_int_attr(tray.config, "perkey_brightness", default=0) != int(brightness_int):
-                    tray.config.perkey_brightness = brightness_int
-            except Exception:
-                pass
-            if int(prev_cfg_brightness) != int(brightness_int):
-                tray.config.brightness = brightness_int
+            tray.config.perkey_brightness = brightness_int
+            tray.config.brightness = brightness_int
             try:
                 # Keep the update atomic relative to the render loop to
                 # avoid a one-frame mix of old/new brightness inputs.
@@ -340,11 +340,9 @@ def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: i
             tray._refresh_ui()
             return
 
-        # Avoid rewriting config.json if brightness is already at the target.
-        if int(prev_cfg_brightness) != int(brightness_int):
-            tray.config.brightness = brightness_int
+        tray.config.brightness = brightness_int
         tray.engine.set_brightness(
-            int(brightness_int),
+            tray.config.brightness,
             apply_to_hardware=not is_sw_effect,
             fade=fade_down,
             fade_duration_s=fade_s,
