@@ -35,20 +35,9 @@ def _set_brightness_best_effort(
         pass
 
 
-def _sync_engine_dim_temp_active(tray: Any, active: bool) -> None:
-    try:
-        eng = getattr(tray, "engine", None)
-        if eng is None:
-            return
-        setattr(eng, "_dim_temp_active", bool(active))
-    except Exception:
-        pass
-
-
 def restore_from_idle(tray: Any) -> None:
     tray.is_off = False
     tray._idle_forced_off = False
-    _sync_engine_dim_temp_active(tray, False)
 
     # When restoring from an off state (screen dim sync / DPMS), avoid using a stale
     # previous color as the fade start. Some devices visibly flash if the first
@@ -103,7 +92,6 @@ def apply_idle_action(
     if action == "turn_off":
         tray._dim_temp_active = False
         tray._dim_temp_target_brightness = None
-        _sync_engine_dim_temp_active(tray, False)
         try:
             tray.engine.stop()
         except Exception:
@@ -134,7 +122,6 @@ def apply_idle_action(
                 pass
             tray._dim_temp_active = True
             tray._dim_temp_target_brightness = int(dim_temp_brightness)
-            _sync_engine_dim_temp_active(tray, True)
             # Pre-read effect outside the lock to minimize lock hold time
             try:
                 effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
@@ -179,7 +166,6 @@ def apply_idle_action(
     if action == "restore_brightness":
         tray._dim_temp_active = False
         tray._dim_temp_target_brightness = None
-        _sync_engine_dim_temp_active(tray, False)
         # Restore to current config brightness (it may have been changed while dimmed).
         # Pre-read all config values outside the lock to minimize lock hold time
         # and reduce latency before the brightness change takes effect.
@@ -223,6 +209,5 @@ def apply_idle_action(
         if not bool(getattr(tray, "_user_forced_off", False)) and not bool(getattr(tray, "_power_forced_off", False)):
             tray._dim_temp_active = False
             tray._dim_temp_target_brightness = None
-            _sync_engine_dim_temp_active(tray, False)
             restore_from_idle_fn(tray)
         return
