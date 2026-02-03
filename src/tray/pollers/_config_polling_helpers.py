@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from src.tray.protocols import ConfigPollingTrayProtocol
+from typing import Any
 
 
-def _log_detected_change(tray: ConfigPollingTrayProtocol, last_applied, current, cause: str, state_for_log_fn):
+def _log_detected_change(tray: Any, last_applied, current, cause: str, state_for_log_fn):
     log_event = getattr(tray, "_log_event", None)
     if not callable(log_event):
         return
@@ -21,7 +21,7 @@ def _log_detected_change(tray: ConfigPollingTrayProtocol, last_applied, current,
         pass
 
 
-def _handle_forced_off(tray: ConfigPollingTrayProtocol, last_applied, current, cause: str, state_for_log_fn):
+def _handle_forced_off(tray: Any, last_applied, current, cause: str, state_for_log_fn):
     """Handle the case where the tray is currently 'off' and remains off.
 
     Returns True when the change is handled (no further action required).
@@ -70,7 +70,7 @@ def _handle_forced_off(tray: ConfigPollingTrayProtocol, last_applied, current, c
     return True
 
 
-def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monotonic_fn, last_apply_warn_at: float):
+def _apply_turn_off(tray: Any, current, cause: str, monotonic_fn, last_apply_warn_at: float):
     log_event = getattr(tray, "_log_event", None)
     if callable(log_event):
         try:
@@ -100,7 +100,7 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
     return last_apply_warn_at
 
 
-def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
+def _sync_reactive(tray: Any, current) -> None:
     try:
         tray.engine.reactive_use_manual_color = bool(current.reactive_use_manual)
         tray.engine.reactive_color = tuple(current.reactive_color)
@@ -112,9 +112,7 @@ def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
         pass
 
 
-def _apply_perkey(
-    tray: ConfigPollingTrayProtocol, current, ite_num_rows: int, ite_num_cols: int, *, cause: str
-) -> None:
+def _apply_perkey(tray: Any, current, ite_num_rows: int, ite_num_cols: int, *, cause: str) -> None:
     if callable(getattr(tray, "_log_event", None)):
         try:
             tray._log_event(
@@ -153,7 +151,7 @@ def _apply_perkey(
         )
 
 
-def _apply_uniform(tray: ConfigPollingTrayProtocol, *, cause: str) -> None:
+def _apply_uniform(tray: Any, *, cause: str) -> None:
     if callable(getattr(tray, "_log_event", None)):
         try:
             tray._log_event(
@@ -170,7 +168,7 @@ def _apply_uniform(tray: ConfigPollingTrayProtocol, *, cause: str) -> None:
         tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
 
 
-def _apply_effect(tray: ConfigPollingTrayProtocol, *, cause: str) -> None:
+def _apply_effect(tray: Any, *, cause: str) -> None:
     if callable(getattr(tray, "_log_event", None)):
         try:
             tray._log_event(

@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from src.tray.protocols import ConfigPollingTrayProtocol
+from typing import Any
 
 from src.core.effects.catalog import REACTIVE_EFFECTS
 
@@ -24,7 +23,7 @@ class ConfigApplyState:
     reactive_brightness: int = 0
 
 
-def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
+def compute_config_apply_state(tray: Any) -> ConfigApplyState:
     try:
         effect = str(getattr(tray.config, "effect", "none") or "none")
     except Exception:
@@ -93,7 +92,7 @@ def state_for_log(state: ConfigApplyState | None):
 
 
 def maybe_apply_fast_path(
-    tray: ConfigPollingTrayProtocol,
+    tray: Any,
     *,
     last_applied: ConfigApplyState | None,
     current: ConfigApplyState,
@@ -172,7 +171,7 @@ def maybe_apply_fast_path(
 
 
 def apply_from_config_once(
-    tray: ConfigPollingTrayProtocol,
+    tray: Any,
     *,
     ite_num_rows: int,
     ite_num_cols: int,

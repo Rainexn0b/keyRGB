@@ -16,7 +16,7 @@ Migration path:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 
 if TYPE_CHECKING:
@@ -106,8 +106,8 @@ class TrayStateProtocol(Protocol):
     """
 
     # Core components
-    config: "Config"
-    engine: "EffectsEngine"
+    config: Any  # Config
+    engine: Any  # EffectsEngine
 
     # Lighting state
     is_off: bool
@@ -137,8 +137,8 @@ class IdlePowerTrayProtocol(Protocol):
     Narrower than TrayStateProtocol - only requires what idle_power_polling needs.
     """
 
-    config: "Config"
-    engine: "EffectsEngine"
+    config: Any
+    engine: Any
     is_off: bool
 
     # Idle power state (can be the IdlePowerState dataclass or duck-typed)
@@ -161,7 +161,33 @@ class IdlePowerTrayProtocol(Protocol):
 
 
 # ---------------------------------------------------------------------------
-def ensure_tray_icon_state(tray: object) -> TrayIconState:
+# Helper to initialize idle power state on a tray object
+# ---------------------------------------------------------------------------
+
+
+def ensure_idle_power_state(tray: Any) -> None:
+    """Initialize idle power state attributes if missing.
+
+    This is the migration helper - existing code can call this,
+    new code should use IdlePowerState directly.
+    """
+    missing = object()
+
+    if getattr(tray, "_idle_forced_off", missing) is missing:
+        tray._idle_forced_off = False
+    if getattr(tray, "_user_forced_off", missing) is missing:
+        tray._user_forced_off = False
+    if getattr(tray, "_power_forced_off", missing) is missing:
+        tray._power_forced_off = False
+    if getattr(tray, "_dim_backlight_baselines", missing) is missing:
+        tray._dim_backlight_baselines = {}
+    if getattr(tray, "_dim_temp_active", missing) is missing:
+        tray._dim_temp_active = False
+    if getattr(tray, "_dim_temp_target_brightness", missing) is missing:
+        tray._dim_temp_target_brightness = None
+
+
+def ensure_tray_icon_state(tray: Any) -> TrayIconState:
     """Ensure a tray has a `tray_icon_state` attribute and return it.
 
     Uses a *public* attribute name to avoid private hasattr/setattr coupling.
@@ -187,38 +213,3 @@ def ensure_tray_icon_state(tray: object) -> TrayIconState:
     except Exception:
         pass
     return st
-
-
-# ---------------------------------------------------------------------------
-# Minimal protocol for config polling / apply-from-config
-# ---------------------------------------------------------------------------
-
-
-@runtime_checkable
-class ConfigPollingTrayProtocol(Protocol):
-    """Minimal protocol for config polling + apply-from-config helpers."""
-
-    config: "Config"
-    engine: "EffectsEngine"
-
-    is_off: bool
-
-    _idle_forced_off: bool
-    _user_forced_off: bool
-    _power_forced_off: bool
-
-    @property
-    def _last_brightness(self) -> int: ...
-
-    @_last_brightness.setter
-    def _last_brightness(self, value: int) -> None: ...
-
-    def _refresh_ui(self) -> None: ...
-
-    def _update_menu(self) -> None: ...
-
-    def _start_current_effect(self) -> None: ...
-
-    def _log_exception(self, msg: str, exc: Exception) -> None: ...
-
-    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
