@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.16.0 (2026-02-03)
+
+- Power: Default `dim` and `dark` profiles now ignore AC/battery brightness override settings.
+- Tests: Add strict unit tests to lock in screen-dim brightness sync ordering (prevents dim/restore regressions).
+- Typing: Add/extend tray Protocols and reduce `Any`/dynamic attribute coupling across tray/core/gui.
+- Maintenance: Replace scattered defensive conversions with `safe_attrs` helpers for clearer, safer reads.
+- Docs: README clarifications for backends/status and removed duplicated env-var section.
+
 ## 0.15.9 (2026-02-02)
 
 - Build: Add a Code Hygiene build step to detect dynamic attribute coupling, defensive conversions, and `Any` creep.

@@ -1,7 +1,7 @@
 """Safe attribute access helpers.
 
 Provides type-safe alternatives to defensive patterns like:
-    int(getattr(obj, "attr", 0) or 0)
+    int (getattr(obj, "attr", 0) or 0)
 
 The issue with the above pattern:
 1. Redundant - getattr already has a default
@@ -10,7 +10,7 @@ The issue with the above pattern:
 
 Migration:
     # Before
-    brightness = int(getattr(tray.config, "brightness", 0) or 0)
+    brightness = int (getattr(tray.config, "brightness", 0) or 0)
 
     # After
     from src.core.utils.safe_attrs import safe_int_attr
@@ -19,11 +19,11 @@ Migration:
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 
 def safe_int_attr(
-    obj: Any, name: str, *, default: int = 0, min_v: Optional[int] = None, max_v: Optional[int] = None
+    obj: object, name: str, *, default: int = 0, min_v: Optional[int] = None, max_v: Optional[int] = None
 ) -> int:
     """Safely get an integer attribute with explicit default.
 
@@ -67,7 +67,7 @@ def safe_int_attr(
     return val
 
 
-def safe_bool_attr(obj: Any, name: str, *, default: bool = False) -> bool:
+def safe_bool_attr(obj: object, name: str, *, default: bool = False) -> bool:
     """Safely get a boolean attribute with explicit default.
 
     Args:
@@ -90,7 +90,7 @@ def safe_bool_attr(obj: Any, name: str, *, default: bool = False) -> bool:
 
 
 def safe_float_attr(
-    obj: Any, name: str, *, default: float = 0.0, min_v: Optional[float] = None, max_v: Optional[float] = None
+    obj: object, name: str, *, default: float = 0.0, min_v: Optional[float] = None, max_v: Optional[float] = None
 ) -> float:
     """Safely get a float attribute with explicit default.
 
@@ -125,7 +125,7 @@ def safe_float_attr(
     return val
 
 
-def safe_str_attr(obj: Any, name: str, *, default: str = "") -> str:
+def safe_str_attr(obj: object, name: str, *, default: str = "") -> str:
     """Safely get a string attribute with explicit default.
 
     Args:
@@ -148,7 +148,7 @@ def safe_str_attr(obj: Any, name: str, *, default: str = "") -> str:
 
 
 def safe_optional_int_attr(
-    obj: Any, name: str, *, min_v: Optional[int] = None, max_v: Optional[int] = None
+    obj: object, name: str, *, min_v: Optional[int] = None, max_v: Optional[int] = None
 ) -> Optional[int]:
     """Safely get an optional integer attribute (preserves None).
 

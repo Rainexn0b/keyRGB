@@ -4,6 +4,8 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Tuple
 
+from src.core.utils.safe_attrs import safe_int_attr
+
 from .ops.color_map_ops import ensure_full_map
 
 Color = Tuple[int, int, int]
@@ -53,7 +55,7 @@ class PerKeyCommitPipeline:
         )
 
         try:
-            if int(getattr(config, "brightness", 0) or 0) == 0:
+            if safe_int_attr(config, "brightness", default=0) == 0:
                 setattr(config, "brightness", 25)
         except Exception:
             pass
@@ -64,10 +66,7 @@ class PerKeyCommitPipeline:
         except Exception:
             pass
 
-        try:
-            brightness = int(getattr(config, "brightness", 0) or 0)
-        except Exception:
-            brightness = 0
+        brightness = safe_int_attr(config, "brightness", default=0)
 
         kb2 = push_fn(
             kb,

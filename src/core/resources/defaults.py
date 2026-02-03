@@ -14,27 +14,28 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import cast
 
 
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "reference_defaults_wootbook_y15_pro.json"
 
 
-def _as_dict(value: Any) -> Dict[str, Any]:
-    return value if isinstance(value, dict) else {}
+def _as_dict(value: object) -> dict[str, object]:
+    return cast(dict[str, object], value) if isinstance(value, dict) else {}
 
 
-def _load_defaults() -> Dict[str, Any]:
+def _load_defaults() -> dict[str, object]:
     try:
-        return json.loads(_DEFAULTS_PATH.read_text(encoding="utf-8"))
+        raw = json.loads(_DEFAULTS_PATH.read_text(encoding="utf-8"))
+        return _as_dict(raw)
     except Exception:
         return {}
 
 
-_RAW = _load_defaults()
+_RAW: dict[str, object] = _load_defaults()
 
 
-DEFAULT_LAYOUT_TWEAKS: Dict[str, float] = {
+DEFAULT_LAYOUT_TWEAKS: dict[str, float] = {
     "dx": 0.0,
     "dy": 0.0,
     "inset": 0.06,
@@ -49,19 +50,19 @@ for _k in list(DEFAULT_LAYOUT_TWEAKS.keys()):
         DEFAULT_LAYOUT_TWEAKS[_k] = float(_v)
 
 
-DEFAULT_KEYMAP: Dict[str, str] = {}
+DEFAULT_KEYMAP: dict[str, str] = {}
 _keymap = _as_dict(_RAW.get("keymap"))
 for _k, _v in _keymap.items():
     if isinstance(_k, str) and isinstance(_v, str):
         DEFAULT_KEYMAP[_k] = _v
 
 
-DEFAULT_PER_KEY_TWEAKS: Dict[str, Dict[str, float]] = {}
+DEFAULT_PER_KEY_TWEAKS: dict[str, dict[str, float]] = {}
 _per_key = _as_dict(_RAW.get("per_key_tweaks"))
 for _key_id, _tweaks in _per_key.items():
     if not isinstance(_key_id, str) or not isinstance(_tweaks, dict):
         continue
-    _out: Dict[str, float] = {}
+    _out: dict[str, float] = {}
     for _k in ("dx", "dy", "sx", "sy", "inset"):
         _v = _tweaks.get(_k)
         if isinstance(_v, (int, float)):

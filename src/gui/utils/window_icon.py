@@ -56,7 +56,7 @@ def apply_keyrgb_window_icon(window: tk.Misc) -> None:
         photo = ImageTk.PhotoImage(img)
 
         # Prevent garbage collection.
-        setattr(window, "_keyrgb_icon_image", photo)
+        setattr(window, "keyrgb_icon_image", photo)
 
         iconphoto = getattr(window, "iconphoto", None)
         if callable(iconphoto):

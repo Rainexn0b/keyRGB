@@ -25,6 +25,7 @@ from ..power_policies.power_source_loop_policy import (
 )
 from src.core.config import Config
 from src.core.profile.paths import get_active_profile
+from src.core.utils.safe_attrs import safe_int_attr
 
 logger = logging.getLogger(__name__)
 
@@ -116,10 +117,7 @@ class PowerManager:
                     continue
 
                 # Determine current brightness and whether user explicitly turned off.
-                try:
-                    current_brightness = int(getattr(self._config, "brightness", 0) or 0)
-                except Exception:
-                    current_brightness = 0
+                current_brightness = safe_int_attr(self._config, "brightness", default=0)
 
                 is_off = bool(getattr(self.kb_controller, "is_off", False))
 
@@ -143,7 +141,7 @@ class PowerManager:
                     batt_brightness_override = None
 
                 enabled = bool(getattr(self._config, "battery_saver_enabled", False))
-                target = int(getattr(self._config, "battery_saver_brightness", 25) or 0)
+                target = safe_int_attr(self._config, "battery_saver_brightness", default=25)
 
                 result = policy.update(
                     PowerSourceLoopInputs(
@@ -285,7 +283,7 @@ class PowerManager:
 
             # If the user explicitly configured brightness=0, treat it as off.
             try:
-                if int(getattr(self._config, "brightness", 0) or 0) == 0:
+                if safe_int_attr(self._config, "brightness", default=0) == 0:
                     return True
             except Exception:
                 pass

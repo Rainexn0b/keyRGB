@@ -6,6 +6,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from src.core.utils.safe_attrs import safe_int_attr
+
 
 def _tier_for_backend_name(name: str) -> int | None:
     n = (name or "").strip().lower()
@@ -259,17 +261,17 @@ def _disable_usb_scan_under_pytest_if_needed():
                 os.environ["KEYRGB_DISABLE_USB_SCAN"] = restore_disable_usb_scan
 
 
-def _probe_backend(backend: Any) -> dict[str, Any]:
+def _probe_backend(backend: object) -> dict[str, Any]:
     try:
         probe_fn = getattr(backend, "probe", None)
         if callable(probe_fn):
             result = probe_fn()
             available = bool(getattr(result, "available", False))
             reason = str(getattr(result, "reason", ""))
-            confidence = int(getattr(result, "confidence", 0) or 0)
+            confidence = safe_int_attr(result, "confidence", default=0)
             identifiers = getattr(result, "identifiers", None)
         else:
-            available = bool(backend.is_available())
+            available = bool(getattr(backend, "is_available")())
             reason = "is_available"
             confidence = 50 if available else 0
             identifiers = None
@@ -287,7 +289,7 @@ def _probe_backend(backend: Any) -> dict[str, Any]:
     }
 
     try:
-        entry["priority"] = int(getattr(backend, "priority", 0) or 0)
+        entry["priority"] = safe_int_attr(backend, "priority", default=0)
     except Exception:
         entry["priority"] = 0
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import logging
 import json
-from typing import Any
 from .defaults import DEFAULTS as _DEFAULTS
 from .file_storage import load_config_settings, save_config_settings_atomic
 from .paths import config_dir, config_file_path
@@ -304,12 +303,24 @@ class Config:
         except Exception:
             r, g, b = 255, 255, 255
 
-        def _clamp(x: Any) -> int:
+        def _clamp(x: object) -> int:
             try:
-                v = int(x)
+                if isinstance(x, bool):
+                    v = int(x)
+                elif isinstance(x, int):
+                    v = x
+                elif isinstance(x, float):
+                    v = int(x)
+                elif isinstance(x, str):
+                    try:
+                        v = int(x)
+                    except Exception:
+                        v = int(float(x))
+                else:
+                    return 0
             except Exception:
                 return 0
-            return max(0, min(255, v))
+            return max(0, min(255, int(v)))
 
         return (_clamp(r), _clamp(g), _clamp(b))
 
@@ -320,12 +331,24 @@ class Config:
         except Exception:
             return
 
-        def _clamp(x: Any) -> int:
+        def _clamp(x: object) -> int:
             try:
-                v = int(x)
+                if isinstance(x, bool):
+                    v = int(x)
+                elif isinstance(x, int):
+                    v = x
+                elif isinstance(x, float):
+                    v = int(x)
+                elif isinstance(x, str):
+                    try:
+                        v = int(x)
+                    except Exception:
+                        v = int(float(x))
+                else:
+                    return 0
             except Exception:
                 return 0
-            return max(0, min(255, v))
+            return max(0, min(255, int(v)))
 
         self._settings["reactive_color"] = [_clamp(r), _clamp(g), _clamp(b)]
         self._save()

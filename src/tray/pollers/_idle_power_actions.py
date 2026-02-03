@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Optional, cast
+
+from src.core.utils.safe_attrs import safe_int_attr
+from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
 
 
 def _set_brightness_best_effort(
-    engine: Any,
+    engine: object,
     brightness: int,
     *,
     apply_to_hardware: bool,
@@ -18,7 +22,12 @@ def _set_brightness_best_effort(
     """
 
     try:
-        engine.set_brightness(
+        set_brightness = getattr(engine, "set_brightness", None)
+        if not callable(set_brightness):
+            return
+        set_brightness_fn = cast(Callable[..., object], set_brightness)
+
+        set_brightness_fn(
             int(brightness),
             apply_to_hardware=bool(apply_to_hardware),
             fade=bool(fade),
@@ -28,14 +37,14 @@ def _set_brightness_best_effort(
     except TypeError:
         # Retry without fade-related kwargs.
         try:
-            engine.set_brightness(int(brightness), apply_to_hardware=bool(apply_to_hardware))
+            set_brightness_fn(int(brightness), apply_to_hardware=bool(apply_to_hardware))
         except Exception:
             pass
     except Exception:
         pass
 
 
-def restore_from_idle(tray: Any) -> None:
+def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     tray.is_off = False
     tray._idle_forced_off = False
 
@@ -50,8 +59,8 @@ def restore_from_idle(tray: Any) -> None:
 
     # Best-effort: if brightness is 0, fall back to last brightness.
     try:
-        if int(getattr(tray.config, "brightness", 0) or 0) == 0:
-            tray.config.brightness = int(getattr(tray, "_last_brightness", 25) or 25)
+        if safe_int_attr(tray.config, "brightness", default=0) == 0:
+            tray.config.brightness = safe_int_attr(tray, "_last_brightness", default=25)
     except Exception:
         pass
 
@@ -67,7 +76,12 @@ def restore_from_idle(tray: Any) -> None:
         else:
             from src.tray.controllers.lighting_controller import start_current_effect
 
-            start_current_effect(tray, brightness_override=1, fade_in=True, fade_in_duration_s=0.25)
+            start_current_effect(
+                cast(LightingTrayProtocol, tray),
+                brightness_override=1,
+                fade_in=True,
+                fade_in_duration_s=0.25,
+            )
     except Exception:
         try:
             tray._log_exception("Failed to restore lighting after idle", Exception("restore failed"))
@@ -75,17 +89,19 @@ def restore_from_idle(tray: Any) -> None:
             pass
 
     try:
-        tray._refresh_ui()
+        refresh_fn = getattr(tray, "_refresh_ui", None)
+        if callable(refresh_fn):
+            refresh_fn()
     except Exception:
         pass
 
 
 def apply_idle_action(
-    tray: Any,
+    tray: IdlePowerTrayProtocol,
     *,
     action: Optional[str],
     dim_temp_brightness: int,
-    restore_from_idle_fn: Callable[[Any], None],
+    restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], None],
     reactive_effects_set: frozenset[str],
     sw_effects_set: frozenset[str],
 ) -> None:
@@ -104,7 +120,9 @@ def apply_idle_action(
         tray.is_off = True
         tray._idle_forced_off = True
         try:
-            tray._refresh_ui()
+            refresh_fn = getattr(tray, "_refresh_ui", None)
+            if callable(refresh_fn):
+                refresh_fn()
         except Exception:
             pass
         return
@@ -170,8 +188,8 @@ def apply_idle_action(
         # Pre-read all config values outside the lock to minimize lock hold time
         # and reduce latency before the brightness change takes effect.
         try:
-            target = int(getattr(tray.config, "brightness", 0) or 0)
-            perkey_target = int(getattr(tray.config, "perkey_brightness", 0) or 0)
+            target = safe_int_attr(tray.config, "brightness", default=0)
+            perkey_target = safe_int_attr(tray.config, "perkey_brightness", default=0)
             effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
         except Exception:
             target = 0

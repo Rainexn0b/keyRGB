@@ -74,7 +74,7 @@ def _unlink_tmp(path: str, *, key: str) -> None:
         )
 
 
-def _write_temp_json(payload: Any, *, prefix: str) -> str:
+def _write_temp_json(payload: object, *, prefix: str) -> str:
     fd, path = tempfile.mkstemp(prefix=prefix, suffix=".json")
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:

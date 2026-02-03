@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers._lighting_controller_helpers import (
     apply_perkey_mode,
     apply_uniform_none_mode,
@@ -38,10 +39,7 @@ def start_current_effect(
     try:
         ensure_device_best_effort(tray)
 
-        try:
-            target_brightness = int(getattr(tray.config, "brightness", 0) or 0)
-        except Exception:
-            target_brightness = 0
+        target_brightness = safe_int_attr(tray.config, "brightness", default=0)
         start_brightness = target_brightness
         if brightness_override is not None:
             try:
@@ -130,7 +128,7 @@ def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:
         tray,
         "menu",
         "set_speed",
-        old=int(getattr(tray.config, "speed", 0) or 0),
+        old=safe_int_attr(tray.config, "speed", default=0),
         new=int(speed),
     )
 
@@ -163,7 +161,7 @@ def on_brightness_clicked(tray: LightingTrayProtocol, item: object) -> None:
         tray,
         "menu",
         "set_brightness",
-        old=int(getattr(tray.config, "brightness", 0) or 0),
+        old=safe_int_attr(tray.config, "brightness", default=0),
         new=int(brightness_hw),
     )
 
@@ -245,11 +243,11 @@ def power_restore(tray: LightingTrayProtocol) -> None:
         tray._idle_forced_off = False
 
         # If we forced off, ensure we have a usable brightness to restore.
-        if int(getattr(tray.config, "brightness", 0) or 0) == 0:
+        if safe_int_attr(tray.config, "brightness", default=0) == 0:
             tray.config.brightness = tray._last_brightness if tray._last_brightness > 0 else 25
 
     # If the user explicitly configured brightness=0, treat that as off.
-    if int(getattr(tray.config, "brightness", 0) or 0) == 0:
+    if safe_int_attr(tray.config, "brightness", default=0) == 0:
         tray.is_off = True
         return
 
@@ -291,7 +289,7 @@ def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: i
             tray,
             "power_policy",
             "apply_brightness",
-            old=int(getattr(tray.config, "brightness", 0) or 0),
+            old=safe_int_attr(tray.config, "brightness", default=0),
             new=int(brightness_int),
         )
 
@@ -299,10 +297,7 @@ def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: i
         is_sw_effect = is_software_effect(effect)
         is_reactive = is_reactive_effect(effect)
 
-        try:
-            prev_cfg_brightness = int(getattr(tray.config, "brightness", 0) or 0)
-        except Exception:
-            prev_cfg_brightness = 0
+        prev_cfg_brightness = safe_int_attr(tray.config, "brightness", default=0)
         fade_down = bool(brightness_int < prev_cfg_brightness)
         fade_s = 0.12 if int(brightness_int) <= 0 else 0.25
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
+from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.protocols import LightingTrayProtocol
 
 
@@ -58,7 +59,7 @@ def set_engine_perkey_from_config_for_sw_effect(tray: LightingTrayProtocol) -> N
         tray.engine.per_key_colors = None
 
     try:
-        tray.engine.per_key_brightness = int(getattr(tray.config, "perkey_brightness", 0) or 0)
+        tray.engine.per_key_brightness = safe_int_attr(tray.config, "perkey_brightness", default=0)
     except Exception:
         tray.engine.per_key_brightness = None
 
@@ -76,9 +77,13 @@ def clear_engine_perkey_state(tray: LightingTrayProtocol) -> None:
 
 def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Optional[int] = None) -> None:
     tray.engine.stop()
-    effective_brightness = (
-        int(brightness_override) if brightness_override is not None else int(getattr(tray.config, "brightness", 0) or 0)
-    )
+    if brightness_override is not None:
+        try:
+            effective_brightness = int(brightness_override)
+        except Exception:
+            effective_brightness = 0
+    else:
+        effective_brightness = safe_int_attr(tray.config, "brightness", default=0)
     if int(effective_brightness) == 0:
         tray.engine.turn_off()
         tray.is_off = True
@@ -90,7 +95,11 @@ def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Option
         tray.engine.per_key_colors = None
 
     try:
-        tray.engine.per_key_brightness = int(getattr(tray.config, "perkey_brightness", tray.config.brightness) or 0)
+        tray.engine.per_key_brightness = safe_int_attr(
+            tray.config,
+            "perkey_brightness",
+            default=safe_int_attr(tray.config, "brightness", default=0),
+        )
     except Exception:
         tray.engine.per_key_brightness = None
 
@@ -116,9 +125,13 @@ def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Option
 
 def apply_uniform_none_mode(tray: LightingTrayProtocol, *, brightness_override: Optional[int] = None) -> None:
     tray.engine.stop()
-    effective_brightness = (
-        int(brightness_override) if brightness_override is not None else int(getattr(tray.config, "brightness", 0) or 0)
-    )
+    if brightness_override is not None:
+        try:
+            effective_brightness = int(brightness_override)
+        except Exception:
+            effective_brightness = 0
+    else:
+        effective_brightness = safe_int_attr(tray.config, "brightness", default=0)
     if int(effective_brightness) == 0:
         tray.engine.turn_off()
         tray.is_off = True

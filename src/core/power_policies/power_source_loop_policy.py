@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 from .battery_saver_policy import BatterySaverPolicy
 from .power_source_policy import compute_power_source_policy
@@ -40,8 +40,8 @@ class PowerSourceLoopInputs:
     # Per power-source configuration
     ac_enabled: bool
     battery_enabled: bool
-    ac_brightness_override: Any
-    battery_brightness_override: Any
+    ac_brightness_override: int | float | str | None
+    battery_brightness_override: int | float | str | None
 
     # Legacy battery saver policy configuration
     battery_saver_enabled: bool

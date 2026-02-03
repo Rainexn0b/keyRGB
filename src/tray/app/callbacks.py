@@ -7,7 +7,7 @@ into this module to keep the class smaller.
 
 from __future__ import annotations
 
-from typing import Any
+from src.tray.protocols import LightingTrayProtocol
 
 import src.core.tcc_power_profiles as tcc_power_profiles
 
@@ -28,16 +28,18 @@ from ..ui.gui_launch import (
 )
 
 
-def on_effect_clicked(tray: Any, item: Any) -> None:
-    effect_name = menu_mod.normalize_effect_label(item)
+def on_effect_clicked(tray: LightingTrayProtocol, item: object) -> None:
+    effect_name = menu_mod.normalize_effect_label(str(item))
     apply_effect_selection(tray, effect_name=effect_name)
 
     # Reflect state changes immediately.
-    if hasattr(tray, "_refresh_ui"):
+    try:
         tray._refresh_ui()
+    except Exception:
+        pass
 
 
-def on_effect_key_clicked(tray: Any, effect_name: str) -> None:
+def on_effect_key_clicked(tray: LightingTrayProtocol, effect_name: str) -> None:
     """Apply a specific effect key (already normalized).
 
     This avoids relying on parsing menu labels and allows menus to show
@@ -45,23 +47,25 @@ def on_effect_key_clicked(tray: Any, effect_name: str) -> None:
     """
 
     apply_effect_selection(tray, effect_name=str(effect_name or "none").strip().lower())
-    if hasattr(tray, "_refresh_ui"):
+    try:
         tray._refresh_ui()
+    except Exception:
+        pass
 
 
-def on_speed_clicked_cb(tray: Any, item: Any) -> None:
+def on_speed_clicked_cb(tray: LightingTrayProtocol, item: object) -> None:
     on_speed_clicked(tray, item)
 
 
-def on_brightness_clicked_cb(tray: Any, item: Any) -> None:
+def on_brightness_clicked_cb(tray: LightingTrayProtocol, item: object) -> None:
     on_brightness_clicked(tray, item)
 
 
-def on_off_clicked(tray: Any) -> None:
+def on_off_clicked(tray: LightingTrayProtocol) -> None:
     turn_off(tray)
 
 
-def on_turn_on_clicked(tray: Any) -> None:
+def on_turn_on_clicked(tray: LightingTrayProtocol) -> None:
     turn_on(tray)
 
 
@@ -77,12 +81,14 @@ def on_reactive_color_gui_clicked() -> None:
     launch_reactive_color_gui()
 
 
-def on_hardware_color_clicked(tray: Any) -> None:
+def on_hardware_color_clicked(tray: LightingTrayProtocol) -> None:
     """Switch to hardware uniform mode, then open the uniform color GUI."""
 
     apply_effect_selection(tray, effect_name="hw_uniform")
-    if hasattr(tray, "_refresh_ui"):
+    try:
         tray._refresh_ui()
+    except Exception:
+        pass
 
     launch_uniform_gui()
 
@@ -95,12 +101,14 @@ def on_tcc_profiles_gui_clicked() -> None:
     launch_tcc_profiles_gui()
 
 
-def on_tcc_profile_clicked(tray: Any, profile_id: str) -> None:
+def on_tcc_profile_clicked(tray: LightingTrayProtocol, profile_id: str) -> None:
     """Switch TUXEDO Control Center power profile (temporary) via DBus."""
 
     try:
         tcc_power_profiles.set_temp_profile_by_id(profile_id)
     finally:
         # Reflect updated active profile state.
-        if hasattr(tray, "_update_menu"):
+        try:
             tray._update_menu()
+        except Exception:
+            pass

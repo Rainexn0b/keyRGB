@@ -10,16 +10,24 @@ When switching modes, the appropriate state is set up automatically.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Protocol, cast
 
 from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import normalize_effect_name
 from src.core.utils.exceptions import is_permission_denied
+from src.core.utils.safe_attrs import safe_int_attr
 
 logger = logging.getLogger(__name__)
 
-profiles: Any
+
+class _ProfilesApi(Protocol):
+    def get_active_profile(self) -> str: ...
+
+    def load_per_key_colors(self, profile_name: str): ...
+
+
+profiles: object | None
 
 try:
     # Module-level import so tests (and callers) can monkeypatch `profiles`.
@@ -38,8 +46,9 @@ def _load_per_key_colors_from_profile(config) -> dict:
         if prof is None:
             from src.core.profile import profiles as prof  # type: ignore[no-redef]
 
-        active = prof.get_active_profile()
-        colors = prof.load_per_key_colors(active)
+        api = cast(_ProfilesApi, prof)
+        active = api.get_active_profile()
+        colors = api.load_per_key_colors(active)
         return dict(colors) if colors else {}
     except Exception as exc:
         logger.debug("Failed to load per-key colors from profile: %s", exc)
@@ -71,7 +80,7 @@ def _ensure_software_mode(tray) -> None:
     # This allows reactive typing effects to keep the backdrop dim while
     # rendering pulses/highlights brighter.
     try:
-        tray.engine.per_key_brightness = int(getattr(config, "perkey_brightness", None) or 0) if existing else None
+        tray.engine.per_key_brightness = safe_int_attr(config, "perkey_brightness", default=0) if existing else None
     except Exception:
         try:
             tray.engine.per_key_brightness = None

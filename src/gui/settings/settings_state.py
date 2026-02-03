@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.core.utils.safe_attrs import safe_int_attr
+
 
 def clamp_brightness(value: int) -> int:
     return max(0, min(50, int(value)))
@@ -24,10 +26,7 @@ def _safe_bool(obj: Any, name: str, default: bool) -> bool:
 
 
 def _safe_int(obj: Any, name: str, default: int) -> int:
-    try:
-        return int(getattr(obj, name, default) or 0)
-    except Exception:
-        return int(default)
+    return safe_int_attr(obj, name, default=int(default))
 
 
 def _safe_optional_int(obj: Any, name: str) -> int | None:

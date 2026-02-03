@@ -1,30 +1,30 @@
 # KeyRGB
 
-KeyRGB is a lightweight Linux tray app and per-key editor for laptop keyboard lighting. It serves as a practical, focused alternative to OpenRGB for supported devices.
+A lightweight Linux tray app and per-key editor for laptop keyboard lighting, with a focus on TongFang-based laptops using ITE controllers.
 
 > LLM note: For a concise, LLM-optimized summary of supported hardware, backends, and repo-discovery hints, see `AGENTS.md`.
 
 ## Supported Backends & Devices
 
-KeyRGB uses a priority-based system to select the best driver for your hardware:
+Uses a priority-based backend system to select the most appropriate implemented backend for detected hardware.
 
 1.  **Kernel Driver (Preferred)**: Uses safe, native Linux kernel interfaces (`/sys/class/leds`).
     *   **Clevo / Tuxedo**: Full RGB support via `tuxedo-drivers` or `clevo-xsm-wmi`.
     *   **System76**: Full RGB support via standard ACPI drivers.
-    *   **Universal**: Brightness control for almost any laptop (Dell, ASUS, HP, etc.).
+	*   **Broad**: Brightness control on many laptops that expose a keyboard backlight LED via `/sys/class/leds`.
 
-2.  **USB Direct (Fallback)**: Uses the `ite8291r3` userspace driver.
-    *   **TongFang**: Supports per-key RGB on devices without kernel drivers (XMG, Wootbook, Eluktronics, older Tuxedo models).
+2.  **USB Direct**: Uses the `ite8291r3` or any other implemented backend userspace driver.
+    *   **TongFang**: Supports per-key RGB on devices without kernel drivers (XMG, Wootbook, Eluktronics, older Tuxedo models) if the hardware supports it.
+
+Note: the USB ITE backends only enable known-good, whitelisted USB IDs. If you want to confirm whether your hardware is supported, check `src/core/backends/ite8291r3/backend.py` (and other `src/core/backends/*/backend.py` backends). You can add additional IDs or new backends at your own risk.
 
 *The installer (`install.sh`) can optionally help you install the necessary kernel modules for Clevo/Tuxedo laptops.*
 
 ## Status
 
-- **Beta**: versioning follows **0.x.y**.
-- **Latest release:** v0.15.8 (2026-01-26)
-- Developed primarily on Fedora / Nobara.
-- Installer support is **best-effort** on other distros via common package managers (dnf/apt/pacman/zypper/apk).
-- Support depends entirely on your specific keyboard controller and firmware.
+- **Beta**: versioning follows **0.x.y**. Currently stable but has limited backend support.
+- Installer support is **best-effort** on other distros via common package managers (dnf/apt/pacman/zypper/apk) but is primarily developed on Fedora.
+- Support depends entirely on your specific keyboard controller and firmware. See **Troubleshooting** and **Hardware support and contributing** below.
 
 ## Screenshots
 
@@ -285,13 +285,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | `--update-appimage` | Non-interactive: update an existing AppImage install (downloads latest and replaces `~/.local/bin/keyrgb`). |
 | `--ref <git-ref>` | For curl installs: download installer modules from a specific git ref (default: `main`). |
 
-### Environment variables
-
-| Variable | Usage |
-| --- | --- |
-| `KEYRGB_BACKEND` | Force backend: `auto` (default), `ite8291r3`, or `sysfs-leds`. |
-| `KEYRGB_DEBUG=1` | Enable verbose debug logging for bug reports. |
-| `KEYRGB_TK_SCALING` | Float override for UI scaling (fixes High-DPI quirks). |
+Environment variables: see the **Environment variables** section above.
 
 ## Hardware support and contributing
 

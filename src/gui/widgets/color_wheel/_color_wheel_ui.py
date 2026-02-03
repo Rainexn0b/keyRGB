@@ -126,7 +126,7 @@ class _ColorWheelUIMixin:
             self.rgb_label.config(text=f"RGB({r},{g},{b})")
 
         # Keep manual entry fields in sync with the current color.
-        if hasattr(self, "_rgb_entry_syncing") and not self._rgb_entry_syncing:
+        if not self._rgb_entry_syncing:
             try:
                 self._rgb_entry_syncing = True
                 self.rgb_r_var.set(str(int(r)))

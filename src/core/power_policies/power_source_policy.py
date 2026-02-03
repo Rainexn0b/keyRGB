@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Optional
 
 
 def compute_power_source_policy(
@@ -8,8 +8,8 @@ def compute_power_source_policy(
     on_ac: bool,
     ac_enabled: bool,
     battery_enabled: bool,
-    ac_brightness_override: Any,
-    battery_brightness_override: Any,
+    ac_brightness_override: int | float | str | None,
+    battery_brightness_override: int | float | str | None,
 ) -> tuple[bool, Optional[int]]:
     """Compute desired on/off + optional brightness override for current power source.
 
