@@ -47,12 +47,6 @@ class KeyRGBTray:
         self._dim_temp_active = False
         self._dim_temp_target_brightness = None
         self._last_brightness = 25
-        try:
-            cfg_brightness = int(getattr(self.config, "brightness", 0) or 0)
-            if cfg_brightness > 0:
-                self._last_brightness = cfg_brightness
-        except Exception:
-            pass
         self._last_resume_at = 0.0
 
         # Event log throttling state (key -> last log monotonic time).
