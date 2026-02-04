@@ -61,6 +61,7 @@ reload_udev_rules_best_effort() {
     # events as a best-effort nudge.
     sudo udevadm trigger --action=add --subsystem-match=usb --attr-match=idVendor=048d || true
     sudo udevadm trigger --action=add --subsystem-match=input --property-match=ID_INPUT_KEYBOARD=1 || true
+    sudo udevadm trigger --action=add --subsystem-match=leds || true
 
     sudo udevadm settle || true
     log_ok "Reloaded udev rules"
@@ -72,24 +73,48 @@ reload_udev_rules_best_effort() {
 
 install_udev_rule_from_ref() {
   local raw_ref="$1"
-  local dst_rule="/etc/udev/rules.d/99-ite8291-wootbook.rules"
+  local dst_usb_rule="/etc/udev/rules.d/99-ite8291-wootbook.rules"
+  local dst_sysfs_rule="/etc/udev/rules.d/99-keyrgb-sysfs-leds.rules"
 
   if ! have_cmd udevadm; then
     log_warn "udevadm not found; cannot install udev rule automatically."
-    log_warn "Copy the rule manually to: $dst_rule"
+    log_warn "Copy the rules manually to: $dst_usb_rule and $dst_sysfs_rule"
     return 0
   fi
 
-  local tmp_rule
-  tmp_rule="$(mktemp)"
+  _install_rule() {
+    local filename="$1" dst="$2"
 
-  local rule_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/system/udev/99-ite8291-wootbook.rules"
-  log_info "Downloading udev rule: $rule_url"
-  download_url_quiet "$rule_url" "$tmp_rule"
+    local tmp_rule
+    tmp_rule="$(mktemp)"
 
-  log_info "Installing udev rule (requires sudo): $dst_rule"
-  sudo install -D -m 0644 "$tmp_rule" "$dst_rule"
-  rm -f "$tmp_rule" 2>/dev/null || true
+    local rule_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/system/udev/${filename}"
+    log_info "Downloading udev rule: $rule_url"
+    if ! download_url_quiet "$rule_url" "$tmp_rule"; then
+      if [ "$raw_ref" != "main" ]; then
+        local rule_url_fallback="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/main/system/udev/${filename}"
+        log_warn "Failed to download udev rule from ref '$raw_ref'; trying main: $rule_url_fallback"
+        if ! download_url_quiet "$rule_url_fallback" "$tmp_rule"; then
+          log_warn "Failed to download udev rule: ${filename}"
+          rm -f "$tmp_rule" 2>/dev/null || true
+          return 0
+        fi
+      else
+        log_warn "Failed to download udev rule: ${filename}"
+        rm -f "$tmp_rule" 2>/dev/null || true
+        return 0
+      fi
+    fi
+
+    log_info "Installing udev rule (requires sudo): $dst"
+    sudo install -D -m 0644 "$tmp_rule" "$dst"
+    rm -f "$tmp_rule" 2>/dev/null || true
+  }
+
+  # 1) USB direct backends (ITE 8291r3) permissions
+  _install_rule "99-ite8291-wootbook.rules" "$dst_usb_rule"
+  # 2) Sysfs LED backends (kernel drivers) permissions
+  _install_rule "99-keyrgb-sysfs-leds.rules" "$dst_sysfs_rule"
 
   reload_udev_rules_best_effort
 }

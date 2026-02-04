@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.16.1 (2026-02-04)
+
+- Installer: Add `99-keyrgb-sysfs-leds.rules` udev rule to grant group-write access to keyboard backlight sysfs nodes (e.g. `rgb:kbd_backlight*`) for the `video` group so kernel-backed Clevo/Tuxedo/System76 keyboards can be controlled without polkit prompts.
+- Installer: Install both ITE USB (`99-ite8291-wootbook.rules`) and sysfs LED rules by default and trigger `udevadm` for the `leds` subsystem; uninstaller supports removing the sysfs rule when KeyRGB-managed.
+- Tray: Improve permission-denied messaging and diagnostics (point users to both the sysfs udev rule and polkit helper paths) and add helpful reproduction steps for maintainers.
+- Maintenance: Add tests and installer tweaks to make udev reload/trigger more reliable on conservative stacks (Ubuntu LTS-like setups).
+
 ## 0.16.0 (2026-02-03)
 
 - Power: Default `dim` and `dark` profiles now ignore AC/battery brightness override settings.

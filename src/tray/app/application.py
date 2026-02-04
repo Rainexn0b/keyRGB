@@ -145,7 +145,7 @@ class KeyRGBTray:
         if backend_name == "ite8291r3":
             msg_lines.append("  • ITE USB devices usually need /etc/udev/rules.d/99-ite8291-wootbook.rules")
         elif backend_name == "sysfs-leds":
-            msg_lines.append("  • Sysfs LED nodes may require a polkit helper/root access")
+            msg_lines.append("  • Sysfs LED nodes may require /etc/udev/rules.d/99-keyrgb-sysfs-leds.rules or a polkit helper")
         msg_lines.append("")
         msg_lines.append(repo_url)
 

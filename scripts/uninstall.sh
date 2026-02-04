@@ -126,6 +126,9 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 UDEV_DST="/etc/udev/rules.d/99-ite8291-wootbook.rules"
 UDEV_SRC="$REPO_DIR/system/udev/99-ite8291-wootbook.rules"
 
+SYSFS_UDEV_DST="/etc/udev/rules.d/99-keyrgb-sysfs-leds.rules"
+SYSFS_UDEV_SRC="$REPO_DIR/system/udev/99-keyrgb-sysfs-leds.rules"
+
 INPUT_UDEV_DST="/etc/udev/rules.d/99-keyrgb-input-uaccess.rules"
 INPUT_UDEV_SRC="$REPO_DIR/system/udev/99-keyrgb-input-uaccess.rules"
 
@@ -157,6 +160,32 @@ if [ -f "$UDEV_DST" ]; then
     fi
   else
     log_warn "udev rule exists but does not look KeyRGB-managed; not removing: $UDEV_DST"
+  fi
+fi
+
+if [ -f "$SYSFS_UDEV_DST" ]; then
+  sysfs_matches_repo=0
+  if [ -f "$SYSFS_UDEV_SRC" ] && cmp -s "$SYSFS_UDEV_SRC" "$SYSFS_UDEV_DST"; then
+    sysfs_matches_repo=1
+  fi
+  sysfs_looks_like_keyrgb=0
+  if file_has_marker "$SYSFS_UDEV_DST" "Allow KeyRGB to write keyboard backlight sysfs LED attributes."; then
+    sysfs_looks_like_keyrgb=1
+  fi
+
+  if [ "$sysfs_matches_repo" -eq 1 ] || [ "$sysfs_looks_like_keyrgb" -eq 1 ]; then
+    if [ "$sysfs_matches_repo" -ne 1 ]; then
+      log_warn "sysfs LED udev rule does not match this repo version, but appears to be KeyRGB-managed: $SYSFS_UDEV_DST"
+    fi
+    if confirm "Remove sysfs LED udev rule $SYSFS_UDEV_DST (requires sudo)?"; then
+      sudo rm -f "$SYSFS_UDEV_DST"
+      reload_udev_rules_best_effort
+      log_ok "Removed sysfs LED udev rule"
+    else
+      log_info "Skipped removing sysfs LED udev rule"
+    fi
+  else
+    log_warn "sysfs LED udev rule exists but does not look KeyRGB-managed; not removing: $SYSFS_UDEV_DST"
   fi
 fi
 

@@ -1,0 +1,24 @@
+# Allow KeyRGB to write keyboard backlight sysfs LED attributes.
+#
+# Some kernel keyboard lighting drivers expose LED nodes under /sys/class/leds/*kbd_backlight*
+# (e.g. rgb:kbd_backlight, rgb:kbd_backlight_1, rgb:kbd_backlight_2) but default them to
+# root-only writes.
+#
+# KeyRGB can optionally use a pkexec/polkit helper for narrow sysfs writes, but a udev rule
+# is simpler and avoids password prompts for basic keyboard lighting.
+#
+# This rule assigns common keyboard backlight attribute files to the 'video' group and
+# makes them group-writable. Ensure your user is in the 'video' group.
+#
+# Installed by KeyRGB's installer to: /etc/udev/rules.d/99-keyrgb-sysfs-leds.rules
+
+SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", ACTION=="add|change", TEST=="brightness", RUN+="/bin/chgrp video /sys%p/brightness", RUN+="/bin/chmod g+w /sys%p/brightness"
+SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", ACTION=="add|change", TEST=="multi_intensity", RUN+="/bin/chgrp video /sys%p/multi_intensity", RUN+="/bin/chmod g+w /sys%p/multi_intensity"
+SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", ACTION=="add|change", TEST=="color", RUN+="/bin/chgrp video /sys%p/color", RUN+="/bin/chmod g+w /sys%p/color"
+SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", ACTION=="add|change", TEST=="rgb", RUN+="/bin/chgrp video /sys%p/rgb", RUN+="/bin/chmod g+w /sys%p/rgb"
+
+# System76 multi-zone files (present on some systems as attributes under a single LED dir).
+SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", ACTION=="add|change", TEST=="color_left", RUN+="/bin/chgrp video /sys%p/color_left", RUN+="/bin/chmod g+w /sys%p/color_left"
+SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", ACTION=="add|change", TEST=="color_center", RUN+="/bin/chgrp video /sys%p/color_center", RUN+="/bin/chmod g+w /sys%p/color_center"
+SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", ACTION=="add|change", TEST=="color_right", RUN+="/bin/chgrp video /sys%p/color_right", RUN+="/bin/chmod g+w /sys%p/color_right"
+SUBSYSTEM=="leds", KERNEL=="*kbd_backlight*", ACTION=="add|change", TEST=="color_extra", RUN+="/bin/chgrp video /sys%p/color_extra", RUN+="/bin/chmod g+w /sys%p/color_extra"
