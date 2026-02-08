@@ -66,7 +66,27 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
     def capabilities(self) -> BackendCapabilities:
         # Report per-key support if we have multiple zones, to enable the Editor UI.
         # This gives users "Virtual 3-Zone" control.
-        return BackendCapabilities(per_key=(len(self._zones) > 1), hardware_effects=False, palette=False)
+        color_supported = False
+        try:
+            for zone in self._zones:
+                led_dir = zone.get("led_dir")
+                if not led_dir:
+                    continue
+                if zone.get("type") == "file":
+                    color_supported = True
+                    break
+                if self._supports_multicolor(led_dir) or self._supports_color_attr(led_dir) or self._supports_rgb_attr(led_dir):
+                    color_supported = True
+                    break
+        except Exception:
+            color_supported = False
+
+        return BackendCapabilities(
+            per_key=(len(self._zones) > 1),
+            color=bool(color_supported),
+            hardware_effects=False,
+            palette=False,
+        )
 
     def _max(self) -> int:
         try:

@@ -29,11 +29,13 @@ logger = logging.getLogger(__name__)
 
 try:
     from src.core.config import Config
+    from src.core.backends.registry import select_backend
     from src.gui.widgets.color_wheel import ColorWheel
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/windows/reactive_color.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
     from src.core.config import Config
+    from src.core.backends.registry import select_backend
     from src.gui.widgets.color_wheel import ColorWheel
 
 
@@ -56,6 +58,14 @@ class ReactiveColorGUI:
         apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
 
         self.config = Config()
+
+        self._color_supported = True
+        try:
+            backend = select_backend()
+            caps = backend.capabilities() if backend is not None else None
+            self._color_supported = bool(getattr(caps, "color", True)) if caps is not None else True
+        except Exception:
+            self._color_supported = True
 
         main = ttk.Frame(self.root, padding=20)
         main.pack(fill="both", expand=True)
@@ -88,23 +98,48 @@ class ReactiveColorGUI:
         self.root.after(0, _sync_desc_wrap)
 
         self._use_manual_var = tk.BooleanVar(value=bool(getattr(self.config, "reactive_use_manual_color", False)))
-        ttk.Checkbutton(
+        self._manual_check = ttk.Checkbutton(
             main,
             text="Use manual color for reactive typing",
             variable=self._use_manual_var,
             command=self._on_toggle_manual,
-        ).pack(anchor="w", pady=(0, 10))
-
-        initial = self.config.reactive_color
-        self.color_wheel = ColorWheel(
-            main,
-            size=350,
-            initial_color=tuple(initial),
-            callback=self._on_color_change,
-            release_callback=self._on_color_release,
-            show_brightness_slider=False,
         )
-        self.color_wheel.pack()
+        self._manual_check.pack(anchor="w", pady=(0, 10))
+
+        if not self._color_supported:
+            try:
+                self._use_manual_var.set(False)
+            except Exception:
+                pass
+            try:
+                self._manual_check.configure(state="disabled")
+            except Exception:
+                pass
+            msg = ttk.Label(
+                main,
+                text=(
+                    "RGB color control is not available with the currently selected backend.\n\n"
+                    "Reactive typing can still run, but manual highlight color won’t be applied to the keyboard on brightness-only backends (common with sysfs kbd_backlight)."
+                ),
+                font=("Sans", 9),
+                justify="left",
+                wraplength=max(200, w - 48),
+            )
+            msg.pack(pady=(6, 10), fill="x")
+
+        if self._color_supported:
+            initial = self.config.reactive_color
+            self.color_wheel = ColorWheel(
+                main,
+                size=350,
+                initial_color=tuple(initial),
+                callback=self._on_color_change,
+                release_callback=self._on_color_release,
+                show_brightness_slider=False,
+            )
+            self.color_wheel.pack()
+        else:
+            self.color_wheel = None
 
         # Divider + independent reactive brightness slider.
         ttk.Separator(main, orient="horizontal").pack(fill="x", pady=(18, 12))
@@ -189,6 +224,8 @@ class ReactiveColorGUI:
         self.root.after(2000, lambda: self.status_label.config(text=""))
 
     def _commit_color_to_config(self, color: tuple[int, int, int]) -> None:
+        if not self._color_supported:
+            return
         try:
             # Selecting a manual color implies enabling manual mode.
             self.config.reactive_use_manual_color = True
@@ -217,6 +254,12 @@ class ReactiveColorGUI:
         return hw
 
     def _on_toggle_manual(self) -> None:
+        if not self._color_supported:
+            try:
+                self._use_manual_var.set(False)
+            except Exception:
+                pass
+            return
         try:
             self.config.reactive_use_manual_color = bool(self._use_manual_var.get())
         except Exception as exc:
@@ -263,6 +306,8 @@ class ReactiveColorGUI:
         self._set_status(f"✓ Saved reactive brightness {pct_i}%", ok=True)
 
     def _on_color_change(self, r: int, g: int, b: int, **meta: Any) -> None:
+        if not self._color_supported:
+            return
         color = (int(r), int(g), int(b))
 
         now = time.monotonic()
@@ -276,6 +321,9 @@ class ReactiveColorGUI:
         self._last_drag_committed_color = color
 
     def _on_color_release(self, r: int, g: int, b: int, **meta: Any) -> None:
+        if not self._color_supported:
+            self._set_status("✗ RGB color control is not supported on this backend", ok=False)
+            return
         color = (int(r), int(g), int(b))
 
         self._commit_color_to_config(color)

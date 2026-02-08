@@ -53,6 +53,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     caps = getattr(tray, "backend_caps", None)
     per_key_supported = bool(getattr(caps, "per_key", True)) if caps is not None else True
     hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
+    color_supported = bool(getattr(caps, "color", True)) if caps is not None else True
 
     probe_device_available(tray)
 
@@ -227,7 +228,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             else []
         ),
         item(
-            "Hardware Color",
+            "Hardware Color" if color_supported else "Hardware Color (brightness-only)",
             tray._on_hardware_color_clicked,
             # Always enabled - this is how user switches to HW uniform color mode
         ),

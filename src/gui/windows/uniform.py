@@ -54,8 +54,14 @@ class UniformColorGUI:
 
         # Try to acquire device for standalone mode; if tray app owns it, we'll defer.
         self.kb = None
+        self._color_supported = True
         try:
             backend = select_backend()
+            try:
+                caps = backend.capabilities() if backend is not None else None
+                self._color_supported = bool(getattr(caps, "color", True)) if caps is not None else True
+            except Exception:
+                self._color_supported = True
             self.kb = backend.get_device() if backend is not None else None
         except Exception:
             # Likely "resource busy" because the tray app already owns the USB device.
@@ -67,19 +73,41 @@ class UniformColorGUI:
         title = ttk.Label(main_frame, text="Select Uniform Keyboard Color", font=("Sans", 14, "bold"))
         title.pack(pady=(0, 10))
 
-        self.color_wheel = ColorWheel(
-            main_frame,
-            size=350,
-            initial_color=(tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color),
-            callback=self._on_color_change,
-            release_callback=self._on_color_release,
-        )
-        self.color_wheel.pack()
+        if not self._color_supported:
+            msg = ttk.Label(
+                main_frame,
+                text=(
+                    "RGB color control is not available with the currently selected backend.\n\n"
+                    "This usually means the sysfs LED driver only exposes brightness (no writable RGB attribute).\n"
+                    "You can still adjust brightness from the tray, or switch to a backend that supports RGB color."
+                ),
+                font=("Sans", 9),
+                justify="left",
+                wraplength=max(200, w - 48),
+            )
+            msg.pack(pady=(10, 16), fill="x")
+            self.color_wheel = None
+        else:
+            self.color_wheel = ColorWheel(
+                main_frame,
+                size=350,
+                initial_color=(
+                    tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color
+                ),
+                callback=self._on_color_change,
+                release_callback=self._on_color_release,
+            )
+            self.color_wheel.pack()
 
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(pady=20, fill="x")
 
         apply_btn = ttk.Button(button_frame, text="Apply", command=self._on_apply)
+        if not self._color_supported:
+            try:
+                apply_btn.configure(state="disabled")
+            except Exception:
+                pass
         apply_btn.pack(side="left", padx=(0, 10), fill="x", expand=True)
 
         close_btn = ttk.Button(button_frame, text="Close", command=self._on_close)
@@ -175,6 +203,10 @@ class UniformColorGUI:
 
     def _on_apply(self):
         """Apply the selected color to the keyboard."""
+        if not self._color_supported or self.color_wheel is None:
+            self._set_status("✗ RGB color control is not supported on this backend", ok=False)
+            return
+
         r, g, b = self.color_wheel.get_color()
 
         brightness = self._ensure_brightness_nonzero()

@@ -129,7 +129,31 @@ class SysfsLedsBackend(KeyboardBackend):
         return self.probe().available
 
     def capabilities(self) -> BackendCapabilities:
-        return BackendCapabilities(per_key=False, hardware_effects=False, palette=False)
+        try:
+            found = self._find_leds()
+        except Exception:
+            found = []
+
+        color_supported = False
+        try:
+            for led_dir in found[:8]:
+                if any(
+                    (
+                        (led_dir / "multi_intensity").exists(),
+                        (led_dir / "color").exists(),
+                        (led_dir / "rgb").exists(),
+                        (led_dir / "color_left").exists(),
+                        (led_dir / "color_center").exists(),
+                        (led_dir / "color_right").exists(),
+                        (led_dir / "color_extra").exists(),
+                    )
+                ):
+                    color_supported = True
+                    break
+        except Exception:
+            color_supported = False
+
+        return BackendCapabilities(per_key=False, color=bool(color_supported), hardware_effects=False, palette=False)
 
     def get_device(self) -> KeyboardDevice:
         found = self._find_leds()

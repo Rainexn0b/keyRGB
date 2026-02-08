@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 import time
 from typing import Optional
@@ -28,6 +29,41 @@ from ._idle_power_utils import should_log_idle_action as _should_log_idle_action
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
+
+
+def _effective_screen_dim_sync_enabled(tray: IdlePowerTrayProtocol, requested_enabled: bool) -> bool:
+    if not requested_enabled:
+        return False
+
+    backend = getattr(tray, "backend", None)
+    backend_name = safe_str_attr(backend, "name", default="") if backend is not None else ""
+
+    # On ASUS systems, asusd/asusctl can independently manage keyboard
+    # backlight on screen dim/off. Default to not fighting it.
+    if backend_name.startswith("asusctl"):
+        allow = os.environ.get("KEYRGB_ALLOW_DIM_SYNC_ASUSCTL", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        if not allow:
+            if not getattr(tray, "_dim_sync_suppressed_logged", False):
+                setattr(tray, "_dim_sync_suppressed_logged", True)
+                log_event = getattr(tray, "_log_event", None)
+                if callable(log_event):
+                    try:
+                        log_event(
+                            "idle_power",
+                            "dim_sync_suppressed",
+                            backend=str(backend_name),
+                            env_override="KEYRGB_ALLOW_DIM_SYNC_ASUSCTL",
+                        )
+                    except Exception:
+                        pass
+            return False
+
+    return True
 
 
 def _compute_idle_action(
@@ -283,7 +319,8 @@ def start_idle_power_polling(
                 power_mgmt_enabled = safe_bool_attr(tray.config, "power_management_enabled", default=True)
                 brightness = safe_int_attr(tray.config, "brightness", default=0)
 
-                dim_sync_enabled = safe_bool_attr(tray.config, "screen_dim_sync_enabled", default=True)
+                dim_sync_enabled_requested = safe_bool_attr(tray.config, "screen_dim_sync_enabled", default=True)
+                dim_sync_enabled = _effective_screen_dim_sync_enabled(tray, bool(dim_sync_enabled_requested))
                 dim_sync_mode = safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off"
                 dim_temp_brightness = safe_int_attr(tray.config, "screen_dim_temp_brightness", default=5)
 

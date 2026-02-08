@@ -239,3 +239,96 @@ def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -
 
     assert applied["n"] == 1
     assert events["n"] == 1
+
+
+def test_start_idle_power_polling_suppresses_dim_sync_for_asusctl_backend(monkeypatch) -> None:
+    import src.tray.pollers.idle_power_polling as ipp
+
+    created = {}
+
+    def fake_thread(*, target, daemon: bool):
+        t = _FakeThread(target=target, daemon=daemon)
+        created["t"] = t
+        return t
+
+    monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
+
+    monkeypatch.setattr(ipp, "_read_dimmed_state", lambda _tray: True)
+    monkeypatch.setattr(ipp, "_read_screen_off_state_drm", lambda: False)
+    monkeypatch.setattr(ipp, "_get_session_id", lambda: None)
+
+    def assert_dim_sync_suppressed(**kw):
+        # Config requests screen-dim sync, but asusctl backend should suppress it by default.
+        assert kw["screen_dim_sync_enabled"] is False
+        return "none"
+
+    monkeypatch.setattr(ipp, "_compute_idle_action", assert_dim_sync_suppressed)
+    monkeypatch.setattr(ipp, "_apply_idle_action", lambda *_a, **_kw: None)
+    monkeypatch.setattr(ipp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    tray = SimpleNamespace(
+        backend=SimpleNamespace(name="asusctl-aura"),
+        config=SimpleNamespace(
+            reload=lambda: None,
+            power_management_enabled=True,
+            brightness=10,
+            screen_dim_sync_enabled=True,
+            screen_dim_sync_mode="off",
+            screen_dim_temp_brightness=5,
+        ),
+        is_off=False,
+        _log_event=lambda *_a, **_kw: None,
+        engine=SimpleNamespace(),
+    )
+
+    ipp.start_idle_power_polling(tray, ite_num_rows=6, ite_num_cols=21, idle_timeout_s=60.0)
+
+    with pytest.raises(KeyboardInterrupt):
+        created["t"].target()
+
+
+def test_start_idle_power_polling_allows_dim_sync_for_asusctl_with_env_override(monkeypatch) -> None:
+    import src.tray.pollers.idle_power_polling as ipp
+
+    monkeypatch.setenv("KEYRGB_ALLOW_DIM_SYNC_ASUSCTL", "1")
+
+    created = {}
+
+    def fake_thread(*, target, daemon: bool):
+        t = _FakeThread(target=target, daemon=daemon)
+        created["t"] = t
+        return t
+
+    monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
+
+    monkeypatch.setattr(ipp, "_read_dimmed_state", lambda _tray: True)
+    monkeypatch.setattr(ipp, "_read_screen_off_state_drm", lambda: False)
+    monkeypatch.setattr(ipp, "_get_session_id", lambda: None)
+
+    def assert_dim_sync_allowed(**kw):
+        assert kw["screen_dim_sync_enabled"] is True
+        return "none"
+
+    monkeypatch.setattr(ipp, "_compute_idle_action", assert_dim_sync_allowed)
+    monkeypatch.setattr(ipp, "_apply_idle_action", lambda *_a, **_kw: None)
+    monkeypatch.setattr(ipp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    tray = SimpleNamespace(
+        backend=SimpleNamespace(name="asusctl-aura"),
+        config=SimpleNamespace(
+            reload=lambda: None,
+            power_management_enabled=True,
+            brightness=10,
+            screen_dim_sync_enabled=True,
+            screen_dim_sync_mode="off",
+            screen_dim_temp_brightness=5,
+        ),
+        is_off=False,
+        _log_event=lambda *_a, **_kw: None,
+        engine=SimpleNamespace(),
+    )
+
+    ipp.start_idle_power_polling(tray, ite_num_rows=6, ite_num_cols=21, idle_timeout_s=60.0)
+
+    with pytest.raises(KeyboardInterrupt):
+        created["t"].target()

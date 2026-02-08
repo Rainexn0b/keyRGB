@@ -266,6 +266,8 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | Permission denied | Ensure udev rules are installed. Try replugging the device or rebooting. |
 | Flickering effects | Ensure other tools (OpenRGB, TCC) are not running. KeyRGB needs exclusive access. |
 | Per-key not working | You likely need to run the Keymap Calibrator first. |
+| Brightness works but color does not (Kernel Driver / `kbd_backlight`) | Your sysfs LED node is likely **brightness-only** (no `multi_intensity`, `color`, or `rgb` attribute under `/sys/class/leds/*kbd_backlight*`). KeyRGB can only change color when the kernel exposes RGB attributes (common on Clevo/Tuxedo/System76). On ASUS ROG laptops, use `asusctl` / rog-control-center for Aura/RGB control. |
+| Per-key editor not available on your laptop | The per-key editor requires a backend that can address individual LEDs (typically the USB ITE/TongFang path). Many kernel drivers expose only uniform brightness (and sometimes uniform RGB), not per-key RGB. |
 
 ## Advanced usage
 

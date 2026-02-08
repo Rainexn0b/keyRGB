@@ -28,6 +28,7 @@ class KeyboardDevice(Protocol):
 @dataclass(frozen=True)
 class BackendCapabilities:
     per_key: bool
+    color: bool
     hardware_effects: bool
     palette: bool
 

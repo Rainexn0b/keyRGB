@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.16.2 (2026-02-08)
+
+- Backends: Add an experimental `asusctl` Aura backend (subprocess-based) for ASUS laptops; includes env toggles and avoids fighting asusd/asusctl dim-sync by default.
+- Sysfs: Improve `/sys/class/leds` candidate selection/scoring, expand probe identifiers, and enhance multi-zone + multi-attribute color writes (`multi_intensity`, `color`, `rgb`, and System76 `color_*` files) with helper fallbacks.
+- Tray/Power: Tighten idle-power polling logic (debounce + logging) and add/extend unit tests to lock in behavior.
+- GUI: Improve Uniform and Reactive Color windows for newer backend capability paths and brightness behavior.
+
 ## 0.16.1 (2026-02-04)
 
 - Installer: Add `99-keyrgb-sysfs-leds.rules` udev rule to grant group-write access to keyboard backlight sysfs nodes (e.g. `rgb:kbd_backlight*`) for the `video` group so kernel-backed Clevo/Tuxedo/System76 keyboards can be controlled without polkit prompts.

@@ -143,7 +143,7 @@ class Ite8291r3Backend(KeyboardBackend):
 
     def capabilities(self) -> BackendCapabilities:
         # ITE supports per-key, HW effects, and palette programming.
-        return BackendCapabilities(per_key=True, hardware_effects=True, palette=True)
+        return BackendCapabilities(per_key=True, color=True, hardware_effects=True, palette=True)
 
     def get_device(self) -> KeyboardDevice:
         ite8291r3 = self._import()

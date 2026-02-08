@@ -79,7 +79,7 @@ class Ite8297Backend(KeyboardBackend):
 
     def capabilities(self) -> BackendCapabilities:
         # Unknown until implemented; keep conservative.
-        return BackendCapabilities(per_key=False, hardware_effects=False, palette=False)
+        return BackendCapabilities(per_key=False, color=False, hardware_effects=False, palette=False)
 
     def get_device(self) -> KeyboardDevice:
         raise NotImplementedError(
