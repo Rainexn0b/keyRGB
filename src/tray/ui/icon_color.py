@@ -74,9 +74,10 @@ def representative_color(
     effect = str(getattr(config, "effect", "none") or "none")
     brightness = int(getattr(config, "brightness", 25) or 25)
 
-    # Reactive typing effects: the base color can be black while idle (which
-    # makes the tray icon disappear in dark mode). Prefer the reactive color
-    # when available and fall back to a visible accent color.
+    # Reactive typing effects can store a separate manual effect color.
+    # Respect the "use manual color" toggle; when disabled, the icon should
+    # mirror the configured base color rather than a stale stored reactive
+    # color override.
     is_reactive = effect.startswith("reactive_")
     # NOTE: For the tray icon we intentionally follow the profile/policy
     # brightness (config.brightness). Reactive pulse intensity is tracked
@@ -163,7 +164,11 @@ def representative_color(
 
     else:
         if is_reactive:
-            base = tuple(getattr(config, "reactive_color", None) or getattr(config, "color", None) or (255, 0, 128))
+            use_manual_reactive_color = bool(getattr(config, "reactive_use_manual_color", False))
+            if use_manual_reactive_color:
+                base = tuple(getattr(config, "reactive_color", None) or getattr(config, "color", None) or (255, 0, 128))
+            else:
+                base = tuple(getattr(config, "color", None) or (255, 0, 128))
             try:
                 if tuple(base) == (0, 0, 0):
                     base = (255, 0, 128)

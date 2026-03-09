@@ -20,20 +20,6 @@ def _scale_rgb(color: tuple[int, int, int], factor: float) -> tuple[int, int, in
     r, g, b = color
     return (_clamp_u8(r * f), _clamp_u8(g * f), _clamp_u8(b * f))
 
-
-def _render_visual(visual: icon_mod.IconVisual):
-    if visual.mode == "rainbow":
-        return icon_mod.create_icon_rainbow(scale=visual.scale, phase=visual.phase)
-    if visual.mode == "mosaic":
-        return icon_mod.create_icon_mosaic(
-            colors_flat=tuple(visual.colors_flat or ()),
-            rows=int(visual.rows or 0),
-            cols=int(visual.cols or 0),
-            scale=visual.scale,
-        )
-    return icon_mod.create_icon(visual.color or (255, 0, 128))
-
-
 def _scaled_visual(visual: icon_mod.IconVisual, factor: float) -> icon_mod.IconVisual:
     if visual.mode == "rainbow":
         return icon_mod.IconVisual(mode="rainbow", scale=visual.scale * factor, phase=visual.phase)
@@ -70,14 +56,14 @@ def update_icon(tray: Any, *, animate: bool = True) -> None:
 
         # Fast path: no previous state, or animation disabled.
         if not animate or last is None or last == target:
-            tray.icon.icon = _render_visual(target)
+            tray.icon.icon = icon_mod.render_icon_visual(target)
             st.visual = target
             return
 
         # Avoid overlapping animations (can happen when multiple pollers/menu actions
         # trigger close together). In that case, just snap to the latest target.
         if st.animating:
-            tray.icon.icon = _render_visual(target)
+            tray.icon.icon = icon_mod.render_icon_visual(target)
             st.visual = target
             return
         st.animating = True
@@ -95,10 +81,10 @@ def update_icon(tray: Any, *, animate: bool = True) -> None:
                     frame = _scaled_visual(last, f)
                 else:
                     frame = _scaled_visual(target, f)
-                tray.icon.icon = _render_visual(frame)
+                tray.icon.icon = icon_mod.render_icon_visual(frame)
                 time.sleep(dt)
 
-            tray.icon.icon = _render_visual(target)
+            tray.icon.icon = icon_mod.render_icon_visual(target)
             st.visual = target
         finally:
             st.animating = False

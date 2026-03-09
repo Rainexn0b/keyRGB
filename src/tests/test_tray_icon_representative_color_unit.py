@@ -61,3 +61,65 @@ def test_representative_color_reactive_typing_uses_base_brightness_not_reactive_
         reactive_color=(255, 0, 0),
     )
     assert representative_color(config=cfg, is_off=False, now=0.0) == (76, 0, 0)
+
+
+def test_representative_color_reactive_manual_color_respects_toggle() -> None:
+    from src.tray.ui.icon import representative_color
+
+    cfg = SimpleNamespace(
+        effect="reactive_ripple",
+        brightness=10,
+        color=(10, 20, 30),
+        reactive_color=(200, 100, 50),
+        reactive_use_manual_color=False,
+    )
+
+    # Manual override disabled -> follow base color, not the stored reactive color.
+    assert representative_color(config=cfg, is_off=False, now=0.0) == (6, 12, 18)
+
+    cfg.reactive_use_manual_color = True
+    assert representative_color(config=cfg, is_off=False, now=0.0) == (120, 60, 30)
+
+
+def test_icon_visual_reactive_uses_base_mosaic_when_manual_color_disabled() -> None:
+    from src.tray.ui.icon import icon_visual
+
+    cfg = SimpleNamespace(
+        effect="reactive_fade",
+        brightness=20,
+        perkey_brightness=20,
+        color=(255, 255, 255),
+        reactive_color=(255, 0, 0),
+        reactive_use_manual_color=False,
+        per_key_colors={
+            (0, 0): (255, 0, 0),
+            (0, 1): (0, 255, 0),
+        },
+    )
+
+    visual = icon_visual(config=cfg, is_off=False, now=0.0)
+    assert visual.mode == "mosaic"
+    assert visual.colors_flat is not None
+    assert visual.rows > 0
+    assert visual.cols > 0
+
+
+def test_icon_visual_reactive_uses_effect_color_when_manual_color_enabled() -> None:
+    from src.tray.ui.icon import icon_visual
+
+    cfg = SimpleNamespace(
+        effect="reactive_ripple",
+        brightness=10,
+        perkey_brightness=10,
+        color=(10, 20, 30),
+        reactive_color=(200, 100, 50),
+        reactive_use_manual_color=True,
+        per_key_colors={
+            (0, 0): (255, 0, 0),
+            (0, 1): (0, 255, 0),
+        },
+    )
+
+    visual = icon_visual(config=cfg, is_off=False, now=0.0)
+    assert visual.mode == "solid"
+    assert visual.color == (120, 60, 30)

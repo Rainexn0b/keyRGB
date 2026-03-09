@@ -183,7 +183,7 @@ def test_log_exception_delegates_to_logger_exception(monkeypatch):
 
 
 def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
-    calls = {"rep": 0, "create": 0, "menu": 0, "run": 0}
+    calls = {"render": 0, "menu": 0, "run": 0}
 
     class FakeIcon:
         def __init__(self, name, image, title, menu):
@@ -203,15 +203,10 @@ def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
 
     monkeypatch.setattr(app.runtime, "get_pystray", lambda: (fake_pystray, fake_item))
 
-    def _rep_color(*, config, is_off):
-        calls["rep"] += 1
+    def _create_icon_for_state(*, config, is_off, now=None):
+        calls["render"] += 1
         assert config.effect == "perkey"
         assert is_off is False
-        return (1, 2, 3)
-
-    def _create_icon(color):
-        calls["create"] += 1
-        assert color == (1, 2, 3)
         return "IMAGE"
 
     def _build_menu(self, *, pystray, item):
@@ -220,8 +215,7 @@ def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
         assert item is fake_item
         return "MENU"
 
-    monkeypatch.setattr(app.icon_mod, "representative_color", _rep_color)
-    monkeypatch.setattr(app.icon_mod, "create_icon", _create_icon)
+    monkeypatch.setattr(app.icon_mod, "create_icon_for_state", _create_icon_for_state)
     monkeypatch.setattr(app.menu_mod, "build_menu", _build_menu)
 
     tray = SimpleNamespace(
@@ -237,7 +231,7 @@ def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
     assert tray.icon.image == "IMAGE"
     assert tray.icon.title == "KeyRGB"
     assert tray.icon.menu == "MENU"
-    assert calls == {"rep": 1, "create": 1, "menu": 1, "run": 1}
+    assert calls == {"render": 1, "menu": 1, "run": 1}
 
 
 def test_on_quit_clicked_stops_power_engine_and_icon():

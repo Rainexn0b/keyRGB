@@ -88,6 +88,67 @@ def _is_non_uniform_effect(config: Any) -> bool:
     return False
 
 
+def _build_perkey_mosaic_visual(*, config: Any, brightness: int) -> IconVisual | None:
+    """Build a mosaic visual from the configured base per-key map.
+
+    Returns ``None`` if there is no usable non-uniform per-key base map.
+    """
+
+    try:
+        per_key = dict(getattr(config, "per_key_colors", {}) or {})
+    except Exception:
+        per_key = {}
+
+    if not per_key:
+        return None
+
+    try:
+        base_color = getattr(config, "color", (255, 0, 128)) or (255, 0, 128)
+        full = build_full_color_grid(
+            base_color=tuple(base_color),
+            per_key_colors=per_key,
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+        )
+        it = iter(full.values())
+        first = next(it)
+        for v in it:
+            if v != first:
+                colors_flat = tuple(full[(r, c)] for r in range(NUM_ROWS) for c in range(NUM_COLS))
+                return IconVisual(
+                    mode="mosaic",
+                    scale=_icon_scale_from_brightness(brightness),
+                    colors_flat=colors_flat,
+                    rows=NUM_ROWS,
+                    cols=NUM_COLS,
+                )
+    except Exception:
+        return None
+
+    return None
+
+
+def render_icon_visual(visual: IconVisual):
+    """Render an ``IconVisual`` into a concrete tray icon image."""
+
+    if visual.mode == "rainbow":
+        return create_icon_rainbow(scale=visual.scale, phase=visual.phase)
+    if visual.mode == "mosaic":
+        return create_icon_mosaic(
+            colors_flat=tuple(visual.colors_flat or ()),
+            rows=int(visual.rows or 0),
+            cols=int(visual.cols or 0),
+            scale=visual.scale,
+        )
+    return create_icon(visual.color or (255, 0, 128))
+
+
+def create_icon_for_state(*, config: Any, is_off: bool, now: float | None = None):
+    """Create the tray icon image for the current state."""
+
+    return render_icon_visual(icon_visual(config=config, is_off=is_off, now=now))
+
+
 def icon_visual(*, config: Any, is_off: bool, now: float | None = None) -> IconVisual:
     """Describe how the tray icon should look for the current state."""
 
@@ -95,6 +156,24 @@ def icon_visual(*, config: Any, is_off: bool, now: float | None = None) -> IconV
         now = time.time()
 
     effect = str(getattr(config, "effect", "none") or "none")
+    is_reactive = effect.startswith("reactive_")
+
+    if (not is_off) and getattr(config, "brightness", 0) != 0 and is_reactive:
+        try:
+            brightness = int(getattr(config, "perkey_brightness", getattr(config, "brightness", 25)) or 25)
+        except Exception:
+            brightness = int(getattr(config, "brightness", 25) or 25)
+
+        use_manual_reactive_color = bool(getattr(config, "reactive_use_manual_color", False))
+        if not use_manual_reactive_color:
+            # When the effect-specific reactive color override is disabled,
+            # show the configured base lighting instead of a stale stored
+            # reactive color.
+            mosaic = _build_perkey_mosaic_visual(config=config, brightness=brightness)
+            if mosaic is not None:
+                return mosaic
+
+        return IconVisual(mode="solid", color=representative_color(config=config, is_off=is_off, now=now))
 
     if (not is_off) and getattr(config, "brightness", 0) != 0 and _is_non_uniform_effect(config):
         brightness = int(getattr(config, "brightness", 25) or 25)
@@ -104,27 +183,9 @@ def icon_visual(*, config: Any, is_off: bool, now: float | None = None) -> IconV
             except Exception:
                 pass
 
-            # For per-key, prefer showing a tiny grid preview in the K cutout.
-            try:
-                base_color = getattr(config, "color", (255, 0, 128)) or (255, 0, 128)
-                per_key = dict(getattr(config, "per_key_colors", {}) or {})
-                full = build_full_color_grid(
-                    base_color=tuple(base_color),
-                    per_key_colors=per_key,
-                    num_rows=NUM_ROWS,
-                    num_cols=NUM_COLS,
-                )
-                colors_flat = tuple(full[(r, c)] for r in range(NUM_ROWS) for c in range(NUM_COLS))
-                return IconVisual(
-                    mode="mosaic",
-                    scale=_icon_scale_from_brightness(brightness),
-                    colors_flat=colors_flat,
-                    rows=NUM_ROWS,
-                    cols=NUM_COLS,
-                )
-            except Exception:
-                # Fall back to rainbow if we can't build the grid.
-                pass
+            mosaic = _build_perkey_mosaic_visual(config=config, brightness=brightness)
+            if mosaic is not None:
+                return mosaic
 
         # Non-uniform non-perkey: use a rainbow K.
         phase = (float(now) * 0.08) % 1.0
@@ -135,9 +196,11 @@ def icon_visual(*, config: Any, is_off: bool, now: float | None = None) -> IconV
 
 __all__ = [
     "create_icon",
+    "create_icon_for_state",
     "create_icon_mosaic",
     "create_icon_rainbow",
     "representative_color",
     "IconVisual",
     "icon_visual",
+    "render_icon_visual",
 ]

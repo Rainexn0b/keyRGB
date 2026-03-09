@@ -40,6 +40,7 @@ Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental 
 ## Status
 
 - **Beta**: versioning follows **0.x.y**. Currently stable but has limited backend support.
+- **Current release**: `v0.17.2`.
 - Installer support is primarily developed on Fedora/Nobara; other distro families are supported on a staged, best-effort basis.
 - Support depends entirely on your specific keyboard controller and firmware. See **Troubleshooting** and **Hardware support and contributing** below.
 
@@ -169,7 +170,7 @@ Notes:
 - The installer reports a distro support profile at startup: Fedora / Red Hat (tested), Debian / Ubuntu / Linux Mint (experimental), Arch / EndeavourOS / Manjaro (experimental), and openSUSE / Other Linux (best-effort).
 - On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver package installs are best-effort and may require TUXEDO package sources; the installer does not add third-party apt repos automatically.
 - Experimental `ite8910` support (`0x048d:0x8910`) uses Linux `hidraw`. The bundled KeyRGB udev rules also grant `uaccess` on matching `hidraw` nodes so the app can talk to that controller without detaching the kernel keyboard driver.
-- To pin installs to a known release tag (instead of `main`), use both `--ref <tag>` and `--version <tag>`.
+- To pin installs to a known release tag (instead of `main`), use both `--ref <tag>` and `--version <tag>` (for example `v0.17.2`).
 
 #### Update existing AppImage (non-interactive)
 
@@ -313,7 +314,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | `--pip` | Legacy alias for dev editable install. |
 | `--clone` | Clone repo and install via editable pip (dev/source). |
 | `--clone-dir <path>` | Clone target directory (dev mode). |
-| `--version <tag>` | Install specific tag (e.g. `v0.9.3`). |
+| `--version <tag>` | Install specific tag (e.g. `v0.17.2`). |
 | `--asset <name>` | Override AppImage filename (default: `keyrgb-x86_64.AppImage`). |
 | `--prerelease` | Allow picking prereleases when auto-resolving latest AppImage. |
 | `--no-system-deps` | Skip system package changes (kernel drivers / TCC app / polkit). |
