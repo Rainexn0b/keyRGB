@@ -17,10 +17,7 @@ class ExperimentalBackendsPanel:
 
         desc = ttk.Label(
             parent,
-            text=(
-                "Validated backends are always eligible. Experimental backends stay\n"
-                "off until you opt in. Dormant backends remain disabled."
-            ),
+            text="Experimental backends are opt-in and may be unstable or unsupported on your hardware. Use at your own risk.",
             font=("Sans", 9),
         )
         desc.pack(anchor="w", pady=(0, 8))
@@ -32,10 +29,3 @@ class ExperimentalBackendsPanel:
             command=on_toggle,
         )
         self.chk_experimental.pack(anchor="w")
-
-        hint = ttk.Label(
-            parent,
-            text="Current plan: `ite8910` is experimental; `ite8297` remains dormant.",
-            font=("Sans", 9),
-        )
-        hint.pack(anchor="w", pady=(6, 0))

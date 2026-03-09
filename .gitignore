@@ -56,6 +56,9 @@ Thumbs.db
 !docs/
 !docs/**
 
+# Local AI/agent session presets
+.github/agents/
+
 # Local reference build system (not part of KeyRGB)
 scripts/build/
 
