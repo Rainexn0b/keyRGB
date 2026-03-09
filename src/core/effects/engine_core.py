@@ -34,6 +34,16 @@ class _EngineCore:
         self.per_key_colors = None
         self.per_key_brightness: Optional[int] = None
 
+        # Temporary brightness cap set by idle dim-sync to prevent reactive
+        # renders from raising HW brightness above the dim target.
+        self._hw_brightness_cap: Optional[int] = None
+        # True when temp-dim mode is active (disables brightness-raise in
+        # reactive rendering so pulses don't fight dim/restore).
+        self._dim_temp_active: bool = False
+        # Per-frame brightness stability guard: last brightness actually sent
+        # to hardware by the reactive render loop. Used to clamp sudden jumps.
+        self._last_rendered_brightness: Optional[int] = None
+
         self._brightness_fade_token: int = 0
         self._brightness_fade_lock = RLock()
 

@@ -8,22 +8,23 @@ from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
 
 
 def _set_engine_hw_brightness_cap(engine: object, brightness: int | None) -> None:
-    """Best-effort reactive render brightness cap.
+    """Set/clear the reactive render brightness cap on the engine.
 
     Used by temp-dim flows so reactive effects do not raise hardware
-    brightness above a temporary policy target while still keeping the tray's
-    dim state owned by the tray object.
+    brightness above a temporary policy target.  Also propagates the
+    ``_dim_temp_active`` flag so ``_resolve_brightness()`` can lock HW
+    brightness to the dim target (preventing reactive pulses from raising
+    it).
     """
 
     try:
         if brightness is None:
-            try:
-                delattr(engine, "_hw_brightness_cap")
-            except AttributeError:
-                pass
+            engine._hw_brightness_cap = None  # type: ignore[attr-defined]
+            engine._dim_temp_active = False  # type: ignore[attr-defined]
             return
 
-        setattr(engine, "_hw_brightness_cap", max(0, min(50, int(brightness))))
+        engine._hw_brightness_cap = max(0, min(50, int(brightness)))  # type: ignore[attr-defined]
+        engine._dim_temp_active = True  # type: ignore[attr-defined]
     except Exception:
         return
 
@@ -188,17 +189,26 @@ def apply_idle_action(
                 # reactive effect brightness so the global hardware brightness
                 # can drop.
                 if effect in reactive_effects_set:
-                    # Keep the update atomic relative to the render loop to
-                    # avoid a one-frame mix of old/new brightness inputs.
+                    # Keep the update atomic relative to the render loop.
+                    # IMPORTANT: do NOT use fade=True inside the lock — the
+                    # RLock reentrancy means the fade's sleep() calls would
+                    # block the render loop for the full fade duration (~250ms),
+                    # causing a visible stutter.  Instead, set brightness
+                    # instantly; the 60 fps render loop + stability guard
+                    # produce a smooth visual transition naturally.
                     with tray.engine.kb_lock:
                         _set_engine_hw_brightness_cap(tray.engine, int(dim_temp_brightness))
                         tray.engine.per_key_brightness = dim_temp_brightness
+                        # Seed the stability guard so the guard ramps DOWN
+                        # smoothly from the previous rendered brightness.
+                        # (Leave _last_rendered_brightness as-is; the guard
+                        # will ramp naturally.)
                         _set_brightness_best_effort(
                             tray.engine,
                             dim_temp_brightness,
                             apply_to_hardware=False,
-                            fade=True,
-                            fade_duration_s=0.25,
+                            fade=False,
+                            fade_duration_s=0.0,
                         )
                 else:
                     _set_brightness_best_effort(
@@ -230,8 +240,10 @@ def apply_idle_action(
             try:
                 is_sw_effect = effect in sw_effects_set
                 if effect in reactive_effects_set:
-                    # Keep the update atomic relative to the render loop to
-                    # avoid a one-frame mix of old/new brightness inputs.
+                    # Keep the update atomic relative to the render loop.
+                    # No fade under lock — same rationale as dim_to_temp above.
+                    # The stability guard in _resolve_brightness() will ramp
+                    # the rendered brightness smoothly over several frames.
                     with tray.engine.kb_lock:
                         _set_engine_hw_brightness_cap(tray.engine, None)
                         tray.engine.per_key_brightness = perkey_target
@@ -239,8 +251,8 @@ def apply_idle_action(
                             tray.engine,
                             target,
                             apply_to_hardware=False,
-                            fade=True,
-                            fade_duration_s=0.25,
+                            fade=False,
+                            fade_duration_s=0.0,
                         )
                 else:
                     _set_brightness_best_effort(

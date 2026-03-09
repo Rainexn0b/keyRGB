@@ -96,7 +96,10 @@ def test_dim_to_temp_for_reactive_effect_also_updates_perkey_brightness() -> Non
 
     assert tray._dim_temp_active is True
     assert tray._dim_temp_target_brightness == 7
-    tray.engine.set_brightness.assert_called_once_with(7, apply_to_hardware=False, fade=True, fade_duration_s=0.25)
+    # Reactive dim-sync uses instant (no-fade) updates to avoid blocking the
+    # render loop under the RLock.  The stability guard in
+    # _resolve_brightness() handles smooth visual transitions.
+    tray.engine.set_brightness.assert_called_once_with(7, apply_to_hardware=False, fade=False, fade_duration_s=0.0)
     assert tray.engine.per_key_brightness == 7
 
 
@@ -110,7 +113,8 @@ def test_restore_brightness_for_reactive_effect_restores_perkey_brightness() -> 
 
     assert tray._dim_temp_active is False
     assert tray._dim_temp_target_brightness is None
-    tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False, fade=True, fade_duration_s=0.25)
+    # Reactive restore uses instant (no-fade) updates.
+    tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False, fade=False, fade_duration_s=0.0)
     assert tray.engine.per_key_brightness == 55
 
 
@@ -208,8 +212,8 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     tray._dim_temp_target_brightness = None
     tray.config = SimpleNamespace(effect="reactive_ripple", brightness=5, perkey_brightness=5)
 
-    # Dim to temp must be atomic + use fade, and must not tamper with
-    # reactive_brightness or introduce ramp attributes.
+    # Dim to temp must be atomic + instant (no fade under lock), and must
+    # not tamper with reactive_brightness or introduce ramp attributes.
     _apply_idle_action(tray, action="dim_to_temp", dim_temp_brightness=3)
     assert tray._dim_temp_active is True
     assert tray._dim_temp_target_brightness == 3
@@ -217,11 +221,13 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     assert engine.per_key_brightness == 3
     assert engine.reactive_brightness == 50
     assert getattr(engine, "_hw_brightness_cap", None) == 3
-    assert engine.set_brightness_calls == [(3, False, True, 0.25)]
+    # _dim_temp_active is now propagated to the engine so
+    # _resolve_brightness() can see it.
+    assert getattr(engine, "_dim_temp_active", None) is True
+    assert engine.set_brightness_calls == [(3, False, False, 0.0)]
     assert not hasattr(engine, "_keyrgb_hw_ramp_start_at")
-    assert not hasattr(engine, "_dim_temp_active")
 
-    # Restore must also be atomic + use fade, keep reactive_brightness intact.
+    # Restore must also be atomic + instant, keep reactive_brightness intact.
     tray._dim_temp_active = True
     tray._dim_temp_target_brightness = 3
     _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=3)
@@ -230,10 +236,11 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     assert engine.kb_lock.enter_count == 2
     assert engine.per_key_brightness == 5
     assert engine.reactive_brightness == 50
-    assert not hasattr(engine, "_hw_brightness_cap")
-    assert engine.set_brightness_calls[-1] == (5, False, True, 0.25)
+    # Cap cleared and _dim_temp_active reset on engine.
+    assert getattr(engine, "_hw_brightness_cap", "MISSING") is None
+    assert getattr(engine, "_dim_temp_active", None) is False
+    assert engine.set_brightness_calls[-1] == (5, False, False, 0.0)
     assert not hasattr(engine, "_keyrgb_hw_ramp_start_at")
-    assert not hasattr(engine, "_dim_temp_active")
 
 
 class _SequencingLock(AbstractContextManager[None]):
@@ -274,8 +281,9 @@ class _OrderingEngine:
         self.events.append("set_brightness")
         self.brightness = int(brightness)
         assert apply_to_hardware is False
-        assert fade is True
-        assert abs(float(fade_duration_s) - 0.25) < 1e-9
+        # Reactive dim-sync now uses instant (no-fade) updates.
+        assert fade is False
+        assert float(fade_duration_s) == 0.0
 
 
 def test_dim_sync_reactive_ordering_under_lock() -> None:

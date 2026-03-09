@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.17.1 (2026-03-09)
+
+- Power/Reactive: Propagate temporary dim state onto the effects engine itself so reactive brightness resolution consistently sees dim-mode state instead of relying on tray-only bookkeeping.
+- Power/Reactive: Remove lock-held reactive brightness fades during dim/restore and switch those transitions to atomic state updates so the 60 FPS render loop no longer stalls for the full fade window.
+- Power/Reactive: Add a per-frame reactive brightness stability guard to clamp sudden hardware-brightness jumps and smooth dim↔restore ramps without reintroducing stale-brightness flashes.
+- Tests: Add focused regression coverage for brightness-guard convergence, engine dim-state propagation, and reactive dim/restore ordering to lock in the no-flicker behavior.
+
 ## 0.17.0 (2026-03-09)
 
 - Backends: Add a dedicated `ite8910` translation of the public ITE 829x (`0x048d:0x8910`) C protocol, including exact packet-builder tests and LED-range coverage.

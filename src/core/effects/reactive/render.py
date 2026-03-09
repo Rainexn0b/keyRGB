@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, Tuple
+import os
+from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import (
@@ -13,6 +14,11 @@ from src.core.utils.logging_utils import log_throttled
 from src.core.utils.exceptions import is_device_disconnected
 
 logger = logging.getLogger(__name__)
+
+# Maximum brightness change per render frame before the stability guard
+# clamps. Prevents single-frame jumps (e.g. 3 -> 50) caused by race
+# conditions between concurrent brightness writers.
+_MAX_BRIGHTNESS_STEP_PER_FRAME: int = 8
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -43,9 +49,19 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
     """Resolve brightness levels for mixed-content rendering.
 
     Returns (base_hw, effect_hw, hw_brightness).
+
+    Brightness resolution rules:
+    1. Read all brightness inputs from the engine.
+    2. When dim-temp is active, lock HW brightness to ``engine.brightness``
+       (the policy-set dim target) — reactive pulses must NOT raise it.
+    3. Otherwise, allow HW brightness to be the max of base/effect/global so
+       reactive pulses can exceed a dim backdrop.
+    4. Apply ``_hw_brightness_cap`` as a hard ceiling in all cases.
+    5. Apply per-frame stability guard: clamp the change from the previous
+       rendered brightness to ``_MAX_BRIGHTNESS_STEP_PER_FRAME`` to prevent
+       single-frame jumps caused by concurrent writers racing.
     """
     # Pulse/highlight target brightness for reactive effects.
-    # This is separate from the hardware brightness (`engine.brightness`).
     try:
         eff = int(getattr(engine, "reactive_brightness", getattr(engine, "brightness", 25)) or 0)
     except Exception:
@@ -59,6 +75,7 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
         global_hw = 25
     global_hw = max(0, min(50, global_hw))
 
+    # Per-key backdrop brightness (only meaningful when a per-key map is loaded).
     base = 0
     try:
         if getattr(engine, "per_key_colors", None):
@@ -67,29 +84,51 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
         pass
     base = max(0, min(50, base))
 
-    # For reactive typing, users expect pulses/highlights to be able to exceed a
-    # dim base/profile brightness (e.g. dim backdrop + bright keypress flashes).
-    #
-    # However, during screen-dim sync (temp-dim mode), we must NOT raise the
-    # hardware brightness above the policy cap or we'll fight dim/restore.
+    # --- dim-temp guard -------------------------------------------------------
+    # During screen-dim sync, we MUST NOT raise HW brightness above the policy
+    # target or we'll fight dim/restore, causing flicker.
     dim_temp_active = bool(getattr(engine, "_dim_temp_active", False))
-    policy_cap = None
-    try:
-        raw_policy_cap = getattr(engine, "_hw_brightness_cap", None)
-        if raw_policy_cap is not None:
-            policy_cap = max(0, min(50, int(raw_policy_cap)))
-    except Exception:
-        policy_cap = None
 
     if dim_temp_active:
+        # Lock to the policy-set dim target.
         hw = global_hw
     else:
+        # Allow reactive pulses to exceed a dim backdrop.
         hw = max(global_hw, base, eff)
 
-    if policy_cap is not None:
-        hw = min(int(hw), int(policy_cap))
+    # --- hard ceiling from idle-power policy ----------------------------------
+    policy_cap: Optional[int] = None
+    try:
+        raw_cap = getattr(engine, "_hw_brightness_cap", None)
+        if raw_cap is not None:
+            policy_cap = max(0, min(50, int(raw_cap)))
+    except Exception:
+        pass
 
-    hw = max(0, min(50, int(hw)))
+    if policy_cap is not None:
+        hw = min(hw, policy_cap)
+
+    hw = max(0, min(50, hw))
+
+    # --- per-frame stability guard --------------------------------------------
+    # Prevent single-frame brightness jumps caused by concurrent writers (e.g.
+    # idle-power clearing the cap one frame before brightness is restored).
+    try:
+        prev = getattr(engine, "_last_rendered_brightness", None)
+        if prev is not None:
+            prev_i = int(prev)
+            delta = hw - prev_i
+            if abs(delta) > _MAX_BRIGHTNESS_STEP_PER_FRAME:
+                hw = prev_i + (_MAX_BRIGHTNESS_STEP_PER_FRAME if delta > 0 else -_MAX_BRIGHTNESS_STEP_PER_FRAME)
+                hw = max(0, min(50, hw))
+                if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
+                    logger.info(
+                        "brightness_guard: clamped %s->%s (prev=%s, cap=%s, dim=%s)",
+                        prev_i + delta, hw, prev_i, policy_cap, dim_temp_active,
+                    )
+    except Exception:
+        pass
+
     return base, eff, hw
 
 
@@ -206,6 +245,7 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
         try:
             with engine.kb_lock:
                 _, _, brightness_hw = _resolve_brightness(engine)
+                engine._last_rendered_brightness = brightness_hw
                 enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
                 try:
                     engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)
@@ -239,6 +279,7 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
 
     with engine.kb_lock:
         _, _, brightness_hw = _resolve_brightness(engine)
+        engine._last_rendered_brightness = brightness_hw
         r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))
         enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
         engine.kb.set_color((r, g, b), brightness=int(brightness_hw))
