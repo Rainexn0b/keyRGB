@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
+from src.core.backends.policy import experimental_backends_enabled, selection_allowed_for_backend, stability_for_backend
 from src.core.utils.safe_attrs import safe_int_attr
 
 
@@ -293,6 +294,19 @@ def _probe_backend(backend: object) -> dict[str, Any]:
     except Exception:
         entry["priority"] = 0
 
+    try:
+        entry["stability"] = stability_for_backend(backend).value
+    except Exception:
+        pass
+
+    try:
+        selection_enabled, selection_reason = selection_allowed_for_backend(backend)
+        entry["selection_enabled"] = bool(selection_enabled)
+        if selection_reason:
+            entry["selection_reason"] = selection_reason
+    except Exception:
+        pass
+
     tier = _tier_for_backend_name(str(entry.get("name") or ""))
     if tier is not None:
         entry["tier"] = tier
@@ -330,6 +344,7 @@ def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str
                 "priority": p.get("priority"),
                 "tier": p.get("tier"),
                 "provider": p.get("provider"),
+                "stability": p.get("stability"),
                 "reason": p.get("reason"),
                 "identifiers": p.get("identifiers"),
             }
@@ -386,6 +401,7 @@ def backend_probe_snapshot() -> dict[str, Any]:
             "requested_effective": requested,
             "blocked": selection_blocked,
             "blocked_reason": selection_blocked_reason,
+            "experimental_backends_enabled": bool(experimental_backends_enabled()),
             "disable_usb_scan": (os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1"),
         },
         "candidates_sorted": available_candidates,

@@ -81,14 +81,20 @@ def on_reactive_color_gui_clicked() -> None:
     launch_reactive_color_gui()
 
 
-def on_hardware_color_clicked(tray: LightingTrayProtocol) -> None:
-    """Switch to hardware uniform mode, then open the uniform color GUI."""
+def on_hardware_static_mode_clicked(tray: LightingTrayProtocol) -> None:
+    """Switch to hardware static mode without opening the color picker."""
 
     apply_effect_selection(tray, effect_name="hw_uniform")
     try:
         tray._refresh_ui()
     except Exception:
         pass
+
+
+def on_hardware_color_clicked(tray: LightingTrayProtocol) -> None:
+    """Switch to hardware static mode, then open the uniform color GUI."""
+
+    on_hardware_static_mode_clicked(tray)
 
     launch_uniform_gui()
 

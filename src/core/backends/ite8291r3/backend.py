@@ -7,7 +7,7 @@ from typing import Any
 
 from src.core.runtime.imports import ensure_ite8291r3_ctl_importable
 
-from ..base import BackendCapabilities, KeyboardBackend, KeyboardDevice, ProbeResult
+from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +43,7 @@ _KNOWN_UNSUPPORTED_USB_IDS: list[tuple[int, int]] = [
 class Ite8291r3Backend(KeyboardBackend):
     name: str = "ite8291r3"
     priority: int = 100
+    stability: BackendStability = BackendStability.VALIDATED
 
     def _import(self):
         if os.environ.get("KEYRGB_USE_INSTALLED_ITE") != "1":

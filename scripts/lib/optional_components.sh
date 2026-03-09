@@ -4,6 +4,17 @@
 
 set -euo pipefail
 
+install_first_available_pkg_best_effort() {
+  local pkg=""
+  for pkg in "$@"; do
+    if pkg_install_best_effort "$pkg"; then
+      printf '%s' "$pkg"
+      return 0
+    fi
+  done
+  return 1
+}
+
 ensure_polkit_best_effort() {
   # Best-effort only; do not fail install.
   # Most desktop distros already ship polkit; avoid touching the system if pkexec exists.
@@ -57,11 +68,16 @@ install_kernel_drivers_best_effort() {
       fi
       ;;
     apt)
-      if pkg_install_best_effort tuxedo-keyboard; then
-        printf '%s\n' "tuxedo-keyboard" >>"$marker" 2>/dev/null || true
-        log_ok "Installed tuxedo-keyboard"
+      local installed_pkg=""
+      installed_pkg="$(install_first_available_pkg_best_effort tuxedo-drivers tuxedo-keyboard)" || true
+      if [ -n "$installed_pkg" ]; then
+        printf '%s\n' "$installed_pkg" >>"$marker" 2>/dev/null || true
+        log_ok "Installed $installed_pkg"
       else
-        log_warn "Could not install 'tuxedo-keyboard' via apt (best-effort)."
+        log_warn "Could not install 'tuxedo-drivers' or 'tuxedo-keyboard' via apt (best-effort)."
+        log_warn "On Debian/Ubuntu/Linux Mint, these packages are often provided via TUXEDO's package source rather than the stock distro repo."
+        log_warn "KeyRGB does not add third-party apt sources automatically."
+        log_warn "See: https://www.tuxedocomputers.com/en/Infos/Help-Support/Instructions/Add-TUXEDO-Computers-software-package-sources.tuxedo"
       fi
       if pkg_install_best_effort clevo-xsm-wmi; then
         printf '%s\n' "clevo-xsm-wmi" >>"$marker" 2>/dev/null || true

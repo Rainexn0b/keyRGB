@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 0.17.0 (2026-03-09)
+
+- Backends: Add a dedicated `ite8910` translation of the public ITE 829x (`0x048d:0x8910`) C protocol, including exact packet-builder tests and LED-range coverage.
+- Backends: Add backend stability classes (`validated`, `experimental`, `dormant`), make `ite8910` opt-in via Settings / `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1`, and keep `ite8297` dormant.
+- Backends: Wire the experimental `ite8910` path to Linux `hidraw` feature reports for actual use without detaching the kernel keyboard driver; installer USB rules now also grant `uaccess` on matching `hidraw` nodes.
+- Diagnostics: Improve support guidance for Clevo/TUXEDO-like `0x048d:0x8910` / `0x048d:0x8911` cases and include backend-policy selection reasons in backend probe snapshots.
+- Power/Reactive: Avoid redundant startup restore/apply actions when AC/battery policy already matches the current keyboard state; this prevents reactive typing from briefly restarting at brightness 1 and flashing on startup.
+- Power/Reactive: Fix reactive temp-dim sync so screen dim now caps actual hardware brightness instead of leaving reactive per-key writes at the old brightness during dim mode.
+- Installer: Add a single distro support-profile header so install flows clearly communicate Fedora / Red Hat (tested), Debian / Ubuntu / Linux Mint (experimental), Arch-like (experimental), and openSUSE / other Linux (best-effort) behavior.
+- Installer: Improve Debian/Ubuntu/Linux Mint AppImage installs by skipping package-manager work when it is not needed, adding clearer Debian-like messaging, and reducing noisy apt failures when package metadata is unhealthy.
+- Installer: For apt-based kernel-driver installs, try both `tuxedo-drivers` and `tuxedo-keyboard`, and point users to TUXEDO package-source docs instead of failing without guidance.
+- Tray/UX: Split hardware static-mode switching from the uniform color picker, and hide the picker on brightness-only backends for cleaner capability degradation.
+- Docs: Document backend policy, experimental `ite8910` usage, installer `hidraw` permissions, and new environment-variable overrides in the README.
+
 ## 0.16.2 (2026-02-08)
 
 - Backends: Add an experimental `asusctl` Aura backend (subprocess-based) for ASUS laptops; includes env toggles and avoids fighting asusd/asusctl dim-sync by default.

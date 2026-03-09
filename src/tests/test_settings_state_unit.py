@@ -38,6 +38,7 @@ def test_load_settings_defaults_without_overrides() -> None:
     assert values.ac_lighting_brightness == 30
     assert values.battery_lighting_brightness == 30
     assert values.os_autostart_enabled is False
+    assert values.experimental_backends_enabled is False
     assert values.screen_dim_sync_enabled is True
     assert values.screen_dim_sync_mode in {"off", "temp"}
     assert clamp_nonzero_brightness(values.screen_dim_temp_brightness) == values.screen_dim_temp_brightness
@@ -79,6 +80,7 @@ def test_apply_settings_values_to_config() -> None:
         power_restore_on_resume=True,
         power_restore_on_lid_open=True,
         autostart=False,
+        experimental_backends_enabled=True,
         ac_lighting_enabled=True,
         battery_lighting_enabled=False,
         ac_lighting_brightness=49,
@@ -98,6 +100,7 @@ def test_apply_settings_values_to_config() -> None:
     assert cfg.power_restore_on_lid_open is True
 
     assert cfg.autostart is False
+    assert cfg.experimental_backends_enabled is True
 
     assert cfg.ac_lighting_enabled is True
     assert cfg.battery_lighting_enabled is False

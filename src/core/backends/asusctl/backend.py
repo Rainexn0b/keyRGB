@@ -5,9 +5,9 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
-from ..base import BackendCapabilities, KeyboardBackend, KeyboardDevice, ProbeResult
+from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 from .device import AsusctlAuraKeyboardDevice
 
 logger = logging.getLogger(__name__)
@@ -41,6 +41,7 @@ class AsusctlAuraBackend(KeyboardBackend):
 
     name: str = "asusctl-aura"
     priority: int = 120
+    stability: BackendStability = BackendStability.VALIDATED
 
     def _asusctl_path(self) -> str:
         return os.environ.get("KEYRGB_ASUSCTL_PATH") or "asusctl"

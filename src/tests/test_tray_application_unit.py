@@ -312,6 +312,7 @@ def test_effect_and_power_wrappers_delegate(monkeypatch):
         ("_on_brightness_clicked", "on_brightness_clicked_cb", (None, "ITEM")),
         ("_on_off_clicked", "on_off_clicked", (None, None)),
         ("_on_turn_on_clicked", "on_turn_on_clicked", (None, None)),
+        ("_on_hardware_static_mode_clicked", "on_hardware_static_mode_clicked", (None, None)),
         ("_on_hardware_color_clicked", "on_hardware_color_clicked", (None, None)),
         ("_on_tcc_profile_clicked", "on_tcc_profile_clicked", ("silent",)),
     ],

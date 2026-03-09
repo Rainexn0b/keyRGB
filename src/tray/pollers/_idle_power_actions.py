@@ -7,6 +7,27 @@ from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
 
 
+def _set_engine_hw_brightness_cap(engine: object, brightness: int | None) -> None:
+    """Best-effort reactive render brightness cap.
+
+    Used by temp-dim flows so reactive effects do not raise hardware
+    brightness above a temporary policy target while still keeping the tray's
+    dim state owned by the tray object.
+    """
+
+    try:
+        if brightness is None:
+            try:
+                delattr(engine, "_hw_brightness_cap")
+            except AttributeError:
+                pass
+            return
+
+        setattr(engine, "_hw_brightness_cap", max(0, min(50, int(brightness))))
+    except Exception:
+        return
+
+
 def _set_brightness_best_effort(
     engine: object,
     brightness: int,
@@ -47,6 +68,11 @@ def _set_brightness_best_effort(
 def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     tray.is_off = False
     tray._idle_forced_off = False
+    try:
+        if hasattr(tray, "engine"):
+            _set_engine_hw_brightness_cap(tray.engine, None)
+    except Exception:
+        pass
 
     # When restoring from an off state (screen dim sync / DPMS), avoid using a stale
     # previous color as the fade start. Some devices visibly flash if the first
@@ -109,6 +135,10 @@ def apply_idle_action(
         tray._dim_temp_active = False
         tray._dim_temp_target_brightness = None
         try:
+            _set_engine_hw_brightness_cap(tray.engine, None)
+        except Exception:
+            pass
+        try:
             tray.engine.stop()
         except Exception:
             pass
@@ -161,6 +191,7 @@ def apply_idle_action(
                     # Keep the update atomic relative to the render loop to
                     # avoid a one-frame mix of old/new brightness inputs.
                     with tray.engine.kb_lock:
+                        _set_engine_hw_brightness_cap(tray.engine, int(dim_temp_brightness))
                         tray.engine.per_key_brightness = dim_temp_brightness
                         _set_brightness_best_effort(
                             tray.engine,
@@ -202,6 +233,7 @@ def apply_idle_action(
                     # Keep the update atomic relative to the render loop to
                     # avoid a one-frame mix of old/new brightness inputs.
                     with tray.engine.kb_lock:
+                        _set_engine_hw_brightness_cap(tray.engine, None)
                         tray.engine.per_key_brightness = perkey_target
                         _set_brightness_best_effort(
                             tray.engine,
@@ -227,5 +259,9 @@ def apply_idle_action(
         if not bool(getattr(tray, "_user_forced_off", False)) and not bool(getattr(tray, "_power_forced_off", False)):
             tray._dim_temp_active = False
             tray._dim_temp_target_brightness = None
+            try:
+                _set_engine_hw_brightness_cap(tray.engine, None)
+            except Exception:
+                pass
             restore_from_idle_fn(tray)
         return

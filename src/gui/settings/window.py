@@ -20,6 +20,7 @@ from .panels.bottom_bar_panel import BottomBarPanel
 from .panels.autostart_panel import AutostartPanel
 from .panels.diagnostics_panel import DiagnosticsPanel
 from .panels.dim_sync_panel import DimSyncPanel
+from .panels.experimental_backends_panel import ExperimentalBackendsPanel
 from .os_autostart import detect_os_autostart_enabled, set_os_autostart
 from .panels.power_management_panel import PowerManagementPanel
 from .panels.power_source_panel import PowerSourcePanel
@@ -125,6 +126,7 @@ class PowerSettingsGUI:
         self.var_restore_resume = tk.BooleanVar(value=bool(values.power_restore_on_resume))
         self.var_restore_lid = tk.BooleanVar(value=bool(values.power_restore_on_lid_open))
         self.var_autostart = tk.BooleanVar(value=bool(values.autostart))
+        self.var_experimental_backends = tk.BooleanVar(value=bool(values.experimental_backends_enabled))
         self.var_os_autostart = tk.BooleanVar(value=bool(values.os_autostart_enabled))
 
         self.var_ac_enabled = tk.BooleanVar(value=bool(values.ac_lighting_enabled))
@@ -190,6 +192,14 @@ class PowerSettingsGUI:
 
         ttk.Separator(right).pack(fill="x", pady=(14, 10))
 
+        self.experimental_backends_panel = ExperimentalBackendsPanel(
+            right,
+            var_experimental_backends=self.var_experimental_backends,
+            on_toggle=self._on_toggle,
+        )
+
+        ttk.Separator(right).pack(fill="x", pady=(14, 10))
+
         self.diagnostics_panel = DiagnosticsPanel(
             right,
             root=self.root,
@@ -249,6 +259,7 @@ class PowerSettingsGUI:
                 power_restore_on_resume=bool(self.var_restore_resume.get()),
                 power_restore_on_lid_open=bool(self.var_restore_lid.get()),
                 autostart=bool(self.var_autostart.get()),
+                experimental_backends_enabled=bool(self.var_experimental_backends.get()),
                 ac_lighting_enabled=bool(self.var_ac_enabled.get()),
                 battery_lighting_enabled=bool(self.var_battery_enabled.get()),
                 ac_lighting_brightness=int(float(self.var_ac_brightness.get())),

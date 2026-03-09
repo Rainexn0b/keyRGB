@@ -73,10 +73,21 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
     # However, during screen-dim sync (temp-dim mode), we must NOT raise the
     # hardware brightness above the policy cap or we'll fight dim/restore.
     dim_temp_active = bool(getattr(engine, "_dim_temp_active", False))
+    policy_cap = None
+    try:
+        raw_policy_cap = getattr(engine, "_hw_brightness_cap", None)
+        if raw_policy_cap is not None:
+            policy_cap = max(0, min(50, int(raw_policy_cap)))
+    except Exception:
+        policy_cap = None
+
     if dim_temp_active:
         hw = global_hw
     else:
         hw = max(global_hw, base, eff)
+
+    if policy_cap is not None:
+        hw = min(int(hw), int(policy_cap))
 
     hw = max(0, min(50, int(hw)))
     return base, eff, hw

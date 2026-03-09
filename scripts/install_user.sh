@@ -33,6 +33,7 @@ Env vars:
   KEYRGB_ALLOW_PRERELEASE=y|n
   KEYRGB_APPIMAGE_ASSET=<name>
   KEYRGB_VERSION=<tag>
+  KEYRGB_DISTRO_PROFILE=auto|fedora|debian|arch|other
   KEYRGB_SKIP_SYSTEM_DEPS=y|n
 
   # Legacy parity (optional components)
@@ -64,6 +65,8 @@ if [ -n "${KEYRGB_ALLOW_PRERELEASE+x}" ]; then
   KEYRGB_ALLOW_PRERELEASE_SET=1
 fi
 KEYRGB_ALLOW_PRERELEASE="${KEYRGB_ALLOW_PRERELEASE:-n}"
+
+KEYRGB_DISTRO_PROFILE="${KEYRGB_DISTRO_PROFILE:-auto}"
 
 KEYRGB_SKIP_SYSTEM_DEPS="${KEYRGB_SKIP_SYSTEM_DEPS:-n}"
 
@@ -107,12 +110,43 @@ fi
 # Legacy parity: load saved AppImage prefs unless overridden via env/CLI.
 load_saved_appimage_prefs
 
+if [ "$UPDATE_ONLY" -ne 1 ]; then
+  show_distro_support_profile_banner
+fi
+
 maybe_prompt_release_channel
 configure_optional_components
 
-if [ "$UPDATE_ONLY" -ne 1 ] && ! is_truthy "$KEYRGB_SKIP_SYSTEM_DEPS"; then
+needs_system_package_changes() {
+  if is_truthy "${KEYRGB_SKIP_SYSTEM_DEPS:-n}"; then
+    return 1
+  fi
+
+  if is_truthy "${KEYRGB_INSTALL_TCC_APP:-n}" || is_truthy "${KEYRGB_INSTALL_KERNEL_DRIVERS:-n}"; then
+    return 0
+  fi
+
+  if ! is_truthy "${KEYRGB_SKIP_PRIVILEGED_HELPERS:-n}" && ! have_cmd pkexec; then
+    return 0
+  fi
+
+  return 1
+}
+
+if [ "$UPDATE_ONLY" -ne 1 ] && needs_system_package_changes; then
   log_info "Installing system packages (best-effort)..."
   log_info "Note: KeyRGB AppImage is self-contained (no Python/Tk system packages required)."
+  case "$(distro_support_profile)" in
+    debian)
+      log_info "Debian-like note: optional kernel-driver packages may be unavailable in stock repos; the installer will not add third-party apt sources automatically."
+      ;;
+    arch)
+      log_info "Arch-like note: AUR DKMS packages are not installed automatically; the installer will print guidance only."
+      ;;
+    other)
+      log_info "Best-effort note: optional driver packages may vary by distro and manual setup may still be required."
+      ;;
+  esac
   detect_pkg_manager || true
 
   # If the user will use pkexec helpers, ensure polkit exists best-effort.
@@ -130,8 +164,10 @@ if [ "$UPDATE_ONLY" -ne 1 ] && ! is_truthy "$KEYRGB_SKIP_SYSTEM_DEPS"; then
 else
   if [ "$UPDATE_ONLY" -eq 1 ]; then
     log_info "Skipping system dependency installation (update-only)."
-  else
+  elif is_truthy "$KEYRGB_SKIP_SYSTEM_DEPS"; then
     log_info "Skipping system package installation (--no-system-deps / KEYRGB_SKIP_SYSTEM_DEPS)."
+  else
+    log_info "No optional system packages selected; skipping package-manager changes."
   fi
 fi
 

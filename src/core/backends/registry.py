@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, Optional
 
 from .base import KeyboardBackend, ProbeResult
+from .policy import experimental_backends_enabled, selection_allowed_for_backend, stability_for_backend
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class BackendSpec:
 def _default_specs() -> list[BackendSpec]:
     # Keep this list small and lazy-importing.
     from .asusctl import AsusctlAuraBackend
+    from .ite8910 import Ite8910Backend
     from .ite8291r3 import Ite8291r3Backend
     from .ite8297 import Ite8297Backend
     from .sysfs import SysfsLedsBackend
@@ -34,6 +36,11 @@ def _default_specs() -> list[BackendSpec]:
             name=Ite8291r3Backend().name,
             priority=Ite8291r3Backend().priority,
             factory=Ite8291r3Backend,
+        ),
+        BackendSpec(
+            name=Ite8910Backend().name,
+            priority=Ite8910Backend().priority,
+            factory=Ite8910Backend,
         ),
         BackendSpec(
             name=Ite8297Backend().name,
@@ -109,6 +116,14 @@ def select_backend(
     if req != "auto":
         for backend in backends:
             if backend.name.lower() == req:
+                selectable, selection_reason = selection_allowed_for_backend(backend)
+                if not selectable:
+                    logger.debug(
+                        "Backend '%s' requested but disabled by policy: %s",
+                        backend.name,
+                        selection_reason,
+                    )
+                    return None
                 result = _probe_backend(backend)
                 if not result.available:
                     logger.debug(
@@ -123,13 +138,24 @@ def select_backend(
 
     candidates: list[tuple[ProbeResult, KeyboardBackend]] = []
     for backend in backends:
+        selectable, selection_reason = selection_allowed_for_backend(backend)
+        if not selectable:
+            logger.debug(
+                "Backend policy: %s -> disabled (%s)",
+                backend.name,
+                selection_reason,
+            )
+            continue
+
         result = _probe_backend(backend)
         logger.debug(
-            "Backend probe: %s -> available=%s confidence=%s reason=%s",
+            "Backend probe: %s -> stability=%s available=%s confidence=%s reason=%s experimental_enabled=%s",
             backend.name,
+            stability_for_backend(backend).value,
             result.available,
             result.confidence,
             result.reason,
+            experimental_backends_enabled(),
         )
         if result.available:
             candidates.append((result, backend))

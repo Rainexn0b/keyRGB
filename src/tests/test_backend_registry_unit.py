@@ -10,7 +10,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from src.core.backends.base import ProbeResult
+from src.core.backends.base import BackendStability, ProbeResult
 from src.core.backends.registry import BackendSpec, select_backend
 
 
@@ -20,6 +20,7 @@ class DummyBackend:
     priority: int
     available: bool
     confidence: int = 50
+    stability: BackendStability = BackendStability.VALIDATED
 
     def is_available(self) -> bool:
         return self.available
@@ -162,4 +163,75 @@ def test_select_backend_returns_none_when_unknown_requested(
     ]
 
     monkeypatch.setenv("KEYRGB_BACKEND", "does-not-exist")
+    assert select_backend(specs=specs) is None
+
+
+def test_select_backend_skips_experimental_backend_when_opt_in_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8910",
+            priority=100,
+            factory=lambda: DummyBackend(
+                "ite8910",
+                100,
+                True,
+                confidence=90,
+                stability=BackendStability.EXPERIMENTAL,
+            ),
+        ),
+    ]
+
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+    monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
+
+    assert select_backend(specs=specs) is None
+
+
+def test_select_backend_allows_experimental_backend_when_opted_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8910",
+            priority=100,
+            factory=lambda: DummyBackend(
+                "ite8910",
+                100,
+                True,
+                confidence=90,
+                stability=BackendStability.EXPERIMENTAL,
+            ),
+        ),
+    ]
+
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
+
+    backend = select_backend(specs=specs)
+    assert backend is not None
+    assert backend.name == "ite8910"
+
+
+def test_select_backend_never_selects_dormant_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8297",
+            priority=100,
+            factory=lambda: DummyBackend(
+                "ite8297",
+                100,
+                True,
+                confidence=90,
+                stability=BackendStability.DORMANT,
+            ),
+        ),
+    ]
+
+    monkeypatch.setenv("KEYRGB_BACKEND", "ite8297")
+    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
+
     assert select_backend(specs=specs) is None

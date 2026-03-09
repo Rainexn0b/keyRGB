@@ -5,7 +5,7 @@ import os
 from dataclasses import dataclass
 from typing import Any
 
-from ..base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeResult
+from ..base import BackendCapabilities, BackendStability, KeyboardDevice, KeyboardBackend, ProbeResult
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ class Ite8297Backend(KeyboardBackend):
 
     name: str = "ite8297"
     priority: int = 95
+    stability: BackendStability = BackendStability.DORMANT
 
     def is_available(self) -> bool:
         # We consider it available only when explicitly enabled via allowlist.

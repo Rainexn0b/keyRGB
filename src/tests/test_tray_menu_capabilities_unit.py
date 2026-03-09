@@ -32,6 +32,7 @@ def fake_item(text, _action, **kwargs):
 class DummyCaps:
     per_key: bool
     hardware_effects: bool
+    color: bool = True
     palette: bool = False
 
 
@@ -83,6 +84,9 @@ class DummyTray:
     def _on_hardware_color_clicked(self, *_a, **_k):
         return
 
+    def _on_hardware_static_mode_clicked(self, *_a, **_k):
+        return
+
     def _on_reactive_color_clicked(self, *_a, **_k):
         return
 
@@ -118,6 +122,21 @@ def test_menu_hides_items_when_capabilities_disabled(
 
     assert "Hardware Effects" not in labels
     assert "Software Color Editor" not in labels
+
+
+def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False, color=False))
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [i["text"] for i in items if isinstance(i, dict)]
+
+    assert "Hardware Static Mode" in labels
+    assert "Hardware Uniform Color…" not in labels
+    assert "Hardware Effects" not in labels
 
 
 def test_menu_includes_keyboard_status_header(monkeypatch: pytest.MonkeyPatch) -> None:

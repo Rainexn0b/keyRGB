@@ -106,3 +106,81 @@ def test_format_support_hints_for_unsupported_usb_device() -> None:
     text = format_diagnostics_text(diag)
     assert "Support hints:" in text
     assert "0x048d:0xc966" in text
+
+
+def test_format_support_hints_for_tuxedo_ite829x_path() -> None:
+    diag = Diagnostics(
+        dmi={},
+        leds=[],
+        sysfs_leds=[],
+        usb_ids=["048d:8910", "048d:8911"],
+        env={},
+        virt={},
+        system={},
+        hints={"modules": ["tuxedo_keyboard"]},
+        app={},
+        power_supply={},
+        backends={
+            "requested": "auto",
+            "selected": None,
+            "probes": [
+                {
+                    "name": "ite8291r3",
+                    "available": False,
+                    "confidence": 0,
+                    "reason": "no matching usb device",
+                },
+                {
+                    "name": "sysfs-leds",
+                    "available": False,
+                    "confidence": 0,
+                    "reason": "no matching sysfs LED",
+                },
+            ],
+        },
+        usb_devices=[],
+        config={},
+        process={},
+    )
+
+    text = format_diagnostics_text(diag)
+    assert "Support hints:" in text
+    assert "048d:8910, 048d:8911" in text
+    assert "ite_829x" in text
+    assert "rgb:kbd_backlight" in text
+
+
+def test_format_support_hints_for_tuxedo_platform_without_led_nodes() -> None:
+    diag = Diagnostics(
+        dmi={},
+        leds=[],
+        sysfs_leds=[],
+        usb_ids=[],
+        env={},
+        virt={},
+        system={},
+        hints={"modules": ["tuxedo_keyboard", "clevo_wmi"]},
+        app={},
+        power_supply={},
+        backends={
+            "requested": "auto",
+            "selected": None,
+            "probes": [
+                {
+                    "name": "sysfs-leds",
+                    "available": False,
+                    "confidence": 0,
+                    "reason": "no matching sysfs LED",
+                },
+            ],
+        },
+        usb_devices=[],
+        config={},
+        process={},
+    )
+
+    text = format_diagnostics_text(diag)
+    assert "Support hints:" in text
+    assert "tuxedo_keyboard is loaded" in text
+    assert "kernel-driver binding/export problem" in text
+    assert "clevo::kbd_backlight" in text

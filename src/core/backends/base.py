@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Any, Protocol
 
 
@@ -33,6 +34,27 @@ class BackendCapabilities:
     palette: bool
 
 
+class BackendStability(str, Enum):
+    VALIDATED = "validated"
+    EXPERIMENTAL = "experimental"
+    DORMANT = "dormant"
+
+
+def normalize_backend_stability(value: object) -> BackendStability:
+    try:
+        if isinstance(value, BackendStability):
+            return value
+        text = str(value or "").strip().lower()
+    except Exception:
+        return BackendStability.VALIDATED
+
+    for item in BackendStability:
+        if item.value == text:
+            return item
+
+    return BackendStability.VALIDATED
+
+
 @dataclass(frozen=True)
 class ProbeResult:
     """Result of probing a backend for availability on this system.
@@ -56,6 +78,7 @@ class KeyboardBackend(Protocol):
 
     name: str
     priority: int
+    stability: BackendStability | str
 
     def is_available(self) -> bool: ...
 

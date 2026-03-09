@@ -26,3 +26,18 @@ def test_return_effect_after_effect_sanitizes_invalid_values(tmp_path, monkeypat
 
     cfg._settings["return_effect_after_effect"] = "perkey_pulse"
     assert cfg.return_effect_after_effect is None
+
+
+def test_experimental_backends_enabled_persists(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setenv("KEYRGB_CONFIG_PATH", str(tmp_path / "cfg" / "config.json"))
+
+    cfg = Config()
+    assert cfg.experimental_backends_enabled is False
+
+    cfg.experimental_backends_enabled = True
+
+    cfg2 = Config()
+    assert cfg2.experimental_backends_enabled is True

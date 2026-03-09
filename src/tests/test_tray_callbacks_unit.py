@@ -66,6 +66,19 @@ def test_on_off_and_on_turn_on_delegate() -> None:
     on.assert_called_once_with(tray)
 
 
+def test_on_hardware_static_mode_clicked_applies_effect_and_refreshes() -> None:
+    from src.tray.app.callbacks import on_hardware_static_mode_clicked
+
+    tray = MagicMock()
+    tray._refresh_ui = MagicMock()
+
+    with patch("src.tray.app.callbacks.apply_effect_selection") as apply:
+        on_hardware_static_mode_clicked(tray)
+
+    apply.assert_called_once_with(tray, effect_name="hw_uniform")
+    tray._refresh_ui.assert_called_once()
+
+
 def test_on_hardware_color_clicked_applies_effect_refreshes_and_launches_gui() -> None:
     from src.tray.app.callbacks import on_hardware_color_clicked
 

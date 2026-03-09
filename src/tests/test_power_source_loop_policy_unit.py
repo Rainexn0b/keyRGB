@@ -88,6 +88,50 @@ def test_power_source_loop_policy_emits_enable_disable_actions() -> None:
     assert any(isinstance(a, RestoreKeyboard) for a in res2.actions)
 
 
+def test_power_source_loop_policy_does_not_restore_on_first_tick_when_already_on() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    res = policy.update(
+        PowerSourceLoopInputs(
+            on_ac=True,
+            now=0.0,
+            power_management_enabled=True,
+            current_brightness=50,
+            is_off=False,
+            ac_enabled=True,
+            battery_enabled=True,
+            ac_brightness_override=None,
+            battery_brightness_override=None,
+            battery_saver_enabled=False,
+            battery_saver_brightness=25,
+        )
+    )
+
+    assert res.actions == ()
+
+
+def test_power_source_loop_policy_restores_on_first_tick_when_currently_off() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    res = policy.update(
+        PowerSourceLoopInputs(
+            on_ac=True,
+            now=0.0,
+            power_management_enabled=True,
+            current_brightness=0,
+            is_off=True,
+            ac_enabled=True,
+            battery_enabled=True,
+            ac_brightness_override=None,
+            battery_brightness_override=None,
+            battery_saver_enabled=False,
+            battery_saver_brightness=25,
+        )
+    )
+
+    assert any(isinstance(a, RestoreKeyboard) for a in res.actions)
+
+
 def test_power_source_loop_policy_applies_override_brightness_only_on_change() -> None:
     policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
 
@@ -125,6 +169,28 @@ def test_power_source_loop_policy_applies_override_brightness_only_on_change() -
         )
     )
     assert not any(isinstance(a, ApplyBrightness) for a in res2.actions)
+
+
+def test_power_source_loop_policy_skips_noop_initial_override_apply() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    res = policy.update(
+        PowerSourceLoopInputs(
+            on_ac=True,
+            now=0.0,
+            power_management_enabled=True,
+            current_brightness=20,
+            is_off=False,
+            ac_enabled=True,
+            battery_enabled=True,
+            ac_brightness_override=20,
+            battery_brightness_override=None,
+            battery_saver_enabled=False,
+            battery_saver_brightness=25,
+        )
+    )
+
+    assert not any(isinstance(a, ApplyBrightness) for a in res.actions)
 
 
 def test_power_source_loop_policy_legacy_battery_saver_dim_action() -> None:

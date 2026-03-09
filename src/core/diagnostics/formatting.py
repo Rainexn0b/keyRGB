@@ -83,13 +83,21 @@ def _append_backends(lines: list[str], backends: object) -> None:
                     lines.append(f"      {k}: {ids[k]}")
 
 
-def _append_support_hints(lines: list[str], backends: object, usb_devices: object) -> None:
+def _append_support_hints(
+    lines: list[str],
+    backends: object,
+    usb_devices: object,
+    usb_ids: object = None,
+    hints: object = None,
+) -> None:
     if not isinstance(backends, dict) or not backends:
         return
 
     probes = backends.get("probes")
     if not isinstance(probes, list) or not probes:
         return
+
+    support_lines: list[str] = []
 
     usb_label_by_id: dict[tuple[str, str], str] = {}
     if isinstance(usb_devices, list):
@@ -140,33 +148,143 @@ def _append_support_hints(lines: list[str], backends: object, usb_devices: objec
         unsupported_usb.append(entry)
 
     if not unsupported_usb:
+        unsupported_usb = []
+
+    if unsupported_usb:
+        support_lines.append(
+            "  One or more USB devices were detected but marked as unsupported (fail-closed) to avoid talking the wrong protocol."
+        )
+
+        for e in unsupported_usb[:6]:
+            product = e.get("product", "")
+            suffix = f" {product}" if product else ""
+            support_lines.append(
+                "  - {vid}:{pid}{suffix} (backend={backend})".format(
+                    vid=e.get("vid"),
+                    pid=e.get("pid"),
+                    suffix=suffix,
+                    backend=e.get("backend"),
+                )
+            )
+            support_lines.append(f"      reason: {e.get('reason')}")
+
+            vid_i = parse_hex_int(str(e.get("vid") or ""))
+            pid_i = parse_hex_int(str(e.get("pid") or ""))
+            if vid_i == 0x048D and pid_i in {0xC965, 0xC966, 0xC967, 0xC936}:
+                support_lines.append(
+                    "      note: this VID/PID is commonly reported on Lenovo Legion / IdeaPad Gaming keyboard RGB controllers."
+                )
+                support_lines.append("      next: please open an issue and include this diagnostics output + your laptop model.")
+
+    seen_candidate_usb_ids: list[str] = []
+
+    if isinstance(usb_ids, list):
+        for entry in usb_ids:
+            if not isinstance(entry, str):
+                continue
+            norm = entry.strip().lower()
+            if norm in {"048d:8910", "048d:8911"} and norm not in seen_candidate_usb_ids:
+                seen_candidate_usb_ids.append(norm)
+
+    if not seen_candidate_usb_ids and isinstance(usb_devices, list):
+        for dev in usb_devices:
+            if not isinstance(dev, dict):
+                continue
+            vid_i = parse_hex_int(str(dev.get("idVendor") or ""))
+            pid_i = parse_hex_int(str(dev.get("idProduct") or ""))
+            if vid_i == 0x048D and pid_i in {0x8910, 0x8911}:
+                norm = f"{vid_i:04x}:{pid_i:04x}"
+                if norm not in seen_candidate_usb_ids:
+                    seen_candidate_usb_ids.append(norm)
+
+    sysfs_reason = ""
+    sysfs_available = False
+    for p in probes:
+        if not isinstance(p, dict):
+            continue
+        if str(p.get("name") or "").strip().lower() != "sysfs-leds":
+            continue
+        sysfs_reason = str(p.get("reason") or "")
+        sysfs_available = bool(p.get("available"))
+        break
+
+    selected = backends.get("selected")
+    selected_name = str(selected).strip().lower() if selected is not None else ""
+
+    module_names: set[str] = set()
+    if isinstance(hints, dict):
+        modules = hints.get("modules")
+        if isinstance(modules, list):
+            for name in modules:
+                if isinstance(name, str) and name.strip():
+                    module_names.add(name.strip().lower())
+
+    ite829x_loaded = "ite_829x" in module_names
+    tuxedo_keyboard_loaded = "tuxedo_keyboard" in module_names
+    clevo_platform_loaded = any(name in module_names for name in {"clevo_wmi", "clevo_acpi"})
+    tuxedo_or_clevo_platform_loaded = tuxedo_keyboard_loaded or clevo_platform_loaded
+
+    if (
+        seen_candidate_usb_ids
+        and not sysfs_available
+        and "no matching sysfs led" in sysfs_reason.lower()
+        and selected_name in {"", "none"}
+    ):
+        support_lines.append(
+            "  Detected USB ID(s) associated with the TUXEDO/Clevo ITE 829x kernel-driver path, but no keyboard backlight sysfs LED was found."
+        )
+        support_lines.append(f"  - seen IDs: {', '.join(seen_candidate_usb_ids)}")
+        if tuxedo_keyboard_loaded and not ite829x_loaded:
+            support_lines.append(
+                "  - observation: tuxedo_keyboard is loaded, but ite_829x was not seen in the module list."
+            )
+        if ite829x_loaded:
+            support_lines.append(
+                "  - next: verify ite_829x bound successfully and exposed rgb:kbd_backlight* under /sys/class/leds."
+            )
+        else:
+            support_lines.append(
+                "  - next: install or update tuxedo-drivers (or another package that provides ite_829x), then confirm the ite_829x module loads."
+            )
+        support_lines.append(
+            "  - expectation: once rgb:kbd_backlight* exists, KeyRGB should detect it via the sysfs-leds backend."
+        )
+
+    if (
+        not seen_candidate_usb_ids
+        and tuxedo_or_clevo_platform_loaded
+        and not sysfs_available
+        and "no matching sysfs led" in sysfs_reason.lower()
+        and selected_name in {"", "none"}
+    ):
+        support_lines.append(
+            "  Detected TUXEDO/Clevo platform modules, but no keyboard backlight sysfs LED was found."
+        )
+        if tuxedo_keyboard_loaded:
+            support_lines.append(
+                "  - observation: tuxedo_keyboard is loaded, so this looks closer to a kernel-driver binding/export problem than a normal sysfs permission issue."
+            )
+        else:
+            support_lines.append(
+                "  - observation: Clevo platform modules are loaded, but no kbd_backlight LED node was exported."
+            )
+        support_lines.append(
+            "  - next: check whether /sys/class/leds exposes rgb:kbd_backlight*, clevo::kbd_backlight, or tuxedo::kbd_backlight after boot."
+        )
+        if ite829x_loaded:
+            support_lines.append(
+                "  - next: verify the ite_829x path actually created LED class nodes for the keyboard."
+            )
+        else:
+            support_lines.append(
+                "  - next: inspect dmesg and lsmod for tuxedo, clevo, and ite_829x to confirm the keyboard-lighting subdriver is present and bound."
+            )
+
+    if not support_lines:
         return
 
     lines.append("Support hints:")
-    lines.append(
-        "  One or more USB devices were detected but marked as unsupported (fail-closed) to avoid talking the wrong protocol."
-    )
-
-    for e in unsupported_usb[:6]:
-        product = e.get("product", "")
-        suffix = f" {product}" if product else ""
-        lines.append(
-            "  - {vid}:{pid}{suffix} (backend={backend})".format(
-                vid=e.get("vid"),
-                pid=e.get("pid"),
-                suffix=suffix,
-                backend=e.get("backend"),
-            )
-        )
-        lines.append(f"      reason: {e.get('reason')}")
-
-        vid_i = parse_hex_int(str(e.get("vid") or ""))
-        pid_i = parse_hex_int(str(e.get("pid") or ""))
-        if vid_i == 0x048D and pid_i in {0xC965, 0xC966, 0xC967, 0xC936}:
-            lines.append(
-                "      note: this VID/PID is commonly reported on Lenovo Legion / IdeaPad Gaming keyboard RGB controllers."
-            )
-            lines.append("      next: please open an issue and include this diagnostics output + your laptop model.")
+    lines.extend(support_lines)
 
 
 def _append_usb_devices(lines: list[str], usb_devices: object) -> None:
@@ -393,7 +511,7 @@ def format_diagnostics_text(diag: "Diagnostics") -> str:
     _append_app(lines, diag.app)
     _append_power_supply(lines, diag.power_supply)
     _append_backends(lines, diag.backends)
-    _append_support_hints(lines, diag.backends, diag.usb_devices)
+    _append_support_hints(lines, diag.backends, diag.usb_devices, diag.usb_ids, diag.hints)
     _append_usb_devices(lines, diag.usb_devices)
     _append_process(lines, diag.process)
     _append_config(lines, diag.config)

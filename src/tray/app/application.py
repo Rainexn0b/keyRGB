@@ -260,6 +260,9 @@ class KeyRGBTray:
     def _on_reactive_color_clicked(self, _icon, _item):
         callbacks.on_reactive_color_gui_clicked()
 
+    def _on_hardware_static_mode_clicked(self, _icon, _item):
+        callbacks.on_hardware_static_mode_clicked(self)
+
     def _on_hardware_color_clicked(self, _icon, _item):
         callbacks.on_hardware_color_clicked(self)
 

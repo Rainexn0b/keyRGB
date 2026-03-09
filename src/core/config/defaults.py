@@ -27,6 +27,9 @@ DEFAULTS: dict = {
     # None | 'perkey'
     "return_effect_after_effect": None,
     "autostart": True,
+    # Experimental backends remain opt-in until they have broader hardware
+    # validation and issue history.
+    "experimental_backends_enabled": False,
     # OS session autostart (XDG ~/.config/autostart). When enabled, KeyRGB tray
     # should be started automatically on login.
     "os_autostart": False,

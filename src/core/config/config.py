@@ -370,6 +370,7 @@ class Config:
     # ---- common boolean/int settings
 
     autostart = bool_prop("autostart", default=True)
+    experimental_backends_enabled = bool_prop("experimental_backends_enabled", default=False)
     os_autostart = bool_prop("os_autostart", default=False)
     power_management_enabled = bool_prop("power_management_enabled", default=True)
     power_off_on_suspend = bool_prop("power_off_on_suspend", default=True)

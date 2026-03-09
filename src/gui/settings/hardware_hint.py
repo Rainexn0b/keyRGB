@@ -12,6 +12,7 @@ def extract_unsupported_rgb_controllers_hint(backends_snapshot: dict) -> str:
         return ""
 
     unsupported: list[str] = []
+    experimental_disabled: list[str] = []
     for probe in probes:
         if not isinstance(probe, dict):
             continue
@@ -28,6 +29,12 @@ def extract_unsupported_rgb_controllers_hint(backends_snapshot: dict) -> str:
 
         if "unsupported by ite8291r3 backend" in reason.lower():
             unsupported.append(f"{vid}:{pid}")
+        if pid.lower() == "0x8910" and "experimental backend disabled" in reason.lower():
+            experimental_disabled.append(f"{vid}:{pid}")
+
+    if experimental_disabled:
+        joined = ", ".join(experimental_disabled)
+        return f"Detected experimental RGB controller(s): {joined}. Enable Experimental backends in Settings to try the ite8910 backend."
 
     if not unsupported:
         return ""

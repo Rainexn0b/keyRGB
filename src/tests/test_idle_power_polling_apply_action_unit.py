@@ -216,6 +216,7 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     assert engine.kb_lock.enter_count == 1
     assert engine.per_key_brightness == 3
     assert engine.reactive_brightness == 50
+    assert getattr(engine, "_hw_brightness_cap", None) == 3
     assert engine.set_brightness_calls == [(3, False, True, 0.25)]
     assert not hasattr(engine, "_keyrgb_hw_ramp_start_at")
     assert not hasattr(engine, "_dim_temp_active")
@@ -229,6 +230,7 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     assert engine.kb_lock.enter_count == 2
     assert engine.per_key_brightness == 5
     assert engine.reactive_brightness == 50
+    assert not hasattr(engine, "_hw_brightness_cap")
     assert engine.set_brightness_calls[-1] == (5, False, True, 0.25)
     assert not hasattr(engine, "_keyrgb_hw_ramp_start_at")
     assert not hasattr(engine, "_dim_temp_active")

@@ -79,6 +79,11 @@ class PowerSourceLoopPolicy:
     def update(self, inputs: PowerSourceLoopInputs) -> PowerSourceLoopResult:
         on_ac = bool(inputs.on_ac)
         now = float(inputs.now)
+        try:
+            current_brightness = int(inputs.current_brightness)
+        except Exception:
+            current_brightness = 0
+        current_enabled = bool(current_brightness > 0 and not bool(inputs.is_off))
 
         # Debounce rapid toggling.
         if self._last_on_ac is not None and on_ac != bool(self._last_on_ac):
@@ -103,10 +108,20 @@ class PowerSourceLoopPolicy:
 
         actions: list[PowerAction] = []
 
-        # Apply on/off on transitions (or when the desired enabled flag changes).
-        if self._last_desired_enabled is None or bool(desired_enabled) != bool(self._last_desired_enabled):
+        # Apply on/off only when the desired state actually differs from the
+        # current state on the first tick, or when the desired state changes
+        # on later ticks. This avoids redundant startup restores that can
+        # restart a running reactive effect and cause a visible flash.
+        should_apply_enabled = False
+        if self._last_desired_enabled is None:
+            should_apply_enabled = bool(desired_enabled) != bool(current_enabled)
+        else:
+            should_apply_enabled = bool(desired_enabled) != bool(self._last_desired_enabled)
+
+        if should_apply_enabled:
             actions.append(RestoreKeyboard() if bool(desired_enabled) else TurnOffKeyboard())
-            self._last_desired_enabled = bool(desired_enabled)
+
+        self._last_desired_enabled = bool(desired_enabled)
 
         # If disabled in this power state, do not apply brightness policies.
         if not bool(desired_enabled):
@@ -114,9 +129,17 @@ class PowerSourceLoopPolicy:
 
         if desired_brightness is not None:
             # Apply only when it actually changes.
-            if self._last_desired_brightness is None or int(desired_brightness) != int(self._last_desired_brightness):
+            should_apply_brightness = False
+            if self._last_desired_brightness is None:
+                should_apply_brightness = int(desired_brightness) != int(current_brightness)
+            else:
+                should_apply_brightness = int(desired_brightness) != int(self._last_desired_brightness)
+
+            if should_apply_brightness:
                 if not bool(inputs.is_off):
                     actions.append(ApplyBrightness(int(desired_brightness)))
+                self._last_desired_brightness = int(desired_brightness)
+            elif self._last_desired_brightness is None:
                 self._last_desired_brightness = int(desired_brightness)
             return PowerSourceLoopResult(skip=False, actions=tuple(actions))
 

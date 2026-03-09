@@ -6,25 +6,51 @@ A lightweight Linux tray app and per-key editor for laptop keyboard lighting, wi
 
 ## Supported Backends & Devices
 
-Uses a priority-based backend system to select the most appropriate implemented backend for detected hardware.
+Uses a priority-based backend system plus a backend-stability policy to select the most appropriate eligible backend for detected hardware.
 
 1.  **Kernel Driver (Preferred)**: Uses safe, native Linux kernel interfaces (`/sys/class/leds`).
     *   **Clevo / Tuxedo**: Full RGB support via `tuxedo-drivers` or `clevo-xsm-wmi`.
     *   **System76**: Full RGB support via standard ACPI drivers.
 	*   **Broad**: Brightness control on many laptops that expose a keyboard backlight LED via `/sys/class/leds`.
 
-2.  **USB Direct**: Uses the `ite8291r3` or any other implemented backend userspace driver.
+2.  **USB / HID Direct**: Uses an implemented userspace backend such as `ite8291r3` or `ite8910`.
     *   **TongFang**: Supports per-key RGB on devices without kernel drivers (XMG, Wootbook, Eluktronics, older Tuxedo models) if the hardware supports it.
 
-Note: the USB ITE backends only enable known-good, whitelisted USB IDs. If you want to confirm whether your hardware is supported, check `src/core/backends/ite8291r3/backend.py` (and other `src/core/backends/*/backend.py` backends). You can add additional IDs or new backends at your own risk.
+3.  **ASUS Aura**: Uses the `asusctl-aura` backend when the ASUS userspace stack is available.
+	*   **ASUS**: Best for laptops that already expose lighting control through `asusctl` / `rog-control-center`.
 
-*The installer (`install.sh`) can optionally help you install the necessary kernel modules for Clevo/Tuxedo laptops.*
+### Backend policy
+
+| Stability | Meaning |
+| --- | --- |
+| `validated` | Eligible by default during automatic backend selection. |
+| `experimental` | Shipped in-tree, but only considered after you opt in via **Settings → Backend policy** or `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1`. |
+| `dormant` | Present for research / future work, but never selected yet. |
+
+Current backend plan:
+
+- `sysfs-leds`, `ite8291r3`, and `asusctl-aura`: `validated`
+- `ite8910`: `experimental` (`0x048d:0x8910`, Linux `hidraw` feature-report path)
+- `ite8297`: `dormant`
+
+Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental and dormant paths are additionally policy-gated, so detection alone does not guarantee automatic selection.
+
+*The installer (`install.sh`) can optionally help you install the necessary kernel modules for Clevo/Tuxedo laptops, and installs the matching KeyRGB udev rules for supported USB / `hidraw` access paths.*
 
 ## Status
 
 - **Beta**: versioning follows **0.x.y**. Currently stable but has limited backend support.
-- Installer support is **best-effort** on other distros via common package managers (dnf/apt/pacman/zypper/apk) but is primarily developed on Fedora.
+- Installer support is primarily developed on Fedora/Nobara; other distro families are supported on a staged, best-effort basis.
 - Support depends entirely on your specific keyboard controller and firmware. See **Troubleshooting** and **Hardware support and contributing** below.
+
+### Distro support profiles
+
+| Profile | Status | Notes |
+| --- | --- | --- |
+| Fedora / Red Hat family | Tested | Primary target. AppImage + optional `dnf`-based helpers is the smoothest path. |
+| Debian / Ubuntu / Linux Mint | Experimental | AppImage-first is recommended. Optional apt kernel-driver installs are best-effort and may require TUXEDO package sources. |
+| Arch / EndeavourOS / Manjaro | Experimental | AppImage-first is recommended. KeyRGB does not install AUR DKMS packages automatically. |
+| openSUSE / Other Linux | Best-effort | AppImage-first is recommended. Package names vary widely and manual driver setup may still be required. |
 
 ## Screenshots
 
@@ -140,6 +166,9 @@ Notes:
 
 - Some integration steps may prompt for `sudo` (installing udev rules / polkit rules).
 - `--no-system-deps` only skips **system package changes**; it does not affect AppImage downloads.
+- The installer reports a distro support profile at startup: Fedora / Red Hat (tested), Debian / Ubuntu / Linux Mint (experimental), Arch / EndeavourOS / Manjaro (experimental), and openSUSE / Other Linux (best-effort).
+- On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver package installs are best-effort and may require TUXEDO package sources; the installer does not add third-party apt repos automatically.
+- Experimental `ite8910` support (`0x048d:0x8910`) uses Linux `hidraw`. The bundled KeyRGB udev rules also grant `uaccess` on matching `hidraw` nodes so the app can talk to that controller without detaching the kernel keyboard driver.
 - To pin installs to a known release tag (instead of `main`), use both `--ref <tag>` and `--version <tag>`.
 
 #### Update existing AppImage (non-interactive)
@@ -216,10 +245,12 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 
 | Variable | Usage |
 | --- | --- |
-| `KEYRGB_BACKEND` | Force backend: `auto` (default), `ite8291r3`, or `sysfs-leds`. |
+| `KEYRGB_BACKEND` | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `asusctl-aura`, or `ite8910` when experimental backends are enabled. |
+| `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1` | Opt in to experimental backends without using the Settings window. |
 | `KEYRGB_DEBUG=1` | Enable verbose debug logging. |
 | `KEYRGB_TK_SCALING` | Float override for UI scaling (High-DPI / fractional scaling). |
 | `KEYRGB_TCCD_BIN` | Override the `tccd` helper path for TCC integration. |
+| `KEYRGB_ITE8910_HIDRAW_PATH` | Override the detected `/dev/hidraw*` node for the experimental `ite8910` backend (mainly for diagnostics / testing). |
 | `KEYRGB_DEBUG_BRIGHTNESS` | When set to `1`, emits detailed logs for brightness actions and sysfs writes (useful when investigating flashes when restoring from dim). Example: `KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb dev state` |
 
 ### Tray effects (names)
@@ -240,6 +271,7 @@ Access **Settings** via the tray menu to configure:
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
 - **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
 - **Autostart**: enable “Start KeyRGB on login”.
+- **Backend policy**: opt in to experimental backends. Current plan: `ite8910` is experimental and `ite8297` remains dormant.
 
 ### Profiles
 
@@ -263,7 +295,8 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | Issue | Solution |
 | --- | --- |
 | No tray icon | Run `keyrgb` from a terminal to see errors. Check if the system tray extension is enabled (GNOME). |
-| Permission denied | Ensure udev rules are installed. Try replugging the device or rebooting. |
+| Permission denied | Ensure KeyRGB udev rules are installed. Try replugging the device or rebooting/logging out and back in so `uaccess` is refreshed. |
+| `0x048d:0x8910` is detected but not selected | Enable **Settings → Backend policy → Enable experimental backends** or set `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1`, then restart KeyRGB. `keyrgb-diagnostics` will also report why the backend was skipped. |
 | Flickering effects | Ensure other tools (OpenRGB, TCC) are not running. KeyRGB needs exclusive access. |
 | Per-key not working | You likely need to run the Keymap Calibrator first. |
 | Brightness works but color does not (Kernel Driver / `kbd_backlight`) | Your sysfs LED node is likely **brightness-only** (no `multi_intensity`, `color`, or `rgb` attribute under `/sys/class/leds/*kbd_backlight*`). KeyRGB can only change color when the kernel exposes RGB attributes (common on Clevo/Tuxedo/System76). On ASUS ROG laptops, use `asusctl` / rog-control-center for Aura/RGB control. |

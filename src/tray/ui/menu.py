@@ -85,17 +85,12 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
         return _checked
 
-    # HW effects menu - "None" always enabled (switches to uniform color mode),
-    # animated effects locked when in SW mode
+    def _checked_hw_static(_item):
+        return tray.config.effect == "none" and hw_mode and not tray.is_off
+
+    # HW effects menu - animated effects lock when in SW mode.
+    # Switching back to static hardware mode is now a separate top-level action.
     hw_effects_menu = pystray.Menu(
-        item(
-            "None (use uniform color)",
-            _hw_cb("hw_uniform"),
-            checked=lambda _i: (tray.config.effect == "none" and hw_mode and not tray.is_off),
-            radio=True,
-            # Always enabled - this is how user switches back to HW uniform mode
-        ),
-        pystray.Menu.SEPARATOR,
         *[
             item(
                 title_for_effect(effect),
@@ -215,7 +210,21 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         ),
         pystray.Menu.SEPARATOR,
         # === HARDWARE MODE ===
-        # HW effects + uniform color picker
+        item(
+            "Hardware Static Mode",
+            tray._on_hardware_static_mode_clicked,
+            checked=_checked_hw_static,
+        ),
+        *(
+            [
+                item(
+                    "Hardware Uniform Color…",
+                    tray._on_hardware_color_clicked,
+                )
+            ]
+            if color_supported
+            else []
+        ),
         *(
             [
                 item(
@@ -226,11 +235,6 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             ]
             if hw_effects_supported
             else []
-        ),
-        item(
-            "Hardware Color" if color_supported else "Hardware Color (brightness-only)",
-            tray._on_hardware_color_clicked,
-            # Always enabled - this is how user switches to HW uniform color mode
         ),
         pystray.Menu.SEPARATOR,
         # === SOFTWARE MODE ===

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ..base import BackendCapabilities, KeyboardDevice, KeyboardBackend, ProbeResult
+from ..base import BackendCapabilities, BackendStability, KeyboardDevice, KeyboardBackend, ProbeResult
 from . import common
 from . import privileged
 from .device import SysfsLedKeyboardDevice
@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class SysfsLedsBackend(KeyboardBackend):
     name: str = "sysfs-leds"
     priority: int = 150
+    stability: BackendStability = BackendStability.VALIDATED
 
     def _find_leds(self) -> list[Path]:
         root = common._leds_root()

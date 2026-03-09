@@ -90,6 +90,9 @@ configure_optional_components() {
     return 0
   fi
 
+  local support_profile=""
+  support_profile="$(distro_support_profile)"
+
   # If the caller explicitly requested no system package changes, don't prompt
   # for options that require package installs.
   if is_truthy "${KEYRGB_SKIP_SYSTEM_DEPS:-n}"; then
@@ -163,7 +166,28 @@ configure_optional_components() {
     echo "Kernel Drivers (Advanced):"
     echo "KeyRGB works best with kernel-level drivers for Clevo/Tuxedo laptops."
     echo "These provide safer and more reliable keyboard control than the USB fallback."
-    KEYRGB_INSTALL_KERNEL_DRIVERS="$(ask_yes_no "Install/Update kernel drivers (best-effort) if available?" "n")"
+    echo "Profile: $(distro_support_profile_label "$support_profile") ($(distro_support_profile_status "$support_profile"))."
+    case "$support_profile" in
+      debian)
+        echo "On Debian/Ubuntu/Linux Mint, these packages are often unavailable in the stock repos."
+        echo "KeyRGB will not add third-party apt sources automatically."
+        echo "If auto-install fails, the AppImage + udev/polkit path can still be used without this step."
+        KEYRGB_INSTALL_KERNEL_DRIVERS="$(ask_yes_no "Install/Update kernel drivers via apt (best-effort; often unavailable in stock repos)?" "n")"
+        ;;
+      arch)
+        echo "On Arch-like systems, KeyRGB does not install AUR DKMS packages automatically."
+        echo "If enabled, the installer will print the recommended AUR package names during setup."
+        KEYRGB_INSTALL_KERNEL_DRIVERS="$(ask_yes_no "Continue with kernel-driver guidance for Arch-like systems?" "n")"
+        ;;
+      other)
+        echo "On openSUSE/other Linux distros, package names and repos vary widely."
+        echo "KeyRGB will try the local package manager when possible, but manual driver setup may still be required."
+        KEYRGB_INSTALL_KERNEL_DRIVERS="$(ask_yes_no "Try best-effort kernel-driver setup if packages are available?" "n")"
+        ;;
+      *)
+        KEYRGB_INSTALL_KERNEL_DRIVERS="$(ask_yes_no "Install/Update kernel drivers (best-effort) if available?" "n")"
+        ;;
+    esac
   fi
 
   if [ "${KEYRGB_INSTALL_INPUT_UDEV:-}" = "" ] && [ -t 0 ]; then

@@ -124,8 +124,8 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
 
         # === FORCE MODE SWITCHES ===
 
-        # Force hardware uniform color mode (used by the tray's "Hardware Color" entry
-        # and "None (use uniform color)" under Hardware Effects).
+        # Force hardware uniform color mode (used by the tray's static-mode action
+        # and the uniform color picker entry).
         if effect_name in {"hw_uniform", "hardware_uniform"}:
             tray.engine.stop()
             try:

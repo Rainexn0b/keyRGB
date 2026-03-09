@@ -51,6 +51,7 @@ class SettingsValues:
     power_restore_on_lid_open: bool
 
     autostart: bool
+    experimental_backends_enabled: bool
 
     ac_lighting_enabled: bool
     battery_lighting_enabled: bool
@@ -94,6 +95,7 @@ def load_settings_values(*, config: Any, os_autostart_enabled: bool) -> Settings
         power_restore_on_resume=_safe_bool(config, "power_restore_on_resume", True),
         power_restore_on_lid_open=_safe_bool(config, "power_restore_on_lid_open", True),
         autostart=_safe_bool(config, "autostart", True),
+        experimental_backends_enabled=_safe_bool(config, "experimental_backends_enabled", False),
         ac_lighting_enabled=_safe_bool(config, "ac_lighting_enabled", True),
         battery_lighting_enabled=_safe_bool(config, "battery_lighting_enabled", True),
         ac_lighting_brightness=clamp_brightness(ac_brightness),
@@ -118,6 +120,7 @@ def apply_settings_values_to_config(*, config: Any, values: SettingsValues) -> N
     config.power_restore_on_lid_open = bool(values.power_restore_on_lid_open)
 
     config.autostart = bool(values.autostart)
+    config.experimental_backends_enabled = bool(values.experimental_backends_enabled)
 
     config.ac_lighting_enabled = bool(values.ac_lighting_enabled)
     config.battery_lighting_enabled = bool(values.battery_lighting_enabled)
