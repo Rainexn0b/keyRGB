@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.17.2 (2026-03-09)
+
+- Tray/Icon: Make the tray-logo `K` cutout follow active effect visuals so dynamic effects keep the icon in sync with live keyboard behavior.
+- Tray/Icon: For reactive typing, respect the manual-effect-color toggle so disabling it makes the `K` cutout mirror base color/per-key state instead of a stale reactive override.
+- Tray/Icon: Align startup icon rendering with the same visual-selection pipeline used during runtime refreshes so first paint and steady-state behavior match.
+- Tests: Add and update tray icon regressions for reactive color-toggle behavior, reactive base-mosaic fallback, and startup icon construction.
+
 ## 0.17.1 (2026-03-09)
 
 - Power/Reactive: Propagate temporary dim state onto the effects engine itself so reactive brightness resolution consistently sees dim-mode state instead of relying on tray-only bookkeeping.
