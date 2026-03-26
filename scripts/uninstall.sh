@@ -14,7 +14,7 @@ Usage: uninstall.sh [--yes] [--purge-config] [--remove-appimage]
 
 --yes             Do not prompt (best-effort).
 --purge-config    Also remove ~/.config/keyrgb (profiles/settings).
---remove-appimage Remove ~/.local/bin/keyrgb if it looks like an AppImage.
+--remove-appimage Remove the KeyRGB AppImage launcher/binary from ~/.local/bin.
 
 Notes:
   - Removes both AppImage-mode and pip-mode installs (with prompts).
@@ -61,38 +61,24 @@ KERNEL_DRIVERS_MARKER="$STATE_DIR/kernel-drivers-installed-by-keyrgb"
 
 log_info "=== KeyRGB Uninstall ==="
 
-looks_like_appimage() {
-  local path="$1"
-  [ -f "$path" ] || return 1
+APPIMAGE_WRAPPER="$HOME/.local/bin/keyrgb"
+APPIMAGE_BIN="$HOME/.local/bin/keyrgb.AppImage"
+HAS_APPIMAGE_INSTALL=0
 
-  python3 - "$path" <<'PY'
-from __future__ import annotations
+if is_appimage_file "$APPIMAGE_BIN"; then
+  HAS_APPIMAGE_INSTALL=1
+fi
+if is_appimage_file "$APPIMAGE_WRAPPER" || file_has_marker "$APPIMAGE_WRAPPER" "KeyRGB AppImage launcher."; then
+  HAS_APPIMAGE_INSTALL=1
+fi
 
-import sys
-from pathlib import Path
-
-p = Path(sys.argv[1])
-data = p.read_bytes()
-
-if not data.startswith(b"\x7fELF"):
-    raise SystemExit(1)
-
-if b"AppImage" in data[:2_000_000]:
-    raise SystemExit(0)
-raise SystemExit(1)
-PY
-}
-
-APPIMAGE_BIN="$HOME/.local/bin/keyrgb"
-if [ "$REMOVE_APPIMAGE" -eq 1 ] && looks_like_appimage "$APPIMAGE_BIN"; then
-  rm -f "$APPIMAGE_BIN" || true
-  log_ok "Removed AppImage binary: $APPIMAGE_BIN"
-elif looks_like_appimage "$APPIMAGE_BIN"; then
-  if confirm "Remove AppImage binary $APPIMAGE_BIN ?"; then
+if [ "$HAS_APPIMAGE_INSTALL" -eq 1 ]; then
+  if [ "$REMOVE_APPIMAGE" -eq 1 ] || confirm "Remove KeyRGB AppImage launcher/binary from ~/.local/bin ?"; then
+    rm -f "$APPIMAGE_WRAPPER" || true
     rm -f "$APPIMAGE_BIN" || true
-    log_ok "Removed AppImage binary"
+    log_ok "Removed AppImage launcher/binary (if present)"
   else
-    log_info "Skipped removing AppImage binary"
+    log_info "Skipped removing AppImage launcher/binary"
   fi
 fi
 

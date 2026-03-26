@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.17.3 (2026-03-26)
+
+- Installer/AppImage: Install a small launcher wrapper at `~/.local/bin/keyrgb` and store the real AppImage as `~/.local/bin/keyrgb.AppImage`, so fresh systems without `libfuse.so.2` automatically fall back to `--appimage-extract-and-run` instead of failing to launch.
+- Installer: Mark Arch / CachyOS / EndeavourOS / Manjaro as a tested distro path (promoted from experimental) and document the `fuse2` install step.
+
 ## 0.17.2 (2026-03-09)
 
 - Tray/Icon: Make the tray-logo `K` cutout follow active effect visuals so dynamic effects keep the icon in sync with live keyboard behavior.

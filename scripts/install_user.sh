@@ -171,7 +171,13 @@ else
   fi
 fi
 
-APPIMAGE_DST="$HOME/.local/bin/keyrgb"
+APPIMAGE_DST="$HOME/.local/bin/keyrgb.AppImage"
+LAUNCHER_DST="$HOME/.local/bin/keyrgb"
+
+if [ ! -f "$APPIMAGE_DST" ] && is_appimage_file "$LAUNCHER_DST"; then
+  log_info "Migrating legacy AppImage install to wrapper-based launcher."
+  mv "$LAUNCHER_DST" "$APPIMAGE_DST"
+fi
 
 resolved_ref=""
 KEYRGB_INSTALLED_TAG="${KEYRGB_INSTALLED_TAG:-}"
@@ -264,7 +270,9 @@ if [ "$UPDATE_ONLY" -ne 1 ]; then
 fi
 
 # Desktop exec should be absolute path.
-install_icon_and_desktop_entries "$APPIMAGE_DST" "$RAW_REF"
+install_appimage_launcher "$LAUNCHER_DST" "$APPIMAGE_DST"
+
+install_icon_and_desktop_entries "$LAUNCHER_DST" "$RAW_REF"
 
 save_appimage_prefs_best_effort
 
@@ -289,7 +297,7 @@ else
   log_ok "Installation complete"
 fi
 
-log_info "Next steps: run '$APPIMAGE_DST' (or add ~/.local/bin to PATH and run 'keyrgb')"
+log_info "Next steps: run '$LAUNCHER_DST' (or add ~/.local/bin to PATH and run 'keyrgb')"
 
 log_info "If you found KeyRGB useful, please consider starring the repo:"
 log_info "  https://github.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}"

@@ -4,6 +4,28 @@
 
 set -euo pipefail
 
+is_appimage_file() {
+  local path="$1"
+  [ -f "$path" ] || return 1
+
+  python3 - "$path" <<'PY'
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+p = Path(sys.argv[1])
+data = p.read_bytes()
+
+if not data.startswith(b"\x7fELF"):
+    raise SystemExit(1)
+
+if b"AppImage" in data[:2_000_000]:
+    raise SystemExit(0)
+raise SystemExit(1)
+PY
+}
+
 # --- Desktop integration + system rules ---
 install_icon_and_desktop_entries() {
   local keyrgb_exec="$1" raw_ref="$2"
@@ -214,6 +236,62 @@ appimage_install() {
   log_ok "Installed AppImage: $dst_path"
 
   printf '%s' "$resolved_tag"
+}
+
+install_appimage_launcher() {
+  local launcher_path="$1" appimage_path="$2"
+  mkdir -p "$(dirname "$launcher_path")"
+
+  cat >"$launcher_path" <<EOF
+#!/usr/bin/env bash
+
+# KeyRGB AppImage launcher.
+# Falls back to AppImage extract-and-run mode on hosts without libfuse.so.2.
+
+set -euo pipefail
+
+APPIMAGE_PATH="$appimage_path"
+
+has_libfuse2() {
+  if command -v ldconfig >/dev/null 2>&1; then
+    if ldconfig -p 2>/dev/null | grep -Fq "libfuse.so.2"; then
+      return 0
+    fi
+  fi
+
+  local candidate
+  for candidate in \
+    /lib/libfuse.so.2 \
+    /lib/libfuse.so.2.* \
+    /lib64/libfuse.so.2 \
+    /lib64/libfuse.so.2.* \
+    /usr/lib/libfuse.so.2 \
+    /usr/lib/libfuse.so.2.* \
+    /usr/lib64/libfuse.so.2 \
+    /usr/lib64/libfuse.so.2.*
+  do
+    if [ -e "\$candidate" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+if [ ! -x "\$APPIMAGE_PATH" ]; then
+  echo "KeyRGB AppImage not found or not executable: \$APPIMAGE_PATH" >&2
+  exit 1
+fi
+
+if has_libfuse2; then
+  exec "\$APPIMAGE_PATH" "\$@"
+fi
+
+exec "\$APPIMAGE_PATH" --appimage-extract-and-run "\$@"
+EOF
+
+  chmod +x "$launcher_path"
+  log_ok "Installed AppImage launcher: $launcher_path"
 }
 
 warn_if_no_usb_device_best_effort() {

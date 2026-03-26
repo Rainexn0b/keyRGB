@@ -40,17 +40,17 @@ Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental 
 ## Status
 
 - **Beta**: versioning follows **0.x.y**. Currently stable but has limited backend support.
-- **Current release**: `v0.17.2`.
-- Installer support is primarily developed on Fedora/Nobara; other distro families are supported on a staged, best-effort basis.
+- **Current release**: `v0.17.3`.
+- Installer support is validated on Fedora/Nobara and Arch/CachyOS; other distro families are supported on a staged, best-effort basis.
 - Support depends entirely on your specific keyboard controller and firmware. See **Troubleshooting** and **Hardware support and contributing** below.
 
 ### Distro support profiles
 
 | Profile | Status | Notes |
 | --- | --- | --- |
-| Fedora / Red Hat family | Tested | Primary target. AppImage + optional `dnf`-based helpers is the smoothest path. |
+| Fedora / Red Hat family | Tested | Tested path. AppImage + optional `dnf`-based helpers is the smoothest path. |
 | Debian / Ubuntu / Linux Mint | Experimental | AppImage-first is recommended. Optional apt kernel-driver installs are best-effort and may require TUXEDO package sources. |
-| Arch / EndeavourOS / Manjaro | Experimental | AppImage-first is recommended. KeyRGB does not install AUR DKMS packages automatically. |
+| Arch / CachyOS / EndeavourOS / Manjaro | Tested | Tested path. AppImage-first is recommended. KeyRGB does not install AUR DKMS packages automatically. |
 | openSUSE / Other Linux | Best-effort | AppImage-first is recommended. Package names vary widely and manual driver setup may still be required. |
 
 ## Screenshots
@@ -135,7 +135,7 @@ Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental 
 KeyRGB's automated installer strategy is a **contained AppImage**:
 
 - Downloads the self-contained AppImage release asset
-- Installs it as `~/.local/bin/keyrgb` (plus desktop launcher + autostart)
+- Stores it as `~/.local/bin/keyrgb.AppImage` and installs a launcher at `~/.local/bin/keyrgb` (plus desktop launcher + autostart)
 - Best-effort permissions/integration (udev rules + optional polkit helper)
 
 The AppImage bundles runtime dependencies (Python, tkinter, tray libraries) so the installer does **not** install Python/Tk/GUI runtime packages via your distro package manager.
@@ -167,14 +167,15 @@ Notes:
 
 - Some integration steps may prompt for `sudo` (installing udev rules / polkit rules).
 - `--no-system-deps` only skips **system package changes**; it does not affect AppImage downloads.
-- The installer reports a distro support profile at startup: Fedora / Red Hat (tested), Debian / Ubuntu / Linux Mint (experimental), Arch / EndeavourOS / Manjaro (experimental), and openSUSE / Other Linux (best-effort).
+- The installer reports a distro support profile at startup: Fedora / Red Hat (tested), Debian / Ubuntu / Linux Mint (experimental), Arch / CachyOS / EndeavourOS / Manjaro (tested), and openSUSE / Other Linux (best-effort).
+- On Arch/CachyOS, install `fuse2` for native AppImage/FUSE launching: `sudo pacman -S --needed fuse2`. KeyRGB also installs a launcher wrapper that falls back to `--appimage-extract-and-run` when `libfuse.so.2` is unavailable.
 - On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver package installs are best-effort and may require TUXEDO package sources; the installer does not add third-party apt repos automatically.
 - Experimental `ite8910` support (`0x048d:0x8910`) uses Linux `hidraw`. The bundled KeyRGB udev rules also grant `uaccess` on matching `hidraw` nodes so the app can talk to that controller without detaching the kernel keyboard driver.
 - To pin installs to a known release tag (instead of `main`), use both `--ref <tag>` and `--version <tag>` (for example `v0.17.2`).
 
 #### Update existing AppImage (non-interactive)
 
-Replaces `~/.local/bin/keyrgb` with the newest matching release. Reuses your last saved release channel (stable vs prerelease).
+Refreshes the stored AppImage and launcher under `~/.local/bin/`. Reuses your last saved release channel (stable vs prerelease).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage
@@ -190,7 +191,7 @@ For development or local modifications. Installs system dependencies + installs 
 
 Notes:
 
-- Fedora / Nobara is the primary supported target.
+- Fedora / Nobara and Arch / CachyOS are tested development targets.
 - Other distros are best-effort via common package managers (dnf/apt/pacman/zypper/apk).
 - System dependencies are only needed for development installs; the AppImage bundles everything.
 

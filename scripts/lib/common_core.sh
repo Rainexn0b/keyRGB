@@ -138,7 +138,7 @@ normalize_distro_support_profile() {
     ""|auto) printf '%s' "auto" ;;
     fedora|redhat|red-hat|red_hat|rhel|nobara) printf '%s' "fedora" ;;
     debian|ubuntu|linuxmint|mint) printf '%s' "debian" ;;
-    arch|archlinux|manjaro|endeavouros|garuda) printf '%s' "arch" ;;
+    arch|archlinux|cachyos|manjaro|endeavouros|garuda) printf '%s' "arch" ;;
     other|opensuse|suse|zypper) printf '%s' "other" ;;
     *) return 1 ;;
   esac
@@ -170,7 +170,7 @@ distro_support_profile_label() {
   case "${1:-other}" in
     fedora) printf '%s' "Fedora / Red Hat family" ;;
     debian) printf '%s' "Debian / Ubuntu / Linux Mint" ;;
-    arch) printf '%s' "Arch / EndeavourOS / Manjaro" ;;
+    arch) printf '%s' "Arch / CachyOS / EndeavourOS / Manjaro" ;;
     *) printf '%s' "openSUSE / Other Linux" ;;
   esac
 }
@@ -178,7 +178,8 @@ distro_support_profile_label() {
 distro_support_profile_status() {
   case "${1:-other}" in
     fedora) printf '%s' "tested" ;;
-    debian|arch) printf '%s' "experimental" ;;
+    debian) printf '%s' "experimental" ;;
+    arch) printf '%s' "tested" ;;
     *) printf '%s' "best-effort" ;;
   esac
 }
@@ -186,13 +187,13 @@ distro_support_profile_status() {
 distro_support_profile_note() {
   case "${1:-other}" in
     fedora)
-      printf '%s' "Primary tested path. AppImage plus optional dnf-based helpers is the smoothest install flow."
+      printf '%s' "Tested path. AppImage plus optional dnf-based helpers is the smoothest install flow."
       ;;
     debian)
       printf '%s' "AppImage-first is recommended. Optional apt kernel-driver installs are best-effort and may require TUXEDO package sources."
       ;;
     arch)
-      printf '%s' "AppImage-first is recommended. KeyRGB does not install AUR DKMS packages automatically."
+      printf '%s' "Tested path. AppImage-first is recommended. KeyRGB does not install AUR DKMS packages automatically."
       ;;
     *)
       printf '%s' "AppImage-first is recommended. Package-manager integration is best-effort and manual driver setup may be required."
