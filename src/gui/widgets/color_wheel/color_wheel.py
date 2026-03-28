@@ -1,14 +1,4 @@
-#!/usr/bin/env python3
-"""Simple color wheel widget for selecting RGB colors.
-
-Reusable component for both uniform and per-key color selection.
-
-Performance note:
-The original implementation drew tens of thousands of tiny polygons on a Canvas.
-That is very slow on many systems (especially in power-saver modes). This widget
-now renders the wheel as a single image (cached on disk), and draws only the
-selector overlay on top.
-"""
+"""Reusable color wheel widget for selecting RGB colors."""
 
 import colorsys
 import os
@@ -180,23 +170,6 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         # Historical default (dark)
         return "#2b2b2b"
 
-    def _derive_border_hex(self, bg_rgb: tuple[int, int, int]) -> str:
-        """Derive a subtle border color from background for both themes."""
-
-        r, g, b = (float(bg_rgb[0]), float(bg_rgb[1]), float(bg_rgb[2]))
-        lum = 0.2126 * r + 0.7152 * g + 0.0722 * b
-
-        if lum >= 160.0:
-            # Light background: darken for border
-            rr, gg, bb = (int(r * 0.75), int(g * 0.75), int(b * 0.75))
-        else:
-            # Dark background: lighten for border
-            rr = int(r + (255.0 - r) * 0.35)
-            gg = int(g + (255.0 - g) * 0.35)
-            bb = int(b + (255.0 - b) * 0.35)
-
-        return self._rgb_to_hex((rr, gg, bb))
-
     def _update_selection(self):
         """Update the selection indicator on the wheel."""
         self.canvas.delete("selector")
@@ -356,22 +329,6 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
 
 
 if __name__ == "__main__":
-    # Test the color wheel
-    try:
-        from src.gui.utils.window_icon import apply_keyrgb_window_icon
-    except Exception:
-        apply_keyrgb_window_icon = None
+    from .demo import main
 
-    root = tk.Tk()
-    root.title("Color Wheel Test")
-    if apply_keyrgb_window_icon is not None:
-        apply_keyrgb_window_icon(root)
-    root.geometry("400x500")
-
-    def on_color_change(r, g, b):
-        print(f"Color changed to RGB({r}, {g}, {b})")
-
-    wheel = ColorWheel(root, size=350, initial_color=(255, 0, 0), callback=on_color_change)
-    wheel.pack(padx=20, pady=20)
-
-    root.mainloop()
+    main()

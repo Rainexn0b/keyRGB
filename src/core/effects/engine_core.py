@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from threading import Event, RLock, Thread
-from typing import Optional
+from typing import Any, Optional
 
 from src.core.effects.device import NullKeyboard, acquire_keyboard
 
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 class _EngineCore:
     """Core engine lifecycle and device acquisition."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.kb_lock = RLock()
         self.device_available = False
         self.kb = NullKeyboard()
@@ -31,7 +32,7 @@ class _EngineCore:
         self.current_color = (255, 0, 0)  # For static/custom effects
         self.reactive_color: Optional[tuple] = None
         self.reactive_use_manual_color: bool = False
-        self.per_key_colors = None
+        self.per_key_colors: Mapping[Any, Any] | None = None
         self.per_key_brightness: Optional[int] = None
 
         # Temporary brightness cap set by idle dim-sync to prevent reactive
@@ -83,7 +84,7 @@ class _EngineCore:
         with self.kb_lock:
             self.kb = NullKeyboard()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop current effect."""
 
         # Reset the per-frame brightness guard unconditionally so the next

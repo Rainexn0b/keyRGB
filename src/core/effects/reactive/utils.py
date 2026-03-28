@@ -141,9 +141,11 @@ def _ripple_radius(*, age_s: float, ttl_s: float, min_radius: float = 0.0, max_r
 
 
 def _age_pulses_in_place(pulses: List[Any], *, dt: float) -> List[Any]:
-    new_pulses: List[Any] = []
+    write_idx = 0
     for pulse in pulses:
         pulse.age_s += dt
         if pulse.age_s <= pulse.ttl_s:
-            new_pulses.append(pulse)
-    return new_pulses
+            pulses[write_idx] = pulse
+            write_idx += 1
+    del pulses[write_idx:]
+    return pulses

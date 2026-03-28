@@ -18,6 +18,8 @@ from .menu_sections import (
     build_perkey_profiles_menu,
     build_system_power_mode_menu,
     build_tcc_profiles_menu,
+)
+from .menu_status import (
     is_hardware_mode,
     is_software_mode,
     keyboard_status_text,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Optional
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
@@ -8,6 +9,16 @@ from src.tray.protocols import LightingTrayProtocol
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
+
+
+def _config_per_key_colors_ref(config: object) -> Mapping[object, object] | None:
+    try:
+        colors = getattr(config, "per_key_colors", None)
+    except Exception:
+        return None
+    if isinstance(colors, Mapping) and colors:
+        return colors
+    return None
 
 
 def parse_menu_int(item: object) -> Optional[int]:
@@ -54,7 +65,7 @@ def ensure_device_best_effort(tray: LightingTrayProtocol) -> None:
 
 def set_engine_perkey_from_config_for_sw_effect(tray: LightingTrayProtocol) -> None:
     try:
-        tray.engine.per_key_colors = dict(getattr(tray.config, "per_key_colors", {}) or {})
+        tray.engine.per_key_colors = _config_per_key_colors_ref(tray.config)
     except Exception:
         tray.engine.per_key_colors = None
 
@@ -90,7 +101,7 @@ def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Option
         return
 
     try:
-        tray.engine.per_key_colors = dict(getattr(tray.config, "per_key_colors", {}) or {})
+        tray.engine.per_key_colors = _config_per_key_colors_ref(tray.config)
     except Exception:
         tray.engine.per_key_colors = None
 

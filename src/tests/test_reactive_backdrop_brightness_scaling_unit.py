@@ -112,3 +112,86 @@ def test_scaling_application() -> None:
     factor = 0.1
     base_scaled = apply_backdrop_brightness_scale(base_unscaled, factor=factor)
     assert base_scaled[(0, 0)] == (20, 10, 5)
+
+
+def test_build_frame_base_maps_reuses_uniform_buffer() -> None:
+    from src.core.effects.reactive._base_maps import build_frame_base_maps
+
+    engine = FakeEngine(global_hw=25, eff=25, base=50, per_key_colors=None, last_rendered=25)
+
+    active1, base_unscaled1, base1 = build_frame_base_maps(
+        engine,
+        background_rgb=(5, 5, 5),
+        effect_brightness_hw=25,
+        backdrop_brightness_scale_factor_fn=backdrop_brightness_scale_factor,
+    )
+    active2, base_unscaled2, base2 = build_frame_base_maps(
+        engine,
+        background_rgb=(7, 8, 9),
+        effect_brightness_hw=25,
+        backdrop_brightness_scale_factor_fn=backdrop_brightness_scale_factor,
+    )
+
+    assert active1 is False
+    assert active2 is False
+    assert base_unscaled1 is base1
+    assert base_unscaled1 is base_unscaled2
+    assert base_unscaled2 is base2
+    assert base2[(0, 0)] == (7, 8, 9)
+
+
+def test_build_frame_base_maps_reuses_per_key_backdrop_buffers() -> None:
+    from src.core.effects.reactive._base_maps import build_frame_base_maps
+
+    engine = FakeEngine(
+        global_hw=50,
+        eff=5,
+        base=5,
+        per_key_colors={(0, 0): (100, 50, 25)},
+        last_rendered=50,
+    )
+
+    active1, base_unscaled1, base1 = build_frame_base_maps(
+        engine,
+        background_rgb=(1, 1, 1),
+        effect_brightness_hw=50,
+        backdrop_brightness_scale_factor_fn=backdrop_brightness_scale_factor,
+    )
+    engine.per_key_colors = {(0, 0): (20, 40, 60)}
+    active2, base_unscaled2, base2 = build_frame_base_maps(
+        engine,
+        background_rgb=(1, 1, 1),
+        effect_brightness_hw=50,
+        backdrop_brightness_scale_factor_fn=backdrop_brightness_scale_factor,
+    )
+
+    assert active1 is True
+    assert active2 is True
+    assert base_unscaled1 is base_unscaled2
+    assert base1 is base2
+    assert base1 is not base_unscaled1
+    assert base_unscaled2[(0, 0)] == (20, 40, 60)
+    assert base2[(0, 0)] == (2, 4, 6)
+
+
+def test_build_frame_base_maps_skips_scaled_copy_when_factor_is_one() -> None:
+    from src.core.effects.reactive._base_maps import build_frame_base_maps
+
+    engine = FakeEngine(
+        global_hw=5,
+        eff=50,
+        base=5,
+        per_key_colors={(0, 0): (11, 22, 33)},
+        last_rendered=5,
+    )
+
+    active, base_unscaled, base = build_frame_base_maps(
+        engine,
+        background_rgb=(1, 1, 1),
+        effect_brightness_hw=5,
+        backdrop_brightness_scale_factor_fn=backdrop_brightness_scale_factor,
+    )
+
+    assert active is True
+    assert base is base_unscaled
+    assert base[(0, 0)] == (11, 22, 33)

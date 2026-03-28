@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class KeyRGBTray:
     """System tray application for KeyRGB."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         EffectsEngine, Config, PowerManager = load_tray_dependencies()
 
         self.config = Config()

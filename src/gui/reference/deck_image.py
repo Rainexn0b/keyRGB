@@ -1,16 +1,10 @@
 from __future__ import annotations
 
-import logging
-import os
-from pathlib import Path
 from typing import Optional
 
 from PIL import Image
 
-from src.core.utils.logging_utils import log_throttled
-from src.core.profile import profiles
-
-logger = logging.getLogger(__name__)
+from src.gui.utils.backdrop_image_cache import backdrop_image_candidates, load_cached_backdrop_image
 
 
 def load_reference_deck_image(*, profile_name: str | None) -> Optional[Image.Image]:
@@ -24,42 +18,6 @@ def load_reference_deck_image(*, profile_name: str | None) -> Optional[Image.Ima
     Returns a PIL Image, or None if no candidate is available/readable.
     """
 
-    candidates: list[str] = []
-
-    try:
-        prof = (profile_name or "").strip()
-        if prof:
-            p = profiles.paths_for(prof).backdrop_image
-            candidates.append(str(p))
-    except Exception as exc:
-        log_throttled(
-            logger,
-            "gui.reference_deck_image.profile_backdrop",
-            interval_s=120,
-            level=logging.DEBUG,
-            msg="Failed to resolve per-profile backdrop image",
-            exc=exc,
-        )
-
-    # File lives at: <repo>/src/gui/reference/deck_image.py
-    repo_root = str(Path(__file__).resolve().parents[3])
-    candidates.append(os.path.join(repo_root, "assets", "y15-pro-deck.png"))
-
-    candidates.append(os.path.join(os.getcwd(), "assets", "y15-pro-deck.png"))
-
-    for path in candidates:
-        try:
-            if os.path.exists(path):
-                return Image.open(path)
-        except OSError as exc:
-            log_throttled(
-                logger,
-                "gui.reference_deck_image.open_failed",
-                interval_s=120,
-                level=logging.DEBUG,
-                msg=f"Failed to open deck image: {path}",
-                exc=exc,
-            )
-            continue
-
-    return None
+    return load_cached_backdrop_image(
+        candidates=backdrop_image_candidates(profile_name=profile_name, include_cwd_fallback=True)
+    )

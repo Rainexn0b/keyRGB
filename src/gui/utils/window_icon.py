@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 import tkinter as tk
+
+
+_WINDOW_ICON_SIZE = (64, 64)
 
 
 def _candidate_logo_paths() -> list[Path]:
@@ -36,6 +40,24 @@ def find_keyrgb_logo_path() -> Path | None:
     return None
 
 
+@lru_cache(maxsize=4)
+def _load_cached_window_icon_image(path_str: str, mtime_ns: int):
+    from PIL import Image  # type: ignore
+
+    with Image.open(path_str) as image:
+        icon = image.convert("RGBA")
+        return icon.resize(_WINDOW_ICON_SIZE)
+
+
+def load_window_icon_image(path: Path):
+    stat = path.stat()
+    return _load_cached_window_icon_image(str(path), int(stat.st_mtime_ns))
+
+
+def clear_cached_window_icon_images() -> None:
+    _load_cached_window_icon_image.cache_clear()
+
+
 def apply_keyrgb_window_icon(window: tk.Misc) -> None:
     """Best-effort: set KeyRGB icon for a Tk window.
 
@@ -48,11 +70,9 @@ def apply_keyrgb_window_icon(window: tk.Misc) -> None:
         return
 
     try:
-        from PIL import Image, ImageTk  # type: ignore
+        from PIL import ImageTk  # type: ignore
 
-        img = Image.open(logo_path)
-        # Small icon size keeps memory reasonable and looks fine in title bars.
-        img = img.resize((64, 64))
+        img = load_window_icon_image(logo_path)
         photo = ImageTk.PhotoImage(img)
 
         # Prevent garbage collection.

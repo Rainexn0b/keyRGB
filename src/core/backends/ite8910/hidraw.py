@@ -129,7 +129,7 @@ class HidrawFeatureTransport:
         if hasattr(os, "O_CLOEXEC"):
             flags |= int(getattr(os, "O_CLOEXEC"))
         self.devnode = Path(devnode)
-        self._fd = os.open(os.fspath(self.devnode), flags)
+        self._fd: int | None = os.open(os.fspath(self.devnode), flags)
 
     def close(self) -> None:
         fd = getattr(self, "_fd", None)
@@ -145,7 +145,11 @@ class HidrawFeatureTransport:
         if len(payload) <= 0:
             raise ValueError("feature report must not be empty")
 
-        fcntl.ioctl(int(self._fd), hidiocsfeature(len(payload)), payload, True)
+        fd = self._fd
+        if fd is None:
+            raise RuntimeError("hidraw transport is closed")
+
+        fcntl.ioctl(int(fd), hidiocsfeature(len(payload)), payload, True)
         return len(payload)
 
     def __del__(self) -> None:

@@ -4,6 +4,7 @@ import tkinter as tk
 from typing import TYPE_CHECKING, Optional
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
+from src.gui.utils.deck_render_cache import DeckRenderCache
 from src.gui.reference.overlay_geometry import (
     CanvasTransform,
     apply_global_tweak,
@@ -38,6 +39,7 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         self.editor = editor
         self._deck_img: Optional[object] = None
         self._deck_img_tk: Optional[object] = None
+        self._deck_render_cache: DeckRenderCache[object] = DeckRenderCache()
         self._deck_drawn_bbox: Optional[tuple[int, int, int, int]] = None
         self._overlay_drag = OverlayDragController(self)
         self._resize_job: Optional[str] = None

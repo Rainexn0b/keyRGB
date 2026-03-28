@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .io import parse_hex_int
+from ._formatting_support import append_support_hints, append_sysfs_leds
 
 if TYPE_CHECKING:
     from .model import Diagnostics
@@ -81,210 +81,6 @@ def _append_backends(lines: list[str], backends: object) -> None:
             if isinstance(ids, dict) and ids:
                 for k in sorted(ids.keys()):
                     lines.append(f"      {k}: {ids[k]}")
-
-
-def _append_support_hints(
-    lines: list[str],
-    backends: object,
-    usb_devices: object,
-    usb_ids: object = None,
-    hints: object = None,
-) -> None:
-    if not isinstance(backends, dict) or not backends:
-        return
-
-    probes = backends.get("probes")
-    if not isinstance(probes, list) or not probes:
-        return
-
-    support_lines: list[str] = []
-
-    usb_label_by_id: dict[tuple[str, str], str] = {}
-    if isinstance(usb_devices, list):
-        for dev in usb_devices:
-            if not isinstance(dev, dict):
-                continue
-            vid = dev.get("idVendor")
-            pid = dev.get("idProduct")
-            if not isinstance(vid, str) or not isinstance(pid, str):
-                continue
-            product = dev.get("product")
-            label = str(product) if product else ""
-            usb_label_by_id[(vid.lower(), pid.lower())] = label
-
-    unsupported_usb: list[dict[str, str]] = []
-    for p in probes:
-        if not isinstance(p, dict):
-            continue
-        if bool(p.get("available")):
-            continue
-
-        ids = p.get("identifiers")
-        if not isinstance(ids, dict):
-            continue
-
-        vid_txt = ids.get("usb_vid")
-        pid_txt = ids.get("usb_pid")
-        if not isinstance(vid_txt, str) or not isinstance(pid_txt, str):
-            continue
-
-        reason = str(p.get("reason") or "")
-        reason_l = reason.lower()
-        # We only emit hints for cases that look like a detected, fail-closed
-        # device rather than general import/probe failures.
-        if "usb device present" not in reason_l or "unsupported" not in reason_l:
-            continue
-
-        backend_name = str(p.get("name") or "")
-        entry: dict[str, str] = {
-            "backend": backend_name,
-            "vid": vid_txt,
-            "pid": pid_txt,
-            "reason": reason,
-        }
-        product_label = usb_label_by_id.get((vid_txt.lower(), pid_txt.lower()))
-        if product_label:
-            entry["product"] = product_label
-        unsupported_usb.append(entry)
-
-    if not unsupported_usb:
-        unsupported_usb = []
-
-    if unsupported_usb:
-        support_lines.append(
-            "  One or more USB devices were detected but marked as unsupported (fail-closed) to avoid talking the wrong protocol."
-        )
-
-        for e in unsupported_usb[:6]:
-            product = e.get("product", "")
-            suffix = f" {product}" if product else ""
-            support_lines.append(
-                "  - {vid}:{pid}{suffix} (backend={backend})".format(
-                    vid=e.get("vid"),
-                    pid=e.get("pid"),
-                    suffix=suffix,
-                    backend=e.get("backend"),
-                )
-            )
-            support_lines.append(f"      reason: {e.get('reason')}")
-
-            vid_i = parse_hex_int(str(e.get("vid") or ""))
-            pid_i = parse_hex_int(str(e.get("pid") or ""))
-            if vid_i == 0x048D and pid_i in {0xC965, 0xC966, 0xC967, 0xC936}:
-                support_lines.append(
-                    "      note: this VID/PID is commonly reported on Lenovo Legion / IdeaPad Gaming keyboard RGB controllers."
-                )
-                support_lines.append("      next: please open an issue and include this diagnostics output + your laptop model.")
-
-    seen_candidate_usb_ids: list[str] = []
-
-    if isinstance(usb_ids, list):
-        for entry in usb_ids:
-            if not isinstance(entry, str):
-                continue
-            norm = entry.strip().lower()
-            if norm in {"048d:8910", "048d:8911"} and norm not in seen_candidate_usb_ids:
-                seen_candidate_usb_ids.append(norm)
-
-    if not seen_candidate_usb_ids and isinstance(usb_devices, list):
-        for dev in usb_devices:
-            if not isinstance(dev, dict):
-                continue
-            vid_i = parse_hex_int(str(dev.get("idVendor") or ""))
-            pid_i = parse_hex_int(str(dev.get("idProduct") or ""))
-            if vid_i == 0x048D and pid_i in {0x8910, 0x8911}:
-                norm = f"{vid_i:04x}:{pid_i:04x}"
-                if norm not in seen_candidate_usb_ids:
-                    seen_candidate_usb_ids.append(norm)
-
-    sysfs_reason = ""
-    sysfs_available = False
-    for p in probes:
-        if not isinstance(p, dict):
-            continue
-        if str(p.get("name") or "").strip().lower() != "sysfs-leds":
-            continue
-        sysfs_reason = str(p.get("reason") or "")
-        sysfs_available = bool(p.get("available"))
-        break
-
-    selected = backends.get("selected")
-    selected_name = str(selected).strip().lower() if selected is not None else ""
-
-    module_names: set[str] = set()
-    if isinstance(hints, dict):
-        modules = hints.get("modules")
-        if isinstance(modules, list):
-            for name in modules:
-                if isinstance(name, str) and name.strip():
-                    module_names.add(name.strip().lower())
-
-    ite829x_loaded = "ite_829x" in module_names
-    tuxedo_keyboard_loaded = "tuxedo_keyboard" in module_names
-    clevo_platform_loaded = any(name in module_names for name in {"clevo_wmi", "clevo_acpi"})
-    tuxedo_or_clevo_platform_loaded = tuxedo_keyboard_loaded or clevo_platform_loaded
-
-    if (
-        seen_candidate_usb_ids
-        and not sysfs_available
-        and "no matching sysfs led" in sysfs_reason.lower()
-        and selected_name in {"", "none"}
-    ):
-        support_lines.append(
-            "  Detected USB ID(s) associated with the TUXEDO/Clevo ITE 829x kernel-driver path, but no keyboard backlight sysfs LED was found."
-        )
-        support_lines.append(f"  - seen IDs: {', '.join(seen_candidate_usb_ids)}")
-        if tuxedo_keyboard_loaded and not ite829x_loaded:
-            support_lines.append(
-                "  - observation: tuxedo_keyboard is loaded, but ite_829x was not seen in the module list."
-            )
-        if ite829x_loaded:
-            support_lines.append(
-                "  - next: verify ite_829x bound successfully and exposed rgb:kbd_backlight* under /sys/class/leds."
-            )
-        else:
-            support_lines.append(
-                "  - next: install or update tuxedo-drivers (or another package that provides ite_829x), then confirm the ite_829x module loads."
-            )
-        support_lines.append(
-            "  - expectation: once rgb:kbd_backlight* exists, KeyRGB should detect it via the sysfs-leds backend."
-        )
-
-    if (
-        not seen_candidate_usb_ids
-        and tuxedo_or_clevo_platform_loaded
-        and not sysfs_available
-        and "no matching sysfs led" in sysfs_reason.lower()
-        and selected_name in {"", "none"}
-    ):
-        support_lines.append(
-            "  Detected TUXEDO/Clevo platform modules, but no keyboard backlight sysfs LED was found."
-        )
-        if tuxedo_keyboard_loaded:
-            support_lines.append(
-                "  - observation: tuxedo_keyboard is loaded, so this looks closer to a kernel-driver binding/export problem than a normal sysfs permission issue."
-            )
-        else:
-            support_lines.append(
-                "  - observation: Clevo platform modules are loaded, but no kbd_backlight LED node was exported."
-            )
-        support_lines.append(
-            "  - next: check whether /sys/class/leds exposes rgb:kbd_backlight*, clevo::kbd_backlight, or tuxedo::kbd_backlight after boot."
-        )
-        if ite829x_loaded:
-            support_lines.append(
-                "  - next: verify the ite_829x path actually created LED class nodes for the keyboard."
-            )
-        else:
-            support_lines.append(
-                "  - next: inspect dmesg and lsmod for tuxedo, clevo, and ite_829x to confirm the keyboard-lighting subdriver is present and bound."
-            )
-
-    if not support_lines:
-        return
-
-    lines.append("Support hints:")
-    lines.extend(support_lines)
 
 
 def _append_usb_devices(lines: list[str], usb_devices: object) -> None:
@@ -391,92 +187,6 @@ def _append_dmi(lines: list[str], dmi: object, backends: object) -> None:
         lines.append(f"  {k}: {dmi[k]}")
 
 
-def _append_sysfs_leds(
-    lines: list[str],
-    sysfs_leds: object,
-    leds: object,
-    backends: object,
-) -> None:
-    if isinstance(sysfs_leds, list) and sysfs_leds:
-        lines.append("Sysfs LEDs:")
-        for entry in sysfs_leds:
-            lines.append(f"  - {entry.get('name')} ({entry.get('path')})")
-            if entry.get("brightness"):
-                lines.append(f"      brightness: {entry['brightness']}")
-            if entry.get("max_brightness"):
-                lines.append(f"      max_brightness: {entry['max_brightness']}")
-            if entry.get("trigger"):
-                lines.append(f"      trigger: {entry['trigger']}")
-
-                trigger_extra: list[str] = []
-                if entry.get("tier") is not None:
-                    trigger_extra.append(f"tier={entry.get('tier')}")
-                if entry.get("provider") is not None:
-                    trigger_extra.append(f"provider={entry.get('provider')}")
-                if entry.get("priority") is not None:
-                    trigger_extra.append(f"priority={entry.get('priority')}")
-                if trigger_extra:
-                    lines.append(f"      {' '.join(trigger_extra)}")
-
-    if isinstance(leds, list) and leds and sysfs_leds != leds:
-        lines.append("Keyboard LEDs (filtered):")
-        for entry in leds:
-            lines.append(f"  - {entry.get('name')} ({entry.get('path')})")
-
-        sysfs_cand = backends.get("sysfs_led_candidates") if isinstance(backends, dict) else None
-        if isinstance(sysfs_cand, dict) and sysfs_cand:
-            lines.append("  sysfs_led_candidates:")
-            for k in ("root", "exists", "candidates_count"):
-                if k in sysfs_cand:
-                    lines.append(f"    {k}: {sysfs_cand.get(k)}")
-
-            power_helper = sysfs_cand.get("power_helper")
-            if isinstance(power_helper, dict) and power_helper:
-                path = power_helper.get("path")
-                exists = power_helper.get("exists")
-                supports = power_helper.get("supports_led_apply")
-                extra = []
-                if "executable" in power_helper:
-                    extra.append(f"executable={power_helper.get('executable')}")
-                if power_helper.get("mode") is not None:
-                    extra.append(f"mode={power_helper.get('mode')}")
-                if power_helper.get("uid") is not None and power_helper.get("gid") is not None:
-                    extra.append(f"uid={power_helper.get('uid')} gid={power_helper.get('gid')}")
-                suffix = (" " + " ".join(extra)) if extra else ""
-                lines.append(f"    power_helper: path={path} exists={exists} supports_led_apply={supports}{suffix}")
-
-            if "pkexec_in_path" in sysfs_cand:
-                lines.append(f"    pkexec_in_path: {sysfs_cand.get('pkexec_in_path')}")
-            if "pkexec_path" in sysfs_cand:
-                lines.append(f"    pkexec_path: {sysfs_cand.get('pkexec_path')}")
-            if "sudo_in_path" in sysfs_cand:
-                lines.append(f"    sudo_in_path: {sysfs_cand.get('sudo_in_path')}")
-            if "sudo_path" in sysfs_cand:
-                lines.append(f"    sudo_path: {sysfs_cand.get('sudo_path')}")
-
-            top = sysfs_cand.get("top")
-            if isinstance(top, list) and top:
-                lines.append("    top:")
-                for e in top[:5]:
-                    if not isinstance(e, dict):
-                        continue
-                    top_extra: list[str] = []
-                    if e.get("brightness_writable") is not None:
-                        top_extra.append(f"writable={e.get('brightness_writable')}")
-                    if e.get("brightness_mode") is not None:
-                        top_extra.append(f"mode={e.get('brightness_mode')}")
-                    if e.get("brightness_uid") is not None and e.get("brightness_gid") is not None:
-                        top_extra.append(f"uid={e.get('brightness_uid')} gid={e.get('brightness_gid')}")
-                    if e.get("brightness_acl") is not None:
-                        top_extra.append(f"acl={e.get('brightness_acl')}")
-                    if e.get("device_driver") is not None:
-                        top_extra.append(f"driver={e.get('device_driver')}")
-                    if e.get("device_module") is not None:
-                        top_extra.append(f"module={e.get('device_module')}")
-                    suffix = (" " + " ".join(top_extra)) if top_extra else ""
-                    lines.append(f"      - {e.get('name')} score={e.get('score')}{suffix}")
-
-
 def _append_usb_ids(lines: list[str], usb_ids: object) -> None:
     if not isinstance(usb_ids, list) or not usb_ids:
         return
@@ -511,13 +221,13 @@ def format_diagnostics_text(diag: "Diagnostics") -> str:
     _append_app(lines, diag.app)
     _append_power_supply(lines, diag.power_supply)
     _append_backends(lines, diag.backends)
-    _append_support_hints(lines, diag.backends, diag.usb_devices, diag.usb_ids, diag.hints)
+    append_support_hints(lines, diag.backends, diag.usb_devices, diag.usb_ids, diag.hints)
     _append_usb_devices(lines, diag.usb_devices)
     _append_process(lines, diag.process)
     _append_config(lines, diag.config)
     _append_virt(lines, diag.virt)
     _append_dmi(lines, diag.dmi, diag.backends)
-    _append_sysfs_leds(lines, diag.sysfs_leds, diag.leds, diag.backends)
+    append_sysfs_leds(lines, diag.sysfs_leds, diag.leds, diag.backends)
     _append_usb_ids(lines, diag.usb_ids)
     _append_hints(lines, diag.hints)
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from threading import RLock
 from typing import Any, Dict, Tuple
 
@@ -72,7 +73,7 @@ def fade_in_per_key(
     *,
     kb: Any,
     kb_lock: RLock,
-    per_key_colors: Dict[Tuple[int, int], Tuple[int, int, int]] | None,
+    per_key_colors: Mapping[Tuple[int, int], Tuple[int, int, int]] | None,
     current_color: tuple,
     brightness: int,
     duration_s: float,

@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import logging
-import json
+from typing import Any
+
+from ._coercion import coerce_loaded_settings, normalize_brightness_value, normalize_rgb_triplet
 from .defaults import DEFAULTS as _DEFAULTS
 from .file_storage import load_config_settings, save_config_settings_atomic
 from .paths import config_dir, config_file_path
@@ -33,13 +35,13 @@ class Config:
         """Convert {"row,col": [r,g,b]} -> {(row,col): (r,g,b)}."""
         return deserialize_per_key_colors(data)
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Recompute at runtime so test harnesses can set env vars in conftest.
         self.CONFIG_DIR = config_dir()
         self.CONFIG_FILE = config_file_path()
         self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         loaded = self._load()
-        self._settings = loaded if loaded is not None else self.DEFAULTS.copy()
+        self._settings: dict[str, Any] = loaded if loaded is not None else self.DEFAULTS.copy()
         self._coerce_loaded_settings()
 
         # Cache mtime for reload() short-circuiting.
@@ -50,7 +52,7 @@ class Config:
         except Exception:
             self._last_reload_mtime_ns = None
 
-    def _load(self, *, retries: int = 3, retry_delay: float = 0.02):
+    def _load(self, *, retries: int = 3, retry_delay: float = 0.02) -> dict[str, Any] | None:
         """Load settings from file.
 
         This may race with writers (tray/GUI) updating the JSON file. We retry a few
@@ -66,7 +68,7 @@ class Config:
             logger=logger,
         )
 
-    def reload(self):
+    def reload(self) -> None:
         try:
             mtime_ns = self.CONFIG_FILE.stat().st_mtime_ns
         except Exception:
@@ -84,7 +86,7 @@ class Config:
             self._settings = loaded
             self._last_reload_mtime_ns = mtime_ns
 
-    def _save(self):
+    def _save(self) -> None:
         save_config_settings_atomic(
             config_dir=self.CONFIG_DIR,
             config_file=self.CONFIG_FILE,
@@ -94,84 +96,16 @@ class Config:
 
     @staticmethod
     def _normalize_brightness_value(value: int) -> int:
-        """Normalize brightness for storage.
-
-        Internally, KeyRGB persists brightness on a 0..50 hardware scale.
-        The tray UI exposes 0..10 steps, which map to multiples of 5.
-        Keeping stored values on that step grid ensures the tray always has
-        a selected radio item.
-        """
-
-        try:
-            v = int(value)
-        except Exception:
-            return 0
-
-        v = max(0, min(50, v))
-        if v == 0:
-            return 0
-
-        snapped = int(round(v / 5.0)) * 5
-        snapped = max(0, min(50, snapped))
-        if snapped == 0:
-            snapped = 5
-        return snapped
+        return normalize_brightness_value(value)
 
     def _coerce_loaded_settings(self) -> None:
         """Coerce loaded settings into a consistent, UI-compatible shape."""
 
-        try:
-            changed = False
-
-            # Detect whether the on-disk config.json explicitly contains the
-            # perkey_brightness field. The loader merges defaults into the
-            # loaded dict, so we can't rely on `get("perkey_brightness") is None`
-            # to decide whether migration is needed.
-            perkey_present_on_disk = False
-            try:
-                with open(self.CONFIG_FILE, "r", encoding="utf-8") as f:
-                    raw = json.load(f)
-                if isinstance(raw, dict) and "perkey_brightness" in raw:
-                    perkey_present_on_disk = True
-            except Exception:
-                perkey_present_on_disk = False
-
-            before = self._settings.get("brightness", None)
-            after = self._normalize_brightness_value(before if before is not None else 0)
-            if before != after:
-                self._settings["brightness"] = after
-                changed = True
-
-            # Per-key brightness: keep separate from effect brightness so users
-            # can use different levels and switching modes doesn't overwrite.
-            perkey_before = self._settings.get("perkey_brightness", None)
-            if perkey_before is None or not perkey_present_on_disk:
-                # Backward-compatible migration: older configs had only
-                # "brightness". When the loader merges defaults, missing keys
-                # appear as the default value, so we also gate on the key being
-                # absent from the on-disk JSON.
-                self._settings["perkey_brightness"] = int(after)
-                changed = True
-            else:
-                perkey_after = self._normalize_brightness_value(perkey_before)
-                if perkey_before != perkey_after:
-                    self._settings["perkey_brightness"] = int(perkey_after)
-                    changed = True
-
-            # Normalize stored power-source brightness overrides when present.
-            for key in ("ac_lighting_brightness", "battery_lighting_brightness"):
-                raw = self._settings.get(key, None)
-                if raw is None:
-                    continue
-                normalized = self._normalize_brightness_value(raw)
-                if raw != normalized:
-                    self._settings[key] = int(normalized)
-                    changed = True
-
-            if changed:
-                self._save()
-        except Exception:
-            return
+        coerce_loaded_settings(
+            settings=self._settings,
+            config_file=self.CONFIG_FILE,
+            save_fn=self._save,
+        )
 
     @property
     def effect(self) -> str:
@@ -298,59 +232,11 @@ class Config:
                 raw = self.DEFAULTS.get("reactive_color", [255, 255, 255])
             except Exception:
                 raw = [255, 255, 255]
-        try:
-            r, g, b = raw
-        except Exception:
-            r, g, b = 255, 255, 255
-
-        def _clamp(x: object) -> int:
-            try:
-                if isinstance(x, bool):
-                    v = int(x)
-                elif isinstance(x, int):
-                    v = x
-                elif isinstance(x, float):
-                    v = int(x)
-                elif isinstance(x, str):
-                    try:
-                        v = int(x)
-                    except Exception:
-                        v = int(float(x))
-                else:
-                    return 0
-            except Exception:
-                return 0
-            return max(0, min(255, int(v)))
-
-        return (_clamp(r), _clamp(g), _clamp(b))
+        return normalize_rgb_triplet(raw)
 
     @reactive_color.setter
-    def reactive_color(self, value: tuple[int, int, int] | tuple):
-        try:
-            r, g, b = value
-        except Exception:
-            return
-
-        def _clamp(x: object) -> int:
-            try:
-                if isinstance(x, bool):
-                    v = int(x)
-                elif isinstance(x, int):
-                    v = x
-                elif isinstance(x, float):
-                    v = int(x)
-                elif isinstance(x, str):
-                    try:
-                        v = int(x)
-                    except Exception:
-                        v = int(float(x))
-                else:
-                    return 0
-            except Exception:
-                return 0
-            return max(0, min(255, int(v)))
-
-        self._settings["reactive_color"] = [_clamp(r), _clamp(g), _clamp(b)]
+    def reactive_color(self, value: tuple[int, int, int] | tuple) -> None:
+        self._settings["reactive_color"] = list(normalize_rgb_triplet(value))
         self._save()
 
     @property

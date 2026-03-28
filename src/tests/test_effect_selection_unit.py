@@ -179,6 +179,20 @@ class TestApplyEffectSelection:
 
         mock_tray.engine.stop.assert_called()
         assert mock_tray.config.effect == "perkey"
+        assert mock_tray.engine.per_key_colors is mock_tray.config.per_key_colors
+        mock_tray._start_current_effect.assert_called_once()
+
+    def test_software_effect_reuses_config_perkey_mapping(self):
+        """Software-mode setup should reuse the config's per-key mapping instead of cloning it."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
+
+        apply_effect_selection(mock_tray, effect_name="reactive_fade")
+
+        assert mock_tray.engine.per_key_colors is mock_tray.config.per_key_colors
         mock_tray._start_current_effect.assert_called_once()
 
     def test_hw_uniform_forces_hardware_mode_even_if_perkey_colors_exist(self):

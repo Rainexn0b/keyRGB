@@ -21,9 +21,14 @@ class _DummyEngine:
 
 def test_pulse_brightness_uses_reactive_brightness_when_lower_than_hw() -> None:
     eng = _DummyEngine(brightness=40, reactive_brightness=20)
-    # Steady-state: set last_rendered=40 so the guard doesn't clamp hw=40.
+    # Per-key hardware uses the reactive slider as a direct 0..50 pulse-intensity
+    # control, independent of the steady-state hardware brightness.
+    assert pulse_brightness_scale_factor(eng) == 0.4
+
+
+def test_pulse_brightness_uniform_backend_still_uses_eff_over_hw_ratio() -> None:
+    eng = _DummyEngine(brightness=40, reactive_brightness=20, has_per_key=False)
     eng._last_rendered_brightness = 40
-    # No backdrop => hw is profile brightness (40). Scale is eff/hw.
     assert pulse_brightness_scale_factor(eng) == 0.5
 
 

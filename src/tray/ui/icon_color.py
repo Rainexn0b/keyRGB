@@ -3,6 +3,7 @@ from __future__ import annotations
 import colorsys
 import math
 import time
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
@@ -17,7 +18,15 @@ def _pace_from_speed(speed: int) -> float:
     return float(0.25 + (10.0 - 0.25) * t)
 
 
-def _weighted_hsv_mean(colors: list[tuple[int, int, int]]) -> tuple[int, int, int]:
+def _per_key_color_mapping(config: Any) -> Mapping[tuple[int, int], tuple[int, int, int]]:
+    try:
+        per_key = getattr(config, "per_key_colors", {}) or {}
+    except Exception:
+        return {}
+    return per_key if isinstance(per_key, Mapping) else {}
+
+
+def _weighted_hsv_mean(colors: Iterable[tuple[int, int, int]]) -> tuple[int, int, int]:
     # Avoid muddy greys when averaging multi-color maps by averaging hue on the
     # unit circle and weighting by saturation/value.
     total = 0.0
@@ -25,8 +34,16 @@ def _weighted_hsv_mean(colors: list[tuple[int, int, int]]) -> tuple[int, int, in
     y = 0.0
     s_acc = 0.0
     v_acc = 0.0
+    count = 0
+    r_sum = 0
+    g_sum = 0
+    b_sum = 0
 
     for r, g, b in colors:
+        count += 1
+        r_sum += int(r)
+        g_sum += int(g)
+        b_sum += int(b)
         rr = max(0, min(255, int(r))) / 255.0
         gg = max(0, min(255, int(g))) / 255.0
         bb = max(0, min(255, int(b))) / 255.0
@@ -42,11 +59,11 @@ def _weighted_hsv_mean(colors: list[tuple[int, int, int]]) -> tuple[int, int, in
         total += w
 
     if total <= 1e-6 or (x == 0.0 and y == 0.0):
-        if not colors:
+        if count == 0:
             return (255, 0, 128)
-        r = int(round(sum(c[0] for c in colors) / len(colors)))
-        g = int(round(sum(c[1] for c in colors) / len(colors)))
-        b = int(round(sum(c[2] for c in colors) / len(colors)))
+        r = int(round(r_sum / count))
+        g = int(round(g_sum / count))
+        b = int(round(b_sum / count))
         return (r, g, b)
 
     mean_h = (math.atan2(y, x) / (2.0 * math.pi)) % 1.0
@@ -54,6 +71,29 @@ def _weighted_hsv_mean(colors: list[tuple[int, int, int]]) -> tuple[int, int, in
     mean_v = max(0.0, min(1.0, v_acc / total))
     rr, gg, bb = colorsys.hsv_to_rgb(mean_h, mean_s, mean_v)
     return (int(rr * 255), int(gg * 255), int(bb * 255))
+
+
+def _representative_perkey_color(config: Any) -> tuple[int, int, int] | None:
+    per_key = _per_key_color_mapping(config)
+    if not per_key:
+        return None
+
+    base_color = tuple(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
+    try:
+        full = build_full_color_grid(
+            base_color=base_color,
+            per_key_colors=per_key,
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+        )
+        return _weighted_hsv_mean(full.values())
+    except Exception:
+        return _weighted_hsv_mean(per_key.values())
+
+
+def _representative_saved_perkey_color(config: Any) -> tuple[int, int, int] | None:
+    per_key = _per_key_color_mapping(config)
+    return _weighted_hsv_mean(per_key.values()) if per_key else None
 
 
 def representative_color(
@@ -89,26 +129,7 @@ def representative_color(
             brightness = int(getattr(config, "perkey_brightness", brightness) or brightness)
         except Exception:
             pass
-
-        base_color = tuple(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
-        try:
-            per_key = dict(getattr(config, "per_key_colors", {}) or {})
-        except Exception:
-            per_key = {}
-
-        # Build the same full grid used by the per-key pipeline, then pick a
-        # representative color using a weighted HSV mean (cheap, but avoids grey).
-        try:
-            full = build_full_color_grid(
-                base_color=base_color,
-                per_key_colors=per_key,
-                num_rows=NUM_ROWS,
-                num_cols=NUM_COLS,
-            )
-            base = _weighted_hsv_mean(list(full.values()))
-        except Exception:
-            values = list(per_key.values())
-            base = _weighted_hsv_mean(values) if values else base_color
+        base = _representative_perkey_color(config) or tuple(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
 
     # Multi-color effects: cycle a hue so the icon changes.
     elif effect in {"rainbow_wave", "rainbow_swirl", "spectrum_cycle", "color_cycle"}:
@@ -168,7 +189,11 @@ def representative_color(
             if use_manual_reactive_color:
                 base = tuple(getattr(config, "reactive_color", None) or getattr(config, "color", None) or (255, 0, 128))
             else:
-                base = tuple(getattr(config, "color", None) or (255, 0, 128))
+                try:
+                    brightness = int(getattr(config, "perkey_brightness", brightness) or brightness)
+                except Exception:
+                    pass
+                base = _representative_saved_perkey_color(config) or tuple(getattr(config, "color", None) or (255, 0, 128))
             try:
                 if tuple(base) == (0, 0, 0):
                     base = (255, 0, 128)

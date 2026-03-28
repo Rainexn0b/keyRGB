@@ -98,3 +98,22 @@ def test_update_custom_profile_rejects_empty_name(
 
     with pytest.raises(tcc_power_profiles.TccProfileWriteError):
         tcc_power_profiles.update_custom_profile("abc", {"name": "   "})
+
+
+def test_get_custom_profile_payload_returns_detached_copy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {"id": "abc", "name": "Old", "nested": {"x": 1}}
+
+    monkeypatch.setattr(
+        tcc_power_profiles,
+        "_load_custom_profiles_payload",
+        lambda: [payload],
+    )
+
+    result = tcc_power_profiles.get_custom_profile_payload("abc")
+
+    assert result == payload
+    assert result is not payload
+    assert result is not None
+    assert result["nested"] is not payload["nested"]

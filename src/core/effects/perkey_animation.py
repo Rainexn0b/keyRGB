@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Dict, Tuple
 
 from src.core.utils.logging_utils import log_throttled
@@ -32,7 +33,7 @@ def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, i
 def build_full_color_grid(
     *,
     base_color: Tuple[int, int, int],
-    per_key_colors: Dict[Tuple[int, int], Tuple[int, int, int]] | None,
+    per_key_colors: Mapping[Tuple[int, int], Tuple[int, int, int]] | None,
     num_rows: int,
     num_cols: int,
 ) -> Dict[Tuple[int, int], Tuple[int, int, int]]:

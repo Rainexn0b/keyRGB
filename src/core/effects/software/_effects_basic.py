@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Dict
 from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
 
+from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer, scale_color_map_into
 from .base import Color, Key, base_color_map, frame_dt_s, mix, pace, render as base_render, scale
 
 if TYPE_CHECKING:
@@ -18,6 +19,7 @@ def run_breathing(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     """Breathing (SW): smooth breathing that respects per-key when available."""
 
     base = base_color_map(engine)
+    color_map = get_engine_color_map_buffer(engine, "_sw_breathing_frame_map")
     phase = 0.0
     dt = frame_dt_s()
     p = pace(engine)
@@ -27,7 +29,7 @@ def run_breathing(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         breath = breath * breath * (3.0 - 2.0 * breath)
         breath = 0.12 + breath * 0.88
 
-        color_map = {k: scale(rgb, breath) for k, rgb in base.items()}
+        scale_color_map_into(color_map, source=base, factor=breath)
         render_fn(engine, color_map=color_map)
 
         phase += 0.08 * p
@@ -38,6 +40,7 @@ def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     """Fire (SW): higher-FPS, smoother flames; overlays onto per-key base when present."""
 
     base = base_color_map(engine)
+    color_map = get_engine_color_map_buffer(engine, "_sw_fire_frame_map")
     dt = frame_dt_s()
     p = pace(engine)
 
@@ -70,7 +73,7 @@ def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
                 below_r = heat[r - 1][c + 1] if c + 1 < NUM_COLS else below
                 heat[r][c] = (below + below_l + below_r) / 3.0
 
-        color_map: Dict[Key, Color] = {}
+        color_map.clear()
         for r in range(NUM_ROWS):
             for c in range(NUM_COLS):
                 h = heat[r][c]
@@ -88,16 +91,22 @@ def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     dt = frame_dt_s()
     p = pace(engine)
     base = base_color_map(engine)
+    color_map = get_engine_color_map_buffer(engine, "_sw_random_frame_map")
+    prev = get_engine_color_map_buffer(engine, "_sw_random_prev_map")
+    target = get_engine_color_map_buffer(engine, "_sw_random_target_map")
 
-    prev = dict(base)
-    target = dict(base)
+    prev.clear()
+    prev.update(base)
+    target.clear()
+    target.update(base)
     t = 1.0
     next_change_s = 0.0
 
     while engine.running and not engine.stop_event.is_set():
         now = time.monotonic()
         if now >= next_change_s:
-            prev = dict(target)
+            prev.clear()
+            prev.update(target)
 
             for k in target.keys():
                 rr = random.randint(0, 255)
@@ -111,7 +120,9 @@ def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             next_change_s = now + (0.75 / p)
 
         t = min(1.0, t + dt * (1.8 * p))
-        color_map = {k: mix(prev[k], target[k], t) for k in target.keys()}
+        color_map.clear()
+        for k in target.keys():
+            color_map[k] = mix(prev[k], target[k], t)
         render_fn(engine, color_map=color_map)
 
         engine.stop_event.wait(dt)
@@ -131,10 +142,11 @@ def run_rainbow_wave(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             pos[(r, c)] = (float(c) / col_den) + (0.18 * (float(r) / row_den))
 
     hue = 0.0
+    color_map = get_engine_color_map_buffer(engine, "_sw_rainbow_wave_frame_map")
     while engine.running and not engine.stop_event.is_set():
         hue = (hue + (dt * (0.165 * p))) % 1.0
 
-        color_map: Dict[Key, Color] = {}
+        color_map.clear()
         for k, position in pos.items():
             h = (hue + position) % 1.0
             color_map[k] = hsv_to_rgb(h, 1.0, 1.0)
@@ -164,10 +176,11 @@ def run_rainbow_swirl(engine: "EffectsEngine", *, render_fn=base_render) -> None
 
     max_r = max(1e-6, max_r)
     hue = 0.0
+    color_map = get_engine_color_map_buffer(engine, "_sw_rainbow_swirl_frame_map")
     while engine.running and not engine.stop_event.is_set():
         hue = (hue + (dt * (0.115 * p))) % 1.0
 
-        color_map: Dict[Key, Color] = {}
+        color_map.clear()
         for k, (ang, rad) in coords.items():
             h = (hue + ang + 0.25 * (rad / max_r)) % 1.0
             color_map[k] = hsv_to_rgb(h, 1.0, 1.0)
@@ -182,11 +195,12 @@ def run_spectrum_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> Non
     dt = frame_dt_s()
     p = pace(engine)
     hue = 0.0
+    color_map = get_engine_color_map_buffer(engine, "_sw_spectrum_cycle_frame_map")
 
     while engine.running and not engine.stop_event.is_set():
         hue = (hue + (dt * (0.22 * p))) % 1.0
         rgb = hsv_to_rgb(hue, 1.0, 1.0)
-        color_map = {(r, c): rgb for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+        fill_uniform_color_map(color_map, color=rgb)
         render_fn(engine, color_map=color_map)
         engine.stop_event.wait(dt)
 
@@ -197,13 +211,14 @@ def run_color_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     dt = frame_dt_s()
     p = pace(engine)
     phase = 0.0
+    color_map = get_engine_color_map_buffer(engine, "_sw_color_cycle_frame_map")
 
     while engine.running and not engine.stop_event.is_set():
         r = (math.sin(phase) + 1.0) / 2.0
         g = (math.sin(phase + (2.0 * math.pi / 3.0)) + 1.0) / 2.0
         b = (math.sin(phase + (4.0 * math.pi / 3.0)) + 1.0) / 2.0
         rgb = (int(round(r * 255)), int(round(g * 255)), int(round(b * 255)))
-        color_map = {(rr, cc): rgb for rr in range(NUM_ROWS) for cc in range(NUM_COLS)}
+        fill_uniform_color_map(color_map, color=rgb)
         render_fn(engine, color_map=color_map)
 
         phase += dt * (1.8 * p)

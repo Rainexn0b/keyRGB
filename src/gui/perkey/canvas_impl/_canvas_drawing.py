@@ -18,6 +18,7 @@ class _KeyboardCanvasDrawingMixin:
     def _load_deck_image(self) -> None:
         prof = getattr(self.editor, "profile_name", None)
         self._deck_img = load_reference_deck_image(profile_name=str(prof) if isinstance(prof, str) else None)
+        self._deck_render_cache.clear()
 
     def reload_backdrop_image(self) -> None:
         """Reload the backdrop image for the current profile and redraw."""
@@ -125,8 +126,6 @@ class _KeyboardCanvasDrawingMixin:
             image_size=self._deck_img.size,
         )
 
-        resized = self._deck_img.resize((dw, dh), Image.Resampling.LANCZOS)
-
         # Backdrop transparency is a user-facing percentage:
         # 0 = opaque, 100 = fully transparent.
         try:
@@ -137,18 +136,19 @@ class _KeyboardCanvasDrawingMixin:
             except Exception:
                 t = 0.0
         t = max(0.0, min(100.0, float(t)))
-        if t > 0.0:
-            alpha_mul = max(0.0, min(1.0, (100.0 - t) / 100.0))
-            try:
-                a = resized.getchannel("A")
-                a = a.point(lambda px: int(px * alpha_mul))
-                resized.putalpha(a)
-            except Exception:
-                # Best-effort: if alpha manipulation fails, keep original.
-                pass
-
-        self._deck_img_tk = ImageTk.PhotoImage(resized)
-        self.create_image(x0, y0, image=self._deck_img_tk, anchor="nw")
+        deck_image = self._deck_img if isinstance(self._deck_img, Image.Image) else None
+        try:
+            self._deck_img_tk = self._deck_render_cache.get_or_create(
+                deck_image=deck_image,
+                draw_size=(dw, dh),
+                transparency_pct=t,
+                photo_factory=ImageTk.PhotoImage,
+            )
+        except Exception:
+            self._deck_render_cache.clear()
+            self._deck_img_tk = None
+        if self._deck_img_tk is not None:
+            self.create_image(x0, y0, image=self._deck_img_tk, anchor="nw")
         self._deck_drawn_bbox = (x0, y0, dw, dh)
 
     def update_key_visual(self, key_id: str, color: tuple[int, int, int]) -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from threading import Thread
 from typing import Any, Final, Literal, Optional, Tuple, cast
 
@@ -44,9 +45,11 @@ class _EngineStart:
     brightness: int
     current_color: tuple
     current_effect: Optional[str]
-    per_key_colors: Any
+    per_key_colors: Mapping[Any, Any] | None
     reactive_color: Optional[tuple]
     reactive_use_manual_color: bool
+    _last_hw_mode_brightness: Optional[int]
+    _last_rendered_brightness: Optional[int]
     stop: Any
     _ensure_device_available: Any
 

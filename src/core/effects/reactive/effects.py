@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import random
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
@@ -16,7 +15,16 @@ from src.core.effects.reactive.utils import (
     _ripple_radius,
     _ripple_weight,
 )
-
+from ._base_maps import (
+    build_frame_base_maps,
+    get_engine_color_map_buffer,
+)
+from ._ripple_helpers import (
+    build_fade_overlay_into,
+    build_ripple_color_map_into,
+    build_ripple_overlay_into,
+    get_engine_overlay_buffer,
+)
 from .input import (
     load_active_profile_keymap,
     try_open_evdev_keyboards,
@@ -59,22 +67,6 @@ def _get_engine_reactive_color(engine: "EffectsEngine") -> Color:
     return (int(src[0]), int(src[1]), int(src[2]))
 
 
-def _build_frame_base_maps(
-    engine: "EffectsEngine", *, background_rgb: Color
-) -> tuple[bool, Dict[Key, Color], Dict[Key, Color]]:
-    per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
-    if per_key_backdrop_active:
-        base_unscaled = base_color_map(engine)
-        factor = backdrop_brightness_scale_factor(
-            engine, effect_brightness_hw=int(getattr(engine, "brightness", 25) or 0)
-        )
-        base = apply_backdrop_brightness_scale(base_unscaled, factor=factor)
-        return True, base_unscaled, base
-
-    base_unscaled = {(r, c): background_rgb for r in range(NUM_ROWS) for c in range(NUM_COLS)}
-    return False, base_unscaled, dict(base_unscaled)
-
-
 def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) -> None:
     """Update the live reactive pulse mix with a short tail decay.
 
@@ -99,6 +91,13 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
         engine._reactive_active_pulse_mix = float(next_mix)
     except Exception:
         pass
+
+
+def _render_uniform_fallback(engine: "EffectsEngine", *, rgb: Color) -> None:
+    color_map = get_engine_color_map_buffer(engine, "_reactive_uniform_fallback_map")
+    color_map.clear()
+    color_map[(0, 0)] = rgb
+    render(engine, color_map=color_map)
 
 
 def _reactive_fade_loop(engine: "EffectsEngine") -> None:
@@ -143,10 +142,8 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
 
         pulses = _age_pulses_in_place(pulses, dt=dt)
 
-        overlay: Dict[Key, float] = {}
-        for pulse in pulses:
-            intensity = 1.0 - (pulse.age_s / pulse.ttl_s)
-            overlay[(pulse.row, pulse.col)] = max(overlay.get((pulse.row, pulse.col), 0.0), intensity)
+        overlay = get_engine_overlay_buffer(engine, "_reactive_fade_overlay")
+        build_fade_overlay_into(overlay, pulses)
 
         try:
             target_mix = max((float(v) for v in overlay.values()), default=0.0)
@@ -154,8 +151,11 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
             target_mix = 0.0
         _set_reactive_active_pulse_mix(engine, target=target_mix)
 
-        per_key_backdrop_active, base_unscaled, base = _build_frame_base_maps(
-            engine, background_rgb=scale(react_color, 0.06)
+        per_key_backdrop_active, base_unscaled, base = build_frame_base_maps(
+            engine,
+            background_rgb=scale(react_color, 0.06),
+            effect_brightness_hw=int(getattr(engine, "brightness", 25) or 0),
+            backdrop_brightness_scale_factor_fn=backdrop_brightness_scale_factor,
         )
 
         # When reactive brightness is 0, treat reactive typing as disabled.
@@ -200,11 +200,12 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
                 pulse_rgb = scale(pulse_rgb, pulse_scale)
 
             rgb = mix(base_rgb, pulse_rgb, t=min(1.0, w_global))
-            render(engine, color_map={(0, 0): rgb})
+            _render_uniform_fallback(engine, rgb=rgb)
             engine.stop_event.wait(dt)
             continue
 
-        color_map: Dict[Key, Color] = {}
+        color_map = get_engine_color_map_buffer(engine, "_reactive_fade_frame_map")
+        color_map.clear()
         for k, base_rgb in base.items():
             base_rgb_unscaled = base_unscaled.get(k, base_rgb)
             w = overlay.get(k, 0.0)
@@ -236,69 +237,6 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
     dt = frame_dt_s()
     p = pace(engine)
 
-    def _build_overlay(pulses: List[_RainbowPulse], *, band: float) -> Dict[Key, Tuple[float, float]]:
-        overlay: Dict[Key, Tuple[float, float]] = {}
-        max_radius = float((NUM_ROWS - 1) + (NUM_COLS - 1))
-        for pulse in pulses:
-            intensity = 1.0 - (pulse.age_s / pulse.ttl_s)
-            radius_f = _ripple_radius(
-                age_s=pulse.age_s,
-                ttl_s=pulse.ttl_s,
-                min_radius=0.0,
-                max_radius=max_radius,
-            )
-            radius_i = int(math.ceil(radius_f + band))
-
-            for dr in range(-radius_i, radius_i + 1):
-                for dc in range(-radius_i, radius_i + 1):
-                    r = pulse.row + dr
-                    c = pulse.col + dc
-                    if r < 0 or r >= NUM_ROWS or c < 0 or c >= NUM_COLS:
-                        continue
-                    d = abs(dr) + abs(dc)
-                    if d > radius_i:
-                        continue
-
-                    w = _ripple_weight(d=d, radius=radius_f, intensity=intensity, band=band)
-                    if w <= 0.0:
-                        continue
-
-                    hue = (pulse.hue_offset + (float(d) * 18.0) + (pulse.age_s / pulse.ttl_s) * 360.0) % 360.0
-                    k = (r, c)
-                    if k not in overlay or w > overlay[k][0]:
-                        overlay[k] = (w, hue)
-
-        return overlay
-
-    def _build_color_map(
-        *,
-        base: Dict[Key, Color],
-        base_unscaled: Dict[Key, Color],
-        overlay: Dict[Key, Tuple[float, float]],
-        per_key_backdrop_active: bool,
-        manual: Color | None,
-        pulse_scale: float,
-    ) -> Dict[Key, Color]:
-        color_map: Dict[Key, Color] = {}
-        for k, base_rgb in base.items():
-            base_rgb_unscaled = base_unscaled.get(k, base_rgb)
-            if k in overlay:
-                w, hue = overlay[k]
-                if manual is not None:
-                    pulse_rgb = manual
-                else:
-                    pulse_rgb = hsv_to_rgb(hue / 360.0, 1.0, 1.0)
-                if per_key_backdrop_active and manual is None:
-                    pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb_unscaled, preferred_rgb=pulse_rgb)
-
-                if pulse_scale < 0.999:
-                    pulse_rgb = scale(pulse_rgb, pulse_scale)
-
-                color_map[k] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
-            else:
-                color_map[k] = base_rgb
-        return color_map
-
     # Base map is built per-frame so changes to per-key backdrop/brightness
     # are reflected immediately.
 
@@ -319,7 +257,12 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
         except Exception:
             eff_hw = 0
 
-        per_key_backdrop_active, base_unscaled, base = _build_frame_base_maps(engine, background_rgb=(5, 5, 5))
+        per_key_backdrop_active, base_unscaled, base = build_frame_base_maps(
+            engine,
+            background_rgb=(5, 5, 5),
+            effect_brightness_hw=int(getattr(engine, "brightness", 25) or 0),
+            backdrop_brightness_scale_factor_fn=backdrop_brightness_scale_factor,
+        )
 
         if eff_hw <= 0:
             _set_reactive_active_pulse_mix(engine, target=0.0)
@@ -346,7 +289,8 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
         pulses = _age_pulses_in_place(pulses, dt=dt)
 
         band = 2.15
-        overlay = _build_overlay(pulses, band=band)
+        overlay = get_engine_overlay_buffer(engine, "_reactive_ripple_overlay")
+        build_ripple_overlay_into(overlay, pulses, band=band)
 
         try:
             target_mix = max((float(w) for (w, _hue) in overlay.values()), default=0.0)
@@ -384,12 +328,14 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
                 pulse_rgb = scale(pulse_rgb, pulse_scale)
 
             rgb = mix(base_rgb, pulse_rgb, t=min(1.0, best_w))
-            render(engine, color_map={(0, 0): rgb})
+            _render_uniform_fallback(engine, rgb=rgb)
             global_hue = (global_hue + 2.0 * p) % 360.0
             engine.stop_event.wait(dt)
             continue
 
-        color_map = _build_color_map(
+        color_map = get_engine_color_map_buffer(engine, "_reactive_ripple_frame_map")
+        build_ripple_color_map_into(
+            color_map,
             base=base,
             base_unscaled=base_unscaled,
             overlay=overlay,

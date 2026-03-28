@@ -29,6 +29,7 @@ v*.tar.gz
 # Local tooling
 .cache/
 .claude/
+.github/agents
 
 # Virtual environments
 venv/

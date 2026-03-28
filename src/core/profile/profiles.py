@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from typing import Dict, Tuple
 
+from ._backdrop import load_backdrop_transparency, save_backdrop_transparency
 from .json_storage import read_json, write_json_atomic
 from .paths import (
     default_profile_path,
@@ -215,7 +216,7 @@ def _builtin_profile_brightness(name: str) -> int | None:
     if prof == "light":
         return 50
     if prof == "dim":
-        return 15
+        return 10
     return None
 
 
@@ -254,12 +255,12 @@ def migrate_builtin_profile_brightness(cfg) -> bool:
 
     should_migrate = False
     if prof == "dim":
-        # Legacy built-in dim used 5.  The current built-in dim baseline is 15,
-        # so repair both stale mismatches (25/5) and previously-persisted 5/5
-        # states when the built-in profile is active.
-        should_migrate = perkey == 5 or brightness == 5 or (perkey == 15 and brightness != 15)
+        # Legacy built-in dim used 5. Later builds used 15. The current built-in
+        # dim baseline is 10, so repair old persisted dim states when the
+        # built-in profile is active.
+        should_migrate = perkey in {5, 15} or brightness in {5, 15} or (perkey == 10 and brightness != 10)
     elif prof == "light":
-        should_migrate = brightness in {5, 15} and perkey in {5, 15}
+        should_migrate = brightness in {5, 10, 15} and perkey in {5, 10, 15}
 
     if not should_migrate:
         return False
@@ -326,38 +327,3 @@ def apply_profile_to_config(cfg, colors: Dict[Tuple[int, int], Tuple[int, int, i
         _set_profile_brightness(builtin_target)
     cfg.effect = "perkey"
     cfg.per_key_colors = colors
-
-
-def load_backdrop_transparency(name: str | None = None) -> int:
-    """Load backdrop transparency setting for a profile.
-
-    Stored as an integer percent where:
-    - 0   = fully opaque backdrop
-    - 100 = fully transparent backdrop
-    """
-
-    p = paths_for(name).backdrop_settings
-    raw = read_json(p)
-    if raw is None:
-        return 0
-
-    if isinstance(raw, dict):
-        v = raw.get("transparency", 0)
-    else:
-        v = 0
-
-    try:
-        out = int(v)
-    except Exception:
-        out = 0
-    return max(0, min(100, out))
-
-
-def save_backdrop_transparency(transparency: int, name: str | None = None) -> None:
-    p = paths_for(name).backdrop_settings
-    try:
-        t = int(transparency)
-    except Exception:
-        t = 0
-    t = max(0, min(100, t))
-    write_json_atomic(p, {"transparency": t})

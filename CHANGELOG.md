@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.18.1 (2026-03-28)
+
+- Reactive/Per-key: Restore reactive typing brightness control on per-key hardware by scaling pulse intensity from the reactive slider itself instead of saturating at the steady-state hardware brightness.
+- Profiles: Lower the built-in `dim` profile baseline from 15 to 10 and migrate stale built-in dim/light brightness states accordingly.
+- Tray/Icon: Make the `K` cutout follow the active per-key profile color for reactive effects when manual reactive color is disabled, and darken the outer logo squarcle to grey for better white-profile contrast.
+- Tray/Icon/Memory: Cache rendered solid tray icon images so steady-state icon refreshes can reuse the same PIL image when the visible color has not changed.
+- Tray/Icon/Memory: Avoid redundant per-key tray-icon map copies and skip unnecessary full-grid rebuilds when deciding whether per-key base state is actually non-uniform.
+- Tray/Icon/Memory: Cache rendered rainbow tray icon frames by phase and brightness scale so animated tray effects stop rebuilding equivalent gradient images across polling ticks.
+- Tray/Memory: Reuse the existing config per-key mapping when handing software-mode state to the effects engine, avoiding extra full-map clones during effect starts, restores, and similar tray-driven mode changes.
+- Tray/Memory: Reuse the configured per-key map on config-apply paths when it is already empty or full, allocating a new map only when sparse fills are actually required.
+- GUI/Memory: Reuse cached resized keyboard backdrops in the per-key editor and calibrator so routine canvas redraws stop reallocating a full deck image every time.
+- GUI/Memory: Share cached profile backdrop source images across overlay-based windows so the per-key editor and calibrator stop decoding separate in-memory copies of the same deck file.
+- GUI/Memory: Cache the resized window-icon source image so opening multiple Tk windows in one session stops decoding and resizing the same logo repeatedly.
+- Reactive/Memory: Reuse the reactive renderer's backdrop base-map buffers so per-key reactive loops stop allocating fresh backdrop dicts every frame.
+- Software/Memory: Reuse frame-map buffers in common software-effect loops so breathing, strobe, chase fallback, and uniform color-cycle effects stop rebuilding full keyboard dicts every tick.
+- Reactive/Memory: Age pulse lists and reuse fade/ripple overlay and frame-map buffers in place so reactive loops stop rebuilding short-lived collections every frame.
+- Buildpython: Add a runtime copy-hotspot scanner to the code-hygiene step so tray/effects regressions that reintroduce avoidable hot-path clones are surfaced during local quality runs.
+
 ## 0.18.0 (2026-03-28)
 
 - Power/Reactive: Fix full-brightness flash on wake from screen-dim-off: reset the reactive render's per-frame brightness guard on `stop()` so the render loop ramps from dark instead of jumping to the last pre-stop brightness on the first frame.

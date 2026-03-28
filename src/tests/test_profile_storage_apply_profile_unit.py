@@ -54,9 +54,9 @@ class TestApplyProfileToConfig:
 
         apply_profile_to_config(cfg, {})
 
-        assert cfg.effect_brightness == 15
-        assert cfg.brightness == 15
-        assert cfg.perkey_brightness == 15
+        assert cfg.effect_brightness == 10
+        assert cfg.brightness == 10
+        assert cfg.perkey_brightness == 10
         assert cfg.effect == "perkey"
 
     def test_apply_light_profile_restores_built_in_baseline_brightness(self, monkeypatch):
@@ -88,15 +88,15 @@ class TestApplyProfileToConfig:
         cfg = Config()
         cfg.effect = "perkey"
         cfg.effect_brightness = 25
-        cfg.brightness = 5
-        cfg.perkey_brightness = 5
+        cfg.brightness = 15
+        cfg.perkey_brightness = 15
 
         changed = migrate_builtin_profile_brightness(cfg)
 
         assert changed is True
-        assert cfg.effect_brightness == 15
-        assert cfg.brightness == 15
-        assert cfg.perkey_brightness == 15
+        assert cfg.effect_brightness == 10
+        assert cfg.brightness == 10
+        assert cfg.perkey_brightness == 10
 
     def test_migrate_builtin_light_profile_repairs_stale_dim_level(self, monkeypatch):
         from src.core.config import Config
@@ -106,9 +106,9 @@ class TestApplyProfileToConfig:
 
         cfg = Config()
         cfg.effect = "perkey"
-        cfg.effect_brightness = 15
-        cfg.brightness = 15
-        cfg.perkey_brightness = 15
+        cfg.effect_brightness = 10
+        cfg.brightness = 10
+        cfg.perkey_brightness = 10
 
         changed = migrate_builtin_profile_brightness(cfg)
 

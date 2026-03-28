@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+from src.core.effects.reactive._ripple_helpers import (
+    build_fade_overlay_into,
+    build_ripple_color_map_into,
+    build_ripple_overlay_into,
+)
+from src.core.effects.reactive.utils import _Pulse, _RainbowPulse, _age_pulses_in_place
+
+
+def test_age_pulses_in_place_reuses_list_and_drops_expired() -> None:
+    pulses = [
+        _Pulse(row=0, col=0, age_s=0.1, ttl_s=0.5),
+        _Pulse(row=1, col=1, age_s=0.4, ttl_s=0.5),
+    ]
+
+    result = _age_pulses_in_place(pulses, dt=0.15)
+
+    assert result is pulses
+    assert len(pulses) == 1
+    assert pulses[0].row == 0
+    assert pulses[0].col == 0
+
+
+def test_build_fade_overlay_into_reuses_dest() -> None:
+    dest = {(9, 9): 0.5}
+    pulses = [
+        _Pulse(row=0, col=0, age_s=0.1, ttl_s=0.5),
+        _Pulse(row=0, col=0, age_s=0.2, ttl_s=0.5),
+        _Pulse(row=1, col=1, age_s=0.3, ttl_s=0.5),
+    ]
+
+    result = build_fade_overlay_into(dest, pulses)
+
+    assert result is dest
+    assert (9, 9) not in dest
+    assert dest[(0, 0)] > dest[(1, 1)]
+
+
+def test_build_ripple_overlay_into_reuses_dest() -> None:
+    dest = {(8, 8): (0.1, 90.0)}
+    pulses = [_RainbowPulse(row=1, col=1, age_s=0.1, ttl_s=0.8, hue_offset=45.0)]
+
+    result = build_ripple_overlay_into(dest, pulses, band=2.15)
+
+    assert result is dest
+    assert (8, 8) not in dest
+    assert dest
+
+
+def test_build_ripple_color_map_into_reuses_dest() -> None:
+    dest = {(9, 9): (1, 1, 1)}
+    base = {(0, 0): (10, 20, 30), (0, 1): (40, 50, 60)}
+    base_unscaled = dict(base)
+    overlay = {(0, 0): (1.0, 180.0)}
+
+    result = build_ripple_color_map_into(
+        dest,
+        base=base,
+        base_unscaled=base_unscaled,
+        overlay=overlay,
+        per_key_backdrop_active=False,
+        manual=None,
+        pulse_scale=1.0,
+    )
+
+    assert result is dest
+    assert (9, 9) not in dest
+    assert dest[(0, 1)] == (40, 50, 60)

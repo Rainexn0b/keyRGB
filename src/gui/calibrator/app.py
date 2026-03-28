@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Dict, Optional, Tuple
 
 import tkinter as tk
-from tkinter import font as tkfont
 from tkinter import ttk
 from tkinter import filedialog
 
@@ -12,6 +11,7 @@ from PIL import Image, ImageTk
 
 from src.core.config import Config
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
+from .helpers.canvas_render import redraw_calibration_canvas
 from .helpers.geometry import hit_test, key_canvas_bbox
 from .helpers.probe import CalibrationProbeState
 from src.gui.utils.profile_backdrop_storage import (
@@ -19,6 +19,7 @@ from src.gui.utils.profile_backdrop_storage import (
     reset_backdrop_image,
     save_backdrop_image,
 )
+from src.gui.utils.deck_render_cache import DeckRenderCache
 from .helpers.keyboard_preview import KeyboardPreviewSession
 from .helpers.profile_storage import (
     get_active_profile_name,
@@ -31,11 +32,8 @@ from .helpers.profile_storage import (
 
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_theme
-from src.gui.utils.key_draw_style import key_draw_style
 from src.gui.reference.overlay_geometry import (
     CanvasTransform,
-    calc_centered_drawn_bbox,
-    transform_from_drawn_bbox,
 )
 
 
@@ -80,6 +78,7 @@ class KeymapCalibrator(tk.Tk):
 
         self._deck_pil: Optional[Image.Image] = None
         self._deck_tk: Optional[ImageTk.PhotoImage] = None
+        self._deck_render_cache: DeckRenderCache[ImageTk.PhotoImage] = DeckRenderCache()
         self._transform: Optional[CanvasTransform] = None
 
         self.columnconfigure(0, weight=1)
@@ -220,6 +219,7 @@ class KeymapCalibrator(tk.Tk):
     def _load_deck_image(self) -> None:
         # Prefer per-profile custom backdrop; fall back to default asset.
         self._deck_pil = load_backdrop_image(self.profile_name)
+        self._deck_render_cache.clear()
 
     def _apply_current_probe(self) -> None:
         r, c = self.probe.current_cell
@@ -261,76 +261,15 @@ class KeymapCalibrator(tk.Tk):
         self.destroy()
 
     def _redraw(self) -> None:
-        self.canvas.delete("all")
-
-        cw = max(1, int(self.canvas.winfo_width()))
-        ch = max(1, int(self.canvas.winfo_height()))
-        x0, y0, dw, dh, _scale = calc_centered_drawn_bbox(canvas_w=cw, canvas_h=ch, image_size=BASE_IMAGE_SIZE)
-        self._transform = transform_from_drawn_bbox(x0=x0, y0=y0, draw_w=dw, draw_h=dh, image_size=BASE_IMAGE_SIZE)
-
-        if self._deck_pil is not None:
-            resized = self._deck_pil.resize((dw, dh), Image.Resampling.LANCZOS)
-            self._deck_tk = ImageTk.PhotoImage(resized)
-            self.canvas.create_image(x0, y0, anchor="nw", image=self._deck_tk)
-
-        # Draw key rectangles (similar styling to the per-key editor)
-        font_name = "TkDefaultFont"
-        for key in REFERENCE_DEVICE_KEYS:
-            x1, y1, x2, y2 = key_canvas_bbox(
-                transform=self._transform,
-                key=key,
-                layout_tweaks=self.layout_tweaks,
-                per_key_layout_tweaks=self.per_key_layout_tweaks,
-                image_size=BASE_IMAGE_SIZE,
-            )
-            mapped = self.keymap.get(key.key_id)
-            selected = self.probe.selected_key_id == key.key_id
-
-            style = key_draw_style(mapped=mapped is not None, selected=selected)
-
-            self.canvas.create_rectangle(
-                x1,
-                y1,
-                x2,
-                y2,
-                outline=style.outline,
-                width=style.width,
-                fill=style.fill,
-                stipple=style.stipple,
-                dash=style.dash,
-                tags=(f"pkey_{key.key_id}", "pkey"),
-            )
-
-            key_w = max(1, int(x2 - x1))
-            key_h = max(1, int(y2 - y1))
-            font_size = max(7, min(11, int(min(key_w, key_h) * 0.30)))
-            max_text_w = max(1, key_w - 6)
-
-            label = key.label
-            try:
-                f = tkfont.Font(font=(font_name, font_size))
-                while font_size > 6 and f.measure(label) > max_text_w:
-                    font_size -= 1
-                    f.configure(size=font_size)
-                if f.measure(label) > max_text_w:
-                    ell = "…"
-                    if f.measure(ell) <= max_text_w:
-                        trimmed = label
-                        while trimmed and f.measure(trimmed + ell) > max_text_w:
-                            trimmed = trimmed[:-1]
-                        label = (trimmed + ell) if trimmed else ell
-            except Exception:
-                # Best-effort: if font measuring fails, render original label.
-                pass
-
-            self.canvas.create_text(
-                (x1 + x2) / 2,
-                (y1 + y2) / 2,
-                text=label,
-                fill=style.text_fill,
-                font=(font_name, font_size),
-                tags=(f"pkey_{key.key_id}", "pkey"),
-            )
+        self._transform, self._deck_tk = redraw_calibration_canvas(
+            canvas=self.canvas,
+            deck_pil=self._deck_pil,
+            deck_render_cache=self._deck_render_cache,
+            layout_tweaks=self.layout_tweaks,
+            per_key_layout_tweaks=self.per_key_layout_tweaks,
+            keymap=self.keymap,
+            selected_key_id=self.probe.selected_key_id,
+        )
 
     def _on_click(self, e: tk.Event) -> None:
         if self._transform is None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Any
 
 from src.core.utils.exceptions import is_permission_denied
@@ -13,10 +14,10 @@ from .hidraw import find_matching_hidraw_device, open_matching_hidraw_transport
 from . import protocol
 
 
-def _effect_builder(effect_name: str):
+def _effect_builder(effect_name: str) -> Callable[..., dict[str, Any]]:
     args = {"speed": None, "brightness": None}
 
-    def build(**kwargs):
+    def build(**kwargs: Any) -> dict[str, Any]:
         _ = args
         for key in kwargs:
             if key not in args:

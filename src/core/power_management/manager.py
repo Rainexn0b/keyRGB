@@ -6,6 +6,11 @@ import logging
 import threading
 import time
 
+from ._manager_helpers import (
+    apply_power_source_actions,
+    build_power_source_loop_inputs,
+    is_intentionally_off,
+)
 from ..monitoring.acpi_monitoring import monitor_acpi_events
 from ..monitoring.lid_monitoring import start_sysfs_lid_monitoring
 from ..monitoring.login1_monitoring import monitor_prepare_for_sleep
@@ -17,11 +22,7 @@ from ..power_policies.power_event_policy import (
     TurnOffKeyboard as TurnOffFromEvent,
 )
 from ..power_policies.power_source_loop_policy import (
-    ApplyBrightness,
-    PowerSourceLoopInputs,
     PowerSourceLoopPolicy,
-    RestoreKeyboard,
-    TurnOffKeyboard,
 )
 from src.core.config import Config
 from src.core.profile.paths import get_active_profile
@@ -106,78 +107,29 @@ class PowerManager:
                     time.sleep(poll_interval_s)
                     continue
 
-                now_mono = time.monotonic()
-
-                # Update config every tick so toggling works without restart.
-                self._config.reload()
-
-                # Treat all power-source behavior as part of "power management".
-                if not bool(getattr(self._config, "power_management_enabled", True)):
+                loop_inputs = build_power_source_loop_inputs(
+                    self._config,
+                    self.kb_controller,
+                    on_ac=bool(on_ac),
+                    now_mono=float(time.monotonic()),
+                    get_active_profile_fn=get_active_profile,
+                    safe_int_attr_fn=safe_int_attr,
+                )
+                if loop_inputs is None:
                     time.sleep(poll_interval_s)
                     continue
 
-                # Determine current brightness and whether user explicitly turned off.
-                current_brightness = safe_int_attr(self._config, "brightness", default=0)
-
-                is_off = bool(getattr(self.kb_controller, "is_off", False))
-
-                # Per power-source desired state.
-                ac_enabled = bool(getattr(self._config, "ac_lighting_enabled", True))
-                batt_enabled = bool(getattr(self._config, "battery_lighting_enabled", True))
-
-                ac_brightness_override = getattr(self._config, "ac_lighting_brightness", None)
-                batt_brightness_override = getattr(self._config, "battery_lighting_brightness", None)
-
-                # Built-in low-light profiles should not be affected by AC/battery overrides.
-                # These profiles are intended to be stable and intentionally dim.
-                try:
-                    active_profile = get_active_profile()
-                except Exception:
-                    active_profile = ""
-                if active_profile in {"dim", "dark"}:
-                    ac_enabled = True
-                    batt_enabled = True
-                    ac_brightness_override = None
-                    batt_brightness_override = None
-
-                enabled = bool(getattr(self._config, "battery_saver_enabled", False))
-                target = safe_int_attr(self._config, "battery_saver_brightness", default=25)
-
-                result = policy.update(
-                    PowerSourceLoopInputs(
-                        on_ac=bool(on_ac),
-                        now=float(now_mono),
-                        power_management_enabled=bool(getattr(self._config, "power_management_enabled", True)),
-                        current_brightness=int(current_brightness),
-                        is_off=bool(is_off),
-                        ac_enabled=bool(ac_enabled),
-                        battery_enabled=bool(batt_enabled),
-                        ac_brightness_override=ac_brightness_override,
-                        battery_brightness_override=batt_brightness_override,
-                        battery_saver_enabled=bool(enabled),
-                        battery_saver_brightness=int(target),
-                    )
-                )
+                result = policy.update(loop_inputs)
 
                 if result.skip:
                     time.sleep(poll_interval_s)
                     continue
 
-                for action in result.actions:
-                    if isinstance(action, TurnOffKeyboard):
-                        try:
-                            if hasattr(self.kb_controller, "turn_off"):
-                                self.kb_controller.turn_off()
-                        except Exception:
-                            pass
-                    elif isinstance(action, RestoreKeyboard):
-                        try:
-                            if hasattr(self.kb_controller, "restore"):
-                                self.kb_controller.restore()
-                        except Exception:
-                            pass
-                    elif isinstance(action, ApplyBrightness):
-                        self._apply_brightness_policy(int(action.brightness))
+                apply_power_source_actions(
+                    kb_controller=self.kb_controller,
+                    actions=getattr(result, "actions", []) or [],
+                    apply_brightness=self._apply_brightness_policy,
+                )
 
             except Exception as exc:
                 logger.exception("Battery saver monitoring error: %s", exc)
@@ -260,38 +212,6 @@ class PowerManager:
         if not enabled:
             return
 
-        def _is_intentionally_off() -> bool:
-            """Return whether lighting is *intentionally* off.
-
-            The tray's `is_off` can be transiently true due to idle/screen-off
-            policies. For suspend/resume restore decisions we want to reflect
-            user intent (explicit off toggle or configured brightness=0).
-            """
-
-            # Prefer explicit user intent flags if present on the controller.
-            try:
-                if getattr(self.kb_controller, "user_forced_off", False) is True:
-                    return True
-            except Exception:
-                pass
-
-            try:
-                if getattr(self.kb_controller, "_user_forced_off", False) is True:
-                    return True
-            except Exception:
-                pass
-
-            # If the user explicitly configured brightness=0, treat it as off.
-            try:
-                if safe_int_attr(self._config, "brightness", default=0) == 0:
-                    return True
-            except Exception:
-                pass
-
-            # Do not fall back to the controller's `is_off`.
-            # That state can be transiently true due to idle/screen-off policies.
-            return False
-
         # Always feed events into the policy so it can record pre-event state
         # even when actions are disabled via configuration.
         try:
@@ -299,7 +219,11 @@ class PowerManager:
                 PowerEventInputs(
                     enabled=bool(enabled),
                     action_enabled=bool(action_enabled),
-                    is_off=_is_intentionally_off(),
+                    is_off=is_intentionally_off(
+                        kb_controller=self.kb_controller,
+                        config=self._config,
+                        safe_int_attr_fn=safe_int_attr,
+                    ),
                 )
             )
         except Exception:

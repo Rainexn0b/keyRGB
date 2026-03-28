@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -8,7 +9,7 @@ from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import build_full_color_grid
 
 from src.tray.ui.icon_draw import create_icon, create_icon_mosaic, create_icon_rainbow
-from src.tray.ui.icon_color import representative_color
+from src.tray.ui.icon_color import _per_key_color_mapping, representative_color
 
 
 @dataclass(frozen=True)
@@ -31,39 +32,39 @@ def _icon_scale_from_brightness(brightness: int) -> float:
     return max(0.25, min(1.0, icon_brightness / 50.0))
 
 
+def _normalized_rgb_or_none(value: object) -> tuple[int, int, int] | None:
+    try:
+        if not isinstance(value, (tuple, list)) or len(value) != 3:
+            return None
+        return (int(value[0]), int(value[1]), int(value[2]))
+    except Exception:
+        return None
+
+
+def _has_non_uniform_perkey_base(
+    *,
+    base_color: tuple[int, int, int],
+    per_key_colors: Mapping[tuple[int, int], tuple[int, int, int]],
+) -> bool:
+    for color in per_key_colors.values():
+        normalized = _normalized_rgb_or_none(color)
+        if normalized is None or normalized != base_color:
+            return True
+    return False
+
+
 def _is_non_uniform_effect(config: Any) -> bool:
     effect = str(getattr(config, "effect", "none") or "none")
 
     if effect == "perkey":
-        try:
-            per_key = dict(getattr(config, "per_key_colors", {}) or {})
-        except Exception:
-            per_key = {}
-
+        per_key = _per_key_color_mapping(config)
         if not per_key:
             return False
 
-        base_color = getattr(config, "color", (255, 0, 128)) or (255, 0, 128)
-        try:
-            full = build_full_color_grid(
-                base_color=tuple(base_color),
-                per_key_colors=per_key,
-                num_rows=NUM_ROWS,
-                num_cols=NUM_COLS,
-            )
-            # Detect true non-uniformity from the *final* grid.
-            it = iter(full.values())
-            first = next(it)
-            for v in it:
-                if v != first:
-                    return True
-            return False
-        except Exception:
-            # Fall back: treat multiple override values as non-uniform.
-            try:
-                return len({tuple(v) for v in per_key.values()}) >= 2
-            except Exception:
-                return True
+        base_color = _normalized_rgb_or_none(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
+        if base_color is None:
+            return True
+        return _has_non_uniform_perkey_base(base_color=base_color, per_key_colors=per_key)
 
     # Known multi-color / non-uniform effects.
     if effect in {
@@ -94,18 +95,16 @@ def _build_perkey_mosaic_visual(*, config: Any, brightness: int) -> IconVisual |
     Returns ``None`` if there is no usable non-uniform per-key base map.
     """
 
-    try:
-        per_key = dict(getattr(config, "per_key_colors", {}) or {})
-    except Exception:
-        per_key = {}
-
+    per_key = _per_key_color_mapping(config)
     if not per_key:
         return None
 
     try:
-        base_color = getattr(config, "color", (255, 0, 128)) or (255, 0, 128)
+        base_color = _normalized_rgb_or_none(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
+        if base_color is None:
+            return None
         full = build_full_color_grid(
-            base_color=tuple(base_color),
+            base_color=base_color,
             per_key_colors=per_key,
             num_rows=NUM_ROWS,
             num_cols=NUM_COLS,

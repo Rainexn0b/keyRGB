@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
-"""Reactive Typing Color GUI.
+"""Reactive Typing color picker GUI.
 
 Allows selecting a manual highlight color used by reactive typing effects
-(`reactive_fade`, `reactive_ripple`) without stopping the currently running
-effect.
-
-The tray process (when running) will pick up changes from config polling.
+without stopping the currently running effect. The tray process picks up
+changes from config polling.
 """
 
 from __future__ import annotations
@@ -179,9 +176,7 @@ class ReactiveColorGUI:
         except Exception:
             pass
 
-        # Initialize the brightness slider from the persisted reactive brightness
-        # when manual mode is disabled. Otherwise (manual mode enabled), the
-        # slider reflects the manual color brightness.
+        # When manual mode is disabled, mirror the persisted reactive brightness.
         try:
             if not bool(self._use_manual_var.get()):
                 hw = int(getattr(self.config, "reactive_brightness", getattr(self.config, "brightness", 0)) or 0)

@@ -6,8 +6,16 @@ import time
 from typing import Optional
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
-from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
+from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.protocols import IdlePowerTrayProtocol
+
+from ._idle_power_actions import apply_idle_action as _apply_idle_action_impl
+from ._idle_power_actions import restore_from_idle as _restore_from_idle_impl
+from ._idle_power_logind import read_logind_idle_seconds as _read_logind_idle_seconds_impl
+from ._idle_power_runtime import IdlePollLoopState, run_idle_power_iteration
+from ._idle_power_utils import build_idle_action_key as _build_idle_action_key_impl
+from ._idle_power_utils import debounce_dim_and_screen_off as _debounce_dim_and_screen_off_impl
+from ._idle_power_utils import should_log_idle_action as _should_log_idle_action_impl
 from .idle_power_policy import IdleAction, compute_idle_action
 from .idle_power_sensors import (
     get_session_id as _get_session_id_impl,
@@ -15,17 +23,6 @@ from .idle_power_sensors import (
     read_screen_off_state_drm as _read_screen_off_state_drm_impl,
     run as _run_impl,
 )
-
-from ._idle_power_actions import apply_idle_action as _apply_idle_action_impl
-from ._idle_power_actions import restore_from_idle as _restore_from_idle_impl
-from ._idle_power_logind import (
-    read_logind_idle_seconds as _read_logind_idle_seconds_impl,
-)
-from ._idle_power_utils import build_idle_action_key as _build_idle_action_key_impl
-from ._idle_power_utils import (
-    debounce_dim_and_screen_off as _debounce_dim_and_screen_off_impl,
-)
-from ._idle_power_utils import should_log_idle_action as _should_log_idle_action_impl
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
@@ -248,149 +245,35 @@ def start_idle_power_polling(
     _ensure_idle_state(tray)
 
     def poll_idle_power() -> None:
-        last_error_at = 0.0
-
-        last_action_key: Optional[str] = None
-
-        # Debounce dim/off signals to avoid rare transient false positives from
-        # sysfs/DRM reads (which can briefly report 0/Off during modesets).
-        dimmed_true_streak = 0
-        dimmed_false_streak = 0
-        screen_off_true_streak = 0
-        # Asymmetric debounce: dim quickly, restore more slowly.
-        #
-        # Rationale: some systems report backlight brightness that can wobble
-        # around the “dimmed” threshold while idle, which can cause repeated
-        # dim↔restore brightness writes (visible as intermittent flicker on
-        # USB-controlled devices).
-        # NOTE: On some systems (notably KDE on certain AMD/NVIDIA setups),
-        # backlight/DRM state can briefly jitter during normal operation,
-        # which can cause visible keyboard "flashes" if we react too quickly.
-        # These values trade a small delay for much better stability.
-        debounce_polls_dimmed_true = 3
-        debounce_polls_dimmed_false = 6
-        debounce_polls_screen_off_true = 4
-
+        loop_state = IdlePollLoopState()
         session_id = _get_session_id()
 
         while True:
             try:
-                _ensure_idle_state(tray)
-
-                # Always reload config here as well (best-effort). While the tray
-                # has a dedicated config polling thread, reloading in this loop
-                # ensures settings changes (especially screen-dim sync mode) take
-                # effect even if the config polling thread is delayed or not
-                # running for some reason.
-                try:
-                    tray.config.reload()
-                except Exception:
-                    pass
-
-                dimmed = _read_dimmed_state(tray)
-                # Screen-off can be inferred from backlight reaching 0, or from
-                # DRM DPMS state when the desktop powers the display down.
-                screen_off_backlight = bool(getattr(tray, "_dim_screen_off", False))
-                screen_off_drm = _read_screen_off_state_drm()
-                screen_off = bool(screen_off_backlight) or bool(screen_off_drm)
-
-                (
-                    dimmed,
-                    screen_off,
-                    dimmed_true_streak,
-                    dimmed_false_streak,
-                    screen_off_true_streak,
-                ) = _debounce_dim_and_screen_off(
-                    dimmed_raw=dimmed,
-                    screen_off_raw=bool(screen_off),
-                    dimmed_true_streak=dimmed_true_streak,
-                    dimmed_false_streak=dimmed_false_streak,
-                    screen_off_true_streak=screen_off_true_streak,
-                    debounce_polls_dimmed_true=debounce_polls_dimmed_true,
-                    debounce_polls_dimmed_false=debounce_polls_dimmed_false,
-                    debounce_polls_screen_off_true=debounce_polls_screen_off_true,
-                )
-
-                # Coarse fallback when we can't infer dim state from backlight.
-                if dimmed is None and session_id:
-                    idle_s = _read_logind_idle_seconds(session_id=session_id)
-                    dimmed = None if idle_s is None else (float(idle_s) >= float(idle_timeout_s))
-
-                power_mgmt_enabled = safe_bool_attr(tray.config, "power_management_enabled", default=True)
-                brightness = safe_int_attr(tray.config, "brightness", default=0)
-
-                dim_sync_enabled_requested = safe_bool_attr(tray.config, "screen_dim_sync_enabled", default=True)
-                dim_sync_enabled = _effective_screen_dim_sync_enabled(tray, bool(dim_sync_enabled_requested))
-                dim_sync_mode = safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off"
-                dim_temp_brightness = safe_int_attr(tray.config, "screen_dim_temp_brightness", default=5)
-
-                if dim_temp_brightness < 1:
-                    dim_temp_brightness = 1
-                if dim_temp_brightness > 50:
-                    dim_temp_brightness = 50
-
-                action = _compute_idle_action(
-                    dimmed=dimmed,
-                    screen_off=bool(screen_off),
+                run_idle_power_iteration(
+                    tray,
+                    loop_state=loop_state,
                     idle_timeout_s=float(idle_timeout_s),
-                    is_off=bool(getattr(tray, "is_off", False)),
-                    idle_forced_off=bool(getattr(tray, "_idle_forced_off", False)),
-                    dim_temp_active=bool(getattr(tray, "_dim_temp_active", False)),
-                    power_management_enabled=bool(power_mgmt_enabled),
-                    screen_dim_sync_enabled=bool(dim_sync_enabled),
-                    screen_dim_sync_mode=str(dim_sync_mode),
-                    screen_dim_temp_brightness=int(dim_temp_brightness),
-                    brightness=int(brightness),
-                    user_forced_off=bool(getattr(tray, "_user_forced_off", False)),
-                    power_forced_off=bool(getattr(tray, "_power_forced_off", False)),
-                    last_resume_at=float(getattr(tray, "_last_resume_at", 0.0)),
-                    now=time.monotonic(),
+                    session_id=session_id,
+                    now_monotonic_fn=time.monotonic,
+                    ensure_idle_state_fn=_ensure_idle_state,
+                    read_dimmed_state_fn=_read_dimmed_state,
+                    read_screen_off_state_drm_fn=_read_screen_off_state_drm,
+                    debounce_dim_and_screen_off_fn=_debounce_dim_and_screen_off,
+                    read_logind_idle_seconds_fn=_read_logind_idle_seconds,
+                    effective_screen_dim_sync_enabled_fn=_effective_screen_dim_sync_enabled,
+                    compute_idle_action_fn=_compute_idle_action,
+                    build_idle_action_key_fn=_build_idle_action_key,
+                    should_log_idle_action_fn=_should_log_idle_action,
+                    apply_idle_action_fn=_apply_idle_action,
                 )
-
-                action_key = _build_idle_action_key_impl(
-                    action=action,
-                    dimmed=dimmed,
-                    screen_off=bool(screen_off),
-                    brightness=int(brightness),
-                    dim_sync_mode=str(dim_sync_mode),
-                    dim_temp_brightness=int(dim_temp_brightness),
-                )
-
-                if _should_log_idle_action_impl(
-                    action=action,
-                    action_key=action_key,
-                    last_action_key=last_action_key,
-                ):
-                    last_action_key = action_key
-                    log_event = getattr(tray, "_log_event", None)
-                    if callable(log_event):
-                        try:
-                            log_event(
-                                "idle_power",
-                                str(action),
-                                dimmed=dimmed,
-                                screen_off=bool(screen_off),
-                                config_brightness=int(brightness),
-                                dim_sync_enabled=bool(dim_sync_enabled),
-                                dim_sync_mode=str(dim_sync_mode),
-                                dim_temp_brightness=int(dim_temp_brightness),
-                                is_off=bool(getattr(tray, "is_off", False)),
-                                user_forced_off=bool(getattr(tray, "_user_forced_off", False)),
-                                power_forced_off=bool(getattr(tray, "_power_forced_off", False)),
-                                idle_forced_off=bool(getattr(tray, "_idle_forced_off", False)),
-                                dim_temp_active=bool(getattr(tray, "_dim_temp_active", False)),
-                            )
-                        except Exception:
-                            pass
-
-                _apply_idle_action(tray, action=action, dim_temp_brightness=int(dim_temp_brightness))
 
                 time.sleep(0.5)
 
             except Exception as exc:
                 now = time.monotonic()
-                if now - last_error_at > 30.0:
-                    last_error_at = now
+                if now - loop_state.last_error_at > 30.0:
+                    loop_state.last_error_at = now
                     try:
                         tray._log_exception("Idle power polling error: %s", exc)
                     except Exception:

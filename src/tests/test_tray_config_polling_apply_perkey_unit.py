@@ -108,3 +108,41 @@ def test_config_polling_apply_perkey_does_not_fill_when_map_empty() -> None:
 
     (colors_arg,), _ = tray.engine.kb.set_key_colors.call_args
     assert colors_arg == {}
+    assert colors_arg is tray.config.per_key_colors
+
+
+def test_config_polling_apply_perkey_reuses_full_map_without_clone() -> None:
+    full_map = {
+        (0, 0): (1, 1, 1),
+        (0, 1): (2, 2, 2),
+        (0, 2): (3, 3, 3),
+        (1, 0): (4, 4, 4),
+        (1, 1): (5, 5, 5),
+        (1, 2): (6, 6, 6),
+    }
+    tray = _mk_tray_for_perkey(brightness=50, base_color=(9, 8, 7), per_key_colors=full_map)
+
+    last_applied = ConfigApplyState(
+        effect="perkey",
+        speed=4,
+        brightness=25,
+        color=(9, 8, 7),
+        perkey_sig=None,
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+    )
+
+    _apply_from_config_once(
+        tray,
+        ite_num_rows=2,
+        ite_num_cols=3,
+        cause="mtime_change",
+        last_applied=last_applied,
+        last_apply_warn_at=0.0,
+    )
+
+    (colors_arg,), kwargs = tray.engine.kb.set_key_colors.call_args
+    assert kwargs["brightness"] == 50
+    assert kwargs["enable_user_mode"] is True
+    assert colors_arg == full_map
+    assert colors_arg is tray.config.per_key_colors

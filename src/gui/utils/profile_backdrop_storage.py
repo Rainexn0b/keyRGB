@@ -7,24 +7,13 @@ from PIL import Image
 
 from src.core.profile import profiles
 from src.core.resources.layout import BASE_IMAGE_SIZE
-
-
-def _default_backdrop_candidates(profile_name: str) -> list[Path]:
-    repo_root = Path(__file__).resolve().parents[3]
-    return [
-        profiles.paths_for(profile_name).backdrop_image,
-        # Repo/AppImage fallback: locate bundled assets regardless of cwd.
-        repo_root / "assets" / "y15-pro-deck.png",
-    ]
+from src.gui.utils.backdrop_image_cache import backdrop_image_candidates, load_cached_backdrop_image
 
 
 def load_backdrop_image(profile_name: str) -> Optional[Image.Image]:
     """Load backdrop image (RGBA) for a profile, or return None."""
 
-    for path in _default_backdrop_candidates(profile_name):
-        if path.exists():
-            return Image.open(path).convert("RGBA")
-    return None
+    return load_cached_backdrop_image(candidates=backdrop_image_candidates(profile_name=profile_name))
 
 
 def save_backdrop_image(*, profile_name: str, source_path: str | Path) -> None:

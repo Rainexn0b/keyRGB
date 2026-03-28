@@ -78,9 +78,9 @@ def _load_tray_logo_alpha_64() -> Image.Image | None:
 
 
 def _outline_color_for_theme() -> tuple[int, int, int]:
-    # Default stays as a light outline (optimized for dark trays), matching the
-    # historical default of dark mode when detection is unknown.
-    base = (235, 235, 235)
+    # Use a light grey outline instead of near-white so the logo remains legible
+    # when the active keyboard/profile color is also white.
+    base = (176, 176, 176)
     try:
         prefers_dark = detect_system_prefers_dark()
     except Exception:
@@ -165,10 +165,11 @@ def _tray_logo_masks() -> tuple[Image.Image, Image.Image] | None:
     return (silhouette, cutout)
 
 
-def create_icon(color: tuple[int, int, int]) -> Image.Image:
-    """Create tray icon image."""
-
-    logo = _tray_logo_outline(_outline_color_for_theme())
+@lru_cache(maxsize=64)
+def _create_cached_solid_icon(
+    color: tuple[int, int, int], outline_color: tuple[int, int, int]
+) -> Image.Image:
+    logo = _tray_logo_outline(outline_color)
     masks = _tray_logo_masks()
     if logo is not None and masks is not None:
         _silhouette_mask, cutout_mask = masks
@@ -199,6 +200,20 @@ def create_icon(color: tuple[int, int, int]) -> Image.Image:
             )
 
     return img
+
+
+def clear_cached_solid_icons() -> None:
+    _create_cached_solid_icon.cache_clear()
+
+
+def _scale_cache_key(scale: float) -> int:
+    return int(round(float(max(0.0, min(1.0, scale))) * 1000.0))
+
+
+def create_icon(color: tuple[int, int, int]) -> Image.Image:
+    """Create tray icon image."""
+
+    return _create_cached_solid_icon(tuple(color), _outline_color_for_theme())
 
 
 def _clamp_u8(v: float) -> int:
@@ -234,15 +249,19 @@ def _rainbow_gradient_64(phase_q: int) -> Image.Image:
     return img
 
 
-def create_icon_rainbow(*, scale: float = 1.0, phase: float = 0.0) -> Image.Image:
-    """Create tray icon where the 'K' cutout is filled with a rainbow gradient."""
-
-    logo = _tray_logo_outline(_outline_color_for_theme())
+@lru_cache(maxsize=256)
+def _create_cached_rainbow_icon(
+    phase_q: int,
+    scale_key: int,
+    outline_color: tuple[int, int, int],
+) -> Image.Image:
+    logo = _tray_logo_outline(outline_color)
     masks = _tray_logo_masks()
+    scale = float(scale_key) / 1000.0
+
     if logo is not None and masks is not None:
         _silhouette_mask, cutout_mask = masks
 
-        phase_q = int(round((float(phase) % 1.0) * 63.0))
         underlay = _rainbow_gradient_64(phase_q).copy()
         if scale != 1.0:
             # Apply brightness scaling to the underlay.
@@ -260,9 +279,19 @@ def create_icon_rainbow(*, scale: float = 1.0, phase: float = 0.0) -> Image.Imag
         out.alpha_composite(logo)
         return out
 
-    # Fallback: approximate with a single representative rainbow color.
-    rr_f, gg_f, bb_f = colorsys.hsv_to_rgb(float(phase) % 1.0, 1.0, 1.0)
+    rr_f, gg_f, bb_f = colorsys.hsv_to_rgb(float(phase_q % 64) / 64.0, 1.0, 1.0)
     return create_icon(_scale_rgb((int(rr_f * 255), int(gg_f * 255), int(bb_f * 255)), scale))
+
+
+def clear_cached_rainbow_icons() -> None:
+    _create_cached_rainbow_icon.cache_clear()
+
+
+def create_icon_rainbow(*, scale: float = 1.0, phase: float = 0.0) -> Image.Image:
+    """Create tray icon where the 'K' cutout is filled with a rainbow gradient."""
+
+    phase_q = int(round((float(phase) % 1.0) * 63.0))
+    return _create_cached_rainbow_icon(phase_q, _scale_cache_key(scale), _outline_color_for_theme())
 
 
 def create_icon_mosaic(

@@ -86,3 +86,14 @@ def test_fade_to_non_black_never_writes_full_black() -> None:
     assert spy.calls
     for rgb, _brightness in spy.calls:
         assert rgb != (0, 0, 0)
+
+
+def test_stop_resets_rendered_and_mode_brightness_caches() -> None:
+    engine = EffectsEngine()
+    engine._last_rendered_brightness = 25
+    engine._last_hw_mode_brightness = 25
+
+    engine.stop()
+
+    assert engine._last_rendered_brightness is None
+    assert engine._last_hw_mode_brightness is None

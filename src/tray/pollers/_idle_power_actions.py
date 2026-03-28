@@ -49,10 +49,13 @@ def _set_reactive_transition(
     """
 
     try:
-        current = getattr(engine, "_last_rendered_brightness", None)
-        if current is None:
-            current = getattr(engine, "brightness", target_brightness)
-        current_i = max(0, min(50, int(current)))
+        current_i = safe_int_attr(
+            engine,
+            "_last_rendered_brightness",
+            default=safe_int_attr(engine, "brightness", default=target_brightness),
+            min_v=0,
+            max_v=50,
+        )
         target_i = max(0, min(50, int(target_brightness)))
         engine._reactive_transition_from_brightness = current_i  # type: ignore[attr-defined]
         engine._reactive_transition_to_brightness = target_i  # type: ignore[attr-defined]

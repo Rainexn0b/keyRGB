@@ -127,9 +127,13 @@ def _apply_perkey(
         except Exception:
             pass
     tray.engine.stop()
-    color_map = dict(tray.config.per_key_colors)
+    configured_map = getattr(tray.config, "per_key_colors", None)
+    if configured_map is None:
+        configured_map = {}
+    color_map = configured_map
 
-    if 0 < len(color_map) < (ite_num_rows * ite_num_cols):
+    if 0 < len(configured_map) < (ite_num_rows * ite_num_cols):
+        color_map = dict(configured_map)
         base = tuple(tray.config.color)
         for r in range(ite_num_rows):
             for c in range(ite_num_cols):

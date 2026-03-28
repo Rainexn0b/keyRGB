@@ -9,6 +9,7 @@ from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
 from src.core.effects.transitions import scaled_color_map_nonzero
 
+from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer
 from .base import (
     Color,
     Key,
@@ -40,6 +41,7 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     base = base_color_map(engine)
     dt = frame_dt_s()
     p = pace(engine)
+    color_map = get_engine_color_map_buffer(engine, "_sw_twinkle_frame_map")
 
     twinkles: List[_Twinkle] = []
     acc = 0.0
@@ -79,7 +81,7 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             if prev is None or intensity > prev[1]:
                 overlay[k] = (tw.color, intensity)
 
-        color_map: Dict[Key, Color] = {}
+        color_map.clear()
         for k, base_rgb in base.items():
             if k in overlay:
                 c, w = overlay[k]
@@ -116,6 +118,7 @@ def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     elapsed = 0.0
     # Start "on" so selecting the effect doesn't immediately blank the keyboard.
     on = True
+    color_map = get_engine_color_map_buffer(engine, "_sw_strobe_frame_map")
 
     while engine.running and not engine.stop_event.is_set():
         elapsed += dt
@@ -123,7 +126,8 @@ def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             elapsed = 0.0
             on = not on
 
-        color_map = dict(base) if on else dict(off_map)
+        color_map.clear()
+        color_map.update(base if on else off_map)
 
         render_fn(engine, color_map=color_map)
         engine.stop_event.wait(dt)
@@ -152,7 +156,7 @@ def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
     pos = 0.0
     width = 1.6
-    color_map: Dict[Key, Color] = {}
+    color_map = get_engine_color_map_buffer(engine, "_sw_chase_frame_map")
     while engine.running and not engine.stop_event.is_set():
         pos = (pos + dt * (3.2 * p)) % float(max(1, NUM_COLS))
 
@@ -160,12 +164,12 @@ def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             phase = float(pos) / float(max(1, NUM_COLS))
             pulse = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(2.0 * math.pi * phase))
             rgb = mix(background_uniform, highlight, t=pulse)
-            color_map = {(r, c): rgb for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+            fill_uniform_color_map(color_map, color=rgb)
             render_fn(engine, color_map=color_map)
             engine.stop_event.wait(dt)
             continue
 
-        color_map = {}
+        color_map.clear()
         for (r, c), base_rgb in base.items():
             d = abs(float(c) - pos)
             d = min(d, float(NUM_COLS) - d)
@@ -192,6 +196,7 @@ def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     base = base_color_map(engine)
     dt = frame_dt_s()
     p = pace(engine)
+    color_map = get_engine_color_map_buffer(engine, "_sw_rain_frame_map")
 
     droplets: List[_RainDrop] = []
 
@@ -229,7 +234,7 @@ def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         droplets = new_droplets
 
         rain_rgb = (40, 140, 255)
-        color_map: Dict[Key, Color] = {}
+        color_map.clear()
         for k, base_rgb in base.items():
             w = overlay.get(k, 0.0)
             color_map[k] = mix(base_rgb, rain_rgb, t=min(1.0, w))

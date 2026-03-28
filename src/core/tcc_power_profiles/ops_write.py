@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import json
 import logging
 import os
@@ -19,6 +20,10 @@ from .root_apply import _apply_new_profiles_file, _apply_new_settings_file
 
 
 logger = logging.getLogger(__name__)
+
+
+def _clone_payload_dict(payload: dict[str, Any]) -> dict[str, Any]:
+    return deepcopy(payload)
 
 
 def _load_custom_profiles_payload(*, get_custom_profiles_json_fn=get_custom_profiles_json) -> list[dict[str, Any]]:
@@ -97,7 +102,7 @@ def get_custom_profile_payload(
         return None
     for p in load_custom_profiles_payload():
         if isinstance(p, dict) and p.get("id") == profile_id:
-            return json.loads(json.dumps(p))
+            return _clone_payload_dict(p)
     return None
 
 
@@ -132,7 +137,7 @@ def update_custom_profile(
     if idx < 0:
         raise TccProfileWriteError("Profile not found among custom profiles")
 
-    payload = json.loads(json.dumps(new_payload))
+    payload = _clone_payload_dict(new_payload)
     payload["id"] = profile_id
 
     name = payload.get("name")
@@ -233,7 +238,7 @@ def duplicate_custom_profile(
     existing_ids = {str(p.get("id")) for p in custom_profiles if isinstance(p, dict) and isinstance(p.get("id"), str)}
     new_id = generate_profile_id(existing_ids)
 
-    clone = json.loads(json.dumps(source))
+    clone = _clone_payload_dict(source)
     clone["id"] = new_id
     clone["name"] = new_name
 

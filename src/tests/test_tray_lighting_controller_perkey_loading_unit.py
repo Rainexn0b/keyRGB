@@ -1,5 +1,9 @@
 from __future__ import annotations
+
+from typing import cast
 from unittest.mock import MagicMock
+
+from src.tray.protocols import LightingTrayProtocol
 from src.tray.controllers.lighting_controller import start_current_effect
 
 
@@ -41,10 +45,11 @@ def test_start_current_effect_loads_perkey_for_software_effect() -> None:
     # We need to ensure SW_EFFECTS contains it. The controller imports it.
     # Assuming runtime env has it.
 
-    start_current_effect(tray)
+    start_current_effect(cast(LightingTrayProtocol, tray))
 
     # Check if per_key_colors/brightness were loaded
     assert tray.engine.per_key_colors == {(0, 0): (255, 255, 255)}
+    assert tray.engine.per_key_colors is tray.config.per_key_colors
     assert tray.engine.per_key_brightness == 10
 
     tray.engine.start_effect.assert_called_once()
@@ -57,7 +62,7 @@ def test_start_current_effect_clears_perkey_for_hardware_effect() -> None:
     tray.engine.per_key_colors = {(0, 0): (255, 255, 255)}
     tray.engine.per_key_brightness = 10
 
-    start_current_effect(tray)
+    start_current_effect(cast(LightingTrayProtocol, tray))
 
     assert tray.engine.per_key_colors is None
     assert tray.engine.per_key_brightness is None

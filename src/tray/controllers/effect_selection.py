@@ -10,6 +10,7 @@ When switching modes, the appropriate state is set up automatically.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Protocol, cast
 
 from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
@@ -55,6 +56,16 @@ def _load_per_key_colors_from_profile(config) -> dict:
         return {}
 
 
+def _config_per_key_colors_ref(config) -> Mapping[object, object] | None:
+    try:
+        colors = getattr(config, "per_key_colors", None)
+    except Exception:
+        return None
+    if isinstance(colors, Mapping) and colors:
+        return colors
+    return None
+
+
 def _ensure_software_mode(tray) -> None:
     """Ensure we're in software mode.
 
@@ -68,11 +79,11 @@ def _ensure_software_mode(tray) -> None:
     config = tray.config
 
     # Get existing per-key colors (if any)
-    existing = dict(getattr(config, "per_key_colors", {}) or {})
+    existing = _config_per_key_colors_ref(config)
 
     # Sync to engine - may be None for uniform mode
     try:
-        tray.engine.per_key_colors = dict(existing) if existing else None
+        tray.engine.per_key_colors = existing
     except Exception:
         pass
 
@@ -146,7 +157,7 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
         if effect_name in {"none", "stop"}:
             tray.engine.stop()
 
-            per_key = dict(getattr(tray.config, "per_key_colors", {}) or {})
+            per_key = _config_per_key_colors_ref(tray.config)
             if per_key and per_key_supported:
                 tray.config.effect = "perkey"
                 _ensure_software_mode(tray)
