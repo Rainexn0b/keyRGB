@@ -1,96 +1,134 @@
 from __future__ import annotations
 
-import logging
 import os
+from pathlib import Path
 from dataclasses import dataclass
 from typing import Any
 
-from ..base import BackendCapabilities, BackendStability, KeyboardDevice, KeyboardBackend, ProbeResult
+from src.core.utils.exceptions import is_permission_denied
 
-logger = logging.getLogger(__name__)
+from ..base import BackendCapabilities, BackendStability, ExperimentalEvidence, KeyboardDevice, KeyboardBackend, ProbeResult
+from ..ite8910.hidraw import HidrawDeviceInfo, HidrawFeatureTransport, find_matching_hidraw_device
+from ..policy import experimental_backends_enabled
+from .device import Ite8297KeyboardDevice
+from . import protocol
 
 
-# Intentionally empty: we do NOT enable this backend by default.
-#
-# Rationale:
-# - There are ITE controller families (commonly described as IT8297/8176) that
-#   appear to use a different HID report dialect than the IT8291r3 devices
-#   supported by `src.core.backends.ite8291r3`.
-# - Without hardware to validate, enabling probe/usage would be risky.
-#
-# When this backend is implemented and validated, add confirmed VID/PID pairs
-# here and in udev rules (if applicable).
-_ITE8297_USB_IDS: list[tuple[int, int]] = []
+def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
+    forced_path = os.environ.get(protocol.HIDRAW_PATH_ENV)
+    if forced_path:
+        devnode = Path(forced_path)
+        if devnode.exists():
+            return HidrawDeviceInfo(
+                hidraw_name=devnode.name,
+                devnode=devnode,
+                sysfs_dir=Path(),
+                vendor_id=protocol.VENDOR_ID,
+                product_id=protocol.SUPPORTED_PRODUCT_IDS[0],
+                hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.SUPPORTED_PRODUCT_IDS[0]:04x}",
+            )
+
+    for product_id in protocol.SUPPORTED_PRODUCT_IDS:
+        match = find_matching_hidraw_device(protocol.VENDOR_ID, product_id)
+        if match is not None:
+            return match
+
+    return None
+
+
+def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo]:
+    info = _find_matching_supported_hidraw_device()
+    if info is None:
+        raise FileNotFoundError(
+            "No hidraw device found for supported ITE 8297 controller IDs: "
+            + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
+        )
+    return HidrawFeatureTransport(info.devnode), info
 
 
 @dataclass
 class Ite8297Backend(KeyboardBackend):
-    """Placeholder backend for the IT8297/8176-family HID dialect.
+    """Experimental ITE 8297 backend for the public 64-byte uniform-color HID path.
 
-    This backend is deliberately dormant: it never probes available unless the
-    allowlist above is populated.
+    This implementation is intentionally conservative: it only enables the
+    confirmed `0x048d:0x8297` path and exposes uniform color writes, not per-key
+    control or firmware effects.
     """
 
     name: str = "ite8297"
     priority: int = 95
-    stability: BackendStability = BackendStability.DORMANT
+    stability: BackendStability = BackendStability.EXPERIMENTAL
+    experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
 
     def is_available(self) -> bool:
-        # We consider it available only when explicitly enabled via allowlist.
-        return len(_ITE8297_USB_IDS) > 0
+        return self.probe().available
 
     def probe(self) -> ProbeResult:
-        if len(_ITE8297_USB_IDS) == 0:
+        if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=False,
-                reason="ite8297 backend scaffold present but disabled (no confirmed USB IDs)",
+                reason="ite8297 hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
             )
 
-        if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
+        match = _find_matching_supported_hidraw_device()
+        if match is None:
             return ProbeResult(
-                available=True,
-                reason="enabled but usb scan disabled",
-                confidence=40,
+                available=False,
+                reason="no matching hidraw device",
+                confidence=0,
+            )
+
+        identifiers = {
+            "usb_vid": f"0x{int(match.vendor_id):04x}",
+            "usb_pid": f"0x{int(match.product_id):04x}",
+            "hidraw": str(match.devnode),
+        }
+        if match.hid_name:
+            identifiers["hid_name"] = str(match.hid_name)
+
+        if not experimental_backends_enabled():
+            return ProbeResult(
+                available=False,
+                reason=(
+                    "experimental backend disabled (detected "
+                    f"0x{int(match.vendor_id):04x}:0x{int(match.product_id):04x}; "
+                    "enable Experimental backends in Settings or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1)"
+                ),
+                confidence=0,
+                identifiers=identifiers,
+            )
+
+        return ProbeResult(
+            available=True,
+            reason=f"hidraw device present ({match.devnode})",
+            confidence=84,
+            identifiers=identifiers,
+        )
+
+    def capabilities(self) -> BackendCapabilities:
+        return BackendCapabilities(per_key=False, color=True, hardware_effects=False, palette=False)
+
+    def get_device(self) -> KeyboardDevice:
+        if not experimental_backends_enabled():
+            raise RuntimeError(
+                "ITE 8297 is classified as experimental. Enable Experimental backends in Settings "
+                "or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 before using it."
             )
 
         try:
-            import usb.core  # type: ignore
-
-            for vid, pid in _ITE8297_USB_IDS:
-                dev = usb.core.find(idVendor=int(vid), idProduct=int(pid))
-                if dev is not None:
-                    return ProbeResult(
-                        available=True,
-                        reason=f"usb device present (0x{int(vid):04x}:0x{int(pid):04x})",
-                        confidence=80,
-                        identifiers={
-                            "usb_vid": f"0x{int(vid):04x}",
-                            "usb_pid": f"0x{int(pid):04x}",
-                        },
-                    )
-
-            return ProbeResult(available=False, reason="no matching usb device", confidence=0)
+            transport, _info = _open_matching_transport()
+            return Ite8297KeyboardDevice(transport.send_feature_report)
         except Exception as exc:
-            return ProbeResult(
-                available=True,
-                reason=f"enabled but usb scan unavailable: {exc}",
-                confidence=40,
-            )
-
-    def capabilities(self) -> BackendCapabilities:
-        # Unknown until implemented; keep conservative.
-        return BackendCapabilities(per_key=False, color=False, hardware_effects=False, palette=False)
-
-    def get_device(self) -> KeyboardDevice:
-        raise NotImplementedError(
-            "ITE8297 backend is a scaffold only and is not implemented yet. "
-            "Do not enable it without a validated implementation and hardware testing."
-        )
+            if is_permission_denied(exc):
+                raise PermissionError(
+                    "Permission denied opening the ITE 8297 hidraw device. "
+                    "Install the KeyRGB udev rules, then reload udev or reboot/log out and back in."
+                ) from exc
+            raise
 
     def dimensions(self) -> tuple[int, int]:
-        # Unknown until implemented.
-        return (0, 0)
+        return (1, 1)
 
     def effects(self) -> dict[str, Any]:
         return {}

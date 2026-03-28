@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from .base import BackendStability, normalize_backend_stability
+from .base import BackendStability, ExperimentalEvidence, normalize_backend_stability, normalize_experimental_evidence
 
 
 def _truthy_text(value: str) -> bool:
@@ -24,6 +24,19 @@ def experimental_backends_enabled() -> bool:
 
 def stability_for_backend(backend: object) -> BackendStability:
     return normalize_backend_stability(getattr(backend, "stability", BackendStability.VALIDATED))
+
+
+def experimental_evidence_for_backend(backend: object) -> ExperimentalEvidence | None:
+    return normalize_experimental_evidence(getattr(backend, "experimental_evidence", None))
+
+
+def experimental_evidence_label(value: object) -> str | None:
+    evidence = normalize_experimental_evidence(value)
+    if evidence == ExperimentalEvidence.REVERSE_ENGINEERED:
+        return "research-backed"
+    if evidence == ExperimentalEvidence.SPECULATIVE:
+        return "speculative"
+    return None
 
 
 def selection_allowed_for_backend(backend: object) -> tuple[bool, str | None]:

@@ -122,6 +122,7 @@ class SysfsLedsBackend(KeyboardBackend):
                 "led_dir": str(led_dir),
                 "supports_multi_intensity": str((led_dir / "multi_intensity").exists()).lower(),
                 "supports_color_attr": str((led_dir / "color").exists()).lower(),
+                "supports_channel_rgb": str(str(led_dir.name).lower().startswith("ite_8297:")).lower(),
                 "all_zones": str([p.name for p in found]),
             },
         )

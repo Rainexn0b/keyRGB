@@ -1,10 +1,7 @@
-"""ITE 8910 / ITE 829x backend package.
+"""ITE 8910 backend package.
 
-This package contains the Python translation of the public `ite-829x`
-userspace reference for `0x048d:0x8910` plus the Linux `hidraw` transport used
-by KeyRGB's experimental rollout path.
-
-For future correction work on the experimental backend, see
+This package contains KeyRGB's experimental Linux `hidraw` path for
+`0x048d:0x8910`, aligned to the public reverse-engineering notes captured in
 `docs/developement/ite8910-protocol-notes.md`.
 """
 

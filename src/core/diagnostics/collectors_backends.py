@@ -5,7 +5,12 @@ from contextlib import contextmanager
 from collections.abc import Iterator
 from typing import Any
 
-from src.core.backends.policy import experimental_backends_enabled, selection_allowed_for_backend, stability_for_backend
+from src.core.backends.policy import (
+    experimental_backends_enabled,
+    experimental_evidence_for_backend,
+    selection_allowed_for_backend,
+    stability_for_backend,
+)
 from src.core.utils.safe_attrs import safe_int_attr
 
 from ._collectors_backends_sysfs import sysfs_led_candidates_snapshot
@@ -91,6 +96,13 @@ def _probe_backend(backend: object) -> dict[str, Any]:
         pass
 
     try:
+        evidence = experimental_evidence_for_backend(backend)
+        if evidence is not None:
+            entry["experimental_evidence"] = evidence.value
+    except Exception:
+        pass
+
+    try:
         selection_enabled, selection_reason = selection_allowed_for_backend(backend)
         entry["selection_enabled"] = bool(selection_enabled)
         if selection_reason:
@@ -136,6 +148,7 @@ def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str
                 "tier": p.get("tier"),
                 "provider": p.get("provider"),
                 "stability": p.get("stability"),
+                "experimental_evidence": p.get("experimental_evidence"),
                 "reason": p.get("reason"),
                 "identifiers": p.get("identifiers"),
             }

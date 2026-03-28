@@ -10,8 +10,9 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from src.core.backends.base import BackendStability, ProbeResult
+from src.core.backends.base import BackendStability, ExperimentalEvidence, ProbeResult
 from src.core.backends.registry import BackendSpec, select_backend
+from src.core.backends.policy import experimental_evidence_for_backend, experimental_evidence_label
 
 
 @dataclass
@@ -21,6 +22,7 @@ class DummyBackend:
     available: bool
     confidence: int = 50
     stability: BackendStability = BackendStability.VALIDATED
+    experimental_evidence: ExperimentalEvidence | None = None
 
     def is_available(self) -> bool:
         return self.available
@@ -235,3 +237,21 @@ def test_select_backend_never_selects_dormant_backend(
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 
     assert select_backend(specs=specs) is None
+
+
+def test_experimental_evidence_helper_normalizes_backend_metadata() -> None:
+    backend = DummyBackend(
+        "ite8910",
+        100,
+        True,
+        confidence=90,
+        stability=BackendStability.EXPERIMENTAL,
+        experimental_evidence=ExperimentalEvidence.REVERSE_ENGINEERED,
+    )
+
+    assert experimental_evidence_for_backend(backend) == ExperimentalEvidence.REVERSE_ENGINEERED
+
+
+def test_experimental_evidence_label_uses_user_facing_wording() -> None:
+    assert experimental_evidence_label(ExperimentalEvidence.REVERSE_ENGINEERED) == "research-backed"
+    assert experimental_evidence_label(ExperimentalEvidence.SPECULATIVE) == "speculative"

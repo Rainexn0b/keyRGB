@@ -83,6 +83,31 @@ def test_sysfs_backend_prefers_multicolor_led(monkeypatch: pytest.MonkeyPatch, t
     assert (plain / "brightness").exists()
 
 
+def test_sysfs_backend_detects_ite8297_channel_triplet(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    red = _make_led(tmp_path, "ite_8297:1", brightness=10, max_brightness=255)
+    _make_led(tmp_path, "ite_8297:2", brightness=20, max_brightness=255)
+    _make_led(tmp_path, "ite_8297:3", brightness=30, max_brightness=255)
+
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
+
+    def fake_access(path: str | os.PathLike[str], mode: int) -> bool:
+        return True
+
+    monkeypatch.setattr(os, "access", fake_access)
+
+    backend = SysfsLedsBackend()
+    probe = backend.probe()
+    assert probe.available is True
+    assert probe.identifiers["led"].lower() == "ite_8297:1"
+    assert probe.identifiers["supports_channel_rgb"] == "true"
+
+    dev = backend.get_device()
+    assert dev.capabilities().color is True
+    assert dev.capabilities().per_key is False
+
+    assert (red / "brightness").exists()
+
+
 def test_sysfs_backend_ignores_noise_lock_leds(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     good = _make_led(tmp_path, "white:kbd_backlight", brightness=1, max_brightness=10)
     caps = _make_led(tmp_path, "white:kbd_backlight:capslock", brightness=1, max_brightness=10)
@@ -191,6 +216,42 @@ def test_sysfs_device_set_color_color_attr(monkeypatch: pytest.MonkeyPatch, tmp_
 
     assert color.read_text(encoding="utf-8") == "010203\n"
     assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "50"
+
+
+def test_sysfs_device_set_color_ite8297_channel_triplet(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    red = _make_led(tmp_path, "ite_8297:1", brightness=0, max_brightness=255)
+    green = _make_led(tmp_path, "ite_8297:2", brightness=0, max_brightness=255)
+    blue = _make_led(tmp_path, "ite_8297:3", brightness=0, max_brightness=255)
+
+    dev = SysfsLedKeyboardDevice(
+        primary_led_dir=red,
+        all_led_dirs=[red, green, blue],
+    )
+
+    dev.set_color((100, 50, 25), brightness=25)
+
+    assert (red / "brightness").read_text(encoding="utf-8").strip() == "50"
+    assert (green / "brightness").read_text(encoding="utf-8").strip() == "25"
+    assert (blue / "brightness").read_text(encoding="utf-8").strip() == "12"
+    assert dev.get_brightness() == 25
+
+
+def test_sysfs_device_brightness_updates_ite8297_channel_triplet(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    red = _make_led(tmp_path, "ite_8297:1", brightness=100, max_brightness=255)
+    green = _make_led(tmp_path, "ite_8297:2", brightness=50, max_brightness=255)
+    blue = _make_led(tmp_path, "ite_8297:3", brightness=25, max_brightness=255)
+
+    dev = SysfsLedKeyboardDevice(
+        primary_led_dir=red,
+        all_led_dirs=[red, green, blue],
+    )
+
+    dev.set_brightness(10)
+
+    assert (red / "brightness").read_text(encoding="utf-8").strip() == "20"
+    assert (green / "brightness").read_text(encoding="utf-8").strip() == "10"
+    assert (blue / "brightness").read_text(encoding="utf-8").strip() == "5"
+    assert dev.get_brightness() == 10
 
 
 def test_sysfs_device_set_color_system76_paths(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -70,9 +70,11 @@ def _append_backends(lines: list[str], backends: object) -> None:
             if not isinstance(p, dict):
                 continue
             lines.append(
-                "  - {name}: available={available} confidence={confidence} reason={reason}".format(
+                "  - {name}: available={available} stability={stability} evidence={evidence} confidence={confidence} reason={reason}".format(
                     name=p.get("name"),
                     available=p.get("available"),
+                    stability=p.get("stability"),
+                    evidence=(p.get("experimental_evidence") or "-"),
                     confidence=p.get("confidence"),
                     reason=p.get("reason"),
                 )

@@ -54,6 +54,7 @@ def _is_candidate_led(name: str) -> bool:
         or "tpacpi::kbd" in n  # ThinkPad
         or "asus::kbd" in n  # ASUS WMI
         or "system76::kbd" in n  # System76
+        or "ite_8297:" in n  # TUXEDO ite_8297 RGB channel triplet
     )
 
 
@@ -76,6 +77,8 @@ def _score_led_dir(led_dir: Path) -> int:
         score += 10
     if "keyboard" in name:
         score += 5
+    if name.startswith("ite_8297:"):
+        score += 35
 
     # Prefer RGB-capable sysfs nodes.
     if (led_dir / "multi_intensity").exists():
@@ -86,6 +89,8 @@ def _score_led_dir(led_dir: Path) -> int:
         score += 45
     if (led_dir / "color_center").exists() or (led_dir / "color_left").exists():
         score += 45
+    if name.startswith("ite_8297:"):
+        score += 35
 
     # De-prioritize "noise" LEDs that frequently contain kbd substrings.
     for noisy in ("capslock", "numlock", "scrolllock", "micmute", "mute"):

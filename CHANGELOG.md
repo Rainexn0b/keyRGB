@@ -1,6 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.18.2 (2026-03-29)
+
+- Backends/ITE8910: Correct the experimental `ite8910` HID framing to the documented 6-byte `0xCC` feature reports, switch the backend to the full reverse-engineered 6x20 LED matrix, and clear the deck before per-key rewrites so stale LEDs do not survive sparse or dynamic updates.
+- Backends/Policy: Keep the `validated` / `experimental` / `dormant` stability model, but add an experimental evidence tag so diagnostics can distinguish speculative backends from public reverse-engineering based ones; the `ite8910` backend is now tagged `reverse_engineered`.
+- Backends/Attribution: Add code and README attribution for the public ITE 8910 reverse-engineering work by Valentin Lobstein (`chocapikk`, Reddit `Greedy-Ad232`) that informed the corrected experimental backend.
+- Tray/Settings: Surface experimental backend evidence with clearer user-facing wording (`research-backed` vs `speculative`) in Settings copy, hardware hints, and the selected-backend tray status line.
+- Backends/ITE8297: Promote `ite8297` from dormant scaffold to an opt-in experimental `hidraw` backend for the confirmed `0x048d:0x8297` path, using the public 64-byte uniform-color HID report shape and conservative non-per-key capabilities.
+- Sysfs/ITE8297: Detect TUXEDO-style `ite_8297:1/2/3` kernel LED channel triplets and drive them as a single uniform RGB device instead of missing them or treating them as independent zones.
 
 ## 0.18.1 (2026-03-28)
 

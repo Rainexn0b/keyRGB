@@ -21,6 +21,43 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
     # Internal state
     _zones: list[dict] = field(default_factory=list, init=False, repr=False)
     _key_to_zone_idx: dict[str, int] = field(default_factory=dict, init=False, repr=False)
+    _channel_group_color: tuple[int, int, int] | None = field(default=None, init=False, repr=False)
+    _channel_group_brightness: int | None = field(default=None, init=False, repr=False)
+
+    def _detect_ite8297_channel_group(self) -> dict[str, Path] | None:
+        channels: dict[str, Path] = {}
+        for led_dir in self.all_led_dirs:
+            name = led_dir.name.lower()
+            if not name.startswith("ite_8297:"):
+                continue
+            suffix = name.rsplit(":", 1)[-1]
+            if suffix == "1":
+                channels["red"] = led_dir
+            elif suffix == "2":
+                channels["green"] = led_dir
+            elif suffix == "3":
+                channels["blue"] = led_dir
+
+        if len(channels) == 3:
+            return channels
+        return None
+
+    def _read_channel_group_state(self, channels: dict[str, Path]) -> tuple[tuple[int, int, int], int]:
+        red = max(0, common._read_int(channels["red"] / "brightness"))
+        green = max(0, common._read_int(channels["green"] / "brightness"))
+        blue = max(0, common._read_int(channels["blue"] / "brightness"))
+        max_values = [
+            max(1, common._read_int(channels["red"] / "max_brightness")),
+            max(1, common._read_int(channels["green"] / "max_brightness")),
+            max(1, common._read_int(channels["blue"] / "max_brightness")),
+        ]
+        level = max(
+            red / max_values[0],
+            green / max_values[1],
+            blue / max_values[2],
+        )
+        brightness = int(round(level * 50))
+        return (red, green, blue), max(0, min(50, brightness))
 
     def __post_init__(self):
         if not self.all_led_dirs:
@@ -32,6 +69,22 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
 
         # Discover lighting zones
         self._zones = []
+
+        ite8297_channels = self._detect_ite8297_channel_group()
+        if ite8297_channels is not None:
+            self._zones.append(
+                {
+                    "type": "ite8297_channels",
+                    "paths": ite8297_channels,
+                    "led_dir": ite8297_channels["red"],
+                }
+            )
+            try:
+                self._channel_group_color, self._channel_group_brightness = self._read_channel_group_state(ite8297_channels)
+            except Exception:
+                self._channel_group_color = (0, 0, 0)
+                self._channel_group_brightness = 0
+            return
 
         # Case 1: Single directory, assume it might be System76 with multiple files
         if len(self.all_led_dirs) == 1:
@@ -75,6 +128,9 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                 if zone.get("type") == "file":
                     color_supported = True
                     break
+                if zone.get("type") == "ite8297_channels":
+                    color_supported = True
+                    break
                 if self._supports_multicolor(led_dir) or self._supports_color_attr(led_dir) or self._supports_rgb_attr(led_dir):
                     color_supported = True
                     break
@@ -108,6 +164,9 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         return self.get_brightness() <= 0
 
     def get_brightness(self) -> int:
+        if self._channel_group_brightness is not None:
+            return int(self._channel_group_brightness)
+
         # Normalize sysfs brightness into KeyRGB's "hardware" 0..50 scale.
         # We read only from the primary zone.
         sysfs_value = self._read_sysfs_brightness()
@@ -115,6 +174,15 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         return int(round((sysfs_value / max_value) * 50))
 
     def set_brightness(self, brightness: int) -> None:
+        if any(zone.get("type") == "ite8297_channels" for zone in self._zones):
+            self._channel_group_brightness = max(0, min(50, int(brightness)))
+            if self._channel_group_color is None:
+                self._channel_group_color = (0, 0, 0)
+            for zone in self._zones:
+                if zone.get("type") == "ite8297_channels":
+                    self._set_zone_color(zone, self._channel_group_color, self._channel_group_brightness)
+            return
+
         # Map KeyRGB's 0..50 brightness scale into sysfs range.
         b = max(0, min(50, int(brightness)))
         max_value = self._max()
@@ -202,6 +270,21 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
     def _set_zone_color(self, zone: dict, color, brightness: int):
         r, g, b = color
         led_dir = zone["led_dir"]
+
+        if zone["type"] == "ite8297_channels":
+            level = max(0, min(50, int(brightness))) / 50 if int(brightness) > 0 else 0.0
+            scaled = {
+                "red": int(round(int(r) * level)),
+                "green": int(round(int(g) * level)),
+                "blue": int(round(int(b) * level)),
+            }
+            for channel_name, value in scaled.items():
+                channel_dir = zone["paths"][channel_name]
+                max_value = max(1, common._read_int(channel_dir / "max_brightness"))
+                common._write_int(channel_dir / "brightness", max(0, min(max_value, int(value))))
+            self._channel_group_color = (int(r), int(g), int(b))
+            self._channel_group_brightness = max(0, min(50, int(brightness)))
+            return
 
         # Case 1: System76 specific file path
         if zone["type"] == "file":

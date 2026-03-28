@@ -40,6 +40,11 @@ class BackendStability(str, Enum):
     DORMANT = "dormant"
 
 
+class ExperimentalEvidence(str, Enum):
+    SPECULATIVE = "speculative"
+    REVERSE_ENGINEERED = "reverse_engineered"
+
+
 def normalize_backend_stability(value: object) -> BackendStability:
     try:
         if isinstance(value, BackendStability):
@@ -53,6 +58,21 @@ def normalize_backend_stability(value: object) -> BackendStability:
             return item
 
     return BackendStability.VALIDATED
+
+
+def normalize_experimental_evidence(value: object) -> ExperimentalEvidence | None:
+    try:
+        if isinstance(value, ExperimentalEvidence):
+            return value
+        text = str(value or "").strip().lower()
+    except Exception:
+        return None
+
+    for item in ExperimentalEvidence:
+        if item.value == text:
+            return item
+
+    return None
 
 
 @dataclass(frozen=True)
@@ -79,6 +99,7 @@ class KeyboardBackend(Protocol):
     name: str
     priority: int
     stability: BackendStability | str
+    experimental_evidence: ExperimentalEvidence | str | None
 
     def is_available(self) -> bool: ...
 

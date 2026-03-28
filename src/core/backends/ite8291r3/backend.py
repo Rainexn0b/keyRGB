@@ -26,7 +26,7 @@ _FALLBACK_USB_IDS: list[tuple[int, int]] = [
 # Known ITE controllers seen in the wild that appear to be a different protocol
 # family (often referred to as "Fusion 2" in community tooling).
 #
-# Safety: we must NOT claim support for these by adding them to PRODUCT_IDS,
+# Safety: keyrgb does NOT claim support for these by adding them to PRODUCT_IDS,
 # otherwise auto-selection may pick this backend and attempt to talk the wrong
 # protocol to the device.
 _KNOWN_UNSUPPORTED_USB_IDS: list[tuple[int, int]] = [

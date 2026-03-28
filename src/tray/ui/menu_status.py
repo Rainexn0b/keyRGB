@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.core.backends.policy import experimental_evidence_for_backend, experimental_evidence_label, stability_for_backend
 from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import title_for_effect
@@ -59,6 +60,33 @@ def _title(name: str) -> str:
     return title_for_effect(name)
 
 
+def _backend_display_name(backend_name: str) -> str:
+    if backend_name == "sysfs-leds":
+        return "Kernel Driver"
+    if backend_name == "ite8291r3":
+        return "ITE 8291 (USB)"
+    if backend_name == "ite8910":
+        return "ITE 8910 (USB)"
+    if backend_name == "ite8297":
+        return "ITE 8297 (USB)"
+    return backend_name
+
+
+def _backend_status_suffix(backend: Any) -> str:
+    if backend is None:
+        return ""
+
+    if stability_for_backend(backend).value != "experimental":
+        return ""
+
+    parts = ["experimental"]
+    evidence_label = experimental_evidence_label(experimental_evidence_for_backend(backend))
+    if evidence_label:
+        parts.append(evidence_label)
+
+    return f" [{', '.join(parts)}]"
+
+
 def keyboard_status_text(tray: Any) -> str:
     """Return a single-line keyboard/device status label for the tray menu."""
 
@@ -67,11 +95,8 @@ def keyboard_status_text(tray: Any) -> str:
 
     backend = getattr(tray, "backend", None)
     backend_name = str(getattr(backend, "name", "unknown"))
-    display_name = backend_name
-    if backend_name == "sysfs-leds":
-        display_name = "Kernel Driver"
-    elif backend_name == "ite8291r3":
-        display_name = "ITE 8291 (USB)"
+    display_name = _backend_display_name(backend_name)
+    status_suffix = _backend_status_suffix(backend)
 
     probe = getattr(tray, "backend_probe", None)
     identifiers = getattr(probe, "identifiers", None) if probe is not None else None
@@ -83,17 +108,17 @@ def keyboard_status_text(tray: Any) -> str:
         vid = _format_hex_id(usb_vid)
         pid = _format_hex_id(usb_pid)
         if vid and pid:
-            return f"Keyboard: {display_name} ({vid}:{pid})"
+            return f"Keyboard: {display_name} ({vid}:{pid}){status_suffix}"
 
     led_name = identifiers.get("led")
     if led_name:
-        return f"Keyboard: {display_name} ({led_name})"
+        return f"Keyboard: {display_name} ({led_name}){status_suffix}"
 
     brightness_path = identifiers.get("brightness")
     if brightness_path:
-        return f"Keyboard: {display_name} ({brightness_path})"
+        return f"Keyboard: {display_name} ({brightness_path}){status_suffix}"
 
-    return f"Keyboard: {display_name}"
+    return f"Keyboard: {display_name}{status_suffix}"
 
 
 def probe_device_available(tray: Any) -> bool:

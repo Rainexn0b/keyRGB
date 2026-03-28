@@ -17,7 +17,11 @@ class ExperimentalBackendsPanel:
 
         desc = ttk.Label(
             parent,
-            text="Experimental backends are opt-in and may be unstable or unsupported on your hardware. Use at your own risk.",
+            text=(
+                "Experimental backends are opt-in. Some are speculative. Others are research-backed, "
+                "which means KeyRGB has public protocol notes or reverse-engineering references, but the "
+                "backend is still not broadly validated on user hardware. Use at your own risk."
+            ),
             font=("Sans", 9),
         )
         desc.pack(anchor="w", pady=(0, 8))

@@ -27,11 +27,13 @@ Uses a priority-based backend system plus a backend-stability policy to select t
 | `experimental` | Shipped in-tree, but only considered after you opt in via **Settings → Backend policy** or `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1`. |
 | `dormant` | Present for research / future work, but never selected yet. |
 
+Experimental backends also carry an evidence tag in diagnostics so maintainers can distinguish speculative implementations from research-backed ones based on public protocol notes or reverse-engineering work.
+
 Current backend plan:
 
 - `sysfs-leds`, `ite8291r3`, and `asusctl-aura`: `validated`
-- `ite8910`: `experimental` (`0x048d:0x8910`, Linux `hidraw` feature-report path)
-- `ite8297`: `dormant`
+- `ite8910`: `experimental` + `reverse_engineered` (`0x048d:0x8910`, Linux `hidraw` feature-report path)
+- `ite8297`: `experimental` + `reverse_engineered` (`0x048d:0x8297`, Linux `hidraw` feature-report path for uniform color only)
 
 Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental and dormant paths are additionally policy-gated, so detection alone does not guarantee automatic selection.
 
@@ -170,7 +172,7 @@ Notes:
 - The installer reports a distro support profile at startup: Fedora / Red Hat (tested), Debian / Ubuntu / Linux Mint (experimental), Arch / CachyOS / EndeavourOS / Manjaro (tested), and openSUSE / Other Linux (best-effort).
 - On Arch/CachyOS, install `fuse2` for native AppImage/FUSE launching: `sudo pacman -S --needed fuse2`. KeyRGB also installs a launcher wrapper that falls back to `--appimage-extract-and-run` when `libfuse.so.2` is unavailable.
 - On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver package installs are best-effort and may require TUXEDO package sources; the installer does not add third-party apt repos automatically.
-- Experimental `ite8910` support (`0x048d:0x8910`) uses Linux `hidraw`. The bundled KeyRGB udev rules also grant `uaccess` on matching `hidraw` nodes so the app can talk to that controller without detaching the kernel keyboard driver.
+- Experimental `ite8910` support (`0x048d:0x8910`) uses Linux `hidraw`. The current implementation is based on public reverse-engineering work by Valentin Lobstein (`chocapikk`, Reddit `Greedy-Ad232`). The bundled KeyRGB udev rules also grant `uaccess` on matching `hidraw` nodes so the app can talk to that controller without detaching the kernel keyboard driver.
 - To pin installs to a known release tag (instead of `main`), use both `--ref <tag>` and `--version <tag>` (for example `v0.17.2`).
 
 #### Update existing AppImage (non-interactive)
@@ -247,8 +249,9 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 
 | Variable | Usage |
 | --- | --- |
-| `KEYRGB_BACKEND` | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `asusctl-aura`, or `ite8910` when experimental backends are enabled. |
+| `KEYRGB_BACKEND` | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `asusctl-aura`, or the experimental `ite8910` / `ite8297` backends when experimental backends are enabled. |
 | `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1` | Opt in to experimental backends without using the Settings window. |
+| `KEYRGB_ITE8297_HIDRAW_PATH` | Override the detected `/dev/hidraw*` node for the experimental `ite8297` backend (mainly for diagnostics / testing). |
 | `KEYRGB_DEBUG=1` | Enable verbose debug logging. |
 | `KEYRGB_TK_SCALING` | Float override for UI scaling (High-DPI / fractional scaling). |
 | `KEYRGB_TCCD_BIN` | Override the `tccd` helper path for TCC integration. |
@@ -273,7 +276,7 @@ Access **Settings** via the tray menu to configure:
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
 - **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
 - **Autostart**: enable “Start KeyRGB on login”.
-- **Backend policy**: opt in to experimental backends. Current plan: `ite8910` is experimental and `ite8297` remains dormant.
+- **Backend policy**: opt in to experimental backends. Current plan: `ite8910` and `ite8297` are both experimental; the UI labels them as speculative or research-backed.
 
 ### Profiles
 

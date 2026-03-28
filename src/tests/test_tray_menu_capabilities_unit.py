@@ -170,6 +170,30 @@ def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) ->
     assert "048d:600b" in items[0]["text"].lower()
 
 
+def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    class DummyBackend:
+        name = "ite8910"
+        stability = "experimental"
+        experimental_evidence = "reverse_engineered"
+
+    class DummyProbe:
+        identifiers = {"usb_vid": "0x048d", "usb_pid": "0x8910"}
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+    tray.backend = DummyBackend()
+    tray.backend_probe = DummyProbe()
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    text = items[0]["text"].lower()
+
+    assert "ite 8910" in text
+    assert "experimental" in text
+    assert "research-backed" in text
+
+
 def test_keyboard_status_shows_warning_when_not_detected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

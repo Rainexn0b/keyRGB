@@ -16,28 +16,19 @@ RAW_BRIGHTNESS_MAX = 0x0A
 RAW_SPEED_MAX = 0x02
 
 REPORT_ID = 0xCC
-REPORT_TRAILER = 0x7F
 LED_ID_ROW_STRIDE = 0x20
 
-# LED ranges documented by the public `ite-829x.c` userspace tool.
-# These are the ids that tool explicitly describes as valid keyboard LEDs.
-LED_ID_RANGES: tuple[tuple[int, int], ...] = (
-    (0, 19),
-    (32, 43),
-    (45, 51),
-    (64, 83),
-    (96, 108),
-    (110, 115),
-    (128, 128),
-    (130, 147),
-    (160, 165),
-    (169, 179),
-)
-
+# Public reverse-engineering attribution:
+# - Valentin Lobstein / chocapikk
+# - Reddit user Greedy-Ad232
+#
+# KeyRGB's experimental ITE 8910 path follows the documented 6-byte 0xCC HID
+# feature-report framing and the full 6x20 encoded LED matrix described in the
+# public reverse-engineering notes captured in docs/developement/ite8910-protocol-notes.md.
 KNOWN_LED_IDS: tuple[int, ...] = tuple(
-    led_id
-    for start, end in LED_ID_RANGES
-    for led_id in range(int(start), int(end) + 1)
+    ((row & 0x07) << 5) | (col & 0x1F)
+    for row in range(NUM_ROWS)
+    for col in range(NUM_COLS)
 )
 
 
@@ -45,20 +36,25 @@ class Ite8910Effect(IntEnum):
     WAVE = 0
     BREATHING = 1
     SCAN = 2
-    BLINK = 3
+    FLASHING = 3
     RANDOM = 4
     RIPPLE = 5
     SNAKE = 6
+    SPECTRUM_CYCLE = 7
+    BLINK = 3
 
 
 CANONICAL_EFFECTS: dict[str, Ite8910Effect] = {
+    "rainbow": Ite8910Effect.SPECTRUM_CYCLE,
     "wave": Ite8910Effect.WAVE,
     "breathing": Ite8910Effect.BREATHING,
     "scan": Ite8910Effect.SCAN,
-    "blink": Ite8910Effect.BLINK,
+    "flashing": Ite8910Effect.FLASHING,
+    "blink": Ite8910Effect.FLASHING,
     "random": Ite8910Effect.RANDOM,
     "ripple": Ite8910Effect.RIPPLE,
     "snake": Ite8910Effect.SNAKE,
+    "spectrum_cycle": Ite8910Effect.SPECTRUM_CYCLE,
 }
 
 _EFFECT_ALIASES: dict[str, Ite8910Effect] = {
@@ -66,14 +62,15 @@ _EFFECT_ALIASES: dict[str, Ite8910Effect] = {
     "breathe": Ite8910Effect.BREATHING,
 }
 
-_EFFECT_REPORT_FIELDS: dict[Ite8910Effect, tuple[int, int, int]] = {
-    Ite8910Effect.WAVE: (0x00, 0x04, 0x7F),
-    Ite8910Effect.BREATHING: (0x0A, 0x00, 0x7F),
-    Ite8910Effect.SCAN: (0x00, 0x0A, 0x7F),
-    Ite8910Effect.BLINK: (0x0B, 0x00, 0x7F),
-    Ite8910Effect.RANDOM: (0x00, 0x09, 0x00),
-    Ite8910Effect.RIPPLE: (0x07, 0x00, 0x00),
-    Ite8910Effect.SNAKE: (0x00, 0x0B, 0x53),
+_EFFECT_REPORT_FIELDS: dict[Ite8910Effect, tuple[int, int, int, int, int]] = {
+    Ite8910Effect.WAVE: (0x00, 0x04, 0x00, 0x00, 0x00),
+    Ite8910Effect.BREATHING: (0x0A, 0x00, 0x00, 0x00, 0x00),
+    Ite8910Effect.SCAN: (0x00, 0x0A, 0x00, 0x00, 0x00),
+    Ite8910Effect.FLASHING: (0x0B, 0x00, 0x00, 0x00, 0x00),
+    Ite8910Effect.RANDOM: (0x00, 0x09, 0x00, 0x00, 0x00),
+    Ite8910Effect.RIPPLE: (0x07, 0x00, 0x00, 0x00, 0x00),
+    Ite8910Effect.SNAKE: (0x00, 0x0B, 0x00, 0x00, 0x00),
+    Ite8910Effect.SPECTRUM_CYCLE: (0x00, 0x02, 0x00, 0x00, 0x00),
 }
 
 
@@ -186,18 +183,16 @@ def build_brightness_speed_report_raw(brightness_raw: int, speed_raw: int) -> by
             clamp_raw_speed(speed_raw),
             0x00,
             0x00,
-            REPORT_TRAILER,
         )
     )
 
 
 def build_effect_report(effect: Ite8910Effect | int | str) -> bytes:
-    effect1, effect2, last = _EFFECT_REPORT_FIELDS[normalize_effect(effect)]
-    return bytes((REPORT_ID, effect1, effect2, 0x00, 0x00, 0x00, last))
+    return bytes((REPORT_ID, *_EFFECT_REPORT_FIELDS[normalize_effect(effect)]))
 
 
 def build_reset_report() -> bytes:
-    return bytes((REPORT_ID, 0x00, 0x0C, 0x00, 0x00, 0x00, REPORT_TRAILER))
+    return bytes((REPORT_ID, 0x00, 0x0C, 0x00, 0x00, 0x00))
 
 
 def build_led_color_report(led_id: int, color: tuple[int, int, int]) -> bytes:
@@ -210,7 +205,6 @@ def build_led_color_report(led_id: int, color: tuple[int, int, int]) -> bytes:
             clamp_channel(red),
             clamp_channel(green),
             clamp_channel(blue),
-            REPORT_TRAILER,
         )
     )
 

@@ -7,7 +7,7 @@ from typing import Any
 
 from src.core.utils.exceptions import is_permission_denied
 
-from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
+from ..base import BackendCapabilities, BackendStability, ExperimentalEvidence, KeyboardBackend, KeyboardDevice, ProbeResult
 from ..policy import experimental_backends_enabled
 from .device import Ite8910KeyboardDevice
 from .hidraw import find_matching_hidraw_device, open_matching_hidraw_transport
@@ -31,11 +31,12 @@ def _effect_builder(effect_name: str) -> Callable[..., dict[str, Any]]:
 
 @dataclass
 class Ite8910Backend(KeyboardBackend):
-    """Experimental backend for the translated ITE 8910 / 829x protocol."""
+    """Experimental backend for the reverse-engineered ITE 8910 HID protocol."""
 
     name: str = "ite8910"
     priority: int = 94
     stability: BackendStability = BackendStability.EXPERIMENTAL
+    experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
 
     def is_available(self) -> bool:
         return self.probe().available
@@ -107,7 +108,16 @@ class Ite8910Backend(KeyboardBackend):
         return (protocol.NUM_ROWS, protocol.NUM_COLS)
 
     def effects(self) -> dict[str, Any]:
-        return {name: _effect_builder(name) for name in protocol.CANONICAL_EFFECTS}
+        return {
+            "rainbow": _effect_builder("rainbow"),
+            "breathing": _effect_builder("breathing"),
+            "wave": _effect_builder("wave"),
+            "scan": _effect_builder("scan"),
+            "flashing": _effect_builder("flashing"),
+            "random": _effect_builder("random"),
+            "snake": _effect_builder("snake"),
+            "spectrum_cycle": _effect_builder("spectrum_cycle"),
+        }
 
     def colors(self) -> dict[str, Any]:
         return {}

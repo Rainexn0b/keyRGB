@@ -152,6 +152,7 @@ class Ite8910KeyboardDevice:
         if enable_user_mode:
             self.enable_user_mode(brightness=brightness, save=False)
         else:
+            self.reset()
             self.set_brightness(brightness)
 
         for key_id, color in (color_map or {}).items():
