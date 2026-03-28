@@ -1,19 +1,28 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 
 from src.core.effects.reactive.render import pulse_brightness_scale_factor
 
 
 class _DummyEngine:
-    def __init__(self, *, brightness: int, reactive_brightness: int):
+    def __init__(self, *, brightness: int, reactive_brightness: int, has_per_key: bool = True):
         self.brightness = brightness
         self.reactive_brightness = reactive_brightness
         self.per_key_colors = None
         self.per_key_brightness = None
+        self.kb = SimpleNamespace(set_key_colors=object()) if has_per_key else SimpleNamespace()
+        self._reactive_active_pulse_mix = 0.0
+        # Set to 50 (steady-state) so the stability guard does not interfere
+        # with tests that verify raw brightness scaling formulas.
+        self._last_rendered_brightness = 50
 
 
 def test_pulse_brightness_uses_reactive_brightness_when_lower_than_hw() -> None:
     eng = _DummyEngine(brightness=40, reactive_brightness=20)
+    # Steady-state: set last_rendered=40 so the guard doesn't clamp hw=40.
+    eng._last_rendered_brightness = 40
     # No backdrop => hw is profile brightness (40). Scale is eff/hw.
     assert pulse_brightness_scale_factor(eng) == 0.5
 
@@ -35,3 +44,58 @@ def test_pulse_brightness_scale_changes_across_range() -> None:
     eng_high.per_key_brightness = 50
 
     assert pulse_brightness_scale_factor(eng_low) < pulse_brightness_scale_factor(eng_high)
+
+
+def test_active_pulse_mix_does_not_lift_hw_on_per_key_backends() -> None:
+    from src.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50)
+    eng._last_rendered_brightness = 10
+    eng._reactive_active_pulse_mix = 1.0
+
+    _base, eff, hw = _resolve_brightness(eng)
+
+    assert eff == 50
+    assert hw == 10
+
+
+def test_active_pulse_mix_can_lift_hw_on_uniform_backends() -> None:
+    from src.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
+    eng._last_rendered_brightness = 10
+    eng._reactive_active_pulse_mix = 1.0
+
+    _base, eff, hw = _resolve_brightness(eng)
+
+    assert eff == 50
+    assert hw == 50
+
+
+def test_idle_without_active_pulse_keeps_hw_at_profile_brightness() -> None:
+    from src.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50)
+    eng._last_rendered_brightness = 10
+    eng._reactive_active_pulse_mix = 0.0
+
+    _base, eff, hw = _resolve_brightness(eng)
+
+    assert eff == 50
+    assert hw == 10
+
+
+def test_pulse_return_to_idle_skips_guard_tail() -> None:
+    from src.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
+    # Previous frame was a fully lifted pulse.
+    eng._last_rendered_brightness = 50
+    eng._reactive_active_pulse_mix = 0.0
+
+    _base, eff, hw = _resolve_brightness(eng)
+
+    assert eff == 50
+    # When a pulse has finished, return directly to the idle baseline instead
+    # of stepping down through a bright tail frame.
+    assert hw == 10

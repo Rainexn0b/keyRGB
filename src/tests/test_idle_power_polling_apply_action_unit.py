@@ -6,6 +6,7 @@ from contextlib import AbstractContextManager
 
 import pytest
 
+from src.tray.controllers._transition_constants import SOFT_OFF_FADE_DURATION_S, SOFT_ON_FADE_DURATION_S
 from src.tray.pollers.idle_power_polling import _apply_idle_action
 
 
@@ -34,7 +35,7 @@ def test_turn_off_stops_engine_turns_off_and_sets_idle_forced_flag() -> None:
     _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
 
     tray.engine.stop.assert_called_once()
-    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=0.12)
+    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
     assert tray.is_off is True
     assert tray._idle_forced_off is True
     assert tray._dim_temp_active is False
@@ -212,20 +213,25 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     tray._dim_temp_target_brightness = None
     tray.config = SimpleNamespace(effect="reactive_ripple", brightness=5, perkey_brightness=5)
 
-    # Dim to temp must be atomic + instant (no fade under lock), and must
-    # not tamper with reactive_brightness or introduce ramp attributes.
+    # Dim to temp must be atomic + instant (no sleeping fade under lock), and
+    # must not tamper with reactive_brightness.
     _apply_idle_action(tray, action="dim_to_temp", dim_temp_brightness=3)
     assert tray._dim_temp_active is True
     assert tray._dim_temp_target_brightness == 3
     assert engine.kb_lock.enter_count == 1
     assert engine.per_key_brightness == 3
     assert engine.reactive_brightness == 50
-    assert getattr(engine, "_hw_brightness_cap", None) == 3
-    # _dim_temp_active is now propagated to the engine so
+    # Reactive dim no longer sets _hw_brightness_cap — the transition +
+    # dim_temp_active is sufficient.  The cap would override the transition
+    # animation and cause a single-frame flash-to-dark.
+    assert not hasattr(engine, "_hw_brightness_cap") or getattr(engine, "_hw_brightness_cap", None) is None
+    # _dim_temp_active is propagated directly to the engine so
     # _resolve_brightness() can see it.
     assert getattr(engine, "_dim_temp_active", None) is True
     assert engine.set_brightness_calls == [(3, False, False, 0.0)]
-    assert not hasattr(engine, "_keyrgb_hw_ramp_start_at")
+    assert getattr(engine, "_reactive_transition_from_brightness", None) == 25
+    assert getattr(engine, "_reactive_transition_to_brightness", None) == 3
+    assert getattr(engine, "_reactive_transition_duration_s", None) == SOFT_OFF_FADE_DURATION_S
 
     # Restore must also be atomic + instant, keep reactive_brightness intact.
     tray._dim_temp_active = True
@@ -240,7 +246,13 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     assert getattr(engine, "_hw_brightness_cap", "MISSING") is None
     assert getattr(engine, "_dim_temp_active", None) is False
     assert engine.set_brightness_calls[-1] == (5, False, False, 0.0)
-    assert not hasattr(engine, "_keyrgb_hw_ramp_start_at")
+    assert getattr(engine, "_reactive_transition_from_brightness", None) == 3
+    # restore_target_hw = max(config.brightness=5, perkey=5) = 5
+    # reactive_brightness is excluded from the target because _resolve_brightness
+    # no longer raises hw above global_hw.  Targeting reactive_brightness=50 would
+    # overshoot steady-state hw=5 and produce a visible flash on every undim.
+    assert getattr(engine, "_reactive_transition_to_brightness", None) == 5
+    assert getattr(engine, "_reactive_transition_duration_s", None) == SOFT_ON_FADE_DURATION_S
 
 
 class _SequencingLock(AbstractContextManager[None]):

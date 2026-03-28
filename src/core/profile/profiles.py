@@ -63,6 +63,7 @@ __all__ = [
     "save_layout_global",
     "save_layout_per_key",
     "save_per_key_colors",
+    "migrate_builtin_profile_brightness",
     "set_active_profile",
     "set_default_profile",
 ]
@@ -209,6 +210,75 @@ def save_per_key_colors(colors: Dict[Tuple[int, int], Tuple[int, int, int]], nam
     write_json_atomic(p, payload)
 
 
+def _builtin_profile_brightness(name: str) -> int | None:
+    prof = safe_profile_name(name)
+    if prof == "light":
+        return 50
+    if prof == "dim":
+        return 15
+    return None
+
+
+def migrate_builtin_profile_brightness(cfg) -> bool:
+    """Repair the known stale built-in profile brightness states.
+
+    Older builds could leave ``active_profile=dim`` while persisting
+    ``brightness=25`` and only setting ``perkey_brightness=5``. Reactive
+    effects use ``cfg.brightness`` as their steady-state hardware brightness,
+    so the built-in dim profile would still render at the light baseline.
+
+    Keep the migration narrow so it only heals the legacy mismatches and does
+    not fight later manual brightness changes.
+    """
+
+    try:
+        prof = safe_profile_name(get_active_profile())
+    except Exception:
+        return False
+
+    target = _builtin_profile_brightness(prof)
+    if target is None:
+        return False
+
+    try:
+        if hasattr(cfg, "effect_brightness"):
+            brightness = int(getattr(cfg, "effect_brightness", 0) or 0)
+        else:
+            brightness = int(getattr(cfg, "brightness", 0) or 0)
+    except Exception:
+        brightness = 0
+    try:
+        perkey = int(getattr(cfg, "perkey_brightness", brightness) or 0)
+    except Exception:
+        perkey = brightness
+
+    should_migrate = False
+    if prof == "dim":
+        # Legacy built-in dim used 5.  The current built-in dim baseline is 15,
+        # so repair both stale mismatches (25/5) and previously-persisted 5/5
+        # states when the built-in profile is active.
+        should_migrate = perkey == 5 or brightness == 5 or (perkey == 15 and brightness != 15)
+    elif prof == "light":
+        should_migrate = brightness in {5, 15} and perkey in {5, 15}
+
+    if not should_migrate:
+        return False
+
+    try:
+        if hasattr(cfg, "effect_brightness"):
+            cfg.effect_brightness = int(target)
+        else:
+            cfg.brightness = int(target)
+    except Exception:
+        return False
+    try:
+        if hasattr(cfg, "perkey_brightness"):
+            cfg.perkey_brightness = int(target)
+    except Exception:
+        pass
+    return True
+
+
 def apply_profile_to_config(cfg, colors: Dict[Tuple[int, int], Tuple[int, int, int]]) -> None:
     # Profile-specific defaults.
     try:
@@ -216,9 +286,26 @@ def apply_profile_to_config(cfg, colors: Dict[Tuple[int, int], Tuple[int, int, i
     except Exception:
         prof = ""
 
+    def _set_profile_brightness(value: int) -> None:
+        try:
+            if hasattr(cfg, "effect_brightness"):
+                cfg.effect_brightness = int(value)
+            else:
+                cfg.brightness = int(value)
+        except Exception:
+            pass
+        try:
+            if hasattr(cfg, "perkey_brightness"):
+                cfg.perkey_brightness = int(value)
+        except Exception:
+            pass
+
     # Ensure visible when activating a per-key profile.
     try:
-        perkey_bri = int(getattr(cfg, "perkey_brightness", getattr(cfg, "brightness", 0)) or 0)
+        if hasattr(cfg, "perkey_brightness"):
+            perkey_bri = int(getattr(cfg, "perkey_brightness", 0) or 0)
+        else:
+            perkey_bri = int(getattr(cfg, "brightness", 0) or 0)
     except Exception:
         perkey_bri = 0
 
@@ -229,12 +316,14 @@ def apply_profile_to_config(cfg, colors: Dict[Tuple[int, int], Tuple[int, int, i
             # Backward-compat for callers that pass in a stub config.
             cfg.brightness = 50
 
-    # Low-light typing preset should default to ~10% brightness (0..50 scale).
-    if prof == "dim":
-        if hasattr(cfg, "perkey_brightness"):
-            cfg.perkey_brightness = 5
-        else:
-            cfg.brightness = 5
+    # Built-in brightness presets should define the baseline keyboard level,
+    # not just the per-key backdrop value.  Reactive effects read cfg.brightness
+    # as their steady-state hardware brightness, so only changing
+    # perkey_brightness leaves the built-in dim profile visually identical to
+    # light for reactive typing.
+    builtin_target = _builtin_profile_brightness(prof)
+    if builtin_target is not None:
+        _set_profile_brightness(builtin_target)
     cfg.effect = "perkey"
     cfg.per_key_colors = colors
 

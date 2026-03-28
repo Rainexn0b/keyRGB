@@ -75,6 +75,32 @@ def _build_frame_base_maps(
     return False, base_unscaled, dict(base_unscaled)
 
 
+def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) -> None:
+    """Update the live reactive pulse mix with a short tail decay.
+
+    Ripple/fade overlays can disappear abruptly when the last pulse ages out,
+    which would drop the entire keyboard from lifted hardware brightness back to
+    idle in one frame.  Preserve a tiny decay tail so the end of the effect is
+    less perceptible keyboard-wide.
+    """
+
+    try:
+        prev = float(getattr(engine, "_reactive_active_pulse_mix", 0.0) or 0.0)
+    except Exception:
+        prev = 0.0
+
+    target_f = max(0.0, min(1.0, float(target)))
+    if target_f <= 0.0 and prev > 0.0:
+        next_mix = max(0.0, prev - 0.34)
+    else:
+        next_mix = target_f
+
+    try:
+        engine._reactive_active_pulse_mix = float(next_mix)
+    except Exception:
+        pass
+
+
 def _reactive_fade_loop(engine: "EffectsEngine") -> None:
     dt = frame_dt_s()
     p = pace(engine)
@@ -122,6 +148,12 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
             intensity = 1.0 - (pulse.age_s / pulse.ttl_s)
             overlay[(pulse.row, pulse.col)] = max(overlay.get((pulse.row, pulse.col), 0.0), intensity)
 
+        try:
+            target_mix = max((float(v) for v in overlay.values()), default=0.0)
+        except Exception:
+            target_mix = 0.0
+        _set_reactive_active_pulse_mix(engine, target=target_mix)
+
         per_key_backdrop_active, base_unscaled, base = _build_frame_base_maps(
             engine, background_rgb=scale(react_color, 0.06)
         )
@@ -129,6 +161,7 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
         # When reactive brightness is 0, treat reactive typing as disabled.
         # Keep the current background/backdrop rendering but suppress pulses.
         if eff_hw <= 0:
+            _set_reactive_active_pulse_mix(engine, target=0.0)
             render(engine, color_map=base)
             engine.stop_event.wait(dt)
             continue
@@ -289,6 +322,7 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
         per_key_backdrop_active, base_unscaled, base = _build_frame_base_maps(engine, background_rgb=(5, 5, 5))
 
         if eff_hw <= 0:
+            _set_reactive_active_pulse_mix(engine, target=0.0)
             render(engine, color_map=base)
             engine.stop_event.wait(dt)
             continue
@@ -313,6 +347,12 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
 
         band = 2.15
         overlay = _build_overlay(pulses, band=band)
+
+        try:
+            target_mix = max((float(w) for (w, _hue) in overlay.values()), default=0.0)
+        except Exception:
+            target_mix = 0.0
+        _set_reactive_active_pulse_mix(engine, target=target_mix)
 
         manual = _get_engine_manual_reactive_color(engine)
         pulse_scale = pulse_brightness_scale_factor(engine)

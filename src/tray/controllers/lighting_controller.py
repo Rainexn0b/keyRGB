@@ -5,6 +5,11 @@ from typing import Optional
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.utils.safe_attrs import safe_int_attr
+from src.tray.controllers._transition_constants import (
+    SOFT_OFF_FADE_DURATION_S,
+    SOFT_ON_FADE_DURATION_S,
+    SOFT_ON_START_BRIGHTNESS,
+)
 from src.tray.controllers._lighting_controller_helpers import (
     apply_perkey_mode,
     apply_uniform_none_mode,
@@ -77,6 +82,31 @@ def start_current_effect(
         else:
             clear_engine_perkey_state(tray)
 
+        # When a fade-in is planned, decide the ramp strategy based on
+        # whether the effect runs its own render loop.
+        _will_fade = fade_in and target_brightness > start_brightness and target_brightness > 0
+        is_loop_effect = is_software_effect(effect) or is_reactive_effect(effect)
+
+        # Hardware-only effects (perkey, none) need a blocking fade and
+        # auxiliary brightness caps so _resolve_brightness stays aligned.
+        # Loop effects (reactive, SW) use the render loop's per-frame
+        # stability guard for smooth ramping — capping reactive_brightness
+        # would make pulses invisible during the ramp window.
+        _saved_reactive_br = None
+        _saved_perkey_br = None
+        if _will_fade and not is_loop_effect:
+            try:
+                _saved_reactive_br = getattr(tray.engine, "reactive_brightness", None)
+                tray.engine.reactive_brightness = start_brightness
+            except Exception:
+                pass
+            try:
+                _saved_perkey_br = getattr(tray.engine, "per_key_brightness", None)
+                if _saved_perkey_br is not None:
+                    tray.engine.per_key_brightness = start_brightness
+            except Exception:
+                pass
+
         tray.engine.start_effect(
             effect,
             speed=tray.config.speed,
@@ -87,14 +117,33 @@ def start_current_effect(
         )
         tray.is_off = False
 
-        if fade_in and target_brightness > start_brightness and target_brightness > 0:
-            is_sw_effect = is_software_effect(effect)
-            tray.engine.set_brightness(
-                target_brightness,
-                apply_to_hardware=not is_sw_effect,
-                fade=True,
-                fade_duration_s=float(fade_in_duration_s),
-            )
+        if _will_fade:
+            if is_loop_effect:
+                # The render loop's stability guard ramps brightness
+                # frame-by-frame (~8 units/frame).  Just set the target
+                # atomically — no blocking fade, no aux caps needed.
+                tray.engine.set_brightness(
+                    target_brightness,
+                    apply_to_hardware=False,
+                )
+            else:
+                tray.engine.set_brightness(
+                    target_brightness,
+                    apply_to_hardware=True,
+                    fade=True,
+                    fade_duration_s=float(fade_in_duration_s),
+                )
+            # Restore auxiliary brightness for hardware effects.
+            if _saved_reactive_br is not None:
+                try:
+                    tray.engine.reactive_brightness = int(_saved_reactive_br)
+                except Exception:
+                    pass
+            if _saved_perkey_br is not None:
+                try:
+                    tray.engine.per_key_brightness = int(_saved_perkey_br)
+                except Exception:
+                    pass
     except Exception as exc:
         # If the USB device disappeared, mark it unavailable and avoid a scary traceback.
         if is_device_disconnected(exc):
@@ -206,7 +255,12 @@ def turn_on(tray: LightingTrayProtocol) -> None:
         tray.config.brightness = tray._last_brightness if tray._last_brightness > 0 else 25
 
     # Fade-in from a minimal brightness to reduce abrupt on/off transitions.
-    start_current_effect(tray, brightness_override=1, fade_in=True, fade_in_duration_s=0.25)
+    start_current_effect(
+        tray,
+        brightness_override=SOFT_ON_START_BRIGHTNESS,
+        fade_in=True,
+        fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+    )
 
     tray._refresh_ui()
 
@@ -216,7 +270,7 @@ def power_turn_off(tray: LightingTrayProtocol) -> None:
     tray._power_forced_off = True
     tray._idle_forced_off = False
     tray.is_off = True
-    tray.engine.turn_off(fade=True, fade_duration_s=0.12)
+    tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
     tray._refresh_ui()
 
 
@@ -258,7 +312,12 @@ def power_restore(tray: LightingTrayProtocol) -> None:
     except Exception:
         pass
     tray.is_off = False
-    start_current_effect(tray, brightness_override=1, fade_in=True, fade_in_duration_s=0.25)
+    start_current_effect(
+        tray,
+        brightness_override=SOFT_ON_START_BRIGHTNESS,
+        fade_in=True,
+        fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+    )
     tray._refresh_ui()
 
 

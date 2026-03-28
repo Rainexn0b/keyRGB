@@ -147,16 +147,54 @@ class _EngineStart:
         prev_color: tuple,
         fade_to_color: tuple,
     ) -> None:
-        if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
-            self._fade_in_per_key(duration_s=0.06)
-        else:
-            # Fade from previous color to the chosen effect's start color.
-            self._fade_uniform_color(
-                from_color=prev_color,
-                to_color=fade_to_color,
-                brightness=int(self.brightness),
-                duration_s=0.06,
+        if int(self.brightness) > 1:
+            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+                self._fade_in_per_key(duration_s=0.06)
+                # Record the mode brightness established by the per-key fade so
+                # the reactive render's first frame doesn't send a redundant
+                # SET_EFFECT (enable_user_mode).
+                try:
+                    self._last_hw_mode_brightness = int(self.brightness)
+                except Exception:
+                    pass
+                # Seed _last_rendered_brightness so the per-frame stability
+                # guard treats the fade endpoint as the starting point.
+                # Without this, the guard sees prev=None→0 and clamps the
+                # first reactive frame down to 8 (0+step), producing a
+                # visible dip from the fade's brightness before ramping back.
+                try:
+                    self._last_rendered_brightness = int(self.brightness)
+                except Exception:
+                    pass
+            else:
+                # Fade from previous color to the chosen effect's start color.
+                self._fade_uniform_color(
+                    from_color=prev_color,
+                    to_color=fade_to_color,
+                    brightness=int(self.brightness),
+                    duration_s=0.06,
+                )
+                # Seed _last_rendered_brightness so the per-frame stability
+                # guard starts from the fade's final brightness, not from 0.
+                # Without this, the guard sees prev=None→0 and steps up
+                # frame-by-frame from 0 to engine.brightness, producing a
+                # visible sweep-to-brightness at effect start.
+                try:
+                    self._last_rendered_brightness = int(self.brightness)
+                except Exception:
+                    pass
+        elif self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+            # At very low brightness (e.g. brightness_override=1 during a
+            # wake-from-idle restore) the cosmetic fade is invisible.
+            # Initialise user mode at brightness=0 so the SET_EFFECT mode-
+            # init is invisible.  The render loop then ramps using the
+            # lighter SET_BRIGHTNESS command (no mode reinit, no flash).
+            from src.core.effects.perkey_animation import enable_user_mode_once
+
+            enable_user_mode_once(
+                kb=self.kb, kb_lock=self.kb_lock, brightness=0
             )
+            self._last_hw_mode_brightness = 0
 
         def _run_target_best_effort() -> None:
             try:

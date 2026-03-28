@@ -8,6 +8,12 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+from src.tray.controllers._transition_constants import (
+    SOFT_OFF_FADE_DURATION_S,
+    SOFT_ON_FADE_DURATION_S,
+    SOFT_ON_START_BRIGHTNESS,
+)
+
 
 class TestParseMenuInt:
     """Test parse_menu_int helper."""
@@ -282,9 +288,9 @@ class TestTurnOffOn:
         assert mock_tray.config.brightness == 75
         mock_start.assert_called_once_with(
             mock_tray,
-            brightness_override=1,
+            brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=0.25,
+            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
         )
 
     def test_turn_on_uses_default_25_if_no_last_brightness(self):
@@ -305,9 +311,9 @@ class TestTurnOffOn:
         assert mock_tray.config.brightness == 25
         mock_start.assert_called_once_with(
             mock_tray,
-            brightness_override=1,
+            brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=0.25,
+            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
         )
 
 
@@ -326,7 +332,10 @@ class TestPowerTurnOffRestore:
         assert mock_tray._power_forced_off is True
         assert mock_tray._idle_forced_off is False
         assert mock_tray.is_off is True
-        mock_tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=0.12)
+        mock_tray.engine.turn_off.assert_called_once_with(
+            fade=True,
+            fade_duration_s=SOFT_OFF_FADE_DURATION_S,
+        )
 
     def test_power_restore_restores_when_power_forced(self):
         """power_restore should restore when _power_forced_off was True."""
@@ -350,9 +359,9 @@ class TestPowerTurnOffRestore:
         assert mock_tray.engine.current_color == (0, 0, 0)
         mock_start.assert_called_once_with(
             mock_tray,
-            brightness_override=1,
+            brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=0.25,
+            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
         )
 
     def test_power_restore_restores_when_off_due_to_hardware_reset(self):
@@ -374,9 +383,9 @@ class TestPowerTurnOffRestore:
         assert mock_tray.engine.current_color == (0, 0, 0)
         mock_start.assert_called_once_with(
             mock_tray,
-            brightness_override=1,
+            brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=0.25,
+            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
         )
 
     def test_power_restore_does_not_fight_user_forced_off(self):

@@ -28,6 +28,9 @@ class _RecordingKB:
     def enable_user_mode(self, *, brightness: int, save: bool = False) -> None:
         pass
 
+    def set_brightness(self, brightness: int) -> None:
+        pass
+
     def set_key_colors(self, _color_map, *, brightness: int, enable_user_mode: bool = False) -> None:
         self.brightness_log.append(int(brightness))
 
@@ -57,6 +60,7 @@ def _mk_engine(
         per_key_brightness=per_key_brightness,
         reactive_brightness=reactive_brightness,
         per_key_colors={(0, 0): (255, 0, 0)} if has_per_key else None,
+        _reactive_active_pulse_mix=0.0,
         _hw_brightness_cap=hw_brightness_cap,
         _dim_temp_active=dim_temp_active,
         _last_rendered_brightness=last_rendered,
@@ -96,13 +100,16 @@ def test_guard_allows_small_change() -> None:
     assert hw == 50  # max(45, 50, 50) = 50, same as last_rendered
 
 
-def test_guard_inactive_when_no_previous_frame() -> None:
-    """First frame (no _last_rendered_brightness): no clamping applied."""
-    from src.core.effects.reactive.render import _resolve_brightness
+def test_guard_ramps_from_zero_on_first_frame_after_restart() -> None:
+    """After stop() resets _last_rendered_brightness to None, the guard treats
+    None as 0 so the first rendered frame ramps up from dark instead of
+    jumping straight to target brightness."""
+    from src.core.effects.reactive.render import _resolve_brightness, _MAX_BRIGHTNESS_STEP_PER_FRAME
 
     engine = _mk_engine(brightness=50, last_rendered=None)
     _, _, hw = _resolve_brightness(engine)
-    assert hw == 50
+    # Guard treats None as 0: first frame is clamped to _MAX_BRIGHTNESS_STEP_PER_FRAME.
+    assert hw == _MAX_BRIGHTNESS_STEP_PER_FRAME
 
 
 def test_guard_converges_over_multiple_frames() -> None:
@@ -147,21 +154,82 @@ def test_guard_works_with_dim_temp_cap() -> None:
     assert all(f <= 50 for f in frames)
 
 
+def test_transition_cap_ramps_reactive_restore(monkeypatch) -> None:
+    """A reactive restore transition should cap brightness to the interpolated value."""
+    import src.core.effects.reactive.render as render_module
+
+    engine = _mk_engine(brightness=25, per_key_brightness=25, reactive_brightness=50, last_rendered=3)
+    engine._reactive_transition_from_brightness = 3
+    engine._reactive_transition_to_brightness = 25
+    engine._reactive_transition_started_at = 100.0
+    engine._reactive_transition_duration_s = 1.0
+
+    monkeypatch.setattr(render_module.time, "monotonic", lambda: 100.5)
+
+    _, eff, hw = render_module._resolve_brightness(engine)
+
+    assert eff == 14
+    # The transition resolves to 14, but the per-frame guard still clamps the
+    # hardware step from 3 upward to 11 in a single frame.
+    assert hw == 11
+
+
+def test_transition_cap_ramps_reactive_dim(monkeypatch) -> None:
+    """A reactive dim transition should hold brightness above the final dim target until the fade completes.
+
+    In production, reactive dim_to_temp no longer sets _hw_brightness_cap (the
+    cap would override the transition and flash-to-dark).  This test verifies
+    the transition + dim_temp_active path with no cap: hw tracks the
+    transition value (14 at 50%) instead of being clamped to the dim target.
+    """
+    import src.core.effects.reactive.render as render_module
+
+    engine = _mk_engine(
+        brightness=3,
+        per_key_brightness=3,
+        reactive_brightness=50,
+        hw_brightness_cap=None,
+        dim_temp_active=True,
+        last_rendered=25,
+    )
+    engine._reactive_transition_from_brightness = 25
+    engine._reactive_transition_to_brightness = 3
+    engine._reactive_transition_started_at = 200.0
+    engine._reactive_transition_duration_s = 1.0
+
+    monkeypatch.setattr(render_module.time, "monotonic", lambda: 200.5)
+
+    base, eff, hw = render_module._resolve_brightness(engine)
+
+    assert base == 14
+    assert eff == 14
+    # dim_temp_active=True locks hw to global_hw.  The falling transition
+    # raises global_hw to max(engine.brightness=3, transition=14) = 14.
+    # Guard bypass applies (dim_temp + negative delta), so hw reaches 14
+    # directly from prev=25.
+    assert hw == 14
+
+
 # ---------------------------------------------------------------------------
 # render() integration tests — _last_rendered_brightness tracking
 # ---------------------------------------------------------------------------
 
 
 def test_render_updates_last_rendered_brightness() -> None:
-    """render() should update engine._last_rendered_brightness after each frame."""
-    from src.core.effects.reactive.render import render
+    """render() should update engine._last_rendered_brightness after each frame.
+
+    When starting from None (post-stop), the guard ramps from 0 so the first
+    frame value is _MAX_BRIGHTNESS_STEP_PER_FRAME, not the raw target.
+    """
+    from src.core.effects.reactive.render import render, _MAX_BRIGHTNESS_STEP_PER_FRAME
 
     engine = _mk_engine(brightness=25, last_rendered=None)
     color_map = {(0, 0): (255, 255, 255)}
 
     render(engine, color_map=color_map)
     assert engine._last_rendered_brightness is not None
-    assert engine._last_rendered_brightness == 50  # max(25, 50, 50) = 50
+    # First frame: guard ramps from 0 → _MAX_BRIGHTNESS_STEP_PER_FRAME (8).
+    assert engine._last_rendered_brightness == _MAX_BRIGHTNESS_STEP_PER_FRAME
 
 
 def test_render_ramps_brightness_over_multiple_frames() -> None:
@@ -248,3 +316,9 @@ def test_engine_init_has_proper_dim_attributes() -> None:
     assert engine._dim_temp_active is False
     assert hasattr(engine, "_last_rendered_brightness")
     assert engine._last_rendered_brightness is None
+    assert hasattr(engine, "_reactive_transition_from_brightness")
+    assert engine._reactive_transition_from_brightness is None
+    assert hasattr(engine, "_reactive_transition_to_brightness")
+    assert engine._reactive_transition_to_brightness is None
+    assert hasattr(engine, "_reactive_active_pulse_mix")
+    assert engine._reactive_active_pulse_mix == 0.0

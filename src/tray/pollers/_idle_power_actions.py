@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from typing import Optional, cast
 
+from src.tray.controllers._transition_constants import (
+    SOFT_OFF_FADE_DURATION_S,
+    SOFT_ON_FADE_DURATION_S,
+    SOFT_ON_START_BRIGHTNESS,
+)
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
 
@@ -25,6 +31,33 @@ def _set_engine_hw_brightness_cap(engine: object, brightness: int | None) -> Non
 
         engine._hw_brightness_cap = max(0, min(50, int(brightness)))  # type: ignore[attr-defined]
         engine._dim_temp_active = True  # type: ignore[attr-defined]
+    except Exception:
+        return
+
+
+def _set_reactive_transition(
+    engine: object,
+    *,
+    target_brightness: int,
+    duration_s: float,
+) -> None:
+    """Seed a render-time reactive brightness transition.
+
+    The idle-power path still performs the authoritative state update under
+    kb_lock.  These attributes only tell the reactive renderer how to fade
+    visually toward that new target over a short time window.
+    """
+
+    try:
+        current = getattr(engine, "_last_rendered_brightness", None)
+        if current is None:
+            current = getattr(engine, "brightness", target_brightness)
+        current_i = max(0, min(50, int(current)))
+        target_i = max(0, min(50, int(target_brightness)))
+        engine._reactive_transition_from_brightness = current_i  # type: ignore[attr-defined]
+        engine._reactive_transition_to_brightness = target_i  # type: ignore[attr-defined]
+        engine._reactive_transition_started_at = float(time.monotonic())  # type: ignore[attr-defined]
+        engine._reactive_transition_duration_s = max(0.0, float(duration_s))  # type: ignore[attr-defined]
     except Exception:
         return
 
@@ -97,7 +130,11 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
         start_fn = getattr(tray, "_start_current_effect", None)
         if callable(start_fn):
             try:
-                start_fn(brightness_override=1, fade_in=True, fade_in_duration_s=0.25)
+                start_fn(
+                    brightness_override=SOFT_ON_START_BRIGHTNESS,
+                    fade_in=True,
+                    fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+                )
             except TypeError:
                 start_fn()
         else:
@@ -105,9 +142,9 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
 
             start_current_effect(
                 cast(LightingTrayProtocol, tray),
-                brightness_override=1,
+                brightness_override=SOFT_ON_START_BRIGHTNESS,
                 fade_in=True,
-                fade_in_duration_s=0.25,
+                fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
             )
     except Exception:
         try:
@@ -144,7 +181,7 @@ def apply_idle_action(
         except Exception:
             pass
         try:
-            tray.engine.turn_off(fade=True, fade_duration_s=0.12)
+            tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
         except Exception:
             pass
 
@@ -192,17 +229,27 @@ def apply_idle_action(
                     # Keep the update atomic relative to the render loop.
                     # IMPORTANT: do NOT use fade=True inside the lock — the
                     # RLock reentrancy means the fade's sleep() calls would
-                    # block the render loop for the full fade duration (~250ms),
-                    # causing a visible stutter.  Instead, set brightness
-                    # instantly; the 60 fps render loop + stability guard
-                    # produce a smooth visual transition naturally.
+                    # block the render loop for the full fade duration.
+                    # Instead, update the engine state atomically and let the
+                    # reactive renderer interpolate toward the target.
+                    #
+                    # NOTE: we do NOT set _hw_brightness_cap here.  The cap
+                    # would immediately clamp hw to the dim target, overriding
+                    # the transition animation and causing a single-frame jump
+                    # from 50→5 (visible as a flash-to-dark).  Instead, we
+                    # rely on _dim_temp_active=True (which locks hw to
+                    # global_hw) combined with the reactive transition to
+                    # smoothly fade brightness from the current level down to
+                    # the dim target.  Reactive pulses cannot raise hw above
+                    # global_hw while _dim_temp_active is set.
                     with tray.engine.kb_lock:
-                        _set_engine_hw_brightness_cap(tray.engine, int(dim_temp_brightness))
+                        tray.engine._dim_temp_active = True  # type: ignore[attr-defined]
+                        _set_reactive_transition(
+                            tray.engine,
+                            target_brightness=int(dim_temp_brightness),
+                            duration_s=SOFT_OFF_FADE_DURATION_S,
+                        )
                         tray.engine.per_key_brightness = dim_temp_brightness
-                        # Seed the stability guard so the guard ramps DOWN
-                        # smoothly from the previous rendered brightness.
-                        # (Leave _last_rendered_brightness as-is; the guard
-                        # will ramp naturally.)
                         _set_brightness_best_effort(
                             tray.engine,
                             dim_temp_brightness,
@@ -241,10 +288,29 @@ def apply_idle_action(
                 is_sw_effect = effect in sw_effects_set
                 if effect in reactive_effects_set:
                     # Keep the update atomic relative to the render loop.
-                    # No fade under lock — same rationale as dim_to_temp above.
-                    # The stability guard in _resolve_brightness() will ramp
-                    # the rendered brightness smoothly over several frames.
+                    # No sleeping fade under lock.  Seed a render-time
+                    # transition so the reactive path ramps back up visibly.
+                    #
+                    # The transition target is engine.brightness (the profile
+                    # slider value), not max(engine.brightness, reactive_brightness).
+                    # Since _resolve_brightness no longer raises hw above
+                    # global_hw (which tracks engine.brightness), the restore
+                    # only needs to ramp back to the steady-state hw level.
+                    # Using reactive_brightness as the target would overshoot
+                    # the steady state and cause a visible "flash to max
+                    # brightness" on every undim.
+                    reactive_br = 0
+                    try:
+                        reactive_br = max(0, int(getattr(tray.engine, "reactive_brightness", 0) or 0))
+                    except Exception:
+                        pass
+                    restore_target_hw = max(int(target), int(perkey_target))
                     with tray.engine.kb_lock:
+                        _set_reactive_transition(
+                            tray.engine,
+                            target_brightness=restore_target_hw,
+                            duration_s=SOFT_ON_FADE_DURATION_S,
+                        )
                         _set_engine_hw_brightness_cap(tray.engine, None)
                         tray.engine.per_key_brightness = perkey_target
                         _set_brightness_best_effort(

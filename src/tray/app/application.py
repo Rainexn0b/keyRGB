@@ -38,6 +38,12 @@ class KeyRGBTray:
         EffectsEngine, Config, PowerManager = load_tray_dependencies()
 
         self.config = Config()
+        try:
+            from src.core.profile import profiles as core_profiles
+
+            core_profiles.migrate_builtin_profile_brightness(self.config)
+        except Exception:
+            pass
         self.engine = EffectsEngine()
         self.icon = None
         self.is_off = False
@@ -228,8 +234,8 @@ class KeyRGBTray:
 
     # ---- effect application
 
-    def _start_current_effect(self):
-        start_current_effect(self)
+    def _start_current_effect(self, **kwargs):
+        start_current_effect(self, **kwargs)
 
     # ---- menu callbacks
 

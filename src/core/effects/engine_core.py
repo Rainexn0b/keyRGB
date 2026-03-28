@@ -44,6 +44,24 @@ class _EngineCore:
         # to hardware by the reactive render loop. Used to clamp sudden jumps.
         self._last_rendered_brightness: Optional[int] = None
 
+        # Last brightness passed to enable_user_mode (SET_EFFECT cmd).  Tracked
+        # so render() can use the lighter SET_BRIGHTNESS cmd for frame-to-frame
+        # brightness changes, avoiding a full mode reinit that flashes the LEDs.
+        self._last_hw_mode_brightness: Optional[int] = None
+
+        # Optional render-time transition for reactive temp-dim / restore.
+        # The idle-power path updates brightness atomically under kb_lock, then
+        # the renderer interpolates toward the target without blocking the loop.
+        self._reactive_transition_from_brightness: Optional[int] = None
+        self._reactive_transition_to_brightness: Optional[int] = None
+        self._reactive_transition_started_at: Optional[float] = None
+        self._reactive_transition_duration_s: Optional[float] = None
+
+        # Strength of the currently active reactive pulse frame (0..1). This
+        # lets the renderer lift hardware brightness only while a pulse is
+        # actually visible, without raising the idle baseline.
+        self._reactive_active_pulse_mix: float = 0.0
+
         self._brightness_fade_token: int = 0
         self._brightness_fade_lock = RLock()
 
@@ -67,6 +85,21 @@ class _EngineCore:
 
     def stop(self):
         """Stop current effect."""
+
+        # Reset the per-frame brightness guard unconditionally so the next
+        # render loop ramps up from 0 instead of jumping to the last rendered
+        # brightness.  Without this, restoring from a dim/off state would
+        # immediately write at the pre-stop brightness (e.g. 25) on the first
+        # frame, bypassing any brightness_override=1 fade-in and making
+        # reactive pulses flash at full intensity on wake.
+        self._last_rendered_brightness = None
+        # Force the next render frame to re-init user mode via SET_EFFECT.
+        self._last_hw_mode_brightness = None
+        self._reactive_transition_from_brightness = None
+        self._reactive_transition_to_brightness = None
+        self._reactive_transition_started_at = None
+        self._reactive_transition_duration_s = None
+        self._reactive_active_pulse_mix = 0.0
 
         # Be robust to concurrent callers: treat `self.thread` as a shared
         # pointer and always operate on a local snapshot.

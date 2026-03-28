@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.18.0 (2026-03-28)
+
+- Power/Reactive: Fix full-brightness flash on wake from screen-dim-off: reset the reactive render's per-frame brightness guard on `stop()` so the render loop ramps from dark instead of jumping to the last pre-stop brightness on the first frame.
+- Power/Reactive: Use lightweight `SET_BRIGHTNESS` for frame-to-frame brightness changes during reactive rendering instead of full mode reinit (`SET_EFFECT`), eliminating visible LED strobe during dim↔restore ramps.
+- Power/Reactive: Prevent double `SET_EFFECT` on restore-from-idle by recording the mode brightness after the startup per-key fade so the reactive render's first frame skips a redundant mode reinit.
+- Power/Reactive: Temporarily cap `reactive_brightness` and `per_key_brightness` to match the fade-in start value during restore, so `_resolve_brightness()` tracks the intended ramp instead of jumping to the stale profile value on the first frame.
+- Power/Transitions: Retune idle and power soft-off / soft-on timings so screen dim, wake, and related restore paths fade more deliberately instead of snapping between states.
+- Power/Reactive: Add a render-time transition for reactive temp-dim and restore so the dim-profile path visibly fades between brightness levels instead of jumping to the target in a few guard-limited frames.
+- Power/Reactive: Skip the cosmetic per-key fade when starting at brightness ≤ 1 (wake-from-idle), letting the reactive render's first frame initialise user mode atomically instead of sending a separate `SET_EFFECT` that flashes on some firmware.
+- Power/Reactive: Use `apply_to_hardware=False` for the brightness fade-in with reactive effects so the render loop is the sole hardware brightness writer, preventing stutter from two threads fighting over `SET_BRIGHTNESS`.
+- Power/Reactive: Initialise user mode at brightness 0 (invisible) before starting the render thread on wake, then send per-key data before each `SET_BRIGHTNESS` update, so the brightness ramp never briefly illuminates stale frame data.
+- Power/Tray: Fix `_start_current_effect` to accept keyword arguments (`brightness_override`, `fade_in`, `fade_in_duration_s`) so the restore-from-idle path actually uses the fade-in ramp instead of silently falling back to an instant full-brightness start.
+- Power/Reactive: Stop per-key reactive typing from lifting whole-keyboard hardware brightness on each keypress; keep pulse-time brightness lifts restricted to uniform-only backends so local ripples stay visible without keyboard-wide flicker.
+- Tests/Docs: Add backend-split reactive renderer regressions and document the brightness invariants that protect dim, restore, startup, and per-key reactive behavior.
+
 ## 0.17.3 (2026-03-26)
 
 - Installer/AppImage: Install a small launcher wrapper at `~/.local/bin/keyrgb` and store the real AppImage as `~/.local/bin/keyrgb.AppImage`, so fresh systems without `libfuse.so.2` automatically fall back to `--appimage-extract-and-run` instead of failing to launch.
