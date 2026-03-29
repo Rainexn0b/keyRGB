@@ -89,6 +89,8 @@ Per-key (Direct) mode:
 
 ## Notes
 
-- The Uniwill Control Center (Windows, `LedKeyboardSetting.exe` - rebranded as XMG/TUXEDO/Eluktronics Control Center) replaces black (0,0,0) with red (255,0,0) as a default color for custom color modes. This is a software choice, not a firmware limitation.
+- The Uniwill Control Center (Windows, `LedKeyboardSetting.exe` rebranded as XMG/TUXEDO/Eluktronics Control Center) replaces black (0,0,0) with red (255,0,0) as a default color for custom color modes. This is a software choice, not a firmware limitation.
 - ClearColor (0x0C) stops the active animation but LEDs retain their last color. Send black to all LEDs after clear for a full reset.
 - Brightness max is 0x0A (firmware clamps internally).
+- Resending the animation mode command (`[CC, 00, mode_id]`) restarts the animation. Only send it when the mode actually changes, not on every color/speed update.
+- Resending brightness/speed when unchanged can cause firmware timing issues. Track the current values and only send when they change.
