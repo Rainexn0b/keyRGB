@@ -15,48 +15,48 @@ No 7th byte. The HID descriptor is malformed (declares 3-bit fields) but the fir
 
 ## Commands
 
-| Command | Packet | Description |
-|---------|--------|-------------|
-| Set Key Color | `[CC, 01, led_id, R, G, B]` | Per-key color |
+| Command          | Packet                                | Description                           |
+| ---------------- | ------------------------------------- | ------------------------------------- |
+| Set Key Color    | `[CC, 01, led_id, R, G, B]`           | Per-key color                         |
 | Brightness/Speed | `[CC, 09, brightness, speed, 00, 00]` | Brightness 0x00-0x0A, speed 0x00-0x0A |
-| Animation Mode | `[CC, 00, mode_id, 00, 00, 00]` | Select firmware animation |
-| Breathing Random | `[CC, 0A, 00, 00, 00, 00]` | Breathing with random colors |
-| Breathing Color | `[CC, 0A, AA, R, G, B]` | Breathing with custom color |
-| Flashing Random | `[CC, 0B, 00, 00, 00, 00]` | Flashing with random colors |
-| Flashing Color | `[CC, 0B, AA, R, G, B]` | Flashing with custom color |
-| Random Color | `[CC, 18, A1, R, G, B]` | Random with custom color |
-| Wave Direction | `[CC, 15, slot, 00, 00, 00]` | Preset direction (rainbow) |
-| Wave Color | `[CC, 15, slot, R, G, B]` | Custom direction + color |
-| Snake Direction | `[CC, 16, slot, 00, 00, 00]` | Preset direction (multicolor) |
-| Snake Color | `[CC, 16, slot, R, G, B]` | Custom direction + color |
-| Scan Color 1 | `[CC, 17, A1, R, G, B]` | First band color |
-| Scan Color 2 | `[CC, 17, A2, R, G, B]` | Second band color |
+| Animation Mode   | `[CC, 00, mode_id, 00, 00, 00]`       | Select firmware animation             |
+| Breathing Random | `[CC, 0A, 00, 00, 00, 00]`            | Breathing with random colors          |
+| Breathing Color  | `[CC, 0A, AA, R, G, B]`               | Breathing with custom color           |
+| Flashing Random  | `[CC, 0B, 00, 00, 00, 00]`            | Flashing with random colors           |
+| Flashing Color   | `[CC, 0B, AA, R, G, B]`               | Flashing with custom color            |
+| Random Color     | `[CC, 18, A1, R, G, B]`               | Random with custom color              |
+| Wave Direction   | `[CC, 15, slot, 00, 00, 00]`          | Preset direction (rainbow)            |
+| Wave Color       | `[CC, 15, slot, R, G, B]`             | Custom direction + color              |
+| Snake Direction  | `[CC, 16, slot, 00, 00, 00]`          | Preset direction (multicolor)         |
+| Snake Color      | `[CC, 16, slot, R, G, B]`             | Custom direction + color              |
+| Scan Color 1     | `[CC, 17, A1, R, G, B]`               | First band color                      |
+| Scan Color 2     | `[CC, 17, A2, R, G, B]`               | Second band color                     |
 
 ## Animation mode IDs
 
-| ID | Mode |
-|----|------|
-| 0x02 | Spectrum Cycle |
-| 0x04 | Rainbow Wave |
-| 0x09 | Random |
-| 0x0A | Scan |
-| 0x0B | Snake |
+| ID   | Mode                            |
+| ---- | ------------------------------- |
+| 0x02 | Spectrum Cycle                  |
+| 0x04 | Rainbow Wave                    |
+| 0x09 | Random                          |
+| 0x0A | Scan                            |
+| 0x0B | Snake                           |
 | 0x0C | Clear (required before per-key) |
 
 ## Wave direction slots
 
 Preset (rainbow, direction only) and custom (color + direction) slots share the same direction mapping:
 
-| Preset | Custom | Direction |
-|--------|--------|-----------|
-| 0x71 | 0xA1 | Up-Left |
-| 0x72 | 0xA2 | Up-Right |
-| 0x73 | 0xA3 | Down-Left |
-| 0x74 | 0xA4 | Down-Right |
-| 0x75 | 0xA5 | Up |
-| 0x76 | 0xA6 | Down |
-| 0x77 | 0xA7 | Left |
-| 0x78 | 0xA8 | Right |
+| Preset | Custom | Direction  |
+| ------ | ------ | ---------- |
+| 0x71   | 0xA1   | Up-Left    |
+| 0x72   | 0xA2   | Up-Right   |
+| 0x73   | 0xA3   | Down-Left  |
+| 0x74   | 0xA4   | Down-Right |
+| 0x75   | 0xA5   | Up         |
+| 0x76   | 0xA6   | Down       |
+| 0x77   | 0xA7   | Left       |
+| 0x78   | 0xA8   | Right      |
 
 Only the last slot sent is active. Preset and custom cannot be combined.
 
@@ -64,12 +64,12 @@ Only the last slot sent is active. Preset and custom cannot be combined.
 
 4 diagonal directions only:
 
-| Preset | Custom | Direction |
-|--------|--------|-----------|
-| 0x71 | 0xA1 | Up-Left |
-| 0x72 | 0xA2 | Up-Right |
-| 0x73 | 0xA3 | Down-Left |
-| 0x74 | 0xA4 | Down-Right |
+| Preset | Custom | Direction  |
+| ------ | ------ | ---------- |
+| 0x71   | 0xA1   | Up-Left    |
+| 0x72   | 0xA2   | Up-Right   |
+| 0x73   | 0xA3   | Down-Left  |
+| 0x74   | 0xA4   | Down-Right |
 
 ## LED ID encoding
 
