@@ -39,7 +39,7 @@ install_icon_and_desktop_entries() {
 
   mkdir -p "$icon_dir" "$app_dir" "$autostart_dir"
 
-  local icon_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-keyrgb.png"
+  local icon_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-tray-squircle.png"
   log_info "Downloading icon: $icon_url"
   download_url_quiet "$icon_url" "$icon_file"
   log_ok "Installed icon: $icon_file"

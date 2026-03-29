@@ -13,6 +13,12 @@ from unittest.mock import MagicMock
 class TestApplyEffectSelection:
     """Test apply_effect_selection decision logic."""
 
+    @staticmethod
+    def _backend(*effect_names: str):
+        backend = MagicMock()
+        backend.effects.return_value = {name: object() for name in effect_names}
+        return backend
+
     def test_none_effect_stops_engine_and_sets_static_color(self):
         """'none' effect should stop engine and set static color."""
         from src.tray.controllers.effect_selection import apply_effect_selection
@@ -48,6 +54,7 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=False, per_key=True)
+        mock_tray.backend = self._backend("rainbow")
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
 
         apply_effect_selection(mock_tray, effect_name="rainbow")
@@ -98,6 +105,7 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend("wave")
 
         apply_effect_selection(mock_tray, effect_name="wave")
 
@@ -110,6 +118,7 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = None
+        mock_tray.backend = self._backend("rainbow")
 
         # Both hardware and per-key effects should work
         apply_effect_selection(mock_tray, effect_name="rainbow")
@@ -136,6 +145,7 @@ class TestApplyEffectSelection:
             "aurora",
             "fireworks",
         ]
+        mock_tray.backend = self._backend(*hw_effects)
 
         for effect in hw_effects:
             apply_effect_selection(mock_tray, effect_name=effect)
@@ -147,6 +157,7 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend("wave")
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
         mock_tray.config.color = (255, 0, 0)
         mock_tray.config.brightness = 100
@@ -168,6 +179,7 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend("reactive_fade")
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
 
         # Start from per-key with colors loaded.
@@ -188,6 +200,7 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend("reactive_fade")
         mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
 
         apply_effect_selection(mock_tray, effect_name="reactive_fade")
@@ -201,6 +214,7 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend("rainbow")
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
 
         # Start from software mode with per-key colors loaded.
@@ -216,3 +230,19 @@ class TestApplyEffectSelection:
             mock_tray.config.color, brightness=mock_tray.config.brightness
         )
         assert mock_tray.is_off is False
+
+    def test_prefixed_hardware_effect_can_override_software_name_collision(self):
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend("rainbow_wave")
+
+        apply_effect_selection(mock_tray, effect_name="rainbow_wave")
+        assert mock_tray.config.effect == "rainbow_wave"
+
+        mock_tray._start_current_effect.reset_mock()
+        apply_effect_selection(mock_tray, effect_name="hw:rainbow_wave")
+
+        assert mock_tray.config.effect == "hw:rainbow_wave"
+        mock_tray._start_current_effect.assert_called_once()

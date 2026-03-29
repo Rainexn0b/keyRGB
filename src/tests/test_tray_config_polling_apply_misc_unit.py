@@ -204,6 +204,25 @@ def test_apply_from_config_once_other_effect_starts_current_effect() -> None:
     tray._start_current_effect.assert_called_once()
 
 
+def test_apply_from_config_once_normalizes_effect_name_against_backend() -> None:
+    tray = _mk_tray_base(effect="hw:rainbow_wave", brightness=10)
+
+    backend = MagicMock()
+    backend.effects.return_value = {"rainbow_wave": object()}
+    tray.backend = backend
+
+    _apply_from_config_once(
+        tray,
+        ite_num_rows=6,
+        ite_num_cols=21,
+        cause="mtime_change",
+        last_applied=None,
+        last_apply_warn_at=0.0,
+    )
+
+    assert tray.config.effect == "rainbow_wave"
+
+
 def test_apply_from_config_once_marks_device_unavailable_on_errno_19() -> None:
     tray = _mk_tray_base(effect="none", brightness=10)
 

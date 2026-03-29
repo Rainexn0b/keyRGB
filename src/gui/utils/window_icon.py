@@ -23,9 +23,10 @@ def _candidate_logo_paths() -> list[Path]:
     # Repo checkout (and editable installs) typically keep assets/ alongside src/.
     start = Path(__file__).resolve()
     for parent in [start] + list(start.parents):
-        cand = parent / "assets" / "logo-keyrgb.png"
-        if cand not in paths:
-            paths.append(cand)
+        for name in ("logo-tray-squircle.png", "logo-keyrgb.png"):
+            cand = parent / "assets" / name
+            if cand not in paths:
+                paths.append(cand)
 
     return paths
 
@@ -61,7 +62,7 @@ def clear_cached_window_icon_images() -> None:
 def apply_keyrgb_window_icon(window: tk.Misc) -> None:
     """Best-effort: set KeyRGB icon for a Tk window.
 
-    Uses the PNG logo from install.sh (preferred) or from repo assets.
+    Uses the installed PNG icon (preferred) or the repo asset fallback.
     Safe to call on any Tk root/toplevel; does nothing on failure.
     """
 

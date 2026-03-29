@@ -310,7 +310,7 @@ class KeyRGBTray:
         logger.info("Creating tray icon...")
         self.icon = pystray.Icon(
             "keyrgb",
-            icon_mod.create_icon_for_state(config=self.config, is_off=self.is_off),
+            icon_mod.create_icon_for_state(config=self.config, is_off=self.is_off, backend=self.backend),
             "KeyRGB",
             menu=menu_mod.build_menu(self, pystray=pystray, item=item),
         )

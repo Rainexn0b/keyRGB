@@ -3,8 +3,33 @@ from __future__ import annotations
 import threading
 import time
 
+from src.core.effects.catalog import resolve_effect_name_for_backend
 
-_DYNAMIC_ICON_EFFECTS = {"rainbow", "aurora", "fireworks", "wave", "marquee"}
+
+_ANIMATED_ICON_EFFECTS = frozenset(
+    {
+        "rainbow",
+        "rainbow_wave",
+        "rainbow_swirl",
+        "spectrum_cycle",
+        "color_cycle",
+        "random",
+        "aurora",
+        "fireworks",
+        "wave",
+        "marquee",
+    }
+)
+
+
+def _has_animated_icon_state(*, effect: str, config: object | None) -> bool:
+    if effect in _ANIMATED_ICON_EFFECTS:
+        return True
+
+    if effect == "reactive_ripple":
+        return not bool(getattr(config, "reactive_use_manual_color", False))
+
+    return False
 
 
 def _normalize_color(value) -> tuple[int, int, int]:
@@ -23,9 +48,10 @@ def _normalize_color(value) -> tuple[int, int, int]:
         return (0, 0, 0)
 
 
-def _compute_icon_sig(tray) -> tuple[bool, str, int, int, tuple[int, int, int]]:
+def _compute_icon_sig(tray) -> tuple[bool, str, int, int, tuple[int, int, int], bool]:
     config = getattr(tray, "config", None)
-    effect = (getattr(config, "effect", "") or "") if config is not None else ""
+    raw_effect = (getattr(config, "effect", "") or "") if config is not None else ""
+    effect = resolve_effect_name_for_backend(raw_effect, getattr(tray, "backend", None))
     speed = getattr(config, "speed", 0) if config is not None else 0
     brightness = getattr(config, "brightness", 0) if config is not None else 0
     color = getattr(config, "color", (0, 0, 0)) if config is not None else (0, 0, 0)
@@ -46,6 +72,7 @@ def _compute_icon_sig(tray) -> tuple[bool, str, int, int, tuple[int, int, int]]:
         speed_i,
         brightness_i,
         _normalize_color(color),
+        _has_animated_icon_state(effect=str(effect), config=config),
     )
 
 
@@ -54,7 +81,7 @@ def _should_update_icon(sig, last_sig) -> bool:
     # from a background thread can make the tray icon stop reacting
     # to clicks. Keep the periodic repaint limited to hardware
     # effects only.
-    dynamic = bool(sig) and (sig[1] in _DYNAMIC_ICON_EFFECTS)
+    dynamic = bool(sig) and bool(sig[5])
     return bool(dynamic) or (sig != last_sig)
 
 

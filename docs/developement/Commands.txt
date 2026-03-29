@@ -17,65 +17,6 @@ python -m buildpython --run-steps=1,2
 python -m buildpython --run-steps="Ruff,Ruff Format,Black"
 python -m buildpython --run-steps="Import Validation,Import Scan,Pip Check"
 python -m buildpython --run-steps=14,15
+Key command docs moved to `docs/developement/commits/Commands.md`.
 
-// Single Line Commit Procedure
-python -m buildpython --profile=full --with-black
-git add .
-git commit -m "comment"
-git push
-
-// Detailed Commit Procedure
-python -m buildpython --profile=full --with-black --continue-on-error
-git add -p
-git commit
-git push
-
-// Release Procedure
-// 1) Update version + changelog first
-//    - pyproject.toml -> [project].version
-//    - CHANGELOG.md -> add release heading / notes
-python -m buildpython --profile=release
-git add -A
-git commit -m "Release vX.Y.Z"
-git tag -a vX.Y.Z -m "release vX.Y.Z"
-git push --follow-tags
-
-// Optional Python package build
-python -m pip install -U build
-python -m build
-
-// Logs / summaries
-cat buildlog/keyrgb/build-summary.md
-ls buildlog/keyrgb
-// Common step logs:
-// - buildlog/keyrgb/step-03-ruff.log
-// - buildlog/keyrgb/step-07-ruff-format.log
-// - buildlog/keyrgb/step-11-black.log
-// - buildlog/keyrgb/step-14-appimage.log
-// - buildlog/keyrgb/step-15-appimage-smoke.log
-
-// Runtime debug
-KEYRGB_DEBUG=1 ./keyrgb
-KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb
-KEYRGB_DEBUG=1 KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb
-
-// Fixes
-python -m ruff check src buildpython --fix
-python -m ruff format src buildpython
-python -m black src buildpython
-python -m pytest -q -o addopts=
-python -m pip check
-
-// Hardware tests (opt-in only)
-KEYRGB_HW_TESTS=1 python -m pytest -q -o addopts=
-
-// AppImage notes
-// - dist/keyrgb-x86_64.AppImage is the artifact
-// - AppImage Smoke skips locally when Docker is unavailable
-
-// Rollback: (Destructive)
-git fetch origin
-git reset --hard origin/main
-
-// brightness logging
-KEYRGB_DEBUG=1 KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb >> ./keyrgb-brightness.log 2>&1
+This legacy flat file remains only as a compatibility pointer.

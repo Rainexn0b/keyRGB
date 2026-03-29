@@ -2,7 +2,7 @@
 
 This package contains KeyRGB's experimental Linux `hidraw` path for
 `0x048d:0x8910`, aligned to the public reverse-engineering notes captured in
-`docs/developement/ite8910-protocol-notes.md`.
+`docs/developement/backends/ite8910-protocol-notes.md`.
 """
 
 from .backend import Ite8910Backend

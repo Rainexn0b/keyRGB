@@ -141,6 +141,24 @@ def test_icon_visual_reactive_uses_effect_color_when_manual_color_enabled() -> N
     assert visual.color == (120, 60, 30)
 
 
+def test_icon_visual_reactive_ripple_uses_animated_rainbow_when_manual_color_disabled() -> None:
+    from src.tray.ui.icon import icon_visual
+
+    cfg = SimpleNamespace(
+        effect="reactive_ripple",
+        brightness=10,
+        perkey_brightness=10,
+        color=(10, 20, 30),
+        reactive_color=(200, 100, 50),
+        reactive_use_manual_color=False,
+        per_key_colors={(0, 0): (255, 0, 0)},
+    )
+
+    visual = icon_visual(config=cfg, is_off=False, now=0.0)
+    assert visual.mode == "rainbow"
+    assert visual.phase == 0.0
+
+
 def test_icon_visual_perkey_non_uniform_builds_full_grid_once(monkeypatch) -> None:
     from src.tray.ui import icon
 

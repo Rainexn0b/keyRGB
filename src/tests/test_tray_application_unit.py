@@ -203,10 +203,11 @@ def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
 
     monkeypatch.setattr(app.runtime, "get_pystray", lambda: (fake_pystray, fake_item))
 
-    def _create_icon_for_state(*, config, is_off, now=None):
+    def _create_icon_for_state(*, config, is_off, now=None, backend=None):
         calls["render"] += 1
         assert config.effect == "perkey"
         assert is_off is False
+        assert backend is tray.backend
         return "IMAGE"
 
     def _build_menu(self, *, pystray, item):
@@ -222,6 +223,7 @@ def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
         config=SimpleNamespace(effect="perkey", speed=4, brightness=5),
         is_off=False,
         icon=None,
+        backend=object(),
     )
 
     app.KeyRGBTray.run(tray)

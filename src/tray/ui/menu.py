@@ -6,9 +6,10 @@ from typing import Any
 
 import src.core.tcc_power_profiles as tcc_power_profiles
 from src.core.effects.catalog import (
-    HW_EFFECTS,
     REACTIVE_EFFECTS,
     SOFTWARE_EFFECTS,
+    detected_backend_hw_effect_names,
+    hardware_effect_selection_key,
     normalize_effect_name,
     title_for_effect,
 )
@@ -20,6 +21,7 @@ from .menu_sections import (
     build_tcc_profiles_menu,
 )
 from .menu_status import (
+    hardware_effects_menu_text,
     is_hardware_mode,
     is_software_mode,
     keyboard_status_text,
@@ -69,9 +71,16 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
 
         return _action
 
-    def _checked_effect(effect: str):
+    def _checked_hw_effect(effect: str):
         def _checked(_item):
-            return tray.config.effect == effect and not tray.is_off
+            current = normalize_effect_name(str(getattr(tray.config, "effect", "none") or "none"))
+            return current in {effect, normalize_effect_name(effect), normalize_effect_name(effect).removeprefix("hw:")} and hw_mode and not tray.is_off
+
+        return _checked
+
+    def _checked_sw_effect(effect: str):
+        def _checked(_item):
+            return tray.config.effect == effect and sw_mode and not tray.is_off
 
         return _checked
 
@@ -90,18 +99,21 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     def _checked_hw_static(_item):
         return tray.config.effect == "none" and hw_mode and not tray.is_off
 
+    hw_effect_names = detected_backend_hw_effect_names(getattr(tray, "backend", None))
+    hw_effects_label = hardware_effects_menu_text(tray)
+
     # HW effects menu - animated effects lock when in SW mode.
     # Switching back to static hardware mode is now a separate top-level action.
     hw_effects_menu = pystray.Menu(
         *[
             item(
                 title_for_effect(effect),
-                _hw_cb(effect),
-                checked=_checked_effect(effect),
+                _hw_cb(hardware_effect_selection_key(effect)),
+                checked=_checked_hw_effect(hardware_effect_selection_key(effect)),
                 radio=True,
                 enabled=hw_mode,  # Grey out animated effects when in SW mode
             )
-            for effect in HW_EFFECTS
+            for effect in hw_effect_names
         ],
     )
 
@@ -133,7 +145,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             item(
                 title_for_effect(effect),
                 _sw_cb(effect),
-                checked=_checked_effect(effect),
+                checked=_checked_sw_effect(effect),
                 radio=True,
                 enabled=sw_mode,
             )
@@ -144,7 +156,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             item(
                 title_for_effect(effect),
                 _sw_cb(effect),
-                checked=_checked_effect(effect),
+                checked=_checked_sw_effect(effect),
                 radio=True,
                 enabled=sw_mode,
             )
@@ -230,8 +242,9 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         *(
             [
                 item(
-                    "Hardware Effects",
+                    hw_effects_label,
                     hw_effects_menu,
+                    enabled=bool(hw_effect_names),
                     # Menu always enabled, individual animated effects locked when in SW mode
                 )
             ]

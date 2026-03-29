@@ -15,14 +15,14 @@ def test_update_icon_sets_icon_image(monkeypatch) -> None:
 
     calls = {"n": 0}
 
-    monkeypatch.setattr(refresh.icon_mod, "representative_color", lambda *, config, is_off: (1, 2, 3))
+    monkeypatch.setattr(refresh.icon_mod, "representative_color", lambda *, config, is_off, now=None, backend=None: (1, 2, 3))
     monkeypatch.setattr(
         refresh.icon_mod,
         "create_icon",
         lambda color: (calls.__setitem__("n", calls["n"] + 1) or f"icon:{color}"),
     )
 
-    tray = SimpleNamespace(icon=SimpleNamespace(icon=None), config=SimpleNamespace(), is_off=True)
+    tray = SimpleNamespace(icon=SimpleNamespace(icon=None), config=SimpleNamespace(), is_off=True, backend=None)
 
     refresh.update_icon(tray)
     assert tray.icon.icon == "icon:(1, 2, 3)"
@@ -56,7 +56,7 @@ def test_refresh_ui_calls_both(monkeypatch) -> None:
     monkeypatch.setattr(
         refresh,
         "update_icon",
-        lambda _tray: calls.__setitem__("icon", calls["icon"] + 1),
+        lambda _tray, animate=True: calls.__setitem__("icon", calls["icon"] + 1),
     )
     monkeypatch.setattr(
         refresh,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from src.core.effects.catalog import REACTIVE_EFFECTS
@@ -27,7 +28,10 @@ class ConfigApplyState:
 
 def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
     try:
-        effect = str(getattr(tray.config, "effect", "none") or "none")
+        effect = resolve_effect_name_for_backend(
+            str(getattr(tray.config, "effect", "none") or "none"),
+            getattr(tray, "backend", None),
+        )
     except Exception:
         effect = "none"
 
@@ -204,6 +208,12 @@ def apply_from_config_once(
     if current == last_applied:
         return last_applied, last_apply_warn_at
 
+    try:
+        if str(getattr(tray.config, "effect", "none") or "none") != current.effect:
+            tray.config.effect = current.effect
+    except Exception:
+        pass
+
     log_event = getattr(tray, "_log_event", None)
     # If the tray is currently off and a user/power/idle "forced off" state
     # is active, log and skip applying any changes.
@@ -252,10 +262,10 @@ def apply_from_config_once(
         # compact and more testable.
         from ._config_polling_helpers import _apply_perkey, _apply_uniform, _apply_effect
 
-        if tray.config.effect == "perkey":
+        if current.effect == "perkey":
             _apply_perkey(tray, current, ite_num_rows, ite_num_cols, cause=cause)
 
-        elif tray.config.effect == "none":
+        elif current.effect == "none":
             _apply_uniform(tray, cause=cause)
 
         else:

@@ -50,7 +50,12 @@ def update_icon(tray: Any, *, animate: bool = True) -> None:
     if getattr(tray, "icon", None):
         st = ensure_tray_icon_state(tray)
         now = time.time()
-        target = icon_mod.icon_visual(config=tray.config, is_off=tray.is_off, now=now)
+        target = icon_mod.icon_visual(
+            config=tray.config,
+            is_off=tray.is_off,
+            now=now,
+            backend=getattr(tray, "backend", None),
+        )
 
         last = st.visual
 

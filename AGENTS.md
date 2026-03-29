@@ -57,7 +57,7 @@
 
 - `README.md` (overview + backends, env vars, commands)
 - `system/udev/99-ite8291-wootbook.rules` (permissions)
-- `docs/developement/device-id-discovery.md` (new device IDs, e.g. `0x600B`)
+- `docs/developement/backends/device-id-discovery.md` (new device IDs, e.g. `0x600B`)
 - `CHANGELOG.md` (history/notes)
 - `scripts/lib/user_integration.sh` and `install.sh` (installer plumbing)
 

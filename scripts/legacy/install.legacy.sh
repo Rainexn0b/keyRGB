@@ -991,7 +991,7 @@ install_icon_and_desktop_entries() {
     mkdir -p "$icon_dir" "$app_dir" "$autostart_dir"
 
     if [ "$MODE" = "pip" ]; then
-        local icon_src="$REPO_DIR/assets/logo-keyrgb.png"
+        local icon_src="$REPO_DIR/assets/logo-tray-squircle.png"
         if ! [ -f "$icon_src" ]; then
             echo "❌ Logo not found: $icon_src" >&2
             exit 1
@@ -1002,7 +1002,7 @@ install_icon_and_desktop_entries() {
         if [ -n "$KEYRGB_VERSION" ]; then
             raw_ref="$KEYRGB_VERSION"
         fi
-        local icon_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/assets/logo-keyrgb.png"
+        local icon_url="https://raw.githubusercontent.com/Rainexn0b/keyRGB/$raw_ref/assets/logo-tray-squircle.png"
         echo "⬇️  Downloading icon: $icon_url"
         download_url "$icon_url" "$icon_file"
     fi

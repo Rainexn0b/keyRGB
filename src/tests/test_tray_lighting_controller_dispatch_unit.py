@@ -100,3 +100,31 @@ class TestStartCurrentEffect:
         mock_tray.engine.start_effect = MagicMock(side_effect=RuntimeError("hardware error"))
 
         start_current_effect(mock_tray)
+
+    def test_start_current_effect_resolves_prefixed_hardware_name_before_engine_start(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        backend = MagicMock()
+        backend.effects.return_value = {"rainbow_wave": object()}
+
+        mock_tray = MagicMock()
+        mock_tray.backend = backend
+        mock_tray.config.effect = "hw:rainbow_wave"
+        mock_tray.config.brightness = 40
+        mock_tray.config.speed = 3
+        mock_tray.config.color = (1, 2, 3)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
+
+        start_current_effect(mock_tray)
+
+        assert mock_tray.config.effect == "rainbow_wave"
+        mock_tray.engine.start_effect.assert_called_once_with(
+            "rainbow_wave",
+            speed=3,
+            brightness=40,
+            color=(1, 2, 3),
+            reactive_color=None,
+            reactive_use_manual_color=False,
+            direction=mock_tray.config.direction,
+        )

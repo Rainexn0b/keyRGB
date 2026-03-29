@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from typing import Optional
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
+from src.core.effects.catalog import is_forced_hardware_effect, resolve_effect_name_for_backend, strip_effect_namespace
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.protocols import LightingTrayProtocol
 
@@ -41,17 +42,22 @@ def try_log_event(tray: LightingTrayProtocol, source: str, action: str, **fields
 
 def get_effect_name(tray: LightingTrayProtocol) -> str:
     try:
-        return str(getattr(tray.config, "effect", "none") or "none")
+        return resolve_effect_name_for_backend(
+            str(getattr(tray.config, "effect", "none") or "none"),
+            getattr(tray, "backend", None),
+        )
     except Exception:
         return "none"
 
 
 def is_software_effect(effect: str) -> bool:
-    return effect in SW_EFFECTS
+    if is_forced_hardware_effect(effect):
+        return False
+    return strip_effect_namespace(effect) in SW_EFFECTS
 
 
 def is_reactive_effect(effect: str) -> bool:
-    return effect in REACTIVE_EFFECTS_SET
+    return strip_effect_namespace(effect) in REACTIVE_EFFECTS_SET
 
 
 def ensure_device_best_effort(tray: LightingTrayProtocol) -> None:

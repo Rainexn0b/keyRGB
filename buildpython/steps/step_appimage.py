@@ -70,9 +70,17 @@ def build_appimage() -> Path:
     if deck_src.exists():
         shutil.copy2(deck_src, assets_dst / deck_src.name)
 
-    tray_logo_src = root / "assets" / "logo-tray.png"
-    if tray_logo_src.exists():
-        shutil.copy2(tray_logo_src, assets_dst / tray_logo_src.name)
+    app_logo_src = root / "assets" / "logo-tray-squircle.png"
+    if app_logo_src.exists():
+        shutil.copy2(app_logo_src, assets_dst / app_logo_src.name)
+
+    tray_mask_src = root / "assets" / "tray-mask.svg"
+    if tray_mask_src.exists():
+        shutil.copy2(tray_mask_src, assets_dst / tray_mask_src.name)
+
+    logo_svg_src = root / "assets" / "logo-keyrgb.svg"
+    if logo_svg_src.exists():
+        shutil.copy2(logo_svg_src, assets_dst / logo_svg_src.name)
 
     # Bundle python deps (pip wheels) into the AppDir.
     # We still use the system python interpreter at runtime.
@@ -116,7 +124,7 @@ def build_appimage() -> Path:
         bundle_pygobject(appdir=appdir, site_packages=site_packages)
 
     # Desktop + icon expected by appimagetool.
-    icon_src = root / "assets" / "logo-keyrgb.png"
+    icon_src = root / "assets" / "logo-tray-squircle.png"
     if not icon_src.exists():
         raise SystemExit(f"Missing icon: {icon_src}")
 

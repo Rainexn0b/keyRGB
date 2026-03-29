@@ -109,6 +109,25 @@ class DummyTray:
         return
 
 
+def test_menu_uses_detected_backend_hardware_effects_count(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    class DummyBackend:
+        def effects(self):
+            return {"rainbow": object(), "breathing": object(), "wave": object()}
+
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+    tray.backend = DummyBackend()
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [i["text"] for i in items if isinstance(i, dict)]
+
+    assert "Hardware Effects (3 modes)" in labels
+
+
 def test_menu_hides_items_when_capabilities_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

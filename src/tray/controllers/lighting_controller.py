@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers._transition_constants import (
     SOFT_OFF_FADE_DURATION_S,
@@ -53,7 +54,16 @@ def start_current_effect(
             except Exception:
                 start_brightness = target_brightness
 
-        effect = get_effect_name(tray)
+        try:
+            raw_effect = str(getattr(tray.config, "effect", "none") or "none")
+        except Exception:
+            raw_effect = "none"
+        effect = resolve_effect_name_for_backend(raw_effect, getattr(tray, "backend", None))
+        if effect != raw_effect:
+            try:
+                tray.config.effect = effect
+            except Exception:
+                pass
         if effect == "perkey":
             apply_perkey_mode(tray, brightness_override=start_brightness)
             if fade_in and target_brightness > start_brightness and target_brightness > 0:
