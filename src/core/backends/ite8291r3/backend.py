@@ -149,7 +149,12 @@ class Ite8291r3Backend(KeyboardBackend):
     def get_device(self) -> KeyboardDevice:
         ite8291r3 = self._import()
         try:
-            return ite8291r3.get()
+            device = ite8291r3.get()
+            try:
+                setattr(device, "keyrgb_hw_speed_policy", "inverted")
+            except Exception:
+                pass
+            return device
         except Exception as exc:
             msg = str(exc).lower()
             errno = getattr(exc, "errno", None)

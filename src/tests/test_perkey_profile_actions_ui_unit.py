@@ -78,7 +78,9 @@ class DummyEditor:
 
 
 def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
-    def fake_activate_profile(_name: str, *, config, current_colors):
+    def fake_activate_profile(_name: str, *, config, current_colors, num_rows, num_cols):
+        assert num_rows > 0
+        assert num_cols > 0
         return ActivatedProfile(
             name="p2",
             keymap={"K": (0, 0)},

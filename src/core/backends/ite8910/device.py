@@ -65,6 +65,8 @@ class Ite8910KeyboardDevice:
     tested independently from the Linux `hidraw` transport.
     """
 
+    keyrgb_hw_speed_policy = "direct"
+
     def __init__(
         self,
         send_feature_report: FeatureReportWriter,
@@ -159,9 +161,6 @@ class Ite8910KeyboardDevice:
     def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
         if enable_user_mode:
             self.enable_user_mode(brightness=brightness, save=False)
-        else:
-            self.reset()
-            self.set_brightness(brightness)
 
         for key_id, color in (color_map or {}).items():
             self.set_led_color_by_id(_coerce_led_id(key_id), color)

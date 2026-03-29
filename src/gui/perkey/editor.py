@@ -17,7 +17,7 @@ from .ui.backdrop import reset_backdrop_ui, set_backdrop_ui
 
 from .hardware import get_keyboard, NUM_ROWS, NUM_COLS
 from .overlay import auto_sync_per_key_overlays
-from .profile_management import load_profile_colors
+from .profile_management import load_profile_colors, sanitize_keymap_cells
 from .keyboard_apply import push_per_key_colors
 from .editor_ui import build_editor_ui
 from .window_geometry import apply_perkey_editor_geometry
@@ -108,7 +108,13 @@ class PerKeyEditor:
 
         # Prefer profile-stored per-key colors over whatever happens to be in
         # config.json (e.g., the calibrator probe state).
-        self.colors = load_profile_colors(name=self.profile_name, config=self.config, current_colors={})
+        self.colors = load_profile_colors(
+            name=self.profile_name,
+            config=self.config,
+            current_colors={},
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+        )
 
         self.keymap: dict[str, tuple[int, int]] = self._load_keymap()
         self.layout_tweaks = self._load_layout_tweaks()
@@ -333,7 +339,7 @@ class PerKeyEditor:
         set_default_profile_ui(self)
 
     def _load_keymap(self) -> dict[str, tuple[int, int]]:
-        return profiles.load_keymap(self.profile_name)
+        return sanitize_keymap_cells(profiles.load_keymap(self.profile_name), num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def run(self):
         self.root.mainloop()

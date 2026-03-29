@@ -54,10 +54,10 @@ def test_led_color_report_matches_upstream_reference_shape() -> None:
 
 
 def test_led_id_from_row_col_matches_vendor_formula() -> None:
-    assert led_id_from_row_col(0, 0) == 0x00
-    assert led_id_from_row_col(1, 0) == 0x20
-    assert led_id_from_row_col(2, 10) == 0x4A
-    assert led_id_from_row_col(5, 19) == 0xB3
+    assert led_id_from_row_col(0, 0) == 0xA0
+    assert led_id_from_row_col(1, 0) == 0x80
+    assert led_id_from_row_col(2, 10) == 0x6A
+    assert led_id_from_row_col(5, 19) == 0x13
 
 
 def test_known_led_ids_match_full_reverse_engineered_matrix() -> None:
@@ -134,8 +134,8 @@ def test_device_translates_row_col_writes_to_led_reports() -> None:
         assert sent[1 + i] == build_led_color_report(led_id, (0, 0, 0))
     brightness_idx = 1 + len(KNOWN_LED_IDS)
     assert sent[brightness_idx] == build_brightness_speed_report_raw(0x05, 0x00)
-    assert sent[brightness_idx + 1] == build_led_color_report(0x4A, (255, 0, 0))
-    assert sent[brightness_idx + 2] == build_led_color_report(0x00, (1, 2, 3))
+    assert sent[brightness_idx + 1] == build_led_color_report(0x6A, (255, 0, 0))
+    assert sent[brightness_idx + 2] == build_led_color_report(0xA0, (1, 2, 3))
 
 
 def test_device_set_color_uses_known_led_ids_from_upstream_comment() -> None:
@@ -172,7 +172,13 @@ def test_device_effect_payload_applies_brightness_speed_then_effect() -> None:
     assert sent[1] == build_effect_report("wave")
 
 
-def test_device_set_key_colors_without_user_mode_still_clears_before_write() -> None:
+def test_ite8910_device_declares_direct_speed_policy() -> None:
+    kb = Ite8910KeyboardDevice(lambda _report: 6)
+
+    assert kb.keyrgb_hw_speed_policy == "direct"
+
+
+def test_device_set_key_colors_without_user_mode_writes_incremental_frame_only() -> None:
     sent: list[bytes] = []
 
     def writer(report: bytes) -> int:
@@ -182,10 +188,7 @@ def test_device_set_key_colors_without_user_mode_still_clears_before_write() -> 
     kb = Ite8910KeyboardDevice(writer)
     kb.set_key_colors({(0, 0): (1, 2, 3)}, brightness=25, enable_user_mode=False)
 
-    assert sent[0] == build_reset_report()
-    brightness_idx = 1 + len(KNOWN_LED_IDS)
-    assert sent[brightness_idx] == build_brightness_speed_report_raw(0x05, 0x00)
-    assert sent[brightness_idx + 1] == build_led_color_report(0x00, (1, 2, 3))
+    assert sent == [build_led_color_report(0xA0, (1, 2, 3))]
 
 
 def test_backend_effect_builders_return_dict_payloads() -> None:
@@ -235,6 +238,7 @@ def test_backend_get_device_returns_keyboard(
     backend = Ite8910Backend()
     kb = backend.get_device()
     assert isinstance(kb, Ite8910KeyboardDevice)
+    assert kb.keyrgb_hw_speed_policy == "direct"
     kb.set_brightness(25)
     assert transport.sent[0] == build_brightness_speed_report_raw(0x05, 0x00)
 

@@ -21,6 +21,8 @@ def activate_profile_ui(editor: Any) -> None:
         editor._profile_name_var.get(),
         config=editor.config,
         current_colors=dict(getattr(editor, "colors", {}) or {}),
+        num_rows=NUM_ROWS,
+        num_cols=NUM_COLS,
     )
     editor.profile_name = result.name
     editor._profile_name_var.set(result.name)

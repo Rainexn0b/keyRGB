@@ -35,6 +35,7 @@ def evdev_key_name_to_key_id(name: str) -> Optional[str]:
         "COMPOSE": "menu",
         "MENU": "menu",
         "BACKSLASH": "bslash",
+        "102ND": "nonusbackslash",
         "LEFTBRACE": "lbracket",
         "RIGHTBRACE": "rbracket",
         "SEMICOLON": "semicolon",

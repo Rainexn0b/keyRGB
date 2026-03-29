@@ -146,6 +146,7 @@ class TestReactiveKeyMapping:
         assert _evdev_key_name_to_key_id("KEY_LEFTSHIFT") == "lshift"
         assert _evdev_key_name_to_key_id("KEY_RIGHTALT") == "ralt"
         assert _evdev_key_name_to_key_id("KEY_BACKSLASH") == "bslash"
+        assert _evdev_key_name_to_key_id("KEY_102ND") == "nonusbackslash"
         assert _evdev_key_name_to_key_id("KEY_LEFTBRACE") == "lbracket"
         assert _evdev_key_name_to_key_id("KEY_KP1") == "num1"
         assert _evdev_key_name_to_key_id("KEY_KPDOT") == "numdot"

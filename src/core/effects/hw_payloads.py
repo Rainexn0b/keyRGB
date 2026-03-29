@@ -7,6 +7,14 @@ from typing import Any, Callable, Dict, Optional
 from src.core.utils.logging_utils import log_throttled
 
 
+def _hw_speed_from_ui_speed(ui_speed: int, *, kb: Any) -> int:
+    policy = str(getattr(kb, "keyrgb_hw_speed_policy", "direct") or "direct").strip().lower()
+    normalized = max(0, min(10, int(ui_speed)))
+    if policy == "inverted":
+        return max(0, min(10, 11 - normalized))
+    return normalized
+
+
 def allowed_hw_effect_keys(effect_func: Callable[..., Any], *, logger: logging.Logger) -> set[str]:
     """Best-effort introspection of ite8291r3-ctl's effect builders."""
 
@@ -50,10 +58,12 @@ def build_hw_effect_payload(
     "drop unsupported keys" retry loop).
     """
 
-    # The controller's speed scale is inverted compared to the UX:
-    # UI: 10 = fastest, 0/1 = slowest
-    # HW: larger values slow the effect down
-    hw_speed = max(0, min(10, 11 - int(ui_speed)))
+    # Hardware speed policy is backend-specific.
+    # - ite8910: firmware uses 0..10 with larger values = faster
+    # - ite8291r3: vendored backend documents 0 = fastest, 10 = slowest
+    # Unknown backends default to the UI scale directly so new hardware-effect
+    # paths do not inherit the old inverted behavior by accident.
+    hw_speed = _hw_speed_from_ui_speed(ui_speed, kb=kb)
 
     hw_kwargs: Dict[str, Any] = {
         "speed": hw_speed,

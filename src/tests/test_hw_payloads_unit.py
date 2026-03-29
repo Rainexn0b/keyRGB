@@ -62,11 +62,41 @@ class TestAllowedHwEffectKeys:
 class TestBuildHwEffectPayload:
     """Test build_hw_effect_payload construction logic."""
 
-    def test_inverts_speed_scale_correctly(self):
-        """UI speed 10 (fastest) should map to HW speed 1 (fastest)."""
+    def test_ite8910_uses_direct_speed_scale(self):
+        """ITE8910 should preserve the UI speed ordering instead of inverting it."""
         from src.core.effects.hw_payloads import build_hw_effect_payload
 
-        mock_kb = MagicMock()
+        class FakeIte8910Keyboard:
+            keyrgb_hw_speed_policy = "direct"
+
+        captured_kwargs = {}
+
+        def capture_effect_func(**kwargs):
+            captured_kwargs.update(kwargs)
+            return "payload"
+
+        result = build_hw_effect_payload(
+            effect_name="wave",
+            effect_func=capture_effect_func,
+            ui_speed=10,
+            brightness=50,
+            current_color=(255, 0, 0),
+            hw_colors={},
+            kb=FakeIte8910Keyboard(),
+            kb_lock=RLock(),
+            logger=logging.getLogger(),
+        )
+
+        assert captured_kwargs["speed"] == 10
+        assert result == "payload"
+
+    def test_ite8291r3_inverts_speed_scale(self):
+        """Vendored ite8291r3 uses 0 = fastest, 10 = slowest."""
+        from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        class FakeIte8291r3Keyboard:
+            keyrgb_hw_speed_policy = "inverted"
+
         kb_lock = RLock()
 
         captured_kwargs = {}
@@ -82,7 +112,7 @@ class TestBuildHwEffectPayload:
             brightness=50,
             current_color=(255, 0, 0),
             hw_colors={"red": 1},
-            kb=mock_kb,
+            kb=FakeIte8291r3Keyboard(),
             kb_lock=kb_lock,
             logger=logging.getLogger(),
         )
@@ -91,9 +121,12 @@ class TestBuildHwEffectPayload:
         assert captured_kwargs["speed"] == 1
         assert result == "payload"
 
-    def test_slowest_speed_conversion(self):
-        """UI speed 0/1 (slowest) should map to HW speed 10 (slowest)."""
+    def test_ite8291r3_slowest_speed_conversion(self):
+        """Lowest UI speed should stay slowest on the ite8291r3 backend."""
         from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        class FakeIte8291r3Keyboard:
+            keyrgb_hw_speed_policy = "inverted"
 
         captured_kwargs = {}
 
@@ -108,7 +141,7 @@ class TestBuildHwEffectPayload:
             brightness=50,
             current_color=(0, 255, 0),
             hw_colors={},
-            kb=MagicMock(),
+            kb=FakeIte8291r3Keyboard(),
             kb_lock=RLock(),
             logger=logging.getLogger(),
         )
@@ -253,9 +286,12 @@ class TestBuildHwEffectPayload:
                 logger=logging.getLogger(),
             )
 
-    def test_clamps_speed_to_valid_range(self):
-        """Speed should be clamped to [0, 10]."""
+    def test_ite8291r3_clamps_speed_to_valid_range(self):
+        """ite8291r3 speed inversion should still clamp to [0, 10]."""
         from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        class FakeIte8291r3Keyboard:
+            keyrgb_hw_speed_policy = "inverted"
 
         captured_kwargs = {}
 
@@ -263,7 +299,9 @@ class TestBuildHwEffectPayload:
             captured_kwargs.update(kwargs)
             return "payload"
 
-        # Test upper bound: UI 15 -> HW speed should clamp to 0 (max(0, 11-15) = 0)
+        # Test upper bound: values above the UI range first clamp to 10, then
+        # the ite8291r3 inversion maps that to the fastest supported hardware
+        # value.
         build_hw_effect_payload(
             effect_name="test",
             effect_func=capture_effect_func,
@@ -271,12 +309,12 @@ class TestBuildHwEffectPayload:
             brightness=50,
             current_color=(0, 0, 0),
             hw_colors={},
-            kb=MagicMock(),
+            kb=FakeIte8291r3Keyboard(),
             kb_lock=RLock(),
             logger=logging.getLogger(),
         )
 
-        assert captured_kwargs["speed"] == 0
+        assert captured_kwargs["speed"] == 1
 
         # Test lower bound: UI -5 -> HW speed should clamp to 10 (min(10, 11-(-5)) = 10)
         build_hw_effect_payload(
@@ -286,7 +324,7 @@ class TestBuildHwEffectPayload:
             brightness=50,
             current_color=(0, 0, 0),
             hw_colors={},
-            kb=MagicMock(),
+            kb=FakeIte8291r3Keyboard(),
             kb_lock=RLock(),
             logger=logging.getLogger(),
         )

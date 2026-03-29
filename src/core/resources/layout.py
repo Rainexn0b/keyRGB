@@ -3,9 +3,9 @@
 This is a *visual* layout used to draw clickable key hitboxes on top of the
 bundled reference deck image (historically the WootBook Y15 Pro image).
 
-Important: The ITE controller exposes a 6×21 LED matrix (row,col). The mapping
-between a physical key and a matrix coordinate is device-specific and must be
-calibrated.
+Important: KeyRGB's reference profiles historically used a 6×21 Tongfang-style
+matrix, but actual backend dimensions vary by controller. The mapping between a
+physical key and a matrix coordinate is device-specific and must be calibrated.
 
 Coordinates in this file are in the source image coordinate space:
 - Image size: 1008×450
@@ -69,7 +69,12 @@ def _units_row_with_spacers(
 
 
 def build_layout() -> List[KeyDef]:
-    """Return the built-in reference layout (full-size-with-numpad)."""
+    """Return the built-in reference layout with ANSI+ISO hitboxes.
+
+    The drawing stays close to the historical full-size reference deck, but it
+    includes the ISO-only key next to left shift so ISO users can calibrate the
+    extra physical key instead of being blocked by an ANSI-only overlay.
+    """
 
     unit = 40
     gap = 6
@@ -215,7 +220,8 @@ def build_layout() -> List[KeyDef]:
         unit,
         gap,
         [
-            ("lshift", "Shift", 2.25),
+            ("lshift", "Shift", 1.25),
+            ("nonusbackslash", "<>", 1),
             ("z", "Z", 1),
             ("x", "X", 1),
             ("c", "C", 1),

@@ -13,6 +13,7 @@ if REPO_ROOT not in sys.path:
 from src.core.backends.sysfs import SysfsLedsBackend
 from src.core.backends.sysfs.device import SysfsLedKeyboardDevice
 from src.core.backends.sysfs.common import _leds_root, _safe_write_text
+from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
 
 
 def _make_led(tmp_path: Path, name: str, *, brightness: int, max_brightness: int) -> Path:
@@ -340,7 +341,7 @@ def test_sysfs_backend_api_methods_are_stable(monkeypatch: pytest.MonkeyPatch, t
     backend = SysfsLedsBackend()
     assert backend.is_available() is False
     assert backend.capabilities().per_key is False
-    assert backend.dimensions() == (6, 21)
+    assert backend.dimensions() == (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
     assert backend.effects() == {}
     assert backend.colors() == {}
 

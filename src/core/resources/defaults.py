@@ -18,6 +18,8 @@ from typing import cast
 
 
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "reference_defaults_wootbook_y15_pro.json"
+_FALLBACK_REFERENCE_ROWS = 6
+_FALLBACK_REFERENCE_COLS = 21
 
 
 def _as_dict(value: object) -> dict[str, object]:
@@ -33,6 +35,14 @@ def _load_defaults() -> dict[str, object]:
 
 
 _RAW: dict[str, object] = _load_defaults()
+
+
+def _parse_row_col(text: object) -> tuple[int, int] | None:
+    try:
+        row_text, col_text = str(text).split(",", 1)
+        return int(row_text.strip()), int(col_text.strip())
+    except Exception:
+        return None
 
 
 DEFAULT_LAYOUT_TWEAKS: dict[str, float] = {
@@ -57,6 +67,26 @@ for _k, _v in _keymap.items():
         DEFAULT_KEYMAP[_k] = _v
 
 
+def _infer_reference_matrix_dimensions() -> tuple[int, int]:
+    max_row = -1
+    max_col = -1
+    for coord_text in DEFAULT_KEYMAP.values():
+        parsed = _parse_row_col(coord_text)
+        if parsed is None:
+            continue
+        row, col = parsed
+        max_row = max(max_row, int(row))
+        max_col = max(max_col, int(col))
+
+    if max_row >= 0 and max_col >= 0:
+        return max_row + 1, max_col + 1
+
+    return _FALLBACK_REFERENCE_ROWS, _FALLBACK_REFERENCE_COLS
+
+
+REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS = _infer_reference_matrix_dimensions()
+
+
 DEFAULT_PER_KEY_TWEAKS: dict[str, dict[str, float]] = {}
 _per_key = _as_dict(_RAW.get("per_key_tweaks"))
 for _key_id, _tweaks in _per_key.items():
@@ -71,8 +101,13 @@ for _key_id, _tweaks in _per_key.items():
         DEFAULT_PER_KEY_TWEAKS[_key_id] = _out
 
 
-# Generate default colors (all white)
-DEFAULT_COLORS = {(r, c): (255, 255, 255) for r in range(6) for c in range(21)}
+def build_default_colors(*, num_rows: int | None = None, num_cols: int | None = None) -> dict[tuple[int, int], tuple[int, int, int]]:
+    rows = REFERENCE_MATRIX_ROWS if num_rows is None else max(0, int(num_rows))
+    cols = REFERENCE_MATRIX_COLS if num_cols is None else max(0, int(num_cols))
+    return {(r, c): (255, 255, 255) for r in range(rows) for c in range(cols)}
+
+
+DEFAULT_COLORS = build_default_colors()
 
 
 __all__ = [
@@ -80,4 +115,7 @@ __all__ = [
     "DEFAULT_KEYMAP",
     "DEFAULT_PER_KEY_TWEAKS",
     "DEFAULT_COLORS",
+    "REFERENCE_MATRIX_ROWS",
+    "REFERENCE_MATRIX_COLS",
+    "build_default_colors",
 ]

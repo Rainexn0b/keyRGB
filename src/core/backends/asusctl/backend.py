@@ -7,6 +7,8 @@ import subprocess
 from dataclasses import dataclass
 from typing import Any
 
+from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
+
 from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 from .device import AsusctlAuraKeyboardDevice
 
@@ -124,7 +126,7 @@ class AsusctlAuraBackend(KeyboardBackend):
 
     def dimensions(self) -> tuple[int, int]:
         # Not a real per-key matrix backend (unless mapped to zones).
-        return (6, 21)
+            return (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
 
     def effects(self) -> dict[str, Any]:
         return {}

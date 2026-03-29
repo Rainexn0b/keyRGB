@@ -11,6 +11,8 @@ from PIL import Image, ImageTk
 
 from src.core.config import Config
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
+from src.gui.perkey.hardware import NUM_ROWS as BACKEND_NUM_ROWS, NUM_COLS as BACKEND_NUM_COLS
+from src.gui.perkey.profile_management import sanitize_keymap_cells
 from .helpers.canvas_render import redraw_calibration_canvas
 from .helpers.geometry import hit_test, key_canvas_bbox
 from .helpers.probe import CalibrationProbeState
@@ -37,8 +39,8 @@ from src.gui.reference.overlay_geometry import (
 )
 
 
-MATRIX_ROWS = 6
-MATRIX_COLS = 21
+MATRIX_ROWS = BACKEND_NUM_ROWS
+MATRIX_COLS = BACKEND_NUM_COLS
 
 
 def _keymap_path() -> Path:
@@ -70,7 +72,11 @@ class KeymapCalibrator(tk.Tk):
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.profile_name = get_active_profile_name()
-        self.keymap = load_keymap(self.profile_name)
+        self.keymap = sanitize_keymap_cells(
+            load_keymap(self.profile_name),
+            num_rows=MATRIX_ROWS,
+            num_cols=MATRIX_COLS,
+        )
         self.layout_tweaks = load_layout_global(self.profile_name)
         self.per_key_layout_tweaks = load_layout_per_key(self.profile_name)
 

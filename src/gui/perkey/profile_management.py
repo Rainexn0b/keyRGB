@@ -10,7 +10,45 @@ from src.core.config import Config
 PerKeyColors = Dict[Tuple[int, int], Tuple[int, int, int]]
 
 
-def load_profile_colors(*, name: str, config: Config, current_colors: PerKeyColors) -> PerKeyColors:
+def _is_valid_cell(cell: Tuple[int, int], *, num_rows: int, num_cols: int) -> bool:
+    row, col = int(cell[0]), int(cell[1])
+    return 0 <= row < int(num_rows) and 0 <= col < int(num_cols)
+
+
+def sanitize_keymap_cells(
+    keymap: Dict[str, Tuple[int, int]],
+    *,
+    num_rows: int,
+    num_cols: int,
+) -> Dict[str, Tuple[int, int]]:
+    return {
+        str(key_id): (int(cell[0]), int(cell[1]))
+        for key_id, cell in (keymap or {}).items()
+        if _is_valid_cell(cell, num_rows=num_rows, num_cols=num_cols)
+    }
+
+
+def sanitize_color_map_cells(
+    color_map: PerKeyColors,
+    *,
+    num_rows: int,
+    num_cols: int,
+) -> PerKeyColors:
+    return {
+        (int(cell[0]), int(cell[1])): (int(rgb[0]), int(rgb[1]), int(rgb[2]))
+        for cell, rgb in (color_map or {}).items()
+        if _is_valid_cell(cell, num_rows=num_rows, num_cols=num_cols)
+    }
+
+
+def load_profile_colors(
+    *,
+    name: str,
+    config: Config,
+    current_colors: PerKeyColors,
+    num_rows: int,
+    num_cols: int,
+) -> PerKeyColors:
     """Load per-key colors for a profile with sensible fallbacks.
 
     Profiles may exist without a saved per-key map yet; in that case we should not
@@ -19,7 +57,7 @@ def load_profile_colors(*, name: str, config: Config, current_colors: PerKeyColo
 
     prof_colors = profiles.load_per_key_colors(name)
     if prof_colors:
-        return dict(prof_colors)
+        return sanitize_color_map_cells(prof_colors, num_rows=num_rows, num_cols=num_cols)
 
     try:
         cfg_colors = dict(getattr(config, "per_key_colors", {}) or {})
@@ -27,9 +65,9 @@ def load_profile_colors(*, name: str, config: Config, current_colors: PerKeyColo
         cfg_colors = {}
 
     if cfg_colors:
-        return cfg_colors
+        return sanitize_color_map_cells(cfg_colors, num_rows=num_rows, num_cols=num_cols)
 
-    return dict(current_colors or {})
+    return sanitize_color_map_cells(dict(current_colors or {}), num_rows=num_rows, num_cols=num_cols)
 
 
 @dataclass(frozen=True)
@@ -46,14 +84,22 @@ def activate_profile(
     *,
     config: Config,
     current_colors: PerKeyColors,
+    num_rows: int,
+    num_cols: int,
 ) -> ActivatedProfile:
     name = profiles.set_active_profile(requested_name)
 
-    keymap = profiles.load_keymap(name)
+    keymap = sanitize_keymap_cells(profiles.load_keymap(name), num_rows=num_rows, num_cols=num_cols)
     layout_tweaks = profiles.load_layout_global(name)
     per_key_layout_tweaks = profiles.load_layout_per_key(name)
 
-    colors = load_profile_colors(name=name, config=config, current_colors=current_colors)
+    colors = load_profile_colors(
+        name=name,
+        config=config,
+        current_colors=current_colors,
+        num_rows=num_rows,
+        num_cols=num_cols,
+    )
     profiles.apply_profile_to_config(config, colors)
 
     return ActivatedProfile(

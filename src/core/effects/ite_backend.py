@@ -12,6 +12,7 @@ Exports kept stable:
 from __future__ import annotations
 
 from src.core.backends.registry import select_backend
+from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
 
 
 def _select_backend():
@@ -36,7 +37,7 @@ try:
     hw_colors = _backend.colors()
 except Exception:
     # Keep legacy defaults so imports don't crash when no dependency/hardware.
-    NUM_ROWS, NUM_COLS = 6, 21
+    NUM_ROWS, NUM_COLS = REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
     hw_effects = {}
     hw_colors = {}
 

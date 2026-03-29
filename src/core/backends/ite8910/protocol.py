@@ -241,7 +241,17 @@ def normalize_effect(effect: Ite8910Effect | int | str) -> Ite8910Effect:
 
 
 def led_id_from_row_col(row: int, col: int) -> int:
-    return ((int(row) & 0x07) << 5) | (int(col) & 0x1F)
+    """Translate KeyRGB logical `(row, col)` into the ITE8910 LED id.
+
+    KeyRGB's saved keymaps and built-in reference profiles use a bottom-up
+    logical row convention: row 0 is the bottom row and row 5 is the top row.
+    The ITE8910 hardware formula numbers rows in the opposite direction, so the
+    row must be flipped before encoding the LED id.
+    """
+
+    logical_row = int(row)
+    hardware_row = (NUM_ROWS - 1) - logical_row
+    return ((hardware_row & 0x07) << 5) | (int(col) & 0x1F)
 
 
 def iter_matrix_led_ids() -> Iterable[int]:

@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 from src.core.backends.registry import select_backend
+from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
 from src.core.utils.logging_utils import log_throttled
 
 
@@ -35,7 +36,7 @@ try:
     NUM_ROWS, NUM_COLS = _backend.dimensions()
     NUM_ROWS, NUM_COLS = int(NUM_ROWS), int(NUM_COLS)
 except Exception:
-    NUM_ROWS, NUM_COLS = 6, 21
+    NUM_ROWS, NUM_COLS = REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
 
 
 def get_keyboard():

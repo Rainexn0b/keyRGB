@@ -162,3 +162,16 @@ def test_ite_probe_fallback_usb_ids_cover_known_devices() -> None:
     assert (0x048D, 0x6008) in allow
     assert (0x048D, 0x600B) in allow
     assert (0x048D, 0xCE00) in allow
+
+
+def test_ite_backend_get_device_tags_speed_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    device = types.SimpleNamespace()
+    fake_ite = types.SimpleNamespace(get=lambda: device)
+
+    backend = Ite8291r3Backend()
+    monkeypatch.setattr(backend, "_import", lambda: fake_ite)
+
+    kb = backend.get_device()
+
+    assert kb is device
+    assert kb.keyrgb_hw_speed_policy == "inverted"

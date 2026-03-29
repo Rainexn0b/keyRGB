@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
+
 from ..base import BackendCapabilities, BackendStability, KeyboardDevice, KeyboardBackend, ProbeResult
 from . import common
 from . import privileged
@@ -170,7 +172,7 @@ class SysfsLedsBackend(KeyboardBackend):
     def dimensions(self) -> tuple[int, int]:
         # Not per-key. Return a common matrix size for legacy callers that assume
         # dimensions exist, but treat per_key=False as authoritative.
-        return (6, 21)
+            return (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
 
     def effects(self) -> dict[str, Any]:
         return {}
