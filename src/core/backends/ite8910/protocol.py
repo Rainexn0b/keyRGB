@@ -40,6 +40,13 @@ REPORT_ID = 0xCC
 LED_ID_ROW_STRIDE = 0x20
 COLOR_CUSTOM = 0xAA
 COLOR_SLOT_BASE = 0xA1
+PRESET_SLOT_BASE = 0x71
+
+# Wave: 8 directions (preset 0x71-0x78, custom 0xA1-0xA8)
+# Snake: 4 diagonal directions (preset 0x71-0x74, custom 0xA1-0xA4)
+# Slot index encodes direction in both preset and custom ranges.
+WAVE_DIRECTIONS = ("up_left", "up_right", "down_left", "down_right", "up", "down", "left", "right")
+SNAKE_DIRECTIONS = ("up_left", "up_right", "down_left", "down_right")
 
 Color = tuple[int, int, int]
 
@@ -98,6 +105,7 @@ class _EffectDesc(NamedTuple):
     color_cmd: Cmd | None = None
     slot_cmd: Cmd | None = None
     slot_max: int = 0
+    directions: tuple[str, ...] = ()
 
 
 _EFFECTS: dict[Ite8910Effect, _EffectDesc] = {
@@ -105,7 +113,8 @@ _EFFECTS: dict[Ite8910Effect, _EffectDesc] = {
     Ite8910Effect.RAINBOW_WAVE: _EffectDesc(
         animation=AnimationMode.RAINBOW_WAVE,
         slot_cmd=Cmd.WAVE_COLOR,
-        slot_max=8,
+        slot_max=1,
+        directions=WAVE_DIRECTIONS,
     ),
     Ite8910Effect.BREATHING: _EffectDesc(random_cmd=Cmd.BREATHING),
     Ite8910Effect.BREATHING_COLOR: _EffectDesc(color_cmd=Cmd.BREATHING, random_cmd=Cmd.BREATHING),
@@ -125,7 +134,8 @@ _EFFECTS: dict[Ite8910Effect, _EffectDesc] = {
     Ite8910Effect.SNAKE: _EffectDesc(
         animation=AnimationMode.SNAKE,
         slot_cmd=Cmd.SNAKE_COLOR,
-        slot_max=4,
+        slot_max=1,
+        directions=SNAKE_DIRECTIONS,
     ),
     Ite8910Effect.FN_HIGHLIGHT: _EffectDesc(animation=AnimationMode.SPECTRUM_CYCLE),
     Ite8910Effect.OFF: _EffectDesc(animation=AnimationMode.CLEAR),
@@ -272,12 +282,23 @@ def build_led_color_report(led_id: int, color: Color) -> bytes:
     return _report(Cmd.SET_LED, int(led_id) & 0xFF, r, g, b)
 
 
-def build_effect_reports(effect: Ite8910Effect, colors: list[Color] | None = None) -> list[bytes]:
+def _direction_index(direction: str | None, directions: tuple[str, ...]) -> int:
+    """Resolve a direction name to an index within the direction table."""
+    if direction and direction in directions:
+        return directions.index(direction)
+    return 0
+
+
+def build_effect_reports(
+    effect: Ite8910Effect,
+    colors: list[Color] | None = None,
+    direction: str | None = None,
+) -> list[bytes]:
     """Build the full report sequence for an effect.
 
-    Sequence per the Windows Control Center:
+    Sequence per the Uniwill Control Center:
     1. Animation mode or color effect command
-    2. Color slots (if applicable)
+    2. Direction/color slots (if applicable)
     3. Brightness/speed (handled separately by the caller)
     """
     desc = _EFFECTS.get(effect)
@@ -293,14 +314,24 @@ def build_effect_reports(effect: Ite8910Effect, colors: list[Color] | None = Non
     if desc.color_cmd and colors:
         r, g, b = _rgb(*colors[0])
         reports.append(_report(desc.color_cmd, COLOR_CUSTOM, r, g, b))
-    elif desc.random_cmd and not desc.animation:
+
+    if desc.random_cmd and not desc.animation and not colors:
         reports.append(_report(desc.random_cmd, 0x00, 0x00, 0x00, 0x00))
 
-    if desc.slot_cmd and colors:
-        for i, (r, g, b) in enumerate(colors[: desc.slot_max]):
-            r, g, b = _rgb(r, g, b)
-            slot_id = COLOR_SLOT_BASE + i
-            reports.append(_report(desc.slot_cmd, slot_id, r, g, b))
+    if not desc.slot_cmd:
+        return reports
+
+    idx = _direction_index(direction, desc.directions)
+
+    if desc.directions and colors:
+        r, g, b = _rgb(*colors[0])
+        reports.append(_report(desc.slot_cmd, COLOR_SLOT_BASE + idx, r, g, b))
+    elif desc.directions:
+        reports.append(_report(desc.slot_cmd, PRESET_SLOT_BASE + idx, 0x00, 0x00, 0x00))
+    else:
+        for i, c in enumerate(colors[: desc.slot_max]):
+            r, g, b = _rgb(*c)
+            reports.append(_report(desc.slot_cmd, COLOR_SLOT_BASE + i, r, g, b))
 
     return reports
 
@@ -337,8 +368,13 @@ class Ite8910ProtocolState:
     def set_speed_raw(self, speed: int) -> bytes:
         return self.set_brightness_and_speed_raw(self.current_brightness_raw, speed)
 
-    def set_effect(self, effect: Ite8910Effect | int | str, colors: list[Color] | None = None) -> list[bytes]:
-        return build_effect_reports(normalize_effect(effect), colors)
+    def set_effect(
+        self,
+        effect: Ite8910Effect | int | str,
+        colors: list[Color] | None = None,
+        direction: str | None = None,
+    ) -> list[bytes]:
+        return build_effect_reports(normalize_effect(effect), colors, direction)
 
     def reset(self) -> bytes:
         return build_reset_report()
