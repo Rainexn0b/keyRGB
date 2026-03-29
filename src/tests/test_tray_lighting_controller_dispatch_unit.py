@@ -88,6 +88,7 @@ class TestStartCurrentEffect:
             color=(0, 255, 0),
             reactive_color=None,
             reactive_use_manual_color=False,
+            direction=mock_tray.config.direction,
         )
         assert mock_tray.is_off is False
 

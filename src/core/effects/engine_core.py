@@ -32,6 +32,7 @@ class _EngineCore:
         self.current_color = (255, 0, 0)  # For static/custom effects
         self.reactive_color: Optional[tuple] = None
         self.reactive_use_manual_color: bool = False
+        self.direction: Optional[str] = None
         self.per_key_colors: Mapping[Any, Any] | None = None
         self.per_key_brightness: Optional[int] = None
 

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.backends.ite8910 import Ite8910Backend, Ite8910KeyboardDevice
-from src.core.backends.base import ExperimentalEvidence
+from src.core.backends.base import BackendStability
 from src.core.backends.ite8910.protocol import (
     Ite8910Effect,
     Ite8910ProtocolState,
@@ -23,18 +23,17 @@ from src.core.backends.ite8910.protocol import (
 def test_brightness_speed_report_matches_upstream_reference() -> None:
     assert build_brightness_speed_report_raw(0x00, 0x00).hex() == "cc0900000000"
     assert build_brightness_speed_report_raw(0x0A, 0x02).hex() == "cc090a020000"
-    assert build_brightness_speed_report_raw(0x0C, 0x09).hex() == "cc090a020000"
+    assert build_brightness_speed_report_raw(0x0C, 0x09).hex() == "cc090a090000"
 
 
 @pytest.mark.parametrize(
     ("effect", "expected_hex"),
     [
-        (Ite8910Effect.WAVE, "cc0004000000"),
+        (Ite8910Effect.RAINBOW_WAVE, "cc0004000000"),
         (Ite8910Effect.BREATHING, "cc0a00000000"),
         (Ite8910Effect.SCAN, "cc000a000000"),
         (Ite8910Effect.FLASHING, "cc0b00000000"),
         (Ite8910Effect.RANDOM, "cc0009000000"),
-        (Ite8910Effect.RIPPLE, "cc0700000000"),
         (Ite8910Effect.SNAKE, "cc000b000000"),
         (Ite8910Effect.SPECTRUM_CYCLE, "cc0002000000"),
     ],
@@ -104,10 +103,11 @@ def test_raw_brightness_from_ui_preserves_nonzero_values() -> None:
     assert raw_brightness_from_ui(50) == 10
 
 
-def test_raw_speed_from_effect_speed_maps_keyrgb_range_to_three_steps() -> None:
-    assert raw_speed_from_effect_speed(1) == 0
-    assert raw_speed_from_effect_speed(5) == 1
-    assert raw_speed_from_effect_speed(10) == 2
+def test_raw_speed_from_effect_speed_clamps_to_firmware_range() -> None:
+    assert raw_speed_from_effect_speed(0) == 0
+    assert raw_speed_from_effect_speed(5) == 5
+    assert raw_speed_from_effect_speed(10) == 10
+    assert raw_speed_from_effect_speed(15) == 10
 
 
 def test_device_translates_row_col_writes_to_led_reports() -> None:
@@ -127,10 +127,15 @@ def test_device_translates_row_col_writes_to_led_reports() -> None:
         enable_user_mode=True,
     )
 
+    # reset() sends clear + 120 black LED reports, then set_brightness
     assert sent[0] == build_reset_report()
-    assert sent[1] == build_brightness_speed_report_raw(0x05, 0x00)
-    assert sent[2] == build_led_color_report(0x4A, (255, 0, 0))
-    assert sent[3] == build_led_color_report(0x00, (1, 2, 3))
+    # 120 black LED clears (sent[1] .. sent[120])
+    for i, led_id in enumerate(KNOWN_LED_IDS):
+        assert sent[1 + i] == build_led_color_report(led_id, (0, 0, 0))
+    brightness_idx = 1 + len(KNOWN_LED_IDS)
+    assert sent[brightness_idx] == build_brightness_speed_report_raw(0x05, 0x00)
+    assert sent[brightness_idx + 1] == build_led_color_report(0x4A, (255, 0, 0))
+    assert sent[brightness_idx + 2] == build_led_color_report(0x00, (1, 2, 3))
 
 
 def test_device_set_color_uses_known_led_ids_from_upstream_comment() -> None:
@@ -143,9 +148,11 @@ def test_device_set_color_uses_known_led_ids_from_upstream_comment() -> None:
     kb = Ite8910KeyboardDevice(writer)
     kb.set_color((0x12, 0x34, 0x56), brightness=10)
 
+    # reset: clear + 120 black LEDs
     assert sent[0] == build_reset_report()
-    assert sent[1] == build_brightness_speed_report_raw(0x02, 0x00)
-    led_reports = sent[2:]
+    brightness_idx = 1 + len(KNOWN_LED_IDS)
+    assert sent[brightness_idx] == build_brightness_speed_report_raw(0x02, 0x00)
+    led_reports = sent[brightness_idx + 1:]
     assert len(led_reports) == len(KNOWN_LED_IDS)
     assert led_reports[0] == build_led_color_report(KNOWN_LED_IDS[0], (0x12, 0x34, 0x56))
     assert led_reports[-1] == build_led_color_report(KNOWN_LED_IDS[-1], (0x12, 0x34, 0x56))
@@ -161,7 +168,7 @@ def test_device_effect_payload_applies_brightness_speed_then_effect() -> None:
     kb = Ite8910KeyboardDevice(writer)
     kb.set_effect({"name": "wave", "brightness": 25, "speed": 10})
 
-    assert sent[0] == build_brightness_speed_report_raw(0x05, 0x02)
+    assert sent[0] == build_brightness_speed_report_raw(0x05, 0x0A)
     assert sent[1] == build_effect_report("wave")
 
 
@@ -176,22 +183,39 @@ def test_device_set_key_colors_without_user_mode_still_clears_before_write() -> 
     kb.set_key_colors({(0, 0): (1, 2, 3)}, brightness=25, enable_user_mode=False)
 
     assert sent[0] == build_reset_report()
-    assert sent[1] == build_brightness_speed_report_raw(0x05, 0x00)
-    assert sent[2] == build_led_color_report(0x00, (1, 2, 3))
+    brightness_idx = 1 + len(KNOWN_LED_IDS)
+    assert sent[brightness_idx] == build_brightness_speed_report_raw(0x05, 0x00)
+    assert sent[brightness_idx + 1] == build_led_color_report(0x00, (1, 2, 3))
 
 
 def test_backend_effect_builders_return_dict_payloads() -> None:
     backend = Ite8910Backend()
-    wave_builder = backend.effects()["wave"]
+    effects = backend.effects()
+    wave_builder = effects["wave"]
 
     payload = wave_builder(speed=4, brightness=25)
-    assert payload == {"name": "wave", "speed": 4, "brightness": 25}
-    assert "rainbow" in backend.effects()
-    assert "ripple" not in backend.effects()
-    assert backend.experimental_evidence == ExperimentalEvidence.REVERSE_ENGINEERED
+    assert payload == {"name": "rainbow_wave", "speed": 4, "brightness": 25}
+
+    payload_with_dir = wave_builder(speed=4, brightness=25, direction="up_left")
+    assert payload_with_dir["direction"] == "up_left"
+
+    payload_with_color = wave_builder(speed=4, brightness=25, color=(255, 0, 0))
+    assert payload_with_color["color"] == (255, 0, 0)
+
+    assert "rainbow" in effects
+    assert "snake" in effects
+    assert backend.stability == BackendStability.VALIDATED
+
+    # Snake accepts direction and color
+    snake_payload = effects["snake"](speed=3, brightness=20, direction="down_right")
+    assert snake_payload["direction"] == "down_right"
+
+    # Spectrum cycle only accepts speed and brightness
+    with pytest.raises(ValueError, match="not needed"):
+        effects["spectrum_cycle"](speed=4, brightness=25, direction="up")
 
 
-def test_backend_get_device_returns_keyboard_when_experimental_enabled(
+def test_backend_get_device_returns_keyboard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class FakeTransport:
@@ -203,7 +227,6 @@ def test_backend_get_device_returns_keyboard_when_experimental_enabled(
             return len(report)
 
     transport = FakeTransport()
-    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
         "src.core.backends.ite8910.backend.open_matching_hidraw_transport",
         lambda *_a, **_k: (transport, SimpleNamespace(devnode="/dev/hidraw7")),
@@ -216,30 +239,8 @@ def test_backend_get_device_returns_keyboard_when_experimental_enabled(
     assert transport.sent[0] == build_brightness_speed_report_raw(0x05, 0x00)
 
 
-def test_backend_probe_reports_detected_but_disabled_until_opted_in(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_backend_probe_reports_available_when_device_present(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
-    monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
-    monkeypatch.setattr(
-        "src.core.backends.ite8910.backend.find_matching_hidraw_device",
-        lambda *_a, **_k: SimpleNamespace(
-            vendor_id=0x048D,
-            product_id=0x8910,
-            devnode="/dev/hidraw7",
-            hid_name="ITE Device(829x)",
-        ),
-    )
-
-    backend = Ite8910Backend()
-    res = backend.probe()
-    assert res.available is False
-    assert res.identifiers["usb_vid"] == "0x048d"
-    assert res.identifiers["usb_pid"] == "0x8910"
-    assert "experimental backend disabled" in (res.reason or "")
-
-
-def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
-    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
         "src.core.backends.ite8910.backend.find_matching_hidraw_device",
         lambda *_a, **_k: SimpleNamespace(

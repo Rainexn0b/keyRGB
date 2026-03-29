@@ -225,6 +225,18 @@ class Config:
         self._save()
 
     @property
+    def direction(self) -> str | None:
+        val = self._settings.get("direction", None)
+        if val is None:
+            return None
+        return str(val).strip().lower() or None
+
+    @direction.setter
+    def direction(self, value: str | None):
+        self._settings["direction"] = value
+        self._save()
+
+    @property
     def reactive_color(self) -> tuple[int, int, int]:
         raw = self._settings.get("reactive_color", None)
         if raw is None:

@@ -42,6 +42,7 @@ def build_hw_effect_payload(
     kb: Any,
     kb_lock: RLock,
     logger: logging.Logger,
+    direction: Optional[str] = None,
 ) -> Any:
     """Build payload for a hardware effect.
 
@@ -59,10 +60,12 @@ def build_hw_effect_payload(
         "brightness": int(brightness),
     }
 
-    # For breathing, use the user's configured RGB.
-    # The controller expects a palette index, so we program a palette slot
-    # and then reference it.
-    if effect_name == "breathing":
+    allowed = allowed_hw_effect_keys(effect_func, logger=logger)
+
+    # For palette-based backends (hw_colors non-empty), breathing uses a
+    # palette slot. For direct-RGB backends (hw_colors empty), pass the
+    # user's color as an RGB tuple.
+    if effect_name == "breathing" and hw_colors:
         palette_slot = int(hw_colors.get("red", 1))
         try:
             with kb_lock:
@@ -77,7 +80,15 @@ def build_hw_effect_payload(
             )
         hw_kwargs["color"] = palette_slot
 
-    allowed = allowed_hw_effect_keys(effect_func, logger=logger)
+    # Direct-RGB color pass-through for backends that accept color as an
+    # RGB tuple (ITE8910). Only set if not already populated by the palette
+    # path above.
+    if "color" not in hw_kwargs and "color" in allowed:
+        hw_kwargs["color"] = tuple(current_color)
+
+    if direction and "direction" in allowed:
+        hw_kwargs["direction"] = direction
+
     if allowed:
         hw_kwargs = {k: v for k, v in hw_kwargs.items() if k in allowed}
 
