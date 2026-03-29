@@ -22,7 +22,7 @@ LED_ID_ROW_STRIDE = 0x20
 # https://chocapikk.com/posts/2026/reverse-engineering-ite8910-keyboard-rgb/
 #
 # All commands are 6-byte HID feature reports with report ID 0xCC:
-# [0xCC, command, data0, data1, data2, data3]
+#   [0xCC, command, data0, data1, data2, data3]
 #
 # Command reference (from reverse-engineered .NET IL and native DLL):
 #   0x00 XX       - Animation mode select (XX = mode ID)
@@ -37,9 +37,11 @@ LED_ID_ROW_STRIDE = 0x20
 #   0x17 SL R G B - Scan color slot (SL: 0xA1-0xA2)
 #   0x18 A1 R G B - Random with custom color
 
+Color = tuple[int, int, int]
 
-# Animation mode IDs for command [CC, 00, XX]
+
 class AnimationMode(IntEnum):
+    """Firmware animation mode IDs for command [CC, 00, XX]."""
     SPECTRUM_CYCLE = 0x02
     RAINBOW_WAVE = 0x04
     RANDOM = 0x09
@@ -48,35 +50,28 @@ class AnimationMode(IntEnum):
     CLEAR = 0x0C
 
 
-# Color slot base for custom colors
-COLOR_SLOT_CUSTOM_BASE = 0xA1
-COLOR_SLOT_PRESET_BASE = 0x71
-
-# Commands for color effects with random/custom variants
-CMD_SET_LED = 0x01
-CMD_BRIGHTNESS_SPEED = 0x09
-CMD_BREATHING = 0x0A
-CMD_FLASHING = 0x0B
-CMD_WAVE_COLOR = 0x15
-CMD_SNAKE_COLOR = 0x16
-CMD_SCAN_COLOR = 0x17
-CMD_RANDOM_COLOR = 0x18
-CMD_ANIMATION = 0x00
-
-# Wave supports 8 custom color slots
-WAVE_MAX_COLORS = 8
-# Snake supports 4 custom color slots
-SNAKE_MAX_COLORS = 4
-# Scan supports 2 custom color slots
-SCAN_MAX_COLORS = 2
+class Cmd(IntEnum):
+    """HID report command bytes."""
+    ANIMATION = 0x00
+    SET_LED = 0x01
+    BRIGHTNESS_SPEED = 0x09
+    BREATHING = 0x0A
+    FLASHING = 0x0B
+    WAVE_COLOR = 0x15
+    SNAKE_COLOR = 0x16
+    SCAN_COLOR = 0x17
+    RANDOM_COLOR = 0x18
 
 
-# LED ID encoding: ((row & 0x07) << 5) | (col & 0x1F)
-KNOWN_LED_IDS: tuple[int, ...] = tuple(
-    ((row & 0x07) << 5) | (col & 0x1F)
-    for row in range(NUM_ROWS)
-    for col in range(NUM_COLS)
-)
+COLOR_CUSTOM = 0xAA
+COLOR_SLOT_BASE = 0xA1
+
+SLOT_LIMITS: dict[Cmd, int] = {
+    Cmd.WAVE_COLOR: 8,
+    Cmd.SNAKE_COLOR: 4,
+    Cmd.SCAN_COLOR: 2,
+    Cmd.RANDOM_COLOR: 1,
+}
 
 
 class Ite8910Effect(IntEnum):
@@ -94,14 +89,17 @@ class Ite8910Effect(IntEnum):
     OFF = 11
 
 
-CANONICAL_EFFECTS: dict[str, Ite8910Effect] = {
+_EFFECT_NAMES: dict[str, Ite8910Effect] = {
     "spectrum_cycle": Ite8910Effect.SPECTRUM_CYCLE,
     "rainbow_wave": Ite8910Effect.RAINBOW_WAVE,
     "rainbow": Ite8910Effect.RAINBOW_WAVE,
+    "wave": Ite8910Effect.RAINBOW_WAVE,
     "breathing": Ite8910Effect.BREATHING,
     "breathing_color": Ite8910Effect.BREATHING_COLOR,
+    "breathe": Ite8910Effect.BREATHING,
     "flashing": Ite8910Effect.FLASHING,
     "flashing_color": Ite8910Effect.FLASHING_COLOR,
+    "blink": Ite8910Effect.FLASHING,
     "random": Ite8910Effect.RANDOM,
     "random_color": Ite8910Effect.RANDOM_COLOR,
     "scan": Ite8910Effect.SCAN,
@@ -110,77 +108,69 @@ CANONICAL_EFFECTS: dict[str, Ite8910Effect] = {
     "off": Ite8910Effect.OFF,
 }
 
-_EFFECT_ALIASES: dict[str, Ite8910Effect] = {
-    **CANONICAL_EFFECTS,
-    "breathe": Ite8910Effect.BREATHING,
-    "blink": Ite8910Effect.FLASHING,
-    "wave": Ite8910Effect.RAINBOW_WAVE,
-}
+CANONICAL_EFFECTS = {k: v for k, v in _EFFECT_NAMES.items() if k == v.name.lower()}
+
+KNOWN_LED_IDS: tuple[int, ...] = tuple(
+    ((row & 0x07) << 5) | (col & 0x1F)
+    for row in range(NUM_ROWS)
+    for col in range(NUM_COLS)
+)
 
 
-def clamp_channel(value: int) -> int:
-    return max(0, min(0xFF, int(value)))
+# --- Helpers ---
+
+def _clamp(value: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, int(value)))
 
 
-def clamp_raw_brightness(value: int) -> int:
-    return max(0, min(RAW_BRIGHTNESS_MAX, int(value)))
+def _rgb(r: int, g: int, b: int) -> tuple[int, int, int]:
+    return _clamp(r, 0, 0xFF), _clamp(g, 0, 0xFF), _clamp(b, 0, 0xFF)
 
 
-def clamp_raw_speed(value: int) -> int:
-    return max(0, min(RAW_SPEED_MAX, int(value)))
+def _report(*data: int) -> bytes:
+    return bytes((REPORT_ID, *data))
+
+
+clamp_channel = lambda v: _clamp(v, 0, 0xFF)
+clamp_raw_brightness = lambda v: _clamp(v, 0, RAW_BRIGHTNESS_MAX)
+clamp_raw_speed = lambda v: _clamp(v, 0, RAW_SPEED_MAX)
 
 
 def raw_speed_from_effect_speed(value: int) -> int:
-    """Map KeyRGB's generic hardware-effect speed arg to the 0..10 ITE 8910 scale.
+    """Map KeyRGB's speed arg to the firmware's 0x00-0x0A scale.
 
-    The firmware accepts speed values 0x00 (slowest) to 0x0A (fastest).
-    The Windows Control Center maps 4 UI levels to: 1->0x02, 2->0x04, 3->0x06, 4->0x0A.
+    The firmware accepts 0x00 (slowest) to 0x0A (fastest).
+    The Windows Control Center maps: 1->0x02, 2->0x04, 3->0x06, 4->0x0A.
     """
-
     try:
-        speed_value = int(value)
-    except Exception:
+        return clamp_raw_speed(int(value))
+    except (TypeError, ValueError):
         return 0
-
-    return clamp_raw_speed(max(0, min(10, speed_value)))
 
 
 def raw_brightness_from_ui(value: int) -> int:
-    """Map KeyRGB's 0..50 UI brightness into the controller's 0..10 scale.
+    """Map KeyRGB's 0..50 UI brightness to the firmware's 0..10 scale.
 
-    The Windows Control Center maps 4 UI levels to: 1->0x02, 2->0x04, 3->0x06, 4->0x0A.
     Values above 0x0A cause undefined firmware behavior.
     """
-
-    ui_value = max(0, min(UI_BRIGHTNESS_MAX, int(value)))
-    if ui_value == 0:
-        return 0
-    return clamp_raw_brightness(int(ceil((ui_value * RAW_BRIGHTNESS_MAX) / UI_BRIGHTNESS_MAX)))
+    ui = _clamp(value, 0, UI_BRIGHTNESS_MAX)
+    return 0 if ui == 0 else clamp_raw_brightness(int(ceil(ui * RAW_BRIGHTNESS_MAX / UI_BRIGHTNESS_MAX)))
 
 
 def ui_brightness_from_raw(value: int) -> int:
-    raw_value = clamp_raw_brightness(value)
-    if raw_value == 0:
-        return 0
-    scaled = int(round((raw_value / RAW_BRIGHTNESS_MAX) * UI_BRIGHTNESS_MAX))
-    return max(1, min(UI_BRIGHTNESS_MAX, scaled))
+    raw = clamp_raw_brightness(value)
+    return 0 if raw == 0 else _clamp(round(raw / RAW_BRIGHTNESS_MAX * UI_BRIGHTNESS_MAX), 1, UI_BRIGHTNESS_MAX)
 
 
 def normalize_effect(effect: Ite8910Effect | int | str) -> Ite8910Effect:
     if isinstance(effect, Ite8910Effect):
         return effect
-
     if isinstance(effect, str):
         key = effect.strip().lower().replace(" ", "_")
-        try:
-            return _EFFECT_ALIASES[key]
-        except KeyError as exc:
-            raise ValueError(f"Unsupported ITE 8910 effect: {effect}") from exc
-
-    try:
-        return Ite8910Effect(int(effect))
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"Unsupported ITE 8910 effect: {effect}") from exc
+        if key in _EFFECT_NAMES:
+            return _EFFECT_NAMES[key]
+        raise ValueError(f"Unsupported ITE 8910 effect: {effect}")
+    return Ite8910Effect(int(effect))
 
 
 def led_id_from_row_col(row: int, col: int) -> int:
@@ -198,209 +188,142 @@ def iter_known_led_ids() -> Iterable[int]:
 
 
 # --- Report builders ---
-# All reports are 6 bytes: [REPORT_ID, cmd/data0, data1, data2, data3, data4]
 
-
-def build_brightness_speed_report(brightness_raw: int, speed_raw: int) -> bytes:
-    """[CC, 09, brightness, speed, 00, 00]"""
-    return bytes((
-        REPORT_ID, CMD_BRIGHTNESS_SPEED,
-        clamp_raw_brightness(brightness_raw),
-        clamp_raw_speed(speed_raw),
-        0x00, 0x00,
-    ))
+def build_brightness_speed_report(brightness: int, speed: int) -> bytes:
+    return _report(Cmd.BRIGHTNESS_SPEED, clamp_raw_brightness(brightness), clamp_raw_speed(speed), 0x00, 0x00)
 
 
 def build_animation_mode_report(mode: AnimationMode) -> bytes:
-    """[CC, 00, mode, 00, 00, 00]"""
-    return bytes((REPORT_ID, CMD_ANIMATION, int(mode), 0x00, 0x00, 0x00))
+    return _report(Cmd.ANIMATION, int(mode), 0x00, 0x00, 0x00)
 
 
 def build_reset_report() -> bytes:
-    """[CC, 00, 0C, 00, 00, 00] - Clear all LEDs, required before per-key updates."""
+    """Clear all LEDs. Required before per-key updates."""
     return build_animation_mode_report(AnimationMode.CLEAR)
 
 
-def build_led_color_report(led_id: int, color: tuple[int, int, int]) -> bytes:
-    """[CC, 01, led_id, R, G, B]"""
-    r, g, b = color
-    return bytes((
-        REPORT_ID, CMD_SET_LED,
-        int(led_id) & 0xFF,
-        clamp_channel(r), clamp_channel(g), clamp_channel(b),
-    ))
+def build_led_color_report(led_id: int, color: Color) -> bytes:
+    r, g, b = _rgb(*color)
+    return _report(Cmd.SET_LED, int(led_id) & 0xFF, r, g, b)
 
 
-def build_breathing_random_report() -> bytes:
-    """[CC, 0A, 00, 00, 00, 00] - Breathing with random colors."""
-    return bytes((REPORT_ID, CMD_BREATHING, 0x00, 0x00, 0x00, 0x00))
+def _build_color_effect_report(cmd: Cmd, r: int, g: int, b: int) -> bytes:
+    """[CC, cmd, AA, R, G, B] - Effect with custom color."""
+    r, g, b = _rgb(r, g, b)
+    return _report(cmd, COLOR_CUSTOM, r, g, b)
 
 
-def build_breathing_color_report(r: int, g: int, b: int) -> bytes:
-    """[CC, 0A, AA, R, G, B] - Breathing with custom color."""
-    return bytes((
-        REPORT_ID, CMD_BREATHING, 0xAA,
-        clamp_channel(r), clamp_channel(g), clamp_channel(b),
-    ))
+def _build_random_effect_report(cmd: Cmd) -> bytes:
+    """[CC, cmd, 00, 00, 00, 00] - Effect with random colors."""
+    return _report(cmd, 0x00, 0x00, 0x00, 0x00)
 
 
-def build_flashing_random_report() -> bytes:
-    """[CC, 0B, 00, 00, 00, 00] - Flashing with random colors."""
-    return bytes((REPORT_ID, CMD_FLASHING, 0x00, 0x00, 0x00, 0x00))
+def _build_color_slot_report(cmd: Cmd, slot: int, r: int, g: int, b: int) -> bytes:
+    """[CC, cmd, slot_id, R, G, B] - Set a color slot."""
+    r, g, b = _rgb(r, g, b)
+    slot_id = COLOR_SLOT_BASE + _clamp(slot, 0, SLOT_LIMITS[cmd] - 1)
+    return _report(cmd, slot_id, r, g, b)
 
 
-def build_flashing_color_report(r: int, g: int, b: int) -> bytes:
-    """[CC, 0B, AA, R, G, B] - Flashing with custom color."""
-    return bytes((
-        REPORT_ID, CMD_FLASHING, 0xAA,
-        clamp_channel(r), clamp_channel(g), clamp_channel(b),
-    ))
+def build_effect_reports(effect: Ite8910Effect, colors: list[Color] | None = None) -> list[bytes]:
+    """Build the full report sequence for an effect.
 
-
-def build_random_color_report(r: int, g: int, b: int) -> bytes:
-    """[CC, 18, A1, R, G, B] - Random with custom color."""
-    return bytes((
-        REPORT_ID, CMD_RANDOM_COLOR, COLOR_SLOT_CUSTOM_BASE,
-        clamp_channel(r), clamp_channel(g), clamp_channel(b),
-    ))
-
-
-def build_wave_color_slot_report(slot: int, r: int, g: int, b: int) -> bytes:
-    """[CC, 15, slot, R, G, B] - Set wave color slot (0-7 -> 0xA1-0xA8)."""
-    slot_id = COLOR_SLOT_CUSTOM_BASE + max(0, min(WAVE_MAX_COLORS - 1, int(slot)))
-    return bytes((
-        REPORT_ID, CMD_WAVE_COLOR, slot_id,
-        clamp_channel(r), clamp_channel(g), clamp_channel(b),
-    ))
-
-
-def build_snake_color_slot_report(slot: int, r: int, g: int, b: int) -> bytes:
-    """[CC, 16, slot, R, G, B] - Set snake color slot (0-3 -> 0xA1-0xA4)."""
-    slot_id = COLOR_SLOT_CUSTOM_BASE + max(0, min(SNAKE_MAX_COLORS - 1, int(slot)))
-    return bytes((
-        REPORT_ID, CMD_SNAKE_COLOR, slot_id,
-        clamp_channel(r), clamp_channel(g), clamp_channel(b),
-    ))
-
-
-def build_scan_color_slot_report(slot: int, r: int, g: int, b: int) -> bytes:
-    """[CC, 17, slot, R, G, B] - Set scan color slot (0-1 -> 0xA1-0xA2)."""
-    slot_id = COLOR_SLOT_CUSTOM_BASE + max(0, min(SCAN_MAX_COLORS - 1, int(slot)))
-    return bytes((
-        REPORT_ID, CMD_SCAN_COLOR, slot_id,
-        clamp_channel(r), clamp_channel(g), clamp_channel(b),
-    ))
-
-
-def build_effect_reports(effect: Ite8910Effect, colors: list[tuple[int, int, int]] | None = None) -> list[bytes]:
-    """Build the correct sequence of reports for an effect.
-
-    The Windows Control Center follows this sequence:
-    1. Set animation mode
-    2. Set color slots if applicable
-    3. Set brightness and speed (handled separately)
-
-    For per-key Direct mode:
-    1. Clear all LEDs (reset)
-    2. Set brightness and speed
-    3. Set each key color
+    Sequence per the Windows Control Center:
+    1. Animation mode or color effect command
+    2. Color slots (if applicable)
+    3. Brightness/speed (handled separately by the caller)
     """
-    reports: list[bytes] = []
     colors = colors or []
 
-    if effect == Ite8910Effect.SPECTRUM_CYCLE:
-        reports.append(build_animation_mode_report(AnimationMode.SPECTRUM_CYCLE))
+    animation_effects: dict[Ite8910Effect, AnimationMode] = {
+        Ite8910Effect.SPECTRUM_CYCLE: AnimationMode.SPECTRUM_CYCLE,
+        Ite8910Effect.RAINBOW_WAVE: AnimationMode.RAINBOW_WAVE,
+        Ite8910Effect.RANDOM: AnimationMode.RANDOM,
+        Ite8910Effect.SCAN: AnimationMode.SCAN,
+        Ite8910Effect.SNAKE: AnimationMode.SNAKE,
+        Ite8910Effect.FN_HIGHLIGHT: AnimationMode.SPECTRUM_CYCLE,
+        Ite8910Effect.OFF: AnimationMode.CLEAR,
+    }
 
-    elif effect == Ite8910Effect.RAINBOW_WAVE:
-        reports.append(build_animation_mode_report(AnimationMode.RAINBOW_WAVE))
-        for i, (r, g, b) in enumerate(colors[:WAVE_MAX_COLORS]):
-            reports.append(build_wave_color_slot_report(i, r, g, b))
+    slot_effects: dict[Ite8910Effect, tuple[AnimationMode, Cmd]] = {
+        Ite8910Effect.RAINBOW_WAVE: (AnimationMode.RAINBOW_WAVE, Cmd.WAVE_COLOR),
+        Ite8910Effect.SCAN: (AnimationMode.SCAN, Cmd.SCAN_COLOR),
+        Ite8910Effect.SNAKE: (AnimationMode.SNAKE, Cmd.SNAKE_COLOR),
+    }
 
-    elif effect == Ite8910Effect.BREATHING:
-        reports.append(build_breathing_random_report())
+    color_effects: dict[Ite8910Effect, tuple[Ite8910Effect, Cmd]] = {
+        Ite8910Effect.BREATHING_COLOR: (Ite8910Effect.BREATHING, Cmd.BREATHING),
+        Ite8910Effect.FLASHING_COLOR: (Ite8910Effect.FLASHING, Cmd.FLASHING),
+    }
 
-    elif effect == Ite8910Effect.BREATHING_COLOR:
-        if colors:
-            r, g, b = colors[0]
-            reports.append(build_breathing_color_report(r, g, b))
-        else:
-            reports.append(build_breathing_random_report())
+    random_effects: dict[Ite8910Effect, Cmd] = {
+        Ite8910Effect.BREATHING: Cmd.BREATHING,
+        Ite8910Effect.FLASHING: Cmd.FLASHING,
+    }
 
-    elif effect == Ite8910Effect.FLASHING:
-        reports.append(build_flashing_random_report())
+    reports: list[bytes] = []
 
-    elif effect == Ite8910Effect.FLASHING_COLOR:
-        if colors:
-            r, g, b = colors[0]
-            reports.append(build_flashing_color_report(r, g, b))
-        else:
-            reports.append(build_flashing_random_report())
-
-    elif effect == Ite8910Effect.RANDOM:
-        reports.append(build_animation_mode_report(AnimationMode.RANDOM))
-
-    elif effect == Ite8910Effect.RANDOM_COLOR:
+    if effect == Ite8910Effect.RANDOM_COLOR:
         reports.append(build_animation_mode_report(AnimationMode.RANDOM))
         if colors:
             r, g, b = colors[0]
-            reports.append(build_random_color_report(r, g, b))
-
-    elif effect == Ite8910Effect.SCAN:
-        reports.append(build_animation_mode_report(AnimationMode.SCAN))
-        for i, (r, g, b) in enumerate(colors[:SCAN_MAX_COLORS]):
-            reports.append(build_scan_color_slot_report(i, r, g, b))
-
-    elif effect == Ite8910Effect.SNAKE:
-        reports.append(build_animation_mode_report(AnimationMode.SNAKE))
-        for i, (r, g, b) in enumerate(colors[:SNAKE_MAX_COLORS]):
-            reports.append(build_snake_color_slot_report(i, r, g, b))
-
-    elif effect == Ite8910Effect.FN_HIGHLIGHT:
-        reports.append(build_animation_mode_report(AnimationMode.SPECTRUM_CYCLE))
-
-    elif effect == Ite8910Effect.OFF:
-        reports.append(build_animation_mode_report(AnimationMode.CLEAR))
+            reports.append(_build_color_slot_report(Cmd.RANDOM_COLOR, 0, r, g, b))
+    elif effect in color_effects:
+        base, cmd = color_effects[effect]
+        if colors:
+            r, g, b = colors[0]
+            reports.append(_build_color_effect_report(cmd, r, g, b))
+        elif base in random_effects:
+            reports.append(_build_random_effect_report(random_effects[base]))
+    elif effect in random_effects:
+        reports.append(_build_random_effect_report(random_effects[effect]))
+    elif effect in animation_effects:
+        reports.append(build_animation_mode_report(animation_effects[effect]))
+        if effect in slot_effects and colors:
+            _, cmd = slot_effects[effect]
+            limit = SLOT_LIMITS[cmd]
+            for i, (r, g, b) in enumerate(colors[:limit]):
+                reports.append(_build_color_slot_report(cmd, i, r, g, b))
 
     return reports
 
 
-# Legacy aliases for backward compatibility with existing keyRGB code
+# --- Legacy aliases ---
+
 build_brightness_speed_report_raw = build_brightness_speed_report
 
 
 def build_effect_report(effect: Ite8910Effect | int | str) -> bytes:
-    """Legacy single-report interface. Returns the first report of the effect sequence."""
+    """Legacy single-report interface."""
     reports = build_effect_reports(normalize_effect(effect))
     return reports[0] if reports else build_reset_report()
 
 
+# --- Stateful interface ---
+
 @dataclass
 class Ite8910ProtocolState:
-    """Stateful protocol handler.
-
-    Tracks brightness and speed state as the firmware expects both
-    to be sent together in a single command.
-    """
+    """Tracks brightness/speed state since the firmware expects both in one command."""
 
     current_brightness_raw: int = 0
     current_speed_raw: int = 0
 
-    def set_brightness_and_speed_raw(self, brightness_raw: int, speed_raw: int) -> bytes:
-        self.current_brightness_raw = clamp_raw_brightness(brightness_raw)
-        self.current_speed_raw = clamp_raw_speed(speed_raw)
+    def set_brightness_and_speed_raw(self, brightness: int, speed: int) -> bytes:
+        self.current_brightness_raw = clamp_raw_brightness(brightness)
+        self.current_speed_raw = clamp_raw_speed(speed)
         return build_brightness_speed_report(self.current_brightness_raw, self.current_speed_raw)
 
-    def set_brightness_raw(self, brightness_raw: int) -> bytes:
-        return self.set_brightness_and_speed_raw(brightness_raw, self.current_speed_raw)
+    def set_brightness_raw(self, brightness: int) -> bytes:
+        return self.set_brightness_and_speed_raw(brightness, self.current_speed_raw)
 
-    def set_speed_raw(self, speed_raw: int) -> bytes:
-        return self.set_brightness_and_speed_raw(self.current_brightness_raw, speed_raw)
+    def set_speed_raw(self, speed: int) -> bytes:
+        return self.set_brightness_and_speed_raw(self.current_brightness_raw, speed)
 
-    def set_effect(self, effect: Ite8910Effect | int | str, colors: list[tuple[int, int, int]] | None = None) -> list[bytes]:
+    def set_effect(self, effect: Ite8910Effect | int | str, colors: list[Color] | None = None) -> list[bytes]:
         return build_effect_reports(normalize_effect(effect), colors)
 
     def reset(self) -> bytes:
         return build_reset_report()
 
-    def set_led_color(self, led_id: int, color: tuple[int, int, int]) -> bytes:
+    def set_led_color(self, led_id: int, color: Color) -> bytes:
         return build_led_color_report(led_id, color)
