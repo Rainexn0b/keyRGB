@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import colorsys
+import importlib
 import re
 from functools import lru_cache
 from io import BytesIO
@@ -168,8 +169,8 @@ def _load_tray_mask_alpha_64() -> Image.Image | None:
             continue
 
         try:
-            from cairosvg import svg2png  # type: ignore
-
+            cairosvg = importlib.import_module("cairosvg")
+            svg2png = getattr(cairosvg, "svg2png")
             png_bytes = svg2png(url=str(p), output_width=_ICON_INNER_SIZE[0], output_height=_ICON_INNER_SIZE[1])
             img = Image.open(BytesIO(png_bytes)).convert("RGBA")
             return _center_alpha_mask(img.getchannel("A"))
