@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.18.3 (2026-03-29)
+
+- Backends/ITE8910: Rewrite the `ite8910` HID protocol around the published reverse-engineered 6-byte `0xCC` feature-report spec, including corrected command builders, mode sequencing, and slot handling for reliable firmware control.
+- Backends/ITE8910: Add full end-to-end firmware effect support for direction and custom color control, including 8-direction wave handling, 4-direction snake handling, corrected random-color slot usage, and tracked mode/brightness updates so unchanged writes are skipped.
+- Backends/ITE8910: Promote `ite8910` from experimental to validated after hardware-backed verification, keeping it eligible by default during backend selection.
+- Tray/Effects: Route firmware effect direction through the tray lighting controller and hardware payload pipeline so UI-selected direction and color settings reach the validated `ite8910` backend correctly.
+- Config: Add persistent direction-aware configuration defaults and state wiring required for the expanded `ite8910` firmware effect controls.
+- Tests/Docs: Expand protocol notes and translation coverage to lock in the corrected packet shapes, direction-slot mappings, and firmware behavior documented by the reverse-engineering notes; README now reflects `ite8910` as validated hardware support.
+
 ## 0.18.2 (2026-03-29)
 
 - Backends/ITE8910: Correct the experimental `ite8910` HID framing to the documented 6-byte `0xCC` feature reports, switch the backend to the full reverse-engineered 6x20 LED matrix, and clear the deck before per-key rewrites so stale LEDs do not survive sparse or dynamic updates.
