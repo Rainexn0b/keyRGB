@@ -14,8 +14,8 @@ Command reference (from reverse-engineered .NET IL and native DLL):
   0x0A AA R G B - Breathing with custom color
   0x0B 00       - Flashing with random colors
   0x0B AA R G B - Flashing with custom color
-  0x15 SL R G B - Wave color slot (SL: 0xA1-0xA8 custom, 0x71-0x78 preset)
-  0x16 SL R G B - Snake color slot (SL: 0xA1-0xA4 custom, 0x71-0x74 preset)
+  0x15 SL R G B - Wave direction + color (SL: 0xA1-0xA8 custom, 0x71-0x78 preset)
+  0x16 SL R G B - Snake direction + color (SL: 0xA1-0xA4 custom, 0x71-0x74 preset)
   0x17 SL R G B - Scan color slot (SL: 0xA1-0xA2)
   0x18 A1 R G B - Random with custom color
 """
@@ -326,9 +326,11 @@ def build_effect_reports(
     if desc.directions and colors:
         r, g, b = _rgb(*colors[0])
         reports.append(_report(desc.slot_cmd, COLOR_SLOT_BASE + idx, r, g, b))
-    elif desc.directions:
+
+    if desc.directions and not colors:
         reports.append(_report(desc.slot_cmd, PRESET_SLOT_BASE + idx, 0x00, 0x00, 0x00))
-    else:
+
+    if not desc.directions:
         for i, c in enumerate(colors[: desc.slot_max]):
             r, g, b = _rgb(*c)
             reports.append(_report(desc.slot_cmd, COLOR_SLOT_BASE + i, r, g, b))
