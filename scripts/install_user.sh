@@ -26,7 +26,7 @@ Options:
   --version <tag>       Install a specific Git tag (e.g. v0.7.9)
   --asset <name>        AppImage filename (default: keyrgb-x86_64.AppImage)
   --prerelease          Allow picking prereleases when auto-resolving latest
-  --update-appimage     Only update the AppImage (non-interactive); still refreshes desktop + udev
+  --update-appimage     Only update the AppImage (non-interactive); still refreshes desktop integration
   --no-system-deps      Skip best-effort system package changes (kernel drivers / TCC app / polkit)
 
 Env vars:
@@ -96,7 +96,7 @@ log_info "=== KeyRGB Installation (User) ==="
 
 if [ "$UPDATE_ONLY" -eq 1 ]; then
   log_info "=== KeyRGB AppImage Update ==="
-  log_info "Update-only mode: download a fresh AppImage and refresh udev + desktop integration."
+  log_info "Update-only mode: download a fresh AppImage and refresh desktop integration only."
 
   # The release channel comes from saved prefs unless overridden via env/CLI.
   if is_truthy "${KEYRGB_ALLOW_PRERELEASE:-n}"; then
@@ -228,8 +228,13 @@ fi
 # If we resolved a tag, use it for icon/udev. Otherwise fall back to main.
 RAW_REF="${resolved_ref:-main}"
 
-# Always refresh udev + desktop integration; it's quick and keeps things consistent.
-install_udev_rule_from_ref "$RAW_REF"
+# Update-only mode should stay user-local. Udev rules are a first-install or
+# explicit reinstall concern because they live under /etc and require sudo.
+if [ "$UPDATE_ONLY" -ne 1 ]; then
+  install_udev_rule_from_ref "$RAW_REF"
+else
+  log_info "Skipping udev rule installation (update-only)."
+fi
 
 if [ "$UPDATE_ONLY" -ne 1 ]; then
   # Install narrowly-scoped pkexec helpers + polkit rules so sysfs writes (power mode,

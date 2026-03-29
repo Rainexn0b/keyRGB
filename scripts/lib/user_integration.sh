@@ -26,10 +26,34 @@ raise SystemExit(1)
 PY
 }
 
+refresh_desktop_integration_caches_best_effort() {
+  local icon_theme_dir="$HOME/.local/share/icons/hicolor"
+  local app_dir="$HOME/.local/share/applications"
+
+  if have_cmd gtk-update-icon-cache && [ -d "$icon_theme_dir" ]; then
+    gtk-update-icon-cache -f -t "$icon_theme_dir" >/dev/null 2>&1 || \
+      log_warn "Could not refresh GTK icon cache automatically"
+  fi
+
+  if have_cmd update-desktop-database && [ -d "$app_dir" ]; then
+    update-desktop-database "$app_dir" >/dev/null 2>&1 || \
+      log_warn "Could not refresh desktop database automatically"
+  fi
+
+  if have_cmd kbuildsycoca6; then
+    kbuildsycoca6 >/dev/null 2>&1 || log_warn "Could not refresh KDE service cache automatically"
+  elif have_cmd kbuildsycoca5; then
+    kbuildsycoca5 >/dev/null 2>&1 || log_warn "Could not refresh KDE service cache automatically"
+  fi
+}
+
 # --- Desktop integration + system rules ---
 install_icon_and_desktop_entries() {
   local keyrgb_exec="$1" raw_ref="$2"
 
+  local icon_dir_legacy="$HOME/.local/share/icons"
+  local icon_file_legacy_png="$icon_dir_legacy/keyrgb.png"
+  local icon_file_legacy_svg="$icon_dir_legacy/keyrgb.svg"
   local icon_dir_png="$HOME/.local/share/icons/hicolor/256x256/apps"
   local icon_file_png="$icon_dir_png/keyrgb.png"
   local icon_dir_svg="$HOME/.local/share/icons/hicolor/scalable/apps"
@@ -39,21 +63,28 @@ install_icon_and_desktop_entries() {
   local autostart_dir="$HOME/.config/autostart"
   local autostart_file="$autostart_dir/keyrgb.desktop"
 
-  mkdir -p "$icon_dir_png" "$icon_dir_svg" "$app_dir" "$autostart_dir"
+  mkdir -p "$icon_dir_legacy" "$icon_dir_png" "$icon_dir_svg" "$app_dir" "$autostart_dir"
 
   local icon_url_png="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-tray-squircle.png"
   local icon_url_svg="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-keyrgb.svg"
   log_info "Downloading icon: $icon_url_png"
   download_url_quiet "$icon_url_png" "$icon_file_png"
   log_ok "Installed icon: $icon_file_png"
+  cp -f "$icon_file_png" "$icon_file_legacy_png"
 
+  local desktop_icon="$icon_file_png"
   log_info "Downloading scalable icon: $icon_url_svg"
   if download_url_quiet "$icon_url_svg" "$icon_file_svg"; then
     log_ok "Installed scalable icon: $icon_file_svg"
+    cp -f "$icon_file_svg" "$icon_file_legacy_svg"
+    desktop_icon="$icon_file_svg"
   else
     rm -f "$icon_file_svg" 2>/dev/null || true
+    rm -f "$icon_file_legacy_svg" 2>/dev/null || true
     log_warn "Could not install scalable SVG icon; GUI window icons will fall back to PNG"
   fi
+
+  rm -f "$icon_dir_legacy/keyrgb.jpg" 2>/dev/null || true
 
   cat >"$app_file" <<EOF
 [Desktop Entry]
@@ -61,7 +92,7 @@ Type=Application
 Name=KeyRGB
 Comment=RGB Keyboard Controller
 Exec=$keyrgb_exec
-Icon=keyrgb
+Icon=$desktop_icon
 Terminal=false
 Categories=Utility;System;
 StartupNotify=false
@@ -73,13 +104,14 @@ Type=Application
 Name=KeyRGB
 Comment=RGB Keyboard Controller
 Exec=$keyrgb_exec
-Icon=keyrgb
+Icon=$desktop_icon
 Terminal=false
 Categories=Utility;System;
 X-KDE-autostart-after=plasma-workspace
 X-KDE-StartupNotify=false
 EOF
 
+  refresh_desktop_integration_caches_best_effort
   log_ok "Desktop launcher installed + autostart configured"
 }
 

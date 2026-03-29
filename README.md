@@ -176,7 +176,7 @@ Notes:
 
 #### Update existing AppImage (non-interactive)
 
-Refreshes the stored AppImage and launcher under `~/.local/bin/`, and also refreshes desktop integration and udev setup. Reuses your last saved release channel (stable vs prerelease).
+Refreshes the stored AppImage and launcher under `~/.local/bin/`, and also refreshes desktop integration. Reuses your last saved release channel (stable vs prerelease).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage
@@ -323,7 +323,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | `--asset <name>`     | Override AppImage filename (default: `keyrgb-x86_64.AppImage`).                                             |
 | `--prerelease`       | Allow picking prereleases when auto-resolving latest AppImage.                                              |
 | `--no-system-deps`   | Skip system package changes (kernel drivers / TCC app / polkit).                                            |
-| `--update-appimage`  | Non-interactive: update an existing AppImage install, then refresh desktop integration and udev setup. |
+| `--update-appimage`  | Non-interactive: update an existing AppImage install, then refresh desktop integration. |
 | `--ref <git-ref>`    | For curl installs: download installer modules from a specific git ref (default: `main`).                    |
 
 Environment variables: see the **Environment variables** section above.
