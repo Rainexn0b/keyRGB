@@ -48,6 +48,7 @@ class _EngineStart:
     per_key_colors: Mapping[Any, Any] | None
     reactive_color: Optional[tuple]
     reactive_use_manual_color: bool
+    direction: Optional[str]
     _last_hw_mode_brightness: Optional[int]
     _last_rendered_brightness: Optional[int]
     stop: Any
@@ -83,6 +84,7 @@ class _EngineStart:
         color: Optional[tuple] = None,
         reactive_color: Optional[tuple] = None,
         reactive_use_manual_color: Optional[bool] = None,
+        direction: Optional[str] = None,
     ):
         """Start an effect (hardware or software)."""
 
@@ -119,6 +121,9 @@ class _EngineStart:
 
         if reactive_use_manual_color is not None:
             self.reactive_use_manual_color = bool(reactive_use_manual_color)
+
+        if direction is not None:
+            self.direction = direction
 
         # Hardware effects - delegate to controller
         if effect_name in self.HW_EFFECTS:
@@ -267,6 +272,7 @@ class _EngineStart:
             kb=self.kb,
             kb_lock=self.kb_lock,
             logger=logger,
+            direction=getattr(self, "direction", None),
         )
 
         with self.kb_lock:

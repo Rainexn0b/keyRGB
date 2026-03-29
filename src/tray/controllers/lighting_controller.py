@@ -115,6 +115,7 @@ def start_current_effect(
             color=tray.config.color,
             reactive_color=getattr(tray.config, "reactive_color", None),
             reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
+            direction=getattr(tray.config, "direction", None),
         )
         tray.is_off = False
 

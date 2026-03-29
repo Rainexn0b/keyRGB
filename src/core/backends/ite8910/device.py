@@ -122,6 +122,8 @@ class Ite8910KeyboardDevice:
 
     def reset(self) -> None:
         self._send(self._state.reset())
+        for led_id in protocol.iter_known_led_ids():
+            self._send(self._state.set_led_color(led_id, (0, 0, 0)))
 
     def set_led_color_by_id(self, led_id: int, color) -> None:
         self._send(self._state.set_led_color(int(led_id), _coerce_rgb(color)))
@@ -129,8 +131,14 @@ class Ite8910KeyboardDevice:
     def set_matrix_color(self, row: int, col: int, color) -> None:
         self.set_led_color_by_id(protocol.led_id_from_row_col(row, col), color)
 
-    def set_effect_index(self, effect: protocol.Ite8910Effect | int | str) -> None:
-        self._send(self._state.set_effect(effect))
+    def set_effect_index(
+        self,
+        effect: protocol.Ite8910Effect | int | str,
+        colors: list[tuple[int, int, int]] | None = None,
+        direction: str | None = None,
+    ) -> None:
+        for report in self._state.set_effect(effect, colors, direction):
+            self._send(report)
 
     def enable_user_mode(self, *, brightness: int, save: bool = False) -> None:
         del save
@@ -159,9 +167,15 @@ class Ite8910KeyboardDevice:
             self.set_led_color_by_id(_coerce_led_id(key_id), color)
 
     def set_effect(self, effect_data) -> None:
+        direction = None
+        colors = None
+
         if isinstance(effect_data, dict):
             brightness = effect_data.get("brightness", None)
             speed = effect_data.get("speed", None)
+            direction = effect_data.get("direction", None)
+            color = effect_data.get("color", None)
+
             if brightness is not None or speed is not None:
                 brightness_raw = self.current_brightness_raw
                 speed_raw = self.current_speed_raw
@@ -173,4 +187,7 @@ class Ite8910KeyboardDevice:
 
                 self.set_brightness_and_speed_raw(brightness_raw, speed_raw)
 
-        self.set_effect_index(_coerce_effect_value(effect_data))
+            if color is not None:
+                colors = [_coerce_rgb(color)]
+
+        self.set_effect_index(_coerce_effect_value(effect_data), colors=colors, direction=direction)

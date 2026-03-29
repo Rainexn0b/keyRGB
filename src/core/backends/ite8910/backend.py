@@ -7,15 +7,16 @@ from typing import Any
 
 from src.core.utils.exceptions import is_permission_denied
 
-from ..base import BackendCapabilities, BackendStability, ExperimentalEvidence, KeyboardBackend, KeyboardDevice, ProbeResult
-from ..policy import experimental_backends_enabled
+from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 from .device import Ite8910KeyboardDevice
 from .hidraw import find_matching_hidraw_device, open_matching_hidraw_transport
 from . import protocol
 
 
-def _effect_builder(effect_name: str) -> Callable[..., dict[str, Any]]:
+def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> Callable[..., dict[str, Any]]:
     args = {"speed": None, "brightness": None}
+    for k in extra:
+        args[k] = None
 
     def build(**kwargs: Any) -> dict[str, Any]:
         _ = args
@@ -31,12 +32,12 @@ def _effect_builder(effect_name: str) -> Callable[..., dict[str, Any]]:
 
 @dataclass
 class Ite8910Backend(KeyboardBackend):
-    """Experimental backend for the reverse-engineered ITE 8910 HID protocol."""
+    """Backend for the ITE 8910 HID protocol (reverse-engineered, hardware-validated)."""
 
     name: str = "ite8910"
     priority: int = 94
-    stability: BackendStability = BackendStability.EXPERIMENTAL
-    experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
+    stability: BackendStability = BackendStability.VALIDATED
+    experimental_evidence: None = None
 
     def is_available(self) -> bool:
         return self.probe().available
@@ -65,17 +66,6 @@ class Ite8910Backend(KeyboardBackend):
         if match.hid_name:
             identifiers["hid_name"] = str(match.hid_name)
 
-        if not experimental_backends_enabled():
-            return ProbeResult(
-                available=False,
-                reason=(
-                    "experimental backend disabled (detected 0x048d:0x8910; "
-                    "enable Experimental backends in Settings or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1)"
-                ),
-                confidence=0,
-                identifiers=identifiers,
-            )
-
         return ProbeResult(
             available=True,
             reason=f"hidraw device present ({match.devnode})",
@@ -87,12 +77,6 @@ class Ite8910Backend(KeyboardBackend):
         return BackendCapabilities(per_key=True, color=True, hardware_effects=True, palette=False)
 
     def get_device(self) -> KeyboardDevice:
-        if not experimental_backends_enabled():
-            raise RuntimeError(
-                "ITE 8910 is classified as experimental. Enable Experimental backends in Settings "
-                "or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 before using it."
-            )
-
         try:
             transport, _info = open_matching_hidraw_transport(protocol.VENDOR_ID, protocol.PRODUCT_ID)
             return Ite8910KeyboardDevice(transport.send_feature_report)
@@ -109,13 +93,13 @@ class Ite8910Backend(KeyboardBackend):
 
     def effects(self) -> dict[str, Any]:
         return {
-            "rainbow": _effect_builder("rainbow"),
-            "breathing": _effect_builder("breathing"),
-            "wave": _effect_builder("wave"),
-            "scan": _effect_builder("scan"),
-            "flashing": _effect_builder("flashing"),
-            "random": _effect_builder("random"),
-            "snake": _effect_builder("snake"),
+            "rainbow": _effect_builder("rainbow_wave"),
+            "breathing": _effect_builder("breathing_color", extra=("color",)),
+            "wave": _effect_builder("rainbow_wave", extra=("direction", "color")),
+            "scan": _effect_builder("scan", extra=("color",)),
+            "flashing": _effect_builder("flashing_color", extra=("color",)),
+            "random": _effect_builder("random_color", extra=("color",)),
+            "snake": _effect_builder("snake", extra=("direction", "color")),
             "spectrum_cycle": _effect_builder("spectrum_cycle"),
         }
 
