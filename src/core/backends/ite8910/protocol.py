@@ -366,7 +366,12 @@ def build_effect_reports(effect: Ite8910Effect, colors: list[tuple[int, int, int
 
 # Legacy aliases for backward compatibility with existing keyRGB code
 build_brightness_speed_report_raw = build_brightness_speed_report
-build_effect_report = lambda effect: build_effect_reports(normalize_effect(effect))[0] if build_effect_reports(normalize_effect(effect)) else build_reset_report()
+
+
+def build_effect_report(effect: Ite8910Effect | int | str) -> bytes:
+    """Legacy single-report interface. Returns the first report of the effect sequence."""
+    reports = build_effect_reports(normalize_effect(effect))
+    return reports[0] if reports else build_reset_report()
 
 
 @dataclass
