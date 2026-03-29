@@ -13,7 +13,8 @@ logger = logging.getLogger(__name__)
 class _EngineCore:
     """Core engine lifecycle and device acquisition."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, backend: Any | None = None) -> None:
+        self.backend = backend
         self.kb_lock = RLock()
         self.device_available = False
         self.kb = NullKeyboard()
@@ -73,10 +74,42 @@ class _EngineCore:
         if self.device_available and not isinstance(self.kb, NullKeyboard):
             return True
 
-        kb, available = acquire_keyboard(kb_lock=self.kb_lock, logger=logger)
+        kb, available = acquire_keyboard(kb_lock=self.kb_lock, logger=logger, backend=self.backend)
         self.kb = kb
         self.device_available = bool(available)
         return self.device_available
+
+    def set_backend(self, backend: Any | None) -> None:
+        """Update the selected backend and force the next reacquire through it."""
+
+        self.backend = backend
+        self.mark_device_unavailable()
+
+    def get_backend_effects(self) -> dict[str, Any]:
+        backend = getattr(self, "backend", None)
+        effect_fn = getattr(backend, "effects", None) if backend is not None else None
+        if not callable(effect_fn):
+            return {}
+        try:
+            raw_effects = effect_fn()
+        except Exception:
+            return {}
+        if not isinstance(raw_effects, dict):
+            return {}
+        return dict(raw_effects or {})
+
+    def get_backend_colors(self) -> dict[str, Any]:
+        backend = getattr(self, "backend", None)
+        colors_fn = getattr(backend, "colors", None) if backend is not None else None
+        if not callable(colors_fn):
+            return {}
+        try:
+            raw_colors = colors_fn()
+        except Exception:
+            return {}
+        if not isinstance(raw_colors, dict):
+            return {}
+        return dict(raw_colors or {})
 
     def mark_device_unavailable(self) -> None:
         """Force the engine into a safe 'no device' mode."""

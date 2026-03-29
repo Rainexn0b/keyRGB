@@ -6,7 +6,7 @@ import time
 from threading import RLock
 from typing import Any, Tuple
 
-from src.core.effects.ite_backend import get
+from src.core.backends.registry import select_backend
 from src.core.utils.logging_utils import log_throttled
 
 
@@ -40,6 +40,25 @@ class NullKeyboard:
 
 def _debug_brightness_enabled() -> bool:
     return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1"
+
+
+def get_keyboard_device(*, backend: Any | None = None) -> Any:
+    """Return the keyboard device for the selected backend.
+
+    When a backend is injected explicitly, use it directly. Otherwise, fall
+    back to backend auto-selection.
+    """
+
+    selected_backend = backend if backend is not None else select_backend()
+    if selected_backend is None:
+        raise FileNotFoundError("No keyboard backend available")
+    return selected_backend.get_device()
+
+
+def get(*, backend: Any | None = None) -> Any:
+    """Compatibility alias for legacy callers and tests."""
+
+    return get_keyboard_device(backend=backend)
 
 
 class _BrightnessLoggingKeyboardProxy:
@@ -150,7 +169,7 @@ class _BrightnessLoggingKeyboardProxy:
         return self._inner.set_palette_color(int(slot), color)
 
 
-def acquire_keyboard(*, kb_lock: RLock, logger: logging.Logger) -> Tuple[Any, bool]:
+def acquire_keyboard(*, kb_lock: RLock, logger: logging.Logger, backend: Any | None = None) -> Tuple[Any, bool]:
     """Best-effort attempt to acquire the keyboard device.
 
     Returns:
@@ -168,7 +187,7 @@ def acquire_keyboard(*, kb_lock: RLock, logger: logging.Logger) -> Tuple[Any, bo
 
     try:
         with kb_lock:
-            kb = get()
+            kb = get() if backend is None else get(backend=backend)
         if _debug_brightness_enabled() and not isinstance(kb, NullKeyboard):
             kb = _BrightnessLoggingKeyboardProxy(kb, logger=logger)
         return kb, True

@@ -2,8 +2,21 @@ from __future__ import annotations
 
 import time
 
+from src.core.effects.catalog import hardware_effect_selection_key
 from src.core.effects.device import NullKeyboard
 from src.core.effects.engine import EffectsEngine
+
+
+def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):  # type: ignore[no-untyped-def]
+    args = {"speed": None, "brightness": None}
+    for key in extra:
+        args[key] = None
+
+    def build(**kwargs):
+        _ = args
+        return {"name": effect_name, **kwargs}
+
+    return build
 
 
 def test_start_effect_stops_previous_software_thread() -> None:
@@ -97,3 +110,128 @@ def test_stop_resets_rendered_and_mode_brightness_caches() -> None:
 
     assert engine._last_rendered_brightness is None
     assert engine._last_hw_mode_brightness is None
+
+
+def test_start_hw_effect_uses_injected_backend_effects() -> None:
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.payloads: list[object] = []
+
+        def set_effect(self, effect_data) -> None:
+            self.payloads.append(effect_data)
+
+    class DummyBackend:
+        def effects(self):
+            return {"snake": _effect_builder("snake", extra=("direction", "color"))}
+
+        def colors(self):
+            return {}
+
+    engine = EffectsEngine(backend=DummyBackend())
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.current_color = (9, 8, 7)
+    engine.direction = "left"
+
+    engine.start_effect("snake", speed=5, brightness=20, color=(9, 8, 7))
+
+    assert spy.payloads
+    payload = spy.payloads[-1]
+    assert payload["name"] == "snake"
+    assert payload["color"] == (9, 8, 7)
+    assert payload["direction"] == "left"
+
+
+def test_start_effect_rejects_legacy_generic_hw_name_without_backend_support() -> None:
+    engine = EffectsEngine()
+    engine.kb = NullKeyboard()
+    engine.device_available = False
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+
+    try:
+        engine.start_effect("wave", speed=5, brightness=20, color=(9, 8, 7))
+    except ValueError as exc:
+        assert "Unknown effect: wave" in str(exc)
+    else:
+        raise AssertionError("Expected legacy generic hardware name to be rejected")
+
+
+def test_start_effect_accepts_backend_exposed_hw_name() -> None:
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.payloads: list[object] = []
+
+        def set_effect(self, effect_data) -> None:
+            self.payloads.append(effect_data)
+
+    class DummyBackend:
+        def effects(self):
+            return {"wave": _effect_builder("wave", extra=("color",))}
+
+        def colors(self):
+            return {}
+
+    engine = EffectsEngine(backend=DummyBackend())
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.current_color = (3, 2, 1)
+
+    engine.start_effect("wave", speed=5, brightness=20, color=(3, 2, 1))
+
+    assert spy.payloads
+    payload = spy.payloads[-1]
+    assert payload["name"] == "wave"
+    assert payload["color"] == (3, 2, 1)
+
+
+def test_start_effect_prefers_software_for_hw_sw_name_collision() -> None:
+    class DummyBackend:
+        def effects(self):
+            return {"spectrum_cycle": _effect_builder("hw_spectrum_cycle")}
+
+        def colors(self):
+            return {}
+
+    engine = EffectsEngine(backend=DummyBackend())
+    engine.kb = NullKeyboard()
+    engine.device_available = False
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+
+    engine.start_effect("spectrum_cycle", speed=5, brightness=20, color=(3, 2, 1))
+
+    assert engine.current_effect == "spectrum_cycle"
+
+    engine.stop()
+
+
+def test_start_effect_forced_hardware_collision_uses_backend_effect() -> None:
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.payloads: list[object] = []
+
+        def set_effect(self, effect_data) -> None:
+            self.payloads.append(effect_data)
+
+    class DummyBackend:
+        def effects(self):
+            return {"spectrum_cycle": _effect_builder("spectrum_cycle")}
+
+        def colors(self):
+            return {}
+
+    engine = EffectsEngine(backend=DummyBackend())
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.current_color = (3, 2, 1)
+
+    engine.start_effect(hardware_effect_selection_key("spectrum_cycle"), speed=5, brightness=20, color=(3, 2, 1))
+
+    assert spy.payloads
+    payload = spy.payloads[-1]
+    assert payload["name"] == "spectrum_cycle"

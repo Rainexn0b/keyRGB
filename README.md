@@ -176,7 +176,7 @@ Notes:
 
 #### Update existing AppImage (non-interactive)
 
-Refreshes the stored AppImage and launcher under `~/.local/bin/`. Reuses your last saved release channel (stable vs prerelease).
+Refreshes the stored AppImage and launcher under `~/.local/bin/`, and also refreshes desktop integration and udev setup. Reuses your last saved release channel (stable vs prerelease).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage
@@ -261,10 +261,12 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 
 These are the effect names stored in `~/.config/keyrgb/config.json` under the `effect` key.
 
-- Hardware (firmware) effects: `rainbow`, `breathing`, `wave`, `ripple`, `marquee`, `raindrop`, `aurora`, `fireworks`
+- Hardware (firmware) effects: backend-specific. Common legacy values include `rainbow`, `breathing`, `wave`, `ripple`, `marquee`, `raindrop`, `aurora`, `fireworks`.
 - Software effects: `rainbow_wave`, `rainbow_swirl`, `spectrum_cycle`, `color_cycle`, `chase`, `twinkle`, `strobe`
 - Reactive typing: `reactive_fade`, `reactive_ripple`
 - Per-key static map: `perkey`
+
+When a hardware effect name collides with a software effect name, KeyRGB stores the hardware selection with an `hw:` prefix to preserve the user's choice. Example: hardware `spectrum_cycle` is stored as `hw:spectrum_cycle`.
 
 ## Configuration
 
@@ -275,7 +277,7 @@ Access **Settings** via the tray menu to configure:
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
 - **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
 - **Autostart**: enable “Start KeyRGB on login”.
-- **Backend policy**: opt in to experimental backends. Currently `ite8297` is experimental; the UI labels it as speculative or research-backed.
+- **Backend policy**: opt in to experimental backends. Currently `ite8297` is experimental; the UI labels experimental paths as speculative or research-backed.
 
 ### Profiles
 
@@ -321,7 +323,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | `--asset <name>`     | Override AppImage filename (default: `keyrgb-x86_64.AppImage`).                                             |
 | `--prerelease`       | Allow picking prereleases when auto-resolving latest AppImage.                                              |
 | `--no-system-deps`   | Skip system package changes (kernel drivers / TCC app / polkit).                                            |
-| `--update-appimage`  | Non-interactive: update an existing AppImage install (downloads latest and replaces `~/.local/bin/keyrgb`). |
+| `--update-appimage`  | Non-interactive: update an existing AppImage install, then refresh desktop integration and udev setup. |
 | `--ref <git-ref>`    | For curl installs: download installer modules from a specific git ref (default: `main`).                    |
 
 Environment variables: see the **Environment variables** section above.

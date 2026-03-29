@@ -44,7 +44,6 @@ class KeyRGBTray:
             core_profiles.migrate_builtin_profile_brightness(self.config)
         except Exception:
             pass
-        self.engine = EffectsEngine()
         self.icon = None
         self.is_off = False
         self._power_forced_off = False
@@ -64,6 +63,17 @@ class KeyRGBTray:
 
         # Backend selection is used for capability-driven UI gating.
         self.backend, self.backend_probe, self.backend_caps = select_backend_with_introspection()
+
+        try:
+            self.engine = EffectsEngine(backend=self.backend)
+        except TypeError:
+            self.engine = EffectsEngine()
+            set_backend = getattr(self.engine, "set_backend", None)
+            if callable(set_backend):
+                try:
+                    set_backend(self.backend)
+                except Exception:
+                    pass
 
         self._ite_rows, self._ite_cols = load_ite_dimensions()
 

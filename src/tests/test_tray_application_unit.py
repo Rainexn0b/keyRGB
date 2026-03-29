@@ -22,7 +22,8 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
             self.brightness = 50
 
     class FakeEngine:
-        def __init__(self):
+        def __init__(self, *, backend=None):
+            self.backend = backend
             self.stopped = False
 
         def stop(self):
@@ -80,6 +81,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
 
     assert isinstance(tray.config, FakeConfig)
     assert isinstance(tray.engine, FakeEngine)
+    assert tray.engine.backend == "backend"
     assert tray.power_manager is fake_pm
     assert tray.backend == "backend"
     assert tray.backend_probe == "probe"

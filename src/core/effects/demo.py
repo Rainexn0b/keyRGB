@@ -24,10 +24,14 @@ def run_demo(engine_factory: _EngineFactory) -> None:
 
     try:
         print("\nTesting hardware effects...")
-        for effect in ["rainbow", "breathing", "wave"]:
+        backend_hw_effects = tuple(str(name or "").strip() for name in getattr(engine, "get_backend_effects")().keys())
+        for effect in backend_hw_effects:
             print(f"  {effect}")
             engine.start_effect(effect, speed=5, brightness=25)
             time.sleep(4)
+
+        if not backend_hw_effects:
+            print("  (none exposed by selected backend)")
 
         print("\nTesting software effects...")
         for effect in ["rainbow_wave", "rainbow_swirl", "spectrum_cycle", "twinkle"]:

@@ -4,7 +4,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import build_full_color_grid
 
 from ._render_brightness import (

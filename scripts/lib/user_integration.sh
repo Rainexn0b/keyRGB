@@ -30,19 +30,30 @@ PY
 install_icon_and_desktop_entries() {
   local keyrgb_exec="$1" raw_ref="$2"
 
-  local icon_dir="$HOME/.local/share/icons/hicolor/256x256/apps"
-  local icon_file="$icon_dir/keyrgb.png"
+  local icon_dir_png="$HOME/.local/share/icons/hicolor/256x256/apps"
+  local icon_file_png="$icon_dir_png/keyrgb.png"
+  local icon_dir_svg="$HOME/.local/share/icons/hicolor/scalable/apps"
+  local icon_file_svg="$icon_dir_svg/keyrgb.svg"
   local app_dir="$HOME/.local/share/applications"
   local app_file="$app_dir/keyrgb.desktop"
   local autostart_dir="$HOME/.config/autostart"
   local autostart_file="$autostart_dir/keyrgb.desktop"
 
-  mkdir -p "$icon_dir" "$app_dir" "$autostart_dir"
+  mkdir -p "$icon_dir_png" "$icon_dir_svg" "$app_dir" "$autostart_dir"
 
-  local icon_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-tray-squircle.png"
-  log_info "Downloading icon: $icon_url"
-  download_url_quiet "$icon_url" "$icon_file"
-  log_ok "Installed icon: $icon_file"
+  local icon_url_png="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-tray-squircle.png"
+  local icon_url_svg="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-keyrgb.svg"
+  log_info "Downloading icon: $icon_url_png"
+  download_url_quiet "$icon_url_png" "$icon_file_png"
+  log_ok "Installed icon: $icon_file_png"
+
+  log_info "Downloading scalable icon: $icon_url_svg"
+  if download_url_quiet "$icon_url_svg" "$icon_file_svg"; then
+    log_ok "Installed scalable icon: $icon_file_svg"
+  else
+    rm -f "$icon_file_svg" 2>/dev/null || true
+    log_warn "Could not install scalable SVG icon; GUI window icons will fall back to PNG"
+  fi
 
   cat >"$app_file" <<EOF
 [Desktop Entry]

@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from threading import RLock
 from typing import Any, Dict, Tuple
 
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
     enable_user_mode_once,

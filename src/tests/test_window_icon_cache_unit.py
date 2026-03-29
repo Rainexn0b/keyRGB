@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from io import BytesIO
 import os
 
 from PIL import Image
@@ -53,6 +54,28 @@ def test_load_window_icon_image_invalidates_when_file_changes(tmp_path) -> None:
     window_icon.clear_cached_window_icon_images()
 
 
+def test_load_window_icon_image_rasterizes_svg_with_optional_cairosvg(tmp_path, monkeypatch) -> None:
+    window_icon.clear_cached_window_icon_images()
+    image_path = tmp_path / "icon.svg"
+    image_path.write_text("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'></svg>", encoding="utf-8")
+
+    def fake_rasterize(path_str: str):
+        assert path_str == str(image_path)
+        out = BytesIO()
+        Image.new("RGBA", (64, 64), color=(1, 2, 3, 255)).save(out, format="PNG")
+        with Image.open(BytesIO(out.getvalue())) as image:
+            return image.convert("RGBA")
+
+    monkeypatch.setattr(window_icon, "_rasterize_svg_window_icon", fake_rasterize)
+
+    image = window_icon.load_window_icon_image(image_path)
+
+    assert image.size == (64, 64)
+    assert image.getpixel((0, 0)) == (1, 2, 3, 255)
+
+    window_icon.clear_cached_window_icon_images()
+
+
 def test_apply_keyrgb_window_icon_uses_cached_source_image(tmp_path, monkeypatch) -> None:
     window_icon.clear_cached_window_icon_images()
     image_path = tmp_path / "icon.png"
@@ -87,5 +110,37 @@ def test_apply_keyrgb_window_icon_uses_cached_source_image(tmp_path, monkeypatch
     assert created[0] is created[1]
     assert len(first_window.iconphoto_calls) == 1
     assert len(second_window.iconphoto_calls) == 1
+
+    window_icon.clear_cached_window_icon_images()
+
+
+def test_apply_keyrgb_window_icon_falls_back_to_png_when_svg_cannot_be_rasterized(tmp_path, monkeypatch) -> None:
+    window_icon.clear_cached_window_icon_images()
+    svg_path = tmp_path / "icon.svg"
+    png_path = tmp_path / "icon.png"
+    svg_path.write_text("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'></svg>", encoding="utf-8")
+    _save_icon(png_path, (0, 0, 255, 255))
+
+    created: list[object] = []
+
+    def fake_photo(image):
+        created.append(image)
+        return {"image": image}
+
+    monkeypatch.setattr(window_icon, "find_keyrgb_logo_path", lambda: svg_path)
+    monkeypatch.setattr(window_icon, "_candidate_logo_paths", lambda: [svg_path, png_path])
+    monkeypatch.setattr(
+        window_icon,
+        "_rasterize_svg_window_icon",
+        lambda path_str: (_ for _ in ()).throw(ImportError(path_str)),
+    )
+    monkeypatch.setattr("PIL.ImageTk.PhotoImage", fake_photo)
+
+    window = DummyWindow()
+    window_icon.apply_keyrgb_window_icon(window)
+
+    assert len(created) == 1
+    assert created[0].getpixel((0, 0)) == (0, 0, 255, 255)
+    assert len(window.iconphoto_calls) == 1
 
     window_icon.clear_cached_window_icon_images()

@@ -24,5 +24,5 @@ class EffectsEngine(_EngineCore, _EngineBrightness, _EngineStart):
     SW_EFFECTS = _SW_EFFECTS
     ALL_EFFECTS = _ALL_EFFECTS
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *, backend=None):
+        super().__init__(backend=backend)

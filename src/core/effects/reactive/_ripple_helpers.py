@@ -4,7 +4,7 @@ import math
 from typing import Dict, List, Sequence, Tuple
 
 from src.core.effects.colors import hsv_to_rgb
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.reactive.utils import (
     _Pulse,
     _RainbowPulse,
