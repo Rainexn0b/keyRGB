@@ -13,18 +13,65 @@ NUM_COLS = 20
 
 UI_BRIGHTNESS_MAX = 50
 RAW_BRIGHTNESS_MAX = 0x0A
-RAW_SPEED_MAX = 0x02
+RAW_SPEED_MAX = 0x0A
 
 REPORT_ID = 0xCC
 LED_ID_ROW_STRIDE = 0x20
 
-# Public reverse-engineering attribution:
-# - Valentin Lobstein / chocapikk
-# - Reddit user Greedy-Ad232
+# Protocol documentation:
+# https://chocapikk.com/posts/2026/reverse-engineering-ite8910-keyboard-rgb/
 #
-# KeyRGB's experimental ITE 8910 path follows the documented 6-byte 0xCC HID
-# feature-report framing and the full 6x20 encoded LED matrix described in the
-# public reverse-engineering notes captured in docs/developement/ite8910-protocol-notes.md.
+# All commands are 6-byte HID feature reports with report ID 0xCC:
+# [0xCC, command, data0, data1, data2, data3]
+#
+# Command reference (from reverse-engineered .NET IL and native DLL):
+#   0x00 XX       - Animation mode select (XX = mode ID)
+#   0x01 ID R G B - Set single key color
+#   0x09 BR SP    - Set brightness (0x00-0x0A) and speed (0x00-0x0A)
+#   0x0A 00       - Breathing with random colors
+#   0x0A AA R G B - Breathing with custom color
+#   0x0B 00       - Flashing with random colors
+#   0x0B AA R G B - Flashing with custom color
+#   0x15 SL R G B - Wave color slot (SL: 0xA1-0xA8 custom, 0x71-0x78 preset)
+#   0x16 SL R G B - Snake color slot (SL: 0xA1-0xA4 custom, 0x71-0x74 preset)
+#   0x17 SL R G B - Scan color slot (SL: 0xA1-0xA2)
+#   0x18 A1 R G B - Random with custom color
+
+
+# Animation mode IDs for command [CC, 00, XX]
+class AnimationMode(IntEnum):
+    SPECTRUM_CYCLE = 0x02
+    RAINBOW_WAVE = 0x04
+    RANDOM = 0x09
+    SCAN = 0x0A
+    SNAKE = 0x0B
+    CLEAR = 0x0C
+
+
+# Color slot base for custom colors
+COLOR_SLOT_CUSTOM_BASE = 0xA1
+COLOR_SLOT_PRESET_BASE = 0x71
+
+# Commands for color effects with random/custom variants
+CMD_SET_LED = 0x01
+CMD_BRIGHTNESS_SPEED = 0x09
+CMD_BREATHING = 0x0A
+CMD_FLASHING = 0x0B
+CMD_WAVE_COLOR = 0x15
+CMD_SNAKE_COLOR = 0x16
+CMD_SCAN_COLOR = 0x17
+CMD_RANDOM_COLOR = 0x18
+CMD_ANIMATION = 0x00
+
+# Wave supports 8 custom color slots
+WAVE_MAX_COLORS = 8
+# Snake supports 4 custom color slots
+SNAKE_MAX_COLORS = 4
+# Scan supports 2 custom color slots
+SCAN_MAX_COLORS = 2
+
+
+# LED ID encoding: ((row & 0x07) << 5) | (col & 0x1F)
 KNOWN_LED_IDS: tuple[int, ...] = tuple(
     ((row & 0x07) << 5) | (col & 0x1F)
     for row in range(NUM_ROWS)
@@ -33,44 +80,41 @@ KNOWN_LED_IDS: tuple[int, ...] = tuple(
 
 
 class Ite8910Effect(IntEnum):
-    WAVE = 0
-    BREATHING = 1
-    SCAN = 2
-    FLASHING = 3
-    RANDOM = 4
-    RIPPLE = 5
-    SNAKE = 6
-    SPECTRUM_CYCLE = 7
-    BLINK = 3
+    SPECTRUM_CYCLE = 0
+    RAINBOW_WAVE = 1
+    BREATHING = 2
+    BREATHING_COLOR = 3
+    FLASHING = 4
+    FLASHING_COLOR = 5
+    RANDOM = 6
+    RANDOM_COLOR = 7
+    SCAN = 8
+    SNAKE = 9
+    FN_HIGHLIGHT = 10
+    OFF = 11
 
 
 CANONICAL_EFFECTS: dict[str, Ite8910Effect] = {
-    "rainbow": Ite8910Effect.SPECTRUM_CYCLE,
-    "wave": Ite8910Effect.WAVE,
-    "breathing": Ite8910Effect.BREATHING,
-    "scan": Ite8910Effect.SCAN,
-    "flashing": Ite8910Effect.FLASHING,
-    "blink": Ite8910Effect.FLASHING,
-    "random": Ite8910Effect.RANDOM,
-    "ripple": Ite8910Effect.RIPPLE,
-    "snake": Ite8910Effect.SNAKE,
     "spectrum_cycle": Ite8910Effect.SPECTRUM_CYCLE,
+    "rainbow_wave": Ite8910Effect.RAINBOW_WAVE,
+    "rainbow": Ite8910Effect.RAINBOW_WAVE,
+    "breathing": Ite8910Effect.BREATHING,
+    "breathing_color": Ite8910Effect.BREATHING_COLOR,
+    "flashing": Ite8910Effect.FLASHING,
+    "flashing_color": Ite8910Effect.FLASHING_COLOR,
+    "random": Ite8910Effect.RANDOM,
+    "random_color": Ite8910Effect.RANDOM_COLOR,
+    "scan": Ite8910Effect.SCAN,
+    "snake": Ite8910Effect.SNAKE,
+    "fn_highlight": Ite8910Effect.FN_HIGHLIGHT,
+    "off": Ite8910Effect.OFF,
 }
 
 _EFFECT_ALIASES: dict[str, Ite8910Effect] = {
     **CANONICAL_EFFECTS,
     "breathe": Ite8910Effect.BREATHING,
-}
-
-_EFFECT_REPORT_FIELDS: dict[Ite8910Effect, tuple[int, int, int, int, int]] = {
-    Ite8910Effect.WAVE: (0x00, 0x04, 0x00, 0x00, 0x00),
-    Ite8910Effect.BREATHING: (0x0A, 0x00, 0x00, 0x00, 0x00),
-    Ite8910Effect.SCAN: (0x00, 0x0A, 0x00, 0x00, 0x00),
-    Ite8910Effect.FLASHING: (0x0B, 0x00, 0x00, 0x00, 0x00),
-    Ite8910Effect.RANDOM: (0x00, 0x09, 0x00, 0x00, 0x00),
-    Ite8910Effect.RIPPLE: (0x07, 0x00, 0x00, 0x00, 0x00),
-    Ite8910Effect.SNAKE: (0x00, 0x0B, 0x00, 0x00, 0x00),
-    Ite8910Effect.SPECTRUM_CYCLE: (0x00, 0x02, 0x00, 0x00, 0x00),
+    "blink": Ite8910Effect.FLASHING,
+    "wave": Ite8910Effect.RAINBOW_WAVE,
 }
 
 
@@ -87,10 +131,10 @@ def clamp_raw_speed(value: int) -> int:
 
 
 def raw_speed_from_effect_speed(value: int) -> int:
-    """Map KeyRGB's generic hardware-effect speed arg to the 0..2 ITE 8910 scale.
+    """Map KeyRGB's generic hardware-effect speed arg to the 0..10 ITE 8910 scale.
 
-    `build_hw_effect_payload()` currently produces a 1..10 speed argument where
-    smaller values are faster. The original public C backend exposes 3 steps.
+    The firmware accepts speed values 0x00 (slowest) to 0x0A (fastest).
+    The Windows Control Center maps 4 UI levels to: 1->0x02, 2->0x04, 3->0x06, 4->0x0A.
     """
 
     try:
@@ -98,22 +142,14 @@ def raw_speed_from_effect_speed(value: int) -> int:
     except Exception:
         return 0
 
-    if speed_value <= 0:
-        return 0
-
-    speed_value = max(1, min(10, speed_value))
-    if speed_value <= 3:
-        return 0
-    if speed_value <= 7:
-        return 1
-    return 2
+    return clamp_raw_speed(max(0, min(10, speed_value)))
 
 
 def raw_brightness_from_ui(value: int) -> int:
     """Map KeyRGB's 0..50 UI brightness into the controller's 0..10 scale.
 
-    This scaling is a KeyRGB adapter layer, not part of the upstream C CLI.
-    Non-zero UI values stay non-zero on hardware.
+    The Windows Control Center maps 4 UI levels to: 1->0x02, 2->0x04, 3->0x06, 4->0x0A.
+    Values above 0x0A cause undefined firmware behavior.
     """
 
     ui_value = max(0, min(UI_BRIGHTNESS_MAX, int(value)))
@@ -148,73 +184,197 @@ def normalize_effect(effect: Ite8910Effect | int | str) -> Ite8910Effect:
 
 
 def led_id_from_row_col(row: int, col: int) -> int:
-    """Translate a logical matrix coordinate to the controller LED id.
-
-    This follows the `get_led_id(row, col)` macro from the vendored TUXEDO
-    `ite_829x` kernel driver for the same controller family.
-
-    Note: this row/column helper is a KeyRGB adapter convenience. The public C
-    CLI itself works directly with LED ids.
-    """
-
     return ((int(row) & 0x07) << 5) | (int(col) & 0x1F)
 
 
 def iter_matrix_led_ids() -> Iterable[int]:
-    """Yield the full derived 6x20 matrix id space from the kernel-driver macro."""
-
     for row in range(NUM_ROWS):
         for col in range(NUM_COLS):
             yield led_id_from_row_col(row, col)
 
 
 def iter_known_led_ids() -> Iterable[int]:
-    """Yield the exact LED ids documented by the public upstream C backend."""
-
     yield from KNOWN_LED_IDS
 
 
-def build_brightness_speed_report_raw(brightness_raw: int, speed_raw: int) -> bytes:
-    return bytes(
-        (
-            REPORT_ID,
-            0x09,
-            clamp_raw_brightness(brightness_raw),
-            clamp_raw_speed(speed_raw),
-            0x00,
-            0x00,
-        )
-    )
+# --- Report builders ---
+# All reports are 6 bytes: [REPORT_ID, cmd/data0, data1, data2, data3, data4]
 
 
-def build_effect_report(effect: Ite8910Effect | int | str) -> bytes:
-    return bytes((REPORT_ID, *_EFFECT_REPORT_FIELDS[normalize_effect(effect)]))
+def build_brightness_speed_report(brightness_raw: int, speed_raw: int) -> bytes:
+    """[CC, 09, brightness, speed, 00, 00]"""
+    return bytes((
+        REPORT_ID, CMD_BRIGHTNESS_SPEED,
+        clamp_raw_brightness(brightness_raw),
+        clamp_raw_speed(speed_raw),
+        0x00, 0x00,
+    ))
+
+
+def build_animation_mode_report(mode: AnimationMode) -> bytes:
+    """[CC, 00, mode, 00, 00, 00]"""
+    return bytes((REPORT_ID, CMD_ANIMATION, int(mode), 0x00, 0x00, 0x00))
 
 
 def build_reset_report() -> bytes:
-    return bytes((REPORT_ID, 0x00, 0x0C, 0x00, 0x00, 0x00))
+    """[CC, 00, 0C, 00, 00, 00] - Clear all LEDs, required before per-key updates."""
+    return build_animation_mode_report(AnimationMode.CLEAR)
 
 
 def build_led_color_report(led_id: int, color: tuple[int, int, int]) -> bytes:
-    red, green, blue = color
-    return bytes(
-        (
-            REPORT_ID,
-            0x01,
-            int(led_id) & 0xFF,
-            clamp_channel(red),
-            clamp_channel(green),
-            clamp_channel(blue),
-        )
-    )
+    """[CC, 01, led_id, R, G, B]"""
+    r, g, b = color
+    return bytes((
+        REPORT_ID, CMD_SET_LED,
+        int(led_id) & 0xFF,
+        clamp_channel(r), clamp_channel(g), clamp_channel(b),
+    ))
+
+
+def build_breathing_random_report() -> bytes:
+    """[CC, 0A, 00, 00, 00, 00] - Breathing with random colors."""
+    return bytes((REPORT_ID, CMD_BREATHING, 0x00, 0x00, 0x00, 0x00))
+
+
+def build_breathing_color_report(r: int, g: int, b: int) -> bytes:
+    """[CC, 0A, AA, R, G, B] - Breathing with custom color."""
+    return bytes((
+        REPORT_ID, CMD_BREATHING, 0xAA,
+        clamp_channel(r), clamp_channel(g), clamp_channel(b),
+    ))
+
+
+def build_flashing_random_report() -> bytes:
+    """[CC, 0B, 00, 00, 00, 00] - Flashing with random colors."""
+    return bytes((REPORT_ID, CMD_FLASHING, 0x00, 0x00, 0x00, 0x00))
+
+
+def build_flashing_color_report(r: int, g: int, b: int) -> bytes:
+    """[CC, 0B, AA, R, G, B] - Flashing with custom color."""
+    return bytes((
+        REPORT_ID, CMD_FLASHING, 0xAA,
+        clamp_channel(r), clamp_channel(g), clamp_channel(b),
+    ))
+
+
+def build_random_color_report(r: int, g: int, b: int) -> bytes:
+    """[CC, 18, A1, R, G, B] - Random with custom color."""
+    return bytes((
+        REPORT_ID, CMD_RANDOM_COLOR, COLOR_SLOT_CUSTOM_BASE,
+        clamp_channel(r), clamp_channel(g), clamp_channel(b),
+    ))
+
+
+def build_wave_color_slot_report(slot: int, r: int, g: int, b: int) -> bytes:
+    """[CC, 15, slot, R, G, B] - Set wave color slot (0-7 -> 0xA1-0xA8)."""
+    slot_id = COLOR_SLOT_CUSTOM_BASE + max(0, min(WAVE_MAX_COLORS - 1, int(slot)))
+    return bytes((
+        REPORT_ID, CMD_WAVE_COLOR, slot_id,
+        clamp_channel(r), clamp_channel(g), clamp_channel(b),
+    ))
+
+
+def build_snake_color_slot_report(slot: int, r: int, g: int, b: int) -> bytes:
+    """[CC, 16, slot, R, G, B] - Set snake color slot (0-3 -> 0xA1-0xA4)."""
+    slot_id = COLOR_SLOT_CUSTOM_BASE + max(0, min(SNAKE_MAX_COLORS - 1, int(slot)))
+    return bytes((
+        REPORT_ID, CMD_SNAKE_COLOR, slot_id,
+        clamp_channel(r), clamp_channel(g), clamp_channel(b),
+    ))
+
+
+def build_scan_color_slot_report(slot: int, r: int, g: int, b: int) -> bytes:
+    """[CC, 17, slot, R, G, B] - Set scan color slot (0-1 -> 0xA1-0xA2)."""
+    slot_id = COLOR_SLOT_CUSTOM_BASE + max(0, min(SCAN_MAX_COLORS - 1, int(slot)))
+    return bytes((
+        REPORT_ID, CMD_SCAN_COLOR, slot_id,
+        clamp_channel(r), clamp_channel(g), clamp_channel(b),
+    ))
+
+
+def build_effect_reports(effect: Ite8910Effect, colors: list[tuple[int, int, int]] | None = None) -> list[bytes]:
+    """Build the correct sequence of reports for an effect.
+
+    The Windows Control Center follows this sequence:
+    1. Set animation mode
+    2. Set color slots if applicable
+    3. Set brightness and speed (handled separately)
+
+    For per-key Direct mode:
+    1. Clear all LEDs (reset)
+    2. Set brightness and speed
+    3. Set each key color
+    """
+    reports: list[bytes] = []
+    colors = colors or []
+
+    if effect == Ite8910Effect.SPECTRUM_CYCLE:
+        reports.append(build_animation_mode_report(AnimationMode.SPECTRUM_CYCLE))
+
+    elif effect == Ite8910Effect.RAINBOW_WAVE:
+        reports.append(build_animation_mode_report(AnimationMode.RAINBOW_WAVE))
+        for i, (r, g, b) in enumerate(colors[:WAVE_MAX_COLORS]):
+            reports.append(build_wave_color_slot_report(i, r, g, b))
+
+    elif effect == Ite8910Effect.BREATHING:
+        reports.append(build_breathing_random_report())
+
+    elif effect == Ite8910Effect.BREATHING_COLOR:
+        if colors:
+            r, g, b = colors[0]
+            reports.append(build_breathing_color_report(r, g, b))
+        else:
+            reports.append(build_breathing_random_report())
+
+    elif effect == Ite8910Effect.FLASHING:
+        reports.append(build_flashing_random_report())
+
+    elif effect == Ite8910Effect.FLASHING_COLOR:
+        if colors:
+            r, g, b = colors[0]
+            reports.append(build_flashing_color_report(r, g, b))
+        else:
+            reports.append(build_flashing_random_report())
+
+    elif effect == Ite8910Effect.RANDOM:
+        reports.append(build_animation_mode_report(AnimationMode.RANDOM))
+
+    elif effect == Ite8910Effect.RANDOM_COLOR:
+        reports.append(build_animation_mode_report(AnimationMode.RANDOM))
+        if colors:
+            r, g, b = colors[0]
+            reports.append(build_random_color_report(r, g, b))
+
+    elif effect == Ite8910Effect.SCAN:
+        reports.append(build_animation_mode_report(AnimationMode.SCAN))
+        for i, (r, g, b) in enumerate(colors[:SCAN_MAX_COLORS]):
+            reports.append(build_scan_color_slot_report(i, r, g, b))
+
+    elif effect == Ite8910Effect.SNAKE:
+        reports.append(build_animation_mode_report(AnimationMode.SNAKE))
+        for i, (r, g, b) in enumerate(colors[:SNAKE_MAX_COLORS]):
+            reports.append(build_snake_color_slot_report(i, r, g, b))
+
+    elif effect == Ite8910Effect.FN_HIGHLIGHT:
+        reports.append(build_animation_mode_report(AnimationMode.SPECTRUM_CYCLE))
+
+    elif effect == Ite8910Effect.OFF:
+        reports.append(build_animation_mode_report(AnimationMode.CLEAR))
+
+    return reports
+
+
+# Legacy aliases for backward compatibility with existing keyRGB code
+build_brightness_speed_report_raw = build_brightness_speed_report
+build_effect_report = lambda effect: build_effect_reports(normalize_effect(effect))[0] if build_effect_reports(normalize_effect(effect)) else build_reset_report()
 
 
 @dataclass
 class Ite8910ProtocolState:
-    """Stateful translation of the upstream C command helpers.
+    """Stateful protocol handler.
 
-    The original userspace tool preserves the last brightness and speed values,
-    and reuses that state when only one side of the pair changes.
+    Tracks brightness and speed state as the firmware expects both
+    to be sent together in a single command.
     """
 
     current_brightness_raw: int = 0
@@ -223,7 +383,7 @@ class Ite8910ProtocolState:
     def set_brightness_and_speed_raw(self, brightness_raw: int, speed_raw: int) -> bytes:
         self.current_brightness_raw = clamp_raw_brightness(brightness_raw)
         self.current_speed_raw = clamp_raw_speed(speed_raw)
-        return build_brightness_speed_report_raw(self.current_brightness_raw, self.current_speed_raw)
+        return build_brightness_speed_report(self.current_brightness_raw, self.current_speed_raw)
 
     def set_brightness_raw(self, brightness_raw: int) -> bytes:
         return self.set_brightness_and_speed_raw(brightness_raw, self.current_speed_raw)
@@ -231,8 +391,8 @@ class Ite8910ProtocolState:
     def set_speed_raw(self, speed_raw: int) -> bytes:
         return self.set_brightness_and_speed_raw(self.current_brightness_raw, speed_raw)
 
-    def set_effect(self, effect: Ite8910Effect | int | str) -> bytes:
-        return build_effect_report(effect)
+    def set_effect(self, effect: Ite8910Effect | int | str, colors: list[tuple[int, int, int]] | None = None) -> list[bytes]:
+        return build_effect_reports(normalize_effect(effect), colors)
 
     def reset(self) -> bytes:
         return build_reset_report()
