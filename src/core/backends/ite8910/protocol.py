@@ -1,241 +1,394 @@
+"""ITE 8910 HID protocol for per-key RGB keyboards.
+
+Protocol documentation:
+https://chocapikk.com/posts/2026/reverse-engineering-ite8910-keyboard-rgb/
+
+All commands are 6-byte HID feature reports with report ID 0xCC:
+  [0xCC, command, data0, data1, data2, data3]
+
+Command reference (from reverse-engineered .NET IL and native DLL):
+  0x00 XX       - Animation mode select (XX = mode ID)
+  0x01 ID R G B - Set single key color
+  0x09 BR SP    - Set brightness (0x00-0x0A) and speed (0x00-0x0A)
+  0x0A 00       - Breathing with random colors
+  0x0A AA R G B - Breathing with custom color
+  0x0B 00       - Flashing with random colors
+  0x0B AA R G B - Flashing with custom color
+  0x15 SL R G B - Wave direction + color (SL: 0xA1-0xA8 custom, 0x71-0x78 preset)
+  0x16 SL R G B - Snake direction + color (SL: 0xA1-0xA4 custom, 0x71-0x74 preset)
+  0x17 SL R G B - Scan color slot (SL: 0xA1-0xA2)
+  0x18 A1 R G B - Random with custom color
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import IntEnum
 from math import ceil
-from typing import Iterable
+from typing import Iterable, NamedTuple
+
+# --- Hardware constants ---
 
 VENDOR_ID = 0x048D
 PRODUCT_ID = 0x8910
-
 NUM_ROWS = 6
 NUM_COLS = 20
-
 UI_BRIGHTNESS_MAX = 50
 RAW_BRIGHTNESS_MAX = 0x0A
-RAW_SPEED_MAX = 0x02
-
+RAW_SPEED_MAX = 0x0A
 REPORT_ID = 0xCC
 LED_ID_ROW_STRIDE = 0x20
+COLOR_CUSTOM = 0xAA
+COLOR_SLOT_BASE = 0xA1
+PRESET_SLOT_BASE = 0x71
 
-# Public reverse-engineering attribution:
-# - Valentin Lobstein / chocapikk
-# - Reddit user Greedy-Ad232
-#
-# KeyRGB's experimental ITE 8910 path follows the documented 6-byte 0xCC HID
-# feature-report framing and the full 6x20 encoded LED matrix described in the
-# public reverse-engineering notes captured in docs/developement/ite8910-protocol-notes.md.
-KNOWN_LED_IDS: tuple[int, ...] = tuple(
-    ((row & 0x07) << 5) | (col & 0x1F)
-    for row in range(NUM_ROWS)
-    for col in range(NUM_COLS)
-)
+# Wave: 8 directions (preset 0x71-0x78, custom 0xA1-0xA8)
+# Snake: 4 diagonal directions (preset 0x71-0x74, custom 0xA1-0xA4)
+# Slot index encodes direction in both preset and custom ranges.
+WAVE_DIRECTIONS = ("up_left", "up_right", "down_left", "down_right", "up", "down", "left", "right")
+SNAKE_DIRECTIONS = ("up_left", "up_right", "down_left", "down_right")
+
+Color = tuple[int, int, int]
+
+
+# --- Enums ---
+
+
+class AnimationMode(IntEnum):
+    """Firmware animation mode IDs for command [CC, 00, XX]."""
+
+    SPECTRUM_CYCLE = 0x02
+    RAINBOW_WAVE = 0x04
+    RANDOM = 0x09
+    SCAN = 0x0A
+    SNAKE = 0x0B
+    CLEAR = 0x0C
+
+
+class Cmd(IntEnum):
+    """HID report command bytes."""
+
+    ANIMATION = 0x00
+    SET_LED = 0x01
+    BRIGHTNESS_SPEED = 0x09
+    BREATHING = 0x0A
+    FLASHING = 0x0B
+    WAVE_COLOR = 0x15
+    SNAKE_COLOR = 0x16
+    SCAN_COLOR = 0x17
+    RANDOM_COLOR = 0x18
 
 
 class Ite8910Effect(IntEnum):
-    WAVE = 0
-    BREATHING = 1
-    SCAN = 2
-    FLASHING = 3
-    RANDOM = 4
-    RIPPLE = 5
-    SNAKE = 6
-    SPECTRUM_CYCLE = 7
-    BLINK = 3
+    SPECTRUM_CYCLE = 0
+    RAINBOW_WAVE = 1
+    BREATHING = 2
+    BREATHING_COLOR = 3
+    FLASHING = 4
+    FLASHING_COLOR = 5
+    RANDOM = 6
+    RANDOM_COLOR = 7
+    SCAN = 8
+    SNAKE = 9
+    FN_HIGHLIGHT = 10
+    OFF = 11
 
 
-CANONICAL_EFFECTS: dict[str, Ite8910Effect] = {
-    "rainbow": Ite8910Effect.SPECTRUM_CYCLE,
-    "wave": Ite8910Effect.WAVE,
+# --- Effect dispatch table ---
+
+
+class _EffectDesc(NamedTuple):
+    """Describes how to build reports for a given effect."""
+
+    animation: AnimationMode | None = None
+    random_cmd: Cmd | None = None
+    color_cmd: Cmd | None = None
+    slot_cmd: Cmd | None = None
+    slot_max: int = 0
+    directions: tuple[str, ...] = ()
+
+
+_EFFECTS: dict[Ite8910Effect, _EffectDesc] = {
+    Ite8910Effect.SPECTRUM_CYCLE: _EffectDesc(animation=AnimationMode.SPECTRUM_CYCLE),
+    Ite8910Effect.RAINBOW_WAVE: _EffectDesc(
+        animation=AnimationMode.RAINBOW_WAVE,
+        slot_cmd=Cmd.WAVE_COLOR,
+        slot_max=1,
+        directions=WAVE_DIRECTIONS,
+    ),
+    Ite8910Effect.BREATHING: _EffectDesc(random_cmd=Cmd.BREATHING),
+    Ite8910Effect.BREATHING_COLOR: _EffectDesc(color_cmd=Cmd.BREATHING, random_cmd=Cmd.BREATHING),
+    Ite8910Effect.FLASHING: _EffectDesc(random_cmd=Cmd.FLASHING),
+    Ite8910Effect.FLASHING_COLOR: _EffectDesc(color_cmd=Cmd.FLASHING, random_cmd=Cmd.FLASHING),
+    Ite8910Effect.RANDOM: _EffectDesc(animation=AnimationMode.RANDOM),
+    Ite8910Effect.RANDOM_COLOR: _EffectDesc(
+        animation=AnimationMode.RANDOM,
+        slot_cmd=Cmd.RANDOM_COLOR,
+        slot_max=1,
+    ),
+    Ite8910Effect.SCAN: _EffectDesc(
+        animation=AnimationMode.SCAN,
+        slot_cmd=Cmd.SCAN_COLOR,
+        slot_max=2,
+    ),
+    Ite8910Effect.SNAKE: _EffectDesc(
+        animation=AnimationMode.SNAKE,
+        slot_cmd=Cmd.SNAKE_COLOR,
+        slot_max=1,
+        directions=SNAKE_DIRECTIONS,
+    ),
+    Ite8910Effect.FN_HIGHLIGHT: _EffectDesc(animation=AnimationMode.SPECTRUM_CYCLE),
+    Ite8910Effect.OFF: _EffectDesc(animation=AnimationMode.CLEAR),
+}
+
+
+# --- Name resolution ---
+
+_EFFECT_NAMES: dict[str, Ite8910Effect] = {
+    "spectrum_cycle": Ite8910Effect.SPECTRUM_CYCLE,
+    "rainbow_wave": Ite8910Effect.RAINBOW_WAVE,
+    "rainbow": Ite8910Effect.RAINBOW_WAVE,
+    "wave": Ite8910Effect.RAINBOW_WAVE,
     "breathing": Ite8910Effect.BREATHING,
-    "scan": Ite8910Effect.SCAN,
+    "breathing_color": Ite8910Effect.BREATHING_COLOR,
+    "breathe": Ite8910Effect.BREATHING,
     "flashing": Ite8910Effect.FLASHING,
+    "flashing_color": Ite8910Effect.FLASHING_COLOR,
     "blink": Ite8910Effect.FLASHING,
     "random": Ite8910Effect.RANDOM,
-    "ripple": Ite8910Effect.RIPPLE,
+    "random_color": Ite8910Effect.RANDOM_COLOR,
+    "scan": Ite8910Effect.SCAN,
     "snake": Ite8910Effect.SNAKE,
-    "spectrum_cycle": Ite8910Effect.SPECTRUM_CYCLE,
+    "fn_highlight": Ite8910Effect.FN_HIGHLIGHT,
+    "off": Ite8910Effect.OFF,
 }
 
-_EFFECT_ALIASES: dict[str, Ite8910Effect] = {
-    **CANONICAL_EFFECTS,
-    "breathe": Ite8910Effect.BREATHING,
-}
+CANONICAL_EFFECTS = {k: v for k, v in _EFFECT_NAMES.items() if k == v.name.lower()}
 
-_EFFECT_REPORT_FIELDS: dict[Ite8910Effect, tuple[int, int, int, int, int]] = {
-    Ite8910Effect.WAVE: (0x00, 0x04, 0x00, 0x00, 0x00),
-    Ite8910Effect.BREATHING: (0x0A, 0x00, 0x00, 0x00, 0x00),
-    Ite8910Effect.SCAN: (0x00, 0x0A, 0x00, 0x00, 0x00),
-    Ite8910Effect.FLASHING: (0x0B, 0x00, 0x00, 0x00, 0x00),
-    Ite8910Effect.RANDOM: (0x00, 0x09, 0x00, 0x00, 0x00),
-    Ite8910Effect.RIPPLE: (0x07, 0x00, 0x00, 0x00, 0x00),
-    Ite8910Effect.SNAKE: (0x00, 0x0B, 0x00, 0x00, 0x00),
-    Ite8910Effect.SPECTRUM_CYCLE: (0x00, 0x02, 0x00, 0x00, 0x00),
-}
+SLOT_LIMITS: dict[Cmd, int] = {desc.slot_cmd: desc.slot_max for desc in _EFFECTS.values() if desc.slot_cmd}
+
+
+# --- LED IDs ---
+
+KNOWN_LED_IDS: tuple[int, ...] = tuple(
+    ((row & 0x07) << 5) | (col & 0x1F) for row in range(NUM_ROWS) for col in range(NUM_COLS)
+)
+
+
+# --- Clamping ---
+
+
+def _clamp(value: int, lo: int, hi: int) -> int:
+    return max(lo, min(hi, int(value)))
+
+
+def _rgb(r: int, g: int, b: int) -> tuple[int, int, int]:
+    return _clamp(r, 0, 0xFF), _clamp(g, 0, 0xFF), _clamp(b, 0, 0xFF)
 
 
 def clamp_channel(value: int) -> int:
-    return max(0, min(0xFF, int(value)))
+    return _clamp(value, 0, 0xFF)
 
 
 def clamp_raw_brightness(value: int) -> int:
-    return max(0, min(RAW_BRIGHTNESS_MAX, int(value)))
+    return _clamp(value, 0, RAW_BRIGHTNESS_MAX)
 
 
 def clamp_raw_speed(value: int) -> int:
-    return max(0, min(RAW_SPEED_MAX, int(value)))
+    return _clamp(value, 0, RAW_SPEED_MAX)
+
+
+# --- Conversions ---
 
 
 def raw_speed_from_effect_speed(value: int) -> int:
-    """Map KeyRGB's generic hardware-effect speed arg to the 0..2 ITE 8910 scale.
+    """Map KeyRGB's speed arg to the firmware's 0x00-0x0A scale.
 
-    `build_hw_effect_payload()` currently produces a 1..10 speed argument where
-    smaller values are faster. The original public C backend exposes 3 steps.
+    The firmware accepts 0x00 (slowest) to 0x0A (fastest).
+    The Windows Control Center maps: 1->0x02, 2->0x04, 3->0x06, 4->0x0A.
     """
 
     try:
-        speed_value = int(value)
-    except Exception:
+        return clamp_raw_speed(int(value))
+    except (TypeError, ValueError):
         return 0
-
-    if speed_value <= 0:
-        return 0
-
-    speed_value = max(1, min(10, speed_value))
-    if speed_value <= 3:
-        return 0
-    if speed_value <= 7:
-        return 1
-    return 2
 
 
 def raw_brightness_from_ui(value: int) -> int:
-    """Map KeyRGB's 0..50 UI brightness into the controller's 0..10 scale.
+    """Map KeyRGB's 0..50 UI brightness to the firmware's 0..10 scale."""
 
-    This scaling is a KeyRGB adapter layer, not part of the upstream C CLI.
-    Non-zero UI values stay non-zero on hardware.
-    """
-
-    ui_value = max(0, min(UI_BRIGHTNESS_MAX, int(value)))
-    if ui_value == 0:
+    ui = _clamp(value, 0, UI_BRIGHTNESS_MAX)
+    if ui == 0:
         return 0
-    return clamp_raw_brightness(int(ceil((ui_value * RAW_BRIGHTNESS_MAX) / UI_BRIGHTNESS_MAX)))
+    return clamp_raw_brightness(int(ceil(ui * RAW_BRIGHTNESS_MAX / UI_BRIGHTNESS_MAX)))
 
 
 def ui_brightness_from_raw(value: int) -> int:
-    raw_value = clamp_raw_brightness(value)
-    if raw_value == 0:
+    raw = clamp_raw_brightness(value)
+    if raw == 0:
         return 0
-    scaled = int(round((raw_value / RAW_BRIGHTNESS_MAX) * UI_BRIGHTNESS_MAX))
-    return max(1, min(UI_BRIGHTNESS_MAX, scaled))
+    return _clamp(round(raw / RAW_BRIGHTNESS_MAX * UI_BRIGHTNESS_MAX), 1, UI_BRIGHTNESS_MAX)
 
 
 def normalize_effect(effect: Ite8910Effect | int | str) -> Ite8910Effect:
     if isinstance(effect, Ite8910Effect):
         return effect
-
     if isinstance(effect, str):
         key = effect.strip().lower().replace(" ", "_")
-        try:
-            return _EFFECT_ALIASES[key]
-        except KeyError as exc:
-            raise ValueError(f"Unsupported ITE 8910 effect: {effect}") from exc
-
-    try:
-        return Ite8910Effect(int(effect))
-    except (TypeError, ValueError) as exc:
-        raise ValueError(f"Unsupported ITE 8910 effect: {effect}") from exc
+        if key in _EFFECT_NAMES:
+            return _EFFECT_NAMES[key]
+        msg = f"Unsupported ITE 8910 effect: {effect}"
+        raise ValueError(msg)
+    return Ite8910Effect(int(effect))
 
 
 def led_id_from_row_col(row: int, col: int) -> int:
-    """Translate a logical matrix coordinate to the controller LED id.
-
-    This follows the `get_led_id(row, col)` macro from the vendored TUXEDO
-    `ite_829x` kernel driver for the same controller family.
-
-    Note: this row/column helper is a KeyRGB adapter convenience. The public C
-    CLI itself works directly with LED ids.
-    """
-
     return ((int(row) & 0x07) << 5) | (int(col) & 0x1F)
 
 
 def iter_matrix_led_ids() -> Iterable[int]:
-    """Yield the full derived 6x20 matrix id space from the kernel-driver macro."""
-
     for row in range(NUM_ROWS):
         for col in range(NUM_COLS):
             yield led_id_from_row_col(row, col)
 
 
 def iter_known_led_ids() -> Iterable[int]:
-    """Yield the exact LED ids documented by the public upstream C backend."""
-
     yield from KNOWN_LED_IDS
 
 
-def build_brightness_speed_report_raw(brightness_raw: int, speed_raw: int) -> bytes:
-    return bytes(
-        (
-            REPORT_ID,
-            0x09,
-            clamp_raw_brightness(brightness_raw),
-            clamp_raw_speed(speed_raw),
-            0x00,
-            0x00,
-        )
-    )
+# --- Report builders ---
 
 
-def build_effect_report(effect: Ite8910Effect | int | str) -> bytes:
-    return bytes((REPORT_ID, *_EFFECT_REPORT_FIELDS[normalize_effect(effect)]))
+def _report(*data: int) -> bytes:
+    return bytes((REPORT_ID, *data))
+
+
+def build_brightness_speed_report(brightness: int, speed: int) -> bytes:
+    """[CC, 09, brightness, speed, 00, 00]."""
+
+    return _report(Cmd.BRIGHTNESS_SPEED, clamp_raw_brightness(brightness), clamp_raw_speed(speed), 0x00, 0x00)
+
+
+def build_animation_mode_report(mode: AnimationMode) -> bytes:
+    """[CC, 00, mode, 00, 00, 00]."""
+
+    return _report(Cmd.ANIMATION, int(mode), 0x00, 0x00, 0x00)
 
 
 def build_reset_report() -> bytes:
-    return bytes((REPORT_ID, 0x00, 0x0C, 0x00, 0x00, 0x00))
+    """[CC, 00, 0C, 00, 00, 00] - Clear all LEDs. Required before per-key updates."""
+
+    return build_animation_mode_report(AnimationMode.CLEAR)
 
 
-def build_led_color_report(led_id: int, color: tuple[int, int, int]) -> bytes:
-    red, green, blue = color
-    return bytes(
-        (
-            REPORT_ID,
-            0x01,
-            int(led_id) & 0xFF,
-            clamp_channel(red),
-            clamp_channel(green),
-            clamp_channel(blue),
-        )
-    )
+def build_led_color_report(led_id: int, color: Color) -> bytes:
+    """[CC, 01, led_id, R, G, B]."""
+
+    r, g, b = _rgb(*color)
+    return _report(Cmd.SET_LED, int(led_id) & 0xFF, r, g, b)
+
+
+def _direction_index(direction: str | None, directions: tuple[str, ...]) -> int:
+    """Resolve a direction name to an index within the direction table."""
+
+    if direction and direction in directions:
+        return directions.index(direction)
+    return 0
+
+
+def build_effect_reports(
+    effect: Ite8910Effect,
+    colors: list[Color] | None = None,
+    direction: str | None = None,
+) -> list[bytes]:
+    """Build the full report sequence for an effect.
+
+    Sequence per the Uniwill Control Center:
+    1. Animation mode or color effect command
+    2. Direction/color slots (if applicable)
+    3. Brightness/speed (handled separately by the caller)
+    """
+
+    desc = _EFFECTS.get(effect)
+    if not desc:
+        return []
+
+    colors = colors or []
+    reports: list[bytes] = []
+
+    if desc.animation:
+        reports.append(build_animation_mode_report(desc.animation))
+
+    if desc.color_cmd and colors:
+        r, g, b = _rgb(*colors[0])
+        reports.append(_report(desc.color_cmd, COLOR_CUSTOM, r, g, b))
+
+    if desc.random_cmd and not desc.animation and not colors:
+        reports.append(_report(desc.random_cmd, 0x00, 0x00, 0x00, 0x00))
+
+    if not desc.slot_cmd:
+        return reports
+
+    idx = _direction_index(direction, desc.directions)
+
+    if desc.directions and colors:
+        r, g, b = _rgb(*colors[0])
+        reports.append(_report(desc.slot_cmd, COLOR_SLOT_BASE + idx, r, g, b))
+
+    if desc.directions and not colors:
+        reports.append(_report(desc.slot_cmd, PRESET_SLOT_BASE + idx, 0x00, 0x00, 0x00))
+
+    if not desc.directions:
+        for i, c in enumerate(colors[: desc.slot_max]):
+            r, g, b = _rgb(*c)
+            reports.append(_report(desc.slot_cmd, COLOR_SLOT_BASE + i, r, g, b))
+
+    return reports
+
+
+# --- Legacy aliases ---
+
+build_brightness_speed_report_raw = build_brightness_speed_report
+
+
+def build_effect_report(effect: Ite8910Effect | int | str) -> bytes:
+    """Legacy single-report interface."""
+
+    reports = build_effect_reports(normalize_effect(effect))
+    return reports[0] if reports else build_reset_report()
+
+
+# --- Stateful interface ---
 
 
 @dataclass
 class Ite8910ProtocolState:
-    """Stateful translation of the upstream C command helpers.
-
-    The original userspace tool preserves the last brightness and speed values,
-    and reuses that state when only one side of the pair changes.
-    """
+    """Tracks brightness/speed state since the firmware expects both in one command."""
 
     current_brightness_raw: int = 0
     current_speed_raw: int = 0
 
-    def set_brightness_and_speed_raw(self, brightness_raw: int, speed_raw: int) -> bytes:
-        self.current_brightness_raw = clamp_raw_brightness(brightness_raw)
-        self.current_speed_raw = clamp_raw_speed(speed_raw)
-        return build_brightness_speed_report_raw(self.current_brightness_raw, self.current_speed_raw)
+    def set_brightness_and_speed_raw(self, brightness: int, speed: int) -> bytes:
+        self.current_brightness_raw = clamp_raw_brightness(brightness)
+        self.current_speed_raw = clamp_raw_speed(speed)
+        return build_brightness_speed_report(self.current_brightness_raw, self.current_speed_raw)
 
-    def set_brightness_raw(self, brightness_raw: int) -> bytes:
-        return self.set_brightness_and_speed_raw(brightness_raw, self.current_speed_raw)
+    def set_brightness_raw(self, brightness: int) -> bytes:
+        return self.set_brightness_and_speed_raw(brightness, self.current_speed_raw)
 
-    def set_speed_raw(self, speed_raw: int) -> bytes:
-        return self.set_brightness_and_speed_raw(self.current_brightness_raw, speed_raw)
+    def set_speed_raw(self, speed: int) -> bytes:
+        return self.set_brightness_and_speed_raw(self.current_brightness_raw, speed)
 
-    def set_effect(self, effect: Ite8910Effect | int | str) -> bytes:
-        return build_effect_report(effect)
+    def set_effect(
+        self,
+        effect: Ite8910Effect | int | str,
+        colors: list[Color] | None = None,
+        direction: str | None = None,
+    ) -> list[bytes]:
+        return build_effect_reports(normalize_effect(effect), colors, direction)
 
     def reset(self) -> bytes:
         return build_reset_report()
 
-    def set_led_color(self, led_id: int, color: tuple[int, int, int]) -> bytes:
+    def set_led_color(self, led_id: int, color: Color) -> bytes:
         return build_led_color_report(led_id, color)

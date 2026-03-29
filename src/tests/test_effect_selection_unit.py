@@ -98,10 +98,50 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend.effects.return_value = {"wave": object()}
 
         apply_effect_selection(mock_tray, effect_name="wave")
 
         assert mock_tray.config.effect == "wave"
+        mock_tray._start_current_effect.assert_called_once()
+
+    def test_backend_specific_hardware_effect_starts_engine_normally(self):
+        """Backend-exposed hardware effects should start even when not in the legacy catalog."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend.effects.return_value = {"snake": object()}
+
+        apply_effect_selection(mock_tray, effect_name="snake")
+
+        assert mock_tray.config.effect == "snake"
+        mock_tray._start_current_effect.assert_called_once()
+
+    def test_colliding_backend_hardware_effect_uses_hw_prefix(self):
+        """Colliding hardware effects should preserve the user's hardware choice."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend.effects.return_value = {"spectrum_cycle": object()}
+
+        apply_effect_selection(mock_tray, effect_name="hw:spectrum_cycle")
+
+        assert mock_tray.config.effect == "hw:spectrum_cycle"
+        mock_tray._start_current_effect.assert_called_once()
+
+    def test_plain_colliding_effect_name_stays_software(self):
+        """Unprefixed colliding names should keep the software effect behavior."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend.effects.return_value = {"spectrum_cycle": object()}
+
+        apply_effect_selection(mock_tray, effect_name="spectrum_cycle")
+
+        assert mock_tray.config.effect == "spectrum_cycle"
         mock_tray._start_current_effect.assert_called_once()
 
     def test_defaults_to_support_all_when_caps_missing(self):
@@ -110,6 +150,7 @@ class TestApplyEffectSelection:
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = None
+        mock_tray.backend.effects.return_value = {"rainbow": object()}
 
         # Both hardware and per-key effects should work
         apply_effect_selection(mock_tray, effect_name="rainbow")
@@ -117,6 +158,21 @@ class TestApplyEffectSelection:
 
         apply_effect_selection(mock_tray, effect_name="perkey")
         assert mock_tray.config.effect == "perkey"
+
+    def test_unexposed_legacy_hardware_name_is_treated_as_unknown(self):
+        """Legacy catalog names should not force hardware mode when the backend does not expose them."""
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend.effects.return_value = {}
+        mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
+
+        apply_effect_selection(mock_tray, effect_name="wave")
+
+        mock_tray.engine.stop.assert_called_once()
+        mock_tray.engine.kb.set_color.assert_called_once()
+        assert mock_tray.config.effect == "none"
 
     def test_hardware_effects_list_blocked_correctly(self):
         """All hardware effects in the list should be blocked when not supported."""

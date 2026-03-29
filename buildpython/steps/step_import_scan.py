@@ -8,7 +8,6 @@ from pathlib import Path
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
-
 OPTIONAL_TOPLEVEL = {
     "PyQt6",  # optional UI sliders
     "ruff",  # optional lint/format

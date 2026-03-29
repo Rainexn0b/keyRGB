@@ -31,8 +31,7 @@ Experimental backends also carry an evidence tag in diagnostics so maintainers c
 
 Current backend plan:
 
-- `sysfs-leds`, `ite8291r3`, and `asusctl-aura`: `validated`
-- `ite8910`: `experimental` + `reverse_engineered` (`0x048d:0x8910`, Linux `hidraw` feature-report path)
+- `sysfs-leds`, `ite8291r3`, `ite8910`, and `asusctl-aura`: `validated`
 - `ite8297`: `experimental` + `reverse_engineered` (`0x048d:0x8297`, Linux `hidraw` feature-report path for uniform color only)
 
 Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental and dormant paths are additionally policy-gated, so detection alone does not guarantee automatic selection.
@@ -172,12 +171,12 @@ Notes:
 - The installer reports a distro support profile at startup: Fedora / Red Hat (tested), Debian / Ubuntu / Linux Mint (experimental), Arch / CachyOS / EndeavourOS / Manjaro (tested), and openSUSE / Other Linux (best-effort).
 - On Arch/CachyOS, install `fuse2` for native AppImage/FUSE launching: `sudo pacman -S --needed fuse2`. KeyRGB also installs a launcher wrapper that falls back to `--appimage-extract-and-run` when `libfuse.so.2` is unavailable.
 - On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver package installs are best-effort and may require TUXEDO package sources; the installer does not add third-party apt repos automatically.
-- Experimental `ite8910` support (`0x048d:0x8910`) uses Linux `hidraw`. The current implementation is based on public reverse-engineering work by Valentin Lobstein (`chocapikk`, Reddit `Greedy-Ad232`). The bundled KeyRGB udev rules also grant `uaccess` on matching `hidraw` nodes so the app can talk to that controller without detaching the kernel keyboard driver.
+- `ite8910` support (`0x048d:0x8910`) uses Linux `hidraw` and is hardware-validated. The implementation is based on reverse-engineering work by [Valentin Lobstein](https://github.com/Chocapikk) (Reddit `Greedy-Ad232`), with full per-key RGB, 8 wave directions, 4 snake diagonals, and custom color support for the verified firmware effect path. The bundled KeyRGB udev rules also grant `uaccess` on matching `hidraw` nodes so the app can talk to that controller without detaching the kernel keyboard driver.
 - To pin installs to a known release tag (instead of `main`), use both `--ref <tag>` and `--version <tag>` (for example `v0.17.2`).
 
 #### Update existing AppImage (non-interactive)
 
-Refreshes the stored AppImage and launcher under `~/.local/bin/`. Reuses your last saved release channel (stable vs prerelease).
+Refreshes the stored AppImage and launcher under `~/.local/bin/`, and also refreshes the desktop entry, autostart entry, installed app icon, and udev integration. Reuses your last saved release channel (stable vs prerelease).
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage
@@ -249,23 +248,25 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 
 | Variable | Usage |
 | --- | --- |
-| `KEYRGB_BACKEND` | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `asusctl-aura`, or the experimental `ite8910` / `ite8297` backends when experimental backends are enabled. |
+| `KEYRGB_BACKEND` | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `ite8910`, `asusctl-aura`, or the experimental `ite8297` backend when experimental backends are enabled. |
 | `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1` | Opt in to experimental backends without using the Settings window. |
 | `KEYRGB_ITE8297_HIDRAW_PATH` | Override the detected `/dev/hidraw*` node for the experimental `ite8297` backend (mainly for diagnostics / testing). |
 | `KEYRGB_DEBUG=1` | Enable verbose debug logging. |
 | `KEYRGB_TK_SCALING` | Float override for UI scaling (High-DPI / fractional scaling). |
 | `KEYRGB_TCCD_BIN` | Override the `tccd` helper path for TCC integration. |
-| `KEYRGB_ITE8910_HIDRAW_PATH` | Override the detected `/dev/hidraw*` node for the experimental `ite8910` backend (mainly for diagnostics / testing). |
+| `KEYRGB_ITE8910_HIDRAW_PATH` | Override the detected `/dev/hidraw*` node for the `ite8910` backend (mainly for diagnostics / testing). |
 | `KEYRGB_DEBUG_BRIGHTNESS` | When set to `1`, emits detailed logs for brightness actions and sysfs writes (useful when investigating flashes when restoring from dim). Example: `KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb dev state` |
 
 ### Tray effects (names)
 
 These are the effect names stored in `~/.config/keyrgb/config.json` under the `effect` key.
 
-- Hardware (firmware) effects: `rainbow`, `breathing`, `wave`, `ripple`, `marquee`, `raindrop`, `aurora`, `fireworks`
+- Hardware (firmware) effects: backend-specific. Common legacy values include `rainbow`, `breathing`, `wave`, `ripple`, `marquee`, `raindrop`, `aurora`, `fireworks`.
 - Software effects: `rainbow_wave`, `rainbow_swirl`, `spectrum_cycle`, `color_cycle`, `chase`, `twinkle`, `strobe`
 - Reactive typing: `reactive_fade`, `reactive_ripple`
 - Per-key static map: `perkey`
+
+When a hardware effect name collides with a software effect name, KeyRGB stores the hardware selection with an `hw:` prefix to preserve the user's choice. Example: hardware `spectrum_cycle` is stored as `hw:spectrum_cycle`.
 
 ## Configuration
 
@@ -276,7 +277,7 @@ Access **Settings** via the tray menu to configure:
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
 - **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
 - **Autostart**: enable “Start KeyRGB on login”.
-- **Backend policy**: opt in to experimental backends. Current plan: `ite8910` and `ite8297` are both experimental; the UI labels them as speculative or research-backed.
+- **Backend policy**: opt in to experimental backends. Currently `ite8297` is experimental; the UI labels experimental paths as speculative or research-backed.
 
 ### Profiles
 
@@ -301,7 +302,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | --- | --- |
 | No tray icon | Run `keyrgb` from a terminal to see errors. Check if the system tray extension is enabled (GNOME). |
 | Permission denied | Ensure KeyRGB udev rules are installed. Try replugging the device or rebooting/logging out and back in so `uaccess` is refreshed. |
-| `0x048d:0x8910` is detected but not selected | Enable **Settings → Backend policy → Enable experimental backends** or set `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1`, then restart KeyRGB. `keyrgb-diagnostics` will also report why the backend was skipped. |
+| `0x048d:0x8910` is detected but not working | Ensure the KeyRGB udev rules are installed and you have rebooted or logged out and back in so `uaccess` is refreshed. Run `keyrgb-diagnostics` to confirm `ite8910` was selected. |
 | Flickering effects | Ensure other tools (OpenRGB, TCC) are not running. KeyRGB needs exclusive access. |
 | Per-key not working | You likely need to run the Keymap Calibrator first. |
 | Brightness works but color does not (Kernel Driver / `kbd_backlight`) | Your sysfs LED node is likely **brightness-only** (no `multi_intensity`, `color`, or `rgb` attribute under `/sys/class/leds/*kbd_backlight*`). KeyRGB can only change color when the kernel exposes RGB attributes (common on Clevo/Tuxedo/System76). On ASUS ROG laptops, use `asusctl` / rog-control-center for Aura/RGB control. |

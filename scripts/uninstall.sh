@@ -84,15 +84,19 @@ fi
 
 APP_FILE="$HOME/.local/share/applications/keyrgb.desktop"
 AUTOSTART_FILE="$HOME/.config/autostart/keyrgb.desktop"
+ICON_FILE_SVG="$HOME/.local/share/icons/keyrgb.svg"
 ICON_FILE_PNG="$HOME/.local/share/icons/keyrgb.png"
 ICON_FILE_JPG="$HOME/.local/share/icons/keyrgb.jpg"
+ICON_FILE_THEME_SVG="$HOME/.local/share/icons/hicolor/scalable/apps/keyrgb.svg"
 ICON_FILE_THEME_PNG="$HOME/.local/share/icons/hicolor/256x256/apps/keyrgb.png"
 
 if confirm "Remove desktop launcher + autostart entries?"; then
   rm -f "$APP_FILE" || true
   rm -f "$AUTOSTART_FILE" || true
+  rm -f "$ICON_FILE_SVG" || true
   rm -f "$ICON_FILE_PNG" || true
   rm -f "$ICON_FILE_JPG" || true
+  rm -f "$ICON_FILE_THEME_SVG" || true
   rm -f "$ICON_FILE_THEME_PNG" || true
   log_ok "Removed desktop entries + icon (if present)"
 else

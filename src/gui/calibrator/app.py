@@ -12,7 +12,7 @@ from PIL import Image, ImageTk
 from src.core.config import Config
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 from .helpers.canvas_render import redraw_calibration_canvas
-from .helpers.geometry import hit_test, key_canvas_bbox
+from .helpers.geometry import hit_test
 from .helpers.probe import CalibrationProbeState
 from src.gui.utils.profile_backdrop_storage import (
     load_backdrop_image,
@@ -35,7 +35,6 @@ from src.gui.theme import apply_clam_theme
 from src.gui.reference.overlay_geometry import (
     CanvasTransform,
 )
-
 
 MATRIX_ROWS = 6
 MATRIX_COLS = 21

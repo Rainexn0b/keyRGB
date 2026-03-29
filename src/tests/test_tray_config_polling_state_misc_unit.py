@@ -56,6 +56,27 @@ def test_compute_config_apply_state_handles_property_exceptions() -> None:
     assert state.color == (255, 255, 255)
 
 
+def test_compute_config_apply_state_resolves_legacy_effect_against_backend() -> None:
+    class _Backend:
+        def effects(self):
+            return {}
+
+    tray = MagicMock()
+    tray.backend = _Backend()
+    tray.config = SimpleNamespace(
+        effect="wave",
+        per_key_colors={},
+        speed=1,
+        brightness=2,
+        color=(7, 8, 9),
+        reactive_use_manual_color=False,
+        reactive_color=(10, 20, 30),
+    )
+
+    state = _compute_config_apply_state(tray)
+    assert state.effect == "none"
+
+
 def test_state_for_log_returns_none_on_unexpected_state_shape() -> None:
     class _BadIterable:
         def __iter__(self):

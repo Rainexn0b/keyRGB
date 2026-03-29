@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-
 _SKIP_AGENT_TESTS_ENV = "KEYRGB_SKIP_AGENT_TESTS"
 
 

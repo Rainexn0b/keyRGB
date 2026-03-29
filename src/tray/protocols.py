@@ -18,7 +18,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
-
 if TYPE_CHECKING:
     from src.core.config import Config
     from src.core.effects.engine import EffectsEngine

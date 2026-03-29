@@ -7,7 +7,15 @@ from typing import Any
 
 from src.core.runtime.imports import ensure_ite8291r3_ctl_importable
 
-from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
+from ..base import (
+    BackendCapabilities,
+    BackendStability,
+    KeyboardBackend,
+    KeyboardDevice,
+    ProbeResult,
+    legacy_builder_supported_args,
+    make_hardware_effect_descriptor,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +176,15 @@ class Ite8291r3Backend(KeyboardBackend):
 
     def effects(self) -> dict[str, Any]:
         ite8291r3 = self._import()
-        return dict(getattr(ite8291r3, "effects", {}) or {})
+        raw_effects = dict(getattr(ite8291r3, "effects", {}) or {})
+        return {
+            str(name): make_hardware_effect_descriptor(
+                builder,
+                supported_args=legacy_builder_supported_args(builder),
+            )
+            for name, builder in raw_effects.items()
+            if callable(builder)
+        }
 
     def colors(self) -> dict[str, Any]:
         ite8291r3 = self._import()

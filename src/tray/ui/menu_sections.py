@@ -6,7 +6,6 @@ from src.core.utils.logging_utils import log_throttled
 
 from src.core.system_power import PowerMode, get_status, set_mode
 
-
 logger = logging.getLogger(__name__)
 
 

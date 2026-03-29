@@ -14,6 +14,8 @@ DEFAULTS: dict = {
     # edits don't overwrite the effect brightness (and vice versa).
     "perkey_brightness": 25,
     "color": [255, 0, 0],  # RGB for static/custom effects
+    # Direction for directional effects (wave, snake). None = default direction.
+    "direction": None,
     # Manual highlight color for reactive typing effects.
     # When disabled, reactive effects use their built-in coloring.
     "reactive_use_manual_color": False,

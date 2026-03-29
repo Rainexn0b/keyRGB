@@ -10,7 +10,6 @@ from pathlib import Path
 from src.core.utils.logging_utils import log_throttled
 from src.core.config import Config
 
-
 DEFAULT_PROFILE_NAME = "light"
 
 # Backward compatibility: historical profile name used by older versions.

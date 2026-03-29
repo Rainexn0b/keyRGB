@@ -6,14 +6,13 @@ from threading import Thread
 from typing import Any, Final, Literal, Optional, Tuple, cast
 
 from src.core.effects.catalog import (
-    ALL_EFFECTS as _ALL_EFFECTS,
-    HW_EFFECTS as _HW_EFFECTS,
     SW_EFFECTS as _SW_EFFECTS,
+    is_forced_hardware_effect,
     normalize_effect_name,
+    strip_effect_namespace,
 )
 from src.core.effects.fades import fade_in_per_key, fade_uniform_color
 from src.core.effects.hw_payloads import build_hw_effect_payload
-from src.core.effects.ite_backend import hw_colors, hw_effects
 from src.core.effects.software.effects import (
     run_chase,
     run_color_cycle,
@@ -48,6 +47,7 @@ class _EngineStart:
     per_key_colors: Mapping[Any, Any] | None
     reactive_color: Optional[tuple]
     reactive_use_manual_color: bool
+    direction: Optional[str]
     _last_hw_mode_brightness: Optional[int]
     _last_rendered_brightness: Optional[int]
     stop: Any
@@ -56,10 +56,10 @@ class _EngineStart:
     # Optional callback invoked when hardware I/O fails due to permissions.
     # Signature: cb(exc: Exception) -> None
     _permission_error_cb: Any
+    get_backend_effects: Any
+    get_backend_colors: Any
 
-    HW_EFFECTS = _HW_EFFECTS
     SW_EFFECTS = _SW_EFFECTS
-    ALL_EFFECTS = _ALL_EFFECTS
 
     _SW_START_SPECS: Final[dict[str, tuple[str, Literal["current"] | Tuple[int, int, int]]]] = {
         # Effect name -> (method_name, fade_to)
@@ -83,6 +83,7 @@ class _EngineStart:
         color: Optional[tuple] = None,
         reactive_color: Optional[tuple] = None,
         reactive_use_manual_color: Optional[bool] = None,
+        direction: Optional[str] = None,
     ):
         """Start an effect (hardware or software)."""
 
@@ -93,19 +94,15 @@ class _EngineStart:
         # If no device is present, keep state but do not crash.
         self._ensure_device_available()
 
-        effect_name = normalize_effect_name(effect_name)
+        requested_effect_name = normalize_effect_name(effect_name)
+        force_hardware = is_forced_hardware_effect(requested_effect_name)
+        effect_name = strip_effect_namespace(requested_effect_name)
+        backend_effects = self.get_backend_effects()
+        available_hw_effects = frozenset(str(name or "").strip().lower() for name in backend_effects.keys())
+        known_effects = frozenset(self.SW_EFFECTS) | available_hw_effects
 
-        if effect_name not in self.ALL_EFFECTS:
-            raise ValueError(f"Unknown effect: {effect_name}. Valid: {', '.join(self.ALL_EFFECTS)}")
-
-        # If a backend doesn't expose hardware effects (e.g. sysfs-leds),
-        # some catalog entries like 'rainbow' may not be supported. Provide
-        # a best-effort fallback instead of raising and spamming tracebacks.
-        if effect_name in self.HW_EFFECTS and effect_name not in hw_effects:
-            if effect_name == "rainbow":
-                effect_name = "rainbow_wave"
-            else:
-                effect_name = "none"
+        if effect_name not in known_effects:
+            raise ValueError(f"Unknown effect: {effect_name}. Valid: {', '.join(sorted(known_effects))}")
 
         self.current_effect = effect_name
         self.speed = max(0, min(10, speed))
@@ -120,15 +117,21 @@ class _EngineStart:
         if reactive_use_manual_color is not None:
             self.reactive_use_manual_color = bool(reactive_use_manual_color)
 
+        if direction is not None:
+            self.direction = direction
+
         # Hardware effects - delegate to controller
-        if effect_name in self.HW_EFFECTS:
+        is_backend_hw_effect = effect_name in available_hw_effects
+
+        if force_hardware or (is_backend_hw_effect and effect_name not in self.SW_EFFECTS):
             self._start_hw_effect(effect_name)
 
         # Software effects - run in a worker thread
         else:
             spec = self._SW_START_SPECS.get(effect_name)
             if spec is None:
-                # Should not happen due to earlier validation against ALL_EFFECTS.
+                # Should not happen due to earlier validation against the
+                # backend-owned hardware set plus canonical software effects.
                 raise ValueError(f"Unhandled effect: {effect_name}")
 
             method_name, fade_to = spec
@@ -194,9 +197,7 @@ class _EngineStart:
             # lighter SET_BRIGHTNESS command (no mode reinit, no flash).
             from src.core.effects.perkey_animation import enable_user_mode_once
 
-            enable_user_mode_once(
-                kb=self.kb, kb_lock=self.kb_lock, brightness=0
-            )
+            enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=0)
             self._last_hw_mode_brightness = 0
 
         def _run_target_best_effort() -> None:
@@ -246,8 +247,9 @@ class _EngineStart:
     def _start_hw_effect(self, effect_name: str):
         """Start hardware effect."""
 
-        effect_func = hw_effects.get(effect_name)
-        if not effect_func:
+        backend_effects = self.get_backend_effects()
+        effect_descriptor = backend_effects.get(effect_name)
+        if not effect_descriptor:
             # Backend doesn't expose this effect; fall back to a static color.
             try:
                 logger.warning("Hardware effect not supported by backend: %s", effect_name)
@@ -257,16 +259,18 @@ class _EngineStart:
                 self.kb.set_color(tuple(self.current_color), brightness=int(self.brightness))
             return
 
+        backend_colors = self.get_backend_colors()
         effect_data = build_hw_effect_payload(
             effect_name=effect_name,
-            effect_func=effect_func,
+            effect_func=effect_descriptor,
             ui_speed=int(self.speed),
             brightness=int(self.brightness),
             current_color=tuple(self.current_color),
-            hw_colors=hw_colors,
+            hw_colors=backend_colors,
             kb=self.kb,
             kb_lock=self.kb_lock,
             logger=logger,
+            direction=getattr(self, "direction", None),
         )
 
         with self.kb_lock:

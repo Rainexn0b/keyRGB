@@ -24,7 +24,6 @@ from .idle_power_sensors import (
     run as _run_impl,
 )
 
-
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 
 

@@ -44,7 +44,12 @@ class KeyRGBTray:
             core_profiles.migrate_builtin_profile_brightness(self.config)
         except Exception:
             pass
-        self.engine = EffectsEngine()
+
+        # Backend selection is used for capability-driven UI gating and for the
+        # effects engine's hardware runtime path.
+        self.backend, self.backend_probe, self.backend_caps = select_backend_with_introspection()
+
+        self.engine = EffectsEngine(backend=self.backend)
         self.icon = None
         self.is_off = False
         self._power_forced_off = False
@@ -61,9 +66,6 @@ class KeyRGBTray:
         # Notification state.
         self._permission_notice_sent: bool = False
         self._pending_notifications: list[tuple[str, str]] = []
-
-        # Backend selection is used for capability-driven UI gating.
-        self.backend, self.backend_probe, self.backend_caps = select_backend_with_introspection()
 
         self._ite_rows, self._ite_cols = load_ite_dimensions()
 
@@ -151,7 +153,9 @@ class KeyRGBTray:
         if backend_name == "ite8291r3":
             msg_lines.append("  • ITE USB devices usually need /etc/udev/rules.d/99-ite8291-wootbook.rules")
         elif backend_name == "sysfs-leds":
-            msg_lines.append("  • Sysfs LED nodes may require /etc/udev/rules.d/99-keyrgb-sysfs-leds.rules or a polkit helper")
+            msg_lines.append(
+                "  • Sysfs LED nodes may require /etc/udev/rules.d/99-keyrgb-sysfs-leds.rules or a polkit helper"
+            )
         msg_lines.append("")
         msg_lines.append(repo_url)
 
@@ -310,7 +314,7 @@ class KeyRGBTray:
         logger.info("Creating tray icon...")
         self.icon = pystray.Icon(
             "keyrgb",
-            icon_mod.create_icon_for_state(config=self.config, is_off=self.is_off),
+            icon_mod.create_icon_for_state(config=self.config, is_off=self.is_off, backend=self.backend),
             "KeyRGB",
             menu=menu_mod.build_menu(self, pystray=pystray, item=item),
         )

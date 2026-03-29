@@ -174,7 +174,6 @@ def _bundle_tk_shared_lib_deps(*, appdir: Path, usr_lib: Path, tk_lib: Path, tcl
             "libutil.so.1",
             "libgcc_s.so.1",
             "libstdc++.so.6",
-
             # These are commonly provided by every distro and are frequently
             # consumed by system GTK/Pango stacks. Bundling older copies can
             # cause hard-to-debug symbol/version mismatches (notably breaking

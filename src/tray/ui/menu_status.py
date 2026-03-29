@@ -3,12 +3,21 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.core.backends.policy import experimental_evidence_for_backend, experimental_evidence_label, stability_for_backend
-from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
+from src.core.backends.policy import (
+    experimental_evidence_for_backend,
+    experimental_evidence_label,
+    stability_for_backend,
+)
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+from src.core.effects.catalog import (
+    backend_hw_effect_names,
+    detected_backend_hw_effect_names,
+    is_forced_hardware_effect,
+    resolve_effect_name_for_backend,
+    strip_effect_namespace,
+)
 from src.core.effects.catalog import title_for_effect
 from src.core.utils.logging_utils import log_throttled
-
 
 logger = logging.getLogger(__name__)
 
@@ -17,9 +26,13 @@ def is_software_mode(tray: Any) -> bool:
     """Return True if we're in software/per-key mode (SW effects available)."""
 
     cfg = getattr(tray, "config", None)
-    effect = str(getattr(cfg, "effect", "none") or "none")
+    effect = resolve_effect_name_for_backend(
+        str(getattr(cfg, "effect", "none") or "none"),
+        getattr(tray, "backend", None),
+    )
+    effect_base = strip_effect_namespace(effect)
 
-    if effect == "perkey" or effect in SW_EFFECTS:
+    if effect_base == "perkey" or (effect_base in SW_EFFECTS and not is_forced_hardware_effect(effect)):
         return True
 
     try:
@@ -146,10 +159,15 @@ def tray_lighting_mode_text(tray: Any) -> str:
         return "Active: Off"
 
     cfg = getattr(tray, "config", None)
-    effect = str(getattr(cfg, "effect", "none") or "none")
+    effect = resolve_effect_name_for_backend(
+        str(getattr(cfg, "effect", "none") or "none"),
+        getattr(tray, "backend", None),
+    )
+    effect_base = strip_effect_namespace(effect)
     sw_mode = is_software_mode(tray)
+    backend_hw_effects = frozenset(backend_hw_effect_names(getattr(tray, "backend", None)))
 
-    if effect == "perkey":
+    if effect_base == "perkey":
         try:
             from src.core.profile import profiles
 
@@ -159,17 +177,30 @@ def tray_lighting_mode_text(tray: Any) -> str:
 
         return f"Mode: Software ({active_profile})"
 
-    if effect in SW_EFFECTS:
+    if effect_base in SW_EFFECTS and not is_forced_hardware_effect(effect):
         if sw_mode:
-            return f"Mode: Software + {_title(effect)}"
-        return f"Mode: {_title(effect)}"
+            return f"Mode: Software + {_title(effect_base)}"
+        return f"Mode: {_title(effect_base)}"
 
-    if effect in HW_EFFECTS:
-        return f"Mode: Hardware + {_title(effect)}"
+    if effect_base in backend_hw_effects:
+        return f"Mode: Hardware + {_title(effect_base)}"
 
-    if effect == "none":
+    if effect_base == "none":
         if sw_mode:
             return "Mode: Software (static)"
         return "Mode: Hardware (uniform)"
 
-    return f"Mode: {_title(effect)}"
+    return f"Mode: {_title(effect_base)}"
+
+
+def hardware_effects_menu_text(tray: Any) -> str:
+    """Return the hardware-effects submenu label with detected count."""
+
+    caps = getattr(tray, "backend_caps", None)
+    hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
+    if not hw_effects_supported:
+        return "Hardware Effects"
+
+    count = len(detected_backend_hw_effect_names(getattr(tray, "backend", None)))
+    noun = "mode" if count == 1 else "modes"
+    return f"Hardware Effects ({count} {noun})"

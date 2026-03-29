@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-
 IdleAction = Optional[Literal["turn_off", "restore", "dim_to_temp", "restore_brightness"]]
 
 

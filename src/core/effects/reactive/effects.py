@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import random
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING, List
 
 from src.core.effects.colors import hsv_to_rgb
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.reactive.utils import (
     _Pulse,
     _RainbowPulse,
@@ -31,10 +31,7 @@ from .input import (
 )
 from .render import (
     Color,
-    Key,
-    apply_backdrop_brightness_scale,
     backdrop_brightness_scale_factor,
-    base_color_map,
     frame_dt_s,
     mix,
     pace,

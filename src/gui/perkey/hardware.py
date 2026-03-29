@@ -6,7 +6,6 @@ from typing import Any
 from src.core.backends.registry import select_backend
 from src.core.utils.logging_utils import log_throttled
 
-
 logger = logging.getLogger(__name__)
 
 

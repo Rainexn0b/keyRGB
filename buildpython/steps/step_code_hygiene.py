@@ -20,7 +20,6 @@ from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 from .reports import write_csv, write_json, write_md
 
-
 # ---------------------------------------------------------------------------
 # Configuration / thresholds
 # ---------------------------------------------------------------------------
@@ -32,11 +31,11 @@ FAIL_THRESHOLD_TOTAL = 0  # Start as report-only; tighten later
 # Thresholds are set close to current baseline counts to allow minor
 # fluctuations but catch regressions.
 CATEGORY_THRESHOLDS = {
-    "defensive_conversion": 50,   # Current: 48 - migrate to safe_attrs over time
-    "hasattr_coupling": 22,       # Current: 20 - migrate to typed state objects over time
-    "any_type_hint": 66,          # Current: 64 - add Protocol types over time
-    "runtime_copy_hotspot": 0,    # Report-only until the baseline is tightened
-    "test_naming": 0,             # Fixed - no new violations allowed
+    "defensive_conversion": 50,  # Current: 48 - migrate to safe_attrs over time
+    "hasattr_coupling": 22,  # Current: 20 - migrate to typed state objects over time
+    "any_type_hint": 66,  # Current: 64 - add Protocol types over time
+    "runtime_copy_hotspot": 0,  # Report-only until the baseline is tightened
+    "test_naming": 0,  # Fixed - no new violations allowed
 }
 
 # Paths to exclude from analysis (vendor code, generated, etc.)
@@ -54,6 +53,7 @@ EXCLUDE_PATTERNS = [
 # Issue types
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True)
 class HygieneIssue:
     category: str
@@ -66,6 +66,7 @@ class HygieneIssue:
 # ---------------------------------------------------------------------------
 # Detectors
 # ---------------------------------------------------------------------------
+
 
 def _should_exclude(path: Path, root: Path) -> bool:
     rel = str(path.relative_to(root))
@@ -112,13 +113,15 @@ def _detect_defensive_conversions(path: Path, root: Path) -> list[HygieneIssue]:
     for idx, line in enumerate(text.splitlines(), start=1):
         for pattern, desc in _DEFENSIVE_PATTERNS:
             if pattern.search(line):
-                issues.append(HygieneIssue(
-                    category="defensive_conversion",
-                    path=rel,
-                    line=idx,
-                    message=desc,
-                    snippet=line.strip()[:120],
-                ))
+                issues.append(
+                    HygieneIssue(
+                        category="defensive_conversion",
+                        path=rel,
+                        line=idx,
+                        message=desc,
+                        snippet=line.strip()[:120],
+                    )
+                )
     return issues
 
 
@@ -151,22 +154,26 @@ def _detect_hasattr_coupling(path: Path, root: Path) -> list[HygieneIssue]:
 
     for idx, line in enumerate(lines, start=1):
         if _HASATTR_PATTERN.search(line):
-            issues.append(HygieneIssue(
-                category="hasattr_coupling",
-                path=rel,
-                line=idx,
-                message="hasattr() on private attr - consider typed state object",
-                snippet=line.strip()[:120],
-            ))
+            issues.append(
+                HygieneIssue(
+                    category="hasattr_coupling",
+                    path=rel,
+                    line=idx,
+                    message="hasattr() on private attr - consider typed state object",
+                    snippet=line.strip()[:120],
+                )
+            )
         # Also flag setattr to private attrs (usually paired with hasattr)
         if _SETATTR_PATTERN.search(line):
-            issues.append(HygieneIssue(
-                category="hasattr_coupling",
-                path=rel,
-                line=idx,
-                message="setattr() on private attr - consider typed state object",
-                snippet=line.strip()[:120],
-            ))
+            issues.append(
+                HygieneIssue(
+                    category="hasattr_coupling",
+                    path=rel,
+                    line=idx,
+                    message="setattr() on private attr - consider typed state object",
+                    snippet=line.strip()[:120],
+                )
+            )
 
     return issues
 
@@ -358,8 +365,8 @@ def _detect_any_type_hints(path: Path, root: Path) -> list[HygieneIssue]:
         return issues
 
     # Pattern: function parameter with : Any or -> Any
-    any_param = re.compile(r':\s*Any\b(?!\[)')  # Any but not Any[...]
-    any_return = re.compile(r'->\s*Any\b(?!\[)')
+    any_param = re.compile(r":\s*Any\b(?!\[)")  # Any but not Any[...]
+    any_return = re.compile(r"->\s*Any\b(?!\[)")
 
     for idx, line in enumerate(text.splitlines(), start=1):
         # Skip imports
@@ -371,21 +378,25 @@ def _detect_any_type_hints(path: Path, root: Path) -> list[HygieneIssue]:
             continue
 
         if any_param.search(line):
-            issues.append(HygieneIssue(
-                category="any_type_hint",
-                path=rel,
-                line=idx,
-                message="Parameter typed as Any - consider Protocol or concrete type",
-                snippet=line.strip()[:120],
-            ))
+            issues.append(
+                HygieneIssue(
+                    category="any_type_hint",
+                    path=rel,
+                    line=idx,
+                    message="Parameter typed as Any - consider Protocol or concrete type",
+                    snippet=line.strip()[:120],
+                )
+            )
         if any_return.search(line):
-            issues.append(HygieneIssue(
-                category="any_type_hint",
-                path=rel,
-                line=idx,
-                message="Return typed as Any - consider Protocol or concrete type",
-                snippet=line.strip()[:120],
-            ))
+            issues.append(
+                HygieneIssue(
+                    category="any_type_hint",
+                    path=rel,
+                    line=idx,
+                    message="Return typed as Any - consider Protocol or concrete type",
+                    snippet=line.strip()[:120],
+                )
+            )
 
     return issues
 
@@ -395,7 +406,7 @@ def _detect_any_type_hints(path: Path, root: Path) -> list[HygieneIssue]:
 # ---------------------------------------------------------------------------
 
 # Expected: test_<module>_<aspect>_unit.py or test_<module>_<aspect>_integration.py
-_TEST_NAME_PATTERN = re.compile(r'^test_[a-z0-9_]+_(unit|integration|e2e)\.py$')
+_TEST_NAME_PATTERN = re.compile(r"^test_[a-z0-9_]+_(unit|integration|e2e)\.py$")
 
 
 def _detect_test_naming_issues(root: Path) -> list[HygieneIssue]:
@@ -406,13 +417,15 @@ def _detect_test_naming_issues(root: Path) -> list[HygieneIssue]:
 
     for p in tests_dir.glob("test_*.py"):
         if not _TEST_NAME_PATTERN.match(p.name):
-            issues.append(HygieneIssue(
-                category="test_naming",
-                path=str(p.relative_to(root)),
-                line=0,
-                message=f"Test file should end with _unit.py, _integration.py, or _e2e.py",
-                snippet=p.name,
-            ))
+            issues.append(
+                HygieneIssue(
+                    category="test_naming",
+                    path=str(p.relative_to(root)),
+                    line=0,
+                    message=f"Test file should end with _unit.py, _integration.py, or _e2e.py",
+                    snippet=p.name,
+                )
+            )
 
     return issues
 
@@ -420,6 +433,7 @@ def _detect_test_naming_issues(root: Path) -> list[HygieneIssue]:
 # ---------------------------------------------------------------------------
 # Main runner
 # ---------------------------------------------------------------------------
+
 
 def _collect_all_issues(root: Path) -> list[HygieneIssue]:
     all_issues: list[HygieneIssue] = []

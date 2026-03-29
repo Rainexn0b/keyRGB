@@ -6,10 +6,10 @@ import time
 from typing import TYPE_CHECKING, Dict
 
 from src.core.effects.colors import hsv_to_rgb
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer, scale_color_map_into
-from .base import Color, Key, base_color_map, frame_dt_s, mix, pace, render as base_render, scale
+from .base import Color, Key, base_color_map, frame_dt_s, mix, pace, render as base_render
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine

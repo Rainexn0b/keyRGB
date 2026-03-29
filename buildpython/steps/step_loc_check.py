@@ -6,7 +6,6 @@ from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 from .reports import write_csv, write_json, write_md
 
-
 THRESHOLD_LINES = 400
 
 

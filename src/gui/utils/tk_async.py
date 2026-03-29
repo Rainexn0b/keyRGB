@@ -6,7 +6,6 @@ from typing import TypeVar
 
 import tkinter as tk
 
-
 T = TypeVar("T")
 
 

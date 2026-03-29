@@ -15,7 +15,7 @@ def test_update_icon_sets_icon_image(monkeypatch) -> None:
 
     calls = {"n": 0}
 
-    monkeypatch.setattr(refresh.icon_mod, "representative_color", lambda *, config, is_off: (1, 2, 3))
+    monkeypatch.setattr(refresh.icon_mod, "representative_color", lambda *, config, is_off, backend=None, now=None: (1, 2, 3))
     monkeypatch.setattr(
         refresh.icon_mod,
         "create_icon",

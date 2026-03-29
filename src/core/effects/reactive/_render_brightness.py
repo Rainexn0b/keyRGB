@@ -13,6 +13,7 @@ def resolve_reactive_transition_brightness(
     engine: "EffectsEngine",
     *,
     clamp01_fn: Callable[[float], float],
+    monotonic_fn: Callable[[], float] = time.monotonic,
 ) -> Optional[tuple[int, bool]]:
     """Return the current transition brightness for reactive temp-dim flows."""
 
@@ -39,7 +40,7 @@ def resolve_reactive_transition_brightness(
         _clear_transition_state(engine)
         return end_i, bool(end_i >= start_i)
 
-    elapsed = max(0.0, float(time.monotonic()) - started)
+    elapsed = max(0.0, float(monotonic_fn()) - started)
     if elapsed >= duration:
         _clear_transition_state(engine)
         return end_i, bool(end_i >= start_i)
@@ -55,6 +56,7 @@ def resolve_brightness(
     max_step_per_frame: int,
     clamp01_fn: Callable[[float], float],
     logger: logging.Logger,
+    monotonic_fn: Callable[[], float] = time.monotonic,
 ) -> tuple[int, int, int]:
     """Resolve (base_hw, effect_hw, hw_brightness) for mixed-content rendering."""
 
@@ -78,7 +80,11 @@ def resolve_brightness(
         pass
     base = max(0, min(50, base))
 
-    transition = resolve_reactive_transition_brightness(engine, clamp01_fn=clamp01_fn)
+    transition = resolve_reactive_transition_brightness(
+        engine,
+        clamp01_fn=clamp01_fn,
+        monotonic_fn=monotonic_fn,
+    )
     if transition is not None:
         transition_brightness, rising = transition
         eff = min(eff, transition_brightness)

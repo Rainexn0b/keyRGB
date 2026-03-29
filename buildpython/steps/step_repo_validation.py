@@ -5,7 +5,6 @@ from pathlib import Path
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
-
 _REQUIRED_FILES = [
     "README.md",
     "LICENSE",

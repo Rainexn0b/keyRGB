@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 
+from src.core.backends.base import make_hardware_effect_descriptor
 from src.core.effects.device import NullKeyboard
 from src.core.effects.engine import EffectsEngine
 
@@ -97,3 +98,95 @@ def test_stop_resets_rendered_and_mode_brightness_caches() -> None:
 
     assert engine._last_rendered_brightness is None
     assert engine._last_hw_mode_brightness is None
+
+
+def test_start_hw_effect_uses_injected_backend_effects() -> None:
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.payloads: list[object] = []
+
+        def set_effect(self, effect_data) -> None:
+            self.payloads.append(effect_data)
+
+    class DummyBackend:
+        def effects(self):
+            def snake(**kwargs):
+                return {"name": "snake", **kwargs}
+
+            return {
+                "snake": make_hardware_effect_descriptor(
+                    snake,
+                    supported_args=("speed", "brightness", "direction", "color"),
+                )
+            }
+
+        def colors(self):
+            return {}
+
+    engine = EffectsEngine(backend=DummyBackend())
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.current_color = (9, 8, 7)
+    engine.direction = "left"
+
+    engine.start_effect("snake", speed=5, brightness=20, color=(9, 8, 7))
+
+    assert spy.payloads
+    payload = spy.payloads[-1]
+    assert payload["name"] == "snake"
+    assert payload["color"] == (9, 8, 7)
+    assert payload["direction"] == "left"
+
+
+def test_start_effect_rejects_legacy_generic_hw_name_without_backend_support() -> None:
+    engine = EffectsEngine()
+    engine.kb = NullKeyboard()
+    engine.device_available = False
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+
+    try:
+        engine.start_effect("wave", speed=5, brightness=20, color=(9, 8, 7))
+    except ValueError as exc:
+        assert "Unknown effect: wave" in str(exc)
+    else:
+        raise AssertionError("Expected legacy generic hardware name to be rejected")
+
+
+def test_start_effect_accepts_backend_exposed_hw_name() -> None:
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.payloads: list[object] = []
+
+        def set_effect(self, effect_data) -> None:
+            self.payloads.append(effect_data)
+
+    class DummyBackend:
+        def effects(self):
+            def wave(**kwargs):
+                return {"name": "wave", **kwargs}
+
+            return {
+                "wave": make_hardware_effect_descriptor(
+                    wave,
+                    supported_args=("speed", "brightness", "color"),
+                )
+            }
+
+        def colors(self):
+            return {}
+
+    engine = EffectsEngine(backend=DummyBackend())
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.current_color = (3, 2, 1)
+
+    engine.start_effect("wave", speed=5, brightness=20, color=(3, 2, 1))
+
+    assert spy.payloads
+    payload = spy.payloads[-1]
+    assert payload["name"] == "wave"
+    assert payload["color"] == (3, 2, 1)

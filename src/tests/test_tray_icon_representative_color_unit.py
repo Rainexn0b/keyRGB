@@ -141,6 +141,25 @@ def test_icon_visual_reactive_uses_effect_color_when_manual_color_enabled() -> N
     assert visual.color == (120, 60, 30)
 
 
+def test_icon_visual_reactive_ripple_uses_rainbow_when_manual_color_disabled_even_with_uniform_profile() -> None:
+    from src.tray.ui.icon import _ANIMATED_ICON_SCALE_FLOOR, icon_visual
+
+    cfg = SimpleNamespace(
+        effect="reactive_ripple",
+        brightness=1,
+        perkey_brightness=10,
+        color=(255, 0, 0),
+        reactive_color=(255, 255, 255),
+        reactive_use_manual_color=False,
+        per_key_colors={(r, c): (255, 255, 255) for r in range(6) for c in range(21)},
+    )
+
+    visual = icon_visual(config=cfg, is_off=False, now=10.0)
+    assert visual.mode == "rainbow"
+    assert visual.scale == _ANIMATED_ICON_SCALE_FLOOR
+    assert visual.phase == 0.08
+
+
 def test_icon_visual_perkey_non_uniform_builds_full_grid_once(monkeypatch) -> None:
     from src.tray.ui import icon
 
@@ -169,6 +188,32 @@ def test_icon_visual_perkey_non_uniform_builds_full_grid_once(monkeypatch) -> No
     assert calls["count"] == 1
 
 
+def test_icon_visual_perkey_full_uniform_profile_uses_solid_when_base_color_is_stale(monkeypatch) -> None:
+    from src.tray.ui import icon
+
+    calls = {"count": 0}
+
+    def fake_build_full_color_grid(*, base_color, per_key_colors, num_rows, num_cols):
+        calls["count"] += 1
+        return {(r, c): tuple(base_color) for r in range(num_rows) for c in range(num_cols)}
+
+    monkeypatch.setattr(icon, "build_full_color_grid", fake_build_full_color_grid)
+
+    cfg = SimpleNamespace(
+        effect="perkey",
+        brightness=20,
+        perkey_brightness=20,
+        color=(255, 0, 0),
+        per_key_colors={(r, c): (255, 255, 255) for r in range(6) for c in range(21)},
+    )
+
+    visual = icon.icon_visual(config=cfg, is_off=False, now=0.0)
+
+    assert visual.mode == "solid"
+    assert visual.color == (255, 255, 255)
+    assert calls["count"] == 0
+
+
 def test_icon_visual_perkey_uniform_override_skips_full_grid_build(monkeypatch) -> None:
     from src.tray.ui import icon
 
@@ -192,3 +237,62 @@ def test_icon_visual_perkey_uniform_override_skips_full_grid_build(monkeypatch) 
 
     assert visual.mode == "solid"
     assert calls["count"] == 0
+
+
+def test_icon_visual_resolves_unsupported_legacy_wave_to_uniform(monkeypatch) -> None:
+    from src.tray.ui import icon
+
+    class _Backend:
+        def effects(self):
+            return {}
+
+    monkeypatch.setattr(icon, "representative_color", lambda *, config, is_off, backend=None, now=None: (9, 8, 7))
+
+    cfg = SimpleNamespace(
+        effect="wave",
+        brightness=20,
+        color=(255, 255, 255),
+    )
+
+    visual = icon.icon_visual(config=cfg, is_off=False, now=0.0, backend=_Backend())
+
+    assert visual.mode == "solid"
+    assert visual.color == (9, 8, 7)
+
+
+def test_icon_visual_resolves_legacy_rainbow_to_software_rainbow(monkeypatch) -> None:
+    from src.tray.ui import icon
+
+    class _Backend:
+        def effects(self):
+            return {}
+
+    cfg = SimpleNamespace(
+        effect="rainbow",
+        brightness=20,
+        color=(255, 255, 255),
+    )
+
+    visual = icon.icon_visual(config=cfg, is_off=False, now=0.0, backend=_Backend())
+
+    assert visual.mode == "rainbow"
+
+
+def test_icon_visual_non_uniform_effect_uses_highlighted_slow_rainbow() -> None:
+    from src.tray.ui.icon import _ANIMATED_ICON_SCALE_FLOOR, icon_visual
+
+    class _Backend:
+        def effects(self):
+            return {}
+
+    cfg = SimpleNamespace(
+        effect="rainbow",
+        brightness=1,
+        color=(255, 255, 255),
+    )
+
+    visual = icon_visual(config=cfg, is_off=False, now=25.0, backend=_Backend())
+
+    assert visual.mode == "rainbow"
+    assert visual.scale == _ANIMATED_ICON_SCALE_FLOOR
+    assert visual.phase == 0.2

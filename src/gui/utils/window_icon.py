@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from io import BytesIO
 from functools import lru_cache
 from pathlib import Path
 
 import tkinter as tk
-
 
 _WINDOW_ICON_SIZE = (64, 64)
 
@@ -15,7 +15,9 @@ def _candidate_logo_paths() -> list[Path]:
     # install.sh installs a user icon here.
     try:
         home = Path.home()
+        paths.append(home / ".local/share/icons/hicolor/scalable/apps/keyrgb.svg")
         paths.append(home / ".local/share/icons/hicolor/256x256/apps/keyrgb.png")
+        paths.append(home / ".local/share/icons/keyrgb.svg")
         paths.append(home / ".local/share/icons/keyrgb.png")
     except Exception:
         pass
@@ -23,7 +25,7 @@ def _candidate_logo_paths() -> list[Path]:
     # Repo checkout (and editable installs) typically keep assets/ alongside src/.
     start = Path(__file__).resolve()
     for parent in [start] + list(start.parents):
-        cand = parent / "assets" / "logo-keyrgb.png"
+        cand = parent / "assets" / "logo-keyrgb.svg"
         if cand not in paths:
             paths.append(cand)
 
@@ -44,6 +46,15 @@ def find_keyrgb_logo_path() -> Path | None:
 def _load_cached_window_icon_image(path_str: str, mtime_ns: int):
     from PIL import Image  # type: ignore
 
+    path = Path(path_str)
+    if path.suffix.lower() == ".svg":
+        from cairosvg import svg2png  # type: ignore
+
+        svg_bytes = svg2png(url=path_str, output_width=_WINDOW_ICON_SIZE[0], output_height=_WINDOW_ICON_SIZE[1])
+        with Image.open(BytesIO(svg_bytes)) as image:
+            icon = image.convert("RGBA")
+            return icon.resize(_WINDOW_ICON_SIZE)
+
     with Image.open(path_str) as image:
         icon = image.convert("RGBA")
         return icon.resize(_WINDOW_ICON_SIZE)
@@ -61,7 +72,7 @@ def clear_cached_window_icon_images() -> None:
 def apply_keyrgb_window_icon(window: tk.Misc) -> None:
     """Best-effort: set KeyRGB icon for a Tk window.
 
-    Uses the PNG logo from install.sh (preferred) or from repo assets.
+    Uses the SVG logo from install.sh (preferred) or from repo assets.
     Safe to call on any Tk root/toplevel; does nothing on failure.
     """
 

@@ -78,6 +78,7 @@ class TestStartCurrentEffect:
         mock_tray.config.color = (0, 255, 0)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
+        mock_tray.config.direction = "up_right"
 
         start_current_effect(mock_tray)
 
@@ -88,8 +89,52 @@ class TestStartCurrentEffect:
             color=(0, 255, 0),
             reactive_color=None,
             reactive_use_manual_color=False,
+            direction="up_right",
         )
         assert mock_tray.is_off is False
+
+    def test_legacy_unsupported_rainbow_is_migrated_before_dispatch(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        mock_tray = MagicMock()
+        mock_tray.backend.effects.return_value = {}
+        mock_tray.config.effect = "rainbow"
+        mock_tray.config.brightness = 40
+        mock_tray.config.speed = 3
+        mock_tray.config.color = (0, 255, 0)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
+        mock_tray.config.direction = None
+
+        start_current_effect(mock_tray)
+
+        assert mock_tray.config.effect == "rainbow_wave"
+        mock_tray.engine.start_effect.assert_called_once_with(
+            "rainbow_wave",
+            speed=3,
+            brightness=40,
+            color=(0, 255, 0),
+            reactive_color=None,
+            reactive_use_manual_color=False,
+            direction=None,
+        )
+
+    def test_legacy_unsupported_wave_falls_back_to_uniform_none(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        mock_tray = MagicMock()
+        mock_tray.backend.effects.return_value = {}
+        mock_tray.config.effect = "wave"
+        mock_tray.config.brightness = 30
+        mock_tray.config.color = (255, 0, 0)
+        mock_tray.engine.kb_lock = _lock_mock()
+
+        start_current_effect(mock_tray)
+
+        assert mock_tray.config.effect == "none"
+        mock_tray.engine.stop.assert_called_once()
+        mock_tray.engine.kb.set_color.assert_called_once_with((255, 0, 0), brightness=30)
+        mock_tray.engine.start_effect.assert_not_called()
 
     def test_start_current_effect_handles_exception_gracefully(self):
         from src.tray.controllers.lighting_controller import start_current_effect

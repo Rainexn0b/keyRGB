@@ -13,9 +13,10 @@ import logging
 from collections.abc import Mapping
 from typing import Protocol, cast
 
-from src.core.effects.catalog import HW_EFFECTS_SET as HW_EFFECTS
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
+from src.core.effects.catalog import is_backend_hardware_effect, is_forced_hardware_effect
 from src.core.effects.catalog import normalize_effect_name
+from src.core.effects.catalog import strip_effect_namespace
 from src.core.utils.exceptions import is_permission_denied
 from src.core.utils.safe_attrs import safe_int_attr
 
@@ -133,6 +134,8 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
         except Exception:
             effect_name = "none"
 
+        base_effect_name = strip_effect_namespace(effect_name)
+
         # === FORCE MODE SWITCHES ===
 
         # Force hardware uniform color mode (used by the tray's static-mode action
@@ -193,7 +196,7 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
             return
 
         # === HARDWARE EFFECTS ===
-        if effect_name in HW_EFFECTS:
+        if is_backend_hardware_effect(effect_name, getattr(tray, "backend", None)):
             if not hw_effects_supported:
                 tray.engine.stop()
                 tray.config.effect = "none"
@@ -208,15 +211,15 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
             except Exception:
                 pass
             _ensure_hardware_mode(tray)
-            tray.config.effect = effect_name
+            tray.config.effect = effect_name if is_forced_hardware_effect(effect_name) else base_effect_name
             tray._start_current_effect()
             tray.is_off = False
             return
 
         # === SOFTWARE EFFECTS ===
-        if effect_name in SW_EFFECTS:
+        if base_effect_name in SW_EFFECTS and not is_forced_hardware_effect(effect_name):
             _ensure_software_mode(tray)
-            tray.config.effect = effect_name
+            tray.config.effect = base_effect_name
             tray._start_current_effect()
             tray.is_off = False
             return

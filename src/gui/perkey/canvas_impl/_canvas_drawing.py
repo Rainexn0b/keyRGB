@@ -10,7 +10,6 @@ from src.gui.reference.deck_image import load_reference_deck_image
 from src.gui.reference.overlay_geometry import calc_centered_drawn_bbox, key_canvas_rect
 from src.gui.utils.key_draw_style import key_draw_style
 
-
 logger = logging.getLogger(__name__)
 
 

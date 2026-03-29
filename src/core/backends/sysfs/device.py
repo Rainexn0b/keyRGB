@@ -80,7 +80,9 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                 }
             )
             try:
-                self._channel_group_color, self._channel_group_brightness = self._read_channel_group_state(ite8297_channels)
+                self._channel_group_color, self._channel_group_brightness = self._read_channel_group_state(
+                    ite8297_channels
+                )
             except Exception:
                 self._channel_group_color = (0, 0, 0)
                 self._channel_group_brightness = 0
@@ -131,7 +133,11 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                 if zone.get("type") == "ite8297_channels":
                     color_supported = True
                     break
-                if self._supports_multicolor(led_dir) or self._supports_color_attr(led_dir) or self._supports_rgb_attr(led_dir):
+                if (
+                    self._supports_multicolor(led_dir)
+                    or self._supports_color_attr(led_dir)
+                    or self._supports_rgb_attr(led_dir)
+                ):
                     color_supported = True
                     break
         except Exception:

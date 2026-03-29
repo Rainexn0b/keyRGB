@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.19.0 (2026-03-29)
+
+- Packaging/AppIcon: Switch the app icon source to `assets/logo-keyrgb.svg`, keep the runtime loader able to rasterize SVG icons, and drop the old in-repo PNG source.
+- Tray/Icon: Move the live tray renderer off the raster `assets/logo-tray.png` source and load the new `assets/tray-mask.svg` directly so the tray mark uses the same vector-first asset flow as the rest of the updated branding.
+- Tray/Icon: Drop the filled squirkle from the live tray renderer and switch to a cleaner floating `K` mark with a crisp theme-aware outline, so the icon reads more like a modern status icon alongside other tray items.
+- GitHub/Issues: Add an experimental backend confirmation issue template so contributors can report successful opt-in backend results and request review for promotion to `validated`.
+- Tray/Icon: Keep full-coverage uniform light/dark-style per-key profiles on a solid tray-color state instead of incorrectly falling through to the rainbow `K`, and make reactive ripple advertise its rainbow highlight instead of the grey/white profile backdrop.
+- Tray/Hardware Effects: Build the hardware-effects submenu from the selected backend's exposed effect list instead of the legacy hard-coded catalog, and namespace same-named hardware effects such as `hw:spectrum_cycle` so tray state can distinguish hardware and software selections cleanly.
+- Tray/Hardware Effects: Fold the detected hardware-mode count into the Hardware Effects submenu label itself, and drop the separate hardware-static row so the hardware section is smaller while still showing backend-specific mode detection.
+- Tray/Hardware Effects: Make tray mode detection and startup restore backend-authoritative as well, so stale saved hardware names like unsupported `wave` no longer pretend to be active hardware modes and older `rainbow` configs are migrated onto the software fallback before dispatch.
+- Effects Runtime: Stop `EffectsEngine.start_effect()` from treating the legacy generic hardware catalog as runnable input; direct callers must now use backend-exposed hardware effect names, and the legacy demo follows the selected backend's effect list instead of assuming hard-coded hardware modes exist.
+- Tray/Config/Icon: Resolve saved effect names against the selected backend consistently across config polling, power-policy brightness handling, icon state, and icon polling, so stale legacy hardware names normalize once instead of being interpreted differently by separate tray subsystems.
+- Effects Runtime: Remove the obsolete `src/core/effects/ite_backend.py` compatibility shim now that internal code no longer imports it; backend/device runtime state is fully sourced through injected backends plus the shared matrix-layout module.
+- Effects Catalog: Replace the old generic hardware-effect list with explicit legacy config-name migration rules, keeping compatibility behavior narrow instead of leaving a broader pseudo-catalog that no longer reflects runtime effect ownership.
+- Backends/ITE8910: Extend `ite8910` to the verified reverse-engineered protocol shape with full 6-byte `0xCC` HID reports, the full 6x20 LED matrix, directional wave and snake slot handling, direct-RGB effect color support, and black-fill resets after ClearColor so stale LEDs do not survive per-key rewrites.
+- Backends/Policy: Promote `ite8910` from research-backed experimental to `validated` after real hardware confirmation, while keeping evidence tags for the remaining experimental paths such as `ite8297`.
+- Backends/Attribution: Add code and README attribution for the public ITE 8910 reverse-engineering work by Valentin Lobstein (`chocapikk`, Reddit `Greedy-Ad232`) that informed the now-validated backend.
+- Tray/Settings: Surface experimental backend evidence with clearer user-facing wording (`research-backed` vs `speculative`) in Settings copy, hardware hints, and the selected-backend tray status line.
+
 ## 0.18.2 (2026-03-29)
 
 - Backends/ITE8910: Correct the experimental `ite8910` HID framing to the documented 6-byte `0xCC` feature reports, switch the backend to the full reverse-engineered 6x20 LED matrix, and clear the deck before per-key rewrites so stale LEDs do not survive sparse or dynamic updates.

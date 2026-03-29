@@ -272,9 +272,9 @@ def test_render_ramps_brightness_over_multiple_frames() -> None:
     # Each step should be <= _MAX_BRIGHTNESS_STEP_PER_FRAME from the previous
     prev = 3
     for v in brightness_values:
-        assert abs(v - prev) <= _MAX_BRIGHTNESS_STEP_PER_FRAME, (
-            f"Jump {prev} -> {v} exceeds max step {_MAX_BRIGHTNESS_STEP_PER_FRAME}"
-        )
+        assert (
+            abs(v - prev) <= _MAX_BRIGHTNESS_STEP_PER_FRAME
+        ), f"Jump {prev} -> {v} exceeds max step {_MAX_BRIGHTNESS_STEP_PER_FRAME}"
         prev = v
 
 

@@ -57,7 +57,9 @@ def test_backend_probe_reports_detected_but_disabled_until_opted_in(monkeypatch)
 
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
-    monkeypatch.setattr("src.core.backends.ite8297.backend._find_matching_supported_hidraw_device", lambda: DummyMatch())
+    monkeypatch.setattr(
+        "src.core.backends.ite8297.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
+    )
 
     result = Ite8297Backend().probe()
 
@@ -75,7 +77,9 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch) -> None:
 
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
-    monkeypatch.setattr("src.core.backends.ite8297.backend._find_matching_supported_hidraw_device", lambda: DummyMatch())
+    monkeypatch.setattr(
+        "src.core.backends.ite8297.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
+    )
 
     result = Ite8297Backend().probe()
 

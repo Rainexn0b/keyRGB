@@ -4,7 +4,7 @@ import logging
 import time
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import build_full_color_grid
 
 from ._render_brightness import (
@@ -46,7 +46,11 @@ def scale(rgb: Color, s: float) -> Color:
 
 
 def _resolve_reactive_transition_brightness(engine: "EffectsEngine") -> Optional[tuple[int, bool]]:
-    return _resolve_reactive_transition_brightness_impl(engine, clamp01_fn=clamp01)
+    return _resolve_reactive_transition_brightness_impl(
+        engine,
+        clamp01_fn=clamp01,
+        monotonic_fn=time.monotonic,
+    )
 
 
 def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
@@ -55,6 +59,7 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
         max_step_per_frame=_MAX_BRIGHTNESS_STEP_PER_FRAME,
         clamp01_fn=clamp01,
         logger=logger,
+        monotonic_fn=time.monotonic,
     )
 
 

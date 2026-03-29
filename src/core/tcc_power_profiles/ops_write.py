@@ -18,7 +18,6 @@ from .json_api import (
 from .models import TccProfileWriteError
 from .root_apply import _apply_new_profiles_file, _apply_new_settings_file
 
-
 logger = logging.getLogger(__name__)
 
 

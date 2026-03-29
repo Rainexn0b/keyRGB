@@ -6,7 +6,6 @@ from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 from .reports import write_csv, write_json, write_md
 
-
 WARN_LINES = 350
 CRIT_LINES = 600
 SEVERE_LINES = 900

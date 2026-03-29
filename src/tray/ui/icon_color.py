@@ -6,7 +6,8 @@ import time
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.catalog import resolve_effect_name_for_backend
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import build_full_color_grid
 
 
@@ -101,6 +102,7 @@ def representative_color(
     config: Any,
     is_off: bool,
     now: float | None = None,
+    backend: object | None = None,
 ) -> tuple[int, int, int]:
     """Pick an RGB color representative of the currently applied state."""
 
@@ -111,7 +113,10 @@ def representative_color(
     if is_off or getattr(config, "brightness", 0) == 0:
         return (64, 64, 64)
 
-    effect = str(getattr(config, "effect", "none") or "none")
+    effect = resolve_effect_name_for_backend(
+        str(getattr(config, "effect", "none") or "none"),
+        backend,
+    )
     brightness = int(getattr(config, "brightness", 25) or 25)
 
     # Reactive typing effects can store a separate manual effect color.
@@ -193,7 +198,9 @@ def representative_color(
                     brightness = int(getattr(config, "perkey_brightness", brightness) or brightness)
                 except Exception:
                     pass
-                base = _representative_saved_perkey_color(config) or tuple(getattr(config, "color", None) or (255, 0, 128))
+                base = _representative_saved_perkey_color(config) or tuple(
+                    getattr(config, "color", None) or (255, 0, 128)
+                )
             try:
                 if tuple(base) == (0, 0, 0):
                     base = (255, 0, 128)

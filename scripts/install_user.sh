@@ -26,7 +26,7 @@ Options:
   --version <tag>       Install a specific Git tag (e.g. v0.7.9)
   --asset <name>        AppImage filename (default: keyrgb-x86_64.AppImage)
   --prerelease          Allow picking prereleases when auto-resolving latest
-  --update-appimage     Only update the AppImage (non-interactive); still refreshes desktop + udev
+  --update-appimage     Only update the AppImage (non-interactive); still refreshes launcher + desktop entry + icon + udev
   --no-system-deps      Skip best-effort system package changes (kernel drivers / TCC app / polkit)
 
 Env vars:
@@ -96,7 +96,7 @@ log_info "=== KeyRGB Installation (User) ==="
 
 if [ "$UPDATE_ONLY" -eq 1 ]; then
   log_info "=== KeyRGB AppImage Update ==="
-  log_info "Update-only mode: download a fresh AppImage and refresh udev + desktop integration."
+  log_info "Update-only mode: download a fresh AppImage and refresh launcher + desktop entry + icon + udev."
 
   # The release channel comes from saved prefs unless overridden via env/CLI.
   if is_truthy "${KEYRGB_ALLOW_PRERELEASE:-n}"; then

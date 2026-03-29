@@ -6,7 +6,6 @@ import subprocess
 
 from .models import TccProfileWriteError
 
-
 _DEFAULT_TCCD_BIN = "/opt/tuxedo-control-center/resources/dist/tuxedo-control-center/data/service/tccd"
 
 

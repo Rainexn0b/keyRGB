@@ -36,6 +36,7 @@ class MockTray:
         self.config = MockConfig()
         self.engine = MockEngine()
         self.is_off = False
+        self.backend = None
 
 
 def test_start_current_effect_loads_perkey_for_software_effect() -> None:
@@ -57,7 +58,8 @@ def test_start_current_effect_loads_perkey_for_software_effect() -> None:
 
 def test_start_current_effect_clears_perkey_for_hardware_effect() -> None:
     tray = MockTray()
-    tray.config.effect = "breathing"  # Assuming HW effect
+    tray.config.effect = "breathing"
+    tray.backend = type("_Backend", (), {"effects": lambda self: {"breathing": "Breathing"}})()
     # Pre-set engine state to ensure it gets cleared
     tray.engine.per_key_colors = {(0, 0): (255, 255, 255)}
     tray.engine.per_key_brightness = 10

@@ -22,8 +22,9 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
             self.brightness = 50
 
     class FakeEngine:
-        def __init__(self):
+        def __init__(self, *, backend=None):
             self.stopped = False
+            self.backend = backend
 
         def stop(self):
             self.stopped = True
@@ -80,6 +81,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
 
     assert isinstance(tray.config, FakeConfig)
     assert isinstance(tray.engine, FakeEngine)
+    assert tray.engine.backend == "backend"
     assert tray.power_manager is fake_pm
     assert tray.backend == "backend"
     assert tray.backend_probe == "probe"
@@ -203,10 +205,11 @@ def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
 
     monkeypatch.setattr(app.runtime, "get_pystray", lambda: (fake_pystray, fake_item))
 
-    def _create_icon_for_state(*, config, is_off, now=None):
+    def _create_icon_for_state(*, config, is_off, now=None, backend=None):
         calls["render"] += 1
         assert config.effect == "perkey"
         assert is_off is False
+        assert backend is tray.backend
         return "IMAGE"
 
     def _build_menu(self, *, pystray, item):
@@ -222,6 +225,7 @@ def test_run_builds_icon_and_runs_without_real_pystray(monkeypatch):
         config=SimpleNamespace(effect="perkey", speed=4, brightness=5),
         is_off=False,
         icon=None,
+        backend=object(),
     )
 
     app.KeyRGBTray.run(tray)

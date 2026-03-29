@@ -25,7 +25,13 @@ class FakePystray:
 
 
 def fake_item(text, _action, **kwargs):
-    return {"text": str(text), "enabled": kwargs.get("enabled", True)}
+    return {
+        "text": str(text),
+        "enabled": kwargs.get("enabled", True),
+        "action": _action,
+        "checked": kwargs.get("checked"),
+        "radio": kwargs.get("radio", False),
+    }
 
 
 @dataclass
@@ -134,7 +140,6 @@ def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     labels = [i["text"] for i in items if isinstance(i, dict)]
 
-    assert "Hardware Static Mode" in labels
     assert "Hardware Uniform Color…" not in labels
     assert "Hardware Effects" not in labels
 
@@ -205,6 +210,105 @@ def test_keyboard_status_shows_warning_when_not_detected(
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     assert "not detected" in items[0]["text"].lower()
+
+
+def test_hardware_menu_uses_backend_specific_effects(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    class DummyBackend:
+        def effects(self):
+            return {
+                "snake": object(),
+                "spectrum_cycle": object(),
+            }
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=True))
+    tray.backend = DummyBackend()
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    hw_menu_item = next(i for i in items if isinstance(i, dict) and i["text"] == "Hardware Effects (2 modes)")
+    hw_menu = hw_menu_item["action"]
+
+    assert isinstance(hw_menu, FakeMenu)
+    labels = [i["text"] for i in hw_menu.items if isinstance(i, dict)]
+    assert labels == ["Snake", "Spectrum Cycle"]
+
+
+def test_menu_shows_detected_hardware_mode_count(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    class DummyBackend:
+        def effects(self):
+            return {
+                "snake": object(),
+                "wave": object(),
+                "spectrum_cycle": object(),
+            }
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=True))
+    tray.backend = DummyBackend()
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    detection_item = next(i for i in items if isinstance(i, dict) and i["text"] == "Hardware Effects (3 modes)")
+
+    assert detection_item["enabled"] is True
+
+
+def test_menu_shows_zero_detected_hardware_modes_in_effects_label(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    class DummyBackend:
+        def effects(self):
+            return {}
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=True))
+    tray.backend = DummyBackend()
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    effects_item = next(i for i in items if isinstance(i, dict) and i["text"] == "Hardware Effects (0 modes)")
+
+    assert effects_item["enabled"] is False
+
+
+def test_mode_indicator_treats_hw_prefixed_effect_as_hardware(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    class DummyBackend:
+        def effects(self):
+            return {"spectrum_cycle": object()}
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=True))
+    tray.backend = DummyBackend()
+    tray.config.effect = "hw:spectrum_cycle"
+    tray.is_off = False
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    mode_text = items[-2]["text"].lower()
+    assert "hardware" in mode_text
+    assert "spectrum cycle" in mode_text
+
+
+def test_mode_indicator_resolves_legacy_unsupported_hardware_effect(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    class DummyBackend:
+        def effects(self):
+            return {}
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=True))
+    tray.backend = DummyBackend()
+    tray.config.effect = "rainbow"
+    tray.is_off = False
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    mode_text = items[-2]["text"].lower()
+    assert "software" in mode_text
+    assert "rainbow wave" in mode_text
 
 
 def test_menu_includes_active_mode_indicator_between_off_and_quit(

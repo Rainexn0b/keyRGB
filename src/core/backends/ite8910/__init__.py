@@ -1,7 +1,7 @@
 """ITE 8910 backend package.
 
-This package contains KeyRGB's experimental Linux `hidraw` path for
-`0x048d:0x8910`, aligned to the public reverse-engineering notes captured in
+This package contains KeyRGB's Linux `hidraw` path for `0x048d:0x8910`,
+aligned to the public reverse-engineering notes captured in
 `docs/developement/ite8910-protocol-notes.md`.
 """
 

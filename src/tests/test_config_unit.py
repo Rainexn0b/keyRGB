@@ -41,3 +41,18 @@ def test_experimental_backends_enabled_persists(tmp_path, monkeypatch) -> None:
 
     cfg2 = Config()
     assert cfg2.experimental_backends_enabled is True
+
+
+def test_direction_persists_normalized(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.setenv("KEYRGB_CONFIG_PATH", str(tmp_path / "cfg" / "config.json"))
+
+    cfg = Config()
+    assert cfg.direction is None
+
+    cfg.direction = " Up_Right "
+
+    cfg2 = Config()
+    assert cfg2.direction == "up_right"

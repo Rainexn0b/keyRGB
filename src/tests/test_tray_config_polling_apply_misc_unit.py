@@ -189,8 +189,9 @@ def test_apply_from_config_once_uniform_effect_sets_color() -> None:
     tray.engine.kb.set_color.assert_called_once_with((1, 2, 3), brightness=10)
 
 
-def test_apply_from_config_once_other_effect_starts_current_effect() -> None:
+def test_apply_from_config_once_backend_exposed_effect_starts_current_effect() -> None:
     tray = _mk_tray_base(effect="wave", brightness=10)
+    tray.backend.effects.return_value = {"wave": object()}
 
     _apply_from_config_once(
         tray,
@@ -202,6 +203,24 @@ def test_apply_from_config_once_other_effect_starts_current_effect() -> None:
     )
 
     tray._start_current_effect.assert_called_once()
+
+
+def test_apply_from_config_once_unsupported_legacy_effect_falls_back_to_uniform_none() -> None:
+    tray = _mk_tray_base(effect="wave", brightness=10)
+
+    _apply_from_config_once(
+        tray,
+        ite_num_rows=6,
+        ite_num_cols=21,
+        cause="mtime_change",
+        last_applied=None,
+        last_apply_warn_at=0.0,
+    )
+
+    assert tray.config.effect == "none"
+    tray.engine.stop.assert_called_once()
+    tray.engine.kb.set_color.assert_called_once_with((1, 2, 3), brightness=10)
+    tray._start_current_effect.assert_not_called()
 
 
 def test_apply_from_config_once_marks_device_unavailable_on_errno_19() -> None:

@@ -236,7 +236,9 @@ def test_sysfs_device_set_color_ite8297_channel_triplet(monkeypatch: pytest.Monk
     assert dev.get_brightness() == 25
 
 
-def test_sysfs_device_brightness_updates_ite8297_channel_triplet(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_sysfs_device_brightness_updates_ite8297_channel_triplet(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     red = _make_led(tmp_path, "ite_8297:1", brightness=100, max_brightness=255)
     green = _make_led(tmp_path, "ite_8297:2", brightness=50, max_brightness=255)
     blue = _make_led(tmp_path, "ite_8297:3", brightness=25, max_brightness=255)

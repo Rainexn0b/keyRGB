@@ -7,7 +7,14 @@ from typing import Any
 
 from src.core.utils.exceptions import is_permission_denied
 
-from ..base import BackendCapabilities, BackendStability, ExperimentalEvidence, KeyboardDevice, KeyboardBackend, ProbeResult
+from ..base import (
+    BackendCapabilities,
+    BackendStability,
+    ExperimentalEvidence,
+    KeyboardDevice,
+    KeyboardBackend,
+    ProbeResult,
+)
 from ..ite8910.hidraw import HidrawDeviceInfo, HidrawFeatureTransport, find_matching_hidraw_device
 from ..policy import experimental_backends_enabled
 from .device import Ite8297KeyboardDevice

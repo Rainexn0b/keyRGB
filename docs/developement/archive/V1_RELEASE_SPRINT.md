@@ -1,3 +1,15 @@
+# Archived: V1 Release Sprint
+
+This checklist tracked the final stabilization pass before the first v1 release. The project is now well past that point, so this note is retained only as historical context.
+
+For current workflow guidance, see:
+
+- [docs/developement/commits/MAINTAINER_COMMITS.md](../commits/MAINTAINER_COMMITS.md)
+- [docs/developement/commits/PR_PROCESS.md](../commits/PR_PROCESS.md)
+- [docs/venv/setup.md](../venv/setup.md)
+
+## Original Checklist
+
 # V1 Release Sprint (Maintainability + Tests)
 
 This checklist is for the “final v1” stabilization pass.

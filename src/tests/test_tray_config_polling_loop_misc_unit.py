@@ -45,7 +45,9 @@ def test_start_config_polling_runs_startup_and_mtime_reload_paths_without_thread
     tray = _mk_tray_base(effect="wave", brightness=10)
     tray.config.reload = MagicMock()
 
-    with patch.object(config_polling, "_apply_from_config_once", wraps=config_polling._apply_from_config_once) as apply_once:
+    with patch.object(
+        config_polling, "_apply_from_config_once", wraps=config_polling._apply_from_config_once
+    ) as apply_once:
         captured: dict[str, object] = {}
 
         def _fake_thread(*, target, daemon):

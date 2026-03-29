@@ -3,7 +3,6 @@ from __future__ import annotations
 import subprocess
 from typing import Optional
 
-
 _TCCD_BUS_NAME = "com.tuxedocomputers.tccd"
 _TCCD_OBJECT_PATH = "/com/tuxedocomputers/tccd"
 _TCCD_INTERFACE = "com.tuxedocomputers.tccd"

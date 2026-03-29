@@ -1,0 +1,118 @@
+name: Experimental backend confirmation / promotion request
+description: Report that an experimental backend works on real hardware and request review for promotion to validated.
+title: "Experimental backend confirmation: <backend> on <brand/model>"
+labels: ["hardware", "support"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when an **experimental** backend is already working on your hardware and you want maintainers to consider promoting that path to `validated` (eligible by default during automatic selection).
+
+        Please include real test results. A single success report may still need follow-up confirmations before a backend is promoted.
+
+  - type: dropdown
+    id: backend
+    attributes:
+      label: Experimental backend
+      description: Which experimental backend did you test?
+      options:
+        - ite8910
+        - ite8297
+        - Other experimental backend
+    validations:
+      required: true
+
+  - type: input
+    id: hardware
+    attributes:
+      label: Laptop / keyboard model
+      description: Brand, model, and any chassis or reseller name if known.
+      placeholder: "e.g. Wootbook Ultra X16 Gen 3 / Tongfang GMxZGxx"
+    validations:
+      required: true
+
+  - type: input
+    id: usb_id
+    attributes:
+      label: USB or HID ID
+      description: Provide the controller ID if known.
+      placeholder: "e.g. 0x048d:0x8910 or /dev/hidraw3"
+    validations:
+      required: false
+
+  - type: textarea
+    id: confirmation
+    attributes:
+      label: What you confirmed works
+      description: Tell us what you tested and how reliable it was.
+      placeholder: |
+        - Experimental backends enabled via:
+        - Selected backend shown by KeyRGB:
+        - Uniform color works:
+        - Brightness works:
+        - Per-key works:
+        - Effects tested:
+        - Resume / reboot / relaunch behavior:
+        - Any flicker, stale LEDs, or conflicts with other tools:
+        - How many launches / reboots / days you tested:
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, desktop session, kernel, and install method.
+      placeholder: |
+        - Distro:
+        - Desktop session:
+        - Kernel:
+        - KeyRGB version / install method:
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: keyrgb-diagnostics output (JSON)
+      description: Paste the full `keyrgb-diagnostics` output from the successful setup.
+      render: json
+      placeholder: "{ ... }"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Debug logs
+      description: Paste `KEYRGB_DEBUG=1 keyrgb` output from a successful run, especially backend selection lines.
+      render: text
+    validations:
+      required: false
+
+  - type: textarea
+    id: extra_notes
+    attributes:
+      label: Promotion request notes
+      description: Add anything that helps maintainers judge whether this backend should move from experimental to validated for this hardware path.
+      placeholder: |
+        Examples:
+        - Works consistently across multiple boots.
+        - Matches another confirmed VID:PID path.
+        - Limitations still present (uniform only, no per-key, etc.).
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Quick checks
+      options:
+        - label: I enabled experimental backends before testing.
+          required: true
+        - label: I stopped other RGB tools before confirming the result.
+          required: false
+        - label: I understand this is a request for promotion to `validated`, not a guarantee that the backend will be promoted immediately.
+          required: true
+        - label: I confirm this report contains no secrets.
+          required: true

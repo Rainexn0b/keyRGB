@@ -20,7 +20,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, cast
 
-
 BASE_IMAGE_SIZE: Tuple[int, int] = (1008, 450)
 
 

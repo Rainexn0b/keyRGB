@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Dict, Tuple
 
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine

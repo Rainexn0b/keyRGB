@@ -8,7 +8,6 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional
 
-
 _CPUFREQ_ROOT_DEFAULT = Path("/sys/devices/system/cpu/cpufreq")
 
 

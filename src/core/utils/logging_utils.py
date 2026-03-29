@@ -3,7 +3,6 @@ from __future__ import annotations
 import threading
 import time
 
-
 _last_log_times: dict[str, float] = {}
 _lock = threading.Lock()
 

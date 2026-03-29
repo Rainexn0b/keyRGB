@@ -22,7 +22,6 @@ from src.gui.utils.window_centering import center_window_on_screen
 from src.gui.tcc.profile_editor import open_profile_json_editor
 import src.core.tcc_power_profiles as tcc_power_profiles
 
-
 logger = logging.getLogger(__name__)
 
 

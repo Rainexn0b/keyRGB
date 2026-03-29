@@ -1,45 +1,45 @@
 from __future__ import annotations
 
 import colorsys
-from collections import deque
+from io import BytesIO
 from functools import lru_cache
 from pathlib import Path
+import re
 from typing import cast
+from xml.etree import ElementTree as ET
 
 from PIL import Image, ImageDraw
 
 from src.gui.theme.detect import detect_system_prefers_dark
 
-
 _ICON_SIZE = (64, 64)
-_ICON_INNER_SIZE = (56, 56)
+_ICON_INNER_SIZE = (48, 48)
+_SVG_PATH_TOKEN_RE = re.compile(r"[MLZmlz]|-?\d+(?:\.\d+)?")
 
 
-def _candidate_tray_logo_paths() -> list[Path]:
+def _candidate_tray_mask_paths() -> list[Path]:
     paths: list[Path] = []
 
     # Repo checkout (and editable installs) typically keep assets/ alongside src/.
-    # Adjust path resolution to be relative to this file's location in src/tray/ui/
-    # original was src/tray/ui/icon.py, this is src/tray/ui/icon_draw.py, so same dir.
     start = Path(__file__).resolve()
     for parent in [start] + list(start.parents):
-        cand = parent / "assets" / "logo-tray.png"
+        cand = parent / "assets" / "tray-mask.svg"
         if cand not in paths:
             paths.append(cand)
 
     # Working-directory fallback (useful for some launchers/tests).
     try:
-        paths.append(Path.cwd() / "assets" / "logo-tray.png")
+        paths.append(Path.cwd() / "assets" / "tray-mask.svg")
     except Exception:
         pass
 
     # Support common system install locations so packaged builds (Flatpak/RPM/AppImage)
     # can still find the asset when it's installed to a system directory.
     for sys_cand in (
-        Path("/usr/share/keyrgb/assets/logo-tray.png"),
-        Path("/usr/lib/keyrgb/assets/logo-tray.png"),
-        Path("/usr/local/share/keyrgb/assets/logo-tray.png"),
-        Path("/usr/local/lib/keyrgb/assets/logo-tray.png"),
+        Path("/usr/share/keyrgb/assets/tray-mask.svg"),
+        Path("/usr/lib/keyrgb/assets/tray-mask.svg"),
+        Path("/usr/local/share/keyrgb/assets/tray-mask.svg"),
+        Path("/usr/local/lib/keyrgb/assets/tray-mask.svg"),
     ):
         if sys_cand not in paths:
             paths.append(sys_cand)
@@ -48,8 +48,8 @@ def _candidate_tray_logo_paths() -> list[Path]:
 
 
 @lru_cache(maxsize=1)
-def _load_tray_logo_alpha_64() -> Image.Image | None:
-    for p in _candidate_tray_logo_paths():
+def _load_tray_mask_alpha_64() -> Image.Image | None:
+    for p in _candidate_tray_mask_paths():
         try:
             if not p.is_file():
                 continue
@@ -57,24 +57,135 @@ def _load_tray_logo_alpha_64() -> Image.Image | None:
             continue
 
         try:
-            img = Image.open(p).convert("RGBA")
-            resampling = getattr(getattr(Image, "Resampling", None), "LANCZOS", getattr(Image, "LANCZOS", 1))
+            from cairosvg import svg2png  # type: ignore
 
-            # Keep a small transparent margin so the icon doesn't look like a
-            # solid square in the tray (resizing a high-res asset directly to
-            # 64×64 tends to eliminate edge transparency).
-            inner = img.resize(_ICON_INNER_SIZE, resampling)  # type: ignore[arg-type]
-            out = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
-            ox = (_ICON_SIZE[0] - _ICON_INNER_SIZE[0]) // 2
-            oy = (_ICON_SIZE[1] - _ICON_INNER_SIZE[1]) // 2
-            out.alpha_composite(inner, dest=(ox, oy))
+            png_bytes = svg2png(url=str(p), output_width=_ICON_INNER_SIZE[0], output_height=_ICON_INNER_SIZE[1])
+            img = Image.open(BytesIO(png_bytes)).convert("RGBA")
+            return _center_alpha_mask(img.getchannel("A"))
+        except Exception:
+            pass
 
-            # Return only the alpha channel; we colorize at render time so we can
-            # invert the outline color in light mode.
-            return out.getchannel("A")
+        try:
+            alpha = _render_simple_svg_mask_alpha_64(p)
+            if alpha is not None:
+                return alpha
         except Exception:
             continue
     return None
+
+
+def _resampling_lanczos() -> int:
+    return getattr(getattr(Image, "Resampling", None), "LANCZOS", getattr(Image, "LANCZOS", 1))
+
+
+def _center_alpha_mask(alpha: Image.Image) -> Image.Image:
+    bbox = alpha.getbbox()
+    if bbox is None:
+        return Image.new("L", _ICON_SIZE, color=0)
+
+    cropped = alpha.crop(bbox)
+    src_w, src_h = cropped.size
+    if src_w <= 0 or src_h <= 0:
+        return Image.new("L", _ICON_SIZE, color=0)
+
+    scale = min(
+        float(_ICON_INNER_SIZE[0]) / float(src_w),
+        float(_ICON_INNER_SIZE[1]) / float(src_h),
+    )
+    dst_w = max(1, int(round(src_w * scale)))
+    dst_h = max(1, int(round(src_h * scale)))
+    inner = cropped.resize((dst_w, dst_h), _resampling_lanczos())  # type: ignore[arg-type]
+
+    out = Image.new("L", _ICON_SIZE, color=0)
+    ox = (_ICON_SIZE[0] - dst_w) // 2
+    oy = (_ICON_SIZE[1] - dst_h) // 2
+    out.paste(inner, (ox, oy))
+    return out
+
+
+def _parse_simple_svg_subpaths(path_data: str) -> list[list[tuple[float, float]]]:
+    tokens = _SVG_PATH_TOKEN_RE.findall(path_data)
+    subpaths: list[list[tuple[float, float]]] = []
+    current: list[tuple[float, float]] = []
+    cursor = (0.0, 0.0)
+    command: str | None = None
+    idx = 0
+
+    while idx < len(tokens):
+        token = tokens[idx]
+        if token.isalpha():
+            next_command = token
+            idx += 1
+            if next_command in {"Z", "z"}:
+                if current:
+                    subpaths.append(current)
+                    current = []
+                command = None
+                continue
+            if next_command in {"M", "m"} and current:
+                subpaths.append(current)
+                current = []
+            command = next_command
+            continue
+
+        if command not in {"M", "L", "m", "l"} or (idx + 1) >= len(tokens):
+            return []
+
+        x = float(token)
+        y = float(tokens[idx + 1])
+        idx += 2
+
+        if command in {"m", "l"}:
+            x += cursor[0]
+            y += cursor[1]
+
+        cursor = (x, y)
+        current.append(cursor)
+
+        if command == "M":
+            command = "L"
+        elif command == "m":
+            command = "l"
+
+    if current:
+        subpaths.append(current)
+
+    return [subpath for subpath in subpaths if len(subpath) >= 3]
+
+
+def _render_simple_svg_mask_alpha_64(path: Path) -> Image.Image | None:
+    root = ET.fromstring(path.read_text(encoding="utf-8"))
+    view_box = str(root.attrib.get("viewBox", "")).strip().split()
+    if len(view_box) != 4:
+        return None
+
+    vb_x, vb_y, vb_w, vb_h = (float(part) for part in view_box)
+    if vb_w <= 0 or vb_h <= 0:
+        return None
+
+    path_nodes = root.findall("{http://www.w3.org/2000/svg}path")
+    if not path_nodes:
+        return None
+
+    render_size = (_ICON_INNER_SIZE[0] * 4, _ICON_INNER_SIZE[1] * 4)
+    mask = Image.new("L", render_size, color=0)
+    draw = ImageDraw.Draw(mask)
+    scale_x = float(render_size[0]) / vb_w
+    scale_y = float(render_size[1]) / vb_h
+
+    drew_any = False
+    for node in path_nodes:
+        path_data = str(node.attrib.get("d", ""))
+        for subpath in _parse_simple_svg_subpaths(path_data):
+            points = [((x - vb_x) * scale_x, (y - vb_y) * scale_y) for x, y in subpath]
+            if len(points) >= 3:
+                draw.polygon(points, fill=255)
+                drew_any = True
+
+    if not drew_any:
+        return None
+
+    return _center_alpha_mask(mask)
 
 
 def _outline_color_for_theme() -> tuple[int, int, int]:
@@ -93,94 +204,19 @@ def _outline_color_for_theme() -> tuple[int, int, int]:
 
 
 @lru_cache(maxsize=4)
-def _tray_logo_outline(outline_color: tuple[int, int, int]) -> Image.Image | None:
-    alpha64 = _load_tray_logo_alpha_64()
-    if alpha64 is None:
-        return None
-    outline = Image.new("RGBA", _ICON_SIZE, color=(*outline_color, 0))
-    outline.putalpha(alpha64)
-    return outline
-
-
-@lru_cache(maxsize=1)
-def _tray_logo_masks() -> tuple[Image.Image, Image.Image] | None:
-    """Return (silhouette_mask, cutout_mask) for the tray logo.
-
-    - silhouette_mask keeps the full outer logo silhouette (including internal holes)
-      so we can preserve non-square transparency when needed.
-    - cutout_mask isolates internal transparent regions (the "K" cutout), so we can
-      place dynamic color only behind the cutout and avoid color bleeding at the
-      outer edges of the logo.
-    """
-
-    alpha = _load_tray_logo_alpha_64()
-    if alpha is None:
-        return None
-
-    w, h = alpha.size
-    a = list(alpha.getdata())
-
-    def idx(x: int, y: int) -> int:
-        return y * w + x
-
-    transparent = [v == 0 for v in a]
-    external = [False] * (w * h)
-    q: deque[tuple[int, int]] = deque()
-
-    # Seed border pixels.
-    for x in range(w):
-        for y in (0, h - 1):
-            i = idx(x, y)
-            if transparent[i] and not external[i]:
-                external[i] = True
-                q.append((x, y))
-    for y in range(h):
-        for x in (0, w - 1):
-            i = idx(x, y)
-            if transparent[i] and not external[i]:
-                external[i] = True
-                q.append((x, y))
-
-    # Flood-fill external transparency.
-    while q:
-        x, y = q.popleft()
-        for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
-            if nx < 0 or ny < 0 or nx >= w or ny >= h:
-                continue
-            i = idx(nx, ny)
-            if transparent[i] and not external[i]:
-                external[i] = True
-                q.append((nx, ny))
-
-    # Silhouette = everything that's *not* external background.
-    silhouette_data = [0 if external[i] else 255 for i in range(w * h)]
-    silhouette = Image.new("L", (w, h), color=0)
-    silhouette.putdata(silhouette_data)
-
-    # Cutout = internal transparent pixels (transparent but not external background).
-    cutout_data = [255 if (transparent[i] and not external[i]) else 0 for i in range(w * h)]
-    cutout = Image.new("L", (w, h), color=0)
-    cutout.putdata(cutout_data)
-
-    return (silhouette, cutout)
+def _tray_k_mask() -> Image.Image | None:
+    return _load_tray_mask_alpha_64()
 
 
 @lru_cache(maxsize=64)
-def _create_cached_solid_icon(
-    color: tuple[int, int, int], outline_color: tuple[int, int, int]
-) -> Image.Image:
-    logo = _tray_logo_outline(outline_color)
-    masks = _tray_logo_masks()
-    if logo is not None and masks is not None:
-        _silhouette_mask, cutout_mask = masks
+def _create_cached_solid_icon(color: tuple[int, int, int], outline_color: tuple[int, int, int]) -> Image.Image:
+    k_mask = _tray_k_mask()
+    if k_mask is not None:
+        fill = Image.new("RGBA", _ICON_SIZE, color=(*color, 255))
+        fill.putalpha(k_mask)
 
-        # Only show dynamic color through the internal cutout (the transparent "K").
-        # This avoids tinted halos at the outer logo edges caused by anti-aliasing.
-        underlay = Image.new("RGBA", _ICON_SIZE, color=(*color, 255))
-        underlay.putalpha(cutout_mask)
-
-        out = underlay.copy()
-        out.alpha_composite(logo)
+        out = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
+        out.alpha_composite(fill)
         return out
 
     # Fallback: old placeholder keyboard icon.
@@ -204,6 +240,10 @@ def _create_cached_solid_icon(
 
 def clear_cached_solid_icons() -> None:
     _create_cached_solid_icon.cache_clear()
+    for cached in (_load_tray_mask_alpha_64, _tray_k_mask):
+        clear_cache = getattr(cached, "cache_clear", None)
+        if callable(clear_cache):
+            clear_cache()
 
 
 def _scale_cache_key(scale: float) -> int:
@@ -255,13 +295,10 @@ def _create_cached_rainbow_icon(
     scale_key: int,
     outline_color: tuple[int, int, int],
 ) -> Image.Image:
-    logo = _tray_logo_outline(outline_color)
-    masks = _tray_logo_masks()
+    k_mask = _tray_k_mask()
     scale = float(scale_key) / 1000.0
 
-    if logo is not None and masks is not None:
-        _silhouette_mask, cutout_mask = masks
-
+    if k_mask is not None:
         underlay = _rainbow_gradient_64(phase_q).copy()
         if scale != 1.0:
             # Apply brightness scaling to the underlay.
@@ -274,9 +311,9 @@ def _create_cached_rainbow_icon(
                         rr, gg, bb = _scale_rgb((r, g, b), scale)
                         px[x, y] = (rr, gg, bb, a)
 
-        underlay.putalpha(cutout_mask)
-        out = underlay.copy()
-        out.alpha_composite(logo)
+                underlay.putalpha(k_mask)
+        out = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
+        out.alpha_composite(underlay)
         return out
 
     rr_f, gg_f, bb_f = colorsys.hsv_to_rgb(float(phase_q % 64) / 64.0, 1.0, 1.0)
@@ -285,6 +322,10 @@ def _create_cached_rainbow_icon(
 
 def clear_cached_rainbow_icons() -> None:
     _create_cached_rainbow_icon.cache_clear()
+    for cached in (_load_tray_mask_alpha_64, _tray_k_mask):
+        clear_cache = getattr(cached, "cache_clear", None)
+        if callable(clear_cache):
+            clear_cache()
 
 
 def create_icon_rainbow(*, scale: float = 1.0, phase: float = 0.0) -> Image.Image:
@@ -306,10 +347,8 @@ def create_icon_mosaic(
     colors_flat is expected to be row-major with length rows*cols.
     """
 
-    logo = _tray_logo_outline(_outline_color_for_theme())
-    masks = _tray_logo_masks()
-    if logo is not None and masks is not None:
-        _silhouette_mask, cutout_mask = masks
+    k_mask = _tray_k_mask()
+    if k_mask is not None:
 
         r_n = max(1, int(rows))
         c_n = max(1, int(cols))
@@ -341,9 +380,9 @@ def create_icon_mosaic(
                 cr, cg, cb = _scale_rgb((int(rr), int(gg), int(bb)), scale)
                 draw.rectangle((x0, y0, max(x0, x1 - 1), max(y0, y1 - 1)), fill=(cr, cg, cb, 255))
 
-        underlay.putalpha(cutout_mask)
-        out = underlay.copy()
-        out.alpha_composite(logo)
+            underlay.putalpha(k_mask)
+        out = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
+        out.alpha_composite(underlay)
         return out
 
     # Fallback: pick first cell as representative.

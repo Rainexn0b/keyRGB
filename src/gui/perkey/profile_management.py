@@ -6,7 +6,6 @@ from typing import Dict, Tuple
 from src.core.profile import profiles
 from src.core.config import Config
 
-
 PerKeyColors = Dict[Tuple[int, int], Tuple[int, int, int]]
 
 

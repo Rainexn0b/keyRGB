@@ -16,7 +16,6 @@ import json
 from pathlib import Path
 from typing import cast
 
-
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "reference_defaults_wootbook_y15_pro.json"
 
 

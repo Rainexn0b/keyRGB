@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from src.core.effects.colors import hsv_to_rgb
-from src.core.effects.ite_backend import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.transitions import scaled_color_map_nonzero
 
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer

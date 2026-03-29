@@ -5,7 +5,6 @@ from typing import Callable, Generic, TypeVar
 
 from PIL import Image
 
-
 PhotoT = TypeVar("PhotoT")
 
 

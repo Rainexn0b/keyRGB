@@ -18,7 +18,6 @@ from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.utils.window_centering import center_window_on_screen
 from src.gui.theme import apply_clam_theme
 
-
 logger = logging.getLogger(__name__)
 
 try:
@@ -91,9 +90,7 @@ class UniformColorGUI:
             self.color_wheel = ColorWheel(
                 main_frame,
                 size=350,
-                initial_color=(
-                    tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color
-                ),
+                initial_color=(tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color),
                 callback=self._on_color_change,
                 release_callback=self._on_color_release,
             )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
@@ -32,6 +33,46 @@ class BackendCapabilities:
     color: bool
     hardware_effects: bool
     palette: bool
+
+
+@dataclass(frozen=True)
+class HardwareEffectDescriptor:
+    """Typed backend-owned description for a hardware lighting effect."""
+
+    build: Callable[..., Any]
+    supported_args: frozenset[str] = field(default_factory=frozenset)
+
+    def __call__(self, **kwargs: Any) -> Any:
+        return self.build(**kwargs)
+
+
+def legacy_builder_supported_args(effect_builder: Callable[..., Any]) -> frozenset[str]:
+    """Best-effort extraction of supported kwargs from legacy closure builders.
+
+    This exists only to wrap third-party callable effect builders into typed
+    `HardwareEffectDescriptor` instances at backend boundaries.
+    """
+
+    try:
+        freevars = getattr(effect_builder, "__code__").co_freevars
+        closure = getattr(effect_builder, "__closure__")
+        if not freevars or not closure:
+            return frozenset()
+        mapping = dict(zip(freevars, [c.cell_contents for c in closure]))
+        args = mapping.get("args")
+        if isinstance(args, dict):
+            return frozenset(str(key) for key in args.keys())
+    except Exception:
+        return frozenset()
+    return frozenset()
+
+
+def make_hardware_effect_descriptor(
+    builder: Callable[..., Any], *, supported_args: tuple[str, ...] | list[str] | set[str] | frozenset[str] = ()
+) -> HardwareEffectDescriptor:
+    """Create a typed hardware effect descriptor for backend effect maps."""
+
+    return HardwareEffectDescriptor(build=builder, supported_args=frozenset(str(arg) for arg in supported_args))
 
 
 class BackendStability(str, Enum):
@@ -109,6 +150,6 @@ class KeyboardBackend(Protocol):
 
     def dimensions(self) -> tuple[int, int]: ...
 
-    def effects(self) -> dict[str, Any]: ...
+    def effects(self) -> dict[str, HardwareEffectDescriptor]: ...
 
     def colors(self) -> dict[str, Any]: ...
