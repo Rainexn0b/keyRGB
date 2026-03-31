@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import TYPE_CHECKING, Dict, Tuple
 
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
@@ -53,6 +54,37 @@ def frame_dt_s() -> float:
     return 1.0 / 60.0
 
 
+def animation_step_s(
+    engine: "EffectsEngine",
+    attr_name: str,
+    *,
+    nominal_s: float | None = None,
+    max_step_multiple: float = 1.25,
+    now_s: float | None = None,
+) -> float:
+    step_s = frame_dt_s() if nominal_s is None else max(1e-6, float(nominal_s))
+    max_step_s = step_s * max(1.0, float(max_step_multiple))
+    current_s = time.monotonic() if now_s is None else float(now_s)
+
+    try:
+        previous_s = float(getattr(engine, attr_name))
+    except Exception:
+        previous_s = None
+
+    try:
+        setattr(engine, attr_name, current_s)
+    except Exception:
+        pass
+
+    if previous_s is None:
+        return step_s
+
+    elapsed_s = current_s - previous_s
+    if elapsed_s <= 0.0:
+        return step_s
+    return min(max_step_s, elapsed_s)
+
+
 def has_per_key(engine: "EffectsEngine") -> bool:
     return bool(getattr(engine.kb, "set_key_colors", None))
 
@@ -96,23 +128,6 @@ def scale(rgb: Color, s: float) -> Color:
     return (int(round(rgb[0] * ss)), int(round(rgb[1] * ss)), int(round(rgb[2] * ss)))
 
 
-def _apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int) -> None:
-    prev = engine._last_hw_mode_brightness
-    if prev is None:
-        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
-        engine._last_hw_mode_brightness = int(brightness_hw)
-        return
-
-    if int(prev) == int(brightness_hw):
-        return
-
-    try:
-        engine.kb.set_brightness(int(brightness_hw))
-    except (AttributeError, NotImplementedError, OSError):
-        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
-    engine._last_hw_mode_brightness = int(brightness_hw)
-
-
 def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
     """Render per-key when available, otherwise fall back to uniform."""
 
@@ -120,17 +135,21 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
         try:
             with engine.kb_lock:
                 brightness_hw = int(engine.brightness)
-                need_mode_init = engine._last_hw_mode_brightness is None
-                if need_mode_init:
-                    _apply_hw_brightness(engine, brightness_hw)
+                # Re-assert user mode on every frame so the ITE controller does
+                # not drift back to its saved hardware effect between frames.
+                # This matches the v0.18.1 behaviour that kept rendering stable.
+                enable_user_mode_once(
+                    kb=engine.kb,
+                    kb_lock=engine.kb_lock,
+                    brightness=brightness_hw,
+                )
+                engine._last_hw_mode_brightness = brightness_hw
                 try:
                     engine.kb.set_key_colors(
                         color_map,
                         brightness=brightness_hw,
                         enable_user_mode=False,
                     )
-                    if not need_mode_init:
-                        _apply_hw_brightness(engine, brightness_hw)
                     return
                 except Exception as exc:
                     # On USB disconnect, attempting a fallback uniform write can trigger
