@@ -279,3 +279,40 @@ def test_old_effect_thread_cannot_clear_new_thread_state() -> None:
     assert engine.running is True
 
     engine.stop()
+
+
+def test_sw_to_sw_transition_skips_fade_in() -> None:
+    """SW→SW transitions must skip _fade_in_per_key to avoid a dark-dip flicker.
+
+    When the previous effect was a software effect, from_sw_effect=True is passed
+    and the entire fade block is skipped.  The test confirms _fade_uniform_color
+    and _fade_in_per_key are uncalled during an SW→SW start.
+    """
+    from unittest.mock import patch
+
+    engine = EffectsEngine()
+    engine.kb = NullKeyboard()
+    engine.device_available = False
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.brightness = 25
+
+    fade_in_calls = []
+    fade_uniform_calls = []
+
+    # Patch both fade helpers to detect invocations without side effects.
+    with patch.object(engine, "_fade_in_per_key", side_effect=lambda **_kw: fade_in_calls.append(True)), \
+         patch.object(engine, "_fade_uniform_color", side_effect=lambda **_kw: fade_uniform_calls.append(True)):
+        engine._start_sw_effect(
+            target=lambda: None,
+            prev_color=(255, 0, 0),
+            fade_to_color=(0, 0, 255),
+            from_sw_effect=True,
+        )
+        # Brief wait so the thread starts and any erroneous fade would have been called.
+        time.sleep(0.05)
+
+    engine.stop()
+
+    assert not fade_in_calls, "_fade_in_per_key must NOT be called on SW→SW transition"
+    assert not fade_uniform_calls, "_fade_uniform_color must NOT be called on SW→SW transition"
+

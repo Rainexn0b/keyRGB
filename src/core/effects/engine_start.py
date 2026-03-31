@@ -89,6 +89,7 @@ class _EngineStart:
         """Start an effect (hardware or software)."""
 
         prev_color = tuple(self.current_color)
+        prev_effect_was_sw = self.current_effect in self.SW_EFFECTS
 
         self.stop()
 
@@ -145,6 +146,7 @@ class _EngineStart:
                 target=getattr(self, method_name),
                 prev_color=prev_color,
                 fade_to_color=fade_to_color,
+                from_sw_effect=prev_effect_was_sw,
             )
 
     def _start_sw_effect(
@@ -153,8 +155,15 @@ class _EngineStart:
         target,
         prev_color: tuple,
         fade_to_color: tuple,
+        from_sw_effect: bool = False,
     ) -> None:
-        if int(self.brightness) > 1:
+        if from_sw_effect:
+            # The keyboard is already in user mode from the previous software
+            # effect's last frame.  Starting the fade-in from near-black would
+            # create a visible dark dip between effects.  Skip the fade and let
+            # the new thread's first frame write directly at full brightness.
+            pass
+        elif int(self.brightness) > 1:
             if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
                 self._fade_in_per_key(duration_s=0.06)
                 # Record the mode brightness established by the per-key fade so
