@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Callable
 from typing import Optional, cast
 
+from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers._transition_constants import (
     SOFT_OFF_FADE_DURATION_S,
@@ -11,6 +13,9 @@ from src.tray.controllers._transition_constants import (
     SOFT_ON_START_BRIGHTNESS,
 )
 from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
+
+
+logger = logging.getLogger(__name__)
 
 
 def _set_engine_hw_brightness_cap(engine: object, brightness: int | None) -> None:
@@ -30,7 +35,7 @@ def _set_engine_hw_brightness_cap(engine: object, brightness: int | None) -> Non
 
         engine._hw_brightness_cap = max(0, min(50, int(brightness)))  # type: ignore[attr-defined]
         engine._dim_temp_active = True  # type: ignore[attr-defined]
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return
 
 
@@ -55,7 +60,7 @@ def _set_reactive_transition(
         engine._reactive_transition_to_brightness = target_i  # type: ignore[attr-defined]
         engine._reactive_transition_started_at = float(time.monotonic())  # type: ignore[attr-defined]
         engine._reactive_transition_duration_s = max(0.0, float(duration_s))  # type: ignore[attr-defined]
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         return
 
 
@@ -85,31 +90,42 @@ def _set_brightness_best_effort(
     except TypeError:
         try:
             set_brightness_fn(int(brightness), apply_to_hardware=bool(apply_to_hardware))
-        except Exception:
-            pass
-    except Exception:
-        pass
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "idle_power.set_brightness_compat",
+                interval_s=60.0,
+                level=logging.WARNING,
+                msg="Idle-power compatibility brightness write failed",
+                exc=exc,
+            )
+    except Exception as exc:
+        log_throttled(
+            logger,
+            "idle_power.set_brightness_best_effort",
+            interval_s=60.0,
+            level=logging.WARNING,
+            msg="Idle-power brightness update failed",
+            exc=exc,
+        )
 
 
 def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     tray.is_off = False
     tray._idle_forced_off = False
-    try:
-        if hasattr(tray, "engine"):
-            _set_engine_hw_brightness_cap(tray.engine, None)
-    except Exception:
-        pass
+    if hasattr(tray, "engine"):
+        _set_engine_hw_brightness_cap(tray.engine, None)
 
     try:
         if hasattr(tray, "engine"):
             tray.engine.current_color = (0, 0, 0)
-    except Exception:
+    except (AttributeError, TypeError):
         pass
 
     try:
         if safe_int_attr(tray.config, "brightness", default=0) == 0:
             tray.config.brightness = safe_int_attr(tray, "_last_brightness", default=25)
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         pass
 
     try:
@@ -132,18 +148,32 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
                 fade_in=True,
                 fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
             )
-    except Exception:
+    except Exception as exc:
         try:
-            tray._log_exception("Failed to restore lighting after idle", Exception("restore failed"))
+            tray._log_exception("Failed to restore lighting after idle: %s", exc)
         except Exception:
-            pass
+            log_throttled(
+                logger,
+                "idle_power.restore_from_idle",
+                interval_s=60.0,
+                level=logging.ERROR,
+                msg="Failed to restore lighting after idle",
+                exc=exc,
+            )
 
     try:
         refresh_fn = getattr(tray, "_refresh_ui", None)
         if callable(refresh_fn):
             refresh_fn()
-    except Exception:
-        pass
+    except Exception as exc:
+        log_throttled(
+            logger,
+            "idle_power.restore_refresh_ui",
+            interval_s=60.0,
+            level=logging.WARNING,
+            msg="Idle-power UI refresh failed after restore",
+            exc=exc,
+        )
 
 
 def apply_idle_action(
@@ -158,18 +188,29 @@ def apply_idle_action(
     if action == "turn_off":
         tray._dim_temp_active = False
         tray._dim_temp_target_brightness = None
-        try:
-            _set_engine_hw_brightness_cap(tray.engine, None)
-        except Exception:
-            pass
+        _set_engine_hw_brightness_cap(tray.engine, None)
         try:
             tray.engine.stop()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "idle_power.turn_off.stop_engine",
+                interval_s=60.0,
+                level=logging.WARNING,
+                msg="Idle-power turn-off failed while stopping engine",
+                exc=exc,
+            )
         try:
             tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
-        except Exception:
-            pass
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "idle_power.turn_off.turn_off",
+                interval_s=60.0,
+                level=logging.WARNING,
+                msg="Idle-power turn-off failed while writing off state",
+                exc=exc,
+            )
 
         tray.is_off = True
         tray._idle_forced_off = True
@@ -177,8 +218,15 @@ def apply_idle_action(
             refresh_fn = getattr(tray, "_refresh_ui", None)
             if callable(refresh_fn):
                 refresh_fn()
-        except Exception:
-            pass
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "idle_power.turn_off.refresh_ui",
+                interval_s=60.0,
+                level=logging.WARNING,
+                msg="Idle-power UI refresh failed after turn-off",
+                exc=exc,
+            )
         return
 
     if action == "dim_to_temp":
@@ -188,13 +236,21 @@ def apply_idle_action(
                     getattr(tray, "_dim_temp_target_brightness", -1) or -1
                 ) == int(dim_temp_brightness):
                     return
-            except Exception:
+            except (TypeError, ValueError):
                 pass
             tray._dim_temp_active = True
             tray._dim_temp_target_brightness = int(dim_temp_brightness)
             try:
                 effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
-            except Exception:
+            except Exception as exc:
+                log_throttled(
+                    logger,
+                    "idle_power.dim_to_temp.effect_name",
+                    interval_s=60.0,
+                    level=logging.WARNING,
+                    msg="Idle-power dim-to-temp could not read effect name; falling back to none",
+                    exc=exc,
+                )
                 effect = "none"
             try:
                 is_sw_effect = effect in sw_effects_set
@@ -222,8 +278,15 @@ def apply_idle_action(
                         fade=True,
                         fade_duration_s=0.25,
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                log_throttled(
+                    logger,
+                    "idle_power.dim_to_temp.apply",
+                    interval_s=60.0,
+                    level=logging.WARNING,
+                    msg="Idle-power dim-to-temp apply failed",
+                    exc=exc,
+                )
         return
 
     if action == "restore_brightness":
@@ -233,7 +296,15 @@ def apply_idle_action(
             target = safe_int_attr(tray.config, "brightness", default=0)
             perkey_target = safe_int_attr(tray.config, "perkey_brightness", default=0)
             effect = str(getattr(getattr(tray, "config", None), "effect", "none") or "none")
-        except Exception:
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "idle_power.restore_brightness.read_state",
+                interval_s=60.0,
+                level=logging.WARNING,
+                msg="Idle-power restore could not read brightness state; using safe defaults",
+                exc=exc,
+            )
             target = 0
             perkey_target = 0
             effect = "none"
@@ -265,17 +336,22 @@ def apply_idle_action(
                         fade=True,
                         fade_duration_s=0.25,
                     )
-            except Exception:
-                pass
+            except Exception as exc:
+                log_throttled(
+                    logger,
+                    "idle_power.restore_brightness.apply",
+                    interval_s=60.0,
+                    level=logging.WARNING,
+                    msg="Idle-power restore-brightness apply failed",
+                    exc=exc,
+                )
         return
 
     if action == "restore":
         if not bool(getattr(tray, "_user_forced_off", False)) and not bool(getattr(tray, "_power_forced_off", False)):
             tray._dim_temp_active = False
             tray._dim_temp_target_brightness = None
-            try:
+            if hasattr(tray, "engine"):
                 _set_engine_hw_brightness_cap(tray.engine, None)
-            except Exception:
-                pass
             restore_from_idle_fn(tray)
         return

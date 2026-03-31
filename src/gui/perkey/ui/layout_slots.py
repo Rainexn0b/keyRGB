@@ -7,6 +7,14 @@ from typing import Any
 from src.core.resources.layout_slots import get_layout_slot_states
 
 
+def _body_wraplength(body: Any, *, fallback: int = 520) -> int:
+    try:
+        width = int(body.winfo_width())
+    except Exception:
+        return fallback
+    return max(320, width - 12)
+
+
 def refresh_layout_slots_ui(editor: Any) -> None:
     body = getattr(editor, "_layout_slots_body", None)
     if body is None:
@@ -21,23 +29,12 @@ def refresh_layout_slots_ui(editor: Any) -> None:
             body,
             text="This layout has no optional key positions.",
             font=("Sans", 9),
-            wraplength=240,
+            wraplength=_body_wraplength(body),
             justify="left",
         ).grid(row=0, column=0, sticky="w")
         return
 
-    ttk.Label(
-        body,
-        text=(
-            "Hide keys your keyboard does not have and rename legends to match the hardware. "
-            "These changes are part of the keyboard setup and save immediately for this layout family."
-        ),
-        font=("Sans", 9),
-        wraplength=240,
-        justify="left",
-    ).grid(row=0, column=0, sticky="w", pady=(0, 8))
-
-    for index, state in enumerate(states, start=1):
+    for index, state in enumerate(states):
         row = ttk.Frame(body)
         row.grid(row=index, column=0, sticky="ew", pady=(0, 4))
         row.columnconfigure(1, weight=1)

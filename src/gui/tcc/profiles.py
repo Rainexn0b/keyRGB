@@ -216,6 +216,14 @@ class TccProfilesGUI:
             tcc_power_profiles.create_custom_profile(name)
             self._set_status("✓ Created")
         except Exception as exc:
+            log_throttled(
+                logger,
+                "tcc_profiles.create_custom_profile",
+                interval_s=60,
+                level=logging.WARNING,
+                msg="Failed to create TCC custom profile",
+                exc=exc,
+            )
             messagebox.showerror("Create failed", str(exc))
             return
         self._refresh()
@@ -237,6 +245,14 @@ class TccProfilesGUI:
             tcc_power_profiles.duplicate_custom_profile(src.id, name)
             self._set_status("✓ Duplicated")
         except Exception as exc:
+            log_throttled(
+                logger,
+                "tcc_profiles.duplicate_custom_profile",
+                interval_s=60,
+                level=logging.WARNING,
+                msg="Failed to duplicate TCC custom profile",
+                exc=exc,
+            )
             messagebox.showerror("Duplicate failed", str(exc))
             return
         self._refresh()
@@ -258,6 +274,14 @@ class TccProfilesGUI:
             tcc_power_profiles.rename_custom_profile(prof.id, name)
             self._set_status("✓ Renamed")
         except Exception as exc:
+            log_throttled(
+                logger,
+                "tcc_profiles.rename_custom_profile",
+                interval_s=60,
+                level=logging.WARNING,
+                msg="Failed to rename TCC custom profile",
+                exc=exc,
+            )
             messagebox.showerror("Rename failed", str(exc))
             return
         self._refresh()
@@ -275,6 +299,14 @@ class TccProfilesGUI:
             tcc_power_profiles.delete_custom_profile(prof.id)
             self._set_status("✓ Deleted")
         except Exception as exc:
+            log_throttled(
+                logger,
+                "tcc_profiles.delete_custom_profile",
+                interval_s=60,
+                level=logging.WARNING,
+                msg="Failed to delete TCC custom profile",
+                exc=exc,
+            )
             messagebox.showerror("Delete failed", str(exc))
             return
         self._refresh()
@@ -290,7 +322,15 @@ class TccProfilesGUI:
         payload = None
         try:
             payload = tcc_power_profiles.get_custom_profile_payload(prof.id)
-        except Exception:
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "tcc_profiles.get_custom_profile_payload",
+                interval_s=60,
+                level=logging.WARNING,
+                msg="Failed to load editable TCC profile payload",
+                exc=exc,
+            )
             payload = None
 
         if not isinstance(payload, dict):
@@ -316,7 +356,15 @@ class TccProfilesGUI:
         ok = False
         try:
             ok = tcc_power_profiles.set_temp_profile_by_id(profile.id)
-        except Exception:
+        except Exception as exc:
+            log_throttled(
+                logger,
+                "tcc_profiles.set_temp_profile_by_id",
+                interval_s=60,
+                level=logging.WARNING,
+                msg="Failed to activate temporary TCC profile",
+                exc=exc,
+            )
             ok = False
 
         if ok:

@@ -356,6 +356,20 @@ def test_set_brightness_percent_clamps_updates_label_and_restores_guard() -> Non
     assert wheel._suspend_brightness_events is False
 
 
+def test_set_brightness_percent_without_slider_updates_value_and_visuals() -> None:
+    wheel = _make_wheel()
+    updates: list[str] = []
+    wheel._update_color = lambda *, source: updates.append(source)
+    del wheel.brightness_var
+    del wheel.brightness_label
+
+    wheel.set_brightness_percent(28)
+
+    assert wheel.current_value == pytest.approx(0.28)
+    assert updates == ["brightness"]
+    assert wheel._suspend_brightness_events is False
+
+
 def test_update_color_recomputes_rgb_updates_visuals_and_invokes_callback(monkeypatch: pytest.MonkeyPatch) -> None:
     wheel = _make_wheel()
     wheel.callback = object()
@@ -399,6 +413,24 @@ def test_set_color_updates_hsv_slider_and_visuals() -> None:
     assert wheel.current_color == (0, 128, 255)
     assert wheel.brightness_var.value == pytest.approx(100.0)
     assert wheel.brightness_label.options["text"] == "100%"
+    assert selections == ["selection"]
+    assert previews == ["preview"]
+    assert wheel.get_color() == (0, 128, 255)
+
+
+def test_set_color_without_slider_updates_visuals() -> None:
+    wheel = _make_wheel()
+    selections: list[str] = []
+    previews: list[str] = []
+    wheel._update_selection = lambda: selections.append("selection")
+    wheel._update_preview = lambda: previews.append("preview")
+    del wheel.brightness_var
+    del wheel.brightness_label
+
+    wheel.set_color(0, 128, 255)
+
+    assert wheel.current_color == (0, 128, 255)
+    assert wheel.current_value == pytest.approx(1.0)
     assert selections == ["selection"]
     assert previews == ["preview"]
     assert wheel.get_color() == (0, 128, 255)

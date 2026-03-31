@@ -130,10 +130,9 @@ def build_editor_ui(editor) -> None:
     ttk.Button(btns, text="Clear All", command=editor._clear_all).pack(fill="x", pady=(0, 6))
 
     _divider(btns, "Setup")
-    ttk.Button(btns, text="Keyboard Setup", command=editor._toggle_layout_setup).pack(fill="x", pady=(0, 6))
-    ttk.Button(btns, text="Overlay Editor", command=editor._toggle_overlay).pack(fill="x", pady=(0, 6))
-    ttk.Button(btns, text="Keymap Calibrator", command=editor._run_calibrator).pack(fill="x", pady=(0, 6))
-    ttk.Button(btns, text="Reload Keymap", command=editor._reload_keymap).pack(fill="x")
+    ttk.Button(btns, text="1. Keyboard Setup", command=editor._toggle_layout_setup).pack(fill="x", pady=(0, 6))
+    ttk.Button(btns, text="2. Keymap Calibrator", command=editor._run_calibrator).pack(fill="x", pady=(0, 6))
+    ttk.Button(btns, text="3. Overlay Alignment", command=editor._toggle_overlay).pack(fill="x", pady=(0, 6))
 
     extras = ttk.Frame(left)
     extras.grid(row=1, column=0, sticky="ew", pady=(12, 0))

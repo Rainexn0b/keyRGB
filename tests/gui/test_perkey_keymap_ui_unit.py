@@ -49,7 +49,7 @@ def test_reload_keymap_ui_updates_selection_and_sets_status_on_change() -> None:
 
     assert ed.keymap == {"K1": (1, 2)}
     assert ed.selected_cell == (1, 2)
-    assert ed.status_label.text == "Keymap reloaded"
+    assert ed.status_label.text == "Saved keymap reloaded"
     assert ed.canvas.redraw_calls == 1
 
 

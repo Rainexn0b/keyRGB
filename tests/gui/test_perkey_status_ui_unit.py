@@ -48,9 +48,9 @@ def test_set_status_sets_label_text() -> None:
 
 
 def test_messages_match_existing_strings() -> None:
-    assert no_keymap_found_initial() == "No keymap found — click 'Keymap Calibrator'"
+    assert no_keymap_found_initial() == "No keymap found — click '2. Keymap Calibrator'"
     assert no_keymap_found() == "No keymap found — run Keymap Calibrator"
-    assert keymap_reloaded() == "Keymap reloaded"
+    assert keymap_reloaded() == "Saved keymap reloaded"
 
     assert selected_unmapped("K") == "Selected K (unmapped) — run Keymap Calibrator"
     assert selected_mapped("K", 1, 2) == "Selected K -> 1,2"

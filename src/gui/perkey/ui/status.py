@@ -51,7 +51,7 @@ def action_failed(action: str, exc: Exception | None = None, *, extra_hint: str 
 
 
 def no_keymap_found_initial() -> str:
-    return "No keymap found — click 'Keymap Calibrator'"
+    return "No keymap found — click '2. Keymap Calibrator'"
 
 
 def selected_unmapped(key_id: str) -> str:
@@ -95,7 +95,7 @@ def calibrator_failed(exc: Exception | None = None) -> str:
 
 
 def keymap_reloaded() -> str:
-    return "Keymap reloaded"
+    return "Saved keymap reloaded"
 
 
 def no_keymap_found() -> str:

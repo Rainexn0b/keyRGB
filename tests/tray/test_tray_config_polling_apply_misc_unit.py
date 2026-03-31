@@ -241,3 +241,68 @@ def test_apply_from_config_once_marks_device_unavailable_on_errno_19() -> None:
 
     tray.engine.mark_device_unavailable.assert_called_once()
     tray._log_exception.assert_any_call("Error applying config change: %s", ANY)
+
+
+def test_apply_from_config_once_logs_fast_path_exception_and_falls_back() -> None:
+    tray = _mk_tray_base(effect="none", brightness=10)
+
+    with (
+        patch.object(config_polling, "_maybe_apply_fast_path", side_effect=RuntimeError("boom")),
+        patch.object(config_polling.time, "monotonic", return_value=100.0),
+    ):
+        new_last, warn_at = _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=0.0,
+        )
+
+    assert isinstance(new_last, ConfigApplyState)
+    assert warn_at == 100.0
+    tray._log_exception.assert_any_call("Error applying config fast path: %s", ANY)
+    tray.engine.kb.set_color.assert_called_once_with((1, 2, 3), brightness=10)
+
+
+def test_apply_from_config_once_logs_refresh_ui_exception_throttled() -> None:
+    tray = _mk_tray_base(effect="none", brightness=10)
+    tray._refresh_ui.side_effect = RuntimeError("boom")
+
+    with patch.object(config_polling.time, "monotonic", side_effect=[100.0, 120.0, 200.0]):
+        _, warn_at = _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=0.0,
+        )
+        assert warn_at == 100.0
+
+        _, warn_at = _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=warn_at,
+        )
+        assert warn_at == 100.0
+
+        _, warn_at = _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=warn_at,
+        )
+        assert warn_at == 200.0
+
+    refresh_logs = [
+        call_args
+        for call_args in tray._log_exception.call_args_list
+        if call_args.args and call_args.args[0] == "Failed to refresh tray UI after config apply: %s"
+    ]
+    assert len(refresh_logs) == 2

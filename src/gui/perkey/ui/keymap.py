@@ -6,11 +6,7 @@ from .status import keymap_reloaded, no_keymap_found, set_status
 
 
 def reload_keymap_ui(editor: Any) -> None:
-    """Reload the current profile keymap and refresh editor selection.
-
-    No UX change: preserves the prior behavior and messages from
-    `PerKeyEditor._reload_keymap`.
-    """
+    """Reload the saved keymap for the current profile and refresh selection."""
 
     old = dict(getattr(editor, "keymap", {}) or {})
 

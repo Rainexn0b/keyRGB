@@ -155,10 +155,9 @@ def test_refresh_layout_slots_ui_builds_rows_and_binds_commands(monkeypatch: pyt
 
     layout_slots.refresh_layout_slots_ui(editor)
 
-    assert registry["labels"][0].options["text"].startswith("Hide keys your keyboard does not have")
     checkbutton = registry["checkbuttons"][0]
     entry = registry["entries"][0]
-    default_label = registry["labels"][-1]
+    default_label = registry["labels"][0]
 
     assert checkbutton.options["text"] == "iso_extra"
     assert checkbutton.options["variable"].get() is True

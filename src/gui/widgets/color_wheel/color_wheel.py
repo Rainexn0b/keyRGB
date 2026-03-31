@@ -275,7 +275,8 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
             self._suspend_brightness_events = True
             # Setting the variable updates the slider; some Tk builds will call
             # the Scale command, so `_on_brightness_change` must be guarded.
-            self.brightness_var.set(pct_f)
+            if hasattr(self, "brightness_var"):
+                self.brightness_var.set(pct_f)
             # Ensure internal state and visuals match even if Tk doesn't invoke.
             self.current_value = pct_f / 100.0
             if hasattr(self, "brightness_label"):
@@ -318,7 +319,8 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self.current_saturation = s
         self.current_value = v
 
-        self.brightness_var.set(v * 100)
+        if hasattr(self, "brightness_var"):
+            self.brightness_var.set(v * 100)
         # Keep the percentage label in sync when the slider is updated
         # programmatically (some Tk themes do not call the Scale command).
         if hasattr(self, "brightness_label"):

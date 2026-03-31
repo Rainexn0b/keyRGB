@@ -1,14 +1,46 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import cast
 
 from src.core.effects.catalog import REACTIVE_EFFECTS
 from src.core.effects.catalog import resolve_effect_name_for_backend
+from src.core.utils.safe_attrs import safe_bool_attr
 from src.core.utils.safe_attrs import safe_int_attr
+from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
+_CONFIG_FALLBACK_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
+_FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+
+def _safe_tuple_attr(config: object, name: str, *, default: tuple[int, int, int]) -> tuple[int, ...]:
+    try:
+        raw = getattr(config, name, default)
+    except _CONFIG_FALLBACK_EXCEPTIONS:
+        return tuple(default)
+
+    try:
+        return tuple(raw)
+    except _CONFIG_FALLBACK_EXCEPTIONS:
+        return tuple(default)
+
+
+def _safe_perkey_signature(config: object) -> tuple | None:
+    try:
+        per_key_colors = getattr(config, "per_key_colors", None)
+    except _CONFIG_FALLBACK_EXCEPTIONS:
+        return None
+
+    if per_key_colors is None:
+        return None
+
+    try:
+        return tuple(sorted(per_key_colors.items()))
+    except _CONFIG_FALLBACK_EXCEPTIONS:
+        return None
 
 
 @dataclass(frozen=True)
@@ -26,46 +58,34 @@ class ConfigApplyState:
 def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
     try:
         effect = resolve_effect_name_for_backend(
-            str(getattr(tray.config, "effect", "none") or "none"),
+            safe_str_attr(tray.config, "effect", default="none") or "none",
             getattr(tray, "backend", None),
         )
-    except Exception:
+    except _CONFIG_FALLBACK_EXCEPTIONS:
         effect = "none"
 
     perkey_sig = None
     if effect == "perkey":
-        try:
-            perkey_sig = tuple(sorted(tray.config.per_key_colors.items()))
-        except Exception:
-            perkey_sig = None
+        perkey_sig = _safe_perkey_signature(tray.config)
 
-    try:
-        reactive_use_manual = bool(getattr(tray.config, "reactive_use_manual_color", False))
-    except Exception:
-        reactive_use_manual = False
-    try:
-        reactive_color = tuple(getattr(tray.config, "reactive_color", (255, 255, 255)))
-    except Exception:
-        reactive_color = (255, 255, 255)
+    reactive_use_manual = safe_bool_attr(tray.config, "reactive_use_manual_color", default=False)
+    reactive_color = _safe_tuple_attr(tray.config, "reactive_color", default=(255, 255, 255))
 
     base_brightness = safe_int_attr(tray.config, "brightness", default=0)
     reactive_brightness = 0
     if effect in REACTIVE_EFFECTS_SET:
         reactive_brightness = safe_int_attr(tray.config, "reactive_brightness", default=base_brightness)
 
-    try:
-        color = tuple(getattr(tray.config, "color", (255, 255, 255)))
-    except Exception:
-        color = (255, 255, 255)
+    color = _safe_tuple_attr(tray.config, "color", default=(255, 255, 255))
 
     return ConfigApplyState(
         effect=str(effect),
         speed=safe_int_attr(tray.config, "speed", default=0),
         brightness=base_brightness,
-        color=tuple(color),
+        color=cast("tuple[int, int, int]", tuple(color)),
         perkey_sig=perkey_sig,
         reactive_use_manual=bool(reactive_use_manual),
-        reactive_color=tuple(reactive_color),
+        reactive_color=cast("tuple[int, int, int]", tuple(reactive_color)),
         reactive_brightness=int(reactive_brightness),
     )
 
@@ -82,7 +102,7 @@ def state_for_log(state: ConfigApplyState | None):
             "color": tuple(state.color) if state.color is not None else None,
             "perkey_keys": perkey_keys,
         }
-    except Exception:
+    except _CONFIG_FALLBACK_EXCEPTIONS:
         return None
 
 
@@ -111,7 +131,7 @@ def maybe_apply_fast_path(
                 or last_applied.reactive_brightness != current.reactive_brightness
             )
         )
-    except Exception:
+    except _CONFIG_FALLBACK_EXCEPTIONS:
         only_reactive_changed = False
 
     if only_reactive_changed:
@@ -119,11 +139,11 @@ def maybe_apply_fast_path(
             tray.engine.reactive_use_manual_color = bool(current.reactive_use_manual)
             tray.engine.reactive_color = tuple(current.reactive_color)
             tray.engine.reactive_brightness = int(current.reactive_brightness)
-        except Exception:
+        except _FAST_PATH_EXCEPTIONS:
             pass
         try:
             tray._refresh_ui()
-        except Exception:
+        except _FAST_PATH_EXCEPTIONS:
             pass
         return True, current
 
@@ -138,7 +158,7 @@ def maybe_apply_fast_path(
             and last_applied.reactive_brightness == current.reactive_brightness
             and last_applied.brightness != current.brightness
         )
-    except Exception:
+    except _CONFIG_FALLBACK_EXCEPTIONS:
         only_brightness_changed = False
 
     if (
@@ -148,11 +168,11 @@ def maybe_apply_fast_path(
     ):
         try:
             tray.engine.set_brightness(int(current.brightness), apply_to_hardware=False)
-        except Exception:
+        except _FAST_PATH_EXCEPTIONS:
             pass
         try:
             tray._refresh_ui()
-        except Exception:
+        except _FAST_PATH_EXCEPTIONS:
             pass
         return True, current
 
@@ -190,11 +210,12 @@ def apply_from_config_once(
     if current == last_applied:
         return last_applied, last_apply_warn_at
 
-    try:
-        if str(getattr(tray.config, "effect", "none") or "none") != current.effect:
+    configured_effect = safe_str_attr(tray.config, "effect", default="none") or "none"
+    if configured_effect != current.effect:
+        try:
             tray.config.effect = current.effect
-    except Exception:
-        pass
+        except _CONFIG_FALLBACK_EXCEPTIONS:
+            pass
 
     log_event = getattr(tray, "_log_event", None)
     from .helpers import (
@@ -209,7 +230,17 @@ def apply_from_config_once(
     if _handle_forced_off(tray, last_applied, current, cause, state_for_log_fn):
         return current, last_apply_warn_at
 
-    handled, new_last_applied = maybe_apply_fast_path_fn(tray, last_applied=last_applied, current=current)
+    try:
+        handled, new_last_applied = maybe_apply_fast_path_fn(tray, last_applied=last_applied, current=current)
+    except Exception as exc:
+        now = float(monotonic_fn())
+        if now - last_apply_warn_at > 60:
+            last_apply_warn_at = now
+            try:
+                tray._log_exception("Error applying config fast path: %s", exc)
+            except (OSError, RuntimeError, ValueError):
+                pass
+        handled, new_last_applied = False, current
     if handled:
         return new_last_applied, last_apply_warn_at
 
@@ -224,15 +255,15 @@ def apply_from_config_once(
                 old=old_state,
                 new=new_state,
             )
-        except Exception:
+        except _CONFIG_FALLBACK_EXCEPTIONS:
             pass
 
-    if tray.config.brightness == 0:
+    if current.brightness == 0:
         last_apply_warn_at = _apply_turn_off(tray, current, cause, monotonic_fn, last_apply_warn_at)
         return current, last_apply_warn_at
 
-    if tray.config.brightness > 0:
-        tray._last_brightness = tray.config.brightness
+    if current.brightness > 0:
+        tray._last_brightness = current.brightness
 
     _sync_reactive(tray, current)
 
@@ -259,7 +290,13 @@ def apply_from_config_once(
 
     try:
         tray._refresh_ui()
-    except Exception:
-        pass
+    except Exception as exc:
+        now = float(monotonic_fn())
+        if now - last_apply_warn_at > 60:
+            last_apply_warn_at = now
+            try:
+                tray._log_exception("Failed to refresh tray UI after config apply: %s", exc)
+            except (OSError, RuntimeError, ValueError):
+                pass
 
     return current, last_apply_warn_at

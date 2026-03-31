@@ -399,16 +399,22 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         "Reset Backdrop": "_reset_backdrop",
         "Fill All": "_fill_all",
         "Clear All": "_clear_all",
-        "Keyboard Setup": "_toggle_layout_setup",
-        "Overlay Editor": "_toggle_overlay",
-        "Keymap Calibrator": "_run_calibrator",
-        "Reload Keymap": "_reload_keymap",
+        "1. Keyboard Setup": "_toggle_layout_setup",
+        "2. Keymap Calibrator": "_run_calibrator",
+        "3. Overlay Alignment": "_toggle_overlay",
         "New": "_new_profile",
         "Activate": "_activate_profile",
         "Save": "_save_profile",
         "Delete": "_delete_profile",
         "Set as Default": "_set_default_profile",
     }
+
+    button_texts = [button.options["text"] for button in registry["buttons"]]
+    assert button_texts[4:7] == [
+        "1. Keyboard Setup",
+        "2. Keymap Calibrator",
+        "3. Overlay Alignment",
+    ]
 
     label_texts = [label.options.get("text") for label in registry["labels"]]
     assert "Backdrop transparency" in label_texts

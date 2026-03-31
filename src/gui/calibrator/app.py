@@ -10,7 +10,9 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 
 from src.core.config import Config
+from src.core.resources.defaults import get_default_keymap
 from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef, get_layout_keys
+from src.core.resources.layouts import LAYOUT_CATALOG, resolve_layout_id
 from src.gui.perkey.hardware import NUM_ROWS as BACKEND_NUM_ROWS, NUM_COLS as BACKEND_NUM_COLS
 from src.gui.perkey.profile_management import sanitize_keymap_cells
 from .helpers.canvas_render import redraw_calibration_canvas
@@ -42,6 +44,7 @@ from src.gui.reference.overlay_geometry import (
 
 MATRIX_ROWS = BACKEND_NUM_ROWS
 MATRIX_COLS = BACKEND_NUM_COLS
+_LAYOUT_LABELS = {layout.layout_id: layout.label for layout in LAYOUT_CATALOG}
 
 
 def _keymap_path() -> Path:
@@ -52,6 +55,43 @@ def _keymap_path() -> Path:
 def _save_keymap(keymap: Dict[str, Tuple[int, int]]) -> None:
     # Use shared saver to keep behavior consistent with per-key UI.
     save_keymap(get_active_profile_name(), keymap)
+
+
+def _parse_default_keymap(layout_id: str) -> dict[str, tuple[int, int]]:
+    parsed: dict[str, tuple[int, int]] = {}
+    for key_id, coord_text in get_default_keymap(layout_id).items():
+        try:
+            row_text, col_text = coord_text.split(",", 1)
+            parsed[key_id] = (int(row_text.strip()), int(col_text.strip()))
+        except (AttributeError, TypeError, ValueError):
+            continue
+    return parsed
+
+
+def _resolved_layout_label(layout_id: str) -> str:
+    resolved_layout = resolve_layout_id(layout_id)
+    return _LAYOUT_LABELS.get(resolved_layout, resolved_layout.upper())
+
+
+def _load_profile_state(
+    profile_name: str,
+    *,
+    physical_layout: str,
+) -> tuple[
+    Dict[str, Tuple[int, int]],
+    Dict[str, float],
+    Dict[str, Dict[str, float]],
+    Dict[str, Dict[str, object]],
+]:
+    keymap = sanitize_keymap_cells(
+        load_keymap(profile_name, physical_layout=physical_layout),
+        num_rows=MATRIX_ROWS,
+        num_cols=MATRIX_COLS,
+    )
+    layout_tweaks = load_layout_global(profile_name, physical_layout=physical_layout)
+    per_key_layout_tweaks = load_layout_per_key(profile_name, physical_layout=physical_layout)
+    layout_slot_overrides = load_layout_slots(profile_name, physical_layout)
+    return keymap, layout_tweaks, per_key_layout_tweaks, layout_slot_overrides
 
 
 class KeymapCalibrator(tk.Tk):
@@ -73,14 +113,15 @@ class KeymapCalibrator(tk.Tk):
 
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.profile_name = get_active_profile_name()
-        self.keymap = sanitize_keymap_cells(
-            load_keymap(self.profile_name),
-            num_rows=MATRIX_ROWS,
-            num_cols=MATRIX_COLS,
+        (
+            self.keymap,
+            self.layout_tweaks,
+            self.per_key_layout_tweaks,
+            self.layout_slot_overrides,
+        ) = _load_profile_state(
+            self.profile_name,
+            physical_layout=str(self.cfg.physical_layout or "auto"),
         )
-        self.layout_tweaks = load_layout_global(self.profile_name)
-        self.per_key_layout_tweaks = load_layout_per_key(self.profile_name)
-        self.layout_slot_overrides = load_layout_slots(self.profile_name, self.cfg.physical_layout)
 
         self.probe = CalibrationProbeState(rows=MATRIX_ROWS, cols=MATRIX_COLS)
 
@@ -156,9 +197,12 @@ class KeymapCalibrator(tk.Tk):
         ttk.Button(side, text="Reset Backdrop", command=self._reset_backdrop).grid(
             row=7, column=0, sticky="ew", pady=(6, 0)
         )
-        ttk.Button(side, text="Save", command=self._save).grid(row=8, column=0, sticky="ew", pady=(18, 0))
+        ttk.Button(side, text="Reset Keymap Defaults", command=self._reset_keymap_defaults).grid(
+            row=8, column=0, sticky="ew", pady=(18, 0)
+        )
+        ttk.Button(side, text="Save", command=self._save).grid(row=9, column=0, sticky="ew", pady=(18, 0))
         ttk.Button(side, text="Save && Close", command=self._save_and_close).grid(
-            row=9, column=0, sticky="ew", pady=(6, 0)
+            row=10, column=0, sticky="ew", pady=(6, 0)
         )
 
         # Keyboard shortcuts.
@@ -216,6 +260,16 @@ class KeymapCalibrator(tk.Tk):
             self.lbl_status.configure(text="Backdrop reset")
         except Exception:
             self.lbl_status.configure(text="Failed to reset backdrop")
+
+    def _reset_keymap_defaults(self) -> None:
+        physical_layout = str(self.cfg.physical_layout or "auto")
+        self.keymap = sanitize_keymap_cells(
+            _parse_default_keymap(physical_layout),
+            num_rows=MATRIX_ROWS,
+            num_cols=MATRIX_COLS,
+        )
+        self._redraw()
+        self.lbl_status.configure(text=f"Reset keymap to {_resolved_layout_label(physical_layout)} defaults")
 
     def _restore_original_config(self) -> None:
         self.preview.restore()

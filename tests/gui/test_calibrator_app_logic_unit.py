@@ -97,6 +97,51 @@ def test_save_keymap_uses_active_profile(monkeypatch: pytest.MonkeyPatch) -> Non
     assert calls == [("profile-z", keymap)]
 
 
+def test_load_profile_state_uses_selected_physical_layout(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, str, str | None]] = []
+
+    def fake_load_keymap(profile_name: str, *, physical_layout: str | None = None) -> dict[str, tuple[int, int]]:
+        calls.append(("keymap", profile_name, physical_layout))
+        return {"iso_extra": (0, 1), "invalid": (99, 99)}
+
+    def fake_load_layout_global(profile_name: str, *, physical_layout: str | None = None) -> dict[str, float]:
+        calls.append(("layout_global", profile_name, physical_layout))
+        return {"dx": 1.5}
+
+    def fake_load_layout_per_key(
+        profile_name: str,
+        *,
+        physical_layout: str | None = None,
+    ) -> dict[str, dict[str, float]]:
+        calls.append(("layout_per_key", profile_name, physical_layout))
+        return {"iso_extra": {"dx": 0.25}}
+
+    def fake_load_layout_slots(profile_name: str, physical_layout: str) -> dict[str, dict[str, object]]:
+        calls.append(("layout_slots", profile_name, physical_layout))
+        return {"nonusbackslash": {"label": "<>"}}
+
+    monkeypatch.setattr(calibrator_app, "load_keymap", fake_load_keymap)
+    monkeypatch.setattr(calibrator_app, "load_layout_global", fake_load_layout_global)
+    monkeypatch.setattr(calibrator_app, "load_layout_per_key", fake_load_layout_per_key)
+    monkeypatch.setattr(calibrator_app, "load_layout_slots", fake_load_layout_slots)
+
+    keymap, layout_tweaks, per_key_layout_tweaks, layout_slot_overrides = calibrator_app._load_profile_state(
+        "profile-z",
+        physical_layout="iso",
+    )
+
+    assert calls == [
+        ("keymap", "profile-z", "iso"),
+        ("layout_global", "profile-z", "iso"),
+        ("layout_per_key", "profile-z", "iso"),
+        ("layout_slots", "profile-z", "iso"),
+    ]
+    assert keymap == {"iso_extra": (0, 1)}
+    assert layout_tweaks == {"dx": 1.5}
+    assert per_key_layout_tweaks == {"iso_extra": {"dx": 0.25}}
+    assert layout_slot_overrides == {"nonusbackslash": {"label": "<>"}}
+
+
 def test_set_backdrop_saves_reloads_and_redraws_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _make_app()
     calls: list[tuple[str, str]] = []
@@ -297,6 +342,21 @@ def test_assign_updates_keymap_redraws_and_advances() -> None:
     assert app.keymap == {"esc": (1, 2)}
     assert app.lbl_status.text == "Assigned esc -> (1, 2)"
     assert calls == ["redraw", "next"]
+
+
+def test_reset_keymap_defaults_restores_layout_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _make_app(keymap={"old": (4, 4)}, cfg=SimpleNamespace(physical_layout="iso"))
+    calls: list[str] = []
+    app._redraw = lambda: calls.append("redraw")
+
+    monkeypatch.setattr(calibrator_app, "_parse_default_keymap", lambda layout_id: {"iso_extra": (0, 1)})
+    monkeypatch.setattr(calibrator_app, "_resolved_layout_label", lambda layout_id: "ISO (102/105-key)")
+
+    calibrator_app.KeymapCalibrator._reset_keymap_defaults(app)
+
+    assert app.keymap == {"iso_extra": (0, 1)}
+    assert app.lbl_status.text == "Reset keymap to ISO (102/105-key) defaults"
+    assert calls == ["redraw"]
 
 
 def test_save_persists_keymap_and_reports_path(monkeypatch: pytest.MonkeyPatch) -> None:
