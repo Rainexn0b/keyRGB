@@ -66,7 +66,7 @@ Fish users should prefer `.venv/bin/python ...` directly instead of sourcing the
 ## Common commands
 
 ```bash
-.venv/bin/python -m pytest src/tests/
+.venv/bin/python -m pytest tests/
 .venv/bin/python -m buildpython --profile=ci
 .venv/bin/python -m buildpython --profile=full --with-black
 .venv/bin/python -m src.tray.entrypoint

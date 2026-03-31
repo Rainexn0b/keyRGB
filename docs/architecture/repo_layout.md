@@ -5,7 +5,7 @@ This page documents the *repository* directory structure (as opposed to runtime 
 ## Source code
 
 - `src/` — application source (core, tray app, and GUIs)
-- `src/tests/` — unit tests (pytest)
+- `tests/` — unit tests (pytest)
 
 ## Documentation
 
