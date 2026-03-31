@@ -1,0 +1,81 @@
+{
+  "code_hygiene": {
+    "counts": {
+      "defensive_conversion": 29,
+      "hasattr_coupling": 2,
+      "any_type_hint": 39,
+      "runtime_copy_hotspot": 0,
+      "test_naming": 0,
+      "forbidden_getattr": 51,
+      "forbidden_api": 0,
+      "resource_leak": 0,
+      "cleanup_hotspot": 33,
+      "silent_broad_except": 280,
+      "logged_broad_except": 33,
+      "fallback_broad_except": 308
+    },
+    "gated_categories": [
+      "forbidden_getattr",
+      "forbidden_api",
+      "resource_leak",
+      "cleanup_hotspot",
+      "silent_broad_except",
+      "logged_broad_except",
+      "fallback_broad_except"
+    ],
+    "path_budgets": {
+      "silent_broad_except": {
+        "src/tray/pollers/idle_power/_actions.py": 17,
+        "src/tray/app/application.py": 12,
+        "src/tray/pollers/config_polling_internal/helpers.py": 12,
+        "src/tray/controllers/lighting_controller.py": 11,
+        "src/core/effects/engine_start.py": 10
+      },
+      "logged_broad_except": {
+        "src/gui/tcc/profiles.py": 4,
+        "src/tray/pollers/config_polling_internal/core.py": 3,
+        "src/gui/windows/reactive_color.py": 3,
+        "src/core/power/management/manager.py": 3
+      },
+      "fallback_broad_except": {
+        "src/tray/controllers/_lighting_controller_helpers.py": 9,
+        "src/core/effects/reactive/effects.py": 9,
+        "src/tray/pollers/config_polling_internal/core.py": 8,
+        "src/core/effects/reactive/input.py": 8,
+        "src/core/config/config.py": 7
+      }
+    }
+  },
+  "coverage": {
+    "minimum_total_percent": 5.0,
+    "tracked_prefixes": {
+      "src/core/": 5.0,
+      "src/tray/": 5.0,
+      "src/gui/": 2.0
+    },
+    "watch_files": [
+      "src/core/backends/sysfs/device.py",
+      "src/core/backends/asusctl/backend.py",
+      "src/core/backends/asusctl/device.py",
+      "src/core/backends/ite8297/backend.py",
+      "src/core/power/management/manager.py",
+      "src/tray/app/application.py",
+      "src/core/config/config.py"
+    ]
+  },
+  "code_markers": {
+    "marker_counts": {
+      "TODO": 0,
+      "FIXME": 0,
+      "HACK": 0,
+      "NOTE": 3,
+      "OPTIMIZE": 0,
+      "REVIEW": 0
+    },
+    "gated_markers": [
+      "TODO",
+      "FIXME",
+      "HACK"
+    ]
+  }
+}

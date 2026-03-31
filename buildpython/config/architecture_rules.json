@@ -1,0 +1,73 @@
+{
+  "rules": [
+    {
+      "id": "core-layer-boundary",
+      "description": "Core modules must stay independent from tray and GUI layers.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "src/core/**/*.py"
+        ]
+      },
+      "patterns": [
+        {
+          "regex": "^\\s*(?:from|import)\\s+src\\.(?:tray|gui)\\b",
+          "flags": "m",
+          "message": "Core modules must not import tray or gui modules."
+        }
+      ]
+    },
+    {
+      "id": "gui-no-tray-runtime-dependency",
+      "description": "GUI modules should not couple directly to tray runtime modules.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "src/gui/**/*.py"
+        ]
+      },
+      "patterns": [
+        {
+          "regex": "^\\s*(?:from|import)\\s+src\\.tray\\b",
+          "flags": "m",
+          "message": "GUI modules must not import tray runtime modules."
+        }
+      ]
+    },
+    {
+      "id": "tray-ui-no-backend-selection",
+      "description": "Tray UI should not probe backends directly; selection belongs in app or controller layers.",
+      "severity": "warning",
+      "corpus": {
+        "include": [
+          "src/tray/ui/**/*.py"
+        ]
+      },
+      "patterns": [
+        {
+          "regex": "^\\s*(?:from|import)\\s+src\\.core\\.backends\\.registry\\b",
+          "flags": "m",
+          "message": "Tray UI should not import backend selection directly."
+        }
+      ]
+    },
+    {
+      "id": "no-legacy-effects-shim",
+      "description": "The removed legacy effects ite_backend shim must stay unused.",
+      "severity": "error",
+      "corpus": {
+        "include": [
+          "src/**/*.py",
+          "buildpython/**/*.py"
+        ]
+      },
+      "patterns": [
+        {
+          "regex": "^\\s*(?:from|import)\\s+src\\.core\\.effects\\.ite_backend\\b",
+          "flags": "m",
+          "message": "Legacy src.core.effects.ite_backend imports are forbidden."
+        }
+      ]
+    }
+  ]
+}

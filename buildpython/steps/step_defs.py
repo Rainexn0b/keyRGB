@@ -22,11 +22,7 @@ def steps() -> list[Step]:
         )
 
     def pytest_runner():
-        return run(
-            [python_exe(), "-m", "pytest", "-q", "-o", "addopts="],
-            cwd=str(root),
-            env_overrides={"KEYRGB_HW_TESTS": "0"},
-        )
+        return pytest_runner_with_optional_coverage()
 
     # Optional: ruff (only runs if installed)
     def ruff_runner():
@@ -49,6 +45,8 @@ def steps() -> list[Step]:
     from .step_type_check import mypy_runner
     from .step_loc_check import loc_over_400_runner
     from .step_code_hygiene import code_hygiene_runner
+    from .step_architecture_validation import architecture_validation_runner
+    from .step_coverage import coverage_runner, pytest_runner_with_optional_coverage
 
     return [
         Step(
@@ -162,5 +160,19 @@ def steps() -> list[Step]:
             description="Check defensive patterns, type discipline, test naming",
             log_file=_log("step-16-code-hygiene.log"),
             runner=code_hygiene_runner,
+        ),
+        Step(
+            number=17,
+            name="Architecture Validation",
+            description="Validate configured corpus-pattern architecture boundaries",
+            log_file=_log("step-17-architecture.log"),
+            runner=architecture_validation_runner,
+        ),
+        Step(
+            number=18,
+            name="Coverage",
+            description="Build coverage debt summary and track coverage regressions",
+            log_file=_log("step-18-coverage.log"),
+            runner=coverage_runner,
         ),
     ]

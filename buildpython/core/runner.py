@@ -1,11 +1,95 @@
 from __future__ import annotations
 
+import re
+import sys
 import time
 
+from .debt_index import write_debt_index
 from .model import Step, StepOutcome
-from .summary import BuildSummary, StepSummary, write_summary
+from .summary import (
+    BuildSummary,
+    StepSummary,
+    build_terminal_build_overview,
+    build_terminal_coverage_highlight,
+    build_terminal_debt_snapshot,
+    write_summary,
+)
 from ..utils.log_format import StepLogRecord, format_standard_log
 from ..utils.paths import buildlog_dir
+
+
+_USE_COLOR = sys.stdout.isatty()
+_RESET = "\033[0m" if _USE_COLOR else ""
+_BOLD = "\033[1m" if _USE_COLOR else ""
+_DIM = "\033[2m" if _USE_COLOR else ""
+_RED = "\033[31m" if _USE_COLOR else ""
+_GREEN = "\033[32m" if _USE_COLOR else ""
+_YELLOW = "\033[33m" if _USE_COLOR else ""
+_BLUE = "\033[34m" if _USE_COLOR else ""
+_CYAN = "\033[36m" if _USE_COLOR else ""
+
+
+def _color(text: str, code: str) -> str:
+    if not code:
+        return text
+    return f"{code}{text}{_RESET}"
+
+
+def _status_badge(status: str) -> str:
+    if status == "running":
+        return _color("[..]", _CYAN)
+    if status == "success":
+        return _color("[OK]", _GREEN)
+    if status == "failure":
+        return _color("[!!]", _RED)
+    if status == "skipped":
+        return _color("[--]", _YELLOW)
+    return "[??]"
+
+
+def _print_step_header(step: Step, *, index: int, total_steps: int, name_width: int) -> None:
+    print(_color("-" * 72, _DIM))
+    step_label = f"[{index}/{total_steps}]"
+    name = f"{step.name:<{name_width}}"
+    print(f"{_status_badge('running')} {step_label} {name} : {step.description}")
+
+
+def _print_step_footer(outcome: StepOutcome, highlights: list[str]) -> None:
+    if outcome.status == "success":
+        print(f"Completed ({outcome.duration_s:.1f}s)")
+    elif outcome.status == "skipped":
+        print(f"Skipped ({outcome.duration_s:.1f}s)")
+    else:
+        print(f"Failed ({outcome.duration_s:.1f}s)")
+
+    for line in highlights:
+        print(f"  {line}")
+
+
+def _extract_pytest_highlight(stdout: str, stderr: str) -> str | None:
+    text = f"{stdout}\n{stderr}"
+    patterns = [
+        r"(\d+ passed(?:, \d+ skipped)?(?:, \d+ deselected)?(?:, \d+ xfailed)?(?:, \d+ xpassed)?(?:, \d+ warnings?)?) in [^\n]+",
+        r"(\d+ failed(?:, \d+ passed)?(?:, \d+ skipped)?(?:, \d+ errors?)?) in [^\n]+",
+    ]
+    for pattern in patterns:
+        matches = re.findall(pattern, text)
+        if matches:
+            return f"Tests: {matches[-1]}"
+    return None
+
+
+def _step_highlights(step: Step, *, stdout: str, stderr: str) -> list[str]:
+    highlights: list[str] = []
+    if step.name == "Pytest":
+        pytest_line = _extract_pytest_highlight(stdout, stderr)
+        if pytest_line is not None:
+            highlights.append(pytest_line)
+    if step.name == "Coverage":
+        coverage_line = build_terminal_coverage_highlight(buildlog_dir())
+        if coverage_line is not None:
+            highlights.append(coverage_line)
+    return highlights
 
 
 def _write_log(
@@ -38,8 +122,9 @@ def _is_module_available(module: str) -> bool:
         return False
 
 
-def run_step(step: Step, *, verbose: bool) -> StepOutcome:
+def run_step(step: Step, *, index: int, total_steps: int, name_width: int, verbose: bool) -> StepOutcome:
     start = time.time()
+    _print_step_header(step, index=index, total_steps=total_steps, name_width=name_width)
 
     # Optional step gating
     if step.name in {"Ruff", "Ruff Format"} and not _is_module_available("ruff"):
@@ -52,13 +137,14 @@ def run_step(step: Step, *, verbose: bool) -> StepOutcome:
             0,
             duration,
         )
-        print(f"[{step.number}] {step.name}: SKIPPED")
-        return StepOutcome(
+        outcome = StepOutcome(
             status="skipped",
             exit_code=0,
             duration_s=duration,
             message="ruff not installed",
         )
+        _print_step_footer(outcome, ["ruff not installed"])
+        return outcome
 
     if step.name == "Black" and not _is_module_available("black"):
         duration = time.time() - start
@@ -70,13 +156,14 @@ def run_step(step: Step, *, verbose: bool) -> StepOutcome:
             0,
             duration,
         )
-        print(f"[{step.number}] {step.name}: SKIPPED")
-        return StepOutcome(
+        outcome = StepOutcome(
             status="skipped",
             exit_code=0,
             duration_s=duration,
             message="black not installed",
         )
+        _print_step_footer(outcome, ["black not installed"])
+        return outcome
 
     if step.name == "Type Check" and not _is_module_available("mypy"):
         duration = time.time() - start
@@ -88,13 +175,33 @@ def run_step(step: Step, *, verbose: bool) -> StepOutcome:
             0,
             duration,
         )
-        print(f"[{step.number}] {step.name}: SKIPPED")
-        return StepOutcome(
+        outcome = StepOutcome(
             status="skipped",
             exit_code=0,
             duration_s=duration,
             message="mypy not installed",
         )
+        _print_step_footer(outcome, ["mypy not installed"])
+        return outcome
+
+    if step.name == "Coverage" and (not _is_module_available("coverage") or not _is_module_available("pytest")):
+        duration = time.time() - start
+        _write_log(
+            step,
+            "python -m coverage ...",
+            "(skipped: coverage or pytest not installed)\n",
+            "",
+            0,
+            duration,
+        )
+        outcome = StepOutcome(
+            status="skipped",
+            exit_code=0,
+            duration_s=duration,
+            message="coverage or pytest not installed",
+        )
+        _print_step_footer(outcome, ["coverage or pytest not installed"])
+        return outcome
 
     result = step.runner()
     duration = time.time() - start
@@ -108,8 +215,13 @@ def run_step(step: Step, *, verbose: bool) -> StepOutcome:
         duration,
     )
 
-    status = "OK" if result.exit_code == 0 else "FAIL"
-    print(f"[{step.number}] {step.name}: {status} ({duration:.1f}s)")
+    outcome = StepOutcome(
+        status="success" if result.exit_code == 0 else "failure",
+        exit_code=result.exit_code,
+        duration_s=duration,
+    )
+    highlights = _step_highlights(step, stdout=result.stdout, stderr=result.stderr)
+    _print_step_footer(outcome, highlights)
 
     if verbose or result.exit_code != 0:
         if result.stdout.strip():
@@ -117,15 +229,16 @@ def run_step(step: Step, *, verbose: bool) -> StepOutcome:
         if result.stderr.strip():
             print(result.stderr.rstrip())
 
-    return StepOutcome(
-        status="success" if result.exit_code == 0 else "failure",
-        exit_code=result.exit_code,
-        duration_s=duration,
-    )
+    return outcome
 
 
 def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
-    print(f"KeyRGB build runner (logs: {buildlog_dir()})")
+    total_steps = len(steps)
+    name_width = max((len(step.name) for step in steps), default=7)
+
+    print(_color("KeyRGB build runner", _BOLD + _CYAN))
+    print(f"Logs: {buildlog_dir()}")
+    print(f"Steps: {total_steps}")
 
     started = time.time()
     summaries: list[StepSummary] = []
@@ -137,14 +250,8 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         successes = sum(1 for s in considered if s.status == "success")
         return int(round(100 * successes / len(considered)))
 
-    def _print_health(score: int) -> None:
-        bar_width = 20
-        filled = max(0, min(bar_width, int(round(score / 100 * bar_width))))
-        bar = "[" + ("#" * filled) + ("-" * (bar_width - filled)) + "]"
-        print(f"Build health: {score}/100 {bar}")
-
-    for step in steps:
-        outcome = run_step(step, verbose=verbose)
+    for index, step in enumerate(steps, start=1):
+        outcome = run_step(step, index=index, total_steps=total_steps, name_width=name_width, verbose=verbose)
 
         summaries.append(
             StepSummary(
@@ -170,8 +277,19 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
                     steps=summaries,
                 ),
             )
+            write_debt_index(buildlog_dir())
 
-            _print_health(score)
+            print(_color("-" * 72, _DIM))
+            final_summary = BuildSummary(
+                passed=False,
+                health_score=score,
+                total_duration_s=time.time() - started,
+                steps=summaries,
+            )
+            for line in build_terminal_build_overview(buildlog_dir(), final_summary):
+                print(line)
+            for line in build_terminal_debt_snapshot(buildlog_dir(), include_coverage=False):
+                print(line)
 
             return outcome.exit_code
 
@@ -187,7 +305,18 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
             steps=summaries,
         ),
     )
+    write_debt_index(buildlog_dir())
 
-    _print_health(score)
+    print(_color("-" * 72, _DIM))
+    final_summary = BuildSummary(
+        passed=passed,
+        health_score=score,
+        total_duration_s=time.time() - started,
+        steps=summaries,
+    )
+    for line in build_terminal_build_overview(buildlog_dir(), final_summary):
+        print(line)
+    for line in build_terminal_debt_snapshot(buildlog_dir(), include_coverage=False):
+        print(line)
 
     return 0
