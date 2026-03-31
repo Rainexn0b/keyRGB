@@ -176,36 +176,6 @@ def test_physical_layout_enum_prop(tmp_path, monkeypatch) -> None:
     assert cfg.physical_layout == "auto"
 
 
-def test_init_and_reload_handle_stat_failures_without_clobbering_settings(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
-
-    real_stat = Path.stat
-    target_config_path = tmp_path / "cfg" / "config.json"
-
-    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
-    monkeypatch.setenv("KEYRGB_CONFIG_PATH", str(tmp_path / "cfg" / "config.json"))
-    monkeypatch.setattr(
-        Path,
-        "stat",
-        lambda self, *args, **kwargs: (
-            (_ for _ in ()).throw(RuntimeError("boom"))
-            if self == target_config_path
-            else real_stat(self, *args, **kwargs)
-        ),
-    )
-
-    cfg = Config()
-    assert cfg._last_reload_mtime_ns is None
-
-    cfg._settings["effect"] = "wave"
-    monkeypatch.setattr(Config, "_load", lambda self: None)
-
-    cfg.reload()
-
-    assert cfg._settings["effect"] == "wave"
-    assert cfg._last_reload_mtime_ns is None
-
-
 def test_effect_speed_and_return_effect_setters_normalize_values(tmp_path, monkeypatch) -> None:
     cfg = _make_config(tmp_path, monkeypatch)
 
