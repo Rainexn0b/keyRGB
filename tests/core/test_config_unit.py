@@ -73,7 +73,7 @@ def test_reload_skips_disk_load_when_mtime_is_unchanged(tmp_path, monkeypatch) -
     load_calls = {"count": 0}
 
     monkeypatch.setattr(Config, "_load", lambda self: load_calls.__setitem__("count", load_calls["count"] + 1) or {})
-    monkeypatch.setattr(Path, "stat", lambda self: SimpleNamespace(st_mtime_ns=123))
+    monkeypatch.setattr(Path, "stat", lambda self, *args, **kwargs: SimpleNamespace(st_mtime_ns=123, st_mode=0o100644))
 
     cfg.reload()
 
@@ -96,7 +96,7 @@ def test_reload_replaces_settings_when_file_mtime_changes(tmp_path, monkeypatch)
             "perkey_brightness": 25,
         },
     )
-    monkeypatch.setattr(Path, "stat", lambda self: SimpleNamespace(st_mtime_ns=456))
+    monkeypatch.setattr(Path, "stat", lambda self, *args, **kwargs: SimpleNamespace(st_mtime_ns=456, st_mode=0o100644))
 
     cfg.reload()
 
@@ -181,7 +181,11 @@ def test_init_and_reload_handle_stat_failures_without_clobbering_settings(tmp_pa
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setenv("KEYRGB_CONFIG_PATH", str(tmp_path / "cfg" / "config.json"))
-    monkeypatch.setattr(Path, "stat", lambda self: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        Path,
+        "stat",
+        lambda self, *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
 
     cfg = Config()
     assert cfg._last_reload_mtime_ns is None
