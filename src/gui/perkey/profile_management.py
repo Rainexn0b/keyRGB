@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, Tuple
 
 from src.core.profile import profiles
@@ -77,6 +77,7 @@ class ActivatedProfile:
     layout_tweaks: Dict[str, float]
     per_key_layout_tweaks: Dict[str, Dict[str, float]]
     colors: PerKeyColors
+    layout_slot_overrides: Dict[str, Dict[str, object]] = field(default_factory=dict)
 
 
 def activate_profile(
@@ -86,12 +87,18 @@ def activate_profile(
     current_colors: PerKeyColors,
     num_rows: int,
     num_cols: int,
+    physical_layout: str,
 ) -> ActivatedProfile:
     name = profiles.set_active_profile(requested_name)
 
-    keymap = sanitize_keymap_cells(profiles.load_keymap(name), num_rows=num_rows, num_cols=num_cols)
-    layout_tweaks = profiles.load_layout_global(name)
-    per_key_layout_tweaks = profiles.load_layout_per_key(name)
+    keymap = sanitize_keymap_cells(
+        profiles.load_keymap(name, physical_layout=physical_layout),
+        num_rows=num_rows,
+        num_cols=num_cols,
+    )
+    layout_tweaks = profiles.load_layout_global(name, physical_layout=physical_layout)
+    per_key_layout_tweaks = profiles.load_layout_per_key(name, physical_layout=physical_layout)
+    layout_slot_overrides = profiles.load_layout_slots(name, physical_layout=physical_layout)
 
     colors = load_profile_colors(
         name=name,
@@ -108,6 +115,7 @@ def activate_profile(
         layout_tweaks=layout_tweaks,
         per_key_layout_tweaks=per_key_layout_tweaks,
         colors=colors,
+        layout_slot_overrides=layout_slot_overrides,
     )
 
 
@@ -118,6 +126,8 @@ def save_profile(
     keymap: Dict[str, Tuple[int, int]],
     layout_tweaks: Dict[str, float],
     per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    physical_layout: str,
+    layout_slot_overrides: Dict[str, Dict[str, object]] | None = None,
     colors: PerKeyColors,
 ) -> str:
     name = profiles.set_active_profile(requested_name)
@@ -125,6 +135,7 @@ def save_profile(
     profiles.save_keymap(keymap, name)
     profiles.save_layout_global(layout_tweaks, name)
     profiles.save_layout_per_key(per_key_layout_tweaks, name)
+    profiles.save_layout_slots(dict(layout_slot_overrides or {}), name, physical_layout=physical_layout)
     profiles.save_per_key_colors(colors, name)
     profiles.apply_profile_to_config(config, colors)
 
@@ -147,7 +158,7 @@ def delete_profile(requested_name: str) -> DeleteProfileResult:
         return DeleteProfileResult(
             deleted=False,
             active_profile=profiles.get_active_profile(),
-            message=f"Cannot delete '{profiles.DEFAULT_PROFILE_NAME}'",
+            message=f"Cannot delete lighting profile '{profiles.DEFAULT_PROFILE_NAME}'",
         )
 
     safe = profiles._safe_name(name)
@@ -157,5 +168,5 @@ def delete_profile(requested_name: str) -> DeleteProfileResult:
     return DeleteProfileResult(
         deleted=True,
         active_profile=profiles.get_active_profile(),
-        message=f"Deleted profile: {safe}",
+        message=f"Deleted lighting profile: {safe}",
     )

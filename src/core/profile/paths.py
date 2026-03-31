@@ -208,6 +208,7 @@ class ProfilePaths:
     keymap: Path
     layout_global: Path
     layout_per_key: Path
+    layout_slots: Path
     per_key_colors: Path
     backdrop_image: Path
     backdrop_settings: Path
@@ -244,6 +245,7 @@ def paths_for(name: str | None = None) -> ProfilePaths:
         keymap=keymap,
         layout_global=layout_global,
         layout_per_key=layout_per_key,
+        layout_slots=root / "layout_slots.json",
         per_key_colors=root / "per_key_colors.json",
         backdrop_image=backdrop_image,
         backdrop_settings=backdrop_settings,

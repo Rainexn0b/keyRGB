@@ -9,6 +9,7 @@ from src.gui.widgets.dropdown import UpwardListboxDropdown
 
 from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
+from .ui.layout_setup import LayoutSetupControls
 
 
 def build_editor_ui(editor) -> None:
@@ -129,6 +130,7 @@ def build_editor_ui(editor) -> None:
     ttk.Button(btns, text="Clear All", command=editor._clear_all).pack(fill="x", pady=(0, 6))
 
     _divider(btns, "Setup")
+    ttk.Button(btns, text="Keyboard Setup", command=editor._toggle_layout_setup).pack(fill="x", pady=(0, 6))
     ttk.Button(btns, text="Overlay Editor", command=editor._toggle_overlay).pack(fill="x", pady=(0, 6))
     ttk.Button(btns, text="Keymap Calibrator", command=editor._run_calibrator).pack(fill="x", pady=(0, 6))
     ttk.Button(btns, text="Reload Keymap", command=editor._reload_keymap).pack(fill="x")
@@ -141,17 +143,17 @@ def build_editor_ui(editor) -> None:
 
     extras_profiles = ttk.Frame(extras)
     extras_profiles.grid(row=0, column=0, sticky="nsew", padx=(0, 8))
-    extras_overlay = ttk.Frame(extras)
-    extras_overlay.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
+    extras_setup = ttk.Frame(extras)
+    extras_setup.grid(row=0, column=1, sticky="nsew", padx=(8, 0))
 
     extras_profiles.columnconfigure(0, weight=1)
-    extras_overlay.columnconfigure(0, weight=1)
+    extras_setup.columnconfigure(0, weight=1)
 
-    editor._profiles_frame = ttk.LabelFrame(extras_profiles, text="Profiles", padding=10)
+    editor._profiles_frame = ttk.LabelFrame(extras_profiles, text="Lighting profiles", padding=10)
     editor._profiles_frame.grid(row=0, column=0, sticky="nsew")
     editor._profiles_frame.columnconfigure(1, weight=1)
 
-    ttk.Label(editor._profiles_frame, text="Profile").grid(row=0, column=0, sticky="w")
+    ttk.Label(editor._profiles_frame, text="Lighting profile").grid(row=0, column=0, sticky="w")
     editor._profiles_combo = ttk.Combobox(
         editor._profiles_frame,
         textvariable=editor._profile_name_var,
@@ -201,8 +203,11 @@ def build_editor_ui(editor) -> None:
         pady=(8, 0),
     )
 
-    editor.overlay_controls = OverlayControls(extras_overlay, editor=editor)
+    editor._layout_setup_controls = LayoutSetupControls(extras_setup, editor=editor)
+    editor._layout_setup_controls.grid(row=0, column=0, sticky="nsew")
+    editor._layout_setup_controls.grid_remove()
+
+    editor.overlay_controls = OverlayControls(extras_setup, editor=editor)
     editor.overlay_controls.grid(row=0, column=0, sticky="nsew")
-    # Hidden by default (toggled by the Overlay button)
     editor.overlay_controls.grid_remove()
     editor.overlay_controls.sync_vars_from_scope()

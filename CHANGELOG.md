@@ -1,5 +1,55 @@
 # Changelog
 
+
+
+## Unreleased
+
+- GUI/Per-key Editor: Split always-visible lighting profile controls from keyboard-setup controls. Layout selection, layout reset, and optional-key setup now open in the shared setup pane used by Overlay Editor, so lighting presets stay visible while first-time or refresh-only keyboard setup is invoked on demand.
+- GUI/Layout: Add layout-scoped optional-key setup on top of the shared physical layout families. Optional positions such as ISO/JIS/KS/ABNT-specific keys, plus variable bottom-row utility keys, can now be hidden or relabeled in the per-key editor while keeping stable internal key IDs, and the editor/calibrator now treat those choices as keyboard setup rather than lighting-profile data.
+- Docs/Buildpython: Add active `docs/tech-debt/` tracking pages for the March 2026 maintainability review, and add a `buildpython --profile debt` workflow for debt-focused static analysis and architecture checks.
+- Buildpython/DevOps: Add a Coverage step with JSON/CSV/Markdown debt reports, per-path exception hotspot budgets in Code Hygiene, and a combined `debt-index` artifact so repo-wide and hotspot debt signals are visible in one place.
+- Buildpython/DevOps: Make long-running steps visibly report `RUNNING`, make Coverage consume explicit pytest-captured data instead of silently launching the full suite on step 18 alone, and include Pytest in the `debt` profile so debt reports remain actionable.
+- Buildpython/DevOps: Render missing coverage captures explicitly in the terminal debt snapshot, build summary, and debt index so step 18 without a prior pytest capture no longer looks like real 0% coverage.
+- Buildpython/DevOps: Refresh the default terminal UX with clearer step headers and completions, compact Pytest and Coverage highlights, and a final build overview that surfaces health and total coverage directly in `.venv/bin/python -m buildpython`.
+- Buildpython/DevOps: Add a config-driven Architecture Validation step with corpus-scoped regex rules, structured JSON/CSV/Markdown reports, and initial KeyRGB boundary checks for core, GUI, tray UI, and banned legacy imports.
+- Effects/Reactive Typing: Stop synthetic/random keypress fallback in normal runtime, explicitly close and recover evdev readers around reactive loop restarts, ignore non-keyboard `EV_KEY` devices such as power/sleep/video-button event nodes, and keep stale effect workers from clobbering newer runs. This reduces phantom reactive pulses, intermittent reactive desync, and restart-related memory growth.
+- Installer/Updates: Keep `--update-appimage` user-local by skipping udev rule installation in update-only mode, so AppImage refreshes do not prompt for `sudo` after first-time setup.
+- Installer/Desktop Integration: Refresh icon and desktop caches after desktop-entry updates, keep legacy user-icon copies in sync, and write the installed icon path into desktop entries so app-icon changes take effect more reliably.
+- Docs: Clarify that `--update-appimage` refreshes desktop integration only, not udev setup.
+- GUI/Layout: Add a physical keyboard layout catalog for the per-key editor and calibrator with `auto`, `ansi`, `iso`, `ks`, `abnt`, and `jis` variants. Exposed as a **Layout dropdown directly in the per-key editor's Profiles section** and also in Settings under "Keyboard layout". Layout definitions live in a dedicated `src/core/resources/layouts/` package, decoupled from any backend.
+- GUI/Layout: Make `auto` layout resolution conservative and cached. Generic laptop `AT Translated Set 2 keyboard` nodes no longer force a false ISO pick just because they advertise `KEY_102ND`, and repeated redraw/hit-test paths no longer re-probe sysfs on every interaction.
+- GUI/Layout: Make Settings accept the full shared physical-layout catalog instead of silently clamping new variants back to ANSI/ISO-only values, and remove stale layout-catalog compatibility metadata/import shims left over from the refactor.
+- Effects/ITE8910: Make software per-key rendering honor the shared hardware-mode brightness state so `ite8910` no longer re-enters user mode on every frame, which was a likely remaining source of visible flashing.
+- GUI/Layout: Extend the shared ANSI/ISO/ABNT bottom-row reference overlay with a right Ctrl key so the physical-layout catalog covers the reporter's missing-key example more accurately.
+- GUI/Layout: Rename the historical WootBook reference defaults to ANSI defaults, add starter built-in default bundles for each physical layout, and make per-key built-in keymap/layout fallbacks follow the selected layout without overwriting saved user profiles.
+- GUI/Layout: Seed starter overlay tweaks for the new ISO/ABNT/KS/JIS-only keys, make `auto` starter defaults follow the resolved concrete layout instead of always collapsing to ANSI, and add a per-key editor action to reset the current starter keymap/overlay bundle for the selected layout.
+- GUI/Layout: Remove the accidental ANSI right-Ctrl overlay slot, tighten ABNT right-side starter tweaks so Copilot/Menu no longer overlaps right Ctrl, and draw ISO-style Enter as a shaped key for ISO/ABNT/JIS so JIS top-row keys no longer collide with Enter.
+- Tests: Add layout catalog, layout detection, expanded physical-layout variant, and config-property regressions for the new `physical_layout` setting.
+
+
+## 0.18.6 (2026-03-29)
+
+- Effects/Runtime Boundaries: Inject the selected backend into `EffectsEngine` device acquisition and hardware-effect dispatch, make direct engine hardware starts validate against backend-exposed effects instead of the legacy global adapter, and keep software effects authoritative unless a hardware selection is explicitly namespaced.
+- Effects/Legacy Cleanup: Replace the remaining software/reactive matrix-size dependency on `src/core/effects/ite_backend.py` with a backend-agnostic `src/core/effects/matrix_layout.py` module, then remove the obsolete shim.
+- Docs/Workflow: Add an experimental backend confirmation issue template for promotion requests, and clarify in the README that hardware effect names are backend-specific, `hw:` preserves hardware/software name collisions, and `--update-appimage` also refreshes desktop integration and udev setup.
+- GUI/Installer: Prefer the SVG app logo for Tk window icons when optional rasterization support is available, keep PNG fallback behavior intact, and install/remove the scalable icon alongside the existing desktop PNG asset.
+- Tests: Add focused regressions for backend-injected engine hardware dispatch, backend-aware direct effect validation, hardware/software collision handling, tray startup wiring of the selected backend into the effects engine, and SVG/PNG window-icon cache and fallback behavior.
+
+## 0.18.5 (2026-03-29)
+
+- Tray/Backend Awareness: Resolve tray effect selection, startup state, config polling, menu labels, and icon behavior against the detected backend so hardware-effect menus reflect real backend capabilities and hardware/software name collisions are handled explicitly.
+- Tray/Icon/Assets: Switch the tray icon renderer to the new SVG mask asset, tighten animated icon polling to truly animated states, refresh the bundled app/tray branding assets, and update packaging/install paths to use the new squircle app icon.
+- Docs/Project Organization: Reorganize development docs into `docs/developement/backends/`, `docs/developement/commits/`, `docs/developement/archived/`, and `docs/venv/`, remove the stale flat dev-doc copies, and update internal references to the new structure.
+- Tests: Add focused tray regressions covering backend-aware effect selection, menu capability detection, config normalization, startup icon wiring, animated icon polling, and the updated tray icon cache/visual behavior.
+
+## 0.18.4 (2026-03-29)
+
+- Backends/ITE8910: Fix the remaining issue #4 behavior on `ite8910` by aligning logical `(row, col)` writes with KeyRGB's bottom-up saved-keymap convention, stopping per-frame reset/black clears in software/reactive incremental updates, and preserving the backend's direct firmware speed scale.
+- GUI/Calibrator/Profiles: Use backend-provided matrix dimensions in the calibrator and per-key editor paths, and sanitize out-of-range keymap/per-key color cells on load so older 6x21 profile state cannot bleed into the 6x20 `ite8910` path.
+- GUI/ISO: Extend the built-in reference keyboard overlay with the ISO-only key beside left shift and map `KEY_102ND` into the reactive/keymap identifier model so ISO users can calibrate and use the extra key.
+- Backends/Shared Defaults: Replace scattered hardcoded fallback matrix sizes and string-based hardware-speed detection with shared reference-matrix defaults and explicit backend/device speed-policy metadata.
+- Tests/Docs: Add focused regression coverage for `ite8910` translation and speed-policy metadata, profile sanitization, calibrator dimension wiring, reference defaults/layout invariants, and document the issue #4 investigation in `docs/bug-reports/issue-4.md`.
+
 ## 0.18.3 (2026-03-29)
 
 - Backends/ITE8910: Rewrite the `ite8910` HID protocol around the published reverse-engineered 6-byte `0xCC` feature-report spec, including corrected command builders, mode sequencing, and slot handling for reliable firmware control.
@@ -158,7 +208,7 @@
 - Improvement: Add sysfs multi-zone support (virtual per-key zoning), GUI and tray stability fixes, improved tests, and AppImage packaging updates.
 - Refactor: Extract and simplify backend and tray modules (sysfs device, ITE backend, and lighting-controller helpers); refactor `SysfsLedKeyboardDevice` dataclass to use `primary_led_dir`/`all_led_dirs`, centralize per-key zoning logic, and reduce cyclomatic complexity to improve testability and maintainability.
 - Fix: Sysfs: Restore missing `_max()` helper, add explicit typing for `zone_lists`, and implement N-zone mapping (Left/Center/Right) with `primary_led_dir` and `all_led_dirs`.
-- Fix: Tests: Update `src/tests/test_sysfs_leds_backend_unit.py` to use the new `primary_led_dir` constructor and expand coverage for multi-zone behavior; update tray tests for controller edge cases.
+- Fix: Tests: Update `tests/core/test_sysfs_leds_backend_unit.py` to use the new `primary_led_dir` constructor and expand coverage for multi-zone behavior; update tray tests for controller edge cases.
 - Build: Add LOC and type checks, fix type annotation issues, and ensure the full build pipeline (Compile, Pytest, Type Check, AppImage) passes.
 - Misc: Add `system/udev/99-ite8291-wootbook.rules` for Wootbook ITE permissions and other minor docs/build improvements.
 
@@ -294,7 +344,7 @@
 - Fix: ensure per-key disconnect handling marks the device unavailable while holding the device lock to reduce race windows that could lead to libusb crashes.
 - Maintenance: centralize USB error classification (device disconnected/busy) to reduce duplicated, inconsistent errno/string checks across tray/effects/GUI (`src/core/utils/exceptions.py`).
 - Refactor: extract config property factory helpers into `src/core/config/_props.py` and simplify `src/core/config/config.py` (reduced LOC and clearer property helpers).
-- Tests: add unit tests to cover brightness-split behavior, disconnect-safe effect rendering, and software-effects visibility (`src/tests/test_brightness_split_unit.py`, `src/tests/test_effects_render_disconnect_unit.py`, `src/tests/test_software_effects_visibility_unit.py`).
+- Tests: add unit tests to cover brightness-split behavior, disconnect-safe effect rendering, and software-effects visibility (`tests/core/test_brightness_split_unit.py`, `tests/core/test_effects_render_disconnect_unit.py`, `tests/core/test_software_effects_visibility_unit.py`).
 - Fix: correct a syntax/indentation regression in `src/gui/windows/uniform.py` caught by `py_compile`.
 - Misc: additional small cleanups and test coverage improvements across tray/pollers/effects/GUI.
 

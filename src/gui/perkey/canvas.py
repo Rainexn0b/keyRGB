@@ -3,13 +3,14 @@ from __future__ import annotations
 import tkinter as tk
 from typing import TYPE_CHECKING, Optional
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
+from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef, get_layout_keys
 from src.gui.utils.deck_render_cache import DeckRenderCache
 from src.gui.reference.overlay_geometry import (
     CanvasTransform,
     apply_global_tweak,
     apply_per_key_tweak,
     inset_bbox,
+    key_canvas_hit_rects,
     key_canvas_rect,
     transform_from_drawn_bbox,
 )
@@ -105,6 +106,13 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         return transform_from_drawn_bbox(x0=x0, y0=y0, draw_w=dw, draw_h=dh, image_size=BASE_IMAGE_SIZE)
 
     def _keydef_by_id(self, key_id: str) -> KeyDef | None:
+        physical_layout = getattr(self.editor, "_physical_layout", "auto") or "auto"
+        for key in get_layout_keys(
+            physical_layout,
+            slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
+        ):
+            if key.key_id == key_id:
+                return key
         return KEYDEF_BY_ID.get(key_id)
 
     def _resize_edges_for_point(self, key_id: str, cx: float, cy: float) -> str:
@@ -188,18 +196,21 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         t = self._canvas_transform()
         if t is None:
             return None
-        for kd in REFERENCE_DEVICE_KEYS:
-            x1, y1, x2, y2, inset_value = key_canvas_rect(
+        physical_layout = getattr(self.editor, "_physical_layout", "auto") or "auto"
+        visible_keys = get_layout_keys(
+            physical_layout,
+            slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
+        )
+        for kd in visible_keys:
+            for x1, y1, x2, y2 in key_canvas_hit_rects(
                 transform=t,
                 key=kd,
                 layout_tweaks=self.editor.layout_tweaks,
                 per_key_layout_tweaks=self.editor.per_key_layout_tweaks,
                 image_size=BASE_IMAGE_SIZE,
-            )
-            inset = self._inset_pixels(x2 - x1, y2 - y1, inset_value)
-            x1, y1, x2, y2 = (x1 + inset, y1 + inset, x2 - inset, y2 - inset)
-            if point_in_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy):
-                return kd.key_id
+            ):
+                if point_in_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy):
+                    return kd.key_id
         return None
 
     def _overlay_press_mode(

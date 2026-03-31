@@ -139,15 +139,27 @@ def cleared_all_keys() -> str:
 
 
 def active_profile(name: str) -> str:
-    return f"Active profile: {name}"
+    return f"Active lighting profile: {name}"
 
 
 def saved_profile(name: str) -> str:
-    return f"Saved profile: {name}"
+    return f"Saved lighting profile: {name}"
 
 
 def default_profile_set(name: str) -> str:
-    return f"Default profile: {name}"
+    return f"Default lighting profile: {name}"
+
+
+def layout_defaults_reset(label: str) -> str:
+    return f"Reset to {label} layout defaults"
+
+
+def layout_slot_visibility_updated(key_id: str, visible: bool) -> str:
+    return f"Keyboard setup: {key_id} {'shown' if visible else 'hidden'}"
+
+
+def layout_slot_label_updated(key_id: str, label: str) -> str:
+    return f"Keyboard setup: {key_id} label set to {label}"
 
 
 def sample_tool_pick_a_key() -> str:

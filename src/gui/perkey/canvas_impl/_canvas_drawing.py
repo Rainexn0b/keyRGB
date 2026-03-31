@@ -5,13 +5,27 @@ from tkinter import font as tkfont
 
 from PIL import Image, ImageTk
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS
+from src.core.resources.layout import BASE_IMAGE_SIZE, get_layout_keys
 from src.gui.reference.deck_image import load_reference_deck_image
-from src.gui.reference.overlay_geometry import calc_centered_drawn_bbox, key_canvas_rect
+from src.gui.reference.overlay_geometry import calc_centered_drawn_bbox, key_canvas_hit_rects, key_canvas_rect
 from src.gui.utils.key_draw_style import key_draw_style
 
 
 logger = logging.getLogger(__name__)
+
+
+def _shape_polygon_points(shape_rects: list[tuple[float, float, float, float]]) -> list[float]:
+    if len(shape_rects) != 2:
+        left = min(rect[0] for rect in shape_rects)
+        top = min(rect[1] for rect in shape_rects)
+        right = max(rect[2] for rect in shape_rects)
+        bottom = max(rect[3] for rect in shape_rects)
+        return [left, top, right, top, right, bottom, left, bottom]
+
+    upper, lower = sorted(shape_rects, key=lambda rect: (rect[1], rect[0]))
+    ux1, uy1, ux2, uy2 = upper
+    lx1, _ly1, lx2, ly2 = lower
+    return [ux1, uy1, ux2, uy1, ux2, uy2, lx2, uy2, lx2, ly2, lx1, ly2, lx1, uy2, ux1, uy2]
 
 
 class _KeyboardCanvasDrawingMixin:
@@ -36,7 +50,13 @@ class _KeyboardCanvasDrawingMixin:
         if t is None:
             return
 
-        for key in REFERENCE_DEVICE_KEYS:
+        physical_layout = getattr(getattr(self, "editor", None), "_physical_layout", "auto") or "auto"
+        visible_keys = get_layout_keys(
+            physical_layout,
+            slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
+        )
+
+        for key in visible_keys:
             x1, y1, x2, y2, inset_value = key_canvas_rect(
                 transform=t,
                 key=key,
@@ -60,18 +80,40 @@ class _KeyboardCanvasDrawingMixin:
                 color=color,
             )
 
-            rect_id = self.create_rectangle(
-                x1,
-                y1,
-                x2,
-                y2,
-                fill=style.fill,
-                stipple=style.stipple,
-                outline=style.outline,
-                width=style.width,
-                dash=style.dash,
-                tags=(f"pkey_{key.key_id}", "pkey"),
+            shape_rects = list(
+                key_canvas_hit_rects(
+                    transform=t,
+                    key=key,
+                    layout_tweaks=self.editor.layout_tweaks,
+                    per_key_layout_tweaks=self.editor.per_key_layout_tweaks,
+                    image_size=BASE_IMAGE_SIZE,
+                )
             )
+            if len(shape_rects) == 1:
+                sx1, sy1, sx2, sy2 = shape_rects[0]
+                rect_id = self.create_rectangle(
+                    sx1,
+                    sy1,
+                    sx2,
+                    sy2,
+                    fill=style.fill,
+                    stipple=style.stipple,
+                    outline=style.outline,
+                    width=style.width,
+                    dash=style.dash,
+                    tags=(f"pkey_{key.key_id}", "pkey"),
+                )
+            else:
+                rect_id = self.create_polygon(
+                    _shape_polygon_points(shape_rects),
+                    fill=style.fill,
+                    stipple=style.stipple,
+                    outline=style.outline,
+                    width=style.width,
+                    dash=style.dash,
+                    joinstyle="miter",
+                    tags=(f"pkey_{key.key_id}", "pkey"),
+                )
             self.key_rects[key.key_id] = rect_id
 
             key_w = max(1, int(x2 - x1))

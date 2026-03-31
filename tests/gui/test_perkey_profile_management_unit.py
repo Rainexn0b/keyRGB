@@ -87,10 +87,15 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
     monkeypatch.setattr(
         profile_management.profiles,
         "load_keymap",
-        lambda _name: {"keep": (0, 0), "drop": (0, 20)},
+        lambda _name, **_kwargs: {"keep": (0, 0), "drop": (0, 20)},
     )
-    monkeypatch.setattr(profile_management.profiles, "load_layout_global", lambda _name: {"dx": 1.0})
-    monkeypatch.setattr(profile_management.profiles, "load_layout_per_key", lambda _name: {"keep": {"dx": 0.1}})
+    monkeypatch.setattr(profile_management.profiles, "load_layout_global", lambda _name, **_kwargs: {"dx": 1.0})
+    monkeypatch.setattr(profile_management.profiles, "load_layout_per_key", lambda _name, **_kwargs: {"keep": {"dx": 0.1}})
+    monkeypatch.setattr(
+        profile_management.profiles,
+        "load_layout_slots",
+        lambda _name, **_kwargs: {"nonusbackslash": {"visible": False}},
+    )
     monkeypatch.setattr(
         profile_management.profiles,
         "load_per_key_colors",
@@ -113,6 +118,7 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
         current_colors={(3, 3): (2, 2, 2)},
         num_rows=6,
         num_cols=20,
+        physical_layout="ansi",
     )
 
     assert result.name == "safe-p1"
@@ -120,6 +126,7 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
     assert result.layout_tweaks == {"dx": 1.0}
     assert result.per_key_layout_tweaks == {"keep": {"dx": 0.1}}
     assert result.colors == {(1, 1): (10, 20, 30)}
+    assert result.layout_slot_overrides == {"nonusbackslash": {"visible": False}}
     assert applied == {
         "config": cfg,
         "colors": {(1, 1): (10, 20, 30)},

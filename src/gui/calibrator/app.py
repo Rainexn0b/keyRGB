@@ -10,11 +10,11 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 
 from src.core.config import Config
-from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
+from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef, get_layout_keys
 from src.gui.perkey.hardware import NUM_ROWS as BACKEND_NUM_ROWS, NUM_COLS as BACKEND_NUM_COLS
 from src.gui.perkey.profile_management import sanitize_keymap_cells
 from .helpers.canvas_render import redraw_calibration_canvas
-from .helpers.geometry import hit_test, key_canvas_bbox
+from .helpers.geometry import hit_test
 from .helpers.probe import CalibrationProbeState
 from src.gui.utils.profile_backdrop_storage import (
     load_backdrop_image,
@@ -29,6 +29,7 @@ from .helpers.profile_storage import (
     load_keymap,
     load_layout_global,
     load_layout_per_key,
+    load_layout_slots,
     save_keymap,
 )
 
@@ -79,6 +80,7 @@ class KeymapCalibrator(tk.Tk):
         )
         self.layout_tweaks = load_layout_global(self.profile_name)
         self.per_key_layout_tweaks = load_layout_per_key(self.profile_name)
+        self.layout_slot_overrides = load_layout_slots(self.profile_name, self.cfg.physical_layout)
 
         self.probe = CalibrationProbeState(rows=MATRIX_ROWS, cols=MATRIX_COLS)
 
@@ -275,6 +277,8 @@ class KeymapCalibrator(tk.Tk):
             per_key_layout_tweaks=self.per_key_layout_tweaks,
             keymap=self.keymap,
             selected_key_id=self.probe.selected_key_id,
+            physical_layout=self.cfg.physical_layout,
+            slot_overrides=self.layout_slot_overrides,
         )
 
     def _on_click(self, e: tk.Event) -> None:
@@ -298,13 +302,14 @@ class KeymapCalibrator(tk.Tk):
         if self._transform is None:
             return None
 
+        visible_keys = get_layout_keys(self.cfg.physical_layout, slot_overrides=self.layout_slot_overrides)
         return hit_test(
             transform=self._transform,
             x=x,
             y=y,
             layout_tweaks=self.layout_tweaks,
             per_key_layout_tweaks=self.per_key_layout_tweaks,
-            keys=REFERENCE_DEVICE_KEYS,
+            keys=visible_keys,
             image_size=BASE_IMAGE_SIZE,
         )
 

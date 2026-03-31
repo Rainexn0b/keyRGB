@@ -28,3 +28,7 @@ def load_layout_global(profile_name: str) -> Dict[str, float]:
 
 def load_layout_per_key(profile_name: str) -> Dict[str, Dict[str, float]]:
     return profiles.load_layout_per_key(profile_name)
+
+
+def load_layout_slots(profile_name: str, physical_layout: str) -> Dict[str, Dict[str, object]]:
+    return profiles.load_layout_slots(profile_name, physical_layout=physical_layout)

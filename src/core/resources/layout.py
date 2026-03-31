@@ -20,6 +20,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List, Tuple, cast
 
+from .layout_specs import load_layout_spec
+
 
 BASE_IMAGE_SIZE: Tuple[int, int] = (1008, 450)
 
@@ -29,6 +31,7 @@ class KeyDef:
     key_id: str
     label: str
     rect: Tuple[int, int, int, int]  # x, y, w, h in BASE_IMAGE_SIZE coords
+    shape_segments: Tuple[Tuple[float, float, float, float], ...] | None = None
 
 
 def _units_row(y: int, x0: int, unit: int, gap: int, keys: Iterable[Tuple[str, str, float]]) -> List[KeyDef]:
@@ -68,13 +71,173 @@ def _units_row_with_spacers(
     return out
 
 
-def build_layout() -> List[KeyDef]:
-    """Return the built-in reference layout with ANSI+ISO hitboxes.
+def _segmented_key(
+    key_id: str,
+    label: str,
+    segments: Iterable[Tuple[int, int, int, int]],
+) -> KeyDef:
+    segment_list = list(segments)
+    if not segment_list:
+        return KeyDef(key_id=key_id, label=label, rect=(0, 0, 0, 0))
 
-    The drawing stays close to the historical full-size reference deck, but it
-    includes the ISO-only key next to left shift so ISO users can calibrate the
-    extra physical key instead of being blocked by an ANSI-only overlay.
+    left = min(x for x, _y, _w, _h in segment_list)
+    top = min(y for _x, y, _w, _h in segment_list)
+    right = max(x + w for x, _y, w, _h in segment_list)
+    bottom = max(y + h for _x, y, _w, h in segment_list)
+    width = max(1, right - left)
+    height = max(1, bottom - top)
+
+    normalized_segments = tuple(
+        (
+            float(x - left) / float(width),
+            float(y - top) / float(height),
+            float(w) / float(width),
+            float(h) / float(height),
+        )
+        for x, y, w, h in segment_list
+    )
+    return KeyDef(
+        key_id=key_id,
+        label=label,
+        rect=(left, top, width, height),
+        shape_segments=normalized_segments,
+    )
+
+
+LAYOUT_VARIANTS: frozenset[str] = frozenset({"ansi", "iso", "ks", "abnt", "jis"})
+
+ISO_ONLY_KEY_IDS: frozenset[str] = frozenset({"nonusbackslash", "nonushash"})
+"""Key IDs that exist on ISO-style alpha blocks and derived variants."""
+
+
+def _normalize_layout_variant(variant: str | None) -> str:
+    normalized = str(variant or "iso").strip().lower()
+    return normalized if normalized in LAYOUT_VARIANTS else "iso"
+
+
+def _end_x(keys: List[KeyDef]) -> int:
+    if not keys:
+        return 0
+    last = keys[-1]
+    return int(last.rect[0] + last.rect[2])
+
+
+def _layout_row_items(
+    spec: dict[str, object], row_name: str
+) -> List[Tuple[str, str, float] | Tuple[None, None, float]]:
+    rows = spec.get("rows")
+    if not isinstance(rows, dict):
+        return []
+    raw_items = rows.get(row_name)
+    if not isinstance(raw_items, list):
+        return []
+
+    out: List[Tuple[str, str, float] | Tuple[None, None, float]] = []
+    for raw_item in raw_items:
+        if not isinstance(raw_item, dict):
+            continue
+        if "spacer" in raw_item:
+            spacer = raw_item.get("spacer")
+            if isinstance(spacer, (int, float)):
+                out.append((None, None, float(spacer)))
+            continue
+
+        key_id = raw_item.get("key_id")
+        label = raw_item.get("label")
+        width = raw_item.get("width")
+        if isinstance(key_id, str) and isinstance(label, str) and isinstance(width, (int, float)):
+            out.append((key_id, label, float(width)))
+    return out
+
+
+def _shape_segments_from_spec(raw_segments: object) -> Tuple[Tuple[float, float, float, float], ...] | None:
+    if not isinstance(raw_segments, list):
+        return None
+
+    segments: list[Tuple[float, float, float, float]] = []
+    for raw_segment in raw_segments:
+        if not isinstance(raw_segment, list | tuple) or len(raw_segment) != 4:
+            continue
+        x, y, w, h = raw_segment
+        if all(isinstance(value, (int, float)) for value in (x, y, w, h)):
+            segments.append((float(x), float(y), float(w), float(h)))
+    return tuple(segments) if segments else None
+
+
+def _layout_special_keys(
+    spec: dict[str, object],
+    *,
+    row_lookup: dict[str, List[KeyDef]],
+    row_top_lookup: dict[str, int],
+    unit: int,
+    gap: int,
+) -> List[KeyDef]:
+    raw_special_keys = spec.get("special_keys")
+    if not isinstance(raw_special_keys, list):
+        return []
+
+    out: List[KeyDef] = []
+    for raw_key in raw_special_keys:
+        if not isinstance(raw_key, dict):
+            continue
+        key_id = raw_key.get("key_id")
+        label = raw_key.get("label")
+        anchor_after_row = raw_key.get("anchor_after_row")
+        y_row = raw_key.get("y_row")
+        width = raw_key.get("width")
+        height_rows = raw_key.get("height_rows")
+        dx = raw_key.get("dx", 0)
+        dy = raw_key.get("dy", 0)
+
+        if not (
+            isinstance(key_id, str)
+            and isinstance(label, str)
+            and isinstance(anchor_after_row, str)
+            and isinstance(y_row, str)
+            and isinstance(width, (int, float))
+            and isinstance(height_rows, int)
+            and isinstance(dx, (int, float))
+            and isinstance(dy, (int, float))
+        ):
+            continue
+
+        anchor_row = row_lookup.get(anchor_after_row, [])
+        y_base = row_top_lookup.get(y_row)
+        if y_base is None:
+            continue
+
+        rect = (
+            _end_x(anchor_row) + gap + int(round(float(dx))),
+            y_base + int(round(float(dy))),
+            int(round(float(width) * unit)),
+            max(1, int(height_rows) * unit + (max(1, int(height_rows)) - 1) * gap),
+        )
+        out.append(
+            KeyDef(
+                key_id=key_id,
+                label=label,
+                rect=rect,
+                shape_segments=_shape_segments_from_spec(raw_key.get("shape_segments")),
+            )
+        )
+    return out
+
+
+def build_layout(*, variant: str | None = None, include_iso: bool | None = None) -> List[KeyDef]:
+    """Return the built-in reference layout.
+
+    ``variant`` selects a concrete physical keyboard family. Supported values
+    are ``"ansi"``, ``"iso"``, ``"ks"``, ``"abnt"``, and ``"jis"``.
+
+    ``include_iso`` is kept for backward compatibility with older ANSI/ISO-only
+    callers. When provided without an explicit ``variant``, ``False`` maps to
+    ``"ansi"`` and ``True`` maps to ``"iso"``.
     """
+
+    if variant is None and include_iso is not None:
+        variant = "iso" if include_iso else "ansi"
+    variant = _normalize_layout_variant(variant)
+    spec = load_layout_spec(variant) or load_layout_spec("iso")
 
     unit = 40
     gap = 6
@@ -146,111 +309,36 @@ def build_layout() -> List[KeyDef]:
         ],
     )
 
-    keys += _units_row(
-        r0,
-        x0,
-        unit,
-        gap,
-        [
-            ("grave", "`", 1),
-            ("1", "1", 1),
-            ("2", "2", 1),
-            ("3", "3", 1),
-            ("4", "4", 1),
-            ("5", "5", 1),
-            ("6", "6", 1),
-            ("7", "7", 1),
-            ("8", "8", 1),
-            ("9", "9", 1),
-            ("0", "0", 1),
-            ("minus", "-", 1),
-            ("equal", "=", 1),
-            ("backspace", "Bksp", 2.15),
-        ],
-    )
+    number_row = _units_row_with_spacers(r0, x0, unit, gap, _layout_row_items(spec, "number"))
+    keys += number_row
 
-    keys += _units_row(
-        r1,
-        x0,
-        unit,
-        gap,
-        [
-            ("tab", "Tab", 1.5),
-            ("q", "Q", 1),
-            ("w", "W", 1),
-            ("e", "E", 1),
-            ("r", "R", 1),
-            ("t", "T", 1),
-            ("y", "Y", 1),
-            ("u", "U", 1),
-            ("i", "I", 1),
-            ("o", "O", 1),
-            ("p", "P", 1),
-            ("lbracket", "[", 1),
-            ("rbracket", "]", 1),
-            ("bslash", "\\", 1.65),
-        ],
-    )
+    top_row = _units_row_with_spacers(r1, x0, unit, gap, _layout_row_items(spec, "top"))
+    keys += top_row
 
-    keys += _units_row(
-        r2,
-        x0,
-        unit,
-        gap,
-        [
-            ("caps", "Caps", 1.75),
-            ("a", "A", 1),
-            ("s", "S", 1),
-            ("d", "D", 1),
-            ("f", "F", 1),
-            ("g", "G", 1),
-            ("h", "H", 1),
-            ("j", "J", 1),
-            ("k", "K", 1),
-            ("l", "L", 1),
-            ("semicolon", ";", 1),
-            ("quote", "'", 1),
-            ("enter", "Enter", 2.35),
-        ],
-    )
+    home_row = _units_row_with_spacers(r2, x0, unit, gap, _layout_row_items(spec, "home"))
+    keys += home_row
 
-    keys += _units_row(
-        r3,
-        x0,
-        unit,
-        gap,
-        [
-            ("lshift", "Shift", 1.25),
-            ("nonusbackslash", "<>", 1),
-            ("z", "Z", 1),
-            ("x", "X", 1),
-            ("c", "C", 1),
-            ("v", "V", 1),
-            ("b", "B", 1),
-            ("n", "N", 1),
-            ("m", "M", 1),
-            ("comma", ",", 1),
-            ("dot", ".", 1),
-            ("slash", "/", 1),
-            ("rshift", "Shift", 2.85),
-        ],
-    )
+    row_lookup = {
+        "number": number_row,
+        "top": top_row,
+        "home": home_row,
+    }
+    row_top_lookup = {
+        "number": r0,
+        "top": r1,
+        "home": r2,
+        "shift": r3,
+        "bottom": r4,
+    }
+    keys += _layout_special_keys(spec, row_lookup=row_lookup, row_top_lookup=row_top_lookup, unit=unit, gap=gap)
 
-    keys += _units_row(
-        r4,
-        x0,
-        unit,
-        gap,
-        [
-            ("lctrl", "Ctrl", 1.25),
-            ("fn", "Fn", 1.0),
-            ("lwin", "Win", 1.0),
-            ("lalt", "Alt", 1.25),
-            ("space", "Space", 6.45),
-            ("ralt", "Alt", 1.25),
-            ("menu", "Copilot", 1.0),
-        ],
-    )
+    shift_row = _units_row_with_spacers(r3, x0, unit, gap, _layout_row_items(spec, "shift"))
+    keys += shift_row
+    row_lookup["shift"] = shift_row
+
+    bottom_row = _units_row_with_spacers(r4, x0, unit, gap, _layout_row_items(spec, "bottom"))
+    keys += bottom_row
+    row_lookup["bottom"] = bottom_row
 
     arrow_unit = 34
     ax0 = 642
@@ -296,4 +384,44 @@ def build_layout() -> List[KeyDef]:
     return keys
 
 
-REFERENCE_DEVICE_KEYS: List[KeyDef] = build_layout()
+def _build_reference_device_keys() -> List[KeyDef]:
+    out: List[KeyDef] = []
+    seen: set[str] = set()
+    for variant_name in ("iso", "ansi", "ks", "abnt", "jis"):
+        for key in build_layout(variant=variant_name):
+            if key.key_id in seen:
+                continue
+            out.append(key)
+            seen.add(key.key_id)
+    return out
+
+
+# Superset used by backends and overlay helpers that need a stable key-id index.
+REFERENCE_DEVICE_KEYS: List[KeyDef] = _build_reference_device_keys()
+
+
+def get_layout_keys(
+    physical_layout: str = "auto",
+    *,
+    slot_overrides: dict[str, dict[str, object]] | None = None,
+) -> List[KeyDef]:
+    """Return the reference layout key list for *physical_layout*.
+
+    Delegates to :mod:`src.core.resources.layouts` for catalog resolution.
+    ``"auto"`` probes sysfs; other values are looked up in the layout catalog.
+    """
+
+    from .layouts import get_layout_keys as _get
+
+    return _get(physical_layout, slot_overrides=slot_overrides)
+
+
+def resolve_physical_layout(physical_layout: str) -> str:
+    """Resolve *physical_layout* to a concrete, non-``"auto"`` layout ID.
+
+    Delegates to :mod:`src.core.resources.layouts` for catalog resolution.
+    """
+
+    from .layouts import resolve_layout_id
+
+    return resolve_layout_id(physical_layout)

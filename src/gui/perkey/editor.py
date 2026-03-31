@@ -7,8 +7,9 @@ import tkinter as tk
 from tkinter import ttk
 
 from src.core.config import Config
-from src.core.resources.defaults import DEFAULT_LAYOUT_TWEAKS
-from src.core.resources.layout import REFERENCE_DEVICE_KEYS
+from src.core.resources.defaults import get_default_layout_tweaks
+from src.core.resources.layout_slots import get_layout_slot_states
+from src.core.resources.layout import get_layout_keys
 from src.core.profile import profiles
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_theme
@@ -28,6 +29,7 @@ from .ui.profile_actions import (
     activate_profile_ui,
     delete_profile_ui,
     new_profile_ui,
+    reset_layout_defaults_ui,
     save_profile_ui,
     set_default_profile_ui,
 )
@@ -39,6 +41,8 @@ from .ui.full_map import ensure_full_map_ui
 from .ui.sample_tool import on_key_clicked_ui, on_sample_tool_toggled_ui
 from .ui.status import (
     auto_synced_overlay_tweaks,
+    layout_slot_label_updated,
+    layout_slot_visibility_updated,
     no_keymap_found_initial,
     reset_overlay_tweaks_for_key,
     reset_overlay_tweaks_global,
@@ -99,6 +103,11 @@ class PerKeyEditor:
 
         self.config = Config()
         self.profile_name = profiles.get_active_profile()
+        self._physical_layout: str = self.config.physical_layout
+
+        # Tk variable so the layout dropdown in editor_ui can bind to it.
+        # Stores the layout_id (e.g. "auto", "ansi", "iso").
+        self._layout_var = tk.StringVar(value=self._physical_layout)
 
         self.backdrop_transparency = tk.DoubleVar(value=float(profiles.load_backdrop_transparency(self.profile_name)))
         self._backdrop_transparency_save_job: str | None = None
@@ -119,13 +128,13 @@ class PerKeyEditor:
         self.keymap: dict[str, tuple[int, int]] = self._load_keymap()
         self.layout_tweaks = self._load_layout_tweaks()
         self.per_key_layout_tweaks: dict[str, dict[str, float]] = self._load_per_key_layout_tweaks()
+        self.layout_slot_overrides: dict[str, dict[str, object]] = self._load_layout_slot_overrides()
 
         self.overlay_scope = tk.StringVar(value="global")  # global | key
         self.apply_all_keys = tk.BooleanVar(value=False)
         self.sample_tool_enabled = tk.BooleanVar(value=False)
         self._sample_tool_has_sampled = False
-        self._profiles_visible = True
-        self._overlay_visible = False
+        self._setup_panel_mode: str | None = None
         self._profile_name_var = tk.StringVar(value=self.profile_name)
         self.selected_key_id: str | None = None
         self.selected_cell: tuple[int, int] | None = None
@@ -143,7 +152,8 @@ class PerKeyEditor:
 
         self.root.bind("<FocusIn>", lambda _e: self._reload_keymap())
 
-        for kd in REFERENCE_DEVICE_KEYS:
+        visible_keys = self._get_visible_layout_keys()
+        for kd in visible_keys:
             if kd.key_id in self.keymap:
                 self.select_key_id(kd.key_id)
                 break
@@ -192,6 +202,74 @@ class PerKeyEditor:
 
     def _build_ui(self):
         build_editor_ui(self)
+
+    def _get_visible_layout_keys(self):
+        return get_layout_keys(self._physical_layout, slot_overrides=self.layout_slot_overrides)
+
+    def _refresh_layout_slot_controls(self) -> None:
+        from .ui.layout_slots import refresh_layout_slots_ui
+
+        refresh_layout_slots_ui(self)
+
+    def _sync_visible_layout_state(self) -> None:
+        visible_keys = self._get_visible_layout_keys()
+        visible_key_ids = {key.key_id for key in visible_keys}
+        if self.selected_key_id not in visible_key_ids:
+            self.selected_key_id = None
+            self.selected_cell = None
+            for key in visible_keys:
+                if key.key_id in self.keymap:
+                    self.select_key_id(key.key_id)
+                    break
+
+    def _load_layout_slot_overrides(self) -> dict[str, dict[str, object]]:
+        return profiles.load_layout_slots(self.profile_name, physical_layout=self._physical_layout)
+
+    def _persist_layout_slot_overrides(self) -> None:
+        self.layout_slot_overrides = profiles.save_layout_slots(
+            dict(self.layout_slot_overrides),
+            self.profile_name,
+            physical_layout=self._physical_layout,
+        )
+
+    def _set_layout_slot_visibility(self, key_id: str, visible: bool) -> None:
+        override = dict(self.layout_slot_overrides.get(key_id, {}))
+        if bool(visible):
+            override.pop("visible", None)
+        else:
+            override["visible"] = False
+
+        if override:
+            self.layout_slot_overrides[key_id] = override
+        else:
+            self.layout_slot_overrides.pop(key_id, None)
+
+        self._persist_layout_slot_overrides()
+        self._refresh_layout_slot_controls()
+        self._sync_visible_layout_state()
+        self.canvas.redraw()
+        set_status(self, layout_slot_visibility_updated(key_id, visible))
+
+    def _set_layout_slot_label(self, key_id: str, label: str) -> None:
+        default_labels = {state.key_id: state.default_label for state in get_layout_slot_states(self._physical_layout)}
+        normalized_label = str(label).strip()
+        override = dict(self.layout_slot_overrides.get(key_id, {}))
+        default_label = default_labels.get(key_id, key_id)
+
+        if normalized_label and normalized_label != default_label:
+            override["label"] = normalized_label
+        else:
+            override.pop("label", None)
+
+        if override:
+            self.layout_slot_overrides[key_id] = override
+        else:
+            self.layout_slot_overrides.pop(key_id, None)
+
+        self._persist_layout_slot_overrides()
+        self._refresh_layout_slot_controls()
+        self.canvas.redraw()
+        set_status(self, layout_slot_label_updated(key_id, normalized_label or default_label))
 
     def select_key_id(self, key_id: str):
         self.selected_key_id = key_id
@@ -244,7 +322,7 @@ class PerKeyEditor:
             set_status(self, reset_overlay_tweaks_for_key(self.selected_key_id))
             return
 
-        self.layout_tweaks = dict(DEFAULT_LAYOUT_TWEAKS)
+        self.layout_tweaks = get_default_layout_tweaks(self._physical_layout)
         self.overlay_controls.sync_vars_from_scope()
         self.canvas.redraw()
         set_status(self, reset_overlay_tweaks_global())
@@ -253,10 +331,11 @@ class PerKeyEditor:
         auto_sync_per_key_overlays(
             layout_tweaks=self.layout_tweaks,
             per_key_layout_tweaks=self.per_key_layout_tweaks,
+            keys=self._get_visible_layout_keys(),
         )
 
         # Refresh UI.
-        if self._overlay_visible:
+        if self._setup_panel_mode == "overlay":
             self.overlay_controls.sync_vars_from_scope()
         self.canvas.redraw()
         set_status(self, auto_synced_overlay_tweaks())
@@ -309,19 +388,61 @@ class PerKeyEditor:
         clear_all_ui(self, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _load_layout_tweaks(self) -> dict[str, float]:
-        return profiles.load_layout_global(self.profile_name)
+        return profiles.load_layout_global(self.profile_name, physical_layout=self._physical_layout)
 
     def _load_per_key_layout_tweaks(self) -> dict[str, dict[str, float]]:
-        return profiles.load_layout_per_key(self.profile_name)
+        return profiles.load_layout_per_key(self.profile_name, physical_layout=self._physical_layout)
+
+    def _on_layout_changed(self) -> None:
+        """Handle layout dropdown change — update overlay and persist to config."""
+        layout_id = self._layout_var.get()
+        self._physical_layout = layout_id
+        self.config.physical_layout = layout_id
+
+        profile_paths = profiles.paths_for(self.profile_name)
+        if not profile_paths.keymap.exists():
+            self.keymap = self._load_keymap()
+        if not profile_paths.layout_global.exists():
+            self.layout_tweaks = self._load_layout_tweaks()
+        if not profile_paths.layout_per_key.exists():
+            self.per_key_layout_tweaks = self._load_per_key_layout_tweaks()
+
+        self.layout_slot_overrides = self._load_layout_slot_overrides()
+
+        if self._setup_panel_mode == "overlay":
+            self.overlay_controls.sync_vars_from_scope()
+
+        self._refresh_layout_slot_controls()
+        self._sync_visible_layout_state()
+
+        self.canvas.redraw()
+
+    def _hide_setup_panel(self) -> None:
+        self.overlay_controls.grid_remove()
+        self._layout_setup_controls.grid_remove()
+        self._setup_panel_mode = None
+
+    def _show_setup_panel(self, mode: str) -> None:
+        self._hide_setup_panel()
+        if mode == "overlay":
+            self.overlay_controls.grid()
+            self.overlay_controls.sync_vars_from_scope()
+        elif mode == "layout":
+            self._layout_setup_controls.grid()
+            self._refresh_layout_slot_controls()
+        self._setup_panel_mode = mode
 
     def _toggle_overlay(self):
-        if self._overlay_visible:
-            self.overlay_controls.grid_remove()
-            self._overlay_visible = False
+        if self._setup_panel_mode == "overlay":
+            self._hide_setup_panel()
         else:
-            self.overlay_controls.grid()
-            self._overlay_visible = True
-            self.overlay_controls.sync_vars_from_scope()
+            self._show_setup_panel("overlay")
+
+    def _toggle_layout_setup(self):
+        if self._setup_panel_mode == "layout":
+            self._hide_setup_panel()
+        else:
+            self._show_setup_panel("layout")
 
     def _new_profile(self):
         new_profile_ui(self)
@@ -338,8 +459,15 @@ class PerKeyEditor:
     def _set_default_profile(self):
         set_default_profile_ui(self)
 
+    def _reset_layout_defaults(self):
+        reset_layout_defaults_ui(self)
+
     def _load_keymap(self) -> dict[str, tuple[int, int]]:
-        return sanitize_keymap_cells(profiles.load_keymap(self.profile_name), num_rows=NUM_ROWS, num_cols=NUM_COLS)
+        return sanitize_keymap_cells(
+            profiles.load_keymap(self.profile_name, physical_layout=self._physical_layout),
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+        )
 
     def run(self):
         self.root.mainloop()

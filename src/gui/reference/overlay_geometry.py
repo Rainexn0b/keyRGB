@@ -161,6 +161,36 @@ def key_canvas_rect(
     return x1, y1, x2, y2, inset_value
 
 
+def key_canvas_hit_rects(
+    *,
+    transform: CanvasTransform,
+    key: KeyDef,
+    layout_tweaks: Dict[str, float],
+    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    image_size: tuple[int, int] = BASE_IMAGE_SIZE,
+) -> Tuple[Tuple[float, float, float, float], ...]:
+    x1, y1, x2, y2, inset_value = key_canvas_rect(
+        transform=transform,
+        key=key,
+        layout_tweaks=layout_tweaks,
+        per_key_layout_tweaks=per_key_layout_tweaks,
+        image_size=image_size,
+    )
+    x1, y1, x2, y2 = inset_bbox(x1=x1, y1=y1, x2=x2, y2=y2, inset_value=float(inset_value))
+
+    shape_segments = key.shape_segments or ((0.0, 0.0, 1.0, 1.0),)
+    width = max(1.0, x2 - x1)
+    height = max(1.0, y2 - y1)
+    out: list[Tuple[float, float, float, float]] = []
+    for sx, sy, sw, sh in shape_segments:
+        seg_x1 = x1 + float(sx) * width
+        seg_y1 = y1 + float(sy) * height
+        seg_x2 = seg_x1 + float(sw) * width
+        seg_y2 = seg_y1 + float(sh) * height
+        out.append((seg_x1, seg_y1, seg_x2, seg_y2))
+    return tuple(out)
+
+
 def inset_bbox(
     *,
     x1: float,

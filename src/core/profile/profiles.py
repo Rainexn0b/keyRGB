@@ -33,10 +33,11 @@ from .paths import (
 )
 from src.core.resources.defaults import (
     DEFAULT_COLORS,
-    DEFAULT_KEYMAP,
-    DEFAULT_LAYOUT_TWEAKS,
-    DEFAULT_PER_KEY_TWEAKS,
+    get_default_keymap,
+    get_default_layout_tweaks,
+    get_default_per_key_tweaks,
 )
+from src.core.config.layout_slots import load_layout_slot_overrides, save_layout_slot_overrides
 
 # Backwards-compatible constant
 _DEFAULT_PROFILE = DEFAULT_PROFILE_NAME
@@ -55,6 +56,7 @@ __all__ = [
     "load_keymap",
     "load_layout_global",
     "load_layout_per_key",
+    "load_layout_slots",
     "load_per_key_colors",
     "paths_for",
     "profiles_root",
@@ -63,6 +65,7 @@ __all__ = [
     "save_keymap",
     "save_layout_global",
     "save_layout_per_key",
+    "save_layout_slots",
     "save_per_key_colors",
     "migrate_builtin_profile_brightness",
     "set_active_profile",
@@ -70,11 +73,11 @@ __all__ = [
 ]
 
 
-def load_keymap(name: str | None = None) -> Dict[str, Tuple[int, int]]:
+def load_keymap(name: str | None = None, *, physical_layout: str | None = None) -> Dict[str, Tuple[int, int]]:
     p = paths_for(name).keymap
     raw = read_json(p)
     if raw is None:
-        raw = DEFAULT_KEYMAP
+        raw = get_default_keymap(physical_layout)
 
     out: Dict[str, Tuple[int, int]] = {}
     if isinstance(raw, dict):
@@ -99,11 +102,11 @@ def save_keymap(keymap: Dict[str, Tuple[int, int]], name: str | None = None) -> 
     write_json_atomic(p, payload)
 
 
-def load_layout_global(name: str | None = None) -> Dict[str, float]:
+def load_layout_global(name: str | None = None, *, physical_layout: str | None = None) -> Dict[str, float]:
     p = paths_for(name).layout_global
     raw = read_json(p)
     if raw is None:
-        raw = DEFAULT_LAYOUT_TWEAKS
+        raw = get_default_layout_tweaks(physical_layout)
 
     out = {"dx": 0.0, "dy": 0.0, "sx": 1.0, "sy": 1.0, "inset": 0.06}
     if isinstance(raw, dict):
@@ -127,11 +130,11 @@ def save_layout_global(tweaks: Dict[str, float], name: str | None = None) -> Non
     write_json_atomic(p, payload)
 
 
-def load_layout_per_key(name: str | None = None) -> Dict[str, Dict[str, float]]:
+def load_layout_per_key(name: str | None = None, *, physical_layout: str | None = None) -> Dict[str, Dict[str, float]]:
     p = paths_for(name).layout_per_key
     raw = read_json(p)
     if raw is None:
-        raw = DEFAULT_PER_KEY_TWEAKS
+        raw = get_default_per_key_tweaks(physical_layout)
 
     out: Dict[str, Dict[str, float]] = {}
     if isinstance(raw, dict):
@@ -166,6 +169,23 @@ def save_layout_per_key(per_key: Dict[str, Dict[str, float]], name: str | None =
                 t["inset"] = max(0.0, min(0.20, float(t["inset"])))
             payload[key_id] = t
     write_json_atomic(p, payload)
+
+
+def load_layout_slots(
+    name: str | None = None,
+    *,
+    physical_layout: str | None = None,
+) -> Dict[str, Dict[str, object]]:
+    return load_layout_slot_overrides(physical_layout or "auto", legacy_profile_name=name)
+
+
+def save_layout_slots(
+    layout_slots: Dict[str, Dict[str, object]],
+    name: str | None = None,
+    *,
+    physical_layout: str | None = None,
+) -> Dict[str, Dict[str, object]]:
+    return save_layout_slot_overrides(physical_layout or "auto", layout_slots)
 
 
 def load_per_key_colors(

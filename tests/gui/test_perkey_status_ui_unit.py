@@ -77,8 +77,8 @@ def test_messages_match_existing_strings() -> None:
     assert filled_all_keys_rgb(1, 2, 3) == "Filled all keys = RGB(1,2,3)"
     assert cleared_all_keys() == "Cleared all keys"
 
-    assert active_profile("p") == "Active profile: p"
-    assert saved_profile("p") == "Saved profile: p"
+    assert active_profile("p") == "Active lighting profile: p"
+    assert saved_profile("p") == "Saved lighting profile: p"
 
 
 def test_action_failed_includes_next_steps() -> None:

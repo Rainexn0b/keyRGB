@@ -1,0 +1,294 @@
+{
+  "layouts": {
+    "ansi": {
+      "rows": {
+        "number": [
+          {"key_id": "grave", "label": "`", "width": 1},
+          {"key_id": "1", "label": "1", "width": 1},
+          {"key_id": "2", "label": "2", "width": 1},
+          {"key_id": "3", "label": "3", "width": 1},
+          {"key_id": "4", "label": "4", "width": 1},
+          {"key_id": "5", "label": "5", "width": 1},
+          {"key_id": "6", "label": "6", "width": 1},
+          {"key_id": "7", "label": "7", "width": 1},
+          {"key_id": "8", "label": "8", "width": 1},
+          {"key_id": "9", "label": "9", "width": 1},
+          {"key_id": "0", "label": "0", "width": 1},
+          {"key_id": "minus", "label": "-", "width": 1},
+          {"key_id": "equal", "label": "=", "width": 1},
+          {"key_id": "backspace", "label": "Bksp", "width": 2.15}
+        ],
+        "top": [
+          {"key_id": "tab", "label": "Tab", "width": 1.5},
+          {"key_id": "q", "label": "Q", "width": 1},
+          {"key_id": "w", "label": "W", "width": 1},
+          {"key_id": "e", "label": "E", "width": 1},
+          {"key_id": "r", "label": "R", "width": 1},
+          {"key_id": "t", "label": "T", "width": 1},
+          {"key_id": "y", "label": "Y", "width": 1},
+          {"key_id": "u", "label": "U", "width": 1},
+          {"key_id": "i", "label": "I", "width": 1},
+          {"key_id": "o", "label": "O", "width": 1},
+          {"key_id": "p", "label": "P", "width": 1},
+          {"key_id": "lbracket", "label": "[", "width": 1},
+          {"key_id": "rbracket", "label": "]", "width": 1},
+          {"key_id": "bslash", "label": "\\", "width": 1.65}
+        ],
+        "home": [
+          {"key_id": "caps", "label": "Caps", "width": 1.75},
+          {"key_id": "a", "label": "A", "width": 1},
+          {"key_id": "s", "label": "S", "width": 1},
+          {"key_id": "d", "label": "D", "width": 1},
+          {"key_id": "f", "label": "F", "width": 1},
+          {"key_id": "g", "label": "G", "width": 1},
+          {"key_id": "h", "label": "H", "width": 1},
+          {"key_id": "j", "label": "J", "width": 1},
+          {"key_id": "k", "label": "K", "width": 1},
+          {"key_id": "l", "label": "L", "width": 1},
+          {"key_id": "semicolon", "label": ";", "width": 1},
+          {"key_id": "quote", "label": "'", "width": 1},
+          {"key_id": "enter", "label": "Enter", "width": 2.35}
+        ],
+        "shift": [
+          {"key_id": "lshift", "label": "Shift", "width": 2.4},
+          {"key_id": "z", "label": "Z", "width": 1},
+          {"key_id": "x", "label": "X", "width": 1},
+          {"key_id": "c", "label": "C", "width": 1},
+          {"key_id": "v", "label": "V", "width": 1},
+          {"key_id": "b", "label": "B", "width": 1},
+          {"key_id": "n", "label": "N", "width": 1},
+          {"key_id": "m", "label": "M", "width": 1},
+          {"key_id": "comma", "label": ",", "width": 1},
+          {"key_id": "dot", "label": ".", "width": 1},
+          {"key_id": "slash", "label": "/", "width": 1},
+          {"key_id": "rshift", "label": "Shift", "width": 2.85}
+        ],
+        "bottom": [
+          {"key_id": "lctrl", "label": "Ctrl", "width": 1.25},
+          {"key_id": "fn", "label": "Fn", "width": 1},
+          {"key_id": "lwin", "label": "Win", "width": 1},
+          {"key_id": "lalt", "label": "Alt", "width": 1.25},
+          {"key_id": "space", "label": "Space", "width": 6.45},
+          {"key_id": "ralt", "label": "Alt", "width": 1.25},
+          {"key_id": "menu", "label": "Copilot", "width": 1}
+        ]
+      },
+      "special_keys": []
+    },
+    "iso": {
+      "extends": "ansi",
+      "rows": {
+        "top": [
+          {"key_id": "tab", "label": "Tab", "width": 1.5},
+          {"key_id": "q", "label": "Q", "width": 1},
+          {"key_id": "w", "label": "W", "width": 1},
+          {"key_id": "e", "label": "E", "width": 1},
+          {"key_id": "r", "label": "R", "width": 1},
+          {"key_id": "t", "label": "T", "width": 1},
+          {"key_id": "y", "label": "Y", "width": 1},
+          {"key_id": "u", "label": "U", "width": 1},
+          {"key_id": "i", "label": "I", "width": 1},
+          {"key_id": "o", "label": "O", "width": 1},
+          {"key_id": "p", "label": "P", "width": 1},
+          {"key_id": "lbracket", "label": "[", "width": 1},
+          {"key_id": "rbracket", "label": "]", "width": 1}
+        ],
+        "home": [
+          {"key_id": "caps", "label": "Caps", "width": 1.75},
+          {"key_id": "a", "label": "A", "width": 1},
+          {"key_id": "s", "label": "S", "width": 1},
+          {"key_id": "d", "label": "D", "width": 1},
+          {"key_id": "f", "label": "F", "width": 1},
+          {"key_id": "g", "label": "G", "width": 1},
+          {"key_id": "h", "label": "H", "width": 1},
+          {"key_id": "j", "label": "J", "width": 1},
+          {"key_id": "k", "label": "K", "width": 1},
+          {"key_id": "l", "label": "L", "width": 1},
+          {"key_id": "semicolon", "label": ";", "width": 1},
+          {"key_id": "quote", "label": "'", "width": 1},
+          {"key_id": "nonushash", "label": "#", "width": 1}
+        ],
+        "shift": [
+          {"key_id": "lshift", "label": "Shift", "width": 1.25},
+          {"key_id": "nonusbackslash", "label": "<>", "width": 1},
+          {"key_id": "z", "label": "Z", "width": 1},
+          {"key_id": "x", "label": "X", "width": 1},
+          {"key_id": "c", "label": "C", "width": 1},
+          {"key_id": "v", "label": "V", "width": 1},
+          {"key_id": "b", "label": "B", "width": 1},
+          {"key_id": "n", "label": "N", "width": 1},
+          {"key_id": "m", "label": "M", "width": 1},
+          {"key_id": "comma", "label": ",", "width": 1},
+          {"key_id": "dot", "label": ".", "width": 1},
+          {"key_id": "slash", "label": "/", "width": 1},
+          {"key_id": "rshift", "label": "Shift", "width": 2.85}
+        ],
+        "bottom": [
+          {"key_id": "lctrl", "label": "Ctrl", "width": 1.25},
+          {"key_id": "fn", "label": "Fn", "width": 1},
+          {"key_id": "lwin", "label": "Win", "width": 1},
+          {"key_id": "lalt", "label": "Alt", "width": 1.25},
+          {"key_id": "space", "label": "Space", "width": 5.2},
+          {"key_id": "ralt", "label": "AltGr", "width": 1.25},
+          {"key_id": "menu", "label": "Copilot", "width": 1},
+          {"key_id": "rctrl", "label": "Ctrl", "width": 1.25}
+        ]
+      },
+      "special_keys": [
+        {
+          "key_id": "enter",
+          "label": "Enter",
+          "anchor_after_row": "home",
+          "y_row": "top",
+          "width": 1.35,
+          "height_rows": 2
+        }
+      ]
+    },
+    "abnt": {
+      "extends": "iso",
+      "rows": {
+        "shift": [
+          {"key_id": "lshift", "label": "Shift", "width": 1.25},
+          {"key_id": "nonusbackslash", "label": "<>", "width": 1},
+          {"key_id": "z", "label": "Z", "width": 1},
+          {"key_id": "x", "label": "X", "width": 1},
+          {"key_id": "c", "label": "C", "width": 1},
+          {"key_id": "v", "label": "V", "width": 1},
+          {"key_id": "b", "label": "B", "width": 1},
+          {"key_id": "n", "label": "N", "width": 1},
+          {"key_id": "m", "label": "M", "width": 1},
+          {"key_id": "comma", "label": ",", "width": 1},
+          {"key_id": "dot", "label": ".", "width": 1},
+          {"key_id": "slash", "label": "/", "width": 1},
+          {"key_id": "abnt2slash", "label": "/?", "width": 1},
+          {"key_id": "rshift", "label": "Shift", "width": 1.85}
+        ]
+      }
+    },
+    "ks": {
+      "extends": "ansi",
+      "rows": {
+        "number": [
+          {"key_id": "grave", "label": "`", "width": 1},
+          {"key_id": "1", "label": "1", "width": 1},
+          {"key_id": "2", "label": "2", "width": 1},
+          {"key_id": "3", "label": "3", "width": 1},
+          {"key_id": "4", "label": "4", "width": 1},
+          {"key_id": "5", "label": "5", "width": 1},
+          {"key_id": "6", "label": "6", "width": 1},
+          {"key_id": "7", "label": "7", "width": 1},
+          {"key_id": "8", "label": "8", "width": 1},
+          {"key_id": "9", "label": "9", "width": 1},
+          {"key_id": "0", "label": "0", "width": 1},
+          {"key_id": "minus", "label": "-", "width": 1},
+          {"key_id": "equal", "label": "=", "width": 1},
+          {"key_id": "ks_extra", "label": "Han", "width": 1},
+          {"key_id": "backspace", "label": "Bksp", "width": 1.15}
+        ],
+        "bottom": [
+          {"key_id": "lctrl", "label": "Ctrl", "width": 1.25},
+          {"key_id": "fn", "label": "Fn", "width": 1},
+          {"key_id": "lwin", "label": "Win", "width": 1},
+          {"key_id": "lalt", "label": "Alt", "width": 1},
+          {"key_id": "hanja", "label": "Hanja", "width": 1},
+          {"key_id": "space", "label": "Space", "width": 4.55},
+          {"key_id": "hangul", "label": "Hangul", "width": 1},
+          {"key_id": "ralt", "label": "Alt", "width": 1.25},
+          {"key_id": "menu", "label": "Menu", "width": 1}
+        ]
+      }
+    },
+    "jis": {
+      "extends": "ansi",
+      "rows": {
+        "number": [
+          {"key_id": "grave", "label": "`", "width": 1},
+          {"key_id": "1", "label": "1", "width": 1},
+          {"key_id": "2", "label": "2", "width": 1},
+          {"key_id": "3", "label": "3", "width": 1},
+          {"key_id": "4", "label": "4", "width": 1},
+          {"key_id": "5", "label": "5", "width": 1},
+          {"key_id": "6", "label": "6", "width": 1},
+          {"key_id": "7", "label": "7", "width": 1},
+          {"key_id": "8", "label": "8", "width": 1},
+          {"key_id": "9", "label": "9", "width": 1},
+          {"key_id": "0", "label": "0", "width": 1},
+          {"key_id": "minus", "label": "-", "width": 1},
+          {"key_id": "equal", "label": "=", "width": 1},
+          {"key_id": "yen", "label": "Yen", "width": 1},
+          {"key_id": "backspace", "label": "Bksp", "width": 1.15}
+        ],
+        "top": [
+          {"key_id": "tab", "label": "Tab", "width": 1.5},
+          {"key_id": "q", "label": "Q", "width": 1},
+          {"key_id": "w", "label": "W", "width": 1},
+          {"key_id": "e", "label": "E", "width": 1},
+          {"key_id": "r", "label": "R", "width": 1},
+          {"key_id": "t", "label": "T", "width": 1},
+          {"key_id": "y", "label": "Y", "width": 1},
+          {"key_id": "u", "label": "U", "width": 1},
+          {"key_id": "i", "label": "I", "width": 1},
+          {"key_id": "o", "label": "O", "width": 1},
+          {"key_id": "p", "label": "P", "width": 1},
+          {"key_id": "lbracket", "label": "[", "width": 1},
+          {"key_id": "rbracket", "label": "]", "width": 1},
+          {"key_id": "jp_at", "label": "@", "width": 1}
+        ],
+        "home": [
+          {"key_id": "caps", "label": "Caps", "width": 1.75},
+          {"key_id": "a", "label": "A", "width": 1},
+          {"key_id": "s", "label": "S", "width": 1},
+          {"key_id": "d", "label": "D", "width": 1},
+          {"key_id": "f", "label": "F", "width": 1},
+          {"key_id": "g", "label": "G", "width": 1},
+          {"key_id": "h", "label": "H", "width": 1},
+          {"key_id": "j", "label": "J", "width": 1},
+          {"key_id": "k", "label": "K", "width": 1},
+          {"key_id": "l", "label": "L", "width": 1},
+          {"key_id": "semicolon", "label": ";", "width": 1},
+          {"key_id": "quote", "label": "'", "width": 1},
+          {"key_id": "jp_colon", "label": ":", "width": 1}
+        ],
+        "shift": [
+          {"key_id": "lshift", "label": "Shift", "width": 1.85},
+          {"key_id": "z", "label": "Z", "width": 1},
+          {"key_id": "x", "label": "X", "width": 1},
+          {"key_id": "c", "label": "C", "width": 1},
+          {"key_id": "v", "label": "V", "width": 1},
+          {"key_id": "b", "label": "B", "width": 1},
+          {"key_id": "n", "label": "N", "width": 1},
+          {"key_id": "m", "label": "M", "width": 1},
+          {"key_id": "comma", "label": ",", "width": 1},
+          {"key_id": "dot", "label": ".", "width": 1},
+          {"key_id": "slash", "label": "/", "width": 1},
+          {"key_id": "jp_ro", "label": "Ro", "width": 0.95},
+          {"key_id": "rshift", "label": "Shift", "width": 1.85}
+        ],
+        "bottom": [
+          {"key_id": "lctrl", "label": "Ctrl", "width": 1.25},
+          {"key_id": "fn", "label": "Fn", "width": 1},
+          {"key_id": "lwin", "label": "Win", "width": 1},
+          {"key_id": "lalt", "label": "Alt", "width": 1.25},
+          {"key_id": "muhenkan", "label": "Muhen", "width": 1},
+          {"key_id": "space", "label": "Space", "width": 4},
+          {"key_id": "henkan", "label": "Henkan", "width": 1},
+          {"key_id": "katakana", "label": "Kana", "width": 1},
+          {"key_id": "ralt", "label": "Alt", "width": 1.25},
+          {"key_id": "menu", "label": "Copilot", "width": 1},
+          {"key_id": "rctrl", "label": "Ctrl", "width": 1.25}
+        ]
+      },
+      "special_keys": [
+        {
+          "key_id": "enter",
+          "label": "Enter",
+          "anchor_after_row": "top",
+          "y_row": "top",
+          "width": 1.15,
+          "height_rows": 2
+        }
+      ]
+    }
+  }
+}
