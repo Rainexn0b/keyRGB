@@ -13,9 +13,7 @@ def test_find_matching_hidraw_device_matches_vid_pid(tmp_path: Path) -> None:
     dev_root.mkdir(parents=True)
 
     (sysfs_dir / "uevent").write_text(
-        "DRIVER=hid-generic\n"
-        "HID_ID=0003:0000048D:00008910\n"
-        "HID_NAME=ITE Device(829x)\n",
+        "DRIVER=hid-generic\nHID_ID=0003:0000048D:00008910\nHID_NAME=ITE Device(829x)\n",
         encoding="utf-8",
     )
     (dev_root / "hidraw7").write_text("", encoding="utf-8")
@@ -37,8 +35,7 @@ def test_find_matching_hidraw_device_ignores_other_products(tmp_path: Path) -> N
     dev_root.mkdir(parents=True)
 
     (sysfs_dir / "uevent").write_text(
-        "HID_ID=0003:0000048D:0000600B\n"
-        "HID_NAME=Some Other ITE Device\n",
+        "HID_ID=0003:0000048D:0000600B\nHID_NAME=Some Other ITE Device\n",
         encoding="utf-8",
     )
     (dev_root / "hidraw1").write_text("", encoding="utf-8")

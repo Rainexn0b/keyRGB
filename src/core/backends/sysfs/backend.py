@@ -21,6 +21,7 @@ class SysfsLedsBackend(KeyboardBackend):
     name: str = "sysfs-leds"
     priority: int = 150
     stability: BackendStability = BackendStability.VALIDATED
+    experimental_evidence: None = None
 
     def _find_leds(self) -> list[Path]:
         root = common._leds_root()
@@ -172,7 +173,7 @@ class SysfsLedsBackend(KeyboardBackend):
     def dimensions(self) -> tuple[int, int]:
         # Not per-key. Return a common matrix size for legacy callers that assume
         # dimensions exist, but treat per_key=False as authoritative.
-            return (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
+        return (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
 
     def effects(self) -> dict[str, Any]:
         return {}

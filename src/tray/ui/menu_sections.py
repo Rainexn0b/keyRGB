@@ -4,7 +4,7 @@ import logging
 from typing import Any, Optional
 from src.core.utils.logging_utils import log_throttled
 
-from src.core.system_power import PowerMode, get_status, set_mode
+from src.core.power.system import PowerMode, get_status, set_mode
 
 
 logger = logging.getLogger(__name__)
@@ -48,7 +48,7 @@ def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> 
             item(
                 p.name,
                 _make_tcc_profile_callback(p.id),
-                checked=lambda _i, pid=p.id: (active is not None and active.id == pid),
+                checked=lambda _i, pid=p.id: active is not None and active.id == pid,
                 radio=True,
             )
             for p in tcc_profiles
@@ -102,7 +102,7 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
             return _cb
 
         def _checked(mode: PowerMode):
-            return lambda _i, m=mode: (get_status().mode == m)
+            return lambda _i, m=mode: get_status().mode == m
 
         # Keep labels simple and user-facing.
         return pystray.Menu(

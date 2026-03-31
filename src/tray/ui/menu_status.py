@@ -3,7 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.core.backends.policy import experimental_evidence_for_backend, experimental_evidence_label, stability_for_backend
+from src.core.backends.policy import (
+    experimental_evidence_for_backend,
+    experimental_evidence_label,
+    stability_for_backend,
+)
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import backend_hw_effect_names, detected_backend_hw_effect_names
 from src.core.effects.catalog import is_forced_hardware_effect, resolve_effect_name_for_backend, strip_effect_namespace

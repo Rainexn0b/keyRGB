@@ -44,6 +44,7 @@ class AsusctlAuraBackend(KeyboardBackend):
     name: str = "asusctl-aura"
     priority: int = 120
     stability: BackendStability = BackendStability.VALIDATED
+    experimental_evidence: None = None
 
     def _asusctl_path(self) -> str:
         return os.environ.get("KEYRGB_ASUSCTL_PATH") or "asusctl"
@@ -126,7 +127,7 @@ class AsusctlAuraBackend(KeyboardBackend):
 
     def dimensions(self) -> tuple[int, int]:
         # Not a real per-key matrix backend (unless mapped to zones).
-            return (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
+        return (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
 
     def effects(self) -> dict[str, Any]:
         return {}

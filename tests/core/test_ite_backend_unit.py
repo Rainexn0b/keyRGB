@@ -5,7 +5,7 @@ This is NOT a unit test. It talks to real hardware and may change your
 keyboard lighting.
 
 - Under pytest: skipped unless KEYRGB_HW_TESTS=1.
-- Manual run: `KEYRGB_HW_TESTS=1 python3 src/tests/test_ite_backend.py`
+- Manual run: `KEYRGB_HW_TESTS=1 python3 tests/core/test_ite_backend_unit.py`
 """
 
 from __future__ import annotations

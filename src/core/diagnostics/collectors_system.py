@@ -211,7 +211,7 @@ def system_power_mode_snapshot() -> dict[str, Any]:
     """
 
     try:
-        from src.core.system_power import get_status
+        from src.core.power.system import get_status
 
         st = get_status()
         return {

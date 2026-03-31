@@ -4,7 +4,6 @@ import logging
 import re
 import subprocess
 from dataclasses import dataclass, field
-from typing import Optional
 
 from ...resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS
 from ..base import KeyboardDevice

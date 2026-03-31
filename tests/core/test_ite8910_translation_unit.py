@@ -152,7 +152,7 @@ def test_device_set_color_uses_known_led_ids_from_upstream_comment() -> None:
     assert sent[0] == build_reset_report()
     brightness_idx = 1 + len(KNOWN_LED_IDS)
     assert sent[brightness_idx] == build_brightness_speed_report_raw(0x02, 0x00)
-    led_reports = sent[brightness_idx + 1:]
+    led_reports = sent[brightness_idx + 1 :]
     assert len(led_reports) == len(KNOWN_LED_IDS)
     assert led_reports[0] == build_led_color_report(KNOWN_LED_IDS[0], (0x12, 0x34, 0x56))
     assert led_reports[-1] == build_led_color_report(KNOWN_LED_IDS[-1], (0x12, 0x34, 0x56))

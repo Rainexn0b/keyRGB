@@ -44,6 +44,7 @@ class Ite8291r3Backend(KeyboardBackend):
     name: str = "ite8291r3"
     priority: int = 100
     stability: BackendStability = BackendStability.VALIDATED
+    experimental_evidence: None = None
 
     def _import(self):
         if os.environ.get("KEYRGB_USE_INSTALLED_ITE") != "1":

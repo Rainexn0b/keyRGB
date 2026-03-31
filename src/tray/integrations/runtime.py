@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import atexit
 import os
 import sys
 import importlib
@@ -180,6 +181,7 @@ def acquire_single_instance_lock() -> bool:
     try:
         _instance_lock_fh = open(lock_path, "a+")
         fcntl.flock(_instance_lock_fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        atexit.register(_instance_lock_fh.close)
         _instance_lock_fh.seek(0)
         _instance_lock_fh.truncate()
         _instance_lock_fh.write(f"pid={os.getpid()}\n")

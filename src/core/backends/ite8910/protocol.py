@@ -205,7 +205,8 @@ def raw_speed_from_effect_speed(value: int) -> int:
     """Map KeyRGB's speed arg to the firmware's 0x00-0x0A scale.
 
     The firmware accepts 0x00 (slowest) to 0x0A (fastest).
-    The Windows Control Center maps: 1->0x02, 2->0x04, 3->0x06, 4->0x0A.
+    KeyRGB currently passes the UI speed through directly and relies on the
+    backend speed policy to choose inversion or direct ordering.
     """
     try:
         return clamp_raw_speed(int(value))

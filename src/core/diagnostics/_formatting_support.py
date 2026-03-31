@@ -141,9 +141,7 @@ def append_support_hints(
         and "no matching sysfs led" in sysfs_reason.lower()
         and selected_name in {"", "none"}
     ):
-        support_lines.append(
-            "  Detected TUXEDO/Clevo platform modules, but no keyboard backlight sysfs LED was found."
-        )
+        support_lines.append("  Detected TUXEDO/Clevo platform modules, but no keyboard backlight sysfs LED was found.")
         if tuxedo_keyboard_loaded:
             support_lines.append(
                 "  - observation: tuxedo_keyboard is loaded, so this looks closer to a kernel-driver binding/export problem than a normal sysfs permission issue."

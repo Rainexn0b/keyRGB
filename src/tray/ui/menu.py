@@ -4,7 +4,7 @@ import logging
 import re
 from typing import Any
 
-import src.core.tcc_power_profiles as tcc_power_profiles
+import src.core.power.tcc_profiles as tcc_power_profiles
 from src.core.effects.catalog import (
     REACTIVE_EFFECTS,
     SOFTWARE_EFFECTS,
@@ -13,7 +13,7 @@ from src.core.effects.catalog import (
     normalize_effect_name,
     title_for_effect,
 )
-from src.core.system_power import get_status as _system_power_status
+from src.core.power.system import get_status as _system_power_status
 
 from .menu_sections import (
     build_perkey_profiles_menu,
@@ -74,7 +74,11 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     def _checked_hw_effect(effect: str):
         def _checked(_item):
             current = normalize_effect_name(str(getattr(tray.config, "effect", "none") or "none"))
-            return current in {effect, normalize_effect_name(effect), normalize_effect_name(effect).removeprefix("hw:")} and hw_mode and not tray.is_off
+            return (
+                current in {effect, normalize_effect_name(effect), normalize_effect_name(effect).removeprefix("hw:")}
+                and hw_mode
+                and not tray.is_off
+            )
 
         return _checked
 
