@@ -207,9 +207,7 @@ def _tray_k_mask() -> Image.Image | None:
 
 
 @lru_cache(maxsize=64)
-def _create_cached_solid_icon(
-    color: tuple[int, int, int], outline_color: tuple[int, int, int]
-) -> Image.Image:
+def _create_cached_solid_icon(color: tuple[int, int, int], outline_color: tuple[int, int, int]) -> Image.Image:
     k_mask = _tray_k_mask()
     if k_mask is not None:
         fill = Image.new("RGBA", _ICON_SIZE, color=(*color, 255))
@@ -311,9 +309,9 @@ def _create_cached_rainbow_icon(
                         rr, gg, bb = _scale_rgb((r, g, b), scale)
                         px[x, y] = (rr, gg, bb, a)
 
-                underlay.putalpha(k_mask)
-                out = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
-                out.alpha_composite(underlay)
+        underlay.putalpha(k_mask)
+        out = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
+        out.alpha_composite(underlay)
         return out
 
     rr_f, gg_f, bb_f = colorsys.hsv_to_rgb(float(phase_q % 64) / 64.0, 1.0, 1.0)
@@ -349,7 +347,6 @@ def create_icon_mosaic(
 
     k_mask = _tray_k_mask()
     if k_mask is not None:
-
         r_n = max(1, int(rows))
         c_n = max(1, int(cols))
         expected = r_n * c_n

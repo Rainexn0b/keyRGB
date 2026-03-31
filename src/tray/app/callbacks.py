@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from src.tray.protocols import LightingTrayProtocol
 
-import src.core.tcc_power_profiles as tcc_power_profiles
+import src.core.power.tcc_profiles as tcc_power_profiles
 
 from ..controllers.effect_selection import apply_effect_selection
 from ..controllers.lighting_controller import (

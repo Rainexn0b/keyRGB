@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping
 from threading import RLock
-from typing import Any, Dict, Tuple
+from typing import Any, Tuple
 
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import (

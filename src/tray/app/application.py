@@ -18,7 +18,7 @@ from ..controllers.lighting_controller import (
     power_turn_off,
     start_current_effect,
 )
-from ..hw.ite_dimensions import load_ite_dimensions
+from .backend import load_ite_dimensions
 from ..integrations.dependencies import load_tray_dependencies
 from ..integrations import runtime
 from .lifecycle import maybe_autostart_effect, start_all_polling, start_power_monitoring
@@ -27,6 +27,7 @@ from ..ui import menu as menu_mod
 from ..ui.refresh import update_icon as update_tray_icon
 from ..ui.refresh import update_menu as update_tray_menu
 from src.core.utils.exceptions import is_permission_denied
+from src.core.utils.safe_attrs import safe_str_attr
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,7 @@ class KeyRGBTray:
         # even when they happen in a background effect thread.
         try:
             setattr(self.engine, "_permission_error_cb", self._notify_permission_issue)
-        except Exception:
+        except (AttributeError, RuntimeError):
             pass
 
         self.power_manager = start_power_monitoring(self, power_manager_cls=PowerManager, config=self.config)
@@ -99,10 +100,7 @@ class KeyRGBTray:
 
         icon = getattr(self, "icon", None)
         if icon is None:
-            try:
-                self._pending_notifications.append((str(title), str(message)))
-            except Exception:
-                pass
+            self._pending_notifications.append((str(title), str(message)))
             return
 
         notify_fn = getattr(icon, "notify", None)
@@ -128,7 +126,7 @@ class KeyRGBTray:
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-        except Exception:
+        except OSError:
             return
 
     def _notify_permission_issue(self, exc: Exception | None = None) -> None:
@@ -141,11 +139,7 @@ class KeyRGBTray:
 
         self._permission_notice_sent = True
 
-        backend_name = ""
-        try:
-            backend_name = str(getattr(self.backend, "name", "") or "")
-        except Exception:
-            backend_name = ""
+        backend_name = safe_str_attr(self.backend, "name", default="") if self.backend is not None else ""
 
         repo_url = "https://github.com/Rainexn0b/keyRGB"
 
@@ -161,15 +155,14 @@ class KeyRGBTray:
         if backend_name == "ite8291r3":
             msg_lines.append("  • ITE USB devices usually need /etc/udev/rules.d/99-ite8291-wootbook.rules")
         elif backend_name == "sysfs-leds":
-            msg_lines.append("  • Sysfs LED nodes may require /etc/udev/rules.d/99-keyrgb-sysfs-leds.rules or a polkit helper")
+            msg_lines.append(
+                "  • Sysfs LED nodes may require /etc/udev/rules.d/99-keyrgb-sysfs-leds.rules or a polkit helper"
+            )
         msg_lines.append("")
         msg_lines.append(repo_url)
 
-        try:
-            if exc is not None:
-                logger.warning("Permission issue while applying lighting: %s", exc)
-        except Exception:
-            pass
+        if exc is not None:
+            logger.warning("Permission issue while applying lighting: %s", exc)
 
         self._notify("KeyRGB: Permission denied", "\n".join(msg_lines))
 
@@ -329,11 +322,10 @@ class KeyRGBTray:
         logger.info("Current effect: %s", self.config.effect)
         logger.info("Speed: %s, Brightness: %s", self.config.speed, self.config.brightness)
         # Flush any queued notifications from early startup.
-        try:
-            pending = list(getattr(self, "_pending_notifications", []) or [])
-            self._pending_notifications = []
-            for title, message in pending:
-                self._notify(title, message)
-        except Exception:
-            pass
+        pending_store = vars(self).get("_pending_notifications")
+        pending = list(pending_store) if isinstance(pending_store, list) else []
+        if isinstance(pending_store, list):
+            pending_store.clear()
+        for title, message in pending:
+            self._notify(title, message)
         self.icon.run()

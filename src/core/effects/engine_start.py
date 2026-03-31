@@ -50,6 +50,7 @@ class _EngineStart:
     direction: Optional[str]
     _last_hw_mode_brightness: Optional[int]
     _last_rendered_brightness: Optional[int]
+    _thread_generation: int
     stop: Any
     _ensure_device_available: Any
 
@@ -200,6 +201,13 @@ class _EngineStart:
             enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=0)
             self._last_hw_mode_brightness = 0
 
+        try:
+            self._thread_generation = int(getattr(self, "_thread_generation", 0)) + 1
+        except Exception:
+            self._thread_generation = 1
+        run_generation = int(getattr(self, "_thread_generation", 1))
+        thread_ref: Thread | None = None
+
         def _run_target_best_effort() -> None:
             try:
                 target()
@@ -234,15 +242,27 @@ class _EngineStart:
 
                 logger.exception("Unhandled exception in effect thread")
             finally:
-                # If the thread exits (error or normal), keep state consistent.
+                stale_generation = False
                 try:
-                    self.running = False
+                    stale_generation = int(getattr(self, "_thread_generation", 0)) != run_generation
                 except Exception:
-                    pass
+                    stale_generation = False
+
+                if not stale_generation:
+                    try:
+                        self.running = False
+                    except Exception:
+                        pass
+                    try:
+                        if thread_ref is not None and getattr(self, "thread", None) is thread_ref:
+                            self.thread = None
+                    except Exception:
+                        pass
 
         self.running = True
-        self.thread = Thread(target=_run_target_best_effort, daemon=True)
-        self.thread.start()
+        thread_ref = Thread(target=_run_target_best_effort, daemon=True)
+        self.thread = thread_ref
+        thread_ref.start()
 
     def _start_hw_effect(self, effect_name: str):
         """Start hardware effect."""

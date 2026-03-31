@@ -24,6 +24,7 @@ class _EngineCore:
         self.running = False
         self.thread: Optional[Thread] = None
         self.stop_event = Event()
+        self._thread_generation = 0
 
         self.current_effect: Optional[str] = None
         self.speed = 4  # 0-10 (UI speed scale; 10 = fastest)
@@ -120,6 +121,11 @@ class _EngineCore:
 
     def stop(self) -> None:
         """Stop current effect."""
+
+        try:
+            self._thread_generation = int(getattr(self, "_thread_generation", 0)) + 1
+        except Exception:
+            self._thread_generation = 1
 
         # Reset the per-frame brightness guard unconditionally so the next
         # render loop ramps up from 0 instead of jumping to the last rendered

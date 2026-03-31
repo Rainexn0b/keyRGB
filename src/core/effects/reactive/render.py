@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-import time
+import time as _time
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
@@ -14,6 +14,7 @@ from ._render_brightness import (
 from ._render_runtime import render_per_key_frame, render_uniform_frame
 
 logger = logging.getLogger(__name__)
+time = _time
 
 # Maximum brightness change per render frame before the stability guard
 # clamps. Prevents single-frame jumps (e.g. 3 -> 50) caused by race

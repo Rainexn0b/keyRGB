@@ -6,7 +6,7 @@ from typing import Optional
 
 from PIL import Image, ImageTk
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS
+from src.core.resources.layout import BASE_IMAGE_SIZE, get_layout_keys
 from src.gui.reference.overlay_geometry import (
     CanvasTransform,
     calc_centered_drawn_bbox,
@@ -27,6 +27,8 @@ def redraw_calibration_canvas(
     per_key_layout_tweaks: object,
     keymap: dict[str, tuple[int, int]],
     selected_key_id: str | None,
+    physical_layout: str = "auto",
+    slot_overrides: dict[str, dict[str, object]] | None = None,
 ) -> tuple[CanvasTransform, Optional[ImageTk.PhotoImage]]:
     canvas.delete("all")
 
@@ -46,7 +48,8 @@ def redraw_calibration_canvas(
         if deck_tk is not None:
             canvas.create_image(x0, y0, anchor="nw", image=deck_tk)
 
-    for key in REFERENCE_DEVICE_KEYS:
+    visible_keys = get_layout_keys(physical_layout, slot_overrides=slot_overrides)
+    for key in visible_keys:
         x1, y1, x2, y2 = key_canvas_bbox(
             transform=transform,
             key=key,

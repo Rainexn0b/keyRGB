@@ -171,10 +171,10 @@ def representative_color(
 
         elif effect == "color_cycle":
             phase = now * (1.8 * p)
-            r = (math.sin(phase) + 1.0) / 2.0
-            g = (math.sin(phase + (2.0 * math.pi / 3.0)) + 1.0) / 2.0
-            b = (math.sin(phase + (4.0 * math.pi / 3.0)) + 1.0) / 2.0
-            base = (int(round(r * 255)), int(round(g * 255)), int(round(b * 255)))
+            rf = (math.sin(phase) + 1.0) / 2.0
+            gf = (math.sin(phase + (2.0 * math.pi / 3.0)) + 1.0) / 2.0
+            bf = (math.sin(phase + (4.0 * math.pi / 3.0)) + 1.0) / 2.0
+            base = (int(round(rf * 255)), int(round(gf * 255)), int(round(bf * 255)))
 
         else:  # spectrum_cycle
             hue = (now * (0.22 * p)) % 1.0
@@ -199,7 +199,9 @@ def representative_color(
                     brightness = int(getattr(config, "perkey_brightness", brightness) or brightness)
                 except Exception:
                     pass
-                base = _representative_saved_perkey_color(config) or tuple(getattr(config, "color", None) or (255, 0, 128))
+                base = _representative_saved_perkey_color(config) or tuple(
+                    getattr(config, "color", None) or (255, 0, 128)
+                )
             try:
                 if tuple(base) == (0, 0, 0):
                     base = (255, 0, 128)

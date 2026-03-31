@@ -12,7 +12,7 @@ from typing import Any
 from ..pollers.config_polling import start_config_polling
 from ..pollers.hardware_polling import start_hardware_polling
 from ..pollers.icon_color_polling import start_icon_color_polling
-from ..pollers.idle_power_polling import start_idle_power_polling
+from ..pollers.idle_power import start_idle_power_polling
 
 
 def start_power_monitoring(tray: Any, *, power_manager_cls: type[Any], config: Any) -> Any:

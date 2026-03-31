@@ -305,3 +305,10 @@ class Config:
     screen_dim_sync_mode = enum_prop("screen_dim_sync_mode", default="off", allowed=("off", "temp"))
     # Temp brightness is intended to be non-zero; allow 1..50.
     screen_dim_temp_brightness = int_prop("screen_dim_temp_brightness", default=5, min_v=1, max_v=50)
+
+    # Physical keyboard layout for the per-key editor / calibrator overlay.
+    physical_layout = enum_prop(
+        "physical_layout",
+        default="auto",
+        allowed=("auto", "ansi", "iso", "ks", "abnt", "jis"),
+    )

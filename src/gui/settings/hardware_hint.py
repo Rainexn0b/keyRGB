@@ -60,7 +60,11 @@ def extract_unsupported_rgb_controllers_hint(backends_snapshot: dict) -> str:
 
     if experimental_disabled:
         joined = ", ".join(experimental_disabled)
-        label = "research-backed experimental RGB controller(s)" if research_backed_disabled else "experimental RGB controller(s)"
+        label = (
+            "research-backed experimental RGB controller(s)"
+            if research_backed_disabled
+            else "experimental RGB controller(s)"
+        )
         backend_names = sorted({name for name in experimental_backend_names if name})
         if backend_names:
             if len(backend_names) == 1:

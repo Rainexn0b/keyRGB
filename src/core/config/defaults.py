@@ -64,4 +64,8 @@ DEFAULTS: dict = {
     "screen_dim_sync_mode": "off",
     # 1-50 (same brightness scale as `brightness`). Used when mode == 'temp'.
     "screen_dim_temp_brightness": 5,
+    # Physical keyboard layout for the per-key editor / calibrator overlay.
+    # 'auto' probes sysfs conservatively; manual options expose common desktop
+    # and laptop physical variants directly in the editor dropdown.
+    "physical_layout": "auto",
 }

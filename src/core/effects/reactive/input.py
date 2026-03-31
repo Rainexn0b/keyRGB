@@ -1,8 +1,88 @@
 from __future__ import annotations
 
-from typing import Dict, Optional, Tuple
+import os
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple, TypeAlias
 
 Key = Tuple[int, int]
+
+
+EvdevKeyboardDevice: TypeAlias = Any
+EvdevKeyboardDevices: TypeAlias = list[EvdevKeyboardDevice]
+
+
+def _read_udev_input_properties(device_path: str) -> Dict[str, str]:
+    try:
+        stat_result = os.stat(device_path)
+        major_num = os.major(stat_result.st_rdev)
+        minor_num = os.minor(stat_result.st_rdev)
+        data_path = Path(f"/run/udev/data/c{major_num}:{minor_num}")
+        if not data_path.is_file():
+            return {}
+        props: Dict[str, str] = {}
+        for line in data_path.read_text(encoding="utf-8", errors="replace").splitlines():
+            if not line.startswith("E:"):
+                continue
+            key, sep, value = line[2:].partition("=")
+            if sep:
+                props[key] = value.strip()
+        return props
+    except Exception:
+        return {}
+
+
+def _udev_device_is_keyboard(device_path: str) -> Optional[bool]:
+    props = _read_udev_input_properties(device_path)
+    if not props:
+        return None
+    return props.get("ID_INPUT_KEYBOARD") == "1"
+
+
+def _evdev_device_looks_like_keyboard(dev: EvdevKeyboardDevice, evdev: Any) -> bool:
+    try:
+        caps = dev.capabilities(verbose=False)
+        key_codes = set(caps.get(evdev.ecodes.EV_KEY, []) or [])
+    except Exception:
+        return False
+
+    letter_keys = {
+        evdev.ecodes.KEY_A,
+        evdev.ecodes.KEY_B,
+        evdev.ecodes.KEY_C,
+        evdev.ecodes.KEY_D,
+        evdev.ecodes.KEY_E,
+        evdev.ecodes.KEY_F,
+        evdev.ecodes.KEY_G,
+        evdev.ecodes.KEY_H,
+        evdev.ecodes.KEY_I,
+        evdev.ecodes.KEY_J,
+        evdev.ecodes.KEY_K,
+        evdev.ecodes.KEY_L,
+        evdev.ecodes.KEY_M,
+        evdev.ecodes.KEY_N,
+        evdev.ecodes.KEY_O,
+        evdev.ecodes.KEY_P,
+        evdev.ecodes.KEY_Q,
+        evdev.ecodes.KEY_R,
+        evdev.ecodes.KEY_S,
+        evdev.ecodes.KEY_T,
+        evdev.ecodes.KEY_U,
+        evdev.ecodes.KEY_V,
+        evdev.ecodes.KEY_W,
+        evdev.ecodes.KEY_X,
+        evdev.ecodes.KEY_Y,
+        evdev.ecodes.KEY_Z,
+    }
+    control_keys = {
+        evdev.ecodes.KEY_SPACE,
+        evdev.ecodes.KEY_ENTER,
+        evdev.ecodes.KEY_TAB,
+        evdev.ecodes.KEY_BACKSPACE,
+        evdev.ecodes.KEY_LEFTSHIFT,
+        evdev.ecodes.KEY_RIGHTSHIFT,
+    }
+
+    return len(key_codes & letter_keys) >= 8 and len(key_codes & control_keys) >= 3
 
 
 def evdev_key_name_to_key_id(name: str) -> Optional[str]:
@@ -96,10 +176,8 @@ def evdev_key_name_to_key_id(name: str) -> Optional[str]:
     return None
 
 
-def try_open_evdev_keyboards() -> Optional[list]:
+def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
     try:
-        import os
-
         if str(os.environ.get("KEYRGB_DISABLE_EVDEV", "")).strip().lower() in {
             "1",
             "true",
@@ -115,20 +193,63 @@ def try_open_evdev_keyboards() -> Optional[list]:
         return None
 
     try:
-        devices = [evdev.InputDevice(p) for p in evdev.list_devices()]
+        device_paths = list(evdev.list_devices())
     except Exception:
         return None
 
     out = []
-    for dev in devices:
+    for device_path in device_paths:
+        keyboard_tag = _udev_device_is_keyboard(device_path)
+        if keyboard_tag is False:
+            continue
+
         try:
-            caps = dev.capabilities(verbose=False)
-            if evdev.ecodes.EV_KEY in caps:
-                out.append(dev)
+            dev = evdev.InputDevice(device_path)
         except Exception:
             continue
 
+        try:
+            if keyboard_tag is True or _evdev_device_looks_like_keyboard(dev, evdev):
+                out.append(dev)
+                continue
+        except Exception:
+            pass
+
+        try:
+            close_fn = getattr(dev, "close", None)
+            if callable(close_fn):
+                close_fn()
+        except Exception:
+            pass
+
     return out or None
+
+
+def close_evdev_keyboards(devices: Optional[EvdevKeyboardDevices]) -> None:
+    if not devices:
+        return
+
+    for dev in list(devices):
+        try:
+            close_fn = getattr(dev, "close", None)
+            if callable(close_fn):
+                close_fn()
+        except Exception:
+            continue
+
+    try:
+        devices.clear()
+    except Exception:
+        pass
+
+
+def reactive_synthetic_fallback_enabled() -> bool:
+    try:
+        raw = str(os.environ.get("KEYRGB_REACTIVE_SYNTHETIC_FALLBACK", "")).strip().lower()
+    except Exception:
+        return False
+
+    return raw in {"1", "true", "yes", "on"}
 
 
 def load_active_profile_keymap() -> Dict[str, Key]:
@@ -142,7 +263,7 @@ def load_active_profile_keymap() -> Dict[str, Key]:
         return {}
 
 
-def poll_keypress_key_id(devices: Optional[list]) -> Optional[str]:
+def poll_keypress_key_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[str]:
     if not devices:
         return None
 
@@ -154,7 +275,7 @@ def poll_keypress_key_id(devices: Optional[list]) -> Optional[str]:
         if not r:
             return None
 
-        for dev in r:
+        for dev in list(r):
             try:
                 for event in dev.read():
                     if getattr(event, "type", None) != evdev.ecodes.EV_KEY:
@@ -169,9 +290,20 @@ def poll_keypress_key_id(devices: Optional[list]) -> Optional[str]:
                     if key_id:
                         return key_id
             except Exception:
+                try:
+                    devices.remove(dev)
+                except Exception:
+                    pass
+                try:
+                    close_fn = getattr(dev, "close", None)
+                    if callable(close_fn):
+                        close_fn()
+                except Exception:
+                    pass
                 continue
 
     except Exception:
+        close_evdev_keyboards(devices)
         return None
 
     return None

@@ -96,23 +96,41 @@ def scale(rgb: Color, s: float) -> Color:
     return (int(round(rgb[0] * ss)), int(round(rgb[1] * ss)), int(round(rgb[2] * ss)))
 
 
+def _apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int) -> None:
+    prev = engine._last_hw_mode_brightness
+    if prev is None:
+        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
+        engine._last_hw_mode_brightness = int(brightness_hw)
+        return
+
+    if int(prev) == int(brightness_hw):
+        return
+
+    try:
+        engine.kb.set_brightness(int(brightness_hw))
+    except (AttributeError, NotImplementedError, OSError):
+        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
+    engine._last_hw_mode_brightness = int(brightness_hw)
+
+
 def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
     """Render per-key when available, otherwise fall back to uniform."""
 
     if has_per_key(engine):
         try:
             with engine.kb_lock:
-                enable_user_mode_once(
-                    kb=engine.kb,
-                    kb_lock=engine.kb_lock,
-                    brightness=int(engine.brightness),
-                )
+                brightness_hw = int(engine.brightness)
+                need_mode_init = engine._last_hw_mode_brightness is None
+                if need_mode_init:
+                    _apply_hw_brightness(engine, brightness_hw)
                 try:
                     engine.kb.set_key_colors(
                         color_map,
-                        brightness=int(engine.brightness),
+                        brightness=brightness_hw,
                         enable_user_mode=False,
                     )
+                    if not need_mode_init:
+                        _apply_hw_brightness(engine, brightness_hw)
                     return
                 except Exception as exc:
                     # On USB disconnect, attempting a fallback uniform write can trigger

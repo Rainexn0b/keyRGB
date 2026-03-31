@@ -357,3 +357,33 @@ Select **Hardware support / diagnostics** and paste the JSON output from step 1.
 ## License
 
 GPL-2.0-or-later.
+
+## Code Hygiene & Static Analysis
+
+KeyRGB enforces strict code hygiene in its build system. The build runner checks for:
+
+- Over-defensive type conversions
+- Dynamic attribute coupling (hasattr/setattr/getattr/delattr on private attributes)
+- Excessive `Any` type hints
+- Forbidden API usage (`os.system`, `eval`, `exec`)
+- Resource leaks (`open()` not used in a `with` context or without `.close()`)
+- Silent broad exception swallowing (`except Exception: pass` and similar no-signal handlers)
+- Broad exception debt split into silent, logged/signaled, and fallback buckets
+- Test naming and structure
+
+Run the hygiene step directly:
+
+```bash
+.venv/bin/python -m buildpython --run-steps=16
+```
+
+All new code should pass these checks. See `buildpython/steps/step_code_hygiene.py` for details.
+Some hygiene categories are report-first and become blocking only after thresholds are tightened.
+
+Build reports are structured to expose debt instead of hiding it:
+
+- `buildlog/keyrgb/code-hygiene.md` includes top files for exception debt, cleanup debt, forbidden API usage, and resource leak hotspots.
+- Exception debt is split into silent, logged/signaled, and fallback hotspot tables.
+- `buildlog/keyrgb/code-markers.md` includes top files for `HACK`, `FIXME`, and `TODO` marker hotspots.
+
+Debt baselines live in `buildpython/config/debt_baselines.json` so existing backlog stays visible while new regressions become build failures.

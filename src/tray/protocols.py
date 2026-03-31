@@ -5,12 +5,7 @@ the tray codebase. Using Protocols instead of `Any` enables:
 1. Static type checking
 2. IDE autocompletion
 3. Explicit documentation of required interfaces
-4. Gradual migration from dynamic attributes
-
-Migration path:
-- Replace `tray: Any` with `tray: TrayStateProtocol`
-- Replace dynamic hasattr/setattr with explicit state initialization
-- Use IdlePowerState dataclass for dim/power tracking
+4. Clearer shared tray state
 """
 
 from __future__ import annotations
@@ -26,7 +21,7 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
-# Idle/Power state - replaces _idle_forced_off, _user_forced_off, etc.
+# Idle/Power state
 # ---------------------------------------------------------------------------
 
 
@@ -34,8 +29,7 @@ if TYPE_CHECKING:
 class IdlePowerState:
     """Typed state for idle/power management tracking.
 
-    Intended to replace scattered per-function initialization of private tray
-    attributes with a single typed state container.
+    Holds idle and power-management state in one typed container.
     """
 
     idle_forced_off: bool = False
@@ -54,7 +48,7 @@ class IdlePowerState:
 
 
 # ---------------------------------------------------------------------------
-# Tray icon state - replaces _tray_icon_visual, _tray_icon_animating
+# Tray icon state
 # ---------------------------------------------------------------------------
 
 
@@ -93,7 +87,7 @@ class HasEngine(Protocol):
 
 
 # ---------------------------------------------------------------------------
-# Full tray protocol (for gradual adoption)
+# Full tray protocol
 # ---------------------------------------------------------------------------
 
 
@@ -139,6 +133,7 @@ class IdlePowerTrayProtocol(Protocol):
 
     config: "Config"
     engine: "EffectsEngine"
+    backend: object | None
     is_off: bool
 
     # Idle power state (can be the IdlePowerState dataclass or duck-typed)
@@ -150,9 +145,12 @@ class IdlePowerTrayProtocol(Protocol):
     _dim_temp_active: bool
     _dim_temp_target_brightness: Optional[int]
     _dim_screen_off: bool
+    _dim_sync_suppressed_logged: bool
 
     # Resume tracking
     _last_resume_at: float
+
+    def _refresh_ui(self) -> None: ...
 
     # Logging helpers (best-effort, but present on the real tray implementation)
     def _log_exception(self, msg: str, exc: Exception) -> None: ...
@@ -162,29 +160,16 @@ class IdlePowerTrayProtocol(Protocol):
 
 # ---------------------------------------------------------------------------
 def ensure_tray_icon_state(tray: object) -> TrayIconState:
-    """Ensure a tray has a `tray_icon_state` attribute and return it.
-
-    Uses a *public* attribute name to avoid private hasattr/setattr coupling.
-    Also migrates legacy `_tray_icon_*` values into the state object when present.
-    """
+    """Ensure a tray has a `tray_icon_state` attribute and return it."""
 
     existing = getattr(tray, "tray_icon_state", None)
     if isinstance(existing, TrayIconState):
         return existing
 
-    try:
-        legacy_visual = getattr(tray, "_tray_icon_visual", None)
-    except Exception:
-        legacy_visual = None
-    try:
-        legacy_animating = bool(getattr(tray, "_tray_icon_animating", False))
-    except Exception:
-        legacy_animating = False
-
-    st = TrayIconState(visual=legacy_visual, animating=legacy_animating)
+    st = TrayIconState()
     try:
         setattr(tray, "tray_icon_state", st)
-    except Exception:
+    except AttributeError:
         pass
     return st
 

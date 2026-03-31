@@ -9,10 +9,10 @@ Reactive typing regressions in this codebase have clustered around one boundary:
 the distinction between per-key pulse content and whole-keyboard hardware
 brightness. When those two responsibilities blur, the result is visible flicker.
 
-The tests in `src/tests/test_reactive_render_brightness_cap_unit.py`,
-`src/tests/test_reactive_pulse_brightness_unit.py`, and
-`src/tests/test_brightness_stability_guard_unit.py` lock down the invariants
-below.
+The tests in `tests/core/test_reactive_render_brightness_cap_unit.py`,
+`tests/core/test_reactive_pulse_brightness_unit.py`, and
+`tests/tray/test_brightness_stability_guard_unit.py` lock down the
+invariants below.
 
 ## Invariants
 

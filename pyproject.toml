@@ -70,10 +70,10 @@ where = ["."]
 include = ["src*", "buildpython*"]
 
 [tool.setuptools.package-data]
-src = ["*.png", "*.json", "core/*.json"]
+src = ["*.png", "*.json", "core/*.json", "core/resources/*.json"]
 
 [tool.pytest.ini_options]
-testpaths = ["src/tests"]
+testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
@@ -82,7 +82,7 @@ addopts = "-v --cov=src --cov-report=html --cov-report=term"
 
 [tool.coverage.run]
 source = ["src"]
-omit = ["src/tests/*", "src/*_legacy.py"]
+omit = ["tests/*", "src/*_legacy.py"]
 
 [tool.coverage.report]
 exclude_lines = [
@@ -109,4 +109,4 @@ pretty = true
 show_error_codes = true
 
 [tool.ruff.lint]
-per-file-ignores = { "src/tests/**/*.py" = ["E402"] }
+per-file-ignores = { "tests/**/*.py" = ["E402"] }

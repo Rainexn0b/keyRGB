@@ -5,7 +5,12 @@ from dataclasses import dataclass
 from typing import Any, List, Tuple
 
 from src.core.effects.colors import hsv_to_rgb
-from src.core.effects.reactive.input import poll_keypress_key_id
+from src.core.effects.reactive.input import (
+    EvdevKeyboardDevices,
+    close_evdev_keyboards,
+    poll_keypress_key_id,
+    try_open_evdev_keyboards,
+)
 
 # Type alias
 Color = Tuple[int, int, int]
@@ -99,10 +104,13 @@ class _RainbowPulse:
 
 @dataclass
 class _PressSource:
-    devices: list
+    devices: EvdevKeyboardDevices
     synthetic: bool
     spawn_interval_s: float
+    allow_synthetic: bool = False
     spawn_acc: float = 0.0
+    reopen_interval_s: float = 2.0
+    reopen_acc_s: float = 0.0
 
     def poll_key_id(self, *, dt: float) -> str | None:
         """Return a key id (string) when pressed.
@@ -114,13 +122,26 @@ class _PressSource:
         if key_id:
             return str(key_id)
 
-        if self.synthetic:
+        if not self.devices:
+            self.reopen_acc_s += float(dt)
+            if self.reopen_acc_s >= float(self.reopen_interval_s):
+                self.reopen_acc_s = 0.0
+                reopened = try_open_evdev_keyboards() or []
+                if reopened:
+                    self.devices = reopened
+                    self.synthetic = False
+
+        if self.synthetic and self.allow_synthetic:
             self.spawn_acc += float(dt)
             if self.spawn_acc >= float(self.spawn_interval_s):
                 self.spawn_acc = 0.0
                 return ""
 
         return None
+
+    def close(self) -> None:
+        close_evdev_keyboards(self.devices)
+        self.devices = []
 
 
 def _ripple_weight(*, d: int, radius: float, intensity: float, band: float) -> float:

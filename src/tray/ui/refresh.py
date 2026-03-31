@@ -20,6 +20,7 @@ def _scale_rgb(color: tuple[int, int, int], factor: float) -> tuple[int, int, in
     r, g, b = color
     return (_clamp_u8(r * f), _clamp_u8(g * f), _clamp_u8(b * f))
 
+
 def _scaled_visual(visual: icon_mod.IconVisual, factor: float) -> icon_mod.IconVisual:
     if visual.mode == "rainbow":
         return icon_mod.IconVisual(mode="rainbow", scale=visual.scale * factor, phase=visual.phase)
