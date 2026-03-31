@@ -180,7 +180,7 @@ def test_init_and_reload_handle_stat_failures_without_clobbering_settings(tmp_pa
     from src.core.config import Config
 
     real_stat = Path.stat
-    target_config_path = (tmp_path / "cfg" / "config.json").resolve()
+    target_config_path = tmp_path / "cfg" / "config.json"
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setenv("KEYRGB_CONFIG_PATH", str(tmp_path / "cfg" / "config.json"))
@@ -189,7 +189,7 @@ def test_init_and_reload_handle_stat_failures_without_clobbering_settings(tmp_pa
         "stat",
         lambda self, *args, **kwargs: (
             (_ for _ in ()).throw(RuntimeError("boom"))
-            if self.resolve() == target_config_path
+            if self == target_config_path
             else real_stat(self, *args, **kwargs)
         ),
     )
