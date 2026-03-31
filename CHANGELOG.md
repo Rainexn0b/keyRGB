@@ -4,27 +4,16 @@
 
 ## Unreleased
 
-- GUI/Per-key Editor: Split always-visible lighting profile controls from keyboard-setup controls. Layout selection, layout reset, and optional-key setup now open in the shared setup pane used by Overlay Editor, so lighting presets stay visible while first-time or refresh-only keyboard setup is invoked on demand.
-- GUI/Layout: Add layout-scoped optional-key setup on top of the shared physical layout families. Optional positions such as ISO/JIS/KS/ABNT-specific keys, plus variable bottom-row utility keys, can now be hidden or relabeled in the per-key editor while keeping stable internal key IDs, and the editor/calibrator now treat those choices as keyboard setup rather than lighting-profile data.
-- Docs/Buildpython: Add active `docs/tech-debt/` tracking pages for the March 2026 maintainability review, and add a `buildpython --profile debt` workflow for debt-focused static analysis and architecture checks.
-- Buildpython/DevOps: Add a Coverage step with JSON/CSV/Markdown debt reports, per-path exception hotspot budgets in Code Hygiene, and a combined `debt-index` artifact so repo-wide and hotspot debt signals are visible in one place.
-- Buildpython/DevOps: Make long-running steps visibly report `RUNNING`, make Coverage consume explicit pytest-captured data instead of silently launching the full suite on step 18 alone, and include Pytest in the `debt` profile so debt reports remain actionable.
-- Buildpython/DevOps: Render missing coverage captures explicitly in the terminal debt snapshot, build summary, and debt index so step 18 without a prior pytest capture no longer looks like real 0% coverage.
-- Buildpython/DevOps: Refresh the default terminal UX with clearer step headers and completions, compact Pytest and Coverage highlights, and a final build overview that surfaces health and total coverage directly in `.venv/bin/python -m buildpython`.
-- Buildpython/DevOps: Add a config-driven Architecture Validation step with corpus-scoped regex rules, structured JSON/CSV/Markdown reports, and initial KeyRGB boundary checks for core, GUI, tray UI, and banned legacy imports.
-- Effects/Reactive Typing: Stop synthetic/random keypress fallback in normal runtime, explicitly close and recover evdev readers around reactive loop restarts, ignore non-keyboard `EV_KEY` devices such as power/sleep/video-button event nodes, and keep stale effect workers from clobbering newer runs. This reduces phantom reactive pulses, intermittent reactive desync, and restart-related memory growth.
-- Installer/Updates: Keep `--update-appimage` user-local by skipping udev rule installation in update-only mode, so AppImage refreshes do not prompt for `sudo` after first-time setup.
-- Installer/Desktop Integration: Refresh icon and desktop caches after desktop-entry updates, keep legacy user-icon copies in sync, and write the installed icon path into desktop entries so app-icon changes take effect more reliably.
-- Docs: Clarify that `--update-appimage` refreshes desktop integration only, not udev setup.
-- GUI/Layout: Add a physical keyboard layout catalog for the per-key editor and calibrator with `auto`, `ansi`, `iso`, `ks`, `abnt`, and `jis` variants. Exposed as a **Layout dropdown directly in the per-key editor's Profiles section** and also in Settings under "Keyboard layout". Layout definitions live in a dedicated `src/core/resources/layouts/` package, decoupled from any backend.
-- GUI/Layout: Make `auto` layout resolution conservative and cached. Generic laptop `AT Translated Set 2 keyboard` nodes no longer force a false ISO pick just because they advertise `KEY_102ND`, and repeated redraw/hit-test paths no longer re-probe sysfs on every interaction.
-- GUI/Layout: Make Settings accept the full shared physical-layout catalog instead of silently clamping new variants back to ANSI/ISO-only values, and remove stale layout-catalog compatibility metadata/import shims left over from the refactor.
-- Effects/ITE8910: Make software per-key rendering honor the shared hardware-mode brightness state so `ite8910` no longer re-enters user mode on every frame, which was a likely remaining source of visible flashing.
-- GUI/Layout: Extend the shared ANSI/ISO/ABNT bottom-row reference overlay with a right Ctrl key so the physical-layout catalog covers the reporter's missing-key example more accurately.
-- GUI/Layout: Rename the historical WootBook reference defaults to ANSI defaults, add starter built-in default bundles for each physical layout, and make per-key built-in keymap/layout fallbacks follow the selected layout without overwriting saved user profiles.
-- GUI/Layout: Seed starter overlay tweaks for the new ISO/ABNT/KS/JIS-only keys, make `auto` starter defaults follow the resolved concrete layout instead of always collapsing to ANSI, and add a per-key editor action to reset the current starter keymap/overlay bundle for the selected layout.
-- GUI/Layout: Remove the accidental ANSI right-Ctrl overlay slot, tighten ABNT right-side starter tweaks so Copilot/Menu no longer overlaps right Ctrl, and draw ISO-style Enter as a shaped key for ISO/ABNT/JIS so JIS top-row keys no longer collide with Enter.
-- Tests: Add layout catalog, layout detection, expanded physical-layout variant, and config-property regressions for the new `physical_layout` setting.
+
+## 0.19.0 (2026-03-31)
+
+- GUI/Keyboard Setup: Split keyboard setup from lighting profiles so layout selection, layout reset, and optional-key setup now live in a dedicated flow while lighting profile controls stay visible in the per-key editor.
+- GUI/Layout Support: Add a shared physical keyboard layout catalog with `auto`, `ansi`, `iso`, `ks`, `abnt`, and `jis` variants, plus better auto-detection, layout-specific starter defaults, optional-key handling, and more accurate ISO/ABNT/JIS overlay geometry.
+- Effects/Lighting Reliability: Harden reactive typing and software-render restarts by ignoring non-keyboard event devices, cleaning up input readers correctly, preventing stale workers from overwriting newer runs, and reducing visible per-key flashing on `ite8910`.
+- Backends/Diagnostics: Tighten backend probing and sysfs detection, improve diagnostics output, and make experimental-backend status and tray capability reporting clearer.
+- Installer/Desktop Integration: Keep `--update-appimage` user-local without re-running udev setup, and refresh desktop/icon caches more reliably so updated icons and desktop entries take effect after installs and updates.
+- Build/Quality: Add architecture and debt reporting to `buildpython`, improve coverage reporting, move the test suite out of the shipped app package/AppImage path, and substantially increase automated coverage across core, GUI, and tray workflows.
+- Docs/Maintenance: Reorganize contributor docs, add active tech-debt tracking, and document the updated build, release, and reactive-brightness workflows more clearly.
 
 
 ## 0.18.6 (2026-03-29)
