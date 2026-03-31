@@ -21,6 +21,7 @@ from .panels.autostart_panel import AutostartPanel
 from .panels.diagnostics_panel import DiagnosticsPanel
 from .panels.dim_sync_panel import DimSyncPanel
 from .panels.experimental_backends_panel import ExperimentalBackendsPanel
+from .panels.keyboard_layout_panel import KeyboardLayoutPanel
 from .os_autostart import detect_os_autostart_enabled, set_os_autostart
 from .panels.power_management_panel import PowerManagementPanel
 from .panels.power_source_panel import PowerSourcePanel
@@ -138,11 +139,13 @@ class PowerSettingsGUI:
         self.var_dim_sync_mode = tk.StringVar(value=str(values.screen_dim_sync_mode or "off"))
         self.var_dim_temp_brightness = tk.DoubleVar(value=float(values.screen_dim_temp_brightness))
 
+        self.var_physical_layout = tk.StringVar(value=str(values.physical_layout or "auto"))
+
     def _init_panels(self, *, bg_color: str, fg_color: str) -> None:
         left = self._left
         right = self._right
 
-        self.power_management_panel = PowerManagementPanel(
+        self.management_panel = PowerManagementPanel(
             left,
             var_enabled=self.var_enabled,
             var_off_suspend=self.var_off_suspend,
@@ -200,6 +203,14 @@ class PowerSettingsGUI:
 
         ttk.Separator(right).pack(fill="x", pady=(14, 10))
 
+        self.keyboard_layout_panel = KeyboardLayoutPanel(
+            right,
+            var_physical_layout=self.var_physical_layout,
+            on_toggle=self._on_toggle,
+        )
+
+        ttk.Separator(right).pack(fill="x", pady=(14, 10))
+
         self.diagnostics_panel = DiagnosticsPanel(
             right,
             root=self.root,
@@ -246,7 +257,7 @@ class PowerSettingsGUI:
     def _apply_enabled_state(self) -> None:
         enabled = bool(self.var_enabled.get())
 
-        self.power_management_panel.apply_enabled_state()
+        self.management_panel.apply_enabled_state()
         self.dim_sync_panel.apply_enabled_state(power_management_enabled=enabled)
         self.power_source_panel.apply_enabled_state(power_management_enabled=enabled)
 
@@ -268,6 +279,7 @@ class PowerSettingsGUI:
                 screen_dim_sync_mode=str(self.var_dim_sync_mode.get() or "off"),
                 screen_dim_temp_brightness=int(float(self.var_dim_temp_brightness.get())),
                 os_autostart_enabled=bool(self.var_os_autostart.get()),
+                physical_layout=str(self.var_physical_layout.get() or "auto"),
             )
             apply_settings_values_to_config(config=self.config, values=values)
         except Exception:

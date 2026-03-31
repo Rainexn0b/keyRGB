@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.core.resources.layouts.catalog import VALID_LAYOUT_IDS
 from src.core.utils.safe_attrs import safe_int_attr
 
 
@@ -66,6 +67,10 @@ class SettingsValues:
 
     os_autostart_enabled: bool
 
+    # Physical keyboard layout for per-key editor / calibrator overlay.
+    # Canonical values come from src.core.resources.layouts.catalog.
+    physical_layout: str = "auto"
+
 
 def load_settings_values(*, config: Any, os_autostart_enabled: bool) -> SettingsValues:
     """Best-effort load of GUI settings from a Config-like object.
@@ -88,8 +93,14 @@ def load_settings_values(*, config: Any, os_autostart_enabled: bool) -> Settings
     else:
         batt_brightness = bs_brightness if bs_enabled else base_brightness
 
+    power_management_enabled = _safe_bool(
+        config,
+        "power_management_enabled",
+        _safe_bool(config, "management_enabled", True),
+    )
+
     return SettingsValues(
-        power_management_enabled=_safe_bool(config, "power_management_enabled", True),
+        power_management_enabled=power_management_enabled,
         power_off_on_suspend=_safe_bool(config, "power_off_on_suspend", True),
         power_off_on_lid_close=_safe_bool(config, "power_off_on_lid_close", True),
         power_restore_on_resume=_safe_bool(config, "power_restore_on_resume", True),
@@ -107,6 +118,7 @@ def load_settings_values(*, config: Any, os_autostart_enabled: bool) -> Settings
             default=5,
         ),
         os_autostart_enabled=bool(os_autostart_enabled),
+        physical_layout=str(getattr(config, "physical_layout", "auto") or "auto").strip().lower(),
     )
 
 
@@ -114,6 +126,7 @@ def apply_settings_values_to_config(*, config: Any, values: SettingsValues) -> N
     """Apply GUI settings back onto a Config-like object."""
 
     config.power_management_enabled = bool(values.power_management_enabled)
+    config.management_enabled = bool(values.power_management_enabled)
     config.power_off_on_suspend = bool(values.power_off_on_suspend)
     config.power_off_on_lid_close = bool(values.power_off_on_lid_close)
     config.power_restore_on_resume = bool(values.power_restore_on_resume)
@@ -133,3 +146,6 @@ def apply_settings_values_to_config(*, config: Any, values: SettingsValues) -> N
     config.screen_dim_sync_mode = mode if mode in {"off", "temp"} else "off"
 
     config.screen_dim_temp_brightness = clamp_nonzero_brightness(values.screen_dim_temp_brightness, default=5)
+
+    layout = str(values.physical_layout or "auto").strip().lower()
+    config.physical_layout = layout if layout in VALID_LAYOUT_IDS else "auto"

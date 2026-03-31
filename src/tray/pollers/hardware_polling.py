@@ -4,6 +4,7 @@ import threading
 import time
 
 from src.core.utils.exceptions import is_device_disconnected
+from src.tray.protocols import IdlePowerTrayProtocol
 
 
 def _normalize_brightness_to_config_scale(brightness: int, *, expected: int | None = None) -> int:
@@ -23,7 +24,7 @@ def _normalize_brightness_to_config_scale(brightness: int, *, expected: int | No
 
 
 def _apply_polled_hardware_state(
-    tray,
+    tray: IdlePowerTrayProtocol,
     *,
     raw_brightness: int | None = None,
     current_brightness: int,
@@ -31,11 +32,14 @@ def _apply_polled_hardware_state(
     last_brightness,
     last_off_state,
 ):
+    tray_vars = vars(tray)
+
     # If we're temporarily forcing brightness due to screen dim sync, do not
     # persist that brightness back into config.json (it would become a user
     # setting). Still allow off/on transitions to be detected.
-    dim_temp_active = bool(getattr(tray, "_dim_temp_active", False))
-    dim_temp_target = getattr(tray, "_dim_temp_target_brightness", None)
+    dim_temp_active = bool(tray_vars.get("_dim_temp_active", False))
+    dim_temp_target = tray_vars.get("_dim_temp_target_brightness")
+    log_event = tray_vars.get("_log_event")
 
     if raw_brightness is None:
         raw_brightness = current_brightness
@@ -46,9 +50,8 @@ def _apply_polled_hardware_state(
         current_off = True
 
     if last_brightness is not None and current_brightness != last_brightness:
-        log_event = getattr(tray, "_log_event", None)
-        if callable(log_event):
-            try:
+        try:
+            if callable(log_event):
                 log_event(
                     "hardware",
                     "brightness_change",
@@ -58,8 +61,8 @@ def _apply_polled_hardware_state(
                     dim_temp_active=bool(dim_temp_active),
                     dim_temp_target=dim_temp_target,
                 )
-            except Exception:
-                pass
+        except Exception:
+            pass
 
         if dim_temp_active and dim_temp_target is not None:
             try:
@@ -70,7 +73,7 @@ def _apply_polled_hardware_state(
             except Exception:
                 pass
 
-        if tray._power_forced_off and current_brightness == 0:
+        if bool(tray_vars.get("_power_forced_off", False)) and current_brightness == 0:
             return current_brightness, current_off
 
         # Never persist brightness=0 from hardware polling. Some backends can
@@ -85,9 +88,9 @@ def _apply_polled_hardware_state(
             # item selected after restart.
             if last_brightness == 0:
                 if (
-                    not bool(getattr(tray, "_user_forced_off", False))
-                    and not bool(getattr(tray, "_power_forced_off", False))
-                    and not bool(getattr(tray, "_idle_forced_off", False))
+                    not bool(tray_vars.get("_user_forced_off", False))
+                    and not bool(tray_vars.get("_power_forced_off", False))
+                    and not bool(tray_vars.get("_idle_forced_off", False))
                 ):
                     tray.is_off = False
 
@@ -95,19 +98,18 @@ def _apply_polled_hardware_state(
         return current_brightness, current_off
 
     if last_off_state is not None and current_off != last_off_state:
-        log_event = getattr(tray, "_log_event", None)
-        if callable(log_event):
-            try:
+        try:
+            if callable(log_event):
                 log_event(
                     "hardware",
                     "off_state_change",
                     old=bool(last_off_state),
                     new=bool(current_off),
                 )
-            except Exception:
-                pass
+        except Exception:
+            pass
 
-        if tray._power_forced_off and current_off:
+        if bool(tray_vars.get("_power_forced_off", False)) and current_off:
             return current_brightness, current_off
 
         if current_off:
@@ -115,9 +117,9 @@ def _apply_polled_hardware_state(
         else:
             # Avoid overriding explicit forced-off states.
             if (
-                not bool(getattr(tray, "_user_forced_off", False))
-                and not bool(getattr(tray, "_power_forced_off", False))
-                and not bool(getattr(tray, "_idle_forced_off", False))
+                not bool(tray_vars.get("_user_forced_off", False))
+                and not bool(tray_vars.get("_power_forced_off", False))
+                and not bool(tray_vars.get("_idle_forced_off", False))
             ):
                 tray.is_off = False
         tray._refresh_ui()
@@ -126,7 +128,7 @@ def _apply_polled_hardware_state(
     return current_brightness, current_off
 
 
-def _handle_hardware_polling_exception(tray, exc: Exception, *, last_error_at: float) -> float:
+def _handle_hardware_polling_exception(tray: IdlePowerTrayProtocol, exc: Exception, *, last_error_at: float) -> float:
     # Device disconnects can happen at any time.
     if is_device_disconnected(exc):
         try:
@@ -146,7 +148,7 @@ def _handle_hardware_polling_exception(tray, exc: Exception, *, last_error_at: f
     return float(last_error_at)
 
 
-def start_hardware_polling(tray) -> None:
+def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
     """Poll keyboard hardware state to detect physical button changes."""
 
     def poll_hardware():
