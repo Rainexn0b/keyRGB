@@ -1,14 +1,55 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, TypeAlias
+
+from src.core.utils.logging_utils import log_throttled
 
 Key = Tuple[int, int]
 
 
 EvdevKeyboardDevice: TypeAlias = Any
 EvdevKeyboardDevices: TypeAlias = list[EvdevKeyboardDevice]
+
+
+logger = logging.getLogger(__name__)
+
+
+def _log_reactive_input_exception(key: str, message: str, exc: BaseException) -> None:
+    log_throttled(
+        logger,
+        key,
+        interval_s=30,
+        level=logging.WARNING,
+        msg=message,
+        exc=exc,
+    )
+
+
+def _close_evdev_device(dev: EvdevKeyboardDevice, *, log_key: str, message: str) -> None:
+    close_fn = getattr(dev, "close", None)
+    if not callable(close_fn):
+        return
+
+    try:
+        close_fn()
+    except (OSError, RuntimeError, TypeError, ValueError) as exc:
+        _log_reactive_input_exception(log_key, message, exc)
+
+
+def _drop_evdev_device(devices: EvdevKeyboardDevices, dev: EvdevKeyboardDevice) -> None:
+    try:
+        devices.remove(dev)
+    except ValueError:
+        pass
+
+    _close_evdev_device(
+        dev,
+        log_key="effects.reactive.evdev.close_failed",
+        message="Failed to close evdev keyboard device",
+    )
 
 
 def _read_udev_input_properties(device_path: str) -> Dict[str, str]:
@@ -27,7 +68,7 @@ def _read_udev_input_properties(device_path: str) -> Dict[str, str]:
             if sep:
                 props[key] = value.strip()
         return props
-    except Exception:
+    except (OSError, ValueError):
         return {}
 
 
@@ -42,7 +83,7 @@ def _evdev_device_looks_like_keyboard(dev: EvdevKeyboardDevice, evdev: Any) -> b
     try:
         caps = dev.capabilities(verbose=False)
         key_codes = set(caps.get(evdev.ecodes.EV_KEY, []) or [])
-    except Exception:
+    except (AttributeError, OSError, TypeError, ValueError):
         return False
 
     letter_keys = {
@@ -177,24 +218,26 @@ def evdev_key_name_to_key_id(name: str) -> Optional[str]:
 
 
 def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
-    try:
-        if str(os.environ.get("KEYRGB_DISABLE_EVDEV", "")).strip().lower() in {
-            "1",
-            "true",
-            "yes",
-        }:
-            return None
-    except Exception:
-        pass
+    if str(os.environ.get("KEYRGB_DISABLE_EVDEV", "")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+    }:
+        return None
 
     try:
         import evdev  # type: ignore
-    except Exception:
+    except ImportError:
         return None
 
     try:
         device_paths = list(evdev.list_devices())
-    except Exception:
+    except (AttributeError, OSError, TypeError, ValueError) as exc:
+        _log_reactive_input_exception(
+            "effects.reactive.evdev.list_devices_failed",
+            "Failed to enumerate evdev devices for reactive input",
+            exc,
+        )
         return None
 
     out = []
@@ -205,22 +248,23 @@ def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
 
         try:
             dev = evdev.InputDevice(device_path)
-        except Exception:
+        except (AttributeError, OSError, TypeError, ValueError) as exc:
+            _log_reactive_input_exception(
+                "effects.reactive.evdev.open_failed",
+                f"Failed to open evdev device {device_path!r} for reactive input",
+                exc,
+            )
             continue
 
-        try:
-            if keyboard_tag is True or _evdev_device_looks_like_keyboard(dev, evdev):
-                out.append(dev)
-                continue
-        except Exception:
-            pass
+        if keyboard_tag is True or _evdev_device_looks_like_keyboard(dev, evdev):
+            out.append(dev)
+            continue
 
-        try:
-            close_fn = getattr(dev, "close", None)
-            if callable(close_fn):
-                close_fn()
-        except Exception:
-            pass
+        _close_evdev_device(
+            dev,
+            log_key="effects.reactive.evdev.close_non_keyboard_failed",
+            message="Failed to close non-keyboard evdev device",
+        )
 
     return out or None
 
@@ -230,24 +274,17 @@ def close_evdev_keyboards(devices: Optional[EvdevKeyboardDevices]) -> None:
         return
 
     for dev in list(devices):
-        try:
-            close_fn = getattr(dev, "close", None)
-            if callable(close_fn):
-                close_fn()
-        except Exception:
-            continue
+        _close_evdev_device(
+            dev,
+            log_key="effects.reactive.evdev.close_failed",
+            message="Failed to close evdev keyboard device",
+        )
 
-    try:
-        devices.clear()
-    except Exception:
-        pass
+    devices.clear()
 
 
 def reactive_synthetic_fallback_enabled() -> bool:
-    try:
-        raw = str(os.environ.get("KEYRGB_REACTIVE_SYNTHETIC_FALLBACK", "")).strip().lower()
-    except Exception:
-        return False
+    raw = str(os.environ.get("KEYRGB_REACTIVE_SYNTHETIC_FALLBACK", "")).strip().lower()
 
     return raw in {"1", "true", "yes", "on"}
 
@@ -255,11 +292,19 @@ def reactive_synthetic_fallback_enabled() -> bool:
 def load_active_profile_keymap() -> Dict[str, Key]:
     try:
         from src.core.profile import profiles
+    except ImportError:
+        return {}
 
+    try:
         active = profiles.get_active_profile()
         km = profiles.load_keymap(active)
         return {str(k).lower(): (int(v[0]), int(v[1])) for k, v in (km or {}).items()}
-    except Exception:
+    except (AttributeError, IndexError, KeyError, OSError, TypeError, ValueError) as exc:
+        _log_reactive_input_exception(
+            "effects.reactive.profile_keymap_load_failed",
+            "Failed to load reactive keymap from active profile",
+            exc,
+        )
         return {}
 
 
@@ -269,41 +314,50 @@ def poll_keypress_key_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[st
 
     try:
         import select
+    except ImportError:
+        return None
+
+    try:
         import evdev  # type: ignore
+    except ImportError:
+        return None
 
+    try:
         r, _, _ = select.select(devices, [], [], 0)
-        if not r:
-            return None
-
-        for dev in list(r):
-            try:
-                for event in dev.read():
-                    if getattr(event, "type", None) != evdev.ecodes.EV_KEY:
-                        continue
-                    if getattr(event, "value", None) != 1:
-                        continue
-                    code = getattr(event, "code", None)
-                    if code is None:
-                        continue
-                    name = evdev.ecodes.KEY.get(int(code))
-                    key_id = evdev_key_name_to_key_id(str(name) if name else "")
-                    if key_id:
-                        return key_id
-            except Exception:
-                try:
-                    devices.remove(dev)
-                except Exception:
-                    pass
-                try:
-                    close_fn = getattr(dev, "close", None)
-                    if callable(close_fn):
-                        close_fn()
-                except Exception:
-                    pass
-                continue
-
-    except Exception:
+    except (OSError, TypeError, ValueError) as exc:
+        _log_reactive_input_exception(
+            "effects.reactive.evdev.select_failed",
+            "Reactive evdev polling failed; closing keyboard devices",
+            exc,
+        )
         close_evdev_keyboards(devices)
         return None
+
+    if not r:
+        return None
+
+    for dev in list(r):
+        try:
+            for event in dev.read():
+                if getattr(event, "type", None) != evdev.ecodes.EV_KEY:
+                    continue
+                if getattr(event, "value", None) != 1:
+                    continue
+                code = getattr(event, "code", None)
+                if code is None:
+                    continue
+                name = evdev.ecodes.KEY.get(int(code))
+                key_id = evdev_key_name_to_key_id(str(name) if name else "")
+                if key_id:
+                    return key_id
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            dev_name = getattr(dev, "path", "<unknown>")
+            _log_reactive_input_exception(
+                "effects.reactive.evdev.read_failed",
+                f"Reactive evdev device read failed for {dev_name}; dropping device",
+                exc,
+            )
+            _drop_evdev_device(devices, dev)
+            continue
 
     return None

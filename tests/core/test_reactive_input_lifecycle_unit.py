@@ -124,3 +124,50 @@ def test_try_open_evdev_keyboards_closes_unknown_non_keyboards(monkeypatch) -> N
 
     assert devices is None
     assert created["/dev/input/event5"].closed == 1
+
+
+def test_load_active_profile_keymap_logs_failures_and_returns_empty_map(monkeypatch) -> None:
+    import src.core.profile as profile_pkg
+
+    logs: list[tuple[tuple[object, ...], dict[str, object]]] = []
+    fake_profiles = SimpleNamespace(
+        get_active_profile=lambda: "default",
+        load_keymap=lambda _active: (_ for _ in ()).throw(OSError("boom")),
+    )
+
+    monkeypatch.setattr(profile_pkg, "profiles", fake_profiles, raising=False)
+    monkeypatch.setattr(reactive_input, "log_throttled", lambda *args, **kwargs: logs.append((args, kwargs)))
+
+    assert reactive_input.load_active_profile_keymap() == {}
+    assert len(logs) == 1
+    args, kwargs = logs[0]
+    assert args[1] == "effects.reactive.profile_keymap_load_failed"
+    assert kwargs["exc"].args == ("boom",)
+
+
+def test_poll_keypress_key_id_logs_and_drops_devices_on_read_failure(monkeypatch) -> None:
+    logs: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    class _BrokenInputDevice(_FakeDevice):
+        path = "/dev/input/event9"
+
+        def read(self):
+            raise OSError("read failed")
+
+    device = _BrokenInputDevice()
+    fake_evdev = SimpleNamespace(ecodes=SimpleNamespace(EV_KEY=1, KEY={}))
+    fake_select = SimpleNamespace(select=lambda readers, _writers, _errors, _timeout: (list(readers), [], []))
+
+    monkeypatch.setitem(sys.modules, "evdev", fake_evdev)
+    monkeypatch.setitem(sys.modules, "select", fake_select)
+    monkeypatch.setattr(reactive_input, "log_throttled", lambda *args, **kwargs: logs.append((args, kwargs)))
+
+    devices = [device]
+
+    assert reactive_input.poll_keypress_key_id(devices) is None
+    assert devices == []
+    assert device.closed == 1
+    assert len(logs) == 1
+    args, kwargs = logs[0]
+    assert args[1] == "effects.reactive.evdev.read_failed"
+    assert kwargs["exc"].args == ("read failed",)

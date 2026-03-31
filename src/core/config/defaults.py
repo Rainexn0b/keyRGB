@@ -68,4 +68,8 @@ DEFAULTS: dict = {
     # 'auto' probes sysfs conservatively; manual options expose common desktop
     # and laptop physical variants directly in the editor dropdown.
     "physical_layout": "auto",
+    # Per-effect speed overrides.  Maps effect name (str) to speed (0-10).
+    # When a value is present for the active effect, it overrides the global
+    # 'speed' setting.  When absent, the global speed is used.
+    "effect_speeds": {},
 }

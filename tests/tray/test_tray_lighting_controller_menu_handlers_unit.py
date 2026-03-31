@@ -41,6 +41,40 @@ class TestOnSpeedClicked:
 
         assert mock_tray.config.speed == original_speed
 
+    def test_on_speed_clicked_sw_effect_updates_engine_speed_without_restart(self):
+        """For software effects, speed change should update engine.speed in-place, not restart."""
+        from src.tray.controllers.lighting_controller import on_speed_clicked
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        # Use a known software effect name from the catalog.
+        mock_tray.config.effect = "rainbow_wave"
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            on_speed_clicked(mock_tray, "8")
+
+        assert mock_tray.config.speed == 8
+        # Engine speed is updated in-place.
+        assert mock_tray.engine.speed == 8
+        # Per-effect speed is persisted.
+        mock_tray.config.set_effect_speed.assert_called_once_with("rainbow_wave", 8)
+        # Full restart is NOT issued (avoids flicker).
+        mock_start.assert_not_called()
+
+    def test_on_speed_clicked_hw_effect_still_restarts(self):
+        """For hardware effects, speed change still requires a full effect restart."""
+        from src.tray.controllers.lighting_controller import on_speed_clicked
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        # Use a known hardware effect name that is NOT in SW_EFFECTS_SET.
+        mock_tray.config.effect = "breathing"
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            on_speed_clicked(mock_tray, "6")
+
+        assert mock_tray.config.speed == 6
+        mock_start.assert_called_once_with(mock_tray)
 
 class TestOnBrightnessClicked:
     def test_on_brightness_clicked_updates_config_and_restarts(self):

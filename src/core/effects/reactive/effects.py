@@ -104,13 +104,12 @@ def _render_uniform_fallback(engine: "EffectsEngine", *, rgb: Color) -> None:
 
 def _reactive_fade_loop(engine: "EffectsEngine") -> None:
     dt = frame_dt_s()
-    p = pace(engine)
 
     devices = try_open_evdev_keyboards() or []
     press = _PressSource(
         devices=devices,
         synthetic=not bool(devices),
-        spawn_interval_s=max(0.10, 0.45 / max(0.1, p)),
+        spawn_interval_s=max(0.10, 0.45 / max(0.1, pace(engine))),
         allow_synthetic=reactive_synthetic_fallback_enabled(),
     )
 
@@ -119,6 +118,8 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
     pulses: List[_Pulse] = []
     try:
         while engine.running and not engine.stop_event.is_set():
+            p = pace(engine)
+            press.spawn_interval_s = max(0.10, 0.45 / max(0.1, p))
             try:
                 eff_hw = int(getattr(engine, "reactive_brightness", 0) or 0)
             except Exception:
@@ -241,7 +242,6 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
     # Ripple implementation: an expanding ring wave that reads clearly across
     # the keyboard.
     dt = frame_dt_s()
-    p = pace(engine)
 
     # Base map is built per-frame so changes to per-key backdrop/brightness
     # are reflected immediately.
@@ -250,7 +250,7 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
     press = _PressSource(
         devices=devices,
         synthetic=not bool(devices),
-        spawn_interval_s=max(0.10, 0.45 / max(0.1, p)),
+        spawn_interval_s=max(0.10, 0.45 / max(0.1, pace(engine))),
         allow_synthetic=reactive_synthetic_fallback_enabled(),
     )
     keymap = load_active_profile_keymap()
@@ -260,6 +260,8 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
 
     try:
         while engine.running and not engine.stop_event.is_set():
+            p = pace(engine)
+            press.spawn_interval_s = max(0.10, 0.45 / max(0.1, p))
             try:
                 eff_hw = int(getattr(engine, "reactive_brightness", 0) or 0)
             except Exception:

@@ -120,7 +120,7 @@ def start_current_effect(
 
         tray.engine.start_effect(
             effect,
-            speed=tray.config.speed,
+            speed=tray.config.get_effect_speed(effect),
             brightness=start_brightness,
             color=tray.config.color,
             reactive_color=getattr(tray.config, "reactive_color", None),
@@ -128,6 +128,14 @@ def start_current_effect(
             direction=getattr(tray.config, "direction", None),
         )
         tray.is_off = False
+
+        # Sync the global speed to the per-effect speed that was just started
+        # so the tray speed-menu checkmark shows the correct value for this
+        # effect.  Skipping the write when they already match avoids a spurious
+        # config-poller restart.
+        effective_speed = tray.config.get_effect_speed(effect)
+        if effective_speed != safe_int_attr(tray.config, "speed", default=effective_speed):
+            tray.config.speed = effective_speed
 
         if _will_fade:
             if is_loop_effect:
@@ -193,9 +201,23 @@ def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:
         new=int(speed),
     )
 
+    # Save globally and as a per-effect override so each effect remembers its speed.
     tray.config.speed = speed
+    effect = get_effect_name(tray)
+    if effect and effect not in {"none", "perkey"}:
+        tray.config.set_effect_speed(effect, speed)
+
     if not tray.is_off:
-        start_current_effect(tray)
+        is_loop = is_software_effect(effect) or is_reactive_effect(effect)
+        if is_loop:
+            # SW/reactive loops read engine.speed on every frame — update in-place
+            # without restarting the loop (avoids flicker and state loss).
+            try:
+                tray.engine.speed = speed
+            except Exception:
+                start_current_effect(tray)
+        else:
+            start_current_effect(tray)
     tray._update_menu()
 
 

@@ -148,6 +148,28 @@ class Config:
         self._settings["speed"] = max(0, min(10, value))
         self._save()
 
+    def get_effect_speed(self, effect_name: str) -> int:
+        """Return the saved per-effect speed, falling back to the global speed."""
+        try:
+            speeds = self._settings.get("effect_speeds", None) or {}
+            if isinstance(speeds, dict) and effect_name in speeds:
+                return max(0, min(10, int(speeds[effect_name])))
+        except Exception:
+            pass
+        return self.speed
+
+    def set_effect_speed(self, effect_name: str, speed: int) -> None:
+        """Persist a per-effect speed override."""
+        try:
+            speeds = self._settings.get("effect_speeds", None)
+            if not isinstance(speeds, dict):
+                speeds = {}
+            speeds[str(effect_name)] = max(0, min(10, int(speed)))
+            self._settings["effect_speeds"] = speeds
+            self._save()
+        except Exception:
+            pass
+
     @property
     def brightness(self) -> int:
         # Active brightness depends on mode: per-key brightness is independent

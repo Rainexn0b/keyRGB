@@ -258,6 +258,54 @@ def test_reactive_color_defaults_and_manual_toggle_cover_defensive_paths(tmp_pat
     cfg._settings["reactive_color"] = None
     assert cfg.reactive_color == (255, 255, 255)
 
+
+def test_get_effect_speed_returns_per_effect_when_set(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg._settings["speed"] = 4
+
+    cfg.set_effect_speed("breathe", 7)
+
+    assert cfg.get_effect_speed("breathe") == 7
+    # Other effects still fall back to global.
+    assert cfg.get_effect_speed("wave") == 4
+
+
+def test_get_effect_speed_falls_back_to_global_when_no_override(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg._settings["speed"] = 6
+    cfg._settings["effect_speeds"] = {}
+
+    assert cfg.get_effect_speed("rainbow_swirl") == 6
+
+
+def test_set_effect_speed_clamps_value(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg.set_effect_speed("twinkle", 99)
+    assert cfg.get_effect_speed("twinkle") == 10
+
+    cfg.set_effect_speed("twinkle", -5)
+    assert cfg.get_effect_speed("twinkle") == 0
+
+
+def test_set_effect_speed_persists_to_disk(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg.set_effect_speed("fire", 8)
+
+    cfg2 = Config()
+    assert cfg2.get_effect_speed("fire") == 8
+
+
+def test_get_effect_speed_ignores_corrupt_effect_speeds(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg._settings["speed"] = 5
+    cfg._settings["effect_speeds"] = "not-a-dict"
+
+    # Should fall back to global without raising.
+    assert cfg.get_effect_speed("breathe") == 5
+
+
     cfg.reactive_color = ("9", "10", "bad")
     assert cfg._settings["reactive_color"] == [9, 10, 0]
 

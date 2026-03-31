@@ -30,6 +30,9 @@ class MockConfig:
         self.perkey_brightness = 10
         self.reactive_color = None
 
+    def get_effect_speed(self, effect_name: str) -> int:
+        return self.speed
+
 
 class MockTray:
     def __init__(self):

@@ -75,6 +75,7 @@ class TestStartCurrentEffect:
         mock_tray.config.effect = "breathe"
         mock_tray.config.brightness = 100
         mock_tray.config.speed = 3
+        mock_tray.config.get_effect_speed.return_value = 3
         mock_tray.config.color = (0, 255, 0)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
@@ -112,6 +113,7 @@ class TestStartCurrentEffect:
         mock_tray.config.effect = "hw:rainbow_wave"
         mock_tray.config.brightness = 40
         mock_tray.config.speed = 3
+        mock_tray.config.get_effect_speed.return_value = 3
         mock_tray.config.color = (1, 2, 3)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
