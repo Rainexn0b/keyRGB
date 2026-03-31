@@ -110,10 +110,11 @@ def build_terminal_build_overview(buildlog_dir: Path, summary: BuildSummary) -> 
 
 def _append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
     hygiene = _read_json_if_exists(buildlog_dir / "code-hygiene.json")
+    exception_transparency = _read_json_if_exists(buildlog_dir / "exception-transparency.json")
     markers = _read_json_if_exists(buildlog_dir / "code-markers.json")
     coverage = _read_json_if_exists(buildlog_dir / "coverage-summary.json")
 
-    if hygiene is None and markers is None and coverage is None:
+    if hygiene is None and exception_transparency is None and markers is None and coverage is None:
         return
 
     lines.extend(["", "## Debt Snapshot", ""])
@@ -195,6 +196,61 @@ def _append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
         lines.append(f"- Report: {buildlog_dir / 'code-hygiene.md'}")
         lines.append("")
 
+    if exception_transparency is not None:
+        counts = exception_transparency.get("counts", {})
+        baseline = exception_transparency.get("baseline", {})
+        baseline_counts = baseline.get("counts", {}) if isinstance(baseline, dict) else {}
+        regressions = baseline.get("regressions", []) if isinstance(baseline, dict) else []
+        top_files = exception_transparency.get("top_files_by_category", {})
+
+        lines.append("### Exception Transparency")
+        for category in [
+            "naked_except",
+            "baseexception_catch",
+            "broad_except_total",
+            "broad_except_traceback_logged",
+            "broad_except_logged_no_traceback",
+            "broad_except_unlogged",
+        ]:
+            current = counts.get(category)
+            if not isinstance(current, int):
+                continue
+            baseline_count = baseline_counts.get(category)
+            delta = "n/a"
+            if isinstance(baseline_count, int):
+                delta = f"{current - baseline_count:+d}"
+            lines.append(f"- {category}: {current} (delta {delta})")
+
+        if isinstance(regressions, list) and regressions:
+            lines.append("- Regressions:")
+            for item in regressions[:10]:
+                if not isinstance(item, dict):
+                    continue
+                reg_category = item.get("category")
+                current = item.get("current")
+                expected = item.get("baseline")
+                if not isinstance(reg_category, str):
+                    continue
+                lines.append(f"  - {reg_category}: {current} > baseline {expected}")
+        else:
+            lines.append("- Regressions: none")
+
+        if isinstance(top_files, dict):
+            for category, label in [
+                ("broad_except_unlogged", "Top unlogged broad catch hotspot"),
+                ("broad_except_logged_no_traceback", "Top no-traceback hotspot"),
+                ("broad_except_total", "Top broad catch hotspot"),
+            ]:
+                hotspots = top_files.get(category, [])
+                if not isinstance(hotspots, list) or not hotspots:
+                    continue
+                item = hotspots[0]
+                if isinstance(item, dict):
+                    lines.append(f"- {label}: {item.get('path')} ({item.get('count')})")
+
+        lines.append(f"- Report: {buildlog_dir / 'exception-transparency.md'}")
+        lines.append("")
+
     if coverage is not None:
         summary = coverage.get("summary", {})
         baseline = coverage.get("baseline", {})
@@ -262,10 +318,11 @@ def _append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
 def build_terminal_debt_snapshot(buildlog_dir: Path, *, include_coverage: bool = True) -> list[str]:
     lines: list[str] = []
     hygiene = _read_json_if_exists(buildlog_dir / "code-hygiene.json")
+    exception_transparency = _read_json_if_exists(buildlog_dir / "exception-transparency.json")
     markers = _read_json_if_exists(buildlog_dir / "code-markers.json")
     coverage = _read_json_if_exists(buildlog_dir / "coverage-summary.json")
 
-    if hygiene is None and markers is None and coverage is None:
+    if hygiene is None and exception_transparency is None and markers is None and coverage is None:
         return lines
 
     lines.append("Debt snapshot:")
@@ -321,6 +378,57 @@ def build_terminal_debt_snapshot(buildlog_dir: Path, *, include_coverage: bool =
                 lines.append(
                     "  Path budget regression: "
                     f"{first.get('category')} {first.get('path')} ({first.get('current')} > {first.get('baseline')})"
+                )
+
+    if exception_transparency is not None:
+        counts = exception_transparency.get("counts", {})
+        baseline = exception_transparency.get("baseline", {})
+        baseline_counts = baseline.get("counts", {}) if isinstance(baseline, dict) else {}
+        et_parts: list[str] = []
+        for category in [
+            "broad_except_total",
+            "broad_except_unlogged",
+            "broad_except_logged_no_traceback",
+            "broad_except_traceback_logged",
+            "naked_except",
+            "baseexception_catch",
+        ]:
+            current = counts.get(category)
+            if not isinstance(current, int):
+                continue
+            baseline_count = baseline_counts.get(category)
+            delta = "n/a"
+            if isinstance(baseline_count, int):
+                delta = f"{current - baseline_count:+d}"
+            et_parts.append(f"{category}={current} ({delta})")
+        if et_parts:
+            lines.append("  Exception transparency: " + ", ".join(et_parts))
+
+        top_files = exception_transparency.get("top_files_by_category", {})
+        if isinstance(top_files, dict):
+            for category, label in [
+                ("broad_except_unlogged", "Top unlogged broad catch"),
+                ("broad_except_logged_no_traceback", "Top no-traceback catch"),
+                ("broad_except_total", "Top broad catch"),
+            ]:
+                hotspots = top_files.get(category, [])
+                if not isinstance(hotspots, list) or not hotspots:
+                    continue
+                first = hotspots[0]
+                if not isinstance(first, dict):
+                    continue
+                path = first.get("path")
+                count = first.get("count")
+                if isinstance(path, str):
+                    lines.append(f"  {label}: {path} ({count})")
+
+        regressions = baseline.get("regressions", []) if isinstance(baseline, dict) else []
+        if isinstance(regressions, list) and regressions:
+            first = regressions[0]
+            if isinstance(first, dict):
+                lines.append(
+                    "  Exception regression: "
+                    f"{first.get('category')} ({first.get('current')} > {first.get('baseline')})"
                 )
 
     if coverage is not None and include_coverage:

@@ -47,6 +47,7 @@ def steps() -> list[Step]:
     from .step_code_hygiene import code_hygiene_runner
     from .step_architecture_validation import architecture_validation_runner
     from .step_coverage import coverage_runner, pytest_runner_with_optional_coverage
+    from .step_exception_transparency import exception_transparency_runner
 
     return [
         Step(
@@ -174,5 +175,12 @@ def steps() -> list[Step]:
             description="Build coverage debt summary and track coverage regressions",
             log_file=_log("step-18-coverage.log"),
             runner=coverage_runner,
+        ),
+        Step(
+            number=19,
+            name="Exception Transparency",
+            description="Track broad exception debt and silent-failure hotspots",
+            log_file=_log("step-19-exception-transparency.log"),
+            runner=exception_transparency_runner,
         ),
     ]

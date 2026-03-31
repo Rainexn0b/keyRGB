@@ -6,7 +6,7 @@
       "any_type_hint": 39,
       "runtime_copy_hotspot": 0,
       "test_naming": 0,
-      "forbidden_getattr": 51,
+      "forbidden_getattr": 54,
       "forbidden_api": 0,
       "resource_leak": 0,
       "cleanup_hotspot": 33,
@@ -33,7 +33,7 @@
       },
       "logged_broad_except": {
         "src/gui/tcc/profiles.py": 4,
-        "src/tray/pollers/config_polling_internal/core.py": 3,
+        "src/tray/pollers/config_polling_internal/core.py": 5,
         "src/gui/windows/reactive_color.py": 3,
         "src/core/power/management/manager.py": 3
       },
@@ -61,6 +61,20 @@
       "src/core/power/management/manager.py",
       "src/tray/app/application.py",
       "src/core/config/config.py"
+    ]
+  },
+  "exception_transparency": {
+    "counts": {
+      "naked_except": 0,
+      "baseexception_catch": 0,
+      "broad_except_total": 638,
+      "broad_except_traceback_logged": 20,
+      "broad_except_logged_no_traceback": 13,
+      "broad_except_unlogged": 591
+    },
+    "gated_categories": [
+      "naked_except",
+      "baseexception_catch"
     ]
   },
   "code_markers": {

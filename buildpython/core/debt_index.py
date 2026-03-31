@@ -25,6 +25,7 @@ def _coverage_status(coverage: dict[str, Any]) -> str | None:
 
 def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
     hygiene = _read_json_if_exists(buildlog_dir / "code-hygiene.json")
+    exception_transparency = _read_json_if_exists(buildlog_dir / "exception-transparency.json")
     markers = _read_json_if_exists(buildlog_dir / "code-markers.json")
     file_size = _read_json_if_exists(buildlog_dir / "file-size-analysis.json")
     loc_check = _read_json_if_exists(buildlog_dir / "loc-check.json")
@@ -42,6 +43,14 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
             "top_files_by_category": hygiene.get("top_files_by_category", {}),
         }
         report_paths["code_hygiene"] = str(buildlog_dir / "code-hygiene.md")
+
+    if exception_transparency is not None:
+        sections["exception_transparency"] = {
+            "counts": exception_transparency.get("counts", {}),
+            "regressions": exception_transparency.get("baseline", {}).get("regressions", []),
+            "top_files_by_category": exception_transparency.get("top_files_by_category", {}),
+        }
+        report_paths["exception_transparency"] = str(buildlog_dir / "exception-transparency.md")
 
     if markers is not None:
         sections["code_markers"] = {
@@ -139,6 +148,34 @@ def write_debt_index(buildlog_dir: Path) -> None:
                     )
             else:
                 lines.append("- Path budget regressions: none")
+            lines.append("")
+
+        exception_transparency = sections.get("exception_transparency")
+        if isinstance(exception_transparency, dict):
+            counts = exception_transparency.get("counts", {})
+            regressions = exception_transparency.get("regressions", [])
+            lines.extend(["## Exception transparency", ""])
+            for category in [
+                "naked_except",
+                "baseexception_catch",
+                "broad_except_total",
+                "broad_except_traceback_logged",
+                "broad_except_logged_no_traceback",
+                "broad_except_unlogged",
+            ]:
+                value = counts.get(category)
+                if isinstance(value, int):
+                    lines.append(f"- {category}: {value}")
+            if isinstance(regressions, list) and regressions:
+                lines.append("- Regressions:")
+                for item in regressions[:10]:
+                    if not isinstance(item, dict):
+                        continue
+                    lines.append(
+                        f"  - {item.get('category')}: {item.get('current')} > {item.get('baseline')}"
+                    )
+            else:
+                lines.append("- Regressions: none")
             lines.append("")
 
         coverage = sections.get("coverage")
