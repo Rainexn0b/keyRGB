@@ -9,7 +9,7 @@ from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer, scale_color_map_into
-from .base import Color, Key, base_color_map, frame_dt_s, mix, pace, render as base_render
+from .base import animation_step_s, Color, Key, base_color_map, frame_dt_s, mix, pace, render as base_render
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -21,10 +21,11 @@ def run_breathing(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     base = base_color_map(engine)
     color_map = get_engine_color_map_buffer(engine, "_sw_breathing_frame_map")
     phase = 0.0
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
 
     while engine.running and not engine.stop_event.is_set():
+        step_s = animation_step_s(engine, "_sw_breathing_tick", nominal_s=nominal_dt)
         breath = (math.sin(phase) + 1.0) / 2.0
         breath = breath * breath * (3.0 - 2.0 * breath)
         breath = 0.12 + breath * 0.88
@@ -32,8 +33,8 @@ def run_breathing(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         scale_color_map_into(color_map, source=base, factor=breath)
         render_fn(engine, color_map=color_map)
 
-        phase += 0.08 * p
-        engine.stop_event.wait(dt)
+        phase += (step_s / nominal_dt) * (0.08 * p)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
@@ -41,7 +42,7 @@ def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
     base = base_color_map(engine)
     color_map = get_engine_color_map_buffer(engine, "_sw_fire_frame_map")
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
 
     heat = [[0.0 for _ in range(NUM_COLS)] for _ in range(NUM_ROWS)]
@@ -55,12 +56,14 @@ def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         return (255, int(80 + (175 * t)), int(0 + (20 * t)))
 
     while engine.running and not engine.stop_event.is_set():
-        cooling = 0.06 * p
+        step_s = animation_step_s(engine, "_sw_fire_tick", nominal_s=nominal_dt)
+        step_ratio = step_s / nominal_dt
+        cooling = 0.06 * p * step_ratio
         for r in range(NUM_ROWS):
             for c in range(NUM_COLS):
                 heat[r][c] = max(0.0, heat[r][c] - cooling)
 
-        sparks = max(1, int(2 * p))
+        sparks = max(1, int(round((2 * p) * step_ratio)))
         for _ in range(sparks):
             c = random.randrange(NUM_COLS)
             r = random.randrange(min(2, NUM_ROWS))
@@ -82,13 +85,13 @@ def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
                 color_map[(r, c)] = mix(base_rgb, fire_rgb, t=min(1.0, h * 0.95))
 
         render_fn(engine, color_map=color_map)
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     """Random (SW): frequent, smooth cross-fades; per-key when available."""
 
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
     base = base_color_map(engine)
     color_map = get_engine_color_map_buffer(engine, "_sw_random_frame_map")
@@ -104,6 +107,7 @@ def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
     while engine.running and not engine.stop_event.is_set():
         now = time.monotonic()
+        step_s = animation_step_s(engine, "_sw_random_tick", nominal_s=nominal_dt, now_s=now)
         if now >= next_change_s:
             prev.clear()
             prev.update(target)
@@ -119,19 +123,19 @@ def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             t = 0.0
             next_change_s = now + (0.75 / p)
 
-        t = min(1.0, t + dt * (1.8 * p))
+        t = min(1.0, t + step_s * (1.8 * p))
         color_map.clear()
         for k in target.keys():
             color_map[k] = mix(prev[k], target[k], t)
         render_fn(engine, color_map=color_map)
 
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_rainbow_wave(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     """Rainbow Wave (SW): OpenRGB-style hue gradient wave across the key matrix."""
 
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
 
     col_den = float(max(1, NUM_COLS - 1))
@@ -144,7 +148,9 @@ def run_rainbow_wave(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     hue = 0.0
     color_map = get_engine_color_map_buffer(engine, "_sw_rainbow_wave_frame_map")
     while engine.running and not engine.stop_event.is_set():
-        hue = (hue + (dt * (0.165 * p))) % 1.0
+        # Use constant step so USB write-time jitter is not amplified into
+        # visible hue variation at high speeds (matches v0.18.1 behaviour).
+        hue = (hue + (nominal_dt * (0.165 * p))) % 1.0
 
         color_map.clear()
         for k, position in pos.items():
@@ -152,13 +158,13 @@ def run_rainbow_wave(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             color_map[k] = hsv_to_rgb(h, 1.0, 1.0)
 
         render_fn(engine, color_map=color_map)
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_rainbow_swirl(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     """Rainbow Swirl (SW): OpenRGB-style swirl around the keyboard center."""
 
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
 
     cr = (NUM_ROWS - 1) / 2.0
@@ -178,7 +184,9 @@ def run_rainbow_swirl(engine: "EffectsEngine", *, render_fn=base_render) -> None
     hue = 0.0
     color_map = get_engine_color_map_buffer(engine, "_sw_rainbow_swirl_frame_map")
     while engine.running and not engine.stop_event.is_set():
-        hue = (hue + (dt * (0.115 * p))) % 1.0
+        # Use constant step so USB write-time jitter is not amplified into
+        # visible hue variation at high speeds (matches v0.18.1 behaviour).
+        hue = (hue + (nominal_dt * (0.115 * p))) % 1.0
 
         color_map.clear()
         for k, (ang, rad) in coords.items():
@@ -186,29 +194,31 @@ def run_rainbow_swirl(engine: "EffectsEngine", *, render_fn=base_render) -> None
             color_map[k] = hsv_to_rgb(h, 1.0, 1.0)
 
         render_fn(engine, color_map=color_map)
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_spectrum_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     """Spectrum Cycle (SW): OpenRGB-style uniform hue cycling."""
 
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
     hue = 0.0
     color_map = get_engine_color_map_buffer(engine, "_sw_spectrum_cycle_frame_map")
 
     while engine.running and not engine.stop_event.is_set():
-        hue = (hue + (dt * (0.22 * p))) % 1.0
+        # Use constant step so USB write-time jitter is not amplified into
+        # visible hue variation at high speeds (matches v0.18.1 behaviour).
+        hue = (hue + (nominal_dt * (0.22 * p))) % 1.0
         rgb = hsv_to_rgb(hue, 1.0, 1.0)
         fill_uniform_color_map(color_map, color=rgb)
         render_fn(engine, color_map=color_map)
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_color_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     """Color Cycle (SW): smooth RGB cycling (OpenRGB-style)."""
 
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
     phase = 0.0
     color_map = get_engine_color_map_buffer(engine, "_sw_color_cycle_frame_map")
@@ -221,5 +231,7 @@ def run_color_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         fill_uniform_color_map(color_map, color=rgb)
         render_fn(engine, color_map=color_map)
 
-        phase += dt * (1.8 * p)
-        engine.stop_event.wait(dt)
+        # Use constant step so USB write-time jitter is not amplified into
+        # visible phase variation at high speeds (matches v0.18.1 behaviour).
+        phase += nominal_dt * (1.8 * p)
+        engine.stop_event.wait(nominal_dt)

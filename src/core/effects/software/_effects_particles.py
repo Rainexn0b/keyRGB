@@ -11,6 +11,7 @@ from src.core.effects.transitions import scaled_color_map_nonzero
 
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer
 from .base import (
+    animation_step_s,
     Color,
     Key,
     base_color_map,
@@ -39,7 +40,7 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     """Twinkle (SW): random sparkles that fade out (OpenRGB-style)."""
 
     base = base_color_map(engine)
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
     color_map = get_engine_color_map_buffer(engine, "_sw_twinkle_frame_map")
 
@@ -47,7 +48,8 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     acc = 0.0
 
     while engine.running and not engine.stop_event.is_set():
-        acc += dt * p
+        step_s = animation_step_s(engine, "_sw_twinkle_tick", nominal_s=nominal_dt)
+        acc += step_s * p
         while acc >= 0.12:
             acc -= 0.12
             count = 1 if p < 4.5 else 2
@@ -67,7 +69,7 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
         alive: List[_Twinkle] = []
         for tw in twinkles:
-            tw.age_s += dt
+            tw.age_s += step_s
             if tw.age_s <= tw.ttl_s:
                 alive.append(tw)
         twinkles = alive
@@ -90,7 +92,7 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
                 color_map[k] = base_rgb
 
         render_fn(engine, color_map=color_map)
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
@@ -111,7 +113,7 @@ def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     # (0,0,0) as an "off" latch and won't recover smoothly. Instead, render a
     # dimmed version of the base.
     off_map = scaled_color_map_nonzero(base, scale=0.08, brightness=brightness)
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
 
     half_period_s = max(0.04, 0.38 / p)
@@ -121,7 +123,8 @@ def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     color_map = get_engine_color_map_buffer(engine, "_sw_strobe_frame_map")
 
     while engine.running and not engine.stop_event.is_set():
-        elapsed += dt
+        step_s = animation_step_s(engine, "_sw_strobe_tick", nominal_s=nominal_dt)
+        elapsed += step_s
         if elapsed >= half_period_s:
             elapsed = 0.0
             on = not on
@@ -130,7 +133,7 @@ def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         color_map.update(base if on else off_map)
 
         render_fn(engine, color_map=color_map)
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
@@ -138,7 +141,7 @@ def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
     per_key_ok = has_per_key(engine)
     base = base_color_map(engine)
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
 
     highlight_src = getattr(engine, "current_color", None)
@@ -158,7 +161,8 @@ def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     width = 1.6
     color_map = get_engine_color_map_buffer(engine, "_sw_chase_frame_map")
     while engine.running and not engine.stop_event.is_set():
-        pos = (pos + dt * (3.2 * p)) % float(max(1, NUM_COLS))
+        step_s = animation_step_s(engine, "_sw_chase_tick", nominal_s=nominal_dt)
+        pos = (pos + step_s * (3.2 * p)) % float(max(1, NUM_COLS))
 
         if not per_key_ok:
             phase = float(pos) / float(max(1, NUM_COLS))
@@ -166,7 +170,7 @@ def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             rgb = mix(background_uniform, highlight, t=pulse)
             fill_uniform_color_map(color_map, color=rgb)
             render_fn(engine, color_map=color_map)
-            engine.stop_event.wait(dt)
+            engine.stop_event.wait(nominal_dt)
             continue
 
         color_map.clear()
@@ -180,7 +184,7 @@ def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
                 color_map[(r, c)] = base_rgb
 
         render_fn(engine, color_map=color_map)
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
 
 
 def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
@@ -194,7 +198,7 @@ def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         ttl_s: float
 
     base = base_color_map(engine)
-    dt = frame_dt_s()
+    nominal_dt = frame_dt_s()
     p = pace(engine)
     color_map = get_engine_color_map_buffer(engine, "_sw_rain_frame_map")
 
@@ -206,7 +210,8 @@ def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
     acc = 0.0
     while engine.running and not engine.stop_event.is_set():
-        acc += dt * p
+        step_s = animation_step_s(engine, "_sw_rain_tick", nominal_s=nominal_dt)
+        acc += step_s * p
         if acc >= 0.18:
             acc = 0.0
             spawn()
@@ -214,7 +219,7 @@ def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         new_droplets: List[_RainDrop] = []
         overlay: Dict[Key, float] = {}
         for d in droplets:
-            d.age_s += dt
+            d.age_s += step_s
             if d.age_s > d.ttl_s:
                 continue
 
@@ -240,4 +245,4 @@ def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             color_map[k] = mix(base_rgb, rain_rgb, t=min(1.0, w))
 
         render_fn(engine, color_map=color_map)
-        engine.stop_event.wait(dt)
+        engine.stop_event.wait(nominal_dt)
