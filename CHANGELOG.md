@@ -2,7 +2,17 @@
 
 
 
-## Unreleased
+## 0.19.1 (2026-04-01)
+
+- GUI/Reactive Color: Fix the Reactive Typing color window crash when opening it with the shared ColorWheel brightness slider hidden; programmatic brightness sync now works without requiring the wheel's internal slider state.
+- GUI/Calibrator: Make the keymap calibrator load layout-specific keymap and overlay defaults using the active Keyboard Setup physical layout, so ISO and other variants carry through consistently when no custom profile files exist yet.
+- GUI/Per-key Editor: Reorder the main setup actions into the intended workflow (`1. Keyboard Setup`, `2. Keymap Calibrator`, `3. Overlay Alignment`), remove the redundant manual keymap-reload button from the main surface, and rely on in-context reset actions for each setup stage instead.
+- Effects/Software: Fix per-key software effects randomly bouncing between colors instead of animating smoothly on `ite8291r3`: re-assert user mode (`SET_EFFECT`) before every `set_key_colors` call so the controller cannot revert to its saved hardware effect between frames.
+- Effects/Software: Fix choppy high-speed appearance on rainbow swirl, rainbow wave, spectrum cycle, and color cycle by reverting those effects to a constant per-frame step instead of elapsed wall-clock time; USB write-time jitter was being amplified by the pace multiplier (up to ×10 at max speed) and causing visible color steps.
+- Effects/Software: Eliminate the brief dark-dip flicker when switching between software effects by skipping the fade-in animation when the previous effect was also a software effect; the keyboard stays in user mode between effects so the new effect's first frame is seamless.
+- Effects/Software: Save and restore speed independently per software effect so each animation remembers its own last-used speed; changing speed no longer requires restarting the effect loop, and switching between effects preserves each effect's individual pace.
+- Effects/Reactive: Fix speed changes having no visible effect on reactive typing animations (`reactive_fade`, `reactive_ripple`): `pace()` is now re-evaluated each frame so changing speed via the tray menu is reflected immediately in pulse lifetime and spawn rate without restarting the effect.
+- Build/Type Checking: Fix pre-existing mypy errors in `config_polling_internal/core.py` (cast ambiguous `tuple(color)` results) and `buildpython/core/summary.py` (variable name shadowing and redefinition); `src/core`, `src/tray`, and `buildpython` now pass mypy cleanly.
 
 
 ## 0.19.0 (2026-03-31)

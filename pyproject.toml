@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "keyrgb"
-version = "0.19.0"
+version = "0.19.1"
 description = "Minimal RGB keyboard controller for ITE 8291 keyboards"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -78,7 +78,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 pythonpath = ["."]
-addopts = "-v --cov=src --cov-report=html --cov-report=term"
+addopts = "-v"
 
 [tool.coverage.run]
 source = ["src"]
