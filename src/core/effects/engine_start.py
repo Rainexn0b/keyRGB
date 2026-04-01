@@ -34,6 +34,30 @@ logger = logging.getLogger(__name__)
 _INT_COERCION_ERRORS: Final[tuple[type[BaseException], ...]] = (TypeError, ValueError, OverflowError)
 
 
+class _ManagedEffectThread(Thread):
+    """Thread wrapper that clears the published engine thread after join.
+
+    Fast-failing worker targets can exit before callers have a chance to read
+    `engine.thread`. Keeping the reference published until an explicit join (or
+    stop()) avoids that race while still cleaning up the shared pointer once the
+    caller observes the finished thread.
+    """
+
+    def __init__(self, *, engine: object, target: Any) -> None:
+        super().__init__(target=target, daemon=True)
+        self._engine = engine
+
+    def join(self, timeout: float | None = None) -> None:
+        super().join(timeout=timeout)
+        if self.is_alive():
+            return
+        try:
+            if getattr(self._engine, "thread", None) is self:
+                setattr(self._engine, "thread", None)
+        except Exception:
+            return
+
+
 class _EngineStart:
     """Effect selection and start/stop orchestration."""
 
@@ -254,11 +278,9 @@ class _EngineStart:
 
                 if not stale_generation:
                     self.running = False
-                    if thread_ref is not None and getattr(self, "thread", None) is thread_ref:
-                        self.thread = None
 
         self.running = True
-        thread_ref = Thread(target=_run_target_best_effort, daemon=True)
+        thread_ref = _ManagedEffectThread(engine=self, target=_run_target_best_effort)
         self.thread = thread_ref
         thread_ref.start()
 
