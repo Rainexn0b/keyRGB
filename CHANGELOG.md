@@ -1,6 +1,31 @@
 # Changelog
 
+## unreleased
 
+## 0.19.2 (2026-04-01)
+
+- Backends/Lightbar: Promote `ite8233` for the confirmed secondary `0x048d:0x7001` Tongfang/MECHREVO HID device from dormant scaffold to an opt-in experimental backend, using the upstream-backed single-zone lightbar path for uniform color, brightness, and off via `hidraw`.
+- Docs/Backends: Add a backend research note for the suspected ITE 8233 auxiliary lightbar path, including current evidence, unknowns, required dumps, and the promotion criteria for moving from dormant to experimental.
+- Docs/Workflow: Add a staged diagnostics and backend-discovery roadmap covering the tray-first support surface, safe discovery scanners, and the planned export flow for new backend reports.
+- GUI/Settings: Remove the Diagnostics and Keyboard Layout sections from Settings so support flows can move to the tray and physical layout stays owned by the per-key editor setup flow.
+- Tray/Support: Add first-pass tray-first Debug and Detect New Backends entries, plus a dedicated Support Tools window that can run the existing full diagnostics report and a new safe device-discovery scan without going through Settings.
+- Diagnostics/Discovery: Add a read-only device discovery snapshot that cross-references backend probes, USB IDs, USB sysfs details, and hidraw enumeration so dormant, experimental-disabled, supported, and unrecognized ITE-class devices can be surfaced explicitly.
+- Diagnostics/Hidraw: Capture hidraw report descriptors safely with read-only ioctls when access is available, and include descriptor sizes in the backend-discovery output so new controller reports carry more actionable evidence by default.
+- GUI/Support: Add save-to-file export for diagnostics and discovery output, plus a combined support-bundle export for issue attachments.
+- Diagnostics/Support: Add issue-template-aware support actions and generated issue drafts so discovery output, saved bundles, and tray support flows point users at the right GitHub form with more complete first-round evidence.
+- GUI/Support: Add an in-window support-issue preview with the recommended template and issue URL, so users can review the generated draft before copying, saving, or opening the GitHub form.
+- Diagnostics/Support: Include optional deeper-evidence commands like `lsusb -v` and `usbhid-dump -e descriptor` in unsupported-device guidance when the read-only scan still lacks enough protocol evidence.
+- Tray/Support: Collapse the tray's flat diagnostics and backend-discovery entries into a single `Support Tools` submenu to keep the top-level menu shorter while preserving the same support actions.
+- Tray/Support: Simplify the tray launch path further to a single `Support Tools…` entry, since both support flows now live in the same window.
+- GUI/Support: Clarify export button labels so diagnostics JSON, discovery JSON, and the combined support bundle are easier to distinguish.
+- GUI/Support: Add a guided “Collect missing evidence…” flow for unsupported devices, including optional privileged `usbhid-dump` capture and bundle persistence so issue-5-style reports can gather deeper USB/HID data from the UI.
+- Diagnostics/Support: Extend support bundles and hardware-support issue drafts/templates with supplemental evidence capture results when the initial scans still lack the required protocol data.
+- GUI/Per-key Editor: Add a profile-backed conditional `Lightbar` placement panel beneath `Overlay alignment`, with a resizable preview, transform controls, and a matching chassis overlay rendered on the main editor canvas when a secondary lightbar device is discovered.
+- Tray/UI: Make the top tray device status rows selectable device contexts so the menu body can switch between keyboard controls and secondary-device surfaces, instead of forcing future lightbar controls into the keyboard menu.
+- Tray/UI: Persist the selected tray device context in config so the tray reopens on the last chosen device, while still falling back to `Keyboard` if that saved secondary device is no longer present.
+- Tray/UI: Split non-keyboard device-context rendering into dedicated tray menu section builders so future device types can plug in their own context surfaces without growing more branches inside the main keyboard menu builder.
+- Tray/Lightbar: Replace the lightbar selector placeholder surface with real `Color…`, `Brightness`, and `Turn Off` actions, backed by independent lightbar color/brightness config state and a target-aware uniform color window.
+- Effects/Software: Introduce a real software-effect target policy (`Keyboard Only` vs `All Compatible Devices`) so looped software and reactive effects can mirror their uniformized output to compatible auxiliary devices like the experimental `ite8233` lightbar without folding those devices into keyboard-only engine logic.
 
 ## 0.19.1 (2026-04-01)
 
