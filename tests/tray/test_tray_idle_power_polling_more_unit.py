@@ -110,6 +110,45 @@ def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
     assert calls["refresh"] == 1
 
 
+
+def test_restore_from_idle_logs_tray_logger_failure_with_fallback(monkeypatch) -> None:
+    import src.tray.pollers.idle_power._actions as actions_module
+    import src.tray.pollers.idle_power.polling as ipp
+
+    logs: list[tuple[str, str, BaseException | None]] = []
+
+    def fake_log_throttled(_logger, key, *, interval_s, level, msg, exc=None):
+        logs.append((key, msg, exc))
+        return True
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        config=SimpleNamespace(brightness=0),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError('restore failed')),
+        _refresh_ui=lambda: None,
+    )
+
+    def broken_log_exception(*_args, **_kwargs):
+        raise RuntimeError('log failed')
+
+    tray._log_exception = broken_log_exception
+    monkeypatch.setattr(actions_module, 'log_throttled', fake_log_throttled)
+
+    ipp._restore_from_idle(tray)
+
+    assert [entry[0] for entry in logs] == [
+        'idle_power.restore_from_idle.logger',
+        'idle_power.restore_from_idle',
+    ]
+    assert isinstance(logs[0][2], RuntimeError)
+    assert str(logs[0][2]) == 'log failed'
+    assert isinstance(logs[1][2], RuntimeError)
+    assert str(logs[1][2]) == 'restore failed'
+
+
 def test_apply_idle_action_dim_to_temp_respects_is_off_and_sw_effect(
     monkeypatch,
 ) -> None:

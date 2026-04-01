@@ -6,6 +6,8 @@ Focuses on small behaviors that should not depend on real user config.
 
 from __future__ import annotations
 
+import logging
+
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -176,6 +178,59 @@ def test_physical_layout_enum_prop(tmp_path, monkeypatch) -> None:
     assert cfg.physical_layout == "auto"
 
 
+def test_tray_device_context_persists_and_normalizes(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    assert cfg.tray_device_context == "keyboard"
+
+    cfg.tray_device_context = " LightBar:048D:7001 "
+    assert cfg.tray_device_context == "lightbar:048d:7001"
+
+    cfg2 = Config()
+    assert cfg2.tray_device_context == "lightbar:048d:7001"
+
+    cfg._settings["tray_device_context"] = object()
+    assert cfg.tray_device_context == "keyboard"
+
+
+def test_lightbar_color_and_brightness_persist_independently(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    assert cfg.lightbar_brightness == 25
+    assert cfg.lightbar_color == (255, 0, 0)
+
+    cfg.lightbar_brightness = 17
+    cfg.lightbar_color = ("9", "10", "bad")
+
+    assert cfg.lightbar_brightness == 15
+    assert cfg.lightbar_color == (9, 10, 0)
+
+    cfg2 = Config()
+    assert cfg2.lightbar_brightness == 15
+    assert cfg2.lightbar_color == (9, 10, 0)
+
+
+def test_software_effect_target_persists_and_normalizes(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    assert cfg.software_effect_target == "keyboard"
+
+    cfg.software_effect_target = "ALL_UNIFORM_CAPABLE"
+    assert cfg.software_effect_target == "all_uniform_capable"
+
+    cfg2 = Config()
+    assert cfg2.software_effect_target == "all_uniform_capable"
+
+    cfg.software_effect_target = "invalid"
+    assert cfg.software_effect_target == "keyboard"
+
+
 def test_effect_speed_and_return_effect_setters_normalize_values(tmp_path, monkeypatch) -> None:
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -311,3 +366,35 @@ def test_get_effect_speed_ignores_corrupt_effect_speeds(tmp_path, monkeypatch) -
 
     cfg.reactive_use_manual_color = 1
     assert cfg.reactive_use_manual_color is True
+
+def test_set_effect_speed_logs_save_failures_without_raising(tmp_path, monkeypatch, caplog) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    monkeypatch.setattr(cfg, "_save", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    with caplog.at_level(logging.ERROR, logger="src.core.config.config"):
+        cfg.set_effect_speed("wave", 7)
+
+    assert cfg._settings["effect_speeds"]["wave"] == 7
+    records = [record for record in caplog.records if "Failed to persist effect speed override" in record.getMessage()]
+    assert records
+    assert records[-1].exc_info is not None
+
+
+def test_lightbar_color_falls_back_and_logs_when_defaults_lookup_raises(tmp_path, monkeypatch, caplog) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    class BrokenDefaults:
+        def get(self, *_args, **_kwargs):
+            raise RuntimeError("boom")
+
+    cfg.DEFAULTS = BrokenDefaults()
+    cfg._settings["lightbar_color"] = None
+
+    with caplog.at_level(logging.ERROR, logger="src.core.config.config"):
+        assert cfg.lightbar_color == (255, 0, 0)
+
+    records = [record for record in caplog.records if "Failed to read config default 'lightbar_color'" in record.getMessage()]
+    assert records
+    assert records[-1].exc_info is not None
+

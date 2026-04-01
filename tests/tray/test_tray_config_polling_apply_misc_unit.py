@@ -173,6 +173,24 @@ def test_apply_from_config_once_perkey_enable_user_mode_typeerror_fallback() -> 
     tray.engine.kb.set_key_colors.assert_called_once()
 
 
+def test_apply_from_config_once_perkey_enable_user_mode_runtimeerror_is_logged() -> None:
+    tray = _mk_tray_base(effect="perkey", brightness=10)
+    tray.config.per_key_colors = {(0, 0): (9, 9, 9)}
+    tray.engine.kb.enable_user_mode = MagicMock(side_effect=RuntimeError("boom"))
+
+    _apply_from_config_once(
+        tray,
+        ite_num_rows=1,
+        ite_num_cols=1,
+        cause="mtime_change",
+        last_applied=None,
+        last_apply_warn_at=0.0,
+    )
+
+    tray._log_exception.assert_any_call("Failed to enable per-key user mode: %s", ANY)
+    tray.engine.kb.set_key_colors.assert_called_once()
+
+
 def test_apply_from_config_once_uniform_effect_sets_color() -> None:
     tray = _mk_tray_base(effect="none", brightness=10)
 

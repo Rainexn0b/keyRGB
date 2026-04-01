@@ -78,6 +78,7 @@ class ActivatedProfile:
     per_key_layout_tweaks: Dict[str, Dict[str, float]]
     colors: PerKeyColors
     layout_slot_overrides: Dict[str, Dict[str, object]] = field(default_factory=dict)
+    lightbar_overlay: Dict[str, bool | float] = field(default_factory=dict)
 
 
 def activate_profile(
@@ -99,6 +100,7 @@ def activate_profile(
     layout_tweaks = profiles.load_layout_global(name, physical_layout=physical_layout)
     per_key_layout_tweaks = profiles.load_layout_per_key(name, physical_layout=physical_layout)
     layout_slot_overrides = profiles.load_layout_slots(name, physical_layout=physical_layout)
+    lightbar_overlay = profiles.load_lightbar_overlay(name)
 
     colors = load_profile_colors(
         name=name,
@@ -116,6 +118,7 @@ def activate_profile(
         per_key_layout_tweaks=per_key_layout_tweaks,
         colors=colors,
         layout_slot_overrides=layout_slot_overrides,
+        lightbar_overlay=lightbar_overlay,
     )
 
 
@@ -126,6 +129,7 @@ def save_profile(
     keymap: Dict[str, Tuple[int, int]],
     layout_tweaks: Dict[str, float],
     per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    lightbar_overlay: Dict[str, bool | float] | None = None,
     physical_layout: str,
     layout_slot_overrides: Dict[str, Dict[str, object]] | None = None,
     colors: PerKeyColors,
@@ -135,6 +139,7 @@ def save_profile(
     profiles.save_keymap(keymap, name)
     profiles.save_layout_global(layout_tweaks, name)
     profiles.save_layout_per_key(per_key_layout_tweaks, name)
+    profiles.save_lightbar_overlay(dict(lightbar_overlay or {}), name)
     profiles.save_layout_slots(dict(layout_slot_overrides or {}), name, physical_layout=physical_layout)
     profiles.save_per_key_colors(colors, name)
     profiles.apply_profile_to_config(config, colors)

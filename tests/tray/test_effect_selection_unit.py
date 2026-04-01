@@ -7,6 +7,7 @@ specific UI elements or hardware implementations.
 
 from __future__ import annotations
 
+import pytest
 from unittest.mock import MagicMock
 
 
@@ -246,3 +247,53 @@ class TestApplyEffectSelection:
 
         assert mock_tray.config.effect == "hw:rainbow_wave"
         mock_tray._start_current_effect.assert_called_once()
+
+    def test_load_per_key_colors_logs_traceback_when_profile_load_fails(self, monkeypatch):
+        from src.tray.controllers import effect_selection
+
+        debug = MagicMock()
+        broken_profiles = MagicMock()
+        broken_profiles.get_active_profile.return_value = "default"
+        broken_profiles.load_per_key_colors.side_effect = RuntimeError("boom")
+
+        monkeypatch.setattr(effect_selection, "profiles", broken_profiles)
+        monkeypatch.setattr(effect_selection.logger, "debug", debug)
+
+        assert effect_selection._load_per_key_colors_from_profile(MagicMock()) == {}
+        assert debug.call_count == 1
+        assert debug.call_args[0][0] == "Failed to load per-key colors from profile"
+        assert debug.call_args.kwargs["exc_info"] is True
+
+    def test_load_per_key_colors_reraises_unexpected_exceptions(self, monkeypatch):
+        from src.tray.controllers import effect_selection
+
+        broken_profiles = MagicMock()
+        broken_profiles.get_active_profile.return_value = "default"
+        broken_profiles.load_per_key_colors.side_effect = AssertionError("boom")
+
+        monkeypatch.setattr(effect_selection, "profiles", broken_profiles)
+
+        with pytest.raises(AssertionError, match="boom"):
+            effect_selection._load_per_key_colors_from_profile(MagicMock())
+
+    def test_permission_notification_failure_is_logged(self, monkeypatch):
+        from src.tray.controllers import effect_selection
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        log_exception = MagicMock()
+        permission_error = PermissionError("denied")
+
+        monkeypatch.setattr(effect_selection.logger, "exception", log_exception)
+
+        mock_tray = MagicMock()
+        mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
+        mock_tray.config.per_key_colors = {}
+        mock_tray.engine.kb.set_color.side_effect = permission_error
+        mock_tray._notify_permission_issue = MagicMock(side_effect=RuntimeError("notify failed"))
+
+        apply_effect_selection(mock_tray, effect_name="none")
+
+        mock_tray._notify_permission_issue.assert_called_once_with(permission_error)
+        assert log_exception.call_count == 1
+        assert log_exception.call_args[0][0] == "Failed to notify permission issue during effect selection: %s"
+        assert str(log_exception.call_args[0][1]) == "notify failed"

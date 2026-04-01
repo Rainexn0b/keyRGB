@@ -53,6 +53,15 @@ body:
     validations:
       required: false
 
+  - type: textarea
+    id: additional_evidence
+    attributes:
+      label: Additional evidence (optional)
+      description: Paste any extra capture results such as `lsusb -v -d <vid:pid>`, `usbhid-dump -e descriptor`, or support-bundle evidence collected from the Support Tools window.
+      render: text
+    validations:
+      required: false
+
   - type: checkboxes
     id: privacy
     attributes:

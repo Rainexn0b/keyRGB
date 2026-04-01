@@ -1,0 +1,415 @@
+{
+  "device_discovery": {
+    "candidates": [
+      {
+        "hidraw_descriptor_sizes": [],
+        "hidraw_nodes": [],
+        "manufacturer": "ITE Tech. Inc.",
+        "probe_names": [
+          "ite8291r3"
+        ],
+        "probe_selection_reasons": [],
+        "probe_stabilities": [
+          "validated"
+        ],
+        "product": "ITE Device(8291)",
+        "recommended_action": "Handled by an available backend.",
+        "status": "supported",
+        "usb_pid": "0x600b",
+        "usb_vid": "0x048d"
+      }
+    ],
+    "hidraw_devices": [
+      {
+        "access": {
+          "read": false,
+          "write": false
+        },
+        "devnode": "/dev/hidraw1",
+        "hid_id": "0018:0000093A:00000255",
+        "hid_name": "UNIW0001:00 093A:0255",
+        "hidraw_name": "hidraw1",
+        "product_id": "0x0255",
+        "sysfs_dir": "/sys/class/hidraw/hidraw1",
+        "vendor_id": "0x093a"
+      }
+    ],
+    "selected_backend": "ite8291r3",
+    "summary": {
+      "attention_count": 0,
+      "candidate_count": 1,
+      "supported_count": 1
+    },
+    "support_actions": {
+      "next_steps": [
+        "If supported hardware is still misbehaving, attach diagnostics to a bug report.",
+        "Include KEYRGB_DEBUG=1 logs from a failing run if you can reproduce the problem."
+      ],
+      "recommended_issue_template": "bug-report",
+      "recommended_issue_url": "https://github.com/Rainexn0b/keyRGB/issues/new?template=bug-report.yml"
+    },
+    "usb_ids": [
+      "048d:600b",
+      "05e3:0610",
+      "05e3:0620",
+      "13d3:3585",
+      "1d6b:0002",
+      "1d6b:0003",
+      "2b7e:c906"
+    ]
+  },
+  "diagnostics": {
+    "app": {
+      "dist_name": "keyrgb",
+      "dist_version": "0.18.5",
+      "version": "0.19.1",
+      "version_source": "pyproject"
+    },
+    "backends": {
+      "candidates_sorted": [
+        {
+          "confidence": 90,
+          "experimental_evidence": null,
+          "identifiers": {
+            "usb_pid": "0x600b",
+            "usb_vid": "0x048d"
+          },
+          "name": "ite8291r3",
+          "priority": 100,
+          "provider": "usb-userspace",
+          "reason": "usb device present (0x048d:0x600b)",
+          "stability": "validated",
+          "tier": 2
+        }
+      ],
+      "probes": [
+        {
+          "available": false,
+          "confidence": 0,
+          "name": "asusctl-aura",
+          "priority": 120,
+          "reason": "asusctl not found",
+          "selection_enabled": true,
+          "stability": "validated"
+        },
+        {
+          "available": true,
+          "confidence": 90,
+          "identifiers": {
+            "usb_pid": "0x600b",
+            "usb_vid": "0x048d"
+          },
+          "name": "ite8291r3",
+          "priority": 100,
+          "provider": "usb-userspace",
+          "reason": "usb device present (0x048d:0x600b)",
+          "selection_enabled": true,
+          "stability": "validated",
+          "tier": 2
+        },
+        {
+          "available": false,
+          "confidence": 0,
+          "experimental_evidence": "speculative",
+          "identifiers": {
+            "usb_pid": "0x7001",
+            "usb_vid": "0x048d"
+          },
+          "name": "ite8233",
+          "priority": 96,
+          "provider": "usb-userspace",
+          "reason": "no matching hidraw device for speculative ITE 8233 lightbar IDs: 0x048d:0x7001",
+          "selection_enabled": false,
+          "selection_reason": "dormant backend disabled",
+          "stability": "dormant",
+          "tier": 2
+        },
+        {
+          "available": false,
+          "confidence": 0,
+          "name": "ite8910",
+          "priority": 94,
+          "provider": "usb-userspace",
+          "reason": "no matching hidraw device",
+          "selection_enabled": true,
+          "stability": "validated",
+          "tier": 2
+        },
+        {
+          "available": false,
+          "confidence": 0,
+          "experimental_evidence": "reverse_engineered",
+          "name": "ite8297",
+          "priority": 95,
+          "provider": "usb-userspace",
+          "reason": "no matching hidraw device",
+          "selection_enabled": false,
+          "selection_reason": "experimental backend disabled (enable Experimental backends in Settings or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1)",
+          "stability": "experimental",
+          "tier": 2
+        },
+        {
+          "available": false,
+          "confidence": 0,
+          "name": "sysfs-leds",
+          "priority": 150,
+          "provider": "kernel-sysfs",
+          "reason": "no matching sysfs LED",
+          "selection_enabled": true,
+          "stability": "validated",
+          "tier": 1
+        }
+      ],
+      "requested": "auto",
+      "selected": "ite8291r3",
+      "selection": {
+        "blocked": false,
+        "blocked_reason": null,
+        "disable_usb_scan": false,
+        "experimental_backends_enabled": false,
+        "policy": "highest confidence wins; priority is tie-breaker",
+        "requested_effective": "auto"
+      },
+      "sysfs_led_candidates": {
+        "candidates_count": 0,
+        "exists": true,
+        "pkexec_in_path": true,
+        "pkexec_path": "/usr/bin/pkexec",
+        "power_helper": {
+          "executable": true,
+          "exists": true,
+          "gid": 0,
+          "mode": "0755",
+          "path": "/usr/local/bin/keyrgb-power-helper",
+          "supports_led_apply": true,
+          "uid": 0
+        },
+        "root": "/sys/class/leds",
+        "root_is_sysfs": true,
+        "sudo_in_path": true,
+        "sudo_path": "/usr/bin/sudo",
+        "top": [],
+        "zones": {
+          "groups": [],
+          "inferred_zone_count": 0,
+          "kbd_backlight_leds": []
+        }
+      }
+    },
+    "config": {
+      "mtime": 1774998068,
+      "per_key_colors_count": 120,
+      "present": true,
+      "settings": {
+        "ac_lighting_brightness": 25,
+        "ac_lighting_enabled": true,
+        "autostart": true,
+        "battery_lighting_brightness": 25,
+        "battery_lighting_enabled": true,
+        "battery_saver_brightness": 25,
+        "battery_saver_enabled": false,
+        "brightness": 10,
+        "color": [
+          255,
+          0,
+          0
+        ],
+        "effect": "reactive_ripple",
+        "os_autostart": true,
+        "power_management_enabled": true,
+        "power_off_on_lid_close": true,
+        "power_off_on_suspend": true,
+        "power_restore_on_lid_open": true,
+        "power_restore_on_resume": true,
+        "speed": 5
+      }
+    },
+    "dmi": {
+      "bios_date": "10/10/2025",
+      "bios_vendor": "American Megatrends International, LLC.",
+      "bios_version": "N.1.20WOO03",
+      "board_name": "Standard",
+      "board_vendor": "Standard",
+      "board_version": "Standard",
+      "product_family": "STX\\KRK",
+      "product_name": "Standard",
+      "product_version": "Standard",
+      "sys_vendor": "Standard"
+    },
+    "env": {
+      "DESKTOP_SESSION": "/usr/share/wayland-sessions/plasma.desktop",
+      "XDG_CURRENT_DESKTOP": "KDE"
+    },
+    "hints": {
+      "modules": [
+        "snd_soc_acpi_amd_match",
+        "snd_amd_sdw_acpi",
+        "snd_amd_acpi_mach",
+        "snd_soc_acpi",
+        "snd_intel_sdw_acpi",
+        "ucsi_acpi",
+        "hid_multitouch",
+        "asus_wmi",
+        "i2c_hid_acpi",
+        "nvidia_wmi_ec_backlight",
+        "wmi_bmof",
+        "i2c_hid",
+        "mac_hid",
+        "wmi"
+      ]
+    },
+    "leds": [],
+    "power_supply": {
+      "AC0": {
+        "online": "1",
+        "type": "Mains"
+      },
+      "BAT0": {
+        "capacity": "100",
+        "charge_now": "4300000",
+        "status": "Full",
+        "type": "Battery"
+      },
+      "ucsi-source-psy-USBC000:001": {
+        "online": "1",
+        "status": "Charging",
+        "type": "USB"
+      },
+      "ucsi-source-psy-USBC000:002": {
+        "online": "0",
+        "status": "Not charging",
+        "type": "USB"
+      }
+    },
+    "process": {
+      "egid": 1000,
+      "euid": 1000,
+      "groups": [
+        3,
+        90,
+        956,
+        979,
+        982,
+        983,
+        985,
+        989,
+        995,
+        998,
+        1000
+      ],
+      "pid": 1161812
+    },
+    "sysfs_leds": [
+      {
+        "brightness": "0",
+        "max_brightness": "1",
+        "name": "input3::capslock",
+        "path": "/sys/class/leds/input3::capslock",
+        "trigger": "none default usb-gadget usb-host rc-feedback kbd-scrolllock kbd-numlock [kbd-capslock] kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online"
+      },
+      {
+        "brightness": "1",
+        "max_brightness": "1",
+        "name": "input3::numlock",
+        "path": "/sys/class/leds/input3::numlock",
+        "trigger": "none default usb-gadget usb-host rc-feedback kbd-scrolllock [kbd-numlock] kbd-capslock kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online"
+      },
+      {
+        "brightness": "0",
+        "max_brightness": "1",
+        "name": "input3::scrolllock",
+        "path": "/sys/class/leds/input3::scrolllock",
+        "trigger": "none default usb-gadget usb-host rc-feedback [kbd-scrolllock] kbd-numlock kbd-capslock kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online"
+      }
+    ],
+    "system": {
+      "kernel_release": "6.19.10-1-cachyos",
+      "machine": "x86_64",
+      "os_release": {
+        "ID": "cachyos",
+        "NAME": "CachyOS Linux",
+        "PRETTY_NAME": "CachyOS"
+      },
+      "power_mode": {
+        "identifiers": {
+          "boost_enabled": "true",
+          "can_apply": "true",
+          "cpufreq_root": "/sys/devices/system/cpu/cpufreq",
+          "helper_present": "true",
+          "policies": "20",
+          "sysfs_writable": "false"
+        },
+        "mode": "balanced",
+        "reason": "ok",
+        "supported": true
+      },
+      "python": "3.14.3"
+    },
+    "usb_devices": [
+      {
+        "bcdDevice": "0003",
+        "busnum": "3",
+        "devnode": "/dev/bus/usb/003/003",
+        "devnode_access": {
+          "read": true,
+          "write": true
+        },
+        "devnode_gid": 0,
+        "devnode_mode": "0o664",
+        "devnode_open_by": [
+          {
+            "cmdline": "/home/cyril/Projects/Keyrgb/.venv/bin/python -B -m src.tray",
+            "comm": "python",
+            "exe": "/usr/bin/python3.14",
+            "is_self": false,
+            "pid": 1158137
+          }
+        ],
+        "devnode_open_by_others": [
+          {
+            "cmdline": "/home/cyril/Projects/Keyrgb/.venv/bin/python -B -m src.tray",
+            "comm": "python",
+            "exe": "/usr/bin/python3.14",
+            "is_self": false,
+            "pid": 1158137
+          }
+        ],
+        "devnode_uid": 0,
+        "devnum": "3",
+        "driver": "usb",
+        "idProduct": "0x600b",
+        "idVendor": "0x048d",
+        "manufacturer": "ITE Tech. Inc.",
+        "product": "ITE Device(8291)",
+        "speed": "12",
+        "sysfs_path": "/sys/bus/usb/devices/3-3"
+      }
+    ],
+    "usb_ids": [
+      "048d:600b",
+      "05e3:0610",
+      "05e3:0620",
+      "13d3:3585",
+      "1d6b:0002",
+      "1d6b:0003",
+      "2b7e:c906"
+    ],
+    "virt": {
+      "systemd_detect_virt": "none"
+    }
+  },
+  "issue_report": {
+    "fields": {
+      "diagnostics": "{\n  \"app\": {\n    \"dist_name\": \"keyrgb\",\n    \"dist_version\": \"0.18.5\",\n    \"version\": \"0.19.1\",\n    \"version_source\": \"pyproject\"\n  },\n  \"backends\": {\n    \"candidates_sorted\": [\n      {\n        \"confidence\": 90,\n        \"experimental_evidence\": null,\n        \"identifiers\": {\n          \"usb_pid\": \"0x600b\",\n          \"usb_vid\": \"0x048d\"\n        },\n        \"name\": \"ite8291r3\",\n        \"priority\": 100,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"usb device present (0x048d:0x600b)\",\n        \"stability\": \"validated\",\n        \"tier\": 2\n      }\n    ],\n    \"probes\": [\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"name\": \"asusctl-aura\",\n        \"priority\": 120,\n        \"reason\": \"asusctl not found\",\n        \"selection_enabled\": true,\n        \"stability\": \"validated\"\n      },\n      {\n        \"available\": true,\n        \"confidence\": 90,\n        \"identifiers\": {\n          \"usb_pid\": \"0x600b\",\n          \"usb_vid\": \"0x048d\"\n        },\n        \"name\": \"ite8291r3\",\n        \"priority\": 100,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"usb device present (0x048d:0x600b)\",\n        \"selection_enabled\": true,\n        \"stability\": \"validated\",\n        \"tier\": 2\n      },\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"experimental_evidence\": \"speculative\",\n        \"identifiers\": {\n          \"usb_pid\": \"0x7001\",\n          \"usb_vid\": \"0x048d\"\n        },\n        \"name\": \"ite8233\",\n        \"priority\": 96,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"no matching hidraw device for speculative ITE 8233 lightbar IDs: 0x048d:0x7001\",\n        \"selection_enabled\": false,\n        \"selection_reason\": \"dormant backend disabled\",\n        \"stability\": \"dormant\",\n        \"tier\": 2\n      },\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"name\": \"ite8910\",\n        \"priority\": 94,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"no matching hidraw device\",\n        \"selection_enabled\": true,\n        \"stability\": \"validated\",\n        \"tier\": 2\n      },\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"experimental_evidence\": \"reverse_engineered\",\n        \"name\": \"ite8297\",\n        \"priority\": 95,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"no matching hidraw device\",\n        \"selection_enabled\": false,\n        \"selection_reason\": \"experimental backend disabled (enable Experimental backends in Settings or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1)\",\n        \"stability\": \"experimental\",\n        \"tier\": 2\n      },\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"name\": \"sysfs-leds\",\n        \"priority\": 150,\n        \"provider\": \"kernel-sysfs\",\n        \"reason\": \"no matching sysfs LED\",\n        \"selection_enabled\": true,\n        \"stability\": \"validated\",\n        \"tier\": 1\n      }\n    ],\n    \"requested\": \"auto\",\n    \"selected\": \"ite8291r3\",\n    \"selection\": {\n      \"blocked\": false,\n      \"blocked_reason\": null,\n      \"disable_usb_scan\": false,\n      \"experimental_backends_enabled\": false,\n      \"policy\": \"highest confidence wins; priority is tie-breaker\",\n      \"requested_effective\": \"auto\"\n    },\n    \"sysfs_led_candidates\": {\n      \"candidates_count\": 0,\n      \"exists\": true,\n      \"pkexec_in_path\": true,\n      \"pkexec_path\": \"/usr/bin/pkexec\",\n      \"power_helper\": {\n        \"executable\": true,\n        \"exists\": true,\n        \"gid\": 0,\n        \"mode\": \"0755\",\n        \"path\": \"/usr/local/bin/keyrgb-power-helper\",\n        \"supports_led_apply\": true,\n        \"uid\": 0\n      },\n      \"root\": \"/sys/class/leds\",\n      \"root_is_sysfs\": true,\n      \"sudo_in_path\": true,\n      \"sudo_path\": \"/usr/bin/sudo\",\n      \"top\": [],\n      \"zones\": {\n        \"groups\": [],\n        \"inferred_zone_count\": 0,\n        \"kbd_backlight_leds\": []\n      }\n    }\n  },\n  \"config\": {\n    \"mtime\": 1774998068,\n    \"per_key_colors_count\": 120,\n    \"present\": true,\n    \"settings\": {\n      \"ac_lighting_brightness\": 25,\n      \"ac_lighting_enabled\": true,\n      \"autostart\": true,\n      \"battery_lighting_brightness\": 25,\n      \"battery_lighting_enabled\": true,\n      \"battery_saver_brightness\": 25,\n      \"battery_saver_enabled\": false,\n      \"brightness\": 10,\n      \"color\": [\n        255,\n        0,\n        0\n      ],\n      \"effect\": \"reactive_ripple\",\n      \"os_autostart\": true,\n      \"power_management_enabled\": true,\n      \"power_off_on_lid_close\": true,\n      \"power_off_on_suspend\": true,\n      \"power_restore_on_lid_open\": true,\n      \"power_restore_on_resume\": true,\n      \"speed\": 5\n    }\n  },\n  \"dmi\": {\n    \"bios_date\": \"10/10/2025\",\n    \"bios_vendor\": \"American Megatrends International, LLC.\",\n    \"bios_version\": \"N.1.20WOO03\",\n    \"board_name\": \"Standard\",\n    \"board_vendor\": \"Standard\",\n    \"board_version\": \"Standard\",\n    \"product_family\": \"STX\\\\KRK\",\n    \"product_name\": \"Standard\",\n    \"product_version\": \"Standard\",\n    \"sys_vendor\": \"Standard\"\n  },\n  \"env\": {\n    \"DESKTOP_SESSION\": \"/usr/share/wayland-sessions/plasma.desktop\",\n    \"XDG_CURRENT_DESKTOP\": \"KDE\"\n  },\n  \"hints\": {\n    \"modules\": [\n      \"snd_soc_acpi_amd_match\",\n      \"snd_amd_sdw_acpi\",\n      \"snd_amd_acpi_mach\",\n      \"snd_soc_acpi\",\n      \"snd_intel_sdw_acpi\",\n      \"ucsi_acpi\",\n      \"hid_multitouch\",\n      \"asus_wmi\",\n      \"i2c_hid_acpi\",\n      \"nvidia_wmi_ec_backlight\",\n      \"wmi_bmof\",\n      \"i2c_hid\",\n      \"mac_hid\",\n      \"wmi\"\n    ]\n  },\n  \"leds\": [],\n  \"power_supply\": {\n    \"AC0\": {\n      \"online\": \"1\",\n      \"type\": \"Mains\"\n    },\n    \"BAT0\": {\n      \"capacity\": \"100\",\n      \"charge_now\": \"4300000\",\n      \"status\": \"Full\",\n      \"type\": \"Battery\"\n    },\n    \"ucsi-source-psy-USBC000:001\": {\n      \"online\": \"1\",\n      \"status\": \"Charging\",\n      \"type\": \"USB\"\n    },\n    \"ucsi-source-psy-USBC000:002\": {\n      \"online\": \"0\",\n      \"status\": \"Not charging\",\n      \"type\": \"USB\"\n    }\n  },\n  \"process\": {\n    \"egid\": 1000,\n    \"euid\": 1000,\n    \"groups\": [\n      3,\n      90,\n      956,\n      979,\n      982,\n      983,\n      985,\n      989,\n      995,\n      998,\n      1000\n    ],\n    \"pid\": 1161812\n  },\n  \"sysfs_leds\": [\n    {\n      \"brightness\": \"0\",\n      \"max_brightness\": \"1\",\n      \"name\": \"input3::capslock\",\n      \"path\": \"/sys/class/leds/input3::capslock\",\n      \"trigger\": \"none default usb-gadget usb-host rc-feedback kbd-scrolllock kbd-numlock [kbd-capslock] kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online\"\n    },\n    {\n      \"brightness\": \"1\",\n      \"max_brightness\": \"1\",\n      \"name\": \"input3::numlock\",\n      \"path\": \"/sys/class/leds/input3::numlock\",\n      \"trigger\": \"none default usb-gadget usb-host rc-feedback kbd-scrolllock [kbd-numlock] kbd-capslock kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online\"\n    },\n    {\n      \"brightness\": \"0\",\n      \"max_brightness\": \"1\",\n      \"name\": \"input3::scrolllock\",\n      \"path\": \"/sys/class/leds/input3::scrolllock\",\n      \"trigger\": \"none default usb-gadget usb-host rc-feedback [kbd-scrolllock] kbd-numlock kbd-capslock kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online\"\n    }\n  ],\n  \"system\": {\n    \"kernel_release\": \"6.19.10-1-cachyos\",\n    \"machine\": \"x86_64\",\n    \"os_release\": {\n      \"ID\": \"cachyos\",\n      \"NAME\": \"CachyOS Linux\",\n      \"PRETTY_NAME\": \"CachyOS\"\n    },\n    \"power_mode\": {\n      \"identifiers\": {\n        \"boost_enabled\": \"true\",\n        \"can_apply\": \"true\",\n        \"cpufreq_root\": \"/sys/devices/system/cpu/cpufreq\",\n        \"helper_present\": \"true\",\n        \"policies\": \"20\",\n        \"sysfs_writable\": \"false\"\n      },\n      \"mode\": \"balanced\",\n      \"reason\": \"ok\",\n      \"supported\": true\n    },\n    \"python\": \"3.14.3\"\n  },\n  \"usb_devices\": [\n    {\n      \"bcdDevice\": \"0003\",\n      \"busnum\": \"3\",\n      \"devnode\": \"/dev/bus/usb/003/003\",\n      \"devnode_access\": {\n        \"read\": true,\n        \"write\": true\n      },\n      \"devnode_gid\": 0,\n      \"devnode_mode\": \"0o664\",\n      \"devnode_open_by\": [\n        {\n          \"cmdline\": \"/home/cyril/Projects/Keyrgb/.venv/bin/python -B -m src.tray\",\n          \"comm\": \"python\",\n          \"exe\": \"/usr/bin/python3.14\",\n          \"is_self\": false,\n          \"pid\": 1158137\n        }\n      ],\n      \"devnode_open_by_others\": [\n        {\n          \"cmdline\": \"/home/cyril/Projects/Keyrgb/.venv/bin/python -B -m src.tray\",\n          \"comm\": \"python\",\n          \"exe\": \"/usr/bin/python3.14\",\n          \"is_self\": false,\n          \"pid\": 1158137\n        }\n      ],\n      \"devnode_uid\": 0,\n      \"devnum\": \"3\",\n      \"driver\": \"usb\",\n      \"idProduct\": \"0x600b\",\n      \"idVendor\": \"0x048d\",\n      \"manufacturer\": \"ITE Tech. Inc.\",\n      \"product\": \"ITE Device(8291)\",\n      \"speed\": \"12\",\n      \"sysfs_path\": \"/sys/bus/usb/devices/3-3\"\n    }\n  ],\n  \"usb_ids\": [\n    \"048d:600b\",\n    \"05e3:0610\",\n    \"05e3:0620\",\n    \"13d3:3585\",\n    \"1d6b:0002\",\n    \"1d6b:0003\",\n    \"2b7e:c906\"\n  ],\n  \"virt\": {\n    \"systemd_detect_virt\": \"none\"\n  }\n}",
+      "environment": "- Distro: CachyOS\n- Desktop session: KDE\n- Kernel: 6.19.10-1-cachyos\n- KeyRGB version / install method: 0.19.1 (pyproject; installed 0.18.5)",
+      "logs": "Paste KEYRGB_DEBUG=1 keyrgb output around the failure here if available.",
+      "summary": "Steps:\n1. \n2. \n\nExpected:\nActual:\n\nSelected backend: ite8291r3\nDetected hardware: Standard Standard",
+      "version": "0.19.1 (pyproject; installed 0.18.5)"
+    },
+    "issue_url": "https://github.com/Rainexn0b/keyRGB/issues/new?template=bug-report.yml",
+    "markdown": "Template: Bug report (supported hardware)\nSuggested title: Bug: ite8291r3 issue on Standard Standard\nIssue URL: https://github.com/Rainexn0b/keyRGB/issues/new?template=bug-report.yml\n\n## summary\nSteps:\n1. \n2. \n\nExpected:\nActual:\n\nSelected backend: ite8291r3\nDetected hardware: Standard Standard\n\n## version\n0.19.1 (pyproject; installed 0.18.5)\n\n## environment\n- Distro: CachyOS\n- Desktop session: KDE\n- Kernel: 6.19.10-1-cachyos\n- KeyRGB version / install method: 0.19.1 (pyproject; installed 0.18.5)\n\n## diagnostics\n```json\n{\n  \"app\": {\n    \"dist_name\": \"keyrgb\",\n    \"dist_version\": \"0.18.5\",\n    \"version\": \"0.19.1\",\n    \"version_source\": \"pyproject\"\n  },\n  \"backends\": {\n    \"candidates_sorted\": [\n      {\n        \"confidence\": 90,\n        \"experimental_evidence\": null,\n        \"identifiers\": {\n          \"usb_pid\": \"0x600b\",\n          \"usb_vid\": \"0x048d\"\n        },\n        \"name\": \"ite8291r3\",\n        \"priority\": 100,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"usb device present (0x048d:0x600b)\",\n        \"stability\": \"validated\",\n        \"tier\": 2\n      }\n    ],\n    \"probes\": [\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"name\": \"asusctl-aura\",\n        \"priority\": 120,\n        \"reason\": \"asusctl not found\",\n        \"selection_enabled\": true,\n        \"stability\": \"validated\"\n      },\n      {\n        \"available\": true,\n        \"confidence\": 90,\n        \"identifiers\": {\n          \"usb_pid\": \"0x600b\",\n          \"usb_vid\": \"0x048d\"\n        },\n        \"name\": \"ite8291r3\",\n        \"priority\": 100,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"usb device present (0x048d:0x600b)\",\n        \"selection_enabled\": true,\n        \"stability\": \"validated\",\n        \"tier\": 2\n      },\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"experimental_evidence\": \"speculative\",\n        \"identifiers\": {\n          \"usb_pid\": \"0x7001\",\n          \"usb_vid\": \"0x048d\"\n        },\n        \"name\": \"ite8233\",\n        \"priority\": 96,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"no matching hidraw device for speculative ITE 8233 lightbar IDs: 0x048d:0x7001\",\n        \"selection_enabled\": false,\n        \"selection_reason\": \"dormant backend disabled\",\n        \"stability\": \"dormant\",\n        \"tier\": 2\n      },\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"name\": \"ite8910\",\n        \"priority\": 94,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"no matching hidraw device\",\n        \"selection_enabled\": true,\n        \"stability\": \"validated\",\n        \"tier\": 2\n      },\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"experimental_evidence\": \"reverse_engineered\",\n        \"name\": \"ite8297\",\n        \"priority\": 95,\n        \"provider\": \"usb-userspace\",\n        \"reason\": \"no matching hidraw device\",\n        \"selection_enabled\": false,\n        \"selection_reason\": \"experimental backend disabled (enable Experimental backends in Settings or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1)\",\n        \"stability\": \"experimental\",\n        \"tier\": 2\n      },\n      {\n        \"available\": false,\n        \"confidence\": 0,\n        \"name\": \"sysfs-leds\",\n        \"priority\": 150,\n        \"provider\": \"kernel-sysfs\",\n        \"reason\": \"no matching sysfs LED\",\n        \"selection_enabled\": true,\n        \"stability\": \"validated\",\n        \"tier\": 1\n      }\n    ],\n    \"requested\": \"auto\",\n    \"selected\": \"ite8291r3\",\n    \"selection\": {\n      \"blocked\": false,\n      \"blocked_reason\": null,\n      \"disable_usb_scan\": false,\n      \"experimental_backends_enabled\": false,\n      \"policy\": \"highest confidence wins; priority is tie-breaker\",\n      \"requested_effective\": \"auto\"\n    },\n    \"sysfs_led_candidates\": {\n      \"candidates_count\": 0,\n      \"exists\": true,\n      \"pkexec_in_path\": true,\n      \"pkexec_path\": \"/usr/bin/pkexec\",\n      \"power_helper\": {\n        \"executable\": true,\n        \"exists\": true,\n        \"gid\": 0,\n        \"mode\": \"0755\",\n        \"path\": \"/usr/local/bin/keyrgb-power-helper\",\n        \"supports_led_apply\": true,\n        \"uid\": 0\n      },\n      \"root\": \"/sys/class/leds\",\n      \"root_is_sysfs\": true,\n      \"sudo_in_path\": true,\n      \"sudo_path\": \"/usr/bin/sudo\",\n      \"top\": [],\n      \"zones\": {\n        \"groups\": [],\n        \"inferred_zone_count\": 0,\n        \"kbd_backlight_leds\": []\n      }\n    }\n  },\n  \"config\": {\n    \"mtime\": 1774998068,\n    \"per_key_colors_count\": 120,\n    \"present\": true,\n    \"settings\": {\n      \"ac_lighting_brightness\": 25,\n      \"ac_lighting_enabled\": true,\n      \"autostart\": true,\n      \"battery_lighting_brightness\": 25,\n      \"battery_lighting_enabled\": true,\n      \"battery_saver_brightness\": 25,\n      \"battery_saver_enabled\": false,\n      \"brightness\": 10,\n      \"color\": [\n        255,\n        0,\n        0\n      ],\n      \"effect\": \"reactive_ripple\",\n      \"os_autostart\": true,\n      \"power_management_enabled\": true,\n      \"power_off_on_lid_close\": true,\n      \"power_off_on_suspend\": true,\n      \"power_restore_on_lid_open\": true,\n      \"power_restore_on_resume\": true,\n      \"speed\": 5\n    }\n  },\n  \"dmi\": {\n    \"bios_date\": \"10/10/2025\",\n    \"bios_vendor\": \"American Megatrends International, LLC.\",\n    \"bios_version\": \"N.1.20WOO03\",\n    \"board_name\": \"Standard\",\n    \"board_vendor\": \"Standard\",\n    \"board_version\": \"Standard\",\n    \"product_family\": \"STX\\\\KRK\",\n    \"product_name\": \"Standard\",\n    \"product_version\": \"Standard\",\n    \"sys_vendor\": \"Standard\"\n  },\n  \"env\": {\n    \"DESKTOP_SESSION\": \"/usr/share/wayland-sessions/plasma.desktop\",\n    \"XDG_CURRENT_DESKTOP\": \"KDE\"\n  },\n  \"hints\": {\n    \"modules\": [\n      \"snd_soc_acpi_amd_match\",\n      \"snd_amd_sdw_acpi\",\n      \"snd_amd_acpi_mach\",\n      \"snd_soc_acpi\",\n      \"snd_intel_sdw_acpi\",\n      \"ucsi_acpi\",\n      \"hid_multitouch\",\n      \"asus_wmi\",\n      \"i2c_hid_acpi\",\n      \"nvidia_wmi_ec_backlight\",\n      \"wmi_bmof\",\n      \"i2c_hid\",\n      \"mac_hid\",\n      \"wmi\"\n    ]\n  },\n  \"leds\": [],\n  \"power_supply\": {\n    \"AC0\": {\n      \"online\": \"1\",\n      \"type\": \"Mains\"\n    },\n    \"BAT0\": {\n      \"capacity\": \"100\",\n      \"charge_now\": \"4300000\",\n      \"status\": \"Full\",\n      \"type\": \"Battery\"\n    },\n    \"ucsi-source-psy-USBC000:001\": {\n      \"online\": \"1\",\n      \"status\": \"Charging\",\n      \"type\": \"USB\"\n    },\n    \"ucsi-source-psy-USBC000:002\": {\n      \"online\": \"0\",\n      \"status\": \"Not charging\",\n      \"type\": \"USB\"\n    }\n  },\n  \"process\": {\n    \"egid\": 1000,\n    \"euid\": 1000,\n    \"groups\": [\n      3,\n      90,\n      956,\n      979,\n      982,\n      983,\n      985,\n      989,\n      995,\n      998,\n      1000\n    ],\n    \"pid\": 1161812\n  },\n  \"sysfs_leds\": [\n    {\n      \"brightness\": \"0\",\n      \"max_brightness\": \"1\",\n      \"name\": \"input3::capslock\",\n      \"path\": \"/sys/class/leds/input3::capslock\",\n      \"trigger\": \"none default usb-gadget usb-host rc-feedback kbd-scrolllock kbd-numlock [kbd-capslock] kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online\"\n    },\n    {\n      \"brightness\": \"1\",\n      \"max_brightness\": \"1\",\n      \"name\": \"input3::numlock\",\n      \"path\": \"/sys/class/leds/input3::numlock\",\n      \"trigger\": \"none default usb-gadget usb-host rc-feedback kbd-scrolllock [kbd-numlock] kbd-capslock kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online\"\n    },\n    {\n      \"brightness\": \"0\",\n      \"max_brightness\": \"1\",\n      \"name\": \"input3::scrolllock\",\n      \"path\": \"/sys/class/leds/input3::scrolllock\",\n      \"trigger\": \"none default usb-gadget usb-host rc-feedback [kbd-scrolllock] kbd-numlock kbd-capslock kbd-kanalock kbd-shiftlock kbd-altgrlock kbd-ctrllock kbd-altlock kbd-shiftllock kbd-shiftrlock kbd-ctrlllock kbd-ctrlrlock disk-activity disk-read disk-write mtd nand-disk cpu cpu0 cpu1 cpu2 cpu3 cpu4 cpu5 cpu6 cpu7 panic AC0-online BAT0-charging-or-full BAT0-charging BAT0-full BAT0-charging-blink-full-solid BAT0-charging-orange-full-green mmc0 rfkill-any rfkill-none bluetooth-power hci0-power rfkill0 ucsi-source-psy-USBC000:001-online phy0rx phy0tx phy0assoc phy0radio rfkill1 ucsi-source-psy-USBC000:002-online\"\n    }\n  ],\n  \"system\": {\n    \"kernel_release\": \"6.19.10-1-cachyos\",\n    \"machine\": \"x86_64\",\n    \"os_release\": {\n      \"ID\": \"cachyos\",\n      \"NAME\": \"CachyOS Linux\",\n      \"PRETTY_NAME\": \"CachyOS\"\n    },\n    \"power_mode\": {\n      \"identifiers\": {\n        \"boost_enabled\": \"true\",\n        \"can_apply\": \"true\",\n        \"cpufreq_root\": \"/sys/devices/system/cpu/cpufreq\",\n        \"helper_present\": \"true\",\n        \"policies\": \"20\",\n        \"sysfs_writable\": \"false\"\n      },\n      \"mode\": \"balanced\",\n      \"reason\": \"ok\",\n      \"supported\": true\n    },\n    \"python\": \"3.14.3\"\n  },\n  \"usb_devices\": [\n    {\n      \"bcdDevice\": \"0003\",\n      \"busnum\": \"3\",\n      \"devnode\": \"/dev/bus/usb/003/003\",\n      \"devnode_access\": {\n        \"read\": true,\n        \"write\": true\n      },\n      \"devnode_gid\": 0,\n      \"devnode_mode\": \"0o664\",\n      \"devnode_open_by\": [\n        {\n          \"cmdline\": \"/home/cyril/Projects/Keyrgb/.venv/bin/python -B -m src.tray\",\n          \"comm\": \"python\",\n          \"exe\": \"/usr/bin/python3.14\",\n          \"is_self\": false,\n          \"pid\": 1158137\n        }\n      ],\n      \"devnode_open_by_others\": [\n        {\n          \"cmdline\": \"/home/cyril/Projects/Keyrgb/.venv/bin/python -B -m src.tray\",\n          \"comm\": \"python\",\n          \"exe\": \"/usr/bin/python3.14\",\n          \"is_self\": false,\n          \"pid\": 1158137\n        }\n      ],\n      \"devnode_uid\": 0,\n      \"devnum\": \"3\",\n      \"driver\": \"usb\",\n      \"idProduct\": \"0x600b\",\n      \"idVendor\": \"0x048d\",\n      \"manufacturer\": \"ITE Tech. Inc.\",\n      \"product\": \"ITE Device(8291)\",\n      \"speed\": \"12\",\n      \"sysfs_path\": \"/sys/bus/usb/devices/3-3\"\n    }\n  ],\n  \"usb_ids\": [\n    \"048d:600b\",\n    \"05e3:0610\",\n    \"05e3:0620\",\n    \"13d3:3585\",\n    \"1d6b:0002\",\n    \"1d6b:0003\",\n    \"2b7e:c906\"\n  ],\n  \"virt\": {\n    \"systemd_detect_virt\": \"none\"\n  }\n}\n```\n\n## logs\nPaste KEYRGB_DEBUG=1 keyrgb output around the failure here if available.\n",
+    "template": "bug-report",
+    "template_label": "Bug report (supported hardware)",
+    "title": "Bug: ite8291r3 issue on Standard Standard"
+  }
+}

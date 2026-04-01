@@ -116,3 +116,70 @@ class TestApplyProfileToConfig:
         assert cfg.effect_brightness == 50
         assert cfg.brightness == 50
         assert cfg.perkey_brightness == 50
+
+    def test_migrate_builtin_profile_logs_active_profile_lookup_failure(self, monkeypatch):
+        from src.core.config import Config
+        from src.core.profile import profiles
+
+        logs: list[tuple[str, str, BaseException | None]] = []
+
+        def fail_active_profile():
+            raise RuntimeError("boom")
+
+        def fake_log_throttled(_logger, key, *, interval_s, level, msg, exc=None):
+            logs.append((key, msg, exc))
+            return True
+
+        monkeypatch.setattr(profiles, "get_active_profile", fail_active_profile)
+        monkeypatch.setattr(profiles, "log_throttled", fake_log_throttled)
+
+        changed = profiles.migrate_builtin_profile_brightness(Config())
+
+        assert changed is False
+        assert len(logs) == 1
+        assert logs[0][0] == "profiles.migrate_builtin_profile_brightness.active_profile"
+        assert logs[0][1] == "Failed to resolve active profile during built-in brightness migration"
+        assert isinstance(logs[0][2], RuntimeError)
+
+    def test_apply_dim_profile_logs_brightness_set_failure_and_continues(self, monkeypatch):
+        from src.core.profile import profiles
+
+        logs: list[tuple[str, str, BaseException | None]] = []
+
+        class ConfigStub:
+            def __init__(self) -> None:
+                self._effect_brightness = 25
+                self.brightness = 25
+                self.perkey_brightness = 25
+                self.effect = "wave"
+                self.per_key_colors = {}
+
+            @property
+            def effect_brightness(self) -> int:
+                return self._effect_brightness
+
+            @effect_brightness.setter
+            def effect_brightness(self, _value: int) -> None:
+                raise RuntimeError("deny")
+
+        def fake_log_throttled(_logger, key, *, interval_s, level, msg, exc=None):
+            logs.append((key, msg, exc))
+            return True
+
+        monkeypatch.setattr(profiles, "get_active_profile", lambda: "dim")
+        monkeypatch.setattr(profiles, "log_throttled", fake_log_throttled)
+
+        cfg = ConfigStub()
+        colors = {(0, 0): (1, 2, 3)}
+
+        profiles.apply_profile_to_config(cfg, colors)
+
+        assert cfg.effect == "perkey"
+        assert cfg.per_key_colors == colors
+        assert cfg.effect_brightness == 25
+        assert cfg.brightness == 25
+        assert cfg.perkey_brightness == 10
+        assert len(logs) == 1
+        assert logs[0][0] == "profiles.apply_profile_to_config.set_effect_brightness"
+        assert logs[0][1] == "Failed to set effect brightness while applying a profile"
+        assert isinstance(logs[0][2], RuntimeError)

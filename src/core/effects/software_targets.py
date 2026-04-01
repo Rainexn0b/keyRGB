@@ -1,0 +1,157 @@
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from typing import Any, Iterable
+
+from src.core.effects.transitions import avoid_full_black
+from src.core.utils.exceptions import is_permission_denied
+from src.core.utils.logging_utils import log_throttled
+
+SOFTWARE_EFFECT_TARGET_KEYBOARD = "keyboard"
+SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE = "all_uniform_capable"
+SOFTWARE_EFFECT_TARGETS = (
+    SOFTWARE_EFFECT_TARGET_KEYBOARD,
+    SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
+)
+
+Color = tuple[int, int, int]
+
+
+@dataclass(frozen=True)
+class SoftwareRenderTarget:
+    key: str
+    device_type: str
+    device: Any
+    supports_per_key: bool = False
+
+
+def normalize_software_effect_target(value: object) -> str:
+    try:
+        normalized = str(value or SOFTWARE_EFFECT_TARGET_KEYBOARD).strip().lower()
+    except Exception:
+        return SOFTWARE_EFFECT_TARGET_KEYBOARD
+    if normalized in SOFTWARE_EFFECT_TARGETS:
+        return normalized
+    return SOFTWARE_EFFECT_TARGET_KEYBOARD
+
+
+def software_render_targets(engine: Any) -> list[SoftwareRenderTarget]:
+    primary_device = getattr(engine, "kb", None)
+    targets = [
+        SoftwareRenderTarget(
+            key="keyboard",
+            device_type="keyboard",
+            device=primary_device,
+            supports_per_key=bool(getattr(primary_device, "set_key_colors", None)),
+        )
+    ]
+
+    if normalize_software_effect_target(getattr(engine, "software_effect_target", None)) != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
+        return targets
+
+    provider = getattr(engine, "secondary_software_targets_provider", None)
+    if not callable(provider):
+        return targets
+
+    try:
+        provided = provider()
+    except Exception:
+        return targets
+
+    if not isinstance(provided, Iterable):
+        return targets
+
+    for raw_target in provided:
+        target = _coerce_target(raw_target)
+        if target is None:
+            continue
+        if str(target.key or "").strip().lower() == "keyboard":
+            continue
+        targets.append(target)
+
+    return targets
+
+
+def average_color_map(color_map: dict[object, Color]) -> Color:
+    if not color_map:
+        return (0, 0, 0)
+
+    red = sum(color[0] for color in color_map.values())
+    green = sum(color[1] for color in color_map.values())
+    blue = sum(color[2] for color in color_map.values())
+    count = max(1, len(color_map))
+    return (int(red / count), int(green / count), int(blue / count))
+
+
+def render_secondary_uniform_rgb(
+    engine: Any,
+    *,
+    rgb: Color,
+    brightness_hw: int,
+    logger: logging.Logger,
+    log_key: str,
+) -> None:
+    targets = software_render_targets(engine)[1:]
+    if not targets:
+        return
+
+    red, green, blue = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))
+    permission_cb = getattr(engine, "_permission_error_cb", None)
+
+    for target in targets:
+        try:
+            target.device.set_color((red, green, blue), brightness=int(brightness_hw))
+        except Exception as exc:
+            if is_permission_denied(exc) and callable(permission_cb):
+                try:
+                    permission_cb(exc)
+                except Exception:
+                    pass
+            log_throttled(
+                logger,
+                f"{log_key}.{target.key}",
+                interval_s=30,
+                level=logging.WARNING,
+                msg=f"Secondary software-effect render failed for {target.key}",
+                exc=exc,
+            )
+
+
+def _coerce_target(raw_target: object) -> SoftwareRenderTarget | None:
+    if isinstance(raw_target, SoftwareRenderTarget):
+        return raw_target if raw_target.device is not None else None
+
+    if isinstance(raw_target, dict):
+        device = raw_target.get("device")
+        if device is None:
+            return None
+        return SoftwareRenderTarget(
+            key=str(raw_target.get("key") or raw_target.get("device_type") or "secondary"),
+            device_type=str(raw_target.get("device_type") or "secondary"),
+            device=device,
+            supports_per_key=bool(raw_target.get("supports_per_key", False)),
+        )
+
+    device = getattr(raw_target, "device", raw_target)
+    if device is None:
+        return None
+
+    return SoftwareRenderTarget(
+        key=str(getattr(raw_target, "key", getattr(raw_target, "device_type", "secondary")) or "secondary"),
+        device_type=str(getattr(raw_target, "device_type", "secondary") or "secondary"),
+        device=device,
+        supports_per_key=bool(getattr(raw_target, "supports_per_key", False)),
+    )
+
+
+__all__ = [
+    "SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE",
+    "SOFTWARE_EFFECT_TARGET_KEYBOARD",
+    "SOFTWARE_EFFECT_TARGETS",
+    "SoftwareRenderTarget",
+    "average_color_map",
+    "normalize_software_effect_target",
+    "render_secondary_uniform_rgb",
+    "software_render_targets",
+]

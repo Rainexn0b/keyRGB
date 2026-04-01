@@ -35,8 +35,13 @@ class UniformColorGUI:
     """Simple GUI for selecting a uniform keyboard color."""
 
     def __init__(self):
+        self.target_context = str(os.environ.get("KEYRGB_UNIFORM_TARGET_CONTEXT", "keyboard") or "keyboard").strip().lower()
+        self.requested_backend = str(os.environ.get("KEYRGB_UNIFORM_BACKEND", "") or "").strip().lower() or None
+        self._target_is_lightbar = self.target_context.startswith("lightbar") or self.requested_backend == "ite8233"
+        self._target_label = "Lightbar" if self._target_is_lightbar else "Keyboard"
+
         self.root = tk.Tk()
-        self.root.title("KeyRGB - Uniform Color")
+        self.root.title(f"KeyRGB - {self._target_label} Color")
         apply_keyrgb_window_icon(self.root)
         desired_w, desired_h = 520, 610
         max_w = int(self.root.winfo_screenwidth() * 0.95)
@@ -56,7 +61,7 @@ class UniformColorGUI:
         self.kb = None
         self._color_supported = True
         try:
-            backend = select_backend()
+            backend = select_backend(requested=self.requested_backend)
             try:
                 caps = backend.capabilities() if backend is not None else None
                 self._color_supported = bool(getattr(caps, "color", True)) if caps is not None else True
@@ -70,7 +75,7 @@ class UniformColorGUI:
         main_frame = ttk.Frame(self.root, padding=20)
         main_frame.pack(fill="both", expand=True)
 
-        title = ttk.Label(main_frame, text="Select Uniform Keyboard Color", font=("Sans", 14, "bold"))
+        title = ttk.Label(main_frame, text=f"Select Uniform {self._target_label} Color", font=("Sans", 14, "bold"))
         title.pack(pady=(0, 10))
 
         if not self._color_supported:
@@ -91,7 +96,7 @@ class UniformColorGUI:
             self.color_wheel = ColorWheel(
                 main_frame,
                 size=350,
-                initial_color=(tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color),
+                initial_color=self._initial_color(),
                 callback=self._on_color_change,
                 release_callback=self._on_color_release,
             )
@@ -129,16 +134,28 @@ class UniformColorGUI:
         self.root.after(2000, lambda: self.status_label.config(text=""))
 
     def _ensure_brightness_nonzero(self) -> int:
-        brightness = int(self.config.brightness)
+        brightness = int(self.config.lightbar_brightness if self._target_is_lightbar else self.config.brightness)
         if brightness == 0:
             brightness = 25
-            self.config.brightness = brightness  # Auto-saves
+            if self._target_is_lightbar:
+                self.config.lightbar_brightness = brightness
+            else:
+                self.config.brightness = brightness  # Auto-saves
         return brightness
 
     def _commit_color_to_config(self, r: int, g: int, b: int) -> None:
+        if self._target_is_lightbar:
+            self.config.lightbar_color = (r, g, b)
+            return
+
         # Stop any running effects first, then save the color (auto-saves)
         self.config.effect = "none"
         self.config.color = (r, g, b)
+
+    def _initial_color(self) -> tuple[int, int, int]:
+        if self._target_is_lightbar:
+            return tuple(self.config.lightbar_color)
+        return tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color
 
     def _on_color_change(self, r, g, b):
         """Handle color wheel changes (during drag)."""
@@ -193,9 +210,9 @@ class UniformColorGUI:
 
         result = self._apply_color(r, g, b, brightness)
         if result is True:
-            self._set_status(f"✓ Applied RGB({r}, {g}, {b})", ok=True)
+            self._set_status(f"✓ Applied {self._target_label} RGB({r}, {g}, {b})", ok=True)
         elif result == "deferred":
-            self._set_status(f"✓ Saved RGB({r}, {g}, {b})", ok=True)
+            self._set_status(f"✓ Saved {self._target_label} RGB({r}, {g}, {b})", ok=True)
         else:
             self._set_status("✗ Error applying color", ok=False)
 
@@ -212,9 +229,9 @@ class UniformColorGUI:
 
         result = self._apply_color(r, g, b, brightness)
         if result is True:
-            self._set_status(f"✓ Applied RGB({r}, {g}, {b})", ok=True)
+            self._set_status(f"✓ Applied {self._target_label} RGB({r}, {g}, {b})", ok=True)
         elif result == "deferred":
-            self._set_status(f"✓ Saved RGB({r}, {g}, {b})", ok=True)
+            self._set_status(f"✓ Saved {self._target_label} RGB({r}, {g}, {b})", ok=True)
         else:
             self._set_status("✗ Error applying color", ok=False)
 

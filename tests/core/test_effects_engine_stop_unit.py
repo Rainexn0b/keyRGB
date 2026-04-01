@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import time
 from threading import Event
 
@@ -315,4 +316,77 @@ def test_sw_to_sw_transition_skips_fade_in() -> None:
 
     assert not fade_in_calls, "_fade_in_per_key must NOT be called on SW→SW transition"
     assert not fade_uniform_calls, "_fade_uniform_color must NOT be called on SW→SW transition"
+
+
+def test_permission_denied_effect_thread_logs_traceback_and_notifies_callback(caplog) -> None:
+    engine = EffectsEngine()
+    engine.kb = NullKeyboard()
+    engine.device_available = False
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+
+    seen: list[Exception] = []
+    engine._permission_error_cb = lambda exc: seen.append(exc)
+
+    with caplog.at_level(logging.WARNING, logger="src.core.effects.engine_start"):
+        engine._start_sw_effect(
+            target=lambda: (_ for _ in ()).throw(PermissionError("denied")),
+            prev_color=(0, 0, 0),
+            fade_to_color=(255, 0, 0),
+        )
+        thread = engine.thread
+        assert thread is not None
+        thread.join(timeout=1.0)
+
+    assert len(seen) == 1
+    assert isinstance(seen[0], PermissionError)
+    assert engine.running is False
+    assert engine.thread is None
+
+    warning_records = [
+        record
+        for record in caplog.records
+        if "Permission denied while applying effect" in record.getMessage()
+    ]
+    assert warning_records
+    assert warning_records[-1].exc_info is not None
+
+
+def test_disconnect_effect_thread_logs_traceback_even_if_marking_unavailable_fails(caplog) -> None:
+    engine = EffectsEngine()
+    engine.kb = NullKeyboard()
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+
+    def fail_mark_unavailable() -> None:
+        raise RuntimeError("mark failed")
+
+    engine.mark_device_unavailable = fail_mark_unavailable  # type: ignore[assignment]
+
+    with caplog.at_level(logging.WARNING, logger="src.core.effects.engine_start"):
+        engine._start_sw_effect(
+            target=lambda: (_ for _ in ()).throw(OSError(19, "No such device")),
+            prev_color=(0, 0, 0),
+            fade_to_color=(255, 0, 0),
+        )
+        thread = engine.thread
+        assert thread is not None
+        thread.join(timeout=1.0)
+
+    failure_records = [
+        record
+        for record in caplog.records
+        if "Failed to mark keyboard device unavailable after disconnect" in record.getMessage()
+    ]
+    assert failure_records
+    assert failure_records[-1].exc_info is not None
+
+    warning_records = [
+        record
+        for record in caplog.records
+        if "Keyboard device disconnected while applying effect" in record.getMessage()
+    ]
+    assert warning_records
+    assert warning_records[-1].exc_info is not None
+    assert engine.running is False
+    assert engine.thread is None
 

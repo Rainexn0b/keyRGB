@@ -96,6 +96,7 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
         "load_layout_slots",
         lambda _name, **_kwargs: {"nonusbackslash": {"visible": False}},
     )
+    monkeypatch.setattr(profile_management.profiles, "load_lightbar_overlay", lambda _name: {"visible": True, "length": 0.7})
     monkeypatch.setattr(
         profile_management.profiles,
         "load_per_key_colors",
@@ -127,7 +128,37 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
     assert result.per_key_layout_tweaks == {"keep": {"dx": 0.1}}
     assert result.colors == {(1, 1): (10, 20, 30)}
     assert result.layout_slot_overrides == {"nonusbackslash": {"visible": False}}
+    assert result.lightbar_overlay == {"visible": True, "length": 0.7}
     assert applied == {
         "config": cfg,
         "colors": {(1, 1): (10, 20, 30)},
     }
+
+
+def test_save_profile_persists_lightbar_overlay(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+
+    monkeypatch.setattr(profile_management.profiles, "set_active_profile", lambda name: f"safe-{name}")
+    monkeypatch.setattr(profile_management.profiles, "save_keymap", lambda *args: calls.setdefault("keymap", args))
+    monkeypatch.setattr(profile_management.profiles, "save_layout_global", lambda *args: calls.setdefault("layout_global", args))
+    monkeypatch.setattr(profile_management.profiles, "save_layout_per_key", lambda *args: calls.setdefault("layout_per_key", args))
+    monkeypatch.setattr(profile_management.profiles, "save_lightbar_overlay", lambda *args: calls.setdefault("lightbar_overlay", args))
+    monkeypatch.setattr(profile_management.profiles, "save_layout_slots", lambda *args, **kwargs: calls.setdefault("layout_slots", (args, kwargs)))
+    monkeypatch.setattr(profile_management.profiles, "save_per_key_colors", lambda *args: calls.setdefault("colors", args))
+    monkeypatch.setattr(profile_management.profiles, "apply_profile_to_config", lambda *args: calls.setdefault("apply", args))
+
+    cfg = SimpleNamespace()
+    name = profile_management.save_profile(
+        "p1",
+        config=cfg,
+        keymap={"k": (0, 0)},
+        layout_tweaks={"dx": 1.0},
+        per_key_layout_tweaks={"k": {"dx": 0.1}},
+        lightbar_overlay={"visible": True, "length": 0.9},
+        physical_layout="ansi",
+        layout_slot_overrides={"k": {"visible": False}},
+        colors={(0, 0): (1, 2, 3)},
+    )
+
+    assert name == "safe-p1"
+    assert calls["lightbar_overlay"] == ({"visible": True, "length": 0.9}, "safe-p1")

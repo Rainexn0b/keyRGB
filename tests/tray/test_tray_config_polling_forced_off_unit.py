@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import ANY, MagicMock
 
 import pytest
 
@@ -81,6 +81,28 @@ def test_forced_off_skip_prevents_fastpath_brightness_update(flag_name: str) -> 
         user_forced_off=bool(getattr(tray, "_user_forced_off", False)),
         power_forced_off=bool(getattr(tray, "_power_forced_off", False)),
         idle_forced_off=bool(getattr(tray, "_idle_forced_off", False)),
+    )
+
+
+def test_forced_off_skip_logs_update_menu_failure() -> None:
+    tray = _mk_tray(brightness=30, effect="rainbow_wave")
+    tray.is_off = True
+    tray._user_forced_off = True
+    tray._update_menu.side_effect = RuntimeError("boom")
+
+    new_last_applied, _ = _apply_from_config_once(
+        tray,
+        ite_num_rows=6,
+        ite_num_cols=21,
+        cause="mtime_change",
+        last_applied=None,
+        last_apply_warn_at=0.0,
+    )
+
+    assert isinstance(new_last_applied, ConfigApplyState)
+    tray._log_exception.assert_any_call(
+        "Failed to update tray menu after forced-off config change: %s",
+        ANY,
     )
 
 

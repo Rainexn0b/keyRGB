@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Optional
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import resolve_effect_name_for_backend
-from src.core.utils.safe_attrs import safe_int_attr
+from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
 from src.tray.controllers._transition_constants import (
     SOFT_OFF_FADE_DURATION_S,
     SOFT_ON_FADE_DURATION_S,
@@ -24,11 +25,29 @@ from src.tray.controllers._lighting_controller_helpers import (
     set_engine_perkey_from_config_for_sw_effect,
     try_log_event,
 )
+from src.tray.controllers.software_target_controller import restore_secondary_software_targets
+from src.tray.controllers.software_target_controller import software_effect_target_routes_aux_devices
+from src.tray.controllers.software_target_controller import turn_off_secondary_software_targets
 from src.tray.protocols import LightingTrayProtocol
 from src.core.utils.exceptions import is_device_disconnected
 from src.core.utils.exceptions import is_permission_denied
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_brightness_override(brightness_override: object, *, default: int) -> int:
+    try:
+        value = int(brightness_override)
+    except (TypeError, ValueError, OverflowError):
+        return default
+    return max(0, min(50, value))
+
+
+def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
+    try:
+        tray._log_exception(msg, exc)
+    except Exception:
+        logger.exception(msg, exc)
 
 
 def start_current_effect(
@@ -49,23 +68,16 @@ def start_current_effect(
         target_brightness = safe_int_attr(tray.config, "brightness", default=0)
         start_brightness = target_brightness
         if brightness_override is not None:
-            try:
-                start_brightness = max(0, min(50, int(brightness_override)))
-            except Exception:
-                start_brightness = target_brightness
+            start_brightness = _coerce_brightness_override(brightness_override, default=target_brightness)
 
-        try:
-            raw_effect = str(getattr(tray.config, "effect", "none") or "none")
-        except Exception:
-            raw_effect = "none"
+        raw_effect = safe_str_attr(tray.config, "effect", default="none") or "none"
         effect = resolve_effect_name_for_backend(raw_effect, getattr(tray, "backend", None))
         if effect != raw_effect:
-            try:
-                tray.config.effect = effect
-            except Exception:
-                pass
+            tray.config.effect = effect
         if effect == "perkey":
             apply_perkey_mode(tray, brightness_override=start_brightness)
+            if software_effect_target_routes_aux_devices(tray):
+                restore_secondary_software_targets(tray)
             if fade_in and target_brightness > start_brightness and target_brightness > 0:
                 tray.engine.set_brightness(
                     target_brightness,
@@ -77,6 +89,8 @@ def start_current_effect(
 
         if effect == "none":
             apply_uniform_none_mode(tray, brightness_override=start_brightness)
+            if software_effect_target_routes_aux_devices(tray):
+                restore_secondary_software_targets(tray)
             if fade_in and target_brightness > start_brightness and target_brightness > 0:
                 tray.engine.set_brightness(
                     target_brightness,
@@ -106,17 +120,11 @@ def start_current_effect(
         _saved_reactive_br = None
         _saved_perkey_br = None
         if _will_fade and not is_loop_effect:
-            try:
-                _saved_reactive_br = getattr(tray.engine, "reactive_brightness", None)
-                tray.engine.reactive_brightness = start_brightness
-            except Exception:
-                pass
-            try:
-                _saved_perkey_br = getattr(tray.engine, "per_key_brightness", None)
-                if _saved_perkey_br is not None:
-                    tray.engine.per_key_brightness = start_brightness
-            except Exception:
-                pass
+            _saved_reactive_br = getattr(tray.engine, "reactive_brightness", None)
+            tray.engine.reactive_brightness = start_brightness
+            _saved_perkey_br = getattr(tray.engine, "per_key_brightness", None)
+            if _saved_perkey_br is not None:
+                tray.engine.per_key_brightness = start_brightness
 
         tray.engine.start_effect(
             effect,
@@ -157,20 +165,23 @@ def start_current_effect(
             if _saved_reactive_br is not None:
                 try:
                     tray.engine.reactive_brightness = int(_saved_reactive_br)
-                except Exception:
+                except (AttributeError, TypeError, ValueError, OverflowError):
                     pass
             if _saved_perkey_br is not None:
                 try:
                     tray.engine.per_key_brightness = int(_saved_perkey_br)
-                except Exception:
+                except (AttributeError, TypeError, ValueError, OverflowError):
                     pass
+
+        if not is_loop_effect and software_effect_target_routes_aux_devices(tray):
+            restore_secondary_software_targets(tray)
     except Exception as exc:
         # If the USB device disappeared, mark it unavailable and avoid a scary traceback.
         if is_device_disconnected(exc):
             try:
                 tray.engine.mark_device_unavailable()
-            except Exception:
-                pass
+            except Exception as mark_exc:
+                _log_boundary_exception(tray, "Failed to mark device unavailable: %s", mark_exc)
             logger.warning("Keyboard device unavailable: %s", exc)
             return
 
@@ -179,13 +190,10 @@ def start_current_effect(
         if is_permission_denied(exc) and callable(notify_permission_issue):
             try:
                 notify_permission_issue(exc)
-            except Exception:
-                pass
+            except Exception as notify_exc:
+                _log_boundary_exception(tray, "Failed to notify permission issue: %s", notify_exc)
             return
-        try:
-            tray._log_exception("Error starting effect: %s", exc)
-        except Exception:
-            logger.exception("Error starting effect")
+        _log_boundary_exception(tray, "Error starting effect: %s", exc)
 
 
 def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:
@@ -214,7 +222,8 @@ def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:
             # without restarting the loop (avoids flicker and state loss).
             try:
                 tray.engine.speed = speed
-            except Exception:
+            except Exception as exc:
+                _log_boundary_exception(tray, "Failed to update engine speed in place: %s", exc)
                 start_current_effect(tray)
         else:
             start_current_effect(tray)
@@ -257,11 +266,11 @@ def on_brightness_clicked(tray: LightingTrayProtocol, item: object) -> None:
     if is_reactive:
         try:
             tray.config.reactive_brightness = int(brightness_hw)
-        except Exception:
+        except (AttributeError, TypeError, ValueError, OverflowError):
             pass
         try:
             tray.engine.reactive_brightness = int(brightness_hw)
-        except Exception:
+        except (AttributeError, TypeError, ValueError, OverflowError):
             pass
 
     tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_loop_effect)
@@ -275,6 +284,8 @@ def turn_off(tray: LightingTrayProtocol) -> None:
     tray._user_forced_off = True
     tray._idle_forced_off = False
     tray.engine.turn_off()
+    if software_effect_target_routes_aux_devices(tray):
+        turn_off_secondary_software_targets(tray)
     tray.is_off = True
     tray._refresh_ui()
 
@@ -305,17 +316,14 @@ def power_turn_off(tray: LightingTrayProtocol) -> None:
     tray._idle_forced_off = False
     tray.is_off = True
     tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    if software_effect_target_routes_aux_devices(tray):
+        turn_off_secondary_software_targets(tray)
     tray._refresh_ui()
 
 
 def power_restore(tray: LightingTrayProtocol) -> None:
     # Track resume time so idle polling can ignore stale screen-off state.
-    try:
-        import time
-
-        tray._last_resume_at = time.monotonic()
-    except Exception:
-        pass
+    tray._last_resume_at = time.monotonic()
 
     # Never fight explicit user off.
     if bool(getattr(tray, "_user_forced_off", False)):
@@ -341,10 +349,7 @@ def power_restore(tray: LightingTrayProtocol) -> None:
 
     # Common restore path: hardware may have reset to off across suspend.
     # Avoid a visible flash from fading from a stale prior color.
-    try:
-        tray.engine.current_color = (0, 0, 0)
-    except Exception:
-        pass
+    tray.engine.current_color = (0, 0, 0)
     tray.is_off = False
     start_current_effect(
         tray,

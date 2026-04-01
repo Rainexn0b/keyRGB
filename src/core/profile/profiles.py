@@ -14,6 +14,7 @@ profile data by writing to config when you activate a profile.
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, Tuple
 
 from ._backdrop import load_backdrop_transparency, save_backdrop_transparency
@@ -31,16 +32,21 @@ from .paths import (
     set_active_profile,
     set_default_profile,
 )
+from src.core.config.layout_slots import load_layout_slot_overrides, save_layout_slot_overrides
 from src.core.resources.defaults import (
     DEFAULT_COLORS,
+    get_default_lightbar_overlay,
     get_default_keymap,
     get_default_layout_tweaks,
     get_default_per_key_tweaks,
 )
-from src.core.config.layout_slots import load_layout_slot_overrides, save_layout_slot_overrides
+from src.core.utils.logging_utils import log_throttled
 
 # Backwards-compatible constant
 _DEFAULT_PROFILE = DEFAULT_PROFILE_NAME
+logger = logging.getLogger(__name__)
+_MISSING = object()
+_READ_FAILED = object()
 
 
 __all__ = [
@@ -57,6 +63,7 @@ __all__ = [
     "load_layout_global",
     "load_layout_per_key",
     "load_layout_slots",
+    "load_lightbar_overlay",
     "load_per_key_colors",
     "paths_for",
     "profiles_root",
@@ -66,11 +73,35 @@ __all__ = [
     "save_layout_global",
     "save_layout_per_key",
     "save_layout_slots",
+    "save_lightbar_overlay",
     "save_per_key_colors",
     "migrate_builtin_profile_brightness",
     "set_active_profile",
     "set_default_profile",
 ]
+
+
+def _normalize_lightbar_overlay(raw: object) -> Dict[str, bool | float]:
+    out: Dict[str, bool | float] = dict(get_default_lightbar_overlay())
+    if isinstance(raw, dict):
+        visible = raw.get("visible")
+        if isinstance(visible, bool):
+            out["visible"] = visible
+        elif isinstance(visible, (int, float)):
+            out["visible"] = bool(visible)
+
+        for key in ("length", "thickness", "dx", "dy", "inset"):
+            value = raw.get(key)
+            if isinstance(value, (int, float)):
+                out[key] = float(value)
+
+    out["length"] = max(0.20, min(1.0, float(out.get("length", 0.72))))
+    out["thickness"] = max(0.04, min(0.40, float(out.get("thickness", 0.12))))
+    out["dx"] = max(-0.50, min(0.50, float(out.get("dx", 0.0))))
+    out["dy"] = max(-0.50, min(0.50, float(out.get("dy", 0.0))))
+    out["inset"] = max(0.0, min(0.25, float(out.get("inset", 0.04))))
+    out["visible"] = bool(out.get("visible", True))
+    return out
 
 
 def load_keymap(name: str | None = None, *, physical_layout: str | None = None) -> Dict[str, Tuple[int, int]]:
@@ -86,12 +117,12 @@ def load_keymap(name: str | None = None, *, physical_layout: str | None = None) 
                 a, b = v.split(",", 1)
                 try:
                     out[k] = (int(a), int(b))
-                except Exception:
+                except (TypeError, ValueError):
                     continue
             elif isinstance(k, str) and isinstance(v, (list, tuple)) and len(v) == 2:
                 try:
                     out[k] = (int(v[0]), int(v[1]))
-                except Exception:
+                except (TypeError, ValueError):
                     continue
     return out
 
@@ -171,6 +202,24 @@ def save_layout_per_key(per_key: Dict[str, Dict[str, float]], name: str | None =
     write_json_atomic(p, payload)
 
 
+def load_lightbar_overlay(name: str | None = None) -> Dict[str, bool | float]:
+    p = paths_for(name).lightbar_overlay
+    raw = read_json(p)
+    if raw is None:
+        raw = get_default_lightbar_overlay()
+    return _normalize_lightbar_overlay(raw)
+
+
+def save_lightbar_overlay(
+    overlay: Dict[str, bool | float],
+    name: str | None = None,
+) -> Dict[str, bool | float]:
+    p = paths_for(name).lightbar_overlay
+    payload = _normalize_lightbar_overlay(overlay)
+    write_json_atomic(p, payload)
+    return payload
+
+
 def load_layout_slots(
     name: str | None = None,
     *,
@@ -214,7 +263,7 @@ def load_per_key_colors(
             c = int(cs.strip())
             rr, gg, bb = v
             out[(r, c)] = (int(rr), int(gg), int(bb))
-        except Exception:
+        except (TypeError, ValueError):
             continue
     return out
 
@@ -226,9 +275,66 @@ def save_per_key_colors(colors: Dict[Tuple[int, int], Tuple[int, int, int]], nam
         try:
             rr, gg, bb = rgb
             payload[f"{int(r)},{int(c)}"] = [int(rr), int(gg), int(bb)]
-        except Exception:
+        except (TypeError, ValueError):
             continue
     write_json_atomic(p, payload)
+
+
+def _active_profile_name(*, default: str, log_key: str, log_msg: str) -> str:
+    try:
+        return safe_profile_name(get_active_profile())
+    except Exception as exc:
+        log_throttled(
+            logger,
+            log_key,
+            interval_s=60,
+            level=logging.DEBUG,
+            msg=log_msg,
+            exc=exc,
+        )
+        return default
+
+
+def _read_attr_value(obj: object, attr_name: str, *, log_key: str, log_msg: str) -> object:
+    try:
+        return getattr(obj, attr_name)
+    except AttributeError:
+        return _MISSING
+    except Exception as exc:
+        log_throttled(
+            logger,
+            log_key,
+            interval_s=60,
+            level=logging.DEBUG,
+            msg=log_msg,
+            exc=exc,
+        )
+        return _READ_FAILED
+
+
+def _coerce_int(value: object, *, default: int) -> int:
+    if value is _MISSING or value is _READ_FAILED or value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _set_attr_value(obj: object, attr_name: str, value: int, *, log_key: str, log_msg: str) -> bool:
+    try:
+        setattr(obj, attr_name, int(value))
+        return True
+    except Exception as exc:
+        log_throttled(
+            logger,
+            log_key,
+            interval_s=60,
+            level=logging.DEBUG,
+            msg=log_msg,
+            exc=exc,
+        )
+        return False
 
 
 def _builtin_profile_brightness(name: str) -> int | None:
@@ -252,26 +358,44 @@ def migrate_builtin_profile_brightness(cfg) -> bool:
     not fight later manual brightness changes.
     """
 
-    try:
-        prof = safe_profile_name(get_active_profile())
-    except Exception:
-        return False
+    prof = _active_profile_name(
+        default="",
+        log_key="profiles.migrate_builtin_profile_brightness.active_profile",
+        log_msg="Failed to resolve active profile during built-in brightness migration",
+    )
 
     target = _builtin_profile_brightness(prof)
     if target is None:
         return False
 
-    try:
-        if hasattr(cfg, "effect_brightness"):
-            brightness = int(getattr(cfg, "effect_brightness", 0) or 0)
-        else:
-            brightness = int(getattr(cfg, "brightness", 0) or 0)
-    except Exception:
+    effect_brightness = _read_attr_value(
+        cfg,
+        "effect_brightness",
+        log_key="profiles.migrate_builtin_profile_brightness.effect_brightness",
+        log_msg="Failed to read effect brightness during built-in profile migration",
+    )
+    if effect_brightness is _MISSING:
+        brightness = _coerce_int(
+            _read_attr_value(
+                cfg,
+                "brightness",
+                log_key="profiles.migrate_builtin_profile_brightness.brightness",
+                log_msg="Failed to read brightness during built-in profile migration",
+            ),
+            default=0,
+        )
+    elif effect_brightness is _READ_FAILED:
         brightness = 0
-    try:
-        perkey = int(getattr(cfg, "perkey_brightness", brightness) or 0)
-    except Exception:
-        perkey = brightness
+    else:
+        brightness = _coerce_int(effect_brightness, default=0)
+
+    perkey_raw = _read_attr_value(
+        cfg,
+        "perkey_brightness",
+        log_key="profiles.migrate_builtin_profile_brightness.perkey_brightness",
+        log_msg="Failed to read per-key brightness during built-in profile migration",
+    )
+    perkey = _coerce_int(perkey_raw, default=brightness)
 
     should_migrate = False
     if prof == "dim":
@@ -285,50 +409,95 @@ def migrate_builtin_profile_brightness(cfg) -> bool:
     if not should_migrate:
         return False
 
-    try:
-        if hasattr(cfg, "effect_brightness"):
-            cfg.effect_brightness = int(target)
-        else:
-            cfg.brightness = int(target)
-    except Exception:
+    brightness_attr = "effect_brightness" if effect_brightness is not _MISSING else "brightness"
+    if effect_brightness is _READ_FAILED or not _set_attr_value(
+        cfg,
+        brightness_attr,
+        target,
+        log_key=f"profiles.migrate_builtin_profile_brightness.set_{brightness_attr}",
+        log_msg=f"Failed to set {brightness_attr} during built-in profile migration",
+    ):
         return False
-    try:
-        if hasattr(cfg, "perkey_brightness"):
-            cfg.perkey_brightness = int(target)
-    except Exception:
-        pass
+
+    if perkey_raw is not _MISSING and perkey_raw is not _READ_FAILED:
+        _set_attr_value(
+            cfg,
+            "perkey_brightness",
+            target,
+            log_key="profiles.migrate_builtin_profile_brightness.set_perkey_brightness",
+            log_msg="Failed to set per-key brightness during built-in profile migration",
+        )
     return True
 
 
 def apply_profile_to_config(cfg, colors: Dict[Tuple[int, int], Tuple[int, int, int]]) -> None:
     # Profile-specific defaults.
-    try:
-        prof = safe_profile_name(get_active_profile())
-    except Exception:
-        prof = ""
+    prof = _active_profile_name(
+        default="",
+        log_key="profiles.apply_profile_to_config.active_profile",
+        log_msg="Failed to resolve active profile while applying a profile",
+    )
 
     def _set_profile_brightness(value: int) -> None:
-        try:
-            if hasattr(cfg, "effect_brightness"):
-                cfg.effect_brightness = int(value)
-            else:
-                cfg.brightness = int(value)
-        except Exception:
-            pass
-        try:
-            if hasattr(cfg, "perkey_brightness"):
-                cfg.perkey_brightness = int(value)
-        except Exception:
-            pass
+        effect_brightness = _read_attr_value(
+            cfg,
+            "effect_brightness",
+            log_key="profiles.apply_profile_to_config.effect_brightness",
+            log_msg="Failed to read effect brightness while applying a profile",
+        )
+        if effect_brightness is _MISSING:
+            _set_attr_value(
+                cfg,
+                "brightness",
+                value,
+                log_key="profiles.apply_profile_to_config.set_brightness",
+                log_msg="Failed to set brightness while applying a profile",
+            )
+        elif effect_brightness is not _READ_FAILED:
+            _set_attr_value(
+                cfg,
+                "effect_brightness",
+                value,
+                log_key="profiles.apply_profile_to_config.set_effect_brightness",
+                log_msg="Failed to set effect brightness while applying a profile",
+            )
+
+        perkey_brightness = _read_attr_value(
+            cfg,
+            "perkey_brightness",
+            log_key="profiles.apply_profile_to_config.perkey_brightness",
+            log_msg="Failed to read per-key brightness while applying a profile",
+        )
+        if perkey_brightness is not _MISSING and perkey_brightness is not _READ_FAILED:
+            _set_attr_value(
+                cfg,
+                "perkey_brightness",
+                value,
+                log_key="profiles.apply_profile_to_config.set_perkey_brightness",
+                log_msg="Failed to set per-key brightness while applying a profile",
+            )
 
     # Ensure visible when activating a per-key profile.
-    try:
-        if hasattr(cfg, "perkey_brightness"):
-            perkey_bri = int(getattr(cfg, "perkey_brightness", 0) or 0)
-        else:
-            perkey_bri = int(getattr(cfg, "brightness", 0) or 0)
-    except Exception:
+    perkey_brightness = _read_attr_value(
+        cfg,
+        "perkey_brightness",
+        log_key="profiles.apply_profile_to_config.read_perkey_brightness",
+        log_msg="Failed to read per-key brightness while applying a profile",
+    )
+    if perkey_brightness is _MISSING:
+        perkey_bri = _coerce_int(
+            _read_attr_value(
+                cfg,
+                "brightness",
+                log_key="profiles.apply_profile_to_config.read_brightness",
+                log_msg="Failed to read brightness while applying a profile",
+            ),
+            default=0,
+        )
+    elif perkey_brightness is _READ_FAILED:
         perkey_bri = 0
+    else:
+        perkey_bri = _coerce_int(perkey_brightness, default=0)
 
     if perkey_bri <= 0:
         if hasattr(cfg, "perkey_brightness"):

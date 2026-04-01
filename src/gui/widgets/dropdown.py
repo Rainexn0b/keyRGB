@@ -6,6 +6,10 @@ from typing import Callable, Iterable
 from src.gui.theme import detect_system_prefers_dark
 
 
+_TK_RUNTIME_ERRORS = (tk.TclError, RuntimeError)
+_LISTBOX_SELECTION_ERRORS = _TK_RUNTIME_ERRORS + (IndexError,)
+
+
 class UpwardListboxDropdown:
     def __init__(
         self,
@@ -37,11 +41,11 @@ class UpwardListboxDropdown:
         self._win = None
         try:
             win.grab_release()
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
         try:
             win.destroy()
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
 
     def open(self, _e=None) -> str:
@@ -61,12 +65,12 @@ class UpwardListboxDropdown:
         # Hint to the WM that this is a combo/dropdown (helps with z-order/focus on Linux).
         try:
             popup.attributes("-type", "combo")
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
 
         try:
             popup.configure(bg=self._bg)
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
 
         # Selection color for hover feedback
@@ -99,7 +103,7 @@ class UpwardListboxDropdown:
                 lb.selection_set(idx)
                 lb.activate(idx)
                 lb.see(idx)
-            except Exception:
+            except _TK_RUNTIME_ERRORS:
                 pass
 
         def _commit(_event=None) -> None:
@@ -109,7 +113,7 @@ class UpwardListboxDropdown:
                     self.close()
                     return
                 chosen = str(lb.get(sel[0]))
-            except Exception:
+            except _LISTBOX_SELECTION_ERRORS:
                 self.close()
                 return
             self._set_value(chosen)
@@ -117,12 +121,12 @@ class UpwardListboxDropdown:
 
         def _on_motion(event) -> None:
             try:
-                index = lb.nearest(event.y)
+                index = lb.nearest(getattr(event, "y", 0))
                 if index >= 0:
                     lb.selection_clear(0, "end")
                     lb.selection_set(index)
                     lb.activate(index)
-            except Exception:
+            except _TK_RUNTIME_ERRORS:
                 pass
 
         lb.bind("<Motion>", _on_motion)
@@ -148,29 +152,26 @@ class UpwardListboxDropdown:
 
         try:
             popup.grab_set()
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
 
         try:
             popup.focus_force()
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
         lb.focus_set()
 
         def _check_click_outside(event) -> None:
-            try:
-                if event.widget == lb:
-                    return
-                self.close()
-            except Exception:
-                self.close()
+            if getattr(event, "widget", None) == lb:
+                return
+            self.close()
 
         popup.bind("<Button-1>", _check_click_outside)
 
         # If the app is closing while the popup is open, ensure we release the grab cleanly.
         try:
             self._root.bind("<Destroy>", self.close, add=True)
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
 
         self._win = popup

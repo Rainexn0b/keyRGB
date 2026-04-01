@@ -130,6 +130,154 @@ def keyboard_status_text(tray: Any) -> str:
     return f"Keyboard: {display_name}{status_suffix}"
 
 
+def device_context_entries(tray: Any) -> list[dict[str, str]]:
+    """Return selectable device-context entries for the tray header."""
+
+    entries = [
+        {
+            "key": "keyboard",
+            "device_type": "keyboard",
+            "status": "supported",
+            "text": keyboard_status_text(tray),
+        }
+    ]
+
+    payload = getattr(tray, "device_discovery", None)
+    if not isinstance(payload, dict):
+        return entries
+
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list):
+        return entries
+
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+
+        device_type = str(candidate.get("device_type") or "").strip().lower()
+        if not device_type or device_type == "keyboard":
+            continue
+
+        usb_vid = _format_hex_id(str(candidate.get("usb_vid") or ""))
+        usb_pid = _format_hex_id(str(candidate.get("usb_pid") or ""))
+        status = str(candidate.get("status") or "").strip()
+        product = str(candidate.get("product") or "").strip()
+
+        usb_id = f" ({usb_vid}:{usb_pid})" if usb_vid and usb_pid else ""
+        details = f": {product}" if product else ""
+        label = device_type.replace("_", " ").title()
+        key = f"{device_type}:{usb_vid}:{usb_pid}" if usb_vid and usb_pid else device_type
+        entries.append(
+            {
+                "key": key,
+                "device_type": device_type,
+                "status": status,
+                "text": f"{label}{details}{usb_id}{_secondary_status_suffix(status)}",
+            }
+        )
+
+    return entries
+
+
+def selected_device_context_key(tray: Any, *, entries: list[dict[str, str]] | None = None) -> str:
+    """Return a valid selected device-context key for the tray."""
+
+    available = entries if entries is not None else device_context_entries(tray)
+    valid_keys = {str(entry.get("key") or "") for entry in available}
+
+    current = str(getattr(tray, "selected_device_context", "keyboard") or "keyboard")
+    if current in valid_keys:
+        return current
+
+    fallback = str(available[0].get("key") or "keyboard") if available else "keyboard"
+    try:
+        setattr(tray, "selected_device_context", fallback)
+    except Exception:
+        pass
+    try:
+        getattr(tray, "config", None).tray_device_context = fallback
+    except Exception:
+        pass
+    return fallback
+
+
+def selected_device_context_entry(tray: Any) -> dict[str, str]:
+    """Return the selected device-context entry for the tray."""
+
+    entries = device_context_entries(tray)
+    selected_key = selected_device_context_key(tray, entries=entries)
+    for entry in entries:
+        if str(entry.get("key") or "") == selected_key:
+            return entry
+    return entries[0] if entries else {"key": "keyboard", "device_type": "keyboard", "status": "supported"}
+
+
+def secondary_device_status_texts(tray: Any) -> list[str]:
+    """Return additional typed device status lines for tray display.
+
+    Today this is used for auxiliary lighting devices such as a secondary
+    lightbar controller discovered alongside the main keyboard controller.
+    """
+
+    payload = getattr(tray, "device_discovery", None)
+    if not isinstance(payload, dict):
+        return []
+
+    candidates = payload.get("candidates")
+    if not isinstance(candidates, list):
+        return []
+
+    lines: list[str] = []
+    for candidate in candidates:
+        if not isinstance(candidate, dict):
+            continue
+        if str(candidate.get("device_type") or "") != "lightbar":
+            continue
+
+        usb_vid = _format_hex_id(str(candidate.get("usb_vid") or ""))
+        usb_pid = _format_hex_id(str(candidate.get("usb_pid") or ""))
+        usb_id = f" ({usb_vid}:{usb_pid})" if usb_vid and usb_pid else ""
+
+        product = str(candidate.get("product") or "").strip()
+        details = f": {product}" if product else ""
+
+        status = str(candidate.get("status") or "").strip()
+        status_suffix = _secondary_status_suffix(status)
+        lines.append(f"Lightbar{details}{usb_id}{status_suffix}")
+
+    return lines
+
+
+def device_context_controls_available(tray: Any, context_entry: dict[str, str]) -> bool:
+    """Return whether the selected non-keyboard device has live controls."""
+
+    device_type = str(context_entry.get("device_type") or "").strip().lower()
+    if device_type == "keyboard":
+        return True
+
+    explicit = getattr(tray, "secondary_device_controls", None)
+    if isinstance(explicit, dict):
+        value = explicit.get(str(context_entry.get("key") or ""))
+        if value is not None:
+            return bool(value)
+
+    return str(context_entry.get("status") or "").strip() == "supported"
+
+
+def _secondary_status_suffix(status: str) -> str:
+    if status == "supported":
+        return ""
+    if status == "experimental_disabled":
+        return " [experimental disabled]"
+    if status == "known_dormant":
+        return " [detected]"
+    if status == "known_unavailable":
+        return " [unavailable]"
+    if status == "unrecognized_ite":
+        return " [unrecognized]"
+    return f" [{status}]" if status else ""
+
+
 def probe_device_available(tray: Any) -> bool:
     """Best-effort device availability probe."""
 

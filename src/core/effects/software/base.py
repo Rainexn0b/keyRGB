@@ -5,6 +5,7 @@ import time
 from typing import TYPE_CHECKING, Dict, Tuple
 
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from src.core.effects.software_targets import average_color_map, render_secondary_uniform_rgb
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
     enable_user_mode_once,
@@ -150,7 +151,6 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
                         brightness=brightness_hw,
                         enable_user_mode=False,
                     )
-                    return
                 except Exception as exc:
                     # On USB disconnect, attempting a fallback uniform write can trigger
                     # a libusb crash on some systems. Mark the device unavailable and
@@ -162,6 +162,14 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
                             pass
                         return
                     raise
+                render_secondary_uniform_rgb(
+                    engine,
+                    rgb=average_color_map(color_map),
+                    brightness_hw=brightness_hw,
+                    logger=logger,
+                    log_key="effects.render.secondary",
+                )
+                return
         except Exception as exc:
             log_throttled(
                 logger,
@@ -175,13 +183,16 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
     if not color_map:
         rgb = (0, 0, 0)
     else:
-        rs = sum(c[0] for c in color_map.values())
-        gs = sum(c[1] for c in color_map.values())
-        bs = sum(c[2] for c in color_map.values())
-        n = max(1, len(color_map))
-        rgb = (int(rs / n), int(gs / n), int(bs / n))
+        rgb = average_color_map(color_map)
 
     r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(engine.brightness))
     with engine.kb_lock:
         enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
         engine.kb.set_color((r, g, b), brightness=int(engine.brightness))
+    render_secondary_uniform_rgb(
+        engine,
+        rgb=(r, g, b),
+        brightness_hw=int(engine.brightness),
+        logger=logger,
+        log_key="effects.render.secondary",
+    )

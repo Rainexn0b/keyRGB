@@ -220,6 +220,7 @@ class LightingTrayProtocol(Protocol):
 
     config: "Config"
     engine: "EffectsEngine"
+    selected_device_context: str
 
     is_off: bool
 

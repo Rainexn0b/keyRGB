@@ -15,10 +15,12 @@ from src.gui.perkey.ui.status import (
     keymap_reloaded,
     no_keymap_found,
     no_keymap_found_initial,
+    reset_lightbar_overlay,
     reset_overlay_tweaks_for_key,
     reset_overlay_tweaks_global,
     saved_all_keys_rgb,
     saved_key_rgb,
+    saved_lightbar_overlay,
     saved_overlay_tweaks_for_key,
     saved_overlay_tweaks_global,
     saved_profile,
@@ -57,8 +59,10 @@ def test_messages_match_existing_strings() -> None:
 
     assert saved_overlay_tweaks_for_key("K") == "Saved overlay tweaks for K"
     assert saved_overlay_tweaks_global() == "Saved global overlay alignment tweaks"
+    assert saved_lightbar_overlay() == "Saved lightbar placement"
     assert reset_overlay_tweaks_for_key("K") == "Reset overlay tweaks for K"
     assert reset_overlay_tweaks_global() == "Reset global overlay alignment tweaks"
+    assert reset_lightbar_overlay() == "Reset lightbar placement"
 
     assert calibrator_started() == "Calibrator started — map keys then Save"
     assert "Failed to start calibrator" in calibrator_failed()

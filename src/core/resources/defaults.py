@@ -130,10 +130,22 @@ def get_default_per_key_tweaks(layout_id: str | None = None) -> dict[str, dict[s
     return out
 
 
+def get_default_lightbar_overlay() -> dict[str, bool | float]:
+    return {
+        "visible": True,
+        "length": 0.72,
+        "thickness": 0.12,
+        "dx": 0.0,
+        "dy": 0.0,
+        "inset": 0.04,
+    }
+
+
 DEFAULT_LAYOUT_TWEAKS = get_default_layout_tweaks(_DEFAULT_LAYOUT_ID)
 DEFAULT_KEYMAP = get_default_keymap(_DEFAULT_LAYOUT_ID)
 REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS = get_reference_matrix_dimensions(_DEFAULT_LAYOUT_ID)
 DEFAULT_PER_KEY_TWEAKS = get_default_per_key_tweaks(_DEFAULT_LAYOUT_ID)
+DEFAULT_LIGHTBAR_OVERLAY = get_default_lightbar_overlay()
 
 
 def build_default_colors(
@@ -152,9 +164,11 @@ __all__ = [
     "DEFAULT_KEYMAP",
     "DEFAULT_PER_KEY_TWEAKS",
     "DEFAULT_COLORS",
+    "DEFAULT_LIGHTBAR_OVERLAY",
     "REFERENCE_MATRIX_ROWS",
     "REFERENCE_MATRIX_COLS",
     "build_default_colors",
+    "get_default_lightbar_overlay",
     "get_default_keymap",
     "get_default_layout_tweaks",
     "get_default_per_key_tweaks",

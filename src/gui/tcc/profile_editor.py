@@ -2,9 +2,15 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import json
+import logging
 
 import tkinter as tk
 from tkinter import messagebox, ttk
+
+from src.core.utils.logging_utils import log_throttled
+
+
+logger = logging.getLogger(__name__)
 
 
 def open_profile_json_editor(
@@ -53,7 +59,7 @@ def open_profile_json_editor(
         raw = text.get("1.0", "end").strip()
         try:
             obj = json.loads(raw)
-        except Exception as exc:
+        except json.JSONDecodeError as exc:
             messagebox.showerror("Invalid JSON", str(exc), parent=win)
             return
         if not isinstance(obj, dict):
@@ -62,6 +68,14 @@ def open_profile_json_editor(
         try:
             on_save(obj)
         except Exception as exc:
+            log_throttled(
+                logger,
+                "tcc_profile_editor.on_save",
+                interval_s=60,
+                level=logging.WARNING,
+                msg="Failed to save edited TCC profile JSON",
+                exc=exc,
+            )
             messagebox.showerror("Save failed", str(exc), parent=win)
             return
         win.destroy()

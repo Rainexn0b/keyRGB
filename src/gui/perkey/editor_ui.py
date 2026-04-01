@@ -9,6 +9,7 @@ from src.gui.widgets.dropdown import UpwardListboxDropdown
 
 from .canvas import KeyboardCanvas
 from .overlay import OverlayControls
+from .lightbar_controls import LightbarControls
 from .ui.layout_setup import LayoutSetupControls
 
 
@@ -206,7 +207,19 @@ def build_editor_ui(editor) -> None:
     editor._layout_setup_controls.grid(row=0, column=0, sticky="nsew")
     editor._layout_setup_controls.grid_remove()
 
-    editor.overlay_controls = OverlayControls(extras_setup, editor=editor)
+    editor._overlay_setup_panel = ttk.Frame(extras_setup)
+    editor._overlay_setup_panel.grid(row=0, column=0, sticky="nsew")
+    editor._overlay_setup_panel.columnconfigure(0, weight=1)
+    editor._overlay_setup_panel.grid_remove()
+
+    editor.overlay_controls = OverlayControls(editor._overlay_setup_panel, editor=editor)
     editor.overlay_controls.grid(row=0, column=0, sticky="nsew")
-    editor.overlay_controls.grid_remove()
+
+    editor.lightbar_controls = None
+    if bool(getattr(editor, "has_lightbar_device", False)):
+        editor.lightbar_controls = LightbarControls(editor._overlay_setup_panel, editor=editor)
+        editor.lightbar_controls.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+
     editor.overlay_controls.sync_vars_from_scope()
+    if editor.lightbar_controls is not None:
+        editor.lightbar_controls.sync_vars_from_editor()

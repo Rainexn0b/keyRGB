@@ -18,14 +18,22 @@ from ..controllers.lighting_controller import (
     turn_off,
     turn_on,
 )
+from ..controllers.secondary_device_controller import (
+    apply_selected_secondary_brightness,
+    selected_secondary_backend_name,
+)
+from ..controllers.secondary_device_controller import turn_off_selected_secondary_device
+from ..controllers.software_target_controller import apply_software_effect_target_selection
 from ..ui import menu as menu_mod
 from ..ui.gui_launch import (
     launch_perkey_gui,
     launch_power_gui,
     launch_reactive_color_gui,
+    launch_support_gui,
     launch_tcc_profiles_gui,
     launch_uniform_gui,
 )
+from ..ui.menu_status import selected_device_context_entry
 
 
 def on_effect_clicked(tray: LightingTrayProtocol, item: object) -> None:
@@ -59,6 +67,32 @@ def on_speed_clicked_cb(tray: LightingTrayProtocol, item: object) -> None:
 
 def on_brightness_clicked_cb(tray: LightingTrayProtocol, item: object) -> None:
     on_brightness_clicked(tray, item)
+
+
+def on_device_context_clicked(tray: LightingTrayProtocol, context_key: str) -> None:
+    normalized = str(context_key or "keyboard") or "keyboard"
+    try:
+        tray.selected_device_context = normalized
+    except Exception:
+        return
+
+    try:
+        tray.config.tray_device_context = normalized
+    except Exception:
+        pass
+
+    try:
+        tray._update_menu()
+    except Exception:
+        pass
+
+
+def on_software_effect_target_clicked(tray: LightingTrayProtocol, target_key: str) -> None:
+    apply_software_effect_target_selection(tray, target_key)
+    try:
+        tray._update_menu()
+    except Exception:
+        pass
 
 
 def on_off_clicked(tray: LightingTrayProtocol) -> None:
@@ -99,8 +133,45 @@ def on_hardware_color_clicked(tray: LightingTrayProtocol) -> None:
     launch_uniform_gui()
 
 
+def on_selected_device_color_clicked(tray: LightingTrayProtocol) -> None:
+    entry = selected_device_context_entry(tray)
+    device_type = str(entry.get("device_type") or "keyboard").strip().lower()
+    if device_type == "keyboard":
+        on_hardware_color_clicked(tray)
+        return
+
+    backend_name = selected_secondary_backend_name(tray)
+    launch_uniform_gui(target_context=str(entry.get("key") or device_type), backend_name=backend_name)
+
+
+def on_selected_device_brightness_clicked(tray: LightingTrayProtocol, item: object) -> None:
+    entry = selected_device_context_entry(tray)
+    device_type = str(entry.get("device_type") or "keyboard").strip().lower()
+    if device_type == "keyboard":
+        on_brightness_clicked(tray, item)
+        return
+    apply_selected_secondary_brightness(tray, item)
+
+
+def on_selected_device_turn_off_clicked(tray: LightingTrayProtocol) -> None:
+    entry = selected_device_context_entry(tray)
+    device_type = str(entry.get("device_type") or "keyboard").strip().lower()
+    if device_type == "keyboard":
+        turn_off(tray)
+        return
+    turn_off_selected_secondary_device(tray)
+
+
 def on_power_settings_clicked() -> None:
     launch_power_gui()
+
+
+def on_support_debug_clicked() -> None:
+    launch_support_gui(focus="debug")
+
+
+def on_backend_discovery_clicked() -> None:
+    launch_support_gui(focus="discovery")
 
 
 def on_tcc_profiles_gui_clicked() -> None:

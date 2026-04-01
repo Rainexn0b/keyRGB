@@ -77,6 +77,37 @@ def test_dim_to_temp_uses_hw_write_only_for_non_software_effects(effect: str, ex
     )
 
 
+
+def test_dim_to_temp_logs_effect_name_failure_and_falls_back_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.tray.pollers.idle_power._actions as actions_module
+
+    logs: list[tuple[str, str, BaseException | None]] = []
+
+    def fake_log_throttled(_logger, key, *, interval_s, level, msg, exc=None):
+        logs.append((key, msg, exc))
+        return True
+
+    class BadEffect:
+        def __str__(self) -> str:
+            raise RuntimeError('bad effect')
+
+    tray = _mk_tray(effect=BadEffect(), brightness=25)
+    monkeypatch.setattr(actions_module, 'log_throttled', fake_log_throttled)
+
+    _apply_idle_action(tray, action='dim_to_temp', dim_temp_brightness=7)
+
+    tray.engine.set_brightness.assert_called_once_with(
+        7,
+        apply_to_hardware=True,
+        fade=True,
+        fade_duration_s=0.25,
+    )
+    assert len(logs) == 1
+    assert logs[0][0] == 'idle_power.dim_to_temp.effect_name'
+    assert logs[0][1] == 'Idle-power dim-to-temp could not read effect name; falling back to none'
+    assert isinstance(logs[0][2], RuntimeError)
+
+
 def test_restore_brightness_clears_dim_temp_and_updates_engine_for_running_sw_effect_without_hw_write() -> None:
     tray = _mk_tray(effect="rainbow_wave", brightness=30)
     tray._dim_temp_active = True

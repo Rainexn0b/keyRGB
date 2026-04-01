@@ -10,7 +10,9 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
+import src.core.backends.sysfs.common as sysfs_common
 from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
+from src.core.diagnostics._collectors_backends_sysfs import sysfs_led_candidates_snapshot
 from src.core.diagnostics.model import Diagnostics
 
 
@@ -184,3 +186,44 @@ def test_format_support_hints_for_tuxedo_platform_without_led_nodes() -> None:
     assert "tuxedo_keyboard is loaded" in text
     assert "kernel-driver binding/export problem" in text
     assert "clevo::kbd_backlight" in text
+
+
+def test_sysfs_led_candidates_snapshot_records_root_resolution_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom() -> Path:
+        raise RuntimeError("root failed")
+
+    monkeypatch.setattr(sysfs_common, "_leds_root", boom)
+
+    snapshot = sysfs_led_candidates_snapshot()
+
+    assert "errors" in snapshot
+    assert snapshot["errors"][0]["stage"] == "resolve_leds_root"
+    assert snapshot["errors"][0]["type"] == "RuntimeError"
+    assert "RuntimeError: root failed" in snapshot["errors"][0]["traceback"]
+
+
+def test_sysfs_led_candidates_snapshot_records_scoring_failure(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    leds_root = tmp_path / "sys" / "class" / "leds"
+    led_dir = leds_root / "tongfang::kbd_backlight"
+    led_dir.mkdir(parents=True)
+    (led_dir / "brightness").write_text("1\n", encoding="utf-8")
+
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(leds_root))
+
+    def bad_score(path: Path) -> int:
+        raise RuntimeError(f"cannot score {path.name}")
+
+    monkeypatch.setattr(sysfs_common, "_score_led_dir", bad_score)
+
+    snapshot = sysfs_led_candidates_snapshot()
+
+    assert snapshot["candidates_count"] == 1
+    assert snapshot["top"][0]["name"] == "tongfang::kbd_backlight"
+    assert snapshot["top"][0]["score"] == 0
+    assert any(error.get("stage") == "score_led_dir" for error in snapshot.get("errors", []))
+    assert any(
+        "RuntimeError: cannot score tongfang::kbd_backlight" in str(error.get("traceback") or "")
+        for error in snapshot.get("errors", [])
+    )

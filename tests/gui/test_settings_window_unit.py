@@ -107,7 +107,7 @@ class _FakeScrollArea:
         self.bind_mousewheel_calls: list[tuple[object, object]] = []
         self.finalize_calls = 0
 
-    def bind_mousewheel(self, root, *, priority_scroll_widget) -> None:
+    def bind_mousewheel(self, root, *, priority_scroll_widget=None) -> None:
         self.bind_mousewheel_calls.append((root, priority_scroll_widget))
 
     def finalize_initial_scrollbar_state(self) -> None:
@@ -162,7 +162,7 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(settings_window, "load_settings_values", lambda **kwargs: calls.append(("load", (), kwargs)) or "values")
     monkeypatch.setattr(settings_window.PowerSettingsGUI, "_init_layout", lambda self, **kwargs: calls.append(("layout", (), kwargs)))
     monkeypatch.setattr(settings_window.PowerSettingsGUI, "_init_vars", lambda self, values: calls.append(("vars", (values,), {})))
-    monkeypatch.setattr(settings_window.PowerSettingsGUI, "_init_panels", lambda self, **kwargs: calls.append(("panels", (), kwargs)))
+    monkeypatch.setattr(settings_window.PowerSettingsGUI, "_init_panels", lambda self: calls.append(("panels", (), {})))
     monkeypatch.setattr(settings_window.PowerSettingsGUI, "_finalize_layout", lambda self: calls.append(("finalize", (), {})))
     monkeypatch.setattr(settings_window.PowerSettingsGUI, "_start_footer_hardware_probe", lambda self: calls.append(("probe", (), {})))
 
@@ -181,7 +181,7 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
         ("load", (), {"config": "config-obj", "os_autostart_enabled": True}),
         ("layout", (), {"bg_color": "#111"}),
         ("vars", ("values",), {}),
-        ("panels", (), {"bg_color": "#111", "fg_color": "#eee"}),
+        ("panels", (), {}),
         ("finalize", (), {}),
         ("probe", (), {}),
     ]
@@ -291,10 +291,9 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_dim_sync_enabled.get() is True
     assert gui.var_dim_sync_mode.get() == "temp"
     assert gui.var_dim_temp_brightness.get() == 7.0
-    assert gui.var_physical_layout.get() == "auto"
     assert len(bool_vars) == 11
     assert len(double_vars) == 3
-    assert len(string_vars) == 2
+    assert len(string_vars) == 1
 
 
 def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -321,9 +320,6 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     monkeypatch.setattr(settings_window, "VersionPanel", make_panel("version"))
     monkeypatch.setattr(settings_window, "AutostartPanel", make_panel("autostart"))
     monkeypatch.setattr(settings_window, "ExperimentalBackendsPanel", make_panel("experimental"))
-    monkeypatch.setattr(settings_window, "KeyboardLayoutPanel", make_panel("layout"))
-    monkeypatch.setattr(settings_window, "DiagnosticsPanel", make_panel("diagnostics"))
-
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
     gui._left = object()
@@ -344,24 +340,20 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui.var_autostart = _FakeVar(True)
     gui.var_os_autostart = _FakeVar(False)
     gui.var_experimental_backends = _FakeVar(False)
-    gui.var_physical_layout = _FakeVar("auto")
     gui._on_toggle = lambda: None
 
-    gui._init_panels(bg_color="#111111", fg_color="#eeeeee")
+    gui._init_panels()
 
     assert created["management"].args == (gui._left,)
     assert created["power_source"].kwargs["var_ac_brightness"] is gui.var_ac_brightness
     assert created["version"].kwargs["root"] is gui.root
     assert created["version"].kwargs["get_status_label"]() is gui.status
-    assert created["diagnostics"].kwargs["bg_color"] == "#111111"
-    assert created["diagnostics"].kwargs["fg_color"] == "#eeeeee"
-    assert len(separators) == 7
+    assert len(separators) == 5
 
 
 def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.diagnostics_panel = _FakePanel()
     gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=16)
     gui.bottom_bar = _FakeWidget()
     calls: list[str] = []
@@ -371,8 +363,7 @@ def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.M
     gui._finalize_layout()
 
     assert calls == ["enabled"]
-    assert gui.diagnostics_panel.apply_calls == [{"apply_state": True}]
-    assert gui.scroll.bind_mousewheel_calls == [(gui.root, gui.diagnostics_panel.txt_diagnostics)]
+    assert gui.scroll.bind_mousewheel_calls == [(gui.root, None)]
     assert gui.scroll.canvas.configure_calls == [{"scrollregion": (1, 2, 3, 4)}]
     assert gui.scroll.canvas.bbox_calls == ["all"]
     assert gui.scroll.finalize_calls == 1
@@ -383,7 +374,6 @@ def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.M
 def test_finalize_layout_swallows_scrollregion_errors() -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.diagnostics_panel = _FakePanel()
     gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=16)
     gui.scroll.canvas.configure = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
     gui.bottom_bar = _FakeWidget()
@@ -439,7 +429,7 @@ def test_apply_enabled_state_delegates_to_panels() -> None:
 
 def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
-    gui.config = SimpleNamespace()
+    gui.config = SimpleNamespace(physical_layout="ansi")
     gui.root = _FakeRoot()
     gui.status = _FakeWidget()
     gui.var_enabled = _FakeVar(True)
@@ -457,7 +447,6 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
     gui.var_dim_sync_mode = _FakeVar("temp")
     gui.var_dim_temp_brightness = _FakeVar(4.4)
     gui.var_os_autostart = _FakeVar(True)
-    gui.var_physical_layout = _FakeVar("ansi")
     apply_calls: list[SettingsValues] = []
     monkeypatch.setattr(settings_window, "apply_settings_values_to_config", lambda *, config, values: apply_calls.append(values))
     monkeypatch.setattr(settings_window, "set_os_autostart", lambda enabled: None)
@@ -468,6 +457,7 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
 
     assert apply_calls and apply_calls[0].ac_lighting_brightness == 12
     assert apply_calls[0].battery_lighting_brightness == 8
+    assert apply_calls[0].physical_layout == "ansi"
     assert gui.config.os_autostart is True
     assert enabled_calls == ["enabled"]
     assert gui.status.configure_calls[0] == {"text": "✓ Saved"}
@@ -478,7 +468,7 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
 
 def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
-    gui.config = SimpleNamespace()
+    gui.config = SimpleNamespace(physical_layout="auto")
     gui.root = _FakeRoot()
     gui.status = _FakeWidget()
     gui.var_enabled = _FakeVar(True)
@@ -496,7 +486,6 @@ def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.
     gui.var_dim_sync_mode = _FakeVar("off")
     gui.var_dim_temp_brightness = _FakeVar(5.0)
     gui.var_os_autostart = _FakeVar(True)
-    gui.var_physical_layout = _FakeVar("auto")
     monkeypatch.setattr(settings_window, "apply_settings_values_to_config", lambda *, config, values: None)
     monkeypatch.setattr(settings_window, "set_os_autostart", lambda enabled: (_ for _ in ()).throw(RuntimeError("boom")))
     monkeypatch.setattr(settings_window, "detect_os_autostart_enabled", lambda: False)

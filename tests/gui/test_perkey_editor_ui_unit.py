@@ -133,6 +133,15 @@ class _FakeOverlayControls(_FakeLayoutSetupControls):
         self.sync_calls += 1
 
 
+class _FakeLightbarControls(_FakeLayoutSetupControls):
+    def __init__(self, parent=None, *, editor):
+        super().__init__(parent, editor=editor)
+        self.sync_calls = 0
+
+    def sync_vars_from_editor(self) -> None:
+        self.sync_calls += 1
+
+
 class _FakeEditor:
     def __init__(self, root: _FakeRoot):
         self.root = root
@@ -213,6 +222,7 @@ def _install_fake_ui(monkeypatch: pytest.MonkeyPatch, *, frame_width: int = 360)
         "dropdowns": [],
         "layout_controls": [],
         "overlay_controls": [],
+        "lightbar_controls": [],
         "profiles_list_calls": 0,
     }
 
@@ -299,6 +309,11 @@ def _install_fake_ui(monkeypatch: pytest.MonkeyPatch, *, frame_width: int = 360)
         registry["overlay_controls"].append(controls)
         return controls
 
+    def fake_lightbar_controls(parent=None, *, editor):
+        controls = _FakeLightbarControls(parent, editor=editor)
+        registry["lightbar_controls"].append(controls)
+        return controls
+
     def fake_list_profiles() -> list[str]:
         registry["profiles_list_calls"] += 1
         return ["default", "gaming", "movie"]
@@ -308,14 +323,23 @@ def _install_fake_ui(monkeypatch: pytest.MonkeyPatch, *, frame_width: int = 360)
     monkeypatch.setattr(editor_ui, "UpwardListboxDropdown", fake_dropdown)
     monkeypatch.setattr(editor_ui, "LayoutSetupControls", fake_layout_controls)
     monkeypatch.setattr(editor_ui, "OverlayControls", fake_overlay_controls)
+    monkeypatch.setattr(editor_ui, "LightbarControls", fake_lightbar_controls)
     monkeypatch.setattr(editor_ui.profiles, "list_profiles", fake_list_profiles)
     return registry
 
 
-def _build_ui(monkeypatch: pytest.MonkeyPatch, *, bind_error: bool = False, frame_width: int = 360):
+def _build_ui(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    bind_error: bool = False,
+    frame_width: int = 360,
+    has_lightbar_device: bool = False,
+):
     registry = _install_fake_ui(monkeypatch, frame_width=frame_width)
     root = _FakeRoot(bind_error=bind_error)
     editor = _FakeEditor(root)
+    editor.has_lightbar_device = has_lightbar_device
+    editor.lightbar_overlay = {"visible": True, "length": 0.72}
     editor_ui.build_editor_ui(editor)
     return editor, root, registry
 
@@ -453,6 +477,7 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
 
     layout_controls = editor._layout_setup_controls
     overlay_controls = editor.overlay_controls
+    overlay_panel = editor._overlay_setup_panel
     assert layout_controls is registry["layout_controls"][0]
     assert overlay_controls is registry["overlay_controls"][0]
     assert layout_controls.editor is editor
@@ -460,8 +485,21 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert layout_controls.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
     assert overlay_controls.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
     assert layout_controls.grid_remove_calls == 1
-    assert overlay_controls.grid_remove_calls == 1
+    assert overlay_panel.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew"}]
+    assert overlay_panel.grid_remove_calls == 1
     assert overlay_controls.sync_calls == 1
+    assert editor.lightbar_controls is None
+
+
+def test_build_editor_ui_adds_lightbar_controls_when_lightbar_is_detected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    editor, _root, registry = _build_ui(monkeypatch, has_lightbar_device=True)
+
+    assert editor.lightbar_controls is registry["lightbar_controls"][0]
+    assert editor.lightbar_controls.parent is editor._overlay_setup_panel
+    assert editor.lightbar_controls.grid_calls == [{"row": 1, "column": 0, "sticky": "ew", "pady": (10, 0)}]
+    assert editor.lightbar_controls.sync_calls == 1
 
 
 def test_build_editor_ui_schedules_status_wrap_sync_on_bind_and_after(monkeypatch: pytest.MonkeyPatch) -> None:

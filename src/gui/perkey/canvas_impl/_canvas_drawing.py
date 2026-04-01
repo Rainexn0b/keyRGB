@@ -10,6 +10,8 @@ from src.gui.reference.deck_image import load_reference_deck_image
 from src.gui.reference.overlay_geometry import calc_centered_drawn_bbox, key_canvas_hit_rects, key_canvas_rect
 from src.gui.utils.key_draw_style import key_draw_style
 
+from ..lightbar_layout import lightbar_rect_for_size
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,8 @@ class _KeyboardCanvasDrawingMixin:
         t = self._canvas_transform()
         if t is None:
             return
+
+        self._draw_lightbar_overlay()
 
         physical_layout = getattr(getattr(self, "editor", None), "_physical_layout", "auto") or "auto"
         visible_keys = get_layout_keys(
@@ -192,6 +196,36 @@ class _KeyboardCanvasDrawingMixin:
         if self._deck_img_tk is not None:
             self.create_image(x0, y0, image=self._deck_img_tk, anchor="nw")
         self._deck_drawn_bbox = (x0, y0, dw, dh)
+
+    def _draw_lightbar_overlay(self) -> None:
+        if not bool(getattr(self.editor, "has_lightbar_device", False)):
+            return
+
+        transform = self._canvas_transform()
+        if transform is None:
+            return
+
+        rect = lightbar_rect_for_size(
+            width=float(BASE_IMAGE_SIZE[0]),
+            height=float(BASE_IMAGE_SIZE[1]),
+            overlay=getattr(self.editor, "lightbar_overlay", None),
+        )
+        if rect is None:
+            return
+
+        x1, y1, x2, y2 = rect
+        cx1, cy1, cx2, cy2 = transform.to_canvas((x1, y1, x2 - x1, y2 - y1))
+        self.create_rectangle(
+            cx1,
+            cy1,
+            cx2,
+            cy2,
+            fill="#f28c28",
+            stipple="gray50",
+            outline="#f7c56f",
+            width=2,
+            tags=("lightbar_overlay",),
+        )
 
     def update_key_visual(self, key_id: str, color: tuple[int, int, int]) -> None:
         if not key_id:

@@ -3,7 +3,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from threading import Event, RLock, Thread
-from typing import Any, Optional
+from typing import Any, Callable, Optional
+
+from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 
 from src.core.effects.device import NullKeyboard, acquire_keyboard
 
@@ -29,6 +31,8 @@ class _EngineCore:
         self.current_effect: Optional[str] = None
         self.speed = 4  # 0-10 (UI speed scale; 10 = fastest)
         self.brightness = 25  # 0-50 (hardware brightness scale)
+        self.software_effect_target = SOFTWARE_EFFECT_TARGET_KEYBOARD
+        self.secondary_software_targets_provider: Callable[[], list[object]] | None = None
         # Reactive typing pulse/highlight intensity (0..50).
         self.reactive_brightness = 25
         self.current_color = (255, 0, 0)  # For static/custom effects

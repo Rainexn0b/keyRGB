@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import time
 
-from .backend import select_backend_with_introspection
+from .backend import select_backend_with_introspection, select_device_discovery_snapshot
 from . import callbacks
 from ..controllers.lighting_controller import (
     apply_brightness_from_power_policy,
@@ -18,6 +18,7 @@ from ..controllers.lighting_controller import (
     power_turn_off,
     start_current_effect,
 )
+from ..controllers.software_target_controller import configure_engine_software_targets
 from .backend import load_ite_dimensions
 from ..integrations.dependencies import load_tray_dependencies
 from ..integrations import runtime
@@ -64,6 +65,8 @@ class KeyRGBTray:
 
         # Backend selection is used for capability-driven UI gating.
         self.backend, self.backend_probe, self.backend_caps = select_backend_with_introspection()
+        self.device_discovery = select_device_discovery_snapshot()
+        self.selected_device_context = str(getattr(self.config, "tray_device_context", "keyboard") or "keyboard")
 
         try:
             self.engine = EffectsEngine(backend=self.backend)
@@ -84,6 +87,8 @@ class KeyRGBTray:
             setattr(self.engine, "_permission_error_cb", self._notify_permission_issue)
         except (AttributeError, RuntimeError):
             pass
+
+        configure_engine_software_targets(self)
 
         self.power_manager = start_power_monitoring(self, power_manager_cls=PowerManager, config=self.config)
         start_all_polling(self, ite_num_rows=self._ite_rows, ite_num_cols=self._ite_cols)
@@ -254,6 +259,21 @@ class KeyRGBTray:
     def _on_brightness_clicked(self, _icon, item):
         callbacks.on_brightness_clicked_cb(self, item)
 
+    def _on_device_context_clicked(self, context_key: str) -> None:
+        callbacks.on_device_context_clicked(self, context_key)
+
+    def _on_selected_device_color_clicked(self, _icon, _item):
+        callbacks.on_selected_device_color_clicked(self)
+
+    def _on_selected_device_brightness_clicked(self, _icon, item):
+        callbacks.on_selected_device_brightness_clicked(self, item)
+
+    def _on_selected_device_turn_off_clicked(self, _icon, _item):
+        callbacks.on_selected_device_turn_off_clicked(self)
+
+    def _on_software_effect_target_clicked(self, target_key: str) -> None:
+        callbacks.on_software_effect_target_clicked(self, target_key)
+
     def _on_off_clicked(self, _icon, _item):
         callbacks.on_off_clicked(self)
 
@@ -277,6 +297,12 @@ class KeyRGBTray:
 
     def _on_power_settings_clicked(self, _icon, _item):
         callbacks.on_power_settings_clicked()
+
+    def _on_support_debug_clicked(self, _icon, _item):
+        callbacks.on_support_debug_clicked()
+
+    def _on_backend_discovery_clicked(self, _icon, _item):
+        callbacks.on_backend_discovery_clicked()
 
     def _on_tcc_profiles_gui_clicked(self, _icon, _item):
         callbacks.on_tcc_profiles_gui_clicked()

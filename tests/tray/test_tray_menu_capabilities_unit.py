@@ -25,7 +25,7 @@ class FakePystray:
 
 
 def fake_item(text, _action, **kwargs):
-    return {"text": str(text), "enabled": kwargs.get("enabled", True)}
+    return {"text": str(text), "enabled": kwargs.get("enabled", True), "action": _action}
 
 
 @dataclass
@@ -40,7 +40,10 @@ class DummyConfig:
     effect = "none"
     speed = 5
     brightness = 25
+    lightbar_brightness = 25
     color = (255, 0, 0)
+    tray_device_context = "keyboard"
+    software_effect_target = "keyboard"
 
     def reload(self):
         return
@@ -61,6 +64,8 @@ class DummyTray:
         self.is_off = False
         self.backend = None
         self.backend_probe = None
+        self.device_discovery = None
+        self.selected_device_context = "keyboard"
 
     # Callbacks referenced by menu builder
     def _on_effect_clicked(self, *_a, **_k):
@@ -72,7 +77,28 @@ class DummyTray:
     def _on_brightness_clicked(self, *_a, **_k):
         return
 
+    def _on_device_context_clicked(self, *_a, **_k):
+        return
+
+    def _on_selected_device_color_clicked(self, *_a, **_k):
+        return
+
+    def _on_selected_device_brightness_clicked(self, *_a, **_k):
+        return
+
+    def _on_selected_device_turn_off_clicked(self, *_a, **_k):
+        return
+
+    def _on_software_effect_target_clicked(self, *_a, **_k):
+        return
+
     def _on_power_settings_clicked(self, *_a, **_k):
+        return
+
+    def _on_support_debug_clicked(self, *_a, **_k):
+        return
+
+    def _on_backend_discovery_clicked(self, *_a, **_k):
         return
 
     def _on_perkey_clicked(self, *_a, **_k):
@@ -141,6 +167,11 @@ def test_menu_hides_items_when_capabilities_disabled(
 
     assert "Hardware Effects" not in labels
     assert "Software Color Editor" not in labels
+    assert "Support Tools…" in labels
+    assert "Debug" not in labels
+    assert "Open Debug Tools…" not in labels
+    assert "Detect New Backends" not in labels
+    assert "Open Backend Discovery…" not in labels
 
 
 def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
@@ -165,9 +196,8 @@ def test_menu_includes_keyboard_status_header(monkeypatch: pytest.MonkeyPatch) -
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
 
-    # First entry should be a disabled status line.
+    # First entry should be the keyboard device selector.
     assert isinstance(items[0], dict)
-    assert items[0]["enabled"] is False
     assert "Keyboard" in items[0]["text"]
 
 
@@ -187,6 +217,149 @@ def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) ->
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     assert "048d:600b" in items[0]["text"].lower()
+
+
+def test_menu_includes_lightbar_status_header_when_discovered(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+    tray.device_discovery = {
+        "candidates": [
+            {
+                "device_type": "lightbar",
+                "product": "ITE Device(8233)",
+                "usb_vid": "0x048d",
+                "usb_pid": "0x7001",
+                "status": "experimental_disabled",
+            }
+        ]
+    }
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+
+    assert items[1]["text"] == "Lightbar: ITE Device(8233) (048d:7001) [experimental disabled]"
+
+
+def test_menu_switches_body_when_lightbar_context_is_selected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+    tray.device_discovery = {
+        "candidates": [
+            {
+                "device_type": "lightbar",
+                "product": "ITE Device(8233)",
+                "usb_vid": "0x048d",
+                "usb_pid": "0x7001",
+                "status": "experimental_disabled",
+            }
+        ]
+    }
+    tray.selected_device_context = "lightbar:048d:7001"
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [i["text"] for i in items if isinstance(i, dict)]
+
+    assert "Hardware Static Mode" not in labels
+    assert "Software Effects" not in labels
+    assert "Lightbar backend is present but disabled by experimental-backend policy" in labels
+    assert "Support Tools…" in labels
+    assert "Quit" in labels
+
+
+def test_menu_uses_lightbar_context_builder_when_controls_are_available(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+    tray.device_discovery = {
+        "candidates": [
+            {
+                "device_type": "lightbar",
+                "product": "ITE Device(8233)",
+                "usb_vid": "0x048d",
+                "usb_pid": "0x7001",
+                "status": "supported",
+            }
+        ]
+    }
+    tray.secondary_device_controls = {"lightbar:048d:7001": True}
+    tray.selected_device_context = "lightbar:048d:7001"
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [i["text"] for i in items if isinstance(i, dict)]
+
+    assert "Color…" in labels
+    assert "Brightness" in labels
+    assert "Turn Off" in labels
+    assert "Support Tools…" in labels
+    assert "Quit" in labels
+
+
+def test_menu_includes_software_target_submenu_when_keyboard_context_is_selected(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+    tray.device_discovery = {
+        "candidates": [
+            {
+                "device_type": "lightbar",
+                "product": "ITE Device(8233)",
+                "usb_vid": "0x048d",
+                "usb_pid": "0x7001",
+                "status": "supported",
+            }
+        ]
+    }
+    tray.secondary_device_controls = {"lightbar:048d:7001": True}
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    submenu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Software Targets")
+    labels = [i["text"] for i in submenu.items if isinstance(i, dict)]
+
+    assert labels == ["Keyboard Only", "All Compatible Devices"]
+
+
+def test_software_target_submenu_actions_use_pystray_compatible_arity(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+    tray.device_discovery = {
+        "candidates": [
+            {
+                "device_type": "lightbar",
+                "product": "ITE Device(8233)",
+                "usb_vid": "0x048d",
+                "usb_pid": "0x7001",
+                "status": "supported",
+            }
+        ]
+    }
+    tray.secondary_device_controls = {"lightbar:048d:7001": True}
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    submenu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Software Targets")
+    first_action = next(i["action"] for i in submenu.items if isinstance(i, dict) and i["text"] == "Keyboard Only")
+
+    assert first_action.__code__.co_argcount == 2
+
+
+def test_menu_resets_invalid_selected_context_to_keyboard(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+    tray.selected_device_context = "missing:device"
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+
+    assert tray.selected_device_context == "keyboard"
+    assert tray.config.tray_device_context == "keyboard"
+    assert "Keyboard" in items[0]["text"]
 
 
 def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch: pytest.MonkeyPatch) -> None:

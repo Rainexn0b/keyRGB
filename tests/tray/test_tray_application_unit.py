@@ -9,6 +9,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
     calls = {
         "deps": 0,
         "select_backend": 0,
+        "device_discovery": 0,
         "dimensions": 0,
         "start_power": 0,
         "start_polling": 0,
@@ -20,6 +21,8 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
             self.effect = "perkey"
             self.speed = 4
             self.brightness = 50
+            self.lightbar_brightness = 25
+            self.tray_device_context = "lightbar:048d:7001"
 
     class FakeEngine:
         def __init__(self, *, backend=None):
@@ -46,6 +49,10 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
         calls["dimensions"] += 1
         return 6, 21
 
+    def _select_device_discovery_snapshot():
+        calls["device_discovery"] += 1
+        return {"candidates": [{"device_type": "lightbar"}]}
+
     def _start_power_monitoring(self, *, power_manager_cls, config):
         calls["start_power"] += 1
         assert power_manager_cls is FakePowerManager
@@ -63,6 +70,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
 
     monkeypatch.setattr(app, "load_tray_dependencies", _load_tray_dependencies)
     monkeypatch.setattr(app, "select_backend_with_introspection", _select_backend_with_introspection)
+    monkeypatch.setattr(app, "select_device_discovery_snapshot", _select_device_discovery_snapshot)
     monkeypatch.setattr(app, "load_ite_dimensions", _load_ite_dimensions)
     monkeypatch.setattr(app, "start_power_monitoring", _start_power_monitoring)
     monkeypatch.setattr(app, "start_all_polling", _start_all_polling)
@@ -73,6 +81,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
     assert calls == {
         "deps": 1,
         "select_backend": 1,
+        "device_discovery": 1,
         "dimensions": 1,
         "start_power": 1,
         "start_polling": 1,
@@ -86,6 +95,8 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
     assert tray.backend == "backend"
     assert tray.backend_probe == "probe"
     assert tray.backend_caps == {"caps": True}
+    assert tray.device_discovery == {"candidates": [{"device_type": "lightbar"}]}
+    assert tray.selected_device_context == "lightbar:048d:7001"
 
 
 def test_init_handles_profile_migration_engine_fallback_and_permission_cb_failure(monkeypatch):
@@ -124,6 +135,7 @@ def test_init_handles_profile_migration_engine_fallback_and_permission_cb_failur
     monkeypatch.setattr(profile_pkg, "profiles", fake_profiles, raising=False)
     monkeypatch.setattr(app, "load_tray_dependencies", lambda: (FakeEngine, FakeConfig, FakePowerManager))
     monkeypatch.setattr(app, "select_backend_with_introspection", lambda: ("backend", "probe", {"caps": True}))
+    monkeypatch.setattr(app, "select_device_discovery_snapshot", lambda: None)
     monkeypatch.setattr(app, "load_ite_dimensions", lambda: (6, 21))
     monkeypatch.setattr(
         app,
@@ -497,6 +509,10 @@ def test_effect_and_power_wrappers_delegate(monkeypatch):
         ("_on_effect_key_clicked", "on_effect_key_clicked", ("perkey",)),
         ("_on_speed_clicked", "on_speed_clicked_cb", (None, "ITEM")),
         ("_on_brightness_clicked", "on_brightness_clicked_cb", (None, "ITEM")),
+        ("_on_device_context_clicked", "on_device_context_clicked", ("lightbar:048d:7001",)),
+        ("_on_selected_device_color_clicked", "on_selected_device_color_clicked", (None, None)),
+        ("_on_selected_device_brightness_clicked", "on_selected_device_brightness_clicked", (None, "ITEM")),
+        ("_on_selected_device_turn_off_clicked", "on_selected_device_turn_off_clicked", (None, None)),
         ("_on_off_clicked", "on_off_clicked", (None, None)),
         ("_on_turn_on_clicked", "on_turn_on_clicked", (None, None)),
         ("_on_hardware_static_mode_clicked", "on_hardware_static_mode_clicked", (None, None)),
@@ -527,6 +543,8 @@ def test_callback_wrapper_methods_delegate(monkeypatch, method_name, cb_attr, ar
         ("_on_tuxedo_gui_clicked", "on_uniform_gui_clicked"),
         ("_on_reactive_color_clicked", "on_reactive_color_gui_clicked"),
         ("_on_power_settings_clicked", "on_power_settings_clicked"),
+        ("_on_support_debug_clicked", "on_support_debug_clicked"),
+        ("_on_backend_discovery_clicked", "on_backend_discovery_clicked"),
         ("_on_tcc_profiles_gui_clicked", "on_tcc_profiles_gui_clicked"),
     ],
 )

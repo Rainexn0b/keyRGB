@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from src.core.config import Config
+from src.core.diagnostics.device_discovery import collect_device_discovery
 from src.core.resources.defaults import get_default_layout_tweaks
 from src.core.resources.layout_slots import get_layout_slot_states
 from src.core.resources.layout import get_layout_keys
@@ -104,6 +105,8 @@ class PerKeyEditor:
         self.config = Config()
         self.profile_name = profiles.get_active_profile()
         self._physical_layout: str = self.config.physical_layout
+        self.has_lightbar_device = self._detect_lightbar_device()
+        self.lightbar_overlay = profiles.load_lightbar_overlay(self.profile_name)
 
         # Tk variable so the layout dropdown in editor_ui can bind to it.
         # Stores the layout_id (e.g. "auto", "ansi", "iso").
@@ -224,6 +227,23 @@ class PerKeyEditor:
 
     def _load_layout_slot_overrides(self) -> dict[str, dict[str, object]]:
         return profiles.load_layout_slots(self.profile_name, physical_layout=self._physical_layout)
+
+    def _detect_lightbar_device(self) -> bool:
+        try:
+            payload = collect_device_discovery(include_usb=True)
+        except Exception:
+            return False
+
+        for section in ("supported", "candidates"):
+            entries = payload.get(section)
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                if str(entry.get("device_type") or "") == "lightbar":
+                    return True
+        return False
 
     def _persist_layout_slot_overrides(self) -> None:
         self.layout_slot_overrides = profiles.save_layout_slots(
@@ -418,15 +438,17 @@ class PerKeyEditor:
         self.canvas.redraw()
 
     def _hide_setup_panel(self) -> None:
-        self.overlay_controls.grid_remove()
+        self._overlay_setup_panel.grid_remove()
         self._layout_setup_controls.grid_remove()
         self._setup_panel_mode = None
 
     def _show_setup_panel(self, mode: str) -> None:
         self._hide_setup_panel()
         if mode == "overlay":
-            self.overlay_controls.grid()
+            self._overlay_setup_panel.grid()
             self.overlay_controls.sync_vars_from_scope()
+            if getattr(self, "lightbar_controls", None) is not None:
+                self.lightbar_controls.sync_vars_from_editor()
         elif mode == "layout":
             self._layout_setup_controls.grid()
             self._refresh_layout_slot_controls()

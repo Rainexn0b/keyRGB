@@ -20,8 +20,18 @@ from src.core.effects.catalog import normalize_effect_name
 from src.core.effects.catalog import strip_effect_namespace
 from src.core.utils.exceptions import is_permission_denied
 from src.core.utils.safe_attrs import safe_int_attr
+from src.tray.controllers.software_target_controller import restore_secondary_software_targets
+from src.tray.controllers.software_target_controller import software_effect_target_routes_aux_devices
 
 logger = logging.getLogger(__name__)
+
+_PROFILE_LOAD_RECOVERABLE_EXCEPTIONS = (
+    AttributeError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 class _ProfilesApi(Protocol):
@@ -35,8 +45,16 @@ profiles: object | None
 try:
     # Module-level import so tests (and callers) can monkeypatch `profiles`.
     from src.core.profile import profiles as profiles
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     profiles = None
+
+
+def _set_attr_best_effort(obj: object, name: str, value: object) -> bool:
+    try:
+        setattr(obj, name, value)
+    except (AttributeError, TypeError, ValueError):
+        return False
+    return True
 
 
 def _load_per_key_colors_from_profile(config) -> dict:
@@ -44,24 +62,34 @@ def _load_per_key_colors_from_profile(config) -> dict:
 
     Returns the loaded colors dict, or empty dict on failure.
     """
-    try:
-        prof = profiles
-        if prof is None:
+    prof = profiles
+    if prof is None:
+        try:
             from src.core.profile import profiles as prof  # type: ignore[no-redef]
+        except ImportError:
+            logger.debug("Profile API unavailable while loading per-key colors", exc_info=True)
+            return {}
 
-        api = cast(_ProfilesApi, prof)
-        active = api.get_active_profile()
-        colors = api.load_per_key_colors(active)
+    api = cast(_ProfilesApi, prof)
+    get_active_profile = getattr(api, "get_active_profile", None)
+    load_per_key_colors = getattr(api, "load_per_key_colors", None)
+    if not callable(get_active_profile) or not callable(load_per_key_colors):
+        logger.debug("Profile API unavailable while loading per-key colors")
+        return {}
+
+    try:
+        active = get_active_profile()
+        colors = load_per_key_colors(active)
         return dict(colors) if colors else {}
-    except Exception as exc:
-        logger.debug("Failed to load per-key colors from profile: %s", exc)
+    except _PROFILE_LOAD_RECOVERABLE_EXCEPTIONS:
+        logger.debug("Failed to load per-key colors from profile", exc_info=True)
         return {}
 
 
 def _config_per_key_colors_ref(config) -> Mapping[object, object] | None:
     try:
         colors = getattr(config, "per_key_colors", None)
-    except Exception:
+    except AttributeError:
         return None
     if isinstance(colors, Mapping) and colors:
         return colors
@@ -84,21 +112,14 @@ def _ensure_software_mode(tray) -> None:
     existing = _config_per_key_colors_ref(config)
 
     # Sync to engine - may be None for uniform mode
-    try:
-        tray.engine.per_key_colors = existing
-    except Exception:
-        pass
+    _set_attr_best_effort(tray.engine, "per_key_colors", existing)
 
     # Also sync a per-key base brightness when a per-key backdrop is active.
     # This allows reactive typing effects to keep the backdrop dim while
     # rendering pulses/highlights brighter.
-    try:
-        tray.engine.per_key_brightness = safe_int_attr(config, "perkey_brightness", default=0) if existing else None
-    except Exception:
-        try:
-            tray.engine.per_key_brightness = None
-        except Exception:
-            pass
+    per_key_brightness = safe_int_attr(config, "perkey_brightness", default=0) if existing else None
+    if not _set_attr_best_effort(tray.engine, "per_key_brightness", per_key_brightness):
+        _set_attr_best_effort(tray.engine, "per_key_brightness", None)
 
 
 def _ensure_hardware_mode(tray) -> None:
@@ -106,14 +127,8 @@ def _ensure_hardware_mode(tray) -> None:
 
     Hardware effects and uniform colors don't use per-key state.
     """
-    try:
-        tray.engine.per_key_colors = None
-    except Exception:
-        pass
-    try:
-        tray.engine.per_key_brightness = None
-    except Exception:
-        pass
+    _set_attr_best_effort(tray.engine, "per_key_colors", None)
+    _set_attr_best_effort(tray.engine, "per_key_brightness", None)
 
 
 def apply_effect_selection(tray, *, effect_name: str) -> None:
@@ -132,7 +147,7 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
 
         try:
             effect_name = normalize_effect_name(effect_name)
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             effect_name = "none"
 
         base_effect_name = strip_effect_namespace(effect_name)
@@ -143,15 +158,14 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
         # and the uniform color picker entry).
         if effect_name in {"hw_uniform", "hardware_uniform"}:
             tray.engine.stop()
-            try:
-                tray.config.per_key_colors = {}
-            except Exception:
-                pass
+            _set_attr_best_effort(tray.config, "per_key_colors", {})
 
             tray.config.effect = "none"
             _ensure_hardware_mode(tray)
             with tray.engine.kb_lock:
                 tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+            if software_effect_target_routes_aux_devices(tray):
+                restore_secondary_software_targets(tray)
             tray.is_off = False
             return
 
@@ -171,6 +185,8 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
                 _ensure_hardware_mode(tray)
                 with tray.engine.kb_lock:
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+                if software_effect_target_routes_aux_devices(tray):
+                    restore_secondary_software_targets(tray)
 
             tray.is_off = False
             return
@@ -183,6 +199,8 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
                 _ensure_hardware_mode(tray)
                 with tray.engine.kb_lock:
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+                if software_effect_target_routes_aux_devices(tray):
+                    restore_secondary_software_targets(tray)
                 tray.is_off = False
                 return
 
@@ -204,13 +222,12 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
                 _ensure_hardware_mode(tray)
                 with tray.engine.kb_lock:
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+                if software_effect_target_routes_aux_devices(tray):
+                    restore_secondary_software_targets(tray)
                 tray.is_off = False
                 return
 
-            try:
-                tray.config.per_key_colors = {}
-            except Exception:
-                pass
+            _set_attr_best_effort(tray.config, "per_key_colors", {})
             _ensure_hardware_mode(tray)
             tray.config.effect = effect_name if is_forced_hardware_effect(effect_name) else base_effect_name
             tray._start_current_effect()
@@ -233,11 +250,12 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
             tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
         tray.is_off = False
     except Exception as exc:
-        if is_permission_denied(exc) and callable(getattr(tray, "_notify_permission_issue", None)):
+        notify_permission_issue = getattr(tray, "_notify_permission_issue", None)
+        if is_permission_denied(exc) and callable(notify_permission_issue):
             try:
-                tray._notify_permission_issue(exc)
-            except Exception:
-                pass
+                notify_permission_issue(exc)
+            except Exception as notify_exc:
+                logger.exception("Failed to notify permission issue during effect selection: %s", notify_exc)
             return
-        logger.exception("Error applying effect selection")
+        logger.exception("Error applying effect selection: %s", exc)
         return

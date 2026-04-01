@@ -6,6 +6,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGETS
+
 from ._coercion import coerce_loaded_settings, normalize_brightness_value, normalize_rgb_triplet
 from .defaults import DEFAULTS as _DEFAULTS
 from .file_storage import load_config_settings, save_config_settings_atomic
@@ -14,6 +16,55 @@ from .perkey_colors import deserialize_per_key_colors, serialize_per_key_colors
 from ._props import bool_prop, int_prop, enum_prop, optional_brightness_prop
 
 logger = logging.getLogger(__name__)
+_MISSING = object()
+
+
+def _log_config_exception(message: str, exc: Exception) -> None:
+    logger.error(message, exc, exc_info=(type(exc), exc, exc.__traceback__))
+
+
+def _coerce_int_setting(value: object, *, default: int = 0) -> int:
+    if value is None:
+        return int(default)
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return int(default)
+
+
+def _normalized_optional_string(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().lower()
+    return normalized or None
+
+
+def _bool_setting(value: object, *, default: bool = False) -> bool:
+    if value is None:
+        return bool(default)
+    if isinstance(value, (bool, int, float, str, list, tuple, dict, set)):
+        return bool(value)
+    return bool(default)
+
+
+def _default_setting(defaults: object, key: str, *, fallback_keys: tuple[str, ...] = (), default: object) -> object:
+    if isinstance(defaults, dict):
+        for candidate_key in (key, *fallback_keys):
+            value = defaults.get(candidate_key, _MISSING)
+            if value is not _MISSING:
+                return value
+        return default
+    getter = getattr(defaults, "get", None)
+    if not callable(getter):
+        return default
+    try:
+        for candidate_key in (key, *fallback_keys):
+            value = getter(candidate_key, _MISSING)
+            if value is not _MISSING:
+                return value
+    except Exception as exc:
+        _log_config_exception(f"Failed to read config default '{key}': %s", exc)
+    return default
 
 
 class Config:
@@ -49,7 +100,7 @@ class Config:
         # file hasn't changed.
         try:
             self._last_reload_mtime_ns: int | None = self.CONFIG_FILE.stat().st_mtime_ns
-        except Exception:
+        except OSError:
             self._last_reload_mtime_ns = None
 
     def _load(self, *, retries: int = 3, retry_delay: float = 0.02) -> dict[str, Any] | None:
@@ -71,7 +122,7 @@ class Config:
     def reload(self) -> None:
         try:
             mtime_ns = self.CONFIG_FILE.stat().st_mtime_ns
-        except Exception:
+        except OSError:
             mtime_ns = None
 
         # If the config file hasn't changed since our last successful reload,
@@ -118,16 +169,8 @@ class Config:
 
     @property
     def return_effect_after_effect(self) -> str | None:
-        v = self._settings.get("return_effect_after_effect", None)
-        if v is None:
-            return None
-        try:
-            s = str(v).strip().lower()
-        except Exception:
-            return None
-        if not s:
-            return None
-        if s == "perkey":
+        value = _normalized_optional_string(self._settings.get("return_effect_after_effect", None))
+        if value == "perkey":
             return "perkey"
         return None
 
@@ -150,44 +193,44 @@ class Config:
 
     def get_effect_speed(self, effect_name: str) -> int:
         """Return the saved per-effect speed, falling back to the global speed."""
-        try:
-            speeds = self._settings.get("effect_speeds", None) or {}
-            if isinstance(speeds, dict) and effect_name in speeds:
-                return max(0, min(10, int(speeds[effect_name])))
-        except Exception:
-            pass
+        speeds = self._settings.get("effect_speeds", None) or {}
+        if isinstance(speeds, dict) and effect_name in speeds:
+            return max(0, min(10, _coerce_int_setting(speeds[effect_name], default=self.speed)))
         return self.speed
 
     def set_effect_speed(self, effect_name: str, speed: int) -> None:
         """Persist a per-effect speed override."""
         try:
-            speeds = self._settings.get("effect_speeds", None)
-            if not isinstance(speeds, dict):
-                speeds = {}
-            speeds[str(effect_name)] = max(0, min(10, int(speed)))
-            self._settings["effect_speeds"] = speeds
+            effect_key = str(effect_name)
+        except Exception as exc:
+            _log_config_exception("Failed to normalize effect speed key: %s", exc)
+            return
+
+        speeds = self._settings.get("effect_speeds", None)
+        if not isinstance(speeds, dict):
+            speeds = {}
+        speeds[effect_key] = max(0, min(10, _coerce_int_setting(speed, default=0)))
+        self._settings["effect_speeds"] = speeds
+        try:
             self._save()
-        except Exception:
-            pass
+        except Exception as exc:
+            _log_config_exception("Failed to persist effect speed override: %s", exc)
 
     @property
     def brightness(self) -> int:
         # Active brightness depends on mode: per-key brightness is independent
         # from effect/uniform brightness.
-        try:
-            if str(self._settings.get("effect", "none") or "none") == "perkey":
-                return int(self._settings.get("perkey_brightness", self._settings.get("brightness", 0)) or 0)
-        except Exception:
-            pass
-        return int(self._settings.get("brightness", 0) or 0)
+        if self._settings.get("effect", "none") == "perkey":
+            return _coerce_int_setting(
+                self._settings.get("perkey_brightness", self._settings.get("brightness", 0)),
+                default=0,
+            )
+        return _coerce_int_setting(self._settings.get("brightness", 0), default=0)
 
     @brightness.setter
     def brightness(self, value: int):
         # Preserve the other mode's brightness.
-        try:
-            is_perkey = str(self._settings.get("effect", "none") or "none") == "perkey"
-        except Exception:
-            is_perkey = False
+        is_perkey = self._settings.get("effect", "none") == "perkey"
 
         if is_perkey:
             self._settings["perkey_brightness"] = self._normalize_brightness_value(value)
@@ -227,10 +270,10 @@ class Config:
         Falls back to `brightness` for backward compatibility.
         """
 
-        try:
-            return int(self._settings.get("reactive_brightness", self._settings.get("brightness", 0)) or 0)
-        except Exception:
-            return int(self._settings.get("brightness", 0) or 0)
+        return _coerce_int_setting(
+            self._settings.get("reactive_brightness", self._settings.get("brightness", 0)),
+            default=_coerce_int_setting(self._settings.get("brightness", 0), default=0),
+        )
 
     @reactive_brightness.setter
     def reactive_brightness(self, value: int):
@@ -247,6 +290,30 @@ class Config:
         self._save()
 
     @property
+    def lightbar_brightness(self) -> int:
+        return _coerce_int_setting(
+            self._settings.get("lightbar_brightness", self._settings.get("brightness", 0)),
+            default=_coerce_int_setting(self._settings.get("brightness", 0), default=0),
+        )
+
+    @lightbar_brightness.setter
+    def lightbar_brightness(self, value: int) -> None:
+        self._settings["lightbar_brightness"] = self._normalize_brightness_value(value)
+        self._save()
+
+    @property
+    def lightbar_color(self) -> tuple[int, int, int]:
+        raw = self._settings.get("lightbar_color", None)
+        if raw is None:
+            raw = _default_setting(self.DEFAULTS, "lightbar_color", fallback_keys=("color",), default=[255, 0, 0])
+        return normalize_rgb_triplet(raw, default=(255, 0, 0))
+
+    @lightbar_color.setter
+    def lightbar_color(self, value: tuple[int, int, int] | tuple) -> None:
+        self._settings["lightbar_color"] = list(normalize_rgb_triplet(value, default=(255, 0, 0)))
+        self._save()
+
+    @property
     def direction(self) -> str | None:
         val = self._settings.get("direction", None)
         if val is None:
@@ -259,13 +326,31 @@ class Config:
         self._save()
 
     @property
+    def tray_device_context(self) -> str:
+        raw = self._settings.get("tray_device_context", "keyboard")
+        if raw is None:
+            return "keyboard"
+        if not isinstance(raw, str):
+            return "keyboard"
+        value = raw.strip().lower()
+        return value or "keyboard"
+
+    @tray_device_context.setter
+    def tray_device_context(self, value: str | None) -> None:
+        if value is None:
+            normalized = "keyboard"
+        elif isinstance(value, str):
+            normalized = value.strip().lower()
+        else:
+            normalized = "keyboard"
+        self._settings["tray_device_context"] = normalized or "keyboard"
+        self._save()
+
+    @property
     def reactive_color(self) -> tuple[int, int, int]:
         raw = self._settings.get("reactive_color", None)
         if raw is None:
-            try:
-                raw = self.DEFAULTS.get("reactive_color", [255, 255, 255])
-            except Exception:
-                raw = [255, 255, 255]
+            raw = _default_setting(self.DEFAULTS, "reactive_color", default=[255, 255, 255])
         return normalize_rgb_triplet(raw)
 
     @reactive_color.setter
@@ -277,10 +362,7 @@ class Config:
     def reactive_use_manual_color(self) -> bool:
         # Kept explicit (historically used by reactive GUI); semantics are the
         # same as a normal bool setting.
-        try:
-            return bool(self._settings.get("reactive_use_manual_color", False))
-        except Exception:
-            return False
+        return _bool_setting(self._settings.get("reactive_use_manual_color", False), default=False)
 
     @reactive_use_manual_color.setter
     def reactive_use_manual_color(self, value: bool):
@@ -333,4 +415,10 @@ class Config:
         "physical_layout",
         default="auto",
         allowed=("auto", "ansi", "iso", "ks", "abnt", "jis"),
+    )
+
+    software_effect_target = enum_prop(
+        "software_effect_target",
+        default="keyboard",
+        allowed=SOFTWARE_EFFECT_TARGETS,
     )

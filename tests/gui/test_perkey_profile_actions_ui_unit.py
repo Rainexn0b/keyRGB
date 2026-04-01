@@ -41,6 +41,14 @@ class DummyOverlayControls:
         self.sync_calls += 1
 
 
+class DummyLightbarControls:
+    def __init__(self):
+        self.sync_calls = 0
+
+    def sync_vars_from_editor(self) -> None:
+        self.sync_calls += 1
+
+
 class DummyCombo:
     def __init__(self):
         self.values = None
@@ -62,6 +70,8 @@ class DummyEditor:
     profile_name: str
     selected_key_id: str | None
     overlay_controls: DummyOverlayControls
+    lightbar_controls: DummyLightbarControls | None
+    lightbar_overlay: dict
     canvas: DummyCanvas
     status_label: DummyLabel
     _profiles_combo: DummyCombo
@@ -96,6 +106,7 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
             per_key_layout_tweaks={},
             colors={(0, 0): (1, 2, 3)},
             layout_slot_overrides={"nonusbackslash": {"visible": False}},
+            lightbar_overlay={"visible": True, "length": 0.8},
         )
 
     monkeypatch.setattr(actions, "activate_profile", fake_activate_profile)
@@ -121,6 +132,8 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
         profile_name="p1",
         selected_key_id="K",
         overlay_controls=DummyOverlayControls(),
+        lightbar_controls=DummyLightbarControls(),
+        lightbar_overlay={},
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
@@ -133,9 +146,12 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
     assert ed.keymap == {"K": (0, 0)}
     assert ed.colors == {(0, 0): (1, 2, 3)}
     assert ed.layout_slot_overrides == {"nonusbackslash": {"visible": False}}
+    assert ed.lightbar_overlay == {"visible": True, "length": 0.8}
     assert full_map_calls["n"] == 1
     assert ed.commit_calls == 1
     assert ed.overlay_controls.sync_calls == 1
+    assert ed.lightbar_controls is not None
+    assert ed.lightbar_controls.sync_calls == 1
     assert ed.canvas.redraw_calls == 1
     assert ed.status_label.text == "Active lighting profile: p2"
     assert ed.select_calls == ["K"]
@@ -160,6 +176,8 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
         profile_name="p2",
         selected_key_id=None,
         overlay_controls=DummyOverlayControls(),
+        lightbar_controls=None,
+        lightbar_overlay={},
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
@@ -197,6 +215,8 @@ def test_reset_layout_defaults_ui_reloads_selected_layout_bundle(monkeypatch) ->
         profile_name="p2",
         selected_key_id="old",
         overlay_controls=DummyOverlayControls(),
+        lightbar_controls=None,
+        lightbar_overlay={},
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),

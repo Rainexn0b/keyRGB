@@ -76,6 +76,35 @@ class TestOnSpeedClicked:
         assert mock_tray.config.speed == 6
         mock_start.assert_called_once_with(mock_tray)
 
+    def test_on_speed_clicked_logs_and_restarts_if_inplace_update_fails(self):
+        from src.tray.controllers.lighting_controller import on_speed_clicked
+
+        class BrokenSpeedEngine:
+            def __init__(self) -> None:
+                self._speed = 0
+
+            @property
+            def speed(self) -> int:
+                return self._speed
+
+            @speed.setter
+            def speed(self, value: int) -> None:
+                raise RuntimeError("cannot set speed")
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        mock_tray.config.effect = "rainbow_wave"
+        mock_tray.engine = BrokenSpeedEngine()
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            on_speed_clicked(mock_tray, "7")
+
+        mock_tray._log_exception.assert_called_once()
+        assert mock_tray._log_exception.call_args[0][0] == "Failed to update engine speed in place: %s"
+        assert str(mock_tray._log_exception.call_args[0][1]) == "cannot set speed"
+        mock_start.assert_called_once_with(mock_tray)
+        mock_tray._update_menu.assert_called_once()
+
 class TestOnBrightnessClicked:
     def test_on_brightness_clicked_updates_config_and_restarts(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked

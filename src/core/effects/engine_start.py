@@ -31,6 +31,8 @@ from src.core.utils.exceptions import is_device_disconnected, is_permission_deni
 
 logger = logging.getLogger(__name__)
 
+_INT_COERCION_ERRORS: Final[tuple[type[BaseException], ...]] = (TypeError, ValueError, OverflowError)
+
 
 class _EngineStart:
     """Effect selection and start/stop orchestration."""
@@ -169,19 +171,13 @@ class _EngineStart:
                 # Record the mode brightness established by the per-key fade so
                 # the reactive render's first frame doesn't send a redundant
                 # SET_EFFECT (enable_user_mode).
-                try:
-                    self._last_hw_mode_brightness = int(self.brightness)
-                except Exception:
-                    pass
+                self._last_hw_mode_brightness = int(self.brightness)
                 # Seed _last_rendered_brightness so the per-frame stability
                 # guard treats the fade endpoint as the starting point.
                 # Without this, the guard sees prev=None→0 and clamps the
                 # first reactive frame down to 8 (0+step), producing a
                 # visible dip from the fade's brightness before ramping back.
-                try:
-                    self._last_rendered_brightness = int(self.brightness)
-                except Exception:
-                    pass
+                self._last_rendered_brightness = int(self.brightness)
             else:
                 # Fade from previous color to the chosen effect's start color.
                 self._fade_uniform_color(
@@ -195,10 +191,7 @@ class _EngineStart:
                 # Without this, the guard sees prev=None→0 and steps up
                 # frame-by-frame from 0 to engine.brightness, producing a
                 # visible sweep-to-brightness at effect start.
-                try:
-                    self._last_rendered_brightness = int(self.brightness)
-                except Exception:
-                    pass
+                self._last_rendered_brightness = int(self.brightness)
         elif self.per_key_colors and hasattr(self.kb, "set_key_colors"):
             # At very low brightness (e.g. brightness_override=1 during a
             # wake-from-idle restore) the cosmetic fade is invisible.
@@ -212,7 +205,7 @@ class _EngineStart:
 
         try:
             self._thread_generation = int(getattr(self, "_thread_generation", 0)) + 1
-        except Exception:
+        except _INT_COERCION_ERRORS:
             self._thread_generation = 1
         run_generation = int(getattr(self, "_thread_generation", 1))
         thread_ref: Thread | None = None
@@ -228,11 +221,12 @@ class _EngineStart:
                         try:
                             cb(exc)
                         except Exception:
-                            pass
-                    try:
-                        logger.warning("Permission denied while applying effect: %s", exc)
-                    except Exception:
-                        pass
+                            logger.exception("Permission error callback failed")
+                    logger.warning(
+                        "Permission denied while applying effect: %s",
+                        exc,
+                        exc_info=True,
+                    )
                     return
 
                 # If the device vanished, stop issuing I/O until reacquired.
@@ -242,11 +236,12 @@ class _EngineStart:
                         if callable(mark):
                             mark()
                     except Exception:
-                        pass
-                    try:
-                        logger.warning("Keyboard device disconnected while applying effect: %s", exc)
-                    except Exception:
-                        pass
+                        logger.exception("Failed to mark keyboard device unavailable after disconnect")
+                    logger.warning(
+                        "Keyboard device disconnected while applying effect: %s",
+                        exc,
+                        exc_info=True,
+                    )
                     return
 
                 logger.exception("Unhandled exception in effect thread")
@@ -254,19 +249,13 @@ class _EngineStart:
                 stale_generation = False
                 try:
                     stale_generation = int(getattr(self, "_thread_generation", 0)) != run_generation
-                except Exception:
+                except _INT_COERCION_ERRORS:
                     stale_generation = False
 
                 if not stale_generation:
-                    try:
-                        self.running = False
-                    except Exception:
-                        pass
-                    try:
-                        if thread_ref is not None and getattr(self, "thread", None) is thread_ref:
-                            self.thread = None
-                    except Exception:
-                        pass
+                    self.running = False
+                    if thread_ref is not None and getattr(self, "thread", None) is thread_ref:
+                        self.thread = None
 
         self.running = True
         thread_ref = Thread(target=_run_target_best_effort, daemon=True)
@@ -280,10 +269,7 @@ class _EngineStart:
         effect_func = backend_effects.get(effect_name)
         if not effect_func:
             # Backend doesn't expose this effect; fall back to a static color.
-            try:
-                logger.warning("Hardware effect not supported by backend: %s", effect_name)
-            except Exception:
-                pass
+            logger.warning("Hardware effect not supported by backend: %s", effect_name)
             with self.kb_lock:
                 self.kb.set_color(tuple(self.current_color), brightness=int(self.brightness))
             return

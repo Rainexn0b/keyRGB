@@ -4,12 +4,16 @@ import logging
 from typing import TYPE_CHECKING, Callable, Dict, Tuple
 
 from src.core.effects.perkey_animation import enable_user_mode_once
+from src.core.effects.software_targets import average_color_map as average_color_map_impl
+from src.core.effects.software_targets import render_secondary_uniform_rgb
 from src.core.effects.transitions import avoid_full_black
 from src.core.utils.exceptions import is_device_disconnected
 from src.core.utils.logging_utils import log_throttled
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
+
+logger = logging.getLogger(__name__)
 
 Color = Tuple[int, int, int]
 Key = Tuple[int, int]
@@ -42,6 +46,7 @@ def render_per_key_frame(
     logger: logging.Logger,
 ) -> bool:
     try:
+        brightness_hw = 0
         with engine.kb_lock:
             _, _, brightness_hw = resolve_brightness(engine)
             engine._last_rendered_brightness = brightness_hw
@@ -63,7 +68,14 @@ def render_per_key_frame(
 
             if not need_mode_init:
                 apply_hw_brightness(engine, brightness_hw)
-            return True
+        render_secondary_uniform_rgb(
+            engine,
+            rgb=average_color_map(color_map),
+            brightness_hw=brightness_hw,
+            logger=logger,
+            log_key="effects.reactive.secondary",
+        )
+        return True
     except Exception as exc:
         log_throttled(
             logger,
@@ -83,11 +95,14 @@ def render_uniform_frame(
     resolve_brightness: Callable[["EffectsEngine"], tuple[int, int, int]],
 ) -> None:
     rgb = average_color_map(color_map)
+    final_rgb = rgb
+    brightness_hw = 0
 
     with engine.kb_lock:
         _, _, brightness_hw = resolve_brightness(engine)
         engine._last_rendered_brightness = brightness_hw
         r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))
+        final_rgb = (r, g, b)
 
         need_mode_init = getattr(engine, "_last_hw_mode_brightness", None) is None
         if need_mode_init:
@@ -97,14 +112,14 @@ def render_uniform_frame(
 
         if not need_mode_init:
             apply_hw_brightness(engine, brightness_hw)
+    render_secondary_uniform_rgb(
+        engine,
+        rgb=final_rgb,
+        brightness_hw=brightness_hw,
+        logger=logger,
+        log_key="effects.reactive.secondary",
+    )
 
 
 def average_color_map(color_map: Dict[Key, Color]) -> Color:
-    if not color_map:
-        return (0, 0, 0)
-
-    rs = sum(c[0] for c in color_map.values())
-    gs = sum(c[1] for c in color_map.values())
-    bs = sum(c[2] for c in color_map.values())
-    n = max(1, len(color_map))
-    return (int(rs / n), int(gs / n), int(bs / n))
+    return average_color_map_impl(color_map)

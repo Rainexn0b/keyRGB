@@ -5,9 +5,106 @@ from typing import Any, Optional
 from src.core.utils.logging_utils import log_throttled
 
 from src.core.power.system import PowerMode, get_status, set_mode
+from .menu_status import device_context_controls_available
 
 
 logger = logging.getLogger(__name__)
+
+
+def _device_context_footer_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
+    return [
+        pystray.Menu.SEPARATOR,
+        item("Support Tools…", tray._on_support_debug_clicked),
+        item("Settings", tray._on_power_settings_clicked),
+        pystray.Menu.SEPARATOR,
+        item("Quit", tray._on_quit_clicked),
+    ]
+
+
+def _unsupported_device_context_text(device_label: str, status: str) -> str:
+    return {
+        "known_dormant": f"{device_label} detected, but this backend is still dormant in this build",
+        "experimental_disabled": f"{device_label} backend is present but disabled by experimental-backend policy",
+        "known_unavailable": f"{device_label} was identified, but it is not currently available for control",
+        "unrecognized_ite": f"{device_label} was detected, but it is not recognized by a supported backend yet",
+    }.get(status, f"{device_label} controls are not available in this build")
+
+
+def _build_lightbar_context_menu_items(tray: Any, *, pystray: Any, item: Any, context_entry: dict[str, str]) -> list[Any]:
+    controls_available = device_context_controls_available(tray, context_entry)
+    if controls_available:
+        def _checked_lightbar_brightness(level: int):
+            return lambda _item, expected=level: int(getattr(tray.config, "lightbar_brightness", 0) or 0) == expected * 5
+
+        brightness_menu = pystray.Menu(
+            *[
+                item(
+                    str(level),
+                    tray._on_selected_device_brightness_clicked,
+                    checked=_checked_lightbar_brightness(level),
+                    radio=True,
+                )
+                for level in range(0, 11)
+            ]
+        )
+        body = [
+            item("Color…", tray._on_selected_device_color_clicked),
+            item("Brightness", brightness_menu),
+            pystray.Menu.SEPARATOR,
+            item("Turn Off", tray._on_selected_device_turn_off_clicked),
+        ]
+    else:
+        body = [
+            item(
+                _unsupported_device_context_text("Lightbar", str(context_entry.get("status") or "").strip()),
+                lambda _icon, _item: None,
+                enabled=False,
+            )
+        ]
+
+    return [*body, *_device_context_footer_items(tray, pystray=pystray, item=item)]
+
+
+def _build_generic_device_context_menu_items(
+    tray: Any,
+    *,
+    pystray: Any,
+    item: Any,
+    context_entry: dict[str, str],
+) -> list[Any]:
+    device_label = str(context_entry.get("device_type") or "device").replace("_", " ").title()
+    controls_available = device_context_controls_available(tray, context_entry)
+    if controls_available:
+        body = [
+            item(
+                f"{device_label} controls will be provided by its dedicated controller surface",
+                lambda _icon, _item: None,
+                enabled=False,
+            )
+        ]
+    else:
+        body = [
+            item(
+                _unsupported_device_context_text(device_label, str(context_entry.get("status") or "").strip()),
+                lambda _icon, _item: None,
+                enabled=False,
+            )
+        ]
+
+    return [*body, *_device_context_footer_items(tray, pystray=pystray, item=item)]
+
+
+_DEVICE_CONTEXT_MENU_BUILDERS = {
+    "lightbar": _build_lightbar_context_menu_items,
+}
+
+
+def build_device_context_menu_items(tray: Any, *, pystray: Any, item: Any, context_entry: dict[str, str]) -> list[Any]:
+    """Build a selected device-context surface for non-keyboard devices."""
+
+    device_type = str(context_entry.get("device_type") or "").strip().lower()
+    builder = _DEVICE_CONTEXT_MENU_BUILDERS.get(device_type, _build_generic_device_context_menu_items)
+    return builder(tray, pystray=pystray, item=item, context_entry=context_entry)
 
 
 def _log_menu_debug(key: str, msg: str, exc: Exception, *, interval_s: float = 60) -> None:
@@ -136,6 +233,8 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
             interval_s=120,
         )
         return None
+
+
 
 
 def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_supported: bool) -> Optional[Any]:

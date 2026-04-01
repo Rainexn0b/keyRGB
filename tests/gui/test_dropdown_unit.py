@@ -251,6 +251,24 @@ def test_close_is_idempotent_and_updates_open_state() -> None:
     assert popup.destroy_calls == 1
 
 
+def test_close_tolerates_runtime_teardown_failures() -> None:
+    widget, _chosen = _make_dropdown()
+    popup = _FakePopup(
+        object(),
+        failures={
+            "grab_release": RuntimeError("grab release failed"),
+            "destroy": RuntimeError("destroy failed"),
+        },
+    )
+    widget._win = popup
+
+    widget.close()
+
+    assert widget.is_open() is False
+    assert popup.grab_release_calls == 1
+    assert popup.destroy_calls == 1
+
+
 def test_open_returns_break_without_creating_popup_when_values_provider_is_empty(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -404,6 +422,21 @@ def test_commit_closes_when_selection_is_missing_or_listbox_errors(
     assert popup.destroy_calls == 1
 
 
+def test_open_tolerates_current_selection_restore_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _install_fake_tk(monkeypatch, listbox_failures={"see": RuntimeError("see failed")})
+    widget, _chosen = _make_dropdown(current="second")
+
+    assert widget.open() == "break"
+
+    popup = registry["popup"]
+    listbox = registry["listbox"]
+    assert isinstance(popup, _FakePopup)
+    assert isinstance(listbox, _FakeListbox)
+    assert widget.is_open() is True
+    assert listbox.selection_set_calls == [(1, None)]
+    assert popup.deiconify_calls == 1
+
+
 def test_open_places_popup_below_anchor_when_above_would_go_off_screen(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -446,3 +479,20 @@ def test_open_tolerates_popup_grab_focus_attribute_configure_and_root_bind_failu
     assert popup.focus_force_calls == 1
     assert root.bind_calls == [("<Destroy>", widget.close, True)]
     assert listbox.focus_set_calls == 1
+
+
+def test_click_outside_handler_closes_when_event_has_no_widget(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _install_fake_tk(monkeypatch)
+    widget, _chosen = _make_dropdown()
+
+    widget.open()
+
+    popup = registry["popup"]
+    assert isinstance(popup, _FakePopup)
+
+    click_handler = popup.bound_callbacks["<Button-1>"]
+    click_handler(SimpleNamespace())
+
+    assert widget.is_open() is False
+    assert popup.grab_release_calls == 1
+    assert popup.destroy_calls == 1

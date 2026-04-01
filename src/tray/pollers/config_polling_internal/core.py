@@ -5,6 +5,7 @@ from typing import cast
 
 from src.core.effects.catalog import REACTIVE_EFFECTS
 from src.core.effects.catalog import resolve_effect_name_for_backend
+from src.core.effects.software_targets import normalize_software_effect_target
 from src.core.utils.safe_attrs import safe_bool_attr
 from src.core.utils.safe_attrs import safe_int_attr
 from src.core.utils.safe_attrs import safe_str_attr
@@ -53,6 +54,7 @@ class ConfigApplyState:
     reactive_use_manual: bool
     reactive_color: tuple[int, int, int]
     reactive_brightness: int = 0
+    software_effect_target: str = "keyboard"
 
 
 def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
@@ -77,6 +79,9 @@ def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplySt
         reactive_brightness = safe_int_attr(tray.config, "reactive_brightness", default=base_brightness)
 
     color = _safe_tuple_attr(tray.config, "color", default=(255, 255, 255))
+    software_effect_target = normalize_software_effect_target(
+        safe_str_attr(tray.config, "software_effect_target", default="keyboard") or "keyboard"
+    )
 
     return ConfigApplyState(
         effect=str(effect),
@@ -84,6 +89,7 @@ def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplySt
         brightness=base_brightness,
         color=cast("tuple[int, int, int]", tuple(color)),
         perkey_sig=perkey_sig,
+        software_effect_target=software_effect_target,
         reactive_use_manual=bool(reactive_use_manual),
         reactive_color=cast("tuple[int, int, int]", tuple(reactive_color)),
         reactive_brightness=int(reactive_brightness),
@@ -101,6 +107,7 @@ def state_for_log(state: ConfigApplyState | None):
             "brightness": state.brightness,
             "color": tuple(state.color) if state.color is not None else None,
             "perkey_keys": perkey_keys,
+            "software_effect_target": state.software_effect_target,
         }
     except _CONFIG_FALLBACK_EXCEPTIONS:
         return None
@@ -119,12 +126,41 @@ def maybe_apply_fast_path(
         return False, current
 
     try:
+        only_target_changed = (
+            last_applied.effect == current.effect
+            and last_applied.speed == current.speed
+            and last_applied.brightness == current.brightness
+            and last_applied.color == current.color
+            and last_applied.perkey_sig == current.perkey_sig
+            and last_applied.reactive_use_manual == current.reactive_use_manual
+            and last_applied.reactive_color == current.reactive_color
+            and last_applied.reactive_brightness == current.reactive_brightness
+            and last_applied.software_effect_target != current.software_effect_target
+        )
+    except _CONFIG_FALLBACK_EXCEPTIONS:
+        only_target_changed = False
+
+    if only_target_changed:
+        try:
+            from .helpers import _sync_software_target_policy
+
+            _sync_software_target_policy(tray, current)
+        except _FAST_PATH_EXCEPTIONS:
+            pass
+        try:
+            tray._refresh_ui()
+        except _FAST_PATH_EXCEPTIONS:
+            pass
+        return True, current
+
+    try:
         only_reactive_changed = (
             last_applied.effect == current.effect
             and last_applied.speed == current.speed
             and last_applied.brightness == current.brightness
             and last_applied.color == current.color
             and last_applied.perkey_sig == current.perkey_sig
+            and last_applied.software_effect_target == current.software_effect_target
             and (
                 last_applied.reactive_use_manual != current.reactive_use_manual
                 or last_applied.reactive_color != current.reactive_color
@@ -153,6 +189,7 @@ def maybe_apply_fast_path(
             and last_applied.speed == current.speed
             and last_applied.color == current.color
             and last_applied.perkey_sig == current.perkey_sig
+            and last_applied.software_effect_target == current.software_effect_target
             and last_applied.reactive_use_manual == current.reactive_use_manual
             and last_applied.reactive_color == current.reactive_color
             and last_applied.reactive_brightness == current.reactive_brightness
@@ -225,7 +262,10 @@ def apply_from_config_once(
         _apply_uniform,
         _handle_forced_off,
         _sync_reactive,
+        _sync_software_target_policy,
     )
+
+    _sync_software_target_policy(tray, current)
 
     if _handle_forced_off(tray, last_applied, current, cause, state_for_log_fn):
         return current, last_apply_warn_at
@@ -271,9 +311,9 @@ def apply_from_config_once(
         if current.effect == "perkey":
             _apply_perkey(tray, current, ite_num_rows, ite_num_cols, cause=cause)
         elif current.effect == "none":
-            _apply_uniform(tray, cause=cause)
+            _apply_uniform(tray, current, cause=cause)
         else:
-            _apply_effect(tray, cause=cause)
+            _apply_effect(tray, current, cause=cause)
     except Exception as exc:
         if is_device_disconnected_fn(exc):
             try:

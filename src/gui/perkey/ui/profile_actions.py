@@ -90,6 +90,7 @@ def activate_profile_ui(editor: Any) -> None:
     editor.per_key_layout_tweaks = result.per_key_layout_tweaks
     editor.colors = result.colors
     editor.layout_slot_overrides = dict(result.layout_slot_overrides)
+    editor.lightbar_overlay = dict(result.lightbar_overlay)
 
     # Reload per-profile backdrop state.
     try:
@@ -106,6 +107,8 @@ def activate_profile_ui(editor: Any) -> None:
     editor._commit(force=True)
 
     editor.overlay_controls.sync_vars_from_scope()
+    if getattr(editor, "lightbar_controls", None) is not None:
+        editor.lightbar_controls.sync_vars_from_editor()
     if hasattr(editor, "_refresh_layout_slot_controls"):
         editor._refresh_layout_slot_controls()
     editor.canvas.redraw()
@@ -122,6 +125,7 @@ def save_profile_ui(editor: Any) -> None:
         keymap=editor.keymap,
         layout_tweaks=editor.layout_tweaks,
         per_key_layout_tweaks=editor.per_key_layout_tweaks,
+        lightbar_overlay=dict(getattr(editor, "lightbar_overlay", {}) or {}),
         physical_layout=editor._physical_layout,
         layout_slot_overrides=getattr(editor, "layout_slot_overrides", {}),
         colors=editor.colors,
@@ -166,6 +170,7 @@ def new_profile_ui(editor: Any) -> None:
         keymap=editor.keymap,
         layout_tweaks=editor.layout_tweaks,
         per_key_layout_tweaks=editor.per_key_layout_tweaks,
+        lightbar_overlay=dict(getattr(editor, "lightbar_overlay", {}) or {}),
         physical_layout=editor._physical_layout,
         layout_slot_overrides=getattr(editor, "layout_slot_overrides", {}),
         colors=editor.colors,

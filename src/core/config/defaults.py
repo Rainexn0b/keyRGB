@@ -14,6 +14,9 @@ DEFAULTS: dict = {
     # edits don't overwrite the effect brightness (and vice versa).
     "perkey_brightness": 25,
     "color": [255, 0, 0],  # RGB for static/custom effects
+    # Secondary lightbar state for auxiliary single-zone controllers.
+    "lightbar_brightness": 25,
+    "lightbar_color": [255, 0, 0],
     # Direction for directional effects (wave, snake). None = default direction.
     "direction": None,
     # Manual highlight color for reactive typing effects.
@@ -68,6 +71,14 @@ DEFAULTS: dict = {
     # 'auto' probes sysfs conservatively; manual options expose common desktop
     # and laptop physical variants directly in the editor dropdown.
     "physical_layout": "auto",
+    # Selected tray device-context header row. The tray falls back to
+    # 'keyboard' if the saved device is no longer present.
+    "tray_device_context": "keyboard",
+    # Software-effect routing policy.
+    # 'keyboard' keeps looped software effects on the keyboard only.
+    # 'all_uniform_capable' mirrors uniformized software frames to compatible
+    # auxiliary devices such as the secondary lightbar.
+    "software_effect_target": "keyboard",
     # Per-effect speed overrides.  Maps effect name (str) to speed (0-10).
     # When a value is present for the active effect, it overrides the global
     # 'speed' setting.  When absent, the global speed is used.

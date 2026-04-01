@@ -82,6 +82,14 @@ def auto_synced_overlay_tweaks() -> str:
     return "Auto-synced overlay tweaks"
 
 
+def saved_lightbar_overlay() -> str:
+    return "Saved lightbar placement"
+
+
+def reset_lightbar_overlay() -> str:
+    return "Reset lightbar placement"
+
+
 def calibrator_started() -> str:
     return "Calibrator started — map keys then Save"
 

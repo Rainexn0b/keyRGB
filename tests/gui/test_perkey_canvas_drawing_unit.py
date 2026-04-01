@@ -63,6 +63,8 @@ class _FakeEditor:
         self.layout_slot_overrides: dict[str, object] | None = None
         self.layout_tweaks: dict[str, object] = {}
         self.per_key_layout_tweaks: dict[str, object] = {}
+        self.has_lightbar_device = False
+        self.lightbar_overlay: dict[str, object] = {"visible": True}
         self._physical_layout = "auto"
         self.selected_key_id: str | None = None
         self.keymap: dict[str, tuple[int, int]] = {}
@@ -234,6 +236,50 @@ def test_redraw_returns_early_without_transform_after_resetting_canvas() -> None
     assert calls == ["bg"]
     assert canvas.key_rects == {}
     assert canvas.key_texts == {}
+
+
+def test_redraw_draws_lightbar_overlay_before_keys_when_detected(monkeypatch: pytest.MonkeyPatch) -> None:
+    canvas = _FakeCanvas()
+    canvas._transform = SimpleNamespace(to_canvas=lambda rect: (50.0, 60.0, 150.0, 80.0))
+    canvas.editor.has_lightbar_device = True
+    canvas.editor.lightbar_overlay = {"visible": True}
+
+    monkeypatch.setattr(canvas_drawing, "lightbar_rect_for_size", lambda **_kwargs: (10.0, 20.0, 40.0, 30.0))
+    monkeypatch.setattr(canvas_drawing, "get_layout_keys", lambda *_args, **_kwargs: [_Key("k1", "Esc")])
+    monkeypatch.setattr(canvas_drawing, "key_canvas_rect", lambda **_kwargs: (1.0, 2.0, 21.0, 12.0, 0.0))
+    monkeypatch.setattr(canvas_drawing, "key_canvas_hit_rects", lambda **_kwargs: [(1.0, 2.0, 21.0, 12.0)])
+    monkeypatch.setattr(
+        canvas_drawing,
+        "key_draw_style",
+        lambda **_kwargs: _Style("#010203", "gray50", "#ffffff", 2, (), "#eeeeee"),
+    )
+    monkeypatch.setattr(canvas_drawing.tkfont, "Font", _FakeFont)
+    canvas._draw_deck_background = lambda: None
+
+    canvas.redraw()
+
+    assert canvas.rectangles[0] == {
+        "coords": (50.0, 60.0, 150.0, 80.0),
+        "fill": "#f28c28",
+        "stipple": "gray50",
+        "outline": "#f7c56f",
+        "width": 2,
+        "tags": ("lightbar_overlay",),
+    }
+    assert canvas.rectangles[1]["tags"] == ("pkey_k1", "pkey")
+
+
+def test_draw_lightbar_overlay_is_noop_when_hidden_or_absent(monkeypatch: pytest.MonkeyPatch) -> None:
+    canvas = _FakeCanvas()
+    canvas._transform = SimpleNamespace(to_canvas=lambda rect: rect)
+
+    canvas._draw_lightbar_overlay()
+    assert canvas.rectangles == []
+
+    canvas.editor.has_lightbar_device = True
+    monkeypatch.setattr(canvas_drawing, "lightbar_rect_for_size", lambda **_kwargs: None)
+    canvas._draw_lightbar_overlay()
+    assert canvas.rectangles == []
 
 
 def test_redraw_creates_rectangle_text_and_tag_binding(monkeypatch: pytest.MonkeyPatch) -> None:
