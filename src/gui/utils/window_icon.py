@@ -37,7 +37,7 @@ def _candidate_logo_paths() -> list[Path]:
     # Repo checkout (and editable installs) typically keep assets/ alongside src/.
     start = Path(__file__).resolve()
     for parent in [start] + list(start.parents):
-        for name in ("logo-keyrgb.svg", "logo-tray-squircle.png", "logo-keyrgb.png"):
+        for name in ("logo-keyrgb.svg", "logo-keyrgb.png", "legacy/logo-tray-squircle.png"):
             cand = parent / "assets" / name
             if cand not in paths:
                 paths.append(cand)

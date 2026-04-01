@@ -21,6 +21,14 @@ from .appimage import (
 APPIMAGETOOL_URL = "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
 
 
+def _first_existing_asset(root: Path, *relative_paths: str) -> Path | None:
+    for relative_path in relative_paths:
+        candidate = root / relative_path
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def build_appimage() -> Path:
     root = repo_root()
     dist = root / "dist"
@@ -66,21 +74,21 @@ def build_appimage() -> Path:
     assets_dst.mkdir(parents=True, exist_ok=True)
 
 
-    deck_src = root / "assets" / "y15-pro-deck.png"
-    if deck_src.exists():
-        shutil.copy2(deck_src, assets_dst / deck_src.name)
+    bundled_assets = [
+        "assets/y15-pro-deck.png",
+        "assets/tray-mask.svg",
+        "assets/logo-keyrgb.svg",
+        "assets/logo-keyrgb.png",
+        "assets/legacy/logo-tray-squircle.png",
+    ]
+    for relative_path in bundled_assets:
+        src = root / relative_path
+        if not src.exists():
+            continue
 
-    app_logo_src = root / "assets" / "logo-tray-squircle.png"
-    if app_logo_src.exists():
-        shutil.copy2(app_logo_src, assets_dst / app_logo_src.name)
-
-    tray_mask_src = root / "assets" / "tray-mask.svg"
-    if tray_mask_src.exists():
-        shutil.copy2(tray_mask_src, assets_dst / tray_mask_src.name)
-
-    logo_svg_src = root / "assets" / "logo-keyrgb.svg"
-    if logo_svg_src.exists():
-        shutil.copy2(logo_svg_src, assets_dst / logo_svg_src.name)
+        dst = lib_root / relative_path
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
 
     # Bundle python deps (pip wheels) into the AppDir.
     # We still use the system python interpreter at runtime.
@@ -124,8 +132,12 @@ def build_appimage() -> Path:
         bundle_pygobject(appdir=appdir, site_packages=site_packages)
 
     # Desktop + icon expected by appimagetool.
-    icon_src = root / "assets" / "logo-tray-squircle.png"
-    if not icon_src.exists():
+    icon_src = _first_existing_asset(
+        root,
+        "assets/logo-keyrgb.png",
+        "assets/legacy/logo-tray-squircle.png",
+    )
+    if icon_src is None:
         raise SystemExit(f"Missing icon: {icon_src}")
 
     shutil.copy2(icon_src, appdir / "keyrgb.png")

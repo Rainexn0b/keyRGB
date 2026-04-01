@@ -47,15 +47,54 @@ refresh_desktop_integration_caches_best_effort() {
   fi
 }
 
+local_icon_asset_path() {
+  local relative_path="$1"
+  local repo_dir
+  repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+  if [ -f "$repo_dir/$relative_path" ]; then
+    printf '%s' "$repo_dir/$relative_path"
+    return 0
+  fi
+
+  return 1
+}
+
+install_icon_asset() {
+  local relative_path="$1" dst_path="$2" raw_ref="$3" label="$4"
+  local local_src=""
+
+  local_src="$(local_icon_asset_path "$relative_path" 2>/dev/null || true)"
+  if [ -n "$local_src" ] && [ -f "$local_src" ]; then
+    log_info "Installing $label from local checkout: $local_src"
+    install -D -m 0644 "$local_src" "$dst_path"
+    return 0
+  fi
+
+  local asset_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/${relative_path}"
+  log_info "Downloading $label: $asset_url"
+  if download_url_quiet "$asset_url" "$dst_path"; then
+    return 0
+  fi
+
+  if [ "$raw_ref" != "main" ]; then
+    local fallback_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/main/${relative_path}"
+    log_warn "Failed to download $label from ref '$raw_ref'; trying main: $fallback_url"
+    if download_url_quiet "$fallback_url" "$dst_path"; then
+      return 0
+    fi
+  fi
+
+  rm -f "$dst_path" 2>/dev/null || true
+  return 1
+}
+
 # --- Desktop integration + system rules ---
 install_icon_and_desktop_entries() {
   local keyrgb_exec="$1" raw_ref="$2"
 
   local icon_dir_legacy="$HOME/.local/share/icons"
-  local icon_file_legacy_png="$icon_dir_legacy/keyrgb.png"
   local icon_file_legacy_svg="$icon_dir_legacy/keyrgb.svg"
-  local icon_dir_png="$HOME/.local/share/icons/hicolor/256x256/apps"
-  local icon_file_png="$icon_dir_png/keyrgb.png"
   local icon_dir_svg="$HOME/.local/share/icons/hicolor/scalable/apps"
   local icon_file_svg="$icon_dir_svg/keyrgb.svg"
   local app_dir="$HOME/.local/share/applications"
@@ -63,25 +102,27 @@ install_icon_and_desktop_entries() {
   local autostart_dir="$HOME/.config/autostart"
   local autostart_file="$autostart_dir/keyrgb.desktop"
 
-  mkdir -p "$icon_dir_legacy" "$icon_dir_png" "$icon_dir_svg" "$app_dir" "$autostart_dir"
+  mkdir -p "$icon_dir_legacy" "$icon_dir_svg" "$app_dir" "$autostart_dir"
 
-  local icon_url_png="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-tray-squircle.png"
-  local icon_url_svg="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/assets/logo-keyrgb.svg"
-  log_info "Downloading icon: $icon_url_png"
-  download_url_quiet "$icon_url_png" "$icon_file_png"
-  log_ok "Installed icon: $icon_file_png"
-  cp -f "$icon_file_png" "$icon_file_legacy_png"
-
-  local desktop_icon="$icon_file_png"
-  log_info "Downloading scalable icon: $icon_url_svg"
-  if download_url_quiet "$icon_url_svg" "$icon_file_svg"; then
+  local desktop_icon="$icon_file_svg"
+  if install_icon_asset "assets/logo-keyrgb.svg" "$icon_file_svg" "$raw_ref" "scalable icon"; then
     log_ok "Installed scalable icon: $icon_file_svg"
     cp -f "$icon_file_svg" "$icon_file_legacy_svg"
-    desktop_icon="$icon_file_svg"
+
+    # Remove any stale raster icon so launchers do not keep picking the legacy art.
+    rm -f "$icon_dir_legacy/keyrgb.png" 2>/dev/null || true
+    rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/keyrgb.png" 2>/dev/null || true
+  elif install_icon_asset "assets/legacy/logo-tray-squircle.png" "$icon_dir_legacy/keyrgb.png" "$raw_ref" "legacy raster icon"; then
+    desktop_icon="$icon_dir_legacy/keyrgb.png"
+    rm -f "$icon_file_svg" 2>/dev/null || true
+    rm -f "$icon_file_legacy_svg" 2>/dev/null || true
+    log_warn "Using legacy PNG icon fallback because the SVG icon could not be installed"
   else
     rm -f "$icon_file_svg" 2>/dev/null || true
     rm -f "$icon_file_legacy_svg" 2>/dev/null || true
-    log_warn "Could not install scalable SVG icon; GUI window icons will fall back to PNG"
+    rm -f "$icon_dir_legacy/keyrgb.png" 2>/dev/null || true
+    log_warn "Could not install any desktop icon; keeping launcher entries without refreshing the icon asset"
+    desktop_icon="keyrgb"
   fi
 
   rm -f "$icon_dir_legacy/keyrgb.jpg" 2>/dev/null || true
