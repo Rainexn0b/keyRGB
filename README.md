@@ -33,6 +33,9 @@ Current backend plan:
 
 - `sysfs-leds`, `ite8291r3`, `ite8910`, and `asusctl-aura`: `validated`
 - `ite8297`: `experimental` + `reverse_engineered` (`0x048d:0x8297`, Linux `hidraw` feature-report path for uniform color only)
+- `ite8233`: `experimental` + `reverse_engineered` (`0x048d:0x7001`, auxiliary lightbar / single-zone RGB via Linux `hidraw`)
+
+When a compatible auxiliary device is present, the tray exposes a `Software Targets` submenu so looped software effects can stay on the keyboard or mirror their uniformized output to all compatible secondary devices.
 
 Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental and dormant paths are additionally policy-gated, so detection alone does not guarantee automatic selection.
 
@@ -129,104 +132,112 @@ Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental 
 
 ## Quickstart
 
-### Install
+For most users, use the AppImage installer. Only use a source checkout if you want to modify KeyRGB locally.
 
-#### Standalone AppImage (recommended for most users)
+### Common commands
 
-KeyRGB's automated installer strategy is a **contained AppImage**:
+| Task | Command |
+| --- | --- |
+| Install AppImage | `curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh` |
+| Update existing AppImage | `curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage` |
+| Install AppImage without system package changes | `curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --no-system-deps` |
+| Uninstall AppImage install | `curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/uninstall.sh -o uninstall.sh && bash uninstall.sh --yes --remove-appimage` |
+| Clone repo and install dev dependencies | `git clone https://github.com/Rainexn0b/keyRGB.git && cd keyRGB && ./install.sh --dev` |
 
-- Downloads the self-contained AppImage release asset
-- Stores it as `~/.local/bin/keyrgb.AppImage` and installs a launcher at `~/.local/bin/keyrgb` (plus desktop launcher + autostart)
-- Best-effort permissions/integration (udev rules + optional polkit helper)
+### Install and update
 
-The AppImage bundles runtime dependencies (Python, tkinter, tray libraries) so the installer does **not** install Python/Tk/GUI runtime packages via your distro package manager.
+#### Standalone AppImage (recommended)
 
-Standard install (default):
+The installer downloads the AppImage, stores it as `~/.local/bin/keyrgb.AppImage`, installs the `~/.local/bin/keyrgb` launcher, and refreshes desktop integration. The AppImage bundles the runtime dependencies, so normal installs do not need Python/Tk GUI packages from your distro.
+
+Standard install:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh
 ```
 
-No system package changes (skip kernel drivers / TCC app / polkit installs):
+AppImage install without system package changes:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --no-system-deps
 ```
 
-Full install (non-interactive example: kernel drivers + Reactive Typing permissions + TCC integration):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && \
-  KEYRGB_INSTALL_KERNEL_DRIVERS=y \
-  KEYRGB_INSTALL_INPUT_UDEV=y \
-  KEYRGB_INSTALL_TUXEDO=y \
-  KEYRGB_INSTALL_TCC_APP=y \
-  bash install.sh
-```
-
-Notes:
-
-- Some integration steps may prompt for `sudo` (installing udev rules / polkit rules).
-- `--no-system-deps` only skips **system package changes**; it does not affect AppImage downloads.
-- The installer reports a distro support profile at startup: Fedora / Red Hat (tested), Debian / Ubuntu / Linux Mint (experimental), Arch / CachyOS / EndeavourOS / Manjaro (tested), and openSUSE / Other Linux (best-effort).
-- On Arch/CachyOS, install `fuse2` for native AppImage/FUSE launching: `sudo pacman -S --needed fuse2`. KeyRGB also installs a launcher wrapper that falls back to `--appimage-extract-and-run` when `libfuse.so.2` is unavailable.
-- On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver package installs are best-effort and may require TUXEDO package sources; the installer does not add third-party apt repos automatically.
-- `ite8910` support (`0x048d:0x8910`) uses Linux `hidraw` and is hardware-validated. The implementation is based on reverse-engineering work by [Valentin Lobstein](https://github.com/Chocapikk) (Reddit `Greedy-Ad232`), with full per-key RGB, 9 firmware modes, 8 wave directions, 4 snake diagonals, and custom color support. The bundled KeyRGB udev rules also grant `uaccess` on matching `hidraw` nodes so the app can talk to that controller without detaching the kernel keyboard driver.
-- To pin installs to a known release tag (instead of `main`), use both `--ref <tag>` and `--version <tag>` (for example `v0.17.2`).
-
-#### Update existing AppImage (non-interactive)
-
-Refreshes the stored AppImage and launcher under `~/.local/bin/`, and also refreshes desktop integration. Reuses your last saved release channel (stable vs prerelease).
+Update an existing AppImage install:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage
 ```
 
-#### Development install (local checkout)
-
-For development or local modifications. Installs system dependencies + installs KeyRGB in editable mode.
-
-```bash
-./install.sh --dev
-```
-
 Notes:
 
-- Fedora / Nobara and Arch / CachyOS are tested development targets.
-- Other distros are best-effort via common package managers (dnf/apt/pacman/zypper/apk).
-- System dependencies are only needed for development installs; the AppImage bundles everything.
-
-Docs:
-
-- Quickstart & install instructions: see the **Quickstart** section above.
-- Commands / entrypoints / environment variables: see **Run** and **Environment variables** sections above.
-- Architecture / TongFang support roadmap: [docs/architecture/tongfang/00-index.md](docs/architecture/tongfang/00-index.md)
+- Some integration steps may prompt for `sudo` when installing udev or polkit rules.
+- `--no-system-deps` only skips system package changes; it still downloads and installs the AppImage.
+- On Arch/CachyOS, install `fuse2` for native AppImage/FUSE launching: `sudo pacman -S --needed fuse2`. KeyRGB also installs a launcher wrapper that falls back to `--appimage-extract-and-run` when `libfuse.so.2` is unavailable.
+- On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver installs are best-effort and may require TUXEDO package sources; KeyRGB does not add third-party apt repos automatically.
+- To pin a release tag instead of `main`, use both `--ref <tag>` and `--version <tag>`.
 
 ### Uninstall
 
-#### One-line uninstall (no clone)
-
-Downloads and runs the latest uninstaller script:
+Interactive uninstall:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/uninstall.sh -o uninstall.sh && bash uninstall.sh
 ```
 
-Non-interactive uninstall (AppImage + desktop entries):
+Non-interactive uninstall of the AppImage install and desktop entries:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/uninstall.sh -o uninstall.sh && bash uninstall.sh --yes --remove-appimage
 ```
 
+<details>
+<summary><b>Advanced usage and source checkout</b></summary>
+
+#### Clone and install for local development
+
+```bash
+git clone https://github.com/Rainexn0b/keyRGB.git
+cd keyRGB
+./install.sh --dev
+```
+
+This installs system dependencies as needed and installs KeyRGB in editable mode. Fedora/Nobara and Arch/CachyOS are the main tested development targets; other distros are best-effort.
+
 #### Uninstall from a local checkout
 
 ```bash
-# Interactive removal
 ./uninstall.sh
-
-# Non-interactive (scripted)
 ./uninstall.sh --yes --remove-appimage
 ```
+
+#### Installer arguments
+
+| Argument | Meaning |
+| --- | --- |
+| `--appimage` | Download AppImage (default). |
+| `--dev` | Developer install in editable mode. |
+| `--pip` | Legacy alias for the editable developer install. |
+| `--clone` | Clone repo and install from source. |
+| `--clone-dir <path>` | Clone target directory. |
+| `--version <tag>` | Install a specific tag such as `v0.17.2`. |
+| `--asset <name>` | Override the AppImage filename. |
+| `--prerelease` | Allow prereleases when resolving the latest AppImage. |
+| `--no-system-deps` | Skip system package changes such as kernel-driver, TCC, or polkit installs. |
+| `--update-appimage` | Refresh an existing AppImage install and desktop integration. |
+| `--ref <git-ref>` | Download installer modules from a specific git ref. |
+
+Full non-interactive install example:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && \
+	KEYRGB_INSTALL_KERNEL_DRIVERS=y \
+	KEYRGB_INSTALL_INPUT_UDEV=y \
+	KEYRGB_INSTALL_TUXEDO=y \
+	KEYRGB_INSTALL_TCC_APP=y \
+	bash install.sh
+```
+
+</details>
 
 ### Run
 
@@ -248,9 +259,10 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 
 | Variable                                | Usage                                                                                                                                                                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `KEYRGB_BACKEND`                        | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `ite8910`, `asusctl-aura`, or the experimental `ite8297` backend when experimental backends are enabled.                              |
+| `KEYRGB_BACKEND`                        | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `ite8910`, `asusctl-aura`, or the experimental `ite8297` / `ite8233` backends when experimental backends are enabled.                 |
 | `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1` | Opt in to experimental backends without using the Settings window.                                                                                                                                |
 | `KEYRGB_ITE8297_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8297` backend (mainly for diagnostics / testing).                                                                              |
+| `KEYRGB_ITE8233_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8233` lightbar backend (mainly for diagnostics / testing).                                                                     |
 | `KEYRGB_DEBUG=1`                        | Enable verbose debug logging.                                                                                                                                                                     |
 | `KEYRGB_TK_SCALING`                     | Float override for UI scaling (High-DPI / fractional scaling).                                                                                                                                    |
 | `KEYRGB_TCCD_BIN`                       | Override the `tccd` helper path for TCC integration.                                                                                                                                              |
@@ -277,7 +289,7 @@ Access **Settings** via the tray menu to configure:
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
 - **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
 - **Autostart**: enable “Start KeyRGB on login”.
-- **Backend policy**: opt in to experimental backends. Currently `ite8297` is experimental; the UI labels experimental paths as speculative or research-backed.
+- **Backend policy**: opt in to experimental backends. Currently `ite8297` and `ite8233` are experimental; the UI labels experimental paths as speculative or research-backed.
 
 ### Profiles
 
@@ -308,26 +320,6 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | Brightness works but color does not (Kernel Driver / `kbd_backlight`) | Your sysfs LED node is likely **brightness-only** (no `multi_intensity`, `color`, or `rgb` attribute under `/sys/class/leds/*kbd_backlight*`). KeyRGB can only change color when the kernel exposes RGB attributes (common on Clevo/Tuxedo/System76). On ASUS ROG laptops, use `asusctl` / rog-control-center for Aura/RGB control. |
 | Per-key editor not available on your laptop                           | The per-key editor requires a backend that can address individual LEDs (typically the USB ITE/TongFang path). Many kernel drivers expose only uniform brightness (and sometimes uniform RGB), not per-key RGB.                                                                                                                      |
 
-## Advanced usage
-
-### Installer arguments
-
-| Argument             | Meaning                                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `--appimage`         | Download AppImage (default).                                                                                |
-| `--dev`              | Developer install (editable pip install mode).                                                              |
-| `--pip`              | Legacy alias for dev editable install.                                                                      |
-| `--clone`            | Clone repo and install via editable pip (dev/source).                                                       |
-| `--clone-dir <path>` | Clone target directory (dev mode).                                                                          |
-| `--version <tag>`    | Install specific tag (e.g. `v0.17.2`).                                                                      |
-| `--asset <name>`     | Override AppImage filename (default: `keyrgb-x86_64.AppImage`).                                             |
-| `--prerelease`       | Allow picking prereleases when auto-resolving latest AppImage.                                              |
-| `--no-system-deps`   | Skip system package changes (kernel drivers / TCC app / polkit).                                            |
-| `--update-appimage`  | Non-interactive: update an existing AppImage install, then refresh desktop integration. |
-| `--ref <git-ref>`    | For curl installs: download installer modules from a specific git ref (default: `main`).                    |
-
-Environment variables: see the **Environment variables** section above.
-
 ## Hardware support and contributing
 
 If KeyRGB detects your device but behaves oddly, or if you have a new laptop model (TongFang/Clevo/etc.), please help us support it.
@@ -357,33 +349,3 @@ Select **Hardware support / diagnostics** and paste the JSON output from step 1.
 ## License
 
 GPL-2.0-or-later.
-
-## Code Hygiene & Static Analysis
-
-KeyRGB enforces strict code hygiene in its build system. The build runner checks for:
-
-- Over-defensive type conversions
-- Dynamic attribute coupling (hasattr/setattr/getattr/delattr on private attributes)
-- Excessive `Any` type hints
-- Forbidden API usage (`os.system`, `eval`, `exec`)
-- Resource leaks (`open()` not used in a `with` context or without `.close()`)
-- Silent broad exception swallowing (`except Exception: pass` and similar no-signal handlers)
-- Broad exception debt split into silent, logged/signaled, and fallback buckets
-- Test naming and structure
-
-Run the hygiene step directly:
-
-```bash
-.venv/bin/python -m buildpython --run-steps=16
-```
-
-All new code should pass these checks. See `buildpython/steps/step_code_hygiene.py` for details.
-Some hygiene categories are report-first and become blocking only after thresholds are tightened.
-
-Build reports are structured to expose debt instead of hiding it:
-
-- `buildlog/keyrgb/code-hygiene.md` includes top files for exception debt, cleanup debt, forbidden API usage, and resource leak hotspots.
-- Exception debt is split into silent, logged/signaled, and fallback hotspot tables.
-- `buildlog/keyrgb/code-markers.md` includes top files for `HACK`, `FIXME`, and `TODO` marker hotspots.
-
-Debt baselines live in `buildpython/config/debt_baselines.json` so existing backlog stays visible while new regressions become build failures.
