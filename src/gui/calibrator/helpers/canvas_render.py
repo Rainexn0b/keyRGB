@@ -14,6 +14,7 @@ from src.gui.reference.overlay_geometry import (
 )
 from src.gui.utils.deck_render_cache import DeckRenderCache
 from src.gui.utils.key_draw_style import key_draw_style
+from src.gui.perkey.profile_management import keymap_cells_for
 
 from .geometry import key_canvas_bbox
 
@@ -25,9 +26,11 @@ def redraw_calibration_canvas(
     deck_render_cache: DeckRenderCache[ImageTk.PhotoImage],
     layout_tweaks: object,
     per_key_layout_tweaks: object,
-    keymap: dict[str, tuple[int, int]],
-    selected_key_id: str | None,
+    keymap: dict[str, object],
+    selected_slot_id: str | None = None,
+    selected_key_id: str | None = None,
     physical_layout: str = "auto",
+    legend_pack_id: str | None = None,
     slot_overrides: dict[str, dict[str, object]] | None = None,
 ) -> tuple[CanvasTransform, Optional[ImageTk.PhotoImage]]:
     canvas.delete("all")
@@ -48,7 +51,7 @@ def redraw_calibration_canvas(
         if deck_tk is not None:
             canvas.create_image(x0, y0, anchor="nw", image=deck_tk)
 
-    visible_keys = get_layout_keys(physical_layout, slot_overrides=slot_overrides)
+    visible_keys = get_layout_keys(physical_layout, legend_pack_id=legend_pack_id, slot_overrides=slot_overrides)
     for key in visible_keys:
         x1, y1, x2, y2 = key_canvas_bbox(
             transform=transform,
@@ -57,8 +60,15 @@ def redraw_calibration_canvas(
             per_key_layout_tweaks=per_key_layout_tweaks,
             image_size=BASE_IMAGE_SIZE,
         )
-        mapped = keymap.get(key.key_id)
-        style = key_draw_style(mapped=mapped is not None, selected=selected_key_id == key.key_id)
+        mapped = keymap_cells_for(
+            keymap,
+            key.key_id,
+            slot_id=str(getattr(key, "slot_id", None) or key.key_id),
+            physical_layout=physical_layout,
+        )
+        key_slot_id = str(getattr(key, "slot_id", None) or key.key_id)
+        selected_identity = str(selected_slot_id or selected_key_id or "")
+        style = key_draw_style(mapped=bool(mapped), selected=selected_identity == key_slot_id)
 
         canvas.create_rectangle(
             x1,

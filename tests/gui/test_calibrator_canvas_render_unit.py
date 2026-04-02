@@ -88,6 +88,7 @@ def test_redraw_calibration_canvas_draws_backdrop_keys_and_text(monkeypatch: pyt
         keymap={"esc": (0, 0)},
         selected_key_id="esc",
         physical_layout="iso",
+        legend_pack_id="iso-de-qwertz",
         slot_overrides={"foo": {"visible": True}},
     )
 
@@ -105,6 +106,32 @@ def test_redraw_calibration_canvas_draws_backdrop_keys_and_text(monkeypatch: pyt
     assert canvas.image_calls == [((5, 6), {"anchor": "nw", "image": "deck-photo"})]
     assert canvas.rectangle_calls[0][1]["tags"] == ("pkey_esc", "pkey")
     assert canvas.text_calls[0][1]["text"] == "Esc"
+
+
+def test_redraw_calibration_canvas_passes_legend_pack_to_layout_lookup(monkeypatch: pytest.MonkeyPatch) -> None:
+    canvas = _FakeCanvas()
+    transform = object()
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(canvas_render, "calc_centered_drawn_bbox", lambda **_kwargs: (0, 0, 20, 10, 1.0))
+    monkeypatch.setattr(canvas_render, "transform_from_drawn_bbox", lambda **_kwargs: transform)
+    monkeypatch.setattr(
+        canvas_render,
+        "get_layout_keys",
+        lambda *args, **kwargs: calls.append({"args": args, "kwargs": dict(kwargs)}) or [],
+    )
+
+    canvas_render.redraw_calibration_canvas(
+        canvas=canvas,
+        deck_pil=None,
+        deck_render_cache=_FakeCache(),
+        layout_tweaks={},
+        per_key_layout_tweaks={},
+        keymap={},
+        physical_layout="iso",
+        legend_pack_id="iso-de-qwertz",
+    )
+
+    assert calls == [{"args": ("iso",), "kwargs": {"legend_pack_id": "iso-de-qwertz", "slot_overrides": None}}]
 
 
 def test_redraw_calibration_canvas_skips_backdrop_when_absent(monkeypatch: pytest.MonkeyPatch) -> None:

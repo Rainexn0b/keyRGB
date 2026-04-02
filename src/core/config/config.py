@@ -7,6 +7,7 @@ import logging
 from typing import Any
 
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGETS
+from src.core.resources.layout_legends import get_layout_legend_pack_ids, load_layout_legend_pack
 
 from ._coercion import coerce_loaded_settings, normalize_brightness_value, normalize_rgb_triplet
 from .defaults import DEFAULTS as _DEFAULTS
@@ -45,6 +46,17 @@ def _bool_setting(value: object, *, default: bool = False) -> bool:
     if isinstance(value, (bool, int, float, str, list, tuple, dict, set)):
         return bool(value)
     return bool(default)
+
+
+def _normalize_layout_legend_pack(value: object, *, default: str = "auto") -> str:
+    normalized = str(value or default).strip().lower()
+    if not normalized or normalized == "auto":
+        return "auto"
+
+    available = set(get_layout_legend_pack_ids())
+    if normalized in available and load_layout_legend_pack(normalized):
+        return normalized
+    return str(default or "auto").strip().lower() or "auto"
 
 
 def _default_setting(defaults: object, key: str, *, fallback_keys: tuple[str, ...] = (), default: object) -> object:
@@ -367,6 +379,15 @@ class Config:
     @reactive_use_manual_color.setter
     def reactive_use_manual_color(self, value: bool):
         self._settings["reactive_use_manual_color"] = bool(value)
+        self._save()
+
+    @property
+    def layout_legend_pack(self) -> str:
+        return _normalize_layout_legend_pack(self._settings.get("layout_legend_pack", "auto"), default="auto")
+
+    @layout_legend_pack.setter
+    def layout_legend_pack(self, value: str) -> None:
+        self._settings["layout_legend_pack"] = _normalize_layout_legend_pack(value, default="auto")
         self._save()
 
     # ---- common boolean/int settings

@@ -3,6 +3,7 @@ from __future__ import annotations
 from tkinter import ttk
 from typing import Any
 
+from src.core.resources.layout_legends import get_layout_legend_pack_ids, load_layout_legend_pack
 from src.core.resources.layouts import LAYOUT_CATALOG
 
 from .layout_slots import refresh_layout_slots_ui
@@ -11,6 +12,23 @@ from .layout_slots import refresh_layout_slots_ui
 _LAYOUT_LABELS = [layout.label for layout in LAYOUT_CATALOG]
 _ID_TO_LABEL = {layout.layout_id: layout.label for layout in LAYOUT_CATALOG}
 _LABEL_TO_ID = {layout.label: layout.layout_id for layout in LAYOUT_CATALOG}
+_AUTO_LEGEND_PACK_ID = "auto"
+_AUTO_LEGEND_PACK_LABEL = "Default legends"
+
+
+def _legend_pack_choices(layout_id: str) -> list[tuple[str, str]]:
+    choices: list[tuple[str, str]] = [(_AUTO_LEGEND_PACK_ID, _AUTO_LEGEND_PACK_LABEL)]
+    seen_labels: set[str] = {_AUTO_LEGEND_PACK_LABEL}
+
+    for pack_id in get_layout_legend_pack_ids(layout_id):
+        pack = load_layout_legend_pack(pack_id)
+        label = str(pack.get("label") or pack_id).strip() or pack_id
+        if label in seen_labels:
+            label = f"{label} ({pack_id})"
+        seen_labels.add(label)
+        choices.append((pack_id, label))
+
+    return choices
 
 
 class LayoutSetupControls(ttk.LabelFrame):
@@ -35,6 +53,17 @@ class LayoutSetupControls(ttk.LabelFrame):
         self.editor._layout_combo.grid(row=0, column=1, sticky="ew", padx=(8, 0))
         self.editor._layout_combo.bind("<<ComboboxSelected>>", self._on_layout_select)
 
+        ttk.Label(self, text="Legends").grid(row=1, column=0, sticky="w", pady=(8, 0))
+
+        self.editor._legend_pack_combo = ttk.Combobox(
+            self,
+            state="readonly",
+            width=22,
+        )
+        self.editor._legend_pack_combo.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
+        self.editor._legend_pack_combo.bind("<<ComboboxSelected>>", self._on_legend_pack_select)
+        self.refresh_legend_pack_choices()
+
         self._description_label = ttk.Label(
             self,
             text="Choose the physical layout here when setting up the keyboard or refreshing its saved setup.",
@@ -42,7 +71,7 @@ class LayoutSetupControls(ttk.LabelFrame):
             justify="left",
             anchor="w",
         )
-        self._description_label.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(8, 0))
+        self._description_label.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(8, 0))
         self.bind("<Configure>", self._sync_description_wrap, add=True)
         self.after_idle(self._sync_description_wrap)
 
@@ -50,10 +79,10 @@ class LayoutSetupControls(ttk.LabelFrame):
             self,
             text="Reset Layout Defaults",
             command=self.editor._reset_layout_defaults,
-        ).grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        ).grid(row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0))
 
         layout_slots_frame = ttk.LabelFrame(self, text="Optional keys", padding=10)
-        layout_slots_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+        layout_slots_frame.grid(row=4, column=0, columnspan=2, sticky="ew", pady=(10, 0))
         layout_slots_frame.columnconfigure(0, weight=1)
 
         self.editor._layout_slots_body = ttk.Frame(layout_slots_frame)
@@ -61,6 +90,19 @@ class LayoutSetupControls(ttk.LabelFrame):
         self.editor._layout_slots_body.columnconfigure(0, weight=1)
 
         refresh_layout_slots_ui(self.editor)
+
+    def refresh_legend_pack_choices(self) -> None:
+        choices = _legend_pack_choices(self.editor._physical_layout)
+        id_to_label = {pack_id: label for pack_id, label in choices}
+        label_to_id = {label: pack_id for pack_id, label in choices}
+        self._legend_pack_id_to_label = id_to_label
+        self._legend_pack_label_to_id = label_to_id
+
+        current_pack_id = str(getattr(self.editor, "_layout_legend_pack", _AUTO_LEGEND_PACK_ID) or _AUTO_LEGEND_PACK_ID)
+        current_label = id_to_label.get(current_pack_id, _AUTO_LEGEND_PACK_LABEL)
+
+        self.editor._legend_pack_combo.configure(values=[label for _pack_id, label in choices])
+        self.editor._legend_pack_combo.set(current_label)
 
     def _sync_description_wrap(self, _event=None) -> None:
         try:
@@ -73,3 +115,8 @@ class LayoutSetupControls(ttk.LabelFrame):
         selected = self.editor._layout_combo.get()
         self.editor._layout_var.set(_LABEL_TO_ID.get(selected, "auto"))
         self.editor._on_layout_changed()
+
+    def _on_legend_pack_select(self, _event=None) -> None:
+        selected = self.editor._legend_pack_combo.get()
+        self.editor._legend_pack_var.set(self._legend_pack_label_to_id.get(selected, _AUTO_LEGEND_PACK_ID))
+        self.editor._on_layout_legend_pack_changed()

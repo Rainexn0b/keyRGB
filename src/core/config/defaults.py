@@ -71,6 +71,9 @@ DEFAULTS: dict = {
     # 'auto' probes sysfs conservatively; manual options expose common desktop
     # and laptop physical variants directly in the editor dropdown.
     "physical_layout": "auto",
+    # Visible legend-pack for the per-key editor / calibrator overlay.
+    # 'auto' keeps the built-in default legends for the active physical family.
+    "layout_legend_pack": "auto",
     # Selected tray device-context header row. The tray falls back to
     # 'keyboard' if the saved device is no longer present.
     "tray_device_context": "keyboard",

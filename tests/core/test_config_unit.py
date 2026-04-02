@@ -178,6 +178,23 @@ def test_physical_layout_enum_prop(tmp_path, monkeypatch) -> None:
     assert cfg.physical_layout == "auto"
 
 
+def test_layout_legend_pack_persists_and_normalizes(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    assert cfg.layout_legend_pack == "auto"
+
+    cfg.layout_legend_pack = "ISO-DE-QWERTZ"
+    assert cfg.layout_legend_pack == "iso-de-qwertz"
+
+    cfg2 = Config()
+    assert cfg2.layout_legend_pack == "iso-de-qwertz"
+
+    cfg.layout_legend_pack = "invalid-pack"
+    assert cfg.layout_legend_pack == "auto"
+
+
 def test_tray_device_context_persists_and_normalizes(tmp_path, monkeypatch) -> None:
     from src.core.config import Config
 

@@ -8,7 +8,7 @@ from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.reactive.input import (
     EvdevKeyboardDevices,
     close_evdev_keyboards,
-    poll_keypress_key_id,
+    poll_keypress_slot_id,
     try_open_evdev_keyboards,
 )
 
@@ -112,15 +112,15 @@ class _PressSource:
     reopen_interval_s: float = 2.0
     reopen_acc_s: float = 0.0
 
-    def poll_key_id(self, *, dt: float) -> str | None:
-        """Return a key id (string) when pressed.
+    def poll_slot_id(self, *, dt: float) -> str | None:
+        """Return a slot id (string) when pressed.
 
         For synthetic mode (no evdev devices), returns an empty string "" when
         a synthetic press should be spawned, and None otherwise.
         """
-        key_id = poll_keypress_key_id(self.devices)
-        if key_id:
-            return str(key_id)
+        slot_id = poll_keypress_slot_id(self.devices)
+        if slot_id:
+            return str(slot_id)
 
         if not self.devices:
             self.reopen_acc_s += float(dt)

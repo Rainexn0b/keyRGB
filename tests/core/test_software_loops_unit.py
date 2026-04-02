@@ -219,16 +219,21 @@ class TestReactiveKeyMapping:
     def test_evdev_key_name_to_key_id_letters_digits(self):
         from src.core.effects.reactive.input import (
             evdev_key_name_to_key_id as _evdev_key_name_to_key_id,
+            evdev_key_name_to_slot_id as _evdev_key_name_to_slot_id,
         )
+        from src.core.resources.layouts import slot_id_for_key_id
 
         assert _evdev_key_name_to_key_id("KEY_A") == "a"
         assert _evdev_key_name_to_key_id("KEY_1") == "1"
         assert _evdev_key_name_to_key_id("A") == "a"
+        assert _evdev_key_name_to_slot_id("KEY_A") == str(slot_id_for_key_id("auto", "a") or "a")
 
     def test_evdev_key_name_to_key_id_specials(self):
         from src.core.effects.reactive.input import (
             evdev_key_name_to_key_id as _evdev_key_name_to_key_id,
+            evdev_key_name_to_slot_id as _evdev_key_name_to_slot_id,
         )
+        from src.core.resources.layouts import slot_id_for_key_id
 
         assert _evdev_key_name_to_key_id("KEY_LEFTSHIFT") == "lshift"
         assert _evdev_key_name_to_key_id("KEY_RIGHTALT") == "ralt"
@@ -237,6 +242,9 @@ class TestReactiveKeyMapping:
         assert _evdev_key_name_to_key_id("KEY_LEFTBRACE") == "lbracket"
         assert _evdev_key_name_to_key_id("KEY_KP1") == "num1"
         assert _evdev_key_name_to_key_id("KEY_KPDOT") == "numdot"
+        assert _evdev_key_name_to_slot_id("KEY_102ND") == str(
+            slot_id_for_key_id("auto", "nonusbackslash") or "nonusbackslash"
+        )
 
 
 class TestBrightnessFactorCalculation:

@@ -31,15 +31,39 @@ class KeyDef:
     key_id: str
     label: str
     rect: Tuple[int, int, int, int]  # x, y, w, h in BASE_IMAGE_SIZE coords
+    slot_id: str | None = None
     shape_segments: Tuple[Tuple[float, float, float, float], ...] | None = None
 
+    def __post_init__(self) -> None:
+        if not self.slot_id:
+            object.__setattr__(self, "slot_id", str(self.key_id))
 
-def _units_row(y: int, x0: int, unit: int, gap: int, keys: Iterable[Tuple[str, str, float]]) -> List[KeyDef]:
+
+def _make_slot_id(prefix: str, index: int) -> str:
+    return f"{prefix}_{int(index):02d}"
+
+
+def _units_row(
+    y: int,
+    x0: int,
+    unit: int,
+    gap: int,
+    keys: Iterable[Tuple[str, str, float]],
+    *,
+    slot_prefix: str,
+) -> List[KeyDef]:
     out: List[KeyDef] = []
     x = x0
-    for key_id, label, w_units in keys:
+    for index, (key_id, label, w_units) in enumerate(keys):
         w = int(round(w_units * unit + (w_units - 1) * 0))
-        out.append(KeyDef(key_id=key_id, label=label, rect=(x, y, w, unit)))
+        out.append(
+            KeyDef(
+                key_id=key_id,
+                label=label,
+                rect=(x, y, w, unit),
+                slot_id=_make_slot_id(slot_prefix, index),
+            )
+        )
         x += w + gap
     return out
 
@@ -49,7 +73,9 @@ def _units_row_with_spacers(
     x0: int,
     unit: int,
     gap: int,
-    items: Iterable[Tuple[str, str, float] | Tuple[None, None, float]],
+    items: Iterable[Tuple[str, str, float, str | None] | Tuple[None, None, float, None]],
+    *,
+    slot_prefix: str,
 ) -> List[KeyDef]:
     """Row helper that supports spacer runs.
 
@@ -58,7 +84,8 @@ def _units_row_with_spacers(
 
     out: List[KeyDef] = []
     x = x0
-    for key_id, label, w_units in items:
+    slot_index = 0
+    for key_id, label, w_units, slot_id in items:
         if key_id is None:
             x += int(round(w_units * unit))
             continue
@@ -66,7 +93,15 @@ def _units_row_with_spacers(
         key_id_str = cast(str, key_id)
         label_str = cast(str, label)
         w = int(round(w_units * unit))
-        out.append(KeyDef(key_id=key_id_str, label=label_str, rect=(x, y, w, unit)))
+        out.append(
+            KeyDef(
+                key_id=key_id_str,
+                label=label_str,
+                rect=(x, y, w, unit),
+                slot_id=slot_id or _make_slot_id(slot_prefix, slot_index),
+            )
+        )
+        slot_index += 1
         x += w + gap
     return out
 
@@ -75,10 +110,12 @@ def _segmented_key(
     key_id: str,
     label: str,
     segments: Iterable[Tuple[int, int, int, int]],
+    *,
+    slot_id: str | None = None,
 ) -> KeyDef:
     segment_list = list(segments)
     if not segment_list:
-        return KeyDef(key_id=key_id, label=label, rect=(0, 0, 0, 0))
+        return KeyDef(key_id=key_id, label=label, rect=(0, 0, 0, 0), slot_id=slot_id)
 
     left = min(x for x, _y, _w, _h in segment_list)
     top = min(y for _x, y, _w, _h in segment_list)
@@ -100,6 +137,7 @@ def _segmented_key(
         key_id=key_id,
         label=label,
         rect=(left, top, width, height),
+        slot_id=slot_id,
         shape_segments=normalized_segments,
     )
 
@@ -124,7 +162,7 @@ def _end_x(keys: List[KeyDef]) -> int:
 
 def _layout_row_items(
     spec: dict[str, object], row_name: str
-) -> List[Tuple[str, str, float] | Tuple[None, None, float]]:
+) -> List[Tuple[str, str, float, str | None] | Tuple[None, None, float, None]]:
     rows = spec.get("rows")
     if not isinstance(rows, dict):
         return []
@@ -132,21 +170,22 @@ def _layout_row_items(
     if not isinstance(raw_items, list):
         return []
 
-    out: List[Tuple[str, str, float] | Tuple[None, None, float]] = []
+    out: List[Tuple[str, str, float, str | None] | Tuple[None, None, float, None]] = []
     for raw_item in raw_items:
         if not isinstance(raw_item, dict):
             continue
         if "spacer" in raw_item:
             spacer = raw_item.get("spacer")
             if isinstance(spacer, (int, float)):
-                out.append((None, None, float(spacer)))
+                out.append((None, None, float(spacer), None))
             continue
 
         key_id = raw_item.get("key_id")
         label = raw_item.get("label")
         width = raw_item.get("width")
+        slot_id = raw_item.get("slot_id")
         if isinstance(key_id, str) and isinstance(label, str) and isinstance(width, (int, float)):
-            out.append((key_id, label, float(width)))
+            out.append((key_id, label, float(width), str(slot_id) if isinstance(slot_id, str) else None))
     return out
 
 
@@ -177,7 +216,7 @@ def _layout_special_keys(
         return []
 
     out: List[KeyDef] = []
-    for raw_key in raw_special_keys:
+    for index, raw_key in enumerate(raw_special_keys):
         if not isinstance(raw_key, dict):
             continue
         key_id = raw_key.get("key_id")
@@ -188,6 +227,7 @@ def _layout_special_keys(
         height_rows = raw_key.get("height_rows")
         dx = raw_key.get("dx", 0)
         dy = raw_key.get("dy", 0)
+        slot_id = raw_key.get("slot_id")
 
         if not (
             isinstance(key_id, str)
@@ -217,6 +257,7 @@ def _layout_special_keys(
                 key_id=key_id,
                 label=label,
                 rect=rect,
+                slot_id=(str(slot_id) if isinstance(slot_id, str) else _make_slot_id(f"{y_row}_special", index)),
                 shape_segments=_shape_segments_from_spec(raw_key.get("shape_segments")),
             )
         )
@@ -265,23 +306,24 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
         f_unit,
         f_gap,
         [
-            ("esc", "Esc", 1.05),
-            (None, None, 0.45),
-            ("f1", "F1", 1),
-            ("f2", "F2", 1),
-            ("f3", "F3", 1),
-            ("f4", "F4", 1),
-            (None, None, 0.35),
-            ("f5", "F5", 1),
-            ("f6", "F6", 1),
-            ("f7", "F7", 1),
-            ("f8", "F8", 1),
-            (None, None, 0.35),
-            ("f9", "F9", 1),
-            ("f10", "F10", 1),
-            ("f11", "F11", 1),
-            ("f12", "F12", 1),
+            ("esc", "Esc", 1.05, None),
+            (None, None, 0.45, None),
+            ("f1", "F1", 1, None),
+            ("f2", "F2", 1, None),
+            ("f3", "F3", 1, None),
+            ("f4", "F4", 1, None),
+            (None, None, 0.35, None),
+            ("f5", "F5", 1, None),
+            ("f6", "F6", 1, None),
+            ("f7", "F7", 1, None),
+            ("f8", "F8", 1, None),
+            (None, None, 0.35, None),
+            ("f9", "F9", 1, None),
+            ("f10", "F10", 1, None),
+            ("f11", "F11", 1, None),
+            ("f12", "F12", 1, None),
         ],
+        slot_prefix="frow",
     )
 
     keys += _units_row(
@@ -294,6 +336,7 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
             ("prtsc", "PrtSc", 1),
             ("del", "Del", 1),
         ],
+        slot_prefix="nav",
     )
 
     keys += _units_row(
@@ -307,15 +350,16 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
             ("pgdn", "PgDn", 1),
             ("end", "End", 1),
         ],
+        slot_prefix="navaux",
     )
 
-    number_row = _units_row_with_spacers(r0, x0, unit, gap, _layout_row_items(spec, "number"))
+    number_row = _units_row_with_spacers(r0, x0, unit, gap, _layout_row_items(spec, "number"), slot_prefix="number")
     keys += number_row
 
-    top_row = _units_row_with_spacers(r1, x0, unit, gap, _layout_row_items(spec, "top"))
+    top_row = _units_row_with_spacers(r1, x0, unit, gap, _layout_row_items(spec, "top"), slot_prefix="top")
     keys += top_row
 
-    home_row = _units_row_with_spacers(r2, x0, unit, gap, _layout_row_items(spec, "home"))
+    home_row = _units_row_with_spacers(r2, x0, unit, gap, _layout_row_items(spec, "home"), slot_prefix="home")
     keys += home_row
 
     row_lookup = {
@@ -332,11 +376,11 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
     }
     keys += _layout_special_keys(spec, row_lookup=row_lookup, row_top_lookup=row_top_lookup, unit=unit, gap=gap)
 
-    shift_row = _units_row_with_spacers(r3, x0, unit, gap, _layout_row_items(spec, "shift"))
+    shift_row = _units_row_with_spacers(r3, x0, unit, gap, _layout_row_items(spec, "shift"), slot_prefix="shift")
     keys += shift_row
     row_lookup["shift"] = shift_row
 
-    bottom_row = _units_row_with_spacers(r4, x0, unit, gap, _layout_row_items(spec, "bottom"))
+    bottom_row = _units_row_with_spacers(r4, x0, unit, gap, _layout_row_items(spec, "bottom"), slot_prefix="bottom")
     keys += bottom_row
     row_lookup["bottom"] = bottom_row
 
@@ -348,10 +392,11 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
             "up",
             "↑",
             (ax0 + arrow_unit + 6, ay0 - arrow_unit - 6, arrow_unit, arrow_unit),
+            slot_id="arrow_up",
         ),
-        KeyDef("left", "←", (ax0, ay0, arrow_unit, arrow_unit)),
-        KeyDef("down", "↓", (ax0 + arrow_unit + 6, ay0, arrow_unit, arrow_unit)),
-        KeyDef("right", "→", (ax0 + 2 * (arrow_unit + 6), ay0, arrow_unit, arrow_unit)),
+        KeyDef("left", "←", (ax0, ay0, arrow_unit, arrow_unit), slot_id="arrow_left"),
+        KeyDef("down", "↓", (ax0 + arrow_unit + 6, ay0, arrow_unit, arrow_unit), slot_id="arrow_down"),
+        KeyDef("right", "→", (ax0 + 2 * (arrow_unit + 6), ay0, arrow_unit, arrow_unit), slot_id="arrow_right"),
     ]
 
     keys += _units_row(
@@ -365,21 +410,22 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
             ("numstar", "*", 1),
             ("numminus", "-", 1),
         ],
+        slot_prefix="numpad",
     )
-    keys += _units_row(r1, nx0, unit, gap, [("num7", "7", 1), ("num8", "8", 1), ("num9", "9", 1)])
-    keys += _units_row(r2, nx0, unit, gap, [("num4", "4", 1), ("num5", "5", 1), ("num6", "6", 1)])
-    keys += _units_row(r3, nx0, unit, gap, [("num1", "1", 1), ("num2", "2", 1), ("num3", "3", 1)])
-    keys += _units_row(r4, nx0, unit, gap, [("num0", "0", 2.0), ("numdot", ".", 1)])
+    keys += _units_row(r1, nx0, unit, gap, [("num7", "7", 1), ("num8", "8", 1), ("num9", "9", 1)], slot_prefix="numpad1")
+    keys += _units_row(r2, nx0, unit, gap, [("num4", "4", 1), ("num5", "5", 1), ("num6", "6", 1)], slot_prefix="numpad2")
+    keys += _units_row(r3, nx0, unit, gap, [("num1", "1", 1), ("num2", "2", 1), ("num3", "3", 1)], slot_prefix="numpad3")
+    keys += _units_row(r4, nx0, unit, gap, [("num0", "0", 2.0), ("numdot", ".", 1)], slot_prefix="numpad4")
 
     plus_x = nx0 + 3 * (unit + gap)
     plus_y = r1
     plus_h = 2 * unit + gap
-    keys.append(KeyDef("numplus", "+", (plus_x, plus_y, unit, plus_h)))
+    keys.append(KeyDef("numplus", "+", (plus_x, plus_y, unit, plus_h), slot_id="numpad_plus"))
 
     ent_x = nx0 + 3 * (unit + gap)
     ent_y = r3
     ent_h = 2 * unit + gap
-    keys.append(KeyDef("numenter", "Ent", (ent_x, ent_y, unit, ent_h)))
+    keys.append(KeyDef("numenter", "Ent", (ent_x, ent_y, unit, ent_h), slot_id="numpad_enter"))
 
     return keys
 
@@ -403,6 +449,7 @@ REFERENCE_DEVICE_KEYS: List[KeyDef] = _build_reference_device_keys()
 def get_layout_keys(
     physical_layout: str = "auto",
     *,
+    legend_pack_id: str | None = None,
     slot_overrides: dict[str, dict[str, object]] | None = None,
 ) -> List[KeyDef]:
     """Return the reference layout key list for *physical_layout*.
@@ -413,7 +460,7 @@ def get_layout_keys(
 
     from .layouts import get_layout_keys as _get
 
-    return _get(physical_layout, slot_overrides=slot_overrides)
+    return _get(physical_layout, legend_pack_id=legend_pack_id, slot_overrides=slot_overrides)
 
 
 def resolve_physical_layout(physical_layout: str) -> str:
@@ -425,3 +472,15 @@ def resolve_physical_layout(physical_layout: str) -> str:
     from .layouts import resolve_layout_id
 
     return resolve_layout_id(physical_layout)
+
+
+def slot_id_for_key_id(physical_layout: str, key_id: str) -> str | None:
+    from .layouts import slot_id_for_key_id as _slot_id_for_key_id
+
+    return _slot_id_for_key_id(physical_layout, key_id)
+
+
+def key_id_for_slot_id(physical_layout: str, slot_id: str) -> str | None:
+    from .layouts import key_id_for_slot_id as _key_id_for_slot_id
+
+    return _key_id_for_slot_id(physical_layout, slot_id)

@@ -1,0 +1,42 @@
+{
+  "packs": {
+    "ansi-generic": {
+      "layout_id": "ansi",
+      "label": "ANSI Generic",
+      "labels": {}
+    },
+    "iso-generic": {
+      "extends": "ansi-generic",
+      "layout_id": "iso",
+      "label": "ISO Generic",
+      "labels": {}
+    },
+    "ks-generic": {
+      "extends": "ansi-generic",
+      "layout_id": "ks",
+      "label": "KS Generic",
+      "labels": {}
+    },
+    "abnt-generic": {
+      "extends": "iso-generic",
+      "layout_id": "abnt",
+      "label": "ABNT Generic",
+      "labels": {}
+    },
+    "jis-generic": {
+      "extends": "ansi-generic",
+      "layout_id": "jis",
+      "label": "JIS Generic",
+      "labels": {}
+    },
+    "iso-de-qwertz": {
+      "extends": "iso-generic",
+      "layout_id": "iso",
+      "label": "ISO German QWERTZ",
+      "labels": {
+        "top_06": "Z",
+        "shift_02": "Y"
+      }
+    }
+  }
+}

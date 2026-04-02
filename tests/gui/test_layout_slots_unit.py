@@ -14,6 +14,7 @@ class _SlotState:
     visible: bool
     label: str
     default_label: str
+    slot_id: str = ""
 
 
 class _FakeVar:
@@ -149,7 +150,7 @@ def test_refresh_layout_slots_ui_builds_rows_and_binds_commands(monkeypatch: pyt
     body = _FakeWidget()
     editor._layout_slots_body = body
     states = [
-        _SlotState(key_id="iso_extra", visible=True, label="ISO", default_label="ISO Default"),
+        _SlotState(slot_id="shift_01", key_id="iso_extra", visible=True, label="ISO", default_label="ISO Default"),
     ]
     monkeypatch.setattr(layout_slots, "get_layout_slot_states", lambda *_args, **_kwargs: states)
 
@@ -166,9 +167,25 @@ def test_refresh_layout_slots_ui_builds_rows_and_binds_commands(monkeypatch: pyt
 
     checkbutton.options["variable"].set(False)
     checkbutton.options["command"]()
-    assert editor.visibility_calls == [("iso_extra", False)]
+    assert editor.visibility_calls == [("shift_01", False)]
 
     entry.options["textvariable"].set("Renamed")
     for _event, callback in entry.bind_calls:
         callback(None)
-    assert editor.label_calls == [("iso_extra", "Renamed"), ("iso_extra", "Renamed")]
+    assert editor.label_calls == [("shift_01", "Renamed"), ("shift_01", "Renamed")]
+
+
+def test_refresh_layout_slots_ui_prefers_editor_slot_state_getter(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _install_fake_widgets(monkeypatch)
+    editor = _editor()
+    body = _FakeWidget()
+    editor._layout_slots_body = body
+    editor._get_layout_slot_states = lambda: [
+        _SlotState(slot_id="bottom_05", key_id="menu", visible=True, label="Legend Menu", default_label="Legend Menu")
+    ]
+    monkeypatch.setattr(layout_slots, "get_layout_slot_states", lambda *_args, **_kwargs: [])
+
+    layout_slots.refresh_layout_slots_ui(editor)
+
+    assert registry["checkbuttons"][0].options["text"] == "menu"
+    assert registry["labels"][0].options["text"] == "Default: Legend Menu"

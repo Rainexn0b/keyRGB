@@ -16,7 +16,7 @@ def _filter_layout_slot_overrides(
     physical_layout: str | None,
     raw: object,
 ) -> dict[str, dict[str, object]]:
-    cleaned = sanitize_layout_slot_overrides(raw)
+    cleaned = sanitize_layout_slot_overrides(raw, layout_id=physical_layout)
     allowed_key_ids = set(get_layout_slot_key_ids(physical_layout))
     return {key_id: dict(payload) for key_id, payload in cleaned.items() if key_id in allowed_key_ids}
 

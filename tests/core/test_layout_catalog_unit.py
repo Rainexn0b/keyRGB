@@ -8,8 +8,11 @@ from src.core.resources.layouts import (
     LAYOUT_CATALOG,
     LayoutDef,
     clear_layout_cache,
+    get_layout_legend_labels,
+    get_layout_legend_pack_ids,
     get_layout_keys,
     resolve_layout_id,
+    resolve_layout_legend_pack_id,
 )
 from src.core.resources.layouts.catalog import VALID_LAYOUT_IDS, get_layout_def
 
@@ -151,3 +154,23 @@ def test_get_layout_keys_returns_list() -> None:
         result = get_layout_keys(ld.layout_id)
         assert isinstance(result, list)
         assert len(result) > 0
+
+
+def test_get_layout_legend_pack_ids_filters_by_layout() -> None:
+    pack_ids = set(get_layout_legend_pack_ids("iso"))
+
+    assert "iso-generic" in pack_ids
+    assert "iso-de-qwertz" in pack_ids
+    assert "jis-generic" not in pack_ids
+
+
+def test_resolve_layout_legend_pack_id_defaults_to_generic_pack() -> None:
+    assert resolve_layout_legend_pack_id("iso") == "iso-generic"
+    assert resolve_layout_legend_pack_id("auto") == "ansi-generic"
+
+
+def test_get_layout_legend_labels_uses_sparse_pack_overrides() -> None:
+    labels = get_layout_legend_labels("iso", "iso-de-qwertz")
+
+    assert labels["top_06"] == "Z"
+    assert labels["shift_02"] == "Y"

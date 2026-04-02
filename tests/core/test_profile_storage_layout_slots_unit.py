@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from src.core.resources.layouts import slot_id_for_key_id
+
 
 class TestLayoutSlotStorage:
     def test_save_and_load_layout_slots_roundtrip(self, monkeypatch, tmp_path) -> None:
@@ -13,12 +15,16 @@ class TestLayoutSlotStorage:
             "nonusbackslash": {"visible": False},
             "nonushash": {"label": "Alt #"},
         }
+        canonical_payload = {
+            str(slot_id_for_key_id("iso", "nonusbackslash")): {"visible": False},
+            str(slot_id_for_key_id("iso", "nonushash")): {"label": "Alt #"},
+        }
 
         saved = layout_slots.save_layout_slot_overrides("iso", payload)
         loaded = layout_slots.load_layout_slot_overrides("iso")
 
-        assert saved == payload
-        assert loaded == payload
+        assert saved == canonical_payload
+        assert loaded == canonical_payload
 
     def test_load_layout_slots_filters_unknown_and_empty_values(
         self,
@@ -48,7 +54,7 @@ class TestLayoutSlotStorage:
 
         loaded = layout_slots.load_layout_slot_overrides("iso")
 
-        assert loaded == {"nonusbackslash": {"visible": False}}
+        assert loaded == {str(slot_id_for_key_id("iso", "nonusbackslash")): {"visible": False}}
 
     def test_load_layout_slots_migrates_legacy_profile_sidecar(self, monkeypatch, tmp_path) -> None:
         cfg_dir = tmp_path / "cfg"
@@ -72,14 +78,14 @@ class TestLayoutSlotStorage:
         loaded = layout_slots.load_layout_slot_overrides("iso", legacy_profile_name="test_profile")
 
         assert loaded == {
-            "nonusbackslash": {"visible": False},
-            "nonushash": {"label": "ISO #"},
+            str(slot_id_for_key_id("iso", "nonusbackslash")): {"visible": False},
+            str(slot_id_for_key_id("iso", "nonushash")): {"label": "ISO #"},
         }
         assert json.loads(layout_slots.layout_slots_path().read_text(encoding="utf-8")) == {
             "layouts": {
                 "iso": {
-                    "nonusbackslash": {"visible": False},
-                    "nonushash": {"label": "ISO #"},
+                    str(slot_id_for_key_id("iso", "nonusbackslash")): {"visible": False},
+                    str(slot_id_for_key_id("iso", "nonushash")): {"label": "ISO #"},
                 }
             }
         }

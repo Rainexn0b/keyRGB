@@ -5,9 +5,11 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, TypeAlias
 
+from src.core.resources.layouts import key_id_for_slot_id, slot_id_for_key_id
 from src.core.utils.logging_utils import log_throttled
 
 Key = Tuple[int, int]
+KeyCells = Tuple[Key, ...]
 
 
 EvdevKeyboardDevice: TypeAlias = Any
@@ -127,7 +129,11 @@ def _evdev_device_looks_like_keyboard(dev: EvdevKeyboardDevice, evdev: Any) -> b
 
 
 def evdev_key_name_to_key_id(name: str) -> Optional[str]:
-    """Translate evdev key names (e.g. KEY_A) into our calibrated key_id strings."""
+    """Translate evdev key names into legacy calibrated key_id strings.
+
+    This remains as a thin compatibility helper for code paths that still need
+    semantic-looking key ids before translating into canonical slot ids.
+    """
 
     if not name:
         return None
@@ -217,6 +223,15 @@ def evdev_key_name_to_key_id(name: str) -> Optional[str]:
     return None
 
 
+def evdev_key_name_to_slot_id(name: str, *, physical_layout: str = "auto") -> Optional[str]:
+    """Translate evdev key names into canonical physical slot ids when known."""
+
+    key_id = evdev_key_name_to_key_id(name)
+    if not key_id:
+        return None
+    return str(slot_id_for_key_id(physical_layout, key_id) or key_id)
+
+
 def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
     if str(os.environ.get("KEYRGB_DISABLE_EVDEV", "")).strip().lower() in {
         "1",
@@ -289,7 +304,39 @@ def reactive_synthetic_fallback_enabled() -> bool:
     return raw in {"1", "true", "yes", "on"}
 
 
-def load_active_profile_keymap() -> Dict[str, Key]:
+def _normalize_key_cells(raw_cells: object) -> KeyCells:
+    if isinstance(raw_cells, str):
+        if "," not in raw_cells:
+            return ()
+        row_text, col_text = raw_cells.split(",", 1)
+        try:
+            return ((int(row_text), int(col_text)),)
+        except (TypeError, ValueError):
+            return ()
+
+    if isinstance(raw_cells, (list, tuple)) and len(raw_cells) == 2:
+        first, second = raw_cells
+        if not isinstance(first, (list, tuple, dict)) and not isinstance(second, (list, tuple, dict)):
+            try:
+                return ((int(first), int(second)),)
+            except (TypeError, ValueError):
+                return ()
+
+    if not isinstance(raw_cells, (list, tuple)):
+        return ()
+
+    out: list[Key] = []
+    for cell in raw_cells:
+        normalized = _normalize_key_cells(cell)
+        if not normalized:
+            continue
+        key = normalized[0]
+        if key not in out:
+            out.append(key)
+    return tuple(out)
+
+
+def load_active_profile_slot_keymap() -> Dict[str, KeyCells]:
     try:
         from src.core.profile import profiles
     except ImportError:
@@ -298,7 +345,18 @@ def load_active_profile_keymap() -> Dict[str, Key]:
     try:
         active = profiles.get_active_profile()
         km = profiles.load_keymap(active)
-        return {str(k).lower(): (int(v[0]), int(v[1])) for k, v in (km or {}).items()}
+        out: Dict[str, KeyCells] = {}
+        for key_id, raw_cells in (km or {}).items():
+            cells = list(_normalize_key_cells(raw_cells))
+            if cells:
+                raw_identity = str(key_id or "").strip()
+                if key_id_for_slot_id("auto", raw_identity):
+                    normalized_identity = raw_identity.lower()
+                else:
+                    legacy_identity = evdev_key_name_to_key_id(raw_identity) or raw_identity.lower()
+                    normalized_identity = str(slot_id_for_key_id("auto", legacy_identity) or legacy_identity).lower()
+                out[normalized_identity] = tuple(cells)
+        return out
     except (AttributeError, IndexError, KeyError, OSError, TypeError, ValueError) as exc:
         _log_reactive_input_exception(
             "effects.reactive.profile_keymap_load_failed",
@@ -308,7 +366,7 @@ def load_active_profile_keymap() -> Dict[str, Key]:
         return {}
 
 
-def poll_keypress_key_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[str]:
+def poll_keypress_slot_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[str]:
     if not devices:
         return None
 
@@ -347,9 +405,9 @@ def poll_keypress_key_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[st
                 if code is None:
                     continue
                 name = evdev.ecodes.KEY.get(int(code))
-                key_id = evdev_key_name_to_key_id(str(name) if name else "")
-                if key_id:
-                    return key_id
+                slot_id = evdev_key_name_to_slot_id(str(name) if name else "")
+                if slot_id:
+                    return slot_id
         except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             dev_name = getattr(dev, "path", "<unknown>")
             _log_reactive_input_exception(

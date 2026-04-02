@@ -17,7 +17,13 @@ from __future__ import annotations
 import logging
 from typing import Dict, Tuple
 
-from ._backdrop import load_backdrop_transparency, save_backdrop_transparency
+from ._backdrop import (
+    load_backdrop_mode,
+    load_backdrop_transparency,
+    normalize_backdrop_mode,
+    save_backdrop_mode,
+    save_backdrop_transparency,
+)
 from .json_storage import read_json, write_json_atomic
 from .paths import (
     default_profile_path,
@@ -40,11 +46,16 @@ from src.core.resources.defaults import (
     get_default_layout_tweaks,
     get_default_per_key_tweaks,
 )
+from src.core.resources.layouts import key_id_for_slot_id, slot_id_for_key_id
+from src.core.resources.layout_slots import sanitize_layout_slot_overrides
 from src.core.utils.logging_utils import log_throttled
 
 # Backwards-compatible constant
 _DEFAULT_PROFILE = DEFAULT_PROFILE_NAME
 logger = logging.getLogger(__name__)
+
+KeyCell = Tuple[int, int]
+KeyCells = Tuple[KeyCell, ...]
 _MISSING = object()
 _READ_FAILED = object()
 
@@ -58,6 +69,7 @@ __all__ = [
     "get_default_profile",
     "get_active_profile",
     "list_profiles",
+    "load_backdrop_mode",
     "load_backdrop_transparency",
     "load_keymap",
     "load_layout_global",
@@ -65,9 +77,14 @@ __all__ = [
     "load_layout_slots",
     "load_lightbar_overlay",
     "load_per_key_colors",
+    "normalize_backdrop_mode",
+    "normalize_keymap",
+    "normalize_layout_per_key_tweaks",
+    "normalize_layout_slot_overrides",
     "paths_for",
     "profiles_root",
     "safe_profile_name",
+    "save_backdrop_mode",
     "save_backdrop_transparency",
     "save_keymap",
     "save_layout_global",
@@ -104,32 +121,160 @@ def _normalize_lightbar_overlay(raw: object) -> Dict[str, bool | float]:
     return out
 
 
-def load_keymap(name: str | None = None, *, physical_layout: str | None = None) -> Dict[str, Tuple[int, int]]:
+def _parse_keymap_cell(raw: object) -> KeyCell | None:
+    if isinstance(raw, str) and "," in raw:
+        row_text, col_text = raw.split(",", 1)
+        try:
+            return (int(row_text), int(col_text))
+        except (TypeError, ValueError):
+            return None
+
+    if isinstance(raw, (list, tuple)) and len(raw) == 2:
+        first, second = raw
+        if isinstance(first, (list, tuple, dict)) or isinstance(second, (list, tuple, dict)):
+            return None
+        try:
+            return (int(first), int(second))
+        except (TypeError, ValueError):
+            return None
+
+    return None
+
+
+def _parse_keymap_cells(raw: object) -> KeyCells:
+    single = _parse_keymap_cell(raw)
+    if single is not None:
+        return (single,)
+
+    if not isinstance(raw, (list, tuple)):
+        return ()
+
+    out: list[KeyCell] = []
+    seen: set[KeyCell] = set()
+    for item in raw:
+        cell = _parse_keymap_cell(item)
+        if cell is None or cell in seen:
+            continue
+        seen.add(cell)
+        out.append(cell)
+    return tuple(out)
+
+
+def _canonical_layout_identity(*, physical_layout: str | None, identity: object) -> str:
+    raw_identity = str(identity or "").strip()
+    if not raw_identity:
+        return ""
+
+    slot_id = slot_id_for_key_id(physical_layout or "auto", raw_identity)
+    if slot_id:
+        return str(slot_id)
+
+    if key_id_for_slot_id(physical_layout or "auto", raw_identity):
+        return raw_identity
+
+    return raw_identity
+
+
+def normalize_layout_per_key_tweaks(
+    raw: object,
+    *,
+    physical_layout: str | None,
+) -> Dict[str, Dict[str, float]]:
+    out: Dict[str, Dict[str, float]] = {}
+    if not isinstance(raw, dict):
+        return out
+
+    for identity, tweaks in raw.items():
+        if not isinstance(identity, str) or not isinstance(tweaks, dict):
+            continue
+
+        normalized_identity = _canonical_layout_identity(physical_layout=physical_layout, identity=identity)
+        if not normalized_identity:
+            continue
+
+        parsed: Dict[str, float] = {}
+        for key in ("dx", "dy", "sx", "sy", "inset"):
+            value = tweaks.get(key)
+            if isinstance(value, (int, float)):
+                parsed[key] = float(value)
+
+        if not parsed:
+            continue
+
+        if "inset" in parsed:
+            parsed["inset"] = max(0.0, min(0.20, float(parsed["inset"])))
+
+        existing = dict(out.get(normalized_identity, {}))
+        existing.update(parsed)
+        out[normalized_identity] = existing
+
+    return out
+
+
+def normalize_layout_slot_overrides(
+    raw: object,
+    *,
+    physical_layout: str | None,
+) -> Dict[str, Dict[str, object]]:
+    return sanitize_layout_slot_overrides(raw, layout_id=physical_layout)
+
+
+def normalize_keymap(
+    raw: object,
+    *,
+    physical_layout: str | None,
+) -> Dict[str, KeyCells]:
+    out: Dict[str, KeyCells] = {}
+    if not isinstance(raw, dict):
+        return out
+
+    for identity, raw_cells in raw.items():
+        if not isinstance(identity, str):
+            continue
+
+        normalized_identity = _canonical_layout_identity(physical_layout=physical_layout, identity=identity)
+        if not normalized_identity:
+            continue
+
+        cells = _parse_keymap_cells(raw_cells)
+        if not cells:
+            continue
+
+        merged: list[KeyCell] = list(out.get(normalized_identity, ()))
+        seen = set(merged)
+        for cell in cells:
+            if cell in seen:
+                continue
+            seen.add(cell)
+            merged.append(cell)
+        out[normalized_identity] = tuple(merged)
+
+    return out
+
+
+def load_keymap(name: str | None = None, *, physical_layout: str | None = None) -> Dict[str, KeyCells]:
     p = paths_for(name).keymap
     raw = read_json(p)
     if raw is None:
         raw = get_default_keymap(physical_layout)
 
-    out: Dict[str, Tuple[int, int]] = {}
-    if isinstance(raw, dict):
-        for k, v in raw.items():
-            if isinstance(k, str) and isinstance(v, str) and "," in v:
-                a, b = v.split(",", 1)
-                try:
-                    out[k] = (int(a), int(b))
-                except (TypeError, ValueError):
-                    continue
-            elif isinstance(k, str) and isinstance(v, (list, tuple)) and len(v) == 2:
-                try:
-                    out[k] = (int(v[0]), int(v[1]))
-                except (TypeError, ValueError):
-                    continue
-    return out
+    return normalize_keymap(raw, physical_layout=physical_layout)
 
 
-def save_keymap(keymap: Dict[str, Tuple[int, int]], name: str | None = None) -> None:
+def save_keymap(
+    keymap: Dict[str, KeyCells],
+    name: str | None = None,
+    *,
+    physical_layout: str | None = None,
+) -> None:
     p = paths_for(name).keymap
-    payload = {k: f"{rc[0]},{rc[1]}" for k, rc in sorted(keymap.items())}
+    payload = {}
+    for key_id, raw_cells in sorted(normalize_keymap(keymap or {}, physical_layout=physical_layout).items()):
+        cells = _parse_keymap_cells(raw_cells)
+        if not cells:
+            continue
+        encoded = [f"{row},{col}" for row, col in cells]
+        payload[key_id] = encoded[0] if len(encoded) == 1 else encoded
     write_json_atomic(p, payload)
 
 
@@ -167,38 +312,12 @@ def load_layout_per_key(name: str | None = None, *, physical_layout: str | None 
     if raw is None:
         raw = get_default_per_key_tweaks(physical_layout)
 
-    out: Dict[str, Dict[str, float]] = {}
-    if isinstance(raw, dict):
-        for key_id, tweaks in raw.items():
-            if not isinstance(key_id, str) or not isinstance(tweaks, dict):
-                continue
-            t: Dict[str, float] = {}
-            for k in ("dx", "dy", "sx", "sy", "inset"):
-                v = tweaks.get(k)
-                if isinstance(v, (int, float)):
-                    t[k] = float(v)
-            if t:
-                # Clamp inset if present
-                if "inset" in t:
-                    t["inset"] = max(0.0, min(0.20, float(t["inset"])))
-                out[key_id] = t
-    return out
+    return normalize_layout_per_key_tweaks(raw, physical_layout=physical_layout)
 
 
 def save_layout_per_key(per_key: Dict[str, Dict[str, float]], name: str | None = None) -> None:
     p = paths_for(name).layout_per_key
-    payload: Dict[str, Dict[str, float]] = {}
-    for key_id, tweaks in (per_key or {}).items():
-        if not isinstance(key_id, str) or not isinstance(tweaks, dict):
-            continue
-        t: Dict[str, float] = {}
-        for k in ("dx", "dy", "sx", "sy", "inset"):
-            if k in tweaks and isinstance(tweaks[k], (int, float)):
-                t[k] = float(tweaks[k])
-        if t:
-            if "inset" in t:
-                t["inset"] = max(0.0, min(0.20, float(t["inset"])))
-            payload[key_id] = t
+    payload = normalize_layout_per_key_tweaks(per_key or {}, physical_layout=None)
     write_json_atomic(p, payload)
 
 
@@ -225,7 +344,10 @@ def load_layout_slots(
     *,
     physical_layout: str | None = None,
 ) -> Dict[str, Dict[str, object]]:
-    return load_layout_slot_overrides(physical_layout or "auto", legacy_profile_name=name)
+    return normalize_layout_slot_overrides(
+        load_layout_slot_overrides(physical_layout or "auto", legacy_profile_name=name),
+        physical_layout=physical_layout,
+    )
 
 
 def save_layout_slots(
@@ -234,7 +356,10 @@ def save_layout_slots(
     *,
     physical_layout: str | None = None,
 ) -> Dict[str, Dict[str, object]]:
-    return save_layout_slot_overrides(physical_layout or "auto", layout_slots)
+    return save_layout_slot_overrides(
+        physical_layout or "auto",
+        normalize_layout_slot_overrides(layout_slots, physical_layout=physical_layout),
+    )
 
 
 def load_per_key_colors(

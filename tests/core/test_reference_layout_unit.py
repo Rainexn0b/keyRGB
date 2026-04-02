@@ -6,9 +6,13 @@ from src.core.resources.layout import (
     ISO_ONLY_KEY_IDS,
     build_layout,
     get_layout_keys,
+    key_id_for_slot_id,
+    KeyDef,
     resolve_physical_layout,
+    slot_id_for_key_id,
 )
-from src.core.resources.layout_slots import get_layout_slot_states
+import src.core.resources.layout_slots as layout_slots_mod
+from src.core.resources.layout_slots import apply_layout_slot_overrides, clear_layout_slot_cache, get_layout_slot_states
 from src.core.resources.layout_specs import load_layout_spec
 
 
@@ -82,6 +86,44 @@ def test_get_layout_keys_iso() -> None:
     assert "nonusbackslash" in key_ids
 
 
+def test_get_layout_keys_can_apply_sparse_legend_pack_without_changing_identity() -> None:
+    keys = get_layout_keys("iso", legend_pack_id="iso-de-qwertz")
+    slot_map = {str(key.slot_id): key for key in keys}
+
+    assert slot_map["top_06"].key_id == "y"
+    assert slot_map["top_06"].label == "Z"
+    assert slot_map["shift_02"].key_id == "z"
+    assert slot_map["shift_02"].label == "Y"
+
+
+def test_build_layout_assigns_unique_slot_ids_per_layout() -> None:
+    keys = build_layout(variant="iso")
+    slot_ids = [str(key.slot_id) for key in keys]
+
+    assert all(slot_id for slot_id in slot_ids)
+    assert len(slot_ids) == len(set(slot_ids))
+
+
+def test_alpha_rows_use_physical_slot_ids_not_letter_ids() -> None:
+    ansi_keys = {key.key_id: key for key in build_layout(variant="ansi")}
+    iso_keys = {key.key_id: key for key in build_layout(variant="iso")}
+
+    assert ansi_keys["q"].slot_id == "top_01"
+    assert ansi_keys["a"].slot_id == "home_01"
+    assert ansi_keys["z"].slot_id == "shift_01"
+    assert iso_keys["z"].slot_id == "shift_02"
+    assert iso_keys["nonusbackslash"].slot_id == "shift_01"
+
+
+def test_slot_id_compatibility_helpers_resolve_both_directions() -> None:
+    assert slot_id_for_key_id("ansi", "q") == "top_01"
+    assert key_id_for_slot_id("ansi", "top_01") == "q"
+    assert slot_id_for_key_id("iso", "nonusbackslash") == "shift_01"
+    assert key_id_for_slot_id("iso", "shift_01") == "nonusbackslash"
+    assert slot_id_for_key_id("ansi", "missing") is None
+    assert key_id_for_slot_id("ansi", "missing") is None
+
+
 def test_get_layout_keys_applies_slot_visibility_and_label_overrides() -> None:
     keys = get_layout_keys(
         "iso",
@@ -110,6 +152,36 @@ def test_get_layout_slot_states_includes_optional_bottom_row_keys_for_ansi() -> 
 
     assert state_map["fn"].default_label == "Fn"
     assert state_map["menu"].default_label == "Copilot"
+
+
+def test_get_layout_slot_states_can_use_selected_legend_pack(monkeypatch) -> None:
+    menu_slot_id = str(slot_id_for_key_id("ansi", "menu") or "menu")
+    clear_layout_slot_cache()
+    monkeypatch.setattr(
+        layout_slots_mod,
+        "get_layout_legend_labels",
+        lambda layout_id, legend_pack_id=None: {menu_slot_id: "Legend Menu"} if legend_pack_id == "ansi-test" else {},
+    )
+
+    states = get_layout_slot_states("ansi", legend_pack_id="ansi-test")
+    state_map = {state.key_id: state for state in states}
+
+    assert state_map["menu"].default_label == "Legend Menu"
+
+
+def test_apply_layout_slot_overrides_preserves_optional_legend_pack_labels(monkeypatch) -> None:
+    menu_slot_id = str(slot_id_for_key_id("ansi", "menu") or "menu")
+    clear_layout_slot_cache()
+    monkeypatch.setattr(
+        layout_slots_mod,
+        "get_layout_legend_labels",
+        lambda layout_id, legend_pack_id=None: {menu_slot_id: "Legend Menu"} if legend_pack_id == "ansi-test" else {},
+    )
+
+    keys = [KeyDef("menu", "Legend Menu", (0, 0, 10, 10), slot_id=menu_slot_id)]
+    resolved = apply_layout_slot_overrides(keys, layout_id="ansi", legend_pack_id="ansi-test")
+
+    assert resolved[0].label == "Legend Menu"
 
 
 def test_get_layout_keys_can_hide_optional_menu_key_on_ansi() -> None:

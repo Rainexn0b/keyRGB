@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import json
 
+from src.core.resources.layouts import slot_id_for_key_id
+
 
 class TestLayoutPerKeyLoadSave:
     """Test load_layout_per_key/save_layout_per_key."""
@@ -57,4 +59,4 @@ class TestLayoutPerKeyLoadSave:
         )
 
         loaded = profiles.load_layout_per_key("test_profile", physical_layout="abnt")
-        assert loaded == {"enter": {"dx": 1.0}}
+        assert loaded == {str(slot_id_for_key_id("abnt", "enter") or "enter"): {"dx": 1.0}}

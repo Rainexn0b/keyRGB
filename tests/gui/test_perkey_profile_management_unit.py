@@ -3,12 +3,14 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import src.gui.perkey.profile_management as profile_management
+from src.core.resources.layouts import slot_id_for_key_id
 
 
 def test_sanitize_keymap_cells_drops_out_of_range_entries() -> None:
     keymap = {
         "keep": (0, 0),
         "coerce": ("1", "2"),
+        "multi": [(2, 3), (2, 4), (9, 9)],
         "drop_row": (6, 0),
         "drop_col": (0, 20),
     }
@@ -16,8 +18,9 @@ def test_sanitize_keymap_cells_drops_out_of_range_entries() -> None:
     result = profile_management.sanitize_keymap_cells(keymap, num_rows=6, num_cols=20)
 
     assert result == {
-        "keep": (0, 0),
-        "coerce": (1, 2),
+        "keep": ((0, 0),),
+        "coerce": ((1, 2),),
+        "multi": ((2, 3), (2, 4)),
     }
 
 
@@ -87,7 +90,7 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
     monkeypatch.setattr(
         profile_management.profiles,
         "load_keymap",
-        lambda _name, **_kwargs: {"keep": (0, 0), "drop": (0, 20)},
+        lambda _name, **_kwargs: {"keep": (0, 0), "drop": (0, 20), "enter": [(1, 2), (1, 3)]},
     )
     monkeypatch.setattr(profile_management.profiles, "load_layout_global", lambda _name, **_kwargs: {"dx": 1.0})
     monkeypatch.setattr(profile_management.profiles, "load_layout_per_key", lambda _name, **_kwargs: {"keep": {"dx": 0.1}})
@@ -119,15 +122,15 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
         current_colors={(3, 3): (2, 2, 2)},
         num_rows=6,
         num_cols=20,
-        physical_layout="ansi",
+        physical_layout="iso",
     )
 
     assert result.name == "safe-p1"
-    assert result.keymap == {"keep": (0, 0)}
+    assert result.keymap == {"keep": ((0, 0),), "enter": ((1, 2), (1, 3))}
     assert result.layout_tweaks == {"dx": 1.0}
     assert result.per_key_layout_tweaks == {"keep": {"dx": 0.1}}
     assert result.colors == {(1, 1): (10, 20, 30)}
-    assert result.layout_slot_overrides == {"nonusbackslash": {"visible": False}}
+    assert result.layout_slot_overrides == {str(slot_id_for_key_id("iso", "nonusbackslash")): {"visible": False}}
     assert result.lightbar_overlay == {"visible": True, "length": 0.7}
     assert applied == {
         "config": cfg,
@@ -139,7 +142,11 @@ def test_save_profile_persists_lightbar_overlay(monkeypatch) -> None:
     calls: dict[str, object] = {}
 
     monkeypatch.setattr(profile_management.profiles, "set_active_profile", lambda name: f"safe-{name}")
-    monkeypatch.setattr(profile_management.profiles, "save_keymap", lambda *args: calls.setdefault("keymap", args))
+    monkeypatch.setattr(
+        profile_management.profiles,
+        "save_keymap",
+        lambda *args, **kwargs: calls.setdefault("keymap", (args, kwargs)),
+    )
     monkeypatch.setattr(profile_management.profiles, "save_layout_global", lambda *args: calls.setdefault("layout_global", args))
     monkeypatch.setattr(profile_management.profiles, "save_layout_per_key", lambda *args: calls.setdefault("layout_per_key", args))
     monkeypatch.setattr(profile_management.profiles, "save_lightbar_overlay", lambda *args: calls.setdefault("lightbar_overlay", args))
@@ -151,7 +158,7 @@ def test_save_profile_persists_lightbar_overlay(monkeypatch) -> None:
     name = profile_management.save_profile(
         "p1",
         config=cfg,
-        keymap={"k": (0, 0)},
+        keymap={"k": ((0, 0),)},
         layout_tweaks={"dx": 1.0},
         per_key_layout_tweaks={"k": {"dx": 0.1}},
         lightbar_overlay={"visible": True, "length": 0.9},
@@ -162,3 +169,12 @@ def test_save_profile_persists_lightbar_overlay(monkeypatch) -> None:
 
     assert name == "safe-p1"
     assert calls["lightbar_overlay"] == ({"visible": True, "length": 0.9}, "safe-p1")
+
+
+def test_primary_helpers_pick_first_or_colored_cell() -> None:
+    colors = {(0, 1): (1, 2, 3)}
+    keymap = {"enter": ((0, 0), (0, 1))}
+
+    assert profile_management.keymap_cells_for(keymap, "enter") == ((0, 0), (0, 1))
+    assert profile_management.primary_cell_for_key(keymap, "enter") == (0, 0)
+    assert profile_management.representative_cell(keymap["enter"], colors=colors) == (0, 1)
