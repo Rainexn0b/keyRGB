@@ -144,3 +144,25 @@ def test_apply_keyrgb_window_icon_falls_back_to_png_when_svg_cannot_be_rasterize
     assert len(window.iconphoto_calls) == 1
 
     window_icon.clear_cached_window_icon_images()
+
+
+def test_find_keyrgb_logo_path_prefers_repo_asset_over_installed_icon(tmp_path, monkeypatch) -> None:
+    repo_root = tmp_path / "repo"
+    repo_utils = repo_root / "src" / "gui" / "utils"
+    repo_assets = repo_root / "assets"
+    home_dir = tmp_path / "home"
+    home_icon_dir = home_dir / ".local" / "share" / "icons"
+
+    repo_utils.mkdir(parents=True)
+    repo_assets.mkdir(parents=True)
+    home_icon_dir.mkdir(parents=True)
+
+    repo_icon = repo_assets / "logo-keyrgb.svg"
+    installed_icon = home_icon_dir / "keyrgb.png"
+    repo_icon.write_text("<svg xmlns='http://www.w3.org/2000/svg'></svg>", encoding="utf-8")
+    _save_icon(installed_icon, (255, 0, 0, 255))
+
+    monkeypatch.setattr(window_icon, "__file__", str(repo_utils / "window_icon.py"))
+    monkeypatch.setattr(window_icon.Path, "home", lambda: home_dir)
+
+    assert window_icon.find_keyrgb_logo_path() == repo_icon

@@ -101,6 +101,7 @@ install_icon_and_desktop_entries() {
   local app_file="$app_dir/keyrgb.desktop"
   local autostart_dir="$HOME/.config/autostart"
   local autostart_file="$autostart_dir/keyrgb.desktop"
+  local removed_stale_png=0
 
   mkdir -p "$icon_dir_legacy" "$icon_dir_svg" "$app_dir" "$autostart_dir"
 
@@ -110,8 +111,14 @@ install_icon_and_desktop_entries() {
     cp -f "$icon_file_svg" "$icon_file_legacy_svg"
 
     # Remove any stale raster icon so launchers do not keep picking the legacy art.
+    if [ -f "$icon_dir_legacy/keyrgb.png" ] || [ -f "$HOME/.local/share/icons/hicolor/256x256/apps/keyrgb.png" ]; then
+      removed_stale_png=1
+    fi
     rm -f "$icon_dir_legacy/keyrgb.png" 2>/dev/null || true
     rm -f "$HOME/.local/share/icons/hicolor/256x256/apps/keyrgb.png" 2>/dev/null || true
+    if [ "$removed_stale_png" -eq 1 ]; then
+      log_info "Removed stale legacy PNG icons from older installs"
+    fi
   elif install_icon_asset "assets/legacy/logo-tray-squircle.png" "$icon_dir_legacy/keyrgb.png" "$raw_ref" "legacy raster icon"; then
     desktop_icon="$icon_dir_legacy/keyrgb.png"
     rm -f "$icon_file_svg" 2>/dev/null || true

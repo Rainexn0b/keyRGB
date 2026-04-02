@@ -171,6 +171,7 @@ curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o
 Notes:
 
 - Some integration steps may prompt for `sudo` when installing udev or polkit rules.
+- `--update-appimage` also refreshes desktop integration and removes stale legacy KeyRGB PNG icons from older installs when the current SVG icon is available.
 - `--no-system-deps` only skips system package changes; it still downloads and installs the AppImage.
 - On Arch/CachyOS, install `fuse2` for native AppImage/FUSE launching: `sudo pacman -S --needed fuse2`. KeyRGB also installs a launcher wrapper that falls back to `--appimage-extract-and-run` when `libfuse.so.2` is unavailable.
 - On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver installs are best-effort and may require TUXEDO package sources; KeyRGB does not add third-party apt repos automatically.

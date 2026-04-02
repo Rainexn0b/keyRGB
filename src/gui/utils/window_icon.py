@@ -21,26 +21,41 @@ def _rasterize_svg_window_icon(path_str: str):
         return image.convert("RGBA")
 
 
-def _candidate_logo_paths() -> list[Path]:
+def _repo_candidate_logo_paths() -> list[Path]:
     paths: list[Path] = []
 
-    # install.sh installs user icons here.
-    try:
-        home = Path.home()
-        paths.append(home / ".local/share/icons/hicolor/scalable/apps/keyrgb.svg")
-        paths.append(home / ".local/share/icons/hicolor/256x256/apps/keyrgb.png")
-        paths.append(home / ".local/share/icons/keyrgb.svg")
-        paths.append(home / ".local/share/icons/keyrgb.png")
-    except Exception:
-        pass
-
-    # Repo checkout (and editable installs) typically keep assets/ alongside src/.
+    # Repo checkouts and editable installs should prefer their local assets so
+    # stale user-installed icons cannot override in-tree branding updates.
     start = Path(__file__).resolve()
     for parent in [start] + list(start.parents):
         for name in ("logo-keyrgb.svg", "logo-keyrgb.png", "legacy/logo-tray-squircle.png"):
             cand = parent / "assets" / name
             if cand not in paths:
                 paths.append(cand)
+
+    return paths
+
+
+def _candidate_logo_paths() -> list[Path]:
+    paths: list[Path] = []
+
+    for path in _repo_candidate_logo_paths():
+        if path not in paths:
+            paths.append(path)
+
+    # install.sh installs user icons here.
+    try:
+        home = Path.home()
+        for candidate in (
+            home / ".local/share/icons/hicolor/scalable/apps/keyrgb.svg",
+            home / ".local/share/icons/hicolor/256x256/apps/keyrgb.png",
+            home / ".local/share/icons/keyrgb.svg",
+            home / ".local/share/icons/keyrgb.png",
+        ):
+            if candidate not in paths:
+                paths.append(candidate)
+    except Exception:
+        pass
 
     return paths
 

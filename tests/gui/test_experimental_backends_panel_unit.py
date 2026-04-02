@@ -65,6 +65,8 @@ def test_experimental_backends_panel_init_creates_title_and_description_labels(
             "backend is still not broadly validated on user hardware. Use at your own risk."
         ),
         "font": ("Sans", 9),
+        "justify": "left",
+        "wraplength": 420,
     }
     assert registry["labels"][1].pack_calls == [{"anchor": "w", "pady": (0, 8)}]
 

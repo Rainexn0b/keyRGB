@@ -17,6 +17,32 @@ from src.gui.theme.detect import detect_system_prefers_dark
 _ICON_SIZE = (64, 64)
 _ICON_INNER_SIZE = (48, 48)
 _SVG_PATH_TOKEN_RE = re.compile(r"[MLZmlz]|-?\d+(?:\.\d+)?")
+_CWD_PATH_ERRORS = (OSError,)
+_TRAY_MASK_PATH_ERRORS = (OSError,)
+_TRAY_MASK_RASTER_ERRORS = (
+    AttributeError,
+    ET.ParseError,
+    ImportError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_TRAY_MASK_RENDER_ERRORS = (
+    ET.ParseError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    UnicodeError,
+    ValueError,
+)
+_THEME_DETECTION_ERRORS = (
+    AttributeError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _candidate_tray_mask_paths() -> list[Path]:
@@ -30,7 +56,7 @@ def _candidate_tray_mask_paths() -> list[Path]:
 
     try:
         paths.append(Path.cwd() / "assets" / "tray-mask.svg")
-    except Exception:
+    except _CWD_PATH_ERRORS:
         pass
 
     for sys_cand in (
@@ -159,29 +185,43 @@ def _render_simple_svg_mask_alpha_64(path: Path) -> Image.Image | None:
     return _center_alpha_mask(mask)
 
 
+def _render_cairosvg_mask_alpha_64(path: Path) -> Image.Image:
+    cairosvg = importlib.import_module("cairosvg")
+    svg2png = getattr(cairosvg, "svg2png")
+    png_bytes = svg2png(url=str(path), output_width=_ICON_INNER_SIZE[0], output_height=_ICON_INNER_SIZE[1])
+    img = Image.open(BytesIO(png_bytes)).convert("RGBA")
+    return _center_alpha_mask(img.getchannel("A"))
+
+
+def _coerce_rgb_triplet(value: object) -> tuple[int, int, int] | None:
+    if not isinstance(value, (list, tuple)) or len(value) < 3:
+        return None
+
+    try:
+        return (int(value[0]), int(value[1]), int(value[2]))
+    except (TypeError, ValueError):
+        return None
+
+
 @lru_cache(maxsize=1)
 def _load_tray_mask_alpha_64() -> Image.Image | None:
     for p in _candidate_tray_mask_paths():
         try:
             if not p.is_file():
                 continue
-        except Exception:
+        except _TRAY_MASK_PATH_ERRORS:
             continue
 
         try:
-            cairosvg = importlib.import_module("cairosvg")
-            svg2png = getattr(cairosvg, "svg2png")
-            png_bytes = svg2png(url=str(p), output_width=_ICON_INNER_SIZE[0], output_height=_ICON_INNER_SIZE[1])
-            img = Image.open(BytesIO(png_bytes)).convert("RGBA")
-            return _center_alpha_mask(img.getchannel("A"))
-        except Exception:
+            return _render_cairosvg_mask_alpha_64(p)
+        except _TRAY_MASK_RASTER_ERRORS:
             pass
 
         try:
             alpha = _render_simple_svg_mask_alpha_64(p)
             if alpha is not None:
                 return alpha
-        except Exception:
+        except _TRAY_MASK_RENDER_ERRORS:
             continue
     return None
 
@@ -192,7 +232,7 @@ def _outline_color_for_theme() -> tuple[int, int, int]:
     base = (176, 176, 176)
     try:
         prefers_dark = detect_system_prefers_dark()
-    except Exception:
+    except _THEME_DETECTION_ERRORS:
         prefers_dark = None
 
     # If the system prefers light, invert to a dark outline so it's visible.
@@ -277,12 +317,16 @@ def _rainbow_gradient_64(phase_q: int) -> Image.Image:
     if px is None:
         return img
     for x in range(w):
-        hue = (phase + (float(x) / float(max(1, w - 1)))) % 1.0
-        rr, gg, bb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
-        r = int(rr * 255)
-        g = int(gg * 255)
-        b = int(bb * 255)
         for y in range(h):
+            progress = (
+                (float(x) / float(max(1, w - 1)))
+                + (float(y) / float(max(1, h - 1)))
+            ) / 2.0
+            hue = (phase + progress) % 1.0
+            rr, gg, bb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+            r = int(rr * 255)
+            g = int(gg * 255)
+            b = int(bb * 255)
             px[x, y] = (r, g, b, 255)
     return img
 
@@ -352,13 +396,8 @@ def create_icon_mosaic(
         expected = r_n * c_n
         if len(colors_flat) != expected:
             # Fall back to a representative color if grid size mismatches.
-            base = (255, 0, 128)
-            if colors_flat:
-                try:
-                    base = (colors_flat[0][0], colors_flat[0][1], colors_flat[0][2])
-                except Exception:
-                    base = (255, 0, 128)
-            return create_icon(_scale_rgb(base, scale))
+            base = _coerce_rgb_triplet(colors_flat[0]) if colors_flat else None
+            return create_icon(_scale_rgb(base or (255, 0, 128), scale))
 
         underlay = Image.new("RGBA", _ICON_SIZE, color=(0, 0, 0, 0))
         draw = ImageDraw.Draw(underlay)
@@ -383,10 +422,5 @@ def create_icon_mosaic(
         return out
 
     # Fallback: pick first cell as representative.
-    base = (255, 0, 128)
-    if colors_flat:
-        try:
-            base = (colors_flat[0][0], colors_flat[0][1], colors_flat[0][2])
-        except Exception:
-            base = (255, 0, 128)
-    return create_icon(_scale_rgb(base, scale))
+    base = _coerce_rgb_triplet(colors_flat[0]) if colors_flat else None
+    return create_icon(_scale_rgb(base or (255, 0, 128), scale))

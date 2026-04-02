@@ -23,6 +23,8 @@ class ExperimentalBackendsPanel:
                 "backend is still not broadly validated on user hardware. Use at your own risk."
             ),
             font=("Sans", 9),
+            justify="left",
+            wraplength=420,
         )
         desc.pack(anchor="w", pady=(0, 8))
 
