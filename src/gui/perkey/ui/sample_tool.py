@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tkinter as tk
 from typing import Any, Callable
 
 from ..profile_management import keymap_cells_for, representative_cell
@@ -11,6 +12,19 @@ from .status import (
     sample_tool_unmapped_key,
     set_status,
 )
+
+
+_TK_WIDGET_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+_UI_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
+_OVERLAY_SYNC_ERRORS = _TK_WIDGET_ERRORS + _UI_VALUE_ERRORS
+_WHEEL_COLOR_ERRORS = _TK_WIDGET_ERRORS + _UI_VALUE_ERRORS
+
+
+def _redraw_canvas_best_effort(editor: Any) -> None:
+    try:
+        editor.canvas.redraw()
+    except _TK_WIDGET_ERRORS:
+        pass
 
 
 def _key_id_for_slot_identity(editor: Any, slot_id: str) -> str | None:
@@ -49,7 +63,7 @@ def _set_selected_key_without_updating_wheel(editor: Any, key_id: str) -> None:
                 sync = getattr(oc, "sync_vars_from_scope", None)
                 if callable(sync):
                     sync()
-    except Exception:
+    except _OVERLAY_SYNC_ERRORS:
         pass
 
 
@@ -102,10 +116,7 @@ def on_key_clicked_ui(
 
     if not cells:
         set_status(editor, sample_tool_unmapped_key(key_id))
-        try:
-            editor.canvas.redraw()
-        except Exception:
-            pass
+        _redraw_canvas_best_effort(editor)
         return
 
     colors = getattr(editor, "colors", {}) or {}
@@ -116,31 +127,25 @@ def on_key_clicked_ui(
         r, g, b = colors.get(cell, (0, 0, 0)) if cell is not None else (0, 0, 0)
         try:
             editor.color_wheel.set_color(int(r), int(g), int(b))
-        except Exception:
+        except _WHEEL_COLOR_ERRORS:
             pass
         editor._sample_tool_has_sampled = True
         set_status(editor, sample_tool_sampled_color(key_id, int(r), int(g), int(b)))
-        try:
-            editor.canvas.redraw()
-        except Exception:
-            pass
+        _redraw_canvas_best_effort(editor)
         return
 
     # Stage 2: apply current wheel color to clicked keys.
     try:
         r, g, b = editor.color_wheel.get_color()
         r, g, b = int(r), int(g), int(b)
-    except Exception:
+    except _WHEEL_COLOR_ERRORS:
         # Fallback to last known non-black color.
         r, g, b = getattr(editor, "_last_non_black_color", (255, 0, 0)) or (255, 0, 0)
         r, g, b = int(r), int(g), int(b)
 
     apply_release_fn(editor, r, g, b, num_rows=num_rows, num_cols=num_cols)
 
-    try:
-        editor.canvas.redraw()
-    except Exception:
-        pass
+    _redraw_canvas_best_effort(editor)
 
 
 def on_slot_clicked_ui(

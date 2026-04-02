@@ -69,8 +69,12 @@ class OverlayControls(ttk.LabelFrame):
         )
 
     def sync_vars_from_scope(self):
-        if self.editor.overlay_scope.get() == "key" and self.editor.selected_key_id:
-            kt = self.editor.per_key_layout_tweaks.get(self.editor.selected_key_id, {})
+        identity_getter = getattr(self.editor, "_selected_overlay_identity", None)
+        selected_identity = identity_getter() if callable(identity_getter) else None
+        if not selected_identity:
+            selected_identity = getattr(self.editor, "selected_slot_id", None) or self.editor.selected_key_id
+        if self.editor.overlay_scope.get() == "key" and selected_identity:
+            kt = self.editor.per_key_layout_tweaks.get(selected_identity, {})
             self.dx_var.set(float(kt.get("dx", 0.0)))
             self.dy_var.set(float(kt.get("dy", 0.0)))
             self.sx_var.set(float(kt.get("sx", 1.0)))
@@ -96,8 +100,12 @@ class OverlayControls(ttk.LabelFrame):
             "inset": f(self.inset_var.get(), 0.0, 80.0),
         }
 
-        if self.editor.overlay_scope.get() == "key" and self.editor.selected_key_id:
-            self.editor.per_key_layout_tweaks[self.editor.selected_key_id] = payload
+        identity_getter = getattr(self.editor, "_selected_overlay_identity", None)
+        selected_identity = identity_getter() if callable(identity_getter) else None
+        if not selected_identity:
+            selected_identity = getattr(self.editor, "selected_slot_id", None) or self.editor.selected_key_id
+        if self.editor.overlay_scope.get() == "key" and selected_identity:
+            self.editor.per_key_layout_tweaks[selected_identity] = payload
         else:
             self.editor.layout_tweaks = payload
         self.editor.canvas.redraw()

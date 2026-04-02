@@ -66,10 +66,11 @@ def _build_items(
 ) -> list[dict]:
     items: list[dict] = []
     for kd in keys:
+        key_identity = str(getattr(kd, "slot_id", None) or kd.key_id)
         x, y, w, h = (float(v) for v in kd.rect)
         gx, gy, gw, gh = apply_global(x, y, w, h)
         x2, y2, w2, h2, cx2, cy2, kt = _apply_per_key(
-            key_id=kd.key_id,
+            key_id=key_identity,
             gx=gx,
             gy=gy,
             gw=gw,
@@ -78,7 +79,7 @@ def _build_items(
         )
         items.append(
             {
-                "key_id": kd.key_id,
+                "key_id": key_identity,
                 "gx": gx,
                 "gy": gy,
                 "gw": gw,
