@@ -120,6 +120,29 @@ Current tracked categories:
 - `broad_except_logged_no_traceback`
 - `broad_except_unlogged`
 
+Waivers:
+
+- Broad-handler findings may be waived for a single handler with `@quality-exception exception-transparency: ...` when the comment includes an explanation.
+- Accepted forms are either a same-line comment on `except ...:` or a single immediately preceding comment line aligned with the `except` handler.
+- An indented comment inside the `try` body does not waive the following handler.
+- A bare marker or a missing explanation does nothing. `# @quality-exception exception-transparency` does not suppress findings.
+- Intended use is narrow: legitimate runtime boundaries, process-boundary cleanup, or known scanner false positives that still need a short reason in code.
+
+Example same-line waiver:
+
+```python
+except Exception:  # @quality-exception exception-transparency: optional shutdown cleanup boundary
+    cleanup_best_effort()
+```
+
+Example preceding-line waiver:
+
+```python
+# @quality-exception exception-transparency: plugin hook boundary; host must stay alive
+except Exception:
+    return None
+```
+
 Interpretation:
 
 - `broad_except_total` is the total inventory of broad handlers

@@ -30,6 +30,9 @@ from src.core.utils.safe_attrs import safe_int_attr
 
 logger = logging.getLogger(__name__)
 
+_CONFIG_RELOAD_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_CONFIG_FLAG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
+
 
 class PowerManager:
     """Monitor system power events and control keyboard accordingly."""
@@ -49,39 +52,45 @@ class PowerManager:
         self._saved_state = None
         self._event_policy = PowerEventPolicy()
 
-    def _power_management_enabled_value(self) -> bool:
+    def _reload_config(self, *, context: str) -> bool:
+        try:
+            self._config.reload()
+            return True
+        except _CONFIG_RELOAD_EXCEPTIONS:
+            logger.exception("Failed to reload power management config during %s", context)
+            return False
+
+    def _read_config_bool(self, *names: str, default: bool) -> bool:
         config_dict = getattr(self._config, "__dict__", None)
         if isinstance(config_dict, dict):
-            if "power_management_enabled" in config_dict:
-                return bool(config_dict["power_management_enabled"])
-            if "management_enabled" in config_dict:
-                return bool(config_dict["management_enabled"])
+            for name in names:
+                if name in config_dict:
+                    return bool(config_dict[name])
 
-        try:
-            return bool(getattr(self._config, "power_management_enabled"))
-        except Exception:
-            pass
+        for name in names:
+            try:
+                return bool(getattr(self._config, name))
+            except AttributeError:
+                continue
+            except _CONFIG_FLAG_READ_EXCEPTIONS:
+                logger.exception("Failed to read power management config flag '%s'", name)
 
-        try:
-            return bool(getattr(self._config, "management_enabled"))
-        except Exception:
-            pass
+        return default
 
-        return True
+    def _power_management_enabled_value(self) -> bool:
+        return self._read_config_bool("power_management_enabled", "management_enabled", default=True)
 
     def _is_enabled(self) -> bool:
-        try:
-            self._config.reload()
-            return self._power_management_enabled_value()
-        except Exception:
+        if not self._reload_config(context="power management enablement check"):
             return True
 
+        return self._power_management_enabled_value()
+
     def _flag(self, name: str, default: bool = True) -> bool:
-        try:
-            self._config.reload()
-            return bool(getattr(self._config, name, default))
-        except Exception:
+        if not self._reload_config(context=f"power management flag '{name}'"):
             return default
+
+        return self._read_config_bool(name, default=default)
 
     def start_monitoring(self):
         """Start monitoring power events in background thread."""
@@ -151,8 +160,8 @@ class PowerManager:
                     apply_brightness=self._apply_brightness_policy,
                 )
 
-            except Exception as exc:
-                logger.exception("Battery saver monitoring error: %s", exc)
+            except Exception:  # @quality-exception exception-transparency: battery-saver polling crosses sysfs monitoring, config/profile reads, policy evaluation, and controller actions and must remain non-fatal
+                logger.exception("Battery saver monitoring iteration failed")
 
             time.sleep(poll_interval_s)
 
@@ -162,22 +171,28 @@ class PowerManager:
         if brightness < 0:
             return
 
+        brightness = int(brightness)
+
         try:
             # Prefer a dedicated hook on the controller if present.
             apply_fn = getattr(self.kb_controller, "apply_brightness_from_power_policy", None)
             if callable(apply_fn):
-                apply_fn(int(brightness))
+                apply_fn(brightness)
                 return
 
             # Fallback: try a few known patterns.
-            if hasattr(self.kb_controller, "engine"):
-                try:
-                    self._config.brightness = int(brightness)
-                except Exception:
-                    pass
-                self.kb_controller.engine.set_brightness(int(brightness))
-        except Exception as exc:
-            logger.exception("Battery saver brightness apply failed: %s", exc)
+            engine = getattr(self.kb_controller, "engine", None)
+            if engine is not None:
+                self._sync_config_brightness(brightness)
+                engine.set_brightness(brightness)
+        except Exception:  # @quality-exception exception-transparency: brightness application crosses a runtime controller boundary and must remain best-effort
+            logger.exception("Battery saver brightness apply failed")
+
+    def _sync_config_brightness(self, brightness: int) -> None:
+        try:
+            self._config.brightness = brightness
+        except (AttributeError, TypeError, ValueError, RuntimeError):
+            logger.warning("Failed to mirror power-policy brightness into config", exc_info=True)
 
     # ---- lid/suspend monitoring
 
@@ -197,8 +212,8 @@ class PowerManager:
         except FileNotFoundError:
             logger.warning("dbus-monitor not available, trying alternative method")
             self._monitor_acpi_events()
-        except Exception as exc:
-            logger.exception("Power monitoring error: %s", exc)
+        except Exception:  # @quality-exception exception-transparency: login1 monitoring is an external runtime boundary and power monitoring must remain available
+            logger.exception("Power monitoring error")
 
     def _start_lid_monitor(self):
         """Start a separate thread to monitor lid switch via sysfs."""
@@ -234,19 +249,12 @@ class PowerManager:
 
         # Always feed events into the policy so it can record pre-event state
         # even when actions are disabled via configuration.
-        try:
-            result = policy_method(
-                PowerEventInputs(
-                    enabled=bool(enabled),
-                    action_enabled=bool(action_enabled),
-                    is_off=is_intentionally_off(
-                        kb_controller=self.kb_controller,
-                        config=self._config,
-                        safe_int_attr_fn=safe_int_attr,
-                    ),
-                )
-            )
-        except Exception:
+        result = self._evaluate_power_event_policy(
+            enabled=enabled,
+            action_enabled=action_enabled,
+            policy_method=policy_method,
+        )
+        if result is None:
             return
 
         did_delay = False
@@ -267,12 +275,32 @@ class PowerManager:
                 did_delay = True
                 time.sleep(float(delay_s))
 
-            try:
-                fn = getattr(self.kb_controller, kb_method_name, None)
-                if callable(fn):
-                    fn()
-            except Exception:
-                pass
+            self._invoke_keyboard_method(kb_method_name)
+
+    def _evaluate_power_event_policy(self, *, enabled: bool, action_enabled: bool, policy_method):
+        try:
+            return policy_method(
+                PowerEventInputs(
+                    enabled=bool(enabled),
+                    action_enabled=bool(action_enabled),
+                    is_off=is_intentionally_off(
+                        kb_controller=self.kb_controller,
+                        config=self._config,
+                        safe_int_attr_fn=safe_int_attr,
+                    ),
+                )
+            )
+        except Exception:  # @quality-exception exception-transparency: power-event policy evaluation crosses controller-state sampling and policy boundaries and must remain non-fatal
+            logger.exception("Power event policy evaluation failed")
+            return None
+
+    def _invoke_keyboard_method(self, method_name: str) -> None:
+        try:
+            fn = getattr(self.kb_controller, method_name, None)
+            if callable(fn):
+                fn()
+        except Exception:  # @quality-exception exception-transparency: power-event keyboard actions cross a runtime controller boundary and must remain non-fatal for monitor threads
+            logger.exception("Power event keyboard action '%s' failed", method_name)
 
     def _on_suspend(self):
         """Called when system is about to suspend."""

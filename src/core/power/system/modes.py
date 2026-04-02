@@ -36,7 +36,7 @@ def _cpufreq_root() -> Path:
 def _read_text(path: Path) -> Optional[str]:
     try:
         return path.read_text(encoding="utf-8").strip()
-    except Exception:
+    except (OSError, UnicodeDecodeError):
         return None
 
 
@@ -46,7 +46,7 @@ def _read_int(path: Path) -> Optional[int]:
         return None
     try:
         return int(raw)
-    except Exception:
+    except ValueError:
         return None
 
 
@@ -62,7 +62,7 @@ def _policy_dirs(root: Path) -> list[Path]:
         for child in root.iterdir():
             if child.is_dir() and child.name.startswith("policy"):
                 out.append(child)
-    except Exception:
+    except OSError:
         return []
     return sorted(out, key=lambda p: p.name)
 
@@ -219,7 +219,7 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path) -> None:
                 # Best-effort; may not be supported.
                 try:
                     _write_text(gov, "powersave\n")
-                except Exception:
+                except OSError:
                     pass
 
         elif mode in (PowerMode.BALANCED, PowerMode.PERFORMANCE):
@@ -234,19 +234,19 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path) -> None:
                         gov,
                         ("performance\n" if mode == PowerMode.PERFORMANCE else "schedutil\n"),
                     )
-                except Exception:
+                except OSError:
                     pass
 
     # Boost handling is global-ish.
     if mode == PowerMode.EXTREME_SAVER:
         try:
             _set_boost_enabled(False)
-        except Exception:
+        except OSError:
             pass
     elif mode in (PowerMode.BALANCED, PowerMode.PERFORMANCE):
         try:
             _set_boost_enabled(True)
-        except Exception:
+        except OSError:
             pass
 
 
@@ -275,7 +275,7 @@ def set_mode(mode: PowerMode) -> bool:
     if not isinstance(mode, PowerMode):
         try:
             mode = PowerMode(str(mode))
-        except Exception:
+        except ValueError:
             return False
 
     if mode == PowerMode.UNKNOWN:
@@ -289,7 +289,7 @@ def set_mode(mode: PowerMode) -> bool:
         return True
     except PermissionError:
         pass
-    except Exception:
+    except OSError:
         # If direct write fails for other reasons, still allow helper.
         pass
 

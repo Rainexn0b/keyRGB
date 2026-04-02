@@ -23,6 +23,17 @@ _instance_lock_fh = None
 logger = logging.getLogger(__name__)
 
 
+_GI_PROBE_EXCEPTIONS = (
+    AttributeError,
+    ImportError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_PYSTRAY_IMPORT_RETRY_EXCEPTIONS = _GI_PROBE_EXCEPTIONS
+
+
 @dataclass(frozen=True)
 class _PystrayImportFailure:
     reason: str
@@ -83,7 +94,7 @@ def _gi_is_working() -> bool:
             return False
         gi = importlib.import_module("gi")
         return hasattr(gi, "require_version")
-    except Exception:
+    except _GI_PROBE_EXCEPTIONS:
         return False
 
 
@@ -119,7 +130,7 @@ def get_pystray():
         logger.info("pystray backend: appindicator (auto)")
         try:
             _pystray_mod = importlib.import_module("pystray")
-        except Exception as exc:
+        except _PYSTRAY_IMPORT_RETRY_EXCEPTIONS as exc:
             _clear_failed_import("pystray")
             # Catch GLib.GError indicating missing indicator libraries.
             if "libayatana-indicator" in str(exc) or "app_indicator_new" in str(exc):
@@ -161,7 +172,7 @@ def acquire_single_instance_lock() -> bool:
 
     try:
         import fcntl  # Linux/Unix
-    except Exception:
+    except ImportError:
         return True
 
     lock_dir = None

@@ -61,7 +61,7 @@ def test_detect_gsettings_color_scheme_returns_none_without_tool_or_on_error(
     monkeypatch.setattr(detect, "which", lambda tool: "/usr/bin/gsettings")
 
     def raise_runtime_error(*args, **kwargs):
-        raise RuntimeError("boom")
+        raise detect.subprocess.TimeoutExpired("gsettings", 0.25)
 
     monkeypatch.setattr(detect.subprocess, "run", raise_runtime_error)
     assert detect._detect_gsettings_color_scheme() is None
@@ -112,7 +112,7 @@ def test_read_kde_colorscheme_from_kreadconfig_uses_available_tool_and_falls_bac
     def fake_run_with_failure(args, **kwargs):
         calls.append(args[0])
         if args[0] == "kreadconfig6":
-            raise RuntimeError("transient failure")
+            raise detect.subprocess.TimeoutExpired(args[0], 0.25)
         return SimpleNamespace(stdout="BreezeLight\n")
 
     monkeypatch.setattr(detect.subprocess, "run", fake_run_with_failure)
@@ -211,14 +211,14 @@ def test_detect_kde_prefers_dark_supports_plasma_and_returns_none_without_scheme
     assert detect._detect_kde_prefers_dark() is None
 
 
-def test_detect_system_prefers_dark_uses_first_non_none_provider_and_handles_errors(
+def test_detect_system_prefers_dark_uses_first_non_none_provider(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
 
     def override():
         calls.append("override")
-        raise RuntimeError("broken override")
+        return None
 
     def gtk_theme():
         calls.append("gtk")
@@ -239,6 +239,36 @@ def test_detect_system_prefers_dark_uses_first_non_none_provider_and_handles_err
 
     assert detect.detect_system_prefers_dark() is False
     assert calls == ["override", "gtk", "gsettings"]
+
+
+def test_detect_system_prefers_dark_logs_and_skips_unexpected_provider_errors(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    calls: list[str] = []
+
+    def override():
+        calls.append("override")
+        raise RuntimeError("broken override")
+
+    def gtk_theme():
+        calls.append("gtk")
+        return None
+
+    def gsettings():
+        calls.append("gsettings")
+        return False
+
+    monkeypatch.setattr(detect, "_detect_theme_override", override)
+    monkeypatch.setattr(detect, "_detect_gtk_theme_env", gtk_theme)
+    monkeypatch.setattr(detect, "_detect_gsettings_color_scheme", gsettings)
+    monkeypatch.setattr(detect, "_detect_kde_prefers_dark", lambda: True)
+
+    with caplog.at_level("WARNING"):
+        assert detect.detect_system_prefers_dark() is False
+
+    assert calls == ["override", "gtk", "gsettings"]
+    assert "Theme detection provider 'override' failed" in caplog.text
+    assert "broken override" in caplog.text
 
 
 def test_detect_system_prefers_dark_returns_none_when_all_providers_are_unknown(

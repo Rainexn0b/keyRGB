@@ -19,7 +19,34 @@ Migration:
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, overload
+
+
+def _safe_getattr_or_none(obj: object, name: str) -> object | None:
+    try:
+        return getattr(obj, name, None)
+    except Exception:  # @quality-exception exception-transparency: user-defined attribute access may raise arbitrary runtime errors and callers intentionally treat that as an absent value
+        return None
+
+
+@overload
+def _coerce_int_like(raw: object, *, default: int) -> int: ...
+
+
+@overload
+def _coerce_int_like(raw: object, *, default: None) -> Optional[int]: ...
+
+
+def _coerce_int_like(raw: object, *, default: Optional[int]) -> Optional[int]:
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        try:
+            return int(float(raw))
+        except (TypeError, ValueError, OverflowError):
+            return default
+        except Exception:  # @quality-exception exception-transparency: fallback numeric coercion crosses user-defined __float__ implementations and must stay non-fatal here
+            return default
 
 
 def safe_int_attr(
@@ -43,21 +70,12 @@ def safe_int_attr(
     Returns:
         Integer value, clamped to [min_v, max_v] if specified
     """
-    try:
-        raw = getattr(obj, name, None)
-    except Exception:
-        raw = None
+    raw = _safe_getattr_or_none(obj, name)
 
     if raw is None:
         val = default
     else:
-        try:
-            val = int(raw)
-        except (TypeError, ValueError):
-            try:
-                val = int(float(raw))
-            except Exception:
-                val = default
+        val = _coerce_int_like(raw, default=default)
 
     if min_v is not None and val < min_v:
         val = min_v
@@ -78,10 +96,7 @@ def safe_bool_attr(obj: object, name: str, *, default: bool = False) -> bool:
     Returns:
         Boolean value
     """
-    try:
-        raw = getattr(obj, name, None)
-    except Exception:
-        raw = None
+    raw = _safe_getattr_or_none(obj, name)
 
     if raw is None:
         return default
@@ -104,10 +119,7 @@ def safe_float_attr(
     Returns:
         Float value, clamped to [min_v, max_v] if specified
     """
-    try:
-        raw = getattr(obj, name, None)
-    except Exception:
-        raw = None
+    raw = _safe_getattr_or_none(obj, name)
 
     if raw is None:
         val = default
@@ -136,10 +148,7 @@ def safe_str_attr(obj: object, name: str, *, default: str = "") -> str:
     Returns:
         String value
     """
-    try:
-        raw = getattr(obj, name, None)
-    except Exception:
-        raw = None
+    raw = _safe_getattr_or_none(obj, name)
 
     if raw is None:
         return default
@@ -164,21 +173,14 @@ def safe_optional_int_attr(
     Returns:
         Integer value or None
     """
-    try:
-        raw = getattr(obj, name, None)
-    except Exception:
-        return None
+    raw = _safe_getattr_or_none(obj, name)
 
     if raw is None:
         return None
 
-    try:
-        val = int(raw)
-    except (TypeError, ValueError):
-        try:
-            val = int(float(raw))
-        except Exception:
-            return None
+    val = _coerce_int_like(raw, default=None)
+    if val is None:
+        return None
 
     if min_v is not None and val < min_v:
         val = min_v

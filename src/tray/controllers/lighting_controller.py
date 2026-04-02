@@ -46,8 +46,9 @@ def _coerce_brightness_override(brightness_override: object, *, default: int) ->
 def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
     try:
         tray._log_exception(msg, exc)
-    except Exception:
-        logger.exception(msg, exc)
+    except Exception as log_exc:
+        logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
+        logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 
 
 def start_current_effect(
@@ -193,7 +194,11 @@ def start_current_effect(
             except Exception as notify_exc:
                 _log_boundary_exception(tray, "Failed to notify permission issue: %s", notify_exc)
             return
-        _log_boundary_exception(tray, "Error starting effect: %s", exc)
+        try:
+            tray._log_exception("Error starting effect: %s", exc)
+        except Exception as log_exc:
+            logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
+            logger.error("Error starting effect: %s", exc, exc_info=(type(exc), exc, exc.__traceback__))
 
 
 def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:

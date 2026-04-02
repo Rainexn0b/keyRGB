@@ -26,6 +26,12 @@ import src.core.power.tcc_profiles as tcc_power_profiles
 logger = logging.getLogger(__name__)
 
 
+_SELECTION_INDEX_ERRORS = (IndexError, TypeError, ValueError)
+_TCC_PROFILE_WRITE_ERRORS = (tcc_power_profiles.TccProfileWriteError,)
+_TCC_RUNTIME_BOUNDARY_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
+_TCC_REFRESH_BOUNDARY_ERRORS = _TCC_RUNTIME_BOUNDARY_ERRORS + (AttributeError, tk.TclError)
+
+
 class TccProfilesGUI:
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -183,7 +189,7 @@ class TccProfilesGUI:
             return None
         try:
             return int(sel[0])
-        except Exception:
+        except _SELECTION_INDEX_ERRORS:
             return None
 
     def _update_desc(self, index: int) -> None:
@@ -215,7 +221,7 @@ class TccProfilesGUI:
         try:
             tcc_power_profiles.create_custom_profile(name)
             self._set_status("✓ Created")
-        except Exception as exc:
+        except _TCC_PROFILE_WRITE_ERRORS as exc:
             log_throttled(
                 logger,
                 "tcc_profiles.create_custom_profile",
@@ -244,7 +250,7 @@ class TccProfilesGUI:
         try:
             tcc_power_profiles.duplicate_custom_profile(src.id, name)
             self._set_status("✓ Duplicated")
-        except Exception as exc:
+        except _TCC_PROFILE_WRITE_ERRORS as exc:
             log_throttled(
                 logger,
                 "tcc_profiles.duplicate_custom_profile",
@@ -273,7 +279,7 @@ class TccProfilesGUI:
         try:
             tcc_power_profiles.rename_custom_profile(prof.id, name)
             self._set_status("✓ Renamed")
-        except Exception as exc:
+        except _TCC_PROFILE_WRITE_ERRORS as exc:
             log_throttled(
                 logger,
                 "tcc_profiles.rename_custom_profile",
@@ -298,7 +304,7 @@ class TccProfilesGUI:
         try:
             tcc_power_profiles.delete_custom_profile(prof.id)
             self._set_status("✓ Deleted")
-        except Exception as exc:
+        except _TCC_PROFILE_WRITE_ERRORS as exc:
             log_throttled(
                 logger,
                 "tcc_profiles.delete_custom_profile",
@@ -322,7 +328,7 @@ class TccProfilesGUI:
         payload = None
         try:
             payload = tcc_power_profiles.get_custom_profile_payload(prof.id)
-        except Exception as exc:
+        except _TCC_PROFILE_WRITE_ERRORS as exc:
             log_throttled(
                 logger,
                 "tcc_profiles.get_custom_profile_payload",
@@ -356,7 +362,7 @@ class TccProfilesGUI:
         ok = False
         try:
             ok = tcc_power_profiles.set_temp_profile_by_id(profile.id)
-        except Exception as exc:
+        except _TCC_RUNTIME_BOUNDARY_ERRORS as exc:
             log_throttled(
                 logger,
                 "tcc_profiles.set_temp_profile_by_id",
@@ -375,7 +381,7 @@ class TccProfilesGUI:
         # Refresh so the active checkmark follows what tccd reports.
         try:
             self._refresh()
-        except Exception as exc:
+        except _TCC_REFRESH_BOUNDARY_ERRORS as exc:
             log_throttled(
                 logger,
                 "tcc_profiles.refresh_after_activate",

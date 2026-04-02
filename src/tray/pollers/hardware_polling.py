@@ -7,6 +7,27 @@ from src.core.utils.exceptions import is_device_disconnected
 from src.tray.protocols import IdlePowerTrayProtocol
 
 
+_BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+
+
+def _coerce_poll_int(value: object, *, default: int) -> int:
+    try:
+        return int(value)
+    except _BRIGHTNESS_COERCION_ERRORS:
+        return int(default)
+
+
+def _log_polled_hardware_event(tray_vars: dict[str, object], action: str, **fields: object) -> None:
+    log_event = tray_vars.get("_log_event")
+    if not callable(log_event):
+        return
+
+    try:
+        log_event("hardware", action, **fields)
+    except Exception:  # @quality-exception exception-transparency: tray event logging crosses an arbitrary callback boundary and hardware polling must remain non-fatal
+        return
+
+
 def _normalize_brightness_to_config_scale(brightness: int, *, expected: int | None = None) -> int:
     """Clamp brightness into KeyRGB's expected 0..50 range.
 
@@ -17,7 +38,7 @@ def _normalize_brightness_to_config_scale(brightness: int, *, expected: int | No
 
     try:
         b = int(brightness)
-    except Exception:
+    except _BRIGHTNESS_COERCION_ERRORS:
         return 0
 
     return max(0, min(50, b))
@@ -39,7 +60,6 @@ def _apply_polled_hardware_state(
     # setting). Still allow off/on transitions to be detected.
     dim_temp_active = bool(tray_vars.get("_dim_temp_active", False))
     dim_temp_target = tray_vars.get("_dim_temp_target_brightness")
-    log_event = tray_vars.get("_log_event")
 
     if raw_brightness is None:
         raw_brightness = current_brightness
@@ -50,19 +70,15 @@ def _apply_polled_hardware_state(
         current_off = True
 
     if last_brightness is not None and current_brightness != last_brightness:
-        try:
-            if callable(log_event):
-                log_event(
-                    "hardware",
-                    "brightness_change",
-                    raw=int(raw_brightness),
-                    old=int(last_brightness),
-                    new=int(current_brightness),
-                    dim_temp_active=bool(dim_temp_active),
-                    dim_temp_target=dim_temp_target,
-                )
-        except Exception:
-            pass
+        _log_polled_hardware_event(
+            tray_vars,
+            "brightness_change",
+            raw=_coerce_poll_int(raw_brightness, default=current_brightness),
+            old=_coerce_poll_int(last_brightness, default=current_brightness),
+            new=int(current_brightness),
+            dim_temp_active=bool(dim_temp_active),
+            dim_temp_target=dim_temp_target,
+        )
 
         if dim_temp_active and dim_temp_target is not None:
             try:
@@ -70,7 +86,7 @@ def _apply_polled_hardware_state(
                     # Update the tracked last_brightness so we don't repeatedly
                     # enter this branch; but do not write to config.
                     return int(current_brightness), bool(current_off)
-            except Exception:
+            except _BRIGHTNESS_COERCION_ERRORS:
                 pass
 
         if bool(tray_vars.get("_power_forced_off", False)) and current_brightness == 0:
@@ -98,16 +114,12 @@ def _apply_polled_hardware_state(
         return current_brightness, current_off
 
     if last_off_state is not None and current_off != last_off_state:
-        try:
-            if callable(log_event):
-                log_event(
-                    "hardware",
-                    "off_state_change",
-                    old=bool(last_off_state),
-                    new=bool(current_off),
-                )
-        except Exception:
-            pass
+        _log_polled_hardware_event(
+            tray_vars,
+            "off_state_change",
+            old=bool(last_off_state),
+            new=bool(current_off),
+        )
 
         if bool(tray_vars.get("_power_forced_off", False)) and current_off:
             return current_brightness, current_off
@@ -171,7 +183,7 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
                     last_off_state=last_off_state,
                 )
 
-            except Exception as exc:
+            except Exception as exc:  # @quality-exception exception-transparency: hardware polling crosses backend I/O, tray state sync, and callback boundaries and must remain non-fatal
                 last_error_at = _handle_hardware_polling_exception(
                     tray,
                     exc,

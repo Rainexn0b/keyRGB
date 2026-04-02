@@ -16,6 +16,15 @@ from src.core.utils.version_check import compare_versions, normalize_version_tex
 from src.gui.utils.tk_async import run_in_thread
 
 
+_METADATA_VERSION_LOOKUP_ERRORS = (metadata.PackageNotFoundError,)
+_REPO_ROOT_ERRORS = (OSError, RuntimeError)
+_REPO_VERSION_READ_ERRORS = (OSError,)
+_GITHUB_RELEASE_FETCH_ERRORS = (OSError, UnicodeError, json.JSONDecodeError)
+_BROWSER_OPEN_ERRORS = (webbrowser.Error, OSError)
+_STATUS_LABEL_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+_CLIPBOARD_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+
+
 class VersionPanel:
     def __init__(
         self,
@@ -93,7 +102,7 @@ class VersionPanel:
 
         try:
             v = metadata.version("keyrgb")
-        except Exception:
+        except _METADATA_VERSION_LOOKUP_ERRORS:
             return "unknown"
 
         v_norm = normalize_version_text(v) or str(v).strip()
@@ -105,7 +114,7 @@ class VersionPanel:
 
         try:
             root = repo_root_from(__file__)
-        except Exception:
+        except _REPO_ROOT_ERRORS:
             return None
 
         pyproject = Path(root) / "pyproject.toml"
@@ -141,7 +150,7 @@ class VersionPanel:
                     return m.group("v").strip() or None
 
             return None
-        except Exception:
+        except _REPO_VERSION_READ_ERRORS:
             return None
 
     def _fetch_latest_github_versions(self) -> tuple[str | None, str | None]:
@@ -158,7 +167,7 @@ class VersionPanel:
             with urlopen(req, timeout=5.0) as resp:
                 raw = resp.read().decode("utf-8", errors="replace")
             data = json.loads(raw)
-        except Exception:
+        except _GITHUB_RELEASE_FETCH_ERRORS:
             return None, None
 
         if not isinstance(data, list):
@@ -226,12 +235,12 @@ class VersionPanel:
         url = "https://github.com/Rainexn0b/keyRGB"
         try:
             ok = bool(webbrowser.open(url, new=2))
-        except Exception:
+        except _BROWSER_OPEN_ERRORS:
             ok = False
 
         try:
             status = self._get_status_label()
-        except Exception:
+        except _STATUS_LABEL_ERRORS:
             status = None
 
         if ok:
@@ -241,7 +250,7 @@ class VersionPanel:
             try:
                 self._root.clipboard_clear()
                 self._root.clipboard_append(url)
-            except Exception:
+            except _CLIPBOARD_ERRORS:
                 pass
             if status is not None:
                 status.configure(text="Couldn't open browser (URL copied)")

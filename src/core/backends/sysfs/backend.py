@@ -15,6 +15,16 @@ from .device import SysfsLedKeyboardDevice
 
 logger = logging.getLogger(__name__)
 
+_SYSFS_ENUMERATION_ERRORS = (OSError,)
+_SYSFS_METADATA_ERRORS = (OSError,)
+
+
+def _safe_access(path: Path, mode: int) -> bool:
+    try:
+        return bool(os.access(path, mode))
+    except _SYSFS_METADATA_ERRORS:
+        return False
+
 
 @dataclass
 class SysfsLedsBackend(KeyboardBackend):
@@ -33,15 +43,22 @@ class SysfsLedsBackend(KeyboardBackend):
             for child in root.iterdir():
                 if child.is_dir() and common._is_candidate_led(child.name):
                     candidates.append(child)
-        except Exception:
+        except _SYSFS_ENUMERATION_ERRORS:
             return []
 
         viable: list[tuple[int, str, Path]] = []
         for led_dir in candidates:
             b = led_dir / "brightness"
             m = led_dir / "max_brightness"
-            if b.exists() and m.exists():
-                viable.append((common._score_led_dir(led_dir), led_dir.name, led_dir))
+            if not (b.exists() and m.exists()):
+                continue
+
+            try:
+                score = common._score_led_dir(led_dir)
+            except _SYSFS_METADATA_ERRORS:
+                score = 0
+
+            viable.append((score, led_dir.name, led_dir))
 
         if not viable:
             return []
@@ -74,16 +91,15 @@ class SysfsLedsBackend(KeyboardBackend):
             identifiers["brightness_uid"] = str(int(st.st_uid))
             identifiers["brightness_gid"] = str(int(st.st_gid))
             identifiers["brightness_mode"] = f"{int(st.st_mode) & 0o777:04o}"
-        except Exception:
+        except _SYSFS_METADATA_ERRORS:
             pass
 
-        try:
-            identifiers["brightness_readable"] = str(bool(os.access(brightness_path, os.R_OK))).lower()
-            identifiers["brightness_writable"] = str(bool(os.access(brightness_path, os.W_OK))).lower()
-        except Exception:
-            pass
+        readable = _safe_access(brightness_path, os.R_OK)
+        writable = _safe_access(brightness_path, os.W_OK)
+        identifiers["brightness_readable"] = str(readable).lower()
+        identifiers["brightness_writable"] = str(writable).lower()
 
-        if not os.access(brightness_path, os.R_OK):
+        if not readable:
             return ProbeResult(
                 available=False,
                 reason="brightness not readable",
@@ -91,15 +107,12 @@ class SysfsLedsBackend(KeyboardBackend):
                 identifiers=identifiers,
             )
 
-        if not os.access(brightness_path, os.W_OK):
+        if not writable:
             # Many kernel LED class nodes are root-writable only. If the optional
             # pkexec helper is present and supports LED writes, we can still
             # drive the backlight safely without running the whole app as root.
             if privileged.helper_supports_led_apply():
-                try:
-                    identifiers["helper"] = privileged.power_helper_path()
-                except Exception:
-                    pass
+                identifiers["helper"] = privileged.power_helper_path()
                 return ProbeResult(
                     available=True,
                     reason="sysfs LED present (brightness root-only; using helper)",
@@ -136,7 +149,7 @@ class SysfsLedsBackend(KeyboardBackend):
     def capabilities(self) -> BackendCapabilities:
         try:
             found = self._find_leds()
-        except Exception:
+        except _SYSFS_ENUMERATION_ERRORS:
             found = []
 
         color_supported = False
@@ -155,7 +168,7 @@ class SysfsLedsBackend(KeyboardBackend):
                 ):
                     color_supported = True
                     break
-        except Exception:
+        except _SYSFS_METADATA_ERRORS:
             color_supported = False
 
         return BackendCapabilities(per_key=False, color=bool(color_supported), hardware_effects=False, palette=False)

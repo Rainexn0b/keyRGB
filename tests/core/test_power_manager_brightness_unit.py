@@ -79,8 +79,11 @@ class TestPowerManagerApplyBrightnessExceptionPaths:
         mock_kb.engine = MagicMock()
 
         pm = PowerManager(mock_kb, config=_ConfigRaisingOnSet())
-        pm._apply_brightness_policy(10)
 
+        with patch("src.core.power.management.manager.logger.warning") as warn:
+            pm._apply_brightness_policy(10)
+
+        warn.assert_called_once()
         mock_kb.engine.set_brightness.assert_called_once_with(10)
 
     def test_apply_brightness_policy_logs_if_engine_set_brightness_raises(self):

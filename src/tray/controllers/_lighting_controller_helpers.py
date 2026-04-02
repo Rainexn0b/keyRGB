@@ -13,6 +13,10 @@ from src.tray.protocols import LightingTrayProtocol
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 logger = logging.getLogger(__name__)
 _ENGINE_FALLBACK_UNSET = object()
+_RECOVERABLE_CONFIG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_ENGINE_ATTR_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_module_exception(msg: str, exc: Exception) -> None:
@@ -25,8 +29,9 @@ def _log_tray_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) ->
         try:
             log_exception(msg, exc)
             return
+        # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fall back to module traceback logging
         except Exception as log_exc:
-            _log_module_exception("Tray exception logger failed: %s", log_exc)
+            logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
     _log_module_exception(msg, exc)
 
 
@@ -44,7 +49,7 @@ def _set_engine_attr_best_effort(
         return
     except AttributeError:
         return
-    except Exception as exc:
+    except _RECOVERABLE_ENGINE_ATTR_EXCEPTIONS as exc:
         _log_tray_exception(tray, error_msg, exc)
 
     if fallback is _ENGINE_FALLBACK_UNSET:
@@ -54,7 +59,7 @@ def _set_engine_attr_best_effort(
         setattr(engine, attr, fallback)
     except AttributeError:
         return
-    except Exception as exc:
+    except _RECOVERABLE_ENGINE_ATTR_EXCEPTIONS as exc:
         _log_tray_exception(tray, f"Failed to reset engine attribute '{attr}': %s", exc)
 
 
@@ -70,7 +75,7 @@ def _config_per_key_colors_ref(config: object) -> Mapping[object, object] | None
         colors = getattr(config, "per_key_colors", None)
     except AttributeError:
         return None
-    except Exception as exc:
+    except _RECOVERABLE_CONFIG_READ_EXCEPTIONS as exc:
         _log_module_exception("Failed reading config per-key colors: %s", exc)
         return None
     if isinstance(colors, Mapping) and colors:
@@ -81,6 +86,7 @@ def _config_per_key_colors_ref(config: object) -> Mapping[object, object] | None
 def parse_menu_int(item: object) -> Optional[int]:
     try:
         s = str(item)
+    # @quality-exception exception-transparency: menu item stringification crosses user-defined __str__ implementations and must stay non-fatal in tray handlers
     except Exception as exc:
         _log_module_exception("Failed parsing tray menu integer item: %s", exc)
         return None
@@ -98,6 +104,7 @@ def try_log_event(tray: LightingTrayProtocol, source: str, action: str, **fields
         return
     try:
         log_event(source, action, **fields)
+    # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
     except Exception as exc:
         _log_module_exception("Tray event logging failed: %s", exc)
 
@@ -106,7 +113,7 @@ def get_effect_name(tray: LightingTrayProtocol) -> str:
     effect = safe_str_attr(getattr(tray, "config", None), "effect", default="none") or "none"
     try:
         return resolve_effect_name_for_backend(effect, getattr(tray, "backend", None))
-    except Exception as exc:
+    except _RECOVERABLE_EFFECT_NAME_EXCEPTIONS as exc:
         _log_tray_exception(tray, "Failed to resolve current effect name: %s", exc)
         return "none"
 
@@ -197,9 +204,9 @@ def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Option
             except TypeError:
                 try:
                     enable_user_mode(brightness=effective_brightness)
-                except Exception as exc:
+                except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS as exc:
                     _log_tray_exception(tray, "Failed to enable per-key user mode: %s", exc)
-            except Exception as exc:
+            except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS as exc:
                 _log_tray_exception(tray, "Failed to enable per-key user mode: %s", exc)
         tray.engine.kb.set_key_colors(
             tray.config.per_key_colors,

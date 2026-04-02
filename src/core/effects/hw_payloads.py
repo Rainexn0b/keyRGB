@@ -80,13 +80,16 @@ def build_hw_effect_payload(
         try:
             with kb_lock:
                 kb.set_palette_color(palette_slot, tuple(current_color))
-        except Exception:
+        except Exception as exc:
+            # Hardware writes are a runtime boundary: log full exception
+            # context, then continue building the payload as before.
             log_throttled(
                 logger,
                 "legacy.effects.palette_color",
                 interval_s=120,
                 level=logging.DEBUG,
                 msg="Failed to program palette slot for breathing effect",
+                exc=exc,
             )
         hw_kwargs["color"] = palette_slot
 

@@ -60,6 +60,10 @@ EXCLUDE_PATTERNS = [
 
 _DEBT_BASELINE_PATH = Path("buildpython/config/debt_baselines.json")
 
+_BASELINE_LOAD_ERRORS = (OSError, json.JSONDecodeError)
+_TEXT_READ_ERRORS = (OSError,)
+_SOURCE_PARSE_ERRORS = (OSError, SyntaxError, ValueError)
+
 
 # ---------------------------------------------------------------------------
 # Issue types
@@ -104,7 +108,7 @@ def _load_hygiene_baseline(root: Path) -> HygieneBaseline:
     config_path = root / _DEBT_BASELINE_PATH
     try:
         payload = json.loads(config_path.read_text(encoding="utf-8"))
-    except Exception:
+    except _BASELINE_LOAD_ERRORS:
         return HygieneBaseline(counts={}, gated_categories=set(), path_budgets={})
 
     section = payload.get("code_hygiene", {})
@@ -190,7 +194,7 @@ def _detect_defensive_conversions(path: Path, root: Path) -> list[HygieneIssue]:
     issues: list[HygieneIssue] = []
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except _TEXT_READ_ERRORS:
         return issues
 
     rel = str(path.relative_to(root))
@@ -229,7 +233,7 @@ def _detect_hasattr_coupling(path: Path, root: Path) -> list[HygieneIssue]:
 
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except _TEXT_READ_ERRORS:
         return issues
 
     lines = text.splitlines()
@@ -337,7 +341,7 @@ def _detect_runtime_copy_hotspots(path: Path, root: Path) -> list[HygieneIssue]:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
         tree = ast.parse(text)
-    except Exception:
+    except _SOURCE_PARSE_ERRORS:
         return issues
 
     lines = text.splitlines()
@@ -439,7 +443,7 @@ def _detect_any_type_hints(path: Path, root: Path) -> list[HygieneIssue]:
 
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except _TEXT_READ_ERRORS:
         return issues
 
     # Pattern: function parameter with : Any or -> Any
@@ -516,7 +520,7 @@ def _detect_forbidden_getattr(path: Path, root: Path) -> list[HygieneIssue]:
         return issues
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except _TEXT_READ_ERRORS:
         return issues
     for idx, line in enumerate(text.splitlines(), start=1):
         if _GETATTR_PATTERN.search(line):
@@ -550,7 +554,7 @@ def _detect_forbidden_api_usage(path: Path, root: Path) -> list[HygieneIssue]:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
         tree = ast.parse(text)
-    except Exception:
+    except _SOURCE_PARSE_ERRORS:
         return issues
 
     lines = text.splitlines()
@@ -598,7 +602,7 @@ def _detect_resource_leaks(path: Path, root: Path) -> list[HygieneIssue]:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
         tree = ast.parse(text)
-    except Exception:
+    except _SOURCE_PARSE_ERRORS:
         return issues
 
     lines = text.splitlines()
@@ -681,7 +685,7 @@ def _detect_cleanup_hotspots(path: Path, root: Path) -> list[HygieneIssue]:
         return issues
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except _TEXT_READ_ERRORS:
         return issues
     for idx, line in enumerate(text.splitlines(), start=1):
         for pattern in _CLEANUP_MARKERS:
@@ -719,7 +723,7 @@ def _detect_broad_exception_patterns(path: Path, root: Path) -> list[HygieneIssu
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
         tree = ast.parse(text)
-    except Exception:
+    except _SOURCE_PARSE_ERRORS:
         return issues
 
     lines = text.splitlines()

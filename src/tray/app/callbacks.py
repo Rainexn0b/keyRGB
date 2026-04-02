@@ -36,15 +36,26 @@ from ..ui.gui_launch import (
 from ..ui.menu_status import selected_device_context_entry
 
 
+def _refresh_ui_best_effort(tray: LightingTrayProtocol) -> None:
+    try:
+        tray._refresh_ui()
+    except Exception:  # @quality-exception exception-transparency: tray UI refresh is a best-effort runtime boundary
+        pass
+
+
+def _update_menu_best_effort(tray: LightingTrayProtocol) -> None:
+    try:
+        tray._update_menu()
+    except Exception:  # @quality-exception exception-transparency: tray menu rebuild is a best-effort runtime boundary
+        pass
+
+
 def on_effect_clicked(tray: LightingTrayProtocol, item: object) -> None:
     effect_name = menu_mod.normalize_effect_label(str(item))
     apply_effect_selection(tray, effect_name=effect_name)
 
     # Reflect state changes immediately.
-    try:
-        tray._refresh_ui()
-    except Exception:
-        pass
+    _refresh_ui_best_effort(tray)
 
 
 def on_effect_key_clicked(tray: LightingTrayProtocol, effect_name: str) -> None:
@@ -55,10 +66,7 @@ def on_effect_key_clicked(tray: LightingTrayProtocol, effect_name: str) -> None:
     """
 
     apply_effect_selection(tray, effect_name=str(effect_name or "none").strip().lower())
-    try:
-        tray._refresh_ui()
-    except Exception:
-        pass
+    _refresh_ui_best_effort(tray)
 
 
 def on_speed_clicked_cb(tray: LightingTrayProtocol, item: object) -> None:
@@ -73,26 +81,20 @@ def on_device_context_clicked(tray: LightingTrayProtocol, context_key: str) -> N
     normalized = str(context_key or "keyboard") or "keyboard"
     try:
         tray.selected_device_context = normalized
-    except Exception:
+    except AttributeError:
         return
 
     try:
         tray.config.tray_device_context = normalized
-    except Exception:
+    except AttributeError:
         pass
 
-    try:
-        tray._update_menu()
-    except Exception:
-        pass
+    _update_menu_best_effort(tray)
 
 
 def on_software_effect_target_clicked(tray: LightingTrayProtocol, target_key: str) -> None:
     apply_software_effect_target_selection(tray, target_key)
-    try:
-        tray._update_menu()
-    except Exception:
-        pass
+    _update_menu_best_effort(tray)
 
 
 def on_off_clicked(tray: LightingTrayProtocol) -> None:
@@ -119,10 +121,7 @@ def on_hardware_static_mode_clicked(tray: LightingTrayProtocol) -> None:
     """Switch to hardware static mode without opening the color picker."""
 
     apply_effect_selection(tray, effect_name="hw_uniform")
-    try:
-        tray._refresh_ui()
-    except Exception:
-        pass
+    _refresh_ui_best_effort(tray)
 
 
 def on_hardware_color_clicked(tray: LightingTrayProtocol) -> None:
@@ -185,7 +184,4 @@ def on_tcc_profile_clicked(tray: LightingTrayProtocol, profile_id: str) -> None:
         tcc_power_profiles.set_temp_profile_by_id(profile_id)
     finally:
         # Reflect updated active profile state.
-        try:
-            tray._update_menu()
-        except Exception:
-            pass
+        _update_menu_best_effort(tray)

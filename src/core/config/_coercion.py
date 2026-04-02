@@ -5,12 +5,19 @@ from pathlib import Path
 from typing import Any, Callable
 
 
+_BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+_RGB_TRIPLET_UNPACK_ERRORS = (TypeError, ValueError)
+_CONFIG_LOAD_ERRORS = (OSError, UnicodeDecodeError, json.JSONDecodeError)
+_RGB_CHANNEL_FLOAT_ERRORS = (ValueError, OverflowError)
+_RGB_CHANNEL_PARSE_ERRORS = (ValueError, OverflowError)
+
+
 def normalize_brightness_value(value: Any) -> int:
     """Normalize brightness to the persisted 0..50, 5-step grid."""
 
     try:
         normalized = int(value)
-    except Exception:
+    except _BRIGHTNESS_COERCION_ERRORS:
         return 0
 
     normalized = max(0, min(50, normalized))
@@ -33,7 +40,7 @@ def normalize_rgb_triplet(
 
     try:
         red, green, blue = value  # type: ignore[misc]
-    except Exception:
+    except _RGB_TRIPLET_UNPACK_ERRORS:
         red, green, blue = default
 
     return (_clamp_rgb_channel(red), _clamp_rgb_channel(green), _clamp_rgb_channel(blue))
@@ -47,65 +54,71 @@ def coerce_loaded_settings(
 ) -> None:
     """Mutate loaded settings into a consistent persisted shape."""
 
+    changed = False
+
+    perkey_present_on_disk = False
     try:
-        changed = False
+        with open(config_file, "r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+    except _CONFIG_LOAD_ERRORS:
+        raw = None
 
-        perkey_present_on_disk = False
-        try:
-            with open(config_file, "r", encoding="utf-8") as handle:
-                raw = json.load(handle)
-            if isinstance(raw, dict) and "perkey_brightness" in raw:
-                perkey_present_on_disk = True
-        except Exception:
-            perkey_present_on_disk = False
+    if isinstance(raw, dict) and "perkey_brightness" in raw:
+        perkey_present_on_disk = True
 
-        before = settings.get("brightness", None)
-        after = normalize_brightness_value(before if before is not None else 0)
-        if before != after:
-            settings["brightness"] = after
+    before = settings.get("brightness", None)
+    after = normalize_brightness_value(before if before is not None else 0)
+    if before != after:
+        settings["brightness"] = after
+        changed = True
+
+    perkey_before = settings.get("perkey_brightness", None)
+    if perkey_before is None or not perkey_present_on_disk:
+        settings["perkey_brightness"] = int(after)
+        changed = True
+    else:
+        perkey_after = normalize_brightness_value(perkey_before)
+        if perkey_before != perkey_after:
+            settings["perkey_brightness"] = int(perkey_after)
             changed = True
 
-        perkey_before = settings.get("perkey_brightness", None)
-        if perkey_before is None or not perkey_present_on_disk:
-            settings["perkey_brightness"] = int(after)
+    for key in ("ac_lighting_brightness", "battery_lighting_brightness"):
+        raw_value = settings.get(key, None)
+        if raw_value is None:
+            continue
+        normalized = normalize_brightness_value(raw_value)
+        if raw_value != normalized:
+            settings[key] = int(normalized)
             changed = True
-        else:
-            perkey_after = normalize_brightness_value(perkey_before)
-            if perkey_before != perkey_after:
-                settings["perkey_brightness"] = int(perkey_after)
-                changed = True
 
-        for key in ("ac_lighting_brightness", "battery_lighting_brightness"):
-            raw_value = settings.get(key, None)
-            if raw_value is None:
-                continue
-            normalized = normalize_brightness_value(raw_value)
-            if raw_value != normalized:
-                settings[key] = int(normalized)
-                changed = True
+    if not changed:
+        return
 
-        if changed:
-            save_fn()
-    except Exception:
+    try:
+        save_fn()
+    except Exception:  # @quality-exception exception-transparency: save callback failures are an external best-effort persistence boundary and coercion should already have stabilized in-memory settings
         return
 
 
 def _clamp_rgb_channel(value: Any) -> int:
-    try:
-        if isinstance(value, bool):
+    if isinstance(value, bool):
+        normalized = int(value)
+    elif isinstance(value, int):
+        normalized = value
+    elif isinstance(value, float):
+        try:
             normalized = int(value)
-        elif isinstance(value, int):
-            normalized = value
-        elif isinstance(value, float):
-            normalized = int(value)
-        elif isinstance(value, str):
-            try:
-                normalized = int(value)
-            except Exception:
-                normalized = int(float(value))
-        else:
+        except _RGB_CHANNEL_FLOAT_ERRORS:
             return 0
-    except Exception:
+    elif isinstance(value, str):
+        try:
+            normalized = int(value)
+        except ValueError:
+            try:
+                normalized = int(float(value))
+            except _RGB_CHANNEL_PARSE_ERRORS:
+                return 0
+    else:
         return 0
 
     return max(0, min(255, int(normalized)))

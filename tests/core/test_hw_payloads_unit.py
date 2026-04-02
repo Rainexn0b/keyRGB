@@ -203,6 +203,45 @@ class TestBuildHwEffectPayload:
         # Should pass slot index as color parameter
         assert captured_kwargs["color"] == 3
 
+    def test_breathing_palette_failure_logs_traceback_and_keeps_payload(self, caplog):
+        """Should preserve payload building and log exception context on palette failure."""
+        from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        mock_kb = MagicMock()
+        mock_kb.set_palette_color.side_effect = OSError("palette write failed")
+        kb_lock = RLock()
+        logger = logging.getLogger("tests.hw_payloads")
+
+        captured_kwargs = {}
+
+        def capture_effect_func(**kwargs):
+            captured_kwargs.update(kwargs)
+            return "payload"
+
+        with caplog.at_level(logging.DEBUG, logger=logger.name):
+            result = build_hw_effect_payload(
+                effect_name="breathing",
+                effect_func=capture_effect_func,
+                ui_speed=5,
+                brightness=50,
+                current_color=(255, 128, 64),
+                hw_colors={"red": 3},
+                kb=mock_kb,
+                kb_lock=kb_lock,
+                logger=logger,
+            )
+
+        assert result == "payload"
+        assert captured_kwargs["color"] == 3
+
+        records = [
+            record
+            for record in caplog.records
+            if record.message == "Failed to program palette slot for breathing effect"
+        ]
+        assert records
+        assert any(record.exc_info and isinstance(record.exc_info[1], OSError) for record in records)
+
     def test_retries_on_unsupported_kwarg_error(self):
         """Should retry with fewer kwargs when 'attr is not needed' error occurs."""
         from src.core.effects.hw_payloads import build_hw_effect_payload

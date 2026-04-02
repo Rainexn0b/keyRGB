@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import buildpython.steps.step_code_hygiene as step_code_hygiene
 import json
 
 from buildpython.core.debt_index import build_debt_index, write_debt_index
@@ -15,7 +16,89 @@ from buildpython.steps.step_coverage import CoverageBaseline, build_coverage_rep
 from buildpython.steps.step_exception_transparency import _scan_python_source
 
 
-def test_exception_transparency_scan_classifies_broad_handlers() -> None:
+def test_exception_transparency_scan_suppresses_valid_quality_exception_waivers() -> None:
+    findings = _scan_python_source(
+        """
+def example():
+    try:
+        run_one()
+    # @quality-exception exception-transparency: optional runtime boundary for startup fallback
+    except Exception:
+        pass
+
+    try:
+        run_two()
+    except Exception:  # @quality-exception exception-transparency: shutdown cleanup boundary
+        pass
+""".strip(),
+        rel_path="src/example.py",
+    )
+
+    assert findings == []
+
+
+def test_exception_transparency_scan_ignores_indented_preceding_quality_exception_comment() -> None:
+    findings = _scan_python_source(
+        """
+def example():
+    try:
+        run_one()
+        # @quality-exception exception-transparency: try-body comment should not waive the handler
+    except Exception:
+        pass
+""".strip(),
+        rel_path="src/example.py",
+    )
+
+    counts: dict[str, int] = {}
+    for finding in findings:
+        counts[finding.category] = counts.get(finding.category, 0) + 1
+
+    assert counts["broad_except_total"] == 1
+    assert counts["broad_except_unlogged"] == 1
+
+
+def test_exception_transparency_scan_ignores_other_step_quality_exception_tags() -> None:
+    findings = _scan_python_source(
+        """
+def example():
+    try:
+        run_one()
+    except Exception:  # @quality-exception coverage: tracked by another step
+        pass
+""".strip(),
+        rel_path="src/example.py",
+    )
+
+    counts: dict[str, int] = {}
+    for finding in findings:
+        counts[finding.category] = counts.get(finding.category, 0) + 1
+
+    assert counts["broad_except_total"] == 1
+    assert counts["broad_except_unlogged"] == 1
+
+
+def test_exception_transparency_scan_requires_quality_exception_explanation() -> None:
+    findings = _scan_python_source(
+        """
+def example():
+    try:
+        run_one()
+    except Exception:  # @quality-exception exception-transparency
+        pass
+""".strip(),
+        rel_path="src/example.py",
+    )
+
+    counts: dict[str, int] = {}
+    for finding in findings:
+        counts[finding.category] = counts.get(finding.category, 0) + 1
+
+    assert counts["broad_except_total"] == 1
+    assert counts["broad_except_unlogged"] == 1
+
+
+def test_exception_transparency_scan_classifies_broad_handlers_without_waivers() -> None:
     findings = _scan_python_source(
         """
 from src.core.utils.logging_utils import log_throttled
@@ -97,6 +180,28 @@ def test_path_budget_regressions_flag_specific_hotspots() -> None:
     regressions = _path_budget_regressions(issues, baseline)
 
     assert regressions == [("silent_broad_except", "src/tray/app/application.py", 2, 1)]
+
+
+def test_load_hygiene_baseline_returns_empty_on_invalid_json(tmp_path) -> None:
+    config_dir = tmp_path / "buildpython" / "config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "debt_baselines.json").write_text("{not valid json", encoding="utf-8")
+
+    baseline = step_code_hygiene._load_hygiene_baseline(tmp_path)
+
+    assert baseline == HygieneBaseline(counts={}, gated_categories=set(), path_budgets={})
+
+
+def test_hygiene_detectors_ignore_missing_or_unparseable_sources(tmp_path) -> None:
+    root = tmp_path
+    missing_file = root / "src" / "missing.py"
+    broken_file = root / "src" / "tray" / "ui" / "broken.py"
+    broken_file.parent.mkdir(parents=True)
+    broken_file.write_text("def broken(:\n    pass\n", encoding="utf-8")
+
+    assert step_code_hygiene._detect_cleanup_hotspots(missing_file, root) == []
+    assert step_code_hygiene._detect_runtime_copy_hotspots(broken_file, root) == []
+    assert step_code_hygiene._detect_broad_exception_patterns(broken_file, root) == []
 
 
 def test_build_coverage_report_tracks_prefixes_and_watch_files() -> None:

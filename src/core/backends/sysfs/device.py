@@ -12,6 +12,10 @@ from . import privileged
 
 logger = logging.getLogger(__name__)
 
+_SYSFS_STATE_ERRORS = (OSError, ValueError)
+_CHANNEL_GROUP_STATE_ERRORS = (OSError, RuntimeError, ValueError)
+_CAPABILITY_PROBE_ERRORS = (OSError, RuntimeError)
+
 
 @dataclass
 class SysfsLedKeyboardDevice(KeyboardDevice):
@@ -83,7 +87,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                 self._channel_group_color, self._channel_group_brightness = self._read_channel_group_state(
                     ite8297_channels
                 )
-            except Exception:
+            except _CHANNEL_GROUP_STATE_ERRORS:
                 self._channel_group_color = (0, 0, 0)
                 self._channel_group_brightness = 0
             return
@@ -140,7 +144,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                 ):
                     color_supported = True
                     break
-        except Exception:
+        except _CAPABILITY_PROBE_ERRORS:
             color_supported = False
 
         return BackendCapabilities(
@@ -154,13 +158,13 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         try:
             m = common._read_int(self.max_brightness_path)
             return max(1, int(m))
-        except Exception:
+        except _SYSFS_STATE_ERRORS:
             return 1
 
     def _read_sysfs_brightness(self) -> int:
         try:
             return max(0, int(common._read_int(self.brightness_path)))
-        except Exception:
+        except _SYSFS_STATE_ERRORS:
             return 0
 
     def turn_off(self) -> None:
@@ -194,7 +198,8 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         max_value = self._max()
         sysfs_value = int(round((b / 50) * max_value))
 
-        # Debug logging (once)
+        # Debug logging (once). Logging is optional diagnostics, so a broken handler
+        # should not block LED writes.
         try:
             if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
                 logger.info(
@@ -204,7 +209,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                     len(self._zones),
                     max_value,
                 )
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: debug brightness logging is a best-effort diagnostic boundary and logging handlers may raise arbitrary runtime errors
             pass
 
         # Apply to all zones
@@ -217,9 +222,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         try:
             common._write_int(brightness_path, sysfs_value)
             return
-        except PermissionError:
-            pass
-        except Exception:
+        except OSError:
             pass
 
         if not privileged.helper_supports_led_apply():
@@ -256,6 +259,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
 
     def set_color(self, color, *, brightness: int):
         """Enhanced color setting with multi_intensity and color attribute support"""
+        # Logging is optional diagnostics, so a broken handler should not block LED writes.
         try:
             if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
                 r, g, b = color
@@ -267,7 +271,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                     brightness,
                     len(self._zones),
                 )
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: debug color logging is a best-effort diagnostic boundary and logging handlers may raise arbitrary runtime errors
             pass
 
         for zone in self._zones:

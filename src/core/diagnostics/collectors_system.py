@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from importlib import metadata
 from pathlib import Path
@@ -7,6 +8,13 @@ from typing import Any
 
 from .io import read_kv_file, read_text
 from src.core.runtime.imports import repo_root_from
+
+
+logger = logging.getLogger(__name__)
+
+_FS_SNAPSHOT_ERRORS = (OSError,)
+_METADATA_LOOKUP_ERRORS = (metadata.PackageNotFoundError,)
+_SYSTEM_INFO_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def list_platform_hints() -> list[str]:
@@ -37,7 +45,7 @@ def list_platform_hints() -> list[str]:
             if any(p in name for p in patterns):
                 candidates.append(child.name)
         return candidates[:80]
-    except Exception:
+    except _FS_SNAPSHOT_ERRORS:
         return []
 
 
@@ -64,7 +72,7 @@ def list_module_hints() -> list[str]:
             seen.add(m)
             uniq.append(m)
         return uniq[:120]
-    except Exception:
+    except _FS_SNAPSHOT_ERRORS:
         return []
 
 
@@ -98,7 +106,7 @@ def power_supply_snapshot() -> dict[str, Any]:
                 out[dev.name] = entry
 
         return out
-    except Exception:
+    except _FS_SNAPSHOT_ERRORS:
         return {}
 
 
@@ -135,7 +143,7 @@ def _repo_version_text(anchor: str | Path) -> str | None:
                 return m.group(1).strip()
 
         return None
-    except Exception:
+    except _FS_SNAPSHOT_ERRORS:
         return None
 
 
@@ -154,7 +162,7 @@ def app_snapshot() -> dict[str, Any]:
                 app["dist_name"] = dist_name
                 app["dist_version"] = metadata.version(dist_name)
                 break
-            except Exception:
+            except _METADATA_LOOKUP_ERRORS:
                 continue
     else:
         # Best-effort version reporting. Distribution name may vary, so try a couple.
@@ -164,7 +172,7 @@ def app_snapshot() -> dict[str, Any]:
                 app["dist"] = dist_name
                 app["version_source"] = "dist"
                 break
-            except Exception:
+            except _METADATA_LOOKUP_ERRORS:
                 continue
 
     # Optional helper library used on some hardware.
@@ -172,7 +180,7 @@ def app_snapshot() -> dict[str, Any]:
         try:
             app["ite8291r3_ctl_version"] = metadata.version(dist_name)
             break
-        except Exception:
+        except _METADATA_LOOKUP_ERRORS:
             continue
 
     return app
@@ -188,11 +196,11 @@ def system_snapshot() -> dict[str, Any]:
         u = platform.uname()
         system["kernel_release"] = u.release
         system["machine"] = u.machine
-    except Exception:
+    except _SYSTEM_INFO_ERRORS:
         pass
     try:
         system["python"] = sys.version.split()[0]
-    except Exception:
+    except _SYSTEM_INFO_ERRORS:
         pass
 
     os_release = read_kv_file(Path("/etc/os-release"))
@@ -221,6 +229,7 @@ def system_power_mode_snapshot() -> dict[str, Any]:
             "identifiers": dict(st.identifiers or {}),
         }
     except Exception as exc:
+        logger.log(logging.DEBUG, "Failed to collect system power mode diagnostics", exc_info=True)
         return {
             "supported": False,
             "mode": "unknown",

@@ -44,14 +44,30 @@ Scope
 - Prefer typed protocols and existing helpers (for example `safe_attrs`) over adding new scattered defensive conversions when touching tray/core glue.
 - Keep Linux-first assumptions; this repo is not a cross-platform desktop app.
 
+## Exception-transparency guardrails
+- Treat Step 19 (`python -m buildpython --run-steps=19`) as a standing quality constraint when touching exception-heavy code.
+- Do not introduce new silent `except Exception` paths.
+- When narrowing existing broad catches, prefer concrete exception types or small typed groups that match the real failure modes.
+- Do not remove a documented best-effort runtime boundary just to satisfy the scanner. If a path must stay non-fatal for tray startup, GUI startup, background polling, hardware probing, or user callback safety, keep the boundary explicit.
+- For unavoidable broad runtime boundaries, add a precise `@quality-exception exception-transparency: ...` comment that explains why the boundary is real.
+- If the boundary should remain diagnosable, prefer traceback-backed logging rather than silent fallback.
+- Do not convert a broad catch into a narrower catch that changes the user-facing contract from best-effort to fail-fast without checking callers, tests, and nearby docs.
+- When you touch a fallback boundary, add or update targeted tests that prove both the happy path and the intended degraded behavior.
+- When a task edits files that already appear in the Step 19 report, run Step 19 locally before handing off.
+- In handoff notes, call out any broad catches that remain and justify why they are true runtime seams rather than unfinished cleanup.
+
+
+
 ## Default execution loop
 1. Identify the owning subsystem and affected backend path.
 2. Read the nearest implementation and relevant tests first.
-3. Implement the smallest root-cause fix.
-4. Add or update targeted unit tests.
-5. Run the smallest relevant validation.
-6. Escalate to broader `buildpython` profiles when the change is cross-cutting.
-7. Report changed files, validation, and any follow-up risk.
+3. Check whether exception-transparency or fallback behavior is part of the affected contract.
+4. Implement the smallest root-cause fix.
+5. Add or update targeted unit tests.
+6. Run the smallest relevant validation.
+7. Run `python -m buildpython --run-steps=19` when touching exception boundaries, best-effort fallbacks, or files already present in the debt report.
+8. Escalate to broader `buildpython` profiles when the change is cross-cutting.
+9. Report changed files, validation, remaining broad boundaries, and any follow-up risk.
 
 ## Validation matrix
 - Activate env: `source .venv/bin/activate`

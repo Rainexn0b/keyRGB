@@ -108,6 +108,7 @@ class TestLoadConfigSettings:
         """If JSON is malformed, load should retry and eventually return None."""
         from src.core.config.file_storage import load_config_settings
 
+        logger = MagicMock()
         config_file = temp_config_dir / "config.json"
         config_file.write_text("{this is: not valid json")
 
@@ -116,11 +117,16 @@ class TestLoadConfigSettings:
             defaults={"brightness": 50},
             retries=2,
             retry_delay=0.001,
-            logger=logging.getLogger(),
+            logger=logger,
         )
 
-        # Should return None after retries fail
         assert result is None
+        logger.warning.assert_called_once()
+
+        exc_info = logger.warning.call_args.kwargs["exc_info"]
+        assert exc_info[0] is json.JSONDecodeError
+        assert isinstance(exc_info[1], json.JSONDecodeError)
+        assert exc_info[2] is not None
 
     def test_load_returns_none_on_persistent_io_error(self, temp_config_dir):
         """If file exists but raises OSError, return None."""
@@ -225,6 +231,7 @@ class TestSaveConfigSettingsAtomic:
 
         config_file = temp_config_dir / "config.json"
         settings = {"brightness": 50}
+        logger = MagicMock()
 
         # Make config_dir non-writable (simulate permission error)
         with patch("tempfile.mkstemp", side_effect=OSError("disk full")):
@@ -233,11 +240,16 @@ class TestSaveConfigSettingsAtomic:
                 config_dir=temp_config_dir,
                 config_file=config_file,
                 settings=settings,
-                logger=logging.getLogger(),
+                logger=logger,
             )
 
-        # Original file should not exist (write failed)
         assert not config_file.exists()
+        logger.warning.assert_called_once()
+
+        exc_info = logger.warning.call_args.kwargs["exc_info"]
+        assert exc_info[0] is OSError
+        assert isinstance(exc_info[1], OSError)
+        assert exc_info[2] is not None
 
     def test_save_attempts_temp_cleanup_even_on_failure(self, temp_config_dir):
         """Even if os.replace fails, save should try to clean up temp file."""

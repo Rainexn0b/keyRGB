@@ -61,6 +61,58 @@ class TestPowerManagerEventHandlers:
         mock_kb.turn_off.assert_called_once()
 
     @patch("src.core.power.management.manager.PowerEventPolicy")
+    def test_on_suspend_defaults_to_enabled_when_config_reload_raises_runtime_error(self, mock_policy_cls):
+        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+
+        class _ConfigBrokenReload:
+            def reload(self):
+                raise RuntimeError("reload failed")
+
+        mock_kb = MagicMock()
+        mock_kb.is_off = False
+        mock_kb.turn_off = MagicMock()
+
+        mock_policy_instance = MagicMock()
+        mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
+        mock_policy_cls.return_value = mock_policy_instance
+
+        with patch("src.core.power.management.manager.logger.exception") as exc:
+            pm = PowerManager(mock_kb, config=_ConfigBrokenReload())
+            pm._on_suspend()
+
+        mock_kb.turn_off.assert_called_once()
+        assert exc.call_count == 2
+
+    @patch("src.core.power.management.manager.PowerEventPolicy")
+    def test_on_suspend_defaults_to_enabled_when_management_flag_read_raises_runtime_error(self, mock_policy_cls):
+        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+
+        class _ConfigBrokenFlagRead:
+            def reload(self):
+                return None
+
+            @property
+            def management_enabled(self):
+                raise RuntimeError("flag failed")
+
+            power_off_on_suspend = True
+
+        mock_kb = MagicMock()
+        mock_kb.is_off = False
+        mock_kb.turn_off = MagicMock()
+
+        mock_policy_instance = MagicMock()
+        mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
+        mock_policy_cls.return_value = mock_policy_instance
+
+        with patch("src.core.power.management.manager.logger.exception") as exc:
+            pm = PowerManager(mock_kb, config=_ConfigBrokenFlagRead())
+            pm._on_suspend()
+
+        mock_kb.turn_off.assert_called_once()
+        exc.assert_called_once_with("Failed to read power management config flag '%s'", "management_enabled")
+
+    @patch("src.core.power.management.manager.PowerEventPolicy")
     def test_on_suspend_skips_when_disabled(self, mock_policy_cls):
         """_on_suspend should not call turn_off when power_management_enabled=False."""
         from src.core.power.management.manager import PowerManager
@@ -147,7 +199,10 @@ class TestPowerManagerEventHandlers:
         mock_kb.is_off = False
         mock_kb.turn_off = MagicMock(side_effect=RuntimeError("hardware error"))
 
-        with patch("src.core.power.management.manager.PowerEventPolicy") as mock_policy_cls:
+        with (
+            patch("src.core.power.management.manager.PowerEventPolicy") as mock_policy_cls,
+            patch("src.core.power.management.manager.logger.exception") as exc,
+        ):
             mock_policy_instance = MagicMock()
             mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
             mock_policy_cls.return_value = mock_policy_instance
@@ -158,6 +213,8 @@ class TestPowerManagerEventHandlers:
 
             pm._on_suspend()
 
+        exc.assert_called_once()
+
 
 class TestPowerManagerHandlePowerEventBranches:
     def test_handle_power_event_returns_when_policy_raises(self):
@@ -166,14 +223,17 @@ class TestPowerManagerHandlePowerEventBranches:
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
 
-        pm._handle_power_event(
-            enabled=True,
-            action_enabled=True,
-            log_message="x",
-            policy_method=MagicMock(side_effect=RuntimeError("boom")),
-            expected_action_type=TurnOffFromEvent,
-            kb_method_name="turn_off",
-        )
+        with patch("src.core.power.management.manager.logger.exception") as exc:
+            pm._handle_power_event(
+                enabled=True,
+                action_enabled=True,
+                log_message="x",
+                policy_method=MagicMock(side_effect=RuntimeError("boom")),
+                expected_action_type=TurnOffFromEvent,
+                kb_method_name="turn_off",
+            )
+
+        exc.assert_called_once()
 
     def test_handle_power_event_filters_action_type_and_action_enabled(self):
         from src.core.power.management.manager import (

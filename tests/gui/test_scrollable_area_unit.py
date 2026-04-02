@@ -125,6 +125,16 @@ def _make_area(
     return area
 
 
+def _capture_logs(monkeypatch: pytest.MonkeyPatch) -> list[tuple[tuple[object, ...], dict[str, object]]]:
+    calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    def fake_log_throttled(*args, **kwargs) -> None:
+        calls.append((args, kwargs))
+
+    monkeypatch.setattr(scrollable_area, "log_throttled", fake_log_throttled)
+    return calls
+
+
 @pytest.mark.parametrize(
     ("bbox_result", "height", "expected"),
     [
@@ -168,7 +178,8 @@ def test_update_scrollbar_visibility_toggles_hidden_and_visible_states() -> None
     assert scrollbar.pack_calls == [{"side": "right", "fill": "y"}]
 
 
-def test_update_scrollbar_visibility_swallows_scrollbar_pack_errors() -> None:
+def test_update_scrollbar_visibility_swallows_scrollbar_pack_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    logs = _capture_logs(monkeypatch)
     area = _make_area(
         canvas=_FakeCanvas(bbox_result=(0, 0, 10, 120), height=40),
         scrollbar=_FakeScrollbar(pack_error=RuntimeError("pack failed")),
@@ -179,6 +190,11 @@ def test_update_scrollbar_visibility_swallows_scrollbar_pack_errors() -> None:
 
     assert area._vscroll_visible is False
     assert area._vscroll.pack_calls == [{"side": "right", "fill": "y"}]
+    assert len(logs) == 1
+    args, kwargs = logs[0]
+    assert args[1] == "settings.scrollable_area.show_scrollbar"
+    assert kwargs["msg"] == "Failed to show settings scrollbar"
+    assert isinstance(kwargs["exc"], RuntimeError)
 
 
 def test_is_descendant_walks_master_chain_and_handles_broken_master_access() -> None:
@@ -283,7 +299,8 @@ def test_bind_mousewheel_returns_none_when_no_target_or_no_scroll_units() -> Non
     assert area._canvas.yview_scroll_calls == []
 
 
-def test_bind_mousewheel_swallows_lookup_and_scroll_failures() -> None:
+def test_bind_mousewheel_swallows_lookup_and_scroll_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    logs = _capture_logs(monkeypatch)
     lookup_root = _FakeRoot(containing_error=RuntimeError("lookup failed"))
     lookup_area = _make_area(canvas=_FakeCanvas(bbox_result=(0, 0, 10, 300), height=80))
     lookup_area.bind_mousewheel(lookup_root)
@@ -317,3 +334,14 @@ def test_bind_mousewheel_swallows_lookup_and_scroll_failures() -> None:
 
     assert canvas_callback(SimpleNamespace(x_root=1, y_root=2, delta=120)) is None
     assert canvas_area._canvas.yview_scroll_calls == [(-1, "units")]
+    assert [args[1] for args, _kwargs in logs] == [
+        "settings.scrollable_area.lookup_target",
+        "settings.scrollable_area.priority_scroll",
+        "settings.scrollable_area.canvas_scroll",
+    ]
+    assert [kwargs["msg"] for _args, kwargs in logs] == [
+        "Failed to resolve settings mousewheel target",
+        "Failed to route settings mousewheel to priority widget",
+        "Failed to scroll settings canvas from mousewheel event",
+    ]
+    assert all(isinstance(kwargs["exc"], RuntimeError) for _args, kwargs in logs)

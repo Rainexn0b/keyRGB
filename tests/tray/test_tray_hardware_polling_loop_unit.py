@@ -54,6 +54,39 @@ def test_apply_polled_state_logs_brightness_change_but_swallows_log_errors(
     assert off is False
 
 
+def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> None:
+    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+
+    refreshed = {"n": 0}
+
+    def boom(*_a, **_kw):
+        raise RuntimeError("boom")
+
+    tray = SimpleNamespace(
+        _dim_temp_active=False,
+        _dim_temp_target_brightness=None,
+        _power_forced_off=False,
+        _user_forced_off=False,
+        _idle_forced_off=False,
+        _refresh_ui=lambda: refreshed.__setitem__("n", refreshed["n"] + 1),
+        _log_event=boom,
+        is_off=False,
+    )
+
+    b, off = _apply_polled_hardware_state(
+        tray,
+        raw_brightness=5,
+        current_brightness=5,
+        current_off=True,
+        last_brightness=None,
+        last_off_state=False,
+    )
+
+    assert (b, off) == (5, True)
+    assert tray.is_off is True
+    assert refreshed["n"] == 1
+
+
 def test_apply_polled_state_dim_temp_target_bad_int_is_ignored(monkeypatch) -> None:
     from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 

@@ -124,6 +124,28 @@ class TestEdgeCases:
         obj = BadObj()
         assert safe_int_attr(obj, "anything", default=99) == 99
 
+    def test_handles_broken_float_fallback_for_int_default(self) -> None:
+        class BadCoerce:
+            def __int__(self) -> int:
+                raise TypeError("force float fallback")
+
+            def __float__(self) -> float:
+                raise RuntimeError("boom")
+
+        obj = SimpleNamespace(value=BadCoerce())
+        assert safe_int_attr(obj, "value", default=5) == 5
+
+    def test_handles_broken_float_fallback_for_optional_int(self) -> None:
+        class BadCoerce:
+            def __int__(self) -> int:
+                raise TypeError("force float fallback")
+
+            def __float__(self) -> float:
+                raise RuntimeError("boom")
+
+        obj = SimpleNamespace(value=BadCoerce())
+        assert safe_optional_int_attr(obj, "value") is None
+
     def test_handles_zero_correctly(self) -> None:
         # This is the key bug the old pattern had: `or 0` treats 0 as falsy
         obj = SimpleNamespace(brightness=0)

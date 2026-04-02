@@ -44,7 +44,7 @@ class KeyRGBTray:
             from src.core.profile import profiles as core_profiles
 
             core_profiles.migrate_builtin_profile_brightness(self.config)
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: optional startup migration boundary
             pass
         self.icon = None
         self.is_off = False
@@ -76,7 +76,7 @@ class KeyRGBTray:
             if callable(set_backend):
                 try:
                     set_backend(self.backend)
-                except Exception:
+                except Exception:  # @quality-exception exception-transparency: compatibility backend fallback during engine init
                     pass
 
         self._ite_rows, self._ite_cols = load_ite_dimensions()
@@ -117,9 +117,9 @@ class KeyRGBTray:
                 try:
                     notify_fn(str(message))
                     return
-                except Exception:
+                except Exception:  # @quality-exception exception-transparency: best-effort tray notification fallback
                     pass
-            except Exception:
+            except Exception:  # @quality-exception exception-transparency: best-effort tray notification backend boundary
                 pass
 
         # Fallback for environments where pystray notifications are unavailable.
@@ -186,19 +186,16 @@ class KeyRGBTray:
         try:
             src = str(source)
             act = str(action)
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: event logging must never break tray actions
             return
 
         parts: list[str] = []
-        try:
-            for k in sorted(fields.keys()):
-                v = fields.get(k)
-                try:
-                    parts.append(f"{k}={v}")
-                except Exception:
-                    parts.append(f"{k}=<unrepr>")
-        except Exception:
-            parts = []
+        for k in sorted(fields.keys()):
+            v = fields.get(k)
+            try:
+                parts.append(f"{k}={v}")
+            except Exception:  # @quality-exception exception-transparency: tolerate broken field repr in debug logging
+                parts.append(f"{k}=<unrepr>")
 
         msg = f"EVENT {src}:{act}"
         if parts:
@@ -211,12 +208,12 @@ class KeyRGBTray:
             if now - last < 1.0:
                 return
             self._event_last_at[msg] = now
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: broken throttle state must not affect runtime
             pass
 
         try:
             logger.info("%s", msg)
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: logging backend failure must not affect runtime
             return
 
     # ---- icon

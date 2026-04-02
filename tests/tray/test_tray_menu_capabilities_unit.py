@@ -437,3 +437,60 @@ def test_tray_active_indicator_shows_perkey_profile(
     assert "mode:" in mode_text
     assert "software" in mode_text
     assert "light" in mode_text
+
+
+def test_tcc_profiles_menu_returns_none_when_tcc_query_raises_runtime_error() -> None:
+    from src.tray.ui import menu_sections
+
+    class BrokenTcc:
+        def list_profiles(self):
+            raise RuntimeError("boom")
+
+        def get_active_profile(self):
+            return None
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+
+    assert menu_sections.build_tcc_profiles_menu(
+        tray,
+        pystray=FakePystray,
+        item=fake_item,
+        tcc=BrokenTcc(),
+    ) is None
+
+
+def test_system_power_mode_menu_returns_none_when_status_lookup_raises_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.tray.ui import menu_sections
+
+    monkeypatch.setattr(menu_sections, "get_status", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+
+    assert menu_sections.build_system_power_mode_menu(
+        tray,
+        pystray=FakePystray,
+        item=fake_item,
+    ) is None
+
+
+def test_perkey_profiles_menu_falls_back_to_editor_when_profile_listing_raises_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.tray.ui import menu_sections
+    from src.core.profile import profiles as core_profiles
+
+    monkeypatch.setattr(core_profiles, "list_profiles", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=False))
+
+    menu = menu_sections.build_perkey_profiles_menu(
+        tray,
+        pystray=FakePystray,
+        item=fake_item,
+        per_key_supported=True,
+    )
+
+    assert isinstance(menu, FakeMenu)
+    assert [entry["text"] for entry in menu.items if isinstance(entry, dict)] == ["Open Color Editor…"]

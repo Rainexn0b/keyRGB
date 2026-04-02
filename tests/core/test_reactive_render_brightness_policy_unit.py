@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from types import SimpleNamespace
 
 
@@ -157,3 +159,33 @@ def test_per_key_reactive_pulse_respects_dim_temp_lock() -> None:
 
     assert ("set_key_colors", 5) in kb.calls
     assert not [call for call in kb.calls if call == ("set_brightness", 50)]
+
+
+def test_resolve_brightness_logs_traceback_when_engine_attr_read_raises(caplog) -> None:
+    from src.core.effects.reactive import render as render_module
+
+    class _BrokenEngine:
+        brightness = 7
+        per_key_colors = None
+        per_key_brightness = 0
+        _hw_brightness_cap = None
+        _dim_temp_active = False
+        _last_rendered_brightness = None
+        kb = None
+
+        @property
+        def reactive_brightness(self):
+            raise RuntimeError("reactive getter failed")
+
+    with caplog.at_level(logging.ERROR, logger="src.core.effects.reactive.render"):
+        base, eff, hw = render_module._resolve_brightness(_BrokenEngine())
+
+    assert (base, eff, hw) == (0, 25, 7)
+
+    records = [
+        record
+        for record in caplog.records
+        if "Reactive brightness failed to read engine attribute reactive_brightness" in record.getMessage()
+    ]
+    assert records
+    assert records[-1].exc_info is not None

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from threading import RLock
 from typing import Any
 
@@ -11,6 +12,13 @@ from src.core.utils.exceptions import is_permission_denied
 from src.tray.ui.menu_status import device_context_controls_available, device_context_entries
 
 from ._lighting_controller_helpers import try_log_event
+
+
+logger = logging.getLogger(__name__)
+
+_ENGINE_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
+_CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
+_SECONDARY_TARGET_RUNTIME_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
 
 
 class _CachedLightbarSoftwareTarget:
@@ -43,6 +51,7 @@ class _CachedLightbarSoftwareTarget:
                 self._device = device
             try:
                 operation(device)
+            # @quality-exception exception-transparency: any device-operation failure should invalidate the cached handle before re-raising
             except Exception:
                 self._device = None
                 raise
@@ -54,25 +63,30 @@ def configure_engine_software_targets(tray: Any) -> None:
         return
 
     target = normalize_software_effect_target(getattr(getattr(tray, "config", None), "software_effect_target", None))
-    try:
-        engine.software_effect_target = target
-    except Exception:
-        pass
-
-    try:
-        engine.secondary_software_targets_provider = lambda tray_ref=tray: secondary_software_render_targets(tray_ref)
-    except Exception:
-        pass
+    _set_engine_attr_best_effort(
+        tray,
+        "software_effect_target",
+        target,
+        error_msg="Failed to sync engine software target: %s",
+    )
+    _set_engine_attr_best_effort(
+        tray,
+        "secondary_software_targets_provider",
+        lambda tray_ref=tray: secondary_software_render_targets(tray_ref),
+        error_msg="Failed to install secondary software target provider: %s",
+    )
 
 
 def apply_software_effect_target_selection(tray: Any, target: str) -> str:
     normalized = normalize_software_effect_target(target)
     previous = normalize_software_effect_target(getattr(getattr(tray, "config", None), "software_effect_target", None))
 
-    try:
-        tray.config.software_effect_target = normalized
-    except Exception:
-        pass
+    _set_config_attr_best_effort(
+        tray,
+        "software_effect_target",
+        normalized,
+        error_msg="Failed to persist software effect target selection: %s",
+    )
 
     configure_engine_software_targets(tray)
     try_log_event(tray, "menu", "set_software_effect_target", old=previous, new=normalized)
@@ -114,7 +128,7 @@ def restore_secondary_software_targets(tray: Any) -> None:
     for entry, target in _iter_secondary_targets(tray):
         try:
             _restore_target_from_config(tray, entry=entry, target=target)
-        except Exception as exc:
+        except _SECONDARY_TARGET_RUNTIME_EXCEPTIONS as exc:
             _handle_secondary_target_error(tray, exc, action="restore_secondary_software_target")
 
 
@@ -122,7 +136,7 @@ def turn_off_secondary_software_targets(tray: Any) -> None:
     for _entry, target in _iter_secondary_targets(tray):
         try:
             target.turn_off()
-        except Exception as exc:
+        except _SECONDARY_TARGET_RUNTIME_EXCEPTIONS as exc:
             _handle_secondary_target_error(tray, exc, action="turn_off_secondary_software_target")
 
 
@@ -160,8 +174,10 @@ def _proxy_cache(tray: Any) -> dict[str, object]:
     cache: dict[str, object] = {}
     try:
         tray._software_target_proxy_cache = cache
-    except Exception:
+    except (AttributeError, TypeError):
         pass
+    except RuntimeError as exc:
+        _log_boundary_exception(tray, "Failed to store software target proxy cache: %s", exc)
     return cache
 
 
@@ -198,16 +214,50 @@ def _handle_secondary_target_error(tray: Any, exc: Exception, *, action: str) ->
         try:
             notify(exc)
             return
-        except Exception:
-            pass
+        # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging on failure
+        except Exception as notify_exc:
+            _log_boundary_exception(tray, "Failed to notify permission issue for secondary software target: %s", notify_exc)
 
+    _log_boundary_exception(tray, f"Error during {action}: %s", exc)
+
+
+def _set_engine_attr_best_effort(tray: Any, attr: str, value: object, *, error_msg: str) -> None:
+    engine = getattr(tray, "engine", None)
+    if engine is None:
+        return
+
+    try:
+        setattr(engine, attr, value)
+    except AttributeError:
+        return
+    except _ENGINE_ATTR_WRITE_EXCEPTIONS as exc:
+        _log_boundary_exception(tray, error_msg, exc)
+
+
+def _set_config_attr_best_effort(tray: Any, attr: str, value: object, *, error_msg: str) -> None:
+    config = getattr(tray, "config", None)
+    if config is None:
+        return
+
+    try:
+        setattr(config, attr, value)
+    except AttributeError:
+        return
+    except _CONFIG_ATTR_WRITE_EXCEPTIONS as exc:
+        _log_boundary_exception(tray, error_msg, exc)
+
+
+def _log_boundary_exception(tray: Any, msg: str, exc: Exception) -> None:
     log_exception = getattr(tray, "_log_exception", None)
     if callable(log_exception):
         try:
-            log_exception(f"Error during {action}: %s", exc)
+            log_exception(msg, exc)
             return
-        except Exception:
-            pass
+        # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fall back to module traceback logging
+        except Exception as log_exc:
+            logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
+
+    logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 
 
 __all__ = [

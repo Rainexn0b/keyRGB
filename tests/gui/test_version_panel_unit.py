@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from types import SimpleNamespace
+import webbrowser
 
 import pytest
 
@@ -172,7 +173,7 @@ def test_installed_version_text_returns_unknown_on_metadata_failure(monkeypatch:
     monkeypatch.setattr(
         version_panel.metadata,
         "version",
-        lambda _name: (_ for _ in ()).throw(RuntimeError("boom")),
+        lambda _name: (_ for _ in ()).throw(version_panel.metadata.PackageNotFoundError("keyrgb")),
     )
 
     panel = version_panel.VersionPanel.__new__(version_panel.VersionPanel)
@@ -345,7 +346,7 @@ def test_open_repo_tolerates_status_label_lookup_failure(monkeypatch: pytest.Mon
     monkeypatch.setattr(
         version_panel.webbrowser,
         "open",
-        lambda _url, new: (_ for _ in ()).throw(RuntimeError("browser failed")),
+        lambda _url, new: (_ for _ in ()).throw(webbrowser.Error("browser failed")),
     )
 
     root = _FakeRoot()

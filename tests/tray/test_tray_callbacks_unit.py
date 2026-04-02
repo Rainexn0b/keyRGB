@@ -68,6 +68,54 @@ def test_on_device_context_clicked_updates_selection_and_menu() -> None:
     tray._update_menu.assert_called_once()
 
 
+def test_on_device_context_clicked_returns_when_selection_is_read_only() -> None:
+    from src.tray.app.callbacks import on_device_context_clicked
+
+    class _Config:
+        tray_device_context = "keyboard"
+
+    class _Tray:
+        def __init__(self) -> None:
+            self._selected_device_context = "keyboard"
+            self.config = _Config()
+            self._update_menu = MagicMock()
+
+        @property
+        def selected_device_context(self) -> str:
+            return self._selected_device_context
+
+    tray = _Tray()
+
+    on_device_context_clicked(tray, "lightbar:048d:7001")
+
+    assert tray.selected_device_context == "keyboard"
+    assert tray.config.tray_device_context == "keyboard"
+    tray._update_menu.assert_not_called()
+
+
+def test_on_device_context_clicked_ignores_read_only_config_and_updates_menu() -> None:
+    from src.tray.app.callbacks import on_device_context_clicked
+
+    class _Config:
+        @property
+        def tray_device_context(self) -> str:
+            return "keyboard"
+
+    class _Tray:
+        def __init__(self) -> None:
+            self.selected_device_context = "keyboard"
+            self.config = _Config()
+            self._update_menu = MagicMock()
+
+    tray = _Tray()
+
+    on_device_context_clicked(tray, "lightbar:048d:7001")
+
+    assert tray.selected_device_context == "lightbar:048d:7001"
+    assert tray.config.tray_device_context == "keyboard"
+    tray._update_menu.assert_called_once()
+
+
 def test_on_software_effect_target_clicked_updates_policy_and_menu() -> None:
     from src.tray.app.callbacks import on_software_effect_target_clicked
 

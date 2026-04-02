@@ -16,6 +16,7 @@ from typing import Iterable
 
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
+from .quality_exceptions import explanation_for_quality_exception_step
 from .reports import write_csv, write_json, write_md
 
 
@@ -49,6 +50,7 @@ _MESSAGE_BY_CATEGORY = {
 }
 
 _TRACEBACK_SIGNAL_NAMES = {"log_exception", "_log_exception"}
+_QUALITY_EXCEPTION_STEP_SLUG = "exception-transparency"
 _SIGNAL_NAME_CALLS = {
     "print",
     "notify",
@@ -259,6 +261,48 @@ def _make_finding(category: str, rel_path: str, handler: ast.ExceptHandler, line
     )
 
 
+def _comment_text(line: str) -> str | None:
+    comment_index = line.find("#")
+    if comment_index == -1:
+        return None
+    return line[comment_index + 1 :].strip()
+
+
+def _line_indent(line: str) -> str:
+    return line[: len(line) - len(line.lstrip())]
+
+
+def _has_quality_exception_waiver(lines: list[str], handler: ast.ExceptHandler) -> bool:
+    if not (0 < handler.lineno <= len(lines)):
+        return False
+
+    handler_line = lines[handler.lineno - 1]
+    same_line_explanation = explanation_for_quality_exception_step(
+        _comment_text(handler_line),
+        step_slug=_QUALITY_EXCEPTION_STEP_SLUG,
+    )
+    if same_line_explanation is not None:
+        return bool(same_line_explanation)
+
+    previous_line_index = handler.lineno - 2
+    if previous_line_index < 0:
+        return False
+
+    previous_line = lines[previous_line_index]
+    if not previous_line.lstrip().startswith("#"):
+        return False
+    if _line_indent(previous_line) != _line_indent(handler_line):
+        return False
+
+    previous_line_explanation = explanation_for_quality_exception_step(
+        _comment_text(previous_line),
+        step_slug=_QUALITY_EXCEPTION_STEP_SLUG,
+    )
+    if previous_line_explanation is None:
+        return False
+    return bool(previous_line_explanation)
+
+
 def _scan_python_source(source: str, *, rel_path: str) -> list[ExceptionTransparencyFinding]:
     try:
         tree = ast.parse(source)
@@ -280,6 +324,8 @@ def _scan_python_source(source: str, *, rel_path: str) -> list[ExceptionTranspar
         handlers = getattr(node, "handlers", [])
         for handler in handlers:
             if not isinstance(handler, ast.ExceptHandler) or not _is_broad_handler(handler):
+                continue
+            if _has_quality_exception_waiver(lines, handler):
                 continue
 
             findings.append(_make_finding("broad_except_total", rel_path, handler, lines))

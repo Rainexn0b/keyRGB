@@ -1,9 +1,21 @@
 from __future__ import annotations
 
 import configparser
+import logging
 import os
 import subprocess
 from shutil import which
+
+
+logger = logging.getLogger(__name__)
+
+
+def _log_provider_failure(provider_name: str, exc: Exception) -> None:
+    logger.warning(
+        "Theme detection provider %r failed; treating result as unknown",
+        provider_name,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
 
 
 def _detect_theme_override() -> bool | None:
@@ -42,7 +54,7 @@ def _detect_gsettings_color_scheme() -> bool | None:
             return True
         if "light" in out:
             return False
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         return None
     return None
 
@@ -75,7 +87,7 @@ def _read_kde_colorscheme_from_kreadconfig(kdeglobals: str) -> str | None:
             )
             if out:
                 return out
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             continue
     return None
 
@@ -100,7 +112,7 @@ def _read_kde_colorscheme_from_ini(kdeglobals: str) -> str | None:
                 key, value = line.split("=", 1)
                 if key.strip().lower() == "colorscheme":
                     return value.strip().lower() or None
-    except Exception:
+    except OSError:
         return None
     return None
 
@@ -142,8 +154,9 @@ def detect_system_prefers_dark() -> bool | None:
     for provider in providers:
         try:
             val = provider()
-        except Exception:
-            val = None
+        except Exception as exc:  # @quality-exception exception-transparency: theme detection providers are a best-effort GUI startup boundary and must never fail startup
+            _log_provider_failure(provider.__name__, exc)
+            continue
         if val is not None:
             return val
 
@@ -186,7 +199,7 @@ def _kde_colorscheme_background_luminance(scheme: str) -> float | None:
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             parser.read_file(f)
-    except Exception:
+    except (OSError, configparser.Error):
         return None
 
     # Prefer window background, then view background.
@@ -209,7 +222,7 @@ def _parse_kde_rgb(value: str) -> tuple[int, int, int] | None:
         return None
     try:
         r, g, b = (int(parts[0]), int(parts[1]), int(parts[2]))
-    except Exception:
+    except ValueError:
         return None
     if not (0 <= r <= 255 and 0 <= g <= 255 and 0 <= b <= 255):
         return None

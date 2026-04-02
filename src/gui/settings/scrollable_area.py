@@ -1,7 +1,22 @@
 from __future__ import annotations
 
+import logging
 import tkinter as tk
 from tkinter import ttk
+
+from src.core.utils.logging_utils import log_throttled
+
+
+logger = logging.getLogger(__name__)
+
+_TK_WIDGET_ERRORS = (RuntimeError, tk.TclError)
+_TK_TARGET_ERRORS = _TK_WIDGET_ERRORS + (AttributeError,)
+_TK_GEOMETRY_ERRORS = _TK_WIDGET_ERRORS + (TypeError, ValueError)
+_TK_SCROLL_ERRORS = _TK_WIDGET_ERRORS + (AttributeError, TypeError, ValueError)
+
+
+def _log_boundary_exception(key: str, msg: str, exc: Exception) -> None:
+    log_throttled(logger, key, interval_s=60, level=logging.DEBUG, msg=msg, exc=exc)
 
 
 class ScrollableArea:
@@ -27,15 +42,23 @@ class ScrollableArea:
     def _sync_scrollregion(self, _event=None) -> None:
         try:
             self._canvas.configure(scrollregion=self._canvas.bbox("all"))
-        except Exception:
-            pass
+        except _TK_WIDGET_ERRORS as exc:
+            _log_boundary_exception(
+                "settings.scrollable_area.sync_scrollregion",
+                "Failed to sync settings scrollregion",
+                exc,
+            )
         self._update_scrollbar_visibility()
 
     def _sync_content_width(self, event) -> None:
         try:
             self._canvas.itemconfigure(self._frame_window_id, width=event.width)
-        except Exception:
-            pass
+        except (_TK_WIDGET_ERRORS + (AttributeError,)) as exc:
+            _log_boundary_exception(
+                "settings.scrollable_area.sync_content_width",
+                "Failed to sync settings content width",
+                exc,
+            )
         self._update_scrollbar_visibility()
 
     def _content_needs_scroll(self) -> bool:
@@ -46,21 +69,39 @@ class ScrollableArea:
             content_h = bbox[3] - bbox[1]
             canvas_h = self._canvas.winfo_height()
             return content_h > max(1, canvas_h)
-        except Exception:
+        except _TK_GEOMETRY_ERRORS as exc:
+            _log_boundary_exception(
+                "settings.scrollable_area.content_needs_scroll",
+                "Failed to inspect settings scrollable area geometry",
+                exc,
+            )
             return False
 
     def _update_scrollbar_visibility(self) -> None:
-        try:
-            needs_scroll = self._content_needs_scroll()
+        needs_scroll = self._content_needs_scroll()
 
-            if needs_scroll and not self._vscroll_visible:
+        if needs_scroll and not self._vscroll_visible:
+            try:
                 self._vscroll.pack(side="right", fill="y")
-                self._vscroll_visible = True
-            elif (not needs_scroll) and self._vscroll_visible:
+            except _TK_WIDGET_ERRORS as exc:
+                _log_boundary_exception(
+                    "settings.scrollable_area.show_scrollbar",
+                    "Failed to show settings scrollbar",
+                    exc,
+                )
+                return
+            self._vscroll_visible = True
+        elif (not needs_scroll) and self._vscroll_visible:
+            try:
                 self._vscroll.pack_forget()
-                self._vscroll_visible = False
-        except Exception:
-            pass
+            except _TK_WIDGET_ERRORS as exc:
+                _log_boundary_exception(
+                    "settings.scrollable_area.hide_scrollbar",
+                    "Failed to hide settings scrollbar",
+                    exc,
+                )
+                return
+            self._vscroll_visible = False
 
     @staticmethod
     def _is_descendant(widget: tk.Misc, ancestor: tk.Misc) -> bool:
@@ -70,47 +111,83 @@ class ScrollableArea:
                 return True
             try:
                 cur = cur.master  # type: ignore[assignment]
-            except Exception:
+            except _TK_TARGET_ERRORS:
                 break
         return False
 
+    @staticmethod
+    def _mousewheel_units(event) -> int | None:
+        if getattr(event, "num", None) == 4:
+            return -1
+        if getattr(event, "num", None) == 5:
+            return 1
+        if not hasattr(event, "delta") or not event.delta:
+            return None
+        try:
+            return int(-1 * (event.delta / 120))
+        except (TypeError, ValueError):
+            return None
+
     def bind_mousewheel(self, root: tk.Tk, *, priority_scroll_widget: tk.Misc | None = None) -> None:
         def _on_mousewheel(event) -> str | None:
+            x_root = getattr(event, "x_root", None)
+            y_root = getattr(event, "y_root", None)
+            if x_root is None or y_root is None:
+                return None
+
             try:
-                x_root = getattr(event, "x_root", None)
-                y_root = getattr(event, "y_root", None)
-                if x_root is None or y_root is None:
-                    return None
-
                 target = root.winfo_containing(x_root, y_root)
-                if target is None or target.winfo_toplevel() != root:
+            except _TK_WIDGET_ERRORS as exc:
+                _log_boundary_exception(
+                    "settings.scrollable_area.lookup_target",
+                    "Failed to resolve settings mousewheel target",
+                    exc,
+                )
+                return None
+
+            if target is None:
+                return None
+
+            try:
+                if target.winfo_toplevel() != root:
                     return None
+            except _TK_TARGET_ERRORS as exc:
+                _log_boundary_exception(
+                    "settings.scrollable_area.target_toplevel",
+                    "Failed to resolve settings mousewheel toplevel",
+                    exc,
+                )
+                return None
 
-                units: int | None = None
-                if getattr(event, "num", None) == 4:
-                    units = -1
-                elif getattr(event, "num", None) == 5:
-                    units = 1
-                elif hasattr(event, "delta") and event.delta:
-                    units = int(-1 * (event.delta / 120))
+            units = self._mousewheel_units(event)
+            if not units:
+                return None
 
-                if not units:
+            if priority_scroll_widget is not None and self._is_descendant(target, priority_scroll_widget):
+                try:
+                    priority_scroll_widget.yview_scroll(units, "units")  # type: ignore[attr-defined]
+                except _TK_SCROLL_ERRORS as exc:
+                    _log_boundary_exception(
+                        "settings.scrollable_area.priority_scroll",
+                        "Failed to route settings mousewheel to priority widget",
+                        exc,
+                    )
                     return None
+                return "break"
 
-                if priority_scroll_widget is not None and self._is_descendant(target, priority_scroll_widget):
-                    try:
-                        priority_scroll_widget.yview_scroll(units, "units")  # type: ignore[attr-defined]
-                        return "break"
-                    except Exception:
-                        return None
-
-                if self._content_needs_scroll():
+            if self._content_needs_scroll():
+                try:
                     self._canvas.yview_scroll(units, "units")
-                    return "break"
+                except _TK_SCROLL_ERRORS as exc:
+                    _log_boundary_exception(
+                        "settings.scrollable_area.canvas_scroll",
+                        "Failed to scroll settings canvas from mousewheel event",
+                        exc,
+                    )
+                    return None
+                return "break"
 
-                return None
-            except Exception:
-                return None
+            return None
 
         root.bind_all("<MouseWheel>", _on_mousewheel)
         root.bind_all("<Button-4>", _on_mousewheel)
@@ -119,11 +196,36 @@ class ScrollableArea:
     def finalize_initial_scrollbar_state(self) -> None:
         try:
             bbox = self._canvas.bbox("all")
-            if bbox:
-                content_h = bbox[3] - bbox[1]
-                needs_scroll = content_h > max(1, self._canvas.winfo_height())
-                if not needs_scroll and self._vscroll_visible:
-                    self._vscroll.pack_forget()
-                    self._vscroll_visible = False
-        except Exception:
-            pass
+        except _TK_WIDGET_ERRORS as exc:
+            _log_boundary_exception(
+                "settings.scrollable_area.initial_bbox",
+                "Failed to inspect initial settings scrollable area geometry",
+                exc,
+            )
+            return
+
+        if not bbox:
+            return
+
+        try:
+            content_h = bbox[3] - bbox[1]
+            needs_scroll = content_h > max(1, self._canvas.winfo_height())
+        except _TK_GEOMETRY_ERRORS as exc:
+            _log_boundary_exception(
+                "settings.scrollable_area.initial_needs_scroll",
+                "Failed to compute initial settings scrollbar visibility",
+                exc,
+            )
+            return
+
+        if not needs_scroll and self._vscroll_visible:
+            try:
+                self._vscroll.pack_forget()
+            except _TK_WIDGET_ERRORS as exc:
+                _log_boundary_exception(
+                    "settings.scrollable_area.initial_hide_scrollbar",
+                    "Failed to hide initial settings scrollbar",
+                    exc,
+                )
+                return
+            self._vscroll_visible = False

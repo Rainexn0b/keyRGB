@@ -89,6 +89,24 @@ def test_coerce_loaded_settings_swallows_save_failures() -> None:
     assert settings["perkey_brightness"] == 0
 
 
+def test_coerce_loaded_settings_tolerates_malformed_json_on_disk(tmp_path) -> None:
+    config_file = tmp_path / "config.json"
+    config_file.write_text("{not valid json", encoding="utf-8")
+
+    settings = {"brightness": 1}
+    save_calls: list[str] = []
+
+    coerce_loaded_settings(
+        settings=settings,
+        config_file=config_file,
+        save_fn=lambda: save_calls.append("saved"),
+    )
+
+    assert settings["brightness"] == 5
+    assert settings["perkey_brightness"] == 5
+    assert save_calls == ["saved"]
+
+
 def test_bool_prop_returns_default_when_settings_access_raises() -> None:
     class BrokenSettings(dict):
         def get(self, *_args, **_kwargs):

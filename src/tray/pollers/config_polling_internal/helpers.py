@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+from src.core.effects.software_targets import normalize_software_effect_target
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers.software_target_controller import configure_engine_software_targets
 from src.tray.controllers.software_target_controller import restore_secondary_software_targets
@@ -23,7 +24,7 @@ def _log_tray_exception(tray: ConfigPollingTrayProtocol, msg: str, exc: Exceptio
         try:
             log_exception(msg, exc)
             return
-        except Exception as log_exc:
+        except Exception as log_exc:  # @quality-exception exception-transparency: tray exception logger is a best-effort diagnostic boundary
             _log_module_exception("Config polling tray exception logger failed: %s", log_exc)
     _log_module_exception(msg, exc)
 
@@ -34,14 +35,14 @@ def _try_log_event(tray: ConfigPollingTrayProtocol, source: str, action: str, **
         return
     try:
         log_event(source, action, **fields)
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: event logging must never break config polling
         _log_tray_exception(tray, "Config polling event logging failed: %s", exc)
 
 
 def _safe_state_for_log(tray: ConfigPollingTrayProtocol, state_for_log_fn, state):
     try:
         return state_for_log_fn(state)
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: debug-state serialization is a best-effort logging boundary
         _log_tray_exception(tray, "Failed to serialize config polling state for logs: %s", exc)
         return None
 
@@ -52,7 +53,7 @@ def _call_tray_callback(tray: ConfigPollingTrayProtocol, callback_name: str, *, 
         return
     try:
         callback()
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: tray UI callbacks are best-effort during config polling
         _log_tray_exception(tray, error_msg, exc)
 
 
@@ -68,7 +69,7 @@ def _set_engine_attr_best_effort(
         setattr(engine, attr, value)
     except AttributeError:
         return
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: reactive engine sync must tolerate backend-specific setters
         _log_tray_exception(tray, error_msg, exc)
 
 
@@ -97,9 +98,9 @@ def _enable_user_mode_best_effort(tray: ConfigPollingTrayProtocol, *, brightness
     except TypeError:
         try:
             enable_user_mode(brightness=brightness)
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: per-key backend fallback still crosses a runtime backend boundary
             _log_tray_exception(tray, "Failed to enable per-key user mode fallback: %s", exc)
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: per-key user-mode enable crosses a runtime backend boundary
         _log_tray_exception(tray, "Failed to enable per-key user mode: %s", exc)
 
 
@@ -152,7 +153,7 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
     )
     try:
         tray.engine.turn_off()
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: engine shutdown is a runtime backend boundary during config polling
         last_apply_warn_at = _throttled_log_exception(
             tray,
             "Failed to turn off engine: %s",
@@ -207,12 +208,15 @@ def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
 
 
 def _sync_software_target_policy(tray: ConfigPollingTrayProtocol, current) -> None:
+    target = normalize_software_effect_target(getattr(current, "software_effect_target", "keyboard"))
     try:
-        tray.config.software_effect_target = str(getattr(current, "software_effect_target", "keyboard") or "keyboard")
-    except Exception:
+        tray.config.software_effect_target = target
+    except AttributeError:
         pass
+    except Exception as exc:  # @quality-exception exception-transparency: config persistence failure must not block runtime target sync
+        _log_tray_exception(tray, "Failed to persist software effect target during config polling: %s", exc)
     configure_engine_software_targets(tray)
-    if str(getattr(current, "software_effect_target", "keyboard") or "keyboard") != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
+    if target != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
         if not bool(getattr(tray, "is_off", False)):
             restore_secondary_software_targets(tray)
 

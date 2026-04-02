@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import src.core.power.system.modes as system_modes
 from src.core.power.system import PowerMode, get_status, is_supported, set_mode
 
 
@@ -52,3 +53,39 @@ def test_system_power_mode_balanced_restores_max(monkeypatch: pytest.MonkeyPatch
     assert set_mode(PowerMode.BALANCED) is True
     restored = int((pol / "scaling_max_freq").read_text(encoding="utf-8").strip())
     assert restored == 3000000
+
+
+def test_set_mode_falls_back_to_helper_on_sysfs_oserror(monkeypatch: pytest.MonkeyPatch) -> None:
+    helper_calls: list[PowerMode] = []
+
+    def raise_oserror(_mode: PowerMode, *, root: Path) -> None:
+        raise OSError("sysfs write failed")
+
+    def fake_helper(mode: PowerMode) -> bool:
+        helper_calls.append(mode)
+        return True
+
+    monkeypatch.setattr(system_modes, "_apply_mode_sysfs", raise_oserror)
+    monkeypatch.setattr(system_modes, "_run_privileged_helper", fake_helper)
+
+    assert set_mode(PowerMode.BALANCED) is True
+    assert helper_calls == [PowerMode.BALANCED]
+
+
+def test_set_mode_propagates_unexpected_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    helper_calls: list[PowerMode] = []
+
+    def raise_runtime_error(_mode: PowerMode, *, root: Path) -> None:
+        raise RuntimeError("unexpected bug")
+
+    def fake_helper(mode: PowerMode) -> bool:
+        helper_calls.append(mode)
+        return True
+
+    monkeypatch.setattr(system_modes, "_apply_mode_sysfs", raise_runtime_error)
+    monkeypatch.setattr(system_modes, "_run_privileged_helper", fake_helper)
+
+    with pytest.raises(RuntimeError, match="unexpected bug"):
+        set_mode(PowerMode.BALANCED)
+
+    assert helper_calls == []

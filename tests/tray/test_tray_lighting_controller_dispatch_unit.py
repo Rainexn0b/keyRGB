@@ -38,6 +38,78 @@ class TestParseMenuInt:
         assert records[0].exc_info is not None
 
 
+class TestHelperBoundaries:
+    def test_config_per_key_colors_logs_recoverable_getter_failure(self, caplog):
+        from src.tray.controllers._lighting_controller_helpers import _config_per_key_colors_ref
+
+        class BadConfig:
+            @property
+            def per_key_colors(self):
+                raise RuntimeError("bad config")
+
+        with caplog.at_level(logging.ERROR):
+            assert _config_per_key_colors_ref(BadConfig()) is None
+
+        records = [r for r in caplog.records if "Failed reading config per-key colors" in r.message]
+        assert records
+        assert records[0].exc_info is not None
+
+    def test_set_engine_attr_best_effort_logs_recoverable_runtime_error(self):
+        from src.tray.controllers._lighting_controller_helpers import _set_engine_attr_best_effort
+
+        class RejectingEngine:
+            def __init__(self):
+                self._per_key_colors = {(9, 9): (9, 9, 9)}
+
+            @property
+            def per_key_colors(self):
+                return self._per_key_colors
+
+            @per_key_colors.setter
+            def per_key_colors(self, value):
+                if value is not None:
+                    raise RuntimeError("cannot set colors")
+                self._per_key_colors = value
+
+        tray = MagicMock()
+        tray.engine = RejectingEngine()
+
+        _set_engine_attr_best_effort(
+            tray,
+            "per_key_colors",
+            {(0, 0): (255, 0, 0)},
+            error_msg="Failed to apply per-key colors to engine: %s",
+            fallback=None,
+        )
+
+        tray._log_exception.assert_called_once()
+        assert tray._log_exception.call_args.args[0] == "Failed to apply per-key colors to engine: %s"
+        assert str(tray._log_exception.call_args.args[1]) == "cannot set colors"
+        assert tray.engine.per_key_colors is None
+
+    def test_log_tray_exception_falls_back_to_module_logger_when_tray_logger_raises(self):
+        from src.tray.controllers import _lighting_controller_helpers as helpers
+
+        original_exc = RuntimeError("hardware error")
+        tray = MagicMock()
+        tray._log_exception = MagicMock(side_effect=RuntimeError("logger failed"))
+
+        with patch.object(helpers.logger, "exception") as log_exception:
+            with patch.object(helpers.logger, "error") as log_error:
+                helpers._log_tray_exception(tray, "Helper error: %s", original_exc)
+
+        tray._log_exception.assert_called_once_with("Helper error: %s", original_exc)
+        log_exception.assert_called_once()
+        assert log_exception.call_args.args[0] == "Tray exception logger failed while logging boundary: %s"
+        assert str(log_exception.call_args.args[1]) == "logger failed"
+
+        log_error.assert_called_once_with(
+            "Helper error: %s",
+            original_exc,
+            exc_info=(RuntimeError, original_exc, original_exc.__traceback__),
+        )
+
+
 class TestStartCurrentEffect:
     def test_perkey_effect_calls_set_key_colors(self):
         from src.tray.controllers.lighting_controller import start_current_effect
@@ -159,6 +231,33 @@ class TestStartCurrentEffect:
         mock_tray._log_exception.assert_called_once()
         assert mock_tray._log_exception.call_args.args[0] == "Error starting effect: %s"
         assert isinstance(mock_tray._log_exception.call_args.args[1], RuntimeError)
+
+    def test_start_current_effect_falls_back_to_logger_when_tray_logging_raises(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        original_exc = RuntimeError("hardware error")
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "wave"
+        mock_tray.engine.start_effect = MagicMock(side_effect=original_exc)
+        mock_tray._log_exception = MagicMock(side_effect=RuntimeError("logger failed"))
+
+        with patch("src.tray.controllers.lighting_controller.logger.exception") as log_exception:
+            with patch("src.tray.controllers.lighting_controller.logger.error") as log_error:
+                start_current_effect(mock_tray)
+
+        mock_tray._log_exception.assert_called_once_with("Error starting effect: %s", original_exc)
+        log_exception.assert_called_once()
+        assert log_exception.call_args.args[0] == "Tray exception logger failed while logging boundary: %s"
+        assert str(log_exception.call_args.args[1]) == "logger failed"
+
+        log_error.assert_called_once()
+        assert log_error.call_args.args[0] == "Error starting effect: %s"
+        assert log_error.call_args.args[1] is original_exc
+        exc_info = log_error.call_args.kwargs["exc_info"]
+        assert exc_info[0] is RuntimeError
+        assert exc_info[1] is original_exc
+        assert exc_info[2] is original_exc.__traceback__
+        assert exc_info[2] is not None
 
     def test_start_current_effect_logs_mark_unavailable_failure_on_disconnect(self):
         from src.tray.controllers.lighting_controller import start_current_effect

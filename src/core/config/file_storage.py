@@ -8,6 +8,14 @@ from pathlib import Path
 from typing import Any
 
 
+_CONFIG_LOAD_TERMINAL_ERRORS = (OSError, RecursionError, TypeError, ValueError)
+_CONFIG_SAVE_ERRORS = (OSError, RecursionError, TypeError, ValueError)
+
+
+def _log_warning_with_traceback(logger, message: str, exc: Exception) -> None:
+    logger.warning(message, exc, exc_info=(type(exc), exc, exc.__traceback__))
+
+
 def load_config_settings(
     *,
     config_file: Path,
@@ -29,7 +37,7 @@ def load_config_settings(
     last_error: Exception | None = None
     for _ in range(max(1, retries)):
         try:
-            with open(config_file, "r") as f:
+            with open(config_file, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
             if not isinstance(loaded, dict):
                 loaded = {}
@@ -52,11 +60,12 @@ def load_config_settings(
         except json.JSONDecodeError as e:
             last_error = e
             time.sleep(retry_delay)
-        except Exception as e:
+        except _CONFIG_LOAD_TERMINAL_ERRORS as e:
             last_error = e
             break
 
-    logger.warning("Failed to load config: %s", last_error)
+    if last_error is not None:
+        _log_warning_with_traceback(logger, "Failed to load config: %s", last_error)
     return None
 
 
@@ -80,5 +89,5 @@ def save_config_settings_atomic(*, config_dir: Path, config_file: Path, settings
             except OSError as exc:
                 logger.debug("Failed to remove temp config file %s: %s", tmp_path, exc)
 
-    except Exception as e:
-        logger.warning("Failed to save config: %s", e)
+    except _CONFIG_SAVE_ERRORS as e:
+        _log_warning_with_traceback(logger, "Failed to save config: %s", e)

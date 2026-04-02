@@ -1,13 +1,21 @@
 from __future__ import annotations
 
-import time
 import logging
+import os
+import time
 from threading import RLock
 from typing import Any
 
 from src.core.effects.transitions import choose_steps
 
 logger = logging.getLogger(__name__)
+
+_INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+_INT_ATTR_ERRORS = (AttributeError,) + _INT_COERCION_ERRORS
+
+
+def _debug_brightness_enabled() -> bool:
+    return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1"
 
 
 class _EngineBrightness:
@@ -24,19 +32,26 @@ class _EngineBrightness:
     _brightness_fade_token: int
     _brightness_fade_lock: RLock
 
+    def _advance_brightness_fade_token_unlocked(self) -> int:
+        current_token = int(getattr(self, "_brightness_fade_token", 0))
+        next_token = current_token + 1
+        self._brightness_fade_token = next_token
+        return next_token
+
     def _bump_brightness_fade_token(self) -> int:
         try:
             with self._brightness_fade_lock:
-                self._brightness_fade_token = int(self._brightness_fade_token) + 1
-                return int(self._brightness_fade_token)
+                return self._advance_brightness_fade_token_unlocked()
+        except Exception:
+            logger.exception("Failed to advance brightness fade token under lock")
+
+        try:
+            return self._advance_brightness_fade_token_unlocked()
         except Exception:
             # Best-effort: if anything goes wrong, return a value that won't
             # match any in-flight fade.
-            try:
-                self._brightness_fade_token = int(self._brightness_fade_token) + 1
-                return int(self._brightness_fade_token)
-            except Exception:
-                return -1
+            logger.exception("Failed to advance brightness fade token")
+            return -1
 
     def _fade_brightness(
         self,
@@ -77,7 +92,8 @@ class _EngineBrightness:
                 try:
                     if int(token) != int(self._brightness_fade_token):
                         return
-                except Exception:
+                except _INT_ATTR_ERRORS:
+                    logger.exception("Failed to compare brightness fade token")
                     return
                 t = float(i) / float(steps)
                 val = int(round(s + (e - s) * t))
@@ -91,6 +107,7 @@ class _EngineBrightness:
                 if dt > 0:
                     time.sleep(dt)
         except Exception:
+            logger.exception("Brightness fade failed")
             return
 
     def turn_off(self, *, fade: bool = False, fade_duration_s: float = 0.18):
@@ -104,7 +121,7 @@ class _EngineBrightness:
         if fade:
             try:
                 prev = int(self.brightness)
-            except Exception:
+            except _INT_ATTR_ERRORS:
                 prev = 0
 
             # Fade to a minimal non-zero brightness first, then hard-off.
@@ -122,7 +139,7 @@ class _EngineBrightness:
             try:
                 self.brightness = 0
             except Exception:
-                pass
+                logger.exception("Failed to update engine brightness cache during turn_off")
             self.kb.turn_off()
 
     def set_brightness(
@@ -140,7 +157,7 @@ class _EngineBrightness:
 
         try:
             prev = int(self.brightness)
-        except Exception:
+        except _INT_ATTR_ERRORS:
             prev = 0
 
         # Optional fade (used for policy-driven dim/off and restore/turn-on).
@@ -161,36 +178,26 @@ class _EngineBrightness:
             # Re-read after any fade steps to keep logging accurate.
             try:
                 prev = int(self.brightness)
-            except Exception:
+            except _INT_ATTR_ERRORS:
                 prev = prev
 
             self.brightness = int(target)
 
             # Conditional verbose logging enabled by environment variable for
             # on-device investigations: `KEYRGB_DEBUG_BRIGHTNESS=1`.
-            try:
-                import os
-
-                if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
-                    logger.info(
-                        "engine.set_brightness: prev=%s new=%s apply_to_hardware=%s device_available=%s",
-                        prev,
-                        self.brightness,
-                        bool(apply_to_hardware),
-                        self.device_available,
-                    )
-            except Exception:
-                pass
+            if _debug_brightness_enabled():
+                logger.info(
+                    "engine.set_brightness: prev=%s new=%s apply_to_hardware=%s device_available=%s",
+                    prev,
+                    self.brightness,
+                    bool(apply_to_hardware),
+                    getattr(self, "device_available", False),
+                )
 
             if not apply_to_hardware:
                 return
 
             self._ensure_device_available()
-            try:
-                import os
-
-                if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
-                    logger.info("engine -> kb.set_brightness: %s", self.brightness)
-            except Exception:
-                pass
+            if _debug_brightness_enabled():
+                logger.info("engine -> kb.set_brightness: %s", self.brightness)
             self.kb.set_brightness(self.brightness)

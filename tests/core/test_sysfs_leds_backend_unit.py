@@ -61,6 +61,33 @@ def test_sysfs_backend_probe_unavailable_when_no_leds(monkeypatch: pytest.Monkey
     assert probe.available is False
 
 
+def test_sysfs_backend_probe_tolerates_led_enumeration_oserror(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _BrokenRoot:
+        def exists(self) -> bool:
+            return True
+
+        def iterdir(self):
+            raise PermissionError("denied")
+
+    monkeypatch.setattr("src.core.backends.sysfs.backend.common._leds_root", lambda: _BrokenRoot())
+
+    backend = SysfsLedsBackend()
+    probe = backend.probe()
+
+    assert probe.available is False
+    assert probe.reason == "no matching sysfs LED"
+
+
+def test_sysfs_backend_capabilities_tolerate_find_leds_oserror(monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = SysfsLedsBackend()
+    monkeypatch.setattr(backend, "_find_leds", lambda: (_ for _ in ()).throw(PermissionError("denied")))
+
+    caps = backend.capabilities()
+
+    assert caps.per_key is False
+    assert caps.color is False
+
+
 def test_sysfs_backend_prefers_multicolor_led(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     plain = _make_led(tmp_path, "white:kbd_backlight", brightness=1, max_brightness=10)
     rgb = _make_led(tmp_path, "rgb:kbd_backlight", brightness=1, max_brightness=10)
@@ -275,8 +302,9 @@ def test_sysfs_device_set_color_system76_paths(monkeypatch: pytest.MonkeyPatch, 
     assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "50"
 
 
+@pytest.mark.parametrize("error_cls", [RuntimeError, ValueError])
 def test_sysfs_device_channel_group_init_falls_back_when_state_read_fails(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, error_cls: type[Exception]
 ) -> None:
     red = _make_led(tmp_path, "ite_8297:1", brightness=0, max_brightness=255)
     green = _make_led(tmp_path, "ite_8297:2", brightness=0, max_brightness=255)
@@ -285,7 +313,7 @@ def test_sysfs_device_channel_group_init_falls_back_when_state_read_fails(
     monkeypatch.setattr(
         SysfsLedKeyboardDevice,
         "_read_channel_group_state",
-        lambda self, channels: (_ for _ in ()).throw(RuntimeError("boom")),
+        lambda self, channels: (_ for _ in ()).throw(error_cls("boom")),
     )
 
     dev = SysfsLedKeyboardDevice(primary_led_dir=red, all_led_dirs=[red, green, blue])
@@ -307,11 +335,14 @@ def test_sysfs_device_capabilities_detect_rgb_attr_and_handle_probe_errors(
     assert dev.capabilities().color is False
 
 
-def test_sysfs_device_defensive_readers_and_power_state_helpers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+@pytest.mark.parametrize("error_cls", [OSError, ValueError])
+def test_sysfs_device_defensive_readers_and_power_state_helpers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, error_cls: type[Exception]
+) -> None:
     led_dir = _make_led(tmp_path, "generic::kbd_backlight", brightness=1, max_brightness=10)
     dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
 
-    monkeypatch.setattr("src.core.backends.sysfs.device.common._read_int", lambda _path: (_ for _ in ()).throw(OSError("nope")))
+    monkeypatch.setattr("src.core.backends.sysfs.device.common._read_int", lambda _path: (_ for _ in ()).throw(error_cls("nope")))
     assert dev._max() == 1
     assert dev._read_sysfs_brightness() == 0
 
@@ -548,6 +579,26 @@ def test_sysfs_backend_probe_allows_helper_when_not_writable(monkeypatch: pytest
     assert probe.available is True
     assert probe.confidence >= 60
     assert "helper" in (probe.reason or "").lower()
+
+
+def test_sysfs_backend_probe_treats_access_oserror_as_unavailable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _make_led(tmp_path, "rgb:kbd_backlight", brightness=1, max_brightness=10)
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
+
+    def fake_access(_path: str | os.PathLike[str], _mode: int) -> bool:
+        raise PermissionError("denied")
+
+    monkeypatch.setattr(os, "access", fake_access)
+
+    backend = SysfsLedsBackend()
+    probe = backend.probe()
+
+    assert probe.available is False
+    assert probe.reason == "brightness not readable"
+    assert probe.identifiers["brightness_readable"] == "false"
+    assert probe.identifiers["brightness_writable"] == "false"
 
 
 def test_sysfs_backend_api_methods_are_stable(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

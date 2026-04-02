@@ -10,6 +10,12 @@ from .menu_status import device_context_controls_available
 
 logger = logging.getLogger(__name__)
 
+_MENU_BUILD_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
+_TCC_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (OSError,)
+_SYSTEM_POWER_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (OSError,)
+_SYSTEM_POWER_CALLBACK_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_PERKEY_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (ImportError, OSError)
+
 
 def _device_context_footer_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     return [
@@ -125,7 +131,7 @@ def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> 
         def _cb(_icon, _item):
             try:
                 tray._on_tcc_profile_clicked(profile_id)
-            except Exception as exc:
+            except Exception as exc:  # @quality-exception exception-transparency: tray profile activation crosses UI and runtime backend boundaries and must remain best-effort
                 _log_menu_debug(
                     "tray.menu.tcc_profile_click",
                     "TCC profile activation callback failed",
@@ -156,7 +162,7 @@ def build_tcc_profiles_menu(tray: Any, *, pystray: Any, item: Any, tcc: Any) -> 
             pystray.Menu.SEPARATOR,
             *profiles_items,
         )
-    except Exception as exc:
+    except _TCC_MENU_EXCEPTIONS as exc:
         _log_menu_debug(
             "tray.menu.tcc_profiles",
             "Failed to populate TCC profiles menu",
@@ -183,7 +189,7 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
                 try:
                     ok = set_mode(mode)
                     tray._system_power_last_ok = bool(ok)
-                except Exception as exc:
+                except _SYSTEM_POWER_CALLBACK_EXCEPTIONS as exc:
                     tray._system_power_last_ok = False
                     _log_menu_debug(
                         "tray.menu.system_power.click",
@@ -225,7 +231,7 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
                 radio=True,
             ),
         )
-    except Exception as exc:
+    except _SYSTEM_POWER_MENU_EXCEPTIONS as exc:
         _log_menu_debug(
             "tray.menu.system_power",
             "Failed to populate system power mode menu",
@@ -263,7 +269,7 @@ def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_su
 
                 tray._update_icon()
                 tray._update_menu()
-            except Exception as exc:
+            except Exception as exc:  # @quality-exception exception-transparency: per-key profile activation crosses persistence, UI, and runtime effect boundaries and must remain best-effort
                 _log_menu_debug(
                     "tray.menu.perkey_profile_click",
                     "Per-key profile activation callback failed",
@@ -294,7 +300,7 @@ def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_su
             pystray.Menu.SEPARATOR,
             *profile_items,
         )
-    except Exception as exc:
+    except _PERKEY_MENU_EXCEPTIONS as exc:
         _log_menu_debug(
             "tray.menu.perkey_profiles",
             "Failed to populate per-key profiles menu",

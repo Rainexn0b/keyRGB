@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from types import SimpleNamespace
 import sys
@@ -238,7 +239,7 @@ def test_app_snapshot_prefers_repo_version_and_reports_installed_versions(
             return "9.9.9"
         if dist_name == "ite8291r3-ctl":
             return "0.4.0"
-        raise RuntimeError(f"missing {dist_name}")
+        raise collectors_system.metadata.PackageNotFoundError(dist_name)
 
     monkeypatch.setattr(collectors_system.metadata, "version", fake_version)
 
@@ -261,7 +262,7 @@ def test_app_snapshot_falls_back_to_distribution_version(
     def fake_version(dist_name: str) -> str:
         if dist_name == "KeyRGB":
             return "2.5.0"
-        raise RuntimeError(f"missing {dist_name}")
+        raise collectors_system.metadata.PackageNotFoundError(dist_name)
 
     monkeypatch.setattr(collectors_system.metadata, "version", fake_version)
 
@@ -282,7 +283,7 @@ def test_app_snapshot_uses_alternate_helper_distribution_name(
     def fake_version(dist_name: str) -> str:
         if dist_name == "ite8291r3_ctl":
             return "0.5.1"
-        raise RuntimeError(f"missing {dist_name}")
+        raise collectors_system.metadata.PackageNotFoundError(dist_name)
 
     monkeypatch.setattr(collectors_system.metadata, "version", fake_version)
 
@@ -370,15 +371,20 @@ def test_system_power_mode_snapshot_reports_status(monkeypatch: pytest.MonkeyPat
     }
 
 
-def test_system_power_mode_snapshot_reports_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_system_power_mode_snapshot_reports_errors(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     def raise_status() -> SimpleNamespace:
         raise RuntimeError("status unavailable")
 
     monkeypatch.setattr(power_system, "get_status", raise_status)
 
-    snapshot = collectors_system.system_power_mode_snapshot()
+    with caplog.at_level(logging.DEBUG, logger=collectors_system.__name__):
+        snapshot = collectors_system.system_power_mode_snapshot()
 
     assert snapshot["supported"] is False
     assert snapshot["mode"] == "unknown"
     assert snapshot["reason"] == "error"
     assert "status unavailable" in snapshot["error"]
+    assert "Failed to collect system power mode diagnostics" in caplog.text
