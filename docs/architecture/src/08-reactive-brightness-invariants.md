@@ -1,18 +1,18 @@
 # Reactive Brightness Invariants
 
-This note documents the renderer rules that keep reactive typing stable on ITE
+This note documents the renderer rules that keep reactive typing stable on
 per-key keyboards while preserving the uniform-backend fallback.
 
 ## Why This Exists
 
-Reactive typing regressions in this codebase have clustered around one boundary:
-the distinction between per-key pulse content and whole-keyboard hardware
-brightness. When those two responsibilities blur, the result is visible flicker.
+Reactive typing regressions in this codebase have clustered around one
+boundary: the distinction between per-key pulse content and whole-keyboard
+hardware brightness. When those two responsibilities blur, the result is
+visible flicker.
 
-The tests in `tests/core/test_reactive_render_brightness_cap_unit.py`,
-`tests/core/test_reactive_pulse_brightness_unit.py`, and
-`tests/tray/test_brightness_stability_guard_unit.py` lock down the
-invariants below.
+The tests in `tests/core/test_reactive_render_backend_split_unit.py`,
+`tests/core/test_reactive_pulse_brightness_unit.py`, and the tray brightness
+stability tests lock down the invariants below.
 
 ## Invariants
 
@@ -26,8 +26,8 @@ when a per-key backdrop is active).
 2. Per-key reactive pulses must not raise whole-keyboard hardware brightness.
 
 Per-key pulse visibility comes from the per-key color map itself. Sending a
-global `SET_BRIGHTNESS` bump for every keypress makes the entire keyboard flash,
-which reads as unrelated brightness flicker instead of a local ripple.
+global `SET_BRIGHTNESS` bump for every keypress makes the entire keyboard
+flash, which reads as unrelated brightness flicker instead of a local ripple.
 
 3. Uniform-only backends may still use pulse-time hardware lifts.
 
@@ -43,10 +43,10 @@ temp-dim brightness remains the ceiling for hardware writes.
 
 5. `SET_BRIGHTNESS` is a frame commit, not just a cached property update.
 
-On the ITE 8291 path, sending `SET_BRIGHTNESS` before row data can leave the
-visual frame stale until the next commit. Per-key renders therefore send row
-data first and only then send `SET_BRIGHTNESS` when the hardware brightness
-actually changed.
+On ITE-class per-key paths, sending brightness changes out of order can leave a
+visual frame stale until the next commit. Per-key renders therefore send frame
+content first and only then send `set_brightness()` when the hardware
+brightness actually changed.
 
 6. First-frame startup and post-stop behavior must ramp from the intended base.
 
@@ -63,8 +63,8 @@ The current regression suite intentionally splits behavior by backend class:
   hardware-brightness bumps.
 - Uniform render tests prove that the visibility fallback still works where no
   per-key output exists.
-- Guard and dim tests prove that the no-flicker pulse rules do not regress the
-  earlier dim, restore, and wake fixes.
+- Pulse-brightness tests prove that reactive intensity remains separate from
+  steady-state hardware brightness on per-key backends.
 
 If reactive flicker returns, inspect `src/core/effects/reactive/render.py`
 first. In practice, most regressions come from changing `_resolve_brightness()`

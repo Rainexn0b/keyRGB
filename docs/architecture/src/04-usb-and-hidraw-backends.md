@@ -1,26 +1,29 @@
-# USB Backends (Tongfang)
+# USB and Hidraw Backends
 
 ## Goal
 
-Expand USB-based keyboard support on Tongfang laptops by adding additional backend modules for controller variants.
+Expand direct userspace controller support by adding focused backend modules for
+USB and hidraw protocol families.
 
 ## Baseline
 
-Current USB path is the ITE 8291r3-style controller via `ite8291r3-ctl`.
+Current direct-controller paths include ITE 8291r3, ITE 8910, experimental ITE
+8297, and the auxiliary ITE 8233 lightbar work.
 
 ## Problem breakdown
 
-Supporting “more Tongfang keyboards” via USB typically means one of:
+Supporting more direct-controller devices typically means one of:
 
 1. New USB VID/PID for the same controller/protocol
 2. Same VID/PID but firmware differences (quirks)
-3. Different ITE revision or different USB protocol
+3. Different controller revision or different USB / hidraw protocol
+4. Secondary device on the same chassis that should not be folded into the keyboard backend
 
 ## Approach
 
-- Prefer **new backend modules** (or variants) rather than growing one backend into a large if/else blob.
+- Prefer **new backend modules** (or small variants) rather than growing one backend into a large if/else blob.
 - Keep backends small and focused:
-  - one file per controller/protocol family
+  - one package per controller or protocol family
 
 ## Detection
 
@@ -31,6 +34,7 @@ For ITE-like devices:
 
 - Look for known VID/PID tuples.
 - Record detected USB IDs in diagnostics.
+- Prefer hidraw feature-report transport when that is the stable userspace path.
 
 ## Quirk handling
 
@@ -48,7 +52,7 @@ Matrix dimensions and mapping vary by chassis.
 
 ## Contribution workflow
 
-When adding a new Tongfang model:
+When adding a new controller or chassis variant:
 
 1. Collect:
    - `lsusb -nn`
@@ -56,9 +60,12 @@ When adding a new Tongfang model:
    - whether sysfs LEDs exist
 2. Decide backend type:
    - sysfs backend if present
-   - USB backend otherwise
+   - direct USB / hidraw backend otherwise
 3. Add probe rules + a minimal “smoke path” (brightness/uniform)
 4. Validate per-key only after confirming matrix + calibration.
+
+If the device is auxiliary-only, keep it as a separate surface instead of
+forcing keyboard-only abstractions to own it.
 
 ## Testing
 

@@ -2,12 +2,14 @@
 
 ## Goal
 
-Make `KEYRGB_BACKEND=auto` pick the correct backend on Tongfang machines by probing for real availability, not just “importable Python module”.
+Make `KEYRGB_BACKEND=auto` pick the correct backend on Linux systems by
+probing for real availability, not just “importable Python module”.
 
 ## Why this matters
 
-- Many future backends will be importable on all machines, but only usable on some.
+- Many backends will be importable on all machines, but only usable on some.
 - Probing needs to be fast and safe so the tray can start instantly.
+- Discovery output should be explainable enough for Support Tools and issue reports.
 
 ## Design requirements
 
@@ -49,7 +51,8 @@ This makes selection explainable and easier to debug.
    - highest `priority` (e.g. Sysfs=150 > ITE=100)
    - (tie-breaker: highest `confidence`)
 
-This ensures that if a kernel driver is present (Sysfs), it takes precedence over the userspace driver (ITE), avoiding conflicts and using the safer interface.
+This ensures that if a kernel driver is present (sysfs), it takes precedence
+over a userspace driver where that is the safer path.
 
 ## Env override behavior
 
@@ -75,7 +78,7 @@ Example:
 ```text
 Selected backend: sysfs-leds (confidence 90)
 ite8291r3: unavailable (no matching USB device)
-sysfs-leds: available (found /sys/class/leds/tongfang::kbd_backlight)
+sysfs-leds: available (found /sys/class/leds/clevo::kbd_backlight)
 ```
 
 ## Unit tests
@@ -84,5 +87,6 @@ sysfs-leds: available (found /sys/class/leds/tongfang::kbd_backlight)
 - Env override respected
 - Unknown override returns None
 - “No backends available” returns None
+- Discovery snapshots and diagnostics formatting stay aligned with probe results
 
 Probes should be monkeypatchable so tests don’t touch the real system.

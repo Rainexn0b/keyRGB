@@ -2,7 +2,8 @@
 
 ## Goal
 
-Provide a simple policy for Tongfang laptops: automatically reduce keyboard brightness when AC power is unplugged, and restore it when AC returns.
+Provide a simple policy for Linux laptop keyboards: automatically reduce
+keyboard brightness when AC power is unplugged, and restore it when AC returns.
 
 ## Why this is deferred
 
@@ -49,7 +50,8 @@ Prefer minimal config keys (names to be decided when implementing):
 
 ## Related quirk: resume resets controller state
 
-Some ITE-based laptops reportedly resume into a firmware “rainbow cycle” and ignore prior user settings.
+Some ITE-based laptops reportedly resume into a firmware “rainbow cycle” and
+ignore prior user settings.
 
 Mitigation approach:
 

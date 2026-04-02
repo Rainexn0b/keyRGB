@@ -2,11 +2,13 @@
 
 ## Goal
 
-Support Tongfang laptops that expose keyboard backlight controls via sysfs (LED class or platform driver) even when no USB ITE controller is present.
+Support Linux laptops that expose keyboard backlight controls via sysfs (LED
+class or platform driver) even when no direct USB or hidraw controller path is
+available.
 
 ## Non-goals
 
-- Per-key support (likely not possible for sysfs LED backlights).
+- Per-key support unless the kernel exports a real matrix interface.
 - Hardware firmware effects (unless sysfs exposes them explicitly).
 
 ## Detection
@@ -24,7 +26,8 @@ Some naming patterns seen in the wild (kernel/driver dependent):
 - `/sys/class/leds/white:kbd_backlight/` (Generic)
 - `/sys/class/leds/ite_8291_lb:kbd_backlight/` (ITE Lightbar)
 
-- Known Tongfang patterns if discovered (document per model)
+- Additional model-specific patterns should be documented per driver or family,
+  not assumed from brand alone.
 
 A backend should record:
 
@@ -36,6 +39,7 @@ A backend should record:
 Typical sysfs capabilities:
 
 - `per_key = False`
+- `color = False` unless RGB attributes are present
 - `hardware_effects = False`
 - `palette = False`
 
@@ -56,6 +60,9 @@ Implement a device class that satisfies the minimal protocol used by KeyRGB:
 - `set_color()` -> if RGB supported, write color; otherwise either no-op or raise a clear exception
 - `set_key_colors()` -> not supported (should raise)
 - `set_effect()` -> not supported (should raise)
+
+Auxiliary single-zone devices such as a lightbar can use the same broad model,
+but should stay a separate backend if they are not the main keyboard device.
 
 ## Brightness scale
 
