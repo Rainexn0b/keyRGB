@@ -1,9 +1,10 @@
+# Changelog
+
+## 0.20.0 (2026-04-02)
+
 - Added persisted per-key/calibrator legend-pack selection in Keyboard Setup, with layout-aware fallback back to default legends when the chosen pack does not match the active physical family.
 - Fixed optional-key setup labels to inherit the active legend pack before applying any per-slot overrides, so locale legend defaults are no longer rewritten as custom labels.
 - Renamed reactive input internals to slot-first APIs (`slot_id` polling and slot-keymap loading) while keeping compatibility aliases for older key-id-named imports.
-# Changelog
-
-## unreleased
 
 - Tray/Icon: Change the animated rainbow `K` underlay from a horizontal sweep to a diagonal top-left-to-bottom-right gradient so the visible motion now tracks from the bottom-right corner toward the top-left, matching the app icon.
 - GUI/Layout Architecture: Move optional-layout slot overrides and per-key overlay tweak ownership onto canonical physical slot IDs, while keeping compatibility with existing legacy key_id-based profile/config data as groundwork for future locale/legend separation.
