@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
+from ..profile_management import keymap_cells_for, representative_cell
+from .selection import select_visible_identity
 from .wheel_apply import on_wheel_color_release_ui
 from .status import (
     sample_tool_pick_a_key,
@@ -11,9 +13,33 @@ from .status import (
 )
 
 
+def _key_id_for_slot_identity(editor: Any, slot_id: str) -> str | None:
+    key_lookup = getattr(editor, "_key_id_for_slot_id", None)
+    if callable(key_lookup):
+        key_id = key_lookup(slot_id)
+        if key_id:
+            return str(key_id)
+
+    visible_lookup = getattr(editor, "_visible_key_for_slot_id", None)
+    key = visible_lookup(slot_id) if callable(visible_lookup) else None
+    resolved_key_id = getattr(key, "key_id", None) if key is not None else None
+    if resolved_key_id:
+        return str(resolved_key_id)
+    return None
+
+
 def _set_selected_key_without_updating_wheel(editor: Any, key_id: str) -> None:
     editor.selected_key_id = key_id
-    editor.selected_cell = (getattr(editor, "keymap", {}) or {}).get(key_id)
+    slot_lookup = getattr(editor, "_slot_id_for_key_id", None)
+    if callable(slot_lookup):
+        editor.selected_slot_id = slot_lookup(key_id)
+    editor.selected_cells = keymap_cells_for(
+        getattr(editor, "keymap", {}) or {},
+        key_id,
+        slot_id=getattr(editor, "selected_slot_id", None),
+        physical_layout=getattr(editor, "_physical_layout", None),
+    )
+    editor.selected_cell = representative_cell(editor.selected_cells, colors=getattr(editor, "colors", {}) or {})
 
     # Keep overlay controls in sync if present.
     try:
@@ -59,17 +85,22 @@ def on_key_clicked_ui(
 
     if not enabled:
         editor._sample_tool_has_sampled = False
-        editor.select_key_id(str(key_id))
+        select_visible_identity(editor, key_id=str(key_id))
         return
 
     key_id = str(key_id)
     keymap = getattr(editor, "keymap", {}) or {}
-    cell = keymap.get(key_id)
+    cells = keymap_cells_for(
+        keymap,
+        key_id,
+        slot_id=getattr(editor, "selected_slot_id", None),
+        physical_layout=getattr(editor, "_physical_layout", None),
+    )
 
     # Update selection highlight even in sample mode.
     _set_selected_key_without_updating_wheel(editor, key_id)
 
-    if cell is None:
+    if not cells:
         set_status(editor, sample_tool_unmapped_key(key_id))
         try:
             editor.canvas.redraw()
@@ -81,7 +112,8 @@ def on_key_clicked_ui(
 
     # Stage 1: sample color into the wheel.
     if not bool(getattr(editor, "_sample_tool_has_sampled", False)):
-        r, g, b = colors.get(cell, (0, 0, 0))
+        cell = representative_cell(cells, colors=colors)
+        r, g, b = colors.get(cell, (0, 0, 0)) if cell is not None else (0, 0, 0)
         try:
             editor.color_wheel.set_color(int(r), int(g), int(b))
         except Exception:
@@ -109,3 +141,39 @@ def on_key_clicked_ui(
         editor.canvas.redraw()
     except Exception:
         pass
+
+
+def on_slot_clicked_ui(
+    editor: Any,
+    slot_id: str,
+    *,
+    num_rows: int,
+    num_cols: int,
+    apply_release_fn: Callable[..., None] = on_wheel_color_release_ui,
+) -> None:
+    enabled = bool(getattr(getattr(editor, "sample_tool_enabled", None), "get", lambda: False)())
+
+    if not enabled:
+        editor._sample_tool_has_sampled = False
+        select_slot = getattr(editor, "select_slot_id", None)
+        if callable(select_slot):
+            select_slot(str(slot_id))
+            return
+
+        key_id = _key_id_for_slot_identity(editor, str(slot_id))
+        select_key = getattr(editor, "select_key_id", None)
+        if key_id is not None and callable(select_key):
+            select_key(str(key_id))
+        return
+
+    key_id = _key_id_for_slot_identity(editor, str(slot_id))
+    if key_id is None:
+        return
+
+    on_key_clicked_ui(
+        editor,
+        str(key_id),
+        num_rows=num_rows,
+        num_cols=num_cols,
+        apply_release_fn=apply_release_fn,
+    )

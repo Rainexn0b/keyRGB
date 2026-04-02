@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -11,7 +12,9 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import src.core.backends.sysfs.common as sysfs_common
+import src.core.diagnostics.collectors_backends as collectors_backends
 from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
+from src.core.diagnostics.backend_speed_probe import ITE8910_SPEED_PROBE_KEY
 from src.core.diagnostics._collectors_backends_sysfs import sysfs_led_candidates_snapshot
 from src.core.diagnostics.model import Diagnostics
 
@@ -59,6 +62,9 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     assert sysfs_probe.get("provider") == "kernel-sysfs"
     assert isinstance(sysfs_probe.get("priority"), int)
 
+    guided_speed_probes = diag.backends.get("guided_speed_probes")
+    assert isinstance(guided_speed_probes, list)
+
     # Sysfs candidate snapshot should exist (root is sanitized when overridden).
     sysfs_cand = diag.backends.get("sysfs_led_candidates")
     assert isinstance(sysfs_cand, dict)
@@ -67,6 +73,48 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     text = format_diagnostics_text(diag)
     assert "DMI:" in text
     assert "Sysfs LEDs:" in text
+
+
+def test_format_diagnostics_text_includes_guided_speed_probe_section() -> None:
+    diag = Diagnostics(
+        dmi={},
+        leds=[],
+        sysfs_leds=[],
+        usb_ids=[],
+        env={},
+        virt={},
+        system={},
+        hints={},
+        app={},
+        power_supply={},
+        backends={
+            "selected": "ite8910",
+            "requested": "auto",
+            "probes": [],
+            "guided_speed_probes": [
+                {
+                    "key": ITE8910_SPEED_PROBE_KEY,
+                    "backend": "ite8910",
+                    "effect_name": "spectrum_cycle",
+                    "requested_ui_speeds": [1, 3, 5, 7, 10],
+                    "samples": [
+                        {"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"},
+                        {"ui_speed": 10, "payload_speed": 10, "raw_speed_hex": "0x0a"},
+                    ],
+                    "expectation": "Higher UI speed values should look faster on ite8910.",
+                }
+            ],
+        },
+        usb_devices=[],
+        config={},
+        process={},
+    )
+
+    text = format_diagnostics_text(diag)
+
+    assert "guided_speed_probes:" in text
+    assert "sample: ui=1 payload=1 raw=0x01" in text
+    assert "Higher UI speed values should look faster on ite8910." in text
 
 
 def test_format_empty_diagnostics() -> None:
@@ -227,3 +275,91 @@ def test_sysfs_led_candidates_snapshot_records_scoring_failure(
         "RuntimeError: cannot score tongfang::kbd_backlight" in str(error.get("traceback") or "")
         for error in snapshot.get("errors", [])
     )
+
+
+
+def test_probe_backend_logs_probe_boundary_failures(caplog: pytest.LogCaptureFixture) -> None:
+    class BrokenBackend:
+        name = "broken-backend"
+        priority = 7
+
+        def probe(self) -> object:
+            raise RuntimeError("probe failed")
+
+    with caplog.at_level(logging.DEBUG, logger=collectors_backends.__name__):
+        entry = collectors_backends._probe_backend(BrokenBackend())
+
+    assert entry["name"] == "broken-backend"
+    assert entry["available"] is False
+    assert entry["confidence"] == 0
+    assert entry["reason"] == "probe exception: probe failed"
+
+    records = [
+        record
+        for record in caplog.records
+        if "Failed to probe backend during diagnostics collection" in record.getMessage()
+    ]
+    assert records
+    assert records[-1].exc_info is not None
+
+
+def test_probe_backend_tolerates_runtime_metadata_getter_failures() -> None:
+    class BrokenMetadataBackend:
+        name = "broken-meta"
+
+        def is_available(self) -> bool:
+            return True
+
+        
+        @property
+        def priority(self) -> int:
+            raise RuntimeError("priority failed")
+
+        
+        @property
+        def stability(self) -> object:
+            raise RuntimeError("stability failed")
+
+        
+        @property
+        def experimental_evidence(self) -> object:
+            raise RuntimeError("evidence failed")
+
+    entry = collectors_backends._probe_backend(BrokenMetadataBackend())
+
+    assert entry["available"] is True
+    assert entry["priority"] == 0
+    assert "stability" not in entry
+    assert "experimental_evidence" not in entry
+    assert "selection_enabled" not in entry
+
+
+def test_backend_probe_snapshot_logs_selection_boundary_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import src.core.backends.registry as backend_registry
+
+    monkeypatch.setattr(collectors_backends, "_selection_is_blocked_under_pytest", lambda: (False, None))
+    monkeypatch.setattr(collectors_backends, "build_backend_speed_probe_plans", lambda backends_snapshot: [])
+    monkeypatch.setattr(collectors_backends, "sysfs_led_candidates_snapshot", lambda: {})
+    monkeypatch.setattr(backend_registry, "iter_backends", lambda: [])
+    monkeypatch.setattr(
+        backend_registry,
+        "select_backend",
+        lambda: (_ for _ in ()).throw(RuntimeError("selection failed")),
+    )
+
+    with caplog.at_level(logging.DEBUG, logger=collectors_backends.__name__):
+        snapshot = collectors_backends.backend_probe_snapshot()
+
+    assert snapshot["selected"] is None
+    assert snapshot["probes"] == []
+
+    records = [
+        record
+        for record in caplog.records
+        if "Failed to resolve selected backend during diagnostics collection" in record.getMessage()
+    ]
+    assert records
+    assert records[-1].exc_info is not None

@@ -35,3 +35,31 @@ class TestBackdropTransparency:
 
         profiles.save_backdrop_transparency(-10, "test_profile")
         assert profiles.load_backdrop_transparency("test_profile") == 0
+
+    def test_backdrop_mode_defaults_to_builtin_when_missing(self, temp_profile_dir, profile_paths_factory, monkeypatch) -> None:
+        from src.core.profile import profiles
+
+        def mock_paths(_name):
+            return profile_paths_factory(
+                temp_profile_dir,
+                backdrop_settings=temp_profile_dir / "missing_backdrop_settings.json",
+            )
+
+        monkeypatch.setattr(profiles, "paths_for", mock_paths)
+        assert profiles.load_backdrop_mode("test_profile") == "builtin"
+
+    def test_backdrop_mode_roundtrips_and_preserves_transparency(self, temp_profile_dir, profile_paths_factory, monkeypatch) -> None:
+        from src.core.profile import profiles
+
+        settings_file = temp_profile_dir / "backdrop_settings.json"
+
+        def mock_paths(_name):
+            return profile_paths_factory(temp_profile_dir, backdrop_settings=settings_file)
+
+        monkeypatch.setattr(profiles, "paths_for", mock_paths)
+
+        profiles.save_backdrop_transparency(42, "test_profile")
+        profiles.save_backdrop_mode("none", "test_profile")
+
+        assert profiles.load_backdrop_mode("test_profile") == "none"
+        assert profiles.load_backdrop_transparency("test_profile") == 42

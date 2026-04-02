@@ -32,6 +32,7 @@ if TYPE_CHECKING:
 
 
 KEYDEF_BY_ID: dict[str, KeyDef] = {k.key_id: k for k in REFERENCE_DEVICE_KEYS}
+KEYDEF_BY_SLOT_ID: dict[str, KeyDef] = {str(getattr(k, "slot_id", None) or k.key_id): k for k in REFERENCE_DEVICE_KEYS}
 
 
 class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.Canvas):
@@ -76,11 +77,12 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         )
 
     def _apply_per_key_tweak(
-        self, key_id: str, x: float, y: float, w: float, h: float
+        self, key_id: str, x: float, y: float, w: float, h: float, *, slot_id: str | None = None
     ) -> tuple[float, float, float, float, float]:
         inset_default = float(self.editor.layout_tweaks.get("inset", 0.06))
         return apply_per_key_tweak(
             key_id=str(key_id),
+            slot_id=str(slot_id or "") or None,
             rect=(float(x), float(y), float(w), float(h)),
             per_key_layout_tweaks=self.editor.per_key_layout_tweaks,
             inset_default=inset_default,
@@ -105,18 +107,44 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         x0, y0, dw, dh = self._deck_drawn_bbox
         return transform_from_drawn_bbox(x0=x0, y0=y0, draw_w=dw, draw_h=dh, image_size=BASE_IMAGE_SIZE)
 
+    def _keydef_by_slot_id(self, slot_id: str) -> KeyDef | None:
+        for key in KeyboardCanvas._visible_layout_keys(self):
+            if str(getattr(key, "slot_id", None) or key.key_id) == str(slot_id):
+                return key
+        return KEYDEF_BY_SLOT_ID.get(str(slot_id))
+
     def _keydef_by_id(self, key_id: str) -> KeyDef | None:
-        physical_layout = getattr(self.editor, "_physical_layout", "auto") or "auto"
-        for key in get_layout_keys(
-            physical_layout,
-            slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
-        ):
+        for key in KeyboardCanvas._visible_layout_keys(self):
             if key.key_id == key_id:
                 return key
         return KEYDEF_BY_ID.get(key_id)
 
-    def _resize_edges_for_point(self, key_id: str, cx: float, cy: float) -> str:
-        kd = self._keydef_by_id(key_id)
+    def _visible_layout_keys(self) -> list[KeyDef]:
+        getter = getattr(self.editor, "_get_visible_layout_keys", None)
+        if callable(getter):
+            return list(getter())
+
+        physical_layout = getattr(self.editor, "_physical_layout", "auto") or "auto"
+        resolve_legend_pack = getattr(self.editor, "_resolved_layout_legend_pack_id", None)
+        legend_pack_id = resolve_legend_pack() if callable(resolve_legend_pack) else None
+        return list(
+            get_layout_keys(
+                physical_layout,
+                legend_pack_id=legend_pack_id,
+                slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
+            )
+        )
+
+    def _keydef_by_identity(self, identity: str) -> KeyDef | None:
+        slot_lookup = getattr(self, "_keydef_by_slot_id", None)
+        key = slot_lookup(identity) if callable(slot_lookup) else None
+        if key is not None:
+            return key
+        key_lookup = getattr(self, "_keydef_by_id", None)
+        return key_lookup(identity) if callable(key_lookup) else None
+
+    def _resize_edges_for_point(self, identity: str, cx: float, cy: float) -> str:
+        kd = KeyboardCanvas._keydef_by_identity(self, identity)
         if kd is None:
             return ""
         bbox = self._key_bbox_canvas(kd)
@@ -129,8 +157,8 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
     def _cursor_for_edges(self, edges: str) -> str:
         return cursor_for_edges(edges)
 
-    def _point_in_key_bbox(self, key_id: str, cx: float, cy: float) -> bool:
-        kd = self._keydef_by_id(key_id)
+    def _point_in_key_bbox(self, identity: str, cx: float, cy: float) -> bool:
+        kd = KeyboardCanvas._keydef_by_identity(self, identity)
         if kd is None:
             return False
         bbox = self._key_bbox_canvas(kd)
@@ -139,8 +167,8 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         x1, y1, x2, y2 = bbox
         return point_in_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy)
 
-    def _point_near_key_bbox(self, key_id: str, cx: float, cy: float, *, pad: float) -> bool:
-        kd = self._keydef_by_id(key_id)
+    def _point_near_key_bbox(self, identity: str, cx: float, cy: float, *, pad: float) -> bool:
+        kd = KeyboardCanvas._keydef_by_identity(self, identity)
         if kd is None:
             return False
         bbox = self._key_bbox_canvas(kd)
@@ -149,8 +177,8 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         x1, y1, x2, y2 = bbox
         return point_near_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy, pad=pad)
 
-    def _key_rect_base_after_global(self, key_id: str) -> tuple[float, float, float, float] | None:
-        kd = self._keydef_by_id(key_id)
+    def _key_rect_base_after_global(self, identity: str) -> tuple[float, float, float, float] | None:
+        kd = KeyboardCanvas._keydef_by_identity(self, identity)
         if kd is None:
             return None
         x, y, w, h = (float(v) for v in kd.rect)
@@ -165,7 +193,7 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         return (x1 + inset, y1 + inset, x2 - inset, y2 - inset)
 
     def _overlay_drag_geometry(
-        self, key_id: str
+        self, identity: str
     ) -> tuple[float, float, float, float, float, float, float, float] | None:
         """Return (gx, gy, gw, gh, l0, r0, t0, b0) for the selected key overlay.
 
@@ -173,12 +201,22 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         tweaked rect bounds in base-image coordinates.
         """
 
-        base_rect = self._key_rect_base_after_global(key_id)
+        base_rect = self._key_rect_base_after_global(identity)
         if base_rect is None:
             return None
         gx, gy, gw, gh = base_rect
 
-        x2, y2, w2, h2, _inset = self._apply_per_key_tweak(key_id, gx, gy, gw, gh)
+        key = KeyboardCanvas._keydef_by_identity(self, identity)
+        if key is None:
+            return None
+        x2, y2, w2, h2, _inset = self._apply_per_key_tweak(
+            str(key.key_id),
+            gx,
+            gy,
+            gw,
+            gh,
+            slot_id=str(getattr(key, "slot_id", None) or "") or None,
+        )
         l0, r0 = x2, x2 + w2
         t0, b0 = y2, y2 + h2
         return (
@@ -192,15 +230,11 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
             float(b0),
         )
 
-    def _hit_test_key_id(self, cx: float, cy: float) -> str | None:
+    def _hit_test_slot_id(self, cx: float, cy: float) -> str | None:
         t = self._canvas_transform()
         if t is None:
             return None
-        physical_layout = getattr(self.editor, "_physical_layout", "auto") or "auto"
-        visible_keys = get_layout_keys(
-            physical_layout,
-            slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
-        )
+        visible_keys = KeyboardCanvas._visible_layout_keys(self)
         for kd in visible_keys:
             for x1, y1, x2, y2 in key_canvas_hit_rects(
                 transform=t,
@@ -210,28 +244,49 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
                 image_size=BASE_IMAGE_SIZE,
             ):
                 if point_in_bbox(x1=x1, y1=y1, x2=x2, y2=y2, cx=cx, cy=cy):
-                    return kd.key_id
+                    return str(getattr(kd, "slot_id", None) or kd.key_id)
         return None
 
+    def _hit_test_key_id(self, cx: float, cy: float) -> str | None:
+        slot_id = KeyboardCanvas._hit_test_slot_id(self, cx, cy)
+        if slot_id is None:
+            return None
+        key = KeyboardCanvas._keydef_by_slot_id(self, slot_id)
+        return str(key.key_id) if key is not None else str(slot_id)
+
     def _overlay_press_mode(
-        self, *, selected_key_id: str, cx: float, cy: float, pad: float = 6.0
+        self,
+        *,
+        selected_slot_id: str | None = None,
+        selected_key_id: str | None = None,
+        cx: float,
+        cy: float,
+        pad: float = 6.0,
     ) -> tuple[str, str] | None:
         """Return (mode, edges) for an overlay press, or None if not applicable.
 
         Mode is either "move" or "resize". Edges is a subset of "lrtb".
         """
 
-        if not selected_key_id:
+        selected_identity = str(selected_slot_id or "")
+        if not selected_identity and selected_key_id:
+            key = KeyboardCanvas._keydef_by_id(self, str(selected_key_id))
+            if key is not None:
+                selected_identity = str(getattr(key, "slot_id", None) or key.key_id)
+            else:
+                selected_identity = str(selected_key_id)
+        if not selected_identity:
             return None
 
-        edges = self._resize_edges_for_point(selected_key_id, cx, cy)
+        edges = self._resize_edges_for_point(selected_identity, cx, cy)
         if edges:
-            if not self._point_near_key_bbox(selected_key_id, cx, cy, pad=float(pad)):
+            if not self._point_near_key_bbox(selected_identity, cx, cy, pad=float(pad)):
                 return None
             return "resize", edges
 
-        kid = self._hit_test_key_id(cx, cy)
-        if kid != selected_key_id:
+        hit_test_slot_id = getattr(self, "_hit_test_slot_id", None)
+        slot_id = hit_test_slot_id(cx, cy) if callable(hit_test_slot_id) else None
+        if slot_id != selected_identity:
             return None
         return "move", ""
 

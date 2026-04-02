@@ -155,6 +155,10 @@ class Ite8291r3Backend(KeyboardBackend):
                 setattr(device, "keyrgb_hw_speed_policy", "inverted")
             except Exception:
                 pass
+            try:
+                setattr(device, "keyrgb_per_key_mode_policy", "reassert_every_frame")
+            except Exception:
+                pass
             return device
         except Exception as exc:
             msg = str(exc).lower()

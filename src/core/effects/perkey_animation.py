@@ -9,6 +9,24 @@ from src.core.utils.logging_utils import log_throttled
 
 logger = logging.getLogger(__name__)
 
+PER_KEY_MODE_POLICY_INIT_ONCE = "init_once"
+PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME = "reassert_every_frame"
+
+
+def normalize_per_key_mode_policy(policy: object) -> str:
+    value = str(policy or PER_KEY_MODE_POLICY_INIT_ONCE).strip().lower()
+    if value == PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME:
+        return PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME
+    return PER_KEY_MODE_POLICY_INIT_ONCE
+
+
+def per_key_mode_policy(kb: object) -> str:
+    return normalize_per_key_mode_policy(getattr(kb, "keyrgb_per_key_mode_policy", None))
+
+
+def per_key_mode_requires_frame_reassert(kb: object) -> bool:
+    return per_key_mode_policy(kb) == PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME
+
 
 def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, int]]:
     """Best-effort load of per-key colors from the legacy config."""

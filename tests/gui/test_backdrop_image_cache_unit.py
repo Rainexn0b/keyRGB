@@ -25,6 +25,7 @@ def test_backdrop_loaders_share_cached_rgba_image(tmp_path, monkeypatch) -> None
         "paths_for",
         lambda _name: SimpleNamespace(backdrop_image=image_path),
     )
+    monkeypatch.setattr(backdrop_image_cache.profiles, "load_backdrop_mode", lambda _name: "custom")
 
     first = load_backdrop_image("profile-1")
     second = load_reference_deck_image(profile_name="profile-1")
@@ -46,6 +47,7 @@ def test_backdrop_cache_invalidates_when_file_changes(tmp_path, monkeypatch) -> 
         "paths_for",
         lambda _name: SimpleNamespace(backdrop_image=image_path),
     )
+    monkeypatch.setattr(backdrop_image_cache.profiles, "load_backdrop_mode", lambda _name: "custom")
 
     first = load_backdrop_image("profile-1")
     assert first is not None
@@ -60,5 +62,23 @@ def test_backdrop_cache_invalidates_when_file_changes(tmp_path, monkeypatch) -> 
     assert second is not None
     assert second is not first
     assert second.getpixel((0, 0)) == (0, 0, 255, 255)
+
+    clear_cached_backdrop_images()
+
+
+def test_backdrop_loaders_return_none_when_mode_is_none(tmp_path, monkeypatch) -> None:
+    clear_cached_backdrop_images()
+    image_path = tmp_path / "deck.png"
+    _save_rgba(image_path, (255, 0, 0, 255))
+
+    monkeypatch.setattr(
+        backdrop_image_cache.profiles,
+        "paths_for",
+        lambda _name: SimpleNamespace(backdrop_image=image_path),
+    )
+    monkeypatch.setattr(backdrop_image_cache.profiles, "load_backdrop_mode", lambda _name: "none")
+
+    assert load_backdrop_image("profile-1") is None
+    assert load_reference_deck_image(profile_name="profile-1") is None
 
     clear_cached_backdrop_images()

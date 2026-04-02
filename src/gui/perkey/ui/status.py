@@ -58,8 +58,10 @@ def selected_unmapped(key_id: str) -> str:
     return f"Selected {key_id} (unmapped) — run Keymap Calibrator"
 
 
-def selected_mapped(key_id: str, row: int, col: int) -> str:
-    return f"Selected {key_id} -> {row},{col}"
+def selected_mapped(key_id: str, row: int, col: int, count: int = 1) -> str:
+    if int(count) <= 1:
+        return f"Selected {key_id} -> {row},{col}"
+    return f"Selected {key_id} -> {row},{col} (+{int(count) - 1} more)"
 
 
 def saved_overlay_tweaks_for_key(key_id: str) -> str:

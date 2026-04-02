@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import random
 from typing import TYPE_CHECKING, List
 
@@ -26,7 +27,7 @@ from ._ripple_helpers import (
     get_engine_overlay_buffer,
 )
 from .input import (
-    load_active_profile_keymap,
+    load_active_profile_slot_keymap,
     reactive_synthetic_fallback_enabled,
     try_open_evdev_keyboards,
 )
@@ -45,6 +46,8 @@ if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
 
 
+logger = logging.getLogger(__name__)
+
 _ripple_radius = _utils_ripple_radius
 _ripple_weight = _utils_ripple_weight
 
@@ -57,7 +60,7 @@ def _get_engine_manual_reactive_color(engine: "EffectsEngine") -> Color | None:
         return None
     try:
         return (int(src[0]), int(src[1]), int(src[2]))
-    except Exception:
+    except (TypeError, ValueError, IndexError):
         return None
 
 
@@ -80,7 +83,7 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
 
     try:
         prev = float(getattr(engine, "_reactive_active_pulse_mix", 0.0) or 0.0)
-    except Exception:
+    except (TypeError, ValueError):
         prev = 0.0
 
     target_f = max(0.0, min(1.0, float(target)))
@@ -92,7 +95,7 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
     try:
         engine._reactive_active_pulse_mix = float(next_mix)
     except Exception:
-        pass
+        logger.exception("Failed to cache reactive pulse mix")
 
 
 def _render_uniform_fallback(engine: "EffectsEngine", *, rgb: Color) -> None:
@@ -113,7 +116,7 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
         allow_synthetic=reactive_synthetic_fallback_enabled(),
     )
 
-    keymap = load_active_profile_keymap()
+    slot_keymap = load_active_profile_slot_keymap()
 
     pulses: List[_Pulse] = []
     try:
@@ -122,28 +125,28 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
             press.spawn_interval_s = max(0.10, 0.45 / max(0.1, p))
             try:
                 eff_hw = int(getattr(engine, "reactive_brightness", 0) or 0)
-            except Exception:
+            except (TypeError, ValueError):
                 eff_hw = 0
 
             react_color = _get_engine_reactive_color(engine)
             manual = _get_engine_manual_reactive_color(engine)
 
-            pressed_key_id = press.poll_key_id(dt=dt)
-            if pressed_key_id is not None:
-                if pressed_key_id:
-                    rc = keymap.get(str(pressed_key_id).lower())
+            pressed_slot_id = press.poll_slot_id(dt=dt)
+            if pressed_slot_id is not None:
+                if pressed_slot_id:
+                    mapped_cells = slot_keymap.get(str(pressed_slot_id).lower(), ())
                 else:
-                    rc = None
-
-                if rc is not None:
-                    rr, cc = int(rc[0]), int(rc[1])
-                else:
-                    rr = random.randrange(NUM_ROWS)
-                    cc = random.randrange(NUM_COLS)
+                    mapped_cells = ()
 
                 # Slightly longer lifetime so the ripple travels further.
                 ttl = 0.48 / p
-                pulses.append(_Pulse(row=rr, col=cc, age_s=0.0, ttl_s=ttl))
+                if mapped_cells:
+                    for rr, cc in mapped_cells:
+                        pulses.append(_Pulse(row=int(rr), col=int(cc), age_s=0.0, ttl_s=ttl))
+                else:
+                    rr = random.randrange(NUM_ROWS)
+                    cc = random.randrange(NUM_COLS)
+                    pulses.append(_Pulse(row=rr, col=cc, age_s=0.0, ttl_s=ttl))
 
             pulses = _age_pulses_in_place(pulses, dt=dt)
 
@@ -152,7 +155,7 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
 
             try:
                 target_mix = max((float(v) for v in overlay.values()), default=0.0)
-            except Exception:
+            except (TypeError, ValueError):
                 target_mix = 0.0
             _set_reactive_active_pulse_mix(engine, target=target_mix)
 
@@ -181,17 +184,17 @@ def _reactive_fade_loop(engine: "EffectsEngine") -> None:
                 if overlay:
                     try:
                         w_global = max(float(v) for v in overlay.values())
-                    except Exception:
+                    except (TypeError, ValueError):
                         w_global = 0.0
 
                 # Pick representative base colors.
                 try:
                     base_rgb = next(iter(base.values()))
-                except Exception:
+                except StopIteration:
                     base_rgb = (0, 0, 0)
                 try:
                     base_rgb_unscaled = next(iter(base_unscaled.values()))
-                except Exception:
+                except StopIteration:
                     base_rgb_unscaled = base_rgb
 
                 if manual is not None:
@@ -253,7 +256,7 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
         spawn_interval_s=max(0.10, 0.45 / max(0.1, pace(engine))),
         allow_synthetic=reactive_synthetic_fallback_enabled(),
     )
-    keymap = load_active_profile_keymap()
+    slot_keymap = load_active_profile_slot_keymap()
 
     pulses: List[_RainbowPulse] = []
     global_hue = 0.0
@@ -264,7 +267,7 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
             press.spawn_interval_s = max(0.10, 0.45 / max(0.1, p))
             try:
                 eff_hw = int(getattr(engine, "reactive_brightness", 0) or 0)
-            except Exception:
+            except (TypeError, ValueError):
                 eff_hw = 0
 
             per_key_backdrop_active, base_unscaled, base = build_frame_base_maps(
@@ -280,21 +283,23 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
                 engine.stop_event.wait(dt)
                 continue
 
-            pressed_key_id = press.poll_key_id(dt=dt)
-            if pressed_key_id is not None:
-                if pressed_key_id:
-                    rc = keymap.get(str(pressed_key_id).lower())
+            pressed_slot_id = press.poll_slot_id(dt=dt)
+            if pressed_slot_id is not None:
+                if pressed_slot_id:
+                    mapped_cells = slot_keymap.get(str(pressed_slot_id).lower(), ())
                 else:
-                    rc = None
+                    mapped_cells = ()
 
-                if rc is not None:
-                    rr, cc = int(rc[0]), int(rc[1])
+                ttl = 0.65 / p
+                if mapped_cells:
+                    for rr, cc in mapped_cells:
+                        pulses.append(
+                            _RainbowPulse(row=int(rr), col=int(cc), age_s=0.0, ttl_s=ttl, hue_offset=global_hue)
+                        )
                 else:
                     rr = random.randrange(NUM_ROWS)
                     cc = random.randrange(NUM_COLS)
-
-                ttl = 0.65 / p
-                pulses.append(_RainbowPulse(row=rr, col=cc, age_s=0.0, ttl_s=ttl, hue_offset=global_hue))
+                    pulses.append(_RainbowPulse(row=rr, col=cc, age_s=0.0, ttl_s=ttl, hue_offset=global_hue))
 
             pulses = _age_pulses_in_place(pulses, dt=dt)
 
@@ -304,7 +309,7 @@ def run_reactive_ripple(engine: "EffectsEngine") -> None:
 
             try:
                 target_mix = max((float(w) for (w, _hue) in overlay.values()), default=0.0)
-            except Exception:
+            except (TypeError, ValueError):
                 target_mix = 0.0
             _set_reactive_active_pulse_mix(engine, target=target_mix)
 

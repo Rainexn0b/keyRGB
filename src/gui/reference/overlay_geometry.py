@@ -106,12 +106,13 @@ def apply_global_tweak(
 def apply_per_key_tweak(
     *,
     key_id: str,
+    slot_id: str | None = None,
     rect: Tuple[float, float, float, float],
     per_key_layout_tweaks: Dict[str, Dict[str, float]],
     inset_default: float,
 ) -> Tuple[float, float, float, float, float]:
     x, y, w, h = rect
-    kt = per_key_layout_tweaks.get(key_id, {}) or {}
+    kt = (per_key_layout_tweaks.get(str(slot_id or ""), {}) if slot_id else {}) or per_key_layout_tweaks.get(key_id, {}) or {}
 
     kdx = float(kt.get("dx", 0.0))
     kdy = float(kt.get("dy", 0.0))
@@ -152,6 +153,7 @@ def key_canvas_rect(
     inset_default = float(layout_tweaks.get("inset", 0.06))
     xk, yk, wk, hk, inset_value = apply_per_key_tweak(
         key_id=key.key_id,
+        slot_id=str(getattr(key, "slot_id", None) or "") or None,
         rect=(gx, gy, gw, gh),
         per_key_layout_tweaks=per_key_layout_tweaks,
         inset_default=inset_default,

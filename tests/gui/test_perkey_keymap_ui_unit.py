@@ -25,6 +25,7 @@ class DummyCanvas:
 class DummyEditor:
     keymap: dict
     selected_key_id: str | None
+    selected_cells: tuple[tuple[int, int], ...]
     selected_cell: tuple[int, int] | None
     status_label: DummyLabel
     canvas: DummyCanvas
@@ -39,15 +40,17 @@ def test_reload_keymap_ui_updates_selection_and_sets_status_on_change() -> None:
     ed = DummyEditor(
         keymap={},
         selected_key_id="K1",
+        selected_cells=(),
         selected_cell=None,
         status_label=DummyLabel(),
         canvas=DummyCanvas(),
-        next_keymap={"K1": (1, 2)},
+        next_keymap={"K1": ((1, 2), (1, 3))},
     )
 
     reload_keymap_ui(ed)
 
-    assert ed.keymap == {"K1": (1, 2)}
+    assert ed.keymap == {"K1": ((1, 2), (1, 3))}
+    assert ed.selected_cells == ((1, 2), (1, 3))
     assert ed.selected_cell == (1, 2)
     assert ed.status_label.text == "Saved keymap reloaded"
     assert ed.canvas.redraw_calls == 1
@@ -55,8 +58,9 @@ def test_reload_keymap_ui_updates_selection_and_sets_status_on_change() -> None:
 
 def test_reload_keymap_ui_sets_no_keymap_status_when_keymap_becomes_empty() -> None:
     ed = DummyEditor(
-        keymap={"K1": (1, 2)},
+        keymap={"K1": ((1, 2),)},
         selected_key_id="K1",
+        selected_cells=((1, 2),),
         selected_cell=(1, 2),
         status_label=DummyLabel(),
         canvas=DummyCanvas(),
@@ -73,18 +77,20 @@ def test_reload_keymap_ui_sets_no_keymap_status_when_keymap_becomes_empty() -> N
 
 def test_reload_keymap_ui_does_not_touch_status_when_unchanged() -> None:
     ed = DummyEditor(
-        keymap={"K1": (1, 2)},
+        keymap={"K1": ((1, 2), (1, 3))},
         selected_key_id="K1",
+        selected_cells=((1, 2), (1, 3)),
         selected_cell=(1, 2),
         status_label=DummyLabel(),
         canvas=DummyCanvas(),
-        next_keymap={"K1": (1, 2)},
+        next_keymap={"K1": ((1, 2), (1, 3))},
     )
     ed.status_label.text = "Existing"
 
     reload_keymap_ui(ed)
 
-    assert ed.keymap == {"K1": (1, 2)}
+    assert ed.keymap == {"K1": ((1, 2), (1, 3))}
+    assert ed.selected_cells == ((1, 2), (1, 3))
     assert ed.selected_cell == (1, 2)
     assert ed.status_label.text == "Existing"
     assert ed.canvas.redraw_calls == 1

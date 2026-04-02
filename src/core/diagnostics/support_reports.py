@@ -476,44 +476,90 @@ def _supplemental_evidence_text(
 ) -> str:
     if not isinstance(supplemental_evidence, dict):
         return ""
-    captures = supplemental_evidence.get("captures")
-    if not isinstance(captures, dict) or not captures:
-        return ""
-
     lines: list[str] = []
-    if prefix:
-        lines.append(prefix)
+    has_content = False
 
-    for key, payload in captures.items():
-        if not isinstance(payload, dict):
-            continue
-        lines.append(f"[{key}]")
-        command = payload.get("command")
-        if isinstance(command, list) and command:
-            lines.append("command: " + " ".join(str(part) for part in command))
-        via = payload.get("via")
-        if via:
-            lines.append(f"via: {via}")
-        if payload.get("returncode") is not None:
-            lines.append(f"returncode: {payload.get('returncode')}")
-        stdout = str(payload.get("stdout") or "").strip()
-        stderr = str(payload.get("stderr") or "").strip()
-        error = str(payload.get("error") or "").strip()
-        if stdout:
-            lines.append(stdout)
-        if stderr:
-            lines.append("stderr:")
-            lines.append(stderr)
-        if error:
-            lines.append("error: " + error)
-        lines.append("")
+    captures = supplemental_evidence.get("captures")
+    if isinstance(captures, dict) and captures:
+        if prefix and not lines:
+            lines.append(prefix)
+        for key, payload in captures.items():
+            if not isinstance(payload, dict):
+                continue
+            has_content = True
+            lines.append(f"[{key}]")
+            command = payload.get("command")
+            if isinstance(command, list) and command:
+                lines.append("command: " + " ".join(str(part) for part in command))
+            via = payload.get("via")
+            if via:
+                lines.append(f"via: {via}")
+            if payload.get("returncode") is not None:
+                lines.append(f"returncode: {payload.get('returncode')}")
+            stdout = str(payload.get("stdout") or "").strip()
+            stderr = str(payload.get("stderr") or "").strip()
+            error = str(payload.get("error") or "").strip()
+            if stdout:
+                lines.append(stdout)
+            if stderr:
+                lines.append("stderr:")
+                lines.append(stderr)
+            if error:
+                lines.append("error: " + error)
+            lines.append("")
+
+    backend_probes = supplemental_evidence.get("backend_probes")
+    if isinstance(backend_probes, dict) and backend_probes:
+        if prefix and not lines:
+            lines.append(prefix)
+        has_content = True
+        lines.append("Guided backend probes:")
+        for key, payload in backend_probes.items():
+            if not isinstance(payload, dict):
+                continue
+            lines.append(f"[{key}]")
+            lines.append(f"backend: {payload.get('backend')}")
+            lines.append(f"effect: {payload.get('effect_name')}")
+            started_at = str(payload.get("started_at") or "").strip()
+            completed_at = str(payload.get("completed_at") or "").strip()
+            if started_at:
+                lines.append(f"started_at: {started_at}")
+            if completed_at:
+                lines.append(f"completed_at: {completed_at}")
+            samples = payload.get("samples")
+            if isinstance(samples, list) and samples:
+                lines.append("samples:")
+                for sample in samples:
+                    if not isinstance(sample, dict):
+                        continue
+                    lines.append(
+                        "- ui={ui_speed} payload={payload_speed} raw={raw_speed_hex}".format(
+                            ui_speed=sample.get("ui_speed"),
+                            payload_speed=sample.get("payload_speed"),
+                            raw_speed_hex=sample.get("raw_speed_hex"),
+                        )
+                    )
+            observation = payload.get("observation")
+            if isinstance(observation, dict):
+                distinct_steps = observation.get("distinct_steps")
+                if distinct_steps is not None:
+                    lines.append(f"distinct_steps: {distinct_steps}")
+                notes = str(observation.get("notes") or "").strip()
+                if notes:
+                    lines.append("notes: " + notes)
+            lines.append("")
 
     manual = supplemental_evidence.get("manual")
     if isinstance(manual, list) and manual:
+        if prefix and not lines:
+            lines.append(prefix)
+        has_content = True
         lines.append("Remaining manual evidence:")
         for item in manual:
             if isinstance(item, dict):
                 lines.append("- " + str(item.get("label") or item.get("key") or "manual step"))
+    if not has_content:
+        return ""
     return "\n".join(lines).strip()
 
 

@@ -27,6 +27,7 @@ class _Style:
 class _Key:
     key_id: str
     label: str
+    slot_id: str | None = None
 
 
 class _FakeVar:
@@ -67,6 +68,7 @@ class _FakeEditor:
         self.lightbar_overlay: dict[str, object] = {"visible": True}
         self._physical_layout = "auto"
         self.selected_key_id: str | None = None
+        self.selected_slot_id: str | None = None
         self.keymap: dict[str, tuple[int, int]] = {}
         self.colors: dict[tuple[int, int], tuple[int, int, int]] = {}
         self.backdrop_transparency = _FakeVar("0")
@@ -74,6 +76,9 @@ class _FakeEditor:
 
     def on_key_clicked(self, key_id: str) -> None:
         self.clicked_keys.append(str(key_id))
+
+    def on_slot_clicked(self, slot_id: str) -> None:
+        self.clicked_keys.append(str(slot_id))
 
 
 class _FakeCanvas(_KeyboardCanvasDrawingMixin):
@@ -198,6 +203,16 @@ def test_load_deck_image_uses_string_profile_and_clears_cache(monkeypatch: pytes
     assert canvas._deck_render_cache.clear_calls == 1
 
 
+def test_load_deck_image_can_store_no_backdrop(monkeypatch: pytest.MonkeyPatch) -> None:
+    canvas = _FakeCanvas()
+    monkeypatch.setattr(canvas_drawing, "load_reference_deck_image", lambda **_kwargs: None)
+
+    canvas._load_deck_image()
+
+    assert canvas._deck_img is None
+    assert canvas._deck_render_cache.clear_calls == 1
+
+
 def test_load_deck_image_passes_none_for_non_string_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     canvas = _FakeCanvas()
     canvas.editor.profile_name = 123
@@ -266,7 +281,7 @@ def test_redraw_draws_lightbar_overlay_before_keys_when_detected(monkeypatch: py
         "width": 2,
         "tags": ("lightbar_overlay",),
     }
-    assert canvas.rectangles[1]["tags"] == ("pkey_k1", "pkey")
+    assert canvas.rectangles[1]["tags"] == ("pslot_k1", "pkey_k1", "pkey")
 
 
 def test_draw_lightbar_overlay_is_noop_when_hidden_or_absent(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -286,6 +301,7 @@ def test_redraw_creates_rectangle_text_and_tag_binding(monkeypatch: pytest.Monke
     canvas = _FakeCanvas()
     canvas._transform = object()
     canvas.editor.selected_key_id = "k1"
+    canvas.editor.selected_slot_id = "k1"
     canvas.editor.keymap = {"k1": (0, 0)}
     canvas.editor.colors = {(0, 0): (10, 20, 30)}
 
@@ -304,11 +320,11 @@ def test_redraw_creates_rectangle_text_and_tag_binding(monkeypatch: pytest.Monke
 
     assert len(canvas.rectangles) == 1
     assert len(canvas.texts) == 1
-    assert canvas.rectangles[0]["tags"] == ("pkey_k1", "pkey")
+    assert canvas.rectangles[0]["tags"] == ("pslot_k1", "pkey_k1", "pkey")
     assert canvas.texts[0]["text"] == "Esc"
     assert "k1" in canvas.key_rects
     assert "k1" in canvas.key_texts
-    assert canvas.tag_bind_calls and canvas.tag_bind_calls[0][0] == "pkey_k1"
+    assert canvas.tag_bind_calls and canvas.tag_bind_calls[0][0] == "pslot_k1"
 
     callback = canvas.tag_bind_calls[0][2]
     callback(None)

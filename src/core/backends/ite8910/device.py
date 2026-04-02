@@ -66,6 +66,7 @@ class Ite8910KeyboardDevice:
     """
 
     keyrgb_hw_speed_policy = "direct"
+    keyrgb_per_key_mode_policy = "init_once"
 
     def __init__(
         self,

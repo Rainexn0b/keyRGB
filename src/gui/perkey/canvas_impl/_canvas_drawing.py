@@ -11,6 +11,7 @@ from src.gui.reference.overlay_geometry import calc_centered_drawn_bbox, key_can
 from src.gui.utils.key_draw_style import key_draw_style
 
 from ..lightbar_layout import lightbar_rect_for_size
+from ..profile_management import keymap_cells_for, representative_cell
 
 
 logger = logging.getLogger(__name__)
@@ -54,11 +55,19 @@ class _KeyboardCanvasDrawingMixin:
 
         self._draw_lightbar_overlay()
 
-        physical_layout = getattr(getattr(self, "editor", None), "_physical_layout", "auto") or "auto"
-        visible_keys = get_layout_keys(
-            physical_layout,
-            slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
-        )
+        editor = getattr(self, "editor", None)
+        physical_layout = getattr(editor, "_physical_layout", "auto") or "auto"
+        visible_keys_getter = getattr(self, "_visible_layout_keys", None)
+        if callable(visible_keys_getter):
+            visible_keys = list(visible_keys_getter())
+        else:
+            resolve_legend_pack = getattr(editor, "_resolved_layout_legend_pack_id", None)
+            legend_pack_id = resolve_legend_pack() if callable(resolve_legend_pack) else None
+            visible_keys = get_layout_keys(
+                physical_layout,
+                legend_pack_id=legend_pack_id,
+                slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
+            )
 
         for key in visible_keys:
             x1, y1, x2, y2, inset_value = key_canvas_rect(
@@ -75,12 +84,19 @@ class _KeyboardCanvasDrawingMixin:
             x2 -= inset
             y2 -= inset
 
-            mapped_cell = self.editor.keymap.get(key.key_id)
-            mapped = mapped_cell is not None
+            mapped_cells = keymap_cells_for(
+                self.editor.keymap,
+                key.key_id,
+                slot_id=str(getattr(key, "slot_id", None) or key.key_id),
+                physical_layout=physical_layout,
+            )
+            mapped = bool(mapped_cells)
+            mapped_cell = representative_cell(mapped_cells, colors=self.editor.colors)
             color = self.editor.colors.get(mapped_cell) if mapped_cell is not None else None
+            slot_id = str(getattr(key, "slot_id", None) or key.key_id)
             style = key_draw_style(
                 mapped=mapped,
-                selected=self.editor.selected_key_id == key.key_id,
+                selected=getattr(self.editor, "selected_slot_id", None) == slot_id,
                 color=color,
             )
 
@@ -105,7 +121,7 @@ class _KeyboardCanvasDrawingMixin:
                     outline=style.outline,
                     width=style.width,
                     dash=style.dash,
-                    tags=(f"pkey_{key.key_id}", "pkey"),
+                    tags=(f"pslot_{slot_id}", f"pkey_{key.key_id}", "pkey"),
                 )
             else:
                 rect_id = self.create_polygon(
@@ -116,9 +132,10 @@ class _KeyboardCanvasDrawingMixin:
                     width=style.width,
                     dash=style.dash,
                     joinstyle="miter",
-                    tags=(f"pkey_{key.key_id}", "pkey"),
+                    tags=(f"pslot_{slot_id}", f"pkey_{key.key_id}", "pkey"),
                 )
             self.key_rects[key.key_id] = rect_id
+            self.key_rects[slot_id] = rect_id
 
             key_w = max(1, int(x2 - x1))
             key_h = max(1, int(y2 - y1))
@@ -148,14 +165,15 @@ class _KeyboardCanvasDrawingMixin:
                 text=label,
                 fill=style.text_fill,
                 font=(font_name, font_size),
-                tags=(f"pkey_{key.key_id}", "pkey"),
+                tags=(f"pslot_{slot_id}", f"pkey_{key.key_id}", "pkey"),
             )
             self.key_texts[key.key_id] = text_id
+            self.key_texts[slot_id] = text_id
 
             self.tag_bind(
-                f"pkey_{key.key_id}",
+                f"pslot_{slot_id}",
                 "<Button-1>",
-                lambda _e, kid=key.key_id: self.editor.on_key_clicked(kid),
+                lambda _e, sid=slot_id: self.editor.on_slot_clicked(sid),
             )
 
     def _draw_deck_background(self) -> None:

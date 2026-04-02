@@ -6,13 +6,15 @@ import json
 import logging
 import os
 import webbrowser
+from datetime import datetime, timezone
 
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
-from tkinter import scrolledtext, ttk
+from tkinter import scrolledtext, simpledialog, ttk
 
 from src.core.diagnostics.additional_evidence import build_additional_evidence_plan, collect_additional_evidence
+from src.core.diagnostics.backend_speed_probe import build_backend_speed_probe_plan
 from src.core.diagnostics.device_discovery import collect_device_discovery, format_device_discovery_text
 from src.core.diagnostics.support_reports import (
     ISSUE_URL,
@@ -48,6 +50,7 @@ class SupportToolsGUI:
         self._supplemental_evidence: dict[str, object] | None = None
         self._issue_report: dict[str, object] | None = None
         self._capture_prompt_key = ""
+        self._backend_probe_prompt_key = ""
 
         main = ttk.Frame(self.root, padding=18)
         main.pack(fill="both", expand=True)
@@ -102,6 +105,16 @@ class SupportToolsGUI:
         self.btn_save_debug = ttk.Button(row, text="Save diagnostics JSON…", command=self.save_debug_output)
         self.btn_save_debug.pack(side="left", padx=(8, 0))
         ttk.Button(row, text="Open issue", command=self.open_issue_form).pack(side="left", padx=(8, 0))
+
+        probe_row = ttk.Frame(parent)
+        probe_row.pack(fill="x", pady=(0, 8))
+        ttk.Label(probe_row, text="Guided backend probe:", font=("Sans", 9)).pack(side="left")
+        self.btn_run_speed_probe = ttk.Button(
+            probe_row,
+            text="Run backend speed probe…",
+            command=self.run_backend_speed_probe,
+        )
+        self.btn_run_speed_probe.pack(side="left", padx=(8, 0))
 
         self.txt_debug = scrolledtext.ScrolledText(
             parent,
@@ -225,9 +238,36 @@ class SupportToolsGUI:
         self.btn_save_bundle.configure(
             state="normal" if (self._diagnostics_json or self._discovery_json) else "disabled"
         )
+        self.btn_run_speed_probe.configure(
+            state="normal" if isinstance(self._current_backend_speed_probe_plan(), dict) else "disabled"
+        )
 
     def _current_capture_plan(self) -> dict[str, object]:
         return build_additional_evidence_plan(self._parsed_json(self._discovery_json))
+
+    def _current_backend_speed_probe_plan(self) -> dict[str, object] | None:
+        diagnostics = self._parsed_json(self._diagnostics_json)
+        if isinstance(diagnostics, dict):
+            backends = diagnostics.get("backends")
+            if isinstance(backends, dict):
+                plans = backends.get("guided_speed_probes")
+                if isinstance(plans, list):
+                    for plan in plans:
+                        if isinstance(plan, dict):
+                            return plan
+
+        discovery = self._parsed_json(self._discovery_json)
+        backend_name = ""
+        if isinstance(discovery, dict):
+            backend_name = str(discovery.get("selected_backend") or "").strip().lower()
+        if not backend_name and isinstance(diagnostics, dict):
+            backends = diagnostics.get("backends")
+            if isinstance(backends, dict):
+                backend_name = str(backends.get("selected") or "").strip().lower()
+        if not backend_name:
+            return None
+        plan = build_backend_speed_probe_plan(backend_name)
+        return plan if isinstance(plan, dict) else None
 
     def _parsed_json(self, text: str) -> dict[str, object] | None:
         if not text:
@@ -283,6 +323,41 @@ class SupportToolsGUI:
             ok = False
         if ok:
             self.collect_missing_evidence(prompt=False)
+
+    def _maybe_prompt_for_backend_speed_probe(self) -> None:
+        plan = self._current_backend_speed_probe_plan()
+        if not isinstance(plan, dict):
+            return
+
+        prompt_key = str(plan.get("key") or "") + ":" + str(plan.get("backend") or "")
+        if not prompt_key or prompt_key == self._backend_probe_prompt_key:
+            return
+        self._backend_probe_prompt_key = prompt_key
+
+        message = (
+            "KeyRGB can guide a backend speed probe for this device now.\n\n"
+            "This will not change hardware automatically; it will show you the exact speed steps to try and save your notes into the support bundle.\n\n"
+            "Run the probe now?"
+        )
+        try:
+            ok = bool(messagebox.askyesno("Run Backend Speed Probe", message, parent=self.root))
+        except _TK_RUNTIME_ERRORS:
+            ok = False
+        if ok:
+            self.run_backend_speed_probe(prompt=False)
+
+    def _merge_supplemental_evidence(self, payload: dict[str, object] | None) -> None:
+        if not isinstance(payload, dict):
+            return
+        base = dict(self._supplemental_evidence) if isinstance(self._supplemental_evidence, dict) else {}
+        for key, value in payload.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                merged = dict(base.get(key) or {})
+                merged.update(value)
+                base[key] = merged
+            else:
+                base[key] = value
+        self._supplemental_evidence = base
 
     def _set_status(self, text: str, *, ok: bool = True) -> None:
         color = "#00aa00" if ok else "#bb0000"
@@ -350,6 +425,7 @@ class SupportToolsGUI:
             self._refresh_issue_report()
             self._sync_button_state()
             self._set_status("Diagnostics ready", ok=bool(self._diagnostics_json))
+            self._maybe_prompt_for_backend_speed_probe()
 
         run_in_thread(self.root, work, on_done)
 
@@ -370,13 +446,19 @@ class SupportToolsGUI:
         def on_done(result: tuple[str, str]) -> None:
             payload_text, display_text = result
             self._discovery_json = payload_text
-            self._supplemental_evidence = None
+            backend_probes = None
+            if isinstance(self._supplemental_evidence, dict):
+                existing_backend_probes = self._supplemental_evidence.get("backend_probes")
+                if isinstance(existing_backend_probes, dict) and existing_backend_probes:
+                    backend_probes = dict(existing_backend_probes)
+            self._supplemental_evidence = {"backend_probes": backend_probes} if backend_probes else None
             self._set_text(self.txt_discovery, display_text)
             self.btn_run_discovery.configure(state="normal")
             self._refresh_issue_report()
             self._sync_button_state()
             self._set_status("Discovery scan ready", ok=bool(self._discovery_json))
             self._maybe_prompt_for_missing_evidence()
+            self._maybe_prompt_for_backend_speed_probe()
 
         run_in_thread(self.root, work, on_done)
 
@@ -406,7 +488,7 @@ class SupportToolsGUI:
             return collect_additional_evidence(self._parsed_json(self._discovery_json), allow_privileged=True)
 
         def on_done(payload: dict[str, object]) -> None:
-            self._supplemental_evidence = payload if isinstance(payload, dict) else None
+            self._merge_supplemental_evidence(payload if isinstance(payload, dict) else None)
             self._refresh_issue_report()
             self._sync_button_state()
             captures = payload.get("captures") if isinstance(payload, dict) else None
@@ -416,6 +498,82 @@ class SupportToolsGUI:
             self._set_status("Additional evidence collected" if success else "Additional evidence incomplete", ok=bool(success))
 
         run_in_thread(self.root, work, on_done)
+
+    def run_backend_speed_probe(self, *, prompt: bool = True) -> None:
+        plan = self._current_backend_speed_probe_plan()
+        if not isinstance(plan, dict):
+            self._set_status("No guided backend probe available", ok=False)
+            return
+
+        if prompt:
+            try:
+                ok = bool(
+                    messagebox.askyesno(
+                        "Run Backend Speed Probe",
+                        "Use the guided backend speed probe for the current diagnostics snapshot?",
+                        parent=self.root,
+                    )
+                )
+            except _TK_RUNTIME_ERRORS:
+                ok = False
+            if not ok:
+                return
+
+        instructions = "\n".join(f"- {line}" for line in plan.get("instructions") or [])
+        samples_text = ", ".join(
+            f"UI {sample.get('ui_speed')} -> raw {sample.get('raw_speed_hex')}"
+            for sample in plan.get("samples") or []
+            if isinstance(sample, dict)
+        )
+        message = (
+            f"Backend: {plan.get('backend')}\n"
+            f"Effect: {plan.get('effect_name')}\n"
+            f"Samples: {samples_text}\n\n"
+            f"{instructions}\n\n"
+            "Click OK after you have tested the listed speed values."
+        )
+        started_at = datetime.now(timezone.utc).isoformat()
+        try:
+            messagebox.showinfo("Backend Speed Probe", message, parent=self.root)
+        except _TK_RUNTIME_ERRORS:
+            pass
+
+        distinct_steps = None
+        try:
+            distinct_steps = messagebox.askyesnocancel(
+                "Backend Speed Probe",
+                "Did the listed speed steps look clearly distinct on the keyboard?",
+                parent=self.root,
+            )
+        except _TK_RUNTIME_ERRORS:
+            distinct_steps = None
+
+        try:
+            notes = simpledialog.askstring(
+                "Backend Speed Probe",
+                str(plan.get("observation_prompt") or "Observation notes:"),
+                parent=self.root,
+            )
+        except _TK_RUNTIME_ERRORS:
+            notes = None
+
+        completed_at = datetime.now(timezone.utc).isoformat()
+        result = {
+            "backend": plan.get("backend"),
+            "effect_name": plan.get("effect_name"),
+            "requested_ui_speeds": list(plan.get("requested_ui_speeds") or []),
+            "samples": list(plan.get("samples") or []),
+            "started_at": started_at,
+            "completed_at": completed_at,
+            "observation": {
+                "distinct_steps": distinct_steps,
+                "notes": str(notes or "").strip(),
+            },
+        }
+        self._merge_supplemental_evidence({"backend_probes": {str(plan.get("key") or "backend_probe"): result}})
+        self._refresh_issue_report()
+        self._sync_button_state()
+        self._set_status("Backend speed probe recorded", ok=True)
 
     def copy_debug_output(self) -> None:
         self._copy_text(

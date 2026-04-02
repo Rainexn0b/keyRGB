@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef
+from src.core.resources.layouts import slot_id_for_key_id
 from src.gui.calibrator import app as calibrator_app
 from src.gui.calibrator.helpers.probe import CalibrationProbeState
 from src.gui.reference.overlay_geometry import CanvasTransform
@@ -58,7 +59,7 @@ def _make_app(**overrides: object) -> SimpleNamespace:
         layout_tweaks={"dx": 1.0},
         per_key_layout_tweaks={"esc": {"dx": 0.5}},
         layout_slot_overrides={"macro": {"enabled": True}},
-        cfg=SimpleNamespace(physical_layout="ansi"),
+        cfg=SimpleNamespace(physical_layout="ansi", layout_legend_pack="auto"),
         canvas="canvas",
         _deck_pil=None,
         _deck_tk="stale-tk-image",
@@ -82,27 +83,27 @@ def test_keymap_path_uses_active_profile(monkeypatch: pytest.MonkeyPatch, tmp_pa
 
 
 def test_save_keymap_uses_active_profile(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls: list[tuple[str, dict[str, tuple[int, int]]]] = []
-    keymap = {"esc": (0, 0)}
+    calls: list[tuple[str, dict[str, tuple[tuple[int, int], ...]]]] = []
+    keymap = {"esc": ((0, 0),)}
 
     monkeypatch.setattr(calibrator_app, "get_active_profile_name", lambda: "profile-z")
     monkeypatch.setattr(
         calibrator_app,
         "save_keymap",
-        lambda profile_name, value: calls.append((profile_name, value)),
+        lambda profile_name, value, **kwargs: calls.append((profile_name, value, kwargs)),
     )
 
     calibrator_app._save_keymap(keymap)
 
-    assert calls == [("profile-z", keymap)]
+    assert calls == [("profile-z", keymap, {"physical_layout": None})]
 
 
 def test_load_profile_state_uses_selected_physical_layout(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, str, str | None]] = []
 
-    def fake_load_keymap(profile_name: str, *, physical_layout: str | None = None) -> dict[str, tuple[int, int]]:
+    def fake_load_keymap(profile_name: str, *, physical_layout: str | None = None) -> dict[str, object]:
         calls.append(("keymap", profile_name, physical_layout))
-        return {"iso_extra": (0, 1), "invalid": (99, 99)}
+        return {"iso_extra": (0, 1), "invalid": (99, 99), "enter": [(1, 2), (1, 3)]}
 
     def fake_load_layout_global(profile_name: str, *, physical_layout: str | None = None) -> dict[str, float]:
         calls.append(("layout_global", profile_name, physical_layout))
@@ -136,7 +137,7 @@ def test_load_profile_state_uses_selected_physical_layout(monkeypatch: pytest.Mo
         ("layout_per_key", "profile-z", "iso"),
         ("layout_slots", "profile-z", "iso"),
     ]
-    assert keymap == {"iso_extra": (0, 1)}
+    assert keymap == {"iso_extra": ((0, 1),), "enter": ((1, 2), (1, 3))}
     assert layout_tweaks == {"dx": 1.5}
     assert per_key_layout_tweaks == {"iso_extra": {"dx": 0.25}}
     assert layout_slot_overrides == {"nonusbackslash": {"label": "<>"}}
@@ -145,9 +146,12 @@ def test_load_profile_state_uses_selected_physical_layout(monkeypatch: pytest.Mo
 def test_set_backdrop_saves_reloads_and_redraws_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _make_app()
     calls: list[tuple[str, str]] = []
+    mode_calls: list[tuple[str, str]] = []
     actions: list[str] = []
     app._load_deck_image = lambda: actions.append("load")
     app._redraw = lambda: actions.append("redraw")
+    app._backdrop_mode_var = type("Var", (), {"set": lambda self, value: None})()
+    app._backdrop_mode_combo = type("Combo", (), {"set": lambda self, value: None})()
 
     monkeypatch.setattr(calibrator_app.filedialog, "askopenfilename", lambda **_kwargs: "/tmp/deck.png")
     monkeypatch.setattr(
@@ -155,10 +159,12 @@ def test_set_backdrop_saves_reloads_and_redraws_on_success(monkeypatch: pytest.M
         "save_backdrop_image",
         lambda *, profile_name, source_path: calls.append((profile_name, source_path)),
     )
+    monkeypatch.setattr(calibrator_app.profiles, "save_backdrop_mode", lambda mode, name: mode_calls.append((mode, name)))
 
     calibrator_app.KeymapCalibrator._set_backdrop(app)
 
     assert calls == [("gaming", "/tmp/deck.png")]
+    assert mode_calls == [("custom", "gaming")]
     assert actions == ["load", "redraw"]
     assert app.lbl_status.text == "Backdrop updated"
 
@@ -204,15 +210,20 @@ def test_set_backdrop_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reset_backdrop_reloads_and_redraws_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _make_app()
     reset_calls: list[str] = []
+    mode_calls: list[tuple[str, str]] = []
     actions: list[str] = []
     app._load_deck_image = lambda: actions.append("load")
     app._redraw = lambda: actions.append("redraw")
+    app._backdrop_mode_var = type("Var", (), {"set": lambda self, value: None})()
+    app._backdrop_mode_combo = type("Combo", (), {"set": lambda self, value: None})()
 
     monkeypatch.setattr(calibrator_app, "reset_backdrop_image", lambda profile_name: reset_calls.append(profile_name))
+    monkeypatch.setattr(calibrator_app.profiles, "save_backdrop_mode", lambda mode, name: mode_calls.append((mode, name)))
 
     calibrator_app.KeymapCalibrator._reset_backdrop(app)
 
     assert reset_calls == ["gaming"]
+    assert mode_calls == [("builtin", "gaming")]
     assert actions == ["load", "redraw"]
     assert app.lbl_status.text == "Backdrop reset"
 
@@ -232,6 +243,60 @@ def test_reset_backdrop_reports_failures(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert actions == []
     assert app.lbl_status.text == "Failed to reset backdrop"
+
+
+def test_on_backdrop_mode_changed_persists_reload_and_redraws(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _make_app()
+    actions: list[str] = []
+    app._load_deck_image = lambda: actions.append("load")
+    app._redraw = lambda: actions.append("redraw")
+    app._backdrop_mode_var = type(
+        "Var",
+        (),
+        {
+            "value": "builtin",
+            "set": lambda self, value: setattr(self, "value", value),
+            "get": lambda self: self.value,
+        },
+    )()
+    app._backdrop_mode_combo = type("Combo", (), {"get": lambda self: "No backdrop"})()
+    mode_calls: list[tuple[str, str]] = []
+
+    monkeypatch.setattr(calibrator_app.profiles, "save_backdrop_mode", lambda mode, name: mode_calls.append((mode, name)))
+
+    calibrator_app.KeymapCalibrator._on_backdrop_mode_changed(app)
+
+    assert mode_calls == [("none", "gaming")]
+    assert app._backdrop_mode_var.get() == "none"
+    assert actions == ["load", "redraw"]
+
+
+def test_on_backdrop_mode_changed_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _make_app()
+    actions: list[str] = []
+    app._load_deck_image = lambda: actions.append("load")
+    app._redraw = lambda: actions.append("redraw")
+    app._backdrop_mode_var = type(
+        "Var",
+        (),
+        {
+            "value": "builtin",
+            "set": lambda self, value: setattr(self, "value", value),
+            "get": lambda self: self.value,
+        },
+    )()
+    app._backdrop_mode_combo = type("Combo", (), {"get": lambda self: "Custom image"})()
+
+    monkeypatch.setattr(
+        calibrator_app.profiles,
+        "save_backdrop_mode",
+        lambda mode, name: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    calibrator_app.KeymapCalibrator._on_backdrop_mode_changed(app)
+
+    assert actions == []
+    assert app.lbl_status.text == "Failed to update backdrop mode"
 
 
 def test_restore_original_config_calls_preview_restore() -> None:
@@ -319,7 +384,7 @@ def test_skip_clears_selection_updates_status_and_moves_next() -> None:
 
 
 def test_assign_requires_selected_key() -> None:
-    app = _make_app(probe=SimpleNamespace(selected_key_id=None, current_cell=(1, 1)), keymap={})
+    app = _make_app(probe=SimpleNamespace(selected_key_id=None, selected_slot_id=None, current_cell=(1, 1)), keymap={})
     calls: list[str] = []
     app._redraw = lambda: calls.append("redraw")
     app._next = lambda: calls.append("next")
@@ -332,43 +397,76 @@ def test_assign_requires_selected_key() -> None:
 
 
 def test_assign_updates_keymap_redraws_and_advances() -> None:
-    app = _make_app(probe=SimpleNamespace(selected_key_id="esc", current_cell=(1, 2)), keymap={})
+    app = _make_app(probe=SimpleNamespace(selected_key_id="esc", selected_slot_id="esc", current_cell=(1, 2)), keymap={})
     calls: list[str] = []
     app._redraw = lambda: calls.append("redraw")
     app._next = lambda: calls.append("next")
 
     calibrator_app.KeymapCalibrator._assign(app)
 
-    assert app.keymap == {"esc": (1, 2)}
-    assert app.lbl_status.text == "Assigned esc -> (1, 2)"
+    assert app.keymap == {"esc": ((1, 2),)}
+    assert app.lbl_status.text == "Assigned esc -> (1, 2) (1 cell(s))"
+    assert calls == ["redraw", "next"]
+
+
+def test_assign_appends_unique_cells_for_existing_key() -> None:
+    app = _make_app(
+        probe=SimpleNamespace(selected_key_id="esc", selected_slot_id="esc", current_cell=(1, 3)),
+        keymap={"esc": ((1, 2),)},
+    )
+    calls: list[str] = []
+    app._redraw = lambda: calls.append("redraw")
+    app._next = lambda: calls.append("next")
+
+    calibrator_app.KeymapCalibrator._assign(app)
+
+    assert app.keymap == {"esc": ((1, 2), (1, 3))}
+    assert app.lbl_status.text == "Assigned esc -> (1, 3) (2 cell(s))"
+    assert calls == ["redraw", "next"]
+
+
+def test_assign_uses_selected_slot_id_as_primary_identity() -> None:
+    app = _make_app(
+        probe=SimpleNamespace(selected_key_id=None, selected_slot_id="top_01", current_cell=(0, 4)),
+        keymap={"top_01": ((0, 2),)},
+        cfg=SimpleNamespace(physical_layout="ansi", layout_legend_pack="auto"),
+    )
+    calls: list[str] = []
+    app._redraw = lambda: calls.append("redraw")
+    app._next = lambda: calls.append("next")
+
+    calibrator_app.KeymapCalibrator._assign(app)
+
+    assert app.keymap == {"top_01": ((0, 2), (0, 4))}
+    assert app.lbl_status.text == "Assigned q -> (0, 4) (2 cell(s))"
     assert calls == ["redraw", "next"]
 
 
 def test_reset_keymap_defaults_restores_layout_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app(keymap={"old": (4, 4)}, cfg=SimpleNamespace(physical_layout="iso"))
+    app = _make_app(keymap={"old": ((4, 4),)}, cfg=SimpleNamespace(physical_layout="iso"))
     calls: list[str] = []
     app._redraw = lambda: calls.append("redraw")
 
-    monkeypatch.setattr(calibrator_app, "_parse_default_keymap", lambda layout_id: {"iso_extra": (0, 1)})
+    monkeypatch.setattr(calibrator_app, "_parse_default_keymap", lambda layout_id: {"iso_extra": ((0, 1),)})
     monkeypatch.setattr(calibrator_app, "_resolved_layout_label", lambda layout_id: "ISO (102/105-key)")
 
     calibrator_app.KeymapCalibrator._reset_keymap_defaults(app)
 
-    assert app.keymap == {"iso_extra": (0, 1)}
+    assert app.keymap == {"iso_extra": ((0, 1),)}
     assert app.lbl_status.text == "Reset keymap to ISO (102/105-key) defaults"
     assert calls == ["redraw"]
 
 
 def test_save_persists_keymap_and_reports_path(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app(keymap={"esc": (0, 0)})
-    save_calls: list[dict[str, tuple[int, int]]] = []
+    app = _make_app(keymap={"esc": ((0, 0),)})
+    save_calls: list[dict[str, tuple[tuple[int, int], ...]]] = []
 
-    monkeypatch.setattr(calibrator_app, "_save_keymap", lambda keymap: save_calls.append(dict(keymap)))
+    monkeypatch.setattr(calibrator_app, "_save_keymap", lambda keymap, **kwargs: save_calls.append((dict(keymap), kwargs)))
     monkeypatch.setattr(calibrator_app, "_keymap_path", lambda: Path("/tmp/profile/keymap.json"))
 
     calibrator_app.KeymapCalibrator._save(app)
 
-    assert save_calls == [{"esc": (0, 0)}]
+    assert save_calls == [({"esc": ((0, 0),)}, {"physical_layout": "ansi"})]
     assert app.lbl_status.text == "Saved to /tmp/profile/keymap.json"
 
 
@@ -387,7 +485,7 @@ def test_save_and_close_saves_restores_and_destroys() -> None:
 def test_redraw_delegates_to_canvas_renderer(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _make_app(
         keymap={"esc": (0, 0)},
-        probe=SimpleNamespace(selected_key_id="esc"),
+        probe=SimpleNamespace(selected_key_id="esc", selected_slot_id=None),
         _deck_pil="deck-image",
         _deck_render_cache="cache",
     )
@@ -411,8 +509,10 @@ def test_redraw_delegates_to_canvas_renderer(monkeypatch: pytest.MonkeyPatch) ->
         "layout_tweaks": {"dx": 1.0},
         "per_key_layout_tweaks": {"esc": {"dx": 0.5}},
         "keymap": {"esc": (0, 0)},
+        "selected_slot_id": str(slot_id_for_key_id("ansi", "esc") or "esc"),
         "selected_key_id": "esc",
         "physical_layout": "ansi",
+        "legend_pack_id": None,
         "slot_overrides": {"macro": {"enabled": True}},
     }
     assert app._transform is transform
@@ -422,6 +522,7 @@ def test_redraw_delegates_to_canvas_renderer(monkeypatch: pytest.MonkeyPatch) ->
 def test_on_click_clears_selection_when_no_key_is_hit() -> None:
     app = _make_app(_transform=object())
     app.probe.selected_key_id = "old"
+    app.probe.selected_slot_id = "top_01"
     redraw_calls: list[str] = []
     app._hit_test = lambda _x, _y: None
     app._redraw = lambda: redraw_calls.append("redraw")
@@ -429,12 +530,13 @@ def test_on_click_clears_selection_when_no_key_is_hit() -> None:
     calibrator_app.KeymapCalibrator._on_click(app, SimpleNamespace(x=12, y=34))
 
     assert app.probe.selected_key_id is None
+    assert app.probe.selected_slot_id is None
     assert app.lbl_status.text == "No key hit"
     assert redraw_calls == ["redraw"]
 
 
 def test_on_click_selects_hit_key_and_reports_existing_mapping() -> None:
-    app = _make_app(_transform=object(), keymap={"esc": (0, 0)})
+    app = _make_app(_transform=object(), keymap={"esc": ((0, 0), (0, 1))})
     redraw_calls: list[str] = []
     app._hit_test = lambda _x, _y: KeyDef("esc", "Esc", (0, 0, 10, 10))
     app._redraw = lambda: redraw_calls.append("redraw")
@@ -442,7 +544,8 @@ def test_on_click_selects_hit_key_and_reports_existing_mapping() -> None:
     calibrator_app.KeymapCalibrator._on_click(app, SimpleNamespace(x=12, y=34))
 
     assert app.probe.selected_key_id == "esc"
-    assert app.lbl_status.text == "Selected Esc (mapped (0, 0))"
+    assert app.probe.selected_slot_id == "esc"
+    assert app.lbl_status.text == "Selected Esc (mapped ((0, 0), (0, 1)))"
     assert redraw_calls == ["redraw"]
 
 
@@ -462,9 +565,10 @@ def test_hit_test_uses_visible_keys_and_transform(monkeypatch: pytest.MonkeyPatc
     def fake_get_layout_keys(
         physical_layout: str,
         *,
+        legend_pack_id: str | None = None,
         slot_overrides: dict[str, dict[str, object]] | None = None,
     ) -> list[KeyDef]:
-        layout_calls.append((physical_layout, dict(slot_overrides or {})))
+        layout_calls.append((physical_layout, legend_pack_id, dict(slot_overrides or {})))
         return keys
 
     def fake_hit_test(**kwargs: object) -> KeyDef:
@@ -477,7 +581,7 @@ def test_hit_test_uses_visible_keys_and_transform(monkeypatch: pytest.MonkeyPatc
     result = calibrator_app.KeymapCalibrator._hit_test(app, 55, 77)
 
     assert result is result_key
-    assert layout_calls == [("ansi", {"macro": {"enabled": True}})]
+    assert layout_calls == [("ansi", None, {"macro": {"enabled": True}})]
     assert hit_calls == [
         {
             "transform": app._transform,
@@ -489,3 +593,15 @@ def test_hit_test_uses_visible_keys_and_transform(monkeypatch: pytest.MonkeyPatc
             "image_size": BASE_IMAGE_SIZE,
         }
     ]
+
+
+def test_selected_layout_legend_pack_ignores_invalid_or_cross_layout_values() -> None:
+    assert calibrator_app._selected_layout_legend_pack(SimpleNamespace(layout_legend_pack="auto"), physical_layout="iso") is None
+    assert calibrator_app._selected_layout_legend_pack(
+        SimpleNamespace(layout_legend_pack="iso-de-qwertz"),
+        physical_layout="ansi",
+    ) is None
+    assert calibrator_app._selected_layout_legend_pack(
+        SimpleNamespace(layout_legend_pack="iso-de-qwertz"),
+        physical_layout="iso",
+    ) == "iso-de-qwertz"

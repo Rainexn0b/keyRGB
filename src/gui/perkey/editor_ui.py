@@ -13,6 +13,23 @@ from .lightbar_controls import LightbarControls
 from .ui.layout_setup import LayoutSetupControls
 
 
+_BACKDROP_MODE_LABELS = {
+    "none": "No backdrop",
+    "builtin": "Built-in seed",
+    "custom": "Custom image",
+}
+
+
+def _set_backdrop_mode_from_label(editor, label: str) -> None:
+    for mode, mode_label in _BACKDROP_MODE_LABELS.items():
+        if mode_label == label:
+            editor._backdrop_mode_var.set(mode)
+            break
+    else:
+        editor._backdrop_mode_var.set("builtin")
+    editor._on_backdrop_mode_changed()
+
+
 def build_editor_ui(editor) -> None:
     main = ttk.Frame(editor.root, padding=16)
     main.pack(fill="both", expand=True)
@@ -73,11 +90,27 @@ def build_editor_ui(editor) -> None:
     right.pack_propagate(False)
 
     backdrop_row = ttk.Frame(right)
-    backdrop_row.pack(fill="x", pady=(0, 10))
-    ttk.Button(backdrop_row, text="Set Backdrop...", command=editor._set_backdrop).pack(
+    backdrop_row.pack(fill="x", pady=(0, 6))
+    ttk.Label(backdrop_row, text="Backdrop", font=("Sans", 9)).pack(side="left")
+    editor._backdrop_mode_combo = ttk.Combobox(
+        backdrop_row,
+        state="readonly",
+        width=16,
+        values=[_BACKDROP_MODE_LABELS[mode] for mode in ("none", "builtin", "custom")],
+    )
+    editor._backdrop_mode_combo.set(_BACKDROP_MODE_LABELS.get(editor._backdrop_mode_var.get(), "Built-in seed"))
+    editor._backdrop_mode_combo.pack(side="left", fill="x", expand=True, padx=(8, 0))
+    editor._backdrop_mode_combo.bind(
+        "<<ComboboxSelected>>",
+        lambda _e: _set_backdrop_mode_from_label(editor, editor._backdrop_mode_combo.get()),
+    )
+
+    backdrop_buttons = ttk.Frame(right)
+    backdrop_buttons.pack(fill="x", pady=(0, 10))
+    ttk.Button(backdrop_buttons, text="Set Backdrop...", command=editor._set_backdrop).pack(
         side="left", fill="x", expand=True, padx=(0, 6)
     )
-    ttk.Button(backdrop_row, text="Reset Backdrop", command=editor._reset_backdrop).pack(
+    ttk.Button(backdrop_buttons, text="Reset Backdrop", command=editor._reset_backdrop).pack(
         side="left", fill="x", expand=True
     )
 

@@ -56,6 +56,7 @@ def test_messages_match_existing_strings() -> None:
 
     assert selected_unmapped("K") == "Selected K (unmapped) — run Keymap Calibrator"
     assert selected_mapped("K", 1, 2) == "Selected K -> 1,2"
+    assert selected_mapped("K", 1, 2, 3) == "Selected K -> 1,2 (+2 more)"
 
     assert saved_overlay_tweaks_for_key("K") == "Saved overlay tweaks for K"
     assert saved_overlay_tweaks_global() == "Saved global overlay alignment tweaks"

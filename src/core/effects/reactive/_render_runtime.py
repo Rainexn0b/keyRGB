@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Callable, Dict, Tuple
 
-from src.core.effects.perkey_animation import enable_user_mode_once
+from src.core.effects.perkey_animation import enable_user_mode_once, per_key_mode_requires_frame_reassert
 from src.core.effects.software_targets import average_color_map as average_color_map_impl
 from src.core.effects.software_targets import render_secondary_uniform_rgb
 from src.core.effects.transitions import avoid_full_black
@@ -19,11 +19,11 @@ Color = Tuple[int, int, int]
 Key = Tuple[int, int]
 
 
-def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int) -> None:
+def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_reinit: bool = False) -> None:
     """Set hardware brightness, avoiding a full mode reinit when possible."""
 
     prev = getattr(engine, "_last_hw_mode_brightness", None)
-    if prev is None:
+    if force_reinit or prev is None:
         enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
         engine._last_hw_mode_brightness = int(brightness_hw)
         return
@@ -51,9 +51,10 @@ def render_per_key_frame(
             _, _, brightness_hw = resolve_brightness(engine)
             engine._last_rendered_brightness = brightness_hw
 
-            need_mode_init = getattr(engine, "_last_hw_mode_brightness", None) is None
+            reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
+            need_mode_init = reassert_every_frame or getattr(engine, "_last_hw_mode_brightness", None) is None
             if need_mode_init:
-                apply_hw_brightness(engine, brightness_hw)
+                apply_hw_brightness(engine, brightness_hw, force_reinit=reassert_every_frame)
 
             try:
                 engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)

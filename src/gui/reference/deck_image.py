@@ -4,6 +4,8 @@ from typing import Optional
 
 from PIL import Image
 
+from src.core.profile import profiles
+from src.core.profile._backdrop import BACKDROP_MODE_CUSTOM, BACKDROP_MODE_NONE, normalize_backdrop_mode
 from src.gui.utils.backdrop_image_cache import backdrop_image_candidates, load_cached_backdrop_image
 
 
@@ -18,6 +20,17 @@ def load_reference_deck_image(*, profile_name: str | None) -> Optional[Image.Ima
     Returns a PIL Image, or None if no candidate is available/readable.
     """
 
+    mode = profiles.load_backdrop_mode(profile_name) if profile_name else "builtin"
+    mode = normalize_backdrop_mode(mode)
+    if mode == BACKDROP_MODE_NONE:
+        return None
+
+    if mode == BACKDROP_MODE_CUSTOM and profile_name:
+        custom_path = profiles.paths_for(profile_name).backdrop_image
+        custom_image = load_cached_backdrop_image(candidates=(custom_path,))
+        if custom_image is not None:
+            return custom_image
+
     return load_cached_backdrop_image(
-        candidates=backdrop_image_candidates(profile_name=profile_name, include_cwd_fallback=True)
+        candidates=backdrop_image_candidates(profile_name=None, include_cwd_fallback=True)
     )

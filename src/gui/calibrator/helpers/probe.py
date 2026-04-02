@@ -22,6 +22,7 @@ class CalibrationProbeState:
     cols: int
     current_cell: Tuple[int, int] = (0, 0)
     selected_key_id: Optional[str] = None
+    selected_slot_id: Optional[str] = None
 
     def prev_cell(self) -> Tuple[int, int]:
         self.current_cell = _step_cell(
@@ -43,3 +44,4 @@ class CalibrationProbeState:
 
     def clear_selection(self) -> None:
         self.selected_key_id = None
+        self.selected_slot_id = None

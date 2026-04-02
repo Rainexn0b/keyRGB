@@ -23,6 +23,10 @@ both implementation changes and focused regression tests. The remaining
 materially open complaint is the reporter's later note that the effective
 hardware speed range on `ite8910` still feels too narrow.
 
+For this version, that means issue #4 is functionally complete except for the
+speed-range complaint that now depends on a returned Support Tools bundle with
+the guided backend-speed probe results.
+
 ### Confirmed fixed by current follow-up work
 
 - Hardware effect speed inversion:
@@ -56,6 +60,9 @@ hardware speed range on `ite8910` still feels too narrow.
 	sanity check.
 - From a code and regression perspective, the remaining materially open item is
 	the reported narrow hardware-speed range on `ite8910`.
+- That remaining speed complaint is intentionally evidence-gated now: the next
+	useful step is a returned support bundle containing the guided `ite8910`
+	backend-speed probe observations added in this follow-up work.
 
 ## Code evidence used for assessment
 
@@ -100,6 +107,21 @@ hardware speed range on `ite8910` still feels too narrow.
 	- ratchets the software-render flashing fix through tests that lock in one-time mode init plus incremental per-key writes on `ite8910`
 	- replaces the old ANSI/ISO-only overlay model with explicit physical-layout variants and an on-demand Keyboard Setup pane for calibration/editor use
 	- is functionally complete for the non-speed items in issue #4, with on-device reporter confirmation still useful as a final sanity check
+
+## End-of-version closure view
+
+For the latest reporter complaints, the state for this version is:
+
+1. Layout and calibrator/editor mismatches:
+	- addressed through the physical-layout catalogue, backend-dimension-aware calibrator wiring, and slot-first layout/keymap plumbing.
+2. Wrong per-key assignment and multi-LED logical keys:
+	- addressed through corrected `ite8910` tuple translation plus one-logical-key-to-many-cells keymap support across storage, calibrator, editor, and reactive typing.
+3. `ite8910` software blinking:
+	- addressed in code by switching per-key software/reactive rendering to backend-specific mode-maintenance policy, with `ite8910` using one-time init instead of per-frame reset; hardware retest is still desirable, but the known root causes are covered.
+4. `ite8910` hardware-speed complaint:
+	- still open, but no longer blocked on code discovery. The required next step is the support bundle with the guided backend-speed probe data.
+
+Locale-specific legend polish remains intentionally deferred and is not a release blocker for closing the current issue-4 implementation batch.
 
 ## Follow-up: physical layout setting (post-0.18.6)
 

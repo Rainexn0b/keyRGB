@@ -148,6 +148,7 @@ class _FakeEditor:
         self.bg_color = "#202020"
         self.fg_color = "#efefef"
         self._right_panel_width = 320
+        self._backdrop_mode_var = _FakeVar("builtin")
         self.backdrop_transparency = _FakeVar(45)
         self._last_non_black_color = (10, 20, 30)
         self._wheel_size = 180
@@ -261,7 +262,16 @@ def _install_fake_ui(monkeypatch: pytest.MonkeyPatch, *, frame_width: int = 360)
     class FakeCombobox(_FakeWidget):
         def __init__(self, parent=None, **kwargs):
             super().__init__(parent, **kwargs)
+            self.set_calls = []
+            self.current_value = None
             registry["comboboxes"].append(self)
+
+        def set(self, value) -> None:
+            self.current_value = value
+            self.set_calls.append(value)
+
+        def get(self):
+            return self.current_value
 
     class FakeSeparator(_FakeWidget):
         def __init__(self, parent=None, **kwargs):

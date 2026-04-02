@@ -20,18 +20,40 @@ class _FakeVar:
 
 
 class _FakeEditor:
-    def __init__(self, *, scope: str = "key", selected_key_id: str | None = "k1") -> None:
+    def __init__(
+        self,
+        *,
+        scope: str = "key",
+        selected_key_id: str | None = "k1",
+        selected_slot_id: str | None = "slot_k1",
+    ) -> None:
         self.overlay_scope = _FakeVar(scope)
         self.selected_key_id = selected_key_id
+        self.selected_slot_id = selected_slot_id
         self.clicked_keys: list[str] = []
 
-    def on_key_clicked(self, key_id: str) -> None:
-        self.clicked_keys.append(str(key_id))
+    def _slot_id_for_key_id(self, key_id: str) -> str | None:
+        if str(key_id) == "k1":
+            return "slot_k1"
+        return None
+
+    def on_slot_clicked(self, slot_id: str) -> None:
+        self.clicked_keys.append(str(slot_id))
 
 
 class _FakeCanvas(_KeyboardCanvasEventMixin):
-    def __init__(self, *, scope: str = "key", selected_key_id: str | None = "k1") -> None:
-        self.editor = _FakeEditor(scope=scope, selected_key_id=selected_key_id)
+    def __init__(
+        self,
+        *,
+        scope: str = "key",
+        selected_key_id: str | None = "k1",
+        selected_slot_id: str | None = "slot_k1",
+    ) -> None:
+        self.editor = _FakeEditor(
+            scope=scope,
+            selected_key_id=selected_key_id,
+            selected_slot_id=selected_slot_id,
+        )
         self._resize_job: str | None = None
 
         self.after_cancel_error: Exception | None = None
@@ -75,8 +97,8 @@ class _FakeCanvas(_KeyboardCanvasEventMixin):
         if self.configure_error is not None:
             raise self.configure_error
 
-    def _resize_edges_for_point(self, key_id: str, cx: float, cy: float) -> str:
-        self.resize_edge_calls.append((str(key_id), float(cx), float(cy)))
+    def _resize_edges_for_point(self, slot_id: str, cx: float, cy: float) -> str:
+        self.resize_edge_calls.append((str(slot_id), float(cx), float(cy)))
         if self.resize_edges_error is not None:
             raise self.resize_edges_error
         return self.resize_edges_result
@@ -85,8 +107,8 @@ class _FakeCanvas(_KeyboardCanvasEventMixin):
         self.cursor_for_edges_calls.append(str(edges))
         return self.cursor_for_edges_result
 
-    def _point_in_key_bbox(self, key_id: str, cx: float, cy: float) -> bool:
-        self.point_in_key_bbox_calls.append((str(key_id), float(cx), float(cy)))
+    def _point_in_key_bbox(self, slot_id: str, cx: float, cy: float) -> bool:
+        self.point_in_key_bbox_calls.append((str(slot_id), float(cx), float(cy)))
         return self.point_in_key_bbox_result
 
     def find_withtag(self, tag: str) -> tuple[int, ...]:
@@ -101,7 +123,7 @@ class _FakeCanvas(_KeyboardCanvasEventMixin):
             raise self.gettags_error
         return self.tags_by_item.get(item, ())
 
-    def _hit_test_key_id(self, cx: float, cy: float) -> str | None:
+    def _hit_test_slot_id(self, cx: float, cy: float) -> str | None:
         self.hit_test_calls.append((float(cx), float(cy)))
         return self.hit_test_result
 
@@ -164,7 +186,7 @@ def test_redraw_callback_clears_resize_job_and_redraws() -> None:
 
 
 def test_on_motion_clears_cursor_when_overlay_scope_is_not_key() -> None:
-    canvas = _FakeCanvas(scope="global", selected_key_id="k1")
+    canvas = _FakeCanvas(scope="global", selected_key_id="k1", selected_slot_id="slot_k1")
 
     canvas._on_motion(_event(x=11, y=22))
 
@@ -174,42 +196,42 @@ def test_on_motion_clears_cursor_when_overlay_scope_is_not_key() -> None:
 
 
 def test_on_motion_uses_resize_cursor_when_pointer_is_on_resize_edge() -> None:
-    canvas = _FakeCanvas(scope="key", selected_key_id="k1")
+    canvas = _FakeCanvas(scope="key", selected_key_id="k1", selected_slot_id="slot_k1")
     canvas.resize_edges_result = "rb"
     canvas.cursor_for_edges_result = "top_left_corner"
 
     canvas._on_motion(_event(x=5, y=7))
 
-    assert canvas.resize_edge_calls == [("k1", 5.0, 7.0)]
+    assert canvas.resize_edge_calls == [("slot_k1", 5.0, 7.0)]
     assert canvas.cursor_for_edges_calls == ["rb"]
     assert canvas.point_in_key_bbox_calls == []
     assert canvas.configure_calls == ["top_left_corner"]
 
 
 def test_on_motion_uses_move_cursor_inside_selected_key() -> None:
-    canvas = _FakeCanvas(scope="key", selected_key_id="k1")
+    canvas = _FakeCanvas(scope="key", selected_key_id="k1", selected_slot_id="slot_k1")
     canvas.point_in_key_bbox_result = True
 
     canvas._on_motion(_event(x=15, y=17))
 
-    assert canvas.resize_edge_calls == [("k1", 15.0, 17.0)]
-    assert canvas.point_in_key_bbox_calls == [("k1", 15.0, 17.0)]
+    assert canvas.resize_edge_calls == [("slot_k1", 15.0, 17.0)]
+    assert canvas.point_in_key_bbox_calls == [("slot_k1", 15.0, 17.0)]
     assert canvas.configure_calls == ["fleur"]
 
 
 def test_on_motion_clears_cursor_outside_selected_key() -> None:
-    canvas = _FakeCanvas(scope="key", selected_key_id="k1")
+    canvas = _FakeCanvas(scope="key", selected_key_id="k1", selected_slot_id="slot_k1")
     canvas.point_in_key_bbox_result = False
 
     canvas._on_motion(_event(x=25, y=27))
 
-    assert canvas.resize_edge_calls == [("k1", 25.0, 27.0)]
-    assert canvas.point_in_key_bbox_calls == [("k1", 25.0, 27.0)]
+    assert canvas.resize_edge_calls == [("slot_k1", 25.0, 27.0)]
+    assert canvas.point_in_key_bbox_calls == [("slot_k1", 25.0, 27.0)]
     assert canvas.configure_calls == [""]
 
 
 def test_on_motion_logs_and_swallows_hover_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    canvas = _FakeCanvas(scope="key", selected_key_id="k1")
+    canvas = _FakeCanvas(scope="key", selected_key_id="k1", selected_slot_id="slot_k1")
     canvas.editor.overlay_scope = _FakeVar("key", exc=RuntimeError("boom"))
     logs = _capture_logs(monkeypatch)
 
@@ -220,6 +242,7 @@ def test_on_motion_logs_and_swallows_hover_errors(monkeypatch: pytest.MonkeyPatc
     args, kwargs = logs[0]
     assert args[1] == "perkey.canvas.on_motion"
     assert kwargs["msg"] == "Error in perkey hover handling"
+    assert isinstance(kwargs["exc"], RuntimeError)
 
 
 def test_on_leave_resets_cursor() -> None:
@@ -245,16 +268,42 @@ def test_on_leave_logs_configure_errors(monkeypatch: pytest.MonkeyPatch) -> None
     assert isinstance(kwargs["exc"], RuntimeError)
 
 
-def test_on_click_uses_current_item_pkey_tag_before_hit_test() -> None:
+def test_on_click_uses_current_item_pslot_tag_before_hit_test() -> None:
     canvas = _FakeCanvas()
     canvas.current_items = (7,)
-    canvas.tags_by_item = {7: ("overlay", "pkey_enter")}
+    canvas.tags_by_item = {7: ("overlay", "pslot_top_01", "pkey_q")}
 
     canvas._on_click(_event(x=3, y=4))
 
     assert canvas.find_withtag_calls == ["current"]
     assert canvas.gettags_calls == [7]
-    assert canvas.editor.clicked_keys == ["enter"]
+    assert canvas.editor.clicked_keys == ["top_01"]
+    assert canvas.hit_test_calls == []
+
+
+def test_on_click_routes_pkey_tag_through_slot_lookup_when_available() -> None:
+    canvas = _FakeCanvas()
+    canvas.current_items = (7,)
+    canvas.tags_by_item = {7: ("overlay", "pkey_k1")}
+
+    canvas._on_click(_event(x=3, y=4))
+
+    assert canvas.find_withtag_calls == ["current"]
+    assert canvas.gettags_calls == [7]
+    assert canvas.editor.clicked_keys == ["slot_k1"]
+    assert canvas.hit_test_calls == []
+
+
+def test_on_click_routes_pkey_tag_to_key_identity_as_slot_when_lookup_missing() -> None:
+    canvas = _FakeCanvas()
+    canvas.current_items = (7,)
+    canvas.tags_by_item = {7: ("overlay", "pkey_q")}
+
+    canvas._on_click(_event(x=3, y=4))
+
+    assert canvas.find_withtag_calls == ["current"]
+    assert canvas.gettags_calls == [7]
+    assert canvas.editor.clicked_keys == ["q"]
     assert canvas.hit_test_calls == []
 
 

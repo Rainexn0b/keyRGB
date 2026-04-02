@@ -12,8 +12,9 @@ class _DummyLock:
 
 
 class _DummyKB:
-    def __init__(self):
+    def __init__(self, *, per_key_mode_policy: str = "init_once"):
         self.calls: list[tuple[str, int]] = []
+        self.keyrgb_per_key_mode_policy = str(per_key_mode_policy)
 
     def enable_user_mode(self, *, brightness: int, save: bool = False):
         self.calls.append(("enable_user_mode", int(brightness)))
@@ -79,6 +80,31 @@ def test_per_key_reactive_pulse_first_frame_initializes_mode_at_profile_brightne
         _reactive_active_pulse_mix=1.0,
         _last_rendered_brightness=15,
         _last_hw_mode_brightness=None,
+    )
+
+    render(engine, color_map={(0, 0): (255, 255, 255)})
+
+    assert ("enable_user_mode", 15) in kb.calls
+    assert ("set_key_colors", 15) in kb.calls
+    assert not [call for call in kb.calls if call[0] == "set_brightness"]
+
+
+def test_per_key_reactive_reassert_policy_reinitializes_each_frame() -> None:
+    from src.core.effects.reactive.render import render
+
+    kb = _DummyKB(per_key_mode_policy="reassert_every_frame")
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        brightness=15,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=15,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=1.0,
+        _last_rendered_brightness=15,
+        _last_hw_mode_brightness=15,
     )
 
     render(engine, color_map={(0, 0): (255, 255, 255)})

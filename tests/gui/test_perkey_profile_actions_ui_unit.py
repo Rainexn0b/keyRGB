@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.core.resources.layouts import slot_id_for_key_id
 import src.gui.perkey.ui.profile_actions as actions
-from src.gui.perkey.profile_management import ActivatedProfile, DeleteProfileResult
+from src.gui.perkey.profile_management import ActivatedProfile, DeleteProfileResult, keymap_cells_for, primary_cell
 
 
 class DummyVar:
@@ -69,12 +70,14 @@ class DummyEditor:
     layout_slot_overrides: dict
     profile_name: str
     selected_key_id: str | None
+    selected_slot_id: str | None
     overlay_controls: DummyOverlayControls
     lightbar_controls: DummyLightbarControls | None
     lightbar_overlay: dict
     canvas: DummyCanvas
     status_label: DummyLabel
     _profiles_combo: DummyCombo
+    selected_cells: tuple[tuple[int, int], ...] = ()
     commit_calls: int = 0
     select_calls: list[str] = None  # type: ignore[assignment]
 
@@ -87,8 +90,32 @@ class DummyEditor:
 
     def select_key_id(self, key_id: str) -> None:
         self.selected_key_id = key_id
-        self.selected_cell = self.keymap.get(key_id)
+        self.selected_cells = keymap_cells_for(self.keymap, key_id)
+        self.selected_cell = primary_cell(self.selected_cells)
         self.select_calls.append(key_id)
+
+    def select_slot_id(self, slot_id: str) -> None:
+        self.selected_slot_id = str(slot_id)
+        if self.selected_slot_id == str(slot_id_for_key_id(self._physical_layout, "nonusbackslash") or "nonusbackslash"):
+            self.selected_key_id = "nonusbackslash"
+        elif self.selected_slot_id == str(slot_id_for_key_id(self._physical_layout, "enter") or "enter"):
+            self.selected_key_id = "enter"
+        elif self.selected_slot_id == "K":
+            self.selected_key_id = "K"
+        self.selected_cells = keymap_cells_for(self.keymap, self.selected_key_id, slot_id=self.selected_slot_id)
+        self.selected_cell = primary_cell(self.selected_cells)
+        self.select_calls.append(str(slot_id))
+
+    def _slot_id_for_key_id(self, key_id: str) -> str | None:
+        return str(slot_id_for_key_id(self._physical_layout, key_id) or key_id)
+
+    def _key_id_for_slot_id(self, slot_id: str) -> str | None:
+        candidates = {
+            str(slot_id_for_key_id(self._physical_layout, "nonusbackslash") or "nonusbackslash"): "nonusbackslash",
+            str(slot_id_for_key_id(self._physical_layout, "enter") or "enter"): "enter",
+            "K": "K",
+        }
+        return candidates.get(str(slot_id))
 
     def _refresh_layout_slot_controls(self) -> None:
         return None
@@ -101,7 +128,7 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
         assert physical_layout == "ansi"
         return ActivatedProfile(
             name="p2",
-            keymap={"K": (0, 0)},
+            keymap={"K": ((0, 0), (0, 1))},
             layout_tweaks={"dx": 1.0},
             per_key_layout_tweaks={},
             colors={(0, 0): (1, 2, 3)},
@@ -131,6 +158,7 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
         layout_slot_overrides={},
         profile_name="p1",
         selected_key_id="K",
+        selected_slot_id="K",
         overlay_controls=DummyOverlayControls(),
         lightbar_controls=DummyLightbarControls(),
         lightbar_overlay={},
@@ -143,7 +171,8 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
 
     assert ed.profile_name == "p2"
     assert ed._profile_name_var.get() == "p2"
-    assert ed.keymap == {"K": (0, 0)}
+    assert ed.keymap == {"K": ((0, 0), (0, 1))}
+    assert ed.selected_cells == ((0, 0), (0, 1))
     assert ed.colors == {(0, 0): (1, 2, 3)}
     assert ed.layout_slot_overrides == {"nonusbackslash": {"visible": False}}
     assert ed.lightbar_overlay == {"visible": True, "length": 0.8}
@@ -175,6 +204,7 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
         layout_slot_overrides={},
         profile_name="p2",
         selected_key_id=None,
+        selected_slot_id=None,
         overlay_controls=DummyOverlayControls(),
         lightbar_controls=None,
         lightbar_overlay={},
@@ -207,13 +237,14 @@ def test_reset_layout_defaults_ui_reloads_selected_layout_bundle(monkeypatch) ->
         _profile_name_var=DummyVar("p2"),
         config=object(),
         colors={},
-        keymap={"old": (0, 0)},
+        keymap={"old": ((0, 0),)},
         _physical_layout="auto",
         layout_tweaks={"dx": 9.0},
         per_key_layout_tweaks={"old": {"dx": 1.0}},
         layout_slot_overrides={"nonusbackslash": {"visible": False}},
         profile_name="p2",
         selected_key_id="old",
+        selected_slot_id=None,
         overlay_controls=DummyOverlayControls(),
         lightbar_controls=None,
         lightbar_overlay={},
@@ -224,11 +255,16 @@ def test_reset_layout_defaults_ui_reloads_selected_layout_bundle(monkeypatch) ->
 
     actions.reset_layout_defaults_ui(ed)
 
-    assert ed.keymap == {"nonusbackslash": (1, 2), "enter": (2, 14)}
+    assert ed.keymap == {
+        "nonusbackslash": ((1, 2),),
+        str(slot_id_for_key_id("auto", "enter") or "enter"): ((2, 14),),
+    }
     assert ed.layout_tweaks == {"dx": 1.0}
     assert ed.per_key_layout_tweaks == {"nonusbackslash": {"dx": 2.0}}
     assert ed.layout_slot_overrides == {}
     assert ed.selected_key_id == "nonusbackslash"
+    assert ed.selected_slot_id == "nonusbackslash"
+    assert ed.selected_cells == ((1, 2),)
     assert ed.selected_cell == (1, 2)
     assert ed.overlay_controls.sync_calls == 1
     assert ed.canvas.redraw_calls == 1

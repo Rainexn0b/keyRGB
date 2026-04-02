@@ -9,6 +9,7 @@ from src.core.effects.software_targets import average_color_map, render_secondar
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
     enable_user_mode_once,
+    per_key_mode_requires_frame_reassert,
 )
 from src.core.effects.transitions import avoid_full_black
 from src.core.utils.logging_utils import log_throttled
@@ -136,15 +137,18 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
         try:
             with engine.kb_lock:
                 brightness_hw = int(engine.brightness)
-                # Re-assert user mode on every frame so the ITE controller does
-                # not drift back to its saved hardware effect between frames.
-                # This matches the v0.18.1 behaviour that kept rendering stable.
-                enable_user_mode_once(
-                    kb=engine.kb,
-                    kb_lock=engine.kb_lock,
-                    brightness=brightness_hw,
-                )
-                engine._last_hw_mode_brightness = brightness_hw
+                reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
+                last_hw_brightness = getattr(engine, "_last_hw_mode_brightness", None)
+                need_mode_init = reassert_every_frame or last_hw_brightness is None
+
+                if need_mode_init:
+                    enable_user_mode_once(
+                        kb=engine.kb,
+                        kb_lock=engine.kb_lock,
+                        brightness=brightness_hw,
+                    )
+                    engine._last_hw_mode_brightness = brightness_hw
+
                 try:
                     engine.kb.set_key_colors(
                         color_map,
@@ -162,6 +166,18 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
                             pass
                         return
                     raise
+
+                if not need_mode_init and int(last_hw_brightness) != brightness_hw:
+                    try:
+                        engine.kb.set_brightness(int(brightness_hw))
+                    except Exception:
+                        enable_user_mode_once(
+                            kb=engine.kb,
+                            kb_lock=engine.kb_lock,
+                            brightness=brightness_hw,
+                        )
+                    engine._last_hw_mode_brightness = brightness_hw
+
                 render_secondary_uniform_rgb(
                     engine,
                     rgb=average_color_map(color_map),

@@ -84,6 +84,33 @@ def _append_backends(lines: list[str], backends: object) -> None:
                 for k in sorted(ids.keys()):
                     lines.append(f"      {k}: {ids[k]}")
 
+    guided_speed_probes = backends.get("guided_speed_probes")
+    if isinstance(guided_speed_probes, list) and guided_speed_probes:
+        lines.append("  guided_speed_probes:")
+        for probe in guided_speed_probes:
+            if not isinstance(probe, dict):
+                continue
+            lines.append(
+                "    - {backend}: effect={effect} ui_speeds={ui_speeds}".format(
+                    backend=probe.get("backend"),
+                    effect=probe.get("effect_name"),
+                    ui_speeds=probe.get("requested_ui_speeds"),
+                )
+            )
+            for sample in probe.get("samples") or []:
+                if not isinstance(sample, dict):
+                    continue
+                lines.append(
+                    "      sample: ui={ui_speed} payload={payload_speed} raw={raw_speed_hex}".format(
+                        ui_speed=sample.get("ui_speed"),
+                        payload_speed=sample.get("payload_speed"),
+                        raw_speed_hex=sample.get("raw_speed_hex"),
+                    )
+                )
+            expectation = str(probe.get("expectation") or "").strip()
+            if expectation:
+                lines.append(f"      expectation: {expectation}")
+
 
 def _append_usb_devices(lines: list[str], usb_devices: object) -> None:
     if not isinstance(usb_devices, list) or not usb_devices:

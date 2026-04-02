@@ -4,14 +4,40 @@ from .json_storage import read_json, write_json_atomic
 from .paths import paths_for
 
 
+BACKDROP_MODE_BUILTIN = "builtin"
+BACKDROP_MODE_CUSTOM = "custom"
+BACKDROP_MODE_NONE = "none"
+VALID_BACKDROP_MODES = frozenset({BACKDROP_MODE_BUILTIN, BACKDROP_MODE_CUSTOM, BACKDROP_MODE_NONE})
+
+
+def _load_backdrop_settings(name: str | None = None) -> dict[str, object]:
+    raw = read_json(paths_for(name).backdrop_settings)
+    return dict(raw) if isinstance(raw, dict) else {}
+
+
+def _save_backdrop_settings(settings: dict[str, object], name: str | None = None) -> None:
+    write_json_atomic(paths_for(name).backdrop_settings, dict(settings))
+
+
+def normalize_backdrop_mode(mode: object) -> str:
+    normalized = str(mode or BACKDROP_MODE_BUILTIN).strip().lower()
+    return normalized if normalized in VALID_BACKDROP_MODES else BACKDROP_MODE_BUILTIN
+
+
+def load_backdrop_mode(name: str | None = None) -> str:
+    return normalize_backdrop_mode(_load_backdrop_settings(name).get("mode", BACKDROP_MODE_BUILTIN))
+
+
+def save_backdrop_mode(mode: object, name: str | None = None) -> None:
+    settings = _load_backdrop_settings(name)
+    settings["mode"] = normalize_backdrop_mode(mode)
+    _save_backdrop_settings(settings, name)
+
+
 def load_backdrop_transparency(name: str | None = None) -> int:
     """Load backdrop transparency for a profile as a percent."""
 
-    raw = read_json(paths_for(name).backdrop_settings)
-    if raw is None:
-        return 0
-
-    value = raw.get("transparency", 0) if isinstance(raw, dict) else 0
+    value = _load_backdrop_settings(name).get("transparency", 0)
     try:
         out = int(value)
     except Exception:
@@ -24,4 +50,6 @@ def save_backdrop_transparency(transparency: int, name: str | None = None) -> No
         value = int(transparency)
     except Exception:
         value = 0
-    write_json_atomic(paths_for(name).backdrop_settings, {"transparency": max(0, min(100, value))})
+    settings = _load_backdrop_settings(name)
+    settings["transparency"] = max(0, min(100, value))
+    _save_backdrop_settings(settings, name)

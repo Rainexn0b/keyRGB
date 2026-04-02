@@ -10,6 +10,7 @@ from src.core.backends.ite8910.protocol import (
     Ite8910Effect,
     Ite8910ProtocolState,
     KNOWN_LED_IDS,
+    build_effect_reports,
     build_brightness_speed_report_raw,
     build_effect_report,
     build_led_color_report,
@@ -43,6 +44,52 @@ def test_effect_reports_match_upstream_reference(
     expected_hex: str,
 ) -> None:
     assert build_effect_report(effect).hex() == expected_hex
+
+
+@pytest.mark.parametrize(
+    ("effect", "colors", "direction", "expected_hex"),
+    [
+        (
+            Ite8910Effect.BREATHING_COLOR,
+            [(0x11, 0x22, 0x33)],
+            None,
+            ["cc0aaa112233"],
+        ),
+        (
+            Ite8910Effect.RANDOM_COLOR,
+            [(0x11, 0x22, 0x33)],
+            None,
+            ["cc0009000000", "cc18a1112233"],
+        ),
+        (
+            Ite8910Effect.SCAN,
+            [(0x01, 0x02, 0x03), (0x04, 0x05, 0x06), (0x07, 0x08, 0x09)],
+            None,
+            ["cc000a000000", "cc17a1010203", "cc17a2040506"],
+        ),
+        (
+            Ite8910Effect.RAINBOW_WAVE,
+            [(0x11, 0x22, 0x33)],
+            "left",
+            ["cc0004000000", "cc15a7112233"],
+        ),
+        (
+            Ite8910Effect.SNAKE,
+            None,
+            "down_right",
+            ["cc000b000000", "cc1674000000"],
+        ),
+    ],
+)
+def test_build_effect_reports_cover_colored_and_directional_sequences(
+    effect: Ite8910Effect,
+    colors: list[tuple[int, int, int]] | None,
+    direction: str | None,
+    expected_hex: list[str],
+) -> None:
+    reports = build_effect_reports(effect, colors=colors, direction=direction)
+
+    assert [report.hex() for report in reports] == expected_hex
 
 
 def test_reset_report_matches_upstream_reference() -> None:
@@ -172,10 +219,36 @@ def test_device_effect_payload_applies_brightness_speed_then_effect() -> None:
     assert sent[1] == build_effect_report("wave")
 
 
+def test_device_effect_payload_passes_color_and_direction_reports() -> None:
+    sent: list[bytes] = []
+
+    def writer(report: bytes) -> int:
+        sent.append(bytes(report))
+        return len(report)
+
+    kb = Ite8910KeyboardDevice(writer)
+    kb.set_effect(
+        {
+            "name": "wave",
+            "brightness": 25,
+            "speed": 10,
+            "direction": "left",
+            "color": (0x11, 0x22, 0x33),
+        }
+    )
+
+    assert [report.hex() for report in sent] == [
+        "cc09050a0000",
+        "cc0004000000",
+        "cc15a7112233",
+    ]
+
+
 def test_ite8910_device_declares_direct_speed_policy() -> None:
     kb = Ite8910KeyboardDevice(lambda _report: 6)
 
     assert kb.keyrgb_hw_speed_policy == "direct"
+    assert kb.keyrgb_per_key_mode_policy == "init_once"
 
 
 def test_device_set_key_colors_without_user_mode_writes_incremental_frame_only() -> None:

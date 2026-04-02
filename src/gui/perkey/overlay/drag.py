@@ -5,7 +5,8 @@ from dataclasses import dataclass
 
 @dataclass
 class _OverlayDragContext:
-    kid: str
+    key_id: str | None
+    slot_id: str
     mode: str
     edges: str
     x: float
@@ -23,6 +24,10 @@ class _OverlayDragContext:
     t0: float
     b0: float
 
+    @property
+    def kid(self) -> str:
+        return self.key_id or self.slot_id
+
 
 class OverlayDragController:
     """Stateful overlay drag/resize controller for the per-key canvas."""
@@ -38,29 +43,42 @@ class OverlayDragController:
         if e.overlay_scope.get() != "key":
             self._ctx = None
             return
-        if not e.selected_key_id or c._canvas_transform() is None:
+        selected_key_id = getattr(e, "selected_key_id", None)
+        selected_slot_id = getattr(e, "selected_slot_id", None)
+        if not selected_slot_id and selected_key_id:
+            slot_lookup = getattr(e, "_slot_id_for_key_id", None)
+            if callable(slot_lookup):
+                selected_slot_id = slot_lookup(selected_key_id)
+        if not selected_key_id and selected_slot_id:
+            key_lookup = getattr(e, "_key_id_for_slot_id", None)
+            if callable(key_lookup):
+                selected_key_id = key_lookup(selected_slot_id)
+
+        selected_identity = str(selected_slot_id or "")
+        if not selected_identity or c._canvas_transform() is None:
             self._ctx = None
             return
 
         cx = float(event.x)
         cy = float(event.y)
 
-        press = c._overlay_press_mode(selected_key_id=e.selected_key_id, cx=cx, cy=cy, pad=6.0)
+        press = c._overlay_press_mode(selected_slot_id=selected_identity, cx=cx, cy=cy, pad=6.0)
         if press is None:
             self._ctx = None
             return
         mode, edges = press
 
-        kt = e.per_key_layout_tweaks.get(e.selected_key_id, {})
+        kt = e.per_key_layout_tweaks.get(selected_identity, {}) or e.per_key_layout_tweaks.get(selected_key_id or "", {})
 
-        geom = c._overlay_drag_geometry(e.selected_key_id)
+        geom = c._overlay_drag_geometry(selected_identity)
         if geom is None:
             self._ctx = None
             return
         gx, gy, gw, gh, l0, r0, t0, b0 = geom
 
         self._ctx = _OverlayDragContext(
-            kid=e.selected_key_id,
+            key_id=selected_key_id,
+            slot_id=selected_identity,
             mode=mode,
             edges=edges,
             x=cx,
@@ -90,8 +108,9 @@ class OverlayDragController:
         if t is None:
             return
 
-        kid = self._ctx.kid
-        if not kid:
+        key_id = self._ctx.key_id
+        key_identity = self._ctx.slot_id or self._ctx.key_id
+        if not key_identity:
             return
 
         csx = float(t.sx)
@@ -105,7 +124,7 @@ class OverlayDragController:
         dx_base = dx_canvas / csx
         dy_base = dy_canvas / csy
 
-        kt = dict(e.per_key_layout_tweaks.get(kid, {}))
+        kt = dict(e.per_key_layout_tweaks.get(key_identity, {}) or (e.per_key_layout_tweaks.get(key_id, {}) if key_id else {}))
         g_inset = float(e.layout_tweaks.get("inset", 0.06))
         kt.setdefault("inset", float(kt.get("inset", g_inset)))
 
@@ -157,7 +176,7 @@ class OverlayDragController:
             kt["dx"] = float(self._ctx.dx) + dx_base
             kt["dy"] = float(self._ctx.dy) + dy_base
 
-        e.per_key_layout_tweaks[kid] = kt
+        e.per_key_layout_tweaks[key_identity] = kt
         e.sync_overlay_vars()
         c.redraw()
 

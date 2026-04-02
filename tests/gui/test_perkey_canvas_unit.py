@@ -40,8 +40,13 @@ class _FakeTkCanvas:
         self.bind_calls.append((event, callback))
 
 
-def _key(key_id: str = "k1", *, rect=(10.0, 20.0, 30.0, 40.0)) -> SimpleNamespace:
-    return SimpleNamespace(key_id=key_id, rect=rect, label=key_id)
+def _key(
+    key_id: str = "k1",
+    *,
+    rect=(10.0, 20.0, 30.0, 40.0),
+    slot_id: str | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(key_id=key_id, rect=rect, label=key_id, slot_id=slot_id)
 
 
 def test_init_wires_bindings_and_state(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -134,6 +139,7 @@ def test_apply_global_and_per_key_tweak_delegate_to_helpers(monkeypatch: pytest.
     assert per_key_calls == [
         {
             "key_id": "k1",
+            "slot_id": None,
             "rect": (11.0, 22.0, 33.0, 44.0),
             "per_key_layout_tweaks": fake.editor.per_key_layout_tweaks,
             "inset_default": 0.2,
@@ -202,9 +208,10 @@ def test_resize_and_point_helpers_handle_missing_bboxes_and_success() -> None:
 def test_key_rect_base_bbox_and_overlay_drag_geometry() -> None:
     fake = _FakeCanvasBase()
     key_obj = _key("k1", rect=(10.0, 20.0, 30.0, 40.0))
+    key_obj.slot_id = "slot_k1"
     fake._keydef_by_id = lambda key_id: key_obj if key_id == "k1" else None
     fake._apply_global_tweak = lambda x, y, w, h: (x + 1.0, y + 2.0, w + 3.0, h + 4.0)
-    fake._apply_per_key_tweak = lambda key_id, x, y, w, h: (x + 10.0, y + 20.0, w + 30.0, h + 40.0, 0.5)
+    fake._apply_per_key_tweak = lambda key_id, x, y, w, h, slot_id=None: (x + 10.0, y + 20.0, w + 30.0, h + 40.0, 0.5)
     fake._key_rect_canvas = lambda key: (2.0, 4.0, 22.0, 34.0, 0.25)
     fake._inset_pixels = lambda w, h, inset: 3.0
     fake._key_rect_base_after_global = KeyboardCanvas._key_rect_base_after_global.__get__(fake, _FakeCanvasBase)
@@ -221,7 +228,7 @@ def test_hit_test_key_id_returns_first_matching_visible_key(monkeypatch: pytest.
     fake._canvas_transform = lambda: "tx"
     fake.editor.layout_tweaks = {"a": 1}
     fake.editor.per_key_layout_tweaks = {"b": 2}
-    visible = [_key("k1"), _key("k2")]
+    visible = [_key("k1", slot_id="slot_k1"), _key("k2", slot_id="slot_k2")]
     monkeypatch.setattr(perkey_canvas, "get_layout_keys", lambda *_args, **_kwargs: visible)
 
     hit_calls: list[dict[str, object]] = []
@@ -231,29 +238,34 @@ def test_hit_test_key_id_returns_first_matching_visible_key(monkeypatch: pytest.
         lambda **kwargs: hit_calls.append(kwargs) or ([(0.0, 0.0, 5.0, 5.0)] if kwargs["key"].key_id == "k1" else [(10.0, 10.0, 20.0, 20.0)]),
     )
 
+    assert KeyboardCanvas._hit_test_slot_id(fake, 3.0, 4.0) == "slot_k1"
     assert KeyboardCanvas._hit_test_key_id(fake, 3.0, 4.0) == "k1"
+    assert KeyboardCanvas._hit_test_slot_id(fake, 50.0, 50.0) is None
     assert KeyboardCanvas._hit_test_key_id(fake, 50.0, 50.0) is None
     assert len(hit_calls) >= 2
 
     fake._canvas_transform = lambda: None
+    assert KeyboardCanvas._hit_test_slot_id(fake, 1.0, 1.0) is None
     assert KeyboardCanvas._hit_test_key_id(fake, 1.0, 1.0) is None
 
 
 def test_overlay_press_mode_distinguishes_resize_move_and_miss() -> None:
     fake = _FakeCanvasBase()
-    fake._resize_edges_for_point = lambda key_id, cx, cy: "rb"
-    fake._point_near_key_bbox = lambda key_id, cx, cy, pad: True
-    fake._hit_test_key_id = lambda cx, cy: "k1"
+    fake._keydef_by_id = lambda key_id: _key("k1", slot_id="slot_k1") if key_id == "k1" else None
+    fake._resize_edges_for_point = lambda slot_id, cx, cy: "rb"
+    fake._point_near_key_bbox = lambda slot_id, cx, cy, pad: True
+    fake._hit_test_slot_id = lambda cx, cy: "slot_k1"
 
+    assert KeyboardCanvas._overlay_press_mode(fake, selected_slot_id="slot_k1", cx=4.0, cy=5.0) == ("resize", "rb")
     assert KeyboardCanvas._overlay_press_mode(fake, selected_key_id="k1", cx=4.0, cy=5.0) == ("resize", "rb")
 
-    fake._point_near_key_bbox = lambda key_id, cx, cy, pad: False
-    assert KeyboardCanvas._overlay_press_mode(fake, selected_key_id="k1", cx=4.0, cy=5.0) is None
+    fake._point_near_key_bbox = lambda slot_id, cx, cy, pad: False
+    assert KeyboardCanvas._overlay_press_mode(fake, selected_slot_id="slot_k1", cx=4.0, cy=5.0) is None
 
-    fake._resize_edges_for_point = lambda key_id, cx, cy: ""
-    fake._hit_test_key_id = lambda cx, cy: "k1"
-    assert KeyboardCanvas._overlay_press_mode(fake, selected_key_id="k1", cx=4.0, cy=5.0) == ("move", "")
+    fake._resize_edges_for_point = lambda slot_id, cx, cy: ""
+    fake._hit_test_slot_id = lambda cx, cy: "slot_k1"
+    assert KeyboardCanvas._overlay_press_mode(fake, selected_slot_id="slot_k1", cx=4.0, cy=5.0) == ("move", "")
 
-    fake._hit_test_key_id = lambda cx, cy: "other"
-    assert KeyboardCanvas._overlay_press_mode(fake, selected_key_id="k1", cx=4.0, cy=5.0) is None
+    fake._hit_test_slot_id = lambda cx, cy: "other"
+    assert KeyboardCanvas._overlay_press_mode(fake, selected_slot_id="slot_k1", cx=4.0, cy=5.0) is None
     assert KeyboardCanvas._overlay_press_mode(fake, selected_key_id="", cx=4.0, cy=5.0) is None

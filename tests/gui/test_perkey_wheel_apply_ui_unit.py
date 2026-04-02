@@ -39,7 +39,9 @@ class DummyBool:
 @dataclass
 class DummyEditor:
     colors: dict
+    keymap: dict
     selected_key_id: str | None
+    selected_cells: tuple[tuple[int, int], ...]
     selected_cell: tuple[int, int] | None
     apply_all_keys: DummyBool
     canvas: DummyCanvas
@@ -55,7 +57,9 @@ class DummyEditor:
 def test_on_wheel_color_change_ui_no_selection_no_allkeys_returns() -> None:
     ed = DummyEditor(
         colors={},
+        keymap={},
         selected_key_id=None,
+        selected_cells=(),
         selected_cell=None,
         apply_all_keys=DummyBool(False),
         canvas=DummyCanvas(),
@@ -81,7 +85,9 @@ def test_on_wheel_color_change_ui_no_selection_no_allkeys_returns() -> None:
 def test_on_wheel_color_change_ui_updates_single_key_and_commits_soft() -> None:
     ed = DummyEditor(
         colors={(0, 0): (0, 0, 0)},
+        keymap={"K1": ((0, 0),)},
         selected_key_id="K1",
+        selected_cells=((0, 0),),
         selected_cell=(0, 0),
         apply_all_keys=DummyBool(False),
         canvas=DummyCanvas(),
@@ -97,11 +103,11 @@ def test_on_wheel_color_change_ui_updates_single_key_and_commits_soft() -> None:
         num_cols: int,
         color,
         apply_all_keys: bool,
-        selected_cell,
+        selected_cells,
     ):
         assert (num_rows, num_cols) == (3, 4)
         assert apply_all_keys is False
-        assert selected_cell == (0, 0)
+        assert selected_cells == ((0, 0),)
         assert color == (1, 2, 3)
         # ensure we were passed a copy
         assert colors == {(0, 0): (0, 0, 0)}
@@ -120,7 +126,9 @@ def test_on_wheel_color_change_ui_updates_single_key_and_commits_soft() -> None:
 def test_on_wheel_color_release_ui_all_keys_sets_status_and_commits_hard() -> None:
     ed = DummyEditor(
         colors={},
+        keymap={},
         selected_key_id=None,
+        selected_cells=(),
         selected_cell=None,
         apply_all_keys=DummyBool(True),
         canvas=DummyCanvas(),
@@ -142,7 +150,9 @@ def test_on_wheel_color_release_ui_all_keys_sets_status_and_commits_hard() -> No
 def test_on_wheel_color_release_ui_single_key_sets_status() -> None:
     ed = DummyEditor(
         colors={},
+        keymap={"K7": ((1, 1), (1, 2))},
         selected_key_id="K7",
+        selected_cells=((1, 1), (1, 2)),
         selected_cell=(1, 1),
         apply_all_keys=DummyBool(False),
         canvas=DummyCanvas(),

@@ -17,31 +17,41 @@ from src.core.resources.defaults import (
 from src.core.resources.layouts import LAYOUT_CATALOG, get_layout_keys, resolve_layout_id
 
 from .full_map import ensure_full_map_ui
+from .selection import select_visible_identity
 from ..hardware import NUM_COLS, NUM_ROWS
-from ..profile_management import activate_profile, delete_profile, save_profile
+from ..profile_management import (
+    activate_profile,
+    delete_profile,
+    keymap_cells_for,
+    primary_cell,
+    sanitize_keymap_cells,
+    save_profile,
+)
 from .status import active_profile, default_profile_set, layout_defaults_reset, saved_profile, set_status
 
 
 _LAYOUT_LABELS: dict[str, str] = {ld.layout_id: ld.label for ld in LAYOUT_CATALOG}
 
 
-def _parse_default_keymap(layout_id: str) -> dict[str, tuple[int, int]]:
-    parsed: dict[str, tuple[int, int]] = {}
-    for key_id, coord_text in get_default_keymap(layout_id).items():
-        try:
-            row_text, col_text = coord_text.split(",", 1)
-            parsed[key_id] = (int(row_text.strip()), int(col_text.strip()))
-        except (AttributeError, TypeError, ValueError):
-            continue
-    return parsed
+def _parse_default_keymap(layout_id: str) -> dict[str, tuple[tuple[int, int], ...]]:
+    return sanitize_keymap_cells(
+        profiles.normalize_keymap(get_default_keymap(layout_id), physical_layout=layout_id),
+        num_rows=NUM_ROWS,
+        num_cols=NUM_COLS,
+    )
 
 
 def reset_layout_defaults_ui(editor: Any) -> None:
     resolved_layout = resolve_layout_id(editor._physical_layout)
+    slot_lookup = getattr(editor, "_slot_id_for_key_id", None)
+    key_lookup = getattr(editor, "_key_id_for_slot_id", None)
 
     editor.keymap = _parse_default_keymap(editor._physical_layout)
     editor.layout_tweaks = get_default_layout_tweaks(editor._physical_layout)
-    editor.per_key_layout_tweaks = get_default_per_key_tweaks(editor._physical_layout)
+    editor.per_key_layout_tweaks = profiles.normalize_layout_per_key_tweaks(
+        get_default_per_key_tweaks(editor._physical_layout),
+        physical_layout=editor._physical_layout,
+    )
     editor.layout_slot_overrides = profiles.save_layout_slots(
         {},
         editor.profile_name,
@@ -55,17 +65,44 @@ def reset_layout_defaults_ui(editor: Any) -> None:
         editor._physical_layout, slot_overrides=getattr(editor, "layout_slot_overrides", None)
     )
     visible_key_ids = {key.key_id for key in visible_keys}
+    visible_slot_ids = {str(getattr(key, "slot_id", None) or key.key_id) for key in visible_keys}
+    selected_slot_id = getattr(editor, "selected_slot_id", None)
+    current_slot_id = selected_slot_id
+    if current_slot_id is None and callable(slot_lookup) and editor.selected_key_id in visible_key_ids:
+        current_slot_id = slot_lookup(editor.selected_key_id)
 
-    if editor.selected_key_id in visible_key_ids:
-        editor.selected_cell = editor.keymap.get(editor.selected_key_id)
+    if current_slot_id in visible_slot_ids or editor.selected_key_id in visible_key_ids:
+        editor.selected_slot_id = str(current_slot_id) if current_slot_id else None
+        if editor.selected_slot_id and callable(key_lookup):
+            resolved_key_id = key_lookup(editor.selected_slot_id)
+            if resolved_key_id:
+                editor.selected_key_id = str(resolved_key_id)
+        editor.selected_cells = keymap_cells_for(
+            editor.keymap,
+            editor.selected_key_id,
+            slot_id=getattr(editor, "selected_slot_id", None),
+            physical_layout=getattr(editor, "_physical_layout", None),
+        )
+        editor.selected_cell = primary_cell(editor.selected_cells)
     else:
         editor.selected_key_id = None
+        editor.selected_slot_id = None
+        editor.selected_cells = ()
         editor.selected_cell = None
 
-    if editor.selected_key_id is None:
+    if getattr(editor, "selected_slot_id", None) is None and editor.selected_key_id is None:
         for key in visible_keys:
-            if key.key_id in editor.keymap:
-                editor.select_key_id(key.key_id)
+            if keymap_cells_for(
+                editor.keymap,
+                str(key.key_id),
+                slot_id=str(getattr(key, "slot_id", None) or key.key_id),
+                physical_layout=getattr(editor, "_physical_layout", None),
+            ):
+                select_visible_identity(
+                    editor,
+                    slot_id=str(getattr(key, "slot_id", None) or key.key_id),
+                    key_id=str(key.key_id),
+                )
                 break
 
     editor.overlay_controls.sync_vars_from_scope()
@@ -94,6 +131,18 @@ def activate_profile_ui(editor: Any) -> None:
 
     # Reload per-profile backdrop state.
     try:
+        editor._backdrop_mode_var.set(profiles.load_backdrop_mode(editor.profile_name))
+        mode_combo = getattr(editor, "_backdrop_mode_combo", None)
+        if mode_combo is not None:
+            labels = {
+                "none": "No backdrop",
+                "builtin": "Built-in seed",
+                "custom": "Custom image",
+            }
+            mode_combo.set(labels.get(editor._backdrop_mode_var.get(), "Built-in seed"))
+    except Exception:
+        pass
+    try:
         editor.backdrop_transparency.set(float(profiles.load_backdrop_transparency(editor.profile_name)))
     except Exception:
         pass
@@ -114,8 +163,13 @@ def activate_profile_ui(editor: Any) -> None:
     editor.canvas.redraw()
     set_status(editor, active_profile(editor.profile_name))
 
-    if editor.selected_key_id:
-        editor.select_key_id(editor.selected_key_id)
+    selected_slot_id = getattr(editor, "selected_slot_id", None)
+    slot_lookup = getattr(editor, "_slot_id_for_key_id", None)
+    if selected_slot_id and hasattr(editor, "select_slot_id"):
+        editor.select_slot_id(selected_slot_id)
+    elif editor.selected_key_id:
+        resolved_slot_id = slot_lookup(editor.selected_key_id) if callable(slot_lookup) else None
+        select_visible_identity(editor, slot_id=resolved_slot_id, key_id=editor.selected_key_id)
 
 
 def save_profile_ui(editor: Any) -> None:

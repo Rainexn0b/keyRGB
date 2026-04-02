@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from contextlib import contextmanager
 from collections.abc import Iterator
@@ -14,6 +15,28 @@ from src.core.backends.policy import (
 from src.core.utils.safe_attrs import safe_int_attr
 
 from ._collectors_backends_sysfs import sysfs_led_candidates_snapshot
+from .backend_speed_probe import build_backend_speed_probe_plans
+
+
+logger = logging.getLogger(__name__)
+
+_BACKEND_METADATA_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_IDENTIFIER_NORMALIZATION_ERRORS = (AttributeError, TypeError, ValueError)
+_SORT_VALUE_ERRORS = (OverflowError, RuntimeError, TypeError, ValueError)
+
+
+def _log_snapshot_boundary(message: str, exc: Exception) -> None:
+    logger.log(logging.DEBUG, message, exc_info=(type(exc), exc, exc.__traceback__))
+
+
+def _coerce_sort_value(value: object) -> int:
+    if value is None:
+        return 0
+    try:
+        return int(value)
+    except _SORT_VALUE_ERRORS:
+        return 0
+
 
 
 def _tier_for_backend_name(name: str) -> int | None:
@@ -72,7 +95,8 @@ def _probe_backend(backend: object) -> dict[str, Any]:
             reason = "is_available"
             confidence = 50 if available else 0
             identifiers = None
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: backend probe execution is a best-effort diagnostics boundary
+        _log_snapshot_boundary("Failed to probe backend during diagnostics collection", exc)
         available = False
         reason = f"probe exception: {exc}"
         confidence = 0
@@ -85,21 +109,18 @@ def _probe_backend(backend: object) -> dict[str, Any]:
         "reason": reason,
     }
 
-    try:
-        entry["priority"] = safe_int_attr(backend, "priority", default=0)
-    except Exception:
-        entry["priority"] = 0
+    entry["priority"] = safe_int_attr(backend, "priority", default=0)
 
     try:
         entry["stability"] = stability_for_backend(backend).value
-    except Exception:
+    except _BACKEND_METADATA_ERRORS:
         pass
 
     try:
         evidence = experimental_evidence_for_backend(backend)
         if evidence is not None:
             entry["experimental_evidence"] = evidence.value
-    except Exception:
+    except _BACKEND_METADATA_ERRORS:
         pass
 
     try:
@@ -107,7 +128,7 @@ def _probe_backend(backend: object) -> dict[str, Any]:
         entry["selection_enabled"] = bool(selection_enabled)
         if selection_reason:
             entry["selection_reason"] = selection_reason
-    except Exception:
+    except _BACKEND_METADATA_ERRORS:
         pass
 
     tier = _tier_for_backend_name(str(entry.get("name") or ""))
@@ -120,7 +141,7 @@ def _probe_backend(backend: object) -> dict[str, Any]:
     if identifiers:
         try:
             entry["identifiers"] = dict(identifiers)
-        except Exception:
+        except _IDENTIFIER_NORMALIZATION_ERRORS:
             pass
 
     return entry
@@ -154,16 +175,13 @@ def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str
             }
         )
 
-    try:
-        available_candidates.sort(
-            key=lambda e: (
-                int(e.get("confidence") or 0),
-                int(e.get("priority") or 0),
-            ),
-            reverse=True,
-        )
-    except Exception:
-        pass
+    available_candidates.sort(
+        key=lambda e: (
+            _coerce_sort_value(e.get("confidence")),
+            _coerce_sort_value(e.get("priority")),
+        ),
+        reverse=True,
+    )
 
     return available_candidates
 
@@ -174,7 +192,8 @@ def backend_probe_snapshot() -> dict[str, Any]:
     try:
         # Diagnostics is a subpackage under src/core, so backends live one level up.
         from ..backends.registry import iter_backends, select_backend
-    except Exception:
+    except Exception as exc:  # @quality-exception exception-transparency: backend registry import is a best-effort diagnostics boundary
+        _log_snapshot_boundary("Failed to import backend registry during diagnostics collection", exc)
         return {}
 
     probes: list[dict[str, Any]] = []
@@ -191,10 +210,12 @@ def backend_probe_snapshot() -> dict[str, Any]:
         if not selection_blocked:
             selected_backend = select_backend()
             selected = getattr(selected_backend, "name", None) if selected_backend is not None else None
-    except Exception:
+    except Exception as exc:  # @quality-exception exception-transparency: selected backend resolution is a best-effort diagnostics boundary
+        _log_snapshot_boundary("Failed to resolve selected backend during diagnostics collection", exc)
         selected = None
 
     available_candidates = _collect_available_candidates(probes)
+    guided_speed_probes = build_backend_speed_probe_plans(backends_snapshot={"selected": selected, "probes": probes})
 
     return {
         "selected": selected,
@@ -209,5 +230,6 @@ def backend_probe_snapshot() -> dict[str, Any]:
             "disable_usb_scan": (os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1"),
         },
         "candidates_sorted": available_candidates,
+        "guided_speed_probes": guided_speed_probes,
         "sysfs_led_candidates": sysfs_led_candidates_snapshot(),
     }

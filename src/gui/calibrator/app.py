@@ -10,11 +10,13 @@ from tkinter import filedialog
 from PIL import Image, ImageTk
 
 from src.core.config import Config
+from src.core.profile import profiles
 from src.core.resources.defaults import get_default_keymap
+from src.core.resources.layout_legends import load_layout_legend_pack
 from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef, get_layout_keys
 from src.core.resources.layouts import LAYOUT_CATALOG, resolve_layout_id
 from src.gui.perkey.hardware import NUM_ROWS as BACKEND_NUM_ROWS, NUM_COLS as BACKEND_NUM_COLS
-from src.gui.perkey.profile_management import sanitize_keymap_cells
+from src.gui.perkey.profile_management import keymap_cells_for, sanitize_keymap_cells
 from .helpers.canvas_render import redraw_calibration_canvas
 from .helpers.geometry import hit_test
 from .helpers.probe import CalibrationProbeState
@@ -44,7 +46,18 @@ from src.gui.reference.overlay_geometry import (
 
 MATRIX_ROWS = BACKEND_NUM_ROWS
 MATRIX_COLS = BACKEND_NUM_COLS
+KeyCell = Tuple[int, int]
+KeyCells = Tuple[KeyCell, ...]
+Keymap = Dict[str, KeyCells]
 _LAYOUT_LABELS = {layout.layout_id: layout.label for layout in LAYOUT_CATALOG}
+_BACKDROP_MODE_LABELS = {
+    "none": "No backdrop",
+    "builtin": "Built-in seed",
+    "custom": "Custom image",
+}
+_TK_RUNTIME_ERRORS = (tk.TclError, RuntimeError)
+_WRAP_SYNC_ERRORS = _TK_RUNTIME_ERRORS + (TypeError, ValueError)
+_BACKDROP_UPDATE_ERRORS = _TK_RUNTIME_ERRORS + (OSError, TypeError, ValueError)
 
 
 def _keymap_path() -> Path:
@@ -52,20 +65,17 @@ def _keymap_path() -> Path:
     return keymap_path(get_active_profile_name())
 
 
-def _save_keymap(keymap: Dict[str, Tuple[int, int]]) -> None:
+def _save_keymap(keymap: Keymap, *, physical_layout: str | None = None) -> None:
     # Use shared saver to keep behavior consistent with per-key UI.
-    save_keymap(get_active_profile_name(), keymap)
+    save_keymap(get_active_profile_name(), keymap, physical_layout=physical_layout)
 
 
-def _parse_default_keymap(layout_id: str) -> dict[str, tuple[int, int]]:
-    parsed: dict[str, tuple[int, int]] = {}
-    for key_id, coord_text in get_default_keymap(layout_id).items():
-        try:
-            row_text, col_text = coord_text.split(",", 1)
-            parsed[key_id] = (int(row_text.strip()), int(col_text.strip()))
-        except (AttributeError, TypeError, ValueError):
-            continue
-    return parsed
+def _parse_default_keymap(layout_id: str) -> Keymap:
+    return sanitize_keymap_cells(
+        profiles.normalize_keymap(get_default_keymap(layout_id), physical_layout=layout_id),
+        num_rows=MATRIX_ROWS,
+        num_cols=MATRIX_COLS,
+    )
 
 
 def _resolved_layout_label(layout_id: str) -> str:
@@ -78,7 +88,7 @@ def _load_profile_state(
     *,
     physical_layout: str,
 ) -> tuple[
-    Dict[str, Tuple[int, int]],
+    Keymap,
     Dict[str, float],
     Dict[str, Dict[str, float]],
     Dict[str, Dict[str, object]],
@@ -94,6 +104,76 @@ def _load_profile_state(
     return keymap, layout_tweaks, per_key_layout_tweaks, layout_slot_overrides
 
 
+def _selected_layout_legend_pack(cfg: object, *, physical_layout: str) -> str | None:
+    requested = str(getattr(cfg, "layout_legend_pack", "auto") or "auto").strip().lower()
+    if not requested or requested == "auto":
+        return None
+
+    pack = load_layout_legend_pack(requested)
+    if not pack:
+        return None
+
+    resolved_pack_layout = str(pack.get("layout_id") or physical_layout).strip().lower()
+    return requested if resolved_pack_layout == str(physical_layout or "auto").strip().lower() else None
+
+
+def _physical_layout_id(app: object) -> str:
+    cfg = getattr(app, "cfg", None)
+    return str(getattr(cfg, "physical_layout", "auto") or "auto")
+
+
+def _visible_layout_keys(app: object) -> list[KeyDef]:
+    physical_layout = _physical_layout_id(app)
+    cfg = getattr(app, "cfg", None)
+    return list(
+        get_layout_keys(
+            physical_layout,
+            legend_pack_id=_selected_layout_legend_pack(cfg, physical_layout=physical_layout)
+            if cfg is not None
+            else None,
+            slot_overrides=getattr(app, "layout_slot_overrides", None),
+        )
+    )
+
+
+def _visible_key_for_slot_id(app: object, slot_id: str | None) -> KeyDef | None:
+    normalized_slot_id = str(slot_id or "").strip()
+    if not normalized_slot_id:
+        return None
+
+    for key in _visible_layout_keys(app):
+        if str(getattr(key, "slot_id", None) or key.key_id) == normalized_slot_id:
+            return key
+    return None
+
+
+def _probe_selected_slot_id(app: object) -> str | None:
+    probe = getattr(app, "probe", None)
+    selected_slot_id = str(getattr(probe, "selected_slot_id", "") or "").strip()
+    if selected_slot_id:
+        return selected_slot_id
+
+    selected_key_id = str(getattr(probe, "selected_key_id", "") or "").strip()
+    if not selected_key_id:
+        return None
+
+    for key in _visible_layout_keys(app):
+        if str(key.key_id) == selected_key_id:
+            return str(getattr(key, "slot_id", None) or key.key_id)
+    return selected_key_id
+
+
+def _probe_selected_key_id(app: object) -> str | None:
+    slot_id = _probe_selected_slot_id(app)
+    key = _visible_key_for_slot_id(app, slot_id)
+    if key is not None:
+        return str(key.key_id)
+
+    probe = getattr(app, "probe", None)
+    selected_key_id = str(getattr(probe, "selected_key_id", "") or "").strip()
+    return selected_key_id or None
+
+
 class KeymapCalibrator(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
@@ -103,7 +183,7 @@ class KeymapCalibrator(tk.Tk):
         # Avoid flashing a tiny default-sized window while widgets/images load.
         try:
             self.withdraw()
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
 
         self.bg_color, self.fg_color = apply_clam_theme(self)
@@ -170,12 +250,12 @@ class KeymapCalibrator(tk.Tk):
             try:
                 w = int(side.winfo_width())
                 self.lbl_status.configure(wraplength=max(220, w - 8))
-            except Exception:
+            except _WRAP_SYNC_ERRORS:
                 return
 
         try:
             side.bind("<Configure>", _sync_side_wrap, add=True)
-        except Exception:
+        except _TK_RUNTIME_ERRORS:
             pass
         self.after(0, _sync_side_wrap)
 
@@ -194,15 +274,28 @@ class KeymapCalibrator(tk.Tk):
         ttk.Button(side, text="Set Backdrop...", command=self._set_backdrop).grid(
             row=6, column=0, sticky="ew", pady=(18, 0)
         )
+        ttk.Label(side, text="Backdrop mode", anchor="w", justify="left").grid(
+            row=7, column=0, sticky="ew", pady=(10, 0)
+        )
+        self._backdrop_mode_var = tk.StringVar(value=profiles.load_backdrop_mode(self.profile_name))
+        self._backdrop_mode_combo = ttk.Combobox(
+            side,
+            state="readonly",
+            width=20,
+            values=[_BACKDROP_MODE_LABELS[mode] for mode in ("none", "builtin", "custom")],
+        )
+        self._backdrop_mode_combo.set(_BACKDROP_MODE_LABELS.get(self._backdrop_mode_var.get(), "Built-in seed"))
+        self._backdrop_mode_combo.grid(row=8, column=0, sticky="ew", pady=(6, 0))
+        self._backdrop_mode_combo.bind("<<ComboboxSelected>>", self._on_backdrop_mode_changed)
         ttk.Button(side, text="Reset Backdrop", command=self._reset_backdrop).grid(
-            row=7, column=0, sticky="ew", pady=(6, 0)
+            row=9, column=0, sticky="ew", pady=(6, 0)
         )
         ttk.Button(side, text="Reset Keymap Defaults", command=self._reset_keymap_defaults).grid(
-            row=8, column=0, sticky="ew", pady=(18, 0)
+            row=10, column=0, sticky="ew", pady=(18, 0)
         )
-        ttk.Button(side, text="Save", command=self._save).grid(row=9, column=0, sticky="ew", pady=(18, 0))
+        ttk.Button(side, text="Save", command=self._save).grid(row=11, column=0, sticky="ew", pady=(18, 0))
         ttk.Button(side, text="Save && Close", command=self._save_and_close).grid(
-            row=10, column=0, sticky="ew", pady=(6, 0)
+            row=12, column=0, sticky="ew", pady=(6, 0)
         )
 
         # Keyboard shortcuts.
@@ -228,7 +321,7 @@ class KeymapCalibrator(tk.Tk):
             try:
                 self.deiconify()
                 self.lift()
-            except Exception:
+            except _TK_RUNTIME_ERRORS:
                 pass
 
         # Defer image load/draw until after geometry is applied.
@@ -246,23 +339,45 @@ class KeymapCalibrator(tk.Tk):
             return
         try:
             save_backdrop_image(profile_name=self.profile_name, source_path=path)
+            profiles.save_backdrop_mode("custom", self.profile_name)
+            self._backdrop_mode_var.set("custom")
+            self._backdrop_mode_combo.set("Custom image")
             self._load_deck_image()
             self._redraw()
             self.lbl_status.configure(text="Backdrop updated")
-        except Exception:
+        except _BACKDROP_UPDATE_ERRORS:
             self.lbl_status.configure(text="Failed to set backdrop")
 
     def _reset_backdrop(self) -> None:
         try:
             reset_backdrop_image(self.profile_name)
+            profiles.save_backdrop_mode("builtin", self.profile_name)
+            self._backdrop_mode_var.set("builtin")
+            self._backdrop_mode_combo.set("Built-in seed")
             self._load_deck_image()
             self._redraw()
             self.lbl_status.configure(text="Backdrop reset")
-        except Exception:
+        except _BACKDROP_UPDATE_ERRORS:
             self.lbl_status.configure(text="Failed to reset backdrop")
 
+    def _on_backdrop_mode_changed(self, _event=None) -> None:
+        label = self._backdrop_mode_combo.get()
+        for mode, mode_label in _BACKDROP_MODE_LABELS.items():
+            if mode_label == label:
+                self._backdrop_mode_var.set(mode)
+                break
+        else:
+            self._backdrop_mode_var.set("builtin")
+
+        try:
+            profiles.save_backdrop_mode(self._backdrop_mode_var.get(), self.profile_name)
+            self._load_deck_image()
+            self._redraw()
+        except _BACKDROP_UPDATE_ERRORS:
+            self.lbl_status.configure(text="Failed to update backdrop mode")
+
     def _reset_keymap_defaults(self) -> None:
-        physical_layout = str(self.cfg.physical_layout or "auto")
+        physical_layout = _physical_layout_id(self)
         self.keymap = sanitize_keymap_cells(
             _parse_default_keymap(physical_layout),
             num_rows=MATRIX_ROWS,
@@ -305,16 +420,30 @@ class KeymapCalibrator(tk.Tk):
         self._next()
 
     def _assign(self) -> None:
-        if not self.probe.selected_key_id:
+        slot_id = _probe_selected_slot_id(self)
+        key_id = _probe_selected_key_id(self)
+        if not slot_id and not key_id:
             self.lbl_status.configure(text="Select a key on the image first")
             return
-        self.keymap[self.probe.selected_key_id] = self.probe.current_cell
-        self.lbl_status.configure(text=f"Assigned {self.probe.selected_key_id} -> {self.probe.current_cell}")
+        key_identity = str(slot_id or key_id)
+        display_key_id = str(key_id or key_identity)
+        cells = list(
+            keymap_cells_for(
+                self.keymap,
+                display_key_id,
+                slot_id=slot_id,
+                physical_layout=_physical_layout_id(self),
+            )
+        )
+        if self.probe.current_cell not in cells:
+            cells.append(self.probe.current_cell)
+        self.keymap[key_identity] = tuple(cells)
+        self.lbl_status.configure(text=f"Assigned {display_key_id} -> {self.probe.current_cell} ({len(cells)} cell(s))")
         self._redraw()
         self._next()
 
     def _save(self) -> None:
-        _save_keymap(self.keymap)
+        _save_keymap(self.keymap, physical_layout=_physical_layout_id(self))
         self.lbl_status.configure(text=f"Saved to {str(_keymap_path())}")
 
     def _save_and_close(self) -> None:
@@ -330,8 +459,10 @@ class KeymapCalibrator(tk.Tk):
             layout_tweaks=self.layout_tweaks,
             per_key_layout_tweaks=self.per_key_layout_tweaks,
             keymap=self.keymap,
-            selected_key_id=self.probe.selected_key_id,
-            physical_layout=self.cfg.physical_layout,
+            selected_slot_id=_probe_selected_slot_id(self),
+            selected_key_id=_probe_selected_key_id(self),
+            physical_layout=_physical_layout_id(self),
+            legend_pack_id=_selected_layout_legend_pack(self.cfg, physical_layout=_physical_layout_id(self)),
             slot_overrides=self.layout_slot_overrides,
         )
 
@@ -342,11 +473,17 @@ class KeymapCalibrator(tk.Tk):
         y = e.y
         hit = self._hit_test(x, y)
         if hit is None:
-            self.probe.selected_key_id = None
+            self.probe.clear_selection()
             self.lbl_status.configure(text="No key hit")
         else:
-            self.probe.selected_key_id = hit.key_id
-            mapped = self.keymap.get(hit.key_id)
+            self.probe.selected_slot_id = str(getattr(hit, "slot_id", None) or hit.key_id)
+            self.probe.selected_key_id = str(hit.key_id)
+            mapped = keymap_cells_for(
+                self.keymap,
+                hit.key_id,
+                slot_id=self.probe.selected_slot_id,
+                physical_layout=_physical_layout_id(self),
+            )
             self.lbl_status.configure(
                 text=f"Selected {hit.label}" + (f" (mapped {mapped})" if mapped else " (unmapped)")
             )
@@ -356,14 +493,13 @@ class KeymapCalibrator(tk.Tk):
         if self._transform is None:
             return None
 
-        visible_keys = get_layout_keys(self.cfg.physical_layout, slot_overrides=self.layout_slot_overrides)
         return hit_test(
             transform=self._transform,
             x=x,
             y=y,
             layout_tweaks=self.layout_tweaks,
             per_key_layout_tweaks=self.per_key_layout_tweaks,
-            keys=visible_keys,
+            keys=_visible_layout_keys(self),
             image_size=BASE_IMAGE_SIZE,
         )
 

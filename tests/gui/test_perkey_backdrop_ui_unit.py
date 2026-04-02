@@ -51,6 +51,7 @@ def test_set_backdrop_ui_sets_status_and_reloads_on_success() -> None:
     ed = DummyEditor(profile_name="p1", status_label=DummyLabel(), canvas=DummyCanvas())
 
     saved = {}
+    saved_modes: list[tuple[str, str]] = []
 
     def ask(**_kwargs) -> str:
         return "/tmp/backdrop.png"
@@ -59,9 +60,15 @@ def test_set_backdrop_ui_sets_status_and_reloads_on_success() -> None:
         saved["profile_name"] = profile_name
         saved["source_path"] = source_path
 
-    set_backdrop_ui(ed, askopenfilename=ask, save_fn=save_fn)
+    set_backdrop_ui(
+        ed,
+        askopenfilename=ask,
+        save_fn=save_fn,
+        save_mode_fn=lambda mode, name: saved_modes.append((str(mode), str(name))),
+    )
 
     assert saved == {"profile_name": "p1", "source_path": "/tmp/backdrop.png"}
+    assert saved_modes == [("custom", "p1")]
     assert ed.canvas.reload_calls == 1
     assert ed.status_label.text == "Backdrop updated"
 
@@ -86,13 +93,19 @@ def test_reset_backdrop_ui_sets_status_and_reloads_on_success() -> None:
     ed = DummyEditor(profile_name="p1", status_label=DummyLabel(), canvas=DummyCanvas())
 
     called = {"name": None}
+    saved_modes: list[tuple[str, str]] = []
 
     def reset_fn(name: str) -> None:
         called["name"] = name
 
-    reset_backdrop_ui(ed, reset_fn=reset_fn)
+    reset_backdrop_ui(
+        ed,
+        reset_fn=reset_fn,
+        save_mode_fn=lambda mode, name: saved_modes.append((str(mode), str(name))),
+    )
 
     assert called["name"] == "p1"
+    assert saved_modes == [("builtin", "p1")]
     assert ed.canvas.reload_calls == 1
     assert ed.status_label.text == "Backdrop reset"
 

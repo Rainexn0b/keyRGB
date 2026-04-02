@@ -175,3 +175,4 @@ def test_ite_backend_get_device_tags_speed_policy(monkeypatch: pytest.MonkeyPatc
 
     assert kb is device
     assert kb.keyrgb_hw_speed_policy == "inverted"
+    assert kb.keyrgb_per_key_mode_policy == "reassert_every_frame"
