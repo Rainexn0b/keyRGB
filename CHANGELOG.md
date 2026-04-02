@@ -3,32 +3,13 @@
 ## 0.20.0 (2026-04-02)
 
 - Build/Logging: Scope throttled log suppression by logger identity as well as throttle key, so the breathing-effect palette-failure traceback log is not incorrectly suppressed by unrelated earlier suite activity during release validation.
-- Added persisted per-key/calibrator legend-pack selection in Keyboard Setup, with layout-aware fallback back to default legends when the chosen pack does not match the active physical family.
-- Fixed optional-key setup labels to inherit the active legend pack before applying any per-slot overrides, so locale legend defaults are no longer rewritten as custom labels.
-- Renamed reactive input internals to slot-first APIs (`slot_id` polling and slot-keymap loading) while keeping compatibility aliases for older key-id-named imports.
-
-- Tray/Icon: Change the animated rainbow `K` underlay from a horizontal sweep to a diagonal top-left-to-bottom-right gradient so the visible motion now tracks from the bottom-right corner toward the top-left, matching the app icon.
-- GUI/Layout Architecture: Move optional-layout slot overrides and per-key overlay tweak ownership onto canonical physical slot IDs, while keeping compatibility with existing legacy key_id-based profile/config data as groundwork for future locale/legend separation.
-- GUI/Layout Architecture: Move saved per-key keymaps onto canonical physical slot IDs too, and keep the editor, calibrator, and reactive typing lookup paths compatible with older legacy key_id-based profile data during the migration.
-- Effects/Reactive Input: Switch reactive evdev key translation and active-profile keymap loading to canonical physical slot IDs too, so reactive typing no longer relies on temporary legacy key_id alias maps internally.
-- GUI/Layout Architecture: Add a slot_id-based legend-pack resource layer on top of the physical layout catalogue, with sparse inherited label overrides and layout-API support so future locale variants can change visible legends without duplicating geometry.
-- GUI/Per-key Editor: Make physical slot IDs the primary internal selection identity across the per-key editor, wheel-apply path, overlay drag geometry, and layout reload/reset flows, while keeping legacy key_id handling only as a compatibility/display boundary where older data or labels still require it.
-- GUI/Per-key Editor: Add a profile-backed backdrop mode with `No backdrop`, `Built-in seed`, and `Custom image` options, so both the per-key editor and keymap calibrator can fully disable the bundled laptop seed image instead of always falling back to it.
-- GUI/Per-key Editor: Allow logical keys to map to multiple matrix cells in saved profiles, the calibrator, and reactive typing, so split or duplicated legends can drive every assigned LED instead of only the last calibrated cell.
-- GUI/Calibrator: Make physical slot IDs the primary internal selection identity in the keymap calibrator too, while keeping `key_id` only as a display and compatibility boundary for status text, older selections, and legacy saved data.
-- GUI/Per-key Canvas: Make the live canvas hit-test, hover, click, and overlay-drag path treat physical slot IDs as the primary interaction identity too, and keep legacy key-ID routing only as a narrow compatibility wrapper around the canvas helpers.
-- GUI/Per-key Editor: Push the sample-tool normal selection path and layout-reset/profile-reactivation selection restore flow further toward slot-first routing too, so those editor-level UI actions reuse canonical slot identity when it is already known instead of dropping back to `select_key_id` first.
-- GUI/Per-key Editor: Reduce the editor's remaining public `select_key_id` and normal `on_key_clicked` paths into thin compatibility wrappers over slot-first selection, so slot IDs are now the obvious primary interaction API at the editor boundary too.
-- GUI/Per-key Editor: Route the live slot-click path through a dedicated slot-aware sample-tool helper too, and prefer slot lookup even for legacy `pkey_` canvas tags before falling back to older key-id click handling.
-- GUI/Per-key Editor: Centralize slot-first reselection in a shared UI helper so profile reactivation, layout-reset reselection, and normal sample-tool selection all treat `select_key_id` as a last-resort compatibility path instead of a direct dependency.
-- GUI/Per-key Canvas: Tighten the canvas/editor click contract so canvas events always dispatch slot clicks, including legacy `pkey_` fallback tags, instead of still calling the old key-id click handler from production event routing.
-- GUI/Per-key Editor: Drop the editor's last key-id-named selection and click methods entirely; the concrete editor boundary is now slot-first only, with any remaining fallback behavior isolated to generic UI helpers instead of the `PerKeyEditor` class itself.
-- Effects/Reactive Input: Remove the now-unused lower-level key-id compatibility wrappers from `reactive.input` and `_PressSource`, so the reactive runtime is slot-first all the way down instead of keeping dead alias names alive below the package surface.
-- Effects/Reactive Input: Stop re-exporting the old key-id-named profile-keymap and keypress-poll helpers from the top-level reactive package surface; the slot-first names stay canonical there, while the compatibility wrappers remain available only in the lower-level input module.
-- Effects/Per-key Rendering: Add backend-specific user-mode maintenance for per-key software/reactive rendering so `ite8910` can stay in incremental user mode instead of resetting every frame, while `ite8291r3` keeps the per-frame reassertion it needs to avoid drifting back to its saved hardware effect.
-- Support Tools/Diagnostics: Add a guided `ite8910` hardware-speed probe plan to the backend diagnostics section and let Support Tools save the user’s speed-range observations into the support bundle and issue draft.
-- GUI/Settings: Wrap the Backend policy description so the Settings window no longer expands off-screen, and prefer the in-repo KeyRGB window icon assets over stale user-installed legacy icons when running from a checkout.
-- Installer/Desktop Integration: Keep `--update-appimage` cleaning stale legacy KeyRGB PNG icon files while it refreshes the launcher and desktop integration, so older installs do not keep the previous titlebar/launcher art around.
+- GUI/Layout Architecture: Move the per-key editor, calibrator, canvas, saved keymaps, optional-slot overrides, and reactive typing flows to canonical physical slot IDs while keeping legacy `key_id` data readable during the migration.
+- GUI/Keyboard Setup: Persist legend-pack selection with layout-aware fallback, add slot-based legend-pack resources for future locale variants, and make optional-key labels inherit the active legend pack before per-slot overrides.
+- GUI/Per-key Editor: Add profile-backed backdrop modes (`No backdrop`, `Built-in seed`, `Custom image`) and allow logical keys to map to multiple matrix cells so split legends can drive every assigned LED.
+- Effects/Reactive Input: Finish the slot-first internal API transition for reactive typing and remove most lower-level key-id compatibility aliases from the runtime-facing surface.
+- Effects/Per-key Rendering: Keep `ite8910` in incremental user mode during software and reactive rendering, while preserving the per-frame reassertion needed by `ite8291r3`.
+- Support Tools/Diagnostics: Add guided `ite8910` hardware-speed probe capture and persist the results into support bundles and issue drafts.
+- Tray/UI/Installer: Align the animated tray icon gradient with the app icon, keep the Settings backend policy text on-screen, prefer in-repo window icons over stale installed assets, and clean legacy PNG icons during `--update-appimage` refreshes.
 
 ## 0.19.2 (2026-04-01)
 
