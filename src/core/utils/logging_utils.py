@@ -8,6 +8,13 @@ _last_log_times: dict[str, float] = {}
 _lock = threading.Lock()
 
 
+def _logger_throttle_key(logger, key: str) -> str:
+    logger_name = getattr(logger, "name", None)
+    if not logger_name:
+        return str(key)
+    return f"{logger_name}:{key}"
+
+
 def log_throttled(
     logger,
     key: str,
@@ -23,11 +30,12 @@ def log_throttled(
     """
 
     now = time.monotonic()
+    throttle_key = _logger_throttle_key(logger, key)
     with _lock:
-        last = _last_log_times.get(key, 0.0)
+        last = _last_log_times.get(throttle_key, 0.0)
         if (now - last) < interval_s:
             return False
-        _last_log_times[key] = now
+        _last_log_times[throttle_key] = now
 
     if exc is not None:
         # Prefer proper exception logging when available.

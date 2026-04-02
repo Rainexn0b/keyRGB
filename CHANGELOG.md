@@ -2,6 +2,7 @@
 
 ## 0.20.0 (2026-04-02)
 
+- Build/Logging: Scope throttled log suppression by logger identity as well as throttle key, so the breathing-effect palette-failure traceback log is not incorrectly suppressed by unrelated earlier suite activity during release validation.
 - Added persisted per-key/calibrator legend-pack selection in Keyboard Setup, with layout-aware fallback back to default legends when the chosen pack does not match the active physical family.
 - Fixed optional-key setup labels to inherit the active legend pack before applying any per-slot overrides, so locale legend defaults are no longer rewritten as custom labels.
 - Renamed reactive input internals to slot-first APIs (`slot_id` polling and slot-keymap loading) while keeping compatibility aliases for older key-id-named imports.
