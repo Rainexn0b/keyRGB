@@ -5,9 +5,10 @@ import logging
 from src.core.utils import logging_utils
 
 
-def test_log_throttled_throttles_repeated_logs_for_same_logger_and_key(caplog) -> None:
+def test_log_throttled_throttles_repeated_logs_for_same_logger_and_key(caplog, monkeypatch) -> None:
     logger = logging.getLogger("tests.logging_utils.same")
     logging_utils._last_log_times.clear()
+    monkeypatch.setattr(logging_utils.time, "monotonic", lambda: 10.0)
 
     with caplog.at_level(logging.WARNING, logger=logger.name):
         first = logging_utils.log_throttled(

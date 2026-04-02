@@ -32,8 +32,8 @@ def log_throttled(
     now = time.monotonic()
     throttle_key = _logger_throttle_key(logger, key)
     with _lock:
-        last = _last_log_times.get(throttle_key, 0.0)
-        if (now - last) < interval_s:
+        last = _last_log_times.get(throttle_key)
+        if last is not None and (now - last) < interval_s:
             return False
         _last_log_times[throttle_key] = now
 
