@@ -14,6 +14,8 @@ from .device import AsusctlAuraKeyboardDevice
 
 logger = logging.getLogger(__name__)
 
+_RECOVERABLE_SUBPROCESS_EXCEPTIONS = (OSError, subprocess.SubprocessError)
+
 
 def _env_flag(name: str) -> bool:
     v = str(os.environ.get(name, "")).strip().lower()
@@ -75,7 +77,8 @@ class AsusctlAuraBackend(KeyboardBackend):
 
         try:
             info = self._run(["info"], timeout_s=2.0)
-        except Exception as exc:
+        except _RECOVERABLE_SUBPROCESS_EXCEPTIONS as exc:  # @quality-exception exception-transparency: asusctl probe is a subprocess/hardware boundary; recoverable runtime failures degrade to unavailable while programming bugs still surface
+            logger.exception("asusctl probe failed")
             return ProbeResult(available=False, reason=f"asusctl info failed: {exc}", confidence=0)
 
         stdout = (info.stdout or "").strip()
@@ -106,7 +109,7 @@ class AsusctlAuraBackend(KeyboardBackend):
             aura_help = self._run(["aura", "--help"], timeout_s=2.0)
             if aura_help.returncode == 0:
                 identifiers["aura"] = "true"
-        except Exception:
+        except _RECOVERABLE_SUBPROCESS_EXCEPTIONS:  # @quality-exception exception-transparency: aura capability check is a best-effort subprocess boundary; recoverable runtime failures omit the optional aura identifier
             pass
 
         # If asusctl is present and can talk to the system, we're likely the best

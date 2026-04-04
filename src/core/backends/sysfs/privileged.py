@@ -21,7 +21,7 @@ def helper_supports_led_apply() -> bool:
         cp = subprocess.run([helper, "--help"], check=False, capture_output=True, text=True)
         out = (cp.stdout or "") + "\n" + (cp.stderr or "")
         return "led-apply" in out
-    except Exception:
+    except OSError:
         return False
 
 
@@ -49,7 +49,7 @@ def run_led_apply(*, led: str, brightness: int, rgb: tuple[int, int, int] | None
                 stdout,
                 stderr,
             )
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: debug logging is a best-effort diagnostic boundary; broken logger/format handlers must not block hardware writes
             pass
 
     if os.geteuid() == 0:

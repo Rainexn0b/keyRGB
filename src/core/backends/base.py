@@ -45,12 +45,20 @@ class ExperimentalEvidence(str, Enum):
     REVERSE_ENGINEERED = "reverse_engineered"
 
 
+def _normalize_enum_text(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        return None
+    return value.strip().lower()
+
+
 def normalize_backend_stability(value: object) -> BackendStability:
-    try:
-        if isinstance(value, BackendStability):
-            return value
-        text = str(value or "").strip().lower()
-    except Exception:
+    if isinstance(value, BackendStability):
+        return value
+
+    text = _normalize_enum_text(value)
+    if text is None:
         return BackendStability.VALIDATED
 
     for item in BackendStability:
@@ -61,11 +69,11 @@ def normalize_backend_stability(value: object) -> BackendStability:
 
 
 def normalize_experimental_evidence(value: object) -> ExperimentalEvidence | None:
-    try:
-        if isinstance(value, ExperimentalEvidence):
-            return value
-        text = str(value or "").strip().lower()
-    except Exception:
+    if isinstance(value, ExperimentalEvidence):
+        return value
+
+    text = _normalize_enum_text(value)
+    if text is None:
         return None
 
     for item in ExperimentalEvidence:

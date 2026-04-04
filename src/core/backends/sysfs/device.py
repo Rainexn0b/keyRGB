@@ -7,6 +7,8 @@ from pathlib import Path
 
 from ...resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS
 from ..base import BackendCapabilities, KeyboardDevice
+from ._device_methods import set_zone_color_method as _set_zone_color_method
+from ._device_methods import to_sysfs_brightness_method as _to_sysfs_brightness_method
 from . import common
 from . import privileged
 
@@ -277,102 +279,8 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         for zone in self._zones:
             self._set_zone_color(zone, color, brightness)
 
-    def _set_zone_color(self, zone: dict, color, brightness: int):
-        r, g, b = color
-        led_dir = zone["led_dir"]
-
-        if zone["type"] == "ite8297_channels":
-            level = max(0, min(50, int(brightness))) / 50 if int(brightness) > 0 else 0.0
-            scaled = {
-                "red": int(round(int(r) * level)),
-                "green": int(round(int(g) * level)),
-                "blue": int(round(int(b) * level)),
-            }
-            for channel_name, value in scaled.items():
-                channel_dir = zone["paths"][channel_name]
-                max_value = max(1, common._read_int(channel_dir / "max_brightness"))
-                common._write_int(channel_dir / "brightness", max(0, min(max_value, int(value))))
-            self._channel_group_color = (int(r), int(g), int(b))
-            self._channel_group_brightness = max(0, min(50, int(brightness)))
-            return
-
-        # Case 1: System76 specific file path
-        if zone["type"] == "file":
-            try:
-                hex_color = f"{r:02X}{g:02X}{b:02X}"
-                common._safe_write_text(zone["path"], f"{hex_color}\n")
-                self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
-                return
-            except PermissionError:
-                # Helper fallback logic would be complex here as helper expects LED name + rgb
-                # For now we rely on the main helper path below if possible, or just fail soft
-                pass
-
-        # Case 2: Standard Directory based (multi_intensity, color, rgb)
-        # Try multi_intensity first (Tuxedo/Clevo)
-        if self._supports_multicolor(led_dir):
-            multi_intensity_path = led_dir / "multi_intensity"
-            try:
-                common._safe_write_text(multi_intensity_path, f"{r} {g} {b}\n")
-                self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
-                return
-            except PermissionError:
-                if privileged.helper_supports_led_apply() and privileged.run_led_apply(
-                    led=led_dir.name,
-                    brightness=self._to_sysfs_brightness(brightness),
-                    rgb=(int(r), int(g), int(b)),
-                ):
-                    return
-                if led_dir == self.primary_led_dir:
-                    raise
-
-        # Try color attribute (ITE kernel driver)
-        if self._supports_color_attr(led_dir):
-            hex_color = f"{int(r):02x}{int(g):02x}{int(b):02x}"
-            color_path = led_dir / "color"
-            try:
-                common._safe_write_text(color_path, f"{hex_color}\n")
-                self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
-                return
-            except PermissionError:
-                if privileged.helper_supports_led_apply() and privileged.run_led_apply(
-                    led=led_dir.name,
-                    brightness=self._to_sysfs_brightness(brightness),
-                    rgb=(int(r), int(g), int(b)),
-                ):
-                    return
-                if led_dir == self.primary_led_dir:
-                    raise
-
-        # Try generic 'rgb' attribute
-        if self._supports_rgb_attr(led_dir):
-            rgb_path = led_dir / "rgb"
-            try:
-                common._safe_write_text(rgb_path, f"{r} {g} {b}\n")
-                self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
-                return
-            except PermissionError:
-                if privileged.helper_supports_led_apply() and privileged.run_led_apply(
-                    led=led_dir.name,
-                    brightness=self._to_sysfs_brightness(brightness),
-                    rgb=(int(r), int(g), int(b)),
-                ):
-                    return
-                if led_dir == self.primary_led_dir:
-                    raise
-
-        # Try System76 color paths (legacy fallback if type!=file but paths exist?)
-        # This shouldn't happen if init is correct, but let's keep it consistent with old logic?
-        # No, because we handle file type now.
-
-        # Fallback: brightness-only
-        self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
-
-    def _to_sysfs_brightness(self, brightness: int) -> int:
-        # Helper to avoid recalculating map every time
-        b = max(0, min(50, int(brightness)))
-        max_value = self._max()
-        return int(round((b / 50) * max_value))
+    _set_zone_color = _set_zone_color_method
+    _to_sysfs_brightness = _to_sysfs_brightness_method
 
     def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
         # Implementation of Virtual 3-Zone (or N-zone) mapping

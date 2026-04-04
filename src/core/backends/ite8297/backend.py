@@ -5,7 +5,13 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Any
 
-from src.core.utils.exceptions import is_permission_denied
+from src.core.utils.exceptions import is_permission_denied, is_device_disconnected, is_device_busy
+from src.core.backends.exceptions import (
+    BackendPermissionError,
+    BackendDisconnectedError,
+    BackendBusyError,
+    BackendIOError,
+)
 
 from ..base import (
     BackendCapabilities,
@@ -126,13 +132,17 @@ class Ite8297Backend(KeyboardBackend):
         try:
             transport, _info = _open_matching_transport()
             return Ite8297KeyboardDevice(transport.send_feature_report)
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; all driver exceptions are translated to BackendError subclasses here
             if is_permission_denied(exc):
-                raise PermissionError(
+                raise BackendPermissionError(
                     "Permission denied opening the ITE 8297 hidraw device. "
                     "Install the KeyRGB udev rules, then reload udev or reboot/log out and back in."
                 ) from exc
-            raise
+            if is_device_disconnected(exc):
+                raise BackendDisconnectedError("ITE 8297 device disconnected during initialization") from exc
+            if is_device_busy(exc):
+                raise BackendBusyError("ITE 8297 device is busy; another process may own it") from exc
+            raise BackendIOError(f"ITE 8297 HID transport failed: {exc}") from exc
 
     def dimensions(self) -> tuple[int, int]:
         return (1, 1)

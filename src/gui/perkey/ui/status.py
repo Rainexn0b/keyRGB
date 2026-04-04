@@ -6,15 +6,22 @@ Keeps message formatting consistent and keeps UI modules from sprinkling direct
 
 from __future__ import annotations
 
+import tkinter as tk
 from typing import Any
 
 from src.core.utils.exceptions import is_device_busy
+from src.core.backends import (
+    BackendBusyError,
+    BackendDisconnectedError,
+    BackendPermissionError,
+    BackendUnavailableError,
+)
 
 
 def set_status(editor: Any, text: str) -> None:
     try:
         editor.status_label.config(text=str(text))
-    except Exception:
+    except (AttributeError, tk.TclError):
         return
 
 
@@ -23,6 +30,16 @@ def _next_steps_for_exception(exc: Exception | None) -> str:
 
     if exc is None:
         return "Try: open Settings → Diagnostics"
+
+    # BackendError hierarchy — more precise than generic PermissionError/OSError checks.
+    if isinstance(exc, BackendPermissionError):
+        return "Try: run KeyRGB installer to install udev rules, then reload or reboot"
+    if isinstance(exc, BackendBusyError):
+        return "Try: close other RGB apps and unplug/replug the keyboard"
+    if isinstance(exc, BackendDisconnectedError):
+        return "Try: replug the keyboard"
+    if isinstance(exc, BackendUnavailableError):
+        return "Try: check USB/driver connection and run KeyRGB diagnostics"
 
     # Permissions (sysfs, USB, etc.).
     if isinstance(exc, PermissionError):

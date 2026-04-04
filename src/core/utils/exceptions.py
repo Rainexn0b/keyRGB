@@ -1,7 +1,16 @@
 from __future__ import annotations
 
 
-def is_device_disconnected(exc: Exception) -> bool:
+def _safe_exception_message(exc: BaseException, *, lower: bool = False) -> str | None:
+    try:
+        msg = str(exc)
+    except Exception:  # @quality-exception exception-transparency: arbitrary exception __str__ implementations may fail and these dependency-free boolean helpers must stay non-fatal and noiseless
+        return None
+
+    return msg.lower() if lower else msg
+
+
+def is_device_disconnected(exc: BaseException) -> bool:
     """Best-effort check for a disappeared device.
 
     We intentionally keep this broad and dependency-free (no usb imports), since
@@ -12,30 +21,28 @@ def is_device_disconnected(exc: Exception) -> bool:
     if errno == 19:
         return True
 
-    try:
-        msg = str(exc)
-    except Exception:
+    msg = _safe_exception_message(exc)
+    if msg is None:
         return False
 
     return "No such device" in msg
 
 
-def is_device_busy(exc: Exception) -> bool:
+def is_device_busy(exc: BaseException) -> bool:
     """Best-effort check for transient 'busy' errors."""
 
     errno = getattr(exc, "errno", None)
     if errno == 16:
         return True
 
-    try:
-        msg = str(exc)
-    except Exception:
+    msg = _safe_exception_message(exc)
+    if msg is None:
         return False
 
     return "Device or resource busy" in msg
 
 
-def is_permission_denied(exc: Exception) -> bool:
+def is_permission_denied(exc: BaseException) -> bool:
     """Best-effort check for permission/authorization failures.
 
     Used to detect when hardware writes fail due to missing udev/polkit rules.
@@ -51,9 +58,8 @@ def is_permission_denied(exc: Exception) -> bool:
         # EPERM=1, EACCES=13
         return True
 
-    try:
-        msg = str(exc).lower()
-    except Exception:
+    msg = _safe_exception_message(exc, lower=True)
+    if msg is None:
         return False
 
     return "permission denied" in msg or "access denied" in msg or "not permitted" in msg

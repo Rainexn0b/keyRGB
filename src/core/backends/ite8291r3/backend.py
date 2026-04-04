@@ -6,10 +6,21 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.core.runtime.imports import ensure_ite8291r3_ctl_importable
+from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
+from src.core.backends.exceptions import (
+    BackendBusyError,
+    BackendDisconnectedError,
+    BackendIOError,
+    BackendPermissionError,
+)
 
 from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 
 logger = logging.getLogger(__name__)
+
+_ITE_IMPORT_ERRORS = (ImportError, OSError, RuntimeError, SyntaxError, ValueError)
+_DEVICE_TAG_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+_USB_SCAN_VALUE_ERRORS = (OverflowError, TypeError, ValueError)
 
 _FALLBACK_USB_IDS: list[tuple[int, int]] = [
     # WootBook / common Tongfang rebrands
@@ -37,6 +48,31 @@ _KNOWN_UNSUPPORTED_USB_IDS: list[tuple[int, int]] = [
     # have a dedicated backend + hardware confirmation.
     (0x048D, 0xC966),
 ]
+
+
+def _usb_runtime_error_types(usb_core: Any) -> tuple[type[BaseException], ...]:
+    error_types: list[type[BaseException]] = [AttributeError, OSError, RuntimeError]
+    for name in ("USBError", "NoBackendError"):
+        err_type = getattr(usb_core, name, None)
+        if isinstance(err_type, type) and issubclass(err_type, BaseException):
+            error_types.append(err_type)
+    return tuple(dict.fromkeys(error_types))
+
+
+def _ite_device_open_error_types(ite8291r3: Any) -> tuple[type[BaseException], ...]:
+    error_types: list[type[BaseException]] = [FileNotFoundError, OSError, RuntimeError, ValueError]
+    usb_pkg = getattr(ite8291r3, "usb", None)
+    usb_core = getattr(usb_pkg, "core", None)
+    if usb_core is not None:
+        error_types.extend(_usb_runtime_error_types(usb_core))
+    return tuple(dict.fromkeys(error_types))
+
+
+def _set_best_effort_device_attr(device: object, name: str, value: str) -> None:
+    try:
+        setattr(device, name, value)
+    except _DEVICE_TAG_ERRORS:
+        return
 
 
 @dataclass
@@ -67,7 +103,7 @@ class Ite8291r3Backend(KeyboardBackend):
         try:
             self._import()
             return True
-        except Exception:
+        except _ITE_IMPORT_ERRORS:
             return False
 
     def probe(self) -> ProbeResult:
@@ -80,7 +116,7 @@ class Ite8291r3Backend(KeyboardBackend):
 
         try:
             ite8291r3 = self._import()
-        except Exception as exc:
+        except _ITE_IMPORT_ERRORS as exc:
             return ProbeResult(available=False, reason=f"import failed: {exc}", confidence=0)
 
         # Respect global USB-scan disable flag (primarily used to keep unit tests
@@ -93,8 +129,16 @@ class Ite8291r3Backend(KeyboardBackend):
             )
 
         try:
-            import usb.core  # type: ignore
+            import usb.core as usb_core  # type: ignore
+        except ImportError as exc:
+            return ProbeResult(
+                available=True,
+                reason=f"importable but usb scan unavailable: {exc}",
+                confidence=60,
+            )
 
+        scan_error_types = _usb_runtime_error_types(usb_core) + _USB_SCAN_VALUE_ERRORS
+        try:
             vendor_id = int(getattr(ite8291r3, "VENDOR_ID", 0x048D))
             product_ids = list(getattr(ite8291r3, "PRODUCT_IDS", []) or [])
             for vid, pid in _FALLBACK_USB_IDS:
@@ -107,7 +151,7 @@ class Ite8291r3Backend(KeyboardBackend):
             for vid, pid in _KNOWN_UNSUPPORTED_USB_IDS:
                 if int(vid) != vendor_id:
                     continue
-                dev = usb.core.find(idVendor=vendor_id, idProduct=int(pid))
+                dev = usb_core.find(idVendor=vendor_id, idProduct=int(pid))
                 if dev is not None:
                     return ProbeResult(
                         available=False,
@@ -123,7 +167,7 @@ class Ite8291r3Backend(KeyboardBackend):
                     )
 
             for pid in product_ids:
-                dev = usb.core.find(idVendor=vendor_id, idProduct=int(pid))
+                dev = usb_core.find(idVendor=vendor_id, idProduct=int(pid))
                 if dev is not None:
                     return ProbeResult(
                         available=True,
@@ -136,7 +180,7 @@ class Ite8291r3Backend(KeyboardBackend):
                     )
 
             return ProbeResult(available=False, reason="no matching usb device", confidence=0)
-        except Exception as exc:
+        except scan_error_types as exc:
             return ProbeResult(
                 available=True,
                 reason=f"importable but usb scan unavailable: {exc}",
@@ -149,28 +193,27 @@ class Ite8291r3Backend(KeyboardBackend):
 
     def get_device(self) -> KeyboardDevice:
         ite8291r3 = self._import()
+        open_error_types = _ite_device_open_error_types(ite8291r3)
         try:
             device = ite8291r3.get()
-            try:
-                setattr(device, "keyrgb_hw_speed_policy", "inverted")
-            except Exception:
-                pass
-            try:
-                setattr(device, "keyrgb_per_key_mode_policy", "reassert_every_frame")
-            except Exception:
-                pass
-            return device
-        except Exception as exc:
-            msg = str(exc).lower()
-            errno = getattr(exc, "errno", None)
-            if isinstance(exc, PermissionError) or errno == 13 or "permission denied" in msg or "access denied" in msg:
-                raise PermissionError(
+        except open_error_types as exc:
+            if is_permission_denied(exc):
+                raise BackendPermissionError(
                     "Permission denied opening the ITE 8291 USB device. "
-                    "Install the udev rule (system/udev/99-ite8291-wootbook.rules), then reload udev rules and reboot/log out/in."
+                    "Install the udev rule (system/udev/99-ite8291-wootbook.rules), "
+                    "then reload udev rules and reboot/log out/in."
                 ) from exc
+            if is_device_disconnected(exc):
+                raise BackendDisconnectedError("ITE 8291 device disconnected during initialization") from exc
+            if is_device_busy(exc):
+                raise BackendBusyError("ITE 8291 device is busy; another process may own it") from exc
             if os.environ.get("KEYRGB_DEBUG"):
                 logger.exception("Failed to open ite8291r3 device")
-            raise
+            raise BackendIOError(f"ITE 8291 USB device open failed: {exc}") from exc
+
+        _set_best_effort_device_attr(device, "keyrgb_hw_speed_policy", "inverted")
+        _set_best_effort_device_attr(device, "keyrgb_per_key_mode_policy", "reassert_every_frame")
+        return device
 
     def dimensions(self) -> tuple[int, int]:
         ite8291r3 = self._import()

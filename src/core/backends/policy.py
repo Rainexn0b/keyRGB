@@ -18,7 +18,7 @@ def experimental_backends_enabled() -> bool:
         from src.core.config import Config
 
         return bool(Config().experimental_backends_enabled)
-    except Exception:
+    except Exception:  # @quality-exception exception-transparency: config read for backend policy is a startup boundary; failure degrades to safe default
         return False
 
 

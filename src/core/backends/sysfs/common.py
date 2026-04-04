@@ -23,12 +23,22 @@ def _leds_root() -> Path:
     return Path(root or "/sys/class/leds")
 
 
+def _looks_like_sysfs_path(path_text: str) -> bool:
+    normalized = os.path.normpath(path_text)
+    return normalized == "/sys" or normalized.startswith("/sys/")
+
+
 def _is_real_sysfs_path(path: Path) -> bool:
+    path_text = os.fspath(path)
+    if _looks_like_sysfs_path(path_text):
+        return True
+
     try:
-        real = os.path.realpath(str(path))
-        return real.startswith("/sys/")
-    except Exception:
+        real = os.path.realpath(path_text)
+    except OSError:
         return False
+
+    return _looks_like_sysfs_path(real)
 
 
 def _safe_write_text(path: Path, content: str) -> None:
@@ -111,12 +121,17 @@ def _read_int(path: Path) -> int:
     return int(path.read_text(encoding="utf-8").strip())
 
 
-def _write_int(path: Path, value: int) -> None:
+def _log_debug_write_int(path: Path, value: int) -> None:
+    if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") != "1":
+        return
+
     try:
-        # When KEYRGB_DEBUG_BRIGHTNESS=1, emit a log for every sysfs write
-        # performed by the backend (helps diagnose flash / transient writes).
-        if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
-            logger.info("sysfs.write %s <- %s", path, int(value))
-    except Exception:
+        logger.info("sysfs.write %s <- %s", path, value)
+    except Exception:  # @quality-exception exception-transparency: debug brightness logging is a best-effort diagnostic boundary and broken logging handlers must not block sysfs writes
         pass
-    _safe_write_text(path, f"{int(value)}\n")
+
+
+def _write_int(path: Path, value: int) -> None:
+    normalized_value = int(value)
+    _log_debug_write_int(path, normalized_value)
+    _safe_write_text(path, f"{normalized_value}\n")

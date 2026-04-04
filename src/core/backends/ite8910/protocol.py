@@ -25,7 +25,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import IntEnum
 from math import ceil
-from typing import Iterable, NamedTuple
+from typing import Iterable
+
+from src.core.backends.ite8910._protocol_effects import EffectDesc as _EffectDesc
+from src.core.backends.ite8910._protocol_effects import build_effect_reports_impl
 
 # --- Hardware constants ---
 
@@ -94,20 +97,6 @@ class Ite8910Effect(IntEnum):
     OFF = 11
 
 
-# --- Effect dispatch table ---
-
-
-class _EffectDesc(NamedTuple):
-    """Describes how to build reports for a given effect."""
-
-    animation: AnimationMode | None = None
-    random_cmd: Cmd | None = None
-    color_cmd: Cmd | None = None
-    slot_cmd: Cmd | None = None
-    slot_max: int = 0
-    directions: tuple[str, ...] = ()
-
-
 _EFFECTS: dict[Ite8910Effect, _EffectDesc] = {
     Ite8910Effect.SPECTRUM_CYCLE: _EffectDesc(animation=AnimationMode.SPECTRUM_CYCLE),
     Ite8910Effect.RAINBOW_WAVE: _EffectDesc(
@@ -165,7 +154,7 @@ _EFFECT_NAMES: dict[str, Ite8910Effect] = {
 
 CANONICAL_EFFECTS = {k: v for k, v in _EFFECT_NAMES.items() if k == v.name.lower()}
 
-SLOT_LIMITS: dict[Cmd, int] = {desc.slot_cmd: desc.slot_max for desc in _EFFECTS.values() if desc.slot_cmd}
+SLOT_LIMITS: dict[Cmd, int] = {desc.slot_cmd: desc.slot_max for desc in _EFFECTS.values() if desc.slot_cmd}  # type: ignore[misc]
 
 
 # --- LED IDs ---
@@ -293,60 +282,23 @@ def build_led_color_report(led_id: int, color: Color) -> bytes:
     return _report(Cmd.SET_LED, int(led_id) & 0xFF, r, g, b)
 
 
-def _direction_index(direction: str | None, directions: tuple[str, ...]) -> int:
-    """Resolve a direction name to an index within the direction table."""
-    if direction and direction in directions:
-        return directions.index(direction)
-    return 0
-
-
 def build_effect_reports(
     effect: Ite8910Effect,
     colors: list[Color] | None = None,
     direction: str | None = None,
 ) -> list[bytes]:
-    """Build the full report sequence for an effect.
-
-    Sequence per the Uniwill Control Center:
-    1. Animation mode or color effect command
-    2. Direction/color slots (if applicable)
-    3. Brightness/speed (handled separately by the caller)
-    """
-    desc = _EFFECTS.get(effect)
-    if not desc:
-        return []
-
-    colors = colors or []
-    reports: list[bytes] = []
-
-    if desc.animation:
-        reports.append(build_animation_mode_report(desc.animation))
-
-    if desc.color_cmd and colors:
-        r, g, b = _rgb(*colors[0])
-        reports.append(_report(desc.color_cmd, COLOR_CUSTOM, r, g, b))
-
-    if desc.random_cmd and not desc.animation and not colors:
-        reports.append(_report(desc.random_cmd, 0x00, 0x00, 0x00, 0x00))
-
-    if not desc.slot_cmd:
-        return reports
-
-    idx = _direction_index(direction, desc.directions)
-
-    if desc.directions and colors:
-        r, g, b = _rgb(*colors[0])
-        reports.append(_report(desc.slot_cmd, COLOR_SLOT_BASE + idx, r, g, b))
-
-    if desc.directions and not colors:
-        reports.append(_report(desc.slot_cmd, PRESET_SLOT_BASE + idx, 0x00, 0x00, 0x00))
-
-    if not desc.directions:
-        for i, c in enumerate(colors[: desc.slot_max]):
-            r, g, b = _rgb(*c)
-            reports.append(_report(desc.slot_cmd, COLOR_SLOT_BASE + i, r, g, b))
-
-    return reports
+    return build_effect_reports_impl(
+        effect,
+        effects=_EFFECTS,
+        colors=colors,
+        direction=direction,
+        build_animation_mode_report=build_animation_mode_report,
+        report=_report,
+        rgb=_rgb,
+        color_custom=COLOR_CUSTOM,
+        color_slot_base=COLOR_SLOT_BASE,
+        preset_slot_base=PRESET_SLOT_BASE,
+    )
 
 
 # --- Legacy aliases ---

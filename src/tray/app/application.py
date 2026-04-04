@@ -10,26 +10,41 @@ import shutil
 import subprocess
 import time
 
-from .backend import select_backend_with_introspection, select_device_discovery_snapshot
 from . import callbacks
-from ..controllers.lighting_controller import (
-    apply_brightness_from_power_policy,
-    power_restore,
-    power_turn_off,
-    start_current_effect,
-)
-from ..controllers.software_target_controller import configure_engine_software_targets
-from .backend import load_ite_dimensions
-from ..integrations.dependencies import load_tray_dependencies
+from . import _startup as tray_startup
+from . import backend as tray_backend
+from . import lifecycle as tray_lifecycle
+from ..controllers import lighting_controller, software_target_controller
 from ..integrations import runtime
-from .lifecycle import maybe_autostart_effect, start_all_polling, start_power_monitoring
+from ..integrations import dependencies as tray_dependencies
 from ..ui import icon as icon_mod
 from ..ui import menu as menu_mod
-from ..ui.refresh import update_icon as update_tray_icon
-from ..ui.refresh import update_menu as update_tray_menu
-from src.core.utils.exceptions import is_permission_denied
+from ..ui import refresh as tray_refresh
+from src.core.backends import BackendError, format_backend_error
+from src.core.utils import exceptions as core_exceptions
 from src.core.utils.safe_attrs import safe_str_attr
 
+
+select_backend_with_introspection = tray_backend.select_backend_with_introspection
+select_device_discovery_snapshot = tray_backend.select_device_discovery_snapshot
+load_ite_dimensions = tray_backend.load_ite_dimensions
+build_permission_denied_message = tray_startup.build_permission_denied_message
+create_effects_engine = tray_startup.create_effects_engine
+flush_pending_notifications = tray_startup.flush_pending_notifications
+install_permission_error_callback_best_effort = tray_startup.install_permission_error_callback_best_effort
+migrate_builtin_profile_brightness_best_effort = tray_startup.migrate_builtin_profile_brightness_best_effort
+apply_brightness_from_power_policy = lighting_controller.apply_brightness_from_power_policy
+power_restore = lighting_controller.power_restore
+power_turn_off = lighting_controller.power_turn_off
+start_current_effect = lighting_controller.start_current_effect
+configure_engine_software_targets = software_target_controller.configure_engine_software_targets
+load_tray_dependencies = tray_dependencies.load_tray_dependencies
+maybe_autostart_effect = tray_lifecycle.maybe_autostart_effect
+start_all_polling = tray_lifecycle.start_all_polling
+start_power_monitoring = tray_lifecycle.start_power_monitoring
+update_tray_icon = tray_refresh.update_icon
+update_tray_menu = tray_refresh.update_menu
+is_permission_denied = core_exceptions.is_permission_denied
 logger = logging.getLogger(__name__)
 
 
@@ -40,12 +55,7 @@ class KeyRGBTray:
         EffectsEngine, Config, PowerManager = load_tray_dependencies()
 
         self.config = Config()
-        try:
-            from src.core.profile import profiles as core_profiles
-
-            core_profiles.migrate_builtin_profile_brightness(self.config)
-        except Exception:  # @quality-exception exception-transparency: optional startup migration boundary
-            pass
+        migrate_builtin_profile_brightness_best_effort(self.config)
         self.icon = None
         self.is_off = False
         self._power_forced_off = False
@@ -68,25 +78,13 @@ class KeyRGBTray:
         self.device_discovery = select_device_discovery_snapshot()
         self.selected_device_context = str(getattr(self.config, "tray_device_context", "keyboard") or "keyboard")
 
-        try:
-            self.engine = EffectsEngine(backend=self.backend)
-        except TypeError:
-            self.engine = EffectsEngine()
-            set_backend = getattr(self.engine, "set_backend", None)
-            if callable(set_backend):
-                try:
-                    set_backend(self.backend)
-                except Exception:  # @quality-exception exception-transparency: compatibility backend fallback during engine init
-                    pass
+        self.engine = create_effects_engine(EffectsEngine, backend=self.backend)
 
         self._ite_rows, self._ite_cols = load_ite_dimensions()
 
         # Allow the effects engine to surface permission issues (e.g. missing udev rules)
         # even when they happen in a background effect thread.
-        try:
-            setattr(self.engine, "_permission_error_cb", self._notify_permission_issue)
-        except (AttributeError, RuntimeError):
-            pass
+        install_permission_error_callback_best_effort(self.engine, self._notify_permission_issue)
 
         configure_engine_software_targets(self)
 
@@ -119,8 +117,8 @@ class KeyRGBTray:
                     return
                 except Exception:  # @quality-exception exception-transparency: best-effort tray notification fallback
                     pass
-            except Exception:  # @quality-exception exception-transparency: best-effort tray notification backend boundary
-                pass
+            except (RuntimeError, OSError, AttributeError) as exc:
+                logger.debug("Pystray notification backend failed, trying notify-send: %s", exc)
 
         # Fallback for environments where pystray notifications are unavailable.
         try:
@@ -146,30 +144,11 @@ class KeyRGBTray:
 
         backend_name = safe_str_attr(self.backend, "name", default="") if self.backend is not None else ""
 
-        repo_url = "https://github.com/Rainexn0b/keyRGB"
-
-        # Keep the notification short; point to installer as the canonical fix.
-        msg_lines = [
-            "KeyRGB was blocked by missing permissions while updating keyboard lighting.",
-            "",
-            "Fix:",
-            "  • Re-run KeyRGB's installer (installs udev rules / helpers)",
-            "  • Reload udev rules: sudo udevadm control --reload-rules && sudo udevadm trigger",
-            "  • Replug the device or reboot",
-        ]
-        if backend_name == "ite8291r3":
-            msg_lines.append("  • ITE USB devices usually need /etc/udev/rules.d/99-ite8291-wootbook.rules")
-        elif backend_name == "sysfs-leds":
-            msg_lines.append(
-                "  • Sysfs LED nodes may require /etc/udev/rules.d/99-keyrgb-sysfs-leds.rules or a polkit helper"
-            )
-        msg_lines.append("")
-        msg_lines.append(repo_url)
-
         if exc is not None:
             logger.warning("Permission issue while applying lighting: %s", exc)
 
-        self._notify("KeyRGB: Permission denied", "\n".join(msg_lines))
+        title = "KeyRGB: " + format_backend_error(exc) if isinstance(exc, BackendError) else "KeyRGB: Permission denied"
+        self._notify(title, build_permission_denied_message(backend_name))
 
     # ---- logging helpers
 
@@ -344,11 +323,5 @@ class KeyRGBTray:
         logger.info("KeyRGB tray app started")
         logger.info("Current effect: %s", self.config.effect)
         logger.info("Speed: %s, Brightness: %s", self.config.speed, self.config.brightness)
-        # Flush any queued notifications from early startup.
-        pending_store = vars(self).get("_pending_notifications")
-        pending = list(pending_store) if isinstance(pending_store, list) else []
-        if isinstance(pending_store, list):
-            pending_store.clear()
-        for title, message in pending:
-            self._notify(title, message)
+        flush_pending_notifications(self)
         self.icon.run()

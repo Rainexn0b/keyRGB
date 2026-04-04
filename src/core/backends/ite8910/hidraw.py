@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fcntl
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,8 @@ _IOC_DIRSHIFT = _IOC_SIZESHIFT + _IOC_SIZEBITS
 
 _IOC_WRITE = 1
 _IOC_READ = 2
+
+logger = logging.getLogger(__name__)
 
 
 def _ioc(dir_bits: int, type_bits: int, nr: int, size: int) -> int:
@@ -52,7 +55,7 @@ def _parse_hid_id(value: str) -> tuple[int, int] | None:
     try:
         vendor_id = int(parts[1], 16)
         product_id = int(parts[2], 16)
-    except Exception:
+    except ValueError:
         return None
     return vendor_id, product_id
 
@@ -61,7 +64,7 @@ def _parse_uevent_file(path: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except OSError:
         return out
     for raw_line in text.splitlines():
         line = raw_line.strip()
@@ -155,8 +158,8 @@ class HidrawFeatureTransport:
     def __del__(self) -> None:
         try:
             self.close()
-        except Exception:
-            pass
+        except (OSError, TypeError, ValueError):
+            logger.debug("Ignoring hidraw transport cleanup failure", exc_info=True)
 
 
 def open_matching_hidraw_transport(

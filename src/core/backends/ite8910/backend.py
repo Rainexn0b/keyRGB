@@ -5,7 +5,13 @@ from dataclasses import dataclass
 from collections.abc import Callable
 from typing import Any
 
-from src.core.utils.exceptions import is_permission_denied
+from src.core.utils.exceptions import is_permission_denied, is_device_disconnected, is_device_busy
+from src.core.backends.exceptions import (
+    BackendPermissionError,
+    BackendDisconnectedError,
+    BackendBusyError,
+    BackendIOError,
+)
 
 from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 from .device import Ite8910KeyboardDevice
@@ -80,13 +86,17 @@ class Ite8910Backend(KeyboardBackend):
         try:
             transport, _info = open_matching_hidraw_transport(protocol.VENDOR_ID, protocol.PRODUCT_ID)
             return Ite8910KeyboardDevice(transport.send_feature_report)
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; all driver exceptions are translated to BackendError subclasses here
             if is_permission_denied(exc):
-                raise PermissionError(
+                raise BackendPermissionError(
                     "Permission denied opening the ITE 8910 hidraw device. "
                     "Install the KeyRGB udev rules, then reload udev or reboot/log out and back in."
                 ) from exc
-            raise
+            if is_device_disconnected(exc):
+                raise BackendDisconnectedError("ITE 8910 device disconnected during initialization") from exc
+            if is_device_busy(exc):
+                raise BackendBusyError("ITE 8910 device is busy; another process may own it") from exc
+            raise BackendIOError(f"ITE 8910 HID transport failed: {exc}") from exc
 
     def dimensions(self) -> tuple[int, int]:
         return (protocol.NUM_ROWS, protocol.NUM_COLS)

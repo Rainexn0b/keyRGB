@@ -63,7 +63,7 @@ class Ite8233LightbarDevice:
 
         self._write_report(protocol.build_uniform_color_report(scaled))
         self._write_report(protocol.build_brightness_report(protocol.raw_brightness_from_ui(level)))
-        self._current_color = tuple(int(channel) for channel in color)
+        self._current_color = tuple(int(channel) for channel in color)  # type: ignore[assignment]
         self._brightness = level
         self._is_off = False
 

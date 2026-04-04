@@ -14,7 +14,7 @@ def _clamp_ui_brightness(value: int) -> int:
 def _coerce_rgb(color) -> tuple[int, int, int]:
     try:
         red, green, blue = color
-    except Exception as exc:
+    except (TypeError, ValueError) as exc:
         raise ValueError("color must be an RGB 3-tuple") from exc
 
     return (

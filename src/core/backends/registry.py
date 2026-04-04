@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Callable, Iterable, Optional
 
 from .base import KeyboardBackend, ProbeResult
+from .exceptions import BackendError  # noqa: F401 – available for callers and future narrowing
 from .policy import experimental_backends_enabled, selection_allowed_for_backend, stability_for_backend
 
 logger = logging.getLogger(__name__)
@@ -66,7 +67,8 @@ def iter_backends(*, specs: Optional[Iterable[BackendSpec]] = None) -> list[Keyb
     for spec in list(specs) if specs is not None else _default_specs():
         try:
             out.append(spec.factory())
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: backend factories are runtime plugin boundaries and auto iteration must skip broken implementations; device errors are now BackendError subclasses but raised in get_device(), not the factory constructor
+            logger.exception("Failed to construct backend '%s'", spec.name)
             continue
     return out
 
@@ -84,13 +86,15 @@ def _probe_backend(backend: KeyboardBackend) -> ProbeResult:
             result = probe_fn()
             if isinstance(result, ProbeResult):
                 return result
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: backend probes are runtime hardware/plugin boundaries and selection must degrade to unavailable
+            logger.exception("Backend probe failed for '%s'", backend.name)
             return ProbeResult(available=False, reason=f"probe exception: {exc}", confidence=0)
 
     try:
         ok = bool(backend.is_available())
         return ProbeResult(available=ok, reason="is_available", confidence=(50 if ok else 0))
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: is_available fallback is a runtime backend boundary and selection must degrade to unavailable
+        logger.exception("Backend availability fallback failed for '%s'", backend.name)
         return ProbeResult(available=False, reason=f"is_available exception: {exc}", confidence=0)
 
 
