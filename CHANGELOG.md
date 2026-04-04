@@ -1,9 +1,16 @@
 # Changelog
 
+## 0.21.0 (2026-04-04)
+
+- Build/Architecture: Break the monolithic `buildpython` quality and reporting steps into dedicated subpackages for code hygiene, code markers, coverage, exception transparency, file-size analysis, and AppImage handling, with matching summary/debt reporting support modules.
+- Core/Architecture: Split several dense runtime surfaces into focused support packages across backends, diagnostics, effects, profiles, resources, tray power/icon plumbing, and GUI editor/calibrator/support-window helpers.
+- Error Handling: Introduce a shared `BackendError` hierarchy, translate backend acquisition failures into typed runtime errors, and route clearer permission/availability guidance through tray and per-key UI paths.
+- Maintenance: Replace broad exception handlers with concrete failure types across the refactor, restore the missing tray permission-notification protocol hook, and keep the full `buildpython` suite green after the reorganization.
+
 ## 0.20.0 (2026-04-02)
 
 - Build/Logging: Scope throttled log suppression by logger identity as well as throttle key, so the breathing-effect palette-failure traceback log is not incorrectly suppressed by unrelated earlier suite activity during release validation.
-- GUI/Layout Architecture: Move the per-key editor, calibrator, canvas, saved keymaps, optional-slot overrides, and reactive typing flows to canonical physical slot IDs while keeping legacy `key_id` data readable during the migration.
+- GUI/Layout Architecture: Move the per-key editor, calibrator, canvas, saved keymaps, optional-slot overrides, and react- Build/Quality: Expand `buildpython` file-size reporting to bucket large Python files into `350-399`, `400-499`, `500-599`, and `600+` ranges, and add import-block and flat-directory hotspot scans to the same debt report family.
 - GUI/Keyboard Setup: Persist legend-pack selection with layout-aware fallback, add slot-based legend-pack resources for future locale variants, and make optional-key labels inherit the active legend pack before per-slot overrides.
 - GUI/Per-key Editor: Add profile-backed backdrop modes (`No backdrop`, `Built-in seed`, `Custom image`) and allow logical keys to map to multiple matrix cells so split legends can drive every assigned LED.
 - Effects/Reactive Input: Finish the slot-first internal API transition for reactive typing and remove most lower-level key-id compatibility aliases from the runtime-facing surface.

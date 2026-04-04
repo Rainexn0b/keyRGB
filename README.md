@@ -44,7 +44,6 @@ Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental 
 ## Status
 
 - **Beta**: versioning follows **0.x.y**. Currently stable but has limited backend support.
-- **Current release**: `v0.17.3`.
 - Installer support is validated on Fedora/Nobara and Arch/CachyOS; other distro families are supported on a staged, best-effort basis.
 - Support depends entirely on your specific keyboard controller and firmware. See **Troubleshooting** and **Hardware support and contributing** below.
 
