@@ -101,7 +101,7 @@ def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     base = base_color_map(engine)
     try:
         brightness = int(getattr(engine, "brightness", 25) or 0)
-    except Exception:
+    except (TypeError, ValueError):
         brightness = 0
 
     # If the base is fully black but brightness is non-zero, the effect would

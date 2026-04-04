@@ -84,7 +84,7 @@ def _build_ite8910_speed_probe_plan() -> dict[str, Any]:
         )
         payload_speed = None
         if isinstance(payload, dict) and payload.get("speed") is not None:
-            payload_speed = int(payload.get("speed"))
+            payload_speed = int(payload.get("speed"))  # type: ignore[arg-type]
         raw_speed = ite8910_protocol.raw_speed_from_effect_speed(payload_speed if payload_speed is not None else 0)
         samples.append(
             {

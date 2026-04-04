@@ -17,6 +17,10 @@ from src.core.effects.transitions import (
 )
 
 
+_FADE_SETUP_ERRORS = (IndexError, OverflowError, TypeError, ValueError)
+_FADE_RUNTIME_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def fade_uniform_color(
     *,
     kb: Any,
@@ -33,29 +37,37 @@ def fade_uniform_color(
     """
 
     try:
-        if duration_s <= 0:
-            steps = 1
-            dt = 0.0
-        else:
-            steps = choose_steps(duration_s=float(duration_s), max_steps=int(steps))
-            dt = float(duration_s) / float(steps)
-
+        duration = float(duration_s)
         fr, fg, fb = (int(from_color[0]), int(from_color[1]), int(from_color[2]))
         tr, tg, tb = (int(to_color[0]), int(to_color[1]), int(to_color[2]))
-        brightness = max(0, min(50, int(brightness)))
+        brightness_hw = max(0, min(50, int(brightness)))
+        max_steps = int(steps)
+    except _FADE_SETUP_ERRORS:
+        return
 
-        # Avoid brightness 0 during transitions (tray/hardware pollers may interpret it as "off").
-        effective_brightness = max(1, brightness) if brightness > 0 else 0
+    if duration <= 0:
+        steps = 1
+        dt = 0.0
+    else:
+        try:
+            steps = choose_steps(duration_s=duration, max_steps=max_steps)
+        except _FADE_SETUP_ERRORS:
+            return
+        dt = duration / float(steps)
 
-        # Ensure we are in software/user mode before attempting uniform writes.
-        enable_user_mode_once(kb=kb, kb_lock=kb_lock, brightness=effective_brightness)
+    # Avoid brightness 0 during transitions (tray/hardware pollers may interpret it as "off").
+    effective_brightness = max(1, brightness_hw) if brightness_hw > 0 else 0
 
-        for i in range(1, steps + 1):
-            t = float(i) / float(steps)
-            r = int(round(fr + (tr - fr) * t))
-            g = int(round(fg + (tg - fg) * t))
-            b = int(round(fb + (tb - fb) * t))
+    # Ensure we are in software/user mode before attempting uniform writes.
+    enable_user_mode_once(kb=kb, kb_lock=kb_lock, brightness=effective_brightness)
 
+    for i in range(1, steps + 1):
+        t = float(i) / float(steps)
+        r = int(round(fr + (tr - fr) * t))
+        g = int(round(fg + (tg - fg) * t))
+        b = int(round(fb + (tb - fb) * t))
+
+        try:
             r, g, b = avoid_full_black(
                 rgb=(r, g, b),
                 target_rgb=(tr, tg, tb),
@@ -63,10 +75,10 @@ def fade_uniform_color(
             )
             with kb_lock:
                 kb.set_color((r, g, b), brightness=effective_brightness)
-            if dt > 0:
-                time.sleep(dt)
-    except Exception:
-        return
+        except _FADE_RUNTIME_ERRORS:
+            return
+        if dt > 0:
+            time.sleep(dt)
 
 
 def fade_in_per_key(
@@ -81,41 +93,50 @@ def fade_in_per_key(
 ) -> None:
     """Fade in the current per-key map to reduce harsh transitions."""
 
-    try:
-        if duration_s <= 0:
-            return
-        if not per_key_colors:
-            return
+    if not per_key_colors:
+        return
 
+    try:
+        duration = float(duration_s)
+    except _FADE_SETUP_ERRORS:
+        return
+
+    if duration <= 0:
+        return
+
+    try:
         steps = choose_steps(
-            duration_s=float(duration_s),
+            duration_s=duration,
             max_steps=int(steps),
             target_fps=50.0,
             min_dt_s=0.012,
         )
-        dt = float(duration_s) / float(steps)
-
         base_color_src = current_color or (255, 0, 0)
         base_color = (
             int(base_color_src[0]),
             int(base_color_src[1]),
             int(base_color_src[2]),
         )
-
+        brightness_hw = int(brightness)
         full_colors = build_full_color_grid(
             base_color=base_color,
             per_key_colors=per_key_colors,
             num_rows=NUM_ROWS,
             num_cols=NUM_COLS,
         )
-
-        enable_user_mode_once(kb=kb, kb_lock=kb_lock, brightness=brightness)
-
-        for i in range(1, steps + 1):
-            scale = float(i) / float(steps)
-            color_map = scaled_color_map_nonzero(full_colors, scale=scale, brightness=int(brightness))
-            with kb_lock:
-                kb.set_key_colors(color_map, brightness=int(brightness), enable_user_mode=False)
-            time.sleep(dt)
-    except Exception:
+    except _FADE_SETUP_ERRORS:
         return
+
+    dt = duration / float(steps)
+
+    enable_user_mode_once(kb=kb, kb_lock=kb_lock, brightness=brightness_hw)
+
+    for i in range(1, steps + 1):
+        scale = float(i) / float(steps)
+        try:
+            color_map = scaled_color_map_nonzero(full_colors, scale=scale, brightness=brightness_hw)
+            with kb_lock:
+                kb.set_key_colors(color_map, brightness=brightness_hw, enable_user_mode=False)
+        except _FADE_RUNTIME_ERRORS:
+            return
+        time.sleep(dt)

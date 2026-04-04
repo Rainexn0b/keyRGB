@@ -36,7 +36,7 @@ def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, i
 
         cfg = Config()
         return dict(getattr(cfg, "per_key_colors", {}) or {})
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: config import, instantiation, and property access may fail at runtime; must degrade to empty map
         log_throttled(
             logger,
             "legacy.perkey_animation.load_config",
@@ -104,7 +104,7 @@ def enable_user_mode_once(*, kb, kb_lock, brightness: int) -> None:
     try:
         with kb_lock:
             fn(brightness=brightness, save=False)
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: enable_user_mode is a runtime USB/HID hardware boundary and must degrade gracefully on failure
         log_throttled(
             logger,
             "perkey_animation.enable_user_mode_once",

@@ -81,7 +81,7 @@ def _parse_row_col(text: object) -> tuple[int, int] | None:
     try:
         row_text, col_text = str(text).split(",", 1)
         return int(row_text.strip()), int(col_text.strip())
-    except Exception:
+    except ValueError:
         return None
 
 

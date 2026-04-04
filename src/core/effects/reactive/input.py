@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, TypeAlias
 
+from src.core.effects.reactive._evdev_specs import SPECIAL_KEY_NAMES
+from src.core.effects.reactive._evdev_specs import keyboard_control_keys, keyboard_letter_keys
 from src.core.resources.layouts import key_id_for_slot_id, slot_id_for_key_id
 from src.core.utils.logging_utils import log_throttled
 
@@ -88,42 +90,8 @@ def _evdev_device_looks_like_keyboard(dev: EvdevKeyboardDevice, evdev: Any) -> b
     except (AttributeError, OSError, TypeError, ValueError):
         return False
 
-    letter_keys = {
-        evdev.ecodes.KEY_A,
-        evdev.ecodes.KEY_B,
-        evdev.ecodes.KEY_C,
-        evdev.ecodes.KEY_D,
-        evdev.ecodes.KEY_E,
-        evdev.ecodes.KEY_F,
-        evdev.ecodes.KEY_G,
-        evdev.ecodes.KEY_H,
-        evdev.ecodes.KEY_I,
-        evdev.ecodes.KEY_J,
-        evdev.ecodes.KEY_K,
-        evdev.ecodes.KEY_L,
-        evdev.ecodes.KEY_M,
-        evdev.ecodes.KEY_N,
-        evdev.ecodes.KEY_O,
-        evdev.ecodes.KEY_P,
-        evdev.ecodes.KEY_Q,
-        evdev.ecodes.KEY_R,
-        evdev.ecodes.KEY_S,
-        evdev.ecodes.KEY_T,
-        evdev.ecodes.KEY_U,
-        evdev.ecodes.KEY_V,
-        evdev.ecodes.KEY_W,
-        evdev.ecodes.KEY_X,
-        evdev.ecodes.KEY_Y,
-        evdev.ecodes.KEY_Z,
-    }
-    control_keys = {
-        evdev.ecodes.KEY_SPACE,
-        evdev.ecodes.KEY_ENTER,
-        evdev.ecodes.KEY_TAB,
-        evdev.ecodes.KEY_BACKSPACE,
-        evdev.ecodes.KEY_LEFTSHIFT,
-        evdev.ecodes.KEY_RIGHTSHIFT,
-    }
+    letter_keys = keyboard_letter_keys(evdev)
+    control_keys = keyboard_control_keys(evdev)
 
     return len(key_codes & letter_keys) >= 8 and len(key_codes & control_keys) >= 3
 
@@ -141,75 +109,8 @@ def evdev_key_name_to_key_id(name: str) -> Optional[str]:
     if n.startswith("KEY_"):
         n = n[4:]
 
-    special = {
-        "ESC": "esc",
-        "GRAVE": "grave",
-        "MINUS": "minus",
-        "EQUAL": "equal",
-        "BACKSPACE": "backspace",
-        "TAB": "tab",
-        "CAPSLOCK": "caps",
-        "ENTER": "enter",
-        "SPACE": "space",
-        "LEFTSHIFT": "lshift",
-        "RIGHTSHIFT": "rshift",
-        "LEFTCTRL": "lctrl",
-        "RIGHTCTRL": "rctrl",
-        "LEFTALT": "lalt",
-        "RIGHTALT": "ralt",
-        "LEFTMETA": "lwin",
-        "RIGHTMETA": "rwin",
-        "COMPOSE": "menu",
-        "MENU": "menu",
-        "BACKSLASH": "bslash",
-        "102ND": "nonusbackslash",
-        "LEFTBRACE": "lbracket",
-        "RIGHTBRACE": "rbracket",
-        "SEMICOLON": "semicolon",
-        "APOSTROPHE": "quote",
-        "COMMA": "comma",
-        "DOT": "dot",
-        "SLASH": "slash",
-        "DELETE": "del",
-        "INSERT": "ins",
-        "HOME": "home",
-        "END": "end",
-        "PAGEUP": "pgup",
-        "PAGEDOWN": "pgdn",
-        "UP": "up",
-        "DOWN": "down",
-        "LEFT": "left",
-        "RIGHT": "right",
-        "NUMLOCK": "numlock",
-        "KPSLASH": "numslash",
-        "KPASTERISK": "numstar",
-        "KPMINUS": "numminus",
-        "KPPLUS": "numplus",
-        "KPENTER": "numenter",
-        "KPDOT": "numdot",
-        "SYSRQ": "prtsc",
-        "PRINT": "prtsc",
-        "SCROLLLOCK": "sc",
-        "PAUSE": "pause",
-        "BREAK": "pause",
-        "VOLUMEUP": "volup",
-        "VOLUMEDOWN": "voldown",
-        "MUTE": "mute",
-        "PLAYPAUSE": "play",
-        "PLAY": "play",
-        "STOP": "stop",
-        "NEXTSONG": "next",
-        "PREVIOUSSONG": "prev",
-        "CALC": "calc",
-        "MAIL": "mail",
-        "WWW": "www",
-        "HOMEPAGE": "home",
-        "BACK": "back",
-        "FORWARD": "forward",
-    }
-
-    if n in special:
-        return special[n]
+    if n in SPECIAL_KEY_NAMES:
+        return SPECIAL_KEY_NAMES[n]
 
     if n.startswith("F") and n[1:].isdigit():
         return n.lower()

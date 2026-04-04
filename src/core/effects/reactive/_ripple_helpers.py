@@ -18,18 +18,24 @@ from .render import Color, Key, mix, scale
 
 def get_engine_overlay_buffer(engine: object, attr_name: str):
     try:
-        existing = getattr(engine, attr_name, None)
-    except Exception:
-        existing = None
+        engine_state = object.__getattribute__(engine, "__dict__")
+    except (AttributeError, TypeError):
+        engine_state = None
 
-    if isinstance(existing, dict):
-        return existing
+    if isinstance(engine_state, dict):
+        existing = engine_state.get(attr_name)
+        if isinstance(existing, dict):
+            return existing
 
-    created: dict = {}
+        created: dict = {}
+        engine_state[attr_name] = created
+        return created
+
+    created: dict = {}  # type: ignore[no-redef]
     try:
         setattr(engine, attr_name, created)
-    except Exception:
-        pass
+    except (AttributeError, TypeError):
+        return created
     return created
 
 

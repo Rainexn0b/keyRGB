@@ -62,7 +62,7 @@ def _parse_busctl_string_reply(stdout: str) -> Optional[str]:
     # busctl keeps C-style escapes; json.loads handles standard escapes.
     try:
         return bytes(rest, "utf-8").decode("unicode_escape")
-    except Exception:
+    except (UnicodeDecodeError, ValueError):
         return rest
 
 

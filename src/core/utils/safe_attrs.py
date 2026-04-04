@@ -38,11 +38,12 @@ def _coerce_int_like(raw: object, *, default: None) -> Optional[int]: ...
 
 
 def _coerce_int_like(raw: object, *, default: Optional[int]) -> Optional[int]:
+    _raw = raw
     try:
-        return int(raw)
+        return int(_raw)  # type: ignore[call-overload]
     except (TypeError, ValueError):
         try:
-            return int(float(raw))
+            return int(float(_raw))  # type: ignore[arg-type]
         except (TypeError, ValueError, OverflowError):
             return default
         except Exception:  # @quality-exception exception-transparency: fallback numeric coercion crosses user-defined __float__ implementations and must stay non-fatal here
@@ -125,7 +126,7 @@ def safe_float_attr(
         val = default
     else:
         try:
-            val = float(raw)
+            val = float(raw)  # type: ignore[arg-type]
         except (TypeError, ValueError):
             val = default
 

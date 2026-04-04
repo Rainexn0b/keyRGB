@@ -15,17 +15,23 @@ _ALL_KEYS: tuple[Key, ...] = tuple((r, c) for r in range(NUM_ROWS) for c in rang
 
 def get_engine_color_map_buffer(engine: "EffectsEngine", attr_name: str) -> Dict[Key, Color]:
     try:
-        existing = getattr(engine, attr_name, None)
-    except Exception:
-        existing = None
+        engine_state = object.__getattribute__(engine, "__dict__")
+    except (AttributeError, TypeError):
+        engine_state = None
 
-    if isinstance(existing, dict):
-        return existing
+    if isinstance(engine_state, dict):
+        existing = engine_state.get(attr_name)
+        if isinstance(existing, dict):
+            return existing
 
-    created: Dict[Key, Color] = {}
+        created: Dict[Key, Color] = {}
+        engine_state[attr_name] = created
+        return created
+
+    created: Dict[Key, Color] = {}  # type: ignore[no-redef]
     try:
         setattr(engine, attr_name, created)
-    except Exception:
+    except (AttributeError, TypeError):
         pass
     return created
 

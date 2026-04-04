@@ -125,7 +125,7 @@ def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float 
 
     try:
         s = int(getattr(engine, "speed", 4) or 0)
-    except Exception:
+    except (TypeError, ValueError):
         s = 4
 
     s = max(0, min(10, s))

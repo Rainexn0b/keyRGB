@@ -7,6 +7,10 @@ from .io import parse_hex_int, read_text
 from .paths import sysfs_usb_devices_root, usb_devnode_root
 from .proc import proc_open_holders
 
+_USB_DEVNODE_METADATA_ERRORS = (OSError, RuntimeError, ValueError)
+_USB_DRIVER_LINK_ERRORS = (OSError, RuntimeError)
+_USB_SNAPSHOT_ITERATION_ERRORS = (OSError, RuntimeError, ValueError)
+
 
 def usb_devices_snapshot(target_ids: list[tuple[int, int]]) -> list[dict[str, Any]]:
     """Collect best-effort USB device details from sysfs.
@@ -78,7 +82,7 @@ def usb_devices_snapshot(target_ids: list[tuple[int, int]]) -> list[dict[str, An
                                 entry["devnode_open_by_others"] = others
                     else:
                         entry["devnode_exists"] = False
-                except Exception:
+                except _USB_DEVNODE_METADATA_ERRORS:
                     pass
 
             # Attempt to capture a bound driver name if available.
@@ -86,11 +90,11 @@ def usb_devices_snapshot(target_ids: list[tuple[int, int]]) -> list[dict[str, An
                 drv = dev / "driver"
                 if drv.exists() and drv.is_symlink():
                     entry["driver"] = drv.resolve().name
-            except Exception:
+            except _USB_DRIVER_LINK_ERRORS:
                 pass
 
             out.append(entry)
 
         return out
-    except Exception:
+    except _USB_SNAPSHOT_ITERATION_ERRORS:
         return out

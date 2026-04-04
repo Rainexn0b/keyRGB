@@ -32,7 +32,7 @@ def _load_custom_profiles_payload(*, get_custom_profiles_json_fn=get_custom_prof
         return []
     try:
         payload = json.loads(raw)
-    except Exception as exc:
+    except json.JSONDecodeError as exc:
         raise TccProfileWriteError(f"Failed to parse custom profiles JSON from tccd: {exc}")
     if not isinstance(payload, list):
         raise TccProfileWriteError("Custom profiles JSON from tccd is not a list")
@@ -49,7 +49,7 @@ def _load_settings_payload(*, get_settings_json_fn=get_settings_json) -> dict[st
         return {}
     try:
         payload = json.loads(raw)
-    except Exception as exc:
+    except json.JSONDecodeError as exc:
         raise TccProfileWriteError(f"Failed to parse settings JSON from tccd: {exc}")
     if not isinstance(payload, dict):
         raise TccProfileWriteError("Settings JSON from tccd is not an object")
@@ -85,7 +85,7 @@ def _write_temp_json(payload: object, *, prefix: str) -> str:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False)
             f.write("\n")
-    except Exception:
+    except (OSError, ValueError):
         _unlink_tmp(path, key="tcc_profiles.write_temp_json.cleanup")
         raise
     return path
@@ -190,7 +190,7 @@ def create_custom_profile(
         raise TccProfileWriteError("Failed to fetch default values profile from tccd")
     try:
         base_profile = json.loads(base_raw)
-    except Exception as exc:
+    except json.JSONDecodeError as exc:
         raise TccProfileWriteError(f"Failed to parse default values profile JSON: {exc}")
     if not isinstance(base_profile, dict):
         raise TccProfileWriteError("Default values profile JSON is not an object")

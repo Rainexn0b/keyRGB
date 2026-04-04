@@ -27,21 +27,21 @@ def _read_engine_attr(
         return getattr(engine, name)
     except AttributeError:
         return missing_default
-    except Exception:
+    except Exception:  # @quality-exception exception-transparency: engine attribute getters may have arbitrary runtime side effects beyond AttributeError
         active_logger.exception("Reactive brightness failed to read engine attribute %s", name)
         return error_default
 
 
 def _coerce_int(value: object, *, default: int | None) -> int | None:
     try:
-        return int(value)
+        return int(value)  # type: ignore[call-overload]
     except _INT_COERCION_ERRORS:
         return default
 
 
 def _coerce_float(value: object, *, default: float | None) -> float | None:
     try:
-        return float(value)
+        return float(value)  # type: ignore[arg-type]
     except _INT_COERCION_ERRORS:
         return default
 
@@ -194,7 +194,7 @@ def resolve_brightness(
             error_default=0.0,
             logger=logger,
         )
-        pulse_mix = _coerce_float(raw_pulse_mix or 0.0, default=0.0)
+        pulse_mix = _coerce_float(raw_pulse_mix or 0.0, default=0.0) or 0.0
         if pulse_mix is None:
             pulse_mix = 0.0
         pulse_mix = clamp01_fn(pulse_mix)
@@ -266,5 +266,5 @@ def _clear_transition_state(engine: "EffectsEngine") -> None:
             setattr(engine, name, None)
         except (AttributeError, TypeError):
             continue
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: engine attribute setters may fail unexpectedly beyond AttributeError/TypeError during reactive brightness cleanup
             _LOGGER.exception("Reactive brightness failed to clear engine attribute %s", name)

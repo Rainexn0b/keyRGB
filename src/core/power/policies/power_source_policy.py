@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Optional
 
 
+_BRIGHTNESS_PARSE_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+
+
 def compute_power_source_policy(
     *,
     on_ac: bool,
@@ -29,10 +32,10 @@ def compute_power_source_policy(
 
     try:
         val = int(raw)
-    except Exception:
+    except _BRIGHTNESS_PARSE_EXCEPTIONS:
         try:
             val = int(float(raw))
-        except Exception:
+        except _BRIGHTNESS_PARSE_EXCEPTIONS:
             return desired_enabled, None
 
     return desired_enabled, max(0, min(50, int(val)))

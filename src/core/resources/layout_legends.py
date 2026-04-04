@@ -39,7 +39,7 @@ def _as_dict(value: object) -> dict[str, object]:
 def _load_specs_file() -> dict[str, object]:
     try:
         raw = json.loads(_SPECS_PATH.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return {}
     return _as_dict(raw)
 

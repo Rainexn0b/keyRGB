@@ -7,6 +7,15 @@ from .io import read_text, run_command
 from .paths import sysfs_dmi_root, sysfs_leds_root
 
 
+def _usb_runtime_error_types(usb_core: object) -> tuple[type[BaseException], ...]:
+    error_types: list[type[BaseException]] = [AttributeError, OSError, RuntimeError]
+    for name in ("USBError", "NoBackendError"):
+        err_type = getattr(usb_core, name, None)
+        if isinstance(err_type, type) and issubclass(err_type, BaseException):
+            error_types.append(err_type)
+    return tuple(dict.fromkeys(error_types))
+
+
 def dmi_snapshot() -> dict[str, str]:
     dmi_root = sysfs_dmi_root()
     dmi_keys = [
@@ -63,7 +72,7 @@ def sysfs_leds_snapshot() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
                 lower = name.lower()
                 if "kbd" in lower or "keyboard" in lower:
                     leds.append(entry)
-    except Exception:
+    except OSError:
         # Best-effort.
         all_leds = all_leds
         leds = leds
@@ -83,18 +92,26 @@ def usb_ids_snapshot(*, include_usb: bool) -> list[str]:
 
     usb_ids: list[str] = []
     try:
-        import usb.core  # type: ignore
+        import usb.core as usb_core  # type: ignore
+    except ImportError:
+        return []
 
-        for dev in usb.core.find(find_all=True) or []:  # pragma: no cover
-            try:
-                vid = int(getattr(dev, "idVendor", 0))
-                pid = int(getattr(dev, "idProduct", 0))
-                usb_ids.append(f"{vid:04x}:{pid:04x}")
-            except Exception:
-                continue
-        usb_ids = sorted(set(usb_ids))
-    except Exception:
-        usb_ids = []
+    runtime_error_types = _usb_runtime_error_types(usb_core)
+    try:
+        devices = usb_core.find(find_all=True) or []  # pragma: no cover
+    except runtime_error_types:
+        return []
+
+    device_error_types = runtime_error_types + (TypeError, ValueError, OverflowError)
+    for dev in devices:
+        try:
+            vid = int(getattr(dev, "idVendor", 0))
+            pid = int(getattr(dev, "idProduct", 0))
+        except device_error_types:
+            continue
+        usb_ids.append(f"{vid:04x}:{pid:04x}")
+
+    usb_ids = sorted(set(usb_ids))
 
     return usb_ids
 
@@ -127,17 +144,19 @@ def virt_snapshot() -> dict[str, str]:
 
 
 def process_snapshot() -> dict[str, Any]:
-    process: dict[str, Any] = {}
     try:
-        process["pid"] = int(os.getpid())
-        process["euid"] = int(os.geteuid())
-        process["egid"] = int(os.getegid())
-        # Keep group IDs numeric to avoid leaking usernames.
-        try:
-            process["groups"] = [int(g) for g in os.getgroups()]
-        except Exception:
-            pass
-    except Exception:
-        process = {}
+        process: dict[str, Any] = {
+            "pid": int(os.getpid()),
+            "euid": int(os.geteuid()),
+            "egid": int(os.getegid()),
+        }
+    except (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError):
+        return {}
+
+    # Keep group IDs numeric to avoid leaking usernames.
+    try:
+        process["groups"] = [int(g) for g in os.getgroups()]
+    except (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError):
+        pass
 
     return process

@@ -5,6 +5,10 @@ from pathlib import Path
 from typing import Optional
 
 
+_POWER_SUPPLY_ENUMERATION_EXCEPTIONS = (OSError,)
+_POWER_SUPPLY_TEXT_READ_EXCEPTIONS = (OSError, UnicodeError)
+
+
 def iter_ac_online_files(power_supply_root: Path) -> list[Path]:
     files: list[Path] = []
     try:
@@ -18,21 +22,21 @@ def iter_ac_online_files(power_supply_root: Path) -> list[Path]:
             typ = None
             try:
                 typ = (child / "type").read_text(errors="ignore").strip().lower()
-            except Exception:
+            except _POWER_SUPPLY_TEXT_READ_EXCEPTIONS:
                 typ = None
             if typ == "mains":
                 files.append(online)
 
         if files:
             return files
-    except Exception:
+    except _POWER_SUPPLY_ENUMERATION_EXCEPTIONS:
         pass
 
     # Fallback: common names like AC/ACAD/AC0
     try:
         for online in sorted(power_supply_root.glob("AC*/online")):
             files.append(online)
-    except Exception:
+    except _POWER_SUPPLY_ENUMERATION_EXCEPTIONS:
         pass
 
     return files
@@ -51,7 +55,7 @@ def read_on_ac_power(*, power_supply_root: Optional[Path] = None) -> Optional[bo
             raw = online_path.read_text(errors="ignore").strip()
             if raw in ("1", "0"):
                 return raw == "1"
-        except Exception:
+        except _POWER_SUPPLY_TEXT_READ_EXCEPTIONS:
             continue
 
     return None

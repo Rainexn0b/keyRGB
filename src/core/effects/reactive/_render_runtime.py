@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 Color = Tuple[int, int, int]
 Key = Tuple[int, int]
 
+_RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
 
 def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_reinit: bool = False) -> None:
     """Set hardware brightness, avoiding a full mode reinit when possible."""
@@ -33,7 +35,15 @@ def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_re
 
     try:
         engine.kb.set_brightness(int(brightness_hw))
-    except Exception:
+    except _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS as exc:
+        log_throttled(
+            logger,
+            "effects.reactive.set_brightness_failed",
+            interval_s=120,
+            level=logging.DEBUG,
+            msg="Reactive per-key brightness update failed; reinitializing user mode",
+            exc=exc,
+        )
         enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
     engine._last_hw_mode_brightness = int(brightness_hw)
 
@@ -58,12 +68,19 @@ def render_per_key_frame(
 
             try:
                 engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)
-            except Exception as exc:
+            except Exception as exc:  # @quality-exception exception-transparency: reactive per-key writes cross backend-specific runtime I/O boundaries and disconnect handling must suppress further hardware writes
                 if is_device_disconnected(exc):
                     try:
                         engine.mark_device_unavailable()
-                    except Exception:
-                        pass
+                    except Exception as mark_exc:  # @quality-exception exception-transparency: disconnect cleanup must stay best-effort and still suppress further reactive hardware writes even if invalidation fails
+                        log_throttled(
+                            logger,
+                            "effects.reactive.mark_device_unavailable_failed",
+                            interval_s=120,
+                            level=logging.DEBUG,
+                            msg="Failed to mark disconnected reactive device unavailable",
+                            exc=mark_exc,
+                        )
                     return True
                 raise
 
@@ -77,7 +94,7 @@ def render_per_key_frame(
             log_key="effects.reactive.secondary",
         )
         return True
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: reactive per-key rendering crosses backend I/O and effect runtime policy boundaries and must degrade to uniform output instead of killing the effect loop
         log_throttled(
             logger,
             "effects.render.per_key_failed",

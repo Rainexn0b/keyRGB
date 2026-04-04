@@ -5,11 +5,16 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
+_READ_TEXT_ERRORS = (OSError, UnicodeError)
+_RUN_COMMAND_ERRORS = (OSError, TypeError, ValueError, subprocess.SubprocessError)
+_READ_KV_FILE_ERRORS = (OSError,)
+_PARSE_HEX_INT_ERRORS = (AttributeError, TypeError, ValueError)
+
 
 def read_text(path: Path) -> Optional[str]:
     try:
         return path.read_text(encoding="utf-8").strip()
-    except Exception:
+    except _READ_TEXT_ERRORS:
         return None
 
 
@@ -34,7 +39,7 @@ def run_command(argv: list[str], *, timeout_s: float = 1.5) -> Optional[str]:
         )
         out = (proc.stdout or "").strip()
         return out if out else None
-    except Exception:
+    except _RUN_COMMAND_ERRORS:
         return None
 
 
@@ -50,7 +55,7 @@ def read_kv_file(path: Path) -> dict[str, str]:
             k, v = line.split("=", 1)
             v = v.strip().strip('"')
             data[k.strip()] = v
-    except Exception:
+    except _READ_KV_FILE_ERRORS:
         return {}
     return data
 
@@ -61,5 +66,5 @@ def parse_hex_int(text: str) -> Optional[int]:
         if s.startswith("0x"):
             s = s[2:]
         return int(s, 16)
-    except Exception:
+    except _PARSE_HEX_INT_ERRORS:
         return None

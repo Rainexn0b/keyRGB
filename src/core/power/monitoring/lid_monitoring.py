@@ -51,7 +51,7 @@ def start_sysfs_lid_monitoring(
                         on_lid_open()
                     last_state = state
 
-            except Exception as e:
+            except Exception as e:  # @quality-exception exception-transparency: sysfs lid state read is a runtime hardware/OS boundary; loop exits gracefully on persistent failure
                 logger.exception("Error reading lid state: %s", e)
                 break
 
@@ -81,7 +81,7 @@ def poll_lid_state_paths(
             with open(path) as f:
                 lid_path = path
                 break
-        except Exception:
+        except OSError:
             continue
 
     if not lid_path:
@@ -103,7 +103,7 @@ def poll_lid_state_paths(
                     on_lid_open()
                 last_state = state
 
-        except Exception as e:
+        except Exception as e:  # @quality-exception exception-transparency: fallback lid state poll is a runtime filesystem boundary; loop continues on transient read failures
             logger.exception("Error reading lid state: %s", e)
 
         time.sleep(1)

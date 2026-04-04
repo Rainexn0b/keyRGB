@@ -16,6 +16,7 @@ SOFTWARE_EFFECT_TARGETS = (
 )
 
 Color = tuple[int, int, int]
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -27,10 +28,10 @@ class SoftwareRenderTarget:
 
 
 def normalize_software_effect_target(value: object) -> str:
-    try:
-        normalized = str(value or SOFTWARE_EFFECT_TARGET_KEYBOARD).strip().lower()
-    except Exception:
+    if not isinstance(value, str):
         return SOFTWARE_EFFECT_TARGET_KEYBOARD
+
+    normalized = value.strip().lower()
     if normalized in SOFTWARE_EFFECT_TARGETS:
         return normalized
     return SOFTWARE_EFFECT_TARGET_KEYBOARD
@@ -47,7 +48,10 @@ def software_render_targets(engine: Any) -> list[SoftwareRenderTarget]:
         )
     ]
 
-    if normalize_software_effect_target(getattr(engine, "software_effect_target", None)) != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
+    if (
+        normalize_software_effect_target(getattr(engine, "software_effect_target", None))
+        != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+    ):
         return targets
 
     provider = getattr(engine, "secondary_software_targets_provider", None)
@@ -56,7 +60,8 @@ def software_render_targets(engine: Any) -> list[SoftwareRenderTarget]:
 
     try:
         provided = provider()
-    except Exception:
+    except Exception:  # @quality-exception exception-transparency: provider callbacks are runtime extension seams and broken providers must degrade to keyboard-only fanout
+        LOGGER.exception("Secondary software target provider failed")
         return targets
 
     if not isinstance(provided, Iterable):
@@ -73,7 +78,7 @@ def software_render_targets(engine: Any) -> list[SoftwareRenderTarget]:
     return targets
 
 
-def average_color_map(color_map: dict[object, Color]) -> Color:
+def average_color_map(color_map: dict[Any, Color]) -> Color:
     if not color_map:
         return (0, 0, 0)
 
@@ -102,12 +107,9 @@ def render_secondary_uniform_rgb(
     for target in targets:
         try:
             target.device.set_color((red, green, blue), brightness=int(brightness_hw))
-        except Exception as exc:
-            if is_permission_denied(exc) and callable(permission_cb):
-                try:
-                    permission_cb(exc)
-                except Exception:
-                    pass
+        except Exception as exc:  # @quality-exception exception-transparency: secondary targets are runtime device seams and fanout must keep keyboard rendering alive
+            if is_permission_denied(exc):
+                _notify_permission_error(permission_cb, exc=exc, logger=logger, log_key=log_key, target_key=target.key)
             log_throttled(
                 logger,
                 f"{log_key}.{target.key}",
@@ -116,6 +118,30 @@ def render_secondary_uniform_rgb(
                 msg=f"Secondary software-effect render failed for {target.key}",
                 exc=exc,
             )
+
+
+def _notify_permission_error(
+    permission_cb: object,
+    *,
+    exc: Exception,
+    logger: logging.Logger,
+    log_key: str,
+    target_key: str,
+) -> None:
+    if not callable(permission_cb):
+        return
+
+    try:
+        permission_cb(exc)
+    except Exception as callback_exc:  # @quality-exception exception-transparency: permission callbacks are best-effort notification hooks and must remain non-fatal
+        log_throttled(
+            logger,
+            f"{log_key}.{target_key}.permission-callback",
+            interval_s=30,
+            level=logging.WARNING,
+            msg=f"Secondary software-effect permission callback failed for {target_key}",
+            exc=callback_exc,
+        )
 
 
 def _coerce_target(raw_target: object) -> SoftwareRenderTarget | None:

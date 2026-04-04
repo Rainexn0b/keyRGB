@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable
-from typing import Any
 
 from src.core.utils.safe_attrs import _safe_getattr_or_none
 
@@ -20,7 +19,7 @@ _ACTIVE_PROFILE_LOOKUP_ERRORS = (AttributeError, OSError, RuntimeError, TypeErro
 _SAFE_INT_READ_ERRORS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
 
 
-def _run_controller_action_best_effort(*, kb_controller: Any, method_name: str) -> None:
+def _run_controller_action_best_effort(*, kb_controller: object, method_name: str) -> None:
     try:
         method = getattr(kb_controller, method_name, None)
         if callable(method):
@@ -29,20 +28,20 @@ def _run_controller_action_best_effort(*, kb_controller: Any, method_name: str) 
         logger.exception("Power-source controller action %s failed", method_name)
 
 
-def _flag_attr_is_true(obj: Any, name: str) -> bool:
+def _flag_attr_is_true(obj: object, name: str) -> bool:
     return _safe_getattr_or_none(obj, name) is True
 
 
 def build_power_source_loop_inputs(
-    config: Any,
-    kb_controller: Any,
+    config: object,
+    kb_controller: object,
     *,
     on_ac: bool,
     now_mono: float,
     get_active_profile_fn: Callable[[], str],
     safe_int_attr_fn: Callable[..., int],
 ) -> PowerSourceLoopInputs | None:
-    config.reload()
+    config.reload()  # type: ignore[attr-defined]
     if not bool(getattr(config, "power_management_enabled", True)):
         return None
 
@@ -80,7 +79,7 @@ def build_power_source_loop_inputs(
 
 def apply_power_source_actions(
     *,
-    kb_controller: Any,
+    kb_controller: object,
     actions: Iterable[object],
     apply_brightness: Callable[[int], None],
 ) -> None:
@@ -93,7 +92,7 @@ def apply_power_source_actions(
             apply_brightness(int(action.brightness))
 
 
-def is_intentionally_off(*, kb_controller: Any, config: Any, safe_int_attr_fn: Callable[..., int]) -> bool:
+def is_intentionally_off(*, kb_controller: object, config: object, safe_int_attr_fn: Callable[..., int]) -> bool:
     if _flag_attr_is_true(kb_controller, "user_forced_off"):
         return True
 

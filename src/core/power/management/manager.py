@@ -6,6 +6,7 @@ import logging
 import threading
 import time
 
+from ._manager_config import read_power_management_config_bool, reload_power_management_config
 from ._manager_helpers import (
     apply_power_source_actions,
     build_power_source_loop_inputs,
@@ -30,9 +31,6 @@ from src.core.utils.safe_attrs import safe_int_attr
 
 logger = logging.getLogger(__name__)
 
-_CONFIG_RELOAD_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
-_CONFIG_FLAG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
-
 
 class PowerManager:
     """Monitor system power events and control keyboard accordingly."""
@@ -53,29 +51,10 @@ class PowerManager:
         self._event_policy = PowerEventPolicy()
 
     def _reload_config(self, *, context: str) -> bool:
-        try:
-            self._config.reload()
-            return True
-        except _CONFIG_RELOAD_EXCEPTIONS:
-            logger.exception("Failed to reload power management config during %s", context)
-            return False
+        return reload_power_management_config(self._config, context=context, logger=logger)
 
     def _read_config_bool(self, *names: str, default: bool) -> bool:
-        config_dict = getattr(self._config, "__dict__", None)
-        if isinstance(config_dict, dict):
-            for name in names:
-                if name in config_dict:
-                    return bool(config_dict[name])
-
-        for name in names:
-            try:
-                return bool(getattr(self._config, name))
-            except AttributeError:
-                continue
-            except _CONFIG_FLAG_READ_EXCEPTIONS:
-                logger.exception("Failed to read power management config flag '%s'", name)
-
-        return default
+        return read_power_management_config_bool(self._config, *names, default=default, logger=logger)
 
     def _power_management_enabled_value(self) -> bool:
         return self._read_config_bool("power_management_enabled", "management_enabled", default=True)

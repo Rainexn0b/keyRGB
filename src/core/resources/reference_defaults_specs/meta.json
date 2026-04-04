@@ -1,0 +1,20 @@
+{
+  "layouts": {
+    "abnt": {
+      "extends": "iso"
+    },
+    "ansi": {},
+    "iso": {
+      "extends": "ansi",
+      "remove_keymap_keys": [
+        "bslash"
+      ]
+    },
+    "jis": {
+      "extends": "ansi"
+    },
+    "ks": {
+      "extends": "ansi"
+    }
+  }
+}

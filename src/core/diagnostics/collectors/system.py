@@ -6,8 +6,9 @@ from importlib import metadata
 from pathlib import Path
 from typing import Any
 
-from .io import read_kv_file, read_text
 from src.core.runtime.imports import repo_root_from
+
+from ..io import read_kv_file, read_text
 
 
 logger = logging.getLogger(__name__)
@@ -40,9 +41,9 @@ def list_platform_hints() -> list[str]:
     try:
         if not root.exists():
             return []
-        for child in sorted(root.iterdir(), key=lambda p: p.name):
+        for child in sorted(root.iterdir(), key=lambda path: path.name):
             name = child.name.lower()
-            if any(p in name for p in patterns):
+            if any(pattern in name for pattern in patterns):
                 candidates.append(child.name)
         return candidates[:80]
     except _FS_SNAPSHOT_ERRORS:
@@ -59,19 +60,17 @@ def list_module_hints() -> list[str]:
         if not modules_path.exists():
             return []
         for line in modules_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-            # Format: name size use_count deps state address
             name = (line.split() or [""])[0]
             if name and keep.search(name):
                 out.append(name)
-        # Preserve order, unique.
         seen: set[str] = set()
-        uniq: list[str] = []
-        for m in out:
-            if m in seen:
+        unique: list[str] = []
+        for module_name in out:
+            if module_name in seen:
                 continue
-            seen.add(m)
-            uniq.append(m)
-        return uniq[:120]
+            seen.add(module_name)
+            unique.append(module_name)
+        return unique[:120]
     except _FS_SNAPSHOT_ERRORS:
         return []
 
@@ -85,8 +84,8 @@ def power_supply_snapshot() -> dict[str, Any]:
         if not root.exists():
             return {}
 
-        for dev in sorted(root.iterdir(), key=lambda p: p.name):
-            if not dev.is_dir():
+        for device in sorted(root.iterdir(), key=lambda path: path.name):
+            if not device.is_dir():
                 continue
 
             entry: dict[str, str] = {}
@@ -98,12 +97,12 @@ def power_supply_snapshot() -> dict[str, Any]:
                 "charge_now",
                 "energy_now",
             ):
-                val = read_text(dev / key)
-                if val is not None and val != "":
-                    entry[key] = val
+                value = read_text(device / key)
+                if value is not None and value != "":
+                    entry[key] = value
 
             if entry:
-                out[dev.name] = entry
+                out[device.name] = entry
 
         return out
     except _FS_SNAPSHOT_ERRORS:
@@ -122,7 +121,6 @@ def _repo_version_text(anchor: str | Path) -> str | None:
         if not pyproject.exists():
             return None
 
-        # Minimal parser: look only inside the [project] section.
         in_project = False
         version_re = re.compile(r'^\s*version\s*=\s*"([^"]+)"\s*$')
 
@@ -136,11 +134,10 @@ def _repo_version_text(anchor: str | Path) -> str | None:
             if not in_project:
                 continue
 
-            # Strip trailing comments (good enough for version=...)
             line = raw_line.split("#", 1)[0].strip()
-            m = version_re.match(line)
-            if m:
-                return m.group(1).strip()
+            match = version_re.match(line)
+            if match:
+                return match.group(1).strip()
 
         return None
     except _FS_SNAPSHOT_ERRORS:
@@ -155,8 +152,6 @@ def app_snapshot() -> dict[str, Any]:
         app["version"] = repo_version
         app["version_source"] = "pyproject"
 
-        # Also report the installed distribution version (if any), since dev/source
-        # runs can accidentally pick up a stale site-packages install.
         for dist_name in ("keyrgb", "Keyrgb", "KeyRGB"):
             try:
                 app["dist_name"] = dist_name
@@ -165,7 +160,6 @@ def app_snapshot() -> dict[str, Any]:
             except _METADATA_LOOKUP_ERRORS:
                 continue
     else:
-        # Best-effort version reporting. Distribution name may vary, so try a couple.
         for dist_name in ("keyrgb", "Keyrgb", "KeyRGB"):
             try:
                 app["version"] = metadata.version(dist_name)
@@ -175,7 +169,6 @@ def app_snapshot() -> dict[str, Any]:
             except _METADATA_LOOKUP_ERRORS:
                 continue
 
-    # Optional helper library used on some hardware.
     for dist_name in ("ite8291r3-ctl", "ite8291r3_ctl"):
         try:
             app["ite8291r3_ctl_version"] = metadata.version(dist_name)
@@ -187,15 +180,14 @@ def app_snapshot() -> dict[str, Any]:
 
 
 def system_snapshot() -> dict[str, Any]:
-    # Imported lazily to keep dependency surface minimal.
     import platform
     import sys
 
     system: dict[str, Any] = {}
     try:
-        u = platform.uname()
-        system["kernel_release"] = u.release
-        system["machine"] = u.machine
+        uname = platform.uname()
+        system["kernel_release"] = uname.release
+        system["machine"] = uname.machine
     except _SYSTEM_INFO_ERRORS:
         pass
     try:
@@ -205,9 +197,8 @@ def system_snapshot() -> dict[str, Any]:
 
     os_release = read_kv_file(Path("/etc/os-release"))
     if os_release:
-        # Keep only common, stable keys.
         keep_keys = ("NAME", "PRETTY_NAME", "ID", "VERSION_ID", "VARIANT_ID")
-        system["os_release"] = {k: os_release[k] for k in keep_keys if k in os_release}
+        system["os_release"] = {key: os_release[key] for key in keep_keys if key in os_release}
 
     return system
 
@@ -221,14 +212,14 @@ def system_power_mode_snapshot() -> dict[str, Any]:
     try:
         from src.core.power.system import get_status
 
-        st = get_status()
+        status = get_status()
         return {
-            "supported": bool(st.supported),
-            "mode": str(st.mode.value),
-            "reason": str(st.reason),
-            "identifiers": dict(st.identifiers or {}),
+            "supported": bool(status.supported),
+            "mode": str(status.mode.value),
+            "reason": str(status.reason),
+            "identifiers": dict(status.identifiers or {}),
         }
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: system power mode collection is an arbitrary runtime subsystem boundary; returns a safe fallback dict on any failure
         logger.log(logging.DEBUG, "Failed to collect system power mode diagnostics", exc_info=True)
         return {
             "supported": False,

@@ -27,7 +27,7 @@ def allowed_hw_effect_keys(effect_func: Callable[..., Any], *, logger: logging.L
         args = mapping.get("args")
         if isinstance(args, dict):
             return set(args.keys())
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: CPython closure introspection is version-dependent and must degrade to empty allowed-keys set
         log_throttled(
             logger,
             "legacy.effects.allowed_keys",
@@ -80,7 +80,7 @@ def build_hw_effect_payload(
         try:
             with kb_lock:
                 kb.set_palette_color(palette_slot, tuple(current_color))
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: set_palette_color is a runtime USB/HID hardware write boundary; palette programming failure must not block effect payload construction
             # Hardware writes are a runtime boundary: log full exception
             # context, then continue building the payload as before.
             log_throttled(

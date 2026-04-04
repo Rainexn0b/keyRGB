@@ -43,7 +43,7 @@ def _migrate_profile_file(*, root: Path, new_name: str, old_name: str) -> Path:
     try:
         old_path.rename(new_path)
         return new_path
-    except Exception as exc:
+    except OSError as exc:
         log_throttled(
             logger,
             "profile_paths.migrate_legacy_file",
@@ -89,7 +89,7 @@ def get_default_profile() -> str:
             raw = json.loads(p.read_text(encoding="utf-8"))
             if isinstance(raw, dict) and isinstance(raw.get("name"), str):
                 return safe_profile_name(raw["name"])
-        except Exception as exc:
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
             log_throttled(
                 logger,
                 "profile_paths.get_default_profile",
@@ -116,7 +116,7 @@ def get_active_profile() -> str:
             raw = json.loads(p.read_text(encoding="utf-8"))
             if isinstance(raw, dict) and isinstance(raw.get("name"), str):
                 return safe_profile_name(raw["name"])
-        except Exception as exc:
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
             # Best-effort: fall back to default and log only occasionally.
             log_throttled(
                 logger,
@@ -147,7 +147,7 @@ def ensure_profile(name: str) -> Path:
         if not new_root.exists() and old_root.exists():
             try:
                 old_root.rename(new_root)
-            except Exception as exc:
+            except OSError as exc:
                 log_throttled(
                     logger,
                     "profile_paths.migrate_legacy_dir",

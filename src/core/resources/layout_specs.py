@@ -24,7 +24,7 @@ def _copy_jsonish(value: object) -> object:
 def _load_specs_file() -> dict[str, object]:
     try:
         raw = json.loads(_SPECS_PATH.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return {}
     return cast(dict[str, object], raw) if isinstance(raw, dict) else {}
 

@@ -7,7 +7,7 @@ from pathlib import Path
 def read_json(path: Path) -> object | None:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         return None
 
 

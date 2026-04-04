@@ -61,9 +61,7 @@ def _optional_slot_defs(layout_id: str) -> tuple[tuple[str, str], ...]:
 @lru_cache(maxsize=1)
 def _all_optional_slot_ids() -> frozenset[str]:
     return frozenset(
-        slot_id
-        for layout_id in _OPTIONAL_SLOT_KEY_IDS_BY_LAYOUT
-        for slot_id, _key_id in _optional_slot_defs(layout_id)
+        slot_id for layout_id in _OPTIONAL_SLOT_KEY_IDS_BY_LAYOUT for slot_id, _key_id in _optional_slot_defs(layout_id)
     )
 
 
@@ -71,9 +69,7 @@ def _all_optional_slot_ids() -> frozenset[str]:
 def _default_slot_labels(layout_id: str, legend_pack_id: str | None = None) -> dict[str, str]:
     resolved_layout = _normalized_layout_id(layout_id)
     key_map = get_layout_legend_labels(resolved_layout, legend_pack_id)
-    return {
-        slot_id: str(key_map.get(slot_id, key_id)) for slot_id, key_id in _optional_slot_defs(resolved_layout)
-    }
+    return {slot_id: str(key_map.get(slot_id, key_id)) for slot_id, key_id in _optional_slot_defs(resolved_layout)}
 
 
 def get_layout_slot_key_ids(layout_id: str | None) -> tuple[str, ...]:
@@ -89,7 +85,7 @@ def sanitize_layout_slot_overrides(raw: object, *, layout_id: str | None = None)
     legacy_to_slot: dict[str, str] = {}
     if layout_id is not None:
         optional_defs = _optional_slot_defs(_normalized_layout_id(layout_id))
-        allowed_slot_ids = {slot_id for slot_id, _key_id in optional_defs}
+        allowed_slot_ids = frozenset(slot_id for slot_id, _key_id in optional_defs)
         legacy_to_slot = {key_id: slot_id for slot_id, key_id in optional_defs}
 
     for slot_id, payload in raw.items():

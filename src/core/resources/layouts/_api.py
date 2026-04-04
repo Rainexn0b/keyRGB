@@ -79,7 +79,9 @@ def get_layout_keys(
     """
 
     resolved = resolve_layout_id(layout_id)
-    keys = apply_layout_legend_pack(_get_layout_keys_cached(resolved), layout_id=resolved, legend_pack_id=legend_pack_id)
+    keys = apply_layout_legend_pack(
+        _get_layout_keys_cached(resolved), layout_id=resolved, legend_pack_id=legend_pack_id
+    )
     cleaned_overrides = sanitize_layout_slot_overrides(slot_overrides or {}, layout_id=resolved)
     if not cleaned_overrides:
         return keys

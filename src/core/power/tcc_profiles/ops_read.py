@@ -15,7 +15,7 @@ def get_active_profile(*, get_active_profile_json_fn=get_active_profile_json) ->
 
     try:
         payload = json.loads(raw)
-    except Exception:
+    except json.JSONDecodeError:
         return None
 
     if not isinstance(payload, dict):

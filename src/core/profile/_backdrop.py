@@ -34,22 +34,22 @@ def save_backdrop_mode(mode: object, name: str | None = None) -> None:
     _save_backdrop_settings(settings, name)
 
 
-def load_backdrop_transparency(name: str | None = None) -> int:
-    """Load backdrop transparency for a profile as a percent."""
-
-    value = _load_backdrop_settings(name).get("transparency", 0)
+def _normalize_backdrop_transparency(value: object) -> int:
     try:
-        out = int(value)
-    except Exception:
+        out = int(value)  # type: ignore[call-overload]
+    except (TypeError, ValueError, OverflowError):
         out = 0
     return max(0, min(100, out))
 
 
-def save_backdrop_transparency(transparency: int, name: str | None = None) -> None:
-    try:
-        value = int(transparency)
-    except Exception:
-        value = 0
+def load_backdrop_transparency(name: str | None = None) -> int:
+    """Load backdrop transparency for a profile as a percent."""
+
+    value = _load_backdrop_settings(name).get("transparency", 0)
+    return _normalize_backdrop_transparency(value)
+
+
+def save_backdrop_transparency(transparency: object, name: str | None = None) -> None:
     settings = _load_backdrop_settings(name)
-    settings["transparency"] = max(0, min(100, value))
+    settings["transparency"] = _normalize_backdrop_transparency(transparency)
     _save_backdrop_settings(settings, name)

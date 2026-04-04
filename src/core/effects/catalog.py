@@ -129,7 +129,7 @@ def detected_backend_hw_effect_names(backend: object | None) -> tuple[str, ...]:
                     if normalized and normalized not in seen:
                         seen.add(normalized)
                         names.append(normalized)
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: effect name extraction from backend data is best-effort; failure returns empty list
             names = []
 
     return tuple(names)

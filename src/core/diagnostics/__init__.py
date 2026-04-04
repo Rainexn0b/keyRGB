@@ -4,36 +4,71 @@ import argparse
 import json
 from typing import Any
 
-from .collectors import (
-    app_snapshot as _app_snapshot,
-    backend_probe_snapshot as _backend_probe_snapshot,
-    config_snapshot as _config_snapshot,
-    list_module_hints as _list_module_hints,
-    list_platform_hints as _list_platform_hints,
-    power_supply_snapshot as _power_supply_snapshot,
-    system_snapshot as _system_snapshot,
-    system_power_mode_snapshot as _system_power_mode_snapshot,
-)
-from .formatting import format_diagnostics_text
-from .io import parse_hex_int as _parse_hex_int
-from .usb import usb_devices_snapshot as _usb_devices_snapshot
+from . import collectors as diagnostics_collectors
+from . import formatting as diagnostics_formatting
+from . import io as diagnostics_io
+from . import model as diagnostics_model
+from . import snapshots as diagnostics_snapshots
+from . import usb as diagnostics_usb
 
-from .snapshots import (
-    dmi_snapshot as _dmi_snapshot,
-    env_snapshot as _env_snapshot,
-    process_snapshot as _process_snapshot,
-    sysfs_leds_snapshot as _sysfs_leds_snapshot,
-    usb_ids_snapshot as _usb_ids_snapshot,
-    virt_snapshot as _virt_snapshot,
-)
+_app_snapshot = diagnostics_collectors.app_snapshot
+_backend_probe_snapshot = diagnostics_collectors.backend_probe_snapshot
+_config_snapshot = diagnostics_collectors.config_snapshot
+_list_module_hints = diagnostics_collectors.list_module_hints
+_list_platform_hints = diagnostics_collectors.list_platform_hints
+_power_supply_snapshot = diagnostics_collectors.power_supply_snapshot
+_system_snapshot = diagnostics_collectors.system_snapshot
+_system_power_mode_snapshot = diagnostics_collectors.system_power_mode_snapshot
+format_diagnostics_text = diagnostics_formatting.format_diagnostics_text
+_parse_hex_int = diagnostics_io.parse_hex_int
+Diagnostics = diagnostics_model.Diagnostics
+_dmi_snapshot = diagnostics_snapshots.dmi_snapshot
+_env_snapshot = diagnostics_snapshots.env_snapshot
+_process_snapshot = diagnostics_snapshots.process_snapshot
+_sysfs_leds_snapshot = diagnostics_snapshots.sysfs_leds_snapshot
+_usb_ids_snapshot = diagnostics_snapshots.usb_ids_snapshot
+_virt_snapshot = diagnostics_snapshots.virt_snapshot
+_usb_devices_snapshot = diagnostics_usb.usb_devices_snapshot
 
-from .model import Diagnostics
+_POWER_MODE_SNAPSHOT_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
 
 __all__ = [
     "Diagnostics",
     "collect_diagnostics",
     "format_diagnostics_text",
 ]
+
+
+def _usb_targets_from_backend_probes(backends: object) -> list[tuple[int, int]]:
+    if not isinstance(backends, dict):
+        return []
+
+    probes = backends.get("probes")
+    if not isinstance(probes, list):
+        return []
+
+    usb_targets: list[tuple[int, int]] = []
+    for probe in probes:
+        if not isinstance(probe, dict):
+            continue
+
+        identifiers = probe.get("identifiers")
+        if not isinstance(identifiers, dict):
+            continue
+
+        vid_txt = identifiers.get("usb_vid")
+        pid_txt = identifiers.get("usb_pid")
+        if not isinstance(vid_txt, str) or not isinstance(pid_txt, str):
+            continue
+
+        vid = _parse_hex_int(vid_txt)
+        pid = _parse_hex_int(pid_txt)
+        if vid is None or pid is None:
+            continue
+
+        usb_targets.append((vid, pid))
+
+    return usb_targets
 
 
 def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
@@ -51,7 +86,7 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
     system: dict[str, Any] = _system_snapshot()
     try:
         system["power_mode"] = _system_power_mode_snapshot()
-    except Exception:
+    except _POWER_MODE_SNAPSHOT_ERRORS:
         pass
 
     hints: dict[str, Any] = {}
@@ -68,25 +103,7 @@ def collect_diagnostics(*, include_usb: bool = False) -> Diagnostics:
     backends = _backend_probe_snapshot()
 
     # If any backend reported a USB VID/PID, collect sysfs USB details + devnode permissions.
-    usb_targets: list[tuple[int, int]] = []
-    try:
-        probes = backends.get("probes")
-        if isinstance(probes, list):
-            for p in probes:
-                if not isinstance(p, dict):
-                    continue
-                ids = p.get("identifiers")
-                if not isinstance(ids, dict):
-                    continue
-                vid_txt = ids.get("usb_vid")
-                pid_txt = ids.get("usb_pid")
-                if isinstance(vid_txt, str) and isinstance(pid_txt, str):
-                    vid = _parse_hex_int(vid_txt)
-                    pid = _parse_hex_int(pid_txt)
-                    if vid is not None and pid is not None:
-                        usb_targets.append((vid, pid))
-    except Exception:
-        usb_targets = []
+    usb_targets = _usb_targets_from_backend_probes(backends)
 
     usb_devices = _usb_devices_snapshot(usb_targets)
     config_snapshot = _config_snapshot()

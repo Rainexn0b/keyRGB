@@ -11,9 +11,7 @@ from src.core.effects.catalog import (
     HW_EFFECTS as _HW_EFFECTS,
     SW_EFFECTS as _SW_EFFECTS,
 )
-from src.core.effects.engine_brightness import _EngineBrightness
-from src.core.effects.engine_core import _EngineCore
-from src.core.effects.engine_start import _EngineStart
+from src.core.effects.engine_support import _EngineBrightness, _EngineCore, _EngineStart
 
 
 class EffectsEngine(_EngineCore, _EngineBrightness, _EngineStart):

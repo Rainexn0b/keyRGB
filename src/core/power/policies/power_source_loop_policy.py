@@ -81,7 +81,7 @@ class PowerSourceLoopPolicy:
         now = float(inputs.now)
         try:
             current_brightness = int(inputs.current_brightness)
-        except Exception:
+        except (TypeError, ValueError):
             current_brightness = 0
         current_enabled = bool(current_brightness > 0 and not bool(inputs.is_off))
 

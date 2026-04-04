@@ -43,14 +43,14 @@ def proc_open_holders(target_path: Path, *, limit: int = 10, pid_limit: int = 50
                 for fd in fd_dir.iterdir():
                     try:
                         link = os.readlink(fd)
-                    except Exception:
+                    except OSError:
                         continue
                     if link == target_str or link == target_real:
                         matched = True
                         break
             except PermissionError:
                 continue
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 continue
 
             if not matched:
@@ -64,7 +64,7 @@ def proc_open_holders(target_path: Path, *, limit: int = 10, pid_limit: int = 50
                 exe = child / "exe"
                 if exe.exists():
                     info["exe"] = str(exe.resolve())
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 pass
 
             # Best-effort command line (may be empty for kernel threads).
@@ -78,11 +78,11 @@ def proc_open_holders(target_path: Path, *, limit: int = 10, pid_limit: int = 50
                         # Keep it short to avoid overly verbose diagnostics.
                         joined = " ".join(parts)
                         info["cmdline"] = joined[:300]
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 pass
 
             holders.append(info)
 
         return holders
-    except Exception:
+    except (OSError, RuntimeError, ValueError):
         return holders

@@ -50,30 +50,31 @@ def get_active_profile_json() -> Optional[str]:
 
 
 def list_profiles() -> list[TccProfile]:
-    raw = get_profiles_json()
-    if not raw:
-        return []
+    return _list_profiles_from_json(get_profiles_json())
+
+
+def _profile_from_payload_item(item: object) -> TccProfile | None:
+    if not isinstance(item, dict):
+        return None
+
+    pid = item.get("id")
+    name = item.get("name")
+    if not isinstance(pid, str) or not isinstance(name, str):
+        return None
+
+    desc = item.get("description")
+    if desc is None:
+        return TccProfile(id=pid, name=name, description="")
+
+    if isinstance(desc, str):
+        return TccProfile(id=pid, name=name, description=desc)
 
     try:
-        payload = json.loads(raw)
-    except Exception:
-        return []
+        desc_text = str(desc)
+    except (TypeError, ValueError, RuntimeError):
+        return None
 
-    if not isinstance(payload, list):
-        return []
-
-    out: list[TccProfile] = []
-    for item in payload:
-        if not isinstance(item, dict):
-            continue
-        pid = item.get("id")
-        name = item.get("name")
-        if not isinstance(pid, str) or not isinstance(name, str):
-            continue
-        desc = item.get("description")
-        out.append(TccProfile(id=pid, name=name, description=str(desc) if desc is not None else ""))
-
-    return out
+    return TccProfile(id=pid, name=name, description=desc_text)
 
 
 def _list_profiles_from_json(raw: Optional[str]) -> list[TccProfile]:
@@ -81,20 +82,15 @@ def _list_profiles_from_json(raw: Optional[str]) -> list[TccProfile]:
         return []
     try:
         payload = json.loads(raw)
-    except Exception:
+    except (TypeError, UnicodeDecodeError, json.JSONDecodeError):
         return []
     if not isinstance(payload, list):
         return []
     out: list[TccProfile] = []
     for item in payload:
-        if not isinstance(item, dict):
-            continue
-        pid = item.get("id")
-        name = item.get("name")
-        if not isinstance(pid, str) or not isinstance(name, str):
-            continue
-        desc = item.get("description")
-        out.append(TccProfile(id=pid, name=name, description=str(desc) if desc is not None else ""))
+        profile = _profile_from_payload_item(item)
+        if profile is not None:
+            out.append(profile)
     return out
 
 

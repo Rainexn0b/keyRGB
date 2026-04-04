@@ -3,11 +3,65 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Mapping
 from threading import RLock
-from typing import Any, Tuple
+from typing import Protocol
 
 from src.core.backends.registry import select_backend
 from src.core.utils.logging_utils import log_throttled
+
+
+_LOG_COLOR_SNAPSHOT_ERRORS = (
+    AttributeError,
+    IndexError,
+    KeyError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_LOG_LENGTH_SNAPSHOT_ERRORS = (
+    AttributeError,
+    KeyError,
+    LookupError,
+    OSError,
+    OverflowError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+Color = tuple[int, int, int]
+PerKeyColorMap = Mapping[tuple[int, int], Color]
+
+
+class KeyboardDeviceProtocol(Protocol):
+    def turn_off(self) -> None: ...
+
+    def set_brightness(self, brightness: int) -> None: ...
+
+    def set_color(self, color: object, *, brightness: int) -> object: ...
+
+    def set_key_colors(
+        self,
+        color_map: object,
+        *,
+        brightness: int,
+        enable_user_mode: bool = True,
+    ) -> object: ...
+
+    def set_effect(self, effect_data: object) -> None: ...
+
+    def set_palette_color(self, slot: int, color: object) -> None: ...
+
+    def get_brightness(self) -> int: ...
+
+    def is_off(self) -> bool: ...
+
+
+class KeyboardBackendProtocol(Protocol):
+    def get_device(self) -> KeyboardDeviceProtocol: ...
 
 
 class NullKeyboard:
@@ -19,16 +73,22 @@ class NullKeyboard:
     def set_brightness(self, _brightness: int) -> None:
         return
 
-    def set_color(self, _color, *, brightness: int):
+    def set_color(self, _color: object, *, brightness: int) -> None:
         return
 
-    def set_key_colors(self, _color_map, *, brightness: int, enable_user_mode: bool = True):
+    def set_key_colors(
+        self,
+        _color_map: object,
+        *,
+        brightness: int,
+        enable_user_mode: bool = True,
+    ) -> None:
         return
 
-    def set_effect(self, _effect_data) -> None:
+    def set_effect(self, _effect_data: object) -> None:
         return
 
-    def set_palette_color(self, _slot: int, _color) -> None:
+    def set_palette_color(self, _slot: int, _color: object) -> None:
         return
 
     def get_brightness(self) -> int:
@@ -42,7 +102,10 @@ def _debug_brightness_enabled() -> bool:
     return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1"
 
 
-def get_keyboard_device(*, backend: Any | None = None) -> Any:
+def get_keyboard_device(
+    *,
+    backend: KeyboardBackendProtocol | None = None,
+) -> KeyboardDeviceProtocol:
     """Return the keyboard device for the selected backend.
 
     When a backend is injected explicitly, use it directly. Otherwise, fall
@@ -55,10 +118,25 @@ def get_keyboard_device(*, backend: Any | None = None) -> Any:
     return selected_backend.get_device()
 
 
-def get(*, backend: Any | None = None) -> Any:
+def get(*, backend: KeyboardBackendProtocol | None = None) -> KeyboardDeviceProtocol:
     """Compatibility alias for legacy callers and tests."""
 
     return get_keyboard_device(backend=backend)
+
+
+def _rgb_for_debug_log(color: object) -> tuple[object, object, object]:
+    try:
+        red, green, blue = color
+    except _LOG_COLOR_SNAPSHOT_ERRORS:
+        return ("?", "?", "?")
+    return red, green, blue
+
+
+def _size_for_debug_log(value: object) -> int:
+    try:
+        return len(value)
+    except _LOG_LENGTH_SNAPSHOT_ERRORS:
+        return -1
 
 
 class _BrightnessLoggingKeyboardProxy:
@@ -67,11 +145,11 @@ class _BrightnessLoggingKeyboardProxy:
     Enabled only when `KEYRGB_DEBUG_BRIGHTNESS=1`.
     """
 
-    def __init__(self, inner: Any, *, logger: logging.Logger):
+    def __init__(self, inner: KeyboardDeviceProtocol, *, logger: logging.Logger):
         self._inner = inner
         self._logger = logger
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> object:
         return getattr(self._inner, name)
 
     def set_brightness(self, brightness: int) -> None:
@@ -108,12 +186,9 @@ class _BrightnessLoggingKeyboardProxy:
             )
         return v
 
-    def set_color(self, color, *, brightness: int):
+    def set_color(self, color: object, *, brightness: int) -> object:
         if _debug_brightness_enabled():
-            try:
-                r, g, b = color
-            except Exception:
-                r, g, b = ("?", "?", "?")
+            r, g, b = _rgb_for_debug_log(color)
             self._logger.info(
                 "kb.set_color rgb=(%s,%s,%s) brightness=%s (t=%.6f)",
                 r,
@@ -124,15 +199,17 @@ class _BrightnessLoggingKeyboardProxy:
             )
         return self._inner.set_color(color, brightness=int(brightness))
 
-    def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
+    def set_key_colors(
+        self,
+        color_map: object,
+        *,
+        brightness: int,
+        enable_user_mode: bool = True,
+    ) -> object:
         if _debug_brightness_enabled():
-            try:
-                n = len(color_map)
-            except Exception:
-                n = -1
             self._logger.info(
                 "kb.set_key_colors keys=%s brightness=%s enable_user_mode=%s (t=%.6f)",
-                n,
+                _size_for_debug_log(color_map),
                 int(brightness),
                 bool(enable_user_mode),
                 float(time.monotonic()),
@@ -143,21 +220,18 @@ class _BrightnessLoggingKeyboardProxy:
             enable_user_mode=bool(enable_user_mode),
         )
 
-    def set_effect(self, effect_data) -> None:
+    def set_effect(self, effect_data: object) -> None:
         if _debug_brightness_enabled():
-            try:
-                size = len(effect_data)  # type: ignore[arg-type]
-            except Exception:
-                size = -1
-            self._logger.info("kb.set_effect bytes=%s (t=%.6f)", size, float(time.monotonic()))
+            self._logger.info(
+                "kb.set_effect bytes=%s (t=%.6f)",
+                _size_for_debug_log(effect_data),
+                float(time.monotonic()),
+            )
         return self._inner.set_effect(effect_data)
 
-    def set_palette_color(self, slot: int, color) -> None:
+    def set_palette_color(self, slot: int, color: object) -> None:
         if _debug_brightness_enabled():
-            try:
-                r, g, b = color
-            except Exception:
-                r, g, b = ("?", "?", "?")
+            r, g, b = _rgb_for_debug_log(color)
             self._logger.info(
                 "kb.set_palette_color slot=%s rgb=(%s,%s,%s) (t=%.6f)",
                 int(slot),
@@ -169,7 +243,12 @@ class _BrightnessLoggingKeyboardProxy:
         return self._inner.set_palette_color(int(slot), color)
 
 
-def acquire_keyboard(*, kb_lock: RLock, logger: logging.Logger, backend: Any | None = None) -> Tuple[Any, bool]:
+def acquire_keyboard(
+    *,
+    kb_lock: RLock,
+    logger: logging.Logger,
+    backend: KeyboardBackendProtocol | None = None,
+) -> tuple[KeyboardDeviceProtocol, bool]:
     """Best-effort attempt to acquire the keyboard device.
 
     Returns:
@@ -193,7 +272,7 @@ def acquire_keyboard(*, kb_lock: RLock, logger: logging.Logger, backend: Any | N
         return kb, True
     except FileNotFoundError:
         return NullKeyboard(), False
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: device acquisition crosses backend probing and hardware startup boundaries; non-fatal for effect startup
         log_throttled(
             logger,
             "effects.acquire_keyboard",

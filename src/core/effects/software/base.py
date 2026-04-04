@@ -35,9 +35,17 @@ def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float 
     """
 
     try:
-        s = int(getattr(engine, "speed", 4) or 0)
-    except Exception:
-        s = 4
+        speed_raw = getattr(engine, "speed")
+    except AttributeError:
+        speed_raw = 4
+
+    if speed_raw is None:
+        s = 0
+    else:
+        try:
+            s = int(speed_raw)
+        except (TypeError, ValueError, OverflowError):
+            s = 4
 
     s = max(0, min(10, s))
     t = float(s) / 10.0
@@ -69,13 +77,18 @@ def animation_step_s(
     current_s = time.monotonic() if now_s is None else float(now_s)
 
     try:
-        previous_s = float(getattr(engine, attr_name))
-    except Exception:
+        previous_raw = getattr(engine, attr_name)
+    except AttributeError:
         previous_s = None
+    else:
+        try:
+            previous_s = float(previous_raw)
+        except (TypeError, ValueError, OverflowError):
+            previous_s = None
 
     try:
         setattr(engine, attr_name, current_s)
-    except Exception:
+    except (AttributeError, TypeError, ValueError):
         pass
 
     if previous_s is None:
@@ -155,22 +168,29 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
                         brightness=brightness_hw,
                         enable_user_mode=False,
                     )
-                except Exception as exc:
+                except Exception as exc:  # @quality-exception exception-transparency: disconnect detection spans backend-specific runtime I/O failures and must avoid unsafe uniform fallback writes on device disappearance
                     # On USB disconnect, attempting a fallback uniform write can trigger
                     # a libusb crash on some systems. Mark the device unavailable and
                     # stop issuing I/O until the engine re-acquires it.
                     if is_device_disconnected(exc):
                         try:
                             engine.mark_device_unavailable()
-                        except Exception:
-                            pass
+                        except Exception as mark_exc:  # @quality-exception exception-transparency: disconnect cleanup must stay best-effort and still suppress further hardware writes even if device invalidation fails
+                            log_throttled(
+                                logger,
+                                "effects.render.mark_device_unavailable_failed",
+                                interval_s=120,
+                                level=logging.DEBUG,
+                                msg="Failed to mark disconnected device unavailable",
+                                exc=mark_exc,
+                            )
                         return
                     raise
 
-                if not need_mode_init and int(last_hw_brightness) != brightness_hw:
+                if not need_mode_init and int(last_hw_brightness) != brightness_hw:  # type: ignore[arg-type]
                     try:
                         engine.kb.set_brightness(int(brightness_hw))
-                    except Exception:
+                    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
                         enable_user_mode_once(
                             kb=engine.kb,
                             kb_lock=engine.kb_lock,
@@ -186,7 +206,7 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
                     log_key="effects.render.secondary",
                 )
                 return
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: per-key rendering crosses backend I/O and effect runtime policy boundaries and must degrade to uniform output instead of killing the effect loop
             log_throttled(
                 logger,
                 "effects.render.per_key_failed",

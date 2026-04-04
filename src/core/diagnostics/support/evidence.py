@@ -118,7 +118,7 @@ def _run_command(argv: list[str], *, requires_root: bool) -> dict[str, Any]:
 
     try:
         cp = subprocess.run(run_argv, check=False, capture_output=True, text=True)
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: evidence subprocess is a runtime command boundary; failure is surfaced in the returned dict
         return {
             "ok": False,
             "available": True,

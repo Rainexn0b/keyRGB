@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import logging
 import os
-from contextlib import contextmanager
 from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any
 
 from src.core.backends.policy import (
@@ -14,8 +14,8 @@ from src.core.backends.policy import (
 )
 from src.core.utils.safe_attrs import safe_int_attr
 
-from ._collectors_backends_sysfs import sysfs_led_candidates_snapshot
-from .backend_speed_probe import build_backend_speed_probe_plans
+from ..support import build_backend_speed_probe_plans
+from ._backends_sysfs import sysfs_led_candidates_snapshot
 
 
 logger = logging.getLogger(__name__)
@@ -33,26 +33,25 @@ def _coerce_sort_value(value: object) -> int:
     if value is None:
         return 0
     try:
-        return int(value)
+        return int(value)  # type: ignore[call-overload]
     except _SORT_VALUE_ERRORS:
         return 0
 
 
-
 def _tier_for_backend_name(name: str) -> int | None:
-    n = (name or "").strip().lower()
-    if n == "sysfs-leds":
+    normalized = (name or "").strip().lower()
+    if normalized == "sysfs-leds":
         return 1
-    if n.startswith("ite"):
+    if normalized.startswith("ite"):
         return 2
     return None
 
 
 def _provider_for_backend_name(name: str) -> str | None:
-    n = (name or "").strip().lower()
-    if n == "sysfs-leds":
+    normalized = (name or "").strip().lower()
+    if normalized == "sysfs-leds":
         return "kernel-sysfs"
-    if n.startswith("ite"):
+    if normalized.startswith("ite"):
         return "usb-userspace"
     return None
 
@@ -158,27 +157,27 @@ def _selection_is_blocked_under_pytest() -> tuple[bool, str | None]:
 
 def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str, Any]]:
     available_candidates: list[dict[str, Any]] = []
-    for p in probes:
-        if not p.get("available"):
+    for probe in probes:
+        if not probe.get("available"):
             continue
         available_candidates.append(
             {
-                "name": p.get("name"),
-                "confidence": p.get("confidence"),
-                "priority": p.get("priority"),
-                "tier": p.get("tier"),
-                "provider": p.get("provider"),
-                "stability": p.get("stability"),
-                "experimental_evidence": p.get("experimental_evidence"),
-                "reason": p.get("reason"),
-                "identifiers": p.get("identifiers"),
+                "name": probe.get("name"),
+                "confidence": probe.get("confidence"),
+                "priority": probe.get("priority"),
+                "tier": probe.get("tier"),
+                "provider": probe.get("provider"),
+                "stability": probe.get("stability"),
+                "experimental_evidence": probe.get("experimental_evidence"),
+                "reason": probe.get("reason"),
+                "identifiers": probe.get("identifiers"),
             }
         )
 
     available_candidates.sort(
-        key=lambda e: (
-            _coerce_sort_value(e.get("confidence")),
-            _coerce_sort_value(e.get("priority")),
+        key=lambda entry: (
+            _coerce_sort_value(entry.get("confidence")),
+            _coerce_sort_value(entry.get("priority")),
         ),
         reverse=True,
     )
@@ -190,8 +189,7 @@ def backend_probe_snapshot() -> dict[str, Any]:
     """Collect backend probe results (best-effort)."""
 
     try:
-        # Diagnostics is a subpackage under src/core, so backends live one level up.
-        from ..backends.registry import iter_backends, select_backend
+        from ...backends.registry import iter_backends, select_backend
     except Exception as exc:  # @quality-exception exception-transparency: backend registry import is a best-effort diagnostics boundary
         _log_snapshot_boundary("Failed to import backend registry during diagnostics collection", exc)
         return {}

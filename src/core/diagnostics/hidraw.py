@@ -51,7 +51,7 @@ def _parse_hid_id(value: str) -> tuple[int, int] | None:
     try:
         vendor_id = int(parts[1], 16)
         product_id = int(parts[2], 16)
-    except Exception:
+    except ValueError:
         return None
     return vendor_id, product_id
 
@@ -60,7 +60,7 @@ def _parse_uevent_file(path: Path) -> dict[str, str]:
     out: dict[str, str] = {}
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except OSError:
         return out
 
     for raw_line in text.splitlines():
@@ -102,13 +102,13 @@ def read_hidraw_report_descriptor(devnode: Path) -> dict[str, Any] | None:
             "report_descriptor_size": actual_size,
             "report_descriptor_hex": descriptor.hex(),
         }
-    except Exception as exc:
+    except (OSError, struct.error) as exc:
         return {"report_descriptor_error": str(exc)}
     finally:
         if fd is not None:
             try:
                 os.close(fd)
-            except Exception:
+            except OSError:
                 pass
 
 
@@ -156,7 +156,7 @@ def hidraw_devices_snapshot(*, root: Path | None = None, dev_root: Path | None =
                 if isinstance(descriptor_info, dict):
                     entry.update(descriptor_info)
             out.append(entry)
-    except Exception:
+    except OSError:
         return out
 
     return out

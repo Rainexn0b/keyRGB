@@ -8,11 +8,12 @@ def serialize_per_key_colors(color_map: dict) -> dict:
     if not isinstance(color_map, dict):
         return out
 
-    for (row, col), color in color_map.items():
+    for key, color in color_map.items():
         try:
+            row, col = key
             r, g, b = color
             out[f"{int(row)},{int(col)}"] = [int(r), int(g), int(b)]
-        except Exception:
+        except (TypeError, ValueError, OverflowError):
             continue
 
     return out
@@ -32,7 +33,7 @@ def deserialize_per_key_colors(data: dict) -> dict:
             col = int(col_s.strip())
             r, g, b = v
             out[(row, col)] = (int(r), int(g), int(b))
-        except Exception:
+        except (TypeError, ValueError, OverflowError):
             continue
 
     return out

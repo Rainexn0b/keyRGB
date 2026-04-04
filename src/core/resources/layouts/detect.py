@@ -36,7 +36,7 @@ def _device_name_for_cap_path(cap_path: str) -> str:
     for path in candidates:
         try:
             name = path.read_text(encoding="utf-8", errors="replace").strip()
-        except Exception:
+        except OSError:
             continue
         if name:
             return name
@@ -57,7 +57,7 @@ def detect_physical_layout() -> str:
     for cap_path in sorted(glob.glob("/sys/class/input/*/capabilities/key")):
         try:
             raw = Path(cap_path).read_text(encoding="ascii", errors="replace").strip()
-        except Exception:
+        except OSError:
             continue
 
         words = raw.split()
