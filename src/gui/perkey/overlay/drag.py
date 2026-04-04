@@ -68,7 +68,9 @@ class OverlayDragController:
             return
         mode, edges = press
 
-        kt = e.per_key_layout_tweaks.get(selected_identity, {}) or e.per_key_layout_tweaks.get(selected_key_id or "", {})
+        kt = e.per_key_layout_tweaks.get(selected_identity, {}) or e.per_key_layout_tweaks.get(
+            selected_key_id or "", {}
+        )
 
         geom = c._overlay_drag_geometry(selected_identity)
         if geom is None:
@@ -124,7 +126,9 @@ class OverlayDragController:
         dx_base = dx_canvas / csx
         dy_base = dy_canvas / csy
 
-        kt = dict(e.per_key_layout_tweaks.get(key_identity, {}) or (e.per_key_layout_tweaks.get(key_id, {}) if key_id else {}))
+        kt = dict(
+            e.per_key_layout_tweaks.get(key_identity, {}) or (e.per_key_layout_tweaks.get(key_id, {}) if key_id else {})
+        )
         g_inset = float(e.layout_tweaks.get("inset", 0.06))
         kt.setdefault("inset", float(kt.get("inset", g_inset)))
 

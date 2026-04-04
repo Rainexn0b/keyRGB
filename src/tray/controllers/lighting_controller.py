@@ -1,43 +1,58 @@
 from __future__ import annotations
 
 import logging
-import time
 from typing import Optional
 
-from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
-from src.core.effects.catalog import resolve_effect_name_for_backend
-from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
-from src.tray.controllers._transition_constants import (
-    SOFT_OFF_FADE_DURATION_S,
-    SOFT_ON_FADE_DURATION_S,
-    SOFT_ON_START_BRIGHTNESS,
-)
-from src.tray.controllers._lighting_power_policy import apply_brightness_from_power_policy_impl
-from src.tray.controllers._lighting_controller_helpers import (
-    apply_perkey_mode,
-    apply_uniform_none_mode,
-    clear_engine_perkey_state,
-    ensure_device_best_effort,
-    get_effect_name,
-    is_reactive_effect,
-    is_software_effect,
-    parse_menu_int,
-    set_engine_perkey_from_config_for_sw_effect,
-    try_log_event,
-)
-from src.tray.controllers.software_target_controller import restore_secondary_software_targets
-from src.tray.controllers.software_target_controller import software_effect_target_routes_aux_devices
-from src.tray.controllers.software_target_controller import turn_off_secondary_software_targets
+from src.core.effects import catalog as effects_catalog
+from src.core.utils import exceptions as core_exceptions
+from src.core.utils import safe_attrs
+from src.tray.controllers import _lighting_controller_helpers as lighting_controller_helpers
+from src.tray.controllers._power import _lighting_power_policy as lighting_power_policy
+from src.tray.controllers._power import _lighting_power_state as lighting_power_state
+from src.tray.controllers import software_target_controller
 from src.tray.protocols import LightingTrayProtocol
-from src.core.utils.exceptions import is_device_disconnected
-from src.core.utils.exceptions import is_permission_denied
+
+
+SW_EFFECTS = effects_catalog.SW_EFFECTS_SET
+resolve_effect_name_for_backend = effects_catalog.resolve_effect_name_for_backend
+safe_int_attr = safe_attrs.safe_int_attr
+safe_str_attr = safe_attrs.safe_str_attr
+apply_brightness_from_power_policy_impl = lighting_power_policy.apply_brightness_from_power_policy_impl
+power_restore_impl = lighting_power_state.power_restore_impl
+power_turn_off_impl = lighting_power_state.power_turn_off_impl
+turn_off_impl = lighting_power_state.turn_off_impl
+turn_on_impl = lighting_power_state.turn_on_impl
+apply_perkey_mode = lighting_controller_helpers.apply_perkey_mode
+apply_uniform_none_mode = lighting_controller_helpers.apply_uniform_none_mode
+clear_engine_perkey_state = lighting_controller_helpers.clear_engine_perkey_state
+ensure_device_best_effort = lighting_controller_helpers.ensure_device_best_effort
+get_effect_name = lighting_controller_helpers.get_effect_name
+is_reactive_effect = lighting_controller_helpers.is_reactive_effect
+is_software_effect = lighting_controller_helpers.is_software_effect
+parse_menu_int = lighting_controller_helpers.parse_menu_int
+set_engine_perkey_from_config_for_sw_effect = lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect
+try_log_event = lighting_controller_helpers.try_log_event
+restore_secondary_software_targets = software_target_controller.restore_secondary_software_targets
+software_effect_target_routes_aux_devices = software_target_controller.software_effect_target_routes_aux_devices
+turn_off_secondary_software_targets = software_target_controller.turn_off_secondary_software_targets
+is_device_disconnected = core_exceptions.is_device_disconnected
+is_permission_denied = core_exceptions.is_permission_denied
 
 logger = logging.getLogger(__name__)
 
 
+_LOCAL_COMPATIBILITY_FALLBACK_EXCEPTIONS = (
+    AttributeError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
 def _coerce_brightness_override(brightness_override: object, *, default: int) -> int:
     try:
-        value = int(brightness_override)
+        value = int(brightness_override)  # type: ignore[call-overload]
     except (TypeError, ValueError, OverflowError):
         return default
     return max(0, min(50, value))
@@ -46,7 +61,7 @@ def _coerce_brightness_override(brightness_override: object, *, default: int) ->
 def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
     try:
         tray._log_exception(msg, exc)
-    except Exception as log_exc:
+    except Exception as log_exc:  # @quality-exception exception-transparency: tray._log_exception is an injected dependency and this boundary logger must not raise on failure
         logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
         logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 
@@ -176,27 +191,26 @@ def start_current_effect(
 
         if not is_loop_effect and software_effect_target_routes_aux_devices(tray):
             restore_secondary_software_targets(tray)
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: lighting startup crosses device I/O, backend callbacks, tray actions; must not fail tray runtime
         # If the USB device disappeared, mark it unavailable and avoid a scary traceback.
         if is_device_disconnected(exc):
             try:
                 tray.engine.mark_device_unavailable()
-            except Exception as mark_exc:
+            except _LOCAL_COMPATIBILITY_FALLBACK_EXCEPTIONS as mark_exc:
                 _log_boundary_exception(tray, "Failed to mark device unavailable: %s", mark_exc)
             logger.warning("Keyboard device unavailable: %s", exc)
             return
 
         # Missing permissions should be surfaced as a user-visible notification.
-        notify_permission_issue = getattr(tray, "_notify_permission_issue", None)
-        if is_permission_denied(exc) and callable(notify_permission_issue):
+        if is_permission_denied(exc):
             try:
-                notify_permission_issue(exc)
-            except Exception as notify_exc:
+                tray._notify_permission_issue(exc)
+            except _LOCAL_COMPATIBILITY_FALLBACK_EXCEPTIONS as notify_exc:
                 _log_boundary_exception(tray, "Failed to notify permission issue: %s", notify_exc)
             return
         try:
             tray._log_exception("Error starting effect: %s", exc)
-        except Exception as log_exc:
+        except Exception as log_exc:  # @quality-exception exception-transparency: tray._log_exception is an injected dependency and this last-resort fallback must not raise
             logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
             logger.error("Error starting effect: %s", exc, exc_info=(type(exc), exc, exc.__traceback__))
 
@@ -227,7 +241,7 @@ def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:
             # without restarting the loop (avoids flicker and state loss).
             try:
                 tray.engine.speed = speed
-            except Exception as exc:
+            except _LOCAL_COMPATIBILITY_FALLBACK_EXCEPTIONS as exc:
                 _log_boundary_exception(tray, "Failed to update engine speed in place: %s", exc)
                 start_current_effect(tray)
         else:
@@ -285,84 +299,38 @@ def on_brightness_clicked(tray: LightingTrayProtocol, item: object) -> None:
 
 
 def turn_off(tray: LightingTrayProtocol) -> None:
-    try_log_event(tray, "menu", "turn_off")
-    tray._user_forced_off = True
-    tray._idle_forced_off = False
-    tray.engine.turn_off()
-    if software_effect_target_routes_aux_devices(tray):
-        turn_off_secondary_software_targets(tray)
-    tray.is_off = True
-    tray._refresh_ui()
+    turn_off_impl(
+        tray,
+        try_log_event=try_log_event,
+        software_effect_target_routes_aux_devices=software_effect_target_routes_aux_devices,
+        turn_off_secondary_software_targets=turn_off_secondary_software_targets,
+    )
 
 
 def turn_on(tray: LightingTrayProtocol) -> None:
-    try_log_event(tray, "menu", "turn_on")
-    tray._user_forced_off = False
-    tray._idle_forced_off = False
-    tray.is_off = False
-
-    if tray.config.brightness == 0:
-        tray.config.brightness = tray._last_brightness if tray._last_brightness > 0 else 25
-
-    # Fade-in from a minimal brightness to reduce abrupt on/off transitions.
-    start_current_effect(
+    turn_on_impl(
         tray,
-        brightness_override=SOFT_ON_START_BRIGHTNESS,
-        fade_in=True,
-        fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+        try_log_event=try_log_event,
+        start_current_effect=start_current_effect,
     )
-
-    tray._refresh_ui()
 
 
 def power_turn_off(tray: LightingTrayProtocol) -> None:
-    try_log_event(tray, "power", "turn_off")
-    tray._power_forced_off = True
-    tray._idle_forced_off = False
-    tray.is_off = True
-    tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
-    if software_effect_target_routes_aux_devices(tray):
-        turn_off_secondary_software_targets(tray)
-    tray._refresh_ui()
+    power_turn_off_impl(
+        tray,
+        try_log_event=try_log_event,
+        software_effect_target_routes_aux_devices=software_effect_target_routes_aux_devices,
+        turn_off_secondary_software_targets=turn_off_secondary_software_targets,
+    )
 
 
 def power_restore(tray: LightingTrayProtocol) -> None:
-    # Track resume time so idle polling can ignore stale screen-off state.
-    tray._last_resume_at = time.monotonic()
-
-    # Never fight explicit user off.
-    if bool(getattr(tray, "_user_forced_off", False)):
-        return
-
-    # If lighting is intentionally forced off by idle policy, don't restore.
-    if bool(getattr(tray, "_idle_forced_off", False)):
-        return
-
-    if bool(getattr(tray, "_power_forced_off", False)):
-        try_log_event(tray, "power", "restore")
-        tray._power_forced_off = False
-        tray._idle_forced_off = False
-
-        # If we forced off, ensure we have a usable brightness to restore.
-        if safe_int_attr(tray.config, "brightness", default=0) == 0:
-            tray.config.brightness = tray._last_brightness if tray._last_brightness > 0 else 25
-
-    # If the user explicitly configured brightness=0, treat that as off.
-    if safe_int_attr(tray.config, "brightness", default=0) == 0:
-        tray.is_off = True
-        return
-
-    # Common restore path: hardware may have reset to off across suspend.
-    # Avoid a visible flash from fading from a stale prior color.
-    tray.engine.current_color = (0, 0, 0)
-    tray.is_off = False
-    start_current_effect(
+    power_restore_impl(
         tray,
-        brightness_override=SOFT_ON_START_BRIGHTNESS,
-        fade_in=True,
-        fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+        try_log_event=try_log_event,
+        safe_int_attr_fn=safe_int_attr,
+        start_current_effect=start_current_effect,
     )
-    tray._refresh_ui()
 
 
 def apply_brightness_from_power_policy(tray: LightingTrayProtocol, brightness: int) -> None:

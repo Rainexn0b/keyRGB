@@ -108,5 +108,5 @@ class DimSyncPanel:
     def _set_label_int(lbl: ttk.Label, v: float | str) -> None:
         try:
             lbl.configure(text=str(int(float(v))))
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: label update is a UI callback boundary; widget may be in transition state
             lbl.configure(text="?")

@@ -16,7 +16,9 @@ def backdrop_image_candidates(*, profile_name: str | None, include_cwd_fallback:
         prof = (profile_name or "").strip()
         if prof:
             paths.append(profiles.paths_for(prof).backdrop_image)
-    except Exception:
+    except OSError:
+        pass
+    except Exception:  # @quality-exception exception-transparency: profile backdrop candidate lookup crosses profile storage helpers and filesystem state and must remain non-fatal
         pass
 
     repo_root = Path(__file__).resolve().parents[3]
@@ -25,7 +27,7 @@ def backdrop_image_candidates(*, profile_name: str | None, include_cwd_fallback:
     if include_cwd_fallback:
         try:
             paths.append(Path.cwd() / "assets" / "y15-pro-deck.png")
-        except Exception:
+        except OSError:
             pass
 
     unique_paths: list[Path] = []

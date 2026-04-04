@@ -1,15 +1,90 @@
 from __future__ import annotations
 
 import colorsys
+import logging
 import math
 import time
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Any
 
 from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.core.effects.perkey_animation import build_full_color_grid
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS as NUM_COLS
 from src.core.resources.defaults import REFERENCE_MATRIX_ROWS as NUM_ROWS
+from src.core.utils.logging_utils import log_throttled
+
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_COLOR = (255, 0, 128)
+_OFF_COLOR = (64, 64, 64)
+
+
+def _log_config_read_failure(name: str, exc: Exception) -> None:
+    log_throttled(
+        logger,
+        f"tray_icon.config.{name}",
+        interval_s=120,
+        level=logging.DEBUG,
+        msg=f"Failed to read tray icon config attribute '{name}'",
+        exc=exc,
+    )
+
+
+def _config_value(config: Any, name: str, default: Any) -> Any:
+    try:
+        value = getattr(config, name, default)
+    except AttributeError:
+        return default
+    except Exception as exc:  # @quality-exception exception-transparency: tray icon color reads cross legacy config/property boundaries and must remain best-effort
+        _log_config_read_failure(name, exc)
+        return default
+    return default if value is None else value
+
+
+def _int_or_default(value: object, default: int) -> int:
+    try:
+        return int(value)  # type: ignore[call-overload]
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _config_int(config: Any, name: str, default: int) -> int:
+    return _int_or_default(_config_value(config, name, default), default)
+
+
+def _normalized_rgb_or_none(value: object) -> tuple[int, int, int] | None:
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence) or len(value) != 3:
+        return None
+    try:
+        return (int(value[0]), int(value[1]), int(value[2]))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _config_color(
+    config: Any,
+    name: str,
+    default: tuple[int, int, int] = _DEFAULT_COLOR,
+) -> tuple[int, int, int]:
+    value = _config_value(config, name, default)
+    return _normalized_rgb_or_none(value) or default
+
+
+def _config_optional_color(config: Any, name: str) -> tuple[int, int, int] | None:
+    value = _config_value(config, name, None)
+    if value is None:
+        return None
+    return _normalized_rgb_or_none(value)
+
+
+def _normalized_color_values(colors: Iterable[object]) -> tuple[tuple[int, int, int], ...]:
+    normalized: list[tuple[int, int, int]] = []
+    for color in colors:
+        rgb = _normalized_rgb_or_none(color)
+        if rgb is not None:
+            normalized.append(rgb)
+    return tuple(normalized)
 
 
 def _pace_from_speed(speed: int) -> float:
@@ -21,10 +96,7 @@ def _pace_from_speed(speed: int) -> float:
 
 
 def _per_key_color_mapping(config: Any) -> Mapping[tuple[int, int], tuple[int, int, int]]:
-    try:
-        per_key = getattr(config, "per_key_colors", {}) or {}
-    except Exception:
-        return {}
+    per_key = _config_value(config, "per_key_colors", {})
     return per_key if isinstance(per_key, Mapping) else {}
 
 
@@ -62,7 +134,7 @@ def _weighted_hsv_mean(colors: Iterable[tuple[int, int, int]]) -> tuple[int, int
 
     if total <= 1e-6 or (x == 0.0 and y == 0.0):
         if count == 0:
-            return (255, 0, 128)
+            return _DEFAULT_COLOR
         r = int(round(r_sum / count))
         g = int(round(g_sum / count))
         b = int(round(b_sum / count))
@@ -80,7 +152,11 @@ def _representative_perkey_color(config: Any) -> tuple[int, int, int] | None:
     if not per_key:
         return None
 
-    base_color = tuple(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
+    normalized_per_key = _normalized_color_values(per_key.values())
+    if not normalized_per_key:
+        return None
+
+    base_color = _config_color(config, "color")
     try:
         full = build_full_color_grid(
             base_color=base_color,
@@ -88,14 +164,20 @@ def _representative_perkey_color(config: Any) -> tuple[int, int, int] | None:
             num_rows=NUM_ROWS,
             num_cols=NUM_COLS,
         )
-        return _weighted_hsv_mean(full.values())
-    except Exception:
-        return _weighted_hsv_mean(per_key.values())
+    except (TypeError, ValueError, OverflowError):
+        return _weighted_hsv_mean(normalized_per_key)
+
+    full_colors = _normalized_color_values(full.values())
+    return _weighted_hsv_mean(full_colors or normalized_per_key)
 
 
 def _representative_saved_perkey_color(config: Any) -> tuple[int, int, int] | None:
     per_key = _per_key_color_mapping(config)
-    return _weighted_hsv_mean(per_key.values()) if per_key else None
+    if not per_key:
+        return None
+
+    normalized_per_key = _normalized_color_values(per_key.values())
+    return _weighted_hsv_mean(normalized_per_key) if normalized_per_key else None
 
 
 def representative_color(
@@ -111,14 +193,14 @@ def representative_color(
         now = time.time()
 
     # Off state
-    if is_off or getattr(config, "brightness", 0) == 0:
-        return (64, 64, 64)
+    if is_off or _config_value(config, "brightness", 0) == 0:
+        return _OFF_COLOR
 
     effect = resolve_effect_name_for_backend(
-        str(getattr(config, "effect", "none") or "none"),
+        str(_config_value(config, "effect", "none") or "none"),
         backend,
     )
-    brightness = int(getattr(config, "brightness", 25) or 25)
+    brightness = _config_int(config, "brightness", 25)
 
     # Reactive typing effects can store a separate manual effect color.
     # Respect the "use manual color" toggle; when disabled, the icon should
@@ -131,15 +213,12 @@ def representative_color(
 
     # Per-key: average of configured colors
     if effect == "perkey":
-        try:
-            brightness = int(getattr(config, "perkey_brightness", brightness) or brightness)
-        except Exception:
-            pass
-        base = _representative_perkey_color(config) or tuple(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
+        brightness = _config_int(config, "perkey_brightness", brightness)
+        base = _representative_perkey_color(config) or _config_color(config, "color")
 
     # Multi-color effects: cycle a hue so the icon changes.
     elif effect in {"rainbow_wave", "rainbow_swirl", "spectrum_cycle", "color_cycle"}:
-        speed = int(getattr(config, "speed", 5) or 5)
+        speed = _config_int(config, "speed", 5)
         p = _pace_from_speed(speed)
 
         if effect == "rainbow_wave":
@@ -183,7 +262,7 @@ def representative_color(
 
     elif effect in {"rainbow", "random", "aurora", "fireworks", "wave", "marquee"}:
         # Hardware and mixed effects: keep a cheap animated approximation.
-        speed = int(getattr(config, "speed", 5) or 5)
+        speed = _config_int(config, "speed", 5)
         p = _pace_from_speed(speed)
         hue = (now * (0.18 * p)) % 1.0
         rr, gg, bb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
@@ -191,24 +270,17 @@ def representative_color(
 
     else:
         if is_reactive:
-            use_manual_reactive_color = bool(getattr(config, "reactive_use_manual_color", False))
+            use_manual_reactive_color = bool(_config_value(config, "reactive_use_manual_color", False))
             if use_manual_reactive_color:
-                base = tuple(getattr(config, "reactive_color", None) or getattr(config, "color", None) or (255, 0, 128))
+                base = _config_optional_color(config, "reactive_color") or _config_color(config, "color")
             else:
-                try:
-                    brightness = int(getattr(config, "perkey_brightness", brightness) or brightness)
-                except Exception:
-                    pass
-                base = _representative_saved_perkey_color(config) or tuple(
-                    getattr(config, "color", None) or (255, 0, 128)
-                )
-            try:
-                if tuple(base) == (0, 0, 0):
-                    base = (255, 0, 128)
-            except Exception:
-                base = (255, 0, 128)
+                brightness = _config_int(config, "perkey_brightness", brightness)
+                base = _representative_saved_perkey_color(config) or _config_color(config, "color")
+
+            if base == (0, 0, 0):
+                base = _DEFAULT_COLOR
         else:
-            base = tuple(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
+            base = _config_color(config, "color")
 
     # Scale by brightness (0..50), but bias brighter than the keyboard so the
     # tray icon stays readable in dark mode at low keyboard brightness.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import threading
 import time
@@ -26,6 +27,33 @@ from .sensors import (
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
+logger = logging.getLogger(__name__)
+
+
+def _log_module_exception(msg: str, exc: Exception) -> None:
+    logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
+
+
+def _log_tray_exception(tray: IdlePowerTrayProtocol, msg: str, exc: Exception) -> None:
+    log_exception = getattr(tray, "_log_exception", None)
+    if callable(log_exception):
+        try:
+            log_exception(msg, exc)
+            return
+        except Exception as log_exc:  # @quality-exception exception-transparency: tray exception logging is a best-effort callback boundary during idle-power polling
+            _log_module_exception("Idle power tray exception logger failed: %s", log_exc)
+
+    _log_module_exception(msg, exc)
+
+
+def _try_log_event(tray: IdlePowerTrayProtocol, source: str, action: str, **fields: object) -> None:
+    log_event = getattr(tray, "_log_event", None)
+    if not callable(log_event):
+        return
+    try:
+        log_event(source, action, **fields)
+    except Exception as exc:  # @quality-exception exception-transparency: idle-power event logging is a best-effort diagnostic boundary and must not affect polling
+        _log_tray_exception(tray, "Idle power event logging failed: %s", exc)
 
 
 def _effective_screen_dim_sync_enabled(tray: IdlePowerTrayProtocol, requested_enabled: bool) -> bool:
@@ -45,15 +73,13 @@ def _effective_screen_dim_sync_enabled(tray: IdlePowerTrayProtocol, requested_en
         if not allow:
             if not tray._dim_sync_suppressed_logged:
                 setattr(tray, "_dim_sync_suppressed_logged", True)
-                try:
-                    tray._log_event(
-                        "idle_power",
-                        "dim_sync_suppressed",
-                        backend=str(backend_name),
-                        env_override="KEYRGB_ALLOW_DIM_SYNC_ASUSCTL",
-                    )
-                except Exception:
-                    pass
+                _try_log_event(
+                    tray,
+                    "idle_power",
+                    "dim_sync_suppressed",
+                    backend=str(backend_name),
+                    env_override="KEYRGB_ALLOW_DIM_SYNC_ASUSCTL",
+                )
             return False
 
     return True
@@ -257,14 +283,11 @@ def start_idle_power_polling(
 
                 time.sleep(0.5)
 
-            except Exception as exc:
+            except Exception as exc:  # @quality-exception exception-transparency: idle-power polling crosses runtime policy, sensor, backend, and tray callback boundaries and must remain non-fatal for tray survivability
                 now = time.monotonic()
                 if now - loop_state.last_error_at > 30.0:
                     loop_state.last_error_at = now
-                    try:
-                        tray._log_exception("Idle power polling error: %s", exc)
-                    except Exception:
-                        pass
+                    _log_tray_exception(tray, "Idle power polling error: %s", exc)
 
     threading.Thread(target=poll_idle_power, daemon=True).start()
 

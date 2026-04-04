@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import tkinter as tk
 from tkinter import ttk
 
@@ -11,7 +13,7 @@ class AutostartPanel:
         *,
         var_autostart: tk.BooleanVar,
         var_os_autostart: tk.BooleanVar,
-        on_toggle: callable,
+        on_toggle: Any,
     ) -> None:
         as_title = ttk.Label(parent, text="Autostart", font=("Sans", 11, "bold"))
         as_title.pack(anchor="w", pady=(0, 6))

@@ -95,15 +95,12 @@ def _with_lightbar_device(
         device = Ite8233Backend().get_device()
         operation(device)
         return True
-    # @quality-exception exception-transparency: lightbar device access crosses a runtime backend boundary and must remain non-fatal for tray actions
-    except Exception as exc:
-        notify = getattr(tray, "_notify_permission_issue", None)
-        if is_permission_denied(exc) and callable(notify):
+    except Exception as exc:  # @quality-exception exception-transparency: runtime backend boundary; must remain non-fatal for tray actions
+        if is_permission_denied(exc):
             try:
-                notify(exc)
+                tray._notify_permission_issue(exc)
                 return False
-            # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging on failure
-            except Exception as notify_exc:
+            except Exception as notify_exc:  # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging
                 _log_boundary_exception(tray, "Failed to notify lightbar permission issue: %s", notify_exc)
 
         _log_boundary_exception(tray, error_msg, exc)
@@ -111,13 +108,10 @@ def _with_lightbar_device(
 
 
 def _refresh_menu_best_effort(tray: LightingTrayProtocol) -> None:
-    update_menu = getattr(tray, "_update_menu", None)
-    if callable(update_menu):
-        try:
-            update_menu()
-        # @quality-exception exception-transparency: tray menu refresh is a best-effort UI boundary after a successful lightbar action
-        except Exception as exc:
-            _log_boundary_exception(tray, "Failed to refresh tray menu after lightbar action: %s", exc)
+    try:
+        tray._update_menu()
+    except Exception as exc:  # @quality-exception exception-transparency: tray menu refresh is a best-effort UI boundary after a successful lightbar action
+        _log_boundary_exception(tray, "Failed to refresh tray menu after lightbar action: %s", exc)
 
 
 def _set_lightbar_brightness_best_effort(
@@ -143,14 +137,11 @@ def _log_module_exception(msg: str, exc: Exception) -> None:
 
 
 def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
-    log_exception = getattr(tray, "_log_exception", None)
-    if callable(log_exception):
-        try:
-            log_exception(msg, exc)
-            return
-        # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fall back to module traceback logging
-        except Exception as log_exc:
-            logger.exception("Tray exception logger failed while logging secondary device boundary: %s", log_exc)
+    try:
+        tray._log_exception(msg, exc)
+        return
+    except Exception as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
+        logger.exception("Tray exception logger failed while logging secondary device boundary: %s", log_exc)
 
     _log_module_exception(msg, exc)
 

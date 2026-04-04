@@ -9,9 +9,17 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
+from typing import Any
 
 
 class _ColorWheelUIMixin:
+    # Attributes/methods provided by ColorWheel
+    callback: Any
+    release_callback: Any
+    current_value: Any
+    set_color: Any
+    _invoke_callback: Any
+
     def _create_widgets(self):
         """Create the canvas, brightness slider, preview, and manual RGB inputs."""
         bg = getattr(self, "_theme_bg_hex", None) or "#2b2b2b"
@@ -110,7 +118,7 @@ class _ColorWheelUIMixin:
         if hasattr(self, "brightness_title_label"):
             try:
                 self.brightness_title_label.config(text=self._brightness_label_text)
-            except Exception:
+            except (RuntimeError, tk.TclError):
                 pass
 
     def _update_preview(self):
@@ -141,7 +149,7 @@ class _ColorWheelUIMixin:
         def _parse(v: str) -> int:
             try:
                 return int(str(v).strip())
-            except Exception:
+            except (TypeError, ValueError, tk.TclError):
                 return 0
 
         r = max(0, min(255, _parse(self.rgb_r_var.get())))

@@ -20,6 +20,21 @@ _OVERLAY_SYNC_ERRORS = _TK_WIDGET_ERRORS + _UI_VALUE_ERRORS
 _WHEEL_COLOR_ERRORS = _TK_WIDGET_ERRORS + _UI_VALUE_ERRORS
 
 
+def _physical_layout_or_none(editor: Any) -> object | None:
+    try:
+        return editor._physical_layout
+    except AttributeError:
+        return None
+
+
+def _last_non_black_color_or_default(editor: Any) -> tuple[int, int, int]:
+    try:
+        color = editor._last_non_black_color
+    except AttributeError:
+        color = (255, 0, 0)
+    return tuple(color or (255, 0, 0))
+
+
 def _redraw_canvas_best_effort(editor: Any) -> None:
     try:
         editor.canvas.redraw()
@@ -28,14 +43,17 @@ def _redraw_canvas_best_effort(editor: Any) -> None:
 
 
 def _key_id_for_slot_identity(editor: Any, slot_id: str) -> str | None:
-    key_lookup = getattr(editor, "_key_id_for_slot_id", None)
-    if callable(key_lookup):
-        key_id = key_lookup(slot_id)
-        if key_id:
-            return str(key_id)
+    try:
+        key_id = editor._key_id_for_slot_id(slot_id)
+    except AttributeError:
+        key_id = None
+    if key_id:
+        return str(key_id)
 
-    visible_lookup = getattr(editor, "_visible_key_for_slot_id", None)
-    key = visible_lookup(slot_id) if callable(visible_lookup) else None
+    try:
+        key = editor._visible_key_for_slot_id(slot_id)
+    except AttributeError:
+        key = None
     resolved_key_id = getattr(key, "key_id", None) if key is not None else None
     if resolved_key_id:
         return str(resolved_key_id)
@@ -44,14 +62,15 @@ def _key_id_for_slot_identity(editor: Any, slot_id: str) -> str | None:
 
 def _set_selected_key_without_updating_wheel(editor: Any, key_id: str) -> None:
     editor.selected_key_id = key_id
-    slot_lookup = getattr(editor, "_slot_id_for_key_id", None)
-    if callable(slot_lookup):
-        editor.selected_slot_id = slot_lookup(key_id)
+    try:
+        editor.selected_slot_id = editor._slot_id_for_key_id(key_id)
+    except AttributeError:
+        pass
     editor.selected_cells = keymap_cells_for(
         getattr(editor, "keymap", {}) or {},
         key_id,
         slot_id=getattr(editor, "selected_slot_id", None),
-        physical_layout=getattr(editor, "_physical_layout", None),
+        physical_layout=_physical_layout_or_none(editor),
     )
     editor.selected_cell = representative_cell(editor.selected_cells, colors=getattr(editor, "colors", {}) or {})
 
@@ -108,7 +127,7 @@ def on_key_clicked_ui(
         keymap,
         key_id,
         slot_id=getattr(editor, "selected_slot_id", None),
-        physical_layout=getattr(editor, "_physical_layout", None),
+        physical_layout=_physical_layout_or_none(editor),
     )
 
     # Update selection highlight even in sample mode.
@@ -122,7 +141,7 @@ def on_key_clicked_ui(
     colors = getattr(editor, "colors", {}) or {}
 
     # Stage 1: sample color into the wheel.
-    if not bool(getattr(editor, "_sample_tool_has_sampled", False)):
+    if not bool(editor._sample_tool_has_sampled):
         cell = representative_cell(cells, colors=colors)
         r, g, b = colors.get(cell, (0, 0, 0)) if cell is not None else (0, 0, 0)
         try:
@@ -140,7 +159,7 @@ def on_key_clicked_ui(
         r, g, b = int(r), int(g), int(b)
     except _WHEEL_COLOR_ERRORS:
         # Fallback to last known non-black color.
-        r, g, b = getattr(editor, "_last_non_black_color", (255, 0, 0)) or (255, 0, 0)
+        r, g, b = _last_non_black_color_or_default(editor)
         r, g, b = int(r), int(g), int(b)
 
     apply_release_fn(editor, r, g, b, num_rows=num_rows, num_cols=num_cols)

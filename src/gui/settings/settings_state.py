@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -7,40 +8,63 @@ from src.core.resources.layouts.catalog import VALID_LAYOUT_IDS
 from src.core.utils.safe_attrs import safe_int_attr
 
 
+logger = logging.getLogger(__name__)
+
+
 def clamp_brightness(value: int) -> int:
     return max(0, min(50, int(value)))
 
 
-def clamp_nonzero_brightness(value: int, *, default: int = 5) -> int:
+def _safe_getattr_or_default(obj: Any, name: str, default: Any) -> Any:
     try:
-        v = int(value)
-    except Exception:
-        v = int(default)
+        return getattr(obj, name, default)
+    except Exception:  # @quality-exception exception-transparency: settings-state loading may cross user-defined properties/descriptors and must treat those failures as missing config
+        logger.exception("Failed reading settings attribute '%s'", name)
+        return default
+
+
+def _coerce_int_or_fallback(value: Any, *, fallback: int | None) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return fallback
+    except Exception:  # @quality-exception exception-transparency: config coercion may execute user-defined __int__ implementations and must stay non-fatal for malformed values
+        logger.exception("Failed coercing settings value to int")
+        return fallback
+
+
+def clamp_nonzero_brightness(value: int, *, default: int = 5) -> int:
+    v = _coerce_int_or_fallback(value, fallback=None)
+    if v is None:
+        fallback_value = _coerce_int_or_fallback(default, fallback=5)
+        v = 5 if fallback_value is None else fallback_value
     return max(1, min(50, v))
 
 
 def _safe_bool(obj: Any, name: str, default: bool) -> bool:
+    value = _safe_getattr_or_default(obj, name, default)
     try:
-        return bool(getattr(obj, name, default))
-    except Exception:
+        return bool(value)
+    except Exception:  # @quality-exception exception-transparency: truthiness checks may execute user-defined __bool__/__len__ code and malformed config must fall back to defaults
+        logger.exception("Failed coercing settings attribute '%s' to bool", name)
         return bool(default)
 
 
 def _safe_int(obj: Any, name: str, default: int) -> int:
-    return safe_int_attr(obj, name, default=int(default))
+    default_value = _coerce_int_or_fallback(default, fallback=0)
+    safe_default = 0 if default_value is None else default_value
+    try:
+        return safe_int_attr(obj, name, default=safe_default)
+    except Exception:  # @quality-exception exception-transparency: settings-state integer loading crosses shared coercion helpers and must stay non-fatal for malformed config values
+        logger.exception("Failed reading settings integer attribute '%s'", name)
+        return safe_default
 
 
 def _safe_optional_int(obj: Any, name: str) -> int | None:
-    try:
-        value = getattr(obj, name, None)
-    except Exception:
-        return None
+    value = _safe_getattr_or_default(obj, name, None)
     if value is None:
         return None
-    try:
-        return int(value)
-    except Exception:
-        return None
+    return _coerce_int_or_fallback(value, fallback=None)
 
 
 @dataclass(frozen=True, slots=True)

@@ -24,14 +24,11 @@ def _log_module_exception(msg: str, exc: Exception) -> None:
 
 
 def _log_tray_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
-    log_exception = getattr(tray, "_log_exception", None)
-    if callable(log_exception):
-        try:
-            log_exception(msg, exc)
-            return
-        # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fall back to module traceback logging
-        except Exception as log_exc:
-            logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
+    try:
+        tray._log_exception(msg, exc)
+        return
+    except Exception as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
+        logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
     _log_module_exception(msg, exc)
 
 
@@ -65,7 +62,7 @@ def _set_engine_attr_best_effort(
 
 def _coerce_brightness_override(brightness_override: object) -> int:
     try:
-        return int(brightness_override)
+        return int(brightness_override)  # type: ignore[call-overload]
     except (TypeError, ValueError, OverflowError):
         return 0
 
@@ -86,8 +83,7 @@ def _config_per_key_colors_ref(config: object) -> Mapping[object, object] | None
 def parse_menu_int(item: object) -> Optional[int]:
     try:
         s = str(item)
-    # @quality-exception exception-transparency: menu item stringification crosses user-defined __str__ implementations and must stay non-fatal in tray handlers
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: menu item stringification crosses user-defined __str__ and must stay non-fatal
         _log_module_exception("Failed parsing tray menu integer item: %s", exc)
         return None
 
@@ -99,13 +95,9 @@ def parse_menu_int(item: object) -> Optional[int]:
 
 
 def try_log_event(tray: LightingTrayProtocol, source: str, action: str, **fields: object) -> None:
-    log_event = getattr(tray, "_log_event", None)
-    if not callable(log_event):
-        return
     try:
-        log_event(source, action, **fields)
-    # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
-    except Exception as exc:
+        tray._log_event(source, action, **fields)
+    except Exception as exc:  # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
         _log_module_exception("Tray event logging failed: %s", exc)
 
 

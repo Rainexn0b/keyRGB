@@ -1,16 +1,34 @@
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Tuple
 
+from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
 
 from .ops.color_map_ops import ensure_full_map
 
+logger = logging.getLogger(__name__)
+
 Color = Tuple[int, int, int]
 Cell = Tuple[int, int]
 ColorMap = Mapping[Cell, Color]
+
+
+def _safe_config_write(config: Any, name: str, value: Any) -> None:
+    try:
+        setattr(config, name, value)
+    except Exception as exc:  # @quality-exception exception-transparency: per-key commit config writes cross arbitrary config object/runtime boundaries and GUI commits must stay best-effort while still pushing hardware colors
+        log_throttled(
+            logger,
+            f"perkey.commit_pipeline.config_write.{name}",
+            interval_s=60,
+            level=logging.DEBUG,
+            msg=f"Failed to update per-key commit config field: {name}",
+            exc=exc,
+        )
 
 
 @dataclass
@@ -54,17 +72,11 @@ class PerKeyCommitPipeline:
             fallback_color=fallback_color,
         )
 
-        try:
-            if safe_int_attr(config, "brightness", default=0) == 0:
-                setattr(config, "brightness", 25)
-        except Exception:
-            pass
+        if safe_int_attr(config, "brightness", default=0) == 0:
+            _safe_config_write(config, "brightness", 25)
 
-        try:
-            setattr(config, "effect", "perkey")
-            setattr(config, "per_key_colors", full)
-        except Exception:
-            pass
+        _safe_config_write(config, "effect", "perkey")
+        _safe_config_write(config, "per_key_colors", full)
 
         brightness = safe_int_attr(config, "brightness", default=0)
 

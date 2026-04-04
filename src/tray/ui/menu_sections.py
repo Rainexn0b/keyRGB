@@ -36,11 +36,16 @@ def _unsupported_device_context_text(device_label: str, status: str) -> str:
     }.get(status, f"{device_label} controls are not available in this build")
 
 
-def _build_lightbar_context_menu_items(tray: Any, *, pystray: Any, item: Any, context_entry: dict[str, str]) -> list[Any]:
+def _build_lightbar_context_menu_items(
+    tray: Any, *, pystray: Any, item: Any, context_entry: dict[str, str]
+) -> list[Any]:
     controls_available = device_context_controls_available(tray, context_entry)
     if controls_available:
+
         def _checked_lightbar_brightness(level: int):
-            return lambda _item, expected=level: int(getattr(tray.config, "lightbar_brightness", 0) or 0) == expected * 5
+            return lambda _item, expected=level: (
+                int(getattr(tray.config, "lightbar_brightness", 0) or 0) == expected * 5
+            )
 
         brightness_menu = pystray.Menu(
             *[
@@ -239,8 +244,6 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
             interval_s=120,
         )
         return None
-
-
 
 
 def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_supported: bool) -> Optional[Any]:

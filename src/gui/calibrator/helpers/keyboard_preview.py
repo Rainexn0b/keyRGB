@@ -36,7 +36,7 @@ class KeyboardPreviewSession:
         self._orig_color = tuple(getattr(self.cfg, "color", (255, 0, 0)) or (255, 0, 0))
         try:
             self._orig_per_key_colors = dict(getattr(self.cfg, "per_key_colors", {}) or {})
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: per_key_colors property may have arbitrary getter side effects; snapshot must degrade to empty map
             log_throttled(
                 logger,
                 "calibrator.preview.orig_per_key_colors",
@@ -67,7 +67,7 @@ class KeyboardPreviewSession:
         ):
             try:
                 setattr(self.cfg, key, value)
-            except Exception as exc:
+            except Exception as exc:  # @quality-exception exception-transparency: config property setters may raise arbitrarily; restore must continue to next field on failure
                 log_throttled(
                     logger,
                     f"calibrator.preview.restore.{key}",

@@ -59,5 +59,5 @@ def read_logind_idle_seconds(
         now_us = int(monotonic_fn() * 1_000_000)
         idle_us = max(0, now_us - idle_since_us)
         return idle_us / 1_000_000.0
-    except Exception:
+    except (ValueError, OverflowError):
         return None

@@ -53,7 +53,7 @@ class ScrollableArea:
     def _sync_content_width(self, event) -> None:
         try:
             self._canvas.itemconfigure(self._frame_window_id, width=event.width)
-        except (_TK_WIDGET_ERRORS + (AttributeError,)) as exc:
+        except _TK_WIDGET_ERRORS + (AttributeError,) as exc:
             _log_boundary_exception(
                 "settings.scrollable_area.sync_content_width",
                 "Failed to sync settings content width",

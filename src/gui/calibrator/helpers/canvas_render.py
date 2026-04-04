@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import font as tkfont
-from typing import Optional
+from typing import Any, Optional
 
 from PIL import Image, ImageTk
 
@@ -24,8 +24,8 @@ def redraw_calibration_canvas(
     canvas: tk.Canvas,
     deck_pil: Optional[Image.Image],
     deck_render_cache: DeckRenderCache[ImageTk.PhotoImage],
-    layout_tweaks: object,
-    per_key_layout_tweaks: object,
+    layout_tweaks: Any,
+    per_key_layout_tweaks: Any,
     keymap: dict[str, object],
     selected_slot_id: str | None = None,
     selected_key_id: str | None = None,
@@ -113,7 +113,7 @@ def _fit_key_label(label: str, *, key_w: int, key_h: int) -> tuple[str, int]:
                 while trimmed and font_obj.measure(trimmed + ellipsis) > max_text_w:
                     trimmed = trimmed[:-1]
                 fitted_label = (trimmed + ellipsis) if trimmed else ellipsis
-    except Exception:
+    except Exception:  # @quality-exception exception-transparency: canvas text-fitting is a UI rendering boundary; failure returns the best-effort label and font size
         pass
 
     return fitted_label, font_size

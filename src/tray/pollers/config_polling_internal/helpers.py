@@ -42,7 +42,7 @@ def _try_log_event(tray: ConfigPollingTrayProtocol, source: str, action: str, **
 def _safe_state_for_log(tray: ConfigPollingTrayProtocol, state_for_log_fn, state):
     try:
         return state_for_log_fn(state)
-    except Exception as exc:  # @quality-exception exception-transparency: debug-state serialization is a best-effort logging boundary
+    except Exception as exc:  # @quality-exception exception-transparency: debug-state serialization; best-effort
         _log_tray_exception(tray, "Failed to serialize config polling state for logs: %s", exc)
         return None
 
@@ -53,7 +53,9 @@ def _call_tray_callback(tray: ConfigPollingTrayProtocol, callback_name: str, *, 
         return
     try:
         callback()
-    except Exception as exc:  # @quality-exception exception-transparency: tray UI callbacks are best-effort during config polling
+    except (  # @quality-exception exception-transparency: tray callbacks are best-effort during config polling
+        Exception
+    ) as exc:
         _log_tray_exception(tray, error_msg, exc)
 
 
@@ -69,7 +71,9 @@ def _set_engine_attr_best_effort(
         setattr(engine, attr, value)
     except AttributeError:
         return
-    except Exception as exc:  # @quality-exception exception-transparency: reactive engine sync must tolerate backend-specific setters
+    except (  # @quality-exception exception-transparency: engine sync; tolerates backend-specific setters
+        Exception
+    ) as exc:
         _log_tray_exception(tray, error_msg, exc)
 
 
@@ -100,7 +104,7 @@ def _enable_user_mode_best_effort(tray: ConfigPollingTrayProtocol, *, brightness
             enable_user_mode(brightness=brightness)
         except Exception as exc:  # @quality-exception exception-transparency: per-key backend fallback still crosses a runtime backend boundary
             _log_tray_exception(tray, "Failed to enable per-key user mode fallback: %s", exc)
-    except Exception as exc:  # @quality-exception exception-transparency: per-key user-mode enable crosses a runtime backend boundary
+    except Exception as exc:  # @quality-exception exception-transparency: user-mode enable; runtime backend boundary
         _log_tray_exception(tray, "Failed to enable per-key user mode: %s", exc)
 
 
@@ -161,7 +165,10 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
             monotonic_fn=monotonic_fn,
             last_warn_at=last_apply_warn_at,
         )
-    if str(getattr(current, "software_effect_target", "keyboard") or "keyboard") == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
+    if (
+        str(getattr(current, "software_effect_target", "keyboard") or "keyboard")
+        == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+    ):
         turn_off_secondary_software_targets(tray)
     tray.is_off = True
     _call_tray_callback(
@@ -253,7 +260,10 @@ def _apply_perkey(
             brightness=current.brightness,
             enable_user_mode=True,
         )
-    if str(getattr(current, "software_effect_target", "keyboard") or "keyboard") == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
+    if (
+        str(getattr(current, "software_effect_target", "keyboard") or "keyboard")
+        == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+    ):
         restore_secondary_software_targets(tray)
 
 
@@ -269,7 +279,10 @@ def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> N
     tray.engine.stop()
     with tray.engine.kb_lock:
         tray.engine.kb.set_color(current.color, brightness=current.brightness)
-    if str(getattr(current, "software_effect_target", "keyboard") or "keyboard") == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
+    if (
+        str(getattr(current, "software_effect_target", "keyboard") or "keyboard")
+        == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+    ):
         restore_secondary_software_targets(tray)
 
 

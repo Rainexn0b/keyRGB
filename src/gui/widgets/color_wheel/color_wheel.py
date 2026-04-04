@@ -56,7 +56,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self._theme_bg_rgb = hex_to_rgb(self._theme_bg_hex)
         self._theme_border_hex = derive_border_hex(self._theme_bg_rgb)
 
-        self.size = size
+        self.size = size  # type: ignore[assignment]
         self.radius = size // 2
         # RGB is always on the 0..255 per-channel scale.
         self.callback: Callable[..., Any] | None = callback
@@ -106,18 +106,24 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         ppm_bytes: bytes | None = None
 
         try:
-            if not wheel_path.exists() or wheel_path.stat().st_size < 16:
-                wheel_path.parent.mkdir(parents=True, exist_ok=True)
-                ppm_bytes = build_wheel_ppm_bytes(size=self.size, bg_rgb=bg_rgb, center_size=center_size)
-                write_bytes_atomic(wheel_path, ppm_bytes)
-        except Exception:
-            # Cache path may be unwritable (restricted envs, sandboxing, etc).
+            cache_ready = wheel_path.exists() and wheel_path.stat().st_size >= 16
+        except OSError:
+            cache_ready = False
+
+        if not cache_ready:
             ppm_bytes = build_wheel_ppm_bytes(size=self.size, bg_rgb=bg_rgb, center_size=center_size)
+            try:
+                wheel_path.parent.mkdir(parents=True, exist_ok=True)
+                write_bytes_atomic(wheel_path, ppm_bytes)
+                cache_ready = wheel_path.stat().st_size >= 16
+            except OSError:
+                # Cache path may be unwritable (restricted envs, sandboxing, etc).
+                cache_ready = False
 
         # PhotoImage needs to be held on the instance to avoid GC.
         # Prefer loading via a file path: it's more reliable across Tk builds than feeding
         # a large base64 "data" payload (some systems intermittently fail to parse PPM data).
-        if wheel_path.exists() and wheel_path.stat().st_size >= 16:
+        if cache_ready:
             self._wheel_image = tk.PhotoImage(file=str(wheel_path))
         else:
             # If we couldn't write the cache file, fall back to a temp file for this session.
@@ -133,7 +139,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
                 if tmp_path:
                     try:
                         os.unlink(tmp_path)
-                    except Exception:
+                    except OSError:
                         pass
         self.canvas.create_image(0, 0, anchor="nw", image=self._wheel_image, tags="wheel")
 
@@ -156,7 +162,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
             bg = style.lookup("TFrame", "background") or style.lookup(".", "background")
             if bg:
                 return str(bg)
-        except Exception:
+        except (RuntimeError, tk.TclError):
             pass
 
         # Fallback: use this widget's Tk background if available.
@@ -164,7 +170,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
             bg = str(self.cget("background"))
             if bg:
                 return bg
-        except Exception:
+        except (AttributeError, RuntimeError, tk.TclError):
             pass
 
         # Historical default (dark)
@@ -267,7 +273,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
 
         try:
             pct_f = float(pct)
-        except Exception:
+        except (TypeError, ValueError):
             pct_f = 0.0
         pct_f = max(0.0, min(100.0, pct_f))
 

@@ -5,6 +5,9 @@ from typing import Any, Mapping, Tuple
 from src.core.utils.exceptions import is_device_busy, is_device_disconnected
 
 
+_RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def push_per_key_colors(
     kb: Any,
     colors: Mapping[Tuple[int, int], Tuple[int, int, int]],
@@ -29,9 +32,9 @@ def push_per_key_colors(
                 # Some backends may expose enable_user_mode without a save kwarg.
                 try:
                     kb.enable_user_mode(brightness=brightness)
-                except Exception:
+                except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS:
                     pass
-            except Exception:
+            except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS:
                 pass
 
         kb.set_key_colors(
@@ -40,11 +43,11 @@ def push_per_key_colors(
             enable_user_mode=enable_user_mode,
         )
         return kb
-    except OSError as e:
-        if is_device_busy(e):
+    except OSError as exc:
+        if is_device_busy(exc):
             return None
-        if is_device_disconnected(e):
+        if is_device_disconnected(exc):
             return None
         return kb
-    except Exception:
+    except Exception:  # @quality-exception exception-transparency: per-key hardware writes cross backend/runtime boundaries; GUI apply must remain best-effort for unexpected driver failures
         return kb

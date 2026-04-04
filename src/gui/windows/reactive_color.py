@@ -1,9 +1,4 @@
-"""Reactive Typing color picker GUI.
-
-Allows selecting a manual highlight color used by reactive typing effects
-without stopping the currently running effect. The tray process picks up
-changes from config polling.
-"""
+"""Reactive Typing color picker GUI for live manual-color updates via config polling."""
 
 from __future__ import annotations
 
@@ -18,6 +13,13 @@ import tkinter as tk
 from tkinter import ttk
 
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
+from src.gui.windows._reactive_color_state import (
+    commit_brightness_to_config,
+    commit_color_to_config,
+    read_reactive_brightness_percent,
+    sync_color_wheel_brightness,
+    sync_reactive_brightness_widgets,
+)
 from src.gui.utils.window_centering import center_window_on_screen
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_theme
@@ -209,71 +211,36 @@ class ReactiveColorGUI:
         self.root.after(2000, lambda: self.status_label.config(text=""))
 
     def _read_reactive_brightness_percent(self) -> int | None:
-        raw = getattr(self.config, "reactive_brightness", getattr(self.config, "brightness", 0))
-        try:
-            hw = int(raw or 0)
-        except (TypeError, ValueError):
-            logger.debug(
-                "Invalid persisted reactive brightness %r; leaving reactive brightness widgets unchanged",
-                raw,
-                exc_info=True,
-            )
-            return None
-        return max(0, min(100, int(round(hw * 2))))
+        return read_reactive_brightness_percent(self.config, logger=logger)
 
     def _sync_reactive_brightness_widgets(self) -> None:
-        pct = self._read_reactive_brightness_percent()
-        if pct is None:
-            return
-        try:
-            self._reactive_brightness_var.set(float(pct))
-            self._reactive_brightness_label.config(text=f"{pct}%")
-        except tk.TclError:
-            logger.debug("Reactive brightness widgets were unavailable during initialization", exc_info=True)
+        sync_reactive_brightness_widgets(
+            self._reactive_brightness_var,
+            self._reactive_brightness_label,
+            percent=self._read_reactive_brightness_percent(),
+            tk_error=tk.TclError,
+            logger=logger,
+        )
 
     def _sync_color_wheel_brightness(self) -> None:
         if self.color_wheel is None:
             return
-        if bool(self._use_manual_var.get()):
-            return
-
-        pct = self._read_reactive_brightness_percent()
-        if pct is None:
-            return
-        try:
-            self.color_wheel.set_brightness_percent(pct)
-        except tk.TclError:
-            logger.debug("Reactive color wheel was unavailable during brightness sync", exc_info=True)
+        sync_color_wheel_brightness(
+            self.color_wheel,
+            self._use_manual_var,
+            percent=self._read_reactive_brightness_percent(),
+            tk_error=tk.TclError,
+            logger=logger,
+        )
 
     def _commit_color_to_config(self, color: tuple[int, int, int]) -> None:
         if not self._color_supported:
             return
-        try:
-            # Selecting a manual color implies enabling manual mode.
-            self.config.reactive_use_manual_color = True
-            self._use_manual_var.set(True)
-            self.config.reactive_color = color
-        except (AttributeError, OSError, RuntimeError, TypeError, ValueError, tk.TclError):
-            logger.debug("Failed to save reactive_color", exc_info=True)
+        commit_color_to_config(self.config, self._use_manual_var, color, tk_error=tk.TclError, logger=logger)
 
     def _commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None:
         """Persist reactive typing brightness (pulse/highlight intensity)."""
-        if brightness_percent is None:
-            return None
-        try:
-            pct = float(brightness_percent)
-        except (TypeError, ValueError):
-            return None
-
-        pct = max(0.0, min(100.0, pct))
-        # Config stores brightness on the 0..50 hardware scale.
-        hw = int(round(pct / 2.0))
-        try:
-            self.config.reactive_brightness = hw
-        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
-            logger.debug("Failed to save brightness", exc_info=True)
-            return None
-        return hw
+        return commit_brightness_to_config(self.config, brightness_percent, logger=logger)
 
     def _on_toggle_manual(self) -> None:
         if not self._color_supported:

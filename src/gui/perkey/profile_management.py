@@ -175,7 +175,7 @@ def load_profile_colors(
 
     try:
         cfg_colors = dict(getattr(config, "per_key_colors", {}) or {})
-    except Exception:
+    except (TypeError, ValueError):
         cfg_colors = {}
 
     if cfg_colors:
@@ -293,7 +293,7 @@ def delete_profile(requested_name: str) -> DeleteProfileResult:
             message=f"Cannot delete lighting profile '{profiles.DEFAULT_PROFILE_NAME}'",
         )
 
-    safe = profiles._safe_name(name)
+    safe = profiles.safe_profile_name(name)
     if profiles.get_active_profile() == safe:
         profiles.set_active_profile(profiles.DEFAULT_PROFILE_NAME)
 

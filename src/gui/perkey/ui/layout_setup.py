@@ -5,6 +5,7 @@ from typing import Any
 
 from src.core.resources.layout_legends import get_layout_legend_pack_ids, load_layout_legend_pack
 from src.core.resources.layouts import LAYOUT_CATALOG
+from src.gui.widgets.dropdown import UpwardListboxDropdown
 
 from .layout_slots import refresh_layout_slots_ui
 
@@ -52,6 +53,17 @@ class LayoutSetupControls(ttk.LabelFrame):
         self.editor._layout_combo.set(current_label)
         self.editor._layout_combo.grid(row=0, column=1, sticky="ew", padx=(8, 0))
         self.editor._layout_combo.bind("<<ComboboxSelected>>", self._on_layout_select)
+        self.editor._layout_dropdown = UpwardListboxDropdown(
+            root=getattr(self.editor, "root", None) or self.editor._layout_combo,
+            anchor=self.editor._layout_combo,
+            values_provider=lambda: list(_LAYOUT_LABELS),
+            get_current_value=lambda: str(self.editor._layout_combo.get() or current_label),
+            set_value=self._set_layout_label,
+            bg=getattr(self.editor, "bg_color", "#2b2b2b"),
+            fg=getattr(self.editor, "fg_color", "#ffffff"),
+        )
+        self.editor._layout_combo.bind("<Button-1>", self.editor._layout_dropdown.open)
+        self.editor._layout_combo.bind("<Down>", self.editor._layout_dropdown.open)
 
         ttk.Label(self, text="Legends").grid(row=1, column=0, sticky="w", pady=(8, 0))
 
@@ -62,6 +74,17 @@ class LayoutSetupControls(ttk.LabelFrame):
         )
         self.editor._legend_pack_combo.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
         self.editor._legend_pack_combo.bind("<<ComboboxSelected>>", self._on_legend_pack_select)
+        self.editor._legend_pack_dropdown = UpwardListboxDropdown(
+            root=getattr(self.editor, "root", None) or self.editor._legend_pack_combo,
+            anchor=self.editor._legend_pack_combo,
+            values_provider=lambda: [label for _pack_id, label in _legend_pack_choices(self.editor._physical_layout)],
+            get_current_value=lambda: str(self.editor._legend_pack_combo.get() or _AUTO_LEGEND_PACK_LABEL),
+            set_value=self._set_legend_pack_label,
+            bg=getattr(self.editor, "bg_color", "#2b2b2b"),
+            fg=getattr(self.editor, "fg_color", "#ffffff"),
+        )
+        self.editor._legend_pack_combo.bind("<Button-1>", self.editor._legend_pack_dropdown.open)
+        self.editor._legend_pack_combo.bind("<Down>", self.editor._legend_pack_dropdown.open)
         self.refresh_legend_pack_choices()
 
         self._description_label = ttk.Label(
@@ -107,9 +130,17 @@ class LayoutSetupControls(ttk.LabelFrame):
     def _sync_description_wrap(self, _event=None) -> None:
         try:
             width = int(self.winfo_width())
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: winfo_width is a UI geometry boundary; widget may not be mapped yet
             return
         self._description_label.configure(wraplength=max(200, width - 24))
+
+    def _set_layout_label(self, label: str) -> None:
+        self.editor._layout_combo.set(str(label))
+        self._on_layout_select()
+
+    def _set_legend_pack_label(self, label: str) -> None:
+        self.editor._legend_pack_combo.set(str(label))
+        self._on_legend_pack_select()
 
     def _on_layout_select(self, _event=None) -> None:
         selected = self.editor._layout_combo.get()

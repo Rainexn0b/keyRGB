@@ -8,7 +8,7 @@ def coerce_rgb_triplet(value: object, *, default: tuple[int, int, int]) -> tuple
         try:
             r, g, b = value
             return int(r), int(g), int(b)
-        except Exception:
+        except (TypeError, ValueError):
             return default
     return default
 
@@ -20,4 +20,4 @@ def initial_last_non_black_color(config_color: object) -> tuple[int, int, int]:
 
 def rgb_ints(value: Iterable[object]) -> tuple[int, int, int]:
     r, g, b = value
-    return int(r), int(g), int(b)
+    return int(r), int(g), int(b)  # type: ignore[call-overload]

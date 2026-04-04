@@ -112,7 +112,11 @@ def apply_per_key_tweak(
     inset_default: float,
 ) -> Tuple[float, float, float, float, float]:
     x, y, w, h = rect
-    kt = (per_key_layout_tweaks.get(str(slot_id or ""), {}) if slot_id else {}) or per_key_layout_tweaks.get(key_id, {}) or {}
+    kt = (
+        (per_key_layout_tweaks.get(str(slot_id or ""), {}) if slot_id else {})
+        or per_key_layout_tweaks.get(key_id, {})
+        or {}
+    )
 
     kdx = float(kt.get("dx", 0.0))
     kdy = float(kt.get("dy", 0.0))

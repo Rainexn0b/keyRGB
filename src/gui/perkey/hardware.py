@@ -16,7 +16,7 @@ def _select_backend() -> Any:
 
     try:
         return select_backend()
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: backend registry selection involves runtime hardware probing and must degrade to None when unavailable
         log_throttled(
             logger,
             "perkey.hardware.select_backend.failed",
@@ -35,7 +35,7 @@ try:
         raise RuntimeError("No backend")
     NUM_ROWS, NUM_COLS = _backend.dimensions()
     NUM_ROWS, NUM_COLS = int(NUM_ROWS), int(NUM_COLS)
-except Exception:
+except Exception:  # @quality-exception exception-transparency: keyboard dimension read at import time falls back to reference matrix; backend may be unavailable
     NUM_ROWS, NUM_COLS = REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
 
 
@@ -46,7 +46,7 @@ def get_keyboard():
         return None
     try:
         return _backend.get_device()
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: USB device open is a runtime hardware boundary and failures must degrade to None
         log_throttled(
             logger,
             "perkey.hardware.get_keyboard",

@@ -8,10 +8,14 @@ from typing import Optional
 from src.tray.protocols import IdlePowerTrayProtocol
 
 
+_RECOVERABLE_SYSFS_READ_EXCEPTIONS = (OSError, UnicodeError, ValueError)
+_RECOVERABLE_SUBPROCESS_EXCEPTIONS = (OSError, ValueError, subprocess.SubprocessError)
+
+
 def _read_int(path: Path) -> Optional[int]:
     try:
         return int(path.read_text(encoding="utf-8").strip())
-    except Exception:
+    except _RECOVERABLE_SYSFS_READ_EXCEPTIONS:
         return None
 
 
@@ -100,7 +104,7 @@ def read_screen_off_state_drm(*, drm_base: Path | None = None) -> Optional[bool]
 
         try:
             status_s = (child / "status").read_text(encoding="utf-8").strip().lower()
-        except Exception:
+        except _RECOVERABLE_SYSFS_READ_EXCEPTIONS:
             continue
         if status_s != "connected":
             continue
@@ -119,12 +123,12 @@ def read_screen_off_state_drm(*, drm_base: Path | None = None) -> Optional[bool]
     for child in candidates:
         try:
             dpms_s = (child / "dpms").read_text(encoding="utf-8").strip().lower()
-        except Exception:
+        except _RECOVERABLE_SYSFS_READ_EXCEPTIONS:
             dpms_s = ""
 
         try:
             enabled_s = (child / "enabled").read_text(encoding="utf-8").strip().lower()
-        except Exception:
+        except _RECOVERABLE_SYSFS_READ_EXCEPTIONS:
             enabled_s = ""
 
         if (not dpms_s) and (not enabled_s):
@@ -151,7 +155,7 @@ def read_screen_off_state_drm(*, drm_base: Path | None = None) -> Optional[bool]
 def run(argv: list[str], *, timeout_s: float = 1.0) -> Optional[str]:
     try:
         cp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout_s, check=False)
-    except Exception:
+    except _RECOVERABLE_SUBPROCESS_EXCEPTIONS:
         return None
     if cp.returncode != 0:
         return None

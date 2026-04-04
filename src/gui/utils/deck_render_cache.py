@@ -12,7 +12,7 @@ PhotoT = TypeVar("PhotoT")
 def _transparency_key(transparency_pct: float) -> int:
     try:
         value = float(transparency_pct)
-    except Exception:
+    except (TypeError, ValueError):
         value = 0.0
     value = max(0.0, min(100.0, value))
     return int(round(value * 1000.0))

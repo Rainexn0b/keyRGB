@@ -49,8 +49,19 @@ def _log_idle_action_best_effort(
             idle_forced_off=bool(tray._idle_forced_off),
             dim_temp_active=bool(tray._dim_temp_active),
         )
-    except Exception:
-        pass
+    except Exception:  # @quality-exception exception-transparency: idle action event logging crosses a runtime callback boundary and polling must stay non-fatal without recursive hot-path logging
+        return
+
+
+def _reload_idle_power_config_best_effort(tray: IdlePowerTrayProtocol) -> None:
+    reload_config = getattr(tray.config, "reload", None)
+    if not callable(reload_config):
+        return
+
+    try:
+        reload_config()
+    except Exception:  # @quality-exception exception-transparency: per-iteration config reload is a runtime config/file boundary and idle power polling must keep running when refresh fails
+        return
 
 
 def run_idle_power_iteration(
@@ -73,10 +84,7 @@ def run_idle_power_iteration(
 ) -> None:
     ensure_idle_state_fn(tray)
 
-    try:
-        tray.config.reload()
-    except Exception:
-        pass
+    _reload_idle_power_config_best_effort(tray)
 
     dimmed = read_dimmed_state_fn(tray)
     screen_off = bool(tray._dim_screen_off) or bool(read_screen_off_state_drm_fn())

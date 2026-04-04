@@ -234,7 +234,7 @@ def apply_from_config_once(
 
     try:
         current = compute_state_fn(tray)
-    except Exception as exc:
+    except _CONFIG_FALLBACK_EXCEPTIONS as exc:
         now = float(monotonic_fn())
         if now - last_apply_warn_at > 60:
             last_apply_warn_at = now
@@ -272,7 +272,7 @@ def apply_from_config_once(
 
     try:
         handled, new_last_applied = maybe_apply_fast_path_fn(tray, last_applied=last_applied, current=current)
-    except Exception as exc:
+    except _FAST_PATH_EXCEPTIONS as exc:
         now = float(monotonic_fn())
         if now - last_apply_warn_at > 60:
             last_apply_warn_at = now
@@ -314,11 +314,11 @@ def apply_from_config_once(
             _apply_uniform(tray, current, cause=cause)
         else:
             _apply_effect(tray, current, cause=cause)
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: backend apply is a runtime hardware boundary and device disconnect/errors must degrade tray state gracefully
         if is_device_disconnected_fn(exc):
             try:
                 tray.engine.mark_device_unavailable()
-            except Exception as mark_exc:
+            except Exception as mark_exc:  # @quality-exception exception-transparency: marking device unavailable is itself a degraded-hardware boundary
                 now = float(monotonic_fn())
                 if now - last_apply_warn_at > 60:
                     last_apply_warn_at = now
@@ -330,7 +330,7 @@ def apply_from_config_once(
 
     try:
         tray._refresh_ui()
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: tray UI refresh is a runtime Tk widget boundary and must not break config apply on widget errors
         now = float(monotonic_fn())
         if now - last_apply_warn_at > 60:
             last_apply_warn_at = now

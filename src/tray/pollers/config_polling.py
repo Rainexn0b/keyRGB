@@ -77,12 +77,16 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
     def _file_digest(path: Path) -> str | None:
         try:
             data = path.read_bytes()
-        except Exception:
+        except OSError:
             return None
+
+        return hashlib.blake2s(data, digest_size=16).hexdigest()
+
+    def _log_polling_exception(message: str, exc: Exception) -> None:
         try:
-            return hashlib.blake2s(data, digest_size=16).hexdigest()
-        except Exception:
-            return None
+            tray._log_exception(message, exc)
+        except (OSError, RuntimeError, TypeError, ValueError):
+            pass
 
     def apply_from_config(*, cause: str) -> None:
         nonlocal last_applied
@@ -112,15 +116,12 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
         try:
             tray.config.reload()
             apply_from_config(cause="startup")
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: startup reload/apply is a best-effort tray-thread runtime boundary and polling must survive config or device failures
             # Don't crash the polling thread; but also don't silently eat errors.
             now = time.monotonic()
             if now - last_startup_error_at > 30:
                 last_startup_error_at = now
-                try:
-                    tray._log_exception("Error loading config on startup: %s", exc)
-                except (OSError, RuntimeError, ValueError):
-                    pass
+                _log_polling_exception("Error loading config on startup: %s", exc)
 
         while True:
             try:
@@ -139,8 +140,8 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
                     last_digest = digest
                     tray.config.reload()
                     apply_from_config(cause="mtime_change")
-                except Exception as e:
-                    tray._log_exception("Error reloading config: %s", e)
+                except Exception as exc:  # @quality-exception exception-transparency: mtime-triggered reload/apply is a best-effort runtime boundary and the polling loop must continue after failures
+                    _log_polling_exception("Error reloading config: %s", exc)
 
             time.sleep(0.1)
 

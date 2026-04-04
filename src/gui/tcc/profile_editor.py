@@ -67,7 +67,7 @@ def open_profile_json_editor(
             return
         try:
             on_save(obj)
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: on_save is an injected callback boundary; any failure must be surfaced to the user via the error dialog
             log_throttled(
                 logger,
                 "tcc_profile_editor.on_save",

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Callable
-
+import tkinter as tk
 from tkinter import filedialog
+from typing import Any, Callable
 
 from src.core.profile import profiles
 from src.gui.utils.profile_backdrop_storage import (
@@ -17,6 +17,19 @@ from .status import (
     backdrop_updated,
     set_status,
 )
+
+
+_BACKDROP_PERSISTENCE_ERRORS = (OSError, RuntimeError, ValueError)
+_BACKDROP_UI_ERRORS = (AttributeError, OSError, RuntimeError, ValueError, tk.TclError)
+
+
+def _sync_backdrop_mode_widgets(editor: Any, *, mode: str, label: str) -> None:
+    mode_var = getattr(editor, "_backdrop_mode_var", None)
+    mode_combo = getattr(editor, "_backdrop_mode_combo", None)
+    if mode_var is not None:
+        mode_var.set(mode)
+    if mode_combo is not None:
+        mode_combo.set(label)
 
 
 def set_backdrop_ui(
@@ -45,16 +58,18 @@ def set_backdrop_ui(
     try:
         save_fn(profile_name=editor.profile_name, source_path=path)
         save_mode_fn("custom", editor.profile_name)
-        mode_var = getattr(editor, "_backdrop_mode_var", None)
-        mode_combo = getattr(editor, "_backdrop_mode_combo", None)
-        if mode_var is not None:
-            mode_var.set("custom")
-        if mode_combo is not None:
-            mode_combo.set("Custom image")
-        editor.canvas.reload_backdrop_image()
-        set_status(editor, backdrop_updated())
-    except Exception as exc:
+    except _BACKDROP_PERSISTENCE_ERRORS as exc:
         set_status(editor, backdrop_update_failed(exc))
+        return
+
+    try:
+        _sync_backdrop_mode_widgets(editor, mode="custom", label="Custom image")
+        editor.canvas.reload_backdrop_image()
+    except _BACKDROP_UI_ERRORS as exc:
+        set_status(editor, backdrop_update_failed(exc))
+        return
+
+    set_status(editor, backdrop_updated())
 
 
 def reset_backdrop_ui(
@@ -72,13 +87,15 @@ def reset_backdrop_ui(
     try:
         reset_fn(editor.profile_name)
         save_mode_fn("builtin", editor.profile_name)
-        mode_var = getattr(editor, "_backdrop_mode_var", None)
-        mode_combo = getattr(editor, "_backdrop_mode_combo", None)
-        if mode_var is not None:
-            mode_var.set("builtin")
-        if mode_combo is not None:
-            mode_combo.set("Built-in seed")
-        editor.canvas.reload_backdrop_image()
-        set_status(editor, backdrop_reset())
-    except Exception as exc:
+    except _BACKDROP_PERSISTENCE_ERRORS as exc:
         set_status(editor, backdrop_reset_failed(exc))
+        return
+
+    try:
+        _sync_backdrop_mode_widgets(editor, mode="builtin", label="Built-in seed")
+        editor.canvas.reload_backdrop_image()
+    except _BACKDROP_UI_ERRORS as exc:
+        set_status(editor, backdrop_reset_failed(exc))
+        return
+
+    set_status(editor, backdrop_reset())

@@ -3,19 +3,24 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from src.core.backends.policy import (
-    experimental_evidence_for_backend,
-    experimental_evidence_label,
-    stability_for_backend,
-)
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import backend_hw_effect_names, detected_backend_hw_effect_names
 from src.core.effects.catalog import is_forced_hardware_effect, resolve_effect_name_for_backend, strip_effect_namespace
 from src.core.effects.catalog import title_for_effect
 from src.core.utils.logging_utils import log_throttled
+from ._device_status import backend_display_name, backend_status_suffix, format_hex_id, secondary_status_suffix
 
 
 logger = logging.getLogger(__name__)
+_RECOVERABLE_CONFIG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_PROFILE_LOOKUP_EXCEPTIONS = (
+    AttributeError,
+    ImportError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def is_software_mode(tray: Any) -> bool:
@@ -31,12 +36,8 @@ def is_software_mode(tray: Any) -> bool:
     if effect_base == "perkey" or (effect_base in SW_EFFECTS and not is_forced_hardware_effect(effect)):
         return True
 
-    try:
-        per_key = getattr(cfg, "per_key_colors", None) or None
-        if per_key and len(per_key) > 0:
-            return True
-    except Exception:
-        pass
+    if _config_has_nonempty_per_key_colors(cfg):
+        return True
 
     return False
 
@@ -58,42 +59,34 @@ def _log_menu_debug(key: str, msg: str, exc: Exception, *, interval_s: float = 6
     )
 
 
-def _format_hex_id(val: str) -> str:
-    s = str(val or "").strip().lower() if val is not None else ""
-    if s.startswith("0x"):
-        s = s[2:]
-    return s
+def _config_has_nonempty_per_key_colors(cfg: Any) -> bool:
+    try:
+        per_key = getattr(cfg, "per_key_colors", None)
+        if per_key is None:
+            return False
+        return len(per_key) > 0
+    except AttributeError:
+        return False
+    except _RECOVERABLE_CONFIG_READ_EXCEPTIONS as exc:
+        _log_menu_debug(
+            "tray.menu.per_key_colors",
+            "Failed to inspect per-key colors for tray status",
+            exc,
+            interval_s=60,
+        )
+        return False
+    except Exception as exc:  # @quality-exception exception-transparency: tray status inspection crosses arbitrary config property and __len__ implementations and must remain non-fatal
+        _log_menu_debug(
+            "tray.menu.per_key_colors",
+            "Failed to inspect per-key colors for tray status",
+            exc,
+            interval_s=60,
+        )
+        return False
 
 
 def _title(name: str) -> str:
     return title_for_effect(name)
-
-
-def _backend_display_name(backend_name: str) -> str:
-    if backend_name == "sysfs-leds":
-        return "Kernel Driver"
-    if backend_name == "ite8291r3":
-        return "ITE 8291 (USB)"
-    if backend_name == "ite8910":
-        return "ITE 8910 (USB)"
-    if backend_name == "ite8297":
-        return "ITE 8297 (USB)"
-    return backend_name
-
-
-def _backend_status_suffix(backend: Any) -> str:
-    if backend is None:
-        return ""
-
-    if stability_for_backend(backend).value != "experimental":
-        return ""
-
-    parts = ["experimental"]
-    evidence_label = experimental_evidence_label(experimental_evidence_for_backend(backend))
-    if evidence_label:
-        parts.append(evidence_label)
-
-    return f" [{', '.join(parts)}]"
 
 
 def keyboard_status_text(tray: Any) -> str:
@@ -104,8 +97,8 @@ def keyboard_status_text(tray: Any) -> str:
 
     backend = getattr(tray, "backend", None)
     backend_name = str(getattr(backend, "name", "unknown"))
-    display_name = _backend_display_name(backend_name)
-    status_suffix = _backend_status_suffix(backend)
+    display_name = backend_display_name(backend_name)
+    status_suffix = backend_status_suffix(backend)
 
     probe = getattr(tray, "backend_probe", None)
     identifiers = getattr(probe, "identifiers", None) if probe is not None else None
@@ -114,8 +107,8 @@ def keyboard_status_text(tray: Any) -> str:
     usb_vid = identifiers.get("usb_vid")
     usb_pid = identifiers.get("usb_pid")
     if usb_vid and usb_pid:
-        vid = _format_hex_id(usb_vid)
-        pid = _format_hex_id(usb_pid)
+        vid = format_hex_id(usb_vid)
+        pid = format_hex_id(usb_pid)
         if vid and pid:
             return f"Keyboard: {display_name} ({vid}:{pid}){status_suffix}"
 
@@ -158,8 +151,8 @@ def device_context_entries(tray: Any) -> list[dict[str, str]]:
         if not device_type or device_type == "keyboard":
             continue
 
-        usb_vid = _format_hex_id(str(candidate.get("usb_vid") or ""))
-        usb_pid = _format_hex_id(str(candidate.get("usb_pid") or ""))
+        usb_vid = format_hex_id(str(candidate.get("usb_vid") or ""))
+        usb_pid = format_hex_id(str(candidate.get("usb_pid") or ""))
         status = str(candidate.get("status") or "").strip()
         product = str(candidate.get("product") or "").strip()
 
@@ -172,7 +165,7 @@ def device_context_entries(tray: Any) -> list[dict[str, str]]:
                 "key": key,
                 "device_type": device_type,
                 "status": status,
-                "text": f"{label}{details}{usb_id}{_secondary_status_suffix(status)}",
+                "text": f"{label}{details}{usb_id}{secondary_status_suffix(status)}",
             }
         )
 
@@ -192,11 +185,13 @@ def selected_device_context_key(tray: Any, *, entries: list[dict[str, str]] | No
     fallback = str(available[0].get("key") or "keyboard") if available else "keyboard"
     try:
         setattr(tray, "selected_device_context", fallback)
-    except Exception:
+    except AttributeError:
         pass
     try:
-        getattr(tray, "config", None).tray_device_context = fallback
-    except Exception:
+        _cfg = getattr(tray, "config", None)
+        if _cfg is not None:
+            _cfg.tray_device_context = fallback
+    except AttributeError:
         pass
     return fallback
 
@@ -234,15 +229,15 @@ def secondary_device_status_texts(tray: Any) -> list[str]:
         if str(candidate.get("device_type") or "") != "lightbar":
             continue
 
-        usb_vid = _format_hex_id(str(candidate.get("usb_vid") or ""))
-        usb_pid = _format_hex_id(str(candidate.get("usb_pid") or ""))
+        usb_vid = format_hex_id(str(candidate.get("usb_vid") or ""))
+        usb_pid = format_hex_id(str(candidate.get("usb_pid") or ""))
         usb_id = f" ({usb_vid}:{usb_pid})" if usb_vid and usb_pid else ""
 
         product = str(candidate.get("product") or "").strip()
         details = f": {product}" if product else ""
 
         status = str(candidate.get("status") or "").strip()
-        status_suffix = _secondary_status_suffix(status)
+        status_suffix = secondary_status_suffix(status)
         lines.append(f"Lightbar{details}{usb_id}{status_suffix}")
 
     return lines
@@ -264,20 +259,6 @@ def device_context_controls_available(tray: Any, context_entry: dict[str, str]) 
     return str(context_entry.get("status") or "").strip() == "supported"
 
 
-def _secondary_status_suffix(status: str) -> str:
-    if status == "supported":
-        return ""
-    if status == "experimental_disabled":
-        return " [experimental disabled]"
-    if status == "known_dormant":
-        return " [detected]"
-    if status == "known_unavailable":
-        return " [unavailable]"
-    if status == "unrecognized_ite":
-        return " [unrecognized]"
-    return f" [{status}]" if status else ""
-
-
 def probe_device_available(tray: Any) -> bool:
     """Best-effort device availability probe."""
 
@@ -285,7 +266,7 @@ def probe_device_available(tray: Any) -> bool:
         ensure = getattr(getattr(tray, "engine", None), "_ensure_device_available", None)
         if callable(ensure):
             ensure()
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: device availability probing crosses backend I/O and must remain non-fatal for tray status
         _log_menu_debug(
             "tray.menu.ensure_device",
             "Failed to ensure device availability",
@@ -316,7 +297,13 @@ def tray_lighting_mode_text(tray: Any) -> str:
             from src.core.profile import profiles
 
             active_profile = str(profiles.get_active_profile())
-        except Exception:
+        except _RECOVERABLE_PROFILE_LOOKUP_EXCEPTIONS as exc:
+            _log_menu_debug(
+                "tray.menu.active_profile",
+                "Failed to resolve active per-key profile for tray status",
+                exc,
+                interval_s=60,
+            )
             active_profile = "(unknown)"
 
         return f"Mode: Software ({active_profile})"

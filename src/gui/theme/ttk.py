@@ -35,7 +35,7 @@ def apply_clam_light_theme(
 
     try:
         root.configure(bg=bg_color)  # type: ignore[call-arg]
-    except Exception:
+    except (tk.TclError, RuntimeError):
         pass
 
     # Ensure container widgets pick up a consistent background.
@@ -96,7 +96,7 @@ def apply_clam_dark_theme(
 
     try:
         root.configure(bg=bg_color)  # type: ignore[call-arg]
-    except Exception:
+    except (tk.TclError, RuntimeError):
         pass
 
     style.configure("TFrame", background=bg_color)
@@ -145,7 +145,13 @@ def _apply_scaling_if_configured(root: tk.Misc) -> None:
 
     try:
         scaling = float(scaling_raw)
-        if scaling > 0:
-            root.tk.call("tk", "scaling", scaling)
-    except Exception:
+    except (TypeError, ValueError):
+        return
+
+    if scaling <= 0:
+        return
+
+    try:
+        root.tk.call("tk", "scaling", scaling)
+    except (tk.TclError, RuntimeError):
         pass

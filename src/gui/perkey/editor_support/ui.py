@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import TclError, ttk
 
 from src.core.profile import profiles
 from src.gui.widgets.color_wheel import ColorWheel
 from src.gui.widgets.dropdown import UpwardListboxDropdown
 
-from .canvas import KeyboardCanvas
-from .overlay import OverlayControls
-from .lightbar_controls import LightbarControls
-from .ui.layout_setup import LayoutSetupControls
+from ..canvas import KeyboardCanvas
+from ..lightbar_controls import LightbarControls
+from ..overlay import OverlayControls
+from ..ui.layout_setup import LayoutSetupControls
 
 
 _BACKDROP_MODE_LABELS = {
@@ -18,6 +18,9 @@ _BACKDROP_MODE_LABELS = {
     "builtin": "Built-in seed",
     "custom": "Custom image",
 }
+
+_STATUS_WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, TclError, TypeError, ValueError)
+_TK_CALLBACK_SETUP_ERRORS = (RuntimeError, TclError)
 
 
 def _set_backdrop_mode_from_label(editor, label: str) -> None:
@@ -34,7 +37,6 @@ def build_editor_ui(editor) -> None:
     main = ttk.Frame(editor.root, padding=16)
     main.pack(fill="both", expand=True)
 
-    # Status row (full-width) so messages don't get clipped by the right panel.
     status_row = ttk.Frame(main)
     status_row.pack(fill="x", pady=(0, 10))
 
@@ -49,16 +51,14 @@ def build_editor_ui(editor) -> None:
 
     def _sync_status_wrap(_e=None) -> None:
         try:
-            # Wrap to the available width, accounting for padding.
-            w = int(status_row.winfo_width())
-            editor.status_label.configure(wraplength=max(200, w - 8))
-        except Exception:
+            width = int(status_row.winfo_width())
+            editor.status_label.configure(wraplength=max(200, width - 8))
+        except _STATUS_WRAP_SYNC_ERRORS:
             return
 
-    # Ensure wrapping stays correct when the window is resized.
     try:
         editor.root.bind("<Configure>", _sync_status_wrap, add=True)
-    except Exception:
+    except _TK_CALLBACK_SETUP_ERRORS:
         pass
     editor.root.after(0, _sync_status_wrap)
 
@@ -196,19 +196,16 @@ def build_editor_ui(editor) -> None:
     )
     editor._profiles_combo.grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
-    # The default ttk Combobox popdown opens downward, which often gets clipped
-    # by the bottom panel. Use a small popup list that opens upwards.
     editor._profiles_dropdown = UpwardListboxDropdown(
         root=editor.root,
         anchor=editor._profiles_combo,
         values_provider=profiles.list_profiles,
         get_current_value=lambda: editor._profile_name_var.get(),
-        set_value=lambda v: editor._profile_name_var.set(v),
+        set_value=lambda value: editor._profile_name_var.set(value),
         bg=getattr(editor, "bg_color", "#2b2b2b"),
         fg=getattr(editor, "fg_color", "#ffffff"),
     )
 
-    # Intercept the default popdown.
     editor._profiles_combo.bind("<Button-1>", editor._profiles_dropdown.open)
     editor._profiles_combo.bind("<Down>", editor._profiles_dropdown.open)
 

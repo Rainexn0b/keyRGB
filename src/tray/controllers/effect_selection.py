@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import is_backend_hardware_effect
@@ -131,7 +131,7 @@ def _ensure_hardware_mode(tray) -> None:
     _set_attr_best_effort(tray.engine, "per_key_brightness", None)
 
 
-def apply_effect_selection(tray, *, effect_name: str) -> None:
+def apply_effect_selection(tray: Any, *, effect_name: str) -> None:
     """Apply an effect selection coming from the tray menu.
 
     This is the main entry point for effect changes. It handles:
@@ -249,12 +249,11 @@ def apply_effect_selection(tray, *, effect_name: str) -> None:
         with tray.engine.kb_lock:
             tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
         tray.is_off = False
-    except Exception as exc:
-        notify_permission_issue = getattr(tray, "_notify_permission_issue", None)
-        if is_permission_denied(exc) and callable(notify_permission_issue):
+    except Exception as exc:  # @quality-exception exception-transparency: effect apply crosses device I/O and tray state; permission/disconnect are dispatched and remaining errors are logged with traceback
+        if is_permission_denied(exc):
             try:
-                notify_permission_issue(exc)
-            except Exception as notify_exc:
+                tray._notify_permission_issue(exc)
+            except Exception as notify_exc:  # @quality-exception exception-transparency: notification callback is a user-injected tray boundary and failures must not break the permission-issue handling path
                 logger.exception("Failed to notify permission issue during effect selection: %s", notify_exc)
             return
         logger.exception("Error applying effect selection: %s", exc)

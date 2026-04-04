@@ -1,20 +1,24 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 
+logger = logging.getLogger(__name__)
+
+
 def _expected_holder_pids() -> set[int]:
     expected: set[int] = set()
 
-    try:
-        tray_pid = os.environ.get("KEYRGB_TRAY_PID")
-        if tray_pid:
+    tray_pid = os.environ.get("KEYRGB_TRAY_PID")
+    if tray_pid:
+        try:
             expected.add(int(tray_pid))
-    except Exception:
-        expected = set()
+        except (TypeError, ValueError):
+            pass
 
     # Fallback: if the tray didn't set KEYRGB_TRAY_PID (older build)
     # and Settings was launched as a subprocess, the parent PID is
@@ -27,7 +31,7 @@ def _expected_holder_pids() -> set[int]:
                 parent_comm = comm_path.read_text(encoding="utf-8", errors="ignore").strip()
                 if parent_comm == "keyrgb":
                     expected.add(ppid)
-    except Exception:
+    except (OSError, TypeError, ValueError):
         pass
 
     return expected
@@ -58,7 +62,7 @@ def _device_busy_warnings(payload: dict[str, Any], *, expected_holder_pids: set[
                     try:
                         if pid is not None and int(pid) in expected_holder_pids:
                             continue
-                    except Exception:
+                    except (TypeError, ValueError):
                         pass
                     filtered.append(h)
                 others = filtered
@@ -90,7 +94,8 @@ def _device_busy_warnings(payload: dict[str, Any], *, expected_holder_pids: set[
                 warnings.append(f"Device busy: {devnode} is open by other process(es)")
 
         return warnings
-    except Exception:
+    except Exception:  # @quality-exception exception-transparency: best-effort diagnostics boundary; malformed process metadata must not block JSON generation
+        logger.exception("Failed to build device-busy diagnostics warnings")
         return warnings
 
 

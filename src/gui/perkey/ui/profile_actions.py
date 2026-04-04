@@ -6,6 +6,8 @@ profile-related behaviors.
 
 from __future__ import annotations
 
+import logging
+from tkinter import TclError
 from typing import Any
 
 from src.core.profile import profiles
@@ -30,7 +32,15 @@ from ..profile_management import (
 from .status import active_profile, default_profile_set, layout_defaults_reset, saved_profile, set_status
 
 
+logger = logging.getLogger(__name__)
+
 _LAYOUT_LABELS: dict[str, str] = {ld.layout_id: ld.label for ld in LAYOUT_CATALOG}
+_BACKDROP_MODE_LABELS = {
+    "none": "No backdrop",
+    "builtin": "Built-in seed",
+    "custom": "Custom image",
+}
+_BACKDROP_UI_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError, TclError)
 
 
 def _parse_default_keymap(layout_id: str) -> dict[str, tuple[tuple[int, int], ...]]:
@@ -130,26 +140,29 @@ def activate_profile_ui(editor: Any) -> None:
     editor.lightbar_overlay = dict(result.lightbar_overlay)
 
     # Reload per-profile backdrop state.
-    try:
-        editor._backdrop_mode_var.set(profiles.load_backdrop_mode(editor.profile_name))
-        mode_combo = getattr(editor, "_backdrop_mode_combo", None)
-        if mode_combo is not None:
-            labels = {
-                "none": "No backdrop",
-                "builtin": "Built-in seed",
-                "custom": "Custom image",
-            }
-            mode_combo.set(labels.get(editor._backdrop_mode_var.get(), "Built-in seed"))
-    except Exception:
-        pass
-    try:
-        editor.backdrop_transparency.set(float(profiles.load_backdrop_transparency(editor.profile_name)))
-    except Exception:
-        pass
-    try:
-        editor.canvas.reload_backdrop_image()
-    except Exception:
-        pass
+    backdrop_mode_var = getattr(editor, "_backdrop_mode_var", None)
+    if backdrop_mode_var is not None:
+        backdrop_mode = profiles.load_backdrop_mode(editor.profile_name)
+        try:
+            backdrop_mode_var.set(backdrop_mode)
+            mode_combo = getattr(editor, "_backdrop_mode_combo", None)
+            if mode_combo is not None:
+                mode_combo.set(_BACKDROP_MODE_LABELS.get(backdrop_mode, "Built-in seed"))
+        except _BACKDROP_UI_ERRORS:
+            logger.warning("Failed to update per-profile backdrop mode UI during activation", exc_info=True)
+
+    backdrop_transparency = getattr(editor, "backdrop_transparency", None)
+    if backdrop_transparency is not None:
+        try:
+            backdrop_transparency.set(float(profiles.load_backdrop_transparency(editor.profile_name)))
+        except _BACKDROP_UI_ERRORS:
+            logger.warning("Failed to update per-profile backdrop transparency UI during activation", exc_info=True)
+
+    if hasattr(editor.canvas, "reload_backdrop_image"):
+        try:
+            editor.canvas.reload_backdrop_image()
+        except Exception:  # @quality-exception exception-transparency: optional per-profile backdrop image reload crosses Tk, image decode, and file/runtime seams and must remain non-fatal for profile activation
+            logger.exception("Failed to reload per-profile backdrop image during activation")
 
     # Ensure we're applying a full map, then push it to hardware.
     ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)

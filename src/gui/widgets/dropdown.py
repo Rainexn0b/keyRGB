@@ -59,7 +59,7 @@ class UpwardListboxDropdown:
 
         popup = tk.Toplevel(self._root)
         popup.withdraw()
-        popup.transient(self._root)
+        popup.transient(self._root)  # type: ignore[call-overload]
         popup.overrideredirect(True)
 
         # Hint to the WM that this is a combo/dropdown (helps with z-order/focus on Linux).

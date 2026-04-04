@@ -144,6 +144,7 @@ def get_pystray():
             if explicit_backend:
                 logger.info("pystray backend: %s (explicit)", os.environ.get("PYSTRAY_BACKEND"))
             _pystray_mod = importlib.import_module("pystray")
+        # @quality-exception exception-transparency: pystray import is a runtime desktop-env boundary; broken-gi is classified and retried with xorg fallback
         except Exception as exc:  # pragma: no cover (depends on desktop env)
             failure = _classify_pystray_import_error(exc)
             if failure and failure.reason == "broken-gi":

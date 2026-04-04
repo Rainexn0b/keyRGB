@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from threading import RLock
 from typing import Any
+from src.tray.protocols import LightingTrayProtocol
 
 from src.core.backends.ite8233.backend import Ite8233Backend
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
@@ -28,7 +29,7 @@ class _CachedLightbarSoftwareTarget:
     def __init__(self, *, key: str) -> None:
         self.key = str(key or "lightbar")
         self._lock = RLock()
-        self._device: Any | None = None
+        self._device: Any = None
 
     @property
     def device(self) -> "_CachedLightbarSoftwareTarget":
@@ -77,7 +78,7 @@ def configure_engine_software_targets(tray: Any) -> None:
     )
 
 
-def apply_software_effect_target_selection(tray: Any, target: str) -> str:
+def apply_software_effect_target_selection(tray: LightingTrayProtocol, target: str) -> str:
     normalized = normalize_software_effect_target(target)
     previous = normalize_software_effect_target(getattr(getattr(tray, "config", None), "software_effect_target", None))
 
@@ -97,18 +98,18 @@ def apply_software_effect_target_selection(tray: Any, target: str) -> str:
     return normalized
 
 
-def software_effect_target_has_auxiliary_devices(tray: Any) -> bool:
+def software_effect_target_has_auxiliary_devices(tray: LightingTrayProtocol) -> bool:
     return bool(_secondary_target_entries(tray))
 
 
-def software_effect_target_routes_aux_devices(tray: Any) -> bool:
+def software_effect_target_routes_aux_devices(tray: LightingTrayProtocol) -> bool:
     if not software_effect_target_has_auxiliary_devices(tray):
         return False
     current = normalize_software_effect_target(getattr(getattr(tray, "config", None), "software_effect_target", None))
     return current == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 
 
-def secondary_software_render_targets(tray: Any) -> list[object]:
+def secondary_software_render_targets(tray: LightingTrayProtocol) -> list[object]:
     cache = _proxy_cache(tray)
     targets: list[object] = []
     for entry in _secondary_target_entries(tray):
@@ -140,7 +141,7 @@ def turn_off_secondary_software_targets(tray: Any) -> None:
             _handle_secondary_target_error(tray, exc, action="turn_off_secondary_software_target")
 
 
-def software_effect_target_options(tray: Any) -> list[dict[str, object]]:
+def software_effect_target_options(tray: LightingTrayProtocol) -> list[dict[str, object]]:
     aux_available = software_effect_target_has_auxiliary_devices(tray)
     return [
         {
@@ -156,7 +157,7 @@ def software_effect_target_options(tray: Any) -> list[dict[str, object]]:
     ]
 
 
-def _secondary_target_entries(tray: Any) -> list[dict[str, str]]:
+def _secondary_target_entries(tray: LightingTrayProtocol) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
     for entry in device_context_entries(tray):
         if str(entry.get("device_type") or "keyboard").strip().lower() == "keyboard":
@@ -168,12 +169,12 @@ def _secondary_target_entries(tray: Any) -> list[dict[str, str]]:
 
 
 def _proxy_cache(tray: Any) -> dict[str, object]:
-    existing = getattr(tray, "_software_target_proxy_cache", None)
+    existing = getattr(tray, "software_target_proxy_cache", None)
     if isinstance(existing, dict):
         return existing
     cache: dict[str, object] = {}
     try:
-        tray._software_target_proxy_cache = cache
+        tray.software_target_proxy_cache = cache
     except (AttributeError, TypeError):
         pass
     except RuntimeError as exc:
@@ -181,11 +182,8 @@ def _proxy_cache(tray: Any) -> dict[str, object]:
     return cache
 
 
-def _iter_secondary_targets(tray: Any):
-    targets_by_key = {
-        str(getattr(target, "key", "")): target
-        for target in secondary_software_render_targets(tray)
-    }
+def _iter_secondary_targets(tray: LightingTrayProtocol):
+    targets_by_key = {str(getattr(target, "key", "")): target for target in secondary_software_render_targets(tray)}
     for entry in _secondary_target_entries(tray):
         key = str(entry.get("key") or "")
         target = targets_by_key.get(key)
@@ -194,7 +192,7 @@ def _iter_secondary_targets(tray: Any):
         yield entry, target
 
 
-def _restore_target_from_config(tray: Any, *, entry: dict[str, str], target: Any) -> None:
+def _restore_target_from_config(tray: LightingTrayProtocol, *, entry: dict[str, str], target: Any) -> None:
     device_type = str(entry.get("device_type") or "").strip().lower()
     if device_type != "lightbar":
         return
@@ -208,20 +206,20 @@ def _restore_target_from_config(tray: Any, *, entry: dict[str, str], target: Any
     target.set_color(color, brightness=brightness)
 
 
-def _handle_secondary_target_error(tray: Any, exc: Exception, *, action: str) -> None:
-    notify = getattr(tray, "_notify_permission_issue", None)
-    if is_permission_denied(exc) and callable(notify):
+def _handle_secondary_target_error(tray: LightingTrayProtocol, exc: Exception, *, action: str) -> None:
+    if is_permission_denied(exc):
         try:
-            notify(exc)
+            tray._notify_permission_issue(exc)
             return
-        # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging on failure
-        except Exception as notify_exc:
-            _log_boundary_exception(tray, "Failed to notify permission issue for secondary software target: %s", notify_exc)
+        except Exception as notify_exc:  # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging
+            _log_boundary_exception(
+                tray, "Failed to notify permission issue for secondary software target: %s", notify_exc
+            )
 
     _log_boundary_exception(tray, f"Error during {action}: %s", exc)
 
 
-def _set_engine_attr_best_effort(tray: Any, attr: str, value: object, *, error_msg: str) -> None:
+def _set_engine_attr_best_effort(tray: LightingTrayProtocol, attr: str, value: object, *, error_msg: str) -> None:
     engine = getattr(tray, "engine", None)
     if engine is None:
         return
@@ -234,7 +232,7 @@ def _set_engine_attr_best_effort(tray: Any, attr: str, value: object, *, error_m
         _log_boundary_exception(tray, error_msg, exc)
 
 
-def _set_config_attr_best_effort(tray: Any, attr: str, value: object, *, error_msg: str) -> None:
+def _set_config_attr_best_effort(tray: LightingTrayProtocol, attr: str, value: object, *, error_msg: str) -> None:
     config = getattr(tray, "config", None)
     if config is None:
         return
@@ -247,15 +245,12 @@ def _set_config_attr_best_effort(tray: Any, attr: str, value: object, *, error_m
         _log_boundary_exception(tray, error_msg, exc)
 
 
-def _log_boundary_exception(tray: Any, msg: str, exc: Exception) -> None:
-    log_exception = getattr(tray, "_log_exception", None)
-    if callable(log_exception):
-        try:
-            log_exception(msg, exc)
-            return
-        # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fall back to module traceback logging
-        except Exception as log_exc:
-            logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
+def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
+    try:
+        tray._log_exception(msg, exc)
+        return
+    except Exception as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
+        logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
 
     logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 

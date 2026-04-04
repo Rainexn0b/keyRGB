@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from tkinter import font as tkfont
+from tkinter import TclError, font as tkfont
+from typing import Any
 
 from PIL import Image, ImageTk
 
@@ -15,6 +16,41 @@ from ..profile_management import keymap_cells_for, representative_cell
 
 
 logger = logging.getLogger(__name__)
+
+
+def _fit_key_label(label: str, *, font_name: str, font_size: int, max_text_w: int) -> tuple[str, int]:
+    try:
+        font = tkfont.Font(font=(font_name, font_size))
+        while font_size > 6 and font.measure(label) > max_text_w:
+            font_size -= 1
+            font.configure(size=font_size)
+        if font.measure(label) > max_text_w:
+            ellipsis = "…"
+            if font.measure(ellipsis) <= max_text_w:
+                trimmed = label
+                while trimmed and font.measure(trimmed + ellipsis) > max_text_w:
+                    trimmed = trimmed[:-1]
+                label = (trimmed + ellipsis) if trimmed else ellipsis
+    except (AttributeError, RuntimeError, TclError, TypeError, ValueError):
+        logger.debug("Failed to measure key label %r; drawing without truncation.", label, exc_info=True)
+    return label, font_size
+
+
+def _coerce_backdrop_transparency(value: object) -> float:
+    raw_value = value
+    getter = getattr(raw_value, "get", None)
+    if callable(getter):
+        try:
+            raw_value = getter()
+        except (AttributeError, RuntimeError, TclError, TypeError, ValueError):
+            logger.debug(
+                "Failed to read backdrop transparency variable; falling back to default coercion.", exc_info=True
+            )
+    try:
+        return max(0.0, min(100.0, float(raw_value or 0)))  # type: ignore[arg-type]
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        logger.debug("Failed to coerce backdrop transparency %r; defaulting to 0.", raw_value, exc_info=True)
+        return 0.0
 
 
 def _shape_polygon_points(shape_rects: list[tuple[float, float, float, float]]) -> list[float]:
@@ -32,6 +68,21 @@ def _shape_polygon_points(shape_rects: list[tuple[float, float, float, float]]) 
 
 
 class _KeyboardCanvasDrawingMixin:
+    # Attributes/methods provided by tk.Canvas and KeyboardCanvas
+    editor: Any
+    _canvas_transform: Any
+    _deck_render_cache: Any
+    _inset_pixels: Any
+    create_image: Any
+    create_polygon: Any
+    create_rectangle: Any
+    create_text: Any
+    delete: Any
+    itemconfig: Any
+    tag_bind: Any
+    winfo_height: Any
+    winfo_width: Any
+
     def _load_deck_image(self) -> None:
         prof = getattr(self.editor, "profile_name", None)
         self._deck_img = load_reference_deck_image(profile_name=str(prof) if isinstance(prof, str) else None)
@@ -143,21 +194,12 @@ class _KeyboardCanvasDrawingMixin:
             font_size = max(7, min(11, int(min(key_w, key_h) * 0.30)))
             max_text_w = max(1, key_w - 6)
 
-            label = key.label
-            try:
-                f = tkfont.Font(font=(font_name, font_size))
-                while font_size > 6 and f.measure(label) > max_text_w:
-                    font_size -= 1
-                    f.configure(size=font_size)
-                if f.measure(label) > max_text_w:
-                    ell = "…"
-                    if f.measure(ell) <= max_text_w:
-                        trimmed = label
-                        while trimmed and f.measure(trimmed + ell) > max_text_w:
-                            trimmed = trimmed[:-1]
-                        label = (trimmed + ell) if trimmed else ell
-            except Exception:
-                pass
+            label, font_size = _fit_key_label(
+                key.label,
+                font_name=font_name,
+                font_size=font_size,
+                max_text_w=max_text_w,
+            )
 
             text_id = self.create_text(
                 (x1 + x2) / 2,
@@ -192,14 +234,7 @@ class _KeyboardCanvasDrawingMixin:
 
         # Backdrop transparency is a user-facing percentage:
         # 0 = opaque, 100 = fully transparent.
-        try:
-            t = float(getattr(self.editor, "backdrop_transparency", 0).get())
-        except Exception:
-            try:
-                t = float(getattr(self.editor, "backdrop_transparency", 0) or 0)
-            except Exception:
-                t = 0.0
-        t = max(0.0, min(100.0, float(t)))
+        t = _coerce_backdrop_transparency(getattr(self.editor, "backdrop_transparency", 0))
         deck_image = self._deck_img if isinstance(self._deck_img, Image.Image) else None
         try:
             self._deck_img_tk = self._deck_render_cache.get_or_create(
@@ -208,7 +243,8 @@ class _KeyboardCanvasDrawingMixin:
                 transparency_pct=t,
                 photo_factory=ImageTk.PhotoImage,
             )
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: Pillow/Tk backdrop rendering crosses external runtime seams; must remain best-effort
+            logger.exception("Deck backdrop render failed; clearing cache and skipping the background image.")
             self._deck_render_cache.clear()
             self._deck_img_tk = None
         if self._deck_img_tk is not None:

@@ -12,7 +12,7 @@ _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 
 def _coerce_poll_int(value: object, *, default: int) -> int:
     try:
-        return int(value)
+        return int(value)  # type: ignore[call-overload]
     except _BRIGHTNESS_COERCION_ERRORS:
         return int(default)
 

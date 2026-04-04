@@ -20,6 +20,11 @@ from src.gui.theme import apply_clam_theme
 
 
 logger = logging.getLogger(__name__)
+_BACKEND_CAPABILITY_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_BACKEND_SELECTION_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
+_DEVICE_ACQUISITION_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_DEVICE_APPLY_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+_TK_WIDGET_STATE_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 
 try:
     from src.gui.widgets.color_wheel import ColorWheel
@@ -35,7 +40,9 @@ class UniformColorGUI:
     """Simple GUI for selecting a uniform keyboard color."""
 
     def __init__(self):
-        self.target_context = str(os.environ.get("KEYRGB_UNIFORM_TARGET_CONTEXT", "keyboard") or "keyboard").strip().lower()
+        self.target_context = (
+            str(os.environ.get("KEYRGB_UNIFORM_TARGET_CONTEXT", "keyboard") or "keyboard").strip().lower()
+        )
         self.requested_backend = str(os.environ.get("KEYRGB_UNIFORM_BACKEND", "") or "").strip().lower() or None
         self._target_is_lightbar = self.target_context.startswith("lightbar") or self.requested_backend == "ite8233"
         self._target_label = "Lightbar" if self._target_is_lightbar else "Keyboard"
@@ -58,19 +65,9 @@ class UniformColorGUI:
         self.config = Config()
 
         # Try to acquire device for standalone mode; if tray app owns it, we'll defer.
-        self.kb = None
-        self._color_supported = True
-        try:
-            backend = select_backend(requested=self.requested_backend)
-            try:
-                caps = backend.capabilities() if backend is not None else None
-                self._color_supported = bool(getattr(caps, "color", True)) if caps is not None else True
-            except Exception:
-                self._color_supported = True
-            self.kb = backend.get_device() if backend is not None else None
-        except Exception:
-            # Likely "resource busy" because the tray app already owns the USB device.
-            self.kb = None
+        backend = self._select_backend_best_effort()
+        self._color_supported = self._probe_color_support(backend)
+        self.kb = self._acquire_device_best_effort(backend)
 
         main_frame = ttk.Frame(self.root, padding=20)
         main_frame.pack(fill="both", expand=True)
@@ -109,7 +106,7 @@ class UniformColorGUI:
         if not self._color_supported:
             try:
                 apply_btn.configure(state="disabled")
-            except Exception:
+            except _TK_WIDGET_STATE_ERRORS:
                 pass
         apply_btn.pack(side="left", padx=(0, 10), fill="x", expand=True)
 
@@ -127,6 +124,58 @@ class UniformColorGUI:
 
         # Throttle config writes while dragging (seconds)
         self._drag_commit_interval = 0.06
+
+    def _select_backend_best_effort(self):
+        try:
+            return select_backend(requested=self.requested_backend)
+        except _BACKEND_SELECTION_ERRORS:
+            logger.debug(
+                "Failed to select backend for the uniform color window; falling back to config-only mode",
+                exc_info=True,
+            )
+            return None
+
+    def _probe_color_support(self, backend) -> bool:
+        if backend is None:
+            return True
+
+        try:
+            caps = backend.capabilities()
+            return bool(getattr(caps, "color", True)) if caps is not None else True
+        except _BACKEND_CAPABILITY_ERRORS:
+            logger.debug(
+                "Failed to probe backend capabilities for the uniform color window; assuming RGB support",
+                exc_info=True,
+            )
+            return True
+
+    def _acquire_device_best_effort(self, backend):
+        if backend is None:
+            return None
+
+        try:
+            return backend.get_device()
+        except OSError as exc:
+            if is_device_busy(exc):
+                logger.debug("Uniform color window is deferring to the tray-owned device handle", exc_info=True)
+                return None
+            logger.debug(
+                "Failed to acquire a device for the uniform color window; falling back to config-only mode",
+                exc_info=True,
+            )
+            return None
+        except _DEVICE_ACQUISITION_ERRORS:
+            logger.debug(
+                "Failed to acquire a device for the uniform color window; falling back to config-only mode",
+                exc_info=True,
+            )
+            return None
+
+    def _log_color_apply_failure(self, exc: Exception) -> None:
+        if os.environ.get("KEYRGB_DEBUG"):
+            logger.exception("Error setting color")
+            return
+        logger.error("Error setting color: %s", exc)
 
     def _set_status(self, msg: str, *, ok: bool) -> None:
         color = "#00ff00" if ok else "#ff0000"
@@ -188,16 +237,13 @@ class UniformColorGUI:
             if is_device_busy(e):
                 self.kb = None
                 return "deferred"
-            if os.environ.get("KEYRGB_DEBUG"):
-                logger.exception("Error setting color")
-            else:
-                logger.error("Error setting color: %s", e)
+            self._log_color_apply_failure(e)
             return False
-        except Exception as e:
-            if os.environ.get("KEYRGB_DEBUG"):
-                logger.exception("Error setting color")
-            else:
-                logger.error("Error setting color: %s", e)
+        except _DEVICE_APPLY_ERRORS as e:
+            self._log_color_apply_failure(e)
+            return False
+        except Exception as e:  # @quality-exception exception-transparency: uniform color apply crosses backend/runtime device writes; GUI apply must remain best-effort
+            self._log_color_apply_failure(e)
             return False
 
     def _on_color_release(self, r, g, b):

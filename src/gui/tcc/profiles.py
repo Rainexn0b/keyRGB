@@ -13,13 +13,19 @@ from __future__ import annotations
 import logging
 
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import messagebox, ttk
 
 from src.core.utils.logging_utils import log_throttled
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_theme
 from src.gui.utils.window_centering import center_window_on_screen
-from src.gui.tcc.profile_editor import open_profile_json_editor
+from src.gui.tcc._profile_actions import (
+    create_profile,
+    delete_profile,
+    duplicate_profile,
+    edit_profile,
+    rename_profile,
+)
 import src.core.power.tcc_profiles as tcc_power_profiles
 
 
@@ -212,143 +218,64 @@ class TccProfilesGUI:
         self._update_crud_buttons()
 
     def _on_new(self) -> None:
-        name = simpledialog.askstring("New Profile", "Profile name:", parent=self.root)
-        if name is None:
-            return
-        name = name.strip()
-        if not name:
-            return
-        try:
-            tcc_power_profiles.create_custom_profile(name)
-            self._set_status("✓ Created")
-        except _TCC_PROFILE_WRITE_ERRORS as exc:
-            log_throttled(
-                logger,
-                "tcc_profiles.create_custom_profile",
-                interval_s=60,
-                level=logging.WARNING,
-                msg="Failed to create TCC custom profile",
-                exc=exc,
-            )
-            messagebox.showerror("Create failed", str(exc))
-            return
-        self._refresh()
+        create_profile(
+            self.root,
+            logger=logger,
+            set_status=self._set_status,
+            refresh=self._refresh,
+            write_errors=_TCC_PROFILE_WRITE_ERRORS,
+        )
 
     def _on_duplicate(self) -> None:
         idx = self._selected_index()
         if idx is None or idx < 0 or idx >= len(self._profiles):
             return
-        src = self._profiles[idx]
-        if src.id.startswith("__legacy_"):
-            return
-        name = simpledialog.askstring("Duplicate Profile", "New profile name:", parent=self.root)
-        if name is None:
-            return
-        name = name.strip()
-        if not name:
-            return
-        try:
-            tcc_power_profiles.duplicate_custom_profile(src.id, name)
-            self._set_status("✓ Duplicated")
-        except _TCC_PROFILE_WRITE_ERRORS as exc:
-            log_throttled(
-                logger,
-                "tcc_profiles.duplicate_custom_profile",
-                interval_s=60,
-                level=logging.WARNING,
-                msg="Failed to duplicate TCC custom profile",
-                exc=exc,
-            )
-            messagebox.showerror("Duplicate failed", str(exc))
-            return
-        self._refresh()
+        duplicate_profile(
+            self.root,
+            logger=logger,
+            set_status=self._set_status,
+            refresh=self._refresh,
+            profile=self._profiles[idx],
+            write_errors=_TCC_PROFILE_WRITE_ERRORS,
+        )
 
     def _on_rename(self) -> None:
         idx = self._selected_index()
         if idx is None or idx < 0 or idx >= len(self._profiles):
             return
-        prof = self._profiles[idx]
-        if prof.id.startswith("__legacy_"):
-            return
-        name = simpledialog.askstring("Rename Profile", "New name:", initialvalue=prof.name, parent=self.root)
-        if name is None:
-            return
-        name = name.strip()
-        if not name:
-            return
-        try:
-            tcc_power_profiles.rename_custom_profile(prof.id, name)
-            self._set_status("✓ Renamed")
-        except _TCC_PROFILE_WRITE_ERRORS as exc:
-            log_throttled(
-                logger,
-                "tcc_profiles.rename_custom_profile",
-                interval_s=60,
-                level=logging.WARNING,
-                msg="Failed to rename TCC custom profile",
-                exc=exc,
-            )
-            messagebox.showerror("Rename failed", str(exc))
-            return
-        self._refresh()
+        rename_profile(
+            self.root,
+            logger=logger,
+            set_status=self._set_status,
+            refresh=self._refresh,
+            profile=self._profiles[idx],
+            write_errors=_TCC_PROFILE_WRITE_ERRORS,
+        )
 
     def _on_delete(self) -> None:
         idx = self._selected_index()
         if idx is None or idx < 0 or idx >= len(self._profiles):
             return
-        prof = self._profiles[idx]
-        if prof.id.startswith("__"):
-            return
-        if not messagebox.askyesno("Delete Profile", f"Delete '{prof.name}'?", parent=self.root):
-            return
-        try:
-            tcc_power_profiles.delete_custom_profile(prof.id)
-            self._set_status("✓ Deleted")
-        except _TCC_PROFILE_WRITE_ERRORS as exc:
-            log_throttled(
-                logger,
-                "tcc_profiles.delete_custom_profile",
-                interval_s=60,
-                level=logging.WARNING,
-                msg="Failed to delete TCC custom profile",
-                exc=exc,
-            )
-            messagebox.showerror("Delete failed", str(exc))
-            return
-        self._refresh()
+        delete_profile(
+            self.root,
+            logger=logger,
+            set_status=self._set_status,
+            refresh=self._refresh,
+            profile=self._profiles[idx],
+            write_errors=_TCC_PROFILE_WRITE_ERRORS,
+        )
 
     def _on_edit(self) -> None:
         idx = self._selected_index()
         if idx is None or idx < 0 or idx >= len(self._profiles):
             return
-        prof = self._profiles[idx]
-        if prof.id.startswith("__legacy_"):
-            return
-
-        payload = None
-        try:
-            payload = tcc_power_profiles.get_custom_profile_payload(prof.id)
-        except _TCC_PROFILE_WRITE_ERRORS as exc:
-            log_throttled(
-                logger,
-                "tcc_profiles.get_custom_profile_payload",
-                interval_s=60,
-                level=logging.WARNING,
-                msg="Failed to load editable TCC profile payload",
-                exc=exc,
-            )
-            payload = None
-
-        if not isinstance(payload, dict):
-            messagebox.showerror("Edit failed", "Could not load editable profile payload from tccd.")
-            return
-
-        open_profile_json_editor(
+        edit_profile(
             self.root,
-            profile_name=prof.name,
-            payload=payload,
-            on_save=lambda obj: tcc_power_profiles.update_custom_profile(prof.id, obj),
-            on_saved=lambda: (self._set_status("✓ Saved"), self._refresh()),
+            logger=logger,
+            set_status=self._set_status,
+            refresh=self._refresh,
+            profile=self._profiles[idx],
+            write_errors=_TCC_PROFILE_WRITE_ERRORS,
         )
 
     def _on_activate(self) -> None:

@@ -10,7 +10,7 @@ from src.core.resources.layout_slots import get_layout_slot_states
 def _body_wraplength(body: Any, *, fallback: int = 520) -> int:
     try:
         width = int(body.winfo_width())
-    except Exception:
+    except tk.TclError:
         return fallback
     return max(320, width - 12)
 
@@ -49,7 +49,7 @@ def refresh_layout_slots_ui(editor: Any) -> None:
             row,
             text=state.key_id,
             variable=visible_var,
-            command=lambda slot_id=slot_id, var=visible_var: editor._set_layout_slot_visibility(slot_id, var.get()),
+            command=lambda slot_id=slot_id, var=visible_var: editor._set_layout_slot_visibility(slot_id, var.get()),  # type: ignore[misc]
         ).grid(row=0, column=0, sticky="w", padx=(0, 8))
 
         label_var = tk.StringVar(value=state.label)
@@ -57,11 +57,11 @@ def refresh_layout_slots_ui(editor: Any) -> None:
         entry.grid(row=0, column=1, sticky="ew")
         entry.bind(
             "<Return>",
-            lambda _e, slot_id=slot_id, var=label_var: editor._set_layout_slot_label(slot_id, var.get()),
+            lambda _e, slot_id=slot_id, var=label_var: editor._set_layout_slot_label(slot_id, var.get()),  # type: ignore[misc]
         )
         entry.bind(
             "<FocusOut>",
-            lambda _e, slot_id=slot_id, var=label_var: editor._set_layout_slot_label(slot_id, var.get()),
+            lambda _e, slot_id=slot_id, var=label_var: editor._set_layout_slot_label(slot_id, var.get()),  # type: ignore[misc]
         )
 
         ttk.Label(row, text=f"Default: {state.default_label}", font=("Sans", 8)).grid(

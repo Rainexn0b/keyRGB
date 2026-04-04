@@ -3,15 +3,23 @@ from __future__ import annotations
 from functools import lru_cache
 from io import BytesIO
 import importlib
+import logging
 from pathlib import Path
 
 import tkinter as tk
 
 
+logger = logging.getLogger(__name__)
+
+
 _WINDOW_ICON_SIZE = (64, 64)
+_SVG_RASTERIZER_FALLBACK_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
+_HOME_DISCOVERY_ERRORS = (OSError, RuntimeError)
+_LOGO_PATH_PROBE_ERRORS = (OSError, RuntimeError)
+_WINDOW_ICON_LOAD_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, tk.TclError, TypeError, ValueError)
 
 
-def _rasterize_svg_window_icon(path_str: str):
+def _rasterize_svg_window_icon_with_cairosvg(path_str: str):
     from PIL import Image  # type: ignore
 
     cairosvg = importlib.import_module("cairosvg")
@@ -19,6 +27,45 @@ def _rasterize_svg_window_icon(path_str: str):
     png_bytes = svg2png(url=path_str, output_width=_WINDOW_ICON_SIZE[0], output_height=_WINDOW_ICON_SIZE[1])
     with Image.open(BytesIO(png_bytes)) as image:
         return image.convert("RGBA")
+
+
+def _rasterize_svg_window_icon_with_gdkpixbuf(path_str: str):
+    from PIL import Image  # type: ignore
+
+    gi = importlib.import_module("gi")
+    require_version = getattr(gi, "require_version", None)
+    if callable(require_version):
+        require_version("GdkPixbuf", "2.0")
+
+    from gi.repository import GdkPixbuf  # type: ignore
+
+    pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
+        path_str,
+        _WINDOW_ICON_SIZE[0],
+        _WINDOW_ICON_SIZE[1],
+        True,
+    )
+    ok, png_bytes = pixbuf.save_to_bufferv("png", [], [])
+    if not ok:
+        raise RuntimeError(f"Failed to rasterize SVG icon via GdkPixbuf: {path_str}")
+    with Image.open(BytesIO(bytes(png_bytes))) as image:
+        return image.convert("RGBA")
+
+
+def _rasterize_svg_window_icon(path_str: str):
+    last_exc: Exception | None = None
+    for loader in (
+        _rasterize_svg_window_icon_with_cairosvg,
+        _rasterize_svg_window_icon_with_gdkpixbuf,
+    ):
+        try:
+            return loader(path_str)
+        except _SVG_RASTERIZER_FALLBACK_ERRORS as exc:
+            last_exc = exc
+
+    if last_exc is not None:
+        raise last_exc
+    raise RuntimeError(f"No SVG window icon rasterizer available for: {path_str}")
 
 
 def _repo_candidate_logo_paths() -> list[Path]:
@@ -54,7 +101,7 @@ def _candidate_logo_paths() -> list[Path]:
         ):
             if candidate not in paths:
                 paths.append(candidate)
-    except Exception:
+    except _HOME_DISCOVERY_ERRORS:
         pass
 
     return paths
@@ -65,7 +112,7 @@ def find_keyrgb_logo_path() -> Path | None:
         try:
             if p.is_file():
                 return p
-        except Exception:
+        except _LOGO_PATH_PROBE_ERRORS:
             continue
     return None
 
@@ -121,7 +168,8 @@ def apply_keyrgb_window_icon(window: tk.Misc) -> None:
                 if callable(iconphoto):
                     iconphoto(True, photo)
                 return
-            except Exception:
+            except _WINDOW_ICON_LOAD_ERRORS:
                 continue
-    except Exception:
+    except Exception as exc:  # @quality-exception exception-transparency: Tk window icon setup crosses arbitrary Tk/window callback boundaries and must remain non-fatal during window creation
+        logger.exception("Failed to apply KeyRGB window icon", exc_info=exc)
         return

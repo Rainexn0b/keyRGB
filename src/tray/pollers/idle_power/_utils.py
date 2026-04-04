@@ -62,7 +62,7 @@ def build_idle_action_key(
             f"{action}|dimmed={dimmed}|screen_off={bool(screen_off)}|"
             f"bri={int(brightness)}|dim_mode={str(dim_sync_mode)}|dim_tmp={int(dim_temp_brightness)}"
         )
-    except Exception:
+    except Exception:  # @quality-exception exception-transparency: idle action key formatting degrades to str(action) so the poller never crashes on non-int fields
         return str(action)
 
 

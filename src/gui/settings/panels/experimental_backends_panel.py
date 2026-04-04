@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 import tkinter as tk
 from tkinter import ttk
 
@@ -10,7 +12,7 @@ class ExperimentalBackendsPanel:
         parent: ttk.Frame,
         *,
         var_experimental_backends: tk.BooleanVar,
-        on_toggle: callable,
+        on_toggle: Any,
     ) -> None:
         title = ttk.Label(parent, text="Backend policy", font=("Sans", 11, "bold"))
         title.pack(anchor="w", pady=(0, 6))

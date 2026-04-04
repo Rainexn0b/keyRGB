@@ -40,6 +40,14 @@ from src.gui.theme import apply_clam_theme
 from src.gui.utils.tk_async import run_in_thread
 
 
+_FOOTER_HARDWARE_PROBE_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
+_FOOTER_HARDWARE_HINT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_SCROLLREGION_CONFIGURE_ERRORS = (RuntimeError, tk.TclError)
+_SETTINGS_VALUE_READ_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_SETTINGS_APPLY_ERRORS = (AttributeError, OSError, RecursionError, RuntimeError, TypeError, ValueError)
+_OS_AUTOSTART_WRITE_ERRORS = (OSError, RuntimeError)
+
+
 class PowerSettingsGUI:
     def __init__(self):
         self.root = tk.Tk()
@@ -72,21 +80,21 @@ class PowerSettingsGUI:
 
         def work() -> str:
             try:
-                from src.core.diagnostics.collectors_backends import (
+                from src.core.diagnostics.collectors.backends import (
                     backend_probe_snapshot,
                 )
 
                 snap = backend_probe_snapshot()
                 return extract_unsupported_rgb_controllers_hint(snap)
-            except Exception:
+            except _FOOTER_HARDWARE_PROBE_ERRORS:
                 return ""
 
         def on_done(text: str) -> None:
             try:
                 # Only show the footer hint when we have something actionable.
                 self.bottom_bar_panel.set_hardware_hint(text)
-            except Exception:
-                pass
+            except _FOOTER_HARDWARE_HINT_ERRORS:
+                return
 
         # Defer slightly so the window paints immediately.
         run_in_thread(self.root, work, on_done, delay_ms=100)
@@ -209,7 +217,7 @@ class PowerSettingsGUI:
         self.root.update_idletasks()
         try:
             self.scroll.canvas.configure(scrollregion=self.scroll.canvas.bbox("all"))
-        except Exception:
+        except _SCROLLREGION_CONFIGURE_ERRORS:
             pass
 
         self.scroll.finalize_initial_scrollbar_state()
@@ -258,16 +266,21 @@ class PowerSettingsGUI:
                 os_autostart_enabled=bool(self.var_os_autostart.get()),
                 physical_layout=str(getattr(self.config, "physical_layout", "auto") or "auto"),
             )
-            apply_settings_values_to_config(config=self.config, values=values)
-        except Exception:
-            # Keep best-effort behavior identical to the previous inline implementation.
-            pass
+        except _SETTINGS_VALUE_READ_ERRORS:
+            values = None
+
+        if values is not None:
+            try:
+                apply_settings_values_to_config(config=self.config, values=values)
+            except _SETTINGS_APPLY_ERRORS:
+                # Keep settings persistence best-effort for GUI toggles.
+                pass
 
         desired_os_autostart = bool(self.var_os_autostart.get())
         try:
             set_os_autostart(desired_os_autostart)
             self.config.os_autostart = desired_os_autostart
-        except Exception:
+        except _OS_AUTOSTART_WRITE_ERRORS:
             self.var_os_autostart.set(detect_os_autostart_enabled())
 
         self._apply_enabled_state()

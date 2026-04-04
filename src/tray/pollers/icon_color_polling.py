@@ -32,19 +32,30 @@ def _has_animated_icon_state(*, effect: str, config: object | None) -> bool:
     return False
 
 
-def _normalize_color(value) -> tuple[int, int, int]:
+def _coerce_int(value) -> int:
     try:
-        if value is None:
-            return (0, 0, 0)
-        if isinstance(value, tuple) and len(value) == 3:
-            r, g, b = value
-        else:
+        return int(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def _normalize_color(value) -> tuple[int, int, int]:
+    if value is None:
+        return (0, 0, 0)
+    if isinstance(value, tuple) and len(value) == 3:
+        r, g, b = value
+    else:
+        try:
             seq = list(value)
-            if len(seq) != 3:
-                return (0, 0, 0)
-            r, g, b = seq
+        except TypeError:
+            return (0, 0, 0)
+        if len(seq) != 3:
+            return (0, 0, 0)
+        r, g, b = seq
+
+    try:
         return (int(r), int(g), int(b))
-    except Exception:
+    except (TypeError, ValueError, OverflowError):
         return (0, 0, 0)
 
 
@@ -56,15 +67,8 @@ def _compute_icon_sig(tray) -> tuple[bool, str, int, int, tuple[int, int, int], 
     brightness = getattr(config, "brightness", 0) if config is not None else 0
     color = getattr(config, "color", (0, 0, 0)) if config is not None else (0, 0, 0)
 
-    try:
-        speed_i = int(speed or 0)
-    except Exception:
-        speed_i = 0
-
-    try:
-        brightness_i = int(brightness or 0)
-    except Exception:
-        brightness_i = 0
+    speed_i = _coerce_int(speed or 0)
+    brightness_i = _coerce_int(brightness or 0)
 
     return (
         bool(getattr(tray, "is_off", False)),
@@ -100,7 +104,7 @@ def start_icon_color_polling(tray) -> None:
                     except TypeError:
                         tray._update_icon()
                     last_sig = sig
-            except Exception as exc:
+            except Exception as exc:  # @quality-exception exception-transparency: tray icon polling crosses arbitrary tray callbacks, backend state, and logger boundaries and must remain non-fatal for tray stability
                 now = time.monotonic()
                 if now - last_error_at > 60:
                     last_error_at = now

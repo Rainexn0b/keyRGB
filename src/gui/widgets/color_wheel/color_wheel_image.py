@@ -78,5 +78,5 @@ def write_bytes_atomic(path: Path, data: bytes) -> None:
         try:
             if tmp.exists():
                 tmp.unlink(missing_ok=True)
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: temp-file cleanup in finally block must not mask the original exception
             pass

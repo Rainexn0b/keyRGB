@@ -8,8 +8,8 @@ from .color_wheel import ColorWheel
 def main() -> None:
     try:
         from src.gui.utils.window_icon import apply_keyrgb_window_icon
-    except Exception:
-        apply_keyrgb_window_icon = None
+    except Exception:  # @quality-exception exception-transparency: window icon import is optional; demo runs without it
+        apply_keyrgb_window_icon = None  # type: ignore[assignment]
 
     root = tk.Tk()
     root.title("Color Wheel Test")

@@ -19,7 +19,7 @@ def hex_to_rgb(hex_color: str) -> ColorRGB:
         return (0x2B, 0x2B, 0x2B)
     try:
         return (int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
-    except Exception:
+    except ValueError:
         return (0x2B, 0x2B, 0x2B)
 
 
@@ -76,7 +76,7 @@ def hsv_to_xy(hue: float, saturation: float, radius: float) -> Tuple[float, floa
     return x, y
 
 
-def xy_to_hsv(x: int, y: int, radius: float) -> Tuple[float, float] | None:
+def xy_to_hsv(x: int, y: int, radius: float) -> tuple[float | None, float] | None:
     """Calculate Hue and Saturation from X, Y coordinates.
 
     Returns (hue, saturation) tuple, or None if outside the wheel.

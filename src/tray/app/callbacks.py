@@ -11,29 +11,26 @@ from src.tray.protocols import LightingTrayProtocol
 
 import src.core.power.tcc_profiles as tcc_power_profiles
 
-from ..controllers.effect_selection import apply_effect_selection
-from ..controllers.lighting_controller import (
-    on_brightness_clicked,
-    on_speed_clicked,
-    turn_off,
-    turn_on,
-)
-from ..controllers.secondary_device_controller import (
-    apply_selected_secondary_brightness,
-    selected_secondary_backend_name,
-)
-from ..controllers.secondary_device_controller import turn_off_selected_secondary_device
-from ..controllers.software_target_controller import apply_software_effect_target_selection
+from ..controllers import effect_selection, lighting_controller, secondary_device_controller, software_target_controller
 from ..ui import menu as menu_mod
-from ..ui.gui_launch import (
-    launch_perkey_gui,
-    launch_power_gui,
-    launch_reactive_color_gui,
-    launch_support_gui,
-    launch_tcc_profiles_gui,
-    launch_uniform_gui,
-)
+from ..ui import gui_launch
 from ..ui.menu_status import selected_device_context_entry
+
+apply_effect_selection = effect_selection.apply_effect_selection
+on_brightness_clicked = lighting_controller.on_brightness_clicked
+on_speed_clicked = lighting_controller.on_speed_clicked
+turn_off = lighting_controller.turn_off
+turn_on = lighting_controller.turn_on
+apply_selected_secondary_brightness = secondary_device_controller.apply_selected_secondary_brightness
+selected_secondary_backend_name = secondary_device_controller.selected_secondary_backend_name
+turn_off_selected_secondary_device = secondary_device_controller.turn_off_selected_secondary_device
+apply_software_effect_target_selection = software_target_controller.apply_software_effect_target_selection
+launch_perkey_gui = gui_launch.launch_perkey_gui
+launch_power_gui = gui_launch.launch_power_gui
+launch_reactive_color_gui = gui_launch.launch_reactive_color_gui
+launch_support_gui = gui_launch.launch_support_gui
+launch_tcc_profiles_gui = gui_launch.launch_tcc_profiles_gui
+launch_uniform_gui = gui_launch.launch_uniform_gui
 
 
 def _refresh_ui_best_effort(tray: LightingTrayProtocol) -> None:

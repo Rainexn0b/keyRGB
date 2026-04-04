@@ -100,6 +100,19 @@ class LightbarControls(ttk.LabelFrame):
         self.inset_var.set(float(payload.get("inset", defaults["inset"])))
         self.redraw_preview()
 
+    def _redraw_editor_canvas(self) -> None:
+        canvas = getattr(self.editor, "canvas", None)
+        redraw = getattr(canvas, "redraw", None)
+        if not callable(redraw):
+            return
+
+        try:
+            redraw()
+        except (AttributeError, tk.TclError):
+            return
+        except Exception:  # @quality-exception exception-transparency: per-key lightbar control redraw crosses Tk widget lifetime and canvas implementation callbacks and must remain non-fatal for overlay editing
+            return
+
     def apply_from_vars(self) -> dict[str, bool | float]:
         payload = normalize_lightbar_overlay(
             {
@@ -113,10 +126,7 @@ class LightbarControls(ttk.LabelFrame):
         )
         self.editor.lightbar_overlay = payload
         self.redraw_preview()
-        try:
-            self.editor.canvas.redraw()
-        except Exception:
-            pass
+        self._redraw_editor_canvas()
         return payload
 
     def save_tweaks(self) -> None:
@@ -127,10 +137,7 @@ class LightbarControls(ttk.LabelFrame):
     def reset_tweaks(self) -> None:
         self.editor.lightbar_overlay = get_default_lightbar_overlay()
         self.sync_vars_from_editor()
-        try:
-            self.editor.canvas.redraw()
-        except Exception:
-            pass
+        self._redraw_editor_canvas()
         set_status(self.editor, reset_lightbar_overlay())
 
     def redraw_preview(self) -> None:
@@ -141,7 +148,7 @@ class LightbarControls(ttk.LabelFrame):
         try:
             width = max(120.0, float(canvas.winfo_width()))
             height = max(48.0, float(canvas.winfo_height()))
-        except Exception:
+        except (TypeError, ValueError, tk.TclError):
             width = 180.0
             height = 88.0
 

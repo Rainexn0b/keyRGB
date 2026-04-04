@@ -10,12 +10,14 @@ from src.core.effects.perkey_animation import build_full_color_grid
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS as NUM_COLS
 from src.core.resources.defaults import REFERENCE_MATRIX_ROWS as NUM_ROWS
 
-from src.tray.ui.icon_draw import create_icon, create_icon_mosaic, create_icon_rainbow
-from src.tray.ui.icon_color import _per_key_color_mapping, representative_color
+from src.tray.ui.icon._draw import create_icon, create_icon_mosaic, create_icon_rainbow
+from src.tray.ui.icon._color import _per_key_color_mapping, representative_color
 
 
 _ANIMATED_ICON_PHASE_RATE = 0.008
 _ANIMATED_ICON_SCALE_FLOOR = 0.85
+_CONFIG_READ_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 
 
 @dataclass(frozen=True)
@@ -46,12 +48,28 @@ def _animated_icon_phase(now: float) -> float:
     return (float(now) * _ANIMATED_ICON_PHASE_RATE) % 1.0
 
 
+def _config_value_or_default(config: Any, name: str, default: object) -> object:
+    try:
+        value = getattr(config, name, default)
+    except _CONFIG_READ_ERRORS:
+        return default
+    return default if value is None else value
+
+
+def _config_int_or_default(config: Any, name: str, default: int) -> int:
+    value = _config_value_or_default(config, name, default)
+    try:
+        return int(value)  # type: ignore[call-overload]
+    except _INT_COERCION_ERRORS:
+        return default
+
+
 def _normalized_rgb_or_none(value: object) -> tuple[int, int, int] | None:
     try:
         if not isinstance(value, (tuple, list)) or len(value) != 3:
             return None
         return (int(value[0]), int(value[1]), int(value[2]))
-    except Exception:
+    except _INT_COERCION_ERRORS:
         return None
 
 
@@ -69,7 +87,7 @@ def _has_non_uniform_perkey_base(
 
 def _is_non_uniform_effect(config: Any, *, backend: object | None = None) -> bool:
     effect = resolve_effect_name_for_backend(
-        str(getattr(config, "effect", "none") or "none"),
+        str(_config_value_or_default(config, "effect", "none") or "none"),
         backend,
     )
 
@@ -78,7 +96,7 @@ def _is_non_uniform_effect(config: Any, *, backend: object | None = None) -> boo
         if not per_key:
             return False
 
-        base_color = _normalized_rgb_or_none(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
+        base_color = _normalized_rgb_or_none(_config_value_or_default(config, "color", (255, 0, 128)) or (255, 0, 128))
         if base_color is None:
             return True
         return _has_non_uniform_perkey_base(base_color=base_color, per_key_colors=per_key)
@@ -116,10 +134,11 @@ def _build_perkey_mosaic_visual(*, config: Any, brightness: int) -> IconVisual |
     if not per_key:
         return None
 
+    base_color = _normalized_rgb_or_none(_config_value_or_default(config, "color", (255, 0, 128)) or (255, 0, 128))
+    if base_color is None:
+        return None
+
     try:
-        base_color = _normalized_rgb_or_none(getattr(config, "color", (255, 0, 128)) or (255, 0, 128))
-        if base_color is None:
-            return None
         full = build_full_color_grid(
             base_color=base_color,
             per_key_colors=per_key,
@@ -138,7 +157,7 @@ def _build_perkey_mosaic_visual(*, config: Any, brightness: int) -> IconVisual |
                     rows=NUM_ROWS,
                     cols=NUM_COLS,
                 )
-    except Exception:
+    except _INT_COERCION_ERRORS:
         return None
 
     return None
@@ -171,19 +190,16 @@ def icon_visual(*, config: Any, is_off: bool, now: float | None = None, backend:
     if now is None:
         now = time.time()
 
-    effect = resolve_effect_name_for_backend(
-        str(getattr(config, "effect", "none") or "none"),
-        backend,
-    )
+    effect = resolve_effect_name_for_backend(str(_config_value_or_default(config, "effect", "none") or "none"), backend)
     is_reactive = effect.startswith("reactive_")
+    base_brightness = _config_int_or_default(config, "brightness", 0)
 
-    if (not is_off) and getattr(config, "brightness", 0) != 0 and is_reactive:
-        try:
-            brightness = int(getattr(config, "perkey_brightness", getattr(config, "brightness", 25)) or 25)
-        except Exception:
-            brightness = int(getattr(config, "brightness", 25) or 25)
+    if (not is_off) and base_brightness != 0 and is_reactive:
+        brightness = _config_int_or_default(
+            config, "perkey_brightness", _config_int_or_default(config, "brightness", 25)
+        )
 
-        use_manual_reactive_color = bool(getattr(config, "reactive_use_manual_color", False))
+        use_manual_reactive_color = bool(_config_value_or_default(config, "reactive_use_manual_color", False))
         if not use_manual_reactive_color:
             if effect == "reactive_ripple":
                 return IconVisual(
@@ -204,13 +220,10 @@ def icon_visual(*, config: Any, is_off: bool, now: float | None = None, backend:
             color=representative_color(config=config, is_off=is_off, now=now, backend=backend),
         )
 
-    if (not is_off) and getattr(config, "brightness", 0) != 0 and _is_non_uniform_effect(config, backend=backend):
-        brightness = int(getattr(config, "brightness", 25) or 25)
+    if (not is_off) and base_brightness != 0 and _is_non_uniform_effect(config, backend=backend):
+        brightness = _config_int_or_default(config, "brightness", 25)
         if effect == "perkey":
-            try:
-                brightness = int(getattr(config, "perkey_brightness", brightness) or brightness)
-            except Exception:
-                pass
+            brightness = _config_int_or_default(config, "perkey_brightness", brightness)
 
             mosaic = _build_perkey_mosaic_visual(config=config, brightness=brightness)
             if mosaic is not None:

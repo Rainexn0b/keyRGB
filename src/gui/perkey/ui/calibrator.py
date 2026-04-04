@@ -17,5 +17,5 @@ def run_keymap_calibrator_ui(editor: Any, *, launch_fn: Callable[[], None] = lau
     try:
         launch_fn()
         set_status(editor, calibrator_started())
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: calibrator launch failure is surfaced via set_status; UI must not crash
         set_status(editor, calibrator_failed(exc))

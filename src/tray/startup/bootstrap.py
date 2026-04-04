@@ -38,8 +38,9 @@ def log_startup_diagnostics_if_debug() -> None:
     try:
         diag = collect_diagnostics(include_usb=True)
         logger.debug("Startup diagnostics (Tongfang):\n%s", format_diagnostics_text(diag))
-    except Exception:
+    except (OSError, RuntimeError, AttributeError) as exc:
         # Best-effort; never fail startup because of diagnostics.
+        logger.debug("Startup diagnostics collection failed (non-critical): %s", exc)
         return
 
 

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+import tkinter as tk
 from tkinter import ttk
+
+
+_WRAPLENGTH_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_TK_CALLBACK_SETUP_ERRORS = (RuntimeError, tk.TclError)
 
 
 class BottomBarPanel:
@@ -37,16 +42,16 @@ class BottomBarPanel:
                 if w <= 1:
                     return
                 self.hardware_hint.configure(wraplength=max(200, w - 260))
-            except Exception:
+            except _WRAPLENGTH_SYNC_ERRORS:
                 return
 
         try:
             self.frame.bind("<Configure>", _sync_wraplength)
-        except Exception:
+        except _TK_CALLBACK_SETUP_ERRORS:
             pass
         try:
             self.frame.after(0, _sync_wraplength)
-        except Exception:
+        except _TK_CALLBACK_SETUP_ERRORS:
             pass
 
     def set_hardware_hint(self, text: str) -> None:

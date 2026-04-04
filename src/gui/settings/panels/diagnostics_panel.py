@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import webbrowser
 from typing import Callable
 
@@ -9,6 +10,12 @@ from tkinter import ttk
 
 from ..diagnostics_runner import collect_diagnostics_text
 from src.gui.utils.tk_async import run_in_thread
+
+logger = logging.getLogger(__name__)
+
+_BROWSER_OPEN_ERRORS = (webbrowser.Error, OSError)
+_STATUS_LABEL_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+_CLIPBOARD_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 
 
 class DiagnosticsPanel:
@@ -73,7 +80,7 @@ class DiagnosticsPanel:
     def _status(self) -> ttk.Label | None:
         try:
             return self._get_status_label()
-        except Exception:
+        except _STATUS_LABEL_ERRORS:
             return None
 
     def apply_state(self) -> None:
@@ -85,6 +92,13 @@ class DiagnosticsPanel:
         self.txt_diagnostics.insert("1.0", text)
         self.txt_diagnostics.configure(state="disabled")
 
+    def _collect_diagnostics_text_best_effort(self) -> str:
+        try:
+            return collect_diagnostics_text(include_usb=True)
+        except Exception as exc:  # @quality-exception exception-transparency: diagnostics collection crosses backend probing and JSON serialization; best-effort for settings panel
+            logger.exception("Failed to collect diagnostics for settings panel")
+            return f"Failed to collect diagnostics: {exc}"
+
     def run_diagnostics(self) -> None:
         status = self._status()
         if status is not None:
@@ -93,10 +107,7 @@ class DiagnosticsPanel:
         self.btn_copy_diagnostics.configure(state="disabled")
 
         def work() -> str:
-            try:
-                return collect_diagnostics_text(include_usb=True)
-            except Exception as e:
-                return f"Failed to collect diagnostics: {e}"
+            return self._collect_diagnostics_text_best_effort()
 
         def on_done(text: str) -> None:
             self._diagnostics_json = text if text.strip().startswith("{") else ""
@@ -125,7 +136,7 @@ class DiagnosticsPanel:
         try:
             self._root.clipboard_clear()
             self._root.clipboard_append(self._diagnostics_json)
-        except Exception:
+        except _CLIPBOARD_ERRORS:
             pass
 
         if status is not None:
@@ -136,7 +147,7 @@ class DiagnosticsPanel:
         url = "https://github.com/Rainexn0b/keyRGB/issues/new/choose"
         try:
             ok = bool(webbrowser.open(url, new=2))
-        except Exception:
+        except _BROWSER_OPEN_ERRORS:
             ok = False
 
         status = self._status()
@@ -147,7 +158,7 @@ class DiagnosticsPanel:
             try:
                 self._root.clipboard_clear()
                 self._root.clipboard_append(url)
-            except Exception:
+            except _CLIPBOARD_ERRORS:
                 pass
             if status is not None:
                 status.configure(text="Couldn't open browser (URL copied)")
