@@ -1,0 +1,353 @@
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+
+import pytest
+
+from tests._paths import ensure_repo_root_on_sys_path
+
+
+ensure_repo_root_on_sys_path()
+
+from src.core.backends.base import (
+    BackendStability,
+    ExperimentalEvidence,
+    ProbeResult,
+    normalize_backend_stability,
+    normalize_experimental_evidence,
+)
+from src.core.backends.registry import _probe_backend, BackendSpec, iter_backends, select_backend
+from src.core.backends.policy import experimental_evidence_for_backend, experimental_evidence_label
+
+
+@dataclass
+class DummyBackend:
+    name: str
+    priority: int
+    available: bool
+    confidence: int = 50
+    stability: BackendStability = BackendStability.VALIDATED
+    experimental_evidence: ExperimentalEvidence | None = None
+
+    def is_available(self) -> bool:
+        return self.available
+
+    def probe(self) -> ProbeResult:
+        return ProbeResult(available=self.available, reason="test", confidence=int(self.confidence))
+
+    def capabilities(self):
+        raise NotImplementedError
+
+    def get_device(self):
+        raise NotImplementedError
+
+    def dimensions(self):
+        raise NotImplementedError
+
+    def effects(self):
+        raise NotImplementedError
+
+    def colors(self):
+        raise NotImplementedError
+
+
+class _BrokenStrValue:
+    def __str__(self) -> str:
+        raise AssertionError("unexpected stringification")
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (BackendStability.EXPERIMENTAL, BackendStability.EXPERIMENTAL),
+        ("DoRmAnT", BackendStability.DORMANT),
+    ],
+)
+def test_normalize_backend_stability_accepts_enums_and_strings(
+    value: object,
+    expected: BackendStability,
+) -> None:
+    assert normalize_backend_stability(value) is expected
+
+
+@pytest.mark.parametrize("value", [None, "unknown", 42, _BrokenStrValue()])
+def test_normalize_backend_stability_falls_back_for_invalid_or_non_string_values(value: object) -> None:
+    assert normalize_backend_stability(value) is BackendStability.VALIDATED
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (ExperimentalEvidence.REVERSE_ENGINEERED, ExperimentalEvidence.REVERSE_ENGINEERED),
+        ("SpEcUlAtIvE", ExperimentalEvidence.SPECULATIVE),
+    ],
+)
+def test_normalize_experimental_evidence_accepts_enums_and_strings(
+    value: object,
+    expected: ExperimentalEvidence,
+) -> None:
+    assert normalize_experimental_evidence(value) is expected
+
+
+@pytest.mark.parametrize("value", [None, "unknown", 42, _BrokenStrValue()])
+def test_normalize_experimental_evidence_falls_back_for_invalid_or_non_string_values(value: object) -> None:
+    assert normalize_experimental_evidence(value) is None
+
+
+def test_select_backend_auto_picks_highest_priority_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="low",
+            priority=10,
+            factory=lambda: DummyBackend("low", 10, True, confidence=50),
+        ),
+        BackendSpec(
+            name="high",
+            priority=50,
+            factory=lambda: DummyBackend("high", 50, True, confidence=50),
+        ),
+        BackendSpec(
+            name="missing",
+            priority=999,
+            factory=lambda: DummyBackend("missing", 999, False, confidence=0),
+        ),
+    ]
+
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+
+    backend = select_backend(specs=specs)
+    assert backend is not None
+    assert backend.name == "high"
+
+
+def test_select_backend_auto_prefers_higher_confidence_over_priority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="prio",
+            priority=100,
+            factory=lambda: DummyBackend("prio", 100, True, confidence=10),
+        ),
+        BackendSpec(
+            name="conf",
+            priority=1,
+            factory=lambda: DummyBackend("conf", 1, True, confidence=90),
+        ),
+    ]
+
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+    backend = select_backend(specs=specs)
+    assert backend is not None
+    assert backend.name == "conf"
+
+
+def test_select_backend_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    specs = [
+        BackendSpec(
+            name="a",
+            priority=1,
+            factory=lambda: DummyBackend("a", 1, True, confidence=50),
+        ),
+        BackendSpec(
+            name="b",
+            priority=2,
+            factory=lambda: DummyBackend("b", 2, True, confidence=50),
+        ),
+    ]
+
+    monkeypatch.setenv("KEYRGB_BACKEND", "a")
+    backend = select_backend(specs=specs)
+    assert backend is not None
+    assert backend.name == "a"
+
+
+def test_select_backend_requested_overrides_env(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="a",
+            priority=1,
+            factory=lambda: DummyBackend("a", 1, True, confidence=50),
+        ),
+        BackendSpec(
+            name="b",
+            priority=2,
+            factory=lambda: DummyBackend("b", 2, True, confidence=50),
+        ),
+    ]
+
+    monkeypatch.setenv("KEYRGB_BACKEND", "a")
+    backend = select_backend(requested="b", specs=specs)
+    assert backend is not None
+    assert backend.name == "b"
+
+
+def test_select_backend_returns_none_when_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="a",
+            priority=1,
+            factory=lambda: DummyBackend("a", 1, False, confidence=0),
+        ),
+    ]
+
+    monkeypatch.setenv("KEYRGB_BACKEND", "a")
+    assert select_backend(specs=specs) is None
+
+
+def test_select_backend_returns_none_when_unknown_requested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="a",
+            priority=1,
+            factory=lambda: DummyBackend("a", 1, True, confidence=50),
+        ),
+    ]
+
+    monkeypatch.setenv("KEYRGB_BACKEND", "does-not-exist")
+    assert select_backend(specs=specs) is None
+
+
+def test_select_backend_skips_experimental_backend_when_opt_in_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8910",
+            priority=100,
+            factory=lambda: DummyBackend(
+                "ite8910",
+                100,
+                True,
+                confidence=90,
+                stability=BackendStability.EXPERIMENTAL,
+            ),
+        ),
+    ]
+
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+    monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
+
+    assert select_backend(specs=specs) is None
+
+
+def test_select_backend_allows_experimental_backend_when_opted_in(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8910",
+            priority=100,
+            factory=lambda: DummyBackend(
+                "ite8910",
+                100,
+                True,
+                confidence=90,
+                stability=BackendStability.EXPERIMENTAL,
+            ),
+        ),
+    ]
+
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
+
+    backend = select_backend(specs=specs)
+    assert backend is not None
+    assert backend.name == "ite8910"
+
+
+def test_select_backend_never_selects_dormant_backend(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8297",
+            priority=100,
+            factory=lambda: DummyBackend(
+                "ite8297",
+                100,
+                True,
+                confidence=90,
+                stability=BackendStability.DORMANT,
+            ),
+        ),
+    ]
+
+    monkeypatch.setenv("KEYRGB_BACKEND", "ite8297")
+    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
+
+    assert select_backend(specs=specs) is None
+
+
+def test_experimental_evidence_helper_normalizes_backend_metadata() -> None:
+    backend = DummyBackend(
+        "ite8910",
+        100,
+        True,
+        confidence=90,
+        stability=BackendStability.EXPERIMENTAL,
+        experimental_evidence=ExperimentalEvidence.REVERSE_ENGINEERED,
+    )
+
+    assert experimental_evidence_for_backend(backend) == ExperimentalEvidence.REVERSE_ENGINEERED
+
+
+def test_experimental_evidence_label_uses_user_facing_wording() -> None:
+    assert experimental_evidence_label(ExperimentalEvidence.REVERSE_ENGINEERED) == "research-backed"
+    assert experimental_evidence_label(ExperimentalEvidence.SPECULATIVE) == "speculative"
+
+
+def test_iter_backends_skips_factory_failures() -> None:
+    specs = [
+        BackendSpec(
+            name="broken",
+            priority=100,
+            factory=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        ),
+        BackendSpec(
+            name="ok",
+            priority=1,
+            factory=lambda: DummyBackend("ok", 1, True, confidence=50),
+        ),
+    ]
+
+    backends = iter_backends(specs=specs)
+
+    assert [backend.name for backend in backends] == ["ok"]
+
+
+def test_probe_backend_returns_unavailable_when_probe_raises() -> None:
+    class ProbeFailsBackend(DummyBackend):
+        def probe(self) -> ProbeResult:
+            raise RuntimeError("probe boom")
+
+    result = _probe_backend(ProbeFailsBackend("broken-probe", 1, True))
+
+    assert result.available is False
+    assert result.confidence == 0
+    assert result.reason == "probe exception: probe boom"
+
+
+def test_probe_backend_returns_unavailable_when_is_available_fallback_raises() -> None:
+    class AvailabilityFailsBackend:
+        name = "broken-availability"
+        priority = 1
+        probe = None
+
+        def is_available(self) -> bool:
+            raise RuntimeError("availability boom")
+
+    result = _probe_backend(AvailabilityFailsBackend())
+
+    assert result.available is False
+    assert result.confidence == 0
+    assert result.reason == "is_available exception: availability boom"
