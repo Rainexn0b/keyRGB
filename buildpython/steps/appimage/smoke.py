@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import os
 import shutil
-from pathlib import Path
 
-from ..utils.paths import repo_root
-from ..utils.subproc import RunResult, run
+from ...utils.paths import repo_root
+from ...utils.subproc import RunResult, run
 
 
 def _is_truthy(value: str | None) -> bool:
@@ -56,39 +55,29 @@ def appimage_smoke_runner() -> RunResult:
             exit_code=0,
         )
 
-    # Use a minimal base image with essentially no desktop/python deps.
     image = os.environ.get("KEYRGB_APPIMAGE_SMOKE_IMAGE", "ubuntu:24.04")
 
-    # The smoke test avoids running the tray (it would hang). Instead, it extracts
-    # the AppImage and validates imports using the bundled Python + bundled libs.
     script = "\n".join(
         [
             "set -euo pipefail",
-            # We intentionally do NOT bundle libfontconfig/libfreetype to avoid
-            # system GTK/Pango symbol/version mismatches on some distros.
-            # The smoke test container is intentionally minimal, so install the
-            # small set of system libs we rely on for Tk to load.
             "export DEBIAN_FRONTEND=noninteractive",
             "apt-get update -qq",
             "apt-get install -y --no-install-recommends libfontconfig1 libfreetype6 >/dev/null",
             "cp /dist/keyrgb-x86_64.AppImage ./keyrgb.AppImage",
             "chmod +x ./keyrgb.AppImage",
             "./keyrgb.AppImage --appimage-extract >/dev/null",
-            "HERE=\"$PWD/squashfs-root\"",
-            "export PYTHONHOME=\"$HERE/usr\"",
-            "export PYTHONNOUSERSITE=\"1\"",
-            "export PYTHONPATH=\"$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages\"",
-            "export LD_LIBRARY_PATH=\"$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"",
-            "export TCL_LIBRARY=\"$HERE/usr/lib/tcl8.6\"",
-            "export TK_LIBRARY=\"$HERE/usr/lib/tk8.6\"",
-            "PY=\"$HERE/usr/bin/python3\"",
-            # Ensure _tkinter can load and Tcl can initialize (covers missing libtk/libtcl/init.tcl).
+            'HERE="$PWD/squashfs-root"',
+            'export PYTHONHOME="$HERE/usr"',
+            'export PYTHONNOUSERSITE="1"',
+            'export PYTHONPATH="$HERE/usr/lib/keyrgb:$HERE/usr/lib/keyrgb/site-packages"',
+            'export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/lib64:$HERE/usr/lib/x86_64-linux-gnu:$HERE/usr/lib64/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"',
+            'export TCL_LIBRARY="$HERE/usr/lib/tcl8.6"',
+            'export TK_LIBRARY="$HERE/usr/lib/tk8.6"',
+            'PY="$HERE/usr/bin/python3"',
             "\"$PY\" -c \"import tkinter as tk; t=tk.Tcl(); t.eval('info patchlevel'); print('tcl-ok')\"",
-            "\"$PY\" -c \"import _tkinter; print('_tkinter-ok')\"",
-            # Import a tray-adjacent module that historically pulled in tkinter/theme logic.
-            "\"$PY\" -c \"import src.tray.ui.icon; print('tray-icon-import-ok')\"",
-            # Diagnostics should run without requiring system deps.
-            "\"$PY\" -m src.core.diagnostics > diag.json",
+            '"$PY" -c "import _tkinter; print(\'_tkinter-ok\')"',
+            '"$PY" -c "import src.tray.ui.icon; print(\'tray-icon-import-ok\')"',
+            '"$PY" -m src.core.diagnostics > diag.json',
             "\"$PY\" -c \"import json; json.load(open('diag.json')); print('diagnostics-json-ok')\"",
             "echo 'appimage-smoke-ok'",
         ]

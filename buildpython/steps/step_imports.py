@@ -18,10 +18,7 @@ DEFAULT_IMPORTS = [
 def _has_tkinter() -> bool:
     # Some CI Python builds (notably certain 3.10 toolcache builds) may not ship
     # with tkinter / _tkinter, even if the rest of the stdlib is present.
-    return (
-        importlib.util.find_spec("tkinter") is not None
-        and importlib.util.find_spec("_tkinter") is not None
-    )
+    return importlib.util.find_spec("tkinter") is not None and importlib.util.find_spec("_tkinter") is not None
 
 
 def import_validation_runner() -> RunResult:
@@ -34,7 +31,7 @@ def import_validation_runner() -> RunResult:
             continue
         try:
             importlib.import_module(mod)
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: import step intentionally catches all import failures; full traceback is captured in the failures list via traceback.format_exc()
             failures.append(f"Failed to import {mod}: {exc}\n{traceback.format_exc()}")
 
     if failures:
@@ -49,11 +46,7 @@ def import_validation_runner() -> RunResult:
         command_str="(internal) import validation",
         stdout=(
             "All imports OK:\n"
-            + "\n".join(
-                f"  - {m}"
-                for m in DEFAULT_IMPORTS
-                if has_tk or not m.startswith("src.gui.")
-            )
+            + "\n".join(f"  - {m}" for m in DEFAULT_IMPORTS if has_tk or not m.startswith("src.gui."))
             + ("\n\n(Note: Tkinter not available; skipped Tk GUI imports.)\n" if not has_tk else "\n")
         ),
         stderr="",

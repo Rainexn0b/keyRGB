@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import ast
 import importlib
+import logging
 import sys
 from pathlib import Path
 
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
+
+
+logger = logging.getLogger(__name__)
 
 
 OPTIONAL_TOPLEVEL = {
@@ -78,7 +82,7 @@ def _iter_py_files() -> list[Path]:
 def _parse_imports(path: Path) -> set[str]:
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
-    except Exception:
+    except OSError:
         return set()
 
     try:
@@ -131,12 +135,15 @@ def import_scan_runner() -> RunResult:
     for name in candidates:
         try:
             importlib.import_module(name)
-            ok.append(name)
-        except Exception as exc:
+        except Exception as exc:  # @quality-exception exception-transparency: dynamic module import may raise any exception from module-level code; all failures are classified as missing
+            logger.exception("Import scan failed for candidate module '%s'", name)
+            detail = f"{name} ({type(exc).__name__}: {exc})"
             if name in OPTIONAL_TOPLEVEL:
-                optional_missing.append(f"{name} ({exc})")
+                optional_missing.append(detail)
             else:
-                missing.append(f"{name} ({exc})")
+                missing.append(detail)
+        else:
+            ok.append(name)
 
     stdout_lines: list[str] = []
     stdout_lines.append("Import scan")

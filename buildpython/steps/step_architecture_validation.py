@@ -20,7 +20,7 @@ def architecture_validation_runner() -> RunResult:
     try:
         rules = load_architecture_rules(config_path)
         result = scan_architecture(root, rules)
-    except Exception as exc:
+    except Exception as exc:  # @quality-exception exception-transparency: architecture validation step failure is surfaced as a RunResult with the error message; rules load or scan errors must not crash the build runner
         return RunResult(
             command_str="(internal) architecture validation",
             stdout="Architecture validation\n\nFailed to load rules or scan the repo.\n",

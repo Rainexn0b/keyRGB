@@ -33,6 +33,7 @@ When their steps run, debt-focused checks write structured reports under the sam
 
 - `code-markers.{json,csv,md}`
 - `file-size-analysis.{json,csv,md}`
+	Contains file-size buckets (`350-399`, `400-499`, `500-599`, `600+`), long import-block hotspots, and flat-directory hotspots.
 - `loc-check.{json,csv,md}`
 - `code-hygiene.{json,csv,md}`
 - `architecture-validation.{json,csv,md}`

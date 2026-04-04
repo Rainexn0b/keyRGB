@@ -128,7 +128,7 @@ def _bundle_tk_shared_lib_deps(*, appdir: Path, usr_lib: Path, tk_lib: Path, tcl
                 stderr=subprocess.STDOUT,
                 check=False,
             )
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: tkinter bundle subprocess is a build-tool boundary; failure returns empty dict to skip optional bundling
             return {}
 
         if proc.returncode != 0:
@@ -174,7 +174,6 @@ def _bundle_tk_shared_lib_deps(*, appdir: Path, usr_lib: Path, tk_lib: Path, tcl
             "libutil.so.1",
             "libgcc_s.so.1",
             "libstdc++.so.6",
-
             # These are commonly provided by every distro and are frequently
             # consumed by system GTK/Pango stacks. Bundling older copies can
             # cause hard-to-debug symbol/version mismatches (notably breaking

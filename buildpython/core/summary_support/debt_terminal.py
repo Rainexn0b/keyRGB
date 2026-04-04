@@ -1,0 +1,158 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+from .common import file_size_counts, read_json_if_exists
+
+
+def _top_file(top_files: object, category: str) -> tuple[str, object] | None:
+    if not isinstance(top_files, dict):
+        return None
+    hotspots = top_files.get(category, [])
+    if not isinstance(hotspots, list) or not hotspots or not isinstance(hotspots[0], dict):
+        return None
+    path = hotspots[0].get("path")
+    count = hotspots[0].get("count")
+    return (str(path), count) if isinstance(path, str) else None
+
+
+def build_terminal_hygiene_highlight(buildlog_dir: Path) -> list[str]:
+    hygiene = read_json_if_exists(buildlog_dir / "code-hygiene.json")
+    if hygiene is None:
+        return []
+
+    active = hygiene.get("active_counts", {})
+    suppressed = hygiene.get("suppressed_counts", {})
+    top_files = hygiene.get("top_files_by_category", {})
+
+    parts: list[str] = []
+    for key, label in [
+        ("silent_broad_except", "silent"),
+        ("logged_broad_except", "logged"),
+        ("fallback_broad_except", "fallback"),
+        ("cleanup_hotspot", "cleanup"),
+        ("forbidden_getattr", "getattr"),
+    ]:
+        current = active.get(key)
+        if not isinstance(current, int):
+            continue
+        s = suppressed.get(key, 0)
+        parts.append(f"{label} {current} ({s})" if isinstance(s, int) and s else f"{label} {current}")
+
+    if not parts:
+        return []
+
+    lines: list[str] = ["\U0001f50d  " + "  \u00b7  ".join(parts)]  # 🔍
+    for category, label in [
+        ("silent_broad_except", "Top silent"),
+        ("logged_broad_except", "Top logged"),
+        ("fallback_broad_except", "Top fallback"),
+        ("cleanup_hotspot", "Top cleanup"),
+    ]:
+        hit = _top_file(top_files, category)
+        if hit:
+            lines.append(f"{label + ':':<16}  {hit[0]} ({hit[1]})")
+
+    return lines
+
+
+def build_terminal_transparency_highlight(buildlog_dir: Path) -> list[str]:
+    exception_transparency = read_json_if_exists(buildlog_dir / "exception-transparency.json")
+    if exception_transparency is None:
+        return []
+
+    counts = exception_transparency.get("counts", {})
+    waived_total = exception_transparency.get("waived_total", 0)
+
+    parts: list[str] = []
+    for key, label in [
+        ("broad_except_total", "total"),
+        ("broad_except_unlogged", "unlogged"),
+        ("broad_except_traceback_logged", "traceback"),
+    ]:
+        current = counts.get(key)
+        if not isinstance(current, int):
+            continue
+        if key == "broad_except_total" and isinstance(waived_total, int) and waived_total:
+            parts.append(f"{label} {current} ({waived_total})")
+        else:
+            parts.append(f"{label} {current}")
+
+    if not parts:
+        return []
+
+    lines: list[str] = ["\U0001f9ea  " + "  \u00b7  ".join(parts)]  # 🧪
+    top_files = exception_transparency.get("top_files_by_category", {})
+    for category, label in [
+        ("broad_except_unlogged", "Top unlogged"),
+        ("broad_except_total", "Top broad"),
+    ]:
+        hit = _top_file(top_files, category)
+        if hit:
+            lines.append(f"{label + ':':<16}  {hit[0]} ({hit[1]})")
+
+    return lines
+
+
+def build_terminal_markers_highlight(buildlog_dir: Path) -> list[str]:
+    markers = read_json_if_exists(buildlog_dir / "code-markers.json")
+    if markers is None:
+        return []
+
+    marker_counts = markers.get("marker_counts", {})
+    top_marker_files = markers.get("top_marker_files", {})
+
+    parts: list[str] = []
+    for marker in ["TODO", "FIXME", "HACK", "NOTE"]:
+        current = marker_counts.get(marker)
+        if not isinstance(current, int):
+            continue
+        parts.append(f"{marker} {current}")
+
+    if not parts:
+        return []
+
+    lines: list[str] = ["\U0001f4dd  " + "  \u00b7  ".join(parts)]  # 📝
+    if isinstance(top_marker_files, dict):
+        for marker in ["HACK", "FIXME", "TODO", "NOTE"]:
+            hit = _top_file(top_marker_files, marker)
+            if hit:
+                lines.append(f"{'Top ' + marker + ':':<16}  {hit[0]} ({hit[1]})")
+
+    return lines
+
+
+def build_terminal_filesize_highlight(buildlog_dir: Path) -> list[str]:
+    file_size = read_json_if_exists(buildlog_dir / "file-size-analysis.json")
+    if file_size is None:
+        return []
+
+    file_counts, import_counts, flat_directory_count, facade_candidate_count = file_size_counts(file_size)
+    files = file_size.get("files", [])
+    import_blocks = file_size.get("import_blocks", [])
+    flat_directories = file_size.get("flat_directories", [])
+    facade_candidates = file_size.get("facade_candidates", [])
+
+    fs_parts = [
+        f"refactor {file_counts.get('refactor', 0)}",
+        f"import-warn {import_counts.get('warning', 0)}",
+        f"flat-dirs {flat_directory_count}",
+        f"facades {facade_candidate_count}",
+    ]
+    lines: list[str] = ["\U0001f4c1  " + "  \u00b7  ".join(fs_parts)]  # 📁
+
+    if isinstance(files, list) and files and isinstance(files[0], dict):
+        lines.append(f"{'Top large:':<16}  {files[0].get('path')} ({files[0].get('lines')})")
+    if isinstance(import_blocks, list) and import_blocks and isinstance(import_blocks[0], dict):
+        lines.append(f"{'Top import:':<16}  {import_blocks[0].get('path')} ({import_blocks[0].get('lines')})")
+    if isinstance(flat_directories, list) and flat_directories and isinstance(flat_directories[0], dict):
+        lines.append(
+            f"{'Top flat-dir:':<16}  {flat_directories[0].get('path')} "
+            f"({flat_directories[0].get('direct_python_files')} files)"
+        )
+    if isinstance(facade_candidates, list) and facade_candidates and isinstance(facade_candidates[0], dict):
+        lines.append(
+            f"{'Top facade:':<16}  {facade_candidates[0].get('path')} (score={facade_candidates[0].get('score')})"
+        )
+
+    return lines

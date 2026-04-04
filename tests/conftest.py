@@ -10,6 +10,11 @@ from pathlib import Path
 
 import pytest
 
+from tests._paths import ensure_repo_root_on_sys_path
+
+
+ensure_repo_root_on_sys_path()
+
 
 _SKIP_AGENT_TESTS_ENV = "KEYRGB_SKIP_AGENT_TESTS"
 

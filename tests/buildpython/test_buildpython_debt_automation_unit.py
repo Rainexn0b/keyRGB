@@ -1,19 +1,26 @@
 from __future__ import annotations
 
-import buildpython.steps.step_code_hygiene as step_code_hygiene
 import json
+from pathlib import Path
+
+import buildpython.steps.code_hygiene.step as step_code_hygiene
+import buildpython.steps.code_hygiene.baseline as step_code_hygiene_baseline
 
 from buildpython.core.debt_index import build_debt_index, write_debt_index
 from buildpython.core.summary import (
     BuildSummary,
     build_terminal_build_overview,
     build_terminal_coverage_highlight,
-    build_terminal_debt_snapshot,
     write_summary,
 )
-from buildpython.steps.step_code_hygiene import HygieneBaseline, HygieneIssue, _path_budget_regressions
-from buildpython.steps.step_coverage import CoverageBaseline, build_coverage_report
-from buildpython.steps.step_exception_transparency import _scan_python_source
+from buildpython.core.summary_support.debt_terminal import (
+    build_terminal_transparency_highlight,
+)
+from buildpython.steps.code_hygiene.baseline import _path_budget_regressions
+from buildpython.steps.code_hygiene.models import HygieneBaseline, HygieneIssue
+from buildpython.steps.exception_transparency.scanner import collect_findings
+from buildpython.steps.coverage_step.step import CoverageBaseline, build_coverage_report
+from buildpython.steps.exception_transparency.step import _scan_python_source
 
 
 def test_exception_transparency_scan_suppresses_valid_quality_exception_waivers() -> None:
@@ -144,6 +151,50 @@ def example(logger):
     assert counts.get("naked_except", 0) == 0
 
 
+def test_exception_transparency_scan_skips_unparseable_source() -> None:
+    findings = _scan_python_source(
+        """
+def broken(:
+    pass
+""".strip(),
+        rel_path="src/example.py",
+    )
+
+    assert findings == []
+
+
+def test_exception_transparency_collect_findings_skips_unreadable_files(tmp_path, monkeypatch) -> None:
+    readable = tmp_path / "src" / "ok.py"
+    unreadable = tmp_path / "buildpython" / "blocked.py"
+    readable.parent.mkdir(parents=True)
+    unreadable.parent.mkdir(parents=True)
+    readable.write_text(
+        """
+def example():
+    try:
+        run_one()
+    except Exception:
+        pass
+""".strip(),
+        encoding="utf-8",
+    )
+    unreadable.write_text("def blocked():\n    return None\n", encoding="utf-8")
+
+    original_read_text = Path.read_text
+
+    def fake_read_text(self: Path, *args, **kwargs) -> str:
+        if self == unreadable:
+            raise OSError("permission denied")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", fake_read_text)
+
+    assert {finding.category for finding in collect_findings(tmp_path)} == {
+        "broad_except_total",
+        "broad_except_unlogged",
+    }
+
+
 def test_path_budget_regressions_flag_specific_hotspots() -> None:
     issues = [
         HygieneIssue(
@@ -187,7 +238,7 @@ def test_load_hygiene_baseline_returns_empty_on_invalid_json(tmp_path) -> None:
     config_dir.mkdir(parents=True)
     (config_dir / "debt_baselines.json").write_text("{not valid json", encoding="utf-8")
 
-    baseline = step_code_hygiene._load_hygiene_baseline(tmp_path)
+    baseline = step_code_hygiene_baseline._load_hygiene_baseline(tmp_path)
 
     assert baseline == HygieneBaseline(counts={}, gated_categories=set(), path_budgets={})
 
@@ -261,18 +312,8 @@ def test_write_debt_index_aggregates_reports(tmp_path) -> None:
     (buildlog_dir / "code-hygiene.json").write_text(
         json.dumps(
             {
-                "counts": {"silent_broad_except": 3},
-                "baseline": {
-                    "regressions": [],
-                    "path_budget_regressions": [
-                        {
-                            "category": "silent_broad_except",
-                            "path": "src/tray/app/application.py",
-                            "current": 3,
-                            "baseline": 2,
-                        }
-                    ],
-                },
+                "active_counts": {"silent_broad_except": 3},
+                "suppressed_counts": {"silent_broad_except": 5},
                 "top_files_by_category": {},
             }
         ),
@@ -289,10 +330,8 @@ def test_write_debt_index_aggregates_reports(tmp_path) -> None:
                     "naked_except": 0,
                     "baseexception_catch": 0,
                 },
-                "baseline": {"regressions": []},
-                "top_files_by_category": {
-                    "broad_except_unlogged": [{"path": "src/core/config/config.py", "count": 3}]
-                },
+                "waived_total": 205,
+                "top_files_by_category": {"broad_except_unlogged": [{"path": "src/core/config/config.py", "count": 3}]},
             }
         ),
         encoding="utf-8",
@@ -337,17 +376,7 @@ def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> Non
                     "naked_except": 0,
                     "baseexception_catch": 0,
                 },
-                "baseline": {
-                    "counts": {
-                        "broad_except_total": 6,
-                        "broad_except_unlogged": 4,
-                        "broad_except_logged_no_traceback": 1,
-                        "broad_except_traceback_logged": 1,
-                        "naked_except": 0,
-                        "baseexception_catch": 0,
-                    },
-                    "regressions": [],
-                },
+                "waived_total": 205,
                 "top_files_by_category": {
                     "broad_except_unlogged": [{"path": "src/core/config/config.py", "count": 3}],
                     "broad_except_total": [{"path": "src/core/config/config.py", "count": 4}],
@@ -357,10 +386,11 @@ def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> Non
         encoding="utf-8",
     )
 
-    lines = build_terminal_debt_snapshot(buildlog_dir, include_coverage=False)
+    lines = build_terminal_transparency_highlight(buildlog_dir)
 
-    assert any("Exception transparency:" in line for line in lines)
-    assert any("Top unlogged broad catch: src/core/config/config.py (3)" in line for line in lines)
+    assert any("total 6 (205)" in line for line in lines)
+    assert any("unlogged 4" in line for line in lines)
+    assert any("Top unlogged" in line and "src/core/config/config.py" in line for line in lines)
 
 
 def test_terminal_debt_snapshot_marks_missing_coverage_capture(tmp_path) -> None:
@@ -390,9 +420,10 @@ def test_terminal_debt_snapshot_marks_missing_coverage_capture(tmp_path) -> None
         encoding="utf-8",
     )
 
-    lines = build_terminal_debt_snapshot(buildlog_dir)
+    coverage_line = build_terminal_coverage_highlight(buildlog_dir)
+    lines = [coverage_line] if coverage_line is not None else []
 
-    assert any("Coverage: missing capture" in line for line in lines)
+    assert any("waiting for pytest coverage capture" in line for line in lines)
     assert not any("Coverage: total=0.00%" in line for line in lines)
 
 
@@ -496,7 +527,7 @@ def test_terminal_build_overview_includes_status_health_and_coverage(tmp_path) -
         ),
     )
 
-    assert lines[0] == "Build summary:"
-    assert "Status: PASS" in lines[1]
-    assert "Health: 100/100" in lines[4]
-    assert lines[5] == "  Coverage: 59.49% total | core 73.28% | tray 73.85% | gui 27.50%"
+    assert any("Build Results" in line for line in lines)
+    assert any("PASS" in line for line in lines)
+    assert any("100/100" in line for line in lines)
+    assert any("59.49%" in line and "73.28%" in line for line in lines)

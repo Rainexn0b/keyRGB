@@ -32,22 +32,22 @@ def steps() -> list[Step]:
             env_overrides={"KEYRGB_HW_TESTS": "0"},
         )
 
-    from .step_quality import code_markers_runner
-    from .step_size import file_size_runner
-    from .step_imports import import_validation_runner
-    from .step_format import ruff_format_check_runner
-    from .step_pip import pip_check_runner
-    from .step_import_scan import import_scan_runner
-    from .step_repo_validation import repo_validation_runner
-    from .step_appimage import appimage_build_runner
-    from .step_appimage_smoke import appimage_smoke_runner
-    from .step_black import black_check_runner
-    from .step_type_check import mypy_runner
-    from .step_loc_check import loc_over_400_runner
-    from .step_code_hygiene import code_hygiene_runner
+    from .appimage.build import appimage_build_runner
+    from .appimage.smoke import appimage_smoke_runner
+    from .code_hygiene.step import code_hygiene_runner
+    from .coverage_step.step import coverage_runner, pytest_runner_with_optional_coverage
+    from .exception_transparency.step import exception_transparency_runner
+    from .file_size_analysis.step import file_size_runner
     from .step_architecture_validation import architecture_validation_runner
-    from .step_coverage import coverage_runner, pytest_runner_with_optional_coverage
-    from .step_exception_transparency import exception_transparency_runner
+    from .step_black import black_check_runner
+    from .step_format import ruff_format_check_runner
+    from .step_import_scan import import_scan_runner
+    from .step_imports import import_validation_runner
+    from .step_loc_check import loc_over_400_runner
+    from .step_pip import pip_check_runner
+    from .step_quality import code_markers_runner
+    from .step_repo_validation import repo_validation_runner
+    from .step_type_check import mypy_runner
 
     return [
         Step(

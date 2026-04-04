@@ -37,9 +37,8 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
 
     if hygiene is not None:
         sections["code_hygiene"] = {
-            "counts": hygiene.get("counts", {}),
-            "regressions": hygiene.get("baseline", {}).get("regressions", []),
-            "path_budget_regressions": hygiene.get("baseline", {}).get("path_budget_regressions", []),
+            "active_counts": hygiene.get("active_counts", {}),
+            "suppressed_counts": hygiene.get("suppressed_counts", {}),
             "top_files_by_category": hygiene.get("top_files_by_category", {}),
         }
         report_paths["code_hygiene"] = str(buildlog_dir / "code-hygiene.md")
@@ -47,7 +46,7 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
     if exception_transparency is not None:
         sections["exception_transparency"] = {
             "counts": exception_transparency.get("counts", {}),
-            "regressions": exception_transparency.get("baseline", {}).get("regressions", []),
+            "waived_total": exception_transparency.get("waived_total", 0),
             "top_files_by_category": exception_transparency.get("top_files_by_category", {}),
         }
         report_paths["exception_transparency"] = str(buildlog_dir / "exception-transparency.md")
@@ -64,6 +63,9 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
         sections["file_size"] = {
             "counts": file_size.get("counts", {}),
             "files": file_size.get("files", []),
+            "import_blocks": file_size.get("import_blocks", []),
+            "flat_directories": file_size.get("flat_directories", []),
+            "facade_candidates": file_size.get("facade_candidates", []),
         }
         report_paths["file_size"] = str(buildlog_dir / "file-size-analysis.md")
 
@@ -125,7 +127,8 @@ def write_debt_index(buildlog_dir: Path) -> None:
     if isinstance(sections, dict):
         hygiene = sections.get("code_hygiene")
         if isinstance(hygiene, dict):
-            counts = hygiene.get("counts", {})
+            active = hygiene.get("active_counts", {})
+            suppressed = hygiene.get("suppressed_counts", {})
             lines.extend(["## Code hygiene", ""])
             for category in [
                 "silent_broad_except",
@@ -134,27 +137,20 @@ def write_debt_index(buildlog_dir: Path) -> None:
                 "cleanup_hotspot",
                 "forbidden_getattr",
             ]:
-                value = counts.get(category)
+                value = active.get(category)
                 if isinstance(value, int):
-                    lines.append(f"- {category}: {value}")
-            path_regressions = hygiene.get("path_budget_regressions", [])
-            if isinstance(path_regressions, list) and path_regressions:
-                lines.append("- Path budget regressions:")
-                for item in path_regressions[:10]:
-                    if not isinstance(item, dict):
-                        continue
-                    lines.append(
-                        f"  - {item.get('category')} {item.get('path')}: {item.get('current')} > {item.get('baseline')}"
-                    )
-            else:
-                lines.append("- Path budget regressions: none")
+                    s = suppressed.get(category, 0)
+                    supp_text = f" (suppressed {s})" if isinstance(s, int) and s else ""
+                    lines.append(f"- {category}: {value}{supp_text}")
             lines.append("")
 
         exception_transparency = sections.get("exception_transparency")
         if isinstance(exception_transparency, dict):
             counts = exception_transparency.get("counts", {})
-            regressions = exception_transparency.get("regressions", [])
+            waived_total = exception_transparency.get("waived_total", 0)
             lines.extend(["## Exception transparency", ""])
+            if isinstance(waived_total, int) and waived_total:
+                lines.append(f"- Waived via @quality-exception: {waived_total}")
             for category in [
                 "naked_except",
                 "baseexception_catch",
@@ -166,16 +162,53 @@ def write_debt_index(buildlog_dir: Path) -> None:
                 value = counts.get(category)
                 if isinstance(value, int):
                     lines.append(f"- {category}: {value}")
-            if isinstance(regressions, list) and regressions:
-                lines.append("- Regressions:")
-                for item in regressions[:10]:
-                    if not isinstance(item, dict):
-                        continue
+            lines.append("")
+
+        file_size = sections.get("file_size")
+        if isinstance(file_size, dict):
+            counts = file_size.get("counts", {})
+            file_counts = counts.get("file_lines", counts) if isinstance(counts, dict) else {}
+            import_counts = counts.get("import_block_lines", {}) if isinstance(counts, dict) else {}
+            files = file_size.get("files", [])
+            import_blocks = file_size.get("import_blocks", [])
+            flat_directories = file_size.get("flat_directories", [])
+            facade_candidates = file_size.get("facade_candidates", [])
+            lines.extend(["## File size", ""])
+            if isinstance(file_counts, dict):
+                lines.append(
+                    "- File buckets: "
+                    f"refactor={file_counts.get('refactor', 0)}, "
+                    f"critical={file_counts.get('critical', 0)}, "
+                    f"severe={file_counts.get('severe', 0)}, "
+                    f"extreme={file_counts.get('extreme', 0)}"
+                )
+            if isinstance(import_counts, dict):
+                lines.append(
+                    "- Import blocks: "
+                    f"warning={import_counts.get('warning', 0)}, "
+                    f"critical={import_counts.get('critical', 0)}, "
+                    f"severe={import_counts.get('severe', 0)}"
+                )
+            lines.append(f"- Flat directories: {len(flat_directories) if isinstance(flat_directories, list) else 0}")
+            lines.append(f"- Facade candidates: {len(facade_candidates) if isinstance(facade_candidates, list) else 0}")
+            if isinstance(files, list) and files:
+                first = files[0]
+                if isinstance(first, dict):
+                    lines.append(f"- Largest file: {first.get('path')} ({first.get('lines')} lines)")
+            if isinstance(import_blocks, list) and import_blocks:
+                first = import_blocks[0]
+                if isinstance(first, dict):
+                    lines.append(f"- Longest import block: {first.get('path')} ({first.get('lines')} lines)")
+            if isinstance(flat_directories, list) and flat_directories:
+                first = flat_directories[0]
+                if isinstance(first, dict):
                     lines.append(
-                        f"  - {item.get('category')}: {item.get('current')} > {item.get('baseline')}"
+                        f"- Flattest directory: {first.get('path')} ({first.get('direct_python_files')} direct Python files)"
                     )
-            else:
-                lines.append("- Regressions: none")
+            if isinstance(facade_candidates, list) and facade_candidates:
+                first = facade_candidates[0]
+                if isinstance(first, dict):
+                    lines.append(f"- Top facade candidate: {first.get('path')} (score={first.get('score')})")
             lines.append("")
 
         coverage = sections.get("coverage")

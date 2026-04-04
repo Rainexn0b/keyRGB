@@ -79,6 +79,26 @@ Scope
 - Release gate: `python -m buildpython --profile=release`
 - Logs: `buildlog/keyrgb/build-summary.md` and `buildlog/keyrgb/step-*.log`
 
+### Reading build output
+Each step prints a separator (`────────────────────────────────────────────────────────────`), a step line, then a status/duration line:
+```
+────────────────────────────────────────────────────────────
+⏳  [N/T]  Step Name              : Step description
+✅  Completed (0.3s)
+    Highlight line (e.g. "Tests: 1737 passed, 1 skipped")
+```
+Status icons: `⏳` = running, `✅` = success, `❌` = failure, `⏭️` = skipped.
+
+The final block is `📋 Build Results` followed by `📊 Debt Snapshot` with labelled subsections:
+- `🔍 Hygiene` — broad-except categories (silent/logged/fallback/cleanup/getattr) with deltas; `Top silent/logged/fallback/cleanup` hotspot lines
+- `🧪 Transparency` — exception-transparency totals (total/unlogged/traceback) with deltas; `Top unlogged/broad` hotspot lines
+- `📈 Coverage` — total % and per-prefix breakdown with deltas; regression warnings when present
+- `📝 Markers` — TODO/FIXME/HACK/NOTE counts with deltas; `Top NOTE/HACK` lines
+- `📁 File Size` — refactor/import-warn/flat-dirs/facades counts; `Top large/import/flat-dir/facade` lines
+- `📄 Reports` — lists the report files written under `buildlog/keyrgb/`
+
+The `·`-separated values on each debt line carry `(delta)` vs baseline in parentheses; negative delta = improvement.
+
 ## Common playbooks
 
 ### Backend / hardware triage

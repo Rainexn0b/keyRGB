@@ -33,7 +33,7 @@ def loc_over_400_runner() -> RunResult:
     for p in files:
         try:
             line_count = len(p.read_text(encoding="utf-8", errors="replace").splitlines())
-        except Exception:
+        except OSError:
             continue
 
         if line_count >= THRESHOLD_LINES:

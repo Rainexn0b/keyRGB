@@ -3,9 +3,9 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from ..utils.paths import repo_root
-from ..utils.subproc import RunResult, python_exe, run
-from .appimage import (
+from ...utils.paths import repo_root
+from ...utils.subproc import RunResult, python_exe, run
+from . import (
     bundle_libappindicator,
     bundle_pygobject,
     bundle_python_runtime,
@@ -40,10 +40,6 @@ def build_appimage() -> Path:
 
     appimagetool = tools / "appimagetool-x86_64.AppImage"
 
-    # Some environments (especially bleeding-edge Python builds) can't build
-    # native deps like `evdev` without kernel headers, which blocks full
-    # AppImage construction. These flags let us still refresh the staged AppDir
-    # (and therefore bundled sources/launchers) for local testing.
     staging_only = env_flag("KEYRGB_APPIMAGE_STAGING_ONLY")
     skip_deps = staging_only or env_flag("KEYRGB_APPIMAGE_SKIP_DEPS")
 
@@ -51,13 +47,11 @@ def build_appimage() -> Path:
         shutil.rmtree(appdir)
     work.mkdir(parents=True, exist_ok=True)
 
-    # Download appimagetool if needed.
     if not appimagetool.exists():
         print(f"Downloading appimagetool -> {appimagetool}")
         download(APPIMAGETOOL_URL, appimagetool)
         chmod_x(appimagetool)
 
-    # Layout
     bundle_python_runtime(appdir=appdir)
     bundle_tkinter(appdir=appdir)
     bundle_libappindicator(appdir=appdir)
@@ -68,11 +62,8 @@ def build_appimage() -> Path:
 
     shutil.copytree(root / "src", src_dst)
 
-    # Bundle GUI assets that are loaded from repo-relative paths.
-    # The GUI resolves `assets/...` relative to `usr/lib/keyrgb` inside the AppImage.
     assets_dst = lib_root / "assets"
     assets_dst.mkdir(parents=True, exist_ok=True)
-
 
     bundled_assets = [
         "assets/y15-pro-deck.png",
@@ -90,8 +81,6 @@ def build_appimage() -> Path:
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
-    # Bundle python deps (pip wheels) into the AppDir.
-    # We still use the system python interpreter at runtime.
     site_packages.mkdir(parents=True, exist_ok=True)
 
     if not skip_deps:
@@ -127,11 +116,8 @@ def build_appimage() -> Path:
                 cwd=root,
             )
 
-        # Bundle PyGObject (gi) when available in the build env so pystray can use
-        # AppIndicator without relying on the user's system Python packages.
         bundle_pygobject(appdir=appdir, site_packages=site_packages)
 
-    # Desktop + icon expected by appimagetool.
     icon_src = _first_existing_asset(
         root,
         "assets/logo-keyrgb.png",
@@ -160,10 +146,6 @@ def build_appimage() -> Path:
         ),
     )
 
-    # AppRun: uses the bundled python to avoid system-python ABI mismatches.
-    # Prefer AppIndicator/Gtk when possible; we bundle PyGObject (gi) when
-    # available at build time and provide typelibs via GI_TYPELIB_PATH.
-    # Set TCL_LIBRARY and TK_LIBRARY so bundled tkinter can find init.tcl and support scripts.
     apprun = "\n".join(
         [
             "#!/bin/sh",
@@ -187,7 +169,6 @@ def build_appimage() -> Path:
         print(f"Prepared AppDir (staging-only): {appdir}")
         return appdir
 
-    # Build the AppImage.
     if out.exists():
         out.unlink()
 
@@ -213,7 +194,7 @@ def main() -> int:
 def appimage_build_runner() -> RunResult:
     root = repo_root()
     return run(
-        [python_exe(), "-m", "buildpython.steps.step_appimage"],
+        [python_exe(), "-m", "buildpython.steps.appimage.build"],
         cwd=str(root),
         env_overrides={"KEYRGB_HW_TESTS": "0"},
     )

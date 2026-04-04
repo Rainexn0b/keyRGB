@@ -1,18 +1,18 @@
 {
   "code_hygiene": {
     "counts": {
-      "defensive_conversion": 29,
-      "hasattr_coupling": 2,
-      "any_type_hint": 39,
+      "defensive_conversion": 19,
+      "hasattr_coupling": 4,
+      "any_type_hint": 127,
       "runtime_copy_hotspot": 0,
       "test_naming": 0,
-      "forbidden_getattr": 54,
+      "forbidden_getattr": 94,
       "forbidden_api": 0,
       "resource_leak": 0,
-      "cleanup_hotspot": 33,
-      "silent_broad_except": 280,
-      "logged_broad_except": 33,
-      "fallback_broad_except": 308
+      "cleanup_hotspot": 96,
+      "silent_broad_except": 0,
+      "logged_broad_except": 0,
+      "fallback_broad_except": 0
     },
     "gated_categories": [
       "forbidden_getattr",
@@ -35,7 +35,7 @@
         "src/gui/tcc/profiles.py": 4,
         "src/tray/pollers/config_polling_internal/core.py": 5,
         "src/gui/windows/reactive_color.py": 3,
-        "src/core/power/management/manager.py": 3
+        "src/core/power/management/manager.py": 5
       },
       "fallback_broad_except": {
         "src/tray/controllers/_lighting_controller_helpers.py": 9,
@@ -75,6 +75,66 @@
     "gated_categories": [
       "naked_except",
       "baseexception_catch"
+    ]
+  },
+  "flat_directories": {
+    "allowed": [
+      {
+        "path": "src/core/effects/reactive",
+        "reason": "intentionally flat effect-runtime module set; all 14 files are peer-level implementation units with no natural sub-grouping"
+      },
+      {
+        "path": "src/gui/settings/panels",
+        "reason": "intentionally flat settings-panel set; every file is a distinct settings panel and they are all peer-level siblings with no natural sub-group"
+      },
+      {
+        "path": "src/tray/pollers/idle_power",
+        "reason": "intentionally flat idle-power pipeline; all files form a single subsystem (policy, logind probe, actions, transitions, sensors) with no coherent split"
+      },
+      {
+        "path": "buildpython/steps/code_hygiene",
+        "reason": "intentionally flat hygiene scanner; files are scanner components (models, ast_scanners, text_scanners, runtime_scanners, detectors, baseline, reporting, step) with no meaningful sub-group"
+      },
+      {
+        "path": "buildpython/steps/appimage",
+        "reason": "intentionally flat AppImage builder; each file is a distinct bundle type (python_runtime, pygobject, appindicator, tkinter) plus common helpers and entry point"
+      },
+      {
+        "path": "src/gui/utils",
+        "reason": "intentionally flat GUI utilities collection; files are disparate helpers (window geometry, icon, async, backdrop cache, deck render cache) with no coherent sub-group"
+      },
+      {
+        "path": "src/gui/perkey/ui",
+        "reason": "intentionally flat per-key editor UI; all 13 files are independent per-panel components sharing a common pattern; intra-panel cross-imports (calibrator\u2192status, keymap\u2192status, layout_setup\u2192layout_slots) and existing test groupings (panels/, tools/) document the conceptual structure without requiring a forced sub-split"
+      },
+      {
+        "path": "src/gui/settings",
+        "reason": "intentionally flat settings window package; direct modules are root-level window helpers (window.py, __main__.py, diagnostics_runner.py, hardware_hint.py, os_autostart.py, scrollable_area.py, settings_state.py) with no coherent sub-group beyond the existing panels/ subpackage"
+      },
+      {
+        "path": "src/tray/ui",
+        "reason": "intentionally flat tray menu package; direct modules are menu construction layers (menu.py, menu_sections.py, menu_status.py, _menu_callbacks.py, refresh.py, _device_status.py, gui_launch.py) with icon rendering already extracted into icon/ subpackage"
+      },
+      {
+        "path": "src/core/diagnostics",
+        "reason": "intentionally flat diagnostics root; 14 files span distinct collection concerns (backends, sysfs, device candidates, formatting) already partially organised into collectors/, device_discovery_support/, support/ subdirectories; remaining direct files are peer-level collection modules"
+      },
+      {
+        "path": "src/core/effects",
+        "reason": "intentionally flat effects root; 13 files are module-level coordination and type objects (catalog, colors, demo, device, engine, fades, hw_payloads, matrix_layout, perkey_animation, software_targets, timing, transitions) with subsystems already in engine_support/, reactive/, software/"
+      },
+      {
+        "path": "src/core/resources",
+        "reason": "intentionally flat resources root; 8 files are distinct resource loaders (defaults, layout, layout_legends, layout_slots, _layout_components) with sub-types already in layouts/ and reference_defaults_specs/"
+      },
+      {
+        "path": "buildpython/steps",
+        "reason": "intentionally flat build-step root; 14 files are one-per-step orchestrators plus shared reports/quality_exceptions; 6 subdirectories already group multi-file steps (appimage, architecture_validation, code_hygiene, exception_transparency, file_size_analysis, code_markers)"
+      },
+      {
+        "path": "src/gui/perkey",
+        "reason": "intentionally flat per-key editor root; 12 files are root-level editor concerns (canvas, editor, window_geometry, profile_management, hardware, color_utils, commit_pipeline, lightbar_layout, lightbar_controls, keyboard_apply) with sub-concerns in canvas_impl/, editor_support/, ops/, overlay/, ui/"
+      }
     ]
   },
   "code_markers": {

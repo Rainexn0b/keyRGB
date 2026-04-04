@@ -117,7 +117,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
             scanned_files.add(rel)
             try:
                 text = path.read_text(encoding="utf-8", errors="replace")
-            except Exception:
+            except OSError:
                 continue
 
             lines = text.splitlines()

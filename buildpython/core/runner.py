@@ -11,8 +11,13 @@ from .summary import (
     StepSummary,
     build_terminal_build_overview,
     build_terminal_coverage_highlight,
-    build_terminal_debt_snapshot,
     write_summary,
+)
+from .summary_support.debt_terminal import (
+    build_terminal_filesize_highlight,
+    build_terminal_hygiene_highlight,
+    build_terminal_markers_highlight,
+    build_terminal_transparency_highlight,
 )
 from ..utils.log_format import StepLogRecord, format_standard_log
 from ..utils.paths import buildlog_dir
@@ -28,6 +33,8 @@ _YELLOW = "\033[33m" if _USE_COLOR else ""
 _BLUE = "\033[34m" if _USE_COLOR else ""
 _CYAN = "\033[36m" if _USE_COLOR else ""
 
+_SEP = "\u2500" * 60  # ─────────────────────────────────────────────────────────────
+
 
 def _color(text: str, code: str) -> str:
     if not code:
@@ -35,35 +42,37 @@ def _color(text: str, code: str) -> str:
     return f"{code}{text}{_RESET}"
 
 
-def _status_badge(status: str) -> str:
+def _status_icon(status: str) -> str:
+    """Fixed-width status prefix. Emoji glyphs are 2 terminal columns wide."""
     if status == "running":
-        return _color("[..]", _CYAN)
+        return "\u23f3  "  # ⏳
     if status == "success":
-        return _color("[OK]", _GREEN)
+        return "\u2705  "  # ✅
     if status == "failure":
-        return _color("[!!]", _RED)
+        return "\u274c  "  # ❌
     if status == "skipped":
-        return _color("[--]", _YELLOW)
-    return "[??]"
+        return "\u23ed\ufe0f  "  # ⏭️
+    return "     "
 
 
-def _print_step_header(step: Step, *, index: int, total_steps: int, name_width: int) -> None:
-    print(_color("-" * 72, _DIM))
-    step_label = f"[{index}/{total_steps}]"
+def _print_step_header(step: Step, *, index: int, total_steps: int, name_width: int, label_width: int) -> None:
+    print(_color(_SEP, _DIM))
+    label = f"[{index}/{total_steps}]".ljust(label_width)
     name = f"{step.name:<{name_width}}"
-    print(f"{_status_badge('running')} {step_label} {name} : {step.description}")
+    print(f"{_status_icon('running')}{label}  {name} : {step.description}", flush=True)
 
 
 def _print_step_footer(outcome: StepOutcome, highlights: list[str]) -> None:
+    icon = _status_icon(outcome.status)
     if outcome.status == "success":
-        print(f"Completed ({outcome.duration_s:.1f}s)")
+        print(f"{icon}Completed ({outcome.duration_s:.1f}s)")
     elif outcome.status == "skipped":
-        print(f"Skipped ({outcome.duration_s:.1f}s)")
+        print(f"{icon}Skipped ({outcome.duration_s:.1f}s)")
     else:
-        print(f"Failed ({outcome.duration_s:.1f}s)")
+        print(f"{icon}Failed ({outcome.duration_s:.1f}s)")
 
     for line in highlights:
-        print(f"  {line}")
+        print(f"    {line}")
 
 
 def _extract_pytest_highlight(stdout: str, stderr: str) -> str | None:
@@ -85,10 +94,18 @@ def _step_highlights(step: Step, *, stdout: str, stderr: str) -> list[str]:
         pytest_line = _extract_pytest_highlight(stdout, stderr)
         if pytest_line is not None:
             highlights.append(pytest_line)
-    if step.name == "Coverage":
+    elif step.name == "Code Markers":
+        highlights.extend(build_terminal_markers_highlight(buildlog_dir()))
+    elif step.name == "File Size":
+        highlights.extend(build_terminal_filesize_highlight(buildlog_dir()))
+    elif step.name == "Coverage":
         coverage_line = build_terminal_coverage_highlight(buildlog_dir())
         if coverage_line is not None:
             highlights.append(coverage_line)
+    elif step.name == "Code Hygiene":
+        highlights.extend(build_terminal_hygiene_highlight(buildlog_dir()))
+    elif step.name == "Exception Transparency":
+        highlights.extend(build_terminal_transparency_highlight(buildlog_dir()))
     return highlights
 
 
@@ -118,13 +135,15 @@ def _is_module_available(module: str) -> bool:
     try:
         __import__(module)
         return True
-    except Exception:
+    except Exception:  # @quality-exception exception-transparency: module availability probe intentionally catches all import failures to determine step gating
         return False
 
 
-def run_step(step: Step, *, index: int, total_steps: int, name_width: int, verbose: bool) -> StepOutcome:
+def run_step(
+    step: Step, *, index: int, total_steps: int, name_width: int, label_width: int, verbose: bool
+) -> StepOutcome:
     start = time.time()
-    _print_step_header(step, index=index, total_steps=total_steps, name_width=name_width)
+    _print_step_header(step, index=index, total_steps=total_steps, name_width=name_width, label_width=label_width)
 
     # Optional step gating
     if step.name in {"Ruff", "Ruff Format"} and not _is_module_available("ruff"):
@@ -235,10 +254,11 @@ def run_step(step: Step, *, index: int, total_steps: int, name_width: int, verbo
 def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     total_steps = len(steps)
     name_width = max((len(step.name) for step in steps), default=7)
+    label_width = len(f"[{total_steps}/{total_steps}]")
 
-    print(_color("KeyRGB build runner", _BOLD + _CYAN))
-    print(f"Logs: {buildlog_dir()}")
-    print(f"Steps: {total_steps}")
+    print(
+        f"\U0001f527  {_color('KeyRGB Build', _BOLD + _CYAN)}  {_color(f'\u00b7  {total_steps} steps  \u00b7  Logs in {buildlog_dir()}', _DIM)}"
+    )
 
     started = time.time()
     summaries: list[StepSummary] = []
@@ -251,7 +271,9 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         return int(round(100 * successes / len(considered)))
 
     for index, step in enumerate(steps, start=1):
-        outcome = run_step(step, index=index, total_steps=total_steps, name_width=name_width, verbose=verbose)
+        outcome = run_step(
+            step, index=index, total_steps=total_steps, name_width=name_width, label_width=label_width, verbose=verbose
+        )
 
         summaries.append(
             StepSummary(
@@ -264,7 +286,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         )
 
         if outcome.status == "failure" and not continue_on_error:
-            print(f"Stopped on failure in step {step.number}: {step.name}")
+            print(f"\n{_status_icon('failure')}Build stopped at [{index}/{total_steps}]: {step.name}")
 
             score = _health_score()
 
@@ -279,7 +301,6 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
             )
             write_debt_index(buildlog_dir())
 
-            print(_color("-" * 72, _DIM))
             final_summary = BuildSummary(
                 passed=False,
                 health_score=score,
@@ -287,8 +308,6 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
                 steps=summaries,
             )
             for line in build_terminal_build_overview(buildlog_dir(), final_summary):
-                print(line)
-            for line in build_terminal_debt_snapshot(buildlog_dir(), include_coverage=False):
                 print(line)
 
             return outcome.exit_code
@@ -307,7 +326,6 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     )
     write_debt_index(buildlog_dir())
 
-    print(_color("-" * 72, _DIM))
     final_summary = BuildSummary(
         passed=passed,
         health_score=score,
@@ -315,8 +333,6 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         steps=summaries,
     )
     for line in build_terminal_build_overview(buildlog_dir(), final_summary):
-        print(line)
-    for line in build_terminal_debt_snapshot(buildlog_dir(), include_coverage=False):
         print(line)
 
     return 0

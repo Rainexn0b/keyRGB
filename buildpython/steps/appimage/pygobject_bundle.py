@@ -37,7 +37,7 @@ print(json.dumps({
 
     try:
         data = json.loads(proc.stdout)
-    except Exception:
+    except json.JSONDecodeError:
         return
 
     candidates: list[Path] = []

@@ -45,7 +45,7 @@ print(json.dumps(out))
         raise SystemExit(proc.returncode)
     try:
         data = json.loads(proc.stdout)
-    except Exception:
+    except json.JSONDecodeError:
         raise SystemExit(f"Failed to parse python runtime manifest: {proc.stdout}\n{proc.stderr}")
 
     if not isinstance(data, dict):
@@ -74,7 +74,7 @@ def bundle_python_runtime(*, appdir: Path) -> None:
     def rel_under_prefix(path: Path) -> Path:
         try:
             return path.relative_to(prefix)
-        except Exception:
+        except Exception:  # @quality-exception exception-transparency: relative-to fallback keeps the previous lib layout when the path is outside the prefix
             # Fallback: keep our previous lib layout.
             return Path("lib") / f"python{version}"
 
