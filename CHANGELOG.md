@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.21.2 (2026-04-06)
+
+- GUI/Per-key: Keep the key overlay geometry visible when backdrop mode is set to `No backdrop` by continuing to derive the per-key canvas transform from the base keyboard image bounds even when no backdrop image is drawn.
+- Support Tools/Diagnostics: Enable the guided backend speed probe for `ite8291r3` devices and consolidate the flow onto the tray-driven auto-play path, so the probe always steps through the test speeds automatically and restores the previous effect instead of offering a separate manual path.
+- Support Tools/Diagnostics: Replace the guided backend speed probe's narrow stock popups with wider custom dialogs, including a multi-line notes field so the final observation step has enough vertical typing space.
+- GUI/Support Tools: Move the three primary support checks into a shared top-level action row with distinct button styling, clarify that the backend speed probe derives its target from the current diagnostics/discovery payload, move `Save full support bundle…` into its own final section because it combines diagnostics, discovery, supplemental evidence, and the generated issue draft, and widen the default window while reducing the pane heights so the full tool is less likely to open off-screen.
+
 ## 0.21.1 (2026-04-05)
 
 - Tray/Linux: Make `pystray` backend selection session-aware: prefer AppIndicator on KDE Plasma Wayland so the tray icon stays visible in the panel, prefer `gtk` on other PyGObject-capable sessions to avoid the opaque-square `xorg` icon path, suppress both the Ayatana deprecation warning and the GTK scale-factor critical, and keep `xorg` as the compatibility fallback when the preferred desktop-native backend is unavailable.
