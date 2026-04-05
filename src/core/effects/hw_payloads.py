@@ -32,6 +32,7 @@ class _ClosureIntrospectableProtocol(Protocol):
 
 
 _KNOWN_COLOR_HW_EFFECTS = frozenset({"breathing", "random", "ripple", "raindrop", "aurora", "fireworks"})
+_KNOWN_RANDOM_SENTINEL_HW_EFFECTS = frozenset({"random"})
 
 
 def _keyboard_hw_speed_policy_or_default(kb: object, *, default: str) -> str:
@@ -108,28 +109,32 @@ def build_hw_effect_payload(
 
     allowed = allowed_hw_effect_keys(effect_func, logger=logger)
 
-    supports_color = "color" in allowed or str(effect_name or "").strip().lower() in _KNOWN_COLOR_HW_EFFECTS
+    normalized_effect_name = str(effect_name or "").strip().lower()
+    supports_color = "color" in allowed or normalized_effect_name in _KNOWN_COLOR_HW_EFFECTS
 
     # Palette-based backends (for example ite8291r3) expose a firmware color
     # slot table. Any hardware effect that accepts a `color` parameter expects
     # that palette slot index, not a raw RGB tuple.
     if hw_colors and supports_color:
-        palette_slot = int(hw_colors.get("red", 1))
-        try:
-            with kb_lock:
-                kb.set_palette_color(palette_slot, current_color)
-        except Exception as exc:  # @quality-exception exception-transparency: set_palette_color is a runtime USB/HID hardware write boundary; palette programming failure must not block effect payload construction
-            # Hardware writes are a runtime boundary: log full exception
-            # context, then continue building the payload as before.
-            log_throttled(
-                logger,
-                "legacy.effects.palette_color",
-                interval_s=120,
-                level=logging.DEBUG,
-                msg="Failed to program palette slot for hardware effect",
-                exc=exc,
-            )
-        hw_kwargs["color"] = palette_slot
+        if normalized_effect_name in _KNOWN_RANDOM_SENTINEL_HW_EFFECTS and "random" in hw_colors:
+            hw_kwargs["color"] = int(hw_colors["random"])
+        else:
+            palette_slot = int(hw_colors.get("red", 1))
+            try:
+                with kb_lock:
+                    kb.set_palette_color(palette_slot, current_color)
+            except Exception as exc:  # @quality-exception exception-transparency: set_palette_color is a runtime USB/HID hardware write boundary; palette programming failure must not block effect payload construction
+                # Hardware writes are a runtime boundary: log full exception
+                # context, then continue building the payload as before.
+                log_throttled(
+                    logger,
+                    "legacy.effects.palette_color",
+                    interval_s=120,
+                    level=logging.DEBUG,
+                    msg="Failed to program palette slot for hardware effect",
+                    exc=exc,
+                )
+            hw_kwargs["color"] = palette_slot
 
     # Direct-RGB color pass-through for backends that accept color as an RGB
     # tuple (for example ite8910). Only set if not already populated by the

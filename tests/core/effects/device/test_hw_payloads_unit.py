@@ -268,6 +268,58 @@ class TestBuildHwEffectPayload:
         mock_kb.set_palette_color.assert_called_once_with(3, (255, 128, 64))
         assert captured_kwargs["color"] == 3
 
+    def test_palette_backend_random_effect_preserves_random_sentinel(self):
+        """Palette backends should keep firmware-random effects on the random slot."""
+        from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        mock_kb = MagicMock()
+        captured_kwargs = {}
+
+        def capture_effect_func(**kwargs):
+            captured_kwargs.update(kwargs)
+            return "payload"
+
+        build_hw_effect_payload(
+            effect_name="random",
+            effect_func=capture_effect_func,
+            ui_speed=5,
+            brightness=50,
+            current_color=(255, 128, 64),
+            hw_colors={"red": 3, "random": 8},
+            kb=mock_kb,
+            kb_lock=RLock(),
+            logger=logging.getLogger(),
+        )
+
+        mock_kb.set_palette_color.assert_not_called()
+        assert captured_kwargs["color"] == 8
+
+    def test_direct_rgb_random_effect_passes_color_tuple(self):
+        """Direct-RGB backends should keep tuple colors for hardware random variants."""
+        from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        mock_kb = MagicMock()
+        captured_kwargs = {}
+
+        def capture_effect_func(**kwargs):
+            captured_kwargs.update(kwargs)
+            return "payload"
+
+        build_hw_effect_payload(
+            effect_name="random",
+            effect_func=capture_effect_func,
+            ui_speed=5,
+            brightness=25,
+            current_color=(17, 34, 51),
+            hw_colors={},
+            kb=mock_kb,
+            kb_lock=RLock(),
+            logger=logging.getLogger(),
+        )
+
+        mock_kb.set_palette_color.assert_not_called()
+        assert captured_kwargs["color"] == (17, 34, 51)
+
     def test_retries_on_unsupported_kwarg_error(self):
         """Should retry with fewer kwargs when 'attr is not needed' error occurs."""
         from src.core.effects.hw_payloads import build_hw_effect_payload

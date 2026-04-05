@@ -5,7 +5,8 @@
 - Tray/Linux: Make `pystray` backend selection session-aware: prefer AppIndicator on KDE Plasma Wayland so the tray icon stays visible in the panel, prefer `gtk` on other PyGObject-capable sessions to avoid the opaque-square `xorg` icon path, suppress both the Ayatana deprecation warning and the GTK scale-factor critical, and keep `xorg` as the compatibility fallback when the preferred desktop-native backend is unavailable.
 - GUI/Per-key: Make the per-key editor load profile backdrops through the shared backdrop storage path so `No backdrop` and `Built-in seed` stay aligned with the calibrator behavior.
 - Support Tools/Diagnostics: Record the forced hardware selection key and tray path for the guided `ite8910` speed probe, surface that guidance in the prompt UI, and include the selection details in generated support evidence.
-- Effects/Hardware: Treat palette-slot firmware effects consistently across the known color-capable hardware-effect set so palette-based backends program the selected slot for ripple-style effects as well as breathing.
+- Effects/Hardware: Treat palette-slot firmware effects consistently across the known color-capable hardware-effect set so palette-based backends program the selected slot for ripple-style effects as well as breathing, while preserving the dedicated firmware-random sentinel slot for random hardware effects.
+- Docs/Screenshots: Refresh the captured tray and GUI screenshots for the current 0.21.1 interface state.
 
 ## 0.21.0 (2026-04-05)
 
