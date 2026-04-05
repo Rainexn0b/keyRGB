@@ -255,9 +255,10 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     total_steps = len(steps)
     name_width = max((len(step.name) for step in steps), default=7)
     label_width = len(f"[{total_steps}/{total_steps}]")
+    build_label = f"\u00b7  {total_steps} steps  \u00b7  Logs in {buildlog_dir()}"
 
     print(
-        f"\U0001f527  {_color('KeyRGB Build', _BOLD + _CYAN)}  {_color(f'\u00b7  {total_steps} steps  \u00b7  Logs in {buildlog_dir()}', _DIM)}"
+        f"\U0001f527  {_color('KeyRGB Build', _BOLD + _CYAN)}  {_color(build_label, _DIM)}"
     )
 
     started = time.time()
