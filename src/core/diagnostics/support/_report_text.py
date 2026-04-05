@@ -257,6 +257,9 @@ def supplemental_evidence_text(
             lines.append(f"[{key}]")
             lines.append(f"backend: {payload.get('backend')}")
             lines.append(f"effect: {payload.get('effect_name')}")
+            selection_effect_name = str(payload.get("selection_effect_name") or "").strip()
+            if selection_effect_name:
+                lines.append(f"selection_effect: {selection_effect_name}")
             started_at = str(payload.get("started_at") or "").strip()
             completed_at = str(payload.get("completed_at") or "").strip()
             if started_at:

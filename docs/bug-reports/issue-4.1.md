@@ -1,6 +1,6 @@
-# Issue 4.1: Follow-up plan after 0.19.2 retest
+# Issue 4.1: Follow-up continuation after the 0.20.0 retest
 
-Last updated: 2026-04-02
+Last updated: 2026-04-05
 
 Related issue: https://github.com/Rainexn0b/keyRGB/issues/4
 
@@ -9,13 +9,63 @@ single implementation plan. The goal is to handle the remaining gaps one at a
 time, in an order that improves user-visible behavior quickly without locking
 KeyRGB into short-term fixes that will become debt.
 
-Update for the end of this version:
+Update for the end of the 0.20.0 release follow-up:
 
 - The plan below has been implemented for the functional issue-4 items.
-- The remaining materially open complaint is the `ite8910` hardware-speed-range
-	question, which now depends on a returned Support Tools bundle containing the
-	guided backend-speed probe observations.
+- The reporter's 2026-04-04 retest confirms that the `ite8910` software-effect
+	blinking complaint now appears resolved on-device.
+- The same retest surfaced two smaller release-follow-up concerns:
+	1. the per-key editor backdrop selector did not appear to match the
+	   calibrator's `No backdrop` / `Built-in seed` behavior
+	2. the guided `ite8910` speed probe exposed an effect-name collision because
+	   the plan referred to `spectrum_cycle` without making the required hardware
+	   selection explicit
+- Those two follow-up concerns are now treated as post-0.20.0 cleanup items,
+	not as a re-opening of the larger 0.19.2 implementation plan.
+- After that cleanup, the remaining materially open complaint is still the
+	`ite8910` hardware-speed-range question, which depends on a returned Support
+	Tools bundle containing the guided backend-speed probe observations.
 - Locale-specific legend polish remains intentionally deferred.
+
+## Continuation after the 0.20.0 reporter retest
+
+Reporter feedback from 2026-04-04 changes the status in two useful ways:
+
+1. It confirms that the software blinking complaint is no longer the active
+	blocker.
+2. It narrows the remaining follow-up work to one UX parity fix and one
+	probe-flow clarity fix.
+
+### New concerns reported against 0.20.0
+
+1. Per-key editor backdrop selector parity:
+	- The reporter observed that `No backdrop` and `Built-in seed` in the
+	  per-key editor did not appear to match the keymap calibrator's behavior.
+	- Treat this as a per-key-editor-specific regression in backdrop handling,
+	  not as a failure of the original backdrop-mode feature itself.
+	- The safest fix is to make the per-key editor use the same backdrop-loading
+	  path as the calibrator so both windows interpret profile-backed backdrop
+	  modes identically.
+
+2. Guided speed-probe effect ambiguity:
+	- The probe plan exposed `spectrum_cycle` only by base effect name.
+	- On `ite8910`, that is ambiguous because KeyRGB also has a software
+	  `spectrum_cycle` effect with the same visible title.
+	- Treat this as a probe UX bug, not as evidence that the hardware-speed
+	  investigation is blocked on backend behavior again.
+	- The fix is to record and display the forced hardware selection key
+	  (`hw:spectrum_cycle`) plus the tray menu path, so the reporter can test the
+	  actual firmware effect instead of the software one.
+
+### Updated closure view after this continuation
+
+- Backdrop modes remain functionally implemented.
+- One-logical-key-to-many-cells support remains functionally implemented.
+- `ite8910` software blinking now has positive reporter feedback.
+- The guided speed probe remains the right evidence-collection path, but it
+	needed the hardware-effect selection to be made explicit.
+- The only materially open issue-4 question after this cleanup is still the
+	`ite8910` hardware-speed-range complaint itself.
 
 Treat the main body of this document as the historical planning record for the
 work that has now landed.
@@ -379,9 +429,11 @@ Status against the plan above:
 	- done. Profile storage, calibrator assignment, editor selection, and reactive typing now support one logical identity driving multiple mapped LEDs.
 3. Backend-specific per-key mode-maintenance policy:
 	- done. `ite8291r3` keeps per-frame reassertion, while `ite8910` uses one-time init so per-key software/reactive rendering no longer resets the board every frame.
+	- post-0.20.0 reporter retest: positive. The reporter explicitly noted that software effects now look good and no blinking was seen during testing.
 4. Support Tools speed probes:
-	- done. Support Tools now exposes the guided `ite8910` backend-speed probe flow and persists the observation data into the support bundle and issue draft.
+	- done, with one follow-up clarification. Support Tools now exposes the guided `ite8910` backend-speed probe flow and persists the observation data into the support bundle and issue draft.
+	- post-0.20.0 cleanup: the probe flow now needs to carry the forced hardware-effect selection key and tray path explicitly so `spectrum_cycle` cannot be mistaken for the software effect.
 5. Locale legends:
 	- deferred by design. Slot IDs and legend-pack groundwork landed, but reporter-facing locale polish is not part of this closure batch.
 
-That leaves only one issue-4 item still waiting on external input for final closure: the reporter's hardware-speed-range complaint on `ite8910`, which now needs the saved support bundle from the new probe flow.
+That leaves only one issue-4 item still waiting on external input for final closure: the reporter's hardware-speed-range complaint on `ite8910`, which now needs the saved support bundle from the clarified probe flow.

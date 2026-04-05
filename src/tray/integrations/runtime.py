@@ -18,6 +18,8 @@ if TYPE_CHECKING:
 _pystray_mod = None
 _pystray_item = None
 _instance_lock_fh = None
+_gtk_log_handler_id = None
+_appindicator_log_handler_id = None
 
 
 logger = logging.getLogger(__name__)
@@ -69,14 +71,97 @@ def _classify_pystray_import_error(exc: Exception) -> _PystrayImportFailure | No
     return None
 
 
-def _force_pystray_backend_xorg() -> None:
-    # Only set if user hasn't explicitly chosen a backend.
-    os.environ.setdefault("PYSTRAY_BACKEND", "xorg")
-
-
 def _set_pystray_backend_xorg_for_retry() -> None:
-    # Used for automatic fallback when we previously set appindicator.
+    # Used for automatic selection and retry paths.
     os.environ["PYSTRAY_BACKEND"] = "xorg"
+
+
+def _set_pystray_backend_gtk_for_retry() -> None:
+    os.environ["PYSTRAY_BACKEND"] = "gtk"
+
+
+def _set_pystray_backend_appindicator_for_retry() -> None:
+    os.environ["PYSTRAY_BACKEND"] = "appindicator"
+
+
+def _install_log_filter_for_backend(backend: str) -> None:
+    if backend == "gtk":
+        _install_gtk_scale_factor_log_filter()
+    elif backend == "appindicator":
+        _install_appindicator_deprecation_log_filter()
+
+
+def _configure_backend_for_import(backend: str) -> None:
+    if backend == "gtk":
+        _set_pystray_backend_gtk_for_retry()
+    elif backend == "appindicator":
+        _set_pystray_backend_appindicator_for_retry()
+    elif backend == "xorg":
+        _set_pystray_backend_xorg_for_retry()
+    else:  # pragma: no cover - auto-selection only uses known backends
+        raise ValueError(f"Unsupported pystray backend: {backend}")
+    _install_log_filter_for_backend(backend)
+
+
+def _is_kde_wayland_session() -> bool:
+    session_type = str(os.environ.get("XDG_SESSION_TYPE") or "").strip().lower()
+    current_desktop = str(os.environ.get("XDG_CURRENT_DESKTOP") or "").strip().lower()
+    desktop_session = str(os.environ.get("DESKTOP_SESSION") or "").strip().lower()
+    return session_type == "wayland" and ("kde" in current_desktop or "plasma" in desktop_session)
+
+
+def _install_gtk_scale_factor_log_filter() -> None:
+    global _gtk_log_handler_id
+
+    if _gtk_log_handler_id is not None:
+        return
+
+    try:
+        gi = importlib.import_module("gi")
+        gi.require_version("GLib", "2.0")
+        glib = importlib.import_module("gi.repository.GLib")
+    except _GI_PROBE_EXCEPTIONS:
+        return
+
+    if not all(hasattr(glib, attr) for attr in ("log_default_handler", "log_set_handler", "LogLevelFlags")):
+        return
+
+    def _handler(domain, level, message, user_data):
+        domain_text = "" if domain is None else str(domain)
+        message_text = "" if message is None else str(message)
+        if domain_text == "Gtk" and "gtk_widget_get_scale_factor" in message_text:
+            return
+        glib.log_default_handler(domain, level, message, user_data)
+
+    _gtk_log_handler_id = glib.log_set_handler("Gtk", glib.LogLevelFlags.LEVEL_CRITICAL, _handler, None)
+
+
+def _install_appindicator_deprecation_log_filter() -> None:
+    global _appindicator_log_handler_id
+
+    if _appindicator_log_handler_id is not None:
+        return
+
+    try:
+        gi = importlib.import_module("gi")
+        gi.require_version("GLib", "2.0")
+        glib = importlib.import_module("gi.repository.GLib")
+    except _GI_PROBE_EXCEPTIONS:
+        return
+
+    if not all(hasattr(glib, attr) for attr in ("log_default_handler", "log_set_handler", "LogLevelFlags")):
+        return
+
+    def _handler(domain, level, message, user_data):
+        domain_text = "" if domain is None else str(domain)
+        message_text = "" if message is None else str(message)
+        if domain_text == "libayatana-appindicator" and "is deprecated" in message_text:
+            return
+        glib.log_default_handler(domain, level, message, user_data)
+
+    _appindicator_log_handler_id = glib.log_set_handler(
+        "libayatana-appindicator", glib.LogLevelFlags.LEVEL_WARNING, _handler, None
+    )
 
 
 def _gi_is_working() -> bool:
@@ -104,6 +189,50 @@ def _clear_failed_import(name: str) -> None:
     sys.modules.pop(name, None)
 
 
+def _import_pystray_with_fallbacks(
+    candidates: list[tuple[str, str]],
+    *,
+    import_module=None,
+):
+    if import_module is None:
+        import_module = importlib.import_module
+
+    last_exc: Exception | None = None
+
+    for attempt, (backend, log_label) in enumerate(candidates):
+        if attempt > 0:
+            _clear_failed_import("pystray")
+        _configure_backend_for_import(backend)
+        logger.info("pystray backend: %s", log_label)
+        try:
+            return import_module("pystray")
+        except _PYSTRAY_IMPORT_RETRY_EXCEPTIONS as exc:
+            last_exc = exc
+
+    assert last_exc is not None
+    raise RuntimeError(
+        "pystray could not be initialized. The tray app requires a desktop "
+        "session (X11/Wayland). In CI/headless environments, importing the "
+        "module is supported but running the tray is not."
+    ) from last_exc
+
+
+def _auto_backend_candidates(*, gi_working: bool) -> list[tuple[str, str]]:
+    if not gi_working:
+        return [("xorg", "xorg (auto)")]
+    if _is_kde_wayland_session():
+        return [
+            ("appindicator", "appindicator (auto-kde-wayland)"),
+            ("gtk", "gtk (appindicator fallback)"),
+            ("xorg", "xorg (gtk fallback)"),
+        ]
+    return [
+        ("gtk", "gtk (auto)"),
+        ("xorg", "xorg (gtk fallback)"),
+        ("appindicator", "appindicator (xorg fallback)"),
+    ]
+
+
 def get_pystray():
     """Import pystray only when the tray UI is actually needed.
 
@@ -121,28 +250,21 @@ def get_pystray():
 
     # Backend selection strategy:
     # - Respect explicit user choice via PYSTRAY_BACKEND.
-    # - If PyGObject is usable, prefer AppIndicator first (best UX on modern desktops).
-    # - Fall back to Xorg if AppIndicator import fails.
+    # - On KDE Wayland, prefer AppIndicator so the tray icon stays visible.
+    # - Otherwise, prefer GTK automatically when PyGObject is usable so the tray keeps a shaped icon.
+    # - Fall back to Xorg when the preferred desktop-native path fails.
+    # - Keep the remaining backend as a final compatibility path.
     explicit_backend = "PYSTRAY_BACKEND" in os.environ
 
-    if not explicit_backend and _gi_is_working():
-        os.environ["PYSTRAY_BACKEND"] = "appindicator"
-        logger.info("pystray backend: appindicator (auto)")
-        try:
-            _pystray_mod = importlib.import_module("pystray")
-        except _PYSTRAY_IMPORT_RETRY_EXCEPTIONS as exc:
-            _clear_failed_import("pystray")
-            # Catch GLib.GError indicating missing indicator libraries.
-            if "libayatana-indicator" in str(exc) or "app_indicator_new" in str(exc):
-                logger.info("pystray backend: xorg (missing indicator libs)")
-            else:
-                logger.info("pystray backend: xorg (fallback)")
-            _set_pystray_backend_xorg_for_retry()
-            _pystray_mod = importlib.import_module("pystray")
+    if not explicit_backend:
+        _pystray_mod = _import_pystray_with_fallbacks(_auto_backend_candidates(gi_working=_gi_is_working()))
     else:
         try:
             if explicit_backend:
-                logger.info("pystray backend: %s (explicit)", os.environ.get("PYSTRAY_BACKEND"))
+                backend = os.environ.get("PYSTRAY_BACKEND")
+                if backend is not None:
+                    _install_log_filter_for_backend(backend)
+                logger.info("pystray backend: %s (explicit)", backend)
             _pystray_mod = importlib.import_module("pystray")
         # @quality-exception exception-transparency: pystray import is a runtime desktop-env boundary; broken-gi is classified and retried with xorg fallback
         except Exception as exc:  # pragma: no cover (depends on desktop env)
@@ -151,10 +273,7 @@ def get_pystray():
                 # If a non-PyGObject `gi` module (or a partial/broken install) is found,
                 # pystray's AppIndicator backend raises AttributeError during import and
                 # does not fall back to other backends. Force Xorg and retry once.
-                _clear_failed_import("pystray")
-                _force_pystray_backend_xorg()
-                logger.info("pystray backend: xorg (broken-gi fallback)")
-                _pystray_mod = importlib.import_module("pystray")
+                _pystray_mod = _import_pystray_with_fallbacks([("xorg", "xorg (broken-gi fallback)")])
             else:
                 raise RuntimeError(
                     "pystray could not be initialized. The tray app requires a desktop "

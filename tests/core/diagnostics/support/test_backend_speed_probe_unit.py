@@ -19,6 +19,8 @@ def test_build_backend_speed_probe_plan_for_ite8910() -> None:
     assert plan["key"] == ITE8910_SPEED_PROBE_KEY
     assert plan["backend"] == "ite8910"
     assert plan["effect_name"] == "spectrum_cycle"
+    assert plan["selection_effect_name"] == "hw:spectrum_cycle"
+    assert plan["selection_menu_path"] == "Hardware Effects -> Spectrum Cycle"
     assert plan["requested_ui_speeds"] == [1, 3, 5, 7, 10]
     assert [sample["raw_speed"] for sample in plan["samples"]] == [1, 3, 5, 7, 10]
 

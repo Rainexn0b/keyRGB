@@ -7,8 +7,8 @@ This guide covers creating and maintaining the development venv for KeyRGB.
 | Requirement | Notes |
 |---|---|
 | Python >= 3.10 | 3.12 or 3.14 recommended |
-| PyGObject (`gi`) | Must be installed system-wide |
-| AyatanaAppIndicator3 / AppIndicator3 | Needed for proper tray integration on GTK desktops |
+| PyGObject (`gi`) | Optional tray dependency for the GTK and AppIndicator backends |
+| AyatanaAppIndicator3 / AppIndicator3 | Needed when the session prefers the AppIndicator tray backend, such as KDE Plasma on Wayland |
 
 ### Install system dependencies
 
@@ -40,7 +40,7 @@ PyGObject should come from the system package manager, not from `pip`.
 python3 -m venv .venv
 ```
 
-Expose system `gi` into the venv so `pystray` can use AppIndicator:
+Expose system `gi` into the venv if you need the GTK or AppIndicator tray backends:
 
 ```bash
 PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")

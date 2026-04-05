@@ -191,11 +191,11 @@ def test_load_deck_image_uses_string_profile_and_clears_cache(monkeypatch: pytes
     image = Image.new("RGBA", (4, 4))
     calls: list[object] = []
 
-    def fake_load_reference_deck_image(*, profile_name: str | None) -> Image.Image:
+    def fake_load_backdrop_image(profile_name: str) -> Image.Image:
         calls.append(profile_name)
         return image
 
-    monkeypatch.setattr(canvas_drawing, "load_reference_deck_image", fake_load_reference_deck_image)
+    monkeypatch.setattr(canvas_drawing, "load_backdrop_image", fake_load_backdrop_image)
 
     canvas._load_deck_image()
 
@@ -206,7 +206,7 @@ def test_load_deck_image_uses_string_profile_and_clears_cache(monkeypatch: pytes
 
 def test_load_deck_image_can_store_no_backdrop(monkeypatch: pytest.MonkeyPatch) -> None:
     canvas = _FakeCanvas()
-    monkeypatch.setattr(canvas_drawing, "load_reference_deck_image", lambda **_kwargs: None)
+    monkeypatch.setattr(canvas_drawing, "load_backdrop_image", lambda _profile_name: None)
 
     canvas._load_deck_image()
 
@@ -218,15 +218,11 @@ def test_load_deck_image_passes_none_for_non_string_profile(monkeypatch: pytest.
     canvas = _FakeCanvas()
     canvas.editor.profile_name = 123
     calls: list[object] = []
-    monkeypatch.setattr(
-        canvas_drawing,
-        "load_reference_deck_image",
-        lambda *, profile_name: calls.append(profile_name),
-    )
+    monkeypatch.setattr(canvas_drawing, "load_backdrop_image", lambda profile_name: calls.append(profile_name))
 
     canvas._load_deck_image()
 
-    assert calls == [None]
+    assert calls == []
     assert canvas._deck_render_cache.clear_calls == 1
 
 

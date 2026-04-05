@@ -6,6 +6,7 @@ from typing import Any
 
 from src.core.backends.ite8910 import protocol as ite8910_protocol
 from src.core.backends.ite8910.backend import Ite8910Backend
+from src.core.effects.catalog import hardware_effect_selection_key
 from src.core.effects.hw_payloads import build_hw_effect_payload
 
 ITE8910_SPEED_PROBE_KEY = "ite8910_speed"
@@ -64,6 +65,7 @@ def build_backend_speed_probe_plans(*, backends_snapshot: dict[str, Any] | None)
 def _build_ite8910_speed_probe_plan() -> dict[str, Any]:
     backend = Ite8910Backend()
     effect_name = ITE8910_SPEED_PROBE_EFFECT
+    selection_effect_name = hardware_effect_selection_key(effect_name)
     effect_func = backend.effects()[effect_name]
     kb = _ProbeKeyboard()
     kb_lock = RLock()
@@ -100,11 +102,14 @@ def _build_ite8910_speed_probe_plan() -> dict[str, Any]:
         "label": "ITE8910 hardware speed probe",
         "backend": "ite8910",
         "effect_name": effect_name,
+        "selection_effect_name": selection_effect_name,
+        "selection_menu_path": f"Hardware Effects -> {effect_name.replace('_', ' ').title()}",
         "requested_ui_speeds": [int(value) for value in ui_speeds],
         "samples": samples,
         "expectation": "Higher UI speed values should look faster on ite8910.",
         "instructions": [
-            "Switch the keyboard to the listed hardware effect using the tray or Settings window.",
+            "Switch the keyboard to the hardware effect entry, not the software effect with the same title.",
+            f"In the tray, use {effect_name.replace('_', ' ').title()} from Hardware Effects; the forced selection key is {selection_effect_name}.",
             "Apply the listed UI speed values in order and watch whether each step is visually distinct.",
             "If multiple speeds appear identical or bunched together, record which values looked too close.",
         ],

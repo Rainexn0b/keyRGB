@@ -31,6 +31,9 @@ class _ClosureIntrospectableProtocol(Protocol):
     __closure__: tuple[_ClosureCellProtocol, ...] | None
 
 
+_KNOWN_COLOR_HW_EFFECTS = frozenset({"breathing", "random", "ripple", "raindrop", "aurora", "fireworks"})
+
+
 def _keyboard_hw_speed_policy_or_default(kb: object, *, default: str) -> str:
     try:
         policy = cast(_KeyboardHwSpeedPolicyProtocol, kb).keyrgb_hw_speed_policy
@@ -105,10 +108,12 @@ def build_hw_effect_payload(
 
     allowed = allowed_hw_effect_keys(effect_func, logger=logger)
 
-    # For palette-based backends (hw_colors non-empty), breathing uses a
-    # palette slot. For direct-RGB backends (hw_colors empty), pass the
-    # user's color as an RGB tuple.
-    if effect_name == "breathing" and hw_colors:
+    supports_color = "color" in allowed or str(effect_name or "").strip().lower() in _KNOWN_COLOR_HW_EFFECTS
+
+    # Palette-based backends (for example ite8291r3) expose a firmware color
+    # slot table. Any hardware effect that accepts a `color` parameter expects
+    # that palette slot index, not a raw RGB tuple.
+    if hw_colors and supports_color:
         palette_slot = int(hw_colors.get("red", 1))
         try:
             with kb_lock:
@@ -121,15 +126,15 @@ def build_hw_effect_payload(
                 "legacy.effects.palette_color",
                 interval_s=120,
                 level=logging.DEBUG,
-                msg="Failed to program palette slot for breathing effect",
+                msg="Failed to program palette slot for hardware effect",
                 exc=exc,
             )
         hw_kwargs["color"] = palette_slot
 
-    # Direct-RGB color pass-through for backends that accept color as an
-    # RGB tuple (ITE8910). Only set if not already populated by the palette
-    # path above.
-    if "color" not in hw_kwargs and "color" in allowed:
+    # Direct-RGB color pass-through for backends that accept color as an RGB
+    # tuple (for example ite8910). Only set if not already populated by the
+    # palette path above.
+    if "color" not in hw_kwargs and supports_color:
         hw_kwargs["color"] = tuple(current_color)
 
     if direction and "direction" in allowed:

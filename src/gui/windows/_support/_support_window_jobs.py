@@ -134,6 +134,9 @@ def run_backend_speed_probe(
         window._set_status("No guided backend probe available", ok=False)
         return
 
+    selection_effect_name = str(plan.get("selection_effect_name") or plan.get("effect_name") or "").strip()
+    selection_menu_path = str(plan.get("selection_menu_path") or "").strip()
+
     if prompt:
         try:
             ok = bool(
@@ -154,12 +157,16 @@ def run_backend_speed_probe(
         for sample in plan.get("samples") or []
         if isinstance(sample, dict)
     )
-    message = (
-        f"Backend: {plan.get('backend')}\n"
-        f"Effect: {plan.get('effect_name')}\n"
-        f"Samples: {samples_text}\n\n"
-        f"{instructions}\n\n"
-        "Click OK after you have tested the listed speed values."
+    message = "".join(
+        [
+            f"Backend: {plan.get('backend')}\n",
+            f"Effect: {plan.get('effect_name')}\n",
+            f"Hardware selection key: {selection_effect_name}\n" if selection_effect_name else "",
+            f"Tray path: {selection_menu_path}\n" if selection_menu_path else "",
+            f"Samples: {samples_text}\n\n",
+            f"{instructions}\n\n",
+            "Click OK after you have tested the listed speed values.",
+        ]
     )
     started_at = datetime.now(timezone.utc).isoformat()
     try:
@@ -189,6 +196,7 @@ def run_backend_speed_probe(
     result = {
         "backend": plan.get("backend"),
         "effect_name": plan.get("effect_name"),
+        "selection_effect_name": selection_effect_name,
         "requested_ui_speeds": list(plan.get("requested_ui_speeds") or []),
         "samples": list(plan.get("samples") or []),
         "started_at": started_at,

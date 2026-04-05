@@ -59,6 +59,7 @@ def test_build_issue_report_prefers_hardware_support_for_attention_candidates() 
                 "ite8910_speed": {
                     "backend": "ite8910",
                     "effect_name": "spectrum_cycle",
+                    "selection_effect_name": "hw:spectrum_cycle",
                     "samples": [{"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"}],
                     "observation": {"distinct_steps": False, "notes": "1 and 3 looked nearly identical"},
                 }
@@ -76,6 +77,7 @@ def test_build_issue_report_prefers_hardware_support_for_attention_candidates() 
     assert "additional_evidence" in report["fields"]
     assert "descriptor output" in report["fields"]["additional_evidence"]
     assert "Guided backend probes:" in report["fields"]["additional_evidence"]
+    assert "selection_effect: hw:spectrum_cycle" in report["fields"]["additional_evidence"]
     assert "1 and 3 looked nearly identical" in report["fields"]["additional_evidence"]
     assert "Template: Hardware support / diagnostics" in report["markdown"]
 

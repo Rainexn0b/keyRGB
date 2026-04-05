@@ -7,8 +7,8 @@ from typing import Any
 from PIL import Image, ImageTk
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, get_layout_keys
-from src.gui.reference.deck_image import load_reference_deck_image
 from src.gui.reference.overlay_geometry import calc_centered_drawn_bbox, key_canvas_hit_rects, key_canvas_rect
+from src.gui.utils.profile_backdrop_storage import load_backdrop_image
 from src.gui.utils.key_draw_style import key_draw_style
 
 from ..lightbar_layout import lightbar_rect_for_size
@@ -103,7 +103,7 @@ class _KeyboardCanvasDrawingMixin:
 
     def _load_deck_image(self) -> None:
         prof = getattr(self.editor, "profile_name", None)
-        self._deck_img = load_reference_deck_image(profile_name=str(prof) if isinstance(prof, str) else None)
+        self._deck_img = load_backdrop_image(str(prof)) if isinstance(prof, str) else None
         self._deck_render_cache.clear()
 
     def reload_backdrop_image(self) -> None:

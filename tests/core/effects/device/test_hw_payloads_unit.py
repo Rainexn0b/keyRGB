@@ -237,10 +237,36 @@ class TestBuildHwEffectPayload:
         records = [
             record
             for record in caplog.records
-            if record.message == "Failed to program palette slot for breathing effect"
+            if record.message == "Failed to program palette slot for hardware effect"
         ]
         assert records
         assert any(record.exc_info and isinstance(record.exc_info[1], OSError) for record in records)
+
+    def test_palette_backend_color_effect_uses_palette_slot(self):
+        """Palette-based hardware effects should never receive raw RGB tuples."""
+        from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        mock_kb = MagicMock()
+        captured_kwargs = {}
+
+        def capture_effect_func(**kwargs):
+            captured_kwargs.update(kwargs)
+            return "payload"
+
+        build_hw_effect_payload(
+            effect_name="ripple",
+            effect_func=capture_effect_func,
+            ui_speed=5,
+            brightness=50,
+            current_color=(255, 128, 64),
+            hw_colors={"red": 3},
+            kb=mock_kb,
+            kb_lock=RLock(),
+            logger=logging.getLogger(),
+        )
+
+        mock_kb.set_palette_color.assert_called_once_with(3, (255, 128, 64))
+        assert captured_kwargs["color"] == 3
 
     def test_retries_on_unsupported_kwarg_error(self):
         """Should retry with fewer kwargs when 'attr is not needed' error occurs."""

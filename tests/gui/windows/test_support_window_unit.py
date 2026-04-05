@@ -389,9 +389,14 @@ def test_collect_missing_evidence_updates_bundle_state(monkeypatch: pytest.Monke
 
 def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyPatch) -> None:
     window = _make_window(
-        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8910_speed", "backend": "ite8910", "effect_name": "spectrum_cycle", "requested_ui_speeds": [1, 3], "samples": [{"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"}] , "instructions": ["Do the thing"], "observation_prompt": "Notes?"}]}}'
+        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8910_speed", "backend": "ite8910", "effect_name": "spectrum_cycle", "selection_effect_name": "hw:spectrum_cycle", "selection_menu_path": "Hardware Effects -> Spectrum Cycle", "requested_ui_speeds": [1, 3], "samples": [{"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"}] , "instructions": ["Do the thing"], "observation_prompt": "Notes?"}]}}'
     )
-    monkeypatch.setattr(support_window.messagebox, "showinfo", lambda *args, **kwargs: True)
+    showinfo_calls: list[str] = []
+    monkeypatch.setattr(
+        support_window.messagebox,
+        "showinfo",
+        lambda _title, message, **_kwargs: showinfo_calls.append(str(message)) or True,
+    )
     monkeypatch.setattr(support_window.messagebox, "askyesnocancel", lambda *args, **kwargs: False)
     monkeypatch.setattr(support_window.simpledialog, "askstring", lambda *args, **kwargs: "1 and 3 looked too close")
     monkeypatch.setattr(
@@ -410,9 +415,13 @@ def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyP
     assert isinstance(backend_probes, dict)
     probe = backend_probes["ite8910_speed"]
     assert probe["backend"] == "ite8910"
+    assert probe["selection_effect_name"] == "hw:spectrum_cycle"
     assert probe["observation"]["distinct_steps"] is False
     assert probe["observation"]["notes"] == "1 and 3 looked too close"
     assert window.status_label.options["text"] == "Backend speed probe recorded"
+    assert showinfo_calls
+    assert "Hardware selection key: hw:spectrum_cycle" in showinfo_calls[0]
+    assert "Tray path: Hardware Effects -> Spectrum Cycle" in showinfo_calls[0]
 
 
 def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.MonkeyPatch) -> None:
