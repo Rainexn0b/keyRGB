@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from collections.abc import Callable
-from typing import Any
 
 from src.core.utils.exceptions import is_permission_denied, is_device_disconnected, is_device_busy
 from src.core.backends.exceptions import (
@@ -19,17 +18,21 @@ from .hidraw import find_matching_hidraw_device, open_matching_hidraw_transport
 from . import protocol
 
 
-def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> Callable[..., dict[str, Any]]:
+EffectPayload = dict[str, object]
+EffectBuilder = Callable[..., EffectPayload]
+
+
+def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> EffectBuilder:
     args = {"speed": None, "brightness": None}
     for k in extra:
         args[k] = None
 
-    def build(**kwargs: Any) -> dict[str, Any]:
+    def build(**kwargs: object) -> EffectPayload:
         _ = args
         for key in kwargs:
             if key not in args:
                 raise ValueError(f"'{key}' attr is not needed by effect")
-        payload: dict[str, Any] = {"name": effect_name}
+        payload: EffectPayload = {"name": effect_name}
         payload.update(kwargs)
         return payload
 
@@ -101,7 +104,7 @@ class Ite8910Backend(KeyboardBackend):
     def dimensions(self) -> tuple[int, int]:
         return (protocol.NUM_ROWS, protocol.NUM_COLS)
 
-    def effects(self) -> dict[str, Any]:
+    def effects(self) -> dict[str, EffectBuilder]:
         return {
             "rainbow": _effect_builder("rainbow_wave"),
             "breathing": _effect_builder("breathing_color", extra=("color",)),
@@ -113,5 +116,5 @@ class Ite8910Backend(KeyboardBackend):
             "spectrum_cycle": _effect_builder("spectrum_cycle"),
         }
 
-    def colors(self) -> dict[str, Any]:
+    def colors(self) -> dict[str, object]:
         return {}

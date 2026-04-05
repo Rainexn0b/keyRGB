@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 import os
 import time
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping, Sized
 from threading import RLock
-from typing import Protocol
+from typing import Protocol, cast
 
 from src.core.backends.registry import select_backend
 from src.core.utils.logging_utils import log_throttled
@@ -115,7 +115,7 @@ def get_keyboard_device(
     selected_backend = backend if backend is not None else select_backend()
     if selected_backend is None:
         raise FileNotFoundError("No keyboard backend available")
-    return selected_backend.get_device()
+    return cast(KeyboardDeviceProtocol, selected_backend.get_device())
 
 
 def get(*, backend: KeyboardBackendProtocol | None = None) -> KeyboardDeviceProtocol:
@@ -125,14 +125,24 @@ def get(*, backend: KeyboardBackendProtocol | None = None) -> KeyboardDeviceProt
 
 
 def _rgb_for_debug_log(color: object) -> tuple[object, object, object]:
+    if not isinstance(color, Iterable):
+        return ("?", "?", "?")
+
     try:
-        red, green, blue = color
+        snapshot = tuple(color)
     except _LOG_COLOR_SNAPSHOT_ERRORS:
         return ("?", "?", "?")
-    return red, green, blue
+
+    if len(snapshot) != 3:
+        return ("?", "?", "?")
+
+    return snapshot[0], snapshot[1], snapshot[2]
 
 
 def _size_for_debug_log(value: object) -> int:
+    if not isinstance(value, Sized):
+        return -1
+
     try:
         return len(value)
     except _LOG_LENGTH_SNAPSHOT_ERRORS:

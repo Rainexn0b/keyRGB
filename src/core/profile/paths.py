@@ -13,8 +13,8 @@ from src.core.config import Config
 
 DEFAULT_PROFILE_NAME = "light"
 
-# Backward compatibility: historical profile name used by older versions.
-_LEGACY_PROFILE_ALIASES = {
+# Older profile names that still resolve to the current built-ins.
+_PROFILE_NAME_ALIASES = {
     "default": DEFAULT_PROFILE_NAME,
 }
 
@@ -26,12 +26,12 @@ BUILTIN_PROFILE_NAMES = (DEFAULT_PROFILE_NAME, "dark", "dim")
 logger = logging.getLogger(__name__)
 
 
-def _migrate_profile_file(*, root: Path, new_name: str, old_name: str) -> Path:
-    """Return the preferred path and migrate legacy names when safe.
+def _resolve_profile_file_path(*, root: Path, new_name: str, old_name: str) -> Path:
+    """Return the preferred path and rename older filenames when safe.
 
     If the new path already exists, it wins.
-    If only the legacy path exists, we attempt to rename it to the new path.
-    On failure, fall back to the legacy path.
+    If only the older path exists, we attempt to rename it to the new path.
+    On failure, fall back to the older path.
     """
 
     new_path = root / new_name
@@ -46,10 +46,10 @@ def _migrate_profile_file(*, root: Path, new_name: str, old_name: str) -> Path:
     except OSError as exc:
         log_throttled(
             logger,
-            "profile_paths.migrate_legacy_file",
+            "profile_paths.rename_previous_file",
             interval_s=60,
             level=logging.DEBUG,
-            msg=f"Failed to migrate {old_path.name} -> {new_path.name}",
+            msg=f"Failed to rename older profile file {old_path.name} -> {new_path.name}",
             exc=exc,
         )
         return old_path
@@ -62,7 +62,7 @@ def safe_profile_name(name: str) -> str:
     name = re.sub(r"\s+", "_", name)
     name = re.sub(r"[^A-Za-z0-9_.-]", "", name)
     name = name or DEFAULT_PROFILE_NAME
-    return _LEGACY_PROFILE_ALIASES.get(name, name)
+    return _PROFILE_NAME_ALIASES.get(name, name)
 
 
 def profiles_root() -> Path:
@@ -135,25 +135,25 @@ def ensure_profile(name: str) -> Path:
     name = safe_profile_name(name)
     root_dir = profiles_root()
 
-    # Migrate legacy built-in directory name to the new name when safe.
-    legacy = None
-    for old, new in _LEGACY_PROFILE_ALIASES.items():
+    # Rename older built-in directory names to the current name when safe.
+    previous_name = None
+    for old, new in _PROFILE_NAME_ALIASES.items():
         if new == name:
-            legacy = old
+            previous_name = old
             break
-    if legacy is not None:
+    if previous_name is not None:
         new_root = root_dir / name
-        old_root = root_dir / legacy
+        old_root = root_dir / previous_name
         if not new_root.exists() and old_root.exists():
             try:
                 old_root.rename(new_root)
             except OSError as exc:
                 log_throttled(
                     logger,
-                    "profile_paths.migrate_legacy_dir",
+                    "profile_paths.rename_previous_dir",
                     interval_s=60,
                     level=logging.DEBUG,
-                    msg=f"Failed to migrate {old_root.name} -> {new_root.name}",
+                    msg=f"Failed to rename older profile directory {old_root.name} -> {new_root.name}",
                     exc=exc,
                 )
                 root = old_root
@@ -221,21 +221,21 @@ def paths_for(name: str | None = None) -> ProfilePaths:
     name = safe_profile_name(name)
     root = ensure_profile(name)
 
-    # New, device-agnostic filenames.
-    # We also support legacy Y15 Pro-named files and migrate them in-place.
-    keymap = _migrate_profile_file(root=root, new_name="keymap.json", old_name="keymap_y15_pro.json")
-    layout_global = _migrate_profile_file(
+    # Current device-agnostic filenames.
+    # Older Y15 Pro-named files are still renamed in place when safe.
+    keymap = _resolve_profile_file_path(root=root, new_name="keymap.json", old_name="keymap_y15_pro.json")
+    layout_global = _resolve_profile_file_path(
         root=root,
         new_name="layout_tweaks.json",
         old_name="layout_tweaks_y15_pro.json",
     )
-    layout_per_key = _migrate_profile_file(
+    layout_per_key = _resolve_profile_file_path(
         root=root,
         new_name="layout_tweaks_per_key.json",
         old_name="layout_tweaks_y15_pro_perkey.json",
     )
-    backdrop_image = _migrate_profile_file(root=root, new_name="backdrop.png", old_name="backdrop_y15_pro.png")
-    backdrop_settings = _migrate_profile_file(
+    backdrop_image = _resolve_profile_file_path(root=root, new_name="backdrop.png", old_name="backdrop_y15_pro.png")
+    backdrop_settings = _resolve_profile_file_path(
         root=root,
         new_name="backdrop_settings.json",
         old_name="backdrop_settings_y15_pro.json",

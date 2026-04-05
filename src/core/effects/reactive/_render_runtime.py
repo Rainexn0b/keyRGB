@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable, Dict, Tuple
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, Callable, Tuple
 
 from src.core.effects.perkey_animation import enable_user_mode_once, per_key_mode_requires_frame_reassert
 from src.core.effects.software_targets import average_color_map as average_color_map_impl
@@ -21,10 +22,17 @@ Key = Tuple[int, int]
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
+def _last_hw_mode_brightness_or_none(engine: "EffectsEngine") -> int | None:
+    try:
+        return engine._last_hw_mode_brightness
+    except AttributeError:
+        return None
+
+
 def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_reinit: bool = False) -> None:
     """Set hardware brightness, avoiding a full mode reinit when possible."""
 
-    prev = getattr(engine, "_last_hw_mode_brightness", None)
+    prev = _last_hw_mode_brightness_or_none(engine)
     if force_reinit or prev is None:
         enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
         engine._last_hw_mode_brightness = int(brightness_hw)
@@ -51,7 +59,7 @@ def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_re
 def render_per_key_frame(
     engine: "EffectsEngine",
     *,
-    color_map: Dict[Key, Color],
+    color_map: Mapping[Key, Color],
     resolve_brightness: Callable[["EffectsEngine"], tuple[int, int, int]],
     logger: logging.Logger,
 ) -> bool:
@@ -62,7 +70,7 @@ def render_per_key_frame(
             engine._last_rendered_brightness = brightness_hw
 
             reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
-            need_mode_init = reassert_every_frame or getattr(engine, "_last_hw_mode_brightness", None) is None
+            need_mode_init = reassert_every_frame or _last_hw_mode_brightness_or_none(engine) is None
             if need_mode_init:
                 apply_hw_brightness(engine, brightness_hw, force_reinit=reassert_every_frame)
 
@@ -109,7 +117,7 @@ def render_per_key_frame(
 def render_uniform_frame(
     engine: "EffectsEngine",
     *,
-    color_map: Dict[Key, Color],
+    color_map: Mapping[Key, Color],
     resolve_brightness: Callable[["EffectsEngine"], tuple[int, int, int]],
 ) -> None:
     rgb = average_color_map(color_map)
@@ -122,7 +130,7 @@ def render_uniform_frame(
         r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))
         final_rgb = (r, g, b)
 
-        need_mode_init = getattr(engine, "_last_hw_mode_brightness", None) is None
+        need_mode_init = _last_hw_mode_brightness_or_none(engine) is None
         if need_mode_init:
             apply_hw_brightness(engine, brightness_hw)
 
@@ -139,5 +147,5 @@ def render_uniform_frame(
     )
 
 
-def average_color_map(color_map: Dict[Key, Color]) -> Color:
+def average_color_map(color_map: Mapping[Key, Color]) -> Color:
     return average_color_map_impl(color_map)

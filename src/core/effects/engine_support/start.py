@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from operator import attrgetter
 from threading import RLock, Thread
-from typing import Final, Literal, Protocol
+from typing import Final, Literal, Protocol, cast
 
 from src.core.utils import exceptions as core_exceptions
 
@@ -53,10 +54,36 @@ class _ManagedEffectThread(Thread):
         if self.is_alive():
             return
         try:
-            if getattr(self._engine, "thread", None) is self:
+            if self._engine.thread is self:
                 setattr(self._engine, "thread", None)
         except Exception:  # @quality-exception exception-transparency: engine thread join cleanup is a best-effort boundary; partial engine state must not re-raise from join
             return
+
+
+def _sw_effect_method(engine: "_EngineStart", method_name: str) -> Callable[[], None]:
+    return cast(Callable[[], None], attrgetter(method_name)(engine))
+
+
+def _thread_generation_or_default(engine: "_EngineStart", *, default: int) -> int:
+    try:
+        return int(engine._thread_generation)
+    except AttributeError:
+        return default
+
+
+def _permission_error_callback_or_none(engine: "_EngineStart") -> Callable[[Exception], None] | None:
+    try:
+        return engine._permission_error_cb
+    except AttributeError:
+        return None
+
+
+def _mark_device_unavailable_callback_or_none(engine: object) -> Callable[[], None] | None:
+    try:
+        callback = attrgetter("mark_device_unavailable")(engine)
+    except AttributeError:
+        return None
+    return cast(Callable[[], None] | None, callback if callable(callback) else None)
 
 
 class _EngineStart:
@@ -110,7 +137,7 @@ class _EngineStart:
     ):
         """Start an effect (hardware or software)."""
 
-        prev_color = tuple(self.current_color)
+        prev_color = self.current_color
         prev_effect_was_sw = self.current_effect in self.SW_EFFECTS
 
         self.stop()
@@ -153,12 +180,12 @@ class _EngineStart:
 
             method_name, fade_to = spec
             if fade_to == "current":
-                fade_to_color = tuple(self.current_color)
+                fade_to_color = self.current_color
             else:
                 fade_to_color = fade_to
 
             self._start_sw_effect(
-                target=getattr(self, method_name),
+                target=_sw_effect_method(self, method_name),
                 prev_color=prev_color,
                 fade_to_color=fade_to_color,
                 from_sw_effect=prev_effect_was_sw,
@@ -194,17 +221,17 @@ class _EngineStart:
             self._last_hw_mode_brightness = 0
 
         try:
-            self._thread_generation = int(getattr(self, "_thread_generation", 0)) + 1
+            self._thread_generation = _thread_generation_or_default(self, default=0) + 1
         except _INT_COERCION_ERRORS:
             self._thread_generation = 1
-        run_generation = int(getattr(self, "_thread_generation", 1))
+        run_generation = _thread_generation_or_default(self, default=1)
 
         def _run_target_best_effort() -> None:
             try:
                 target()
             except Exception as exc:  # @quality-exception exception-transparency: effect thread top-level boundary; dispatches permission/disconnect classification before logging unhandled errors
                 if core_exceptions.is_permission_denied(exc):
-                    callback = getattr(self, "_permission_error_cb", None)
+                    callback = _permission_error_callback_or_none(self)
                     if callable(callback):
                         try:
                             callback(exc)
@@ -219,7 +246,7 @@ class _EngineStart:
 
                 if core_exceptions.is_device_disconnected(exc):
                     try:
-                        mark = getattr(self, "mark_device_unavailable", None)
+                        mark = _mark_device_unavailable_callback_or_none(self)
                         if callable(mark):
                             mark()
                     except Exception:  # @quality-exception exception-transparency: mark_device_unavailable is a hardware-state bookkeeping boundary and failures must not interrupt the disconnect-handling path
@@ -235,7 +262,7 @@ class _EngineStart:
             finally:
                 stale_generation = False
                 try:
-                    stale_generation = int(getattr(self, "_thread_generation", 0)) != run_generation
+                    stale_generation = _thread_generation_or_default(self, default=0) != run_generation
                 except _INT_COERCION_ERRORS:
                     stale_generation = False
 
@@ -258,18 +285,18 @@ class _EngineStart:
                 self.kb.set_color(tuple(self.current_color), brightness=int(self.brightness))
             return
 
-        backend_colors = self.get_backend_colors()
+        backend_colors = cast(dict[str, int], self.get_backend_colors())
         effect_data = build_hw_effect_payload(
             effect_name=effect_name,
             effect_func=effect_func,
             ui_speed=int(self.speed),
             brightness=int(self.brightness),
-            current_color=tuple(self.current_color),
+            current_color=self.current_color,
             hw_colors=backend_colors,
             kb=self.kb,
             kb_lock=self.kb_lock,
             logger=logger,
-            direction=getattr(self, "direction", None),
+            direction=self.direction,
         )
 
         with self.kb_lock:

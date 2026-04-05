@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Protocol, cast
 
 from src.core.runtime.imports import ensure_ite8291r3_ctl_importable
 from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
@@ -50,7 +51,19 @@ _KNOWN_UNSUPPORTED_USB_IDS: list[tuple[int, int]] = [
 ]
 
 
-def _usb_runtime_error_types(usb_core: Any) -> tuple[type[BaseException], ...]:
+class _Ite8291r3ModuleProtocol(Protocol):
+    VENDOR_ID: int
+    PRODUCT_IDS: list[int]
+    NUM_ROWS: int
+    NUM_COLS: int
+    effects: Mapping[str, object]
+    colors: Mapping[str, object]
+    usb: object
+
+    def get(self) -> KeyboardDevice: ...
+
+
+def _usb_runtime_error_types(usb_core: object) -> tuple[type[BaseException], ...]:
     error_types: list[type[BaseException]] = [AttributeError, OSError, RuntimeError]
     for name in ("USBError", "NoBackendError"):
         err_type = getattr(usb_core, name, None)
@@ -59,7 +72,7 @@ def _usb_runtime_error_types(usb_core: Any) -> tuple[type[BaseException], ...]:
     return tuple(dict.fromkeys(error_types))
 
 
-def _ite_device_open_error_types(ite8291r3: Any) -> tuple[type[BaseException], ...]:
+def _ite_device_open_error_types(ite8291r3: _Ite8291r3ModuleProtocol) -> tuple[type[BaseException], ...]:
     error_types: list[type[BaseException]] = [FileNotFoundError, OSError, RuntimeError, ValueError]
     usb_pkg = getattr(ite8291r3, "usb", None)
     usb_core = getattr(usb_pkg, "core", None)
@@ -82,7 +95,7 @@ class Ite8291r3Backend(KeyboardBackend):
     stability: BackendStability = BackendStability.VALIDATED
     experimental_evidence: None = None
 
-    def _import(self):
+    def _import(self) -> _Ite8291r3ModuleProtocol:
         if os.environ.get("KEYRGB_USE_INSTALLED_ITE") != "1":
             # Best-effort repo fallback for dev checkouts.
             ensure_ite8291r3_ctl_importable(__file__)
@@ -97,7 +110,7 @@ class Ite8291r3Backend(KeyboardBackend):
                 if pid not in library_pids:
                     library_pids.append(pid)
 
-        return ite8291r3
+        return cast(_Ite8291r3ModuleProtocol, ite8291r3)
 
     def is_available(self) -> bool:
         try:
@@ -219,10 +232,10 @@ class Ite8291r3Backend(KeyboardBackend):
         ite8291r3 = self._import()
         return int(ite8291r3.NUM_ROWS), int(ite8291r3.NUM_COLS)
 
-    def effects(self) -> dict[str, Any]:
+    def effects(self) -> dict[str, object]:
         ite8291r3 = self._import()
         return dict(getattr(ite8291r3, "effects", {}) or {})
 
-    def colors(self) -> dict[str, Any]:
+    def colors(self) -> dict[str, object]:
         ite8291r3 = self._import()
         return dict(getattr(ite8291r3, "colors", {}) or {})

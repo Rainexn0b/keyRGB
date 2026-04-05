@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable, MutableMapping
 from pathlib import Path
-from typing import Any, Callable
+from typing import Callable, SupportsIndex, SupportsInt, cast
 
 
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
@@ -11,12 +12,19 @@ _CONFIG_LOAD_ERRORS = (OSError, UnicodeDecodeError, json.JSONDecodeError)
 _RGB_CHANNEL_FLOAT_ERRORS = (ValueError, OverflowError)
 _RGB_CHANNEL_PARSE_ERRORS = (ValueError, OverflowError)
 
+RgbTriplet = tuple[int, int, int]
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
 
-def normalize_brightness_value(value: Any) -> int:
+
+def _coerce_int(value: object) -> int:
+    return int(cast(IntCoercible, value))
+
+
+def normalize_brightness_value(value: object) -> int:
     """Normalize brightness to the persisted 0..50, 5-step grid."""
 
     try:
-        normalized = int(value)
+        normalized = _coerce_int(value)
     except _BRIGHTNESS_COERCION_ERRORS:
         return 0
 
@@ -32,14 +40,14 @@ def normalize_brightness_value(value: Any) -> int:
 
 
 def normalize_rgb_triplet(
-    value: Any,
+    value: object,
     *,
-    default: tuple[int, int, int] = (255, 255, 255),
-) -> tuple[int, int, int]:
+    default: RgbTriplet = (255, 255, 255),
+) -> RgbTriplet:
     """Best-effort coerce an RGB-like value to a clamped 3-tuple."""
 
     try:
-        red, green, blue = value  # type: ignore[misc]
+        red, green, blue = cast(Iterable[object], value)
     except _RGB_TRIPLET_UNPACK_ERRORS:
         red, green, blue = default
 
@@ -48,7 +56,7 @@ def normalize_rgb_triplet(
 
 def coerce_loaded_settings(
     *,
-    settings: dict[str, Any],
+    settings: MutableMapping[str, object],
     config_file: Path,
     save_fn: Callable[[], None],
 ) -> None:
@@ -100,7 +108,7 @@ def coerce_loaded_settings(
         return
 
 
-def _clamp_rgb_channel(value: Any) -> int:
+def _clamp_rgb_channel(value: object) -> int:
     if isinstance(value, bool):
         normalized = int(value)
     elif isinstance(value, int):

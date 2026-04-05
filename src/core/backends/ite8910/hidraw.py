@@ -126,16 +126,24 @@ def find_matching_hidraw_device(
     return None
 
 
+def _os_cloexec_flag_or_zero() -> int:
+    try:
+        return int(os.O_CLOEXEC)
+    except AttributeError:
+        return 0
+
+
 class HidrawFeatureTransport:
     def __init__(self, devnode: Path) -> None:
-        flags = os.O_RDWR
-        if hasattr(os, "O_CLOEXEC"):
-            flags |= int(getattr(os, "O_CLOEXEC"))
+        flags = int(os.O_RDWR) | _os_cloexec_flag_or_zero()
         self.devnode = Path(devnode)
         self._fd: int | None = os.open(os.fspath(self.devnode), flags)
 
     def close(self) -> None:
-        fd = getattr(self, "_fd", None)
+        try:
+            fd = self._fd
+        except AttributeError:
+            return
         if fd is None:
             return
         try:

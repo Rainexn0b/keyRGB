@@ -2,20 +2,49 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple, TypeAlias
+from typing import Optional, Protocol, TypeAlias, cast
 
 from src.core.effects.reactive._evdev_specs import SPECIAL_KEY_NAMES
 from src.core.effects.reactive._evdev_specs import keyboard_control_keys, keyboard_letter_keys
 from src.core.resources.layouts import key_id_for_slot_id, slot_id_for_key_id
 from src.core.utils.logging_utils import log_throttled
 
-Key = Tuple[int, int]
-KeyCells = Tuple[Key, ...]
+Key = tuple[int, int]
+KeyCells = tuple[Key, ...]
 
 
-EvdevKeyboardDevice: TypeAlias = Any
-EvdevKeyboardDevices: TypeAlias = list[EvdevKeyboardDevice]
+class EvdevInputEventProtocol(Protocol):
+    type: object
+    value: object
+    code: object
+
+
+class EvdevKeyboardDeviceProtocol(Protocol):
+    path: str
+
+    def close(self) -> None: ...
+
+    def capabilities(self, verbose: bool = False) -> Mapping[object, Sequence[object]]: ...
+
+    def read(self) -> Iterable[EvdevInputEventProtocol]: ...
+
+
+class _EvdevEcodesProtocol(Protocol):
+    EV_KEY: int
+    KEY: Mapping[int, str]
+
+
+class _EvdevModuleProtocol(Protocol):
+    ecodes: _EvdevEcodesProtocol
+    InputDevice: Callable[[str], EvdevKeyboardDeviceProtocol]
+
+    def list_devices(self) -> Sequence[str]: ...
+
+
+EvdevKeyboardDevice: TypeAlias = EvdevKeyboardDeviceProtocol
+EvdevKeyboardDevices: TypeAlias = list[EvdevKeyboardDeviceProtocol]
 
 
 logger = logging.getLogger(__name__)
@@ -56,7 +85,7 @@ def _drop_evdev_device(devices: EvdevKeyboardDevices, dev: EvdevKeyboardDevice) 
     )
 
 
-def _read_udev_input_properties(device_path: str) -> Dict[str, str]:
+def _read_udev_input_properties(device_path: str) -> dict[str, str]:
     try:
         stat_result = os.stat(device_path)
         major_num = os.major(stat_result.st_rdev)
@@ -64,7 +93,7 @@ def _read_udev_input_properties(device_path: str) -> Dict[str, str]:
         data_path = Path(f"/run/udev/data/c{major_num}:{minor_num}")
         if not data_path.is_file():
             return {}
-        props: Dict[str, str] = {}
+        props: dict[str, str] = {}
         for line in data_path.read_text(encoding="utf-8", errors="replace").splitlines():
             if not line.startswith("E:"):
                 continue
@@ -83,7 +112,7 @@ def _udev_device_is_keyboard(device_path: str) -> Optional[bool]:
     return props.get("ID_INPUT_KEYBOARD") == "1"
 
 
-def _evdev_device_looks_like_keyboard(dev: EvdevKeyboardDevice, evdev: Any) -> bool:
+def _evdev_device_looks_like_keyboard(dev: EvdevKeyboardDevice, evdev: _EvdevModuleProtocol) -> bool:
     try:
         caps = dev.capabilities(verbose=False)
         key_codes = set(caps.get(evdev.ecodes.EV_KEY, []) or [])
@@ -145,9 +174,10 @@ def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
         import evdev  # type: ignore
     except ImportError:
         return None
+    evdev_module = cast(_EvdevModuleProtocol, evdev)
 
     try:
-        device_paths = list(evdev.list_devices())
+        device_paths = list(evdev_module.list_devices())
     except (AttributeError, OSError, TypeError, ValueError) as exc:
         _log_reactive_input_exception(
             "effects.reactive.evdev.list_devices_failed",
@@ -156,14 +186,14 @@ def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
         )
         return None
 
-    out = []
+    out: EvdevKeyboardDevices = []
     for device_path in device_paths:
         keyboard_tag = _udev_device_is_keyboard(device_path)
         if keyboard_tag is False:
             continue
 
         try:
-            dev = evdev.InputDevice(device_path)
+            dev = evdev_module.InputDevice(device_path)
         except (AttributeError, OSError, TypeError, ValueError) as exc:
             _log_reactive_input_exception(
                 "effects.reactive.evdev.open_failed",
@@ -172,7 +202,7 @@ def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
             )
             continue
 
-        if keyboard_tag is True or _evdev_device_looks_like_keyboard(dev, evdev):
+        if keyboard_tag is True or _evdev_device_looks_like_keyboard(dev, evdev_module):
             out.append(dev)
             continue
 
@@ -237,7 +267,7 @@ def _normalize_key_cells(raw_cells: object) -> KeyCells:
     return tuple(out)
 
 
-def load_active_profile_slot_keymap() -> Dict[str, KeyCells]:
+def load_active_profile_slot_keymap() -> dict[str, KeyCells]:
     try:
         from src.core.profile import profiles
     except ImportError:
@@ -246,7 +276,7 @@ def load_active_profile_slot_keymap() -> Dict[str, KeyCells]:
     try:
         active = profiles.get_active_profile()
         km = profiles.load_keymap(active)
-        out: Dict[str, KeyCells] = {}
+        out: dict[str, KeyCells] = {}
         for key_id, raw_cells in (km or {}).items():
             cells = list(_normalize_key_cells(raw_cells))
             if cells:
@@ -254,8 +284,8 @@ def load_active_profile_slot_keymap() -> Dict[str, KeyCells]:
                 if key_id_for_slot_id("auto", raw_identity):
                     normalized_identity = raw_identity.lower()
                 else:
-                    legacy_identity = evdev_key_name_to_key_id(raw_identity) or raw_identity.lower()
-                    normalized_identity = str(slot_id_for_key_id("auto", legacy_identity) or legacy_identity).lower()
+                    mapped_key_id = evdev_key_name_to_key_id(raw_identity) or raw_identity.lower()
+                    normalized_identity = str(slot_id_for_key_id("auto", mapped_key_id) or mapped_key_id).lower()
                 out[normalized_identity] = tuple(cells)
         return out
     except (AttributeError, IndexError, KeyError, OSError, TypeError, ValueError) as exc:
@@ -280,6 +310,7 @@ def poll_keypress_slot_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[s
         import evdev  # type: ignore
     except ImportError:
         return None
+    evdev_module = cast(_EvdevModuleProtocol, evdev)
 
     try:
         r, _, _ = select.select(devices, [], [], 0)
@@ -298,14 +329,14 @@ def poll_keypress_slot_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[s
     for dev in list(r):
         try:
             for event in dev.read():
-                if getattr(event, "type", None) != evdev.ecodes.EV_KEY:
+                if getattr(event, "type", None) != evdev_module.ecodes.EV_KEY:
                     continue
                 if getattr(event, "value", None) != 1:
                     continue
                 code = getattr(event, "code", None)
                 if code is None:
                     continue
-                name = evdev.ecodes.KEY.get(int(code))
+                name = evdev_module.ecodes.KEY.get(int(code))
                 slot_id = evdev_key_name_to_slot_id(str(name) if name else "")
                 if slot_id:
                     return slot_id

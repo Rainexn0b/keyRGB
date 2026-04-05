@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import time as _time
+from operator import attrgetter
 from typing import TYPE_CHECKING, Dict, Optional, Tuple
 
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
@@ -26,6 +27,24 @@ if TYPE_CHECKING:
 
 Color = Tuple[int, int, int]
 Key = Tuple[int, int]
+_INT_COERCION_ERRORS = (TypeError, ValueError)
+
+
+def _engine_attr_or_default(engine: "EffectsEngine", attr_name: str, *, default: object) -> object:
+    try:
+        return attrgetter(attr_name)(engine)
+    except AttributeError:
+        return default
+
+
+def _keyboard_attr_or_none(engine: "EffectsEngine", attr_name: str) -> object | None:
+    kb = _engine_attr_or_default(engine, "kb", default=None)
+    if kb is None:
+        return None
+    try:
+        return attrgetter(attr_name)(kb)
+    except AttributeError:
+        return None
 
 
 def clamp01(x: float) -> float:
@@ -123,9 +142,10 @@ def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float 
     Matches the quadratic mapping used by the SW loops: speed=10 is much faster.
     """
 
+    speed_raw = _engine_attr_or_default(engine, "speed", default=4)
     try:
-        s = int(getattr(engine, "speed", 4) or 0)
-    except (TypeError, ValueError):
+        s = int(speed_raw or 0)
+    except _INT_COERCION_ERRORS:
         s = 4
 
     s = max(0, min(10, s))
@@ -142,7 +162,7 @@ def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float 
 
 
 def has_per_key(engine: "EffectsEngine") -> bool:
-    return bool(getattr(getattr(engine, "kb", None), "set_key_colors", None))
+    return bool(_keyboard_attr_or_none(engine, "set_key_colors"))
 
 
 def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:

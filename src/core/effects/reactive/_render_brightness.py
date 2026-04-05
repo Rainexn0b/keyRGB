@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from operator import attrgetter
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
@@ -24,12 +25,35 @@ def _read_engine_attr(
 ) -> object:
     active_logger = logger or _LOGGER
     try:
-        return getattr(engine, name)
+        return attrgetter(name)(engine)
     except AttributeError:
         return missing_default
     except Exception:  # @quality-exception exception-transparency: engine attribute getters may have arbitrary runtime side effects beyond AttributeError
         active_logger.exception("Reactive brightness failed to read engine attribute %s", name)
         return error_default
+
+
+def _bool_attr_or_default(engine: "EffectsEngine", name: str, *, default: bool) -> bool:
+    try:
+        return bool(attrgetter(name)(engine))
+    except AttributeError:
+        return default
+
+
+def _keyboard_or_none(engine: "EffectsEngine") -> object | None:
+    try:
+        return engine.kb
+    except AttributeError:
+        return None
+
+
+def _device_attr_or_none(device: object | None, name: str) -> object | None:
+    if device is None:
+        return None
+    try:
+        return attrgetter(name)(device)
+    except AttributeError:
+        return None
 
 
 def _coerce_int(value: object, *, default: int | None) -> int | None:
@@ -178,8 +202,8 @@ def resolve_brightness(
             global_hw = max(global_hw, transition_brightness)
             base = max(base, transition_brightness)
 
-    dim_temp_active = bool(getattr(engine, "_dim_temp_active", False))
-    per_key_hw = bool(getattr(getattr(engine, "kb", None), "set_key_colors", None))
+    dim_temp_active = _bool_attr_or_default(engine, "_dim_temp_active", default=False)
+    per_key_hw = bool(_device_attr_or_none(_keyboard_or_none(engine), "set_key_colors"))
 
     pulse_mix = 0.0
     allow_pulse_hw_lift = False

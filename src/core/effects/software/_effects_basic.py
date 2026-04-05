@@ -116,7 +116,8 @@ def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
                 rr = random.randint(0, 255)
                 gg = random.randint(0, 255)
                 bb = random.randint(0, 255)
-                if int(getattr(engine, "brightness", 25) or 0) > 0 and (rr, gg, bb) == (0, 0, 0):
+                brightness_raw = getattr(engine, "brightness", 25)
+                if int(brightness_raw or 0) > 0 and (rr, gg, bb) == (0, 0, 0):
                     rr = 1
                 target[k] = (rr, gg, bb)
 

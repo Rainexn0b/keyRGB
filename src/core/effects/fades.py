@@ -3,8 +3,8 @@ from __future__ import annotations
 import time
 from collections.abc import Mapping
 from threading import RLock
-from typing import Any, Tuple
 
+from src.core.effects.device import KeyboardDeviceProtocol
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
@@ -16,17 +16,19 @@ from src.core.effects.transitions import (
     scaled_color_map_nonzero,
 )
 
-
 _FADE_SETUP_ERRORS = (IndexError, OverflowError, TypeError, ValueError)
 _FADE_RUNTIME_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+Color = tuple[int, int, int]
+Key = tuple[int, int]
 
 
 def fade_uniform_color(
     *,
-    kb: Any,
+    kb: KeyboardDeviceProtocol,
     kb_lock: RLock,
-    from_color: tuple,
-    to_color: tuple,
+    from_color: Color,
+    to_color: Color,
     brightness: int,
     duration_s: float,
     steps: int = 18,
@@ -83,10 +85,10 @@ def fade_uniform_color(
 
 def fade_in_per_key(
     *,
-    kb: Any,
+    kb: KeyboardDeviceProtocol,
     kb_lock: RLock,
-    per_key_colors: Mapping[Tuple[int, int], Tuple[int, int, int]] | None,
-    current_color: tuple,
+    per_key_colors: Mapping[Key, Color] | None,
+    current_color: Color,
     brightness: int,
     duration_s: float,
     steps: int = 12,

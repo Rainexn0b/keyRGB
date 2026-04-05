@@ -19,6 +19,20 @@ def _debug_brightness_enabled() -> bool:
     return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1"
 
 
+def _brightness_fade_token_or_default(engine: "_EngineBrightness", *, default: int) -> int:
+    try:
+        return int(engine._brightness_fade_token)
+    except AttributeError:
+        return default
+
+
+def _device_available_or_default(engine: "_EngineBrightness", *, default: bool) -> bool:
+    try:
+        return bool(engine.device_available)
+    except AttributeError:
+        return default
+
+
 class _EngineBrightness:
     """Brightness state + best-effort fades."""
 
@@ -33,7 +47,7 @@ class _EngineBrightness:
     _brightness_fade_lock: RLock
 
     def _advance_brightness_fade_token_unlocked(self) -> int:
-        current_token = int(getattr(self, "_brightness_fade_token", 0))
+        current_token = _brightness_fade_token_or_default(self, default=0)
         next_token = current_token + 1
         self._brightness_fade_token = next_token
         return next_token
@@ -179,7 +193,7 @@ class _EngineBrightness:
                     prev,
                     self.brightness,
                     bool(apply_to_hardware),
-                    getattr(self, "device_available", False),
+                    _device_available_or_default(self, default=False),
                 )
 
             if not apply_to_hardware:

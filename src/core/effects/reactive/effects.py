@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import random  # noqa: F401  -- accessed as api.random by _fade_loop
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from src.core.effects import colors, matrix_layout
 from src.core.effects.reactive import utils as reactive_utils
@@ -16,6 +16,8 @@ from . import _ripple_loop
 from . import _runtime_inputs as runtime_inputs
 from . import input as reactive_input
 from . import render as render_runtime
+from ._fade_loop import _ReactiveFadeApiProtocol
+from ._ripple_loop import _ReactiveRippleApiProtocol
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -66,6 +68,13 @@ render = render_runtime.render
 scale = render_runtime.scale
 
 
+def _reactive_active_pulse_mix_or_default(engine: "EffectsEngine", *, default: float) -> float:
+    try:
+        return float(engine._reactive_active_pulse_mix or 0.0)
+    except AttributeError:
+        return default
+
+
 def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) -> None:
     """Update the live reactive pulse mix with a short tail decay.
 
@@ -76,7 +85,7 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
     """
 
     try:
-        prev = float(getattr(engine, "_reactive_active_pulse_mix", 0.0) or 0.0)
+        prev = _reactive_active_pulse_mix_or_default(engine, default=0.0)
     except (TypeError, ValueError):
         prev = 0.0
 
@@ -99,13 +108,17 @@ def _render_uniform_fallback(engine: "EffectsEngine", *, rgb: Color) -> None:
     render(engine, color_map=color_map)
 
 
-def _reactive_api() -> object:
-    return sys.modules[__name__]
+def _reactive_fade_api() -> _ReactiveFadeApiProtocol:
+    return cast(_ReactiveFadeApiProtocol, sys.modules[__name__])
+
+
+def _reactive_ripple_api() -> _ReactiveRippleApiProtocol:
+    return cast(_ReactiveRippleApiProtocol, sys.modules[__name__])
 
 
 def run_reactive_fade(engine: "EffectsEngine") -> None:
-    _fade_loop.run_reactive_fade_loop(engine, api=_reactive_api())
+    _fade_loop.run_reactive_fade_loop(engine, api=_reactive_fade_api())
 
 
 def run_reactive_ripple(engine: "EffectsEngine") -> None:
-    _ripple_loop.run_reactive_ripple_loop(engine, api=_reactive_api())
+    _ripple_loop.run_reactive_ripple_loop(engine, api=_reactive_ripple_api())

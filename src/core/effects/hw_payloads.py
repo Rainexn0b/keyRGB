@@ -1,26 +1,59 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Mapping
 from threading import RLock
-from typing import Any, Callable, Dict, Optional
+from typing import Protocol, cast
 
 from src.core.utils.logging_utils import log_throttled
 
+Color = tuple[int, int, int]
 
-def _hw_speed_from_ui_speed(ui_speed: int, *, kb: Any) -> int:
-    policy = str(getattr(kb, "keyrgb_hw_speed_policy", "direct") or "direct").strip().lower()
+
+class _PaletteKeyboardProtocol(Protocol):
+    def set_palette_color(self, slot: int, color: Color) -> None: ...
+
+
+class _KeyboardHwSpeedPolicyProtocol(Protocol):
+    keyrgb_hw_speed_policy: object
+
+
+class _ClosureCodeProtocol(Protocol):
+    co_freevars: tuple[str, ...]
+
+
+class _ClosureCellProtocol(Protocol):
+    cell_contents: object
+
+
+class _ClosureIntrospectableProtocol(Protocol):
+    __code__: _ClosureCodeProtocol
+    __closure__: tuple[_ClosureCellProtocol, ...] | None
+
+
+def _keyboard_hw_speed_policy_or_default(kb: object, *, default: str) -> str:
+    try:
+        policy = cast(_KeyboardHwSpeedPolicyProtocol, kb).keyrgb_hw_speed_policy
+    except AttributeError:
+        return default
+    return str(policy or default)
+
+
+def _hw_speed_from_ui_speed(ui_speed: int, *, kb: object) -> int:
+    policy = _keyboard_hw_speed_policy_or_default(kb, default="direct").strip().lower()
     normalized = max(0, min(10, int(ui_speed)))
     if policy == "inverted":
         return max(0, min(10, 11 - normalized))
     return normalized
 
 
-def allowed_hw_effect_keys(effect_func: Callable[..., Any], *, logger: logging.Logger) -> set[str]:
+def allowed_hw_effect_keys(effect_func: Callable[..., object], *, logger: logging.Logger) -> set[str]:
     """Best-effort introspection of ite8291r3-ctl's effect builders."""
 
     try:
-        freevars = getattr(effect_func, "__code__").co_freevars
-        closure = getattr(effect_func, "__closure__")
+        introspectable = cast(_ClosureIntrospectableProtocol, effect_func)
+        freevars = introspectable.__code__.co_freevars
+        closure = introspectable.__closure__
         if not freevars or not closure:
             return set()
         mapping = dict(zip(freevars, [c.cell_contents for c in closure]))
@@ -42,16 +75,16 @@ def allowed_hw_effect_keys(effect_func: Callable[..., Any], *, logger: logging.L
 def build_hw_effect_payload(
     *,
     effect_name: str,
-    effect_func: Callable[..., Any],
+    effect_func: Callable[..., object],
     ui_speed: int,
     brightness: int,
-    current_color: tuple,
-    hw_colors: Dict[str, int],
-    kb: Any,
+    current_color: Color,
+    hw_colors: Mapping[str, int],
+    kb: _PaletteKeyboardProtocol,
     kb_lock: RLock,
     logger: logging.Logger,
-    direction: Optional[str] = None,
-) -> Any:
+    direction: str | None = None,
+) -> object:
     """Build payload for a hardware effect.
 
     Mirrors the previous logic in EffectsEngine._start_hw_effect (including the
@@ -65,7 +98,7 @@ def build_hw_effect_payload(
     # paths do not inherit the old inverted behavior by accident.
     hw_speed = _hw_speed_from_ui_speed(ui_speed, kb=kb)
 
-    hw_kwargs: Dict[str, Any] = {
+    hw_kwargs: dict[str, object] = {
         "speed": hw_speed,
         "brightness": int(brightness),
     }
@@ -79,7 +112,7 @@ def build_hw_effect_payload(
         palette_slot = int(hw_colors.get("red", 1))
         try:
             with kb_lock:
-                kb.set_palette_color(palette_slot, tuple(current_color))
+                kb.set_palette_color(palette_slot, current_color)
         except Exception as exc:  # @quality-exception exception-transparency: set_palette_color is a runtime USB/HID hardware write boundary; palette programming failure must not block effect payload construction
             # Hardware writes are a runtime boundary: log full exception
             # context, then continue building the payload as before.
@@ -105,7 +138,7 @@ def build_hw_effect_payload(
     if allowed:
         hw_kwargs = {k: v for k, v in hw_kwargs.items() if k in allowed}
 
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     for _ in range(4):
         try:
             return effect_func(**hw_kwargs)

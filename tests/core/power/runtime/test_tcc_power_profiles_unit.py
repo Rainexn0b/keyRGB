@@ -15,6 +15,7 @@ from src.core.power.tcc_profiles.busctl import (
     _parse_busctl_string_reply,
     _parse_busctl_bool_reply,
 )
+from src.core.power.tcc_profiles.models import BUILT_IN_PROFILE_ID_PREFIX
 
 
 @pytest.mark.parametrize(
@@ -98,6 +99,23 @@ def test_update_custom_profile_rejects_empty_name(
 
     with pytest.raises(tcc_power_profiles.TccProfileWriteError):
         tcc_power_profiles.update_custom_profile("abc", {"name": "   "})
+
+
+def test_update_custom_profile_rejects_exact_built_in_prefix(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tcc_power_profiles, "_load_custom_profiles_payload", lambda: [])
+
+    built_in_id = BUILT_IN_PROFILE_ID_PREFIX + "demo"
+
+    with pytest.raises(tcc_power_profiles.TccProfileWriteError, match="Built-in profiles cannot be edited"):
+        tcc_power_profiles.update_custom_profile(built_in_id, {"name": "Demo"})
+
+
+def test_is_custom_profile_id_only_rejects_exact_built_in_prefix() -> None:
+    assert tcc_power_profiles.is_custom_profile_id(BUILT_IN_PROFILE_ID_PREFIX + "demo") is False
+    assert tcc_power_profiles.is_custom_profile_id(BUILT_IN_PROFILE_ID_PREFIX[:-1]) is True
+    assert tcc_power_profiles.is_custom_profile_id("generated-id") is True
 
 
 def test_get_custom_profile_payload_returns_detached_copy(

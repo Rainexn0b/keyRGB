@@ -45,12 +45,12 @@ def load_config_settings(
             if "effect" in loaded and isinstance(loaded["effect"], str):
                 loaded["effect"] = loaded["effect"].lower()
 
-            # Removed/legacy software effects: keep config safe by falling back
-            # to a supported mode instead of crashing when starting an unknown effect.
-            legacy_effect = loaded.get("effect")
-            if legacy_effect in {"static", "pulse"}:
+            # Removed older software effects still normalize to a safe supported mode
+            # instead of surfacing an unknown-effect failure during startup.
+            older_effect_name = loaded.get("effect")
+            if older_effect_name in {"static", "pulse"}:
                 loaded["effect"] = "none"
-            elif legacy_effect in {"breathing_sw", "fire", "random", "rain"}:
+            elif older_effect_name in {"breathing_sw", "fire", "random", "rain"}:
                 loaded["effect"] = "none"
 
             if "return_effect_after_effect" in loaded and isinstance(loaded["return_effect_after_effect"], str):

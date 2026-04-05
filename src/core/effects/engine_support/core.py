@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from threading import Event, RLock, Thread
-from typing import Callable, Protocol
+from typing import Callable, Protocol, cast
 
 from ..device import (
     Color,
@@ -25,6 +25,43 @@ class _EffectsBackendProtocol(KeyboardBackendProtocol, Protocol):
     def effects(self) -> dict[str, HardwareEffectBuilder]: ...
 
     def colors(self) -> dict[str, object]: ...
+
+
+def _backend_effects_method_or_none(backend: object | None) -> Callable[[], object] | None:
+    if backend is None:
+        return None
+    try:
+        effect_fn = backend.effects  # type: ignore[attr-defined]
+    except AttributeError:
+        return None
+    return cast(Callable[[], object] | None, effect_fn if callable(effect_fn) else None)
+
+
+def _backend_colors_method_or_none(backend: object | None) -> Callable[[], object] | None:
+    if backend is None:
+        return None
+    try:
+        colors_fn = backend.colors  # type: ignore[attr-defined]
+    except AttributeError:
+        return None
+    return cast(Callable[[], object] | None, colors_fn if callable(colors_fn) else None)
+
+
+def _backend_name(backend: object | None) -> str:
+    if backend is None:
+        return "NoneType"
+    try:
+        name = backend.name  # type: ignore[attr-defined]
+    except AttributeError:
+        return type(backend).__name__
+    return str(name)
+
+
+def _thread_generation_or_default(engine: "_EngineCore", *, default: int) -> int:
+    try:
+        return int(engine._thread_generation)
+    except AttributeError:
+        return default
 
 
 class _EngineCore:
@@ -88,11 +125,11 @@ class _EngineCore:
         self.mark_device_unavailable()
 
     def get_backend_effects(self) -> dict[str, HardwareEffectBuilder]:
-        backend = getattr(self, "backend", None)
-        effect_fn = getattr(backend, "effects", None) if backend is not None else None
+        backend = self.backend
+        effect_fn = _backend_effects_method_or_none(backend)
         if not callable(effect_fn):
             return {}
-        backend_name = getattr(backend, "name", type(backend).__name__)
+        backend_name = _backend_name(backend)
         try:
             raw_effects = effect_fn()
         except Exception:  # @quality-exception exception-transparency: backend effect discovery is a runtime plugin boundary and engine behavior must degrade to no backend effects
@@ -103,11 +140,11 @@ class _EngineCore:
         return dict(raw_effects or {})
 
     def get_backend_colors(self) -> dict[str, object]:
-        backend = getattr(self, "backend", None)
-        colors_fn = getattr(backend, "colors", None) if backend is not None else None
+        backend = self.backend
+        colors_fn = _backend_colors_method_or_none(backend)
         if not callable(colors_fn):
             return {}
-        backend_name = getattr(backend, "name", type(backend).__name__)
+        backend_name = _backend_name(backend)
         try:
             raw_colors = colors_fn()
         except Exception:  # @quality-exception exception-transparency: backend color discovery is a runtime plugin boundary and engine behavior must degrade to no backend colors
@@ -128,7 +165,7 @@ class _EngineCore:
         """Stop current effect."""
 
         try:
-            self._thread_generation = int(getattr(self, "_thread_generation", 0)) + 1
+            self._thread_generation = _thread_generation_or_default(self, default=0) + 1
         except (TypeError, ValueError, OverflowError):
             self._thread_generation = 1
 

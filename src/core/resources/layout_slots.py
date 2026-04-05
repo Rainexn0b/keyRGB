@@ -82,11 +82,11 @@ def sanitize_layout_slot_overrides(raw: object, *, layout_id: str | None = None)
         return out
 
     allowed_slot_ids = _all_optional_slot_ids()
-    legacy_to_slot: dict[str, str] = {}
+    older_key_id_aliases: dict[str, str] = {}
     if layout_id is not None:
         optional_defs = _optional_slot_defs(_normalized_layout_id(layout_id))
         allowed_slot_ids = frozenset(slot_id for slot_id, _key_id in optional_defs)
-        legacy_to_slot = {key_id: slot_id for slot_id, key_id in optional_defs}
+        older_key_id_aliases = {key_id: slot_id for slot_id, key_id in optional_defs}
 
     for slot_id, payload in raw.items():
         if not isinstance(slot_id, str) or not isinstance(payload, dict):
@@ -94,7 +94,7 @@ def sanitize_layout_slot_overrides(raw: object, *, layout_id: str | None = None)
 
         normalized_slot_id = str(slot_id)
         if normalized_slot_id not in allowed_slot_ids:
-            normalized_slot_id = legacy_to_slot.get(normalized_slot_id, "")
+            normalized_slot_id = older_key_id_aliases.get(normalized_slot_id, "")
         if normalized_slot_id not in allowed_slot_ids:
             continue
 

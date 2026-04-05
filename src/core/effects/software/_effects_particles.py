@@ -100,7 +100,8 @@ def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
     base = base_color_map(engine)
     try:
-        brightness = int(getattr(engine, "brightness", 25) or 0)
+        brightness_raw = getattr(engine, "brightness", 25)
+        brightness = int(brightness_raw or 0)
     except (TypeError, ValueError):
         brightness = 0
 

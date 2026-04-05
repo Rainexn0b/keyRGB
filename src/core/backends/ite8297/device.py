@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Callable
 
 from . import protocol
 
@@ -78,6 +78,6 @@ class Ite8297KeyboardDevice:
 
         self.set_color((red // count, green // count, blue // count), brightness=brightness)
 
-    def set_effect(self, effect_data: Any) -> None:
+    def set_effect(self, effect_data: object) -> None:
         del effect_data
         return

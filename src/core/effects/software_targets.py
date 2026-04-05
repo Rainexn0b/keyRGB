@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Protocol, TypeVar, cast
 
 from src.core.effects.transitions import avoid_full_black
 from src.core.utils.exceptions import is_permission_denied
@@ -16,14 +17,37 @@ SOFTWARE_EFFECT_TARGETS = (
 )
 
 Color = tuple[int, int, int]
+KeyT = TypeVar("KeyT")
 LOGGER = logging.getLogger(__name__)
+
+
+class _UniformRenderDeviceProtocol(Protocol):
+    def set_color(self, color: Color, *, brightness: int) -> object: ...
+
+
+class _SecondaryTargetsProviderProtocol(Protocol):
+    def __call__(self) -> Iterable[object]: ...
+
+
+class _SoftwareRenderEngineProtocol(Protocol):
+    @property
+    def kb(self) -> _UniformRenderDeviceProtocol | None: ...
+
+    @property
+    def software_effect_target(self) -> object: ...
+
+    @property
+    def secondary_software_targets_provider(self) -> _SecondaryTargetsProviderProtocol | None: ...
+
+    @property
+    def _permission_error_cb(self) -> Callable[[Exception], None] | None: ...
 
 
 @dataclass(frozen=True)
 class SoftwareRenderTarget:
     key: str
     device_type: str
-    device: Any
+    device: _UniformRenderDeviceProtocol | None
     supports_per_key: bool = False
 
 
@@ -37,8 +61,8 @@ def normalize_software_effect_target(value: object) -> str:
     return SOFTWARE_EFFECT_TARGET_KEYBOARD
 
 
-def software_render_targets(engine: Any) -> list[SoftwareRenderTarget]:
-    primary_device = getattr(engine, "kb", None)
+def software_render_targets(engine: object) -> list[SoftwareRenderTarget]:
+    primary_device = cast(_UniformRenderDeviceProtocol | None, getattr(engine, "kb", None))
     targets = [
         SoftwareRenderTarget(
             key="keyboard",
@@ -54,7 +78,9 @@ def software_render_targets(engine: Any) -> list[SoftwareRenderTarget]:
     ):
         return targets
 
-    provider = getattr(engine, "secondary_software_targets_provider", None)
+    provider = cast(
+        _SecondaryTargetsProviderProtocol | None, getattr(engine, "secondary_software_targets_provider", None)
+    )
     if not callable(provider):
         return targets
 
@@ -78,7 +104,7 @@ def software_render_targets(engine: Any) -> list[SoftwareRenderTarget]:
     return targets
 
 
-def average_color_map(color_map: dict[Any, Color]) -> Color:
+def average_color_map(color_map: Mapping[KeyT, Color]) -> Color:
     if not color_map:
         return (0, 0, 0)
 
@@ -89,8 +115,15 @@ def average_color_map(color_map: dict[Any, Color]) -> Color:
     return (int(red / count), int(green / count), int(blue / count))
 
 
+def _permission_error_callback_or_none(engine: object) -> Callable[[Exception], None] | None:
+    try:
+        return cast(_SoftwareRenderEngineProtocol, engine)._permission_error_cb
+    except AttributeError:
+        return None
+
+
 def render_secondary_uniform_rgb(
-    engine: Any,
+    engine: object,
     *,
     rgb: Color,
     brightness_hw: int,
@@ -102,9 +135,11 @@ def render_secondary_uniform_rgb(
         return
 
     red, green, blue = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))
-    permission_cb = getattr(engine, "_permission_error_cb", None)
+    permission_cb = _permission_error_callback_or_none(engine)
 
     for target in targets:
+        if target.device is None:
+            continue
         try:
             target.device.set_color((red, green, blue), brightness=int(brightness_hw))
         except Exception as exc:  # @quality-exception exception-transparency: secondary targets are runtime device seams and fanout must keep keyboard rendering alive
@@ -121,7 +156,7 @@ def render_secondary_uniform_rgb(
 
 
 def _notify_permission_error(
-    permission_cb: object,
+    permission_cb: Callable[[Exception], None] | None,
     *,
     exc: Exception,
     logger: logging.Logger,
@@ -149,7 +184,7 @@ def _coerce_target(raw_target: object) -> SoftwareRenderTarget | None:
         return raw_target if raw_target.device is not None else None
 
     if isinstance(raw_target, dict):
-        device = raw_target.get("device")
+        device = cast(_UniformRenderDeviceProtocol | None, raw_target.get("device"))
         if device is None:
             return None
         return SoftwareRenderTarget(
@@ -159,7 +194,7 @@ def _coerce_target(raw_target: object) -> SoftwareRenderTarget | None:
             supports_per_key=bool(raw_target.get("supports_per_key", False)),
         )
 
-    device = getattr(raw_target, "device", raw_target)
+    device = cast(_UniformRenderDeviceProtocol | None, getattr(raw_target, "device", raw_target))
     if device is None:
         return None
 

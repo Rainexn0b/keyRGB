@@ -1,10 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Callable, SupportsIndex, SupportsInt, cast
 
 from . import protocol
 
 FeatureReportWriter = Callable[[bytes], int | None]
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
+
+
+def _coerce_int(value: object) -> int:
+    return int(cast(IntCoercible, value))
 
 
 def _clamp_ui_brightness(value: int) -> int:
@@ -24,16 +29,16 @@ def _coerce_rgb(color) -> tuple[int, int, int]:
     )
 
 
-def _coerce_led_id(key_id: Any) -> int:
+def _coerce_led_id(key_id: object) -> int:
     if isinstance(key_id, tuple):
         if len(key_id) != 2:
             raise ValueError("tuple key ids must be (row, col)")
         row, col = key_id
         return protocol.led_id_from_row_col(int(row), int(col))
-    return int(key_id) & 0xFF
+    return _coerce_int(key_id) & 0xFF
 
 
-def _coerce_effect_value(effect_data: Any) -> protocol.Ite8910Effect | int | str:
+def _coerce_effect_value(effect_data: object) -> protocol.Ite8910Effect | int | str:
     if isinstance(effect_data, dict):
         if "index" in effect_data:
             effect_value = effect_data["index"]
@@ -54,8 +59,8 @@ def _coerce_effect_value(effect_data: Any) -> protocol.Ite8910Effect | int | str
     raise ValueError("ITE 8910 effect value must be an effect enum, int, or string")
 
 
-def _coerce_effect_payload_speed(value: Any) -> int:
-    return protocol.raw_speed_from_effect_speed(int(value))
+def _coerce_effect_payload_speed(value: object) -> int:
+    return protocol.raw_speed_from_effect_speed(_coerce_int(value))
 
 
 class Ite8910KeyboardDevice:

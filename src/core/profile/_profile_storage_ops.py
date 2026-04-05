@@ -311,7 +311,7 @@ def load_layout_slots(
     normalize_layout_slot_overrides_fn: Callable[..., object],
 ) -> Dict[str, Dict[str, object]]:
     return normalize_layout_slot_overrides_fn(  # type: ignore[return-value]
-        load_layout_slot_overrides(physical_layout or "auto", legacy_profile_name=name),
+        load_layout_slot_overrides(physical_layout or "auto", prior_profile_name=name),
         physical_layout=physical_layout,
     )
 

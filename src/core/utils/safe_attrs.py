@@ -1,18 +1,12 @@
 """Safe attribute access helpers.
 
-Provides type-safe alternatives to defensive patterns like:
-    int (getattr(obj, "attr", 0) or 0)
+Provides type-safe alternatives to legacy inline attribute-to-number coercion,
+where each call site mixed attribute lookup, fallback handling, and conversion.
 
-The issue with the above pattern:
-1. Redundant - getattr already has a default
-2. The `or 0` handles None but also treats 0 as falsy (bug risk)
-3. Nested int() calls are wasteful
+The helpers centralize that behavior and avoid subtle falsy-value bugs such as
+treating 0 like a missing value.
 
 Migration:
-    # Before
-    brightness = int (getattr(tray.config, "brightness", 0) or 0)
-
-    # After
     from src.core.utils.safe_attrs import safe_int_attr
     brightness = safe_int_attr(tray.config, "brightness", default=0)
 """

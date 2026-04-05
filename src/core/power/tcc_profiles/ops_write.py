@@ -15,7 +15,7 @@ from .json_api import (
     get_default_values_profile_json,
     get_settings_json,
 )
-from .models import TccProfileWriteError
+from .models import TccProfileWriteError, is_builtin_profile_id
 from .root_apply import _apply_new_profiles_file, _apply_new_settings_file
 
 
@@ -125,8 +125,8 @@ def update_custom_profile(
         raise TccProfileWriteError("Invalid profile id")
     if not isinstance(new_payload, dict):
         raise TccProfileWriteError("Profile payload must be a JSON object")
-    if profile_id.startswith("__legacy_"):
-        raise TccProfileWriteError("Legacy profiles cannot be edited")
+    if is_builtin_profile_id(profile_id):
+        raise TccProfileWriteError("Built-in profiles cannot be edited")
 
     custom_profiles = load_custom_profiles_payload()
     idx = -1
@@ -156,7 +156,7 @@ def update_custom_profile(
 def is_custom_profile_id(profile_id: str) -> bool:
     if not isinstance(profile_id, str) or not profile_id:
         return False
-    if profile_id.startswith("__legacy_"):
+    if is_builtin_profile_id(profile_id):
         return False
     # Custom IDs include __default_custom_profile__ and generated ids.
     return True

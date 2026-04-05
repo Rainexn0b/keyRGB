@@ -41,24 +41,24 @@ def _load_all_layout_slot_overrides() -> dict[str, dict[str, dict[str, object]]]
     return out
 
 
-def _load_legacy_profile_slot_overrides(
+def _load_prior_profile_slot_overrides(
     physical_layout: str | None,
     *,
-    legacy_profile_name: str | None,
+    prior_profile_name: str | None,
 ) -> dict[str, dict[str, object]]:
-    if not isinstance(legacy_profile_name, str) or not legacy_profile_name.strip():
+    if not isinstance(prior_profile_name, str) or not prior_profile_name.strip():
         return {}
 
     from src.core.profile.paths import safe_profile_name
 
-    legacy_path = config_dir() / "profiles" / safe_profile_name(legacy_profile_name) / "layout_slots.json"
-    return _filter_layout_slot_overrides(physical_layout, read_json(legacy_path))
+    prior_path = config_dir() / "profiles" / safe_profile_name(prior_profile_name) / "layout_slots.json"
+    return _filter_layout_slot_overrides(physical_layout, read_json(prior_path))
 
 
 def load_layout_slot_overrides(
     physical_layout: str | None,
     *,
-    legacy_profile_name: str | None = None,
+    prior_profile_name: str | None = None,
 ) -> dict[str, dict[str, object]]:
     resolved_layout = resolve_physical_layout(physical_layout or "auto")
     all_layouts = _load_all_layout_slot_overrides()
@@ -66,9 +66,9 @@ def load_layout_slot_overrides(
     if current is not None:
         return dict(current)
 
-    migrated = _load_legacy_profile_slot_overrides(
+    migrated = _load_prior_profile_slot_overrides(
         resolved_layout,
-        legacy_profile_name=legacy_profile_name,
+        prior_profile_name=prior_profile_name,
     )
     if migrated:
         save_layout_slot_overrides(resolved_layout, migrated)

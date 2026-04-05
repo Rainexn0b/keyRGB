@@ -88,13 +88,13 @@ class TestLoadConfigSettings:
 
         assert result["return_effect_after_effect"] == "perkey"
 
-    @pytest.mark.parametrize("legacy_effect", ["static", "pulse", "breathing_sw", "fire", "random", "rain"])
-    def test_load_maps_legacy_effects_to_none(self, temp_config_dir, legacy_effect):
-        """Removed legacy effect names should be normalized to a safe fallback."""
+    @pytest.mark.parametrize("older_effect_name", ["static", "pulse", "breathing_sw", "fire", "random", "rain"])
+    def test_load_maps_removed_older_effect_names_to_none(self, temp_config_dir, older_effect_name):
+        """Removed older effect names should be normalized to a safe fallback."""
         from src.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
-        config_file.write_text(json.dumps({"effect": legacy_effect}), encoding="utf-8")
+        config_file.write_text(json.dumps({"effect": older_effect_name}), encoding="utf-8")
 
         result = load_config_settings(
             config_file=config_file,

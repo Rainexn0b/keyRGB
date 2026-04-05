@@ -2,8 +2,19 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Iterable, Optional
 import os
+from typing import Iterable, Optional, Protocol, cast
+
+
+class _ModuleFileProtocol(Protocol):
+    __file__: object
+
+
+def _module_file_or_none(module: object) -> object | None:
+    try:
+        return cast(_ModuleFileProtocol, module).__file__
+    except AttributeError:
+        return None
 
 
 def repo_root_from(anchor: str | Path) -> Path:
@@ -82,19 +93,19 @@ def ensure_ite8291r3_ctl_importable(anchor: str | Path) -> Optional[Path]:
             root = repo_root_from(anchor)
             candidates = [
                 root / "vendor" / "ite8291r3-ctl",
-                root / "ite8291r3-ctl",  # legacy layout
+                root / "ite8291r3-ctl",  # alternate checkout layout
             ]
             return add_first_existing_to_sys_path(candidates)
 
     existing = sys.modules.get("ite8291r3_ctl")
-    if existing is not None and not getattr(existing, "__file__", None):
+    if existing is not None and not _module_file_or_none(existing):
         # Likely an in-memory test double; leave it alone.
         return None
 
     root = repo_root_from(anchor)
     candidates = [
         root / "vendor" / "ite8291r3-ctl",
-        root / "ite8291r3-ctl",  # legacy layout
+        root / "ite8291r3-ctl",  # alternate checkout layout
     ]
 
     # Prefer a vendored checkout when it exists, even if a system-installed

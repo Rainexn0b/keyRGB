@@ -56,15 +56,15 @@ class TestLayoutSlotStorage:
 
         assert loaded == {str(slot_id_for_key_id("iso", "nonusbackslash")): {"visible": False}}
 
-    def test_load_layout_slots_migrates_legacy_profile_sidecar(self, monkeypatch, tmp_path) -> None:
+    def test_load_layout_slots_migrates_prior_profile_sidecar(self, monkeypatch, tmp_path) -> None:
         cfg_dir = tmp_path / "cfg"
         monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(cfg_dir))
 
         from src.core.config import layout_slots
 
-        legacy_file = cfg_dir / "profiles" / "test_profile" / "layout_slots.json"
-        legacy_file.parent.mkdir(parents=True, exist_ok=True)
-        legacy_file.write_text(
+        prior_file = cfg_dir / "profiles" / "test_profile" / "layout_slots.json"
+        prior_file.parent.mkdir(parents=True, exist_ok=True)
+        prior_file.write_text(
             json.dumps(
                 {
                     "nonusbackslash": {"visible": False},
@@ -75,7 +75,7 @@ class TestLayoutSlotStorage:
             encoding="utf-8",
         )
 
-        loaded = layout_slots.load_layout_slot_overrides("iso", legacy_profile_name="test_profile")
+        loaded = layout_slots.load_layout_slot_overrides("iso", prior_profile_name="test_profile")
 
         assert loaded == {
             str(slot_id_for_key_id("iso", "nonusbackslash")): {"visible": False},

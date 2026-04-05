@@ -115,7 +115,7 @@ def test_alpha_rows_use_physical_slot_ids_not_letter_ids() -> None:
     assert iso_keys["nonusbackslash"].slot_id == "shift_01"
 
 
-def test_slot_id_compatibility_helpers_resolve_both_directions() -> None:
+def test_slot_id_mapping_helpers_resolve_both_directions() -> None:
     assert slot_id_for_key_id("ansi", "q") == "top_01"
     assert key_id_for_slot_id("ansi", "top_01") == "q"
     assert slot_id_for_key_id("iso", "nonusbackslash") == "shift_01"

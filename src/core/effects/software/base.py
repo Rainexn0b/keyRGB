@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Dict, Tuple
+from collections.abc import Mapping
+from operator import attrgetter
+from typing import TYPE_CHECKING, Dict, SupportsIndex, SupportsInt, Tuple, cast
 
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.software_targets import average_color_map, render_secondary_uniform_rgb
@@ -22,6 +24,57 @@ if TYPE_CHECKING:
 
 Color = Tuple[int, int, int]
 Key = Tuple[int, int]
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
+
+
+def _engine_attr_or_none(engine: "EffectsEngine", attr_name: str) -> object | None:
+    try:
+        return attrgetter(attr_name)(engine)
+    except AttributeError:
+        return None
+
+
+def _keyboard_attr_or_none(engine: "EffectsEngine", attr_name: str) -> object | None:
+    try:
+        kb = engine.kb
+    except AttributeError:
+        return None
+    try:
+        return attrgetter(attr_name)(kb)
+    except AttributeError:
+        return None
+
+
+def _coerce_color_or_default(value: object, *, default: Color) -> Color:
+    if not isinstance(value, (tuple, list)) or len(value) != 3:
+        return default
+    try:
+        red, green, blue = value
+        return (int(red), int(green), int(blue))
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _current_color_or_default(engine: "EffectsEngine", *, default: Color) -> Color:
+    raw = _engine_attr_or_none(engine, "current_color")
+    return _coerce_color_or_default(raw, default=default)
+
+
+def _per_key_colors_or_none(engine: "EffectsEngine") -> Mapping[Key, Color] | None:
+    raw = _engine_attr_or_none(engine, "per_key_colors")
+    if not raw or not isinstance(raw, Mapping):
+        return None
+    return cast(Mapping[Key, Color], raw)
+
+
+def _last_hw_mode_brightness_or_none(engine: "EffectsEngine") -> int | None:
+    raw = _engine_attr_or_none(engine, "_last_hw_mode_brightness")
+    if raw is None:
+        return None
+    try:
+        return int(cast(IntCoercible, raw))
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 def clamp01(x: float) -> float:
@@ -35,7 +88,7 @@ def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float 
     """
 
     try:
-        speed_raw = getattr(engine, "speed")
+        speed_raw = engine.speed
     except AttributeError:
         speed_raw = 4
 
@@ -77,7 +130,7 @@ def animation_step_s(
     current_s = time.monotonic() if now_s is None else float(now_s)
 
     try:
-        previous_raw = getattr(engine, attr_name)
+        previous_raw = attrgetter(attr_name)(engine)
     except AttributeError:
         previous_s = None
     else:
@@ -101,18 +154,18 @@ def animation_step_s(
 
 
 def has_per_key(engine: "EffectsEngine") -> bool:
-    return bool(getattr(engine.kb, "set_key_colors", None))
+    return bool(_keyboard_attr_or_none(engine, "set_key_colors"))
 
 
 def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
-    base_color_src = getattr(engine, "current_color", None) or (255, 0, 0)
+    base_color_src = _current_color_or_default(engine, default=(255, 0, 0))
     base_color = (
         int(base_color_src[0]),
         int(base_color_src[1]),
         int(base_color_src[2]),
     )
 
-    per_key = getattr(engine, "per_key_colors", None) or None
+    per_key = _per_key_colors_or_none(engine)
     if not per_key:
         return {(r, c): base_color for r in range(NUM_ROWS) for c in range(NUM_COLS)}
 
@@ -143,7 +196,7 @@ def scale(rgb: Color, s: float) -> Color:
     return (int(round(rgb[0] * ss)), int(round(rgb[1] * ss)), int(round(rgb[2] * ss)))
 
 
-def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
+def render(engine: "EffectsEngine", *, color_map: Mapping[Key, Color]) -> None:
     """Render per-key when available, otherwise fall back to uniform."""
 
     if has_per_key(engine):
@@ -151,7 +204,7 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
             with engine.kb_lock:
                 brightness_hw = int(engine.brightness)
                 reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
-                last_hw_brightness = getattr(engine, "_last_hw_mode_brightness", None)
+                last_hw_brightness = _last_hw_mode_brightness_or_none(engine)
                 need_mode_init = reassert_every_frame or last_hw_brightness is None
 
                 if need_mode_init:
@@ -187,7 +240,7 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
                         return
                     raise
 
-                if not need_mode_init and int(last_hw_brightness) != brightness_hw:  # type: ignore[arg-type]
+                if not need_mode_init and last_hw_brightness is not None and int(last_hw_brightness) != brightness_hw:
                     try:
                         engine.kb.set_brightness(int(brightness_hw))
                     except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
