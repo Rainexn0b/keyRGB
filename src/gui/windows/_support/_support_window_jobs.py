@@ -3,8 +3,307 @@
 from __future__ import annotations
 
 import json
+import os
+import time
+import tkinter as tk
 from datetime import datetime, timezone
 from typing import Any
+from tkinter import ttk
+
+
+_PROBE_AUTO_STEP_DURATION_S = 1.25
+_PROBE_AUTO_SETTLE_DURATION_S = 0.35
+_PROBE_AUTOMATION_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_PROBE_DIALOG_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+
+
+def _probe_dialog_geometry(window: Any, *, width: int, height: int) -> str:
+    try:
+        root = window.root
+        root.update_idletasks()
+        root_x = int(root.winfo_rootx())
+        root_y = int(root.winfo_rooty())
+        root_w = max(int(root.winfo_width()), width)
+        root_h = max(int(root.winfo_height()), height)
+        x = root_x + max(24, (root_w - width) // 2)
+        y = root_y + max(24, (root_h - height) // 3)
+        return f"{width}x{height}+{x}+{y}"
+    except _PROBE_DIALOG_ERRORS:
+        return f"{width}x{height}"
+
+
+def _show_probe_message_dialog(
+    window: Any,
+    *,
+    title: str,
+    message: str,
+    tk: Any,
+    ttk: Any,
+    scrolledtext: Any,
+    width: int = 720,
+    height: int = 560,
+) -> bool:
+    dialog = tk.Toplevel(window.root)
+    dialog.title(title)
+    dialog.transient(window.root)
+    dialog.geometry(_probe_dialog_geometry(window, width=width, height=height))
+    dialog.minsize(560, 360)
+    dialog.resizable(True, True)
+
+    container = ttk.Frame(dialog, padding=14)
+    container.pack(fill="both", expand=True)
+    container.columnconfigure(0, weight=1)
+    container.rowconfigure(0, weight=1)
+
+    body = scrolledtext.ScrolledText(
+        container,
+        wrap="word",
+        height=18,
+        background=getattr(window, "_bg_color", None),
+        foreground=getattr(window, "_fg_color", None),
+        insertbackground=getattr(window, "_fg_color", None),
+    )
+    body.grid(row=0, column=0, sticky="nsew")
+    body.insert("1.0", str(message or ""))
+    body.configure(state="disabled")
+
+    button_row = ttk.Frame(container)
+    button_row.grid(row=1, column=0, sticky="e", pady=(12, 0))
+
+    result = {"ok": False}
+
+    def close(*, ok: bool) -> None:
+        result["ok"] = bool(ok)
+        try:
+            dialog.grab_release()
+        except _PROBE_DIALOG_ERRORS:
+            pass
+        dialog.destroy()
+
+    ok_btn = ttk.Button(button_row, text="OK", command=lambda: close(ok=True))
+    ok_btn.pack(side="right")
+
+    dialog.protocol("WM_DELETE_WINDOW", lambda: close(ok=False))
+    try:
+        dialog.grab_set()
+    except _PROBE_DIALOG_ERRORS:
+        pass
+    try:
+        ok_btn.focus_set()
+        body.focus_set()
+    except _PROBE_DIALOG_ERRORS:
+        pass
+    dialog.wait_window()
+    return bool(result["ok"])
+
+
+def _ask_probe_choice_dialog(
+    window: Any,
+    *,
+    title: str,
+    prompt: str,
+    tk: Any,
+    ttk: Any,
+    choices: list[tuple[str, object]],
+    width: int = 520,
+    height: int = 240,
+) -> object:
+    dialog = tk.Toplevel(window.root)
+    dialog.title(title)
+    dialog.transient(window.root)
+    dialog.geometry(_probe_dialog_geometry(window, width=width, height=height))
+    dialog.minsize(420, 200)
+    dialog.resizable(True, False)
+
+    container = ttk.Frame(dialog, padding=16)
+    container.pack(fill="both", expand=True)
+    container.columnconfigure(0, weight=1)
+
+    ttk.Label(container, text=str(prompt or ""), justify="left", wraplength=width - 72).grid(
+        row=0, column=0, sticky="w"
+    )
+
+    result = {"value": None}
+
+    def close(value: object) -> None:
+        result["value"] = value
+        try:
+            dialog.grab_release()
+        except _PROBE_DIALOG_ERRORS:
+            pass
+        dialog.destroy()
+
+    button_row = ttk.Frame(container)
+    button_row.grid(row=1, column=0, sticky="e", pady=(18, 0))
+    created_buttons = []
+    for label, value in choices:
+        btn = ttk.Button(button_row, text=str(label), command=lambda v=value: close(v))
+        btn.pack(side="left", padx=(8, 0))
+        created_buttons.append(btn)
+
+    dialog.protocol("WM_DELETE_WINDOW", lambda: close(None))
+    try:
+        dialog.grab_set()
+    except _PROBE_DIALOG_ERRORS:
+        pass
+    try:
+        if created_buttons:
+            created_buttons[0].focus_set()
+    except _PROBE_DIALOG_ERRORS:
+        pass
+    dialog.wait_window()
+    return result["value"]
+
+
+def _ask_probe_notes_dialog(
+    window: Any,
+    *,
+    title: str,
+    prompt: str,
+    tk: Any,
+    ttk: Any,
+    scrolledtext: Any,
+    width: int = 720,
+    height: int = 340,
+) -> str | None:
+    dialog = tk.Toplevel(window.root)
+    dialog.title(title)
+    dialog.transient(window.root)
+    dialog.geometry(_probe_dialog_geometry(window, width=width, height=height))
+    dialog.minsize(560, 260)
+    dialog.resizable(True, True)
+
+    container = ttk.Frame(dialog, padding=16)
+    container.pack(fill="both", expand=True)
+    container.columnconfigure(0, weight=1)
+    container.rowconfigure(1, weight=1)
+
+    ttk.Label(container, text=str(prompt or ""), justify="left", wraplength=width - 72).grid(
+        row=0, column=0, sticky="w", pady=(0, 10)
+    )
+
+    notes_box = scrolledtext.ScrolledText(
+        container,
+        wrap="word",
+        height=10,
+        background=getattr(window, "_bg_color", None),
+        foreground=getattr(window, "_fg_color", None),
+        insertbackground=getattr(window, "_fg_color", None),
+    )
+    notes_box.grid(row=1, column=0, sticky="nsew")
+
+    result = {"value": None}
+
+    def close(*, ok: bool) -> None:
+        if ok:
+            result["value"] = str(notes_box.get("1.0", "end")).strip()
+        try:
+            dialog.grab_release()
+        except _PROBE_DIALOG_ERRORS:
+            pass
+        dialog.destroy()
+
+    button_row = ttk.Frame(container)
+    button_row.grid(row=2, column=0, sticky="e", pady=(12, 0))
+    ttk.Button(button_row, text="Cancel", command=lambda: close(ok=False)).pack(side="right")
+    ttk.Button(button_row, text="OK", command=lambda: close(ok=True)).pack(side="right", padx=(0, 8))
+
+    dialog.protocol("WM_DELETE_WINDOW", lambda: close(ok=False))
+    try:
+        dialog.grab_set()
+        notes_box.focus_set()
+    except _PROBE_DIALOG_ERRORS:
+        pass
+    dialog.wait_window()
+    return result["value"]
+
+
+def _tray_process_alive(tray_pid: object) -> bool:
+    try:
+        pid = int(str(tray_pid or "").strip())
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    return os.path.exists(f"/proc/{pid}")
+
+
+def _probe_config_snapshot(config: Any) -> dict[str, object]:
+    effect_speeds = None
+    settings = getattr(config, "_settings", None)
+    if isinstance(settings, dict):
+        raw_effect_speeds = settings.get("effect_speeds")
+        if isinstance(raw_effect_speeds, dict):
+            effect_speeds = dict(raw_effect_speeds)
+
+    try:
+        speed = int(getattr(config, "speed", 0) or 0)
+    except (TypeError, ValueError, OverflowError):
+        speed = 0
+
+    return {
+        "effect": str(getattr(config, "effect", "none") or "none"),
+        "speed": max(0, min(10, speed)),
+        "effect_speeds": effect_speeds,
+    }
+
+
+def _restore_probe_config(config: Any, *, snapshot: dict[str, object]) -> None:
+    settings = getattr(config, "_settings", None)
+    save_fn = getattr(config, "_save", None)
+    raw_effect_speeds = snapshot.get("effect_speeds")
+    if isinstance(settings, dict) and callable(save_fn):
+        if isinstance(raw_effect_speeds, dict) and raw_effect_speeds:
+            settings["effect_speeds"] = dict(raw_effect_speeds)
+        else:
+            settings.pop("effect_speeds", None)
+        save_fn()
+
+    try:
+        config.speed = int(snapshot.get("speed") or 0)
+    except _PROBE_AUTOMATION_ERRORS:
+        pass
+
+    try:
+        config.effect = str(snapshot.get("effect") or "none")
+    except _PROBE_AUTOMATION_ERRORS:
+        pass
+
+
+def _auto_run_backend_speed_probe_via_tray_config(
+    plan: dict[str, object],
+    *,
+    config_cls: Any,
+    sleep_fn: Any,
+) -> dict[str, object]:
+    config = config_cls()
+    snapshot = _probe_config_snapshot(config)
+    effect_name = str(plan.get("effect_name") or "").strip()
+    selection_effect_name = str(plan.get("selection_effect_name") or effect_name).strip() or effect_name
+    requested_ui_speeds = [
+        max(0, min(10, int(value)))
+        for value in plan.get("requested_ui_speeds") or []
+        if isinstance(value, int | float) or str(value).strip().isdigit()
+    ]
+
+    try:
+        if selection_effect_name:
+            config.effect = selection_effect_name
+            sleep_fn(_PROBE_AUTO_SETTLE_DURATION_S)
+
+        for ui_speed in requested_ui_speeds:
+            config.set_effect_speed(effect_name, int(ui_speed))
+            config.speed = int(ui_speed)
+            sleep_fn(_PROBE_AUTO_STEP_DURATION_S)
+
+        return {
+            "execution_mode": "auto",
+            "applied_ui_speeds": [int(value) for value in requested_ui_speeds],
+            "restored_effect": str(snapshot.get("effect") or "none"),
+        }
+    finally:
+        _restore_probe_config(config, snapshot=snapshot)
+        sleep_fn(_PROBE_AUTO_SETTLE_DURATION_S)
 
 
 def run_debug(window: Any, *, collect_diagnostics_text: Any, run_in_thread: Any, logger: Any) -> None:
@@ -126,8 +425,13 @@ def run_backend_speed_probe(
     prompt: bool,
     current_backend_speed_probe_plan_fn: Any,
     messagebox: Any,
-    simpledialog: Any,
     tk_runtime_errors: tuple[type[BaseException], ...],
+    run_in_thread: Any,
+    config_cls: Any,
+    tray_pid: str,
+    tk: Any,
+    ttk: Any,
+    scrolledtext: Any,
 ) -> None:
     plan = current_backend_speed_probe_plan_fn()
     if not isinstance(plan, dict):
@@ -135,59 +439,126 @@ def run_backend_speed_probe(
         return
 
     selection_effect_name = str(plan.get("selection_effect_name") or plan.get("effect_name") or "").strip()
-    selection_menu_path = str(plan.get("selection_menu_path") or "").strip()
+    auto_run_available = _tray_process_alive(tray_pid)
+    if not auto_run_available:
+        window._set_status("Backend speed probe requires the running tray session", ok=False)
+        return
 
     if prompt:
+        prompt_message = (
+            "Run the guided backend speed probe through the tray now?\n\n"
+            "KeyRGB will temporarily switch to the probe effect, step through the test speeds automatically, restore the previous tray effect, and then ask for your observation."
+        )
         try:
-            ok = bool(
-                messagebox.askyesno(
-                    "Run Backend Speed Probe",
-                    "Use the guided backend speed probe for the current diagnostics snapshot?",
-                    parent=window.root,
-                )
+            ok = _ask_probe_choice_dialog(
+                window,
+                title="Backend Speed Probe",
+                prompt=prompt_message,
+                tk=tk,
+                ttk=ttk,
+                choices=[("Run probe", True), ("Cancel", None)],
+                width=640,
+                height=230,
             )
         except tk_runtime_errors:
-            ok = False
-        if not ok:
+            ok = None
+        if ok is None:
             return
 
-    instructions = "\n".join(f"- {line}" for line in plan.get("instructions") or [])
-    samples_text = ", ".join(
-        f"UI {sample.get('ui_speed')} -> raw {sample.get('raw_speed_hex')}"
-        for sample in plan.get("samples") or []
-        if isinstance(sample, dict)
-    )
-    message = "".join(
-        [
-            f"Backend: {plan.get('backend')}\n",
-            f"Effect: {plan.get('effect_name')}\n",
-            f"Hardware selection key: {selection_effect_name}\n" if selection_effect_name else "",
-            f"Tray path: {selection_menu_path}\n" if selection_menu_path else "",
-            f"Samples: {samples_text}\n\n",
-            f"{instructions}\n\n",
-            "Click OK after you have tested the listed speed values.",
-        ]
-    )
     started_at = datetime.now(timezone.utc).isoformat()
     try:
-        messagebox.showinfo("Backend Speed Probe", message, parent=window.root)
+        _show_probe_message_dialog(
+            window,
+            title="Backend Speed Probe",
+            message=(
+                "KeyRGB will temporarily switch the tray to the probe effect, play each listed speed step, and then restore the previous tray effect.\n\n"
+                "Watch the keyboard now. When the auto-run finishes, KeyRGB will ask for your observation."
+            ),
+            tk=tk,
+            ttk=ttk,
+            scrolledtext=scrolledtext,
+            width=680,
+            height=320,
+        )
     except tk_runtime_errors:
         pass
 
+    window.btn_run_speed_probe.configure(state="disabled")
+    window._set_status("Auto-running backend speed probe…", ok=True)
+
+    def work() -> dict[str, object]:
+        try:
+            return {
+                "ok": True,
+                "payload": _auto_run_backend_speed_probe_via_tray_config(
+                    plan,
+                    config_cls=config_cls,
+                    sleep_fn=time.sleep,
+                ),
+            }
+        except _PROBE_AUTOMATION_ERRORS as exc:
+            return {"ok": False, "error": str(exc).strip() or exc.__class__.__name__}
+
+    def on_done(result: dict[str, object]) -> None:
+        window.btn_run_speed_probe.configure(state="normal")
+        if not bool(result.get("ok")):
+            window._sync_button_state()
+            window._set_status("Automatic backend speed probe failed", ok=False)
+            return
+        _complete_backend_speed_probe(
+            window,
+            plan=plan,
+            selection_effect_name=selection_effect_name,
+            messagebox=messagebox,
+            tk_runtime_errors=tk_runtime_errors,
+            started_at=started_at,
+            automation_result=result.get("payload") if isinstance(result.get("payload"), dict) else None,
+            tk=tk,
+            ttk=ttk,
+            scrolledtext=scrolledtext,
+        )
+
+    run_in_thread(window.root, work, on_done)
+
+
+def _complete_backend_speed_probe(
+    window: Any,
+    *,
+    plan: dict[str, object],
+    selection_effect_name: str,
+    messagebox: Any,
+    tk_runtime_errors: tuple[type[BaseException], ...],
+    started_at: str,
+    automation_result: dict[str, object] | None,
+    tk: Any,
+    ttk: Any,
+    scrolledtext: Any,
+) -> None:
+
     try:
-        distinct_steps = messagebox.askyesnocancel(
-            "Backend Speed Probe",
-            "Did the listed speed steps look clearly distinct on the keyboard?",
-            parent=window.root,
+        distinct_steps = _ask_probe_choice_dialog(
+            window,
+            title="Backend Speed Probe",
+            prompt="Did the listed speed steps look clearly distinct on the keyboard?",
+            tk=tk,
+            ttk=ttk,
+            choices=[("Yes", True), ("No", False), ("Cancel", None)],
+            width=560,
+            height=220,
         )
     except tk_runtime_errors:
         distinct_steps = None
 
     try:
-        notes = simpledialog.askstring(
-            "Backend Speed Probe",
-            str(plan.get("observation_prompt") or "Observation notes:"),
-            parent=window.root,
+        notes = _ask_probe_notes_dialog(
+            window,
+            title="Backend Speed Probe",
+            prompt=str(plan.get("observation_prompt") or "Observation notes:"),
+            tk=tk,
+            ttk=ttk,
+            scrolledtext=scrolledtext,
+            width=760,
+            height=360,
         )
     except tk_runtime_errors:
         notes = None
@@ -201,8 +572,11 @@ def run_backend_speed_probe(
         "samples": list(plan.get("samples") or []),
         "started_at": started_at,
         "completed_at": completed_at,
+        "execution_mode": str((automation_result or {}).get("execution_mode") or "auto"),
         "observation": {"distinct_steps": distinct_steps, "notes": str(notes or "").strip()},
     }
+    if isinstance(automation_result, dict) and automation_result:
+        result["automation"] = dict(automation_result)
     window._merge_supplemental_evidence({"backend_probes": {str(plan.get("key") or "backend_probe"): result}})
     window._refresh_issue_report()
     window._sync_button_state()
