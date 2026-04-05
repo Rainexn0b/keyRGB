@@ -53,19 +53,22 @@ def config_snapshot() -> dict[str, Any]:
 
     out: dict[str, Any] = {"present": False}
     cfg_path: Path | None = None
+    raw_config = ""
 
     try:
         cfg_path = config_file_path()
-        if not cfg_path.exists():
-            return out
-        out["present"] = True
         try:
             st = cfg_path.stat()
             out["mtime"] = int(st.st_mtime)
+        except FileNotFoundError:
+            return out
         except _CONFIG_STAT_METADATA_ERRORS:
             pass
+        out["present"] = True
 
-        data = json.loads(cfg_path.read_text(encoding="utf-8", errors="ignore"))
+        raw_config = cfg_path.read_text(encoding="utf-8", errors="ignore")
+
+        data = json.loads(raw_config)
         if not isinstance(data, dict):
             return out
 
