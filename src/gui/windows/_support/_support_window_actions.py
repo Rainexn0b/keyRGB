@@ -116,11 +116,12 @@ def maybe_prompt_for_backend_speed_probe(
     window: Any,
     *,
     current_backend_speed_probe_plan_fn: Any,
+    can_run_backend_speed_probe_fn: Any,
     messagebox: Any,
     tk_runtime_errors: tuple[type[BaseException], ...],
 ) -> None:
     plan = current_backend_speed_probe_plan_fn()
-    if not isinstance(plan, dict):
+    if not isinstance(plan, dict) or not bool(can_run_backend_speed_probe_fn()):
         return
 
     prompt_key = str(plan.get("key") or "") + ":" + str(plan.get("backend") or "")
@@ -130,7 +131,7 @@ def maybe_prompt_for_backend_speed_probe(
 
     message = (
         "KeyRGB can guide a backend speed probe for this device now.\n\n"
-        "This will not change hardware automatically; it will show you the exact speed steps to try and save your notes into the support bundle.\n\n"
+        "This will temporarily switch the tray to the probe effect, step through the test speeds automatically, restore the previous tray effect, and save your notes into the support bundle.\n\n"
         "Run the probe now?"
     )
     try:
@@ -141,7 +142,13 @@ def maybe_prompt_for_backend_speed_probe(
         window.run_backend_speed_probe(prompt=False)
 
 
-def sync_button_state(window: Any, *, current_capture_plan_fn: Any, current_backend_speed_probe_plan_fn: Any) -> None:
+def sync_button_state(
+    window: Any,
+    *,
+    current_capture_plan_fn: Any,
+    current_backend_speed_probe_plan_fn: Any,
+    can_run_backend_speed_probe_fn: Any,
+) -> None:
     window.btn_copy_debug.configure(state="normal" if window._diagnostics_json else "disabled")
     window.btn_copy_discovery.configure(state="normal" if window._discovery_json else "disabled")
     window.btn_save_debug.configure(state="normal" if window._diagnostics_json else "disabled")
@@ -157,7 +164,11 @@ def sync_button_state(window: Any, *, current_capture_plan_fn: Any, current_back
         state="normal" if (window._diagnostics_json or window._discovery_json) else "disabled"
     )
     window.btn_run_speed_probe.configure(
-        state="normal" if isinstance(current_backend_speed_probe_plan_fn(), dict) else "disabled"
+        state=(
+            "normal"
+            if isinstance(current_backend_speed_probe_plan_fn(), dict) and bool(can_run_backend_speed_probe_fn())
+            else "disabled"
+        )
     )
 
 

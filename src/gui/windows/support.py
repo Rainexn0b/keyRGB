@@ -9,8 +9,9 @@ import webbrowser
 import tkinter as tk
 from tkinter import filedialog
 from tkinter import messagebox
-from tkinter import scrolledtext, simpledialog, ttk
+from tkinter import scrolledtext, ttk
 
+from src.core.config import Config
 from src.core.diagnostics import device_discovery as diagnostics_device_discovery
 from src.core.diagnostics import support as diagnostics_support
 from src.gui.settings import diagnostics_runner
@@ -47,8 +48,9 @@ class SupportToolsGUI:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Support Tools")
         apply_keyrgb_window_icon(self.root)
-        self.root.geometry("980x980")
-        self.root.minsize(880, 820)
+        _win_h = max(820, self.root.winfo_screenheight() - 80)
+        self.root.geometry(f"1240x{_win_h}")
+        self.root.minsize(1080, 820)
         self.root.resizable(True, True)
 
         bg_color, fg_color = apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
@@ -88,6 +90,7 @@ class SupportToolsGUI:
             self,
             current_capture_plan_fn=self._current_capture_plan,
             current_backend_speed_probe_plan_fn=self._current_backend_speed_probe_plan,
+            can_run_backend_speed_probe_fn=self._can_run_backend_speed_probe,
         )
 
     def _current_capture_plan(self) -> dict[str, object]:
@@ -127,9 +130,14 @@ class SupportToolsGUI:
         support_actions.maybe_prompt_for_backend_speed_probe(
             self,
             current_backend_speed_probe_plan_fn=self._current_backend_speed_probe_plan,
+            can_run_backend_speed_probe_fn=self._can_run_backend_speed_probe,
             messagebox=messagebox,
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
         )
+
+    @staticmethod
+    def _can_run_backend_speed_probe() -> bool:
+        return support_jobs._tray_process_alive(str(os.environ.get("KEYRGB_TRAY_PID") or ""))
 
     def _merge_supplemental_evidence(self, payload: dict[str, object] | None) -> None:
         support_actions.merge_supplemental_evidence(self, payload)
@@ -191,8 +199,13 @@ class SupportToolsGUI:
             prompt=prompt,
             current_backend_speed_probe_plan_fn=self._current_backend_speed_probe_plan,
             messagebox=messagebox,
-            simpledialog=simpledialog,
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
+            run_in_thread=run_in_thread,
+            config_cls=Config,
+            tray_pid=str(os.environ.get("KEYRGB_TRAY_PID") or ""),
+            tk=tk,
+            ttk=ttk,
+            scrolledtext=scrolledtext,
         )
 
     def copy_debug_output(self) -> None:

@@ -25,6 +25,18 @@ class _FakeWidget:
     def focus_set(self) -> None:
         self.options["focused"] = True
 
+    def pack(self, *args, **kwargs) -> None:
+        return
+
+    def grid(self, *args, **kwargs) -> None:
+        return
+
+    def columnconfigure(self, index: int, weight: int = 0, **kwargs: object) -> None:
+        self.options.setdefault("columnconfigure", []).append((index, weight))
+
+    def rowconfigure(self, index: int, weight: int = 0, **kwargs: object) -> None:
+        self.options.setdefault("rowconfigure", []).append((index, weight))
+
 
 class _FakeText(_FakeWidget):
     def __init__(self, text: str = "") -> None:
@@ -69,6 +81,9 @@ class _FakeRoot:
     def resizable(self, width: bool, height: bool) -> None:
         self.resizable_value = (width, height)
 
+    def winfo_screenheight(self) -> int:
+        return 1080
+
     def mainloop(self) -> None:
         return
 
@@ -111,10 +126,6 @@ def _make_window(*, diagnostics_json: str = "", discovery_json: str = ""):
 def test_init_builds_all_sections_before_sync(monkeypatch: pytest.MonkeyPatch) -> None:
     created_roots: list[_FakeRoot] = []
 
-    class _ConstructWidget(_FakeWidget):
-        def pack(self, *args, **kwargs) -> None:
-            return
-
     class _ConstructText(_FakeText):
         def __init__(self, *args, **kwargs) -> None:
             super().__init__("")
@@ -128,11 +139,23 @@ def test_init_builds_all_sections_before_sync(monkeypatch: pytest.MonkeyPatch) -
         created_roots.append(root)
         return root
 
+    class _FakeStyle:
+        def __init__(self, *args, **kwargs) -> None:
+            self.configured: list[tuple[str, dict[str, object]]] = []
+            self.mapped: list[tuple[str, dict[str, object]]] = []
+
+        def configure(self, name: str, **kwargs) -> None:
+            self.configured.append((name, dict(kwargs)))
+
+        def map(self, name: str, **kwargs) -> None:
+            self.mapped.append((name, dict(kwargs)))
+
     monkeypatch.setattr(support_window.tk, "Tk", _make_root)
-    monkeypatch.setattr(support_window.ttk, "Frame", lambda *args, **kwargs: _ConstructWidget(**kwargs))
-    monkeypatch.setattr(support_window.ttk, "Label", lambda *args, **kwargs: _ConstructWidget(**kwargs))
-    monkeypatch.setattr(support_window.ttk, "LabelFrame", lambda *args, **kwargs: _ConstructWidget(**kwargs))
-    monkeypatch.setattr(support_window.ttk, "Button", lambda *args, **kwargs: _ConstructWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "Frame", lambda *args, **kwargs: _FakeWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "Label", lambda *args, **kwargs: _FakeWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "LabelFrame", lambda *args, **kwargs: _FakeWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "Button", lambda *args, **kwargs: _FakeWidget(**kwargs))
+    monkeypatch.setattr(support_window.ttk, "Style", lambda *args, **kwargs: _FakeStyle(*args, **kwargs))
     monkeypatch.setattr(
         support_window.scrolledtext, "ScrolledText", lambda *args, **kwargs: _ConstructText(*args, **kwargs)
     )
@@ -147,6 +170,9 @@ def test_init_builds_all_sections_before_sync(monkeypatch: pytest.MonkeyPatch) -
     assert window.btn_copy_discovery.options["state"] == "disabled"
     assert window.btn_copy_issue.options["state"] == "disabled"
     assert window.root.title_text == "KeyRGB - Support Tools"
+    assert window.btn_run_debug.options["style"] == "SupportChecks.Diagnostics.TButton"
+    assert window.btn_run_speed_probe.options["style"] == "SupportChecks.Probe.TButton"
+    assert window.btn_run_discovery.options["style"] == "SupportChecks.Discovery.TButton"
 
 
 def test_sync_button_state_tracks_copy_and_save_actions() -> None:
@@ -154,6 +180,7 @@ def test_sync_button_state_tracks_copy_and_save_actions() -> None:
         diagnostics_json='{"backends": {"guided_speed_probes": [{"backend": "ite8910"}]}}',
         discovery_json='{"candidate": 1}',
     )
+    window._can_run_backend_speed_probe = lambda: True
     window._issue_report = {"markdown": "issue draft"}
 
     window._sync_button_state()
@@ -168,6 +195,33 @@ def test_sync_button_state_tracks_copy_and_save_actions() -> None:
     assert window.btn_run_speed_probe.options["state"] == "normal"
     assert window.btn_open_issue.options["state"] == "normal"
     assert window.btn_save_bundle.options["state"] == "normal"
+
+
+def test_sync_button_state_enables_backend_speed_probe_for_selected_ite8291r3() -> None:
+    window = _make_window(diagnostics_json='{"backends": {"selected": "ite8291r3"}}')
+    window._can_run_backend_speed_probe = lambda: True
+
+    window._sync_button_state()
+
+    assert window.btn_run_speed_probe.options["state"] == "normal"
+
+
+def test_sync_button_state_enables_backend_speed_probe_from_discovery_backend() -> None:
+    window = _make_window(discovery_json='{"selected_backend": "ite8291r3"}')
+    window._can_run_backend_speed_probe = lambda: True
+
+    window._sync_button_state()
+
+    assert window.btn_run_speed_probe.options["state"] == "normal"
+
+
+def test_sync_button_state_disables_backend_speed_probe_without_tray() -> None:
+    window = _make_window(diagnostics_json='{"backends": {"selected": "ite8291r3"}}')
+    window._can_run_backend_speed_probe = lambda: False
+
+    window._sync_button_state()
+
+    assert window.btn_run_speed_probe.options["state"] == "disabled"
 
 
 def test_copy_debug_output_requires_existing_json() -> None:
@@ -344,6 +398,7 @@ def test_run_discovery_updates_text_and_enables_buttons(monkeypatch: pytest.Monk
     monkeypatch.setattr(
         support_window, "build_additional_evidence_plan", lambda discovery: {"automated": [], "usb_id": ""}
     )
+    monkeypatch.setattr(support_window.messagebox, "askyesno", lambda *args, **kwargs: False)
     monkeypatch.setattr(support_window, "run_in_thread", lambda root, work, on_done: on_done(work()))
 
     window.run_discovery()
@@ -391,14 +446,53 @@ def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyP
     window = _make_window(
         diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8910_speed", "backend": "ite8910", "effect_name": "spectrum_cycle", "selection_effect_name": "hw:spectrum_cycle", "selection_menu_path": "Hardware Effects -> Spectrum Cycle", "requested_ui_speeds": [1, 3], "samples": [{"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"}] , "instructions": ["Do the thing"], "observation_prompt": "Notes?"}]}}'
     )
+    responses = iter([True, False])
     showinfo_calls: list[str] = []
+
+    class _FakeConfig:
+        def __init__(self) -> None:
+            self._effect = "color_cycle"
+            self._speed = 9
+            self._settings = {"effect_speeds": {"spectrum_cycle": 4, "color_cycle": 9}}
+
+        @property
+        def effect(self) -> str:
+            return self._effect
+
+        @effect.setter
+        def effect(self, value: str) -> None:
+            self._effect = str(value)
+
+        @property
+        def speed(self) -> int:
+            return self._speed
+
+        @speed.setter
+        def speed(self, value: int) -> None:
+            self._speed = int(value)
+
+        def set_effect_speed(self, effect_name: str, speed: int) -> None:
+            self._settings.setdefault("effect_speeds", {})[str(effect_name)] = int(speed)
+
+        def _save(self) -> None:
+            return
+
+    monkeypatch.setattr(support_window.support_jobs, "_tray_process_alive", lambda _tray_pid: True)
     monkeypatch.setattr(
-        support_window.messagebox,
-        "showinfo",
-        lambda _title, message, **_kwargs: showinfo_calls.append(str(message)) or True,
+        support_window.support_jobs,
+        "_show_probe_message_dialog",
+        lambda _window, *, title, message, **_kwargs: showinfo_calls.append(str(message)) or True,
     )
-    monkeypatch.setattr(support_window.messagebox, "askyesnocancel", lambda *args, **kwargs: False)
-    monkeypatch.setattr(support_window.simpledialog, "askstring", lambda *args, **kwargs: "1 and 3 looked too close")
+    monkeypatch.setattr(
+        support_window.support_jobs,
+        "_ask_probe_choice_dialog",
+        lambda _window, *, title, prompt, **_kwargs: next(responses),
+    )
+    monkeypatch.setattr(
+        support_window.support_jobs,
+        "_ask_probe_notes_dialog",
+        lambda _window, *, title, prompt, **_kwargs: "1 and 3 looked too close",
+    )
     monkeypatch.setattr(
         support_window,
         "build_issue_report_with_evidence",
@@ -407,8 +501,11 @@ def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyP
             "issue_url": "https://example.invalid",
         },
     )
+    monkeypatch.setattr(support_window, "Config", _FakeConfig)
+    monkeypatch.setattr(support_window, "run_in_thread", lambda root, work, on_done: on_done(work()))
+    monkeypatch.setattr(support_window.support_jobs.time, "sleep", lambda _seconds: None)
 
-    window.run_backend_speed_probe(prompt=False)
+    window.run_backend_speed_probe(prompt=True)
 
     assert window._supplemental_evidence is not None
     backend_probes = window._supplemental_evidence.get("backend_probes")
@@ -416,12 +513,105 @@ def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyP
     probe = backend_probes["ite8910_speed"]
     assert probe["backend"] == "ite8910"
     assert probe["selection_effect_name"] == "hw:spectrum_cycle"
+    assert probe["execution_mode"] == "auto"
     assert probe["observation"]["distinct_steps"] is False
     assert probe["observation"]["notes"] == "1 and 3 looked too close"
     assert window.status_label.options["text"] == "Backend speed probe recorded"
     assert showinfo_calls
-    assert "Hardware selection key: hw:spectrum_cycle" in showinfo_calls[0]
-    assert "Tray path: Hardware Effects -> Spectrum Cycle" in showinfo_calls[0]
+    assert "temporarily switch the tray to the probe effect" in showinfo_calls[0]
+
+
+def test_run_backend_speed_probe_can_auto_run_via_tray_config(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window(
+        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8291r3_speed", "backend": "ite8291r3", "effect_name": "wave", "selection_effect_name": "wave", "selection_menu_path": "Hardware Effects -> Wave", "requested_ui_speeds": [1, 3], "samples": [{"ui_speed": 1, "payload_speed": 10, "raw_speed_hex": "0x0a"}] , "instructions": ["Do the thing"], "observation_prompt": "Notes?"}]}}'
+    )
+    responses = iter([True, True])
+    showinfo_calls: list[str] = []
+
+    class _FakeConfig:
+        last_instance = None
+
+        def __init__(self) -> None:
+            type(self).last_instance = self
+            self._effect = "color_cycle"
+            self._speed = 9
+            self._settings = {"effect_speeds": {"wave": 4, "color_cycle": 9}}
+            self.calls: list[tuple[object, ...]] = []
+
+        @property
+        def effect(self) -> str:
+            return self._effect
+
+        @effect.setter
+        def effect(self, value: str) -> None:
+            self._effect = str(value)
+            self.calls.append(("effect", str(value)))
+
+        @property
+        def speed(self) -> int:
+            return self._speed
+
+        @speed.setter
+        def speed(self, value: int) -> None:
+            self._speed = int(value)
+            self.calls.append(("speed", int(value)))
+
+        def set_effect_speed(self, effect_name: str, speed: int) -> None:
+            self._settings.setdefault("effect_speeds", {})[str(effect_name)] = int(speed)
+            self.calls.append(("set_effect_speed", str(effect_name), int(speed)))
+
+        def _save(self) -> None:
+            self.calls.append(("save_effect_speeds", dict(self._settings.get("effect_speeds", {}))))
+
+    monkeypatch.setenv("KEYRGB_TRAY_PID", "1234")
+    monkeypatch.setattr(support_window.support_jobs, "_tray_process_alive", lambda _tray_pid: True)
+    monkeypatch.setattr(
+        support_window.support_jobs,
+        "_ask_probe_choice_dialog",
+        lambda _window, *, title, prompt, **_kwargs: next(responses),
+    )
+    monkeypatch.setattr(
+        support_window.support_jobs,
+        "_show_probe_message_dialog",
+        lambda _window, *, title, message, **_kwargs: showinfo_calls.append(str(message)) or True,
+    )
+    monkeypatch.setattr(
+        support_window.support_jobs,
+        "_ask_probe_notes_dialog",
+        lambda _window, *, title, prompt, **_kwargs: "looked distinct",
+    )
+    monkeypatch.setattr(
+        support_window,
+        "build_issue_report_with_evidence",
+        lambda *, diagnostics, discovery, supplemental_evidence=None: {
+            "markdown": "issue draft",
+            "issue_url": "https://example.invalid",
+        },
+    )
+    monkeypatch.setattr(support_window, "Config", _FakeConfig)
+    monkeypatch.setattr(support_window, "run_in_thread", lambda root, work, on_done: on_done(work()))
+    monkeypatch.setattr(support_window.support_jobs.time, "sleep", lambda _seconds: None)
+
+    window.run_backend_speed_probe(prompt=True)
+
+    probe = window._supplemental_evidence["backend_probes"]["ite8291r3_speed"]
+    assert probe["execution_mode"] == "auto"
+    assert probe["observation"]["distinct_steps"] is True
+    assert probe["observation"]["notes"] == "looked distinct"
+    assert probe["automation"]["applied_ui_speeds"] == [1, 3]
+    assert _FakeConfig.last_instance is not None
+    assert _FakeConfig.last_instance.calls == [
+        ("effect", "wave"),
+        ("set_effect_speed", "wave", 1),
+        ("speed", 1),
+        ("set_effect_speed", "wave", 3),
+        ("speed", 3),
+        ("save_effect_speeds", {"wave": 4, "color_cycle": 9}),
+        ("speed", 9),
+        ("effect", "color_cycle"),
+    ]
+    assert showinfo_calls
+    assert "temporarily switch the tray to the probe effect" in showinfo_calls[0]
 
 
 def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -466,6 +656,19 @@ def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.Monk
             }
         }
     }
+
+
+def test_run_backend_speed_probe_requires_running_tray(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window(
+        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8291r3_speed", "backend": "ite8291r3", "effect_name": "wave"}]}}'
+    )
+
+    monkeypatch.setattr(support_window.support_jobs, "_tray_process_alive", lambda _tray_pid: False)
+
+    window.run_backend_speed_probe(prompt=False)
+
+    assert window._supplemental_evidence is None
+    assert window.status_label.options["text"] == "Backend speed probe requires the running tray session"
 
 
 def test_set_status_clears_message_after_delay() -> None:
