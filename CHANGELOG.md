@@ -1,10 +1,11 @@
 # Changelog
 
-## 0.21.0 (2026-04-04)
+## 0.21.0 (2026-04-05)
 
 - Build/Architecture: Break the monolithic `buildpython` quality and reporting steps into dedicated subpackages for code hygiene, code markers, coverage, exception transparency, file-size analysis, and AppImage handling, with matching summary/debt reporting support modules.
 - Core/Architecture: Split several dense runtime surfaces into focused support packages across backends, diagnostics, effects, profiles, resources, tray power/icon plumbing, and GUI editor/calibrator/support-window helpers.
 - Error Handling: Introduce a shared `BackendError` hierarchy, translate backend acquisition failures into typed runtime errors, and route clearer permission/availability guidance through tray and per-key UI paths.
+- Maintenance: Zero the active code-hygiene categories by replacing remaining dynamic attribute coupling, defensive conversions, and cleanup markers with typed helpers and narrower best-effort access patterns across core, GUI, tray, and `buildpython` support code.
 - Maintenance: Replace broad exception handlers with concrete failure types across the refactor, restore the missing tray permission-notification protocol hook, and keep the full `buildpython` suite green after the reorganization.
 
 ## 0.20.0 (2026-04-02)
