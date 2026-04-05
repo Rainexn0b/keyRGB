@@ -133,11 +133,11 @@ def _build_ite8291r3_speed_probe_plan() -> dict[str, Any]:
     kb_lock = RLock()
     ui_speeds = _normalize_ui_speeds(ITE8291R3_SPEED_PROBE_UI_SPEEDS)
 
-    samples: list[dict[str, Any]] = []
+    samples: list[dict[str, object]] = []
     for ui_speed in ui_speeds:
-        captured_kwargs: dict[str, Any] = {}
+        captured_kwargs: dict[str, object] = {}
 
-        def _capture_effect(**kwargs: Any) -> dict[str, Any]:
+        def _capture_effect(**kwargs: object) -> dict[str, object]:
             captured_kwargs.update(kwargs)
             return dict(kwargs)
 
@@ -156,7 +156,7 @@ def _build_ite8291r3_speed_probe_plan() -> dict[str, Any]:
         if isinstance(payload, dict) and payload.get("speed") is not None:
             payload_speed = int(payload.get("speed"))  # type: ignore[arg-type]
         elif captured_kwargs.get("speed") is not None:
-            payload_speed = int(captured_kwargs.get("speed"))  # type: ignore[arg-type]
+            payload_speed = int(captured_kwargs.get("speed"))  # type: ignore[call-overload]
         raw_speed = int(payload_speed if payload_speed is not None else 0)
         samples.append(
             {

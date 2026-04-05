@@ -8,7 +8,6 @@ import time
 import tkinter as tk
 from datetime import datetime, timezone
 from typing import Any
-from tkinter import ttk
 
 
 _PROBE_AUTO_STEP_DURATION_S = 1.25
@@ -59,9 +58,9 @@ def _show_probe_message_dialog(
         container,
         wrap="word",
         height=18,
-        background=getattr(window, "_bg_color", None),
-        foreground=getattr(window, "_fg_color", None),
-        insertbackground=getattr(window, "_fg_color", None),
+        background=window._bg_color,
+        foreground=window._fg_color,
+        insertbackground=window._fg_color,
     )
     body.grid(row=0, column=0, sticky="nsew")
     body.insert("1.0", str(message or ""))
@@ -186,9 +185,9 @@ def _ask_probe_notes_dialog(
         container,
         wrap="word",
         height=10,
-        background=getattr(window, "_bg_color", None),
-        foreground=getattr(window, "_fg_color", None),
-        insertbackground=getattr(window, "_fg_color", None),
+        background=window._bg_color,
+        foreground=window._fg_color,
+        insertbackground=window._fg_color,
     )
     notes_box.grid(row=1, column=0, sticky="nsew")
 
@@ -230,14 +229,14 @@ def _tray_process_alive(tray_pid: object) -> bool:
 
 def _probe_config_snapshot(config: Any) -> dict[str, object]:
     effect_speeds = None
-    settings = getattr(config, "_settings", None)
+    settings = config._settings
     if isinstance(settings, dict):
         raw_effect_speeds = settings.get("effect_speeds")
         if isinstance(raw_effect_speeds, dict):
             effect_speeds = dict(raw_effect_speeds)
 
     try:
-        speed = int(getattr(config, "speed", 0) or 0)
+        speed = int(getattr(config, "speed", 0))
     except (TypeError, ValueError, OverflowError):
         speed = 0
 
@@ -249,8 +248,8 @@ def _probe_config_snapshot(config: Any) -> dict[str, object]:
 
 
 def _restore_probe_config(config: Any, *, snapshot: dict[str, object]) -> None:
-    settings = getattr(config, "_settings", None)
-    save_fn = getattr(config, "_save", None)
+    settings = config._settings
+    save_fn = config._save
     raw_effect_speeds = snapshot.get("effect_speeds")
     if isinstance(settings, dict) and callable(save_fn):
         if isinstance(raw_effect_speeds, dict) and raw_effect_speeds:

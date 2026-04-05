@@ -208,7 +208,10 @@ def activate_profile_ui(editor: Any) -> None:
 
     selected_slot_id = getattr(editor, "selected_slot_id", None)
     slot_lookup = editor._slot_id_for_key_id
-    if not (selected_slot_id and _call_optional_method_if_present(editor, "select_slot_id", selected_slot_id)) and editor.selected_key_id:
+    if (
+        not (selected_slot_id and _call_optional_method_if_present(editor, "select_slot_id", selected_slot_id))
+        and editor.selected_key_id
+    ):
         resolved_slot_id = slot_lookup(editor.selected_key_id)
         select_visible_identity(editor, slot_id=resolved_slot_id, key_id=editor.selected_key_id)
 

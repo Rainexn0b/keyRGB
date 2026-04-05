@@ -34,8 +34,8 @@ def _color_luminance(color: str) -> float:
 
 def _configure_run_check_styles(window: Any, *, ttk: Any) -> None:
     style = ttk.Style(window.root)
-    fg_color = str(getattr(window, "_fg_color", "#f0f0f0") or "#f0f0f0")
-    bg_color = str(getattr(window, "_bg_color", "#2b2b2b") or "#2b2b2b")
+    fg_color = str(window._fg_color or "#f0f0f0")
+    bg_color = str(window._bg_color or "#2b2b2b")
     dark_theme = _color_luminance(bg_color) < 0.5
 
     palette = {
@@ -163,9 +163,9 @@ def build_checks_section(window: Any, parent: object, *, ttk: Any, content_wrap:
         button = ttk.Button(cell, text=label, command=command, style=style_name, width=26)
         button.pack(fill="x")
         setattr(window, attr_name, button)
-        ttk.Label(cell, text=caption, font=("Sans", 8), justify="left", wraplength=300).pack(
-            anchor="w", pady=(6, 0)
-        )
+        ttk.Label(cell, text=caption, font=("Sans", 8), justify="left", wraplength=300).pack(anchor="w", pady=(6, 0))
+
+
 def build_debug_section(window: Any, parent: object, *, ttk: Any, scrolledtext: Any, content_wrap: int) -> None:
     ttk.Label(
         parent,

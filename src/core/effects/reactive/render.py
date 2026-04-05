@@ -144,7 +144,7 @@ def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float 
 
     speed_raw = _engine_attr_or_default(engine, "speed", default=4)
     try:
-        s = int(speed_raw or 0)
+        s = int(speed_raw or 0)  # type: ignore[call-overload]
     except _INT_COERCION_ERRORS:
         s = 4
 
