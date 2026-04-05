@@ -238,23 +238,26 @@ class _KeyboardCanvasDrawingMixin:
             )
 
     def _draw_deck_background(self) -> None:
-        if self._deck_img is None:
-            self._deck_drawn_bbox = None
-            return
-
         cw = max(1, int(self.winfo_width()))
         ch = max(1, int(self.winfo_height()))
+
+        deck_image = self._deck_img if isinstance(self._deck_img, Image.Image) else None
+        image_size = deck_image.size if deck_image is not None else BASE_IMAGE_SIZE
 
         x0, y0, dw, dh, _scale = calc_centered_drawn_bbox(
             canvas_w=cw,
             canvas_h=ch,
-            image_size=self._deck_img.size,
+            image_size=image_size,
         )
+
+        self._deck_drawn_bbox = (x0, y0, dw, dh)
+        if deck_image is None:
+            self._deck_img_tk = None
+            return
 
         # Backdrop transparency is a user-facing percentage:
         # 0 = opaque, 100 = fully transparent.
         t = _coerce_backdrop_transparency(getattr(self.editor, "backdrop_transparency", 0))
-        deck_image = self._deck_img if isinstance(self._deck_img, Image.Image) else None
         try:
             self._deck_img_tk = self._deck_render_cache.get_or_create(
                 deck_image=deck_image,
@@ -268,7 +271,6 @@ class _KeyboardCanvasDrawingMixin:
             self._deck_img_tk = None
         if self._deck_img_tk is not None:
             self.create_image(x0, y0, image=self._deck_img_tk, anchor="nw")
-        self._deck_drawn_bbox = (x0, y0, dw, dh)
 
     def _draw_lightbar_overlay(self) -> None:
         if not bool(getattr(self.editor, "has_lightbar_device", False)):

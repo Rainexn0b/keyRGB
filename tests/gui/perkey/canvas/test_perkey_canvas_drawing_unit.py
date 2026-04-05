@@ -380,13 +380,40 @@ def test_redraw_survives_font_measure_failures(monkeypatch: pytest.MonkeyPatch) 
     assert canvas.texts[0]["text"] == "Label"
 
 
-def test_draw_deck_background_is_noop_without_image() -> None:
+def test_draw_deck_background_is_noop_without_image(monkeypatch: pytest.MonkeyPatch) -> None:
     canvas = _FakeCanvas()
+    monkeypatch.setattr(canvas_drawing, "calc_centered_drawn_bbox", lambda **_kwargs: (5, 6, 40, 20, 2.0))
 
     canvas._draw_deck_background()
 
-    assert canvas._deck_drawn_bbox is None
+    assert canvas._deck_drawn_bbox == (5, 6, 40, 20)
+    assert canvas._deck_img_tk is None
     assert canvas.images == []
+
+
+def test_redraw_keeps_key_overlay_when_backdrop_mode_is_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    canvas = _FakeCanvas()
+    canvas._canvas_transform = lambda: object() if canvas._deck_drawn_bbox is not None else None
+
+    monkeypatch.setattr(canvas_drawing, "calc_centered_drawn_bbox", lambda **_kwargs: (5, 6, 40, 20, 2.0))
+    monkeypatch.setattr(canvas_drawing, "get_layout_keys", lambda *_args, **_kwargs: [_Key("k1", "Esc")])
+    monkeypatch.setattr(canvas_drawing, "key_canvas_rect", lambda **_kwargs: (1.0, 2.0, 21.0, 12.0, 0.0))
+    monkeypatch.setattr(canvas_drawing, "key_canvas_hit_rects", lambda **_kwargs: [(1.0, 2.0, 21.0, 12.0)])
+    monkeypatch.setattr(
+        canvas_drawing,
+        "key_draw_style",
+        lambda **_kwargs: _Style("#010203", "gray50", "#ffffff", 2, (), "#eeeeee"),
+    )
+    monkeypatch.setattr(canvas_drawing.tkfont, "Font", _FakeFont)
+
+    canvas.redraw()
+
+    assert canvas.images == []
+    assert canvas._deck_drawn_bbox == (5, 6, 40, 20)
+    assert len(canvas.rectangles) == 1
+    assert canvas.rectangles[0]["tags"] == ("pslot_k1", "pkey_k1", "pkey")
+    assert len(canvas.texts) == 1
+    assert canvas.texts[0]["text"] == "Esc"
 
 
 def test_draw_deck_background_uses_cache_and_transparency_var(monkeypatch: pytest.MonkeyPatch) -> None:
