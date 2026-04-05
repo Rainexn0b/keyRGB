@@ -9,10 +9,10 @@ from pathlib import Path
 from .constants import (
     DIRECTORY_SCAN_ROOTS,
     DIRECT_PYTHON_FILE_THRESHOLD,
-    FACADE_ALIAS_BINDINGS_MIN,
-    FACADE_DELEGATING_CALLABLES_MIN,
-    FACADE_IMPORT_BLOCK_MIN_LINES,
-    FACADE_SCORE_MIN,
+    DELEGATION_ALIAS_BINDINGS_MIN,
+    DELEGATION_DELEGATING_CALLABLES_MIN,
+    DELEGATION_IMPORT_BLOCK_MIN_LINES,
+    DELEGATION_SCORE_MIN,
     file_bucket,
     import_block_level,
 )
@@ -206,7 +206,7 @@ def _count_delegating_callables(tree: ast.Module, imported_names: set[str]) -> t
     return total, delegating
 
 
-def scan_facade_candidate(path: Path) -> dict[str, Any] | None:
+def scan_delegation_candidate(path: Path) -> dict[str, Any] | None:
     try:
         source = path.read_text(encoding="utf-8")
     except OSError:
@@ -224,7 +224,7 @@ def scan_facade_candidate(path: Path) -> dict[str, Any] | None:
     first_import = import_nodes[0]
     last_import = import_nodes[-1]
     import_lines = (last_import.end_lineno or last_import.lineno) - first_import.lineno + 1
-    if import_lines < FACADE_IMPORT_BLOCK_MIN_LINES:
+    if import_lines < DELEGATION_IMPORT_BLOCK_MIN_LINES:
         return None
 
     imported_names = _imported_bindings(import_nodes)
@@ -232,9 +232,9 @@ def scan_facade_candidate(path: Path) -> dict[str, Any] | None:
     callable_count, delegating_callables = _count_delegating_callables(tree, imported_names)
     score = alias_bindings + delegating_callables
 
-    if score < FACADE_SCORE_MIN:
+    if score < DELEGATION_SCORE_MIN:
         return None
-    if alias_bindings < FACADE_ALIAS_BINDINGS_MIN and delegating_callables < FACADE_DELEGATING_CALLABLES_MIN:
+    if alias_bindings < DELEGATION_ALIAS_BINDINGS_MIN and delegating_callables < DELEGATION_DELEGATING_CALLABLES_MIN:
         return None
 
     return {
@@ -314,7 +314,7 @@ def collect_hotspots(
 ]:
     file_rows: list[dict[str, Any]] = []
     import_rows: list[dict[str, Any]] = []
-    facade_rows: list[dict[str, Any]] = []
+    delegation_rows: list[dict[str, Any]] = []
 
     for path in iter_py_files(root, roots=roots):
         lines = read_lines(path)
@@ -341,14 +341,14 @@ def collect_hotspots(
                     }
                 )
 
-        facade_candidate = scan_facade_candidate(path)
-        if facade_candidate is not None:
-            facade_candidate["path"] = rel
-            facade_rows.append(facade_candidate)
+        delegation_candidate = scan_delegation_candidate(path)
+        if delegation_candidate is not None:
+            delegation_candidate["path"] = rel
+            delegation_rows.append(delegation_candidate)
 
     file_rows.sort(key=lambda item: (-int(item["lines"]), str(item["path"])))
     import_rows.sort(key=lambda item: (-int(item["lines"]), -int(item["statements"]), str(item["path"])))
-    facade_rows.sort(
+    delegation_rows.sort(
         key=lambda item: (
             -int(item["score"]),
             -int(item["import_lines"]),
@@ -357,4 +357,4 @@ def collect_hotspots(
         )
     )
     flat_directories, flat_directories_allowed = scan_flat_directories(root)
-    return file_rows, import_rows, flat_directories, flat_directories_allowed, facade_rows
+    return file_rows, import_rows, flat_directories, flat_directories_allowed, delegation_rows

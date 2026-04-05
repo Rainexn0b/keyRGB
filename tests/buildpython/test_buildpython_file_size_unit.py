@@ -24,12 +24,12 @@ def _write_small_python_file(path: Path) -> None:
     path.write_text("VALUE = 1\n", encoding="utf-8")
 
 
-def _write_facade_candidate(path: Path) -> None:
+def _write_delegation_candidate(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "\n".join(
             [
-                '"""Facade candidate."""',
+                '"""Delegation candidate."""',
                 "from pkg import helper_01",
                 "from pkg import helper_02",
                 "from pkg import helper_03",
@@ -56,7 +56,7 @@ def _write_facade_candidate(path: Path) -> None:
                 "alias_two = helper_02",
                 "alias_three = helper_03",
                 "alias_four = helper_04",
-                "class Facade:",
+                "class DelegationSurface:",
                 "    def one(self):",
                 "        return helper_05()",
                 "",
@@ -86,7 +86,7 @@ def test_file_size_runner_reports_bucketed_sizes_import_blocks_and_flat_director
     _write_python_file(tmp_path / "buildpython" / "critical.py", total_lines=420, import_lines=30)
     _write_python_file(tmp_path / "src" / "severe.py", total_lines=520, import_lines=40)
     _write_python_file(tmp_path / "src" / "extreme.py", total_lines=620, import_lines=0)
-    _write_facade_candidate(tmp_path / "src" / "facade_candidate.py")
+    _write_delegation_candidate(tmp_path / "src" / "delegation_candidate.py")
 
     for index in range(9):
         _write_small_python_file(tmp_path / "src" / "flat" / f"module_{index}.py")
@@ -101,7 +101,7 @@ def test_file_size_runner_reports_bucketed_sizes_import_blocks_and_flat_director
     assert "Refactor=1 | Critical=1 | Severe=1 | Extreme=1" in result.stdout
     assert "Warning=2 | Critical=1 | Severe=1" in result.stdout
     assert "Flat directories: 2" in result.stdout
-    assert "Facade candidates: 1" in result.stdout
+    assert "Delegation candidates: 1" in result.stdout
 
     payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.json").read_text(encoding="utf-8"))
 
@@ -120,7 +120,7 @@ def test_file_size_runner_reports_bucketed_sizes_import_blocks_and_flat_director
     }
     assert payload["counts"]["flat_directories"] == 2
     assert payload["counts"].get("flat_directories_allowed", 0) == 0
-    assert payload["counts"]["facade_candidates"] == 1
+    assert payload["counts"]["delegation_candidates"] == 1
     assert payload["files"][0]["path"] == "src/extreme.py"
     assert payload["files"][0]["bucket"] == "EXTREME"
     assert payload["import_blocks"][0]["path"] == "src/severe.py"
@@ -129,13 +129,13 @@ def test_file_size_runner_reports_bucketed_sizes_import_blocks_and_flat_director
     # Both directories have 0 subdirs so density equals file count — ordering preserved.
     assert payload["flat_directories"][0]["flatness_density"] == 10.0
     assert payload["flat_directories"][1]["flatness_density"] == 9.0
-    assert payload["facade_candidates"][0]["path"] == "src/facade_candidate.py"
-    assert payload["facade_candidates"][0]["score"] == 10
+    assert payload["delegation_candidates"][0]["path"] == "src/delegation_candidate.py"
+    assert payload["delegation_candidates"][0]["score"] == 10
 
     markdown = (tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.md").read_text(encoding="utf-8")
     assert "## Import block hotspots" in markdown
     assert "## Flat directory hotspots" in markdown
-    assert "## Facade candidates" in markdown
+    assert "## Delegation candidates" in markdown
 
 
 def test_debt_index_includes_file_size_structure_sections(tmp_path) -> None:
@@ -148,14 +148,14 @@ def test_debt_index_includes_file_size_structure_sections(tmp_path) -> None:
                     "file_lines": {"refactor": 2, "critical": 1, "severe": 0, "extreme": 0, "total": 3},
                     "import_block_lines": {"warning": 1, "critical": 0, "severe": 0, "total": 1},
                     "flat_directories": 1,
-                    "facade_candidates": 1,
+                    "delegation_candidates": 1,
                 },
                 "files": [{"path": "src/demo.py", "lines": 410, "bucket": "CRITICAL"}],
                 "import_blocks": [{"path": "src/demo.py", "lines": 24, "statements": 12, "level": "WARNING"}],
                 "flat_directories": [{"path": "src/demo", "direct_python_files": 6, "subdirectories": 0}],
-                "facade_candidates": [
+                "delegation_candidates": [
                     {
-                        "path": "src/facade.py",
+                        "path": "src/delegation.py",
                         "score": 12,
                         "import_lines": 24,
                         "alias_bindings": 4,
@@ -171,15 +171,15 @@ def test_debt_index_includes_file_size_structure_sections(tmp_path) -> None:
 
     assert payload["sections"]["file_size"]["import_blocks"][0]["path"] == "src/demo.py"
     assert payload["sections"]["file_size"]["flat_directories"][0]["path"] == "src/demo"
-    assert payload["sections"]["file_size"]["facade_candidates"][0]["path"] == "src/facade.py"
+    assert payload["sections"]["file_size"]["delegation_candidates"][0]["path"] == "src/delegation.py"
 
     write_debt_index(buildlog_dir)
     markdown = (buildlog_dir / "debt-index.md").read_text(encoding="utf-8")
     assert "## File size" in markdown
     assert "- Import blocks: warning=1, critical=0, severe=0" in markdown
     assert "- Flattest directory: src/demo (6 direct Python files)" in markdown
-    assert "- Facade candidates: 1" in markdown
-    assert "- Top facade candidate: src/facade.py (score=12)" in markdown
+    assert "- Delegation candidates: 1" in markdown
+    assert "- Top delegation candidate: src/delegation.py (score=12)" in markdown
 
 
 def test_terminal_debt_snapshot_includes_file_size_highlights(tmp_path) -> None:
@@ -192,14 +192,14 @@ def test_terminal_debt_snapshot_includes_file_size_highlights(tmp_path) -> None:
                     "file_lines": {"refactor": 1, "critical": 1, "severe": 1, "extreme": 1, "total": 4},
                     "import_block_lines": {"warning": 1, "critical": 1, "severe": 1, "total": 3},
                     "flat_directories": 2,
-                    "facade_candidates": 1,
+                    "delegation_candidates": 1,
                 },
                 "files": [{"path": "src/extreme.py", "lines": 620, "bucket": "EXTREME"}],
                 "import_blocks": [{"path": "src/severe.py", "lines": 40, "statements": 40, "level": "SEVERE"}],
                 "flat_directories": [{"path": "tests/flat", "direct_python_files": 7, "subdirectories": 0}],
-                "facade_candidates": [
+                "delegation_candidates": [
                     {
-                        "path": "src/facade.py",
+                        "path": "src/delegation.py",
                         "score": 12,
                         "import_lines": 24,
                         "alias_bindings": 4,
@@ -217,8 +217,8 @@ def test_terminal_debt_snapshot_includes_file_size_highlights(tmp_path) -> None:
     assert any("import-warn 1" in line for line in lines)
     assert any("Top import" in line and "src/severe.py" in line for line in lines)
     assert any("Top flat-dir" in line and "tests/flat" in line for line in lines)
-    assert any("facades 1" in line for line in lines)
-    assert any("Top facade" in line and "src/facade.py" in line for line in lines)
+    assert any("delegations 1" in line for line in lines)
+    assert any("Top delegation" in line and "src/delegation.py" in line for line in lines)
 
 
 def test_flat_directory_density_sort_ranks_unsubdivided_before_well_organised(tmp_path, monkeypatch) -> None:

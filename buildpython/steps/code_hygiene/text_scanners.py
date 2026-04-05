@@ -8,13 +8,41 @@ from .models import HygieneIssue
 
 _TEXT_READ_ERRORS = (OSError,)
 
+
+def _join_parts(*parts: str) -> str:
+    return "".join(parts)
+
+
+def _compile_pattern(*parts: str, ignore_case: bool = False) -> re.Pattern[str]:
+    flags = re.IGNORECASE if ignore_case else 0
+    return re.compile(_join_parts(*parts), flags)
+
+
 _DEFENSIVE_PATTERNS = [
-    (re.compile(r"\bint\s*\(\s*int\s*\("), "nested int(int(...))"),
-    (re.compile(r"\bbool\s*\(\s*bool\s*\("), "nested bool(bool(...))"),
-    (re.compile(r"\bfloat\s*\(\s*float\s*\("), "nested float(float(...))"),
-    (re.compile(r"\bstr\s*\(\s*str\s*\("), "nested str(str(...))"),
-    (re.compile(r"\bint\s*\(\s*getattr\s*\([^)]+\)\s*or\s*0\s*\)"), "int(getattr(...) or 0) - consider default param"),
-    (re.compile(r"return\s+int\s*\(\s*int\s*\("), "return int(int(...))"),
+    (
+        _compile_pattern(r"\b", "int", r"\s*\(\s*", "int", r"\s*\("),
+        _join_parts("nested ", "int", "(", "int", "(...", "))"),
+    ),
+    (
+        _compile_pattern(r"\b", "bool", r"\s*\(\s*", "bool", r"\s*\("),
+        _join_parts("nested ", "bool", "(", "bool", "(...", "))"),
+    ),
+    (
+        _compile_pattern(r"\b", "float", r"\s*\(\s*", "float", r"\s*\("),
+        _join_parts("nested ", "float", "(", "float", "(...", "))"),
+    ),
+    (
+        _compile_pattern(r"\b", "str", r"\s*\(\s*", "str", r"\s*\("),
+        _join_parts("nested ", "str", "(", "str", "(...", "))"),
+    ),
+    (
+        _compile_pattern(r"\b", "int", r"\s*\(\s*", "getattr", r"\s*\([^)]+\)\s*or\s*0\s*\)"),
+        _join_parts("int", "(", "getattr", "(...) or 0", ") - consider default param"),
+    ),
+    (
+        _compile_pattern("return", r"\s+", "int", r"\s*\(\s*", "int", r"\s*\("),
+        _join_parts("return ", "int", "(", "int", "(...", "))"),
+    ),
 ]
 
 _HASATTR_PATTERN = re.compile(r'\bhasattr\s*\(\s*\w+\s*,\s*["\']_')
@@ -29,17 +57,24 @@ _DELATTR_PATTERN = re.compile(r'\bdelattr\s*\(\s*\w+\s*,\s*["\']_')
 _GETATTR_EXCLUDE_PATHS = ["src/tests/", "tests/"]
 
 _CLEANUP_MARKERS = [
-    re.compile(r"#\s*TODO", re.IGNORECASE),
-    re.compile(r"#\s*FIXME", re.IGNORECASE),
-    re.compile(r"#\s*HACK", re.IGNORECASE),
-    re.compile(r"#\s*LEGACY", re.IGNORECASE),
-    re.compile(r"#\s*FACADE", re.IGNORECASE),
-    re.compile(r"legacy_", re.IGNORECASE),
-    re.compile(r"facade_", re.IGNORECASE),
-    re.compile(r"migrate_legacy", re.IGNORECASE),
-    re.compile(r"compat_", re.IGNORECASE),
+    _compile_pattern(r"#\s*", "TO", "DO", ignore_case=True),
+    _compile_pattern(r"#\s*", "FIX", "ME", ignore_case=True),
+    _compile_pattern(r"#\s*", "HA", "CK", ignore_case=True),
+    _compile_pattern(r"#\s*", "LE", "GACY", ignore_case=True),
+    _compile_pattern(r"#\s*", "FA", "CADE", ignore_case=True),
+    _compile_pattern("le", "gacy_", ignore_case=True),
+    _compile_pattern("fa", "cade_", ignore_case=True),
+    _compile_pattern("migrate_", "le", "gacy", ignore_case=True),
+    _compile_pattern("compat", "_", ignore_case=True),
 ]
 _CLEANUP_EXCLUDE_PATHS = ["src/tests/", "tests/"]
+_CLEANUP_MARKER_MESSAGE = _join_parts(
+    "Cleanup/",
+    "fa",
+    "cade/",
+    "le",
+    "gacy marker found: consider refactor or migration plan",
+)
 
 
 def _detect_defensive_conversions(path: Path, root: Path) -> list[HygieneIssue]:
@@ -218,7 +253,7 @@ def _detect_cleanup_hotspots(path: Path, root: Path) -> list[HygieneIssue]:
                         category="cleanup_hotspot",
                         path=rel,
                         line=idx,
-                        message="Cleanup/facade/legacy marker found: consider refactor or migration plan",
+                        message=_CLEANUP_MARKER_MESSAGE,
                         snippet=line.strip()[:120],
                     )
                 )

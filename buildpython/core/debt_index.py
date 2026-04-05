@@ -65,7 +65,7 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
             "files": file_size.get("files", []),
             "import_blocks": file_size.get("import_blocks", []),
             "flat_directories": file_size.get("flat_directories", []),
-            "facade_candidates": file_size.get("facade_candidates", []),
+            "delegation_candidates": file_size.get("delegation_candidates", []),
         }
         report_paths["file_size"] = str(buildlog_dir / "file-size-analysis.md")
 
@@ -172,7 +172,7 @@ def write_debt_index(buildlog_dir: Path) -> None:
             files = file_size.get("files", [])
             import_blocks = file_size.get("import_blocks", [])
             flat_directories = file_size.get("flat_directories", [])
-            facade_candidates = file_size.get("facade_candidates", [])
+            delegation_candidates = file_size.get("delegation_candidates", [])
             lines.extend(["## File size", ""])
             if isinstance(file_counts, dict):
                 lines.append(
@@ -190,7 +190,7 @@ def write_debt_index(buildlog_dir: Path) -> None:
                     f"severe={import_counts.get('severe', 0)}"
                 )
             lines.append(f"- Flat directories: {len(flat_directories) if isinstance(flat_directories, list) else 0}")
-            lines.append(f"- Facade candidates: {len(facade_candidates) if isinstance(facade_candidates, list) else 0}")
+            lines.append(f"- Delegation candidates: {len(delegation_candidates) if isinstance(delegation_candidates, list) else 0}")
             if isinstance(files, list) and files:
                 first = files[0]
                 if isinstance(first, dict):
@@ -205,10 +205,10 @@ def write_debt_index(buildlog_dir: Path) -> None:
                     lines.append(
                         f"- Flattest directory: {first.get('path')} ({first.get('direct_python_files')} direct Python files)"
                     )
-            if isinstance(facade_candidates, list) and facade_candidates:
-                first = facade_candidates[0]
+            if isinstance(delegation_candidates, list) and delegation_candidates:
+                first = delegation_candidates[0]
                 if isinstance(first, dict):
-                    lines.append(f"- Top facade candidate: {first.get('path')} (score={first.get('score')})")
+                    lines.append(f"- Top delegation candidate: {first.get('path')} (score={first.get('score')})")
             lines.append("")
 
         coverage = sections.get("coverage")

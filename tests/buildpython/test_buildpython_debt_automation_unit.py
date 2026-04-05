@@ -5,6 +5,7 @@ from pathlib import Path
 
 import buildpython.steps.code_hygiene.step as step_code_hygiene
 import buildpython.steps.code_hygiene.baseline as step_code_hygiene_baseline
+import buildpython.steps.code_hygiene.text_scanners as text_scanners
 
 from buildpython.core.debt_index import build_debt_index, write_debt_index
 from buildpython.core.summary import (
@@ -253,6 +254,59 @@ def test_hygiene_detectors_ignore_missing_or_unparseable_sources(tmp_path) -> No
     assert step_code_hygiene._detect_cleanup_hotspots(missing_file, root) == []
     assert step_code_hygiene._detect_runtime_copy_hotspots(broken_file, root) == []
     assert step_code_hygiene._detect_broad_exception_patterns(broken_file, root) == []
+
+
+def test_text_scanners_match_representative_cleanup_and_defensive_patterns(tmp_path) -> None:
+    root = tmp_path
+    target = root / "buildpython" / "example.py"
+    target.parent.mkdir(parents=True)
+    target.write_text(
+        """
+value = int(int(raw))
+flag = bool(bool(raw_flag))
+ratio = float(float(raw_ratio))
+name = str(str(raw_name))
+fallback = int(getattr(obj, \"count\") or 0)
+return int(int(result))
+# TODO: refactor me
+# FIXME: tighten this later
+# HACK: compatibility shim
+# LEGACY: keep while migrating
+# FACADE: remove after split
+legacy_alias = thing
+facade_alias = thing
+migrate_legacy(profile)
+compat_layer = True
+""".strip(),
+        encoding="utf-8",
+    )
+
+    defensive_issues = text_scanners._detect_defensive_conversions(target, root)
+    cleanup_issues = text_scanners._detect_cleanup_hotspots(target, root)
+
+    assert [issue.line for issue in defensive_issues] == [1, 2, 3, 4, 5, 6, 6]
+    assert [issue.message for issue in defensive_issues] == [
+        "nested int(int(...))",
+        "nested bool(bool(...))",
+        "nested float(float(...))",
+        "nested str(str(...))",
+        "int(getattr(...) or 0) - consider default param",
+        "nested int(int(...))",
+        "return int(int(...))",
+    ]
+    assert [issue.line for issue in cleanup_issues] == [7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert all(
+        issue.message == "Cleanup/facade/legacy marker found: consider refactor or migration plan"
+        for issue in cleanup_issues
+    )
+
+
+def test_text_scanners_do_not_self_flag_cleanup_or_defensive_patterns() -> None:
+    scanner_path = Path(text_scanners.__file__).resolve()
+    root = scanner_path.parents[3]
+
+    assert text_scanners._detect_defensive_conversions(scanner_path, root) == []
+    assert text_scanners._detect_cleanup_hotspots(scanner_path, root) == []
 
 
 def test_build_coverage_report_tracks_prefixes_and_watch_files() -> None:

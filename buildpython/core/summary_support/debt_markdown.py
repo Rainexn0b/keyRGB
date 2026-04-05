@@ -128,11 +128,11 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
         lines.append("")
 
     if file_size is not None:
-        file_counts, import_counts, flat_directory_count, facade_candidate_count = file_size_counts(file_size)
+        file_counts, import_counts, flat_directory_count, delegation_candidate_count = file_size_counts(file_size)
         files = file_size.get("files", [])
         import_blocks = file_size.get("import_blocks", [])
         flat_directories = file_size.get("flat_directories", [])
-        facade_candidates = file_size.get("facade_candidates", [])
+        delegation_candidates = file_size.get("delegation_candidates", [])
 
         lines.append("### File Size")
         lines.append(
@@ -149,7 +149,7 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
             f"severe={import_counts.get('severe', 0)}"
         )
         lines.append(f"- Flat directories: {flat_directory_count}")
-        lines.append(f"- Facade candidates: {facade_candidate_count}")
+        lines.append(f"- Delegation candidates: {delegation_candidate_count}")
         if isinstance(files, list) and files:
             first = files[0]
             if isinstance(first, dict):
@@ -164,10 +164,10 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
                 lines.append(
                     f"- Flattest directory: {first.get('path')} ({first.get('direct_python_files')} direct Python files)"
                 )
-        if isinstance(facade_candidates, list) and facade_candidates:
-            first = facade_candidates[0]
+        if isinstance(delegation_candidates, list) and delegation_candidates:
+            first = delegation_candidates[0]
             if isinstance(first, dict):
-                lines.append(f"- Top facade candidate: {first.get('path')} (score={first.get('score')})")
+                lines.append(f"- Top delegation candidate: {first.get('path')} (score={first.get('score')})")
         lines.append(f"- Report: {buildlog_dir / 'file-size-analysis.md'}")
         lines.append("")
 

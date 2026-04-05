@@ -17,8 +17,8 @@ from .reporting import _build_stdout, _write_reports
 CATEGORY_THRESHOLDS = {
     "defensive_conversion": 50,
     "hasattr_coupling": 22,
-    "any_type_hint": 127,
-    "forbidden_getattr": 94,
+    "any_type_hint": 0,
+    "forbidden_getattr": 0,
     "forbidden_api": 0,
     "resource_leak": 0,
     "cleanup_hotspot": 96,

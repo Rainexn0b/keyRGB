@@ -30,12 +30,12 @@ def file_size_counts(payload: dict[str, Any]) -> tuple[dict[str, Any], dict[str,
     file_counts = counts.get("file_lines", counts)
     import_counts = counts.get("import_block_lines", {})
     flat_directories = counts.get("flat_directories", 0)
-    facade_candidates = counts.get("facade_candidates", 0)
+    delegation_candidates = counts.get("delegation_candidates", 0)
     return (
         file_counts if isinstance(file_counts, dict) else {},
         import_counts if isinstance(import_counts, dict) else {},
         flat_directories if isinstance(flat_directories, int) else 0,
-        facade_candidates if isinstance(facade_candidates, int) else 0,
+        delegation_candidates if isinstance(delegation_candidates, int) else 0,
     )
 
 

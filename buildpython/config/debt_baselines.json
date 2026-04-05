@@ -3,10 +3,10 @@
     "counts": {
       "defensive_conversion": 19,
       "hasattr_coupling": 4,
-      "any_type_hint": 127,
+      "any_type_hint": 0,
       "runtime_copy_hotspot": 0,
       "test_naming": 0,
-      "forbidden_getattr": 94,
+      "forbidden_getattr": 0,
       "forbidden_api": 0,
       "resource_leak": 0,
       "cleanup_hotspot": 96,
@@ -15,6 +15,7 @@
       "fallback_broad_except": 0
     },
     "gated_categories": [
+      "any_type_hint",
       "forbidden_getattr",
       "forbidden_api",
       "resource_leak",

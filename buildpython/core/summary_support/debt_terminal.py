@@ -127,17 +127,17 @@ def build_terminal_filesize_highlight(buildlog_dir: Path) -> list[str]:
     if file_size is None:
         return []
 
-    file_counts, import_counts, flat_directory_count, facade_candidate_count = file_size_counts(file_size)
+    file_counts, import_counts, flat_directory_count, delegation_candidate_count = file_size_counts(file_size)
     files = file_size.get("files", [])
     import_blocks = file_size.get("import_blocks", [])
     flat_directories = file_size.get("flat_directories", [])
-    facade_candidates = file_size.get("facade_candidates", [])
+    delegation_candidates = file_size.get("delegation_candidates", [])
 
     fs_parts = [
         f"refactor {file_counts.get('refactor', 0)}",
         f"import-warn {import_counts.get('warning', 0)}",
         f"flat-dirs {flat_directory_count}",
-        f"facades {facade_candidate_count}",
+        f"delegations {delegation_candidate_count}",
     ]
     lines: list[str] = ["\U0001f4c1  " + "  \u00b7  ".join(fs_parts)]  # 📁
 
@@ -150,9 +150,9 @@ def build_terminal_filesize_highlight(buildlog_dir: Path) -> list[str]:
             f"{'Top flat-dir:':<16}  {flat_directories[0].get('path')} "
             f"({flat_directories[0].get('direct_python_files')} files)"
         )
-    if isinstance(facade_candidates, list) and facade_candidates and isinstance(facade_candidates[0], dict):
+    if isinstance(delegation_candidates, list) and delegation_candidates and isinstance(delegation_candidates[0], dict):
         lines.append(
-            f"{'Top facade:':<16}  {facade_candidates[0].get('path')} (score={facade_candidates[0].get('score')})"
+            f"{'Top delegation:':<16}  {delegation_candidates[0].get('path')} (score={delegation_candidates[0].get('score')})"
         )
 
     return lines

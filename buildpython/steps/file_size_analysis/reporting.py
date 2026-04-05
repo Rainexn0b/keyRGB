@@ -38,8 +38,8 @@ def import_counts(import_rows: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
-def facade_count(facade_rows: list[dict[str, Any]]) -> int:
-    return len(facade_rows)
+def delegation_count(delegation_rows: list[dict[str, Any]]) -> int:
+    return len(delegation_rows)
 
 
 def build_stdout_lines(
@@ -48,11 +48,11 @@ def build_stdout_lines(
     import_rows: list[dict[str, Any]],
     flat_directories: list[dict[str, Any]],
     flat_directories_allowed: list[dict[str, Any]],
-    facade_rows: list[dict[str, Any]],
+    delegation_rows: list[dict[str, Any]],
 ) -> list[str]:
     file_size_counts = file_counts(file_rows)
     import_block_counts = import_counts(import_rows)
-    facade_candidate_count = facade_count(facade_rows)
+    delegation_candidate_count = delegation_count(delegation_rows)
 
     lines: list[str] = [
         "File size analysis",
@@ -60,7 +60,7 @@ def build_stdout_lines(
         "File-size ranges: refactor=350-399, critical=400-499, severe=500-599, extreme=600+",
         "Import-block ranges: warning=20-29, critical=30-39, severe=40+",
         f"Flat-directory threshold: >={DIRECT_PYTHON_FILE_THRESHOLD} direct Python files",
-        "Facade candidates: import block >=20 lines plus many alias bindings/delegating wrappers",
+        "Delegation candidates: import block >=20 lines plus many alias bindings/delegating wrappers",
         "",
         (
             "Large files: "
@@ -74,10 +74,10 @@ def build_stdout_lines(
         ),
         f"Flat directories: {len(flat_directories)}",
         f"Flat directories (suppressed by allowlist): {len(flat_directories_allowed)}",
-        f"Facade candidates: {facade_candidate_count}",
+        f"Delegation candidates: {delegation_candidate_count}",
     ]
 
-    has_hotspots = bool(file_rows or import_rows or flat_directories or facade_rows)
+    has_hotspots = bool(file_rows or import_rows or flat_directories or delegation_rows)
     if not has_hotspots:
         lines.extend(["", "No file-size or structure hotspots detected."])
         if not flat_directories_allowed:
@@ -107,9 +107,9 @@ def build_stdout_lines(
         lines.extend(["", "Flat directories (suppressed by allowlist):"])
         for item in flat_directories_allowed:
             lines.append(f"  [allowed] {item['path']} — {item.get('allowed_reason', '')}")
-    if facade_rows:
-        lines.extend(["", "Facade candidates:"])
-        for item in facade_rows[:20]:
+    if delegation_rows:
+        lines.extend(["", "Delegation candidates:"])
+        for item in delegation_rows[:20]:
             lines.append(
                 "  "
                 f"[score={int(item['score']):2d}] {item['path']} "
@@ -127,7 +127,7 @@ def write_reports(
     import_rows: list[dict[str, Any]],
     flat_directories: list[dict[str, Any]],
     flat_directories_allowed: list[dict[str, Any]],
-    facade_rows: list[dict[str, Any]],
+    delegation_rows: list[dict[str, Any]],
 ) -> None:
     report_dir = root / "buildlog" / "keyrgb"
     report_json = report_dir / "file-size-analysis.json"
@@ -135,7 +135,7 @@ def write_reports(
     report_md = report_dir / "file-size-analysis.md"
     file_size_counts = file_counts(file_rows)
     import_block_counts = import_counts(import_rows)
-    facade_candidate_count = facade_count(facade_rows)
+    delegation_candidate_count = delegation_count(delegation_rows)
 
     write_json(
         report_json,
@@ -155,7 +155,7 @@ def write_reports(
                 "flat_directories": {
                     "direct_python_files_min": DIRECT_PYTHON_FILE_THRESHOLD,
                 },
-                "facade_candidates": {
+                "delegation_candidates": {
                     "import_block_lines_min": 20,
                     "alias_bindings_min": 4,
                     "delegating_callables_min": 6,
@@ -171,13 +171,13 @@ def write_reports(
                 "import_block_lines": import_block_counts,
                 "flat_directories": len(flat_directories),
                 "flat_directories_allowed": len(flat_directories_allowed),
-                "facade_candidates": facade_candidate_count,
+                "delegation_candidates": delegation_candidate_count,
             },
             "files": file_rows,
             "import_blocks": import_rows,
             "flat_directories": flat_directories,
             "flat_directories_allowed": flat_directories_allowed,
-            "facade_candidates": facade_rows,
+            "delegation_candidates": delegation_rows,
         },
     )
 
@@ -209,17 +209,17 @@ def write_reports(
         ]
         + [
             [
-                "facade_candidate",
+                "delegation_candidate",
                 str(item["score"]),
                 str(item["import_lines"]),
-                "FACADE",
+                "DELEGATION",
                 str(item["path"]),
                 (
                     f"aliases={item['alias_bindings']}, delegates={item['delegating_callables']}, "
                     f"callables={item['callables']}"
                 ),
             ]
-            for item in facade_rows
+            for item in delegation_rows
         ],
     )
 
@@ -245,7 +245,7 @@ def write_reports(
         ),
         f"- Flat directories (>={DIRECT_PYTHON_FILE_THRESHOLD} direct Python files): {len(flat_directories)}",
         f"- Flat directories (suppressed by allowlist): {len(flat_directories_allowed)}",
-        f"- Facade candidates: {facade_candidate_count}",
+        f"- Delegation candidates: {delegation_candidate_count}",
         "",
     ]
 
@@ -309,22 +309,22 @@ def write_reports(
             )
         md_lines.append("")
 
-    if facade_rows:
+    if delegation_rows:
         md_lines.extend(
             [
-                "## Facade candidates",
+                "## Delegation candidates",
                 "",
                 "| Score | Import lines | Aliases | Delegates | Callables | Path |",
                 "|---:|---:|---:|---:|---:|---|",
             ]
         )
-        for item in facade_rows[:100]:
+        for item in delegation_rows[:100]:
             md_lines.append(
                 f"| {item['score']} | {item['import_lines']} | {item['alias_bindings']} | "
                 f"{item['delegating_callables']} | {item['callables']} | {item['path']} |"
             )
         md_lines.append("")
     else:
-        md_lines.extend(["## Facade candidates", "", "No facade candidates exceeded the threshold.", ""])
+        md_lines.extend(["## Delegation candidates", "", "No delegation candidates exceeded the threshold.", ""])
 
     write_md(report_md, md_lines)

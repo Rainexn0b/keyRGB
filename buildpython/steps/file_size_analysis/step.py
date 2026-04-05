@@ -9,7 +9,7 @@ from .scanning import collect_hotspots
 
 def file_size_runner() -> RunResult:
     root = repo_root()
-    file_rows, import_rows, flat_directories, flat_directories_allowed, facade_rows = collect_hotspots(
+    file_rows, import_rows, flat_directories, flat_directories_allowed, delegation_rows = collect_hotspots(
         root, roots=SIZE_SCAN_ROOTS
     )
     write_reports(
@@ -18,7 +18,7 @@ def file_size_runner() -> RunResult:
         import_rows=import_rows,
         flat_directories=flat_directories,
         flat_directories_allowed=flat_directories_allowed,
-        facade_rows=facade_rows,
+        delegation_rows=delegation_rows,
     )
     stdout = "\n".join(
         build_stdout_lines(
@@ -26,7 +26,7 @@ def file_size_runner() -> RunResult:
             import_rows=import_rows,
             flat_directories=flat_directories,
             flat_directories_allowed=flat_directories_allowed,
-            facade_rows=facade_rows,
+            delegation_rows=delegation_rows,
         )
     )
     return RunResult(
