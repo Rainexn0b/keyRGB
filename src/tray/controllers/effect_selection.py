@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import Any, Protocol, cast
+from typing import Protocol, cast
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import is_backend_hardware_effect
@@ -20,6 +20,7 @@ from src.core.effects.catalog import normalize_effect_name
 from src.core.effects.catalog import strip_effect_namespace
 from src.core.utils.exceptions import is_permission_denied
 from src.core.utils.safe_attrs import safe_int_attr
+from src.tray.protocols import LightingTrayProtocol
 from src.tray.controllers.software_target_controller import restore_secondary_software_targets
 from src.tray.controllers.software_target_controller import software_effect_target_routes_aux_devices
 
@@ -32,6 +33,18 @@ _PROFILE_LOAD_RECOVERABLE_EXCEPTIONS = (
     TypeError,
     ValueError,
 )
+
+
+class _BackendCapsProtocol(Protocol):
+    per_key: bool
+    hardware_effects: bool
+
+
+class _EffectSelectionTrayProtocol(LightingTrayProtocol, Protocol):
+    backend: object | None
+    backend_caps: _BackendCapsProtocol | None
+
+    def _start_current_effect(self, **kwargs: object) -> None: ...
 
 
 class _ProfilesApi(Protocol):
@@ -131,7 +144,7 @@ def _ensure_hardware_mode(tray) -> None:
     _set_attr_best_effort(tray.engine, "per_key_brightness", None)
 
 
-def apply_effect_selection(tray: Any, *, effect_name: str) -> None:
+def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> None:
     """Apply an effect selection coming from the tray menu.
 
     This is the main entry point for effect changes. It handles:
@@ -141,7 +154,9 @@ def apply_effect_selection(tray: Any, *, effect_name: str) -> None:
     """
 
     try:
-        caps = getattr(tray, "backend_caps", None)
+        effect_tray = cast(_EffectSelectionTrayProtocol, tray)
+
+        caps = getattr(effect_tray, "backend_caps", None)
         per_key_supported = bool(getattr(caps, "per_key", True)) if caps is not None else True
         hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
 
@@ -179,7 +194,7 @@ def apply_effect_selection(tray: Any, *, effect_name: str) -> None:
             if per_key and per_key_supported:
                 tray.config.effect = "perkey"
                 _ensure_software_mode(tray)
-                tray._start_current_effect()
+                effect_tray._start_current_effect()
             else:
                 tray.config.effect = "none"
                 _ensure_hardware_mode(tray)
@@ -210,12 +225,12 @@ def apply_effect_selection(tray: Any, *, effect_name: str) -> None:
 
             _ensure_software_mode(tray)
             tray.config.effect = "perkey"
-            tray._start_current_effect()
+            effect_tray._start_current_effect()
             tray.is_off = False
             return
 
         # === HARDWARE EFFECTS ===
-        if is_backend_hardware_effect(effect_name, getattr(tray, "backend", None)):
+        if is_backend_hardware_effect(effect_name, getattr(effect_tray, "backend", None)):
             if not hw_effects_supported:
                 tray.engine.stop()
                 tray.config.effect = "none"
@@ -230,7 +245,7 @@ def apply_effect_selection(tray: Any, *, effect_name: str) -> None:
             _set_attr_best_effort(tray.config, "per_key_colors", {})
             _ensure_hardware_mode(tray)
             tray.config.effect = effect_name if is_forced_hardware_effect(effect_name) else base_effect_name
-            tray._start_current_effect()
+            effect_tray._start_current_effect()
             tray.is_off = False
             return
 
@@ -238,7 +253,7 @@ def apply_effect_selection(tray: Any, *, effect_name: str) -> None:
         if base_effect_name in SW_EFFECTS and not is_forced_hardware_effect(effect_name):
             _ensure_software_mode(tray)
             tray.config.effect = base_effect_name
-            tray._start_current_effect()
+            effect_tray._start_current_effect()
             tray.is_off = False
             return
 

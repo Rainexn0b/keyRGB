@@ -15,15 +15,29 @@ def _body_wraplength(body: Any, *, fallback: int = 520) -> int:
     return max(320, width - 12)
 
 
+def _layout_slots_body_or_none(editor: Any) -> Any | None:
+    try:
+        return editor._layout_slots_body
+    except AttributeError:
+        return None
+
+
+def _layout_slot_states_getter_or_none(editor: Any):
+    try:
+        return editor._get_layout_slot_states
+    except AttributeError:
+        return None
+
+
 def refresh_layout_slots_ui(editor: Any) -> None:
-    body = getattr(editor, "_layout_slots_body", None)
+    body = _layout_slots_body_or_none(editor)
     if body is None:
         return
 
     for child in list(body.winfo_children()):
         child.destroy()
 
-    slot_states_getter = getattr(editor, "_get_layout_slot_states", None)
+    slot_states_getter = _layout_slot_states_getter_or_none(editor)
     if callable(slot_states_getter):
         states = slot_states_getter()
     else:

@@ -18,6 +18,24 @@ from ..profile_management import keymap_cells_for, representative_cell
 logger = logging.getLogger(__name__)
 
 
+def _visible_layout_keys_or_none(canvas: Any) -> list[object] | None:
+    try:
+        visible_keys_getter = canvas._visible_layout_keys
+    except AttributeError:
+        return None
+    if not callable(visible_keys_getter):
+        return None
+    return list(visible_keys_getter())
+
+
+def _resolved_layout_legend_pack_id_or_none(editor: Any) -> str | None:
+    try:
+        resolve_legend_pack = editor._resolved_layout_legend_pack_id
+    except AttributeError:
+        return None
+    return resolve_legend_pack() if callable(resolve_legend_pack) else None
+
+
 def _fit_key_label(label: str, *, font_name: str, font_size: int, max_text_w: int) -> tuple[str, int]:
     try:
         font = tkfont.Font(font=(font_name, font_size))
@@ -106,19 +124,20 @@ class _KeyboardCanvasDrawingMixin:
 
         self._draw_lightbar_overlay()
 
-        editor = getattr(self, "editor", None)
-        physical_layout = getattr(editor, "_physical_layout", "auto") or "auto"
-        visible_keys_getter = getattr(self, "_visible_layout_keys", None)
-        if callable(visible_keys_getter):
-            visible_keys = list(visible_keys_getter())
-        else:
-            resolve_legend_pack = getattr(editor, "_resolved_layout_legend_pack_id", None)
-            legend_pack_id = resolve_legend_pack() if callable(resolve_legend_pack) else None
-            visible_keys = get_layout_keys(
-                physical_layout,
-                legend_pack_id=legend_pack_id,
-                slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
+        editor = self.editor
+        physical_layout = editor._physical_layout or "auto"
+        visible_keys = _visible_layout_keys_or_none(self)
+        if visible_keys is None:
+            legend_pack_id = _resolved_layout_legend_pack_id_or_none(editor)
+            visible_keys = list(
+                get_layout_keys(
+                    physical_layout,
+                    legend_pack_id=legend_pack_id,
+                    slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
+                )
             )
+        else:
+            visible_keys = list(visible_keys)
 
         for key in visible_keys:
             x1, y1, x2, y2, inset_value = key_canvas_rect(

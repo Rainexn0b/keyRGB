@@ -34,6 +34,8 @@ from .status import active_profile, default_profile_set, layout_defaults_reset, 
 
 logger = logging.getLogger(__name__)
 
+_MISSING = object()
+
 _LAYOUT_LABELS: dict[str, str] = {ld.layout_id: ld.label for ld in LAYOUT_CATALOG}
 _BACKDROP_MODE_LABELS = {
     "none": "No backdrop",
@@ -51,10 +53,39 @@ def _parse_default_keymap(layout_id: str) -> dict[str, tuple[tuple[int, int], ..
     )
 
 
+def _backdrop_mode_var_or_none(editor: Any) -> Any | None:
+    try:
+        return editor._backdrop_mode_var
+    except AttributeError:
+        return None
+
+
+def _backdrop_mode_combo_or_none(editor: Any) -> Any | None:
+    try:
+        return editor._backdrop_mode_combo
+    except AttributeError:
+        return None
+
+
+def _optional_attr(obj: Any, name: str) -> Any:
+    try:
+        return getattr(obj, name)
+    except AttributeError:
+        return _MISSING
+
+
+def _call_optional_method_if_present(obj: Any, name: str, *args: Any, **kwargs: Any) -> bool:
+    method = _optional_attr(obj, name)
+    if method is _MISSING:
+        return False
+    method(*args, **kwargs)
+    return True
+
+
 def reset_layout_defaults_ui(editor: Any) -> None:
     resolved_layout = resolve_layout_id(editor._physical_layout)
-    slot_lookup = getattr(editor, "_slot_id_for_key_id", None)
-    key_lookup = getattr(editor, "_key_id_for_slot_id", None)
+    slot_lookup = editor._slot_id_for_key_id
+    key_lookup = editor._key_id_for_slot_id
 
     editor.keymap = _parse_default_keymap(editor._physical_layout)
     editor.layout_tweaks = get_default_layout_tweaks(editor._physical_layout)
@@ -68,8 +99,7 @@ def reset_layout_defaults_ui(editor: Any) -> None:
         physical_layout=editor._physical_layout,
     )
 
-    if hasattr(editor, "_refresh_layout_slot_controls"):
-        editor._refresh_layout_slot_controls()
+    _call_optional_method_if_present(editor, "_refresh_layout_slot_controls")
 
     visible_keys = get_layout_keys(
         editor._physical_layout, slot_overrides=getattr(editor, "layout_slot_overrides", None)
@@ -78,12 +108,12 @@ def reset_layout_defaults_ui(editor: Any) -> None:
     visible_slot_ids = {str(getattr(key, "slot_id", None) or key.key_id) for key in visible_keys}
     selected_slot_id = getattr(editor, "selected_slot_id", None)
     current_slot_id = selected_slot_id
-    if current_slot_id is None and callable(slot_lookup) and editor.selected_key_id in visible_key_ids:
+    if current_slot_id is None and editor.selected_key_id in visible_key_ids:
         current_slot_id = slot_lookup(editor.selected_key_id)
 
     if current_slot_id in visible_slot_ids or editor.selected_key_id in visible_key_ids:
         editor.selected_slot_id = str(current_slot_id) if current_slot_id else None
-        if editor.selected_slot_id and callable(key_lookup):
+        if editor.selected_slot_id:
             resolved_key_id = key_lookup(editor.selected_slot_id)
             if resolved_key_id:
                 editor.selected_key_id = str(resolved_key_id)
@@ -91,7 +121,7 @@ def reset_layout_defaults_ui(editor: Any) -> None:
             editor.keymap,
             editor.selected_key_id,
             slot_id=getattr(editor, "selected_slot_id", None),
-            physical_layout=getattr(editor, "_physical_layout", None),
+            physical_layout=editor._physical_layout,
         )
         editor.selected_cell = primary_cell(editor.selected_cells)
     else:
@@ -106,7 +136,7 @@ def reset_layout_defaults_ui(editor: Any) -> None:
                 editor.keymap,
                 str(key.key_id),
                 slot_id=str(getattr(key, "slot_id", None) or key.key_id),
-                physical_layout=getattr(editor, "_physical_layout", None),
+                physical_layout=editor._physical_layout,
             ):
                 select_visible_identity(
                     editor,
@@ -140,12 +170,12 @@ def activate_profile_ui(editor: Any) -> None:
     editor.lightbar_overlay = dict(result.lightbar_overlay)
 
     # Reload per-profile backdrop state.
-    backdrop_mode_var = getattr(editor, "_backdrop_mode_var", None)
+    backdrop_mode_var = _backdrop_mode_var_or_none(editor)
     if backdrop_mode_var is not None:
         backdrop_mode = profiles.load_backdrop_mode(editor.profile_name)
         try:
             backdrop_mode_var.set(backdrop_mode)
-            mode_combo = getattr(editor, "_backdrop_mode_combo", None)
+            mode_combo = _backdrop_mode_combo_or_none(editor)
             if mode_combo is not None:
                 mode_combo.set(_BACKDROP_MODE_LABELS.get(backdrop_mode, "Built-in seed"))
         except _BACKDROP_UI_ERRORS:
@@ -158,9 +188,10 @@ def activate_profile_ui(editor: Any) -> None:
         except _BACKDROP_UI_ERRORS:
             logger.warning("Failed to update per-profile backdrop transparency UI during activation", exc_info=True)
 
-    if hasattr(editor.canvas, "reload_backdrop_image"):
+    reload_backdrop_image = _optional_attr(editor.canvas, "reload_backdrop_image")
+    if reload_backdrop_image is not _MISSING:
         try:
-            editor.canvas.reload_backdrop_image()
+            reload_backdrop_image()
         except Exception:  # @quality-exception exception-transparency: optional per-profile backdrop image reload crosses Tk, image decode, and file/runtime seams and must remain non-fatal for profile activation
             logger.exception("Failed to reload per-profile backdrop image during activation")
 
@@ -171,17 +202,14 @@ def activate_profile_ui(editor: Any) -> None:
     editor.overlay_controls.sync_vars_from_scope()
     if getattr(editor, "lightbar_controls", None) is not None:
         editor.lightbar_controls.sync_vars_from_editor()
-    if hasattr(editor, "_refresh_layout_slot_controls"):
-        editor._refresh_layout_slot_controls()
+    _call_optional_method_if_present(editor, "_refresh_layout_slot_controls")
     editor.canvas.redraw()
     set_status(editor, active_profile(editor.profile_name))
 
     selected_slot_id = getattr(editor, "selected_slot_id", None)
-    slot_lookup = getattr(editor, "_slot_id_for_key_id", None)
-    if selected_slot_id and hasattr(editor, "select_slot_id"):
-        editor.select_slot_id(selected_slot_id)
-    elif editor.selected_key_id:
-        resolved_slot_id = slot_lookup(editor.selected_key_id) if callable(slot_lookup) else None
+    slot_lookup = editor._slot_id_for_key_id
+    if not (selected_slot_id and _call_optional_method_if_present(editor, "select_slot_id", selected_slot_id)) and editor.selected_key_id:
+        resolved_slot_id = slot_lookup(editor.selected_key_id)
         select_visible_identity(editor, slot_id=resolved_slot_id, key_id=editor.selected_key_id)
 
 

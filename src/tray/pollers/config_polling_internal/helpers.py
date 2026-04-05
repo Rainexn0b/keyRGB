@@ -19,22 +19,17 @@ def _log_module_exception(msg: str, exc: Exception) -> None:
 
 
 def _log_tray_exception(tray: ConfigPollingTrayProtocol, msg: str, exc: Exception) -> None:
-    log_exception = getattr(tray, "_log_exception", None)
-    if callable(log_exception):
-        try:
-            log_exception(msg, exc)
-            return
-        except Exception as log_exc:  # @quality-exception exception-transparency: tray exception logger is a best-effort diagnostic boundary
-            _log_module_exception("Config polling tray exception logger failed: %s", log_exc)
+    try:
+        tray._log_exception(msg, exc)
+        return
+    except Exception as log_exc:  # @quality-exception exception-transparency: tray exception logger is a best-effort diagnostic boundary
+        _log_module_exception("Config polling tray exception logger failed: %s", log_exc)
     _log_module_exception(msg, exc)
 
 
 def _try_log_event(tray: ConfigPollingTrayProtocol, source: str, action: str, **fields: object) -> None:
-    log_event = getattr(tray, "_log_event", None)
-    if not callable(log_event):
-        return
     try:
-        log_event(source, action, **fields)
+        tray._log_event(source, action, **fields)
     except Exception as exc:  # @quality-exception exception-transparency: event logging must never break config polling
         _log_tray_exception(tray, "Config polling event logging failed: %s", exc)
 

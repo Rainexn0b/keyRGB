@@ -276,6 +276,72 @@ def test_activate_profile_ui_keeps_activation_on_optional_backdrop_reload_failur
     assert "Failed to reload per-profile backdrop image during activation" in caplog.text
 
 
+def test_activate_profile_ui_handles_missing_optional_methods(monkeypatch) -> None:
+    def fake_activate_profile(_name: str, *, config, current_colors, num_rows, num_cols, physical_layout):
+        return ActivatedProfile(
+            name="p2",
+            keymap={"K": ((0, 0),)},
+            layout_tweaks={},
+            per_key_layout_tweaks={},
+            colors={(0, 0): (1, 2, 3)},
+            layout_slot_overrides={},
+            lightbar_overlay={},
+        )
+
+    visible_identity_calls: list[tuple[str | None, str | None]] = []
+
+    def fake_select_visible_identity(editor, *, slot_id, key_id) -> None:
+        visible_identity_calls.append((slot_id, key_id))
+        editor.selected_slot_id = slot_id
+        editor.selected_key_id = key_id
+        editor.selected_cells = keymap_cells_for(editor.keymap, key_id, slot_id=slot_id)
+        editor.selected_cell = primary_cell(editor.selected_cells)
+
+    monkeypatch.setattr(actions, "activate_profile", fake_activate_profile)
+    monkeypatch.setattr(actions, "ensure_full_map_ui", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(actions.profiles, "load_backdrop_mode", lambda _name: "builtin")
+    monkeypatch.setattr(actions.profiles, "load_backdrop_transparency", lambda _name: 15)
+    monkeypatch.setattr(actions, "select_visible_identity", fake_select_visible_identity)
+    monkeypatch.delattr(DummyEditor, "select_slot_id")
+    monkeypatch.delattr(DummyEditor, "_refresh_layout_slot_controls")
+    monkeypatch.delattr(DummyCanvas, "reload_backdrop_image")
+
+    ed = DummyEditor(
+        _profile_name_var=DummyVar("p1"),
+        config=object(),
+        colors={(0, 0): (9, 9, 9)},
+        keymap={},
+        _physical_layout="ansi",
+        layout_tweaks={},
+        per_key_layout_tweaks={},
+        layout_slot_overrides={},
+        profile_name="p1",
+        selected_key_id="K",
+        selected_slot_id="K",
+        overlay_controls=DummyOverlayControls(),
+        lightbar_controls=DummyLightbarControls(),
+        lightbar_overlay={},
+        canvas=DummyCanvas(),
+        status_label=DummyLabel(),
+        _profiles_combo=DummyCombo(),
+    )
+    ed._backdrop_mode_var = DummyVar("none")
+    ed.backdrop_transparency = DummyVar(0.0)
+    ed._backdrop_mode_combo = DummySettable()
+
+    actions.activate_profile_ui(ed)
+
+    assert ed.profile_name == "p2"
+    assert ed.commit_calls == 1
+    assert ed.overlay_controls.sync_calls == 1
+    assert ed.lightbar_controls is not None
+    assert ed.lightbar_controls.sync_calls == 1
+    assert ed.canvas.redraw_calls == 1
+    assert visible_identity_calls == [("K", "K")]
+    assert ed.selected_cells == ((0, 0),)
+    assert ed.status_label.text == "Active lighting profile: p2"
+
+
 def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
     def fake_delete_profile(_name: str) -> DeleteProfileResult:
         return DeleteProfileResult(deleted=True, active_profile="light", message="Deleted lighting profile: p2")

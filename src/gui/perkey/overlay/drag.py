@@ -3,6 +3,26 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+def _slot_id_for_key_id_or_none(editor: object, key_id: str | None) -> str | None:
+    if key_id is None:
+        return None
+    try:
+        slot_lookup = editor._slot_id_for_key_id
+    except AttributeError:
+        return None
+    return slot_lookup(key_id) if callable(slot_lookup) else None
+
+
+def _key_id_for_slot_id_or_none(editor: object, slot_id: str | None) -> str | None:
+    if slot_id is None:
+        return None
+    try:
+        key_lookup = editor._key_id_for_slot_id
+    except AttributeError:
+        return None
+    return key_lookup(slot_id) if callable(key_lookup) else None
+
+
 @dataclass
 class _OverlayDragContext:
     key_id: str | None
@@ -46,13 +66,9 @@ class OverlayDragController:
         selected_key_id = getattr(e, "selected_key_id", None)
         selected_slot_id = getattr(e, "selected_slot_id", None)
         if not selected_slot_id and selected_key_id:
-            slot_lookup = getattr(e, "_slot_id_for_key_id", None)
-            if callable(slot_lookup):
-                selected_slot_id = slot_lookup(selected_key_id)
+            selected_slot_id = _slot_id_for_key_id_or_none(e, selected_key_id)
         if not selected_key_id and selected_slot_id:
-            key_lookup = getattr(e, "_key_id_for_slot_id", None)
-            if callable(key_lookup):
-                selected_key_id = key_lookup(selected_slot_id)
+            selected_key_id = _key_id_for_slot_id_or_none(e, selected_slot_id)
 
         selected_identity = str(selected_slot_id or "")
         if not selected_identity or c._canvas_transform() is None:

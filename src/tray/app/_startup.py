@@ -29,7 +29,7 @@ def create_effects_engine(EffectsEngine: Any, *, backend: Any) -> Any:
 
 def install_permission_error_callback_best_effort(engine: Any, callback: Callable[[Exception | None], None]) -> None:
     try:
-        setattr(engine, "_permission_error_cb", callback)
+        engine._permission_error_cb = callback
     except (AttributeError, RuntimeError):
         return
 

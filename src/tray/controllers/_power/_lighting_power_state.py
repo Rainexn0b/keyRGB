@@ -78,13 +78,13 @@ def power_restore_impl(
 ) -> None:
     tray._last_resume_at = time.monotonic()
 
-    if bool(getattr(tray, "_user_forced_off", False)):
+    if bool(tray._user_forced_off):
         return
 
-    if bool(getattr(tray, "_idle_forced_off", False)):
+    if bool(tray._idle_forced_off):
         return
 
-    if bool(getattr(tray, "_power_forced_off", False)):
+    if bool(tray._power_forced_off):
         try_log_event(tray, "power", "restore")
         tray._power_forced_off = False
         tray._idle_forced_off = False

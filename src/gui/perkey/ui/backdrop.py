@@ -23,9 +23,23 @@ _BACKDROP_PERSISTENCE_ERRORS = (OSError, RuntimeError, ValueError)
 _BACKDROP_UI_ERRORS = (AttributeError, OSError, RuntimeError, ValueError, tk.TclError)
 
 
+def _backdrop_mode_var_or_none(editor: Any) -> Any | None:
+    try:
+        return editor._backdrop_mode_var
+    except AttributeError:
+        return None
+
+
+def _backdrop_mode_combo_or_none(editor: Any) -> Any | None:
+    try:
+        return editor._backdrop_mode_combo
+    except AttributeError:
+        return None
+
+
 def _sync_backdrop_mode_widgets(editor: Any, *, mode: str, label: str) -> None:
-    mode_var = getattr(editor, "_backdrop_mode_var", None)
-    mode_combo = getattr(editor, "_backdrop_mode_combo", None)
+    mode_var = _backdrop_mode_var_or_none(editor)
+    mode_combo = _backdrop_mode_combo_or_none(editor)
     if mode_var is not None:
         mode_var.set(mode)
     if mode_combo is not None:

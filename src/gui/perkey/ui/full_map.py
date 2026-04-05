@@ -5,6 +5,13 @@ from typing import Any, Callable
 from ..ops.color_map_ops import ensure_full_map
 
 
+def _last_non_black_color_or_none(editor: Any) -> object | None:
+    try:
+        return editor._last_non_black_color
+    except AttributeError:
+        return None
+
+
 def ensure_full_map_ui(
     editor: Any,
     *,
@@ -20,7 +27,7 @@ def ensure_full_map_ui(
     # Use the last non-black wheel color as the base fill. This matches the
     # expected workflow: start from a unified color, then override a few keys
     # without blanking the rest of the keyboard.
-    last = getattr(editor, "_last_non_black_color", None)
+    last = _last_non_black_color_or_none(editor)
     if isinstance(last, (list, tuple)) and len(last) == 3:
         base = (int(last[0]), int(last[1]), int(last[2]))
     else:

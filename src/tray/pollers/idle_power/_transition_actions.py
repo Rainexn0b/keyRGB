@@ -1,10 +1,34 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import cast
+from typing import Protocol, cast
 
 from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
+
+
+class _IdleRestoreStartTray(Protocol):
+    def _start_current_effect(self, **kwargs: object) -> None: ...
+
+
+def _start_current_effect_or_none(tray: object) -> Callable[..., object] | None:
+    try:
+        start_fn = cast(_IdleRestoreStartTray, tray)._start_current_effect
+    except AttributeError:
+        return None
+    if not callable(start_fn):
+        return None
+    return cast(Callable[..., object], start_fn)
+
+
+def _refresh_ui_or_none(tray: object) -> Callable[[], None] | None:
+    try:
+        refresh_fn = cast(IdlePowerTrayProtocol, tray)._refresh_ui
+    except AttributeError:
+        return None
+    if not callable(refresh_fn):
+        return None
+    return cast(Callable[[], None], refresh_fn)
 
 
 def start_current_effect_for_idle_restore(
@@ -13,7 +37,7 @@ def start_current_effect_for_idle_restore(
     brightness_override: int,
     fade_in_duration_s: float,
 ) -> None:
-    start_fn = getattr(tray, "_start_current_effect", None)
+    start_fn = _start_current_effect_or_none(tray)
     if callable(start_fn):
         try:
             start_fn(
@@ -124,7 +148,7 @@ def refresh_ui_best_effort(
     call_runtime_boundary: Callable[..., bool],
     warning_level: int,
 ) -> None:
-    refresh_fn = getattr(tray, "_refresh_ui", None)
+    refresh_fn = _refresh_ui_or_none(tray)
     if callable(refresh_fn):
         call_runtime_boundary(refresh_fn, key=key, level=warning_level, msg=msg)
 

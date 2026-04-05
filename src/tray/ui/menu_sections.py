@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import logging
 from typing import Any, Optional
+
 from src.core.utils.logging_utils import log_throttled
+from src.core.utils.safe_attrs import safe_int_attr
 
 from src.core.power.system import PowerMode, get_status, set_mode
 from .menu_status import device_context_controls_available
@@ -15,6 +17,23 @@ _TCC_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (OSError,)
 _SYSTEM_POWER_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (OSError,)
 _SYSTEM_POWER_CALLBACK_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _PERKEY_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (ImportError, OSError)
+
+
+def _call_update_menu_if_present(tray: Any) -> None:
+    try:
+        update_menu = tray._update_menu
+    except AttributeError:
+        return
+    if not callable(update_menu):
+        return
+    update_menu()
+
+
+def _power_forced_off_or_false(tray: Any) -> bool:
+    try:
+        return bool(tray._power_forced_off)
+    except AttributeError:
+        return False
 
 
 def _device_context_footer_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
@@ -44,7 +63,7 @@ def _build_lightbar_context_menu_items(
 
         def _checked_lightbar_brightness(level: int):
             return lambda _item, expected=level: (
-                int(getattr(tray.config, "lightbar_brightness", 0) or 0) == expected * 5
+                safe_int_attr(tray.config, "lightbar_brightness", default=0) == expected * 5
             )
 
         brightness_menu = pystray.Menu(
@@ -203,9 +222,7 @@ def build_system_power_mode_menu(tray: Any, *, pystray: Any, item: Any) -> Optio
                         interval_s=60,
                     )
                 finally:
-                    update_menu = getattr(tray, "_update_menu", None)
-                    if callable(update_menu):
-                        update_menu()
+                    _call_update_menu_if_present(tray)
 
             return _cb
 
@@ -266,7 +283,7 @@ def build_perkey_profiles_menu(tray: Any, *, pystray: Any, item: Any, per_key_su
 
                 # If the user explicitly chose a profile, treat it like an effect selection.
                 # Respect power manager forced-off state.
-                if not getattr(tray, "_power_forced_off", False):
+                if not _power_forced_off_or_false(tray):
                     tray.is_off = False
                     tray._start_current_effect()
 

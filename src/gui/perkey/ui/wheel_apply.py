@@ -7,6 +7,23 @@ from ..profile_management import keymap_cells_for
 from .status import saved_all_keys_rgb, saved_key_rgb, set_status
 
 
+def _physical_layout_or_none(editor: Any) -> object | None:
+    try:
+        return editor._physical_layout
+    except AttributeError:
+        return None
+
+
+def _selected_key_id_for_slot(editor: Any, selected_key_id: str | None, selected_slot_id: str | None) -> str | None:
+    if selected_key_id is not None or selected_slot_id is None:
+        return selected_key_id
+
+    try:
+        return editor._key_id_for_slot_id(selected_slot_id)
+    except AttributeError:
+        return None
+
+
 def on_wheel_color_change_ui(
     editor: Any,
     r: int,
@@ -27,11 +44,7 @@ def on_wheel_color_change_ui(
         editor._last_non_black_color = color
 
     selected_slot_id = getattr(editor, "selected_slot_id", None)
-    selected_key_id = getattr(editor, "selected_key_id", None)
-    if selected_key_id is None and selected_slot_id is not None:
-        key_lookup = getattr(editor, "_key_id_for_slot_id", None)
-        if callable(key_lookup):
-            selected_key_id = key_lookup(selected_slot_id)
+    selected_key_id = _selected_key_id_for_slot(editor, getattr(editor, "selected_key_id", None), selected_slot_id)
     selected_identity = selected_slot_id or selected_key_id
 
     selected_cells = tuple(
@@ -40,7 +53,7 @@ def on_wheel_color_change_ui(
             editor.keymap,
             selected_key_id,
             slot_id=selected_slot_id,
-            physical_layout=getattr(editor, "_physical_layout", None),
+            physical_layout=_physical_layout_or_none(editor),
         )
     )
 
@@ -85,11 +98,7 @@ def on_wheel_color_release_ui(
         editor._last_non_black_color = color
 
     selected_slot_id = getattr(editor, "selected_slot_id", None)
-    selected_key_id = getattr(editor, "selected_key_id", None)
-    if selected_key_id is None and selected_slot_id is not None:
-        key_lookup = getattr(editor, "_key_id_for_slot_id", None)
-        if callable(key_lookup):
-            selected_key_id = key_lookup(selected_slot_id)
+    selected_key_id = _selected_key_id_for_slot(editor, getattr(editor, "selected_key_id", None), selected_slot_id)
     selected_identity = selected_slot_id or selected_key_id
 
     selected_cells = tuple(
@@ -98,7 +107,7 @@ def on_wheel_color_release_ui(
             editor.keymap,
             selected_key_id,
             slot_id=selected_slot_id,
-            physical_layout=getattr(editor, "_physical_layout", None),
+            physical_layout=_physical_layout_or_none(editor),
         )
     )
 

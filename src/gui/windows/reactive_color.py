@@ -7,7 +7,7 @@ import os
 import signal
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol, cast
 
 import tkinter as tk
 from tkinter import ttk
@@ -25,6 +25,37 @@ from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_theme
 
 logger = logging.getLogger(__name__)
+
+
+class _ReactiveColorDragState(Protocol):
+    _last_drag_commit_ts: object
+    _drag_commit_interval: object
+    _last_drag_committed_color: object | None
+
+
+def _last_drag_commit_ts_or_default(gui: object) -> float:
+    try:
+        value = cast(_ReactiveColorDragState, gui)._last_drag_commit_ts
+    except AttributeError:
+        return 0.0
+    return float(value or 0.0)
+
+
+def _drag_commit_interval_or_default(gui: object) -> float:
+    try:
+        value = cast(_ReactiveColorDragState, gui)._drag_commit_interval
+    except AttributeError:
+        return 0.06
+    return float(value or 0.06)
+
+
+def _last_drag_committed_color_or_none(gui: object) -> tuple[int, int, int] | None:
+    try:
+        value = cast(_ReactiveColorDragState, gui)._last_drag_committed_color
+    except AttributeError:
+        return None
+    return cast(tuple[int, int, int] | None, value)
+
 
 try:
     from src.core.config import Config
@@ -268,8 +299,8 @@ class ReactiveColorGUI:
         except tk.TclError:
             pass
 
-        last_drag_commit_ts = float(getattr(self, "_last_drag_commit_ts", 0.0) or 0.0)
-        drag_commit_interval = float(getattr(self, "_drag_commit_interval", 0.06) or 0.06)
+        last_drag_commit_ts = _last_drag_commit_ts_or_default(self)
+        drag_commit_interval = _drag_commit_interval_or_default(self)
         now = time.monotonic()
         if (now - last_drag_commit_ts) < drag_commit_interval:
             return
@@ -301,9 +332,9 @@ class ReactiveColorGUI:
             return
         color = (int(r), int(g), int(b))
 
-        last_drag_committed_color = getattr(self, "_last_drag_committed_color", None)
-        last_drag_commit_ts = float(getattr(self, "_last_drag_commit_ts", 0.0) or 0.0)
-        drag_commit_interval = float(getattr(self, "_drag_commit_interval", 0.06) or 0.06)
+        last_drag_committed_color = _last_drag_committed_color_or_none(self)
+        last_drag_commit_ts = _last_drag_commit_ts_or_default(self)
+        drag_commit_interval = _drag_commit_interval_or_default(self)
         now = time.monotonic()
         if last_drag_committed_color == color and (now - last_drag_commit_ts) < drag_commit_interval:
             return

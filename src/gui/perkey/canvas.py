@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import TYPE_CHECKING, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, Optional
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef, get_layout_keys
 from src.gui.utils.deck_render_cache import DeckRenderCache
@@ -33,6 +34,40 @@ if TYPE_CHECKING:
 
 KEYDEF_BY_ID: dict[str, KeyDef] = {k.key_id: k for k in REFERENCE_DEVICE_KEYS}
 KEYDEF_BY_SLOT_ID: dict[str, KeyDef] = {str(getattr(k, "slot_id", None) or k.key_id): k for k in REFERENCE_DEVICE_KEYS}
+
+
+def _visible_layout_keys_getter_or_none(editor: Any) -> Callable[[], object] | None:
+    try:
+        getter = editor._get_visible_layout_keys
+    except AttributeError:
+        return None
+    return getter if callable(getter) else None
+
+
+def _resolved_layout_legend_pack_id_or_none(editor: Any) -> str | None:
+    try:
+        resolve_legend_pack = editor._resolved_layout_legend_pack_id
+    except AttributeError:
+        return None
+    if not callable(resolve_legend_pack):
+        return None
+    return resolve_legend_pack()
+
+
+def _keydef_by_slot_id_or_none(canvas: Any, identity: str) -> KeyDef | None:
+    try:
+        slot_lookup = canvas._keydef_by_slot_id
+    except AttributeError:
+        return None
+    return slot_lookup(identity) if callable(slot_lookup) else None
+
+
+def _keydef_by_id_or_none(canvas: Any, identity: str) -> KeyDef | None:
+    try:
+        key_lookup = canvas._keydef_by_id
+    except AttributeError:
+        return None
+    return key_lookup(identity) if callable(key_lookup) else None
 
 
 class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.Canvas):
@@ -120,13 +155,15 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         return KEYDEF_BY_ID.get(key_id)
 
     def _visible_layout_keys(self) -> list[KeyDef]:
-        getter = getattr(self.editor, "_get_visible_layout_keys", None)
+        getter = _visible_layout_keys_getter_or_none(self.editor)
         if callable(getter):
             return list(getter())
 
-        physical_layout = getattr(self.editor, "_physical_layout", "auto") or "auto"
-        resolve_legend_pack = getattr(self.editor, "_resolved_layout_legend_pack_id", None)
-        legend_pack_id = resolve_legend_pack() if callable(resolve_legend_pack) else None
+        try:
+            physical_layout = self.editor._physical_layout or "auto"
+        except AttributeError:
+            physical_layout = "auto"
+        legend_pack_id = _resolved_layout_legend_pack_id_or_none(self.editor)
         return list(
             get_layout_keys(
                 physical_layout,
@@ -136,12 +173,10 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         )
 
     def _keydef_by_identity(self, identity: str) -> KeyDef | None:
-        slot_lookup = getattr(self, "_keydef_by_slot_id", None)
-        key = slot_lookup(identity) if callable(slot_lookup) else None
+        key = _keydef_by_slot_id_or_none(self, identity)
         if key is not None:
             return key
-        key_lookup = getattr(self, "_keydef_by_id", None)
-        return key_lookup(identity) if callable(key_lookup) else None
+        return _keydef_by_id_or_none(self, identity)
 
     def _resize_edges_for_point(self, identity: str, cx: float, cy: float) -> str:
         kd = KeyboardCanvas._keydef_by_identity(self, identity)
@@ -284,8 +319,7 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
                 return None
             return "resize", edges
 
-        hit_test_slot_id = getattr(self, "_hit_test_slot_id", None)
-        slot_id = hit_test_slot_id(cx, cy) if callable(hit_test_slot_id) else None
+        slot_id = self._hit_test_slot_id(cx, cy)
         if slot_id != selected_identity:
             return None
         return "move", ""

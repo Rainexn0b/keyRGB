@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from src.core.profile import profiles
 from src.core.resources.layout_legends import load_layout_legend_pack, resolve_layout_legend_pack_id
@@ -9,6 +9,32 @@ from src.core.resources.layout_slots import get_layout_slot_states
 from ..profile_management import keymap_cells_for
 from ..ui.layout_slots import refresh_layout_slots_ui
 from ..ui.status import layout_slot_label_updated, layout_slot_visibility_updated, set_status
+
+
+def _layout_setup_controls_or_none(app: Any) -> Any | None:
+    try:
+        return app._layout_setup_controls
+    except AttributeError:
+        return None
+
+
+def _refresh_legend_pack_choices_or_none(controls: Any) -> Callable[[], object] | None:
+    if controls is None:
+        return None
+    try:
+        refresh_choices = controls.refresh_legend_pack_choices
+    except AttributeError:
+        return None
+    if not callable(refresh_choices):
+        return None
+    return refresh_choices
+
+
+def _lightbar_controls_or_none(app: Any) -> Any | None:
+    try:
+        return app.lightbar_controls
+    except AttributeError:
+        return None
 
 
 def normalize_layout_legend_pack(layout_id: str, legend_pack_id: str | None) -> str:
@@ -44,9 +70,8 @@ def sync_layout_legend_pack_ui(
             exc,
         )
 
-    controls = getattr(app, "_layout_setup_controls", None)
-    refresh_choices = getattr(controls, "refresh_legend_pack_choices", None)
-    if callable(refresh_choices):
+    refresh_choices = _refresh_legend_pack_choices_or_none(_layout_setup_controls_or_none(app))
+    if refresh_choices is not None:
         refresh_choices()
 
 
@@ -179,8 +204,8 @@ def set_layout_slot_label(app: Any, slot_id: str, label: str) -> None:
     )
 
 
-def load_layout_tweaks(app: Any, *, profiles: Any) -> dict[str, float]:
-    return profiles.load_layout_global(app.profile_name, physical_layout=app._physical_layout)
+def load_layout_tweaks(app: Any, *, profiles_module: Any = profiles) -> dict[str, float]:
+    return profiles_module.load_layout_global(app.profile_name, physical_layout=app._physical_layout)
 
 
 def load_per_key_layout_tweaks(app: Any) -> dict[str, dict[str, float]]:
@@ -233,8 +258,9 @@ def show_setup_panel(app: Any, mode: str) -> None:
     if mode == "overlay":
         app._overlay_setup_panel.grid()
         app.overlay_controls.sync_vars_from_scope()
-        if getattr(app, "lightbar_controls", None) is not None:
-            app.lightbar_controls.sync_vars_from_editor()
+        lightbar_controls = _lightbar_controls_or_none(app)
+        if lightbar_controls is not None:
+            lightbar_controls.sync_vars_from_editor()
     elif mode == "layout":
         app._layout_setup_controls.grid()
         app._refresh_layout_slot_controls()

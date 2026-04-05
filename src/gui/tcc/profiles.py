@@ -16,6 +16,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from src.core.utils.logging_utils import log_throttled
+from src.core.power.tcc_profiles.models import is_builtin_profile_id
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_theme
 from src.gui.utils.window_centering import center_window_on_screen
@@ -178,11 +179,11 @@ class TccProfilesGUI:
             return
 
         pid = self._profiles[idx].id
-        is_legacy = pid.startswith("__legacy_")
+        is_builtin = is_builtin_profile_id(pid)
         is_default_custom = pid == "__default_custom_profile__"
 
-        can_edit = (not is_legacy) and tcc_power_profiles.is_custom_profile_id(pid)
-        can_delete = (not is_legacy) and (not is_default_custom) and (not pid.startswith("__"))
+        can_edit = (not is_builtin) and tcc_power_profiles.is_custom_profile_id(pid)
+        can_delete = (not is_builtin) and (not is_default_custom) and (not pid.startswith("__"))
 
         self.btn_duplicate.configure(state="normal" if can_edit else "disabled")
         self.btn_rename.configure(state="normal" if can_edit else "disabled")

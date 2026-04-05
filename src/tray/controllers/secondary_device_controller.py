@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable
+from typing import Callable, Protocol
 
 from src.core.backends.ite8233.backend import Ite8233Backend
 from src.core.utils.exceptions import is_permission_denied
@@ -13,6 +13,12 @@ from ._lighting_controller_helpers import parse_menu_int, try_log_event
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
+
+
+class _LightbarDeviceProtocol(Protocol):
+    def set_brightness(self, brightness: int) -> None: ...
+
+    def turn_off(self) -> None: ...
 
 
 def selected_secondary_context_entry(tray: LightingTrayProtocol) -> dict[str, str] | None:
@@ -54,7 +60,7 @@ def apply_selected_secondary_brightness(tray: LightingTrayProtocol, item: object
 
     try_log_event(tray, "menu", "set_lightbar_brightness", new=int(brightness_hw))
 
-    def _apply(device: Any) -> None:
+    def _apply(device: _LightbarDeviceProtocol) -> None:
         if brightness_hw <= 0:
             device.turn_off()
             return
@@ -87,7 +93,7 @@ def turn_off_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
 
 def _with_lightbar_device(
     tray: LightingTrayProtocol,
-    operation: Callable[[Any], None],
+    operation: Callable[[_LightbarDeviceProtocol], None],
     *,
     error_msg: str,
 ) -> bool:

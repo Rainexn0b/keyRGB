@@ -8,6 +8,15 @@ import tkinter as tk
 
 
 T = TypeVar("T")
+_TK_SCHEDULE_ERRORS = (RuntimeError, tk.TclError)
+
+
+def _schedule_on_tk_thread(root: tk.Misc, callback: Callable[[], None], *, delay_ms: int = 0) -> bool:
+    try:
+        root.after(delay_ms, callback)
+    except _TK_SCHEDULE_ERRORS:
+        return False
+    return True
 
 
 def run_in_thread(
@@ -24,9 +33,9 @@ def run_in_thread(
 
     def worker() -> None:
         result = work()
-        root.after(0, lambda: on_done(result))
+        _schedule_on_tk_thread(root, lambda: on_done(result))
 
     if delay_ms and delay_ms > 0:
-        root.after(delay_ms, lambda: Thread(target=worker, daemon=True).start())
+        _schedule_on_tk_thread(root, lambda: Thread(target=worker, daemon=True).start(), delay_ms=delay_ms)
     else:
         Thread(target=worker, daemon=True).start()

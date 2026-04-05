@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Iterator
 from threading import RLock
-from typing import Any
-from src.tray.protocols import LightingTrayProtocol
+from typing import Protocol, cast
 
 from src.core.backends.ite8233.backend import Ite8233Backend
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
@@ -11,8 +11,6 @@ from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 from src.core.effects.software_targets import normalize_software_effect_target
 from src.core.utils.exceptions import is_permission_denied
 from src.tray.ui.menu_status import device_context_controls_available, device_context_entries
-
-from ._lighting_controller_helpers import try_log_event
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +20,47 @@ _CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
 _SECONDARY_TARGET_RUNTIME_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
 
 
+class _LightbarDeviceProtocol(Protocol):
+    def set_color(self, color: object, *, brightness: int) -> None: ...
+
+    def turn_off(self) -> None: ...
+
+
+class _SecondarySoftwareTargetProtocol(Protocol):
+    key: str
+
+    def set_color(self, color: object, *, brightness: int) -> None: ...
+
+    def turn_off(self) -> None: ...
+
+
+class _LightbarConfigProtocol(Protocol):
+    @property
+    def lightbar_brightness(self) -> int: ...
+
+    @property
+    def lightbar_color(self) -> tuple[int, int, int]: ...
+
+
+class _SoftwareTargetTrayProtocol(Protocol):
+    @property
+    def config(self) -> object: ...
+
+    @property
+    def engine(self) -> object: ...
+
+    @property
+    def is_off(self) -> bool: ...
+
+    def _log_exception(self, msg: str, exc: Exception) -> None: ...
+
+    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
+
+
+class _PermissionIssueTrayProtocol(Protocol):
+    def _notify_permission_issue(self, exc: Exception) -> None: ...
+
+
 class _CachedLightbarSoftwareTarget:
     supports_per_key = False
     device_type = "lightbar"
@@ -29,14 +68,14 @@ class _CachedLightbarSoftwareTarget:
     def __init__(self, *, key: str) -> None:
         self.key = str(key or "lightbar")
         self._lock = RLock()
-        self._device: Any = None
+        self._device: _LightbarDeviceProtocol | None = None
 
     @property
     def device(self) -> "_CachedLightbarSoftwareTarget":
         return self
 
-    def set_color(self, color, *, brightness: int) -> None:
-        def _apply(device: Any) -> None:
+    def set_color(self, color: object, *, brightness: int) -> None:
+        def _apply(device: _LightbarDeviceProtocol) -> None:
             device.set_color(color, brightness=int(brightness))
 
         self._with_device(_apply)
@@ -44,7 +83,7 @@ class _CachedLightbarSoftwareTarget:
     def turn_off(self) -> None:
         self._with_device(lambda device: device.turn_off())
 
-    def _with_device(self, operation) -> None:
+    def _with_device(self, operation: Callable[[_LightbarDeviceProtocol], None]) -> None:
         with self._lock:
             device = self._device
             if device is None:
@@ -58,7 +97,24 @@ class _CachedLightbarSoftwareTarget:
                 raise
 
 
-def configure_engine_software_targets(tray: Any) -> None:
+def _try_log_event(tray: _SoftwareTargetTrayProtocol, source: str, action: str, **fields: object) -> None:
+    try:
+        tray._log_event(source, action, **fields)
+    except Exception as exc:  # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
+        logger.exception("Tray event logging failed: %s", exc)
+
+
+def _notify_permission_issue_or_none(tray: _SoftwareTargetTrayProtocol) -> Callable[[Exception], None] | None:
+    try:
+        notify_permission_issue = cast(_PermissionIssueTrayProtocol, tray)._notify_permission_issue
+    except AttributeError:
+        return None
+    if not callable(notify_permission_issue):
+        return None
+    return notify_permission_issue
+
+
+def configure_engine_software_targets(tray: _SoftwareTargetTrayProtocol) -> None:
     engine = getattr(tray, "engine", None)
     if engine is None:
         return
@@ -78,7 +134,7 @@ def configure_engine_software_targets(tray: Any) -> None:
     )
 
 
-def apply_software_effect_target_selection(tray: LightingTrayProtocol, target: str) -> str:
+def apply_software_effect_target_selection(tray: _SoftwareTargetTrayProtocol, target: str) -> str:
     normalized = normalize_software_effect_target(target)
     previous = normalize_software_effect_target(getattr(getattr(tray, "config", None), "software_effect_target", None))
 
@@ -90,7 +146,7 @@ def apply_software_effect_target_selection(tray: LightingTrayProtocol, target: s
     )
 
     configure_engine_software_targets(tray)
-    try_log_event(tray, "menu", "set_software_effect_target", old=previous, new=normalized)
+    _try_log_event(tray, "menu", "set_software_effect_target", old=previous, new=normalized)
 
     if normalized != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE and not bool(getattr(tray, "is_off", False)):
         restore_secondary_software_targets(tray)
@@ -98,20 +154,20 @@ def apply_software_effect_target_selection(tray: LightingTrayProtocol, target: s
     return normalized
 
 
-def software_effect_target_has_auxiliary_devices(tray: LightingTrayProtocol) -> bool:
+def software_effect_target_has_auxiliary_devices(tray: object) -> bool:
     return bool(_secondary_target_entries(tray))
 
 
-def software_effect_target_routes_aux_devices(tray: LightingTrayProtocol) -> bool:
+def software_effect_target_routes_aux_devices(tray: _SoftwareTargetTrayProtocol) -> bool:
     if not software_effect_target_has_auxiliary_devices(tray):
         return False
     current = normalize_software_effect_target(getattr(getattr(tray, "config", None), "software_effect_target", None))
     return current == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 
 
-def secondary_software_render_targets(tray: LightingTrayProtocol) -> list[object]:
+def secondary_software_render_targets(tray: _SoftwareTargetTrayProtocol) -> list[_SecondarySoftwareTargetProtocol]:
     cache = _proxy_cache(tray)
-    targets: list[object] = []
+    targets: list[_SecondarySoftwareTargetProtocol] = []
     for entry in _secondary_target_entries(tray):
         device_type = str(entry.get("device_type") or "").strip().lower()
         if device_type != "lightbar":
@@ -125,7 +181,7 @@ def secondary_software_render_targets(tray: LightingTrayProtocol) -> list[object
     return targets
 
 
-def restore_secondary_software_targets(tray: Any) -> None:
+def restore_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> None:
     for entry, target in _iter_secondary_targets(tray):
         try:
             _restore_target_from_config(tray, entry=entry, target=target)
@@ -133,7 +189,7 @@ def restore_secondary_software_targets(tray: Any) -> None:
             _handle_secondary_target_error(tray, exc, action="restore_secondary_software_target")
 
 
-def turn_off_secondary_software_targets(tray: Any) -> None:
+def turn_off_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> None:
     for _entry, target in _iter_secondary_targets(tray):
         try:
             target.turn_off()
@@ -141,7 +197,7 @@ def turn_off_secondary_software_targets(tray: Any) -> None:
             _handle_secondary_target_error(tray, exc, action="turn_off_secondary_software_target")
 
 
-def software_effect_target_options(tray: LightingTrayProtocol) -> list[dict[str, object]]:
+def software_effect_target_options(tray: object) -> list[dict[str, object]]:
     aux_available = software_effect_target_has_auxiliary_devices(tray)
     return [
         {
@@ -157,7 +213,7 @@ def software_effect_target_options(tray: LightingTrayProtocol) -> list[dict[str,
     ]
 
 
-def _secondary_target_entries(tray: LightingTrayProtocol) -> list[dict[str, str]]:
+def _secondary_target_entries(tray: object) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
     for entry in device_context_entries(tray):
         if str(entry.get("device_type") or "keyboard").strip().lower() == "keyboard":
@@ -168,13 +224,13 @@ def _secondary_target_entries(tray: LightingTrayProtocol) -> list[dict[str, str]
     return entries
 
 
-def _proxy_cache(tray: Any) -> dict[str, object]:
+def _proxy_cache(tray: _SoftwareTargetTrayProtocol) -> dict[str, _SecondarySoftwareTargetProtocol]:
     existing = getattr(tray, "software_target_proxy_cache", None)
     if isinstance(existing, dict):
         return existing
-    cache: dict[str, object] = {}
+    cache: dict[str, _SecondarySoftwareTargetProtocol] = {}
     try:
-        tray.software_target_proxy_cache = cache
+        setattr(tray, "software_target_proxy_cache", cache)
     except (AttributeError, TypeError):
         pass
     except RuntimeError as exc:
@@ -182,8 +238,10 @@ def _proxy_cache(tray: Any) -> dict[str, object]:
     return cache
 
 
-def _iter_secondary_targets(tray: LightingTrayProtocol):
-    targets_by_key = {str(getattr(target, "key", "")): target for target in secondary_software_render_targets(tray)}
+def _iter_secondary_targets(
+    tray: _SoftwareTargetTrayProtocol,
+) -> Iterator[tuple[dict[str, str], _SecondarySoftwareTargetProtocol]]:
+    targets_by_key = {target.key: target for target in secondary_software_render_targets(tray)}
     for entry in _secondary_target_entries(tray):
         key = str(entry.get("key") or "")
         target = targets_by_key.get(key)
@@ -192,24 +250,41 @@ def _iter_secondary_targets(tray: LightingTrayProtocol):
         yield entry, target
 
 
-def _restore_target_from_config(tray: LightingTrayProtocol, *, entry: dict[str, str], target: Any) -> None:
+def _restore_target_from_config(
+    tray: _SoftwareTargetTrayProtocol,
+    *,
+    entry: dict[str, str],
+    target: _SecondarySoftwareTargetProtocol,
+) -> None:
     device_type = str(entry.get("device_type") or "").strip().lower()
     if device_type != "lightbar":
         return
 
-    brightness = int(getattr(tray.config, "lightbar_brightness", 0) or 0)
+    config = _lightbar_config_or_none(tray)
+    brightness = 0 if config is None else int(config.lightbar_brightness or 0)
     if brightness <= 0:
         target.turn_off()
         return
 
-    color = tuple(getattr(tray.config, "lightbar_color", (255, 0, 0)) or (255, 0, 0))
+    color = (255, 0, 0) if config is None else tuple(config.lightbar_color or (255, 0, 0))
     target.set_color(color, brightness=brightness)
 
 
-def _handle_secondary_target_error(tray: LightingTrayProtocol, exc: Exception, *, action: str) -> None:
+def _lightbar_config_or_none(tray: _SoftwareTargetTrayProtocol) -> _LightbarConfigProtocol | None:
+    config = getattr(tray, "config", None)
+    if config is None:
+        return None
+    return cast(_LightbarConfigProtocol, config)
+
+
+def _handle_secondary_target_error(tray: _SoftwareTargetTrayProtocol, exc: Exception, *, action: str) -> None:
     if is_permission_denied(exc):
+        notify_permission_issue = _notify_permission_issue_or_none(tray)
+        if notify_permission_issue is None:
+            _log_boundary_exception(tray, f"Error during {action}: %s", exc)
+            return
         try:
-            tray._notify_permission_issue(exc)
+            notify_permission_issue(exc)
             return
         except Exception as notify_exc:  # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging
             _log_boundary_exception(
@@ -219,7 +294,9 @@ def _handle_secondary_target_error(tray: LightingTrayProtocol, exc: Exception, *
     _log_boundary_exception(tray, f"Error during {action}: %s", exc)
 
 
-def _set_engine_attr_best_effort(tray: LightingTrayProtocol, attr: str, value: object, *, error_msg: str) -> None:
+def _set_engine_attr_best_effort(
+    tray: _SoftwareTargetTrayProtocol, attr: str, value: object, *, error_msg: str
+) -> None:
     engine = getattr(tray, "engine", None)
     if engine is None:
         return
@@ -232,7 +309,9 @@ def _set_engine_attr_best_effort(tray: LightingTrayProtocol, attr: str, value: o
         _log_boundary_exception(tray, error_msg, exc)
 
 
-def _set_config_attr_best_effort(tray: LightingTrayProtocol, attr: str, value: object, *, error_msg: str) -> None:
+def _set_config_attr_best_effort(
+    tray: _SoftwareTargetTrayProtocol, attr: str, value: object, *, error_msg: str
+) -> None:
     config = getattr(tray, "config", None)
     if config is None:
         return
@@ -245,7 +324,7 @@ def _set_config_attr_best_effort(tray: LightingTrayProtocol, attr: str, value: o
         _log_boundary_exception(tray, error_msg, exc)
 
 
-def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
+def _log_boundary_exception(tray: _SoftwareTargetTrayProtocol, msg: str, exc: Exception) -> None:
     try:
         tray._log_exception(msg, exc)
         return

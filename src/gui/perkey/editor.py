@@ -40,6 +40,13 @@ def _log_boundary_exception(key: str, msg: str, exc: Exception) -> None:
     log_throttled(logger, key, interval_s=60, level=logging.DEBUG, msg=msg, exc=exc)
 
 
+def _last_non_black_color_or(editor: Any, default: object) -> object:
+    try:
+        return editor._last_non_black_color
+    except AttributeError:
+        return default
+
+
 class PerKeyEditor:
     # Attributes initialized by editor_bootstrap.initialize_editor
     config: Any
@@ -208,8 +215,8 @@ class PerKeyEditor:
 
     def _commit(self, *, force: bool = False):
         prev_kb = self.kb
-        base = tuple(getattr(self, "_last_non_black_color", tuple(self.config.color)))
         fallback = tuple(self.config.color)
+        base = tuple(_last_non_black_color_or(self, fallback))
         self.kb, self.colors = self._commit_pipeline.commit(
             kb=self.kb,
             colors=dict(self.colors),

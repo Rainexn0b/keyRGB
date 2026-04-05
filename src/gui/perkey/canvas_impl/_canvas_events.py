@@ -10,6 +10,62 @@ from src.core.utils.logging_utils import log_throttled
 logger = logging.getLogger(__name__)
 
 
+def _selected_overlay_identity_or_none(editor: Any) -> str | None:
+    try:
+        identity_getter = editor._selected_overlay_identity
+    except AttributeError:
+        return None
+    if not callable(identity_getter):
+        return None
+    selected_identity = identity_getter()
+    if not selected_identity:
+        return None
+    return str(selected_identity)
+
+
+def _selected_slot_id_or_none(editor: Any) -> str | None:
+    try:
+        selected_slot_id = editor.selected_slot_id
+    except AttributeError:
+        return None
+    if not selected_slot_id:
+        return None
+    return str(selected_slot_id)
+
+
+def _selected_key_id_or_none(editor: Any) -> str | None:
+    try:
+        selected_key_id = editor.selected_key_id
+    except AttributeError:
+        return None
+    if not selected_key_id:
+        return None
+    return str(selected_key_id)
+
+
+def _slot_id_for_key_id_or_none(editor: Any, key_id: str) -> str | None:
+    try:
+        slot_lookup = editor._slot_id_for_key_id
+    except AttributeError:
+        return None
+    if not callable(slot_lookup):
+        return None
+    resolved_slot_id = slot_lookup(key_id)
+    if not resolved_slot_id:
+        return None
+    return str(resolved_slot_id)
+
+
+def _hit_test_slot_id_or_none(canvas: Any, *, x: float, y: float) -> str | None:
+    try:
+        hit_test = canvas._hit_test_slot_id
+    except AttributeError:
+        return None
+    if not callable(hit_test):
+        return None
+    return hit_test(x, y)
+
+
 class _KeyboardCanvasEventMixin:
     # Attributes/methods provided by tk.Canvas and KeyboardCanvas
     editor: Any
@@ -25,24 +81,21 @@ class _KeyboardCanvasEventMixin:
     _resize_edges_for_point: Any
 
     def _selected_slot_identity(self) -> str | None:
-        identity_getter = getattr(self.editor, "_selected_overlay_identity", None)
-        selected_identity = identity_getter() if callable(identity_getter) else None
-        if selected_identity:
-            return str(selected_identity)
+        selected_identity = _selected_overlay_identity_or_none(self.editor)
+        if selected_identity is not None:
+            return selected_identity
 
-        selected_slot_id = getattr(self.editor, "selected_slot_id", None)
-        if selected_slot_id:
-            return str(selected_slot_id)
+        selected_slot_id = _selected_slot_id_or_none(self.editor)
+        if selected_slot_id is not None:
+            return selected_slot_id
 
-        selected_key_id = getattr(self.editor, "selected_key_id", None)
-        if not selected_key_id:
+        selected_key_id = _selected_key_id_or_none(self.editor)
+        if selected_key_id is None:
             return None
 
-        slot_lookup = getattr(self.editor, "_slot_id_for_key_id", None)
-        if callable(slot_lookup):
-            resolved_slot_id = slot_lookup(selected_key_id)
-            if resolved_slot_id:
-                return str(resolved_slot_id)
+        resolved_slot_id = _slot_id_for_key_id_or_none(self.editor, selected_key_id)
+        if resolved_slot_id is not None:
+            return resolved_slot_id
         return str(selected_key_id)
 
     def _on_resize(self, _event) -> None:
@@ -118,8 +171,7 @@ class _KeyboardCanvasEventMixin:
                         return
                     if t.startswith("pkey_"):
                         key_id = t.removeprefix("pkey_")
-                        slot_lookup = getattr(self.editor, "_slot_id_for_key_id", None)
-                        slot_id = slot_lookup(key_id) if callable(slot_lookup) else None
+                        slot_id = _slot_id_for_key_id_or_none(self.editor, key_id)
                         self.editor.on_slot_clicked(str(slot_id or key_id))
                         return
         except Exception as exc:  # @quality-exception exception-transparency: Tk canvas tag lookup and slot dispatch; must stay non-fatal
@@ -132,8 +184,7 @@ class _KeyboardCanvasEventMixin:
                 exc=exc,
             )
 
-        hit_test = getattr(self, "_hit_test_slot_id", None)
-        slot_id = hit_test(float(event.x), float(event.y)) if callable(hit_test) else None
+        slot_id = _hit_test_slot_id_or_none(self, x=float(event.x), y=float(event.y))
         if slot_id is not None:
             self.editor.on_slot_clicked(slot_id)
 

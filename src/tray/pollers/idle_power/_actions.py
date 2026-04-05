@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from typing import Optional, cast
+from typing import Optional, Protocol, cast
 
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
@@ -59,6 +59,36 @@ def _call_runtime_boundary(
         return False
 
 
+def _tray_log_exception_or_none(tray: object) -> Callable[[str, Exception], None] | None:
+    try:
+        log_exception = cast(IdlePowerTrayProtocol, tray)._log_exception
+    except AttributeError:
+        return None
+    if not callable(log_exception):
+        return None
+    return cast(Callable[[str, Exception], None], log_exception)
+
+
+class _DimTempStateTray(Protocol):
+    _dim_temp_active: bool
+    _dim_temp_target_brightness: int | None
+
+
+def _dim_temp_state_matches(tray: object, *, target_brightness: int) -> bool:
+    try:
+        dim_temp_active = cast(_DimTempStateTray, tray)._dim_temp_active
+    except AttributeError:
+        dim_temp_active = False
+    try:
+        dim_temp_target = cast(_DimTempStateTray, tray)._dim_temp_target_brightness
+    except AttributeError:
+        dim_temp_target = -1
+    try:
+        return bool(dim_temp_active) and int(dim_temp_target or -1) == int(target_brightness)
+    except (TypeError, ValueError):
+        return False
+
+
 def _log_tray_boundary_exception(
     tray: object,
     *,
@@ -68,7 +98,7 @@ def _log_tray_boundary_exception(
     fallback_level: int,
     fallback_msg: str,
 ) -> None:
-    log_exception = getattr(tray, "_log_exception", None)
+    log_exception = _tray_log_exception_or_none(tray)
     if callable(log_exception):
         try:
             log_exception(msg, exc)
@@ -255,18 +285,13 @@ def apply_idle_action(
         return
 
     if action == "dim_to_temp":
-        if not bool(getattr(tray, "is_off", False)):
-            try:
-                if bool(getattr(tray, "_dim_temp_active", False)) and int(
-                    getattr(tray, "_dim_temp_target_brightness", -1) or -1
-                ) == int(dim_temp_brightness):
-                    return
-            except (TypeError, ValueError):
-                pass
+        if not bool(tray.is_off):
+            if _dim_temp_state_matches(tray, target_brightness=dim_temp_brightness):
+                return
             tray._dim_temp_active = True
             tray._dim_temp_target_brightness = int(dim_temp_brightness)
             effect = read_effect_name(
-                getattr(tray, "config", None),
+                tray.config,
                 log_key="idle_power.dim_to_temp.effect_name",
                 log_msg="Idle-power dim-to-temp could not read effect name; falling back to none",
                 log_idle_power_exception=_log_idle_power_exception,
@@ -293,7 +318,7 @@ def apply_idle_action(
     if action == "restore_brightness":
         tray._dim_temp_active = False
         tray._dim_temp_target_brightness = None
-        config = getattr(tray, "config", None)
+        config = tray.config
         target = safe_int_attr(config, "brightness", default=0)
         perkey_target = safe_int_attr(config, "perkey_brightness", default=0)
         effect = read_effect_name(
@@ -304,7 +329,7 @@ def apply_idle_action(
             warning_level=logging.WARNING,
             recoverable_effect_name_exceptions=_RECOVERABLE_EFFECT_NAME_EXCEPTIONS,
         )
-        if target > 0 and not bool(getattr(tray, "is_off", False)):
+        if target > 0 and not bool(tray.is_off):
             _call_runtime_boundary(
                 lambda: apply_restore_brightness(
                     tray,
@@ -325,7 +350,7 @@ def apply_idle_action(
         return
 
     if action == "restore":
-        if not bool(getattr(tray, "_user_forced_off", False)) and not bool(getattr(tray, "_power_forced_off", False)):
+        if not bool(tray._user_forced_off) and not bool(tray._power_forced_off):
             tray._dim_temp_active = False
             tray._dim_temp_target_brightness = None
             if hasattr(tray, "engine"):

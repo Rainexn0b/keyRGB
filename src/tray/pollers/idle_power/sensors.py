@@ -3,13 +3,30 @@ from __future__ import annotations
 import os
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Protocol, cast
 
 from src.tray.protocols import IdlePowerTrayProtocol
 
 
 _RECOVERABLE_SYSFS_READ_EXCEPTIONS = (OSError, UnicodeError, ValueError)
 _RECOVERABLE_SUBPROCESS_EXCEPTIONS = (OSError, ValueError, subprocess.SubprocessError)
+
+
+class _BacklightStateTray(Protocol):
+    _dim_backlight_baselines: dict[str, int]
+    _dim_backlight_dimmed: dict[str, bool]
+
+
+def _backlight_state_or_defaults(tray: object) -> tuple[dict[str, int], dict[str, bool]]:
+    try:
+        baselines = cast(_BacklightStateTray, tray)._dim_backlight_baselines
+    except AttributeError:
+        baselines = {}
+    try:
+        dimmed_states = cast(_BacklightStateTray, tray)._dim_backlight_dimmed
+    except AttributeError:
+        dimmed_states = {}
+    return baselines, dimmed_states
 
 
 def _read_int(path: Path) -> Optional[int]:
@@ -26,8 +43,7 @@ def read_dimmed_state(tray: IdlePowerTrayProtocol, *, backlight_base: Path | Non
     if not base.exists():
         return None
 
-    baselines: dict[str, int] = getattr(tray, "_dim_backlight_baselines", {})
-    dimmed_states: dict[str, bool] = getattr(tray, "_dim_backlight_dimmed", {})
+    baselines, dimmed_states = _backlight_state_or_defaults(tray)
     dimmed_any: Optional[bool] = None
     screen_off_any = False
     observed_any = 0

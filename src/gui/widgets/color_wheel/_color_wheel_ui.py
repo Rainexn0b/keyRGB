@@ -17,13 +17,15 @@ class _ColorWheelUIMixin:
     callback: Any
     release_callback: Any
     current_value: Any
+    _theme_bg_hex: str | None
+    _theme_border_hex: str | None
     set_color: Any
     _invoke_callback: Any
 
     def _create_widgets(self):
         """Create the canvas, brightness slider, preview, and manual RGB inputs."""
-        bg = getattr(self, "_theme_bg_hex", None) or "#2b2b2b"
-        border = getattr(self, "_theme_border_hex", None) or "#666666"
+        bg = self._theme_bg_hex or "#2b2b2b"
+        border = self._theme_border_hex or "#666666"
         # Canvas for the color wheel
         self.canvas = tk.Canvas(self, width=self.size, height=self.size, highlightthickness=0, bg=bg)
         self.canvas.pack(pady=10)

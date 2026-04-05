@@ -8,6 +8,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 
 from src.core.utils.logging_utils import log_throttled
+from src.core.power.tcc_profiles.models import is_builtin_profile_id
 from src.gui.tcc.profile_editor import open_profile_json_editor
 import src.core.power.tcc_profiles as tcc_power_profiles
 
@@ -52,7 +53,7 @@ def duplicate_profile(
     profile: tcc_power_profiles.TccProfile,
     write_errors: tuple[type[BaseException], ...],
 ) -> None:
-    if profile.id.startswith("__legacy_"):
+    if is_builtin_profile_id(profile.id):
         return
     name = simpledialog.askstring("Duplicate Profile", "New profile name:", parent=root)
     if name is None:
@@ -86,7 +87,7 @@ def rename_profile(
     profile: tcc_power_profiles.TccProfile,
     write_errors: tuple[type[BaseException], ...],
 ) -> None:
-    if profile.id.startswith("__legacy_"):
+    if is_builtin_profile_id(profile.id):
         return
     name = simpledialog.askstring("Rename Profile", "New name:", initialvalue=profile.name, parent=root)
     if name is None:
@@ -150,7 +151,7 @@ def edit_profile(
     profile: tcc_power_profiles.TccProfile,
     write_errors: tuple[type[BaseException], ...],
 ) -> None:
-    if profile.id.startswith("__legacy_"):
+    if is_builtin_profile_id(profile.id):
         return
 
     payload: dict[str, Any] | None = None

@@ -4,7 +4,8 @@ import logging
 import os
 import threading
 import time
-from typing import Optional
+from collections.abc import Callable
+from typing import Optional, cast
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
 from src.core.utils.safe_attrs import safe_str_attr
@@ -30,12 +31,32 @@ REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 logger = logging.getLogger(__name__)
 
 
+def _tray_log_exception_or_none(tray: object) -> Callable[..., object] | None:
+    try:
+        log_exception = cast(IdlePowerTrayProtocol, tray)._log_exception
+    except AttributeError:
+        return None
+    if not callable(log_exception):
+        return None
+    return cast(Callable[..., object], log_exception)
+
+
+def _tray_log_event_or_none(tray: object) -> Callable[..., object] | None:
+    try:
+        log_event = cast(IdlePowerTrayProtocol, tray)._log_event
+    except AttributeError:
+        return None
+    if not callable(log_event):
+        return None
+    return cast(Callable[..., object], log_event)
+
+
 def _log_module_exception(msg: str, exc: Exception) -> None:
     logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 
 
 def _log_tray_exception(tray: IdlePowerTrayProtocol, msg: str, exc: Exception) -> None:
-    log_exception = getattr(tray, "_log_exception", None)
+    log_exception = _tray_log_exception_or_none(tray)
     if callable(log_exception):
         try:
             log_exception(msg, exc)
@@ -47,7 +68,7 @@ def _log_tray_exception(tray: IdlePowerTrayProtocol, msg: str, exc: Exception) -
 
 
 def _try_log_event(tray: IdlePowerTrayProtocol, source: str, action: str, **fields: object) -> None:
-    log_event = getattr(tray, "_log_event", None)
+    log_event = _tray_log_event_or_none(tray)
     if not callable(log_event):
         return
     try:
@@ -72,7 +93,7 @@ def _effective_screen_dim_sync_enabled(tray: IdlePowerTrayProtocol, requested_en
         }
         if not allow:
             if not tray._dim_sync_suppressed_logged:
-                setattr(tray, "_dim_sync_suppressed_logged", True)
+                tray._dim_sync_suppressed_logged = True
                 _try_log_event(
                     tray,
                     "idle_power",

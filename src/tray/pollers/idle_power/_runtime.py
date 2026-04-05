@@ -29,12 +29,8 @@ def _log_idle_action_best_effort(
     dim_sync_mode: str,
     dim_temp_brightness: int,
 ) -> None:
-    log_event = getattr(tray, "_log_event", None)
-    if not callable(log_event):
-        return
-
     try:
-        log_event(
+        tray._log_event(
             "idle_power",
             str(action),
             dimmed=dimmed,
