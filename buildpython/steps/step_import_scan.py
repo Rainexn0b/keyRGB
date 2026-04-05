@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 OPTIONAL_TOPLEVEL = {
     "PyQt6",  # optional UI sliders
+    "gi",  # optional desktop integration / icon rasterization support
     "ruff",  # optional lint/format
     "pystray",  # optional tray icon (headless CI)
     # Optional Tuxedo integration (not required for KeyRGB core)
