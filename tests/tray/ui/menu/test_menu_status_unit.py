@@ -101,3 +101,51 @@ def test_keyboard_status_text_uses_ite8291r3_backend_display_name(monkeypatch) -
     )
 
     assert menu_status.keyboard_status_text(tray) == "Keyboard: ITE 8291r3 (USB) (048d:600b)"
+
+
+def test_device_context_entries_threads_backend_name_from_candidate_probe_names() -> None:
+    tray = SimpleNamespace(
+        backend=None,
+        backend_probe=None,
+        device_discovery={
+            "candidates": [
+                {
+                    "device_type": "lightbar",
+                    "product": "ITE Device(8233)",
+                    "usb_vid": "0x048d",
+                    "usb_pid": "0x7001",
+                    "status": "supported",
+                    "probe_names": ["ite8233"],
+                }
+            ]
+        },
+    )
+
+    entries = menu_status.device_context_entries(tray)
+
+    assert entries[1]["device_type"] == "lightbar"
+    assert entries[1]["backend_name"] == "ite8233"
+
+
+def test_device_context_entries_use_sysfs_mouse_context_key_and_backend_name() -> None:
+    tray = SimpleNamespace(
+        backend=None,
+        backend_probe=None,
+        device_discovery={
+            "candidates": [
+                {
+                    "device_type": "mouse",
+                    "product": "usbmouse::rgb",
+                    "status": "supported",
+                    "context_key": "mouse:sysfs:usbmouse__rgb",
+                    "probe_names": ["sysfs-mouse"],
+                }
+            ]
+        },
+    )
+
+    entries = menu_status.device_context_entries(tray)
+
+    assert entries[1]["key"] == "mouse:sysfs:usbmouse__rgb"
+    assert entries[1]["backend_name"] == "sysfs-mouse"
+    assert entries[1]["text"] == "Mouse: usbmouse::rgb"

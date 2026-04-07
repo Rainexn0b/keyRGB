@@ -231,6 +231,22 @@ def test_lightbar_color_and_brightness_persist_independently(tmp_path, monkeypat
     assert cfg2.lightbar_color == (9, 10, 0)
 
 
+def test_secondary_device_state_persists_for_generic_aux_routes(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    cfg.set_secondary_device_brightness("mouse", 17)
+    cfg.set_secondary_device_color("mouse", ("1", "bad", "99"))
+
+    assert cfg.get_secondary_device_brightness("mouse") == 15
+    assert cfg.get_secondary_device_color("mouse") == (1, 0, 99)
+
+    cfg2 = Config()
+    assert cfg2.get_secondary_device_brightness("mouse") == 15
+    assert cfg2.get_secondary_device_color("mouse") == (1, 0, 99)
+
+
 def test_software_effect_target_persists_and_normalizes(tmp_path, monkeypatch) -> None:
     from src.core.config import Config
 

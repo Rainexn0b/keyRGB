@@ -278,3 +278,42 @@ def test_collect_diagnostics_text_sorts_json_keys(monkeypatch) -> None:
 
     assert '"warnings"' not in text
     assert text.index('"alpha"') < text.index('"usb_devices"') < text.index('"zeta"')
+
+
+def test_collect_diagnostics_text_preserves_sysfs_mouse_candidate_details(monkeypatch) -> None:
+    class FakeDiagnostics:
+        def to_dict(self) -> dict[str, object]:
+            return {
+                "backends": {
+                    "selected": "sysfs-leds",
+                    "sysfs_mouse_candidates": {
+                        "candidates_count": 1,
+                        "matched_count": 0,
+                        "eligible_count": 0,
+                        "top": [
+                            {
+                                "name": "steelseries::logo",
+                                "matched": False,
+                                "eligible": False,
+                                "score": 0,
+                                "reasons": ["no mouse/pointer evidence in LED name or device metadata"],
+                            }
+                        ],
+                    },
+                },
+                "usb_devices": [],
+            }
+
+    fake_module = ModuleType("src.core.diagnostics")
+    fake_module.collect_diagnostics = lambda *, include_usb: FakeDiagnostics()  # type: ignore[attr-defined]
+
+    monkeypatch.setitem(sys.modules, "src.core.diagnostics", fake_module)
+    monkeypatch.setattr(runner, "_expected_holder_pids", lambda: set())
+
+    payload = json.loads(runner.collect_diagnostics_text())
+
+    assert payload["backends"]["sysfs_mouse_candidates"]["candidates_count"] == 1
+    assert payload["backends"]["sysfs_mouse_candidates"]["top"][0]["name"] == "steelseries::logo"
+    assert payload["backends"]["sysfs_mouse_candidates"]["top"][0]["reasons"] == [
+        "no mouse/pointer evidence in LED name or device metadata"
+    ]

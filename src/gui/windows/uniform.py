@@ -13,6 +13,7 @@ from tkinter import ttk
 
 from src.core.backends.registry import select_backend
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
+from src.core.secondary_device_routes import route_for_backend_name, route_for_device_type
 from src.core.utils.exceptions import is_device_busy
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.utils.window_centering import center_window_on_screen
@@ -44,8 +45,11 @@ class UniformColorGUI:
             str(os.environ.get("KEYRGB_UNIFORM_TARGET_CONTEXT", "keyboard") or "keyboard").strip().lower()
         )
         self.requested_backend = str(os.environ.get("KEYRGB_UNIFORM_BACKEND", "") or "").strip().lower() or None
-        self._target_is_lightbar = self.target_context.startswith("lightbar") or self.requested_backend == "ite8233"
-        self._target_label = "Lightbar" if self._target_is_lightbar else "Keyboard"
+        self._secondary_route = self._resolve_secondary_route()
+        self._target_is_secondary = self._secondary_route is not None
+        self._target_label = (
+            str(self._secondary_route.display_name) if self._secondary_route is not None else "Keyboard"
+        )
 
         self.root = tk.Tk()
         self.root.title(f"KeyRGB - {self._target_label} Color")
@@ -127,6 +131,9 @@ class UniformColorGUI:
 
     def _select_backend_best_effort(self):
         try:
+            route = getattr(self, "_secondary_route", None)
+            if route is not None:
+                return route.get_backend()
             return select_backend(requested=self.requested_backend)
         except _BACKEND_SELECTION_ERRORS:
             logger.debug(
@@ -134,6 +141,16 @@ class UniformColorGUI:
                 exc_info=True,
             )
             return None
+
+    def _resolve_secondary_route(self):
+        route = route_for_backend_name(self.requested_backend)
+        if route is not None:
+            return route
+
+        device_type = self.target_context.split(":", 1)[0].strip().lower()
+        if not device_type or device_type == "keyboard":
+            return None
+        return route_for_device_type(device_type)
 
     def _probe_color_support(self, backend) -> bool:
         if backend is None:
@@ -183,18 +200,15 @@ class UniformColorGUI:
         self.root.after(2000, lambda: self.status_label.config(text=""))
 
     def _ensure_brightness_nonzero(self) -> int:
-        brightness = int(self.config.lightbar_brightness if self._target_is_lightbar else self.config.brightness)
+        brightness = int(self._current_brightness())
         if brightness == 0:
             brightness = 25
-            if self._target_is_lightbar:
-                self.config.lightbar_brightness = brightness
-            else:
-                self.config.brightness = brightness  # Auto-saves
+            self._store_brightness(brightness)
         return brightness
 
     def _commit_color_to_config(self, r: int, g: int, b: int) -> None:
-        if self._target_is_lightbar:
-            self.config.lightbar_color = (r, g, b)
+        if self._target_is_secondary:
+            self._store_secondary_color((r, g, b))
             return
 
         # Stop any running effects first, then save the color (auto-saves)
@@ -202,9 +216,82 @@ class UniformColorGUI:
         self.config.color = (r, g, b)
 
     def _initial_color(self) -> tuple[int, int, int]:
-        if self._target_is_lightbar:
-            return tuple(self.config.lightbar_color)
+        if self._target_is_secondary:
+            return self._current_secondary_color()
         return tuple(self.config.color) if isinstance(self.config.color, list) else self.config.color
+
+    def _current_brightness(self) -> int:
+        if not self._target_is_secondary:
+            return int(self.config.brightness)
+
+        getter = getattr(self.config, "get_secondary_device_brightness", None)
+        if callable(getter) and self._secondary_route is not None:
+            return int(
+                getter(
+                    str(self._secondary_route.state_key),
+                    fallback_keys=tuple(filter(None, (self._secondary_route.config_brightness_attr,))),
+                    default=25,
+                )
+            )
+
+        if self._secondary_route is not None and self._secondary_route.config_brightness_attr:
+            return int(getattr(self.config, self._secondary_route.config_brightness_attr, 25) or 25)
+        return 25
+
+    def _store_brightness(self, brightness: int) -> None:
+        if not self._target_is_secondary:
+            self.config.brightness = brightness
+            return
+
+        if self._secondary_route is None:
+            return
+
+        setter = getattr(self.config, "set_secondary_device_brightness", None)
+        if callable(setter):
+            setter(
+                str(self._secondary_route.state_key),
+                int(brightness),
+                legacy_key=self._secondary_route.config_brightness_attr,
+            )
+            return
+
+        if self._secondary_route.config_brightness_attr:
+            setattr(self.config, self._secondary_route.config_brightness_attr, int(brightness))
+
+    def _current_secondary_color(self) -> tuple[int, int, int]:
+        if self._secondary_route is None:
+            return (255, 0, 0)
+
+        getter = getattr(self.config, "get_secondary_device_color", None)
+        if callable(getter):
+            return tuple(
+                getter(
+                    str(self._secondary_route.state_key),
+                    fallback_keys=tuple(filter(None, (self._secondary_route.config_color_attr,))),
+                    default=(255, 0, 0),
+                )
+            )
+
+        if self._secondary_route.config_color_attr:
+            return tuple(getattr(self.config, self._secondary_route.config_color_attr, (255, 0, 0)))
+        return (255, 0, 0)
+
+    def _store_secondary_color(self, color: tuple[int, int, int]) -> None:
+        if self._secondary_route is None:
+            return
+
+        setter = getattr(self.config, "set_secondary_device_color", None)
+        if callable(setter):
+            setter(
+                str(self._secondary_route.state_key),
+                color,
+                legacy_key=self._secondary_route.config_color_attr,
+                default=(255, 0, 0),
+            )
+            return
+
+        if self._secondary_route.config_color_attr:
+            setattr(self.config, self._secondary_route.config_color_attr, color)
 
     def _on_color_change(self, r, g, b):
         """Handle color wheel changes (during drag)."""
@@ -217,10 +304,12 @@ class UniformColorGUI:
         if (now - self._last_drag_commit_ts) < self._drag_commit_interval:
             return
 
-        if self.config.effect != "none":
+        if not self._target_is_secondary and self.config.effect != "none":
             self.config.effect = "none"
-
-        self.config.color = color
+        if self._target_is_secondary:
+            self._store_secondary_color(color)
+        else:
+            self.config.color = color
         self._last_drag_commit_ts = now
         self._last_drag_committed_color = color
 

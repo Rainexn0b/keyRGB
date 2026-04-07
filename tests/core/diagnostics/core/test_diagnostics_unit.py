@@ -13,6 +13,7 @@ from tests._paths import ensure_repo_root_on_sys_path
 ensure_repo_root_on_sys_path()
 
 import src.core.backends.sysfs.common as sysfs_common
+import src.core.backends.sysfs_mouse.common as sysfs_mouse_common
 import src.core.diagnostics.collectors as diagnostics_collectors
 import src.core.diagnostics.collectors.backends as collectors_backends
 import src.core.diagnostics.io as diagnostics_io
@@ -72,6 +73,9 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     sysfs_cand = diag.backends.get("sysfs_led_candidates")
     assert isinstance(sysfs_cand, dict)
     assert "exists" in sysfs_cand
+    sysfs_mouse_cand = diag.backends.get("sysfs_mouse_candidates")
+    assert isinstance(sysfs_mouse_cand, dict)
+    assert "exists" in sysfs_mouse_cand
 
     text = format_diagnostics_text(diag)
     assert "DMI:" in text
@@ -278,6 +282,77 @@ def test_sysfs_led_candidates_snapshot_records_scoring_failure(monkeypatch: pyte
     )
 
 
+def test_sysfs_mouse_candidates_snapshot_records_rejection_reason(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    leds_root = tmp_path / "sys" / "class" / "leds"
+    led_dir = leds_root / "steelseries::logo"
+    led_dir.mkdir(parents=True)
+    (led_dir / "brightness").write_text("1\n", encoding="utf-8")
+    (led_dir / "max_brightness").write_text("10\n", encoding="utf-8")
+    (led_dir / "multi_intensity").write_text("0 0 0\n", encoding="utf-8")
+
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(leds_root))
+
+    snapshot = diagnostics_collectors._backends_sysfs.sysfs_mouse_candidates_snapshot()
+
+    assert snapshot["candidates_count"] == 1
+    assert snapshot["matched_count"] == 0
+    assert snapshot["eligible_count"] == 0
+    assert snapshot["top"][0]["name"] == "steelseries::logo"
+    assert snapshot["top"][0]["matched"] is False
+    assert "no mouse/pointer evidence" in snapshot["top"][0]["reasons"][0]
+
+
+def test_format_diagnostics_text_includes_sysfs_mouse_candidate_reasons() -> None:
+    diag = Diagnostics(
+        dmi={},
+        leds=[],
+        sysfs_leds=[],
+        usb_ids=[],
+        env={},
+        virt={},
+        system={},
+        hints={},
+        app={},
+        power_supply={},
+        backends={
+            "selected": "sysfs-leds",
+            "requested": "auto",
+            "probes": [],
+            "sysfs_mouse_candidates": {
+                "root": "<overridden>",
+                "exists": True,
+                "candidates_count": 1,
+                "matched_count": 0,
+                "eligible_count": 0,
+                "top": [
+                    {
+                        "name": "steelseries::logo",
+                        "matched": False,
+                        "eligible": False,
+                        "score": 0,
+                        "reasons": ["no mouse/pointer evidence in LED name or device metadata"],
+                        "metadata": "",
+                        "has_brightness": True,
+                        "has_max_brightness": True,
+                        "color_capable": True,
+                        "brightness_readable": True,
+                        "brightness_writable": True,
+                    }
+                ],
+            },
+        },
+        usb_devices=[],
+        config={},
+        process={},
+    )
+
+    text = format_diagnostics_text(diag)
+
+    assert "sysfs_mouse_candidates:" in text
+    assert "steelseries::logo matched=False eligible=False score=0" in text
+    assert "reasons: no mouse/pointer evidence in LED name or device metadata" in text
+
+
 def test_probe_backend_logs_probe_boundary_failures(caplog: pytest.LogCaptureFixture) -> None:
     class BrokenBackend:
         name = "broken-backend"
@@ -339,6 +414,7 @@ def test_backend_probe_snapshot_logs_selection_boundary_failures(
 
     monkeypatch.setattr(collectors_backends, "_selection_is_blocked_under_pytest", lambda: (False, None))
     monkeypatch.setattr(collectors_backends, "build_backend_speed_probe_plans", lambda backends_snapshot: [])
+    monkeypatch.setattr(collectors_backends, "_iter_auxiliary_probe_backends", lambda: [])
     monkeypatch.setattr(collectors_backends, "sysfs_led_candidates_snapshot", lambda: {})
     monkeypatch.setattr(backend_registry, "iter_backends", lambda: [])
     monkeypatch.setattr(

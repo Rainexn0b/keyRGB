@@ -5,10 +5,10 @@ from collections.abc import Callable, Iterator
 from threading import RLock
 from typing import Protocol, cast
 
-from src.core.backends.ite8233.backend import Ite8233Backend
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 from src.core.effects.software_targets import normalize_software_effect_target
+from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.core.utils.exceptions import is_permission_denied
 from src.tray.ui.menu_status import device_context_controls_available, device_context_entries
 
@@ -34,14 +34,6 @@ class _SecondarySoftwareTargetProtocol(Protocol):
     def turn_off(self) -> None: ...
 
 
-class _LightbarConfigProtocol(Protocol):
-    @property
-    def lightbar_brightness(self) -> int: ...
-
-    @property
-    def lightbar_color(self) -> tuple[int, int, int]: ...
-
-
 class _SoftwareTargetTrayProtocol(Protocol):
     @property
     def config(self) -> object: ...
@@ -61,12 +53,13 @@ class _PermissionIssueTrayProtocol(Protocol):
     def _notify_permission_issue(self, exc: Exception) -> None: ...
 
 
-class _CachedLightbarSoftwareTarget:
+class _CachedSecondarySoftwareTarget:
     supports_per_key = False
-    device_type = "lightbar"
 
-    def __init__(self, *, key: str) -> None:
+    def __init__(self, *, key: str, route: SecondaryDeviceRoute) -> None:
         self.key = str(key or "lightbar")
+        self.device_type = str(route.device_type)
+        self._route = route
         self._lock = RLock()
         self._device: _LightbarDeviceProtocol | None = None
 
@@ -87,7 +80,7 @@ class _CachedLightbarSoftwareTarget:
         with self._lock:
             device = self._device
             if device is None:
-                device = Ite8233Backend().get_device()
+                device = self._route.get_device()
                 self._device = device
             try:
                 operation(device)
@@ -169,13 +162,13 @@ def secondary_software_render_targets(tray: _SoftwareTargetTrayProtocol) -> list
     cache = _proxy_cache(tray)
     targets: list[_SecondarySoftwareTargetProtocol] = []
     for entry in _secondary_target_entries(tray):
-        device_type = str(entry.get("device_type") or "").strip().lower()
-        if device_type != "lightbar":
+        route = route_for_context_entry(entry)
+        if route is None or not bool(route.supports_uniform_color) or not bool(route.supports_software_target):
             continue
-        key = str(entry.get("key") or device_type)
+        key = str(entry.get("key") or route.device_type)
         target = cache.get(key)
         if target is None:
-            target = _CachedLightbarSoftwareTarget(key=key)
+            target = _CachedSecondarySoftwareTarget(key=key, route=route)
             cache[key] = target
         targets.append(target)
     return targets
@@ -256,25 +249,36 @@ def _restore_target_from_config(
     entry: dict[str, str],
     target: _SecondarySoftwareTargetProtocol,
 ) -> None:
-    device_type = str(entry.get("device_type") or "").strip().lower()
-    if device_type != "lightbar":
+    route = route_for_context_entry(entry)
+    if route is None:
         return
 
-    config = _lightbar_config_or_none(tray)
-    brightness = 0 if config is None else int(config.lightbar_brightness or 0)
+    config = getattr(tray, "config", None)
+    if config is None:
+        return
+
+    brightness_getter = getattr(config, "get_secondary_device_brightness", None)
+    color_getter = getattr(config, "get_secondary_device_color", None)
+    if callable(brightness_getter):
+        brightness = int(brightness_getter(str(route.state_key), fallback_keys=tuple(filter(None, (route.config_brightness_attr,))), default=0) or 0)
+    else:
+        brightness_attr = str(route.config_brightness_attr or "").strip()
+        if not brightness_attr:
+            return
+        brightness = int(getattr(config, brightness_attr, 0) or 0)
     if brightness <= 0:
         target.turn_off()
         return
 
-    color = (255, 0, 0) if config is None else tuple(config.lightbar_color or (255, 0, 0))
+    if callable(color_getter):
+        raw_color = color_getter(str(route.state_key), fallback_keys=tuple(filter(None, (route.config_color_attr,))), default=(255, 0, 0))
+    else:
+        color_attr = str(route.config_color_attr or "").strip()
+        if not color_attr:
+            return
+        raw_color = getattr(config, color_attr, (255, 0, 0))
+    color = tuple(raw_color or (255, 0, 0))
     target.set_color(color, brightness=brightness)
-
-
-def _lightbar_config_or_none(tray: _SoftwareTargetTrayProtocol) -> _LightbarConfigProtocol | None:
-    config = getattr(tray, "config", None)
-    if config is None:
-        return None
-    return cast(_LightbarConfigProtocol, config)
 
 
 def _handle_secondary_target_error(tray: _SoftwareTargetTrayProtocol, exc: Exception, *, action: str) -> None:

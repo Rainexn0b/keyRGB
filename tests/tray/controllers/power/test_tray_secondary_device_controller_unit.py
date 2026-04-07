@@ -4,6 +4,16 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, call
 
 
+def _make_lightbar_route(*, device_factory):
+    return SimpleNamespace(
+        device_type="lightbar",
+        backend_name="ite8233",
+        display_name="Lightbar",
+        get_device=device_factory,
+        config_brightness_attr="lightbar_brightness",
+    )
+
+
 def _make_tray() -> SimpleNamespace:
     return SimpleNamespace(
         selected_device_context="lightbar:048d:7001",
@@ -30,8 +40,8 @@ def test_apply_selected_secondary_brightness_updates_lightbar_device(monkeypatch
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.Ite8233Backend.get_device",
-        lambda self: DummyDevice(),
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
     assert apply_selected_secondary_brightness(tray, "6") is True
@@ -55,8 +65,8 @@ def test_turn_off_selected_secondary_device_turns_off_lightbar(monkeypatch) -> N
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.Ite8233Backend.get_device",
-        lambda self: DummyDevice(),
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
     assert turn_off_selected_secondary_device(tray) is True
@@ -76,8 +86,8 @@ def test_apply_selected_secondary_brightness_notifies_permission_errors(monkeypa
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.Ite8233Backend.get_device",
-        lambda self: (_ for _ in ()).throw(err),
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: (_ for _ in ()).throw(err)),
     )
 
     assert apply_selected_secondary_brightness(tray, "4") is False
@@ -109,8 +119,8 @@ def test_apply_selected_secondary_brightness_logs_recoverable_config_write_error
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.Ite8233Backend.get_device",
-        lambda self: DummyDevice(),
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
     assert apply_selected_secondary_brightness(tray, "4") is True
@@ -135,8 +145,8 @@ def test_apply_selected_secondary_brightness_logs_notify_callback_failures(monke
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.Ite8233Backend.get_device",
-        lambda self: (_ for _ in ()).throw(err),
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: (_ for _ in ()).throw(err)),
     )
 
     assert apply_selected_secondary_brightness(tray, "4") is False
@@ -164,8 +174,8 @@ def test_apply_selected_secondary_brightness_logs_menu_refresh_failures(monkeypa
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.Ite8233Backend.get_device",
-        lambda self: DummyDevice(),
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
     assert apply_selected_secondary_brightness(tray, "6") is True
@@ -195,8 +205,8 @@ def test_apply_selected_secondary_brightness_falls_back_to_module_logging_when_t
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.Ite8233Backend.get_device",
-        lambda self: DummyDevice(),
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
     assert controller.apply_selected_secondary_brightness(tray, "6") is True

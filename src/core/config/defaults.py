@@ -17,6 +17,10 @@ DEFAULTS: dict = {
     # Secondary lightbar state for auxiliary single-zone controllers.
     "lightbar_brightness": 25,
     "lightbar_color": [255, 0, 0],
+    # Generic secondary-device state for auxiliary routes such as lightbars or
+    # future mouse sysfs backends. Kept alongside the legacy lightbar fields so
+    # older config consumers continue to work.
+    "secondary_device_state": {},
     # Direction for directional effects (wave, snake). None = default direction.
     "direction": None,
     # Manual highlight color for reactive typing effects.

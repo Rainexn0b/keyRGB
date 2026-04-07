@@ -191,6 +191,25 @@ def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_ligh
     launch.assert_called_once_with(target_context="lightbar:048d:7001", backend_name="ite8233")
 
 
+def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_mouse() -> None:
+    from src.tray.app.callbacks import on_selected_device_color_clicked
+
+    tray = MagicMock()
+    tray.selected_device_context = "mouse:sysfs:usbmouse__rgb"
+
+    with (
+        patch(
+            "src.tray.app.callbacks.selected_device_context_entry",
+            return_value={"key": "mouse:sysfs:usbmouse__rgb", "device_type": "mouse"},
+        ),
+        patch("src.tray.app.callbacks.selected_secondary_backend_name", return_value="sysfs-mouse"),
+        patch("src.tray.app.callbacks.launch_uniform_gui") as launch,
+    ):
+        on_selected_device_color_clicked(tray)
+
+    launch.assert_called_once_with(target_context="mouse:sysfs:usbmouse__rgb", backend_name="sysfs-mouse")
+
+
 def test_on_selected_device_brightness_clicked_delegates_to_secondary_controller() -> None:
     from src.tray.app.callbacks import on_selected_device_brightness_clicked
 

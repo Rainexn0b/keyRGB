@@ -97,6 +97,46 @@ def build_device_discovery_payload(
             )
         )
 
+    for probe in probe_entries:
+        ids = probe.get("identifiers")
+        if not isinstance(ids, dict):
+            continue
+
+        device_type = str(ids.get("device_type") or "").strip().lower()
+        if not device_type or device_type == "keyboard":
+            continue
+
+        context_key = str(ids.get("context_key") or "").strip().lower()
+        led_name = str(ids.get("led") or "").strip()
+        led_dir = str(ids.get("led_dir") or "").strip()
+        if not led_name and not led_dir:
+            continue
+
+        status, action = candidate_status([probe], vendor_id=0)
+        candidates.append(
+            {
+                "usb_vid": "",
+                "usb_pid": "",
+                "manufacturer": "",
+                "product": led_name,
+                "device_type": device_type,
+                "status": status,
+                "recommended_action": action,
+                "probe_names": [str(probe.get("name") or "")],
+                "probe_stabilities": [str(probe.get("stability") or "")],
+                "probe_selection_reasons": [
+                    str(probe.get("selection_reason") or "")
+                    for probe in [probe]
+                    if probe.get("selection_reason")
+                ],
+                "hidraw_nodes": [],
+                "hidraw_descriptor_sizes": [],
+                "context_key": context_key or device_type,
+                "sysfs_led": led_name,
+                "sysfs_led_dir": led_dir,
+            }
+        )
+
     candidates.sort(key=lambda entry: (entry.get("status") != "supported", entry.get("usb_vid"), entry.get("usb_pid")))
 
     return {

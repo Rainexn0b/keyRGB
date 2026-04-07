@@ -5,6 +5,7 @@ from typing import Any, Optional
 
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
+from src.tray.secondary_device_routes import route_for_context_entry
 
 from src.core.power.system import PowerMode, get_status, set_mode
 from .menu_status import device_context_controls_available
@@ -55,44 +56,77 @@ def _unsupported_device_context_text(device_label: str, status: str) -> str:
     }.get(status, f"{device_label} controls are not available in this build")
 
 
-def _build_lightbar_context_menu_items(
+def _secondary_brightness_matches(tray: Any, *, route: Any, expected_level: int) -> bool:
+    config = getattr(tray, "config", None)
+    if config is None or route is None:
+        return False
+
+    getter = getattr(config, "get_secondary_device_brightness", None)
+    if callable(getter):
+        current = getter(
+            str(route.state_key),
+            fallback_keys=tuple(filter(None, (route.config_brightness_attr,))),
+            default=0,
+        )
+        return int(current or 0) == expected_level * 5
+
+    attr_name = str(route.config_brightness_attr or "").strip()
+    if not attr_name:
+        return False
+    return safe_int_attr(config, attr_name, default=0) == expected_level * 5
+
+
+def _build_uniform_secondary_context_menu_items(
     tray: Any, *, pystray: Any, item: Any, context_entry: dict[str, str]
 ) -> list[Any]:
+    route = route_for_context_entry(context_entry)
+    device_label = (
+        str(getattr(route, "display_name", "") or "").strip()
+        or str(context_entry.get("device_type") or "device").replace("_", " ").title()
+    )
     controls_available = device_context_controls_available(tray, context_entry)
-    if controls_available:
+    if controls_available and route is not None and bool(route.supports_uniform_color):
+        body = [item("Color…", tray._on_selected_device_color_clicked)]
 
-        def _checked_lightbar_brightness(level: int):
-            return lambda _item, expected=level: (
-                safe_int_attr(tray.config, "lightbar_brightness", default=0) == expected * 5
+        def _checked_secondary_brightness(level: int):
+            return lambda _item, expected=level: _secondary_brightness_matches(tray, route=route, expected_level=expected)
+
+        if route is not None:
+            brightness_menu = pystray.Menu(
+                *[
+                    item(
+                        str(level),
+                        tray._on_selected_device_brightness_clicked,
+                        checked=_checked_secondary_brightness(level),
+                        radio=True,
+                    )
+                    for level in range(0, 11)
+                ]
             )
+            body.append(item("Brightness", brightness_menu))
 
-        brightness_menu = pystray.Menu(
-            *[
-                item(
-                    str(level),
-                    tray._on_selected_device_brightness_clicked,
-                    checked=_checked_lightbar_brightness(level),
-                    radio=True,
-                )
-                for level in range(0, 11)
+        body.extend(
+            [
+                pystray.Menu.SEPARATOR,
+                item("Turn Off", tray._on_selected_device_turn_off_clicked),
             ]
         )
-        body = [
-            item("Color…", tray._on_selected_device_color_clicked),
-            item("Brightness", brightness_menu),
-            pystray.Menu.SEPARATOR,
-            item("Turn Off", tray._on_selected_device_turn_off_clicked),
-        ]
     else:
         body = [
             item(
-                _unsupported_device_context_text("Lightbar", str(context_entry.get("status") or "").strip()),
+                _unsupported_device_context_text(device_label, str(context_entry.get("status") or "").strip()),
                 lambda _icon, _item: None,
                 enabled=False,
             )
         ]
 
     return [*body, *_device_context_footer_items(tray, pystray=pystray, item=item)]
+
+
+def _build_lightbar_context_menu_items(
+    tray: Any, *, pystray: Any, item: Any, context_entry: dict[str, str]
+) -> list[Any]:
+    return _build_uniform_secondary_context_menu_items(tray, pystray=pystray, item=item, context_entry=context_entry)
 
 
 def _build_generic_device_context_menu_items(
@@ -126,6 +160,7 @@ def _build_generic_device_context_menu_items(
 
 _DEVICE_CONTEXT_MENU_BUILDERS = {
     "lightbar": _build_lightbar_context_menu_items,
+    "mouse": _build_uniform_secondary_context_menu_items,
 }
 
 

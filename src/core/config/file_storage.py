@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import time
+from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +33,7 @@ def load_config_settings(
     """
 
     if not config_file.exists():
-        return dict(defaults)
+        return deepcopy(defaults)
 
     last_error: Exception | None = None
     for _ in range(max(1, retries)):
@@ -56,7 +57,9 @@ def load_config_settings(
             if "return_effect_after_effect" in loaded and isinstance(loaded["return_effect_after_effect"], str):
                 loaded["return_effect_after_effect"] = loaded["return_effect_after_effect"].lower()
 
-            return {**defaults, **loaded}
+            merged = deepcopy(defaults)
+            merged.update(loaded)
+            return merged
         except json.JSONDecodeError as e:
             last_error = e
             time.sleep(retry_delay)

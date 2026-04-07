@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 from typing import Any
 
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGETS
@@ -51,7 +52,7 @@ class Config(LightingConfigAccessors):
         self.CONFIG_FILE = config_file_path()
         self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         loaded = self._load()
-        self._settings: dict[str, Any] = loaded if loaded is not None else self.DEFAULTS.copy()
+        self._settings: dict[str, Any] = loaded if loaded is not None else deepcopy(self.DEFAULTS)
         self._coerce_loaded_settings()
 
         # Cache mtime for reload() short-circuiting.

@@ -15,7 +15,7 @@ from src.core.backends.policy import (
 from src.core.utils.safe_attrs import safe_int_attr
 
 from ..support import build_backend_speed_probe_plans
-from ._backends_sysfs import sysfs_led_candidates_snapshot
+from ._backends_sysfs import sysfs_led_candidates_snapshot, sysfs_mouse_candidates_snapshot
 
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,8 @@ def _tier_for_backend_name(name: str) -> int | None:
     normalized = (name or "").strip().lower()
     if normalized == "sysfs-leds":
         return 1
+    if normalized == "sysfs-mouse":
+        return 1
     if normalized.startswith("ite"):
         return 2
     return None
@@ -50,6 +52,8 @@ def _tier_for_backend_name(name: str) -> int | None:
 def _provider_for_backend_name(name: str) -> str | None:
     normalized = (name or "").strip().lower()
     if normalized == "sysfs-leds":
+        return "kernel-sysfs"
+    if normalized == "sysfs-mouse":
         return "kernel-sysfs"
     if normalized.startswith("ite"):
         return "usb-userspace"
@@ -185,6 +189,16 @@ def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str
     return available_candidates
 
 
+def _iter_auxiliary_probe_backends() -> list[object]:
+    try:
+        from ...backends.sysfs_mouse.backend import SysfsMouseBackend
+
+        return [SysfsMouseBackend()]
+    except Exception as exc:  # @quality-exception exception-transparency: auxiliary diagnostics probe registration is a best-effort boundary and should not block the main snapshot
+        _log_snapshot_boundary("Failed to register auxiliary diagnostics probe backends", exc)
+        return []
+
+
 def backend_probe_snapshot() -> dict[str, Any]:
     """Collect backend probe results (best-effort)."""
 
@@ -197,6 +211,8 @@ def backend_probe_snapshot() -> dict[str, Any]:
     probes: list[dict[str, Any]] = []
     with _disable_usb_scan_under_pytest_if_needed():
         for backend in iter_backends():
+            probes.append(_probe_backend(backend))
+        for backend in _iter_auxiliary_probe_backends():
             probes.append(_probe_backend(backend))
 
     requested = os.environ.get("KEYRGB_BACKEND") or "auto"
@@ -230,4 +246,5 @@ def backend_probe_snapshot() -> dict[str, Any]:
         "candidates_sorted": available_candidates,
         "guided_speed_probes": guided_speed_probes,
         "sysfs_led_candidates": sysfs_led_candidates_snapshot(),
+        "sysfs_mouse_candidates": sysfs_mouse_candidates_snapshot(),
     }

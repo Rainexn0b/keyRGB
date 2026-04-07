@@ -159,11 +159,22 @@ def device_context_entries(tray: Any) -> list[dict[str, str]]:
         usb_id = f" ({usb_vid}:{usb_pid})" if usb_vid and usb_pid else ""
         details = f": {product}" if product else ""
         label = device_type.replace("_", " ").title()
-        key = f"{device_type}:{usb_vid}:{usb_pid}" if usb_vid and usb_pid else device_type
+        key = str(candidate.get("context_key") or "").strip().lower()
+        if not key:
+            key = f"{device_type}:{usb_vid}:{usb_pid}" if usb_vid and usb_pid else device_type
+        backend_name = ""
+        probe_names = candidate.get("probe_names")
+        if isinstance(probe_names, list):
+            for probe_name in probe_names:
+                normalized_probe_name = str(probe_name or "").strip().lower()
+                if normalized_probe_name:
+                    backend_name = normalized_probe_name
+                    break
         entries.append(
             {
                 "key": key,
                 "device_type": device_type,
+                "backend_name": backend_name,
                 "status": status,
                 "text": f"{label}{details}{usb_id}{secondary_status_suffix(status)}",
             }
@@ -226,7 +237,8 @@ def secondary_device_status_texts(tray: Any) -> list[str]:
     for candidate in candidates:
         if not isinstance(candidate, dict):
             continue
-        if str(candidate.get("device_type") or "") != "lightbar":
+        device_type = str(candidate.get("device_type") or "").strip().lower()
+        if not device_type or device_type == "keyboard":
             continue
 
         usb_vid = format_hex_id(str(candidate.get("usb_vid") or ""))
@@ -238,7 +250,8 @@ def secondary_device_status_texts(tray: Any) -> list[str]:
 
         status = str(candidate.get("status") or "").strip()
         status_suffix = secondary_status_suffix(status)
-        lines.append(f"Lightbar{details}{usb_id}{status_suffix}")
+        label = device_type.replace("_", " ").title()
+        lines.append(f"{label}{details}{usb_id}{status_suffix}")
 
     return lines
 

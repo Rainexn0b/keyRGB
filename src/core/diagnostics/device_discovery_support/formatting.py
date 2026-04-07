@@ -43,8 +43,13 @@ def format_device_discovery_text(payload: dict[str, Any]) -> str:
                 continue
             product = str(entry.get("product") or "").strip()
             label = f" {product}" if product else ""
+            usb_vid = str(entry.get("usb_vid") or "").strip()
+            usb_pid = str(entry.get("usb_pid") or "").strip()
+            sysfs_led = str(entry.get("sysfs_led") or "").strip()
+            sysfs_led_dir = str(entry.get("sysfs_led_dir") or "").strip()
+            candidate_prefix = f"{usb_vid}:{usb_pid}" if usb_vid and usb_pid else "sysfs"
             lines.append(
-                f"  - {entry.get('usb_vid')}:{entry.get('usb_pid')}{label} type={entry.get('device_type')} status={entry.get('status')}"
+                f"  - {candidate_prefix}{label} type={entry.get('device_type')} status={entry.get('status')}"
             )
             action = entry.get("recommended_action")
             if action:
@@ -52,6 +57,10 @@ def format_device_discovery_text(payload: dict[str, Any]) -> str:
             probes = entry.get("probe_names")
             if isinstance(probes, list) and probes:
                 lines.append(f"      probes: {', '.join(str(name) for name in probes if name)}")
+            if sysfs_led:
+                lines.append(f"      sysfs_led: {sysfs_led}")
+            if sysfs_led_dir:
+                lines.append(f"      sysfs_led_dir: {sysfs_led_dir}")
             hidraw_nodes = entry.get("hidraw_nodes")
             if isinstance(hidraw_nodes, list) and hidraw_nodes:
                 lines.append(f"      hidraw: {', '.join(str(path) for path in hidraw_nodes if path)}")

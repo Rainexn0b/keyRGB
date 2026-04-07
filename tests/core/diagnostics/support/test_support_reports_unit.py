@@ -128,3 +128,35 @@ def test_build_support_bundle_payload_embeds_issue_report() -> None:
     assert payload["device_discovery"] == {"summary": {}}
     assert payload["supplemental_evidence"] == {"captures": {}}
     assert payload["issue_report"]["template"] == "hardware-support"
+
+
+def test_build_support_bundle_payload_preserves_sysfs_mouse_candidate_diagnostics() -> None:
+    diagnostics = {
+        "backends": {
+            "sysfs_mouse_candidates": {
+                "candidates_count": 1,
+                "matched_count": 0,
+                "eligible_count": 0,
+                "top": [
+                    {
+                        "name": "steelseries::logo",
+                        "matched": False,
+                        "eligible": False,
+                        "score": 0,
+                        "reasons": ["no mouse/pointer evidence in LED name or device metadata"],
+                    }
+                ],
+            }
+        }
+    }
+
+    payload = build_support_bundle_payload(
+        diagnostics=diagnostics,
+        discovery={"summary": {}},
+        supplemental_evidence=None,
+    )
+
+    assert payload["diagnostics"]["backends"]["sysfs_mouse_candidates"]["top"][0]["name"] == "steelseries::logo"
+    assert payload["diagnostics"]["backends"]["sysfs_mouse_candidates"]["top"][0]["reasons"] == [
+        "no mouse/pointer evidence in LED name or device metadata"
+    ]

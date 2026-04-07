@@ -118,6 +118,35 @@ def test_format_device_discovery_text_includes_candidates() -> None:
     assert "lsusb -v -d 048d:7001" in text
 
 
+def test_format_device_discovery_text_includes_sysfs_aux_candidate_details() -> None:
+    text = format_device_discovery_text(
+        {
+            "selected_backend": "sysfs-leds",
+            "usb_ids": [],
+            "summary": {"candidate_count": 1, "supported_count": 1, "attention_count": 0},
+            "support_actions": {},
+            "candidates": [
+                {
+                    "usb_vid": "",
+                    "usb_pid": "",
+                    "product": "usbmouse::rgb",
+                    "device_type": "mouse",
+                    "status": "supported",
+                    "recommended_action": "Use the Mouse device context from the tray.",
+                    "probe_names": ["sysfs-mouse"],
+                    "sysfs_led": "usbmouse::rgb",
+                    "sysfs_led_dir": "/sys/class/leds/usbmouse::rgb",
+                }
+            ],
+        }
+    )
+
+    assert "sysfs usbmouse::rgb type=mouse status=supported" in text
+    assert "probes: sysfs-mouse" in text
+    assert "sysfs_led: usbmouse::rgb" in text
+    assert "sysfs_led_dir: /sys/class/leds/usbmouse::rgb" in text
+
+
 def test_collect_device_discovery_marks_supported_experimental_candidate(monkeypatch) -> None:
     monkeypatch.setattr(
         "src.core.diagnostics.device_discovery.backend_probe_snapshot",
@@ -154,6 +183,39 @@ def test_collect_device_discovery_marks_supported_experimental_candidate(monkeyp
     assert payload["support_actions"]["recommended_issue_template"] == "experimental-backend-confirmation"
 
 
+def test_collect_device_discovery_includes_sysfs_mouse_aux_candidate(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        lambda: {
+            "selected": "sysfs-leds",
+            "probes": [
+                {
+                    "name": "sysfs-mouse",
+                    "available": True,
+                    "stability": "experimental",
+                    "selection_enabled": True,
+                    "identifiers": {
+                        "device_type": "mouse",
+                        "context_key": "mouse:sysfs:usbmouse__rgb",
+                        "led": "usbmouse::rgb",
+                        "led_dir": "/sys/class/leds/usbmouse::rgb",
+                    },
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: [])
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_devices_snapshot", lambda targets: [])
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", lambda: [])
+
+    payload = collect_device_discovery(include_usb=True)
+
+    assert payload["summary"]["candidate_count"] == 1
+    assert payload["candidates"][0]["device_type"] == "mouse"
+    assert payload["candidates"][0]["context_key"] == "mouse:sysfs:usbmouse__rgb"
+    assert payload["candidates"][0]["probe_names"] == ["sysfs-mouse"]
+
+
 def test_collect_device_discovery_recommends_bug_report_for_supported_validated_backend(monkeypatch) -> None:
     monkeypatch.setattr(
         "src.core.diagnostics.device_discovery.backend_probe_snapshot",
@@ -188,3 +250,85 @@ def test_collect_device_discovery_recommends_bug_report_for_supported_validated_
 
     assert payload["support_actions"]["recommended_issue_template"] == "bug-report"
     assert payload["candidates"][0]["device_type"] == "keyboard"
+
+
+def test_collect_device_discovery_marks_ite8258_candidate_as_keyboard(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        lambda: {
+            "selected": None,
+            "probes": [
+                {
+                    "name": "ite8258",
+                    "available": False,
+                    "stability": "experimental",
+                    "selection_enabled": False,
+                    "selection_reason": "experimental backend disabled",
+                    "identifiers": {"usb_vid": "0x048d", "usb_pid": "0xc195"},
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:c195"])
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        lambda targets: [
+            {
+                "idVendor": "0x048d",
+                "idProduct": "0xc195",
+                "product": "ITE Device(8258)",
+                "manufacturer": "ITE Tech. Inc.",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.hidraw_devices_snapshot",
+        lambda: [{"vendor_id": "0x048d", "product_id": "0xc195", "devnode": "/dev/hidraw7"}],
+    )
+
+    payload = collect_device_discovery(include_usb=True)
+
+    assert payload["candidates"][0]["status"] == "experimental_disabled"
+    assert payload["candidates"][0]["device_type"] == "keyboard"
+    assert payload["candidates"][0]["probe_names"] == ["ite8258"]
+
+
+def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        lambda: {
+            "selected": None,
+            "probes": [
+                {
+                    "name": "ite8295-zones",
+                    "available": False,
+                    "stability": "experimental",
+                    "selection_enabled": False,
+                    "selection_reason": "experimental backend disabled",
+                    "identifiers": {"usb_vid": "0x048d", "usb_pid": "0xc963"},
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:c963"])
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        lambda targets: [
+            {
+                "idVendor": "0x048d",
+                "idProduct": "0xc963",
+                "product": "ITE Device(8295)",
+                "manufacturer": "ITE Tech. Inc.",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.hidraw_devices_snapshot",
+        lambda: [{"vendor_id": "0x048d", "product_id": "0xc963", "devnode": "/dev/hidraw9"}],
+    )
+
+    payload = collect_device_discovery(include_usb=True)
+
+    assert payload["candidates"][0]["status"] == "experimental_disabled"
+    assert payload["candidates"][0]["device_type"] == "keyboard"
+    assert payload["candidates"][0]["probe_names"] == ["ite8295-zones"]

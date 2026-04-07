@@ -142,6 +142,61 @@ def sysfs_led_candidates_snapshot() -> dict[str, Any]:
     return out
 
 
+def sysfs_mouse_candidates_snapshot() -> dict[str, Any]:
+    """Collect debug info for auxiliary sysfs mouse candidate selection."""
+
+    try:
+        from ..backends.sysfs_mouse.common import _leds_root, inspect_led_candidate  # type: ignore
+    except _EXPECTED_RUNTIME_ERRORS as exc:
+        return {"errors": [_exception_snapshot(stage="import_sysfs_mouse_common", exc=exc)]}
+
+    root: Path
+    try:
+        root = Path(os.fspath(_leds_root()))
+    except _EXPECTED_RUNTIME_ERRORS as exc:
+        return {"errors": [_exception_snapshot(stage="resolve_sysfs_mouse_root", exc=exc)]}
+
+    root_txt = str(root)
+    root_is_sys = root_txt.startswith("/sys/")
+    out: dict[str, Any] = {
+        "root": (root_txt if root_is_sys else "<overridden>"),
+        "root_is_sysfs": root_is_sys,
+        "exists": bool(root.exists()),
+    }
+
+    if not root.exists():
+        return out
+
+    inspected: list[dict[str, Any]] = []
+    try:
+        for child in root.iterdir():
+            if not child.is_dir():
+                continue
+            entry = dict(inspect_led_candidate(child))
+            if not root_is_sys:
+                entry["path"] = "<overridden>"
+            inspected.append(entry)
+    except _EXPECTED_RUNTIME_ERRORS as exc:
+        out["candidates_count"] = 0
+        _append_error(out, stage="scan_sysfs_mouse_candidates", exc=exc, extra={"root": root_txt})
+        return out
+
+    inspected.sort(
+        key=lambda entry: (
+            not bool(entry.get("eligible")),
+            not bool(entry.get("matched")),
+            -int(entry.get("score") or 0),
+            str(entry.get("name") or "").lower(),
+        )
+    )
+
+    out["candidates_count"] = len(inspected)
+    out["matched_count"] = sum(1 for entry in inspected if bool(entry.get("matched")))
+    out["eligible_count"] = sum(1 for entry in inspected if bool(entry.get("eligible")))
+    out["top"] = inspected[:8]
+    return out
+
+
 def _infer_zone_snapshot(scored: list[tuple[int, str, Path]]) -> dict[str, Any]:
     kbd_names: list[str] = []
     for _, name, _led_dir in scored:

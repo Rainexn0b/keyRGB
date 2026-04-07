@@ -34,6 +34,13 @@ Current backend plan:
 - `sysfs-leds`, `ite8291r3`, `ite8910`, and `asusctl-aura`: `validated`
 - `ite8297`: `experimental` + `reverse_engineered`
   - `0x048d:0x8297` — 64-byte hidraw feature-report path, uniform color only
+- `ite8258`: `experimental` + `reverse_engineered`
+	- `0x048d:0xc195` — Lenovo Legion 5 / Pro 5 Gen 10 24-zone ITE 8258 hidraw keyboard path (4×6 logical zone matrix, static color, brightness, and firmware effects)
+- `ite8295-zones`: `experimental` + `reverse_engineered`
+	- `0x048d:0xc963` — Lenovo 4-zone ITE 8295 hidraw keyboard path used by IdeaPad Gaming 3-class systems, with static color, 4-zone updates, brightness, and the confirmed default firmware effects (`breathing`, `wave`, `spectrum_cycle`)
+	- `0x048d:0xc966` — companion ITE 8176 endpoint reported on the same laptops; still treated as a separate unsupported protocol family until direct RGB evidence exists
+- `sysfs-mouse`: `experimental` + `speculative`
+	- Auxiliary-only route for color-capable external mouse LEDs exposed through `/sys/class/leds`; surfaced through discovery and tray secondary-device contexts, but intentionally kept out of primary keyboard auto-selection
 - `ite8233`: `experimental` + `reverse_engineered`
   - `0x048d:0x7001` — single-zone lightbar, static color / brightness / off
   - `0x048d:0x7000` — lightbar + hidden backend-level effects: `breathing`, `wave`, `bounce`/`clash`, `catchup`/`catch_up`
@@ -268,8 +275,9 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 
 | Variable                                | Usage                                                                                                                                                                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `KEYRGB_BACKEND`                        | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `ite8910`, `asusctl-aura`, or the experimental `ite8297` / `ite8233` / `ite8291` / `ite8291-zones` backends when experimental backends are enabled. |
+| `KEYRGB_BACKEND`                        | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `ite8910`, `asusctl-aura`, or the experimental `ite8297` / `ite8233` / `ite8258` / `ite8291` / `ite8291-zones` / `ite8295-zones` backends when experimental backends are enabled. |
 | `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1` | Opt in to experimental backends without using the Settings window.                                                                                                                                |
+| `KEYRGB_ITE8295_ZONES_HIDRAW_PATH`      | Override the detected `/dev/hidraw*` node for the experimental `ite8295-zones` backend (mainly for diagnostics / testing).                                                                        |
 | `KEYRGB_ITE8297_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8297` backend (mainly for diagnostics / testing).                                                                              |
 | `KEYRGB_ITE8233_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8233` lightbar backend (mainly for diagnostics / testing).                                                                     |
 | `KEYRGB_DEBUG=1`                        | Enable verbose debug logging.                                                                                                                                                                     |
@@ -298,7 +306,7 @@ Access **Settings** via the tray menu to configure:
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
 - **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
 - **Autostart**: enable “Start KeyRGB on login”.
-- **Backend policy**: opt in to experimental backends. Currently `ite8297`, `ite8233`, `ite8291`, and `ite8291-zones` are experimental; the UI labels experimental paths as speculative or research-backed.
+- **Backend policy**: opt in to experimental backends. Currently `ite8297`, `ite8233`, `ite8258`, `ite8291`, `ite8291-zones`, and `ite8295-zones` are experimental; the UI labels experimental paths as speculative or research-backed.
 
 ### Profiles
 

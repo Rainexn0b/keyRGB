@@ -1,4 +1,4 @@
-# Allow user access to supported ITE USB / hidraw devices.
+# Allow user access to supported ITE / Lenovo USB / hidraw devices.
 #
 # Use seat-based ACLs (uaccess) instead of making the device world-writable.
 # Some setups only apply the ACL reliably when explicitly invoking the uaccess
@@ -10,3 +10,5 @@ SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idPro
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="600b", TAG+="uaccess", RUN{builtin}+="uaccess"
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="ce00", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="8910", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c963", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c195", TAG+="uaccess", RUN{builtin}+="uaccess"

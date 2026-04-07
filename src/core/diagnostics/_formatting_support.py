@@ -201,10 +201,8 @@ def append_sysfs_leds(
         for entry in leds:
             lines.append(f"  - {entry.get('name')} ({entry.get('path')})")
 
-        sysfs_cand = backends.get("sysfs_led_candidates") if isinstance(backends, dict) else None
-        if not isinstance(sysfs_cand, dict) or not sysfs_cand:
-            return
-
+    sysfs_cand = backends.get("sysfs_led_candidates") if isinstance(backends, dict) else None
+    if isinstance(sysfs_cand, dict) and sysfs_cand:
         lines.append("  sysfs_led_candidates:")
         for key in ("root", "exists", "candidates_count"):
             if key in sysfs_cand:
@@ -250,6 +248,41 @@ def append_sysfs_leds(
                     top_extra.append(f"module={entry.get('device_module')}")
                 suffix = (" " + " ".join(top_extra)) if top_extra else ""
                 lines.append(f"      - {entry.get('name')} score={entry.get('score')}{suffix}")
+
+    sysfs_mouse_cand = backends.get("sysfs_mouse_candidates") if isinstance(backends, dict) else None
+    if isinstance(sysfs_mouse_cand, dict) and sysfs_mouse_cand:
+        lines.append("  sysfs_mouse_candidates:")
+        for key in ("root", "exists", "candidates_count", "matched_count", "eligible_count"):
+            if key in sysfs_mouse_cand:
+                lines.append(f"    {key}: {sysfs_mouse_cand.get(key)}")
+
+        top = sysfs_mouse_cand.get("top")
+        if isinstance(top, list) and top:
+            lines.append("    top:")
+            for entry in top[:5]:
+                if not isinstance(entry, dict):
+                    continue
+                status_parts = [
+                    f"matched={entry.get('matched')}",
+                    f"eligible={entry.get('eligible')}",
+                    f"score={entry.get('score')}",
+                ]
+                lines.append(f"      - {entry.get('name')} {' '.join(status_parts)}")
+                reasons = entry.get("reasons")
+                if isinstance(reasons, list) and reasons:
+                    lines.append(f"        reasons: {'; '.join(str(reason) for reason in reasons if reason)}")
+                metadata = str(entry.get("metadata") or "").strip()
+                if metadata:
+                    lines.append(f"        metadata: {metadata}")
+                lines.append(
+                    "        attrs: brightness={brightness} max_brightness={max_brightness} color_capable={color_capable} read={readable} write={writable}".format(
+                        brightness=entry.get("has_brightness"),
+                        max_brightness=entry.get("has_max_brightness"),
+                        color_capable=entry.get("color_capable"),
+                        readable=entry.get("brightness_readable"),
+                        writable=entry.get("brightness_writable"),
+                    )
+                )
 
 
 def _collect_candidate_usb_ids(*, usb_ids: object, usb_devices: object) -> list[str]:
