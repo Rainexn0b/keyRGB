@@ -2,19 +2,7 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-import os
-from typing import Iterable, Optional, Protocol, cast
-
-
-class _ModuleFileProtocol(Protocol):
-    __file__: object
-
-
-def _module_file_or_none(module: object) -> object | None:
-    try:
-        return cast(_ModuleFileProtocol, module).__file__
-    except AttributeError:
-        return None
+from typing import Iterable, Optional
 
 
 def repo_root_from(anchor: str | Path) -> Path:
@@ -70,57 +58,3 @@ def add_first_existing_to_sys_path(paths: Iterable[Path]) -> Optional[Path]:
         except OSError:
             continue
     return None
-
-
-def ensure_ite8291r3_ctl_importable(anchor: str | Path) -> Optional[Path]:
-    """Try to make `ite8291r3_ctl` importable from a source checkout.
-
-    Returns the inserted path if a repo/vendored fallback was used, else None.
-    """
-
-    # If explicitly requested, never override the installed module.
-    if os.environ.get("KEYRGB_USE_INSTALLED_ITE") == "1":
-        return None
-
-    # Under pytest, callers often monkeypatch `sys.modules["ite8291r3_ctl"]`.
-    # Do not stomp on that by force-prepending vendored paths.
-    if os.environ.get("PYTEST_CURRENT_TEST"):
-        try:
-            import ite8291r3_ctl  # noqa: F401
-
-            return None
-        except ImportError:
-            root = repo_root_from(anchor)
-            candidates = [
-                root / "vendor" / "ite8291r3-ctl",
-                root / "ite8291r3-ctl",  # alternate checkout layout
-            ]
-            return add_first_existing_to_sys_path(candidates)
-
-    existing = sys.modules.get("ite8291r3_ctl")
-    if existing is not None and not _module_file_or_none(existing):
-        # Likely an in-memory test double; leave it alone.
-        return None
-
-    root = repo_root_from(anchor)
-    candidates = [
-        root / "vendor" / "ite8291r3-ctl",
-        root / "ite8291r3-ctl",  # alternate checkout layout
-    ]
-
-    # Prefer a vendored checkout when it exists, even if a system-installed
-    # `ite8291r3_ctl` is already importable. This keeps dev/source runs stable
-    # when the distro package lags behind required USB IDs/patches.
-    inserted = add_first_existing_to_sys_path(candidates)
-    if inserted is None:
-        return None
-
-    # If the module was already imported from elsewhere (e.g. site-packages),
-    # force a reload so the vendored path wins.
-    already_loaded = any(name == "ite8291r3_ctl" or name.startswith("ite8291r3_ctl.") for name in sys.modules)
-    if already_loaded:
-        for name in list(sys.modules.keys()):
-            if name == "ite8291r3_ctl" or name.startswith("ite8291r3_ctl."):
-                sys.modules.pop(name, None)
-
-    return inserted

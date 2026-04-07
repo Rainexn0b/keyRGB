@@ -169,13 +169,6 @@ def app_snapshot() -> dict[str, Any]:
             except _METADATA_LOOKUP_ERRORS:
                 continue
 
-    for dist_name in ("ite8291r3-ctl", "ite8291r3_ctl"):
-        try:
-            app["ite8291r3_ctl_version"] = metadata.version(dist_name)
-            break
-        except _METADATA_LOOKUP_ERRORS:
-            continue
-
     return app
 
 

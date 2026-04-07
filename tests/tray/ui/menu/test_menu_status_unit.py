@@ -90,3 +90,14 @@ def test_probe_device_available_logs_and_preserves_engine_state_when_ensure_rais
     assert logged[0][0] == "tray.menu.ensure_device"
     assert "device availability" in logged[0][1].lower()
     assert isinstance(logged[0][2], _EnsureFailure)
+
+
+def test_keyboard_status_text_uses_ite8291r3_backend_display_name(monkeypatch) -> None:
+    monkeypatch.setattr(menu_status, "probe_device_available", lambda tray: True)
+
+    tray = SimpleNamespace(
+        backend=SimpleNamespace(name="ite8291r3"),
+        backend_probe=SimpleNamespace(identifiers={"usb_vid": "0x048d", "usb_pid": "0x600b"}),
+    )
+
+    assert menu_status.keyboard_status_text(tray) == "Keyboard: ITE 8291r3 (USB) (048d:600b)"

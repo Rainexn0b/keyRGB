@@ -52,7 +52,7 @@ def _hw_speed_from_ui_speed(ui_speed: int, *, kb: object) -> int:
 
 
 def allowed_hw_effect_keys(effect_func: Callable[..., object], *, logger: logging.Logger) -> set[str]:
-    """Best-effort introspection of ite8291r3-ctl's effect builders."""
+    """Best-effort introspection of hardware-effect builder callables."""
 
     try:
         introspectable = cast(_ClosureIntrospectableProtocol, effect_func)
@@ -97,7 +97,7 @@ def build_hw_effect_payload(
 
     # Hardware speed policy is backend-specific.
     # - ite8910: firmware uses 0..10 with larger values = faster
-    # - ite8291r3: vendored backend documents 0 = fastest, 10 = slowest
+    # - ite8291r3: native backend preserves the legacy 0 = fastest, 10 = slowest firmware scale
     # Unknown backends default to the UI scale directly so new hardware-effect
     # paths do not inherit the old inverted behavior by accident.
     hw_speed = _hw_speed_from_ui_speed(ui_speed, kb=kb)

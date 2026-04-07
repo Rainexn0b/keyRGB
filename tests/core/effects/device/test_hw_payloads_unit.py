@@ -42,7 +42,7 @@ class TestAllowedHwEffectKeys:
         """Should extract allowed keys from closure args dict."""
         from src.core.effects.hw_payloads import allowed_hw_effect_keys
 
-        # Simulate ite8291r3-ctl's pattern where effect builders have args in closure
+        # Simulate the legacy hardware-effect builder pattern with args stored in a closure
         def make_effect_func():
             args = {"speed": None, "brightness": None, "color": None}
 

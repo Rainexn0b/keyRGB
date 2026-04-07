@@ -20,7 +20,7 @@ def backend_display_name(backend_name: str) -> str:
     if backend_name == "sysfs-leds":
         return "Kernel Driver"
     if backend_name == "ite8291r3":
-        return "ITE 8291 (USB)"
+        return "ITE 8291r3 (USB)"
     if backend_name == "ite8910":
         return "ITE 8910 (USB)"
     if backend_name == "ite8297":

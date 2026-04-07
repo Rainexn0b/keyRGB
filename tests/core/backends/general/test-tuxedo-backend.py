@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Test script to verify ITE backend integration with Tuxedo GUI
-Tests effect switching, color changes, and brightness control
-"""
+"""Manual test script for the Tuxedo GUI integration path."""
 
 import os
 import sys
@@ -14,7 +11,6 @@ from tests._paths import REPO_ROOT, ensure_repo_root_on_sys_path
 ensure_repo_root_on_sys_path()
 
 sys.path.insert(0, os.path.join(REPO_ROOT, "tuxedo-src"))
-sys.path.insert(0, os.path.join(REPO_ROOT, "ite8291r3-ctl"))
 
 from backlight_control import backlight
 

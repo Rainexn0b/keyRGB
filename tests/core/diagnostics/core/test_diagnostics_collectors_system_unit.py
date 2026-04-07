@@ -237,8 +237,6 @@ def test_app_snapshot_prefers_repo_version_and_reports_installed_versions(
     def fake_version(dist_name: str) -> str:
         if dist_name == "Keyrgb":
             return "9.9.9"
-        if dist_name == "ite8291r3-ctl":
-            return "0.4.0"
         raise collectors_system.metadata.PackageNotFoundError(dist_name)
 
     monkeypatch.setattr(collectors_system.metadata, "version", fake_version)
@@ -250,7 +248,6 @@ def test_app_snapshot_prefers_repo_version_and_reports_installed_versions(
         "version_source": "pyproject",
         "dist_name": "Keyrgb",
         "dist_version": "9.9.9",
-        "ite8291r3_ctl_version": "0.4.0",
     }
 
 
@@ -273,23 +270,6 @@ def test_app_snapshot_falls_back_to_distribution_version(
         "dist": "KeyRGB",
         "version_source": "dist",
     }
-
-
-def test_app_snapshot_uses_alternate_helper_distribution_name(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(collectors_system, "_repo_version_text", lambda _anchor: None)
-
-    def fake_version(dist_name: str) -> str:
-        if dist_name == "ite8291r3_ctl":
-            return "0.5.1"
-        raise collectors_system.metadata.PackageNotFoundError(dist_name)
-
-    monkeypatch.setattr(collectors_system.metadata, "version", fake_version)
-
-    snapshot = collectors_system.app_snapshot()
-
-    assert snapshot == {"ite8291r3_ctl_version": "0.5.1"}
 
 
 def test_system_snapshot_collects_platform_python_and_filtered_os_release(

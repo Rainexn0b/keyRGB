@@ -54,10 +54,7 @@ def _install_tripwire() -> None:
         return
 
     # 1) Block imports that commonly lead to real USB access.
-    blocked_prefixes = (
-        "usb",  # pyusb
-        "ite8291r3_ctl",  # may load libusb / open device in some environments
-    )
+    blocked_prefixes = ("usb",)
 
     class _BlockImportsFinder(importlib.abc.MetaPathFinder):
         def find_spec(self, fullname: str, path, target=None):  # type: ignore[override]
