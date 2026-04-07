@@ -10,6 +10,15 @@ ensure_repo_root_on_sys_path()
 import src.core.backends.sysfs.privileged as sysfs_privileged
 
 
+def test_helper_can_apply_led_matches_helper_contract() -> None:
+    assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight") is True
+    assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight", color_kind="multi_intensity") is True
+    assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight", color_kind="color") is True
+    assert sysfs_privileged.helper_can_apply_led("ite_8297:1") is False
+    assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight", color_kind="rgb") is False
+    assert sysfs_privileged.helper_can_apply_led("system76::kbd_backlight", color_kind="file") is False
+
+
 def test_helper_supports_led_apply_returns_false_when_helper_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

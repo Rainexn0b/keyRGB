@@ -37,8 +37,20 @@ def set_zone_color_method(self, zone: dict, color, brightness: int):
             common._safe_write_text(zone["path"], f"{hex_color}\n")
             self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
             return
-        except PermissionError:
-            pass
+        except PermissionError as exc:
+            if (
+                privileged.helper_can_apply_led(led_dir.name, color_kind="file")
+                and privileged.helper_supports_led_apply()
+                and privileged.run_led_apply(
+                    led=led_dir.name,
+                    brightness=self._to_sysfs_brightness(brightness),
+                    rgb=(int(r), int(g), int(b)),
+                )
+            ):
+                return
+            if led_dir == self.primary_led_dir:
+                raise PermissionError(f"sysfs color file not writable: {zone['path']}") from exc
+            return
 
     if self._supports_multicolor(led_dir):
         multi_intensity_path = led_dir / "multi_intensity"
@@ -46,15 +58,20 @@ def set_zone_color_method(self, zone: dict, color, brightness: int):
             common._safe_write_text(multi_intensity_path, f"{r} {g} {b}\n")
             self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
             return
-        except PermissionError:
-            if privileged.helper_supports_led_apply() and privileged.run_led_apply(
-                led=led_dir.name,
-                brightness=self._to_sysfs_brightness(brightness),
-                rgb=(int(r), int(g), int(b)),
+        except PermissionError as exc:
+            if (
+                privileged.helper_can_apply_led(led_dir.name, color_kind="multi_intensity")
+                and privileged.helper_supports_led_apply()
+                and privileged.run_led_apply(
+                    led=led_dir.name,
+                    brightness=self._to_sysfs_brightness(brightness),
+                    rgb=(int(r), int(g), int(b)),
+                )
             ):
                 return
             if led_dir == self.primary_led_dir:
-                raise
+                raise PermissionError(f"sysfs multi_intensity not writable: {multi_intensity_path}") from exc
+            return
 
     if self._supports_color_attr(led_dir):
         hex_color = f"{int(r):02x}{int(g):02x}{int(b):02x}"
@@ -63,15 +80,20 @@ def set_zone_color_method(self, zone: dict, color, brightness: int):
             common._safe_write_text(color_path, f"{hex_color}\n")
             self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
             return
-        except PermissionError:
-            if privileged.helper_supports_led_apply() and privileged.run_led_apply(
-                led=led_dir.name,
-                brightness=self._to_sysfs_brightness(brightness),
-                rgb=(int(r), int(g), int(b)),
+        except PermissionError as exc:
+            if (
+                privileged.helper_can_apply_led(led_dir.name, color_kind="color")
+                and privileged.helper_supports_led_apply()
+                and privileged.run_led_apply(
+                    led=led_dir.name,
+                    brightness=self._to_sysfs_brightness(brightness),
+                    rgb=(int(r), int(g), int(b)),
+                )
             ):
                 return
             if led_dir == self.primary_led_dir:
-                raise
+                raise PermissionError(f"sysfs color attribute not writable: {color_path}") from exc
+            return
 
     if self._supports_rgb_attr(led_dir):
         rgb_path = led_dir / "rgb"
@@ -79,14 +101,19 @@ def set_zone_color_method(self, zone: dict, color, brightness: int):
             common._safe_write_text(rgb_path, f"{r} {g} {b}\n")
             self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
             return
-        except PermissionError:
-            if privileged.helper_supports_led_apply() and privileged.run_led_apply(
-                led=led_dir.name,
-                brightness=self._to_sysfs_brightness(brightness),
-                rgb=(int(r), int(g), int(b)),
+        except PermissionError as exc:
+            if (
+                privileged.helper_can_apply_led(led_dir.name, color_kind="rgb")
+                and privileged.helper_supports_led_apply()
+                and privileged.run_led_apply(
+                    led=led_dir.name,
+                    brightness=self._to_sysfs_brightness(brightness),
+                    rgb=(int(r), int(g), int(b)),
+                )
             ):
                 return
             if led_dir == self.primary_led_dir:
-                raise
+                raise PermissionError(f"sysfs rgb attribute not writable: {rgb_path}") from exc
+            return
 
     self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))

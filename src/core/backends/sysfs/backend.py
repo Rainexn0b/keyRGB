@@ -98,6 +98,7 @@ class SysfsLedsBackend(KeyboardBackend):
         writable = _safe_access(brightness_path, os.W_OK)
         identifiers["brightness_readable"] = str(readable).lower()
         identifiers["brightness_writable"] = str(writable).lower()
+        identifiers["helper_led_supported"] = str(privileged.helper_can_apply_led(led_dir.name)).lower()
 
         if not readable:
             return ProbeResult(
@@ -111,7 +112,7 @@ class SysfsLedsBackend(KeyboardBackend):
             # Many kernel LED class nodes are root-writable only. If the optional
             # pkexec helper is present and supports LED writes, we can still
             # drive the backlight safely without running the whole app as root.
-            if privileged.helper_supports_led_apply():
+            if privileged.helper_can_apply_led(led_dir.name) and privileged.helper_supports_led_apply():
                 identifiers["helper"] = privileged.power_helper_path()
                 return ProbeResult(
                     available=True,
@@ -122,7 +123,7 @@ class SysfsLedsBackend(KeyboardBackend):
 
             return ProbeResult(
                 available=False,
-                reason="brightness not writable (needs root or keyrgb-power-helper)",
+                reason="brightness not writable (needs root or a compatible keyrgb-power-helper LED path)",
                 confidence=0,
                 identifiers=identifiers,
             )

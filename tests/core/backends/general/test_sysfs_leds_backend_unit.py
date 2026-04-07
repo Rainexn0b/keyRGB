@@ -434,7 +434,7 @@ def test_sysfs_device_set_color_rgb_attr_success(monkeypatch: pytest.MonkeyPatch
     assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "50"
 
 
-def test_sysfs_device_set_color_file_zone_permission_error_falls_back_to_brightness(
+def test_sysfs_device_set_color_file_zone_permission_error_raises_without_helper_fallback(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     led_dir = _make_led(tmp_path, "system76::kbd_backlight", brightness=0, max_brightness=100)
@@ -442,7 +442,7 @@ def test_sysfs_device_set_color_file_zone_permission_error_falls_back_to_brightn
     file_path.write_text("000000\n", encoding="utf-8")
     dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
     zone = {"type": "file", "path": file_path, "led_dir": led_dir}
-    brightness_calls: list[int] = []
+    helper_calls: list[tuple[str, int, tuple[int, int, int] | None]] = []
 
     def fake_safe_write(path: Path, _content: str) -> None:
         if path == file_path:
@@ -451,12 +451,17 @@ def test_sysfs_device_set_color_file_zone_permission_error_falls_back_to_brightn
 
     monkeypatch.setattr("src.core.backends.sysfs.device.common._safe_write_text", fake_safe_write)
     monkeypatch.setattr(
-        dev, "_set_zone_brightness", lambda _led_dir, sysfs_value: brightness_calls.append(int(sysfs_value))
+        "src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True
+    )
+    monkeypatch.setattr(
+        "src.core.backends.sysfs.device.privileged.run_led_apply",
+        lambda *, led, brightness, rgb: helper_calls.append((led, brightness, rgb)) or True,
     )
 
-    dev._set_zone_color(zone, (1, 2, 3), 25)
+    with pytest.raises(PermissionError, match="sysfs color file not writable"):
+        dev._set_zone_color(zone, (1, 2, 3), 25)
 
-    assert brightness_calls == [50]
+    assert helper_calls == []
 
 
 def test_sysfs_device_set_color_helper_fallbacks_for_multi_and_color_attrs(
@@ -489,13 +494,14 @@ def test_sysfs_device_set_color_helper_fallbacks_for_multi_and_color_attrs(
     ]
 
 
-def test_sysfs_device_set_color_rgb_attr_primary_failure_raises(
+def test_sysfs_device_set_color_rgb_attr_primary_failure_does_not_use_helper(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     led_dir = _make_led(tmp_path, "rgb::kbd_backlight", brightness=0, max_brightness=100)
     rgb = led_dir / "rgb"
     rgb.write_text("0 0 0\n", encoding="utf-8")
     dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
+    helper_calls: list[tuple[str, int, tuple[int, int, int] | None]] = []
 
     def fake_safe_write(path: Path, _content: str) -> None:
         if path == rgb:
@@ -503,10 +509,16 @@ def test_sysfs_device_set_color_rgb_attr_primary_failure_raises(
         raise AssertionError(path)
 
     monkeypatch.setattr("src.core.backends.sysfs.device.common._safe_write_text", fake_safe_write)
-    monkeypatch.setattr("src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: False)
+    monkeypatch.setattr("src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
+    monkeypatch.setattr(
+        "src.core.backends.sysfs.device.privileged.run_led_apply",
+        lambda *, led, brightness, rgb: helper_calls.append((led, brightness, rgb)) or True,
+    )
 
-    with pytest.raises(PermissionError):
+    with pytest.raises(PermissionError, match="sysfs rgb attribute not writable"):
         dev._set_zone_color({"type": "dir", "path": led_dir, "led_dir": led_dir}, (7, 8, 9), 25)
+
+    assert helper_calls == []
 
 
 def test_sysfs_device_set_key_colors_single_zone_and_multi_zone_paths(
@@ -618,6 +630,33 @@ def test_sysfs_backend_probe_allows_helper_when_not_writable(monkeypatch: pytest
     probe = backend.probe()
     assert probe.available is True
     assert probe.confidence >= 60
+
+
+def test_sysfs_backend_probe_rejects_helper_incompatible_root_only_led(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _make_led(tmp_path, "ite_8297:1", brightness=1, max_brightness=255)
+    monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
+
+    def fake_access(path: str | os.PathLike[str], mode: int) -> bool:
+        if mode == os.R_OK:
+            return True
+        if mode == os.W_OK:
+            return False
+        return False
+
+    monkeypatch.setattr(os, "access", fake_access)
+
+    import src.core.backends.sysfs.privileged as sysfs_privileged
+
+    monkeypatch.setattr(sysfs_privileged, "helper_supports_led_apply", lambda: True)
+
+    backend = SysfsLedsBackend()
+    probe = backend.probe()
+
+    assert probe.available is False
+    assert probe.identifiers["helper_led_supported"] == "false"
+    assert "not writable" in (probe.reason or "")
     assert "helper" in (probe.reason or "").lower()
 
 

@@ -2,15 +2,32 @@ from __future__ import annotations
 
 import os
 import logging
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+_LED_NAME_RE = re.compile(r"^[A-Za-z0-9:_\-.]+$")
+_HELPER_COLOR_KINDS = frozenset({"brightness", "multi_intensity", "color"})
+
 
 def _power_helper() -> str:
     return os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
+
+
+def helper_can_apply_led(led: str, *, color_kind: str = "brightness") -> bool:
+    name = (led or "").strip()
+    if not name or "/" in name or "\\" in name:
+        return False
+    if not _LED_NAME_RE.fullmatch(name):
+        return False
+    if "kbd_backlight" not in name.lower():
+        return False
+
+    kind = (color_kind or "brightness").strip().lower()
+    return kind in _HELPER_COLOR_KINDS
 
 
 def helper_supports_led_apply() -> bool:
