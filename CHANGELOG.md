@@ -2,6 +2,12 @@
 
 ## unreleased
 
+## 0.21.4 (2026-04-07)
+
+- Backends/Experimental: Add an opt-in `ite8258` hidraw backend for the Lenovo Legion 5 / Pro 5 Gen 10 `0x048d:0xc195` 24-zone ITE 8258 keyboard path, translating the merged OpenRGB Gen10 grouped-packet protocol into native KeyRGB static 4×6 zone updates, brightness control, and the confirmed firmware-effect subset.
+- Sysfs/Permissions: Tighten `keyrgb-power-helper` eligibility to match the helper's real LED/color support, so root-only sysfs probes no longer over-report helper-backed availability and unsupported `rgb` / System76 `color_*` color writes fail clearly instead of silently degrading to brightness-only writes.
+- Backends/Experimental: Add an opt-in `ite8295-zones` hidraw backend for the Lenovo 4-zone `0x048d:0xc963` ITE 8295 keyboard path used by IdeaPad Gaming 3-class laptops, mirroring the OpenRGB 33-byte `0xCC 0x16` feature-report protocol for static color, 4-zone updates, brightness, and the confirmed default firmware effects while keeping the companion `0x048d:0xc966` ITE 8176 endpoint out of scope.
+- Tray/Sysfs: Add an opt-in experimental auxiliary `sysfs-mouse` path for color-capable external mouse LEDs exposed through `/sys/class/leds`, including discovery candidates, tray device-context routing, uniform-color control, software-target mirroring, and generic secondary-device config state without folding mouse LEDs into primary keyboard auto-selection.
 
 
 ## 0.21.3 (2026-04-07)
