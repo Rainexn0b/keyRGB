@@ -734,14 +734,6 @@ else
     fi
 fi
 
-# Check for git (needed to fetch upstream ite8291r3-ctl)
-if [ "$MODE" = "pip" ]; then
-    if ! command -v git &> /dev/null; then
-        echo "❌ git is required but not installed"
-        exit 1
-    fi
-fi
-
 if [ "$MODE" = "pip" ]; then
     # Ensure pip is usable
     if ! python3 -m pip --version &> /dev/null; then
@@ -1306,77 +1298,6 @@ if [ "$UPDATE_APPIMAGE_ONLY" -eq 1 ]; then
 fi
 
 if [ "$MODE" = "pip" ]; then
-    # Install ite8291r3-ctl library (upstream + tiny local patch for Wootbook 0x600B)
-    echo
-    echo "📦 Installing ite8291r3-ctl library (upstream)..."
-
-    TMPDIR="$(mktemp -d)"
-    cleanup() {
-        rm -rf "$TMPDIR"
-    }
-    trap cleanup EXIT
-
-    git clone --depth 1 https://github.com/pobrn/ite8291r3-ctl.git "$TMPDIR/ite8291r3-ctl"
-
-    python3 - "$TMPDIR/ite8291r3-ctl/ite8291r3_ctl/ite8291r3.py" << 'PY'
-from __future__ import annotations
-
-import re
-import sys
-from pathlib import Path
-
-path = Path(sys.argv[1])
-text = path.read_text(encoding="utf-8")
-
-if "0x600B" in text or "0x600b" in text:
-    print("✓ ite8291r3-ctl already contains 0x600B")
-    raise SystemExit(0)
-
-# Fast path: exact upstream line.
-text2 = text.replace(
-    "PRODUCT_IDS = [0x6004, 0x6006, 0xCE00]",
-    "PRODUCT_IDS = [0x6004, 0x6006, 0x600B, 0xCE00]  # Added 0x600B for Wootbook",
-)
-
-if text2 == text:
-    # Generic path: patch PRODUCT_IDS assignment (single-line or multi-line).
-    m = re.search(r"(?m)^PRODUCT_IDS\s*=\s*\[", text)
-    if not m:
-        raise SystemExit(f"Failed to locate PRODUCT_IDS in {path}")
-
-    start = m.end()  # position right after '['
-    end = text.find("]", start)
-    if end == -1:
-        raise SystemExit(f"Failed to find closing ']' for PRODUCT_IDS in {path}")
-
-    body = text[start:end]
-    if "0x600B" in body or "0x600b" in body:
-        print("✓ ite8291r3-ctl already contains 0x600B")
-        raise SystemExit(0)
-
-    # If it's a single-line list, keep it single-line.
-    if "\n" not in body:
-        inner_stripped = body.strip()
-        if inner_stripped and not inner_stripped.endswith(","):
-            inner_stripped += ","
-        new_body = f" {inner_stripped} 0x600B" + "  # Added 0x600B for Wootbook"
-        text2 = text[:start] + new_body + text[end:]
-    else:
-        # Multi-line list: insert a new element before the closing bracket.
-        last_nl = text.rfind("\n", 0, end)
-        line_start = last_nl + 1 if last_nl != -1 else 0
-        indent = re.match(r"\s*", text[line_start:end]).group(0)
-        insertion = f"\n{indent}0x600B,  # Added 0x600B for Wootbook"
-        text2 = text[:end] + insertion + text[end:]
-
-path.write_text(text2, encoding="utf-8")
-print("✓ Patched ite8291r3-ctl: added 0x600B to PRODUCT_IDS")
-PY
-
-    python3 -m pip install --user "$TMPDIR/ite8291r3-ctl"
-
-    echo "✓ ite8291r3-ctl installed (upstream + local patch)"
-
     # Install Python dependencies
     echo
     echo "📦 Installing Python dependencies..."

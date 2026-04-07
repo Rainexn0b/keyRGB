@@ -1,11 +1,8 @@
 #!/bin/bash
-# Launcher for KeyRGB Tuxedo GUI with ITE backend
-# Sets up proper Python path and launches the forked Tuxedo UI
+# Launcher for the KeyRGB Tuxedo GUI helper.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
-
-export PYTHONPATH="$PWD/ite8291r3-ctl:$PYTHONPATH"
 
 # Use the project venv if present, fall back to system python3.
 if [ -x "$SCRIPT_DIR/.venv/bin/python" ]; then

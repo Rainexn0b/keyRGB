@@ -94,7 +94,8 @@ the guided backend-speed probe results.
 - `src/gui/calibrator/app.py`
 	- The calibrator probe grid now uses the active backend dimensions instead of a hard-coded 6x21 matrix.
 
-- `vendor/ite8291r3-ctl/README.md`
+
+- Historical `ite8291r3-ctl` protocol notes
 	- Documents the older `ite8291r3` hardware-effect speed scale as `0 = fastest, 10 = slowest`, which is why the legacy inversion cannot be removed globally.
 
 ## Current status

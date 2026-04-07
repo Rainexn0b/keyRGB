@@ -104,8 +104,9 @@ else
   log_info "Skipped removing desktop entries"
 fi
 
-if confirm "Uninstall Python packages (keyrgb) from your user site-packages?"; then
+if confirm "Uninstall Python packages (keyrgb, plus legacy helper packages if present) from your user site-packages?"; then
   python3 -m pip uninstall -y keyrgb >/dev/null 2>&1 || true
+  # Older KeyRGB installs pulled in the external helper package separately.
   python3 -m pip uninstall -y ite8291r3-ctl >/dev/null 2>&1 || true
   python3 -m pip uninstall -y ite8291r3_ctl >/dev/null 2>&1 || true
   log_ok "Uninstalled pip packages (best-effort)"

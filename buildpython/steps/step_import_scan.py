@@ -113,11 +113,8 @@ def _parse_imports(path: Path) -> set[str]:
 def import_scan_runner() -> RunResult:
     root = repo_root()
 
-    # mimic runtime behavior: repo root + vendored dependency first
+    # Mimic runtime behavior: import from the checkout root.
     sys.path.insert(0, str(root))
-    vendored = root / "ite8291r3-ctl"
-    if vendored.exists():
-        sys.path.insert(0, str(vendored))
 
     stdlib = _stdlib_modules()
 

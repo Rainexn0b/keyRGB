@@ -421,6 +421,27 @@ Do not move beyond the minimal experimental scope until we have evidence for:
 3. suspend and resume behavior across repeated cycles
 4. no regressions when `0x600b` keyboard and `0x7001` lightbar are both active
 
+### Current in-tree effect scope
+
+The backend now carries hidden effect builders for all vendor-confirmed effects
+across the `ite_8291_lb` family so developers can validate packet paths on real
+hardware without exposing lightbar hardware effects in the tray UI yet.
+
+Full effect table:
+
+| Effect        | PIDs            | Notes                                              |
+|---------------|-----------------|----------------------------------------------------|
+| color/brightness/off | all 3    | static-color/brightness/off for 0x6010/0x7000/0x7001 |
+| `breathing`   | 0x6010, 0x7000  | 7 color-slot writes + mode-`0x02`; `breathe`/`breathing_color` accepted |
+| `wave`        | 0x7000          | single packet mode-`0x03`, no color-slot setup     |
+| `bounce`      | 0x7000          | single packet mode-`0x04`; `clash` accepted as alias |
+| `catchup`     | 0x7000          | single packet mode-`0x05`, apply byte `0x01`; `catch_up` accepted as alias |
+| `flash`       | 0x6010          | 7 color-slot writes + mode-`0x11`; optional `direction` param (none/right/left) |
+
+- `0x7001` remains static-color/brightness/off only (no vendor-confirmed effect functions for that PID)
+- `hardware_effects` should stay disabled in the user-facing capability surface
+   until the broader validation list above is satisfied
+
 ## Dumps To Request From The Reporter
 
 Priority order:

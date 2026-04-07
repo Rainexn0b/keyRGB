@@ -2,7 +2,7 @@
 # KeyRGB Uninstall Script
 #
 # Removes what install.sh installs:
-# - user-level pip installs of keyrgb + ite8291r3-ctl (pip install mode)
+# - user-level pip installs of keyrgb (and legacy helper packages, if present)
 # - AppImage binary at ~/.local/bin/keyrgb (AppImage mode)
 # - desktop launcher and autostart entries
 # - udev rule (with sudo) if it matches this repo's rule
@@ -170,8 +170,8 @@ else
   echo "↷ Skipped removing desktop entries"
 fi
 
-if confirm "Uninstall Python packages (keyrgb, ite8291r3-ctl) from your user site-packages?"; then
-  # Best-effort: uninstall the two packages that install.sh installs explicitly.
+if confirm "Uninstall Python packages (keyrgb, plus legacy helper packages if present) from your user site-packages?"; then
+  # Best-effort: uninstall keyrgb and clean up older helper package installs if they still exist.
   python3 -m pip uninstall -y keyrgb >/dev/null 2>&1 || true
   python3 -m pip uninstall -y ite8291r3-ctl >/dev/null 2>&1 || true
   # Some environments register the dist name slightly differently.

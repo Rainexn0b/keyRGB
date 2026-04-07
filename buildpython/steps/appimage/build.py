@@ -100,22 +100,6 @@ def build_appimage() -> Path:
                 cwd=root,
             )
 
-        vendor_ite = root / "vendor" / "ite8291r3-ctl"
-        if vendor_ite.exists():
-            run_checked(
-                [
-                    python_exe(),
-                    "-m",
-                    "pip",
-                    "install",
-                    "--no-deps",
-                    str(vendor_ite),
-                    "--target",
-                    str(site_packages),
-                ],
-                cwd=root,
-            )
-
         bundle_pygobject(appdir=appdir, site_packages=site_packages)
 
     icon_src = _first_existing_asset(

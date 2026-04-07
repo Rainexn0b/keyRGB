@@ -37,7 +37,6 @@ These are typically generated locally during development:
 ## Vendor
 
 - `vendor/` - upstream reference trees used for investigation and comparison
-- `vendor/ite8291r3-ctl/` - vendored userspace reference backend
 - `vendor/tuxedo-drivers-4.11.3/` - vendored kernel-driver reference tree
 
 Some vendor subtrees are intentionally tracked in git, while others may still
