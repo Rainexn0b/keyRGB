@@ -1,6 +1,27 @@
 # Changelog
 
+## unreleased
+
+
+
+## 0.21.3 (2026-04-07)
+
+- Backends/Lightbar: Add backend-level `catchup` support for the vendor-confirmed `0x048d:0x7000` lightbar variant, with `catch_up` accepted as a backend alias; uses the same single-packet apply-byte-`0x01` path as wave while keeping the effect hidden from the tray/UI.
+- Backends/Lightbar: Add backend-level `flash` support for the vendor-confirmed `0x048d:0x6010` lightbar variant (mode-`0x11`), including the 7-slot color-slot setup path and an optional `direction` parameter (`none`/`right`/`left`) while keeping the effect hidden from the tray/UI.
+- Repo: Remove `vendor/tuxedo-drivers-4.11.3` reference tree; all addressable protocols from that source (`ite_8291_lb`, `ite_8291`, `ite_8297`, `ite_829x`) are now in-tree across the `ite8233`, `ite8291`, `ite8291-zones`, `ite8297`, and `ite8910` backends.
+- Docs: Update README backend table to enumerate all experimental backends and their covered PIDs.
+- Backends/Lightbar: Add backend-level `bounce` support for the vendor-confirmed `0x048d:0x7000` lightbar variant, with `clash` accepted as a backend alias for the same mode-`0x04` packet while keeping the effect hidden from the tray/UI.
+- Backends/Lightbar: Add backend-level `wave` support for the vendor-confirmed `0x048d:0x7000` lightbar variant, keeping it hidden from the tray/UI like the current breathing path until broader real-hardware validation exists.
+- Backends/Lightbar: Add backend-level breathing support for the vendor-confirmed `0x048d:0x7000` and `0x048d:0x6010` lightbar variants, including the family's color-slot programming path and inverted firmware speed scale, while keeping lightbar hardware effects hidden from the tray UI until broader real-hardware validation exists.
+- Backends/Lightbar: Extend the same opt-in experimental `ite8233` lightbar family again to cover the vendored `0x048d:0x6010` sibling, including its distinct `0x02` mode byte, vendor-style off sequence, and the documented DMI color-scaling quirk used by specific TUXEDO/Clevo SKUs.
+- Backends/Lightbar: Extend the opt-in experimental `ite8233` lightbar backend to cover the vendored `0x048d:0x7000` sibling as well as `0x7001`, using the confirmed vendor packet variant for uniform color, brightness, and off while keeping the family under the existing single-zone lightbar path.
+- Backends/Experimental: Add an opt-in native `ite8291` hidraw backend for the reverse-engineered 6x21 ITE 8291 per-key row protocol used by legacy Tongfang/Clevo keyboards, covering the confirmed HID PID family while explicitly rejecting the known `0x048d:0xce00` `bcdDevice 0x0002` zone-only firmware variant until that dialect is implemented.
+- Backends/Experimental: Add an opt-in `ite8291-zones` hidraw backend for the legacy `0x048d:0xce00` `bcdDevice 0x0002` 4-zone firmware split, using the vendored TUXEDO `ite_8291` control sequence for uniform color, brightness, and off.
+- Backends/Detection: Stop the validated `ite8291r3` probe from positively identifying the known `0x048d:0xce00` `bcdDevice 0x0002` zone-only firmware variant as a compatible rev-0.03 device, so backend selection and diagnostics reflect the protocol split more honestly.
+- Backends/ITE8291R3: Replace the old `ite8291r3_ctl` wrapper dependency with a native KeyRGB implementation of the rev-0.03 USB control path, including direct PyUSB transport, native hardware-effect builders, palette programming, and the legacy one-byte-padded 65-byte row format used by the r3 controller family.
+
 ## 0.21.2 (2026-04-06)
+
 
 - GUI/Per-key: Keep the key overlay geometry visible when backdrop mode is set to `No backdrop` by continuing to derive the per-key canvas transform from the base keyboard image bounds even when no backdrop image is drawn.
 - Support Tools/Diagnostics: Enable the guided backend speed probe for `ite8291r3` devices and consolidate the flow onto the tray-driven auto-play path, so the probe always steps through the test speeds automatically and restores the previous effect instead of offering a separate manual path.

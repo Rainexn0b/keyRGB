@@ -37,8 +37,8 @@ def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
                 devnode=devnode,
                 sysfs_dir=Path(),
                 vendor_id=protocol.VENDOR_ID,
-                product_id=protocol.SUPPORTED_PRODUCT_IDS[0],
-                hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.SUPPORTED_PRODUCT_IDS[0]:04x}",
+                product_id=protocol.DEFAULT_PRODUCT_ID,
+                hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.DEFAULT_PRODUCT_ID:04x}",
             )
 
     for product_id in protocol.SUPPORTED_PRODUCT_IDS:
@@ -61,7 +61,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo
 
 @dataclass
 class Ite8233Backend(KeyboardBackend):
-    """Experimental ITE 8233 lightbar backend for the confirmed 0x7001 HID path."""
+    """Experimental ITE lightbar backend for the vendor-backed 0x7000/0x7001 HID path."""
 
     name: str = "ite8233"
     priority: int = 96
@@ -74,7 +74,7 @@ class Ite8233Backend(KeyboardBackend):
     def probe(self) -> ProbeResult:
         identifiers = {
             "usb_vid": f"0x{protocol.VENDOR_ID:04x}",
-            "usb_pid": f"0x{protocol.SUPPORTED_PRODUCT_IDS[0]:04x}",
+            "usb_pid": "/".join(f"0x{product_id:04x}" for product_id in protocol.SUPPORTED_PRODUCT_IDS),
             "feature_report_id": f"0x{protocol.FEATURE_REPORT_ID:02x}",
             "feature_report_size": str(protocol.FEATURE_REPORT_SIZE),
             "usage_page": f"0x{protocol.VENDOR_USAGE_PAGE:04x}",
@@ -93,7 +93,7 @@ class Ite8233Backend(KeyboardBackend):
             return ProbeResult(
                 available=False,
                 reason=(
-                    "no matching hidraw device for speculative ITE 8233 lightbar IDs: "
+                    "no matching hidraw device for speculative ITE lightbar IDs: "
                     + ", ".join(
                         f"0x{protocol.VENDOR_ID:04x}:0x{product_id:04x}"
                         for product_id in protocol.SUPPORTED_PRODUCT_IDS
@@ -148,8 +148,8 @@ class Ite8233Backend(KeyboardBackend):
             )
 
         try:
-            transport, _info = _open_matching_transport()
-            return Ite8233LightbarDevice(transport.send_feature_report)
+            transport, info = _open_matching_transport()
+            return Ite8233LightbarDevice(transport.send_feature_report, product_id=int(info.product_id))
         except Exception as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; all driver exceptions are translated to BackendError subclasses here
             if is_permission_denied(exc):
                 raise BackendPermissionError(

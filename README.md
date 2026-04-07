@@ -32,8 +32,17 @@ Experimental backends also carry an evidence tag in diagnostics so maintainers c
 Current backend plan:
 
 - `sysfs-leds`, `ite8291r3`, `ite8910`, and `asusctl-aura`: `validated`
-- `ite8297`: `experimental` + `reverse_engineered` (`0x048d:0x8297`, Linux `hidraw` feature-report path for uniform color only)
-- `ite8233`: `experimental` + `reverse_engineered` (`0x048d:0x7001`, auxiliary lightbar / single-zone RGB via Linux `hidraw`)
+- `ite8297`: `experimental` + `reverse_engineered`
+  - `0x048d:0x8297` — 64-byte hidraw feature-report path, uniform color only
+- `ite8233`: `experimental` + `reverse_engineered`
+  - `0x048d:0x7001` — single-zone lightbar, static color / brightness / off
+  - `0x048d:0x7000` — lightbar + hidden backend-level effects: `breathing`, `wave`, `bounce`/`clash`, `catchup`/`catch_up`
+  - `0x048d:0x6010` — lightbar + hidden backend-level effects: `breathing`, `flash` (with optional direction), vendor DMI color-scaling quirk for specific SKUs
+- `ite8291`: `experimental` + `reverse_engineered`
+  - `0x048d:0x6004`, `0x6008`, `0x600b` — full per-key 6×21 row protocol
+  - `0x048d:0xce00` (bcdDevice ≠ `0x0002`) — per-key path; `bcdDevice 0x0002` is routed to `ite8291-zones` instead
+- `ite8291-zones`: `experimental` + `reverse_engineered`
+  - `0x048d:0xce00` bcdDevice `0x0002` — 4-zone uniform-color firmware split
 
 When a compatible auxiliary device is present, the tray exposes a `Software Targets` submenu so looped software effects can stay on the keyboard or mirror their uniformized output to all compatible secondary devices.
 
@@ -259,7 +268,7 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 
 | Variable                                | Usage                                                                                                                                                                                             |
 | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `KEYRGB_BACKEND`                        | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `ite8910`, `asusctl-aura`, or the experimental `ite8297` / `ite8233` backends when experimental backends are enabled.                 |
+| `KEYRGB_BACKEND`                        | Force backend: `auto` (default), `sysfs-leds`, `ite8291r3`, `ite8910`, `asusctl-aura`, or the experimental `ite8297` / `ite8233` / `ite8291` / `ite8291-zones` backends when experimental backends are enabled. |
 | `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1` | Opt in to experimental backends without using the Settings window.                                                                                                                                |
 | `KEYRGB_ITE8297_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8297` backend (mainly for diagnostics / testing).                                                                              |
 | `KEYRGB_ITE8233_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8233` lightbar backend (mainly for diagnostics / testing).                                                                     |
@@ -289,7 +298,7 @@ Access **Settings** via the tray menu to configure:
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
 - **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
 - **Autostart**: enable “Start KeyRGB on login”.
-- **Backend policy**: opt in to experimental backends. Currently `ite8297` and `ite8233` are experimental; the UI labels experimental paths as speculative or research-backed.
+- **Backend policy**: opt in to experimental backends. Currently `ite8297`, `ite8233`, `ite8291`, and `ite8291-zones` are experimental; the UI labels experimental paths as speculative or research-backed.
 
 ### Profiles
 
