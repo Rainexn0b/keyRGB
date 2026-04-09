@@ -25,6 +25,7 @@ def load_backdrop_image(profile_name: str, *, backdrop_mode: str | None = None) 
         custom_image = load_cached_backdrop_image(candidates=(custom_path,))
         if custom_image is not None:
             return custom_image
+        return None
 
     return load_cached_backdrop_image(candidates=backdrop_image_candidates(profile_name=None))
 

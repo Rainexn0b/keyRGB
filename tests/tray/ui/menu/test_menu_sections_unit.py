@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.tray.ui import menu_sections
+from src.tray.ui import menu, menu_sections
 
 
 class _MenuItem:
@@ -52,3 +52,11 @@ def test_build_device_context_menu_items_shows_uniform_controls_for_mouse_route(
     assert items[0].text == "Color…"
     assert items[1].text == "Brightness"
     assert items[3].text == "Turn Off"
+
+def test_sw_effects_menu_first_item_is_reactive_typing_settings() -> None:
+    """The Software Effects submenu must open with 'Reactive Typing Settings...' -
+    confirmed after the rename from 'Reactive Typing Color...'."""
+    import inspect
+    src = inspect.getsource(menu)
+    assert "Reactive Typing Settings" in src
+    assert "Reactive Typing Color" not in src

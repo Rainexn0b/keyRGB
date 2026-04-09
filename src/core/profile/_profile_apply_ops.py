@@ -77,7 +77,7 @@ def builtin_profile_brightness(name: str, *, safe_profile_name: Callable[..., ob
     if profile_name == "light":
         return 50
     if profile_name == "dim":
-        return 10
+        return 5
     return None
 
 
@@ -140,7 +140,7 @@ def migrate_builtin_profile_brightness(
 
     should_migrate = False
     if profile_name == "dim":
-        should_migrate = perkey in {5, 15} or brightness in {5, 15} or (perkey == 10 and brightness != 10)
+        should_migrate = perkey in {10, 15} or brightness in {10, 15} or (perkey == 5 and brightness != 5)
     elif profile_name == "light":
         should_migrate = brightness in {5, 10, 15} and perkey in {5, 10, 15}
 

@@ -84,6 +84,23 @@ def test_backdrop_loaders_return_none_when_mode_is_none(tmp_path, monkeypatch) -
     clear_cached_backdrop_images()
 
 
+def test_backdrop_loaders_return_none_when_custom_mode_has_no_saved_image(tmp_path, monkeypatch) -> None:
+    clear_cached_backdrop_images()
+    missing_image_path = tmp_path / "missing-deck.png"
+
+    monkeypatch.setattr(
+        backdrop_image_cache.profiles,
+        "paths_for",
+        lambda _name: SimpleNamespace(backdrop_image=missing_image_path),
+    )
+    monkeypatch.setattr(backdrop_image_cache.profiles, "load_backdrop_mode", lambda _name: "custom")
+
+    assert load_backdrop_image("profile-1") is None
+    assert load_reference_deck_image(profile_name="profile-1") is not None
+
+    clear_cached_backdrop_images()
+
+
 def test_backdrop_image_candidates_keeps_repo_fallback_when_profile_lookup_raises(monkeypatch) -> None:
     monkeypatch.setattr(
         backdrop_image_cache.profiles,

@@ -208,6 +208,20 @@ def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
         error_msg="Failed to apply reactive brightness during config polling: %s",
     )
 
+    reactive_trail_percent = getattr(current, "reactive_trail_percent", None)
+    if reactive_trail_percent is None:
+        reactive_trail_percent = safe_int_attr(tray.config, "reactive_trail_percent", default=50)
+    try:
+        reactive_trail_percent = int(reactive_trail_percent or 50)
+    except (TypeError, ValueError, OverflowError):
+        reactive_trail_percent = 50
+    _set_engine_attr_best_effort(
+        tray,
+        "reactive_trail_percent",
+        reactive_trail_percent,
+        error_msg="Failed to apply reactive trail percent during config polling: %s",
+    )
+
 
 def _sync_software_target_policy(tray: ConfigPollingTrayProtocol, current) -> None:
     target = normalize_software_effect_target(getattr(current, "software_effect_target", "keyboard"))

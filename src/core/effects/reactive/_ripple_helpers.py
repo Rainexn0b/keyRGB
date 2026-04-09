@@ -113,11 +113,11 @@ def build_ripple_color_map_into(
                 pulse_rgb = hsv_to_rgb(hue / 360.0, 1.0, 1.0)
             if per_key_backdrop_active and manual is None:
                 pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb_unscaled, preferred_rgb=pulse_rgb)
-
-            if pulse_scale < 0.999:
-                pulse_rgb = scale(pulse_rgb, pulse_scale)
-
-            dest[key] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
+                dest[key] = mix(base_rgb, pulse_rgb, t=min(1.0, w * pulse_scale))
+            else:
+                if pulse_scale < 0.999:
+                    pulse_rgb = scale(pulse_rgb, pulse_scale)
+                dest[key] = mix(base_rgb, pulse_rgb, t=min(1.0, w))
         else:
             dest[key] = base_rgb
     return dest

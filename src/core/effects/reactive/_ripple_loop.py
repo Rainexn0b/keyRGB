@@ -244,7 +244,12 @@ def run_reactive_ripple_loop(engine: "EffectsEngine", *, api: _ReactiveRippleApi
 
             pulses = api._age_pulses_in_place(pulses, dt=dt)
 
-            band = 2.15
+            # Trail length scales the ring width (band), not TTL, so wave speed stays
+            # constant and the user perceives a wider/narrower illuminated ring rather
+            # than a faster/slower expanding wavefront.
+            trail_pct = _engine_int_attr_or_fallback(engine, "reactive_trail_percent", missing_default=50, error_default=50)
+            trail_scale = max(0.1, min(4.0, ((int(trail_pct) or 50) / 50.0) ** 2))
+            band = 2.15 * trail_scale
             overlay = api.get_engine_overlay_buffer(engine, "_reactive_ripple_overlay")
             api.build_ripple_overlay_into(overlay, pulses, band=band)
 
@@ -279,12 +284,17 @@ def run_reactive_ripple_loop(engine: "EffectsEngine", *, api: _ReactiveRippleApi
                 else:
                     pulse_rgb = api.hsv_to_rgb(best_hue / 360.0, 1.0, 1.0)
 
+                # RGB scaling is safe here: hsv_to_rgb(h, 1.0, 1.0) always returns a
+                # fully-bright colour, avoiding the black edge-case that requires
+                # mix-weight scaling in the per-key contrast-highlight path.
                 if pulse_scale < 0.999:
                     pulse_rgb = api.scale(pulse_rgb, pulse_scale)
 
                 rgb = api.mix(base_rgb, pulse_rgb, t=min(1.0, best_weight))
                 api._render_uniform_fallback(engine, rgb=rgb)
-                global_hue = (global_hue + 2.0 * p) % 360.0
+                # Advance hue at a fixed rate so the rainbow cycles consistently
+                # regardless of typing speed (not pace-coupled).
+                global_hue = (global_hue + 2.0) % 360.0
                 engine.stop_event.wait(dt)
                 continue
 
@@ -300,7 +310,7 @@ def run_reactive_ripple_loop(engine: "EffectsEngine", *, api: _ReactiveRippleApi
             )
 
             api.render(engine, color_map=color_map)
-            global_hue = (global_hue + 2.0 * p) % 360.0
+            global_hue = (global_hue + 2.0) % 360.0
             engine.stop_event.wait(dt)
     finally:
         press.close()

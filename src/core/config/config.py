@@ -9,7 +9,12 @@ from typing import Any
 
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGETS
 
-from ._lighting._coercion import coerce_loaded_settings, normalize_brightness_value
+from ._lighting._coercion import (
+    coerce_loaded_settings,
+    normalize_brightness_value,
+    normalize_precise_brightness_value,
+    normalize_trail_percent_value,
+)
 from ._lighting._lighting_accessors import LightingConfigAccessors, _coerce_int_setting
 from .defaults import DEFAULTS as _DEFAULTS
 from .file_storage import load_config_settings, save_config_settings_atomic
@@ -108,6 +113,14 @@ class Config(LightingConfigAccessors):
     @staticmethod
     def _normalize_brightness_value(value: int) -> int:
         return normalize_brightness_value(value)
+
+    @staticmethod
+    def _normalize_reactive_brightness_value(value: int) -> int:
+        return normalize_precise_brightness_value(value)
+
+    @staticmethod
+    def _normalize_reactive_trail_value(value: int) -> int:
+        return normalize_trail_percent_value(value)
 
     def _coerce_loaded_settings(self) -> None:
         """Coerce loaded settings into a consistent, UI-compatible shape."""

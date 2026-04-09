@@ -185,7 +185,9 @@ def run_reactive_fade_loop(engine: "EffectsEngine", *, api: _ReactiveFadeApiProt
             if pressed_slot_id is not None:
                 mapped_cells = api.mapped_slot_cells(slot_keymap, pressed_slot_id)
 
-                ttl = 0.48 / p
+                trail_pct = _engine_int_attr_or_fallback(engine, "reactive_trail_percent", missing_default=50, error_default=50)
+                trail_scale = max(0.02, min(8.0, ((int(trail_pct) or 50) / 50.0) ** 2))
+                ttl = (0.48 / p) * trail_scale
                 if mapped_cells:
                     for row, col in mapped_cells:
                         pulses.append(api._Pulse(row=int(row), col=int(col), age_s=0.0, ttl_s=ttl))
@@ -262,18 +264,22 @@ def run_reactive_fade_loop(engine: "EffectsEngine", *, api: _ReactiveFadeApiProt
                 weight = overlay.get(key, 0.0)
                 if manual is not None:
                     pulse_rgb = react_color
+                    if pulse_scale < 0.999:
+                        pulse_rgb = api.scale(pulse_rgb, pulse_scale)
+                    color_map[key] = api.mix(base_rgb, pulse_rgb, t=min(1.0, weight))
                 elif per_key_backdrop_active:
+                    # Apply pulse_scale to the mix weight so the brightness slider
+                    # remains effective regardless of the auto-contrast highlight color.
                     pulse_rgb = api._brightness_boost_pulse(base_rgb=base_rgb_unscaled)
+                    color_map[key] = api.mix(base_rgb, pulse_rgb, t=min(1.0, weight * pulse_scale))
                 else:
                     pulse_rgb = api._pick_contrasting_highlight(
                         base_rgb=base_rgb_unscaled,
                         preferred_rgb=react_color,
                     )
-
-                if pulse_scale < 0.999:
-                    pulse_rgb = api.scale(pulse_rgb, pulse_scale)
-
-                color_map[key] = api.mix(base_rgb, pulse_rgb, t=min(1.0, weight))
+                    if pulse_scale < 0.999:
+                        pulse_rgb = api.scale(pulse_rgb, pulse_scale)
+                    color_map[key] = api.mix(base_rgb, pulse_rgb, t=min(1.0, weight))
 
             api.render(engine, color_map=color_map)
             engine.stop_event.wait(dt)

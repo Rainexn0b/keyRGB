@@ -112,3 +112,135 @@ def test_build_ripple_color_map_into_reuses_dest() -> None:
     assert result is dest
     assert (9, 9) not in dest
     assert dest[(0, 1)] == (40, 50, 60)
+
+
+def test_build_ripple_color_map_into_per_key_backdrop_scales_mix_weight_not_rgb() -> None:
+    """per_key_backdrop + no manual: pulse_scale controls mix weight, not RGB scaling.
+    This keeps the brightness slider effective even when the contrasting highlight is
+    black (e.g. against an all-white backdrop where scale(black, x) == black for any x)."""
+    base_white = {(0, 0): (255, 255, 255)}
+    base_unscaled_white = {(0, 0): (255, 255, 255)}
+    overlay_full = {(0, 0): (1.0, 120.0)}  # full weight, hue=green
+
+    result_low = build_ripple_color_map_into(
+        {},
+        base=base_white,
+        base_unscaled=base_unscaled_white,
+        overlay=overlay_full,
+        per_key_backdrop_active=True,
+        manual=None,
+        pulse_scale=0.2,
+    )
+    result_high = build_ripple_color_map_into(
+        {},
+        base=base_white,
+        base_unscaled=base_unscaled_white,
+        overlay=overlay_full,
+        per_key_backdrop_active=True,
+        manual=None,
+        pulse_scale=1.0,
+    )
+
+    # Different scales must produce different key colors
+    assert result_low[(0, 0)] != result_high[(0, 0)]
+
+    # At scale=0, the key stays at its backdrop color (mix weight = 0)
+    result_zero = build_ripple_color_map_into(
+        {},
+        base=base_white,
+        base_unscaled=base_unscaled_white,
+        overlay=overlay_full,
+        per_key_backdrop_active=True,
+        manual=None,
+        pulse_scale=0.0,
+    )
+    assert result_zero[(0, 0)] == (255, 255, 255)
+
+
+def test_build_ripple_color_map_into_no_per_key_backdrop_still_scales_rgb() -> None:
+    """Without per_key_backdrop, pulse_scale is applied to the RGB color directly (unchanged path)."""
+    base_dark = {(0, 0): (5, 5, 5)}
+    base_unscaled_dark = {(0, 0): (5, 5, 5)}
+    overlay_full = {(0, 0): (1.0, 120.0)}
+
+    result_dim = build_ripple_color_map_into(
+        {},
+        base=base_dark,
+        base_unscaled=base_unscaled_dark,
+        overlay=overlay_full,
+        per_key_backdrop_active=False,
+        manual=None,
+        pulse_scale=0.1,
+    )
+    result_bright = build_ripple_color_map_into(
+        {},
+        base=base_dark,
+        base_unscaled=base_unscaled_dark,
+        overlay=overlay_full,
+        per_key_backdrop_active=False,
+        manual=None,
+        pulse_scale=1.0,
+    )
+
+    assert result_dim[(0, 0)] != result_bright[(0, 0)]
+    assert sum(result_dim[(0, 0)]) < sum(result_bright[(0, 0)])
+
+
+def test_build_ripple_color_map_into_dark_profile_per_key_backdrop_scales_mix_weight() -> None:
+    """Dark profile (all-black per-key backdrop) with no manual color: pulse_scale controls
+    mix weight so the reactive brightness slider remains effective. The brightness-boost
+    contrasting highlight chosen against black is white; scale(white, 0.1) != white, but
+    mix weight path handles both dark and light backdrops without the RGB=black edge case."""
+    base_black = {(0, 0): (0, 0, 0)}
+    overlay_full = {(0, 0): (1.0, 200.0)}  # full weight, hue=purple
+
+    result_dim = build_ripple_color_map_into(
+        {},
+        base=base_black,
+        base_unscaled=base_black,
+        overlay=overlay_full,
+        per_key_backdrop_active=True,
+        manual=None,
+        pulse_scale=0.1,
+    )
+    result_bright = build_ripple_color_map_into(
+        {},
+        base=base_black,
+        base_unscaled=base_black,
+        overlay=overlay_full,
+        per_key_backdrop_active=True,
+        manual=None,
+        pulse_scale=1.0,
+    )
+
+    # Brighter scale must produce a key color with higher total channel sum
+    assert sum(result_dim[(0, 0)]) < sum(result_bright[(0, 0)])
+
+    # At scale=0, the key stays at backdrop black
+    result_zero = build_ripple_color_map_into(
+        {},
+        base=base_black,
+        base_unscaled=base_black,
+        overlay=overlay_full,
+        per_key_backdrop_active=True,
+        manual=None,
+        pulse_scale=0.0,
+    )
+    assert result_zero[(0, 0)] == (0, 0, 0)
+
+
+def test_build_ripple_overlay_into_band_controls_ring_width() -> None:
+    """Wider band means more keys are illuminated around the wavefront."""
+    from src.core.effects.reactive._ripple_helpers import build_ripple_overlay_into
+    from src.core.effects.reactive.utils import _RainbowPulse
+
+    pulse = _RainbowPulse(row=3, col=10, age_s=0.3, ttl_s=0.65, hue_offset=0.0)
+
+    narrow = {}
+    build_ripple_overlay_into(narrow, [pulse], band=1.0)
+
+    wide = {}
+    build_ripple_overlay_into(wide, [pulse], band=4.0)
+
+    # Wider band lights up more keys
+    assert len(wide) > len(narrow)

@@ -81,6 +81,14 @@ class LightingConfigAccessors:
         ...
 
     @staticmethod
+    def _normalize_reactive_brightness_value(value: int) -> int:  # type: ignore[empty-body]
+        ...
+
+    @staticmethod
+    def _normalize_reactive_trail_value(value: int) -> int:  # type: ignore[empty-body]
+        ...
+
+    @staticmethod
     def _deserialize_per_key_colors(data: dict) -> dict:  # type: ignore[empty-body]
         ...
 
@@ -132,7 +140,16 @@ class LightingConfigAccessors:
 
     @reactive_brightness.setter
     def reactive_brightness(self, value: int):
-        self._settings["reactive_brightness"] = self._normalize_brightness_value(value)
+        self._settings["reactive_brightness"] = self._normalize_reactive_brightness_value(value)
+        self._save()
+
+    @property
+    def reactive_trail_percent(self) -> int:
+        return _coerce_int_setting(self._settings.get("reactive_trail_percent", 50), default=50)
+
+    @reactive_trail_percent.setter
+    def reactive_trail_percent(self, value: int):
+        self._settings["reactive_trail_percent"] = self._normalize_reactive_trail_value(value)
         self._save()
 
     @property

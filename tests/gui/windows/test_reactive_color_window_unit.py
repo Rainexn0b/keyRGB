@@ -225,9 +225,24 @@ def test_on_color_change_tolerates_missing_drag_state(monkeypatch) -> None:
     assert gui._last_drag_commit_ts == 10.0
 
 
+def test_on_color_change_ignores_brightness_origin_callbacks(monkeypatch) -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui._color_supported = True
+    committed: list[tuple[int, int, int]] = []
+    gui._commit_color_to_config = lambda color: committed.append(color)
+    monkeypatch.setattr(reactive_color.time, "monotonic", lambda: 10.0)
+
+    gui._on_color_change(1, 2, 3, source="brightness", brightness_percent=28.0)
+
+    assert committed == []
+    assert not hasattr(gui, "_last_drag_committed_color")
+
+
 def test_on_reactive_brightness_change_tolerates_missing_drag_state(monkeypatch) -> None:
     gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
     gui._reactive_brightness_label = _FakeLabel()
+    gui.color_wheel = _FakeColorWheel()
+    gui._use_manual_var = _FakeVar(False)
     committed: list[float] = []
     gui._commit_brightness_to_config = lambda pct: committed.append(float(pct)) or 14
     monkeypatch.setattr(reactive_color.time, "monotonic", lambda: 20.0)
@@ -235,5 +250,62 @@ def test_on_reactive_brightness_change_tolerates_missing_drag_state(monkeypatch)
     gui._on_reactive_brightness_change("28")
 
     assert committed == [28.0]
+    assert gui.color_wheel.calls == [28]
     assert gui._last_drag_commit_ts == 20.0
     assert gui._last_drag_committed_brightness == 28
+
+
+def test_read_reactive_trail_percent_returns_default_for_missing_attribute() -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui.config = SimpleNamespace()  # no reactive_trail_percent attribute
+
+    result = gui._read_reactive_trail_percent()
+
+    assert result == 50
+
+
+def test_read_reactive_trail_percent_returns_clamped_values() -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui.config = SimpleNamespace(reactive_trail_percent=200)
+
+    result = gui._read_reactive_trail_percent()
+
+    assert result == 100
+
+
+def test_sync_reactive_trail_widgets_keeps_defaults_when_config_is_invalid() -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui._reactive_trail_var = _FakeVar(50.0)
+    gui._reactive_trail_label = _FakeLabel()
+    gui._read_reactive_trail_percent = lambda: None
+
+    gui._sync_reactive_trail_widgets()
+
+    assert gui._reactive_trail_var.get() == 50.0
+    assert gui._reactive_trail_label.config_calls == []
+
+
+def test_on_reactive_trail_release_saves_and_sets_status() -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui._reactive_trail_var = _FakeVar(75.0)
+    status_calls: list[dict] = []
+    gui._set_status = lambda msg, ok: status_calls.append({"msg": msg, "ok": ok})
+    committed: list[float] = []
+    gui._commit_trail_to_config = lambda pct: committed.append(float(pct)) or int(round(float(pct)))
+
+    gui._on_reactive_trail_release()
+
+    assert committed == [75.0]
+    assert status_calls == [{"msg": "✓ Saved wave thickness 75%", "ok": True}]
+
+
+def test_on_reactive_trail_release_reports_failure_when_commit_returns_none() -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui._reactive_trail_var = _FakeVar(50.0)
+    status_calls: list[dict] = []
+    gui._set_status = lambda msg, ok: status_calls.append({"msg": msg, "ok": ok})
+    gui._commit_trail_to_config = lambda pct: None
+
+    gui._on_reactive_trail_release()
+
+    assert status_calls[0]["ok"] is False

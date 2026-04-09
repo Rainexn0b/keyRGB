@@ -442,6 +442,23 @@ def test_set_brightness_percent_without_slider_updates_value_and_visuals() -> No
     assert wheel._suspend_brightness_events is False
 
 
+def test_set_brightness_percent_does_not_invoke_callback_while_guarded(monkeypatch: pytest.MonkeyPatch) -> None:
+    wheel = _make_wheel()
+    wheel.callback = object()
+    wheel._update_selection = ColorWheel._update_selection.__get__(wheel, ColorWheel)
+    wheel._update_preview = lambda: None
+    calls: list[tuple[object, tuple[object, ...], dict[str, object]]] = []
+
+    def fake_invoke_callback(cb, *args: object, **kwargs: object) -> None:
+        calls.append((cb, args, dict(kwargs)))
+
+    monkeypatch.setattr(color_wheel_module, "invoke_callback", fake_invoke_callback)
+
+    wheel.set_brightness_percent(28)
+
+    assert calls == []
+
+
 def test_update_color_recomputes_rgb_updates_visuals_and_invokes_callback(monkeypatch: pytest.MonkeyPatch) -> None:
     wheel = _make_wheel()
     wheel.callback = object()

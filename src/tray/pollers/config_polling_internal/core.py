@@ -65,6 +65,7 @@ class ConfigApplyState:
     reactive_use_manual: bool
     reactive_color: ColorTuple
     reactive_brightness: int = 0
+    reactive_trail_percent: int = 50
     software_effect_target: str = "keyboard"
 
 
@@ -86,8 +87,10 @@ def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplySt
 
     base_brightness = safe_int_attr(tray.config, "brightness", default=0)
     reactive_brightness = 0
+    reactive_trail_percent = 50
     if effect in REACTIVE_EFFECTS_SET:
         reactive_brightness = safe_int_attr(tray.config, "reactive_brightness", default=base_brightness)
+        reactive_trail_percent = safe_int_attr(tray.config, "reactive_trail_percent", default=50)
 
     color = _safe_tuple_attr(tray.config, "color", default=(255, 255, 255))
     software_effect_target = normalize_software_effect_target(
@@ -104,6 +107,7 @@ def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplySt
         reactive_use_manual=bool(reactive_use_manual),
         reactive_color=reactive_color,
         reactive_brightness=int(reactive_brightness),
+        reactive_trail_percent=int(reactive_trail_percent),
     )
 
 
@@ -176,6 +180,7 @@ def maybe_apply_fast_path(
                 last_applied.reactive_use_manual != current.reactive_use_manual
                 or last_applied.reactive_color != current.reactive_color
                 or last_applied.reactive_brightness != current.reactive_brightness
+                or last_applied.reactive_trail_percent != current.reactive_trail_percent
             )
         )
     except _CONFIG_FALLBACK_EXCEPTIONS:
@@ -186,6 +191,7 @@ def maybe_apply_fast_path(
             tray.engine.reactive_use_manual_color = bool(current.reactive_use_manual)
             tray.engine.reactive_color = current.reactive_color
             tray.engine.reactive_brightness = int(current.reactive_brightness)
+            tray.engine.reactive_trail_percent = int(current.reactive_trail_percent)
         except _FAST_PATH_EXCEPTIONS:
             pass
         try:

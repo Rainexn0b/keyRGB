@@ -54,9 +54,9 @@ class TestApplyProfileToConfig:
 
         apply_profile_to_config(cfg, {})
 
-        assert cfg.effect_brightness == 10
-        assert cfg.brightness == 10
-        assert cfg.perkey_brightness == 10
+        assert cfg.effect_brightness == 5
+        assert cfg.brightness == 5
+        assert cfg.perkey_brightness == 5
         assert cfg.effect == "perkey"
 
     def test_apply_light_profile_restores_built_in_baseline_brightness(self, monkeypatch):
@@ -94,9 +94,46 @@ class TestApplyProfileToConfig:
         changed = migrate_builtin_profile_brightness(cfg)
 
         assert changed is True
-        assert cfg.effect_brightness == 10
-        assert cfg.brightness == 10
-        assert cfg.perkey_brightness == 10
+        assert cfg.effect_brightness == 5
+        assert cfg.brightness == 5
+        assert cfg.perkey_brightness == 5
+
+    def test_migrate_builtin_dim_profile_from_previous_10_target(self, monkeypatch):
+        """Users previously at the old dim target (10) must also be migrated to the new 5."""
+        from src.core.config import Config
+        from src.core.profile.profiles import migrate_builtin_profile_brightness
+
+        monkeypatch.setattr("src.core.profile.profiles.get_active_profile", lambda: "dim")
+
+        cfg = Config()
+        cfg.effect = "perkey"
+        cfg.effect_brightness = 25
+        cfg.brightness = 10
+        cfg.perkey_brightness = 10
+
+        changed = migrate_builtin_profile_brightness(cfg)
+
+        assert changed is True
+        assert cfg.effect_brightness == 5
+        assert cfg.brightness == 5
+        assert cfg.perkey_brightness == 5
+
+    def test_migrate_builtin_dim_profile_no_op_when_already_at_5(self, monkeypatch):
+        """Users already at the current dim target must not be migrated."""
+        from src.core.config import Config
+        from src.core.profile.profiles import migrate_builtin_profile_brightness
+
+        monkeypatch.setattr("src.core.profile.profiles.get_active_profile", lambda: "dim")
+
+        cfg = Config()
+        cfg.effect = "perkey"
+        cfg.effect_brightness = 5
+        cfg.brightness = 5
+        cfg.perkey_brightness = 5
+
+        changed = migrate_builtin_profile_brightness(cfg)
+
+        assert changed is False
 
     def test_migrate_builtin_light_profile_repairs_stale_dim_level(self, monkeypatch):
         from src.core.config import Config
@@ -178,7 +215,7 @@ class TestApplyProfileToConfig:
         assert cfg.per_key_colors == colors
         assert cfg.effect_brightness == 25
         assert cfg.brightness == 25
-        assert cfg.perkey_brightness == 10
+        assert cfg.perkey_brightness == 5
         assert len(logs) == 1
         assert logs[0][0] == "profiles.apply_profile_to_config.set_effect_brightness"
         assert logs[0][1] == "Failed to set effect brightness while applying a profile"

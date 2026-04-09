@@ -318,8 +318,9 @@ def test_brightness_color_and_direction_accessors_cover_fallback_paths(tmp_path,
     cfg.perkey_brightness = 42
     assert cfg.perkey_brightness == 17
 
+    monkeypatch.setattr(cfg, "_normalize_reactive_brightness_value", lambda value: 13)
     cfg.reactive_brightness = 42
-    assert cfg.reactive_brightness == 17
+    assert cfg.reactive_brightness == 13
 
     cfg.color = (1, 2, 3)
     assert cfg.color == (1, 2, 3)

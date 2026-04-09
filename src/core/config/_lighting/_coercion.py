@@ -39,6 +39,27 @@ def normalize_brightness_value(value: object) -> int:
     return snapped
 
 
+def normalize_precise_brightness_value(value: object) -> int:
+    """Clamp brightness to the persisted 0..50 range without 5-step snapping."""
+
+    try:
+        normalized = _coerce_int(value)
+    except _BRIGHTNESS_COERCION_ERRORS:
+        return 0
+
+    return max(0, min(50, normalized))
+
+
+def normalize_trail_percent_value(value: object) -> int:
+    """Clamp reactive trail length to the persisted 1..100 range."""
+
+    try:
+        normalized = _coerce_int(value)
+    except _BRIGHTNESS_COERCION_ERRORS:
+        return 50
+
+    return max(1, min(100, normalized))
+
 def normalize_rgb_triplet(
     value: object,
     *,
@@ -88,6 +109,20 @@ def coerce_loaded_settings(
         perkey_after = normalize_brightness_value(perkey_before)
         if perkey_before != perkey_after:
             settings["perkey_brightness"] = int(perkey_after)
+            changed = True
+
+    reactive_before = settings.get("reactive_brightness", None)
+    if reactive_before is not None:
+        reactive_after = normalize_precise_brightness_value(reactive_before)
+        if reactive_before != reactive_after:
+            settings["reactive_brightness"] = int(reactive_after)
+            changed = True
+
+    trail_before = settings.get("reactive_trail_percent", None)
+    if trail_before is not None:
+        trail_after = normalize_trail_percent_value(trail_before)
+        if trail_before != trail_after:
+            settings["reactive_trail_percent"] = int(trail_after)
             changed = True
 
     for key in ("ac_lighting_brightness", "battery_lighting_brightness"):

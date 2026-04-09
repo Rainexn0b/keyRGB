@@ -16,9 +16,12 @@ from src.core.runtime.imports import ensure_repo_root_on_sys_path
 from src.gui.windows._reactive_color_state import (
     commit_brightness_to_config,
     commit_color_to_config,
+    commit_trail_to_config,
     read_reactive_brightness_percent,
+    read_reactive_trail_percent,
     sync_color_wheel_brightness,
     sync_reactive_brightness_widgets,
+    sync_reactive_trail_widgets,
 )
 from src.gui.utils.window_centering import center_window_on_screen
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
@@ -72,11 +75,11 @@ except ImportError:
 class ReactiveColorGUI:
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("KeyRGB - Reactive Typing Color")
+        self.root.title("KeyRGB - Reactive Typing Settings")
         apply_keyrgb_window_icon(self.root)
         # This window includes extra explanatory text + a toggle above the shared
         # ColorWheel widget; keep it tall enough to avoid clipping.
-        desired_w, desired_h = 629, 847
+        desired_w, desired_h = 629, 940
         max_w = int(self.root.winfo_screenwidth() * 0.95)
         max_h = int(self.root.winfo_screenheight() * 0.95)
         w = min(desired_w, max_w)
@@ -108,7 +111,7 @@ class ReactiveColorGUI:
         main = ttk.Frame(self.root, padding=20)
         main.pack(fill="both", expand=True)
 
-        title = ttk.Label(main, text="Reactive Typing Highlight Color", font=("Sans", 14, "bold"))
+        title = ttk.Label(main, text="Reactive Typing Settings", font=("Sans", 14, "bold"))
         title.pack(pady=(0, 10))
 
         desc = ttk.Label(
@@ -214,6 +217,36 @@ class ReactiveColorGUI:
         # When manual mode is disabled, mirror the persisted reactive brightness.
         self._sync_color_wheel_brightness()
 
+        # Divider + wave thickness slider.
+        ttk.Separator(main, orient="horizontal").pack(fill="x", pady=(18, 12))
+
+        self._reactive_trail_var = tk.DoubleVar(value=50.0)
+        trail_frame = ttk.Frame(main)
+        trail_frame.pack(fill="x", padx=10)
+
+        ttk.Label(trail_frame, text="Wave thickness:").pack(side="left", padx=(0, 10))
+
+        self._reactive_trail_scale = ttk.Scale(
+            trail_frame,
+            from_=1,
+            to=100,
+            orient="horizontal",
+            variable=self._reactive_trail_var,
+            command=self._on_reactive_trail_change,
+        )
+        self._reactive_trail_scale.pack(side="left", fill="x", expand=True)
+
+        self._reactive_trail_label = ttk.Label(trail_frame, text="50%")
+        self._reactive_trail_label.configure(width=5)
+        self._reactive_trail_label.pack(side="left", padx=(10, 5))
+
+        try:
+            self._reactive_trail_scale.bind("<ButtonRelease-1>", self._on_reactive_trail_release)
+        except tk.TclError:
+            pass
+
+        self._sync_reactive_trail_widgets()
+
         # Lightweight feedback for manual RGB entry / release.
         self.status_label = ttk.Label(main, text="", font=("Sans", 9))
         self.status_label.pack(pady=(10, 0))
@@ -244,11 +277,23 @@ class ReactiveColorGUI:
     def _read_reactive_brightness_percent(self) -> int | None:
         return read_reactive_brightness_percent(self.config, logger=logger)
 
+    def _read_reactive_trail_percent(self) -> int | None:
+        return read_reactive_trail_percent(self.config, logger=logger)
+
     def _sync_reactive_brightness_widgets(self) -> None:
         sync_reactive_brightness_widgets(
             self._reactive_brightness_var,
             self._reactive_brightness_label,
             percent=self._read_reactive_brightness_percent(),
+            tk_error=tk.TclError,
+            logger=logger,
+        )
+
+    def _sync_reactive_trail_widgets(self) -> None:
+        sync_reactive_trail_widgets(
+            self._reactive_trail_var,
+            self._reactive_trail_label,
+            percent=self._read_reactive_trail_percent(),
             tk_error=tk.TclError,
             logger=logger,
         )
@@ -272,6 +317,10 @@ class ReactiveColorGUI:
     def _commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None:
         """Persist reactive typing brightness (pulse/highlight intensity)."""
         return commit_brightness_to_config(self.config, brightness_percent, logger=logger)
+
+    def _commit_trail_to_config(self, trail_percent: float | int | None) -> int | None:
+        """Persist reactive wave thickness."""
+        return commit_trail_to_config(self.config, trail_percent, logger=logger)
 
     def _on_toggle_manual(self) -> None:
         if not self._color_supported:
@@ -299,6 +348,15 @@ class ReactiveColorGUI:
         except tk.TclError:
             pass
 
+        if not bool(self._use_manual_var.get()):
+            sync_color_wheel_brightness(
+                self.color_wheel,
+                self._use_manual_var,
+                percent=int(round(pct)),
+                tk_error=tk.TclError,
+                logger=logger,
+            )
+
         last_drag_commit_ts = _last_drag_commit_ts_or_default(self)
         drag_commit_interval = _drag_commit_interval_or_default(self)
         now = time.monotonic()
@@ -317,6 +375,15 @@ class ReactiveColorGUI:
             pct = 0.0
         pct = max(0.0, min(100.0, pct))
 
+        if not bool(self._use_manual_var.get()):
+            sync_color_wheel_brightness(
+                self.color_wheel,
+                self._use_manual_var,
+                percent=int(round(pct)),
+                tk_error=tk.TclError,
+                logger=logger,
+            )
+
         hw = self._commit_brightness_to_config(pct)
         if hw is None:
             self._set_status("✗ Failed to save reactive brightness", ok=False)
@@ -327,8 +394,38 @@ class ReactiveColorGUI:
         self._last_drag_committed_brightness = pct_i
         self._set_status(f"✓ Saved reactive brightness {pct_i}%", ok=True)
 
+    def _on_reactive_trail_change(self, value: str | float) -> None:
+        """Handle wave thickness slider changes (1..100 UI scale)."""
+
+        try:
+            pct = float(value)
+        except (TypeError, ValueError):
+            pct = 50.0
+        pct = max(1.0, min(100.0, pct))
+
+        try:
+            self._reactive_trail_label.config(text=f"{int(pct)}%")
+        except tk.TclError:
+            pass
+
+    def _on_reactive_trail_release(self, _event=None) -> None:
+        try:
+            pct = float(self._reactive_trail_var.get())
+        except (TypeError, ValueError, tk.TclError):
+            pct = 50.0
+        pct = max(1.0, min(100.0, pct))
+
+        hw = self._commit_trail_to_config(pct)
+        if hw is None:
+            self._set_status("✗ Failed to save wave thickness", ok=False)
+            return
+
+        self._set_status(f"✓ Saved wave thickness {hw}%", ok=True)
+
     def _on_color_change(self, r: int, g: int, b: int, **meta: Any) -> None:
         if not self._color_supported:
+            return
+        if str(meta.get("source", "")).strip().lower() == "brightness":
             return
         color = (int(r), int(g), int(b))
 
@@ -348,6 +445,8 @@ class ReactiveColorGUI:
     def _on_color_release(self, r: int, g: int, b: int, **meta: Any) -> None:
         if not self._color_supported:
             self._set_status("✗ RGB color control is not supported on this backend", ok=False)
+            return
+        if str(meta.get("source", "")).strip().lower() == "brightness":
             return
         color = (int(r), int(g), int(b))
 

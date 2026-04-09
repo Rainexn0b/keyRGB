@@ -8,7 +8,9 @@ from src.core.config._lighting._coercion import (
     _clamp_rgb_channel,
     coerce_loaded_settings,
     normalize_brightness_value,
+    normalize_precise_brightness_value,
     normalize_rgb_triplet,
+    normalize_trail_percent_value,
 )
 from src.core.config._lighting._props import bool_prop, enum_prop, int_prop, optional_brightness_prop
 
@@ -17,6 +19,24 @@ def test_normalize_brightness_value_handles_invalid_zero_and_low_nonzero_values(
     assert normalize_brightness_value(object()) == 0
     assert normalize_brightness_value(0) == 0
     assert normalize_brightness_value(1) == 5
+
+
+def test_normalize_precise_brightness_value_preserves_nonzero_single_steps() -> None:
+    assert normalize_precise_brightness_value(object()) == 0
+    assert normalize_precise_brightness_value(-1) == 0
+    assert normalize_precise_brightness_value(1) == 1
+    assert normalize_precise_brightness_value(42) == 42
+    assert normalize_precise_brightness_value(99) == 50
+
+
+def test_normalize_trail_percent_value_clamps_and_defaults() -> None:
+    assert normalize_trail_percent_value(object()) == 50
+    assert normalize_trail_percent_value(0) == 1
+    assert normalize_trail_percent_value(-5) == 1
+    assert normalize_trail_percent_value(1) == 1
+    assert normalize_trail_percent_value(50) == 50
+    assert normalize_trail_percent_value(100) == 100
+    assert normalize_trail_percent_value(200) == 100
 
 
 def test_normalize_rgb_triplet_falls_back_to_default_when_value_is_not_iterable() -> None:
@@ -75,6 +95,62 @@ def test_coerce_loaded_settings_normalizes_existing_perkey_value_when_present_on
     assert settings["brightness"] == 20
     assert settings["perkey_brightness"] == 10
     assert save_calls == ["saved"]
+
+
+def test_coerce_loaded_settings_preserves_precise_reactive_brightness_when_present(tmp_path) -> None:
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"reactive_brightness": 11}), encoding="utf-8")
+
+    settings = {
+        "brightness": 20,
+        "reactive_brightness": 11,
+    }
+    save_calls: list[str] = []
+
+    coerce_loaded_settings(
+        settings=settings,
+        config_file=config_file,
+        save_fn=lambda: save_calls.append("saved"),
+    )
+
+    assert settings["brightness"] == 20
+    assert settings["perkey_brightness"] == 20
+    assert settings["reactive_brightness"] == 11
+    assert save_calls == ["saved"]
+
+
+def test_coerce_loaded_settings_normalizes_out_of_range_trail_percent(tmp_path) -> None:
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"reactive_trail_percent": 200}), encoding="utf-8")
+
+    settings = {
+        "brightness": 20,
+        "reactive_trail_percent": 200,
+    }
+    save_calls: list[str] = []
+
+    coerce_loaded_settings(
+        settings=settings,
+        config_file=config_file,
+        save_fn=lambda: save_calls.append("saved"),
+    )
+
+    assert settings["reactive_trail_percent"] == 100
+    assert save_calls == ["saved"]
+
+
+def test_coerce_loaded_settings_skips_trail_percent_when_absent(tmp_path) -> None:
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"brightness": 20}), encoding="utf-8")
+
+    settings: dict = {"brightness": 20}
+    coerce_loaded_settings(
+        settings=settings,
+        config_file=config_file,
+        save_fn=lambda: None,
+    )
+
+    assert "reactive_trail_percent" not in settings
 
 
 def test_coerce_loaded_settings_swallows_save_failures() -> None:

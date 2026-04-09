@@ -211,3 +211,35 @@ def test_sync_software_target_policy_logs_config_setter_failure_and_still_update
     tray._log_exception.assert_called_once()
     configure_targets.assert_called_once_with(tray)
     restore_targets.assert_called_once_with(tray)
+
+
+def test_fastpath_trail_percent_change_updates_engine_without_restart() -> None:
+    tray = _mk_tray(engine_running=True)
+
+    last = ConfigApplyState(
+        effect="rainbow_wave",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=None,
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+        reactive_trail_percent=50,
+    )
+    current = ConfigApplyState(
+        effect="rainbow_wave",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=None,
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+        reactive_trail_percent=80,
+    )
+
+    handled, new_last = _maybe_apply_fast_path(tray, last_applied=last, current=current)
+
+    assert handled is True
+    assert new_last == current
+    assert tray.engine.reactive_trail_percent == 80
+    tray.engine.set_brightness.assert_not_called()

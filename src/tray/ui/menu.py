@@ -77,7 +77,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     # "None" here means static per-key display, other SW effects locked when in HW mode
     sw_items = [
         item(
-            "Reactive Typing Color…",
+            "Reactive Typing Settings…",
             tray._on_reactive_color_clicked,
         ),
         pystray.Menu.SEPARATOR,

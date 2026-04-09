@@ -301,6 +301,9 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self._update_selection()
         self._update_preview()
 
+        if source == "brightness" and self._suspend_brightness_events:
+            return
+
         if self.callback:
             invoke_callback(
                 self.callback,
