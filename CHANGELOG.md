@@ -1,6 +1,6 @@
 # Changelog
 
-## unreleased
+## 0.21.5 (2026-04-09)
 
 - GUI/Layout Support: Normalize the built-in starter overlays against the canonical layout model, re-space the nav and arrow clusters to remove stock overlaps, and keep Reset Layout Defaults consistent across ANSI, ISO, ABNT, KS, and JIS.
 - GUI/Layout Support: Polish the generic legend packs by defaulting generic `menu` labels to `Menu` and renaming the KS extra key to `Han/Eng`.
