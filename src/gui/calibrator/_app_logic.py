@@ -148,68 +148,25 @@ def probe_selected_key_id(
     return selected_key_id or None
 
 
-def set_backdrop(
-    app: Any,
-    *,
-    askopenfilename: Any,
-    save_backdrop_image: Any,
-    save_backdrop_mode: Any,
-    update_errors: tuple[type[BaseException], ...],
-) -> None:
-    path = askopenfilename(
-        title="Select keyboard backdrop image",
-        filetypes=[("Image files", "*.png *.jpg *.jpeg *.bmp *.webp"), ("All files", "*.*")],
-    )
-    if not path:
-        return
-    try:
-        save_backdrop_image(profile_name=app.profile_name, source_path=path)
-        save_backdrop_mode("custom", app.profile_name)
-        app._backdrop_mode_var.set("custom")
-        app._backdrop_mode_combo.set("Custom image")
-        app._load_deck_image()
-        app._redraw()
-        app.lbl_status.configure(text="Backdrop updated")
-    except update_errors:
-        app.lbl_status.configure(text="Failed to set backdrop")
+def load_deck_image_for_calibrator(app: Any, *, load_backdrop_image: Any, load_backdrop_mode: Any) -> None:
+    """Load backdrop for calibrator display, treating 'none' mode as 'builtin'."""
+    mode = load_backdrop_mode(app.profile_name)
+    effective_mode = "builtin" if mode == "none" else mode
+    img = load_backdrop_image(app.profile_name, backdrop_mode=effective_mode)
+    if img is None and effective_mode not in ("none", "builtin"):
+        img = load_backdrop_image(app.profile_name, backdrop_mode="builtin")
+    app._deck_pil = img
+    app._deck_render_cache.clear()
 
 
-def reset_backdrop(
-    app: Any, *, reset_backdrop_image: Any, save_backdrop_mode: Any, update_errors: tuple[type[BaseException], ...]
-) -> None:
-    try:
-        reset_backdrop_image(app.profile_name)
-        save_backdrop_mode("builtin", app.profile_name)
-        app._backdrop_mode_var.set("builtin")
-        app._backdrop_mode_combo.set("Built-in seed")
-        app._load_deck_image()
-        app._redraw()
-        app.lbl_status.configure(text="Backdrop reset")
-    except update_errors:
-        app.lbl_status.configure(text="Failed to reset backdrop")
-
-
-def on_backdrop_mode_changed(
-    app: Any,
-    *,
-    backdrop_mode_labels: dict[str, str],
-    save_backdrop_mode: Any,
-    update_errors: tuple[type[BaseException], ...],
-) -> None:
-    label = app._backdrop_mode_combo.get()
-    for mode, mode_label in backdrop_mode_labels.items():
-        if mode_label == label:
-            app._backdrop_mode_var.set(mode)
-            break
+def on_show_backdrop_changed(app: Any, *, load_backdrop_image: Any, load_backdrop_mode: Any) -> None:
+    """Toggle backdrop display in the calibrator without saving the profile's backdrop mode."""
+    if app._show_backdrop_var.get():
+        load_deck_image_for_calibrator(app, load_backdrop_image=load_backdrop_image, load_backdrop_mode=load_backdrop_mode)
     else:
-        app._backdrop_mode_var.set("builtin")
-
-    try:
-        save_backdrop_mode(app._backdrop_mode_var.get(), app.profile_name)
-        app._load_deck_image()
-        app._redraw()
-    except update_errors:
-        app.lbl_status.configure(text="Failed to update backdrop mode")
+        app._deck_pil = None
+        app._deck_render_cache.clear()
+    app._redraw()
 
 
 def reset_keymap_defaults(
@@ -235,11 +192,6 @@ def restore_original_config(app: Any) -> None:
 def on_close(app: Any) -> None:
     app._restore_original_config()
     app.destroy()
-
-
-def load_deck_image(app: Any, *, load_backdrop_image: Any) -> None:
-    app._deck_pil = load_backdrop_image(app.profile_name)
-    app._deck_render_cache.clear()
 
 
 def apply_current_probe(app: Any) -> None:

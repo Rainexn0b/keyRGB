@@ -8,8 +8,6 @@ def build_widgets(
     *,
     tk: Any,
     ttk: Any,
-    profiles: Any,
-    backdrop_mode_labels: dict[str, str],
     tk_runtime_errors: tuple[type[BaseException], ...],
     wrap_sync_errors: tuple[type[BaseException], ...],
 ) -> None:
@@ -73,26 +71,20 @@ def build_widgets(
 
     ttk.Button(side, text="Assign selected key", command=app._assign).grid(row=4, column=0, sticky="ew", pady=(10, 0))
     ttk.Button(side, text="Skip (nothing lit)", command=app._skip).grid(row=5, column=0, sticky="ew", pady=(6, 0))
-    ttk.Button(side, text="Set Backdrop...", command=app._set_backdrop).grid(row=6, column=0, sticky="ew", pady=(18, 0))
-    ttk.Label(side, text="Backdrop mode", anchor="w", justify="left").grid(row=7, column=0, sticky="ew", pady=(10, 0))
 
-    app._backdrop_mode_var = tk.StringVar(value=profiles.load_backdrop_mode(app.profile_name))
-    app._backdrop_mode_combo = ttk.Combobox(
+    app._show_backdrop_var = tk.BooleanVar(value=True)
+    ttk.Checkbutton(
         side,
-        state="readonly",
-        width=20,
-        values=[backdrop_mode_labels[mode] for mode in ("none", "builtin", "custom")],
-    )
-    app._backdrop_mode_combo.set(backdrop_mode_labels.get(app._backdrop_mode_var.get(), "Built-in seed"))
-    app._backdrop_mode_combo.grid(row=8, column=0, sticky="ew", pady=(6, 0))
-    app._backdrop_mode_combo.bind("<<ComboboxSelected>>", app._on_backdrop_mode_changed)
+        text="Show backdrop",
+        variable=app._show_backdrop_var,
+        command=app._on_show_backdrop_changed,
+    ).grid(row=6, column=0, sticky="ew", pady=(18, 0))
 
-    ttk.Button(side, text="Reset Backdrop", command=app._reset_backdrop).grid(row=9, column=0, sticky="ew", pady=(6, 0))
     ttk.Button(side, text="Reset Keymap Defaults", command=app._reset_keymap_defaults).grid(
-        row=10, column=0, sticky="ew", pady=(18, 0)
+        row=7, column=0, sticky="ew", pady=(18, 0)
     )
-    ttk.Button(side, text="Save", command=app._save).grid(row=11, column=0, sticky="ew", pady=(18, 0))
-    ttk.Button(side, text="Save && Close", command=app._save_and_close).grid(row=12, column=0, sticky="ew", pady=(6, 0))
+    ttk.Button(side, text="Save", command=app._save).grid(row=8, column=0, sticky="ew", pady=(18, 0))
+    ttk.Button(side, text="Save && Close", command=app._save_and_close).grid(row=9, column=0, sticky="ew", pady=(6, 0))
 
     app.bind("<Return>", lambda _event: app._assign())
     app.bind("<KP_Enter>", lambda _event: app._assign())

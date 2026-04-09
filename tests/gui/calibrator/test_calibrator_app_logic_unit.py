@@ -143,203 +143,93 @@ def test_load_profile_state_uses_selected_physical_layout(monkeypatch: pytest.Mo
     assert layout_slot_overrides == {"nonusbackslash": {"label": "<>"}}
 
 
-def test_set_backdrop_saves_reloads_and_redraws_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app()
-    calls: list[tuple[str, str]] = []
-    mode_calls: list[tuple[str, str]] = []
-    actions: list[str] = []
-    app._load_deck_image = lambda: actions.append("load")
-    app._redraw = lambda: actions.append("redraw")
-    app._backdrop_mode_var = type("Var", (), {"set": lambda self, value: None})()
-    app._backdrop_mode_combo = type("Combo", (), {"set": lambda self, value: None})()
-
-    monkeypatch.setattr(calibrator_app.filedialog, "askopenfilename", lambda **_kwargs: "/tmp/deck.png")
-    monkeypatch.setattr(
-        calibrator_app,
-        "save_backdrop_image",
-        lambda *, profile_name, source_path: calls.append((profile_name, source_path)),
-    )
-    monkeypatch.setattr(
-        calibrator_app.profiles, "save_backdrop_mode", lambda mode, name: mode_calls.append((mode, name))
-    )
-
-    calibrator_app.KeymapCalibrator._set_backdrop(app)
-
-    assert calls == [("gaming", "/tmp/deck.png")]
-    assert mode_calls == [("custom", "gaming")]
-    assert actions == ["load", "redraw"]
-    assert app.lbl_status.text == "Backdrop updated"
-
-
-def test_set_backdrop_returns_early_when_picker_is_cancelled(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app()
-    actions: list[str] = []
-    app._load_deck_image = lambda: actions.append("load")
-    app._redraw = lambda: actions.append("redraw")
-
-    monkeypatch.setattr(calibrator_app.filedialog, "askopenfilename", lambda **_kwargs: "")
-    monkeypatch.setattr(
-        calibrator_app,
-        "save_backdrop_image",
-        lambda **_kwargs: actions.append("save"),
-    )
-
-    calibrator_app.KeymapCalibrator._set_backdrop(app)
-
-    assert actions == []
-    assert app.lbl_status.text == "initial"
-
-
-def test_set_backdrop_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app()
-    actions: list[str] = []
-    app._load_deck_image = lambda: actions.append("load")
-    app._redraw = lambda: actions.append("redraw")
-
-    monkeypatch.setattr(calibrator_app.filedialog, "askopenfilename", lambda **_kwargs: "/tmp/deck.png")
-
-    def fake_save_backdrop_image(**_kwargs: object) -> None:
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(calibrator_app, "save_backdrop_image", fake_save_backdrop_image)
-
-    calibrator_app.KeymapCalibrator._set_backdrop(app)
-
-    assert actions == []
-    assert app.lbl_status.text == "Failed to set backdrop"
-
-
-def test_reset_backdrop_reloads_and_redraws_on_success(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app()
-    reset_calls: list[str] = []
-    mode_calls: list[tuple[str, str]] = []
-    actions: list[str] = []
-    app._load_deck_image = lambda: actions.append("load")
-    app._redraw = lambda: actions.append("redraw")
-    app._backdrop_mode_var = type("Var", (), {"set": lambda self, value: None})()
-    app._backdrop_mode_combo = type("Combo", (), {"set": lambda self, value: None})()
-
-    monkeypatch.setattr(calibrator_app, "reset_backdrop_image", lambda profile_name: reset_calls.append(profile_name))
-    monkeypatch.setattr(
-        calibrator_app.profiles, "save_backdrop_mode", lambda mode, name: mode_calls.append((mode, name))
-    )
-
-    calibrator_app.KeymapCalibrator._reset_backdrop(app)
-
-    assert reset_calls == ["gaming"]
-    assert mode_calls == [("builtin", "gaming")]
-    assert actions == ["load", "redraw"]
-    assert app.lbl_status.text == "Backdrop reset"
-
-
-def test_reset_backdrop_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app()
-    actions: list[str] = []
-    app._load_deck_image = lambda: actions.append("load")
-    app._redraw = lambda: actions.append("redraw")
-
-    def fake_reset_backdrop_image(_profile_name: str) -> None:
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(calibrator_app, "reset_backdrop_image", fake_reset_backdrop_image)
-
-    calibrator_app.KeymapCalibrator._reset_backdrop(app)
-
-    assert actions == []
-    assert app.lbl_status.text == "Failed to reset backdrop"
-
-
-def test_on_backdrop_mode_changed_persists_reload_and_redraws(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app()
-    actions: list[str] = []
-    app._load_deck_image = lambda: actions.append("load")
-    app._redraw = lambda: actions.append("redraw")
-    app._backdrop_mode_var = type(
-        "Var",
-        (),
-        {
-            "value": "builtin",
-            "set": lambda self, value: setattr(self, "value", value),
-            "get": lambda self: self.value,
-        },
-    )()
-    app._backdrop_mode_combo = type("Combo", (), {"get": lambda self: "No backdrop"})()
-    mode_calls: list[tuple[str, str]] = []
-
-    monkeypatch.setattr(
-        calibrator_app.profiles, "save_backdrop_mode", lambda mode, name: mode_calls.append((mode, name))
-    )
-
-    calibrator_app.KeymapCalibrator._on_backdrop_mode_changed(app)
-
-    assert mode_calls == [("none", "gaming")]
-    assert app._backdrop_mode_var.get() == "none"
-    assert actions == ["load", "redraw"]
-
-
-def test_on_backdrop_mode_changed_reports_failures(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _make_app()
-    actions: list[str] = []
-    app._load_deck_image = lambda: actions.append("load")
-    app._redraw = lambda: actions.append("redraw")
-    app._backdrop_mode_var = type(
-        "Var",
-        (),
-        {
-            "value": "builtin",
-            "set": lambda self, value: setattr(self, "value", value),
-            "get": lambda self: self.value,
-        },
-    )()
-    app._backdrop_mode_combo = type("Combo", (), {"get": lambda self: "Custom image"})()
-
-    monkeypatch.setattr(
-        calibrator_app.profiles,
-        "save_backdrop_mode",
-        lambda mode, name: (_ for _ in ()).throw(RuntimeError("boom")),
-    )
-
-    calibrator_app.KeymapCalibrator._on_backdrop_mode_changed(app)
-
-    assert actions == []
-    assert app.lbl_status.text == "Failed to update backdrop mode"
-
-
-def test_restore_original_config_calls_preview_restore() -> None:
-    app = _make_app()
-
-    calibrator_app.KeymapCalibrator._restore_original_config(app)
-
-    assert app.preview.restore_calls == 1
-
-
-def test_on_close_restores_config_then_destroys() -> None:
-    app = _make_app()
-    calls: list[str] = []
-    app._restore_original_config = lambda: calls.append("restore")
-    app.destroy = lambda: calls.append("destroy")
-
-    calibrator_app.KeymapCalibrator._on_close(app)
-
-    assert calls == ["restore", "destroy"]
-
-
-def test_load_deck_image_loads_backdrop_and_clears_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_load_deck_image_for_calibrator_loads_builtin_and_clears_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     app = _make_app()
     image = object()
-    calls: list[str] = []
+    calls: list[tuple[str, str | None]] = []
 
-    def fake_load_backdrop_image(profile_name: str) -> object:
-        calls.append(profile_name)
+    def fake_load_backdrop_image(profile_name: str, *, backdrop_mode: str | None = None) -> object:
+        calls.append((profile_name, backdrop_mode))
         return image
 
     monkeypatch.setattr(calibrator_app, "load_backdrop_image", fake_load_backdrop_image)
+    monkeypatch.setattr(calibrator_app.profiles, "load_backdrop_mode", lambda _name: "builtin")
 
     calibrator_app.KeymapCalibrator._load_deck_image(app)
 
-    assert calls == ["gaming"]
+    assert calls == [("gaming", "builtin")]
     assert app._deck_pil is image
     assert app._deck_render_cache.clear_calls == 1
+
+
+def test_load_deck_image_for_calibrator_treats_none_mode_as_builtin(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _make_app()
+    image = object()
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_load_backdrop_image(profile_name: str, *, backdrop_mode: str | None = None) -> object:
+        calls.append((profile_name, backdrop_mode))
+        return image
+
+    monkeypatch.setattr(calibrator_app, "load_backdrop_image", fake_load_backdrop_image)
+    monkeypatch.setattr(calibrator_app.profiles, "load_backdrop_mode", lambda _name: "none")
+
+    calibrator_app.KeymapCalibrator._load_deck_image(app)
+
+    assert calls == [("gaming", "builtin")]
+    assert app._deck_pil is image
+
+
+def test_load_deck_image_falls_back_to_builtin_when_custom_image_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _make_app()
+    builtin_image = object()
+    calls: list[tuple[str, str | None]] = []
+
+    def fake_load_backdrop_image(profile_name: str, *, backdrop_mode: str | None = None) -> object | None:
+        calls.append((profile_name, backdrop_mode))
+        if backdrop_mode == "custom":
+            return None
+        return builtin_image
+
+    monkeypatch.setattr(calibrator_app, "load_backdrop_image", fake_load_backdrop_image)
+    monkeypatch.setattr(calibrator_app.profiles, "load_backdrop_mode", lambda _name: "custom")
+
+    calibrator_app.KeymapCalibrator._load_deck_image(app)
+
+    assert calls == [("gaming", "custom"), ("gaming", "builtin")]
+    assert app._deck_pil is builtin_image
+    assert app._deck_render_cache.clear_calls == 1
+
+
+def test_on_show_backdrop_changed_loads_image_when_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = _make_app()
+    image = object()
+    app._show_backdrop_var = type("Var", (), {"get": lambda self: True})()
+    app._redraw = lambda: None
+
+    def fake_load_backdrop_image(profile_name: str, *, backdrop_mode: str | None = None) -> object:
+        return image
+
+    monkeypatch.setattr(calibrator_app, "load_backdrop_image", fake_load_backdrop_image)
+    monkeypatch.setattr(calibrator_app.profiles, "load_backdrop_mode", lambda _name: "builtin")
+
+    calibrator_app.KeymapCalibrator._on_show_backdrop_changed(app)
+
+    assert app._deck_pil is image
+
+
+def test_on_show_backdrop_changed_clears_image_when_disabled() -> None:
+    app = _make_app()
+    app._deck_pil = object()
+    app._show_backdrop_var = type("Var", (), {"get": lambda self: False})()
+    redraw_calls: list[str] = []
+    app._redraw = lambda: redraw_calls.append("redraw")
+
+    calibrator_app.KeymapCalibrator._on_show_backdrop_changed(app)
+
+    assert app._deck_pil is None
+    assert app._deck_render_cache.clear_calls == 1
+    assert redraw_calls == ["redraw"]
 
 
 def test_apply_current_probe_updates_label_applies_preview_and_schedules_after() -> None:

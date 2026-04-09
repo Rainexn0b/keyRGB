@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import tkinter as tk
-from tkinter import filedialog
 from tkinter import ttk
 
 from PIL import Image, ImageTk
@@ -32,8 +31,6 @@ load_layout_slots = profile_storage.load_layout_slots
 save_keymap = profile_storage.save_keymap
 
 load_backdrop_image = profile_backdrop_storage.load_backdrop_image
-reset_backdrop_image = profile_backdrop_storage.reset_backdrop_image
-save_backdrop_image = profile_backdrop_storage.save_backdrop_image
 KeyboardPreviewSession = keyboard_preview.KeyboardPreviewSession
 get_layout_keys = layout_resources.get_layout_keys
 hit_test = geometry.hit_test
@@ -46,14 +43,8 @@ KeyCell = Tuple[int, int]
 KeyCells = Tuple[KeyCell, ...]
 Keymap = Dict[str, KeyCells]
 _LAYOUT_LABELS = {layout.layout_id: layout.label for layout in layout_catalog.LAYOUT_CATALOG}
-_BACKDROP_MODE_LABELS = {
-    "none": "No backdrop",
-    "builtin": "Built-in seed",
-    "custom": "Custom image",
-}
 _TK_RUNTIME_ERRORS = (tk.TclError, RuntimeError)
 _WRAP_SYNC_ERRORS = _TK_RUNTIME_ERRORS + (TypeError, ValueError)
-_BACKDROP_UPDATE_ERRORS = _TK_RUNTIME_ERRORS + (OSError, TypeError, ValueError)
 
 
 def _keymap_path() -> Path:
@@ -163,7 +154,11 @@ class KeymapCalibrator(tk.Tk):
         except _TK_RUNTIME_ERRORS:
             pass
 
-        self.bg_color, self.fg_color = apply_clam_theme(self)
+        self.bg_color, self.fg_color = apply_clam_theme(
+            self,
+            include_checkbuttons=True,
+            map_checkbutton_state=True,
+        )
 
         self.cfg = Config()
         self.preview = KeyboardPreviewSession(self.cfg, rows=MATRIX_ROWS, cols=MATRIX_COLS)
@@ -193,37 +188,17 @@ class KeymapCalibrator(tk.Tk):
             self,
             tk=tk,
             ttk=ttk,
-            profiles=profiles,
-            backdrop_mode_labels=_BACKDROP_MODE_LABELS,
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
             wrap_sync_errors=_WRAP_SYNC_ERRORS,
         )
         _app_bootstrap.apply_window_geometry(self)
         _app_bootstrap.finish_init(self, tk_runtime_errors=_TK_RUNTIME_ERRORS)
 
-    def _set_backdrop(self) -> None:
-        _app_logic.set_backdrop(
+    def _on_show_backdrop_changed(self) -> None:
+        _app_logic.on_show_backdrop_changed(
             self,
-            askopenfilename=filedialog.askopenfilename,
-            save_backdrop_image=save_backdrop_image,
-            save_backdrop_mode=profiles.save_backdrop_mode,
-            update_errors=_BACKDROP_UPDATE_ERRORS,
-        )
-
-    def _reset_backdrop(self) -> None:
-        _app_logic.reset_backdrop(
-            self,
-            reset_backdrop_image=reset_backdrop_image,
-            save_backdrop_mode=profiles.save_backdrop_mode,
-            update_errors=_BACKDROP_UPDATE_ERRORS,
-        )
-
-    def _on_backdrop_mode_changed(self, _event=None) -> None:
-        _app_logic.on_backdrop_mode_changed(
-            self,
-            backdrop_mode_labels=_BACKDROP_MODE_LABELS,
-            save_backdrop_mode=profiles.save_backdrop_mode,
-            update_errors=_BACKDROP_UPDATE_ERRORS,
+            load_backdrop_image=load_backdrop_image,
+            load_backdrop_mode=profiles.load_backdrop_mode,
         )
 
     def _reset_keymap_defaults(self) -> None:
@@ -244,7 +219,11 @@ class KeymapCalibrator(tk.Tk):
         _app_logic.on_close(self)
 
     def _load_deck_image(self) -> None:
-        _app_logic.load_deck_image(self, load_backdrop_image=load_backdrop_image)
+        _app_logic.load_deck_image_for_calibrator(
+            self,
+            load_backdrop_image=load_backdrop_image,
+            load_backdrop_mode=profiles.load_backdrop_mode,
+        )
 
     def _apply_current_probe(self) -> None:
         _app_logic.apply_current_probe(self)
