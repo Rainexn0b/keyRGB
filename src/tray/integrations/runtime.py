@@ -110,6 +110,19 @@ def _is_kde_wayland_session() -> bool:
     return session_type == "wayland" and ("kde" in current_desktop or "plasma" in desktop_session)
 
 
+def _is_gnome_session() -> bool:
+    """Return True when running inside a GNOME Shell session.
+
+    GNOME Shell dropped the legacy XEmbed system-tray protocol around GNOME 3.26,
+    so pystray's ``gtk`` backend (GtkStatusIcon) is invisible there regardless of
+    what extensions are installed.  The AppIndicator/SNI extension only helps
+    clients that use the ``appindicator`` (SNI/DBus) backend.
+    """
+    current_desktop = str(os.environ.get("XDG_CURRENT_DESKTOP") or "").strip().lower()
+    desktop_session = str(os.environ.get("DESKTOP_SESSION") or "").strip().lower()
+    return "gnome" in current_desktop or "gnome" in desktop_session
+
+
 def _install_gtk_scale_factor_log_filter() -> None:
     global _gtk_log_handler_id
 
@@ -223,6 +236,15 @@ def _auto_backend_candidates(*, gi_working: bool) -> list[tuple[str, str]]:
     if _is_kde_wayland_session():
         return [
             ("appindicator", "appindicator (auto-kde-wayland)"),
+            ("gtk", "gtk (appindicator fallback)"),
+            ("xorg", "xorg (gtk fallback)"),
+        ]
+    if _is_gnome_session():
+        # GNOME Shell dropped XEmbed trays around 3.26; GtkStatusIcon is invisible.
+        # The AppIndicator/kStatusNotifierItem extension handles SNI/DBus icons,
+        # which is what the appindicator pystray backend uses.
+        return [
+            ("appindicator", "appindicator (auto-gnome)"),
             ("gtk", "gtk (appindicator fallback)"),
             ("xorg", "xorg (gtk fallback)"),
         ]
