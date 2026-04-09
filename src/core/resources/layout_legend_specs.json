@@ -3,9 +3,7 @@
     "ansi-generic": {
       "layout_id": "ansi",
       "label": "ANSI Generic",
-      "labels": {
-        "bottom_06": "Menu"
-      }
+      "labels": {}
     },
     "iso-generic": {
       "extends": "ansi-generic",
@@ -17,10 +15,7 @@
       "extends": "ansi-generic",
       "layout_id": "ks",
       "label": "KS Generic",
-      "labels": {
-        "number_13": "Han/Eng",
-        "bottom_08": "Menu"
-      }
+      "labels": {}
     },
     "abnt-generic": {
       "extends": "iso-generic",
@@ -32,9 +27,7 @@
       "extends": "ansi-generic",
       "layout_id": "jis",
       "label": "JIS Generic",
-      "labels": {
-        "bottom_09": "Menu"
-      }
+      "labels": {}
     },
     "iso-de-qwertz": {
       "extends": "iso-generic",

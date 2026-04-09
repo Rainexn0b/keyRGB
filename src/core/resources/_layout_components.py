@@ -111,7 +111,7 @@ def _layout_special_keys(
     return out
 
 
-def build_function_rows(*, fy: int, x0: int, nav_x0: int, nav_aux_x0: int) -> List[KeyDef]:
+def build_function_rows(*, fy: int, x0: int, nav_x0: int, nx0: int) -> List[KeyDef]:
     keys: List[KeyDef] = []
     f_unit = 34
     f_gap = 6
@@ -151,7 +151,7 @@ def build_function_rows(*, fy: int, x0: int, nav_x0: int, nav_aux_x0: int) -> Li
     )
     keys += _units_row(
         fy + 30,
-        nav_aux_x0,
+        nx0,
         32,
         8,
         [("home", "Home", 1), ("pgup", "PgUp", 1), ("pgdn", "PgDn", 1), ("end", "End", 1)],

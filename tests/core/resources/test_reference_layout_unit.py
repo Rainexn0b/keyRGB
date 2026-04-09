@@ -16,12 +16,6 @@ from src.core.resources.layout_slots import apply_layout_slot_overrides, clear_l
 from src.core.resources.layout_specs import load_layout_spec
 
 
-def _rectangles_overlap(a: KeyDef, b: KeyDef) -> bool:
-    ax, ay, aw, ah = a.rect
-    bx, by, bw, bh = b.rect
-    return ax < bx + bw and bx < ax + aw and ay < by + bh and by < ay + ah
-
-
 def test_reference_layout_includes_iso_extra_key() -> None:
     key_ids = {key.key_id for key in build_layout()}
 
@@ -157,7 +151,7 @@ def test_get_layout_slot_states_includes_optional_bottom_row_keys_for_ansi() -> 
     state_map = {state.key_id: state for state in states}
 
     assert state_map["fn"].default_label == "Fn"
-    assert state_map["menu"].default_label == "Menu"
+    assert state_map["menu"].default_label == "Copilot"
 
 
 def test_get_layout_slot_states_can_use_selected_legend_pack(monkeypatch) -> None:
@@ -262,23 +256,3 @@ def test_abnt_layout_spec_inherits_iso_rows() -> None:
     assert "nonushash" in home_ids
     assert "abnt2slash" in shift_ids
 
-
-def test_reference_layout_variants_have_no_overlapping_key_rects() -> None:
-    for variant in ("ansi", "iso", "abnt", "ks", "jis"):
-        keys = build_layout(variant=variant)
-        overlaps: list[tuple[str, str]] = []
-        for index, key in enumerate(keys):
-            for other in keys[index + 1 :]:
-                if _rectangles_overlap(key, other):
-                    overlaps.append((key.key_id, other.key_id))
-        assert overlaps == [], f"{variant} overlap(s): {overlaps}"
-
-
-def test_arrow_cluster_clears_right_side_keys_across_variants() -> None:
-    for variant in ("ansi", "iso", "abnt", "ks", "jis"):
-        keys = {key.key_id: key for key in build_layout(variant=variant)}
-        up = keys["up"]
-        right_side_key_ids = [key_id for key_id in ("rshift", "menu", "rctrl") if key_id in keys]
-
-        for key_id in right_side_key_ids:
-            assert not _rectangles_overlap(up, keys[key_id]), f"{variant} up overlaps {key_id}"

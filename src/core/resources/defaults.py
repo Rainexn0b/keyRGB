@@ -16,8 +16,6 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import cast
 
-from src.core.resources.layout import build_layout
-from src.core.resources.layout_tweak_autosync import auto_sync_per_key_overlays
 from src.core.resources.layouts import resolve_layout_id
 from src.core.resources.reference_defaults_specs import load_reference_defaults_spec
 
@@ -117,10 +115,8 @@ def get_reference_matrix_dimensions(layout_id: str | None = None) -> tuple[int, 
 
 
 def get_default_per_key_tweaks(layout_id: str | None = None) -> dict[str, dict[str, float]]:
-    resolved_layout = _normalize_layout_id(layout_id)
     out: dict[str, dict[str, float]] = {}
-    raw_defaults = _load_defaults(resolved_layout)
-    per_key = _as_dict(raw_defaults.get("per_key_tweaks"))
+    per_key = _as_dict(_load_defaults(_normalize_layout_id(layout_id)).get("per_key_tweaks"))
     for key_id, tweaks in per_key.items():
         if not isinstance(key_id, str) or not isinstance(tweaks, dict):
             continue
@@ -131,14 +127,6 @@ def get_default_per_key_tweaks(layout_id: str | None = None) -> dict[str, dict[s
                 parsed[tweak_key] = float(value)
         if parsed:
             out[key_id] = parsed
-
-    visible_key_ids = {key.key_id for key in build_layout(variant=resolved_layout)}
-    if out and visible_key_ids <= set(out):
-        auto_sync_per_key_overlays(
-            layout_tweaks=_parse_layout_tweaks(raw_defaults),
-            per_key_layout_tweaks=out,
-            keys=build_layout(variant=resolved_layout),
-        )
     return out
 
 

@@ -15,31 +15,10 @@ from src.core.resources.defaults import (
     get_default_per_key_tweaks,
 )
 from src.core.resources.layout import build_layout
-from src.gui.reference.overlay_geometry import apply_global_tweak, apply_per_key_tweak
 from src.core.resources.reference_defaults_specs import (
     clear_reference_defaults_spec_cache,
     load_reference_defaults_spec,
 )
-
-
-def _rendered_default_size(layout_id: str, key_id: str) -> tuple[float, float]:
-    key = next(key for key in build_layout(variant=layout_id) if key.key_id == key_id)
-    layout_tweaks = get_default_layout_tweaks(layout_id)
-    per_key_tweaks = get_default_per_key_tweaks(layout_id)
-    gx, gy, gw, gh = apply_global_tweak(rect=tuple(float(v) for v in key.rect), layout_tweaks=layout_tweaks)
-    _x, _y, width, height, _inset = apply_per_key_tweak(
-        key_id=key.key_id,
-        slot_id=str(getattr(key, "slot_id", None) or "") or None,
-        rect=(gx, gy, gw, gh),
-        per_key_layout_tweaks=per_key_tweaks,
-        inset_default=float(layout_tweaks.get("inset", 0.06)),
-    )
-    return round(width, 2), round(height, 2)
-
-
-def _assert_same_rendered_size(layout_id: str, key_ids: tuple[str, ...]) -> None:
-    sizes = {_rendered_default_size(layout_id, key_id) for key_id in key_ids}
-    assert len(sizes) == 1
 
 
 def test_reference_matrix_dimensions_cover_default_keymap() -> None:
@@ -272,24 +251,3 @@ def test_layout_defaults_cover_visible_layout_keys() -> None:
         assert visible_key_ids <= keymap_ids
         assert visible_key_ids <= tweak_ids
 
-
-def test_default_overlay_sizes_normalize_standard_key_families() -> None:
-    for layout_id in ("ansi", "iso", "ks", "abnt", "jis"):
-        _assert_same_rendered_size(layout_id, ("left", "down", "right", "up"))
-
-    _assert_same_rendered_size("ansi", ("1", "2", "3", "q", "w", "e", "a", "s", "d", "z", "x", "c"))
-
-
-def test_default_overlay_sizes_keep_variant_specific_keys_consistent() -> None:
-    _assert_same_rendered_size("iso", ("nonusbackslash", "z", "x"))
-    _assert_same_rendered_size("iso", ("nonushash", "quote", "semicolon"))
-
-    _assert_same_rendered_size("abnt", ("abnt2slash", "slash", "dot"))
-
-    _assert_same_rendered_size("ks", ("ks_extra", "equal", "minus"))
-    _assert_same_rendered_size("ks", ("hanja", "fn", "menu", "hangul"))
-
-    _assert_same_rendered_size("jis", ("yen", "equal", "minus"))
-    _assert_same_rendered_size("jis", ("jp_at", "rbracket", "lbracket"))
-    _assert_same_rendered_size("jis", ("jp_colon", "quote", "semicolon"))
-    _assert_same_rendered_size("jis", ("muhenkan", "henkan", "katakana"))

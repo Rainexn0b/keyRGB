@@ -175,26 +175,3 @@ def test_get_layout_legend_labels_uses_sparse_pack_overrides() -> None:
     assert labels["top_06"] == "Z"
     assert labels["shift_02"] == "Y"
 
-
-def test_generic_legend_packs_supply_neutral_default_labels() -> None:
-    ansi_labels = get_layout_legend_labels("ansi")
-    iso_labels = get_layout_legend_labels("iso")
-    abnt_labels = get_layout_legend_labels("abnt")
-    ks_labels = get_layout_legend_labels("ks")
-    jis_labels = get_layout_legend_labels("jis")
-
-    assert ansi_labels["bottom_06"] == "Menu"
-    assert iso_labels["bottom_06"] == "Menu"
-    assert abnt_labels["bottom_06"] == "Menu"
-    assert ks_labels["number_13"] == "Han/Eng"
-    assert ks_labels["bottom_08"] == "Menu"
-    assert jis_labels["bottom_09"] == "Menu"
-
-
-def test_get_layout_keys_applies_generic_pack_defaults() -> None:
-    ks_keys = {key.key_id: key for key in get_layout_keys("ks")}
-    jis_keys = {key.key_id: key for key in get_layout_keys("jis")}
-
-    assert ks_keys["ks_extra"].label == "Han/Eng"
-    assert ks_keys["menu"].label == "Menu"
-    assert jis_keys["menu"].label == "Menu"
