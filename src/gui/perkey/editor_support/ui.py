@@ -33,6 +33,15 @@ def _set_backdrop_mode_from_label(editor, label: str) -> None:
     editor._on_backdrop_mode_changed()
 
 
+def _apply_backdrop_mode_dropdown_value(editor, label: str) -> None:
+    """Update the backdrop combobox display and apply the chosen mode."""
+    try:
+        editor._backdrop_mode_combo.set(label)
+    except _TK_CALLBACK_SETUP_ERRORS:
+        pass
+    _set_backdrop_mode_from_label(editor, label)
+
+
 def build_editor_ui(editor) -> None:
     main = ttk.Frame(editor.root, padding=16)
     main.pack(fill="both", expand=True)
@@ -92,18 +101,26 @@ def build_editor_ui(editor) -> None:
     backdrop_row = ttk.Frame(right)
     backdrop_row.pack(fill="x", pady=(0, 6))
     ttk.Label(backdrop_row, text="Backdrop", font=("Sans", 9)).pack(side="left")
+    _backdrop_mode_label_list = [_BACKDROP_MODE_LABELS[m] for m in ("none", "builtin", "custom")]
     editor._backdrop_mode_combo = ttk.Combobox(
         backdrop_row,
         state="readonly",
         width=16,
-        values=[_BACKDROP_MODE_LABELS[mode] for mode in ("none", "builtin", "custom")],
+        values=_backdrop_mode_label_list,
     )
     editor._backdrop_mode_combo.set(_BACKDROP_MODE_LABELS.get(editor._backdrop_mode_var.get(), "Built-in seed"))
     editor._backdrop_mode_combo.pack(side="left", fill="x", expand=True, padx=(8, 0))
-    editor._backdrop_mode_combo.bind(
-        "<<ComboboxSelected>>",
-        lambda _e: _set_backdrop_mode_from_label(editor, editor._backdrop_mode_combo.get()),
+    editor._backdrop_mode_dropdown = UpwardListboxDropdown(
+        root=editor.root,
+        anchor=editor._backdrop_mode_combo,
+        values_provider=lambda: _backdrop_mode_label_list,
+        get_current_value=lambda: editor._backdrop_mode_combo.get(),
+        set_value=lambda label: _apply_backdrop_mode_dropdown_value(editor, label),
+        bg=getattr(editor, "bg_color", "#2b2b2b"),
+        fg=getattr(editor, "fg_color", "#ffffff"),
     )
+    editor._backdrop_mode_combo.bind("<Button-1>", editor._backdrop_mode_dropdown.open)
+    editor._backdrop_mode_combo.bind("<Down>", editor._backdrop_mode_dropdown.open)
 
     backdrop_buttons = ttk.Frame(right)
     backdrop_buttons.pack(fill="x", pady=(0, 10))

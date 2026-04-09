@@ -468,6 +468,8 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert "Setup" in label_texts
     assert "Lighting profile" in label_texts
     assert len(registry["separators"]) == 2
+    assert len(registry["dropdowns"]) == 2
+    assert editor._backdrop_mode_dropdown is registry["dropdowns"][0]
 
     assert editor._profiles_frame.options["text"] == "Lighting profiles"
     assert editor._profiles_frame.options["padding"] == 10
@@ -482,7 +484,7 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert combo.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
 
     dropdown = editor._profiles_dropdown
-    assert dropdown is registry["dropdowns"][0]
+    assert dropdown is registry["dropdowns"][1]
     assert registry["profiles_list_calls"] == 1
     assert dropdown.kwargs["root"] is root
     assert dropdown.kwargs["anchor"] is combo
