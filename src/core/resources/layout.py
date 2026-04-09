@@ -190,7 +190,8 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
     r3 = r2 + (unit + 10)
     r4 = r3 + (unit + 10)
 
-    nav_x0 = 748
+    nav_x0 = 700
+    nav_aux_x0 = 856
     nx0 = 806
 
     keys: List[KeyDef] = []
@@ -204,12 +205,12 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
         "bottom": r4,
     }
 
-    keys += build_function_rows(fy=fy, x0=x0, nav_x0=nav_x0, nx0=nx0)
+    keys += build_function_rows(fy=fy, x0=x0, nav_x0=nav_x0, nav_aux_x0=nav_aux_x0)
     keys += build_alpha_block(spec=spec, x0=x0, unit=unit, gap=gap, row_tops=row_tops)
 
-    arrow_unit = 34
-    ax0 = 642
-    ay0 = r4 + 10
+    arrow_unit = 30
+    ax0 = 700
+    ay0 = r4 + 26
     keys += build_arrow_cluster(ax0=ax0, ay0=ay0, arrow_unit=arrow_unit)
     keys += build_numpad(r0=r0, r1=r1, r2=r2, r3=r3, r4=r4, nx0=nx0, unit=unit, gap=gap)
 

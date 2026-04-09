@@ -272,21 +272,77 @@ def assign_current_cell(
     probe_selected_key_id_fn: Any,
     keymap_cells_for: Any,
     physical_layout_id_fn: Any,
+    default_keymap_for_layout_fn: Any,
 ) -> None:
     slot_id = probe_selected_slot_id_fn(app)
     key_id = probe_selected_key_id_fn(app)
     if not slot_id and not key_id:
         app.lbl_status.configure(text="Select a key on the image first")
         return
+
+    current_cell = app.probe.current_cell
+    physical_layout = physical_layout_id_fn(app)
     key_identity = str(slot_id or key_id)
     display_key_id = str(key_id or key_identity)
-    cells = list(
-        keymap_cells_for(app.keymap, display_key_id, slot_id=slot_id, physical_layout=physical_layout_id_fn(app))
+    selected_identities = tuple(
+        dict.fromkeys(identity for identity in (key_identity, str(key_id or "").strip()) if identity)
     )
-    if app.probe.current_cell not in cells:
-        cells.append(app.probe.current_cell)
-    app.keymap[key_identity] = tuple(cells)
-    app.lbl_status.configure(text=f"Assigned {display_key_id} -> {app.probe.current_cell} ({len(cells)} cell(s))")
+    default_keymap = default_keymap_for_layout_fn(physical_layout)
+    default_owner_by_cell = {
+        cell: str(identity)
+        for identity, cells in (default_keymap or {}).items()
+        for cell in cells
+    }
+
+    other_owners_by_cell: dict[tuple[int, int], set[str]] = {}
+    for existing_identity, existing_cells in app.keymap.items():
+        if existing_identity in selected_identities:
+            continue
+        for cell in existing_cells:
+            other_owners_by_cell.setdefault(cell, set()).add(str(existing_identity))
+
+    selected_cells: list[tuple[int, int]] = []
+    seen_selected_cells: set[tuple[int, int]] = set()
+    for identity in selected_identities:
+        for cell in app.keymap.get(identity, ()):
+            if cell == current_cell or cell in seen_selected_cells:
+                continue
+            other_owners = other_owners_by_cell.get(cell, set())
+            if other_owners and default_owner_by_cell.get(cell) not in {None, key_identity}:
+                continue
+            seen_selected_cells.add(cell)
+            selected_cells.append(cell)
+
+    selected_cell_set = set(selected_cells)
+    new_keymap: dict[str, tuple[tuple[int, int], ...]] = {}
+    for existing_identity, existing_cells in app.keymap.items():
+        if existing_identity in selected_identities:
+            continue
+        filtered_cells = tuple(
+            cell
+            for cell in existing_cells
+            if cell != current_cell
+            and not (
+                cell in selected_cell_set and default_owner_by_cell.get(cell) in {None, key_identity}
+            )
+        )
+        if filtered_cells:
+            new_keymap[str(existing_identity)] = filtered_cells
+
+    cells = list(
+        keymap_cells_for(
+            {key_identity: tuple(selected_cells)},
+            display_key_id,
+            slot_id=slot_id,
+            physical_layout=physical_layout,
+        )
+    )
+    if current_cell not in cells:
+        cells.append(current_cell)
+
+    new_keymap[key_identity] = tuple(cells)
+    app.keymap = new_keymap
+    app.lbl_status.configure(text=f"Assigned {display_key_id} -> {current_cell} ({len(cells)} cell(s))")
     app._redraw()
     app._next()
 

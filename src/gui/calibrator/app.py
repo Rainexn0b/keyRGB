@@ -265,6 +265,7 @@ class KeymapCalibrator(tk.Tk):
             probe_selected_key_id_fn=_probe_selected_key_id,
             keymap_cells_for=profile_management.keymap_cells_for,
             physical_layout_id_fn=_physical_layout_id,
+            default_keymap_for_layout_fn=_parse_default_keymap,
         )
 
     def _save(self) -> None:

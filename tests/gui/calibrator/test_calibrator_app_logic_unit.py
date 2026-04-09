@@ -433,6 +433,22 @@ def test_assign_appends_unique_cells_for_existing_key() -> None:
     assert calls == ["redraw", "next"]
 
 
+def test_assign_rehomes_physical_cell_from_previous_owner() -> None:
+    app = _make_app(
+        probe=SimpleNamespace(selected_key_id="esc", selected_slot_id="esc", current_cell=(1, 2)),
+        keymap={"esc": ((0, 1),), "f1": ((1, 2),)},
+    )
+    calls: list[str] = []
+    app._redraw = lambda: calls.append("redraw")
+    app._next = lambda: calls.append("next")
+
+    calibrator_app.KeymapCalibrator._assign(app)
+
+    assert app.keymap == {"esc": ((0, 1), (1, 2))}
+    assert app.lbl_status.text == "Assigned esc -> (1, 2) (2 cell(s))"
+    assert calls == ["redraw", "next"]
+
+
 def test_assign_uses_selected_slot_id_as_primary_identity() -> None:
     app = _make_app(
         probe=SimpleNamespace(selected_key_id=None, selected_slot_id="top_01", current_cell=(0, 4)),
@@ -447,6 +463,40 @@ def test_assign_uses_selected_slot_id_as_primary_identity() -> None:
 
     assert app.keymap == {"top_01": ((0, 2), (0, 4))}
     assert app.lbl_status.text == "Assigned q -> (0, 4) (2 cell(s))"
+    assert calls == ["redraw", "next"]
+
+
+def test_assign_canonicalizes_selected_slot_identity_and_drops_key_alias() -> None:
+    app = _make_app(
+        probe=SimpleNamespace(selected_key_id="q", selected_slot_id="top_01", current_cell=(0, 4)),
+        keymap={"q": ((0, 2),)},
+        cfg=SimpleNamespace(physical_layout="ansi", layout_legend_pack="auto"),
+    )
+    calls: list[str] = []
+    app._redraw = lambda: calls.append("redraw")
+    app._next = lambda: calls.append("next")
+
+    calibrator_app.KeymapCalibrator._assign(app)
+
+    assert app.keymap == {"top_01": ((0, 2), (0, 4))}
+    assert app.lbl_status.text == "Assigned q -> (0, 4) (2 cell(s))"
+    assert calls == ["redraw", "next"]
+
+
+def test_assign_resolves_stale_neighbor_overlap_using_layout_defaults() -> None:
+    app = _make_app(
+        probe=SimpleNamespace(selected_key_id="rctrl", selected_slot_id="bottom_07", current_cell=(0, 13)),
+        keymap={"bottom_06": ((0, 12), (0, 11)), "bottom_07": ((0, 11), (0, 12))},
+        cfg=SimpleNamespace(physical_layout="iso", layout_legend_pack="auto"),
+    )
+    calls: list[str] = []
+    app._redraw = lambda: calls.append("redraw")
+    app._next = lambda: calls.append("next")
+
+    calibrator_app.KeymapCalibrator._assign(app)
+
+    assert app.keymap == {"bottom_06": ((0, 12),), "bottom_07": ((0, 11), (0, 13))}
+    assert app.lbl_status.text == "Assigned rctrl -> (0, 13) (2 cell(s))"
     assert calls == ["redraw", "next"]
 
 
