@@ -2,6 +2,18 @@
 
 ## unreleased
 
+- GUI/Layout Support: Normalize the built-in starter overlays against the canonical layout model, re-space the nav and arrow clusters to remove stock overlaps, and keep Reset Layout Defaults consistent across ANSI, ISO, ABNT, KS, and JIS.
+- GUI/Layout Support: Polish the generic legend packs by defaulting generic `menu` labels to `Menu` and renaming the KS extra key to `Han/Eng`.
+- GUI/Reactive Typing: Rename `Reactive Typing Color` to `Reactive Typing Settings` and add a persisted `Wave thickness` slider that updates live.
+- GUI/Reactive Typing: Keep startup brightness sync from forcing manual override, keep the preview brightness in sync, and preserve reactive brightness with full 0..50 precision.
+- Effects/Reactive: Apply `pulse_scale` through the per-key mix path for fade and ripple backdrops so the reactive brightness slider works reliably, including with per-key backdrop colors.
+- Effects/Reactive Ripple: Decouple rainbow hue cycling from typing speed so color rotation stays stable across pace settings.
+- Profiles: Lower the built-in `dim` profile baseline from 10 to 5 and migrate older built-in dim profiles automatically.
+- GUI/Per-key: Make `Custom image` backdrop mode fail closed when no custom backdrop is saved instead of falling back to the built-in deck image.
+- GUI/Keymap Calibrator: Restore exclusive matrix-cell reassignment and clear stale duplicate ownership when adjacent optional keys share default cells.
+- Support Tools/Diagnostics: Slow the guided backend speed probe, show the requested speeds and dwell timing in the UI, and record the timing metadata with the probe evidence.
+- Backends/ITE8910: Send effect mode and color reports before the brightness and speed report so runtime speed changes survive controller reinitialization.
+
 ## 0.21.4 (2026-04-07)
 
 - Backends/Experimental: Add an opt-in `ite8258` hidraw backend for the Lenovo Legion 5 / Pro 5 Gen 10 `0x048d:0xc195` 24-zone ITE 8258 keyboard path, translating the merged OpenRGB Gen10 grouped-packet protocol into native KeyRGB static 4×6 zone updates, brightness control, and the confirmed firmware-effect subset.

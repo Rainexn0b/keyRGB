@@ -205,7 +205,7 @@ def test_device_set_color_uses_known_led_ids_from_upstream_comment() -> None:
     assert led_reports[-1] == build_led_color_report(KNOWN_LED_IDS[-1], (0x12, 0x34, 0x56))
 
 
-def test_device_effect_payload_applies_brightness_speed_then_effect() -> None:
+def test_device_effect_payload_applies_effect_then_brightness_speed() -> None:
     sent: list[bytes] = []
 
     def writer(report: bytes) -> int:
@@ -215,8 +215,8 @@ def test_device_effect_payload_applies_brightness_speed_then_effect() -> None:
     kb = Ite8910KeyboardDevice(writer)
     kb.set_effect({"name": "wave", "brightness": 25, "speed": 10})
 
-    assert sent[0] == build_brightness_speed_report_raw(0x05, 0x0A)
-    assert sent[1] == build_effect_report("wave")
+    assert sent[:-1] == build_effect_reports(Ite8910Effect.RAINBOW_WAVE)
+    assert sent[-1] == build_brightness_speed_report_raw(0x05, 0x0A)
 
 
 def test_device_effect_payload_passes_color_and_direction_reports() -> None:
@@ -238,9 +238,9 @@ def test_device_effect_payload_passes_color_and_direction_reports() -> None:
     )
 
     assert [report.hex() for report in sent] == [
-        "cc09050a0000",
         "cc0004000000",
         "cc15a7112233",
+        "cc09050a0000",
     ]
 
 

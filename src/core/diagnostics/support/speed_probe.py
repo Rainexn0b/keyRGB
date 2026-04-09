@@ -119,6 +119,7 @@ def _build_ite8910_speed_probe_plan() -> dict[str, Any]:
         "instructions": [
             "Switch the keyboard to the hardware effect entry, not the software effect with the same title.",
             f"In the tray, use {effect_name.replace('_', ' ').title()} from Hardware Effects; the forced selection key is {selection_effect_name}.",
+            "During the guided auto-run, each speed step is held for a few seconds before KeyRGB moves to the next value.",
             "Apply the listed UI speed values in order and watch whether each step is visually distinct.",
             "If multiple speeds appear identical or bunched together, record which values looked too close.",
         ],
@@ -183,6 +184,7 @@ def _build_ite8291r3_speed_probe_plan() -> dict[str, Any]:
         "instructions": [
             "Switch the keyboard to the hardware effect entry, not the software effect with the same title.",
             f"In the tray, use {effect_name.replace('_', ' ').title()} from Hardware Effects; the forced selection key is {selection_effect_name}.",
+            "During the guided auto-run, each speed step is held for a few seconds before KeyRGB moves to the next value.",
             "Apply the listed UI speed values in order and watch whether each step is visually distinct.",
             "If higher UI speeds do not look faster, record which values felt reversed or too close together.",
         ],

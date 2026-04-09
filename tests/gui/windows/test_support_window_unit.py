@@ -514,11 +514,14 @@ def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyP
     assert probe["backend"] == "ite8910"
     assert probe["selection_effect_name"] == "hw:spectrum_cycle"
     assert probe["execution_mode"] == "auto"
+    assert probe["automation"]["step_duration_s"] == 2.5
+    assert probe["automation"]["settle_duration_s"] == 0.5
     assert probe["observation"]["distinct_steps"] is False
     assert probe["observation"]["notes"] == "1 and 3 looked too close"
     assert window.status_label.options["text"] == "Backend speed probe recorded"
     assert showinfo_calls
     assert "temporarily switch the tray to the probe effect" in showinfo_calls[0]
+    assert "Each speed will stay active for about 2.5 seconds" in showinfo_calls[0]
 
 
 def test_run_backend_speed_probe_can_auto_run_via_tray_config(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -527,6 +530,7 @@ def test_run_backend_speed_probe_can_auto_run_via_tray_config(monkeypatch: pytes
     )
     responses = iter([True, True])
     showinfo_calls: list[str] = []
+    sleep_calls: list[float] = []
 
     class _FakeConfig:
         last_instance = None
@@ -590,15 +594,18 @@ def test_run_backend_speed_probe_can_auto_run_via_tray_config(monkeypatch: pytes
     )
     monkeypatch.setattr(support_window, "Config", _FakeConfig)
     monkeypatch.setattr(support_window, "run_in_thread", lambda root, work, on_done: on_done(work()))
-    monkeypatch.setattr(support_window.support_jobs.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(support_window.support_jobs.time, "sleep", lambda seconds: sleep_calls.append(seconds))
 
     window.run_backend_speed_probe(prompt=True)
 
     probe = window._supplemental_evidence["backend_probes"]["ite8291r3_speed"]
     assert probe["execution_mode"] == "auto"
+    assert probe["automation"]["step_duration_s"] == 2.5
+    assert probe["automation"]["settle_duration_s"] == 0.5
     assert probe["observation"]["distinct_steps"] is True
     assert probe["observation"]["notes"] == "looked distinct"
     assert probe["automation"]["applied_ui_speeds"] == [1, 3]
+    assert sleep_calls == [0.5, 2.5, 2.5, 0.5]
     assert _FakeConfig.last_instance is not None
     assert _FakeConfig.last_instance.calls == [
         ("effect", "wave"),
@@ -612,6 +619,7 @@ def test_run_backend_speed_probe_can_auto_run_via_tray_config(monkeypatch: pytes
     ]
     assert showinfo_calls
     assert "temporarily switch the tray to the probe effect" in showinfo_calls[0]
+    assert "Each speed will stay active for about 2.5 seconds" in showinfo_calls[0]
 
 
 def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.MonkeyPatch) -> None:

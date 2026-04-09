@@ -174,6 +174,9 @@ class Ite8910KeyboardDevice:
     def set_effect(self, effect_data) -> None:
         direction = None
         colors = None
+        brightness_raw = self.current_brightness_raw
+        speed_raw = self.current_speed_raw
+        apply_brightness_speed = False
 
         if isinstance(effect_data, dict):
             brightness = effect_data.get("brightness", None)
@@ -182,17 +185,15 @@ class Ite8910KeyboardDevice:
             color = effect_data.get("color", None)
 
             if brightness is not None or speed is not None:
-                brightness_raw = self.current_brightness_raw
-                speed_raw = self.current_speed_raw
-
                 if brightness is not None:
                     brightness_raw = protocol.raw_brightness_from_ui(int(brightness))
                 if speed is not None:
                     speed_raw = _coerce_effect_payload_speed(speed)
-
-                self.set_brightness_and_speed_raw(brightness_raw, speed_raw)
+                apply_brightness_speed = True
 
             if color is not None:
                 colors = [_coerce_rgb(color)]
 
         self.set_effect_index(_coerce_effect_value(effect_data), colors=colors, direction=direction)
+        if apply_brightness_speed:
+            self.set_brightness_and_speed_raw(brightness_raw, speed_raw)

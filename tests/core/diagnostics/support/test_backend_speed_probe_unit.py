@@ -23,6 +23,7 @@ def test_build_backend_speed_probe_plan_for_ite8910() -> None:
     assert plan["selection_effect_name"] == "hw:spectrum_cycle"
     assert plan["selection_menu_path"] == "Hardware Effects -> Spectrum Cycle"
     assert plan["requested_ui_speeds"] == [1, 3, 5, 7, 10]
+    assert "each speed step is held for a few seconds" in plan["instructions"][2]
     assert [sample["raw_speed"] for sample in plan["samples"]] == [1, 3, 5, 7, 10]
 
 
@@ -51,6 +52,7 @@ def test_build_backend_speed_probe_plan_for_ite8291r3() -> None:
     assert plan["selection_effect_name"] == "wave"
     assert plan["selection_menu_path"] == "Hardware Effects -> Wave"
     assert plan["requested_ui_speeds"] == [1, 3, 5, 7, 10]
+    assert "each speed step is held for a few seconds" in plan["instructions"][2]
     assert [sample["raw_speed"] for sample in plan["samples"]] == [10, 8, 6, 4, 1]
 
 
