@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.21.6 (2026-04-10)
+
+- Tray/GNOME: Fix tray icon not appearing on GNOME Shell (issue #6) by selecting the `appindicator` pystray backend on GNOME sessions; `PYSTRAY_BACKEND=appindicator` still works as a per-launch override.
+- GUI/Layout Support: Revert v0.21.5 nav-cluster/arrow-block repositioning; the new coordinates produced blank gaps misaligned with the reference backdrop.
+- GUI/Layout Support: Revert v0.21.5 generic `menu → "Menu"` legend-pack override; hardware-specific labels (e.g. `Copilot`) should not be silenced by a built-in default.
+- GUI/Keyboard Setup: Revert v0.21.5 per-key overlay autosync-at-load; normalization at load time diverged overlays from the calibrated backdrop.
+- GUI/Keyboard Setup: Normalize built-in starter overlay sizes (arrow cluster 47.6×47.6 px, F-row 41.1×23.1 px, 1u alpha keys 46.1×43.5 px, numpad 1u keys 45.2×53.2 px) and fix right-arrow inset to match the other arrow keys. Applies to ANSI and all variants. Only affects Reset Layout Defaults; existing overlays are unchanged.
+
 ## 0.21.5 (2026-04-09)
 
 - GUI/Layout Support: Normalize the built-in starter overlays against the canonical layout model, re-space the nav and arrow clusters to remove stock overlaps, and keep Reset Layout Defaults consistent across ANSI, ISO, ABNT, KS, and JIS.
@@ -44,11 +52,11 @@
 - GUI/Per-key: Keep the key overlay geometry visible when backdrop mode is set to `No backdrop` by continuing to derive the per-key canvas transform from the base keyboard image bounds even when no backdrop image is drawn.
 - Support Tools/Diagnostics: Enable the guided backend speed probe for `ite8291r3` devices and consolidate the flow onto the tray-driven auto-play path, so the probe always steps through the test speeds automatically and restores the previous effect instead of offering a separate manual path.
 - Support Tools/Diagnostics: Replace the guided backend speed probe's narrow stock popups with wider custom dialogs, including a multi-line notes field so the final observation step has enough vertical typing space.
-- GUI/Support Tools: Move the three primary support checks into a shared top-level action row with distinct button styling, clarify that the backend speed probe derives its target from the current diagnostics/discovery payload, move `Save full support bundle…` into its own final section because it combines diagnostics, discovery, supplemental evidence, and the generated issue draft, and widen the default window while reducing the pane heights so the full tool is less likely to open off-screen.
+- GUI/Support Tools: Move support checks into a shared action row, move `Save full support bundle…` into its own section, and widen the default window.
 
 ## 0.21.1 (2026-04-05)
 
-- Tray/Linux: Make `pystray` backend selection session-aware: prefer AppIndicator on KDE Plasma Wayland so the tray icon stays visible in the panel, prefer `gtk` on other PyGObject-capable sessions to avoid the opaque-square `xorg` icon path, suppress both the Ayatana deprecation warning and the GTK scale-factor critical, and keep `xorg` as the compatibility fallback when the preferred desktop-native backend is unavailable.
+- Tray/Linux: Make `pystray` backend selection session-aware: prefer AppIndicator on KDE Plasma Wayland, `gtk` on other PyGObject sessions, and `xorg` as the final fallback; suppress Ayatana and GTK scale-factor warnings.
 - GUI/Per-key: Make the per-key editor load profile backdrops through the shared backdrop storage path so `No backdrop` and `Built-in seed` stay aligned with the calibrator behavior.
 - Support Tools/Diagnostics: Record the forced hardware selection key and tray path for the guided `ite8910` speed probe, surface that guidance in the prompt UI, and include the selection details in generated support evidence.
 - Effects/Hardware: Treat palette-slot firmware effects consistently across the known color-capable hardware-effect set so palette-based backends program the selected slot for ripple-style effects as well as breathing, while preserving the dedicated firmware-random sentinel slot for random hardware effects.
