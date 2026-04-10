@@ -4,144 +4,34 @@ A lightweight Linux tray app and per-key editor for laptop keyboard lighting, wi
 
 > LLM note: For a concise, LLM-optimized summary of supported hardware, backends, and repo-discovery hints, see `AGENTS.md`.
 
-## Supported Backends & Devices
-
-Uses a priority-based backend system plus a backend-stability policy to select the most appropriate eligible backend for detected hardware.
-
-1.  **Kernel Driver (Preferred)**: Uses safe, native Linux kernel interfaces (`/sys/class/leds`).
-    *   **Clevo / Tuxedo**: Full RGB support via `tuxedo-drivers` or `clevo-xsm-wmi`.
-    *   **System76**: Full RGB support via standard ACPI drivers.
-	*   **Broad**: Brightness control on many laptops that expose a keyboard backlight LED via `/sys/class/leds`.
-
-2.  **USB / HID Direct**: Uses an implemented userspace backend such as `ite8291r3` or `ite8910`.
-    *   **TongFang**: Supports per-key RGB on devices without kernel drivers (XMG, Wootbook, Eluktronics, older Tuxedo models) if the hardware supports it.
-
-3.  **ASUS Aura**: Uses the `asusctl-aura` backend when the ASUS userspace stack is available.
-	*   **ASUS**: Best for laptops that already expose lighting control through `asusctl` / `rog-control-center`.
-
-### Backend policy
-
-| Stability      | Meaning                                                                                                                             |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `validated`    | Eligible by default during automatic backend selection.                                                                             |
-| `experimental` | Shipped in-tree, but only considered after you opt in via **Settings → Backend policy** or `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1`. |
-| `dormant`      | Present for research / future work, but never selected yet.                                                                         |
-
-Experimental backends also carry an evidence tag in diagnostics so maintainers can distinguish speculative implementations from research-backed ones based on public protocol notes or reverse-engineering work.
-
-Current backend plan:
-
-- `sysfs-leds`, `ite8291r3`, `ite8910`, and `asusctl-aura`: `validated`
-- `ite8297`: `experimental` + `reverse_engineered`
-  - `0x048d:0x8297` — 64-byte hidraw feature-report path, uniform color only
-- `ite8258`: `experimental` + `reverse_engineered`
-	- `0x048d:0xc195` — Lenovo Legion 5 / Pro 5 Gen 10 24-zone ITE 8258 hidraw keyboard path (4×6 logical zone matrix, static color, brightness, and firmware effects)
-- `ite8295-zones`: `experimental` + `reverse_engineered`
-	- `0x048d:0xc963` — Lenovo 4-zone ITE 8295 hidraw keyboard path used by IdeaPad Gaming 3-class systems, with static color, 4-zone updates, brightness, and the confirmed default firmware effects (`breathing`, `wave`, `spectrum_cycle`)
-	- `0x048d:0xc966` — companion ITE 8176 endpoint reported on the same laptops; still treated as a separate unsupported protocol family until direct RGB evidence exists
-- `sysfs-mouse`: `experimental` + `speculative`
-	- Auxiliary-only route for color-capable external mouse LEDs exposed through `/sys/class/leds`; surfaced through discovery and tray secondary-device contexts, but intentionally kept out of primary keyboard auto-selection
-- `ite8233`: `experimental` + `reverse_engineered`
-  - `0x048d:0x7001` — single-zone lightbar, static color / brightness / off
-  - `0x048d:0x7000` — lightbar + hidden backend-level effects: `breathing`, `wave`, `bounce`/`clash`, `catchup`/`catch_up`
-  - `0x048d:0x6010` — lightbar + hidden backend-level effects: `breathing`, `flash` (with optional direction), vendor DMI color-scaling quirk for specific SKUs
-- `ite8291`: `experimental` + `reverse_engineered`
-  - `0x048d:0x6004`, `0x6008`, `0x600b` — full per-key 6×21 row protocol
-  - `0x048d:0xce00` (bcdDevice ≠ `0x0002`) — per-key path; `bcdDevice 0x0002` is routed to `ite8291-zones` instead
-- `ite8291-zones`: `experimental` + `reverse_engineered`
-  - `0x048d:0xce00` bcdDevice `0x0002` — 4-zone uniform-color firmware split
-
-When a compatible auxiliary device is present, the tray exposes a `Software Targets` submenu so looped software effects can stay on the keyboard or mirror their uniformized output to all compatible secondary devices.
-
-Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental and dormant paths are additionally policy-gated, so detection alone does not guarantee automatic selection.
-
-*The installer (`install.sh`) can optionally help you install the necessary kernel modules for Clevo/Tuxedo laptops, and installs the matching KeyRGB udev rules for supported USB / `hidraw` access paths.*
-
-## Status
-
-- **Beta**: versioning follows **0.x.y**. Currently stable but has limited backend support.
-- Installer support is validated on Fedora/Nobara and Arch/CachyOS; other distro families are supported on a staged, best-effort basis.
-- Support depends entirely on your specific keyboard controller and firmware. See **Troubleshooting** and **Hardware support and contributing** below.
-
-### Distro support profiles
-
-| Profile                                | Status       | Notes                                                                                                                      |
-| -------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| Fedora / Red Hat family                | Tested       | Tested path. AppImage + optional `dnf`-based helpers is the smoothest path.                                                |
-| Debian / Ubuntu / Linux Mint           | Experimental | AppImage-first is recommended. Optional apt kernel-driver installs are best-effort and may require TUXEDO package sources. |
-| Arch / CachyOS / EndeavourOS / Manjaro | Tested       | Tested path. AppImage-first is recommended. KeyRGB does not install AUR DKMS packages automatically.                       |
-| openSUSE / Other Linux                 | Best-effort  | AppImage-first is recommended. Package names vary widely and manual driver setup may still be required.                    |
-
 ## Screenshots
 
-<table>
-	<tr>
-		<td width="50%">
-			<b>Tray Menu (Effects)</b><br>
-			<img src="assets/screenshots/trayeffects.png" alt="Tray menu effects">
-		</td>
-		<td width="50%">
-			<b>Power Management</b><br>
-			<img src="assets/screenshots/traypp.png" alt="Tray power menu">
-		</td>
-	</tr>
-	<tr>
-		<td width="50%">
-			<b>Per-Key Editor</b><br>
-			<img src="assets/screenshots/perkeyux.png" alt="Per-key editor">
-		</td>
-		<td width="50%">
-			<b>Settings</b><br>
-			<img src="assets/screenshots/settings.png" alt="Settings UI">
-		</td>
-	</tr>
-	<tr>
-		<td width="50%">
-			<b>Tray Menu (Brightness)</b><br>
-			<img src="assets/screenshots/traybo.png" alt="Tray menu brightness">
-		</td>
-		<td width="50%">
-			<b>RAM / CPU Usage</b><br>
-			<img src="assets/screenshots/ramusage.png" alt="RAM and CPU usage">
-		</td>
-	</tr>
-</table>
+| **Tray Menu (Effects)** | **Power Management** |
+|---|---|
+| ![Tray menu effects](assets/screenshots/trayeffects.png) | ![Tray power menu](assets/screenshots/traypp.png) |
+
+| **Per-Key Editor** | **Settings** |
+|---|---|
+| ![Per-key editor](assets/screenshots/perkeyux.png) | ![Settings UI](assets/screenshots/settings.png) |
+
+| **Tray Menu (Brightness)** | **RAM / CPU Usage** |
+|---|---|
+| ![Tray menu brightness](assets/screenshots/traybo.png) | ![RAM and CPU usage](assets/screenshots/ramusage.png) |
 
 <details>
 <summary><b>More screenshots</b></summary>
 
-<table>
-	<tr>
-		<td width="50%">
-			<b>Tray Menu (Software Effects)</b><br>
-			<img src="assets/screenshots/trayeffectssw.png" alt="Tray menu software effects">
-		</td>
-		<td width="50%">
-			<b>Tray Menu (Keyboard / Profiles)</b><br>
-			<img src="assets/screenshots/traykbp.png" alt="Tray menu keyboard and profiles">
-		</td>
-	</tr>
-	<tr>
-		<td width="50%">
-			<b>Uniform Color UI</b><br>
-			<img src="assets/screenshots/uniformcolorux.png" alt="Uniform color UI">
-		</td>
-		<td width="50%">
-			<b>Per-Key Calibrator</b><br>
-			<img src="assets/screenshots/perkeycalux.png" alt="Per-key calibrator">
-		</td>
-	</tr>
-	<tr>
-		<td width="50%">
-			<b>Keymap Calibration</b><br>
-			<img src="assets/screenshots/keymapcalux.png" alt="Keymap calibration">
-		</td>
-		<td width="50%">
-			<b>Reactive Typing</b><br>
-			<img src="assets/screenshots/reactivekb.png" alt="Reactive typing">
-		</td>
-	</tr>
-</table>
+| **Tray Menu (Software Effects)** | **Tray Menu (Keyboard / Profiles)** |
+|---|---|
+| ![Tray menu software effects](assets/screenshots/trayeffectssw.png) | ![Tray menu keyboard and profiles](assets/screenshots/traykbp.png) |
+
+| **Uniform Color UI** | **Per-Key Calibrator** |
+|---|---|
+| ![Uniform color UI](assets/screenshots/uniformcolorux.png) | ![Per-key calibrator](assets/screenshots/perkeycalux.png) |
+
+| **Keymap Calibration** | **Reactive Typing** |
+|---|---|
+| ![Keymap calibration](assets/screenshots/keymapcalux.png) | ![Reactive typing](assets/screenshots/reactivekb.png) |
 
 </details>
 
@@ -296,6 +186,74 @@ These are the effect names stored in `~/.config/keyrgb/config.json` under the `e
 - Per-key static map: `perkey`
 
 When a hardware effect name collides with a software effect name, KeyRGB stores the hardware selection with an `hw:` prefix to preserve the user's choice. Example: hardware `spectrum_cycle` is stored as `hw:spectrum_cycle`.
+
+## Status
+
+- **Beta**: versioning follows **0.x.y**. Currently stable but has limited backend support.
+- Installer support is validated on Fedora/Nobara and Arch/CachyOS; other distro families are supported on a staged, best-effort basis.
+- Support depends entirely on your specific keyboard controller and firmware. See **Troubleshooting** and **Hardware support and contributing** below.
+
+### Distro support profiles
+
+| Profile                                | Status       | Notes                                                                                                                      |
+| -------------------------------------- | ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Fedora / Red Hat family                | Tested       | Tested path. AppImage + optional `dnf`-based helpers is the smoothest path.                                                |
+| Debian / Ubuntu / Linux Mint           | Experimental | AppImage-first is recommended. Optional apt kernel-driver installs are best-effort and may require TUXEDO package sources. |
+| Arch / CachyOS / EndeavourOS / Manjaro | Tested       | Tested path. AppImage-first is recommended. KeyRGB does not install AUR DKMS packages automatically.                       |
+| openSUSE / Other Linux                 | Best-effort  | AppImage-first is recommended. Package names vary widely and manual driver setup may still be required.                    |
+
+## Supported Backends & Devices
+
+Uses a priority-based backend system plus a backend-stability policy to select the most appropriate eligible backend for detected hardware.
+
+1.  **Kernel Driver (Preferred)**: Uses safe, native Linux kernel interfaces (`/sys/class/leds`).
+    *   **Clevo / Tuxedo**: Full RGB support via `tuxedo-drivers` or `clevo-xsm-wmi`.
+    *   **System76**: Full RGB support via standard ACPI drivers.
+	*   **Broad**: Brightness control on many laptops that expose a keyboard backlight LED via `/sys/class/leds`.
+
+2.  **USB / HID Direct**: Uses an implemented userspace backend such as `ite8291r3` or `ite8910`.
+    *   **TongFang**: Supports per-key RGB on devices without kernel drivers (XMG, Wootbook, Eluktronics, older Tuxedo models) if the hardware supports it.
+
+3.  **ASUS Aura**: Uses the `asusctl-aura` backend when the ASUS userspace stack is available.
+	*   **ASUS**: Best for laptops that already expose lighting control through `asusctl` / `rog-control-center`.
+
+### Backend policy
+
+| Stability      | Meaning                                                                                                                             |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `validated`    | Eligible by default during automatic backend selection.                                                                             |
+| `experimental` | Shipped in-tree, but only considered after you opt in via **Settings → Backend policy** or `KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1`. |
+| `dormant`      | Present for research / future work, but never selected yet.                                                                         |
+
+Experimental backends also carry an evidence tag in diagnostics so maintainers can distinguish speculative implementations from research-backed ones based on public protocol notes or reverse-engineering work.
+
+Current backend plan:
+
+- `sysfs-leds`, `ite8291r3`, `ite8910`, and `asusctl-aura`: `validated`
+- `ite8297`: `experimental` + `reverse_engineered`
+  - `0x048d:0x8297` — 64-byte hidraw feature-report path, uniform color only
+- `ite8258`: `experimental` + `reverse_engineered`
+	- `0x048d:0xc195` — Lenovo Legion 5 / Pro 5 Gen 10 24-zone ITE 8258 hidraw keyboard path (4×6 logical zone matrix, static color, brightness, and firmware effects)
+- `ite8295-zones`: `experimental` + `reverse_engineered`
+	- `0x048d:0xc963` — Lenovo 4-zone ITE 8295 hidraw keyboard path used by IdeaPad Gaming 3-class systems, with static color, 4-zone updates, brightness, and the confirmed default firmware effects (`breathing`, `wave`, `spectrum_cycle`)
+	- `0x048d:0xc966` — companion ITE 8176 endpoint reported on the same laptops; still treated as a separate unsupported protocol family until direct RGB evidence exists
+- `sysfs-mouse`: `experimental` + `speculative`
+	- Auxiliary-only route for color-capable external mouse LEDs exposed through `/sys/class/leds`; surfaced through discovery and tray secondary-device contexts, but intentionally kept out of primary keyboard auto-selection
+- `ite8233`: `experimental` + `reverse_engineered`
+  - `0x048d:0x7001` — single-zone lightbar, static color / brightness / off
+  - `0x048d:0x7000` — lightbar + hidden backend-level effects: `breathing`, `wave`, `bounce`/`clash`, `catchup`/`catch_up`
+  - `0x048d:0x6010` — lightbar + hidden backend-level effects: `breathing`, `flash` (with optional direction), vendor DMI color-scaling quirk for specific SKUs
+- `ite8291`: `experimental` + `reverse_engineered`
+  - `0x048d:0x6004`, `0x6008`, `0x600b` — full per-key 6×21 row protocol
+  - `0x048d:0xce00` (bcdDevice ≠ `0x0002`) — per-key path; `bcdDevice 0x0002` is routed to `ite8291-zones` instead
+- `ite8291-zones`: `experimental` + `reverse_engineered`
+  - `0x048d:0xce00` bcdDevice `0x0002` — 4-zone uniform-color firmware split
+
+When a compatible auxiliary device is present, the tray exposes a `Software Targets` submenu so looped software effects can stay on the keyboard or mirror their uniformized output to all compatible secondary devices.
+
+Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental and dormant paths are additionally policy-gated, so detection alone does not guarantee automatic selection.
+
+*The installer (`install.sh`) can optionally help you install the necessary kernel modules for Clevo/Tuxedo laptops, and installs the matching KeyRGB udev rules for supported USB / `hidraw` access paths.*
 
 ## Configuration
 
