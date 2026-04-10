@@ -8,46 +8,36 @@ A lightweight Linux tray app and per-key editor for laptop keyboard lighting, wi
 
 | **Tray Menu (Effects)** | **Power Management** |
 |---|---|
-| ![Tray menu effects](assets/screenshots/trayeffects.png) | ![Tray power menu](assets/screenshots/traypp.png) |
+| ![Tray menu effects](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/trayeffects.png) | ![Tray power menu](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/traypp.png) |
 
 | **Per-Key Editor** | **Settings** |
 |---|---|
-| ![Per-key editor](assets/screenshots/perkeyux.png) | ![Settings UI](assets/screenshots/settings.png) |
+| ![Per-key editor](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/perkeyux.png) | ![Settings UI](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/settings.png) |
 
 | **Tray Menu (Brightness)** | **RAM / CPU Usage** |
 |---|---|
-| ![Tray menu brightness](assets/screenshots/traybo.png) | ![RAM and CPU usage](assets/screenshots/ramusage.png) |
+| ![Tray menu brightness](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/traybo.png) | ![RAM and CPU usage](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/ramusage.png) |
 
 <details>
 <summary><b>More screenshots</b></summary>
 
 | **Tray Menu (Software Effects)** | **Tray Menu (Keyboard / Profiles)** |
 |---|---|
-| ![Tray menu software effects](assets/screenshots/trayeffectssw.png) | ![Tray menu keyboard and profiles](assets/screenshots/traykbp.png) |
+| ![Tray menu software effects](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/trayeffectssw.png) | ![Tray menu keyboard and profiles](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/traykbp.png) |
 
 | **Uniform Color UI** | **Per-Key Calibrator** |
 |---|---|
-| ![Uniform color UI](assets/screenshots/uniformcolorux.png) | ![Per-key calibrator](assets/screenshots/perkeycalux.png) |
+| ![Uniform color UI](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/uniformcolorux.png) | ![Per-key calibrator](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/perkeycalux.png) |
 
 | **Keymap Calibration** | **Reactive Typing** |
 |---|---|
-| ![Keymap calibration](assets/screenshots/keymapcalux.png) | ![Reactive typing](assets/screenshots/reactivekb.png) |
+| ![Keymap calibration](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/keymapcalux.png) | ![Reactive typing](https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/assets/screenshots/reactivekb.png) |
 
 </details>
 
 ## Quickstart
 
 For most users, use the AppImage installer. Only use a source checkout if you want to modify KeyRGB locally.
-
-### Common commands
-
-| Task | Command |
-| --- | --- |
-| Install AppImage | `curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh` |
-| Update existing AppImage | `curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --update-appimage` |
-| Install AppImage without system package changes | `curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && bash install.sh --no-system-deps` |
-| Uninstall AppImage install | `curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/uninstall.sh -o uninstall.sh && bash uninstall.sh --yes --remove-appimage` |
-| Clone repo and install dev dependencies | `git clone https://github.com/Rainexn0b/keyRGB.git && cd keyRGB && ./install.sh --dev` |
 
 ### Install and update
 
