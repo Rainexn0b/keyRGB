@@ -17,6 +17,7 @@ from src.tray.controllers._lighting_controller_helpers import (
 _BRIGHTNESS_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 _REACTIVE_ENGINE_ATTR_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
 _REACTIVE_ENGINE_BRIGHTNESS_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_POWER_POLICY_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _apply_reactive_brightness_best_effort(
@@ -111,6 +112,6 @@ def apply_brightness_from_power_policy_impl(
         if not bool(getattr(tray, "is_off", False)) and not is_sw_effect:
             start_current_effect(tray)
         tray._refresh_ui()
-    except Exception as exc:  # @quality-exception exception-transparency: power-policy application crosses config setters, backend runtime calls, and UI callbacks; must remain non-fatal
+    except _POWER_POLICY_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: power-policy application crosses config setters, backend runtime calls, and UI callbacks; must remain non-fatal
         _log_tray_exception(tray, "Failed to apply tray lighting power-policy brightness: %s", exc)
         return

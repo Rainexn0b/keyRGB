@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 import src.tray.pollers.idle_power.polling as ipp
 
 
@@ -47,6 +49,39 @@ def test_build_idle_action_key_changes_when_inputs_change() -> None:
     )
     assert base != changed_brightness
     assert base != changed_screen_off
+
+
+def test_build_idle_action_key_falls_back_for_runtime_formatting_errors() -> None:
+    class BadInt:
+        def __int__(self) -> int:
+            raise RuntimeError("bad brightness")
+
+    key = ipp._build_idle_action_key(
+        action="turn_off",
+        dimmed=True,
+        screen_off=False,
+        brightness=BadInt(),
+        dim_sync_mode="off",
+        dim_temp_brightness=5,
+    )
+
+    assert key == "turn_off"
+
+
+def test_build_idle_action_key_propagates_unexpected_formatting_errors() -> None:
+    class BadInt:
+        def __int__(self) -> int:
+            raise AssertionError("unexpected brightness bug")
+
+    with pytest.raises(AssertionError, match="unexpected brightness bug"):
+        ipp._build_idle_action_key(
+            action="turn_off",
+            dimmed=True,
+            screen_off=False,
+            brightness=BadInt(),
+            dim_sync_mode="off",
+            dim_temp_brightness=5,
+        )
 
 
 def test_should_log_idle_action_rejects_none_action():

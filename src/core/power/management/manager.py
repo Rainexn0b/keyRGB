@@ -31,6 +31,9 @@ from src.core.utils.safe_attrs import safe_int_attr
 
 logger = logging.getLogger(__name__)
 
+_POWER_MANAGER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_POWER_MANAGER_MONITOR_ERRORS = _POWER_MANAGER_RUNTIME_ERRORS + (ImportError,)
+
 
 class PowerManager:
     """Monitor system power events and control keyboard accordingly."""
@@ -139,7 +142,7 @@ class PowerManager:
                     apply_brightness=self._apply_brightness_policy,
                 )
 
-            except Exception:  # @quality-exception exception-transparency: battery-saver polling crosses sysfs monitoring, config/profile reads, policy evaluation, and controller actions and must remain non-fatal
+            except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: battery-saver polling crosses sysfs monitoring, config/profile reads, policy evaluation, and controller actions and must remain non-fatal for recoverable failures
                 logger.exception("Battery saver monitoring iteration failed")
 
             time.sleep(poll_interval_s)
@@ -164,7 +167,7 @@ class PowerManager:
             if engine is not None:
                 self._sync_config_brightness(brightness)
                 engine.set_brightness(brightness)
-        except Exception:  # @quality-exception exception-transparency: brightness application crosses a runtime controller boundary and must remain best-effort
+        except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: brightness application crosses a runtime controller boundary and must remain best-effort for recoverable failures
             logger.exception("Battery saver brightness apply failed")
 
     def _sync_config_brightness(self, brightness: int) -> None:
@@ -191,7 +194,7 @@ class PowerManager:
         except FileNotFoundError:
             logger.warning("dbus-monitor not available, trying alternative method")
             self._monitor_acpi_events()
-        except Exception:  # @quality-exception exception-transparency: login1 monitoring is an external runtime boundary and power monitoring must remain available
+        except _POWER_MANAGER_MONITOR_ERRORS:  # @quality-exception exception-transparency: login1 monitoring is an external runtime boundary and power monitoring must remain available on recoverable runtime failures
             logger.exception("Power monitoring error")
 
     def _start_lid_monitor(self):
@@ -269,7 +272,7 @@ class PowerManager:
                     ),
                 )
             )
-        except Exception:  # @quality-exception exception-transparency: power-event policy evaluation crosses controller-state sampling and policy boundaries and must remain non-fatal
+        except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: power-event policy evaluation crosses controller-state sampling and policy boundaries and must remain non-fatal for recoverable failures
             logger.exception("Power event policy evaluation failed")
             return None
 
@@ -278,7 +281,7 @@ class PowerManager:
             fn = getattr(self.kb_controller, method_name, None)
             if callable(fn):
                 fn()
-        except Exception:  # @quality-exception exception-transparency: power-event keyboard actions cross a runtime controller boundary and must remain non-fatal for monitor threads
+        except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: power-event keyboard actions cross a runtime controller boundary and must remain non-fatal for recoverable monitor-thread failures
             logger.exception("Power event keyboard action '%s' failed", method_name)
 
     def _on_suspend(self):

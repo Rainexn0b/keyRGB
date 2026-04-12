@@ -18,7 +18,7 @@ from src.core.backends.base import (
     normalize_experimental_evidence,
 )
 from src.core.backends.registry import _probe_backend, BackendSpec, iter_backends, select_backend
-from src.core.backends.policy import experimental_evidence_for_backend, experimental_evidence_label
+from src.core.backends.policy import experimental_backends_enabled, experimental_evidence_for_backend, experimental_evidence_label
 
 
 @dataclass
@@ -306,6 +306,33 @@ def test_experimental_evidence_label_uses_user_facing_wording() -> None:
     assert experimental_evidence_label(ExperimentalEvidence.SPECULATIVE) == "speculative"
 
 
+def test_experimental_backends_enabled_returns_false_when_config_read_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
+
+    class BrokenConfig:
+        @property
+        def experimental_backends_enabled(self) -> bool:
+            raise RuntimeError("config boom")
+
+    monkeypatch.setattr("src.core.config.Config", BrokenConfig)
+
+    assert experimental_backends_enabled() is False
+
+
+def test_experimental_backends_enabled_propagates_unexpected_config_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
+
+    class BrokenConfig:
+        @property
+        def experimental_backends_enabled(self) -> bool:
+            raise AssertionError("unexpected config bug")
+
+    monkeypatch.setattr("src.core.config.Config", BrokenConfig)
+
+    with pytest.raises(AssertionError, match="unexpected config bug"):
+        experimental_backends_enabled()
+
+
 def test_iter_backends_skips_factory_failures() -> None:
     specs = [
         BackendSpec(
@@ -325,6 +352,19 @@ def test_iter_backends_skips_factory_failures() -> None:
     assert [backend.name for backend in backends] == ["ok"]
 
 
+def test_iter_backends_propagates_unexpected_factory_failures() -> None:
+    specs = [
+        BackendSpec(
+            name="broken",
+            priority=100,
+            factory=lambda: (_ for _ in ()).throw(AssertionError("unexpected factory bug")),
+        ),
+    ]
+
+    with pytest.raises(AssertionError, match="unexpected factory bug"):
+        iter_backends(specs=specs)
+
+
 def test_probe_backend_returns_unavailable_when_probe_raises() -> None:
     class ProbeFailsBackend(DummyBackend):
         def probe(self) -> ProbeResult:
@@ -335,6 +375,15 @@ def test_probe_backend_returns_unavailable_when_probe_raises() -> None:
     assert result.available is False
     assert result.confidence == 0
     assert result.reason == "probe exception: probe boom"
+
+
+def test_probe_backend_propagates_unexpected_probe_failures() -> None:
+    class ProbeFailsBackend(DummyBackend):
+        def probe(self) -> ProbeResult:
+            raise AssertionError("unexpected probe bug")
+
+    with pytest.raises(AssertionError, match="unexpected probe bug"):
+        _probe_backend(ProbeFailsBackend("broken-probe", 1, True))
 
 
 def test_probe_backend_returns_unavailable_when_is_available_fallback_raises() -> None:
@@ -351,3 +400,16 @@ def test_probe_backend_returns_unavailable_when_is_available_fallback_raises() -
     assert result.available is False
     assert result.confidence == 0
     assert result.reason == "is_available exception: availability boom"
+
+
+def test_probe_backend_propagates_unexpected_is_available_failures() -> None:
+    class AvailabilityFailsBackend:
+        name = "broken-availability"
+        priority = 1
+        probe = None
+
+        def is_available(self) -> bool:
+            raise AssertionError("unexpected availability bug")
+
+    with pytest.raises(AssertionError, match="unexpected availability bug"):
+        _probe_backend(AvailabilityFailsBackend())

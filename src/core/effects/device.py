@@ -31,6 +31,7 @@ _LOG_LENGTH_SNAPSHOT_ERRORS = (
     TypeError,
     ValueError,
 )
+_KEYBOARD_ACQUIRE_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 Color = tuple[int, int, int]
 PerKeyColorMap = Mapping[tuple[int, int], Color]
@@ -282,7 +283,7 @@ def acquire_keyboard(
         return kb, True
     except FileNotFoundError:
         return NullKeyboard(), False
-    except Exception as exc:  # @quality-exception exception-transparency: device acquisition crosses backend probing and hardware startup boundaries; non-fatal for effect startup
+    except _KEYBOARD_ACQUIRE_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: device acquisition crosses backend probing and hardware startup boundaries; recoverable failures are non-fatal for effect startup
         log_throttled(
             logger,
             "effects.acquire_keyboard",

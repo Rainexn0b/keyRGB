@@ -11,6 +11,8 @@ import logging
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 
 def _make_config(tmp_path, monkeypatch):
     from src.core.config import Config
@@ -461,3 +463,17 @@ def test_lightbar_color_falls_back_and_logs_when_defaults_lookup_raises(tmp_path
     ]
     assert records
     assert records[-1].exc_info is not None
+
+
+def test_lightbar_color_propagates_unexpected_defaults_lookup_failures(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    class BrokenDefaults:
+        def get(self, *_args, **_kwargs):
+            raise AssertionError("unexpected defaults bug")
+
+    cfg.DEFAULTS = BrokenDefaults()
+    cfg._settings["lightbar_color"] = None
+
+    with pytest.raises(AssertionError, match="unexpected defaults bug"):
+        _ = cfg.lightbar_color

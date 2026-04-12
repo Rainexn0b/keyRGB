@@ -6,6 +6,7 @@ from typing import Iterable
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_INT_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+_CONFIG_HELPER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_config_exception(message: str, exc: Exception) -> None:
@@ -15,7 +16,7 @@ def _log_config_exception(message: str, exc: Exception) -> None:
 def _read_setting(settings: object, key: str, default: object) -> object:
     try:
         return settings.get(key, default)  # type: ignore[attr-defined]
-    except Exception as exc:  # @quality-exception exception-transparency: config helper reads cross arbitrary mapping implementations and must remain non-fatal
+    except _CONFIG_HELPER_RUNTIME_ERRORS as exc:
         _log_config_exception(f"Failed reading config setting {key}: %s", exc)
         return default
 
@@ -23,7 +24,7 @@ def _read_setting(settings: object, key: str, default: object) -> object:
 def _coerce_bool(value: object, *, default: bool) -> bool:
     try:
         return bool(value)
-    except Exception as exc:  # @quality-exception exception-transparency: config bool coercion may call user-defined __bool__ and must remain non-fatal
+    except _CONFIG_HELPER_RUNTIME_ERRORS as exc:
         _log_config_exception("Failed coercing config bool value: %s", exc)
         return bool(default)
 
@@ -33,7 +34,7 @@ def _coerce_int(value: object, *, default: int) -> int:
         return int(value)  # type: ignore[call-overload]
     except _RECOVERABLE_INT_COERCION_EXCEPTIONS:
         return int(default)
-    except Exception as exc:  # @quality-exception exception-transparency: config int coercion may call user-defined __int__/__index__ and must remain non-fatal
+    except _CONFIG_HELPER_RUNTIME_ERRORS as exc:
         _log_config_exception("Failed coercing config int value: %s", exc)
         return int(default)
 
@@ -45,7 +46,7 @@ def _normalize_optional_brightness(owner: object, value: object) -> int | None:
         return owner._normalize_brightness_value(value)  # type: ignore[attr-defined]
     except _RECOVERABLE_INT_COERCION_EXCEPTIONS:
         return None
-    except Exception as exc:  # @quality-exception exception-transparency: optional brightness normalization crosses runtime config helpers and must remain non-fatal
+    except _CONFIG_HELPER_RUNTIME_ERRORS as exc:
         _log_config_exception("Failed normalizing optional brightness value: %s", exc)
         return None
 

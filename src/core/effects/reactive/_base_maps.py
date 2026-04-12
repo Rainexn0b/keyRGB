@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 _PER_KEY_BACKDROP_ITERATION_LOG_KEY = "effects.reactive.per_key_backdrop.iteration_failed"
 _PER_KEY_BACKDROP_ITERATION_LOG_INTERVAL_S = 30.0
+_PER_KEY_BACKDROP_ITERATION_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 _ALL_KEYS: tuple[Key, ...] = tuple((r, c) for r in range(NUM_ROWS) for c in range(NUM_COLS))
 
@@ -70,7 +71,7 @@ def fill_per_key_backdrop_map(
                 dest[(int(row), int(col))] = (int(rr), int(gg), int(bb))
             except (TypeError, ValueError):
                 continue
-    except Exception as exc:  # @quality-exception exception-transparency: reactive per-key backdrops may come from malformed runtime config objects and rendering must degrade to the uniform base color
+    except _PER_KEY_BACKDROP_ITERATION_ERRORS as exc:  # @quality-exception exception-transparency: reactive per-key backdrops may come from malformed runtime config objects and rendering must degrade to the uniform base color
         log_throttled(
             logger,
             _PER_KEY_BACKDROP_ITERATION_LOG_KEY,

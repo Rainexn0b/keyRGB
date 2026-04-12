@@ -316,6 +316,27 @@ def test_backend_get_device_returns_keyboard(
     assert transport.sent[0] == build_brightness_speed_report_raw(0x05, 0x00)
 
 
+def test_backend_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    err = PermissionError("permission denied")
+    monkeypatch.setattr(
+        "src.core.backends.ite8910.backend.open_matching_hidraw_transport",
+        lambda *_a, **_k: (_ for _ in ()).throw(err),
+    )
+
+    with pytest.raises(PermissionError, match="udev rules"):
+        Ite8910Backend().get_device()
+
+
+def test_backend_get_device_propagates_unexpected_open_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "src.core.backends.ite8910.backend.open_matching_hidraw_transport",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("unexpected transport bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected transport bug"):
+        Ite8910Backend().get_device()
+
+
 def test_backend_probe_reports_available_when_device_present(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setattr(

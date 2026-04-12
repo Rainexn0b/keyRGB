@@ -44,3 +44,16 @@ def test_helpers_match_expected_error_messages(helper, exc: BaseException) -> No
 )
 def test_helpers_return_false_when_exception_stringification_breaks(helper) -> None:
     assert helper(_BrokenStrError()) is False
+
+
+@pytest.mark.parametrize(
+    "helper",
+    [is_device_disconnected, is_device_busy, is_permission_denied],
+)
+def test_helpers_propagate_unexpected_stringification_failures(helper) -> None:
+    class _UnexpectedBrokenStrError(Exception):
+        def __str__(self) -> str:
+            raise AssertionError("unexpected __str__ bug")
+
+    with pytest.raises(AssertionError, match="unexpected __str__ bug"):
+        helper(_UnexpectedBrokenStrError())

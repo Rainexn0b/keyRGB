@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 _SYSFS_STATE_ERRORS = (OSError, ValueError)
 _CHANNEL_GROUP_STATE_ERRORS = (OSError, RuntimeError, ValueError)
 _CAPABILITY_PROBE_ERRORS = (OSError, RuntimeError)
+_DEBUG_LOGGING_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 @dataclass
@@ -211,7 +212,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                     len(self._zones),
                     max_value,
                 )
-        except Exception:  # @quality-exception exception-transparency: debug brightness logging is a best-effort diagnostic boundary and logging handlers may raise arbitrary runtime errors
+        except _DEBUG_LOGGING_RUNTIME_ERRORS:
             pass
 
         # Apply to all zones
@@ -273,7 +274,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                     brightness,
                     len(self._zones),
                 )
-        except Exception:  # @quality-exception exception-transparency: debug color logging is a best-effort diagnostic boundary and logging handlers may raise arbitrary runtime errors
+        except _DEBUG_LOGGING_RUNTIME_ERRORS:
             pass
 
         for zone in self._zones:

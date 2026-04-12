@@ -24,6 +24,8 @@ _appindicator_log_handler_id = None
 
 logger = logging.getLogger(__name__)
 
+_PYSTRAY_IMPORT_RUNTIME_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
+
 
 _GI_PROBE_EXCEPTIONS = (
     AttributeError,
@@ -289,7 +291,7 @@ def get_pystray():
                 logger.info("pystray backend: %s (explicit)", backend)
             _pystray_mod = importlib.import_module("pystray")
         # @quality-exception exception-transparency: pystray import is a runtime desktop-env boundary; broken-gi is classified and retried with xorg fallback
-        except Exception as exc:  # pragma: no cover (depends on desktop env)
+        except _PYSTRAY_IMPORT_RUNTIME_ERRORS as exc:  # pragma: no cover (depends on desktop env)
             failure = _classify_pystray_import_error(exc)
             if failure and failure.reason == "broken-gi":
                 # If a non-PyGObject `gi` module (or a partial/broken install) is found,
@@ -327,7 +329,7 @@ def acquire_single_instance_lock() -> bool:
             lock_dir = Path(xdg) / "keyrgb"
         else:
             lock_dir = Path.home() / ".config" / "keyrgb"
-    with suppress(Exception):
+    with suppress(OSError):
         lock_dir.mkdir(parents=True, exist_ok=True)
     lock_path = lock_dir / "keyrgb.lock"
 

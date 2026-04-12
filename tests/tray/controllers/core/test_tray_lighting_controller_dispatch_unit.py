@@ -4,6 +4,8 @@ import logging
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import pytest
+
 
 def _lock_mock() -> MagicMock:
     return MagicMock(__enter__=lambda s: None, __exit__=lambda s, *args: None)
@@ -36,6 +38,16 @@ class TestParseMenuInt:
         records = [r for r in caplog.records if "Failed parsing tray menu integer item" in r.message]
         assert records
         assert records[0].exc_info is not None
+
+    def test_parse_menu_int_propagates_unexpected_stringification_errors(self):
+        from src.tray.controllers._lighting_controller_helpers import parse_menu_int
+
+        class BadMenuItem:
+            def __str__(self) -> str:
+                raise AssertionError("unexpected menu item bug")
+
+        with pytest.raises(AssertionError, match="unexpected menu item bug"):
+            parse_menu_int(BadMenuItem())
 
 
 class TestHelperBoundaries:
@@ -108,6 +120,39 @@ class TestHelperBoundaries:
             original_exc,
             exc_info=(RuntimeError, original_exc, original_exc.__traceback__),
         )
+
+    def test_log_tray_exception_propagates_unexpected_logger_failures(self):
+        from src.tray.controllers import _lighting_controller_helpers as helpers
+
+        original_exc = RuntimeError("hardware error")
+        tray = MagicMock()
+        tray._log_exception = MagicMock(side_effect=AssertionError("unexpected logger bug"))
+
+        with pytest.raises(AssertionError, match="unexpected logger bug"):
+            helpers._log_tray_exception(tray, "Helper error: %s", original_exc)
+
+    def test_try_log_event_logs_recoverable_runtime_errors(self):
+        from src.tray.controllers._lighting_controller_helpers import try_log_event
+
+        tray = MagicMock()
+        tray._log_event = MagicMock(side_effect=RuntimeError("event logger failed"))
+
+        with patch("src.tray.controllers._lighting_controller_helpers.logger.error") as log_error:
+            try_log_event(tray, "tray", "clicked", effect="wave")
+
+        tray._log_event.assert_called_once_with("tray", "clicked", effect="wave")
+        log_error.assert_called_once()
+        assert log_error.call_args.args[0] == "Tray event logging failed: %s"
+        assert str(log_error.call_args.args[1]) == "event logger failed"
+
+    def test_try_log_event_propagates_unexpected_logger_errors(self):
+        from src.tray.controllers._lighting_controller_helpers import try_log_event
+
+        tray = MagicMock()
+        tray._log_event = MagicMock(side_effect=AssertionError("unexpected event logger bug"))
+
+        with pytest.raises(AssertionError, match="unexpected event logger bug"):
+            try_log_event(tray, "tray", "clicked", effect="wave")
 
 
 class TestStartCurrentEffect:
@@ -222,6 +267,16 @@ class TestStartCurrentEffect:
         assert mock_tray._log_exception.call_args.args[0] == "Error starting effect: %s"
         assert str(mock_tray._log_exception.call_args.args[1]) == "hardware error"
 
+    def test_start_current_effect_propagates_unexpected_startup_errors(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "wave"
+        mock_tray.engine.start_effect = MagicMock(side_effect=AssertionError("unexpected startup bug"))
+
+        with pytest.raises(AssertionError, match="unexpected startup bug"):
+            start_current_effect(mock_tray)
+
     def test_start_current_effect_logs_ensure_device_failures(self):
         from src.tray.controllers.lighting_controller import start_current_effect
 
@@ -262,6 +317,27 @@ class TestStartCurrentEffect:
         assert exc_info[1] is original_exc
         assert exc_info[2] is original_exc.__traceback__
         assert exc_info[2] is not None
+
+    def test_start_current_effect_propagates_unexpected_tray_logging_errors(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        original_exc = RuntimeError("hardware error")
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "wave"
+        mock_tray.engine.start_effect = MagicMock(side_effect=original_exc)
+        mock_tray._log_exception = MagicMock(side_effect=AssertionError("unexpected logger bug"))
+
+        with pytest.raises(AssertionError, match="unexpected logger bug"):
+            start_current_effect(mock_tray)
+
+    def test_log_boundary_exception_propagates_unexpected_logger_errors(self):
+        from src.tray.controllers.lighting_controller import _log_boundary_exception
+
+        tray = MagicMock()
+        tray._log_exception = MagicMock(side_effect=AssertionError("unexpected logger bug"))
+
+        with pytest.raises(AssertionError, match="unexpected logger bug"):
+            _log_boundary_exception(tray, "Failed to mark device unavailable: %s", RuntimeError("boom"))
 
     def test_start_current_effect_logs_mark_unavailable_failure_on_disconnect(self):
         from src.tray.controllers.lighting_controller import start_current_effect

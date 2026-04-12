@@ -378,6 +378,17 @@ def test_probe_backend_logs_probe_boundary_failures(caplog: pytest.LogCaptureFix
     assert records[-1].exc_info is not None
 
 
+def test_probe_backend_propagates_unexpected_probe_boundary_failures() -> None:
+    class BrokenBackend:
+        name = "broken-backend"
+
+        def probe(self) -> object:
+            raise AssertionError("unexpected probe bug")
+
+    with pytest.raises(AssertionError, match="unexpected probe bug"):
+        collectors_backends._probe_backend(BrokenBackend())
+
+
 def test_probe_backend_tolerates_runtime_metadata_getter_failures() -> None:
     class BrokenMetadataBackend:
         name = "broken-meta"
@@ -436,6 +447,42 @@ def test_backend_probe_snapshot_logs_selection_boundary_failures(
     ]
     assert records
     assert records[-1].exc_info is not None
+
+
+def test_backend_probe_snapshot_propagates_unexpected_selection_boundary_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.core.backends.registry as backend_registry
+
+    monkeypatch.setattr(collectors_backends, "_selection_is_blocked_under_pytest", lambda: (False, None))
+    monkeypatch.setattr(collectors_backends, "build_backend_speed_probe_plans", lambda backends_snapshot: [])
+    monkeypatch.setattr(collectors_backends, "_iter_auxiliary_probe_backends", lambda: [])
+    monkeypatch.setattr(collectors_backends, "sysfs_led_candidates_snapshot", lambda: {})
+    monkeypatch.setattr(backend_registry, "iter_backends", lambda: [])
+    monkeypatch.setattr(
+        backend_registry,
+        "select_backend",
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected selection bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected selection bug"):
+        collectors_backends.backend_probe_snapshot()
+
+
+def test_iter_auxiliary_probe_backends_propagates_unexpected_registration_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    original_import = __import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name.endswith("sysfs_mouse.backend"):
+            raise AssertionError("unexpected auxiliary import bug")
+        return original_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr("builtins.__import__", fake_import)
+
+    with pytest.raises(AssertionError, match="unexpected auxiliary import bug"):
+        collectors_backends._iter_auxiliary_probe_backends()
 
 
 def test_read_text_returns_none_on_decode_failure(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -566,3 +613,21 @@ def test_config_snapshot_logs_unexpected_boundary_failures(
     ]
     assert records
     assert records[-1].exc_info is not None
+
+
+def test_config_snapshot_propagates_unexpected_boundary_failures(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(diagnostics_collectors, "config_file_path", lambda: cfg_path)
+
+    original_read_text = Path.read_text
+
+    def bad_read_text(self: Path, *args: object, **kwargs: object) -> str:
+        if self == cfg_path:
+            raise AssertionError("unexpected config snapshot bug")
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", bad_read_text)
+
+    with pytest.raises(AssertionError, match="unexpected config snapshot bug"):
+        diagnostics_collectors.config_snapshot()

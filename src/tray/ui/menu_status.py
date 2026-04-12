@@ -13,6 +13,15 @@ from ._device_status import backend_display_name, backend_status_suffix, format_
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_CONFIG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_PER_KEY_STATUS_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_DEVICE_AVAILABILITY_EXCEPTIONS = (
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 _RECOVERABLE_PROFILE_LOOKUP_EXCEPTIONS = (
     AttributeError,
     ImportError,
@@ -67,15 +76,9 @@ def _config_has_nonempty_per_key_colors(cfg: Any) -> bool:
         return len(per_key) > 0
     except AttributeError:
         return False
-    except _RECOVERABLE_CONFIG_READ_EXCEPTIONS as exc:
-        _log_menu_debug(
-            "tray.menu.per_key_colors",
-            "Failed to inspect per-key colors for tray status",
-            exc,
-            interval_s=60,
-        )
-        return False
-    except Exception as exc:  # @quality-exception exception-transparency: tray status inspection crosses arbitrary config property and __len__ implementations and must remain non-fatal
+    except (
+        _RECOVERABLE_CONFIG_READ_EXCEPTIONS + _RECOVERABLE_PER_KEY_STATUS_EXCEPTIONS
+    ) as exc:  # @quality-exception exception-transparency: tray status inspection crosses arbitrary config property and __len__ implementations and must remain non-fatal
         _log_menu_debug(
             "tray.menu.per_key_colors",
             "Failed to inspect per-key colors for tray status",
@@ -279,7 +282,7 @@ def probe_device_available(tray: Any) -> bool:
         ensure = getattr(getattr(tray, "engine", None), "_ensure_device_available", None)
         if callable(ensure):
             ensure()
-    except Exception as exc:  # @quality-exception exception-transparency: device availability probing crosses backend I/O and must remain non-fatal for tray status
+    except _RECOVERABLE_DEVICE_AVAILABILITY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: device availability probing crosses backend I/O and must remain non-fatal for tray status
         _log_menu_debug(
             "tray.menu.ensure_device",
             "Failed to ensure device availability",

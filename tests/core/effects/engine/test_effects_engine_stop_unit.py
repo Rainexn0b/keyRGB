@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import time
 from threading import Event
 
@@ -397,6 +398,30 @@ def test_permission_denied_effect_thread_logs_traceback_and_notifies_callback(ca
     assert warning_records[-1].exc_info is not None
 
 
+def test_permission_error_callback_logs_recoverable_runtime_failures(caplog) -> None:
+    from src.core.effects.engine_support.start import _notify_permission_error_callback_best_effort
+
+    class _Engine:
+        _permission_error_cb = staticmethod(lambda _exc: (_ for _ in ()).throw(RuntimeError("callback failed")))
+
+    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_start"):
+        _notify_permission_error_callback_best_effort(_Engine(), PermissionError("denied"))
+
+    records = [record for record in caplog.records if "Permission error callback failed" in record.getMessage()]
+    assert records
+    assert records[-1].exc_info is not None
+
+
+def test_permission_error_callback_propagates_unexpected_failures() -> None:
+    from src.core.effects.engine_support.start import _notify_permission_error_callback_best_effort
+
+    class _Engine:
+        _permission_error_cb = staticmethod(lambda _exc: (_ for _ in ()).throw(AssertionError("unexpected callback bug")))
+
+    with pytest.raises(AssertionError, match="unexpected callback bug"):
+        _notify_permission_error_callback_best_effort(_Engine(), PermissionError("denied"))
+
+
 def test_disconnect_effect_thread_logs_traceback_even_if_marking_unavailable_fails(caplog) -> None:
     engine = EffectsEngine()
     engine.kb = NullKeyboard()
@@ -435,3 +460,97 @@ def test_disconnect_effect_thread_logs_traceback_even_if_marking_unavailable_fai
     assert warning_records[-1].exc_info is not None
     assert engine.running is False
     assert engine.thread is None
+
+
+def test_effect_thread_propagates_unexpected_failures_to_thread_excepthook(monkeypatch, caplog) -> None:
+    engine = EffectsEngine()
+    engine.kb = NullKeyboard()
+    engine.device_available = False
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+
+    seen: list[threading.ExceptHookArgs] = []
+    monkeypatch.setattr(threading, "excepthook", seen.append)
+
+    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_start"):
+        engine._start_sw_effect(
+            target=lambda: (_ for _ in ()).throw(AssertionError("unexpected thread bug")),
+            prev_color=(0, 0, 0),
+            fade_to_color=(255, 0, 0),
+        )
+        thread = engine.thread
+        assert thread is not None
+        thread.join(timeout=1.0)
+
+    assert len(seen) == 1
+    assert seen[0].exc_type is AssertionError
+    assert str(seen[0].exc_value) == "unexpected thread bug"
+    assert engine.running is False
+    assert engine.thread is None
+    assert not [record for record in caplog.records if "Unhandled exception in effect thread" in record.getMessage()]
+
+
+def test_mark_device_unavailable_logs_recoverable_runtime_failures(caplog) -> None:
+    from src.core.effects.engine_support.start import _mark_device_unavailable_best_effort
+
+    class _Engine:
+        @staticmethod
+        def mark_device_unavailable() -> None:
+            raise RuntimeError("mark failed")
+
+    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_start"):
+        _mark_device_unavailable_best_effort(_Engine())
+
+    records = [
+        record
+        for record in caplog.records
+        if "Failed to mark keyboard device unavailable after disconnect" in record.getMessage()
+    ]
+    assert records
+    assert records[-1].exc_info is not None
+
+
+def test_mark_device_unavailable_propagates_unexpected_failures() -> None:
+    from src.core.effects.engine_support.start import _mark_device_unavailable_best_effort
+
+    class _Engine:
+        @staticmethod
+        def mark_device_unavailable() -> None:
+            raise AssertionError("unexpected mark bug")
+
+    with pytest.raises(AssertionError, match="unexpected mark bug"):
+        _mark_device_unavailable_best_effort(_Engine())
+
+
+def test_managed_effect_thread_join_suppresses_recoverable_cleanup_failures() -> None:
+    from src.core.effects.engine_support.start import _ManagedEffectThread
+
+    class _BrokenEngine:
+        @property
+        def thread(self):
+            raise RuntimeError("thread state failed")
+
+        @thread.setter
+        def thread(self, _value) -> None:
+            raise RuntimeError("thread state failed")
+
+    thread = _ManagedEffectThread(engine=_BrokenEngine(), target=lambda: None)
+    thread.start()
+    thread.join(timeout=1.0)
+
+
+def test_managed_effect_thread_join_propagates_unexpected_cleanup_failures() -> None:
+    from src.core.effects.engine_support.start import _ManagedEffectThread
+
+    class _BrokenEngine:
+        @property
+        def thread(self):
+            raise AssertionError("unexpected thread cleanup bug")
+
+        @thread.setter
+        def thread(self, _value) -> None:
+            raise AssertionError("unexpected thread cleanup bug")
+
+    thread = _ManagedEffectThread(engine=_BrokenEngine(), target=lambda: None)
+    thread.start()
+    with pytest.raises(AssertionError, match="unexpected thread cleanup bug"):
+        thread.join(timeout=1.0)

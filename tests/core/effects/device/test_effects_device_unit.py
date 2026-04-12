@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from threading import RLock
 
+import pytest
+
 import src.core.effects.device as device
 from src.core.effects.device import NullKeyboard, acquire_keyboard
 
@@ -132,3 +134,16 @@ def test_acquire_keyboard_logs_and_falls_back_on_unexpected_error(monkeypatch) -
     assert seen["interval_s"] == 60
     assert seen["msg"] == "Failed to acquire keyboard device; falling back to NullKeyboard"
     assert seen["exc"] is err
+
+
+def test_acquire_keyboard_propagates_unexpected_errors(monkeypatch) -> None:
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "test::case (call)")
+    monkeypatch.setenv("KEYRGB_ALLOW_HARDWARE", "1")
+
+    def fail_get():
+        raise AssertionError("unexpected acquire bug")
+
+    monkeypatch.setattr(device, "get", fail_get)
+
+    with pytest.raises(AssertionError, match="unexpected acquire bug"):
+        acquire_keyboard(kb_lock=RLock(), logger=logging.getLogger(__name__))

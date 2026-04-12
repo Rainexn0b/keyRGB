@@ -4,6 +4,8 @@ import json
 import logging
 from pathlib import Path
 
+import pytest
+
 from src.core.config._lighting._coercion import (
     _clamp_rgb_channel,
     coerce_loaded_settings,
@@ -166,6 +168,20 @@ def test_coerce_loaded_settings_swallows_save_failures() -> None:
     assert settings["perkey_brightness"] == 0
 
 
+def test_coerce_loaded_settings_propagates_unexpected_save_failures() -> None:
+    settings = {"brightness": "bad"}
+
+    with pytest.raises(AssertionError, match="unexpected save bug"):
+        coerce_loaded_settings(
+            settings=settings,
+            config_file=Path("/definitely/missing/keyrgb-config.json"),
+            save_fn=lambda: (_ for _ in ()).throw(AssertionError("unexpected save bug")),
+        )
+
+    assert settings["brightness"] == 0
+    assert settings["perkey_brightness"] == 0
+
+
 def test_coerce_loaded_settings_tolerates_malformed_json_on_disk(tmp_path) -> None:
     config_file = tmp_path / "config.json"
     config_file.write_text("{not valid json", encoding="utf-8")
@@ -208,6 +224,26 @@ def test_bool_prop_returns_default_and_logs_when_settings_access_raises(caplog) 
     holder.enabled = False
     assert holder._settings["enabled"] is False
     assert holder.save_calls == 1
+
+
+def test_bool_prop_propagates_unexpected_settings_access_failures() -> None:
+    class BrokenSettings(dict):
+        def get(self, *_args, **_kwargs):
+            raise AssertionError("unexpected settings bug")
+
+    class Holder:
+        enabled = bool_prop("enabled", default=True)
+
+        def __init__(self) -> None:
+            self._settings = BrokenSettings()
+
+        def _save(self) -> None:
+            return
+
+    holder = Holder()
+
+    with pytest.raises(AssertionError, match="unexpected settings bug"):
+        _ = holder.enabled
 
 
 def test_int_prop_getter_and_setter_fall_back_to_default_on_bad_values() -> None:
@@ -254,6 +290,26 @@ def test_int_prop_logs_when_user_defined_int_coercion_raises_runtime_error(caplo
     assert caplog.text.count("Failed coercing config int value") == 2
     assert holder._settings["level"] == 7
     assert holder.save_calls == 1
+
+
+def test_int_prop_propagates_unexpected_int_coercion_failures() -> None:
+    class BadInt:
+        def __int__(self) -> int:
+            raise AssertionError("unexpected int bug")
+
+    class Holder:
+        level = int_prop("level", default=7, min_v=1, max_v=9)
+
+        def __init__(self) -> None:
+            self._settings = {"level": BadInt()}
+
+        def _save(self) -> None:
+            return
+
+    holder = Holder()
+
+    with pytest.raises(AssertionError, match="unexpected int bug"):
+        _ = holder.level
 
 
 def test_enum_prop_uses_allowed_fallback_when_default_is_invalid() -> None:
@@ -309,3 +365,22 @@ def test_optional_brightness_prop_handles_getter_failure_and_none_setter(caplog)
     holder.brightness_override = 42
     assert holder._settings["brightness_override"] == 17
     assert holder.save_calls == 2
+
+
+def test_optional_brightness_prop_propagates_unexpected_normalization_failures() -> None:
+    class Holder:
+        brightness_override = optional_brightness_prop("brightness_override")
+
+        def __init__(self) -> None:
+            self._settings = {"brightness_override": 42}
+
+        def _normalize_brightness_value(self, _value: object) -> int:
+            raise AssertionError("unexpected brightness bug")
+
+        def _save(self) -> None:
+            return
+
+    holder = Holder()
+
+    with pytest.raises(AssertionError, match="unexpected brightness bug"):
+        _ = holder.brightness_override

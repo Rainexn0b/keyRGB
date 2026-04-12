@@ -8,6 +8,7 @@ from typing import Dict, Tuple, cast
 KeyCell = Tuple[int, int]
 _MISSING = object()
 _READ_FAILED = object()
+_PROFILE_APPLY_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def active_profile_name(
@@ -22,7 +23,7 @@ def active_profile_name(
 ) -> str:
     try:
         return cast(str, safe_profile_name(get_active_profile()))
-    except Exception as exc:  # @quality-exception exception-transparency: get_active_profile and safe_profile_name are injected dependencies and this best-effort helper must return the default on any failure
+    except _PROFILE_APPLY_ERRORS as exc:
         log_throttled(logger, log_key, interval_s=60, level=logging.DEBUG, msg=log_msg, exc=exc)
         return default
 
@@ -40,7 +41,7 @@ def read_attr_value(
         return getattr(obj, attr_name)
     except AttributeError:
         return _MISSING
-    except Exception as exc:  # @quality-exception exception-transparency: property getters on config objects may raise arbitrary exceptions; this helper must degrade gracefully
+    except _PROFILE_APPLY_ERRORS as exc:
         log_throttled(logger, log_key, interval_s=60, level=logging.DEBUG, msg=log_msg, exc=exc)
         return _READ_FAILED
 
@@ -67,7 +68,7 @@ def set_attr_value(
     try:
         setattr(obj, attr_name, int(value))
         return True
-    except Exception as exc:  # @quality-exception exception-transparency: property setters on config objects may raise arbitrary exceptions; this helper must degrade gracefully and report failure
+    except _PROFILE_APPLY_ERRORS as exc:
         log_throttled(logger, log_key, interval_s=60, level=logging.DEBUG, msg=log_msg, exc=exc)
         return False
 

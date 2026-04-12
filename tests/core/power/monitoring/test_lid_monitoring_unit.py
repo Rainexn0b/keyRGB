@@ -101,6 +101,53 @@ def test_start_sysfs_lid_monitoring_emits_callbacks_on_state_change(
     on_close.assert_called_once()
 
 
+def test_start_sysfs_lid_monitoring_logs_recoverable_runtime_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/state"])
+    monkeypatch.setattr(
+        lid_monitoring.threading,
+        "Thread",
+        lambda *, target, daemon: _ImmediateThread(target=target, daemon=daemon),
+    )
+
+    def _open(_path, *args, **kwargs):
+        raise RuntimeError("read failed")
+
+    monkeypatch.setattr(builtins, "open", _open)
+
+    logger = MagicMock()
+    lid_monitoring.start_sysfs_lid_monitoring(
+        is_running=lambda: True,
+        on_lid_close=MagicMock(),
+        on_lid_open=MagicMock(),
+        logger=logger,
+    )
+
+    logger.exception.assert_called_once()
+
+
+def test_start_sysfs_lid_monitoring_propagates_unexpected_callback_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/state"])
+    monkeypatch.setattr(
+        lid_monitoring.threading,
+        "Thread",
+        lambda *, target, daemon: _ImmediateThread(target=target, daemon=daemon),
+    )
+    monkeypatch.setattr(lid_monitoring.time, "sleep", lambda _: None)
+    monkeypatch.setattr(builtins, "open", lambda _path, *args, **kwargs: io.StringIO("state: open\n"))
+
+    with pytest.raises(AssertionError, match="unexpected lid callback bug"):
+        lid_monitoring.start_sysfs_lid_monitoring(
+            is_running=lambda: True,
+            on_lid_close=MagicMock(),
+            on_lid_open=MagicMock(side_effect=AssertionError("unexpected lid callback bug")),
+            logger=MagicMock(),
+        )
+
+
 def test_poll_lid_state_paths_picks_first_readable_path_and_emits_callbacks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -142,3 +189,65 @@ def test_poll_lid_state_paths_picks_first_readable_path_and_emits_callbacks(
 
     on_open.assert_called_once()
     on_close.assert_called_once()
+
+
+def test_poll_lid_state_paths_logs_recoverable_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(lid_monitoring.time, "sleep", lambda _: None)
+
+    chosen_path = "/proc/acpi/button/lid/LID/state"
+    calls = {"n": 0}
+
+    def _open(path, *args, **kwargs):
+        if path != chosen_path:
+            raise FileNotFoundError(path)
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return io.StringIO("open\n")
+        raise RuntimeError("poll failed")
+
+    monkeypatch.setattr(builtins, "open", _open)
+
+    remaining = {"n": 1}
+
+    def is_running() -> bool:
+        remaining["n"] -= 1
+        return remaining["n"] >= 0
+
+    logger = MagicMock()
+    lid_monitoring.poll_lid_state_paths(
+        is_running=is_running,
+        on_lid_close=MagicMock(),
+        on_lid_open=MagicMock(),
+        logger=logger,
+    )
+
+    logger.exception.assert_called_once()
+
+
+def test_poll_lid_state_paths_propagates_unexpected_callback_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(lid_monitoring.time, "sleep", lambda _: None)
+
+    chosen_path = "/proc/acpi/button/lid/LID/state"
+    calls = {"n": 0}
+
+    def _open(path, *args, **kwargs):
+        if path != chosen_path:
+            raise FileNotFoundError(path)
+        calls["n"] += 1
+        return io.StringIO("open\n")
+
+    monkeypatch.setattr(builtins, "open", _open)
+
+    remaining = {"n": 1}
+
+    def is_running() -> bool:
+        remaining["n"] -= 1
+        return remaining["n"] >= 0
+
+    with pytest.raises(AssertionError, match="unexpected poll callback bug"):
+        lid_monitoring.poll_lid_state_paths(
+            is_running=is_running,
+            on_lid_close=MagicMock(),
+            on_lid_open=MagicMock(side_effect=AssertionError("unexpected poll callback bug")),
+            logger=MagicMock(),
+        )

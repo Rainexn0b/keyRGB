@@ -3,6 +3,8 @@ from __future__ import annotations
 import builtins
 from pathlib import Path
 
+import pytest
+
 
 def test_acquire_single_instance_lock_returns_true_when_fcntl_missing(
     monkeypatch,
@@ -58,3 +60,19 @@ def test_acquire_single_instance_lock_returns_false_if_already_locked(monkeypatc
 
     # Sanity: after closing, acquiring should succeed.
     assert runtime.acquire_single_instance_lock() is True
+
+
+def test_acquire_single_instance_lock_propagates_unexpected_mkdir_bug(monkeypatch, tmp_path) -> None:
+    import src.tray.integrations.runtime as runtime
+
+    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    monkeypatch.setattr(runtime, "_instance_lock_fh", None)
+    monkeypatch.setattr(
+        runtime.Path,
+        "mkdir",
+        lambda self, parents=False, exist_ok=False: (_ for _ in ()).throw(AssertionError("unexpected mkdir bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected mkdir bug"):
+        runtime.acquire_single_instance_lock()

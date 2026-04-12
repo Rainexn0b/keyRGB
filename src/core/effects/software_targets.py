@@ -19,6 +19,9 @@ SOFTWARE_EFFECT_TARGETS = (
 Color = tuple[int, int, int]
 KeyT = TypeVar("KeyT")
 LOGGER = logging.getLogger(__name__)
+_SOFTWARE_TARGET_PROVIDER_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_SOFTWARE_TARGET_CALLBACK_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_SOFTWARE_TARGET_RENDER_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class _UniformRenderDeviceProtocol(Protocol):
@@ -86,7 +89,7 @@ def software_render_targets(engine: object) -> list[SoftwareRenderTarget]:
 
     try:
         provided = provider()
-    except Exception:  # @quality-exception exception-transparency: provider callbacks are runtime extension seams and broken providers must degrade to keyboard-only fanout
+    except _SOFTWARE_TARGET_PROVIDER_ERRORS:
         LOGGER.exception("Secondary software target provider failed")
         return targets
 
@@ -142,7 +145,7 @@ def render_secondary_uniform_rgb(
             continue
         try:
             target.device.set_color((red, green, blue), brightness=int(brightness_hw))
-        except Exception as exc:  # @quality-exception exception-transparency: secondary targets are runtime device seams and fanout must keep keyboard rendering alive
+        except _SOFTWARE_TARGET_RENDER_ERRORS as exc:  # @quality-exception exception-transparency: secondary targets are runtime device seams and fanout must keep keyboard rendering alive for recoverable device failures
             if is_permission_denied(exc):
                 _notify_permission_error(permission_cb, exc=exc, logger=logger, log_key=log_key, target_key=target.key)
             log_throttled(
@@ -168,7 +171,7 @@ def _notify_permission_error(
 
     try:
         permission_cb(exc)
-    except Exception as callback_exc:  # @quality-exception exception-transparency: permission callbacks are best-effort notification hooks and must remain non-fatal
+    except _SOFTWARE_TARGET_CALLBACK_ERRORS as callback_exc:
         log_throttled(
             logger,
             f"{log_key}.{target_key}.permission-callback",

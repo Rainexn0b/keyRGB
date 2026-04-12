@@ -15,6 +15,7 @@ from ..device import (
 from ..software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 
 logger = logging.getLogger("src.core.effects.engine_core")
+_BACKEND_DISCOVERY_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 HardwareEffectBuilder = Callable[..., object]
 
@@ -133,7 +134,7 @@ class _EngineCore:
         backend_name = _backend_name(backend)
         try:
             raw_effects = effect_fn()
-        except Exception:  # @quality-exception exception-transparency: backend effect discovery is a runtime plugin boundary and engine behavior must degrade to no backend effects
+        except _BACKEND_DISCOVERY_ERRORS:  # @quality-exception exception-transparency: backend effect discovery is a runtime plugin boundary and engine behavior must degrade to no backend effects
             logger.exception("Failed to query backend effects from '%s'", backend_name)
             return {}
         if not isinstance(raw_effects, dict):
@@ -148,7 +149,7 @@ class _EngineCore:
         backend_name = _backend_name(backend)
         try:
             raw_colors = colors_fn()
-        except Exception:  # @quality-exception exception-transparency: backend color discovery is a runtime plugin boundary and engine behavior must degrade to no backend colors
+        except _BACKEND_DISCOVERY_ERRORS:  # @quality-exception exception-transparency: backend color discovery is a runtime plugin boundary and engine behavior must degrade to no backend colors
             logger.exception("Failed to query backend colors from '%s'", backend_name)
             return {}
         if not isinstance(raw_colors, dict):

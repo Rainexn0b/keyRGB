@@ -17,6 +17,8 @@ _RECOVERABLE_CONFIG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueEr
 _RECOVERABLE_ENGINE_ATTR_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_TRAY_LOGGING_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_STRINGIFICATION_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_module_exception(msg: str, exc: Exception) -> None:
@@ -27,7 +29,7 @@ def _log_tray_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) ->
     try:
         tray._log_exception(msg, exc)
         return
-    except Exception as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
+    except _RECOVERABLE_TRAY_LOGGING_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
         logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
     _log_module_exception(msg, exc)
 
@@ -83,7 +85,7 @@ def _config_per_key_colors_ref(config: object) -> Mapping[object, object] | None
 def parse_menu_int(item: object) -> Optional[int]:
     try:
         s = str(item)
-    except Exception as exc:  # @quality-exception exception-transparency: menu item stringification crosses user-defined __str__ and must stay non-fatal
+    except _RECOVERABLE_STRINGIFICATION_EXCEPTIONS as exc:  # @quality-exception exception-transparency: menu item stringification crosses user-defined __str__ and must stay non-fatal
         _log_module_exception("Failed parsing tray menu integer item: %s", exc)
         return None
 
@@ -97,7 +99,7 @@ def parse_menu_int(item: object) -> Optional[int]:
 def try_log_event(tray: LightingTrayProtocol, source: str, action: str, **fields: object) -> None:
     try:
         tray._log_event(source, action, **fields)
-    except Exception as exc:  # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
+    except _RECOVERABLE_TRAY_LOGGING_EXCEPTIONS as exc:  # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
         _log_module_exception("Tray event logging failed: %s", exc)
 
 

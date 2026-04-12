@@ -12,6 +12,7 @@ from ._coercion import normalize_rgb_triplet
 
 logger = logging.getLogger("src.core.config.config")
 _MISSING = object()
+_DEFAULT_SETTING_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_config_exception(message: str, exc: Exception) -> None:
@@ -42,7 +43,7 @@ def _default_setting(defaults: object, key: str, *, fallback_keys: tuple[str, ..
             value = getter(candidate_key, _MISSING)
             if value is not _MISSING:
                 return value
-    except Exception as exc:  # @quality-exception exception-transparency: config accessor failure is logged via _log_config_exception and falls back to the declared default
+    except _DEFAULT_SETTING_ERRORS as exc:
         _log_config_exception(f"Failed to read config default '{key}': %s", exc)
     return default
 
@@ -196,9 +197,9 @@ class LightingConfigAccessors:
             default=default,
         )
         for key in fallback_keys:
-            legacy_value = self._settings.get(key, _MISSING)
-            if legacy_value is not _MISSING:
-                fallback_value = legacy_value
+            compatibility_value = self._settings.get(key, _MISSING)
+            if compatibility_value is not _MISSING:
+                fallback_value = compatibility_value
                 break
         return self._normalize_brightness_value(_coerce_int_setting(fallback_value, default=default))
 
@@ -207,7 +208,7 @@ class LightingConfigAccessors:
         state_key: str,
         value: int,
         *,
-        legacy_key: str | None = None,
+        compatibility_key: str | None = None,
     ) -> None:
         normalized_key = self._normalize_secondary_state_key(state_key)
         brightness = self._normalize_brightness_value(value)
@@ -217,8 +218,8 @@ class LightingConfigAccessors:
             entry = {}
         entry["brightness"] = brightness
         state[normalized_key] = entry
-        if legacy_key:
-            self._settings[str(legacy_key)] = brightness
+        if compatibility_key:
+            self._settings[str(compatibility_key)] = brightness
         self._save()
 
     def get_secondary_device_color(
@@ -244,9 +245,9 @@ class LightingConfigAccessors:
             default=list(default),
         )
         for key in fallback_keys:
-            legacy_value = self._settings.get(key, _MISSING)
-            if legacy_value is not _MISSING:
-                fallback_value = legacy_value
+            compatibility_value = self._settings.get(key, _MISSING)
+            if compatibility_value is not _MISSING:
+                fallback_value = compatibility_value
                 break
         return normalize_rgb_triplet(fallback_value, default=default)
 
@@ -255,7 +256,7 @@ class LightingConfigAccessors:
         state_key: str,
         value: tuple[int, int, int] | tuple,
         *,
-        legacy_key: str | None = None,
+        compatibility_key: str | None = None,
         default: tuple[int, int, int] = (255, 0, 0),
     ) -> None:
         normalized_key = self._normalize_secondary_state_key(state_key)
@@ -266,8 +267,8 @@ class LightingConfigAccessors:
             entry = {}
         entry["color"] = color
         state[normalized_key] = entry
-        if legacy_key:
-            self._settings[str(legacy_key)] = list(color)
+        if compatibility_key:
+            self._settings[str(compatibility_key)] = list(color)
         self._save()
 
     @property
@@ -280,7 +281,7 @@ class LightingConfigAccessors:
 
     @lightbar_brightness.setter
     def lightbar_brightness(self, value: int) -> None:
-        self.set_secondary_device_brightness("lightbar", value, legacy_key="lightbar_brightness")
+        self.set_secondary_device_brightness("lightbar", value, compatibility_key="lightbar_brightness")
 
     @property
     def lightbar_color(self) -> tuple[int, int, int]:
@@ -292,7 +293,7 @@ class LightingConfigAccessors:
 
     @lightbar_color.setter
     def lightbar_color(self, value: tuple[int, int, int] | tuple) -> None:
-        self.set_secondary_device_color("lightbar", value, legacy_key="lightbar_color", default=(255, 0, 0))
+        self.set_secondary_device_color("lightbar", value, compatibility_key="lightbar_color", default=(255, 0, 0))
 
     @property
     def direction(self) -> str | None:

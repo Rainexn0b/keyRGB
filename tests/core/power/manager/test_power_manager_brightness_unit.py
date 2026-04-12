@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestPowerManagerBrightnessPolicyApplication:
     """Test _apply_brightness_policy dispatch logic."""
@@ -99,3 +101,14 @@ class TestPowerManagerApplyBrightnessExceptionPaths:
             pm._apply_brightness_policy(10)
 
         exc.assert_called_once()
+
+    def test_apply_brightness_policy_propagates_unexpected_failures(self):
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        mock_kb.apply_brightness_from_power_policy = MagicMock(side_effect=AssertionError("unexpected brightness bug"))
+
+        pm = PowerManager(mock_kb)
+
+        with pytest.raises(AssertionError, match="unexpected brightness bug"):
+            pm._apply_brightness_policy(10)

@@ -102,8 +102,7 @@ def inspect_led_candidate(led_dir: Path) -> dict[str, Any]:
     elif vendor_tokens and strong_zone_tokens:
         matched = True
         match_reason = (
-            "vendor mouse-zone evidence: "
-            f"vendor={', '.join(vendor_tokens)} zone={', '.join(strong_zone_tokens)}"
+            f"vendor mouse-zone evidence: vendor={', '.join(vendor_tokens)} zone={', '.join(strong_zone_tokens)}"
         )
     elif vendor_tokens and weak_zone_tokens and metadata_mouse_tokens:
         matched = True

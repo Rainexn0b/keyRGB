@@ -243,6 +243,98 @@ def test_write_int_ignores_debug_logging_failures(
     assert (tmp_path / "brightness").read_text(encoding="utf-8") == "7\n"
 
 
+def test_write_int_propagates_unexpected_debug_logging_failures(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    monkeypatch.setattr(
+        "src.core.backends.sysfs.common.logger.info",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        _write_int(tmp_path / "brightness", 7)
+
+    assert not (tmp_path / "brightness").exists()
+
+
+def test_sysfs_device_set_brightness_ignores_recoverable_debug_logging_failures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    led_dir = _make_led(tmp_path, "rgb:kbd_backlight", brightness=0, max_brightness=100)
+    dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
+
+    monkeypatch.setattr(
+        "src.core.backends.sysfs.device.logger.info",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    dev.set_brightness(25)
+
+    assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "50"
+
+
+def test_sysfs_device_set_brightness_propagates_unexpected_debug_logging_failures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    led_dir = _make_led(tmp_path, "rgb:kbd_backlight", brightness=0, max_brightness=100)
+    dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
+
+    monkeypatch.setattr(
+        "src.core.backends.sysfs.device.logger.info",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        dev.set_brightness(25)
+
+    assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "0"
+
+
+def test_sysfs_device_set_color_ignores_recoverable_debug_logging_failures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    led_dir = _make_led(tmp_path, "rgb::kbd_backlight", brightness=0, max_brightness=100)
+    rgb = led_dir / "rgb"
+    rgb.write_text("0 0 0\n", encoding="utf-8")
+    dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
+
+    monkeypatch.setattr(
+        "src.core.backends.sysfs.device.logger.info",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    dev.set_color((4, 5, 6), brightness=25)
+
+    assert rgb.read_text(encoding="utf-8") == "4 5 6\n"
+    assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "50"
+
+
+def test_sysfs_device_set_color_propagates_unexpected_debug_logging_failures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    led_dir = _make_led(tmp_path, "rgb::kbd_backlight", brightness=0, max_brightness=100)
+    rgb = led_dir / "rgb"
+    rgb.write_text("0 0 0\n", encoding="utf-8")
+    dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
+
+    monkeypatch.setattr(
+        "src.core.backends.sysfs.device.logger.info",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        dev.set_color((4, 5, 6), brightness=25)
+
+    assert rgb.read_text(encoding="utf-8") == "0 0 0\n"
+    assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "0"
+
+
 def test_sysfs_device_set_color_multi_intensity(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     led_dir = _make_led(tmp_path, "rgb:kbd_backlight", brightness=0, max_brightness=100)
     multi = led_dir / "multi_intensity"

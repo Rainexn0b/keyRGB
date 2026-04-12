@@ -213,6 +213,33 @@ def test_sync_software_target_policy_logs_config_setter_failure_and_still_update
     restore_targets.assert_called_once_with(tray)
 
 
+def test_sync_software_target_policy_propagates_unexpected_config_setter_failure() -> None:
+    class BrokenConfig:
+        def __setattr__(self, name: str, value: object) -> None:
+            if name == "software_effect_target":
+                raise AssertionError(f"unexpected persist bug: {value}")
+            super().__setattr__(name, value)
+
+    tray = _mk_tray(engine_running=True)
+    tray.config = BrokenConfig()
+    tray._log_exception = MagicMock()
+    tray.is_off = False
+
+    current = ConfigApplyState(
+        effect="rainbow_wave",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=None,
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+        software_effect_target="keyboard",
+    )
+
+    with pytest.raises(AssertionError, match="unexpected persist bug"):
+        _sync_software_target_policy(tray, current)
+
+
 def test_fastpath_trail_percent_change_updates_engine_without_restart() -> None:
     tray = _mk_tray(engine_running=True)
 

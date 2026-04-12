@@ -33,6 +33,8 @@ _PROFILE_LOAD_RECOVERABLE_EXCEPTIONS = (
     TypeError,
     ValueError,
 )
+_EFFECT_SELECTION_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_NOTIFY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class _BackendCapsProtocol(Protocol):
@@ -264,11 +266,11 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         with tray.engine.kb_lock:
             tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
         tray.is_off = False
-    except Exception as exc:  # @quality-exception exception-transparency: effect apply crosses device I/O and tray state; permission/disconnect are dispatched and remaining errors are logged with traceback
+    except _EFFECT_SELECTION_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: effect apply crosses device I/O and tray state; permission/disconnect are dispatched and remaining recoverable runtime errors are logged with traceback
         if is_permission_denied(exc):
             try:
                 tray._notify_permission_issue(exc)
-            except Exception as notify_exc:  # @quality-exception exception-transparency: notification callback is a user-injected tray boundary and failures must not break the permission-issue handling path
+            except _NOTIFY_CALLBACK_RUNTIME_EXCEPTIONS as notify_exc:  # @quality-exception exception-transparency: notification callback is a user-injected tray boundary and failures must not break the permission-issue handling path
                 logger.exception("Failed to notify permission issue during effect selection: %s", notify_exc)
             return
         logger.exception("Error applying effect selection: %s", exc)

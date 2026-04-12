@@ -185,7 +185,9 @@ def run_reactive_fade_loop(engine: "EffectsEngine", *, api: _ReactiveFadeApiProt
             if pressed_slot_id is not None:
                 mapped_cells = api.mapped_slot_cells(slot_keymap, pressed_slot_id)
 
-                trail_pct = _engine_int_attr_or_fallback(engine, "reactive_trail_percent", missing_default=50, error_default=50)
+                trail_pct = _engine_int_attr_or_fallback(
+                    engine, "reactive_trail_percent", missing_default=50, error_default=50
+                )
                 trail_scale = max(0.02, min(8.0, ((int(trail_pct) or 50) / 50.0) ** 2))
                 ttl = (0.48 / p) * trail_scale
                 if mapped_cells:

@@ -2,6 +2,50 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+
+def test_refresh_ui_best_effort_swallows_recoverable_runtime_errors() -> None:
+    from src.tray.app.callbacks import _refresh_ui_best_effort
+
+    tray = MagicMock()
+    tray._refresh_ui = MagicMock(side_effect=RuntimeError("refresh failed"))
+
+    _refresh_ui_best_effort(tray)
+
+    tray._refresh_ui.assert_called_once()
+
+
+def test_refresh_ui_best_effort_propagates_unexpected_errors() -> None:
+    from src.tray.app.callbacks import _refresh_ui_best_effort
+
+    tray = MagicMock()
+    tray._refresh_ui = MagicMock(side_effect=AssertionError("unexpected refresh bug"))
+
+    with pytest.raises(AssertionError, match="unexpected refresh bug"):
+        _refresh_ui_best_effort(tray)
+
+
+def test_update_menu_best_effort_swallows_recoverable_runtime_errors() -> None:
+    from src.tray.app.callbacks import _update_menu_best_effort
+
+    tray = MagicMock()
+    tray._update_menu = MagicMock(side_effect=RuntimeError("update failed"))
+
+    _update_menu_best_effort(tray)
+
+    tray._update_menu.assert_called_once()
+
+
+def test_update_menu_best_effort_propagates_unexpected_errors() -> None:
+    from src.tray.app.callbacks import _update_menu_best_effort
+
+    tray = MagicMock()
+    tray._update_menu = MagicMock(side_effect=AssertionError("unexpected update bug"))
+
+    with pytest.raises(AssertionError, match="unexpected update bug"):
+        _update_menu_best_effort(tray)
+
 
 def test_on_effect_clicked_normalizes_and_refreshes() -> None:
     from src.tray.app.callbacks import on_effect_clicked

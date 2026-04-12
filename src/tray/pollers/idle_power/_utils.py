@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Optional
 
 
+_IDLE_ACTION_KEY_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def debounce_dim_and_screen_off(
     *,
     dimmed_raw: Optional[bool],
@@ -62,7 +65,7 @@ def build_idle_action_key(
             f"{action}|dimmed={dimmed}|screen_off={bool(screen_off)}|"
             f"bri={int(brightness)}|dim_mode={str(dim_sync_mode)}|dim_tmp={int(dim_temp_brightness)}"
         )
-    except Exception:  # @quality-exception exception-transparency: idle action key formatting degrades to str(action) so the poller never crashes on non-int fields
+    except _IDLE_ACTION_KEY_RUNTIME_EXCEPTIONS:  # @quality-exception exception-transparency: idle action key formatting degrades to str(action) so the poller never crashes on non-int fields
         return str(action)
 
 

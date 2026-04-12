@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestPowerManagerMonitoringThreads:
     def test_start_monitoring_starts_two_daemon_threads(self):
@@ -116,6 +118,20 @@ class TestPowerManagerMonitorLoopFallbacks:
             pm._monitor_loop()
 
         exc.assert_called_once()
+
+    def test_monitor_loop_propagates_unexpected_exceptions(self):
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        pm = PowerManager(mock_kb)
+        pm.monitoring = True
+
+        with patch(
+            "src.core.power.management.manager.monitor_prepare_for_sleep",
+            side_effect=AssertionError("unexpected monitor bug"),
+        ):
+            with pytest.raises(AssertionError, match="unexpected monitor bug"):
+                pm._monitor_loop()
 
     def test_start_lid_monitor_wires_callbacks(self):
         from src.core.power.management.manager import PowerManager

@@ -6,6 +6,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+_DEBUG_LOGGING_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
 
 def _hardware_allowed() -> bool:
     return os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
@@ -127,7 +129,7 @@ def _log_debug_write_int(path: Path, value: int) -> None:
 
     try:
         logger.info("sysfs.write %s <- %s", path, value)
-    except Exception:  # @quality-exception exception-transparency: debug brightness logging is a best-effort diagnostic boundary and broken logging handlers must not block sysfs writes
+    except _DEBUG_LOGGING_RUNTIME_ERRORS:
         pass
 
 

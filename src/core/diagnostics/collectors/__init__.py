@@ -109,7 +109,7 @@ def config_snapshot() -> dict[str, Any]:
     except OSError as exc:
         out["error"] = _config_error_text(cfg_path, exc)
         return out
-    except Exception as exc:  # @quality-exception exception-transparency: config snapshot collection is a best-effort diagnostics boundary
+    except (AttributeError, LookupError, RuntimeError, TypeError, ValueError) as exc:
         _log_snapshot_boundary("Failed to collect config snapshot during diagnostics collection", exc)
         out["error"] = _config_error_text(cfg_path, exc)
         return out

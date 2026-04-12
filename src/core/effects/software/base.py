@@ -18,6 +18,8 @@ from src.core.utils.logging_utils import log_throttled
 from src.core.utils.exceptions import is_device_disconnected
 
 logger = logging.getLogger(__name__)
+_SOFTWARE_RENDER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_SOFTWARE_RENDER_CLEANUP_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -221,14 +223,14 @@ def render(engine: "EffectsEngine", *, color_map: Mapping[Key, Color]) -> None:
                         brightness=brightness_hw,
                         enable_user_mode=False,
                     )
-                except Exception as exc:  # @quality-exception exception-transparency: disconnect detection spans backend-specific runtime I/O failures and must avoid unsafe uniform fallback writes on device disappearance
+                except _SOFTWARE_RENDER_RUNTIME_ERRORS as exc:
                     # On USB disconnect, attempting a fallback uniform write can trigger
                     # a libusb crash on some systems. Mark the device unavailable and
                     # stop issuing I/O until the engine re-acquires it.
                     if is_device_disconnected(exc):
                         try:
                             engine.mark_device_unavailable()
-                        except Exception as mark_exc:  # @quality-exception exception-transparency: disconnect cleanup must stay best-effort and still suppress further hardware writes even if device invalidation fails
+                        except _SOFTWARE_RENDER_CLEANUP_ERRORS as mark_exc:  # @quality-exception exception-transparency: disconnect cleanup must stay best-effort for recoverable invalidation failures while unexpected cleanup bugs still surface
                             log_throttled(
                                 logger,
                                 "effects.render.mark_device_unavailable_failed",
@@ -259,7 +261,7 @@ def render(engine: "EffectsEngine", *, color_map: Mapping[Key, Color]) -> None:
                     log_key="effects.render.secondary",
                 )
                 return
-        except Exception as exc:  # @quality-exception exception-transparency: per-key rendering crosses backend I/O and effect runtime policy boundaries and must degrade to uniform output instead of killing the effect loop
+        except _SOFTWARE_RENDER_RUNTIME_ERRORS as exc:
             log_throttled(
                 logger,
                 "effects.render.per_key_failed",

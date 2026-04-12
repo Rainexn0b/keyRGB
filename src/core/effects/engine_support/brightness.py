@@ -13,6 +13,7 @@ logger = logging.getLogger("src.core.effects.engine_brightness")
 
 _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _INT_ATTR_ERRORS = (AttributeError,) + _INT_COERCION_ERRORS
+_BRIGHTNESS_FADE_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _debug_brightness_enabled() -> bool:
@@ -115,7 +116,7 @@ class _EngineBrightness:
                         self.kb.set_brightness(int(val))
                 if dt > 0:
                     time.sleep(dt)
-        except Exception:  # @quality-exception exception-transparency: best-effort hardware animation boundary; must not raise into its caller thread
+        except _BRIGHTNESS_FADE_RUNTIME_ERRORS:
             logger.exception("Brightness fade failed")
             return
 

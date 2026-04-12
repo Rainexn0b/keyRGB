@@ -21,6 +21,8 @@ _ANIMATED_ICON_EFFECTS = frozenset(
     }
 )
 
+_ICON_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
 
 def _has_animated_icon_state(*, effect: str, config: object | None) -> bool:
     if effect in _ANIMATED_ICON_EFFECTS:
@@ -104,7 +106,7 @@ def start_icon_color_polling(tray) -> None:
                     except TypeError:
                         tray._update_icon()
                     last_sig = sig
-            except Exception as exc:  # @quality-exception exception-transparency: tray icon polling crosses arbitrary tray callbacks, backend state, and logger boundaries and must remain non-fatal for tray stability
+            except _ICON_POLL_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: tray icon polling crosses arbitrary tray callbacks, backend state, and logger boundaries and must remain non-fatal for tray stability
                 now = time.monotonic()
                 if now - last_error_at > 60:
                     last_error_at = now

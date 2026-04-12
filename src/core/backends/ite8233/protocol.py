@@ -231,9 +231,7 @@ def build_color_slot_report(slot: int, color, *, product_id: int = DEFAULT_PRODU
     return bytes(packet)
 
 
-def build_breathing_report(
-    *, brightness: int, speed: int, product_id: int = DEFAULT_PRODUCT_ID
-) -> bytes:
+def build_breathing_report(*, brightness: int, speed: int, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
     product_id = normalize_product_id(product_id)
     if product_id not in _BREATHING_APPLY_BYTE:
         raise ValueError(f"ITE lightbar breathing is not supported for product id 0x{product_id:04x}")
@@ -334,10 +332,15 @@ def build_flash_reports(
     color_reports = tuple(
         build_color_slot_report(slot, color, product_id=product_id) for slot in range(1, COLOR_SLOT_COUNT + 1)
     )
-    return (*color_reports, build_flash_report(brightness=brightness, speed=speed, direction=direction, product_id=product_id))
+    return (
+        *color_reports,
+        build_flash_report(brightness=brightness, speed=speed, direction=direction, product_id=product_id),
+    )
 
 
-def build_mode_report(*, mode: int, brightness: int, speed: int = RAW_SPEED_MIN, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
+def build_mode_report(
+    *, mode: int, brightness: int, speed: int = RAW_SPEED_MIN, product_id: int = DEFAULT_PRODUCT_ID
+) -> bytes:
     product_id = normalize_product_id(product_id)
     packet = bytearray(PACKET_SIZE)
     packet[0] = COMMAND_SET_MODE
@@ -353,7 +356,7 @@ def build_brightness_report(brightness: int, *, product_id: int = DEFAULT_PRODUC
     return build_mode_report(mode=MODE_DIRECT, brightness=brightness, speed=RAW_SPEED_MIN, product_id=product_id)
 
 
-def build_turn_off_reports(*, product_id: int = DEFAULT_PRODUCT_ID) -> tuple[bytes, bytes, bytes, bytes]:
+def build_turn_off_reports(*, product_id: int = DEFAULT_PRODUCT_ID) -> tuple[bytes, ...]:
     product_id = normalize_product_id(product_id)
     sequence: tuple[bytes, ...] = (
         bytes((COMMAND_OFF_STAGE_1, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00)),

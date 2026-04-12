@@ -4,6 +4,8 @@ import logging
 
 from types import SimpleNamespace
 
+import pytest
+
 
 class _DummyLock:
     def __enter__(self):
@@ -189,3 +191,62 @@ def test_resolve_brightness_logs_traceback_when_engine_attr_read_raises(caplog) 
     ]
     assert records
     assert records[-1].exc_info is not None
+
+
+def test_resolve_brightness_propagates_unexpected_engine_attr_read_errors() -> None:
+    from src.core.effects.reactive import render as render_module
+
+    class _BrokenEngine:
+        brightness = 7
+        per_key_colors = None
+        per_key_brightness = 0
+        _hw_brightness_cap = None
+        _dim_temp_active = False
+        _last_rendered_brightness = None
+        kb = None
+
+        @property
+        def reactive_brightness(self):
+            raise AssertionError("unexpected reactive getter bug")
+
+    with pytest.raises(AssertionError, match="unexpected reactive getter bug"):
+        render_module._resolve_brightness(_BrokenEngine())
+
+
+def test_clear_transition_state_logs_runtime_setter_failures(caplog) -> None:
+    from src.core.effects.reactive._render_brightness import _clear_transition_state
+
+    class _BrokenEngine:
+        def __setattr__(self, name, value):
+            del value
+            if name == "_reactive_transition_to_brightness":
+                raise RuntimeError("setter failed")
+            object.__setattr__(self, name, None)
+
+    engine = _BrokenEngine()
+
+    with caplog.at_level(logging.ERROR, logger="src.core.effects.reactive._render_brightness"):
+        _clear_transition_state(engine)
+
+    records = [
+        record
+        for record in caplog.records
+        if "Reactive brightness failed to clear engine attribute _reactive_transition_to_brightness"
+        in record.getMessage()
+    ]
+    assert records
+    assert records[-1].exc_info is not None
+
+
+def test_clear_transition_state_propagates_unexpected_setter_failures() -> None:
+    from src.core.effects.reactive._render_brightness import _clear_transition_state
+
+    class _BrokenEngine:
+        def __setattr__(self, name, value):
+            del value
+            if name == "_reactive_transition_to_brightness":
+                raise AssertionError("unexpected setter bug")
+            object.__setattr__(self, name, None)
+
+    with pytest.raises(AssertionError, match="unexpected setter bug"):
+        _clear_transition_state(_BrokenEngine())

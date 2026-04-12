@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 _ENGINE_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
 _CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
 _SECONDARY_TARGET_RUNTIME_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
+_TRAY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class _LightbarDeviceProtocol(Protocol):
@@ -64,7 +65,7 @@ class _CachedSecondarySoftwareTarget:
         self._device: _LightbarDeviceProtocol | None = None
 
     @property
-    def device(self) -> "_CachedLightbarSoftwareTarget":
+    def device(self) -> "_CachedSecondarySoftwareTarget":
         return self
 
     def set_color(self, color: object, *, brightness: int) -> None:
@@ -85,7 +86,7 @@ class _CachedSecondarySoftwareTarget:
             try:
                 operation(device)
             # @quality-exception exception-transparency: any device-operation failure should invalidate the cached handle before re-raising
-            except Exception:
+            except _SECONDARY_TARGET_RUNTIME_EXCEPTIONS:
                 self._device = None
                 raise
 
@@ -93,7 +94,7 @@ class _CachedSecondarySoftwareTarget:
 def _try_log_event(tray: _SoftwareTargetTrayProtocol, source: str, action: str, **fields: object) -> None:
     try:
         tray._log_event(source, action, **fields)
-    except Exception as exc:  # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
+    except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
         logger.exception("Tray event logging failed: %s", exc)
 
 
@@ -260,7 +261,12 @@ def _restore_target_from_config(
     brightness_getter = getattr(config, "get_secondary_device_brightness", None)
     color_getter = getattr(config, "get_secondary_device_color", None)
     if callable(brightness_getter):
-        brightness = int(brightness_getter(str(route.state_key), fallback_keys=tuple(filter(None, (route.config_brightness_attr,))), default=0) or 0)
+        brightness = int(
+            brightness_getter(
+                str(route.state_key), fallback_keys=tuple(filter(None, (route.config_brightness_attr,))), default=0
+            )
+            or 0
+        )
     else:
         brightness_attr = str(route.config_brightness_attr or "").strip()
         if not brightness_attr:
@@ -271,7 +277,9 @@ def _restore_target_from_config(
         return
 
     if callable(color_getter):
-        raw_color = color_getter(str(route.state_key), fallback_keys=tuple(filter(None, (route.config_color_attr,))), default=(255, 0, 0))
+        raw_color = color_getter(
+            str(route.state_key), fallback_keys=tuple(filter(None, (route.config_color_attr,))), default=(255, 0, 0)
+        )
     else:
         color_attr = str(route.config_color_attr or "").strip()
         if not color_attr:
@@ -290,7 +298,7 @@ def _handle_secondary_target_error(tray: _SoftwareTargetTrayProtocol, exc: Excep
         try:
             notify_permission_issue(exc)
             return
-        except Exception as notify_exc:  # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging
+        except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as notify_exc:  # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging
             _log_boundary_exception(
                 tray, "Failed to notify permission issue for secondary software target: %s", notify_exc
             )
@@ -332,7 +340,7 @@ def _log_boundary_exception(tray: _SoftwareTargetTrayProtocol, msg: str, exc: Ex
     try:
         tray._log_exception(msg, exc)
         return
-    except Exception as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
+    except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
         logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
 
     logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))

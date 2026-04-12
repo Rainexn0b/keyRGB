@@ -38,6 +38,22 @@ class TestAllowedHwEffectKeys:
         result = allowed_hw_effect_keys(mock_func, logger=logging.getLogger())
         assert result == set()
 
+    def test_propagates_unexpected_introspection_errors(self):
+        """Assertion-style introspection bugs should not be treated as normal fallback."""
+        from src.core.effects.hw_payloads import allowed_hw_effect_keys
+
+        class _BrokenCode:
+            @property
+            def co_freevars(self):
+                raise AssertionError("unexpected introspection bug")
+
+        class _BrokenFunc:
+            __code__ = _BrokenCode()
+            __closure__ = ()
+
+        with pytest.raises(AssertionError, match="unexpected introspection bug"):
+            allowed_hw_effect_keys(_BrokenFunc(), logger=logging.getLogger())
+
     def test_extracts_keys_from_closure_with_args_dict(self):
         """Should extract allowed keys from closure args dict."""
         from src.core.effects.hw_payloads import allowed_hw_effect_keys
@@ -241,6 +257,28 @@ class TestBuildHwEffectPayload:
         ]
         assert records
         assert any(record.exc_info and isinstance(record.exc_info[1], OSError) for record in records)
+
+    def test_breathing_palette_failure_propagates_unexpected_errors(self):
+        from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        mock_kb = MagicMock()
+        mock_kb.set_palette_color.side_effect = AssertionError("unexpected palette bug")
+
+        def capture_effect_func(**kwargs):
+            return kwargs
+
+        with pytest.raises(AssertionError, match="unexpected palette bug"):
+            build_hw_effect_payload(
+                effect_name="breathing",
+                effect_func=capture_effect_func,
+                ui_speed=5,
+                brightness=50,
+                current_color=(255, 128, 64),
+                hw_colors={"red": 3},
+                kb=mock_kb,
+                kb_lock=RLock(),
+                logger=logging.getLogger("tests.hw_payloads"),
+            )
 
     def test_palette_backend_color_effect_uses_palette_slot(self):
         """Palette-based hardware effects should never receive raw RGB tuples."""

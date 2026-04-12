@@ -18,6 +18,7 @@ ColorTuple = tuple[int, int, int]
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 _CONFIG_FALLBACK_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
 _FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _safe_tuple_attr(config: object, name: str, *, default: ColorTuple) -> ColorTuple:
@@ -329,11 +330,11 @@ def apply_from_config_once(
             _apply_uniform(tray, current, cause=cause)
         else:
             _apply_effect(tray, current, cause=cause)
-    except Exception as exc:  # @quality-exception exception-transparency: backend apply is a runtime hardware boundary and device disconnect/errors must degrade tray state gracefully
+    except _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: backend apply is a runtime hardware boundary and recoverable device errors must degrade tray state gracefully
         if is_device_disconnected_fn(exc):
             try:
                 tray.engine.mark_device_unavailable()
-            except Exception as mark_exc:  # @quality-exception exception-transparency: marking device unavailable is itself a degraded-hardware boundary
+            except _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS as mark_exc:  # @quality-exception exception-transparency: marking device unavailable is itself a degraded-hardware boundary
                 now = float(monotonic_fn())
                 if now - last_apply_warn_at > 60:
                     last_apply_warn_at = now
@@ -345,7 +346,7 @@ def apply_from_config_once(
 
     try:
         tray._refresh_ui()
-    except Exception as exc:  # @quality-exception exception-transparency: tray UI refresh is a runtime Tk widget boundary and must not break config apply on widget errors
+    except _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: tray UI refresh is a runtime Tk widget boundary and must not break config apply on widget errors
         now = float(monotonic_fn())
         if now - last_apply_warn_at > 60:
             last_apply_warn_at = now

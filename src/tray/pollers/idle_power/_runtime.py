@@ -9,6 +9,9 @@ from src.tray.protocols import IdlePowerTrayProtocol
 from .policy import IdleAction
 
 
+_IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 @dataclass
 class IdlePollLoopState:
     last_error_at: float = 0.0
@@ -45,7 +48,7 @@ def _log_idle_action_best_effort(
             idle_forced_off=bool(tray._idle_forced_off),
             dim_temp_active=bool(tray._dim_temp_active),
         )
-    except Exception:  # @quality-exception exception-transparency: idle action event logging crosses a runtime callback boundary and polling must stay non-fatal without recursive hot-path logging
+    except _IDLE_POWER_RUNTIME_EXCEPTIONS:  # @quality-exception exception-transparency: idle action event logging crosses a runtime callback boundary and polling must stay non-fatal without recursive hot-path logging
         return
 
 
@@ -56,7 +59,7 @@ def _reload_idle_power_config_best_effort(tray: IdlePowerTrayProtocol) -> None:
 
     try:
         reload_config()
-    except Exception:  # @quality-exception exception-transparency: per-iteration config reload is a runtime config/file boundary and idle power polling must keep running when refresh fails
+    except _IDLE_POWER_RUNTIME_EXCEPTIONS:  # @quality-exception exception-transparency: per-iteration config reload is a runtime config/file boundary and idle power polling must keep running when refresh fails
         return
 
 

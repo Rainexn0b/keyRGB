@@ -48,6 +48,8 @@ _LOCAL_COMPATIBILITY_FALLBACK_EXCEPTIONS = (
     TypeError,
     ValueError,
 )
+_START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_TRAY_LOGGER_CALLBACK_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _coerce_brightness_override(brightness_override: object, *, default: int) -> int:
@@ -61,7 +63,7 @@ def _coerce_brightness_override(brightness_override: object, *, default: int) ->
 def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
     try:
         tray._log_exception(msg, exc)
-    except Exception as log_exc:  # @quality-exception exception-transparency: tray._log_exception is an injected dependency and this boundary logger must not raise on failure
+    except _TRAY_LOGGER_CALLBACK_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray._log_exception is an injected dependency and this boundary logger must not raise on failure
         logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
         logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 
@@ -191,7 +193,7 @@ def start_current_effect(
 
         if not is_loop_effect and software_effect_target_routes_aux_devices(tray):
             restore_secondary_software_targets(tray)
-    except Exception as exc:  # @quality-exception exception-transparency: lighting startup crosses device I/O, backend callbacks, tray actions; must not fail tray runtime
+    except _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: lighting startup crosses device I/O, backend callbacks, tray actions; must not fail tray runtime for recoverable failures
         # If the USB device disappeared, mark it unavailable and avoid a scary traceback.
         if is_device_disconnected(exc):
             try:
@@ -210,7 +212,7 @@ def start_current_effect(
             return
         try:
             tray._log_exception("Error starting effect: %s", exc)
-        except Exception as log_exc:  # @quality-exception exception-transparency: tray._log_exception is an injected dependency and this last-resort fallback must not raise
+        except _TRAY_LOGGER_CALLBACK_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray._log_exception is an injected dependency and this last-resort fallback must not raise
             logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
             logger.error("Error starting effect: %s", exc, exc_info=(type(exc), exc, exc.__traceback__))
 

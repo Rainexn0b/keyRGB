@@ -148,6 +148,42 @@ def test_restore_from_idle_logs_tray_logger_failure_with_fallback(monkeypatch) -
     assert str(logs[1][2]) == "restore failed"
 
 
+def test_restore_from_idle_propagates_unexpected_tray_logger_failure() -> None:
+    import src.tray.pollers.idle_power.polling as ipp
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        config=SimpleNamespace(brightness=0),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("restore failed")),
+        _refresh_ui=lambda: None,
+        _log_exception=lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        ipp._restore_from_idle(tray)
+
+
+def test_restore_from_idle_propagates_unexpected_restore_errors() -> None:
+    import src.tray.pollers.idle_power.polling as ipp
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        config=SimpleNamespace(brightness=0),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected restore bug")),
+        _refresh_ui=lambda: None,
+        _log_exception=lambda *_a, **_kw: None,
+    )
+
+    with pytest.raises(AssertionError, match="unexpected restore bug"):
+        ipp._restore_from_idle(tray)
+
+
 def test_apply_idle_action_dim_to_temp_respects_is_off_and_sw_effect(
     monkeypatch,
 ) -> None:
@@ -392,6 +428,20 @@ def test_effective_screen_dim_sync_enabled_logs_event_failures(monkeypatch) -> N
     assert str(logged[0][1]) == "event boom"
 
 
+def test_effective_screen_dim_sync_enabled_propagates_unexpected_event_failures() -> None:
+    import src.tray.pollers.idle_power.polling as ipp
+
+    tray = SimpleNamespace(
+        backend=SimpleNamespace(name="asusctl-aura"),
+        _dim_sync_suppressed_logged=False,
+        _log_event=lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("unexpected event bug")),
+        _log_exception=lambda *_a, **_kw: None,
+    )
+
+    with pytest.raises(AssertionError, match="unexpected event bug"):
+        ipp._effective_screen_dim_sync_enabled(tray, True)
+
+
 def test_start_idle_power_polling_logs_loop_errors_with_module_fallback(monkeypatch) -> None:
     import src.tray.pollers.idle_power.polling as ipp
 
@@ -436,3 +486,69 @@ def test_start_idle_power_polling_logs_loop_errors_with_module_fallback(monkeypa
     assert str(module_logs[0][1]) == "logger boom"
     assert isinstance(module_logs[1][1], RuntimeError)
     assert str(module_logs[1][1]) == "loop boom"
+
+
+def test_start_idle_power_polling_propagates_unexpected_logger_failures(monkeypatch) -> None:
+    import src.tray.pollers.idle_power.polling as ipp
+
+    created = {}
+    run_calls = {"count": 0}
+
+    def fake_thread(*, target, daemon: bool):
+        t = _FakeThread(target=target, daemon=daemon)
+        created["t"] = t
+        return t
+
+    def fake_iteration(*_args, **_kwargs):
+        run_calls["count"] += 1
+        if run_calls["count"] == 1:
+            raise RuntimeError("loop boom")
+        return None
+
+    monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
+    monkeypatch.setattr(ipp, "run_idle_power_iteration", fake_iteration)
+    monkeypatch.setattr(ipp, "_get_session_id", lambda: None)
+    monkeypatch.setattr(ipp.time, "monotonic", lambda: 31.0)
+    monkeypatch.setattr(ipp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    tray = SimpleNamespace(
+        config=SimpleNamespace(),
+        _log_exception=lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
+    )
+
+    ipp.start_idle_power_polling(tray, ite_num_rows=6, ite_num_cols=21, idle_timeout_s=60.0)
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        created["t"].target()
+
+
+def test_start_idle_power_polling_propagates_unexpected_loop_errors(monkeypatch) -> None:
+    import src.tray.pollers.idle_power.polling as ipp
+
+    created = {}
+    run_calls = {"count": 0}
+
+    def fake_thread(*, target, daemon: bool):
+        t = _FakeThread(target=target, daemon=daemon)
+        created["t"] = t
+        return t
+
+    def fake_iteration(*_args, **_kwargs):
+        run_calls["count"] += 1
+        raise AssertionError("unexpected idle loop bug")
+
+    monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
+    monkeypatch.setattr(ipp, "run_idle_power_iteration", fake_iteration)
+    monkeypatch.setattr(ipp, "_get_session_id", lambda: None)
+
+    tray = SimpleNamespace(
+        config=SimpleNamespace(),
+        _log_exception=lambda *_a, **_kw: None,
+    )
+
+    ipp.start_idle_power_polling(tray, ite_num_rows=6, ite_num_cols=21, idle_timeout_s=60.0)
+
+    with pytest.raises(AssertionError, match="unexpected idle loop bug"):
+        created["t"].target()
+
+    assert run_calls["count"] == 1

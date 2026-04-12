@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestPowerManagerBatterySaverLoop:
     def test_battery_saver_loop_covers_common_branches_and_actions(self):
@@ -116,6 +118,23 @@ class TestPowerManagerBatterySaverLoop:
             pm._battery_saver_loop()
 
         exc.assert_called_once()
+
+    def test_battery_saver_loop_propagates_unexpected_exceptions(self):
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        cfg = MagicMock()
+        cfg.reload = MagicMock()
+
+        pm = PowerManager(mock_kb, config=cfg)
+        pm.monitoring = True
+
+        with patch(
+            "src.core.power.management.manager.read_on_ac_power",
+            side_effect=AssertionError("unexpected battery loop bug"),
+        ):
+            with pytest.raises(AssertionError, match="unexpected battery loop bug"):
+                pm._battery_saver_loop()
 
     def test_battery_saver_loop_ignores_ac_battery_overrides_for_dim_profile(self):
         from src.core.power.management.manager import PowerManager

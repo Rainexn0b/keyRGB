@@ -6,6 +6,9 @@ import time
 from collections.abc import Callable
 
 
+_LID_MONITOR_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def _parse_lid_state(content: str | None) -> str | None:
     if not content:
         return None
@@ -51,7 +54,7 @@ def start_sysfs_lid_monitoring(
                         on_lid_open()
                     last_state = state
 
-            except Exception as e:  # @quality-exception exception-transparency: sysfs lid state read is a runtime hardware/OS boundary; loop exits gracefully on persistent failure
+            except _LID_MONITOR_RUNTIME_ERRORS as e:  # @quality-exception exception-transparency: sysfs lid state read is a runtime hardware/OS boundary; loop exits gracefully on persistent recoverable failure
                 logger.exception("Error reading lid state: %s", e)
                 break
 
@@ -103,7 +106,7 @@ def poll_lid_state_paths(
                     on_lid_open()
                 last_state = state
 
-        except Exception as e:  # @quality-exception exception-transparency: fallback lid state poll is a runtime filesystem boundary; loop continues on transient read failures
+        except _LID_MONITOR_RUNTIME_ERRORS as e:  # @quality-exception exception-transparency: fallback lid state poll is a runtime filesystem boundary; loop continues on transient recoverable failures
             logger.exception("Error reading lid state: %s", e)
 
         time.sleep(1)

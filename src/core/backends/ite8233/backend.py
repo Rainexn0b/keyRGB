@@ -7,6 +7,7 @@ from typing import Any
 
 from src.core.utils.exceptions import is_permission_denied, is_device_disconnected, is_device_busy
 from src.core.backends.exceptions import (
+    BACKEND_OPEN_RUNTIME_ERRORS,
     BackendPermissionError,
     BackendDisconnectedError,
     BackendBusyError,
@@ -150,7 +151,7 @@ class Ite8233Backend(KeyboardBackend):
         try:
             transport, info = _open_matching_transport()
             return Ite8233LightbarDevice(transport.send_feature_report, product_id=int(info.product_id))
-        except Exception as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; all driver exceptions are translated to BackendError subclasses here
+        except BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
             if is_permission_denied(exc):
                 raise BackendPermissionError(
                     "Permission denied opening the ITE 8233 hidraw device. "

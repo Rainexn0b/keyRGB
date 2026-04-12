@@ -368,3 +368,15 @@ def test_system_power_mode_snapshot_reports_errors(
     assert snapshot["reason"] == "error"
     assert "status unavailable" in snapshot["error"]
     assert "Failed to collect system power mode diagnostics" in caplog.text
+
+
+def test_system_power_mode_snapshot_propagates_unexpected_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def raise_status() -> SimpleNamespace:
+        raise AssertionError("unexpected power status bug")
+
+    monkeypatch.setattr(power_system, "get_status", raise_status)
+
+    with pytest.raises(AssertionError, match="unexpected power status bug"):
+        collectors_system.system_power_mode_snapshot()

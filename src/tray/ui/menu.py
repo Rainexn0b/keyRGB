@@ -14,6 +14,7 @@ from . import menu_sections, menu_status
 
 
 logger = logging.getLogger(__name__)
+_RECOVERABLE_SYSTEM_POWER_STATUS_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def normalize_effect_label(label: str) -> str:
@@ -161,7 +162,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     try:
         st = system_power.get_status()
         system_power_can_apply = bool(st.supported and st.identifiers.get("can_apply") == "true")
-    except Exception:  # @quality-exception exception-transparency: system power status read is a runtime probe boundary; failure degrades to hiding the menu item
+    except _RECOVERABLE_SYSTEM_POWER_STATUS_ERRORS:  # @quality-exception exception-transparency: system power status read is a runtime probe boundary; failure degrades to hiding the menu item
         system_power_can_apply = False
 
     perkey_menu = menu_sections.build_perkey_profiles_menu(

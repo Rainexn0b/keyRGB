@@ -18,6 +18,16 @@ from .startup import (
 
 logger = logging.getLogger(__name__)
 
+_TRAY_ENTRYPOINT_RUNTIME_ERRORS = (
+    AttributeError,
+    ImportError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 def main() -> None:
     try:
@@ -31,6 +41,6 @@ def main() -> None:
     except KeyboardInterrupt:
         logger.info("Shutting down...")
         sys.exit(0)
-    except Exception as exc:  # @quality-exception exception-transparency: outermost process boundary; any unhandled exception is logged with traceback before clean exit
+    except _TRAY_ENTRYPOINT_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: outermost process boundary; recoverable startup/runtime failures are logged with traceback before clean exit
         logger.exception("Unhandled error: %s", exc)
         sys.exit(1)

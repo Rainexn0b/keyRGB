@@ -25,6 +25,8 @@ from src.tray.protocols import IdlePowerTrayProtocol
 logger = logging.getLogger(__name__)
 _RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, ValueError)
+_IDLE_POWER_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_idle_power_exception(
@@ -54,7 +56,7 @@ def _call_runtime_boundary(
     try:
         fn()
         return True
-    except Exception as exc:  # @quality-exception exception-transparency: idle-power actions cross tray callbacks and runtime boundaries; must remain non-fatal for the polling loop
+    except _IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: idle-power actions cross tray callbacks and runtime boundaries; must remain non-fatal for the polling loop
         _log_idle_power_exception(key=key, level=level, msg=msg, exc=exc)
         return False
 
@@ -103,7 +105,7 @@ def _log_tray_boundary_exception(
         try:
             log_exception(msg, exc)
             return
-        except Exception as log_exc:  # @quality-exception exception-transparency: tray exception logging is a best-effort callback boundary during idle-power recovery
+        except _IDLE_POWER_CALLBACK_RUNTIME_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray exception logging is a best-effort callback boundary during idle-power recovery
             _log_idle_power_exception(
                 key=f"{fallback_key}.logger",
                 level=logging.ERROR,
@@ -228,7 +230,7 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
             brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
         )
-    except Exception as exc:  # @quality-exception exception-transparency: idle-power restore crosses tray callback wiring and lighting startup boundaries; best-effort
+    except _IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: idle-power restore crosses tray callback wiring and lighting startup boundaries; best-effort
         _log_tray_boundary_exception(
             tray,
             msg="Failed to restore lighting after idle: %s",

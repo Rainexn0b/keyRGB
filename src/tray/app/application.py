@@ -46,6 +46,8 @@ update_tray_icon = tray_refresh.update_icon
 update_tray_menu = tray_refresh.update_menu
 is_permission_denied = core_exceptions.is_permission_denied
 logger = logging.getLogger(__name__)
+_NOTIFICATION_BACKEND_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_EVENT_LOGGING_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class KeyRGBTray:
@@ -115,7 +117,9 @@ class KeyRGBTray:
                 try:
                     notify_fn(str(message))
                     return
-                except Exception:  # @quality-exception exception-transparency: best-effort tray notification fallback
+                except (
+                    _NOTIFICATION_BACKEND_ERRORS
+                ):  # @quality-exception exception-transparency: best-effort tray notification fallback
                     pass
             except (RuntimeError, OSError, AttributeError) as exc:
                 logger.debug("Pystray notification backend failed, trying notify-send: %s", exc)
@@ -165,7 +169,9 @@ class KeyRGBTray:
         try:
             src = str(source)
             act = str(action)
-        except Exception:  # @quality-exception exception-transparency: event logging must never break tray actions
+        except (
+            _EVENT_LOGGING_ERRORS
+        ):  # @quality-exception exception-transparency: event logging must never break tray actions
             return
 
         parts: list[str] = []
@@ -173,7 +179,9 @@ class KeyRGBTray:
             v = fields.get(k)
             try:
                 parts.append(f"{k}={v}")
-            except Exception:  # @quality-exception exception-transparency: tolerate broken field repr in debug logging
+            except (
+                _EVENT_LOGGING_ERRORS
+            ):  # @quality-exception exception-transparency: tolerate broken field repr in debug logging
                 parts.append(f"{k}=<unrepr>")
 
         msg = f"EVENT {src}:{act}"
@@ -187,12 +195,16 @@ class KeyRGBTray:
             if now - last < 1.0:
                 return
             self._event_last_at[msg] = now
-        except Exception:  # @quality-exception exception-transparency: broken throttle state must not affect runtime
+        except (
+            _EVENT_LOGGING_ERRORS
+        ):  # @quality-exception exception-transparency: broken throttle state must not affect runtime
             pass
 
         try:
             logger.info("%s", msg)
-        except Exception:  # @quality-exception exception-transparency: logging backend failure must not affect runtime
+        except (
+            _EVENT_LOGGING_ERRORS
+        ):  # @quality-exception exception-transparency: logging backend failure must not affect runtime
             return
 
     # ---- icon

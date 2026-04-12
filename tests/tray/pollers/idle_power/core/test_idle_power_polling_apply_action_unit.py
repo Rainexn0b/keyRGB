@@ -43,6 +43,43 @@ def test_turn_off_stops_engine_turns_off_and_sets_idle_forced_flag() -> None:
     tray._refresh_ui.assert_called_once()
 
 
+def test_turn_off_logs_recoverable_stop_failure_and_continues(monkeypatch: pytest.MonkeyPatch) -> None:
+    import src.tray.pollers.idle_power._actions as actions_module
+
+    logs: list[tuple[str, str, BaseException | None]] = []
+
+    def fake_log_throttled(_logger, key, *, interval_s, level, msg, exc=None):
+        logs.append((key, msg, exc))
+        return True
+
+    tray = _mk_tray(effect="wave", brightness=25)
+    tray.engine.stop.side_effect = RuntimeError("stop failed")
+    monkeypatch.setattr(actions_module, "log_throttled", fake_log_throttled)
+
+    _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
+
+    tray.engine.stop.assert_called_once()
+    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    assert logs == [
+        (
+            "idle_power.turn_off.stop_engine",
+            "Idle-power turn-off failed while stopping engine",
+            tray.engine.stop.side_effect,
+        )
+    ]
+
+
+def test_turn_off_propagates_unexpected_stop_failure() -> None:
+    tray = _mk_tray(effect="wave", brightness=25)
+    tray.engine.stop.side_effect = AssertionError("unexpected stop bug")
+
+    with pytest.raises(AssertionError, match="unexpected stop bug"):
+        _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
+
+    tray.engine.turn_off.assert_not_called()
+    tray._refresh_ui.assert_not_called()
+
+
 def test_dim_to_temp_does_nothing_if_tray_is_off() -> None:
     tray = _mk_tray(effect="wave", brightness=25)
     tray.is_off = True

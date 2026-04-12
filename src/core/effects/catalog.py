@@ -56,6 +56,14 @@ SW_EFFECTS_SET: Final[frozenset[str]] = frozenset(SW_EFFECTS)
 ALL_EFFECTS_SET: Final[frozenset[str]] = frozenset(ALL_EFFECTS)
 
 HARDWARE_EFFECT_PREFIX: Final[str] = "hw:"
+_CATALOG_EFFECT_EXTRACTION_ERRORS: Final[tuple[type[BaseException], ...]] = (
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 _EFFECT_ALIASES: Final[dict[str, str]] = {}
@@ -129,7 +137,7 @@ def detected_backend_hw_effect_names(backend: object | None) -> tuple[str, ...]:
                     if normalized and normalized not in seen:
                         seen.add(normalized)
                         names.append(normalized)
-        except Exception:  # @quality-exception exception-transparency: effect name extraction from backend data is best-effort; failure returns empty list
+        except _CATALOG_EFFECT_EXTRACTION_ERRORS:
             names = []
 
     return tuple(names)

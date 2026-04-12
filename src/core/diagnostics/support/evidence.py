@@ -6,6 +6,9 @@ import subprocess
 from typing import Any
 
 
+_EVIDENCE_COMMAND_ERRORS = (OSError, RuntimeError, TypeError, ValueError, subprocess.SubprocessError)
+
+
 def _primary_candidate(discovery: dict[str, Any] | None) -> dict[str, Any] | None:
     if not isinstance(discovery, dict):
         return None
@@ -118,7 +121,7 @@ def _run_command(argv: list[str], *, requires_root: bool) -> dict[str, Any]:
 
     try:
         cp = subprocess.run(run_argv, check=False, capture_output=True, text=True)
-    except Exception as exc:  # @quality-exception exception-transparency: evidence subprocess is a runtime command boundary; failure is surfaced in the returned dict
+    except _EVIDENCE_COMMAND_ERRORS as exc:
         return {
             "ok": False,
             "available": True,

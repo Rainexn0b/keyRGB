@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 
 def test_representative_color_boosts_visibility_at_low_brightness() -> None:
     from src.tray.ui.icon import representative_color
@@ -129,6 +131,23 @@ def test_representative_color_handles_config_property_exceptions_non_fatally() -
             raise RuntimeError("boom")
 
     assert representative_color(config=_Cfg(), is_off=False, now=0.0) == (153, 0, 76)
+
+
+def test_representative_color_propagates_unexpected_config_property_errors() -> None:
+    from src.tray.ui.icon import representative_color
+
+    class _Cfg:
+        effect = "reactive_fade"
+        brightness = 10
+        perkey_brightness = 10
+        reactive_use_manual_color = False
+
+        @property
+        def per_key_colors(self):
+            raise AssertionError("unexpected config bug")
+
+    with pytest.raises(AssertionError, match="unexpected config bug"):
+        representative_color(config=_Cfg(), is_off=False, now=0.0)
 
 
 def test_icon_visual_reactive_uses_base_mosaic_when_manual_color_disabled() -> None:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from typing import SupportsIndex, SupportsInt, cast
 
 VENDOR_ID = 0x048D
 PRODUCT_IDS: list[int] = [0x6004, 0x6006, 0x600B, 0xCE00]
@@ -67,17 +68,31 @@ DEFAULT_PALETTE: dict[int, tuple[int, int, int]] = {
     7: (255, 0, 255),
 }
 
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
+
+
+def _coerce_int(value: object) -> int:
+    return int(cast(IntCoercible, value))
+
 
 def clamp_channel(value: object) -> int:
-    return max(0, min(255, int(value)))
+    return max(0, min(255, _coerce_int(value)))
 
 
 def clamp_ui_brightness(value: object) -> int:
-    return max(0, min(UI_BRIGHTNESS_MAX, int(value)))
+    return max(0, min(UI_BRIGHTNESS_MAX, _coerce_int(value)))
+
+
+def _coerce_rgb(color: object) -> tuple[int, int, int]:
+    try:
+        red, green, blue = cast(Iterable[object], color)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("color must be an RGB 3-tuple") from exc
+    return (clamp_channel(red), clamp_channel(green), clamp_channel(blue))
 
 
 def build_control_report(*payload: object) -> bytes:
-    values = [int(value) & 0xFF for value in payload]
+    values = [_coerce_int(value) & 0xFF for value in payload]
     if len(values) < 8:
         values.extend([0] * (8 - len(values)))
     return bytes(values[:8])
@@ -110,7 +125,7 @@ def build_set_brightness_report(brightness: int) -> bytes:
 
 
 def build_set_palette_color_report(slot: int, color_value) -> bytes:
-    red, green, blue = color_value
+    red, green, blue = _coerce_rgb(color_value)
     return build_control_report(
         Commands.SET_PALETTE_COLOR,
         0x00,
@@ -142,10 +157,7 @@ def build_row_data_report(colors_for_row: Sequence[object]) -> bytes:
 
     payload = bytearray(ROW_BUFFER_LEN)
     for index, color_value in enumerate(colors_for_row):
-        try:
-            red, green, blue = color_value  # type: ignore[misc]
-        except (TypeError, ValueError) as exc:
-            raise ValueError("row colors must be RGB 3-tuples") from exc
+        red, green, blue = _coerce_rgb(color_value)
         payload[ROW_RED_OFFSET + index] = clamp_channel(red)
         payload[ROW_GREEN_OFFSET + index] = clamp_channel(green)
         payload[ROW_BLUE_OFFSET + index] = clamp_channel(blue)
@@ -163,12 +175,12 @@ def effect(effect_id: int, args: dict[str, tuple[int, int]] | None = None):
     def build(**kwargs: object) -> list[int]:
         payload = [0] * max(1, max_arg_idx + 1)
         for key, (index, default) in args.items():
-            payload[index] = int(default)
+            payload[index] = _coerce_int(default)
 
         for key, value in kwargs.items():
             if key not in args:
                 raise ValueError(f"'{key}' attr is not needed by effect")
-            payload[args[key][0]] = int(value)
+            payload[args[key][0]] = _coerce_int(value)
 
         payload[EffectAttrs.EFFECT] = int(effect_id)
         return payload

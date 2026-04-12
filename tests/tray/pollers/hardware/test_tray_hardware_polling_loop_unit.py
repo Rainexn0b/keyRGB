@@ -87,6 +87,31 @@ def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> N
     assert refreshed["n"] == 1
 
 
+def test_apply_polled_state_propagates_unexpected_log_event_errors() -> None:
+    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+
+    tray = SimpleNamespace(
+        _dim_temp_active=False,
+        _dim_temp_target_brightness=None,
+        _power_forced_off=False,
+        _user_forced_off=False,
+        _idle_forced_off=False,
+        _refresh_ui=lambda: None,
+        _log_event=lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("unexpected event bug")),
+        is_off=False,
+    )
+
+    with pytest.raises(AssertionError, match="unexpected event bug"):
+        _apply_polled_hardware_state(
+            tray,
+            raw_brightness=None,
+            current_brightness=10,
+            current_off=False,
+            last_brightness=5,
+            last_off_state=None,
+        )
+
+
 def test_apply_polled_state_dim_temp_target_bad_int_is_ignored(monkeypatch) -> None:
     from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
@@ -243,3 +268,46 @@ def test_start_hardware_polling_exception_path_calls_handler(monkeypatch) -> Non
         t.target()
 
     assert calls["handled"] == 1
+
+
+def test_start_hardware_polling_propagates_unexpected_loop_errors(monkeypatch) -> None:
+    import src.tray.pollers.hardware_polling as hp
+
+    created = {}
+
+    def fake_thread(*, target, daemon: bool):
+        t = _FakeThread(target=target, daemon=daemon)
+        created["t"] = t
+        return t
+
+    monkeypatch.setattr(hp.threading, "Thread", fake_thread)
+
+    calls = {"handled": 0}
+
+    def fake_handle(_tray, _exc, *, last_error_at: float):
+        calls["handled"] += 1
+        return last_error_at
+
+    monkeypatch.setattr(hp, "_handle_hardware_polling_exception", fake_handle)
+
+    class _Lock:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    tray = SimpleNamespace(
+        engine=SimpleNamespace(
+            kb_lock=_Lock(),
+            kb=SimpleNamespace(get_brightness=lambda: (_ for _ in ()).throw(AssertionError("unexpected poll bug"))),
+        )
+    )
+
+    hp.start_hardware_polling(tray)
+
+    t = created["t"]
+    with pytest.raises(AssertionError, match="unexpected poll bug"):
+        t.target()
+
+    assert calls["handled"] == 0

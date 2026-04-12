@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 
+import pytest
+
 from src.core.effects.engine import EffectsEngine
 
 
@@ -37,6 +39,17 @@ def test_get_backend_effects_returns_empty_dict_and_logs_backend_failures(caplog
     assert error_records[-1].exc_info is not None
 
 
+def test_get_backend_effects_propagates_unexpected_backend_failures() -> None:
+    class DummyBackend:
+        def effects(self):
+            raise AssertionError("unexpected effects bug")
+
+    engine = EffectsEngine(backend=DummyBackend())
+
+    with pytest.raises(AssertionError, match="unexpected effects bug"):
+        engine.get_backend_effects()
+
+
 def test_get_backend_colors_returns_empty_dict_and_logs_backend_failures(caplog) -> None:
     class DummyBackend:
         def colors(self):
@@ -50,3 +63,14 @@ def test_get_backend_colors_returns_empty_dict_and_logs_backend_failures(caplog)
     error_records = [record for record in caplog.records if "Failed to query backend colors" in record.getMessage()]
     assert error_records
     assert error_records[-1].exc_info is not None
+
+
+def test_get_backend_colors_propagates_unexpected_backend_failures() -> None:
+    class DummyBackend:
+        def colors(self):
+            raise AssertionError("unexpected colors bug")
+
+    engine = EffectsEngine(backend=DummyBackend())
+
+    with pytest.raises(AssertionError, match="unexpected colors bug"):
+        engine.get_backend_colors()

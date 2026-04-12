@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from src.tray.ui import menu_status
 
 
@@ -34,7 +36,16 @@ class _BrokenPerKeyColors:
         raise LookupError("broken per-key color container")
 
 
-class _EnsureFailure(Exception):
+class _UnexpectedBrokenPerKeyColors:
+    def __len__(self) -> int:
+        raise AssertionError("unexpected per-key status bug")
+
+
+class _EnsureFailure(RuntimeError):
+    pass
+
+
+class _UnexpectedEnsureFailure(AssertionError):
     pass
 
 
@@ -70,6 +81,16 @@ def test_is_software_mode_logs_and_falls_back_when_per_key_length_is_broken(monk
     assert isinstance(logged[0][2], LookupError)
 
 
+def test_is_software_mode_propagates_unexpected_per_key_length_errors() -> None:
+    tray = SimpleNamespace(
+        config=SimpleNamespace(effect="none", per_key_colors=_UnexpectedBrokenPerKeyColors()),
+        backend=None,
+    )
+
+    with pytest.raises(AssertionError, match="unexpected per-key status bug"):
+        menu_status.is_software_mode(tray)
+
+
 def test_probe_device_available_logs_and_preserves_engine_state_when_ensure_raises(monkeypatch) -> None:
     logged: list[tuple[str, str, Exception]] = []
 
@@ -90,6 +111,17 @@ def test_probe_device_available_logs_and_preserves_engine_state_when_ensure_rais
     assert logged[0][0] == "tray.menu.ensure_device"
     assert "device availability" in logged[0][1].lower()
     assert isinstance(logged[0][2], _EnsureFailure)
+
+
+def test_probe_device_available_propagates_unexpected_ensure_errors() -> None:
+    engine = SimpleNamespace(
+        device_available=False,
+        _ensure_device_available=lambda: (_ for _ in ()).throw(_UnexpectedEnsureFailure("unexpected ensure bug")),
+    )
+    tray = SimpleNamespace(engine=engine)
+
+    with pytest.raises(_UnexpectedEnsureFailure, match="unexpected ensure bug"):
+        menu_status.probe_device_available(tray)
 
 
 def test_keyboard_status_text_uses_ite8291r3_backend_display_name(monkeypatch) -> None:

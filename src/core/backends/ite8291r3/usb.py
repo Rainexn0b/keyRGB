@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Protocol, SupportsIndex, SupportsInt, cast
 
 from . import protocol
 
@@ -8,6 +10,80 @@ DEFAULT_INTERFACE_NUMBER = 1
 _USB_SET_REPORT = 0x009
 _USB_GET_REPORT = 0x001
 _USB_FEATURE_VALUE = 0x300
+
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
+
+
+class _UsbEndpointProtocol(Protocol):
+    bEndpointAddress: int
+
+
+class _UsbInterfaceProtocol(Protocol):
+    pass
+
+
+class _UsbConfigurationProtocol(Protocol):
+    def __getitem__(self, key: tuple[int, int]) -> _UsbInterfaceProtocol: ...
+
+
+class _UsbDeviceProtocol(Protocol):
+    idVendor: object
+    idProduct: object
+    bcdDevice: object
+    bus: object
+    address: object
+
+    def get_active_configuration(self) -> _UsbConfigurationProtocol: ...
+
+    def set_configuration(self) -> object: ...
+
+    def ctrl_transfer(
+        self, bm_request_type: int, b_request: int, w_value: int, w_index: int, data_or_w_length: bytes | int
+    ) -> object: ...
+
+    def write(self, endpoint: int, data: bytes) -> int: ...
+
+    def is_kernel_driver_active(self, interface_number: int) -> bool: ...
+
+    def detach_kernel_driver(self, interface_number: int) -> object: ...
+
+
+class _UsbCoreModuleProtocol(Protocol):
+    USBError: type[BaseException]
+
+    def find(self, **kwargs: object) -> _UsbDeviceProtocol | None: ...
+
+
+class _UsbUtilModuleProtocol(Protocol):
+    ENDPOINT_OUT: int
+    CTRL_OUT: int
+    CTRL_TYPE_CLASS: int
+    CTRL_RECIPIENT_INTERFACE: int
+    CTRL_IN: int
+
+    def find_descriptor(
+        self,
+        interface: _UsbInterfaceProtocol,
+        *,
+        custom_match: Callable[[_UsbEndpointProtocol], bool],
+    ) -> _UsbEndpointProtocol | None: ...
+
+    def endpoint_direction(self, address: int) -> int: ...
+
+    def build_request_type(self, direction: int, request_type: int, recipient: int) -> int: ...
+
+
+def _coerce_int(value: object) -> int:
+    return int(cast(IntCoercible, value))
+
+
+def _coerce_optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+    try:
+        return _coerce_int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 
 @dataclass(frozen=True)
@@ -20,27 +96,24 @@ class UsbDeviceInfo:
     out_endpoint_address: int
 
 
-def _load_pyusb_modules():
-    import usb.core as usb_core  # type: ignore
-    import usb.util as usb_util  # type: ignore
+def _load_pyusb_modules() -> tuple[_UsbCoreModuleProtocol, _UsbUtilModuleProtocol]:
+    import usb.core as usb_core  # type: ignore[import-not-found]
+    import usb.util as usb_util  # type: ignore[import-not-found]
 
-    return usb_core, usb_util
+    return cast(_UsbCoreModuleProtocol, usb_core), cast(_UsbUtilModuleProtocol, usb_util)
 
 
-def device_bcd_device_or_none(device: object) -> int | None:
-    raw = getattr(device, "bcdDevice", None)
-    if raw is None:
-        return None
+def device_bcd_device_or_none(device: _UsbDeviceProtocol) -> int | None:
     try:
-        return int(raw)
-    except (TypeError, ValueError, OverflowError):
+        return _coerce_optional_int(device.bcdDevice)
+    except AttributeError:
         return None
 
 
-def _device_matches(device: object, *, product_ids: tuple[int, ...], required_bcd: int | None) -> bool:
+def _device_matches(device: _UsbDeviceProtocol, *, product_ids: tuple[int, ...], required_bcd: int | None) -> bool:
     try:
-        vendor_id = int(getattr(device, "idVendor"))
-        product_id = int(getattr(device, "idProduct"))
+        vendor_id = _coerce_int(device.idVendor)
+        product_id = _coerce_int(device.idProduct)
     except (AttributeError, TypeError, ValueError, OverflowError):
         return False
 
@@ -77,7 +150,7 @@ def find_matching_device(
     )
 
 
-def _detach_kernel_driver_if_needed(device: object, *, interface_number: int) -> None:
+def _detach_kernel_driver_if_needed(device: _UsbDeviceProtocol, *, interface_number: int) -> None:
     is_active = getattr(device, "is_kernel_driver_active", None)
     if not callable(is_active):
         return
@@ -93,10 +166,16 @@ def _detach_kernel_driver_if_needed(device: object, *, interface_number: int) ->
         detach(int(interface_number))
 
 
-def _resolve_output_endpoint(device: object, usb_core: object, usb_util: object, *, interface_number: int) -> int:
+def _resolve_output_endpoint(
+    device: _UsbDeviceProtocol,
+    usb_core: _UsbCoreModuleProtocol,
+    usb_util: _UsbUtilModuleProtocol,
+    *,
+    interface_number: int,
+) -> int:
     try:
         cfg = device.get_active_configuration()
-    except getattr(usb_core, "USBError", OSError):
+    except (usb_core.USBError, OSError):
         set_configuration = getattr(device, "set_configuration", None)
         if callable(set_configuration):
             set_configuration()
@@ -113,7 +192,14 @@ def _resolve_output_endpoint(device: object, usb_core: object, usb_util: object,
 
 
 class PyUsbTransport:
-    def __init__(self, *, device: object, usb_util: object, out_endpoint_address: int, interface_number: int) -> None:
+    def __init__(
+        self,
+        *,
+        device: _UsbDeviceProtocol,
+        usb_util: _UsbUtilModuleProtocol,
+        out_endpoint_address: int,
+        interface_number: int,
+    ) -> None:
         self._device = device
         self._usb_util = usb_util
         self._out_endpoint_address = int(out_endpoint_address)
@@ -121,7 +207,7 @@ class PyUsbTransport:
 
     def send_control_report(self, report: bytes) -> int:
         payload = bytes(report)
-        return int(
+        return _coerce_int(
             self._device.ctrl_transfer(
                 self._usb_util.build_request_type(
                     self._usb_util.CTRL_OUT,
@@ -147,7 +233,7 @@ class PyUsbTransport:
             self._interface_number,
             int(length),
         )
-        return bytes(data)
+        return bytes(cast(bytes | bytearray | list[int], data))
 
     def write_data(self, payload: bytes) -> int:
         return int(self._device.write(self._out_endpoint_address, bytes(payload)))
@@ -168,11 +254,11 @@ def open_matching_transport(
     _detach_kernel_driver_if_needed(device, interface_number=int(interface_number))
     out_endpoint = _resolve_output_endpoint(device, usb_core, usb_util, interface_number=int(interface_number))
     info = UsbDeviceInfo(
-        vendor_id=int(getattr(device, "idVendor", protocol.VENDOR_ID)),
-        product_id=int(getattr(device, "idProduct")),
+        vendor_id=_coerce_optional_int(device.idVendor) or int(protocol.VENDOR_ID),
+        product_id=_coerce_int(device.idProduct),
         bcd_device=device_bcd_device_or_none(device),
-        bus=int(getattr(device, "bus", 0) or 0) or None,
-        address=int(getattr(device, "address", 0) or 0) or None,
+        bus=_coerce_optional_int(device.bus),
+        address=_coerce_optional_int(device.address),
         out_endpoint_address=int(out_endpoint),
     )
     return (

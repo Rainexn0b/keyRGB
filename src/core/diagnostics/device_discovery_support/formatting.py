@@ -48,9 +48,7 @@ def format_device_discovery_text(payload: dict[str, Any]) -> str:
             sysfs_led = str(entry.get("sysfs_led") or "").strip()
             sysfs_led_dir = str(entry.get("sysfs_led_dir") or "").strip()
             candidate_prefix = f"{usb_vid}:{usb_pid}" if usb_vid and usb_pid else "sysfs"
-            lines.append(
-                f"  - {candidate_prefix}{label} type={entry.get('device_type')} status={entry.get('status')}"
-            )
+            lines.append(f"  - {candidate_prefix}{label} type={entry.get('device_type')} status={entry.get('status')}")
             action = entry.get("recommended_action")
             if action:
                 lines.append(f"      next: {action}")

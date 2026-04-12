@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 
 class TestApplyProfileToConfig:
     """Test apply_profile_to_config logic."""
@@ -178,6 +180,15 @@ class TestApplyProfileToConfig:
         assert logs[0][1] == "Failed to resolve active profile during built-in brightness migration"
         assert isinstance(logs[0][2], RuntimeError)
 
+    def test_migrate_builtin_profile_propagates_unexpected_active_profile_lookup_failure(self, monkeypatch):
+        from src.core.config import Config
+        from src.core.profile import profiles
+
+        monkeypatch.setattr(profiles, "get_active_profile", lambda: (_ for _ in ()).throw(AssertionError("boom")))
+
+        with pytest.raises(AssertionError, match="boom"):
+            profiles.migrate_builtin_profile_brightness(Config())
+
     def test_apply_dim_profile_logs_brightness_set_failure_and_continues(self, monkeypatch):
         from src.core.profile import profiles
 
@@ -220,3 +231,46 @@ class TestApplyProfileToConfig:
         assert logs[0][0] == "profiles.apply_profile_to_config.set_effect_brightness"
         assert logs[0][1] == "Failed to set effect brightness while applying a profile"
         assert isinstance(logs[0][2], RuntimeError)
+
+    def test_apply_profile_propagates_unexpected_brightness_getter_failure(self, monkeypatch):
+        from src.core.profile import profiles
+
+        class ConfigStub:
+            def __init__(self) -> None:
+                self.brightness = 25
+                self.perkey_brightness = 25
+                self.effect = "wave"
+                self.per_key_colors = {}
+
+            @property
+            def effect_brightness(self) -> int:
+                raise AssertionError("unexpected getter bug")
+
+        monkeypatch.setattr(profiles, "get_active_profile", lambda: "dim")
+
+        with pytest.raises(AssertionError, match="unexpected getter bug"):
+            profiles.apply_profile_to_config(ConfigStub(), {(0, 0): (1, 2, 3)})
+
+    def test_apply_profile_propagates_unexpected_brightness_setter_failure(self, monkeypatch):
+        from src.core.profile import profiles
+
+        class ConfigStub:
+            def __init__(self) -> None:
+                self._effect_brightness = 25
+                self.brightness = 25
+                self.perkey_brightness = 25
+                self.effect = "wave"
+                self.per_key_colors = {}
+
+            @property
+            def effect_brightness(self) -> int:
+                return self._effect_brightness
+
+            @effect_brightness.setter
+            def effect_brightness(self, _value: int) -> None:
+                raise AssertionError("unexpected setter bug")
+
+        monkeypatch.setattr(profiles, "get_active_profile", lambda: "dim")
+
+        with pytest.raises(AssertionError, match="unexpected setter bug"):
+            profiles.apply_profile_to_config(ConfigStub(), {(0, 0): (1, 2, 3)})

@@ -33,6 +33,8 @@ class _ClosureIntrospectableProtocol(Protocol):
 
 _KNOWN_COLOR_HW_EFFECTS = frozenset({"breathing", "random", "ripple", "raindrop", "aurora", "fireworks"})
 _KNOWN_RANDOM_SENTINEL_HW_EFFECTS = frozenset({"random"})
+_HW_EFFECT_INTROSPECTION_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_PALETTE_PROGRAM_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _keyboard_hw_speed_policy_or_default(kb: object, *, default: str) -> str:
@@ -64,7 +66,7 @@ def allowed_hw_effect_keys(effect_func: Callable[..., object], *, logger: loggin
         args = mapping.get("args")
         if isinstance(args, dict):
             return set(args.keys())
-    except Exception as exc:  # @quality-exception exception-transparency: CPython closure introspection is version-dependent and must degrade to empty allowed-keys set
+    except _HW_EFFECT_INTROSPECTION_ERRORS as exc:
         log_throttled(
             logger,
             "legacy.effects.allowed_keys",
@@ -123,7 +125,7 @@ def build_hw_effect_payload(
             try:
                 with kb_lock:
                     kb.set_palette_color(palette_slot, current_color)
-            except Exception as exc:  # @quality-exception exception-transparency: set_palette_color is a runtime USB/HID hardware write boundary; palette programming failure must not block effect payload construction
+            except _PALETTE_PROGRAM_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: set_palette_color is a runtime USB/HID hardware write boundary; recoverable palette programming failures must not block effect payload construction
                 # Hardware writes are a runtime boundary: log full exception
                 # context, then continue building the payload as before.
                 log_throttled(

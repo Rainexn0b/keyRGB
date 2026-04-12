@@ -5,6 +5,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestPowerManagerEventHandlers:
     """Test lid/suspend event handlers."""
@@ -215,6 +217,25 @@ class TestPowerManagerEventHandlers:
 
         exc.assert_called_once()
 
+    def test_handle_power_event_propagates_unexpected_keyboard_method_errors(self):
+        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+
+        mock_kb = MagicMock()
+        mock_kb.is_off = False
+        mock_kb.turn_off = MagicMock(side_effect=AssertionError("unexpected keyboard bug"))
+
+        with patch("src.core.power.management.manager.PowerEventPolicy") as mock_policy_cls:
+            mock_policy_instance = MagicMock()
+            mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
+            mock_policy_cls.return_value = mock_policy_instance
+
+            pm = PowerManager(mock_kb)
+            pm._config.management_enabled = True
+            pm._config.power_off_on_suspend = True
+
+            with pytest.raises(AssertionError, match="unexpected keyboard bug"):
+                pm._on_suspend()
+
 
 class TestPowerManagerHandlePowerEventBranches:
     def test_handle_power_event_returns_when_policy_raises(self):
@@ -234,6 +255,21 @@ class TestPowerManagerHandlePowerEventBranches:
             )
 
         exc.assert_called_once()
+
+    def test_handle_power_event_propagates_unexpected_policy_errors(self):
+        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+
+        pm = PowerManager(MagicMock())
+
+        with pytest.raises(AssertionError, match="unexpected policy bug"):
+            pm._handle_power_event(
+                enabled=True,
+                action_enabled=True,
+                log_message="x",
+                policy_method=MagicMock(side_effect=AssertionError("unexpected policy bug")),
+                expected_action_type=TurnOffFromEvent,
+                kb_method_name="turn_off",
+            )
 
     def test_handle_power_event_filters_action_type_and_action_enabled(self):
         from src.core.power.management.manager import (

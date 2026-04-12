@@ -201,18 +201,26 @@ class Ite8291r3Backend(KeyboardBackend):
         return BackendCapabilities(per_key=True, color=True, hardware_effects=True, palette=True)
 
     def _open_matching_transport(self):
-        return open_matching_transport(product_ids=tuple(pid for _vid, pid in _SUPPORTED_USB_IDS), required_bcd=protocol.REV_NUMBER)
+        return open_matching_transport(
+            product_ids=tuple(pid for _vid, pid in _SUPPORTED_USB_IDS), required_bcd=protocol.REV_NUMBER
+        )
 
     def get_device(self) -> KeyboardDevice:
         try:
-            usb_core = self._load_usb_core()
+            self._load_usb_core()
             transport, _info = self._open_matching_transport()
             device = Ite8291r3KeyboardDevice(
                 transport.send_control_report,
                 transport.read_control_report,
                 transport.write_data,
             )
-        except (ImportError, FileNotFoundError, OSError, RuntimeError, ValueError) as exc:  # @quality-exception exception-transparency: USB transport open is a hardware boundary; device/library failures are translated to backend errors here
+        except (
+            ImportError,
+            FileNotFoundError,
+            OSError,
+            RuntimeError,
+            ValueError,
+        ) as exc:  # @quality-exception exception-transparency: USB transport open is a hardware boundary; device/library failures are translated to backend errors here
             if is_permission_denied(exc):
                 raise BackendPermissionError(
                     "Permission denied opening the ITE 8291 USB device. "

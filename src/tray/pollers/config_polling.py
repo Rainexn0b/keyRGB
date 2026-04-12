@@ -19,6 +19,9 @@ from .config_polling_internal.core import state_for_log as _state_for_log_impl
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 
+_CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def _compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
     return _compute_config_apply_state_impl(tray)
 
@@ -116,7 +119,7 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
         try:
             tray.config.reload()
             apply_from_config(cause="startup")
-        except Exception as exc:  # @quality-exception exception-transparency: startup reload/apply is a best-effort tray-thread runtime boundary and polling must survive config or device failures
+        except _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: startup reload/apply is a best-effort tray-thread runtime boundary and polling must survive config or device failures
             # Don't crash the polling thread; but also don't silently eat errors.
             now = time.monotonic()
             if now - last_startup_error_at > 30:
@@ -140,7 +143,7 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
                     last_digest = digest
                     tray.config.reload()
                     apply_from_config(cause="mtime_change")
-                except Exception as exc:  # @quality-exception exception-transparency: mtime-triggered reload/apply is a best-effort runtime boundary and the polling loop must continue after failures
+                except _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: mtime-triggered reload/apply is a best-effort runtime boundary and the polling loop must continue after failures
                     _log_polling_exception("Error reloading config: %s", exc)
 
             time.sleep(0.1)

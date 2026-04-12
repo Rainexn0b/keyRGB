@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 from src.core.backends.exceptions import (
+    BACKEND_OPEN_RUNTIME_ERRORS,
     BackendBusyError,
     BackendDisconnectedError,
     BackendIOError,
@@ -24,7 +24,12 @@ from ..base import (
 from ..policy import experimental_backends_enabled
 from . import protocol
 from .device import Ite8291KeyboardDevice
-from .hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport, find_matching_hidraw_device, open_matching_hidraw_transport
+from .hidraw import (
+    HidrawDeviceInfo,
+    HidrawFeatureOutputTransport,
+    find_matching_hidraw_device,
+    open_matching_hidraw_transport,
+)
 
 
 def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
@@ -136,7 +141,7 @@ class Ite8291Backend(KeyboardBackend):
                     "Detected an ITE 8291 zone-only firmware variant; the experimental per-key HID backend does not support it yet."
                 )
             return Ite8291KeyboardDevice(transport.send_feature_report, transport.write_output_report)
-        except Exception as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; all driver exceptions are translated to BackendError subclasses here
+        except BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
             if is_permission_denied(exc):
                 raise BackendPermissionError(
                     "Permission denied opening the ITE 8291 hidraw device. Install the KeyRGB udev rules, then reload "

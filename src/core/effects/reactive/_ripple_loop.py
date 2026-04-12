@@ -247,7 +247,9 @@ def run_reactive_ripple_loop(engine: "EffectsEngine", *, api: _ReactiveRippleApi
             # Trail length scales the ring width (band), not TTL, so wave speed stays
             # constant and the user perceives a wider/narrower illuminated ring rather
             # than a faster/slower expanding wavefront.
-            trail_pct = _engine_int_attr_or_fallback(engine, "reactive_trail_percent", missing_default=50, error_default=50)
+            trail_pct = _engine_int_attr_or_fallback(
+                engine, "reactive_trail_percent", missing_default=50, error_default=50
+            )
             trail_scale = max(0.1, min(4.0, ((int(trail_pct) or 50) / 50.0) ** 2))
             band = 2.15 * trail_scale
             overlay = api.get_engine_overlay_buffer(engine, "_reactive_ripple_overlay")

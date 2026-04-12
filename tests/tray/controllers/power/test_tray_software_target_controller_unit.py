@@ -67,6 +67,66 @@ def test_secondary_software_render_targets_reuses_cached_proxy_instances() -> No
     assert first[0] is second[0]
 
 
+def test_cached_secondary_target_invalidates_cache_on_recoverable_device_error() -> None:
+    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+
+    calls = {"get_device": 0}
+
+    class Device:
+        def set_color(self, _color, *, brightness: int) -> None:
+            raise RuntimeError(f"device failed at {brightness}")
+
+        def turn_off(self) -> None:
+            return None
+
+    route = SimpleNamespace(device_type="lightbar")
+
+    def get_device() -> Device:
+        calls["get_device"] += 1
+        return Device()
+
+    route.get_device = get_device
+    target = _CachedSecondarySoftwareTarget(key="lightbar", route=route)
+
+    with pytest.raises(RuntimeError, match="device failed at 10"):
+        target.set_color((1, 2, 3), brightness=10)
+
+    with pytest.raises(RuntimeError, match="device failed at 20"):
+        target.set_color((4, 5, 6), brightness=20)
+
+    assert calls["get_device"] == 2
+
+
+def test_cached_secondary_target_propagates_unexpected_device_error_without_invalidating_cache() -> None:
+    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+
+    calls = {"get_device": 0}
+
+    class Device:
+        def set_color(self, _color, *, brightness: int) -> None:
+            raise AssertionError(f"unexpected device bug at {brightness}")
+
+        def turn_off(self) -> None:
+            return None
+
+    route = SimpleNamespace(device_type="lightbar")
+
+    def get_device() -> Device:
+        calls["get_device"] += 1
+        return Device()
+
+    route.get_device = get_device
+    target = _CachedSecondarySoftwareTarget(key="lightbar", route=route)
+
+    with pytest.raises(AssertionError, match="unexpected device bug at 10"):
+        target.set_color((1, 2, 3), brightness=10)
+
+    with pytest.raises(AssertionError, match="unexpected device bug at 20"):
+        target.set_color((4, 5, 6), brightness=20)
+
+    assert calls["get_device"] == 1
+
+
 def test_software_effect_target_options_enable_all_mode_when_auxiliary_device_exists() -> None:
     from src.tray.controllers.software_target_controller import software_effect_target_options
 
@@ -146,3 +206,52 @@ def test_handle_secondary_target_error_falls_back_to_logger_when_tray_logging_ra
     assert exc_info[0] is RuntimeError
     assert exc_info[1] is original_exc
     assert exc_info[2] is original_exc.__traceback__
+
+
+def test_try_log_event_logs_recoverable_runtime_errors() -> None:
+    from src.tray.controllers.software_target_controller import _try_log_event
+
+    tray = _make_tray()
+    tray._log_event.side_effect = RuntimeError("event logger failed")
+
+    with patch("src.tray.controllers.software_target_controller.logger.exception") as log_exception:
+        _try_log_event(tray, "menu", "set_software_effect_target", old="keyboard", new="all_uniform_capable")
+
+    tray._log_event.assert_called_once_with(
+        "menu", "set_software_effect_target", old="keyboard", new="all_uniform_capable"
+    )
+    log_exception.assert_called_once()
+    assert log_exception.call_args.args[0] == "Tray event logging failed: %s"
+    assert str(log_exception.call_args.args[1]) == "event logger failed"
+
+
+def test_try_log_event_propagates_unexpected_runtime_errors() -> None:
+    from src.tray.controllers.software_target_controller import _try_log_event
+
+    tray = _make_tray()
+    tray._log_event.side_effect = AssertionError("unexpected event logger bug")
+
+    with pytest.raises(AssertionError, match="unexpected event logger bug"):
+        _try_log_event(tray, "menu", "set_software_effect_target")
+
+
+def test_handle_secondary_target_error_propagates_unexpected_notify_callback_errors() -> None:
+    from src.tray.controllers.software_target_controller import _handle_secondary_target_error
+
+    original_exc = PermissionError("permission denied")
+    tray = _make_tray()
+    tray._notify_permission_issue.side_effect = AssertionError("unexpected notify bug")
+
+    with patch("src.tray.controllers.software_target_controller.is_permission_denied", return_value=True):
+        with pytest.raises(AssertionError, match="unexpected notify bug"):
+            _handle_secondary_target_error(tray, original_exc, action="restore_secondary_software_target")
+
+
+def test_log_boundary_exception_propagates_unexpected_logger_failures() -> None:
+    from src.tray.controllers.software_target_controller import _log_boundary_exception
+
+    tray = _make_tray()
+    tray._log_exception.side_effect = AssertionError("unexpected logger bug")
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        _log_boundary_exception(tray, "Error during restore_secondary_software_target: %s", RuntimeError("boom"))

@@ -16,6 +16,9 @@ from src.core.backends.registry import select_backend
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 
+_TRAY_BACKEND_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def load_ite_dimensions() -> tuple[int, int]:
     """Load keyboard matrix dimensions from the active backend.
 
@@ -30,7 +33,7 @@ def load_ite_dimensions() -> tuple[int, int]:
             return REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
         r, c = backend.dimensions()
         return int(r), int(c)
-    except Exception:  # @quality-exception exception-transparency: runtime hardware/plugin boundary; tray startup degrades to reference defaults
+    except _TRAY_BACKEND_RUNTIME_ERRORS:  # @quality-exception exception-transparency: runtime hardware/plugin boundary; tray startup degrades to reference defaults
         logger.log(logging.DEBUG, "Falling back to default keyboard dimensions", exc_info=True)
         return REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
 
@@ -50,14 +53,18 @@ def select_backend_with_introspection() -> tuple[Any, Any, Any]:
         probe_fn = getattr(backend, "probe", None) if backend is not None else None
         if callable(probe_fn):
             backend_probe = probe_fn()
-    except Exception:  # @quality-exception exception-transparency: runtime hardware boundary; best-effort probe
+    except (
+        _TRAY_BACKEND_RUNTIME_ERRORS
+    ):  # @quality-exception exception-transparency: runtime hardware boundary; best-effort probe
         logger.log(logging.DEBUG, "Backend probe failed during tray introspection", exc_info=True)
         backend_probe = None
 
     backend_caps = None
     try:
         backend_caps = backend.capabilities() if backend is not None else None
-    except Exception:  # @quality-exception exception-transparency: runtime hardware boundary; best-effort capabilities
+    except (
+        _TRAY_BACKEND_RUNTIME_ERRORS
+    ):  # @quality-exception exception-transparency: runtime hardware boundary; best-effort capabilities
         logger.log(logging.DEBUG, "Backend capabilities lookup failed during tray introspection", exc_info=True)
         backend_caps = None
 
@@ -75,7 +82,7 @@ def select_device_discovery_snapshot() -> dict[str, Any] | None:
 
     try:
         payload = collect_device_discovery(include_usb=True)
-    except Exception:  # @quality-exception exception-transparency: best-effort diagnostics boundary; tray status display must stay non-fatal
+    except _TRAY_BACKEND_RUNTIME_ERRORS:  # @quality-exception exception-transparency: best-effort diagnostics boundary; tray status display must stay non-fatal
         logger.log(logging.DEBUG, "Tray device discovery snapshot collection failed", exc_info=True)
         return None
 

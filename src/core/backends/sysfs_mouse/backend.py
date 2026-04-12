@@ -5,7 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.core.backends.base import BackendCapabilities, BackendStability, ExperimentalEvidence, KeyboardBackend, KeyboardDevice, ProbeResult
+from src.core.backends.base import (
+    BackendCapabilities,
+    BackendStability,
+    ExperimentalEvidence,
+    KeyboardBackend,
+    KeyboardDevice,
+    ProbeResult,
+)
 from src.core.backends.sysfs import privileged
 from src.core.utils.safe_attrs import safe_int_attr
 
@@ -92,7 +99,9 @@ class SysfsMouseBackend(KeyboardBackend):
         identifiers["helper_led_supported"] = str(privileged.helper_can_apply_led(led_dir.name)).lower()
 
         if not readable:
-            return ProbeResult(available=False, reason="mouse brightness not readable", confidence=0, identifiers=identifiers)
+            return ProbeResult(
+                available=False, reason="mouse brightness not readable", confidence=0, identifiers=identifiers
+            )
 
         experimental_enabled = bool(os.environ.get("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS") == "1")
         identifiers["experimental_enabled"] = str(experimental_enabled).lower()

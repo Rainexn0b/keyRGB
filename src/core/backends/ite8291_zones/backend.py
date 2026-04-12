@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from src.core.backends.exceptions import (
+    BACKEND_OPEN_RUNTIME_ERRORS,
     BackendBusyError,
     BackendDisconnectedError,
     BackendIOError,
@@ -20,7 +21,12 @@ from ..base import (
     KeyboardDevice,
     ProbeResult,
 )
-from ..ite8291.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport, find_matching_hidraw_device, open_matching_hidraw_transport
+from ..ite8291.hidraw import (
+    HidrawDeviceInfo,
+    HidrawFeatureOutputTransport,
+    find_matching_hidraw_device,
+    open_matching_hidraw_transport,
+)
 from ..policy import experimental_backends_enabled
 from . import protocol
 from .device import Ite8291ZonesKeyboardDevice
@@ -144,7 +150,7 @@ class Ite8291ZonesBackend(KeyboardBackend):
         try:
             transport, _info = _open_matching_transport()
             return Ite8291ZonesKeyboardDevice(transport.send_feature_report)
-        except Exception as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; all driver exceptions are translated to BackendError subclasses here
+        except BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
             if is_permission_denied(exc):
                 raise BackendPermissionError(
                     "Permission denied opening the ITE 8291 4-zone hidraw device. Install the KeyRGB udev rules, then "

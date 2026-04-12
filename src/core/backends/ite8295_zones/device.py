@@ -196,7 +196,9 @@ class Ite8295ZonesKeyboardDevice:
         if normalized not in {"breathing", "wave", "spectrum_cycle"}:
             raise RuntimeError(f"ITE 8295 does not support hardware effect '{effect_name}'")
 
-        level = protocol.clamp_ui_brightness(effect_dict.get("brightness", self._brightness or protocol.UI_BRIGHTNESS_MAX))
+        level = protocol.clamp_ui_brightness(
+            effect_dict.get("brightness", self._brightness or protocol.UI_BRIGHTNESS_MAX)
+        )
         if level <= 0:
             self.turn_off()
             return

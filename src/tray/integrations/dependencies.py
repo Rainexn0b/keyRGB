@@ -21,7 +21,7 @@ def load_tray_dependencies():
         return EffectsEngine, Config, PowerManager
     except ImportError:
         # Fallback for alternate layouts / direct execution.
-        with suppress(Exception):
+        with suppress(OSError):
             ensure_repo_root_on_sys_path(Path(__file__))
 
         from src.core.effects.engine import EffectsEngine

@@ -11,6 +11,7 @@ _RGB_TRIPLET_UNPACK_ERRORS = (TypeError, ValueError)
 _CONFIG_LOAD_ERRORS = (OSError, UnicodeDecodeError, json.JSONDecodeError)
 _RGB_CHANNEL_FLOAT_ERRORS = (ValueError, OverflowError)
 _RGB_CHANNEL_PARSE_ERRORS = (ValueError, OverflowError)
+_SAVE_CALLBACK_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 RgbTriplet = tuple[int, int, int]
 IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
@@ -59,6 +60,7 @@ def normalize_trail_percent_value(value: object) -> int:
         return 50
 
     return max(1, min(100, normalized))
+
 
 def normalize_rgb_triplet(
     value: object,
@@ -139,7 +141,7 @@ def coerce_loaded_settings(
 
     try:
         save_fn()
-    except Exception:  # @quality-exception exception-transparency: save callback failures are an external best-effort persistence boundary and coercion should already have stabilized in-memory settings
+    except _SAVE_CALLBACK_ERRORS:
         return
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call
 
@@ -157,6 +158,75 @@ def test_apply_selected_secondary_brightness_logs_notify_callback_failures(monke
     ]
 
 
+def test_apply_selected_secondary_brightness_logs_recoverable_device_failures(monkeypatch) -> None:
+    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+
+    tray = _make_tray()
+
+    class DummyDevice:
+        def set_brightness(self, brightness: int) -> None:
+            del brightness
+            raise RuntimeError("device failed")
+
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
+    )
+
+    assert apply_selected_secondary_brightness(tray, "4") is False
+    tray._log_exception.assert_called_once()
+    msg, exc = tray._log_exception.call_args.args
+    assert msg == "Error applying lightbar brightness: %s"
+    assert str(exc) == "device failed"
+
+
+def test_apply_selected_secondary_brightness_propagates_unexpected_notify_callback_failures(monkeypatch) -> None:
+    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+
+    tray = _make_tray()
+    err = PermissionError("denied")
+    tray._notify_permission_issue.side_effect = AssertionError("unexpected notify bug")
+
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: (_ for _ in ()).throw(err)),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected notify bug"):
+        apply_selected_secondary_brightness(tray, "4")
+
+
+def test_apply_selected_secondary_brightness_propagates_unexpected_device_failures(monkeypatch) -> None:
+    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+
+    tray = _make_tray()
+
+    class DummyDevice:
+        def set_brightness(self, brightness: int) -> None:
+            del brightness
+            raise AssertionError("unexpected device bug")
+
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected device bug"):
+        apply_selected_secondary_brightness(tray, "4")
+
+
 def test_apply_selected_secondary_brightness_logs_menu_refresh_failures(monkeypatch) -> None:
     from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
@@ -181,6 +251,29 @@ def test_apply_selected_secondary_brightness_logs_menu_refresh_failures(monkeypa
     assert apply_selected_secondary_brightness(tray, "6") is True
     assert seen == [30]
     tray._log_exception.assert_called_once_with("Failed to refresh tray menu after lightbar action: %s", menu_err)
+
+
+def test_apply_selected_secondary_brightness_propagates_unexpected_menu_refresh_failures(monkeypatch) -> None:
+    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+
+    tray = _make_tray()
+    tray._update_menu.side_effect = AssertionError("unexpected menu bug")
+
+    class DummyDevice:
+        def set_brightness(self, brightness: int) -> None:
+            del brightness
+
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected menu bug"):
+        apply_selected_secondary_brightness(tray, "6")
 
 
 def test_apply_selected_secondary_brightness_falls_back_to_module_logging_when_tray_logger_fails(monkeypatch) -> None:
@@ -218,3 +311,13 @@ def test_apply_selected_secondary_brightness_falls_back_to_module_logging_when_t
     module_error.assert_called_once()
     assert module_error.call_args.args == ("Failed to refresh tray menu after lightbar action: %s", menu_err)
     assert module_error.call_args.kwargs["exc_info"] == (type(menu_err), menu_err, menu_err.__traceback__)
+
+
+def test_log_boundary_exception_propagates_unexpected_tray_logger_failures() -> None:
+    from src.tray.controllers.secondary_device_controller import _log_boundary_exception
+
+    tray = _make_tray()
+    tray._log_exception.side_effect = AssertionError("unexpected logger bug")
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        _log_boundary_exception(tray, "Failed to refresh tray menu after lightbar action: %s", RuntimeError("boom"))

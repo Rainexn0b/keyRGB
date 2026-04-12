@@ -337,6 +337,18 @@ def test_get_pystray_explicit_backend_does_not_probe_gi(monkeypatch):
     assert any("(explicit)" in m for (m, _a) in calls["log"])
 
 
+def test_get_pystray_explicit_backend_propagates_unexpected_import_bug(monkeypatch):
+    monkeypatch.setenv("PYSTRAY_BACKEND", "xorg")
+
+    def _boom(_name: str):
+        raise AssertionError("unexpected import bug")
+
+    monkeypatch.setattr(importlib, "import_module", _boom)
+
+    with pytest.raises(AssertionError, match="unexpected import bug"):
+        runtime.get_pystray()
+
+
 def test_get_pystray_prefers_gtk_when_gi_works(monkeypatch):
     monkeypatch.setattr(runtime, "_gi_is_working", lambda: True)
     monkeypatch.setattr(runtime, "_is_kde_wayland_session", lambda: False)

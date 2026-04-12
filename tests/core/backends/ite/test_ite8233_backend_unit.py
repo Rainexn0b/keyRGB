@@ -179,6 +179,18 @@ def test_ite8233_get_device_reraises_non_permission_errors(monkeypatch: pytest.M
         Ite8233Backend().get_device()
 
 
+def test_ite8233_get_device_propagates_unexpected_open_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
+
+    err = AssertionError("unexpected transport bug")
+    monkeypatch.setattr(
+        "src.core.backends.ite8233.backend._open_matching_transport", lambda: (_ for _ in ()).throw(err)
+    )
+
+    with pytest.raises(AssertionError, match="unexpected transport bug"):
+        Ite8233Backend().get_device()
+
+
 def test_ite8233_get_device_returns_lightbar_device_when_transport_opens(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 

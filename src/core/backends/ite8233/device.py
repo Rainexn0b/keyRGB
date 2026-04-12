@@ -94,7 +94,17 @@ class Ite8233LightbarDevice:
 
     def set_effect(self, effect_data) -> None:
         effect_name = self._normalize_effect_name(effect_data)
-        if effect_name not in {"breathing", "breathing_color", "breathe", "wave", "bounce", "clash", "catchup", "catch_up", "flash"}:
+        if effect_name not in {
+            "breathing",
+            "breathing_color",
+            "breathe",
+            "wave",
+            "bounce",
+            "clash",
+            "catchup",
+            "catch_up",
+            "flash",
+        }:
             self._raise_unimplemented()
 
         effect_dict = effect_data if isinstance(effect_data, dict) else {}
@@ -176,9 +186,7 @@ class Ite8233LightbarDevice:
             return
 
         if not protocol.breathing_supported(self._product_id):
-            raise RuntimeError(
-                f"ITE lightbar breathing is not supported for product 0x{self._product_id:04x}"
-            )
+            raise RuntimeError(f"ITE lightbar breathing is not supported for product 0x{self._product_id:04x}")
 
         color = effect_dict.get("color", self._current_color)
 

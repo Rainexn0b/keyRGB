@@ -217,6 +217,22 @@ def test_log_event_bails_out_if_source_action_not_stringable(monkeypatch):
     app.KeyRGBTray._log_event(tray, BadStr(), BadStr(), x=1)
 
 
+def test_log_event_propagates_unexpected_source_action_string_errors(monkeypatch):
+    tray = SimpleNamespace(_event_last_at={})
+    monkeypatch.setattr(
+        app.logger,
+        "info",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("logged")),
+    )
+
+    class BadStr:
+        def __str__(self):
+            raise AssertionError("unexpected string bug")
+
+    with pytest.raises(AssertionError, match="unexpected string bug"):
+        app.KeyRGBTray._log_event(tray, BadStr(), "act", x=1)
+
+
 def test_log_event_logs_even_if_throttle_state_errors(monkeypatch):
     logged = []
 
@@ -234,6 +250,44 @@ def test_log_event_logs_even_if_throttle_state_errors(monkeypatch):
 
     app.KeyRGBTray._log_event(tray, "src", "act", a=1)
     assert logged == ["EVENT src:act a=1"]
+
+
+def test_log_event_propagates_unexpected_field_repr_errors(monkeypatch):
+    tray = SimpleNamespace(_event_last_at={})
+    monkeypatch.setattr(app.time, "monotonic", lambda: 123.0)
+    monkeypatch.setattr(app.logger, "info", lambda *_a, **_k: None)
+
+    class _Unrepr:
+        def __repr__(self):
+            raise AssertionError("unexpected repr bug")
+
+    with pytest.raises(AssertionError, match="unexpected repr bug"):
+        app.KeyRGBTray._log_event(tray, "config", "apply", b=_Unrepr(), a=1)
+
+
+def test_log_event_propagates_unexpected_throttle_state_errors(monkeypatch):
+    logged = []
+
+    class BadMap(dict):
+        def get(self, *_a, **_k):
+            raise AssertionError("unexpected throttle bug")
+
+    tray = SimpleNamespace(_event_last_at=BadMap())
+
+    monkeypatch.setattr(app.time, "monotonic", lambda: 123.0)
+    monkeypatch.setattr(app.logger, "info", lambda fmt, msg: logged.append(msg))
+
+    with pytest.raises(AssertionError, match="unexpected throttle bug"):
+        app.KeyRGBTray._log_event(tray, "src", "act", a=1)
+
+
+def test_log_event_propagates_unexpected_logger_failures(monkeypatch):
+    tray = SimpleNamespace(_event_last_at={})
+    monkeypatch.setattr(app.time, "monotonic", lambda: 123.0)
+    monkeypatch.setattr(app.logger, "info", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("unexpected logger bug")))
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        app.KeyRGBTray._log_event(tray, "src", "act", a=1)
 
 
 def test_log_event_swallows_logger_failures(monkeypatch):
@@ -374,6 +428,18 @@ def test_notify_uses_icon_notify_with_two_or_one_argument_fallback() -> None:
     app.KeyRGBTray._notify(tray, "Title", "Body")
 
     assert one_arg_calls == ["Body"]
+
+
+def test_notify_propagates_unexpected_one_arg_fallback_errors() -> None:
+    def _notify_one_arg(message, title=None):
+        if title is not None:
+            raise TypeError("one arg only")
+        raise AssertionError("unexpected notification bug")
+
+    tray = SimpleNamespace(icon=SimpleNamespace(notify=_notify_one_arg), _pending_notifications=[])
+
+    with pytest.raises(AssertionError, match="unexpected notification bug"):
+        app.KeyRGBTray._notify(tray, "Title", "Body")
 
 
 def test_notify_falls_back_to_notify_send_when_icon_notify_fails(monkeypatch):

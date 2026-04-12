@@ -4,12 +4,15 @@ from collections.abc import Callable
 from typing import Any
 
 
+_STARTUP_MIGRATION_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def migrate_builtin_profile_brightness_best_effort(config: Any) -> None:
     try:
         from src.core.profile import profiles as core_profiles
 
         core_profiles.migrate_builtin_profile_brightness(config)
-    except Exception:  # @quality-exception exception-transparency: optional startup migration boundary
+    except _STARTUP_MIGRATION_ERRORS:  # @quality-exception exception-transparency: optional startup migration boundary
         return
 
 

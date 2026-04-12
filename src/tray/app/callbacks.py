@@ -31,19 +31,24 @@ launch_reactive_color_gui = gui_launch.launch_reactive_color_gui
 launch_support_gui = gui_launch.launch_support_gui
 launch_tcc_profiles_gui = gui_launch.launch_tcc_profiles_gui
 launch_uniform_gui = gui_launch.launch_uniform_gui
+_RECOVERABLE_UI_CALLBACK_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _refresh_ui_best_effort(tray: LightingTrayProtocol) -> None:
     try:
         tray._refresh_ui()
-    except Exception:  # @quality-exception exception-transparency: tray UI refresh is a best-effort runtime boundary
+    except (
+        _RECOVERABLE_UI_CALLBACK_ERRORS
+    ):  # @quality-exception exception-transparency: tray UI refresh is a best-effort runtime boundary
         pass
 
 
 def _update_menu_best_effort(tray: LightingTrayProtocol) -> None:
     try:
         tray._update_menu()
-    except Exception:  # @quality-exception exception-transparency: tray menu rebuild is a best-effort runtime boundary
+    except (
+        _RECOVERABLE_UI_CALLBACK_ERRORS
+    ):  # @quality-exception exception-transparency: tray menu rebuild is a best-effort runtime boundary
         pass
 
 

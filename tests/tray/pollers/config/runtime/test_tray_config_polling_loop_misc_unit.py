@@ -191,3 +191,81 @@ def test_start_config_polling_survives_reload_log_failures() -> None:
 
     assert tray.config.reload.call_count == 2
     tray._log_exception.assert_called_once()
+
+
+def test_start_config_polling_propagates_unexpected_startup_reload_error() -> None:
+    tray = _mk_tray_base(effect="wave", brightness=10)
+    tray.config.reload = MagicMock(side_effect=AssertionError("unexpected startup reload bug"))
+
+    captured: dict[str, object] = {}
+
+    def _fake_thread(*, target, daemon):
+        captured["target"] = target
+        t = MagicMock()
+        t.start = MagicMock()
+        return t
+
+    class _Stat:
+        def __init__(self, mtime: float):
+            self.st_mtime = mtime
+
+    class _FakePath:
+        def __init__(self, _path: str):
+            pass
+
+        def stat(self):
+            return _Stat(1.0)
+
+        def read_bytes(self) -> bytes:
+            return b"startup"
+
+    with (
+        patch.object(config_polling, "Path", _FakePath),
+        patch.object(config_polling.threading, "Thread", side_effect=_fake_thread),
+    ):
+        start_config_polling(tray, ite_num_rows=6, ite_num_cols=21)
+        with pytest.raises(AssertionError, match="unexpected startup reload bug"):
+            captured["target"]()
+
+
+def test_start_config_polling_propagates_unexpected_mtime_reload_error() -> None:
+    tray = _mk_tray_base(effect="wave", brightness=10)
+    tray.config.reload = MagicMock(side_effect=[None, AssertionError("unexpected mtime reload bug")])
+
+    captured: dict[str, object] = {}
+
+    def _fake_thread(*, target, daemon):
+        captured["target"] = target
+        t = MagicMock()
+        t.start = MagicMock()
+        return t
+
+    class _Stat:
+        def __init__(self, mtime: float):
+            self.st_mtime = mtime
+
+    mtimes = [FileNotFoundError(), _Stat(1.0)]
+
+    def _stat():
+        value = mtimes.pop(0)
+        if isinstance(value, Exception):
+            raise value
+        return value
+
+    class _FakePath:
+        def __init__(self, _path: str):
+            pass
+
+        def stat(self):
+            return _stat()
+
+        def read_bytes(self) -> bytes:
+            return b"changed"
+
+    with (
+        patch.object(config_polling, "Path", _FakePath),
+        patch.object(config_polling.threading, "Thread", side_effect=_fake_thread),
+    ):
+        start_config_polling(tray, ite_num_rows=6, ite_num_cols=21)
+        with pytest.raises(AssertionError, match="unexpected mtime reload bug"):
+            captured["target"]()

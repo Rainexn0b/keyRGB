@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 PER_KEY_MODE_POLICY_INIT_ONCE = "init_once"
 PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME = "reassert_every_frame"
+_PERKEY_CONFIG_LOAD_ERRORS = (AttributeError, ImportError, LookupError, OSError, TypeError, ValueError)
+_ENABLE_USER_MODE_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def normalize_per_key_mode_policy(policy: object) -> str:
@@ -36,7 +38,7 @@ def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, i
 
         cfg = Config()
         return dict(getattr(cfg, "per_key_colors", {}) or {})
-    except Exception as exc:  # @quality-exception exception-transparency: config import, instantiation, and property access may fail at runtime; must degrade to empty map
+    except _PERKEY_CONFIG_LOAD_ERRORS as exc:  # @quality-exception exception-transparency: config import, instantiation, and property access may fail at runtime; must degrade to empty map
         log_throttled(
             logger,
             "legacy.perkey_animation.load_config",
@@ -104,7 +106,7 @@ def enable_user_mode_once(*, kb, kb_lock, brightness: int) -> None:
     try:
         with kb_lock:
             fn(brightness=brightness, save=False)
-    except Exception as exc:  # @quality-exception exception-transparency: enable_user_mode is a runtime USB/HID hardware boundary and must degrade gracefully on failure
+    except _ENABLE_USER_MODE_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: enable_user_mode is a runtime USB/HID hardware boundary and must degrade gracefully on recoverable failure
         log_throttled(
             logger,
             "perkey_animation.enable_user_mode_once",

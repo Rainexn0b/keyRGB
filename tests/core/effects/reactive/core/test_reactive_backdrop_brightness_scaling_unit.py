@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 
+import pytest
+
 from src.core.effects.reactive.render import (
     apply_backdrop_brightness_scale,
     backdrop_brightness_scale_factor,
@@ -311,3 +313,25 @@ def test_fill_per_key_backdrop_map_logs_once_and_preserves_uniform_base_on_broke
     assert records[0].exc_info is not None
 
     logging_utils._last_log_times.clear()
+
+
+def test_fill_per_key_backdrop_map_propagates_unexpected_iteration_errors() -> None:
+    from src.core.effects.reactive._base_maps import fill_per_key_backdrop_map
+
+    class _BrokenItems:
+        def items(self):
+            class _BrokenIterable:
+                def __iter__(self):
+                    return self
+
+                def __next__(self):
+                    raise AssertionError("unexpected backdrop iteration bug")
+
+            return _BrokenIterable()
+
+    with pytest.raises(AssertionError, match="unexpected backdrop iteration bug"):
+        fill_per_key_backdrop_map(
+            {},
+            base_color=(3, 4, 5),
+            per_key_colors=_BrokenItems(),
+        )

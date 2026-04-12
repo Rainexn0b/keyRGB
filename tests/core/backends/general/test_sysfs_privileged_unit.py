@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
@@ -63,3 +65,38 @@ def test_helper_supports_led_apply_propagates_unexpected_probe_bug(
 
     with pytest.raises(RuntimeError, match="probe bug"):
         sysfs_privileged.helper_supports_led_apply()
+
+
+def test_run_led_apply_ignores_recoverable_debug_logging_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG", "1")
+    monkeypatch.setattr(sysfs_privileged.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(
+        sysfs_privileged.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="ok", stderr=""),
+    )
+    monkeypatch.setattr(
+        sysfs_privileged.logger,
+        "info",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    assert sysfs_privileged.run_led_apply(led="rgb:kbd_backlight", brightness=25, rgb=None) is True
+
+
+def test_run_led_apply_propagates_unexpected_debug_logging_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG", "1")
+    monkeypatch.setattr(sysfs_privileged.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(
+        sysfs_privileged.subprocess,
+        "run",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=0, stdout="ok", stderr=""),
+    )
+    monkeypatch.setattr(
+        sysfs_privileged.logger,
+        "info",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected logger bug"):
+        sysfs_privileged.run_led_apply(led="rgb:kbd_backlight", brightness=25, rgb=None)

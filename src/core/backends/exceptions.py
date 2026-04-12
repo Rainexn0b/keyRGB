@@ -16,6 +16,9 @@ Inheritance is designed for backward compatibility:
 from __future__ import annotations
 
 
+BACKEND_OPEN_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 class BackendError(Exception):
     """Base class for all backend hardware / driver errors."""
 

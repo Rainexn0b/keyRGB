@@ -13,6 +13,7 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 _MISSING = object()
 _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+_ENGINE_ATTR_RUNTIME_ERRORS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _read_engine_attr(
@@ -28,7 +29,7 @@ def _read_engine_attr(
         return attrgetter(name)(engine)
     except AttributeError:
         return missing_default
-    except Exception:  # @quality-exception exception-transparency: engine attribute getters may have arbitrary runtime side effects beyond AttributeError
+    except _ENGINE_ATTR_RUNTIME_ERRORS:  # @quality-exception exception-transparency: engine attribute getters may have arbitrary runtime side effects beyond AttributeError
         active_logger.exception("Reactive brightness failed to read engine attribute %s", name)
         return error_default
 
@@ -290,5 +291,5 @@ def _clear_transition_state(engine: "EffectsEngine") -> None:
             setattr(engine, name, None)
         except (AttributeError, TypeError):
             continue
-        except Exception:  # @quality-exception exception-transparency: engine attribute setters may fail unexpectedly beyond AttributeError/TypeError during reactive brightness cleanup
+        except _ENGINE_ATTR_RUNTIME_ERRORS:  # @quality-exception exception-transparency: engine attribute setters may fail unexpectedly beyond AttributeError/TypeError during reactive brightness cleanup
             _LOGGER.exception("Reactive brightness failed to clear engine attribute %s", name)

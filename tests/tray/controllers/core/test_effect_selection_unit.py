@@ -297,3 +297,46 @@ class TestApplyEffectSelection:
         assert log_exception.call_count == 1
         assert log_exception.call_args[0][0] == "Failed to notify permission issue during effect selection: %s"
         assert str(log_exception.call_args[0][1]) == "notify failed"
+
+    def test_recoverable_effect_selection_failure_is_logged(self, monkeypatch):
+        from src.tray.controllers import effect_selection
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        log_exception = MagicMock()
+        monkeypatch.setattr(effect_selection.logger, "exception", log_exception)
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend("wave")
+        mock_tray._start_current_effect.side_effect = RuntimeError("boom")
+
+        apply_effect_selection(mock_tray, effect_name="wave")
+
+        assert log_exception.call_count == 1
+        assert log_exception.call_args[0][0] == "Error applying effect selection: %s"
+        assert str(log_exception.call_args[0][1]) == "boom"
+
+    def test_unexpected_effect_selection_failure_propagates(self):
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
+        mock_tray.backend = self._backend("wave")
+        mock_tray._start_current_effect.side_effect = AssertionError("unexpected effect bug")
+
+        with pytest.raises(AssertionError, match="unexpected effect bug"):
+            apply_effect_selection(mock_tray, effect_name="wave")
+
+    def test_permission_notification_unexpected_failure_propagates(self, monkeypatch):
+        from src.tray.controllers.effect_selection import apply_effect_selection
+
+        permission_error = PermissionError("denied")
+
+        mock_tray = MagicMock()
+        mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
+        mock_tray.config.per_key_colors = {}
+        mock_tray.engine.kb.set_color.side_effect = permission_error
+        mock_tray._notify_permission_issue = MagicMock(side_effect=AssertionError("unexpected notify bug"))
+
+        with pytest.raises(AssertionError, match="unexpected notify bug"):
+            apply_effect_selection(mock_tray, effect_name="none")

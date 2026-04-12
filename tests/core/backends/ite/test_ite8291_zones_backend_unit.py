@@ -202,6 +202,17 @@ def test_backend_get_device_reraises_non_permission_errors(monkeypatch: pytest.M
         Ite8291ZonesBackend().get_device()
 
 
+def test_backend_get_device_propagates_unexpected_open_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
+    monkeypatch.setattr(
+        "src.core.backends.ite8291_zones.backend._open_matching_transport",
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected transport bug")),
+    )
+
+    with pytest.raises(AssertionError, match="unexpected transport bug"):
+        Ite8291ZonesBackend().get_device()
+
+
 def test_backend_get_device_returns_zone_keyboard_device_when_transport_opens(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 

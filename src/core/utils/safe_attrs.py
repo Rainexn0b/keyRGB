@@ -16,10 +16,14 @@ from __future__ import annotations
 from typing import Optional, overload
 
 
+_SAFE_ATTR_ACCESS_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_SAFE_NUMERIC_FALLBACK_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def _safe_getattr_or_none(obj: object, name: str) -> object | None:
     try:
         return getattr(obj, name, None)
-    except Exception:  # @quality-exception exception-transparency: user-defined attribute access may raise arbitrary runtime errors and callers intentionally treat that as an absent value
+    except _SAFE_ATTR_ACCESS_ERRORS:
         return None
 
 
@@ -40,7 +44,7 @@ def _coerce_int_like(raw: object, *, default: Optional[int]) -> Optional[int]:
             return int(float(_raw))  # type: ignore[arg-type]
         except (TypeError, ValueError, OverflowError):
             return default
-        except Exception:  # @quality-exception exception-transparency: fallback numeric coercion crosses user-defined __float__ implementations and must stay non-fatal here
+        except _SAFE_NUMERIC_FALLBACK_ERRORS:
             return default
 
 

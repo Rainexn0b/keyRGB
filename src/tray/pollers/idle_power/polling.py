@@ -30,6 +30,9 @@ from .sensors import (
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 logger = logging.getLogger(__name__)
 
+_IDLE_POWER_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_IDLE_POWER_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
 
 def _tray_log_exception_or_none(tray: object) -> Callable[..., object] | None:
     try:
@@ -61,7 +64,7 @@ def _log_tray_exception(tray: IdlePowerTrayProtocol, msg: str, exc: Exception) -
         try:
             log_exception(msg, exc)
             return
-        except Exception as log_exc:  # @quality-exception exception-transparency: tray exception logging is a best-effort callback boundary during idle-power polling
+        except _IDLE_POWER_CALLBACK_RUNTIME_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray exception logging is a best-effort callback boundary during idle-power polling
             _log_module_exception("Idle power tray exception logger failed: %s", log_exc)
 
     _log_module_exception(msg, exc)
@@ -73,7 +76,7 @@ def _try_log_event(tray: IdlePowerTrayProtocol, source: str, action: str, **fiel
         return
     try:
         log_event(source, action, **fields)
-    except Exception as exc:  # @quality-exception exception-transparency: idle-power event logging is a best-effort diagnostic boundary and must not affect polling
+    except _IDLE_POWER_CALLBACK_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: idle-power event logging is a best-effort diagnostic boundary and must not affect polling
         _log_tray_exception(tray, "Idle power event logging failed: %s", exc)
 
 
@@ -247,10 +250,10 @@ def _build_idle_action_key(
     return _build_idle_action_key_impl(
         action=action,
         dimmed=dimmed,
-        screen_off=bool(screen_off),
-        brightness=int(brightness),
-        dim_sync_mode=str(dim_sync_mode),
-        dim_temp_brightness=int(dim_temp_brightness),
+        screen_off=screen_off,
+        brightness=brightness,
+        dim_sync_mode=dim_sync_mode,
+        dim_temp_brightness=dim_temp_brightness,
     )
 
 
@@ -304,7 +307,7 @@ def start_idle_power_polling(
 
                 time.sleep(0.5)
 
-            except Exception as exc:  # @quality-exception exception-transparency: idle-power polling crosses runtime policy, sensor, backend, and tray callback boundaries and must remain non-fatal for tray survivability
+            except _IDLE_POWER_POLL_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: idle-power polling crosses runtime policy, sensor, backend, and tray callback boundaries and must remain non-fatal for recoverable tray survivability failures
                 now = time.monotonic()
                 if now - loop_state.last_error_at > 30.0:
                     loop_state.last_error_at = now

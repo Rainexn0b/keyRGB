@@ -504,6 +504,54 @@ def test_system_power_mode_menu_returns_none_when_status_lookup_raises_runtime_e
     )
 
 
+def test_menu_keeps_system_power_item_when_followup_status_lookup_raises_runtime_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+    monkeypatch.setattr(tray_menu.menu_sections, "build_tcc_profiles_menu", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        tray_menu.menu_sections,
+        "build_system_power_mode_menu",
+        lambda *args, **kwargs: fake_item("Power Mode", lambda *_a, **_k: None),
+    )
+    monkeypatch.setattr(
+        tray_menu.system_power,
+        "get_status",
+        lambda: (_ for _ in ()).throw(RuntimeError("power status boom")),
+    )
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [i["text"] for i in items if isinstance(i, dict)]
+
+    assert "Power Mode" in labels
+
+
+def test_menu_propagates_unexpected_system_power_status_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
+    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
+    monkeypatch.setattr(tray_menu.menu_sections, "build_tcc_profiles_menu", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        tray_menu.menu_sections,
+        "build_system_power_mode_menu",
+        lambda *args, **kwargs: fake_item("Power Mode", lambda *_a, **_k: None),
+    )
+    monkeypatch.setattr(
+        tray_menu.system_power,
+        "get_status",
+        lambda: (_ for _ in ()).throw(AssertionError("unexpected power status bug")),
+    )
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+
+    with pytest.raises(AssertionError, match="unexpected power status bug"):
+        tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+
+
 def test_perkey_profiles_menu_falls_back_to_editor_when_profile_listing_raises_runtime_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 
 _LED_NAME_RE = re.compile(r"^[A-Za-z0-9:_\-.]+$")
 _HELPER_COLOR_KINDS = frozenset({"brightness", "multi_intensity", "color"})
+_DEBUG_LOGGING_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _power_helper() -> str:
@@ -66,7 +67,7 @@ def run_led_apply(*, led: str, brightness: int, rgb: tuple[int, int, int] | None
                 stdout,
                 stderr,
             )
-        except Exception:  # @quality-exception exception-transparency: debug logging is a best-effort diagnostic boundary; broken logger/format handlers must not block hardware writes
+        except _DEBUG_LOGGING_RUNTIME_ERRORS:
             pass
 
     if os.geteuid() == 0:

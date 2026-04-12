@@ -8,6 +8,8 @@ from src.tray.protocols import IdlePowerTrayProtocol
 
 
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
+_HARDWARE_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_HARDWARE_POLL_EVENT_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _coerce_poll_int(value: object, *, default: int) -> int:
@@ -24,7 +26,7 @@ def _log_polled_hardware_event(tray_vars: dict[str, object], action: str, **fiel
 
     try:
         log_event("hardware", action, **fields)
-    except Exception:  # @quality-exception exception-transparency: tray event logging crosses an arbitrary callback boundary and hardware polling must remain non-fatal
+    except _HARDWARE_POLL_EVENT_RUNTIME_EXCEPTIONS:  # @quality-exception exception-transparency: tray event logging crosses an arbitrary callback boundary and hardware polling must remain non-fatal
         return
 
 
@@ -183,7 +185,7 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
                     last_off_state=last_off_state,
                 )
 
-            except Exception as exc:  # @quality-exception exception-transparency: hardware polling crosses backend I/O, tray state sync, and callback boundaries and must remain non-fatal
+            except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: hardware polling crosses backend I/O, tray state sync, and callback boundaries and must remain non-fatal for recoverable runtime failures
                 last_error_at = _handle_hardware_polling_exception(
                     tray,
                     exc,

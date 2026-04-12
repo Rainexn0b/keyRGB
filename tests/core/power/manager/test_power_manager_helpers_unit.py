@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 def test_build_power_source_loop_inputs_preserves_overrides_when_profile_lookup_raises() -> None:
     from src.core.power.management._manager_helpers import build_power_source_loop_inputs
@@ -40,6 +42,26 @@ def test_build_power_source_loop_inputs_preserves_overrides_when_profile_lookup_
     assert inputs.battery_brightness_override == 15
 
 
+def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> None:
+    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+
+    config = MagicMock()
+    config.reload = MagicMock()
+    config.management_enabled = False
+    config.brightness = 35
+
+    inputs = build_power_source_loop_inputs(
+        config,
+        kb_controller=MagicMock(is_off=False),
+        on_ac=True,
+        now_mono=123.0,
+        get_active_profile_fn=MagicMock(return_value="light"),
+        safe_int_attr_fn=lambda obj, name, default=0: {"brightness": 35, "battery_saver_brightness": 20}.get(name, default),
+    )
+
+    assert inputs is None
+
+
 def test_apply_power_source_actions_logs_controller_failures_and_keeps_processing() -> None:
     from src.core.power.management._manager_helpers import apply_power_source_actions
     from src.core.power.policies.power_source_loop_policy import ApplyBrightness, RestoreKeyboard, TurnOffKeyboard
@@ -64,6 +86,25 @@ def test_apply_power_source_actions_logs_controller_failures_and_keeps_processin
     assert exc.call_count == 2
     assert exc.call_args_list[0].args == ("Power-source controller action %s failed", "turn_off")
     assert exc.call_args_list[1].args == ("Power-source controller action %s failed", "restore")
+
+
+def test_apply_power_source_actions_propagates_unexpected_controller_failures() -> None:
+    from src.core.power.management._manager_helpers import apply_power_source_actions
+    from src.core.power.policies.power_source_loop_policy import TurnOffKeyboard
+
+    class _Controller:
+        def turn_off(self) -> None:
+            raise AssertionError("unexpected turn off bug")
+
+    with patch("src.core.power.management._manager_helpers.logger.exception") as exc:
+        with pytest.raises(AssertionError, match="unexpected turn off bug"):
+            apply_power_source_actions(
+                kb_controller=_Controller(),
+                actions=(TurnOffKeyboard(),),
+                apply_brightness=MagicMock(),
+            )
+
+    exc.assert_not_called()
 
 
 def test_is_intentionally_off_requires_literal_true_for_controller_flags() -> None:

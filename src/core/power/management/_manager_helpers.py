@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable
 
 from src.core.utils.safe_attrs import _safe_getattr_or_none
 
+from ._manager_config import read_power_management_config_bool
 from ..policies.power_source_loop_policy import (
     ApplyBrightness,
     PowerSourceLoopInputs,
@@ -17,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 _ACTIVE_PROFILE_LOOKUP_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _SAFE_INT_READ_ERRORS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
+_CONTROLLER_ACTION_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _run_controller_action_best_effort(*, kb_controller: object, method_name: str) -> None:
@@ -24,12 +26,22 @@ def _run_controller_action_best_effort(*, kb_controller: object, method_name: st
         method = getattr(kb_controller, method_name, None)
         if callable(method):
             method()
-    except Exception:  # @quality-exception exception-transparency: power-source controller actions cross a runtime backend boundary and must remain non-fatal for the polling loop
+    except _CONTROLLER_ACTION_RUNTIME_ERRORS:  # @quality-exception exception-transparency: power-source controller actions cross a runtime backend boundary and must remain non-fatal for recoverable polling-loop failures
         logger.exception("Power-source controller action %s failed", method_name)
 
 
 def _flag_attr_is_true(obj: object, name: str) -> bool:
     return _safe_getattr_or_none(obj, name) is True
+
+
+def _power_management_enabled(config: object) -> bool:
+    return read_power_management_config_bool(
+        config,
+        "power_management_enabled",
+        "management_enabled",
+        default=True,
+        logger=logger,
+    )
 
 
 def build_power_source_loop_inputs(
@@ -42,7 +54,8 @@ def build_power_source_loop_inputs(
     safe_int_attr_fn: Callable[..., int],
 ) -> PowerSourceLoopInputs | None:
     config.reload()  # type: ignore[attr-defined]
-    if not bool(getattr(config, "power_management_enabled", True)):
+    power_management_enabled = _power_management_enabled(config)
+    if not power_management_enabled:
         return None
 
     current_brightness = safe_int_attr_fn(config, "brightness", default=0)
@@ -65,7 +78,7 @@ def build_power_source_loop_inputs(
     return PowerSourceLoopInputs(
         on_ac=bool(on_ac),
         now=float(now_mono),
-        power_management_enabled=bool(getattr(config, "power_management_enabled", True)),
+        power_management_enabled=power_management_enabled,
         current_brightness=int(current_brightness),
         is_off=bool(getattr(kb_controller, "is_off", False)),
         ac_enabled=bool(ac_enabled),

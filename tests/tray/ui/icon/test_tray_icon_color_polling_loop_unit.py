@@ -112,3 +112,28 @@ def test_icon_color_polling_loop_updates_once(monkeypatch) -> None:
         created["t"].target()
 
     assert calls["n"] == 1
+
+
+def test_icon_color_polling_loop_propagates_unexpected_update_errors(monkeypatch) -> None:
+    import src.tray.pollers.icon_color_polling as icp
+
+    created = {}
+
+    def fake_thread(*, target, daemon: bool):
+        t = _FakeThread(target=target, daemon=daemon)
+        created["t"] = t
+        return t
+
+    monkeypatch.setattr(icp.threading, "Thread", fake_thread)
+    monkeypatch.setattr(icp, "_compute_icon_sig", lambda _tray: (False, "perkey", 1, 1, (0, 0, 0)))
+    monkeypatch.setattr(icp, "_should_update_icon", lambda _sig, _last: True)
+
+    tray = SimpleNamespace(
+        _update_icon=lambda: (_ for _ in ()).throw(AssertionError("unexpected icon bug")),
+        _log_exception=lambda *_a, **_kw: None,
+    )
+
+    icp.start_icon_color_polling(tray)
+
+    with pytest.raises(AssertionError, match="unexpected icon bug"):
+        created["t"].target()

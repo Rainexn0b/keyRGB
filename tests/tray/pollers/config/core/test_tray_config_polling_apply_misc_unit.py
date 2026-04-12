@@ -3,6 +3,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, patch
 
+import pytest
+
 from src.tray.pollers import config_polling
 from src.tray.pollers.config_polling import ConfigApplyState, _apply_from_config_once
 
@@ -129,6 +131,21 @@ def test_apply_from_config_once_turns_off_on_zero_brightness_and_throttles_engin
     tray._log_exception.assert_any_call("Failed to turn off engine: %s", ANY)
 
 
+def test_apply_from_config_once_propagates_unexpected_turn_off_error() -> None:
+    tray = _mk_tray_base(effect="rainbow_wave", brightness=0)
+    tray.engine.turn_off = MagicMock(side_effect=AssertionError("unexpected turn-off bug"))
+
+    with pytest.raises(AssertionError, match="unexpected turn-off bug"):
+        _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=0.0,
+        )
+
+
 def test_apply_from_config_once_sets_last_brightness_when_positive() -> None:
     tray = _mk_tray_base(effect="rainbow_wave", brightness=12)
 
@@ -222,6 +239,37 @@ def test_apply_from_config_once_other_effect_starts_current_effect() -> None:
     tray._start_current_effect.assert_called_once()
 
 
+def test_apply_from_config_once_logs_recoverable_apply_error() -> None:
+    tray = _mk_tray_base(effect="wave", brightness=10)
+    tray._start_current_effect.side_effect = RuntimeError("apply boom")
+
+    _apply_from_config_once(
+        tray,
+        ite_num_rows=6,
+        ite_num_cols=21,
+        cause="mtime_change",
+        last_applied=None,
+        last_apply_warn_at=0.0,
+    )
+
+    tray._log_exception.assert_any_call("Error applying config change: %s", ANY)
+
+
+def test_apply_from_config_once_propagates_unexpected_apply_error() -> None:
+    tray = _mk_tray_base(effect="wave", brightness=10)
+    tray._start_current_effect.side_effect = AssertionError("unexpected apply bug")
+
+    with pytest.raises(AssertionError, match="unexpected apply bug"):
+        _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=0.0,
+        )
+
+
 def test_apply_from_config_once_normalizes_effect_name_against_backend() -> None:
     tray = _mk_tray_base(effect="hw:rainbow_wave", brightness=10)
 
@@ -259,6 +307,25 @@ def test_apply_from_config_once_marks_device_unavailable_on_errno_19() -> None:
 
     tray.engine.mark_device_unavailable.assert_called_once()
     tray._log_exception.assert_any_call("Error applying config change: %s", ANY)
+
+
+def test_apply_from_config_once_propagates_unexpected_mark_device_unavailable_error() -> None:
+    tray = _mk_tray_base(effect="none", brightness=10)
+
+    err = OSError("no such")
+    err.errno = 19
+    tray.engine.kb.set_color = MagicMock(side_effect=err)
+    tray.engine.mark_device_unavailable.side_effect = AssertionError("unexpected mark bug")
+
+    with pytest.raises(AssertionError, match="unexpected mark bug"):
+        _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=0.0,
+        )
 
 
 def test_apply_from_config_once_logs_fast_path_exception_and_falls_back() -> None:
@@ -324,3 +391,18 @@ def test_apply_from_config_once_logs_refresh_ui_exception_throttled() -> None:
         if call_args.args and call_args.args[0] == "Failed to refresh tray UI after config apply: %s"
     ]
     assert len(refresh_logs) == 2
+
+
+def test_apply_from_config_once_propagates_unexpected_refresh_ui_error() -> None:
+    tray = _mk_tray_base(effect="none", brightness=10)
+    tray._refresh_ui.side_effect = AssertionError("unexpected refresh bug")
+
+    with pytest.raises(AssertionError, match="unexpected refresh bug"):
+        _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=0.0,
+        )

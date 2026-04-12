@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_COLOR = (255, 0, 128)
 _OFF_COLOR = (64, 64, 64)
+_RECOVERABLE_CONFIG_READ_ERRORS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_config_read_failure(name: str, exc: Exception) -> None:
@@ -36,7 +37,7 @@ def _config_value(config: Any, name: str, default: Any) -> Any:
         value = getattr(config, name, default)
     except AttributeError:
         return default
-    except Exception as exc:  # @quality-exception exception-transparency: tray icon color reads cross legacy config/property boundaries and must remain best-effort
+    except _RECOVERABLE_CONFIG_READ_ERRORS as exc:  # @quality-exception exception-transparency: tray icon color reads cross legacy config/property boundaries and must remain best-effort
         _log_config_read_failure(name, exc)
         return default
     return default if value is None else value

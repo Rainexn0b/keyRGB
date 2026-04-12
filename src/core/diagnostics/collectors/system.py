@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 _FS_SNAPSHOT_ERRORS = (OSError,)
 _METADATA_LOOKUP_ERRORS = (metadata.PackageNotFoundError,)
 _SYSTEM_INFO_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_SYSTEM_POWER_MODE_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def list_platform_hints() -> list[str]:
@@ -212,7 +213,7 @@ def system_power_mode_snapshot() -> dict[str, Any]:
             "reason": str(status.reason),
             "identifiers": dict(status.identifiers or {}),
         }
-    except Exception as exc:  # @quality-exception exception-transparency: system power mode collection is an arbitrary runtime subsystem boundary; returns a safe fallback dict on any failure
+    except _SYSTEM_POWER_MODE_ERRORS as exc:  # @quality-exception exception-transparency: system power mode collection is an arbitrary runtime subsystem boundary; returns a safe fallback dict on recoverable subsystem failures
         logger.log(logging.DEBUG, "Failed to collect system power mode diagnostics", exc_info=True)
         return {
             "supported": False,

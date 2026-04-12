@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
+from typing import SupportsIndex, SupportsInt, cast
 
 HIDRAW_PATH_ENV = "KEYRGB_ITE8291_HIDRAW_PATH"
 
@@ -25,13 +26,27 @@ _ZONE_ONLY_FW_BY_PID: dict[int, frozenset[int]] = {
     0xCE00: frozenset({0x0002}),
 }
 
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
+
+
+def _coerce_int(value: object) -> int:
+    return int(cast(IntCoercible, value))
+
 
 def clamp_channel(value: object) -> int:
-    return max(0, min(255, int(value)))
+    return max(0, min(255, _coerce_int(value)))
 
 
 def clamp_ui_brightness(value: object) -> int:
-    return max(0, min(UI_BRIGHTNESS_MAX, int(value)))
+    return max(0, min(UI_BRIGHTNESS_MAX, _coerce_int(value)))
+
+
+def _coerce_rgb(color: object) -> tuple[int, int, int]:
+    try:
+        red, green, blue = cast(Iterable[object], color)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("row colors must be RGB 3-tuples") from exc
+    return (clamp_channel(red), clamp_channel(green), clamp_channel(blue))
 
 
 def firmware_requires_zone_mode(product_id: int, bcd_device: int | None) -> bool:
@@ -72,10 +87,7 @@ def build_row_data_report(colors: Sequence[object]) -> bytes:
 
     payload = bytearray(ROW_DATA_LENGTH)
     for col, color in enumerate(colors):
-        try:
-            red, green, blue = color  # type: ignore[misc]
-        except (TypeError, ValueError) as exc:
-            raise ValueError("row colors must be RGB 3-tuples") from exc
+        red, green, blue = _coerce_rgb(color)
 
         payload[ROW_BLUE_OFFSET + col] = clamp_channel(blue)
         payload[ROW_GREEN_OFFSET + col] = clamp_channel(green)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import pytest
 from unittest.mock import MagicMock, patch
 
 
@@ -114,3 +115,12 @@ class TestApplyBrightnessFromPowerPolicy:
         assert len(logs) == 1
         assert logs[0][0] == "Failed to apply tray lighting power-policy brightness: %s"
         assert isinstance(logs[0][1], LookupError)
+
+    def test_apply_brightness_from_power_policy_propagates_unexpected_outer_boundary_failure(self):
+        from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+
+        mock_tray = _mk_tray(effect="breathe")
+        mock_tray._refresh_ui.side_effect = AssertionError("unexpected power-policy bug")
+
+        with pytest.raises(AssertionError, match="unexpected power-policy bug"):
+            apply_brightness_from_power_policy(mock_tray, 25)

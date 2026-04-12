@@ -6,6 +6,7 @@ from collections.abc import Callable
 
 from src.core.utils.exceptions import is_permission_denied, is_device_disconnected, is_device_busy
 from src.core.backends.exceptions import (
+    BACKEND_OPEN_RUNTIME_ERRORS,
     BackendPermissionError,
     BackendDisconnectedError,
     BackendBusyError,
@@ -89,7 +90,7 @@ class Ite8910Backend(KeyboardBackend):
         try:
             transport, _info = open_matching_hidraw_transport(protocol.VENDOR_ID, protocol.PRODUCT_ID)
             return Ite8910KeyboardDevice(transport.send_feature_report)
-        except Exception as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; all driver exceptions are translated to BackendError subclasses here
+        except BACKEND_OPEN_RUNTIME_ERRORS as exc:
             if is_permission_denied(exc):
                 raise BackendPermissionError(
                     "Permission denied opening the ITE 8910 hidraw device. "

@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 _BACKEND_METADATA_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _IDENTIFIER_NORMALIZATION_ERRORS = (AttributeError, TypeError, ValueError)
 _SORT_VALUE_ERRORS = (OverflowError, RuntimeError, TypeError, ValueError)
+_BACKEND_PROBE_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_snapshot_boundary(message: str, exc: Exception) -> None:
@@ -98,7 +99,7 @@ def _probe_backend(backend: object) -> dict[str, Any]:
             reason = "is_available"
             confidence = 50 if available else 0
             identifiers = None
-    except Exception as exc:  # @quality-exception exception-transparency: backend probe execution is a best-effort diagnostics boundary
+    except _BACKEND_PROBE_ERRORS as exc:
         _log_snapshot_boundary("Failed to probe backend during diagnostics collection", exc)
         available = False
         reason = f"probe exception: {exc}"
@@ -194,7 +195,7 @@ def _iter_auxiliary_probe_backends() -> list[object]:
         from ...backends.sysfs_mouse.backend import SysfsMouseBackend
 
         return [SysfsMouseBackend()]
-    except Exception as exc:  # @quality-exception exception-transparency: auxiliary diagnostics probe registration is a best-effort boundary and should not block the main snapshot
+    except _BACKEND_PROBE_ERRORS as exc:
         _log_snapshot_boundary("Failed to register auxiliary diagnostics probe backends", exc)
         return []
 
@@ -204,7 +205,7 @@ def backend_probe_snapshot() -> dict[str, Any]:
 
     try:
         from ...backends.registry import iter_backends, select_backend
-    except Exception as exc:  # @quality-exception exception-transparency: backend registry import is a best-effort diagnostics boundary
+    except _BACKEND_PROBE_ERRORS as exc:
         _log_snapshot_boundary("Failed to import backend registry during diagnostics collection", exc)
         return {}
 
@@ -212,8 +213,8 @@ def backend_probe_snapshot() -> dict[str, Any]:
     with _disable_usb_scan_under_pytest_if_needed():
         for backend in iter_backends():
             probes.append(_probe_backend(backend))
-        for backend in _iter_auxiliary_probe_backends():
-            probes.append(_probe_backend(backend))
+        for auxiliary_backend in _iter_auxiliary_probe_backends():
+            probes.append(_probe_backend(auxiliary_backend))
 
     requested = os.environ.get("KEYRGB_BACKEND") or "auto"
 
@@ -224,7 +225,7 @@ def backend_probe_snapshot() -> dict[str, Any]:
         if not selection_blocked:
             selected_backend = select_backend()
             selected = getattr(selected_backend, "name", None) if selected_backend is not None else None
-    except Exception as exc:  # @quality-exception exception-transparency: selected backend resolution is a best-effort diagnostics boundary
+    except _BACKEND_PROBE_ERRORS as exc:
         _log_snapshot_boundary("Failed to resolve selected backend during diagnostics collection", exc)
         selected = None
 

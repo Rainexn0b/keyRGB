@@ -20,6 +20,8 @@ Color = Tuple[int, int, int]
 Key = Tuple[int, int]
 
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_REACTIVE_RENDER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_REACTIVE_RENDER_CLEANUP_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _last_hw_mode_brightness_or_none(engine: "EffectsEngine") -> int | None:
@@ -76,11 +78,11 @@ def render_per_key_frame(
 
             try:
                 engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)
-            except Exception as exc:  # @quality-exception exception-transparency: reactive per-key writes cross backend-specific runtime I/O boundaries and disconnect handling must suppress further hardware writes
+            except _REACTIVE_RENDER_RUNTIME_ERRORS as exc:
                 if is_device_disconnected(exc):
                     try:
                         engine.mark_device_unavailable()
-                    except Exception as mark_exc:  # @quality-exception exception-transparency: disconnect cleanup must stay best-effort and still suppress further reactive hardware writes even if invalidation fails
+                    except _REACTIVE_RENDER_CLEANUP_ERRORS as mark_exc:  # @quality-exception exception-transparency: disconnect cleanup must stay best-effort and still suppress further reactive hardware writes even if invalidation fails
                         log_throttled(
                             logger,
                             "effects.reactive.mark_device_unavailable_failed",
@@ -102,7 +104,7 @@ def render_per_key_frame(
             log_key="effects.reactive.secondary",
         )
         return True
-    except Exception as exc:  # @quality-exception exception-transparency: reactive per-key rendering crosses backend I/O and effect runtime policy boundaries and must degrade to uniform output instead of killing the effect loop
+    except _REACTIVE_RENDER_RUNTIME_ERRORS as exc:
         log_throttled(
             logger,
             "effects.render.per_key_failed",

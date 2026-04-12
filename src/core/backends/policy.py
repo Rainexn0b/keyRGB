@@ -5,6 +5,9 @@ import os
 from .base import BackendStability, ExperimentalEvidence, normalize_backend_stability, normalize_experimental_evidence
 
 
+_BACKEND_POLICY_CONFIG_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def _truthy_text(value: str) -> bool:
     return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
@@ -18,7 +21,7 @@ def experimental_backends_enabled() -> bool:
         from src.core.config import Config
 
         return bool(Config().experimental_backends_enabled)
-    except Exception:  # @quality-exception exception-transparency: config read for backend policy is a startup boundary; failure degrades to safe default
+    except _BACKEND_POLICY_CONFIG_ERRORS:
         return False
 
 

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from typing import SupportsIndex, SupportsInt, cast
 
 HIDRAW_PATH_ENV = "KEYRGB_ITE8258_HIDRAW_PATH"
 
@@ -53,6 +54,7 @@ DIRECTION_LEFT = 0x03
 DIRECTION_RIGHT = 0x04
 
 Color = tuple[int, int, int]
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
 
 
 @dataclass(frozen=True)
@@ -78,12 +80,16 @@ _EFFECT_MODE_BY_NAME: dict[str, int] = {
 }
 
 
+def _coerce_int(value: object) -> int:
+    return int(cast(IntCoercible, value))
+
+
 def clamp_channel(value: object) -> int:
-    return max(0, min(255, int(value)))
+    return max(0, min(255, _coerce_int(value)))
 
 
 def clamp_ui_brightness(value: object) -> int:
-    return max(0, min(UI_BRIGHTNESS_MAX, int(value)))
+    return max(0, min(UI_BRIGHTNESS_MAX, _coerce_int(value)))
 
 
 def raw_brightness_from_ui(value: object) -> int:
@@ -94,7 +100,7 @@ def raw_brightness_from_ui(value: object) -> int:
 
 
 def raw_speed_from_ui(value: object) -> int:
-    ui_speed = max(0, min(UI_SPEED_MAX, int(value)))
+    ui_speed = max(0, min(UI_SPEED_MAX, _coerce_int(value)))
     scaled = round((ui_speed / UI_SPEED_MAX) * (RAW_SPEED_MAX - RAW_SPEED_MIN))
     return max(RAW_SPEED_MIN, min(RAW_SPEED_MAX, RAW_SPEED_MIN + scaled))
 
@@ -115,7 +121,7 @@ def iter_known_led_ids() -> tuple[int, ...]:
 
 def _coerce_rgb(color: object) -> Color:
     try:
-        red, green, blue = color  # type: ignore[misc]
+        red, green, blue = cast(Iterable[object], color)
     except (TypeError, ValueError) as exc:
         raise ValueError("color must be an RGB 3-tuple") from exc
     return (clamp_channel(red), clamp_channel(green), clamp_channel(blue))

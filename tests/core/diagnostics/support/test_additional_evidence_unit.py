@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from tests._paths import ensure_repo_root_on_sys_path
 
 
@@ -68,3 +70,57 @@ def test_collect_additional_evidence_runs_direct_and_privileged(monkeypatch) -> 
     assert calls[1] == ["/usr/bin/pkexec", "usbhid-dump", "-d", "048d:7001", "-e", "descriptor"]
     assert payload["captures"]["lsusb_verbose"]["ok"] is True
     assert payload["captures"]["hid_descriptor_dump"]["via"] == "pkexec"
+
+
+def test_collect_additional_evidence_surfaces_expected_command_failures(monkeypatch) -> None:
+    monkeypatch.setattr(evidence.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(evidence.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def _run(argv, check=False, capture_output=True, text=True):
+        raise RuntimeError("command failed")
+
+    monkeypatch.setattr(evidence.subprocess, "run", _run)
+
+    payload = evidence.collect_additional_evidence(
+        {
+            "candidates": [
+                {
+                    "usb_vid": "0x048d",
+                    "usb_pid": "0x7001",
+                    "status": "known_dormant",
+                    "hidraw_nodes": ["/dev/hidraw1"],
+                    "hidraw_descriptor_sizes": [64],
+                }
+            ]
+        },
+        allow_privileged=True,
+    )
+
+    assert payload["captures"]["lsusb_verbose"]["ok"] is False
+    assert payload["captures"]["lsusb_verbose"]["error"] == "command failed"
+
+
+def test_collect_additional_evidence_propagates_unexpected_command_failures(monkeypatch) -> None:
+    monkeypatch.setattr(evidence.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(evidence.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def _run(argv, check=False, capture_output=True, text=True):
+        raise AssertionError("unexpected command bug")
+
+    monkeypatch.setattr(evidence.subprocess, "run", _run)
+
+    with pytest.raises(AssertionError, match="unexpected command bug"):
+        evidence.collect_additional_evidence(
+            {
+                "candidates": [
+                    {
+                        "usb_vid": "0x048d",
+                        "usb_pid": "0x7001",
+                        "status": "known_dormant",
+                        "hidraw_nodes": ["/dev/hidraw1"],
+                        "hidraw_descriptor_sizes": [64],
+                    }
+                ]
+            },
+            allow_privileged=True,
+        )

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 
+_SAFE_EXCEPTION_MESSAGE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def _safe_exception_message(exc: BaseException, *, lower: bool = False) -> str | None:
     try:
         msg = str(exc)
-    except Exception:  # @quality-exception exception-transparency: arbitrary exception __str__ implementations may fail and these dependency-free boolean helpers must stay non-fatal and noiseless
+    except _SAFE_EXCEPTION_MESSAGE_ERRORS:
         return None
 
     return msg.lower() if lower else msg

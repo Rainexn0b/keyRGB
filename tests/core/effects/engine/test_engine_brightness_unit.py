@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from threading import RLock
 
+import pytest
+
 from src.core.effects.engine_support.brightness import _EngineBrightness
 
 
@@ -96,6 +98,25 @@ def test_fade_brightness_logs_traceback_when_device_write_fails(caplog) -> None:
     records = [record for record in caplog.records if "Brightness fade failed" in record.getMessage()]
     assert records
     assert records[-1].exc_info is not None
+
+
+def test_fade_brightness_propagates_unexpected_failures() -> None:
+    engine = _TestEngine()
+    engine._brightness_fade_token = 1
+
+    def _boom(_brightness: int) -> None:
+        raise AssertionError("unexpected brightness bug")
+
+    engine.kb.set_brightness = _boom  # type: ignore[method-assign]
+
+    with pytest.raises(AssertionError, match="unexpected brightness bug"):
+        engine._fade_brightness(
+            start=25,
+            end=10,
+            apply_to_hardware=True,
+            duration_s=0.0,
+            token=1,
+        )
 
 
 def test_turn_off_logs_traceback_when_cache_write_fails_but_still_turns_off(caplog) -> None:

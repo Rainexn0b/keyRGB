@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from typing import SupportsIndex, SupportsInt, cast
 
 from . import protocol
 
 ControlWriter = Callable[[bytes], int | None]
 ControlReader = Callable[[int], bytes | bytearray | list[int]]
 RowWriter = Callable[[bytes], int | None]
+IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
 
 
-def _coerce_rgb(color) -> tuple[int, int, int]:
+def _coerce_int(value: object) -> int:
+    return int(cast(IntCoercible, value))
+
+
+def _coerce_rgb(color: object) -> tuple[int, int, int]:
     try:
-        red, green, blue = color
+        red, green, blue = cast(Iterable[object], color)
     except (TypeError, ValueError) as exc:
         raise ValueError("color must be an RGB 3-tuple") from exc
 
@@ -56,22 +62,22 @@ def _coerce_effect_payload(effect_data: object) -> tuple[int, ...]:
                 if key in {"speed", "brightness", "color", "direction", "reactive", "save"}
             }
             built = protocol.effects[name](**kwargs)
-            return tuple(int(value) for value in built)
+            return tuple(_coerce_int(value) for value in built)
 
         effect_value = effect_data.get("effect", effect_data.get("index"))
         if effect_value is None:
             raise ValueError("effect dict must contain 'effect', 'index', or 'name'")
         return (
-            int(effect_value),
-            int(effect_data.get("speed", 0)),
-            int(effect_data.get("brightness", 0)),
-            int(effect_data.get("color", 0)),
-            int(effect_data.get("direction", effect_data.get("reactive", 0))),
-            int(effect_data.get("save", 0)),
+            _coerce_int(effect_value),
+            _coerce_int(effect_data.get("speed", 0)),
+            _coerce_int(effect_data.get("brightness", 0)),
+            _coerce_int(effect_data.get("color", 0)),
+            _coerce_int(effect_data.get("direction", effect_data.get("reactive", 0)) or 0),
+            _coerce_int(effect_data.get("save", 0)),
         )
 
     if isinstance(effect_data, (list, tuple)):
-        payload = tuple(int(value) for value in effect_data)
+        payload = tuple(_coerce_int(value) for value in effect_data)
         if len(payload) > 6:
             raise ValueError("effect payload must contain at most 6 values")
         return payload
@@ -229,8 +235,7 @@ class Ite8291r3KeyboardDevice:
         enable_user_mode: bool = True,
     ):
         rows: list[list[tuple[int, int, int]]] = [
-            [(0, 0, 0) for _ in range(protocol.NUM_COLS)]
-            for _ in range(protocol.NUM_ROWS)
+            [(0, 0, 0) for _ in range(protocol.NUM_COLS)] for _ in range(protocol.NUM_ROWS)
         ]
 
         for key_id, color in dict(color_map or {}).items():

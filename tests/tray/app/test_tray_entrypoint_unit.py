@@ -1,3 +1,5 @@
+import pytest
+
 import src.tray.entrypoint as entry
 
 
@@ -90,3 +92,13 @@ def test_main_unhandled_exception_exits_1_and_logs(monkeypatch):
 
     assert calls["exc"] == 1
     assert calls["exit"] == [1]
+
+
+def test_main_propagates_unexpected_startup_bug(monkeypatch):
+    def _boom():
+        raise AssertionError("unexpected startup bug")
+
+    monkeypatch.setattr(entry, "configure_logging", _boom)
+
+    with pytest.raises(AssertionError, match="unexpected startup bug"):
+        entry.main()

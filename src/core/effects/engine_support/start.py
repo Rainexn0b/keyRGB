@@ -34,7 +34,37 @@ _get_interval_method = engine_methods.get_interval_method
 
 logger = logging.getLogger("src.core.effects.engine_start")
 
-_INT_COERCION_ERRORS: Final[tuple[type[BaseException], ...]] = (TypeError, ValueError, OverflowError)
+_INT_COERCION_ERRORS: Final[tuple[type[Exception], ...]] = (TypeError, ValueError, OverflowError)
+_EFFECT_THREAD_RUNTIME_ERRORS: Final[tuple[type[Exception], ...]] = (
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_THREAD_JOIN_CLEANUP_ERRORS: Final[tuple[type[Exception], ...]] = (
+    AttributeError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_PERMISSION_CALLBACK_RUNTIME_ERRORS: Final[tuple[type[Exception], ...]] = (
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+_DEVICE_UNAVAILABLE_MARK_RUNTIME_ERRORS: Final[tuple[type[Exception], ...]] = (
+    AttributeError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 HardwareEffectBuilder = Callable[..., object]
 
 
@@ -56,7 +86,7 @@ class _ManagedEffectThread(Thread):
         try:
             if self._engine.thread is self:
                 setattr(self._engine, "thread", None)
-        except Exception:  # @quality-exception exception-transparency: engine thread join cleanup is a best-effort boundary; partial engine state must not re-raise from join
+        except _THREAD_JOIN_CLEANUP_ERRORS:  # @quality-exception exception-transparency: engine thread join cleanup is a best-effort boundary; partial engine state must not re-raise from join
             return
 
 
@@ -84,6 +114,25 @@ def _mark_device_unavailable_callback_or_none(engine: object) -> Callable[[], No
     except AttributeError:
         return None
     return cast(Callable[[], None] | None, callback if callable(callback) else None)
+
+
+def _notify_permission_error_callback_best_effort(engine: "_EngineStart", exc: Exception) -> None:
+    callback = _permission_error_callback_or_none(engine)
+    if not callable(callback):
+        return
+    try:
+        callback(exc)
+    except _PERMISSION_CALLBACK_RUNTIME_ERRORS:  # @quality-exception exception-transparency: permission error callback is a user-injected boundary and must not break the permission-error handling path
+        logger.exception("Permission error callback failed")
+
+
+def _mark_device_unavailable_best_effort(engine: object) -> None:
+    try:
+        mark = _mark_device_unavailable_callback_or_none(engine)
+        if callable(mark):
+            mark()
+    except _DEVICE_UNAVAILABLE_MARK_RUNTIME_ERRORS:  # @quality-exception exception-transparency: mark_device_unavailable is a hardware-state bookkeeping boundary and failures must not interrupt the disconnect-handling path
+        logger.exception("Failed to mark keyboard device unavailable after disconnect")
 
 
 class _EngineStart:
@@ -229,14 +278,9 @@ class _EngineStart:
         def _run_target_best_effort() -> None:
             try:
                 target()
-            except Exception as exc:  # @quality-exception exception-transparency: effect thread top-level boundary; dispatches permission/disconnect classification before logging unhandled errors
+            except _EFFECT_THREAD_RUNTIME_ERRORS as exc:
                 if core_exceptions.is_permission_denied(exc):
-                    callback = _permission_error_callback_or_none(self)
-                    if callable(callback):
-                        try:
-                            callback(exc)
-                        except Exception:  # @quality-exception exception-transparency: permission error callback is a user-injected boundary and must not break the permission-error handling path
-                            logger.exception("Permission error callback failed")
+                    _notify_permission_error_callback_best_effort(self, exc)
                     logger.warning(
                         "Permission denied while applying effect: %s",
                         exc,
@@ -245,12 +289,7 @@ class _EngineStart:
                     return
 
                 if core_exceptions.is_device_disconnected(exc):
-                    try:
-                        mark = _mark_device_unavailable_callback_or_none(self)
-                        if callable(mark):
-                            mark()
-                    except Exception:  # @quality-exception exception-transparency: mark_device_unavailable is a hardware-state bookkeeping boundary and failures must not interrupt the disconnect-handling path
-                        logger.exception("Failed to mark keyboard device unavailable after disconnect")
+                    _mark_device_unavailable_best_effort(self)
                     logger.warning(
                         "Keyboard device disconnected while applying effect: %s",
                         exc,

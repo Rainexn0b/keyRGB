@@ -125,9 +125,7 @@ def build_device_discovery_payload(
                 "probe_names": [str(probe.get("name") or "")],
                 "probe_stabilities": [str(probe.get("stability") or "")],
                 "probe_selection_reasons": [
-                    str(probe.get("selection_reason") or "")
-                    for probe in [probe]
-                    if probe.get("selection_reason")
+                    str(probe.get("selection_reason") or "") for probe in [probe] if probe.get("selection_reason")
                 ],
                 "hidraw_nodes": [],
                 "hidraw_descriptor_sizes": [],
