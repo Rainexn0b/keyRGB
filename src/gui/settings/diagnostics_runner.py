@@ -9,6 +9,8 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+_DIAGNOSTICS_WARNING_ERRORS = (AttributeError, OverflowError, RuntimeError, TypeError, ValueError)
+
 
 def _expected_holder_pids() -> set[int]:
     expected: set[int] = set()
@@ -94,7 +96,7 @@ def _device_busy_warnings(payload: dict[str, Any], *, expected_holder_pids: set[
                 warnings.append(f"Device busy: {devnode} is open by other process(es)")
 
         return warnings
-    except Exception:  # @quality-exception exception-transparency: best-effort diagnostics boundary; malformed process metadata must not block JSON generation
+    except _DIAGNOSTICS_WARNING_ERRORS:
         logger.exception("Failed to build device-busy diagnostics warnings")
         return warnings
 

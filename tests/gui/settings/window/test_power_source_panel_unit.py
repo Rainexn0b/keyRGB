@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import tkinter as tk
+
 import pytest
 
 import src.gui.settings.panels.power_source_panel as power_source_panel
@@ -14,7 +16,9 @@ class _FakeWidget:
         self.options: dict[str, object] = {}
         self.configure_calls: list[dict[str, object]] = []
         self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
         self.bind_calls: list[tuple[str, object]] = []
+        self.columnconfigure_calls: list[tuple[int, int]] = []
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
@@ -23,8 +27,14 @@ class _FakeWidget:
     def pack(self, **kwargs) -> None:
         self.pack_calls.append(dict(kwargs))
 
+    def grid(self, **kwargs) -> None:
+        self.grid_calls.append(dict(kwargs))
+
     def bind(self, event: str, callback) -> None:
         self.bind_calls.append((event, callback))
+
+    def columnconfigure(self, index: int, weight: int = 0, **_kwargs) -> None:
+        self.columnconfigure_calls.append((index, weight))
 
 
 class _FakeVar:
@@ -98,6 +108,12 @@ def test_init_builds_controls_and_wires_callbacks(monkeypatch: pytest.MonkeyPatc
     assert panel.chk_battery_enabled.kwargs["text"] == "On battery: enable lighting"
     assert panel.lbl_ac_brightness_val.kwargs["text"] == "12"
     assert panel.lbl_battery_brightness_val.kwargs["text"] == "7"
+    assert frames[1].columnconfigure_calls == [(0, 1)]
+    assert frames[3].columnconfigure_calls == [(0, 1)]
+    assert panel.chk_ac_enabled.grid_calls == [{"row": 0, "column": 0, "sticky": "w"}]
+    assert panel.lbl_ac_brightness_val.grid_calls == [{"row": 0, "column": 2, "sticky": "e"}]
+    assert panel.chk_battery_enabled.grid_calls == [{"row": 0, "column": 0, "sticky": "w"}]
+    assert panel.lbl_battery_brightness_val.grid_calls == [{"row": 0, "column": 2, "sticky": "e"}]
     assert panel.scale_ac_brightness.kwargs["variable"].get() == 12.7
     assert panel.scale_battery_brightness.kwargs["variable"].get() == 7.2
     assert panel.scale_ac_brightness.bind_calls[0][0] == "<ButtonRelease-1>"
@@ -131,6 +147,29 @@ def test_set_label_int_falls_back_to_question_mark_on_parse_failure() -> None:
 
     assert label.configure_calls == [{"text": "?"}]
     assert label.options["text"] == "?"
+
+
+def test_set_label_int_retries_with_placeholder_when_widget_rejects_primary_value() -> None:
+    class _RetryLabel(_FakeWidget):
+        def configure(self, **kwargs) -> None:
+            if kwargs.get("text") != "?":
+                raise RuntimeError("widget not ready")
+            super().configure(**kwargs)
+
+    label = _RetryLabel()
+
+    power_source_panel.PowerSourcePanel._set_label_int(label, "12.9")
+
+    assert label.configure_calls == [{"text": "?"}]
+    assert label.options["text"] == "?"
+
+
+def test_set_label_int_swallows_tcl_widget_errors() -> None:
+    class _DestroyedLabel:
+        def configure(self, **kwargs) -> None:
+            raise tk.TclError("widget destroyed")
+
+    power_source_panel.PowerSourcePanel._set_label_int(_DestroyedLabel(), "12.9")
 
 
 @pytest.mark.parametrize(

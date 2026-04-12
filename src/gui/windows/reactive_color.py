@@ -23,11 +23,13 @@ from src.gui.windows._reactive_color_state import (
     sync_reactive_brightness_widgets,
     sync_reactive_trail_widgets,
 )
-from src.gui.utils.window_centering import center_window_on_screen
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
+from src.gui.utils.window_geometry import compute_centered_window_geometry
 from src.gui.theme import apply_clam_theme
 
 logger = logging.getLogger(__name__)
+_GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 
 class _ReactiveColorDragState(Protocol):
@@ -77,15 +79,7 @@ class ReactiveColorGUI:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Reactive Typing Settings")
         apply_keyrgb_window_icon(self.root)
-        # This window includes extra explanatory text + a toggle above the shared
-        # ColorWheel widget; keep it tall enough to avoid clipping.
-        desired_w, desired_h = 629, 940
-        max_w = int(self.root.winfo_screenwidth() * 0.95)
-        max_h = int(self.root.winfo_screenheight() * 0.95)
-        w = min(desired_w, max_w)
-        h = min(desired_h, max_h)
-        self.root.geometry(f"{w}x{h}")
-        self.root.minsize(w, h)
+        self.root.minsize(520, 720)
         self.root.resizable(True, True)
 
         apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
@@ -110,6 +104,8 @@ class ReactiveColorGUI:
 
         main = ttk.Frame(self.root, padding=20)
         main.pack(fill="both", expand=True)
+        self._main_frame = main
+        self._wrap_labels: list[object] = []
 
         title = ttk.Label(main, text="Reactive Typing Settings", font=("Sans", 14, "bold"))
         title.pack(pady=(0, 10))
@@ -123,16 +119,19 @@ class ReactiveColorGUI:
             ),
             font=("Sans", 9),
             justify="left",
-            wraplength=max(200, w - 48),
+            wraplength=520,
         )
         desc.pack(pady=(0, 10), fill="x")
+        self._wrap_labels.append(desc)
 
         def _sync_desc_wrap(_event=None) -> None:
             try:
                 ww = int(main.winfo_width())
                 if ww > 1:
-                    desc.configure(wraplength=max(200, ww - 8))
-            except tk.TclError:
+                    wrap = max(220, ww - 24)
+                    for label in self._wrap_labels:
+                        label.configure(wraplength=wrap)
+            except _WRAP_SYNC_ERRORS:
                 pass
 
         main.bind("<Configure>", _sync_desc_wrap)
@@ -164,9 +163,10 @@ class ReactiveColorGUI:
                 ),
                 font=("Sans", 9),
                 justify="left",
-                wraplength=max(200, w - 48),
+                wraplength=520,
             )
             msg.pack(pady=(6, 10), fill="x")
+            self._wrap_labels.append(msg)
 
         if self._color_supported:
             initial = self.config.reactive_color
@@ -188,8 +188,17 @@ class ReactiveColorGUI:
         self._reactive_brightness_var = tk.DoubleVar(value=100.0)
         brightness_frame = ttk.Frame(main)
         brightness_frame.pack(fill="x", padx=10)
+        try:
+            brightness_frame.columnconfigure(1, weight=1)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
-        ttk.Label(brightness_frame, text="Reactive typing brightness:").pack(side="left", padx=(0, 10))
+        ttk.Label(brightness_frame, text="Reactive typing brightness:").grid(
+            row=0,
+            column=0,
+            sticky="w",
+            padx=(0, 10),
+        )
 
         self._reactive_brightness_scale = ttk.Scale(
             brightness_frame,
@@ -199,11 +208,11 @@ class ReactiveColorGUI:
             variable=self._reactive_brightness_var,
             command=self._on_reactive_brightness_change,
         )
-        self._reactive_brightness_scale.pack(side="left", fill="x", expand=True)
+        self._reactive_brightness_scale.grid(row=0, column=1, sticky="ew")
 
         self._reactive_brightness_label = ttk.Label(brightness_frame, text="100%")
         self._reactive_brightness_label.configure(width=5)
-        self._reactive_brightness_label.pack(side="left", padx=(10, 5))
+        self._reactive_brightness_label.grid(row=0, column=2, sticky="e", padx=(10, 5))
 
         # Commit on mouse release as well.
         try:
@@ -223,8 +232,12 @@ class ReactiveColorGUI:
         self._reactive_trail_var = tk.DoubleVar(value=50.0)
         trail_frame = ttk.Frame(main)
         trail_frame.pack(fill="x", padx=10)
+        try:
+            trail_frame.columnconfigure(1, weight=1)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
-        ttk.Label(trail_frame, text="Wave thickness:").pack(side="left", padx=(0, 10))
+        ttk.Label(trail_frame, text="Wave thickness:").grid(row=0, column=0, sticky="w", padx=(0, 10))
 
         self._reactive_trail_scale = ttk.Scale(
             trail_frame,
@@ -234,11 +247,11 @@ class ReactiveColorGUI:
             variable=self._reactive_trail_var,
             command=self._on_reactive_trail_change,
         )
-        self._reactive_trail_scale.pack(side="left", fill="x", expand=True)
+        self._reactive_trail_scale.grid(row=0, column=1, sticky="ew")
 
         self._reactive_trail_label = ttk.Label(trail_frame, text="50%")
         self._reactive_trail_label.configure(width=5)
-        self._reactive_trail_label.pack(side="left", padx=(10, 5))
+        self._reactive_trail_label.grid(row=0, column=2, sticky="e", padx=(10, 5))
 
         try:
             self._reactive_trail_scale.bind("<ButtonRelease-1>", self._on_reactive_trail_release)
@@ -251,7 +264,8 @@ class ReactiveColorGUI:
         self.status_label = ttk.Label(main, text="", font=("Sans", 9))
         self.status_label.pack(pady=(10, 0))
 
-        center_window_on_screen(self.root)
+        self._apply_geometry()
+        self.root.after(50, self._apply_geometry)
 
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -268,6 +282,23 @@ class ReactiveColorGUI:
         # When launched from a terminal, Ctrl+C sends SIGINT to the whole process group.
         # Use a handler to close cleanly without printing a traceback.
         signal.signal(signal.SIGINT, lambda *_: self._on_close())
+
+    def _apply_geometry(self) -> None:
+        try:
+            self.root.update_idletasks()
+            geometry = compute_centered_window_geometry(
+                self.root,
+                content_height_px=int(self._main_frame.winfo_reqheight()),
+                content_width_px=int(self._main_frame.winfo_reqwidth()),
+                footer_height_px=0,
+                chrome_padding_px=44,
+                default_w=629,
+                default_h=940,
+                screen_ratio_cap=0.95,
+            )
+            self.root.geometry(geometry)
+        except _GEOMETRY_APPLY_ERRORS:
+            return
 
     def _set_status(self, msg: str, *, ok: bool) -> None:
         color = "#00ff00" if ok else "#ff0000"

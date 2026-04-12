@@ -4,6 +4,7 @@ from io import BytesIO
 import os
 
 from PIL import Image
+import pytest
 
 from src.gui.utils import window_icon
 
@@ -176,6 +177,25 @@ def test_apply_keyrgb_window_icon_swallows_unexpected_window_callback_failure(tm
     assert logs[0][0] == "Failed to apply KeyRGB window icon"
     assert isinstance(logs[0][1], LookupError)
     assert str(logs[0][1]) == "broken tk callback"
+    window_icon.clear_cached_window_icon_images()
+
+
+def test_apply_keyrgb_window_icon_propagates_unexpected_window_callback_failures(tmp_path, monkeypatch) -> None:
+    window_icon.clear_cached_window_icon_images()
+    image_path = tmp_path / "icon.png"
+    _save_icon(image_path, (255, 0, 0, 255))
+
+    class BrokenWindow:
+        def iconphoto(self, _default: bool, _photo: object) -> None:
+            raise AssertionError("unexpected icon bug")
+
+    monkeypatch.setattr(window_icon, "find_keyrgb_logo_path", lambda: image_path)
+    monkeypatch.setattr(window_icon, "_candidate_logo_paths", lambda: [image_path])
+    monkeypatch.setattr("PIL.ImageTk.PhotoImage", lambda image: {"image": image})
+
+    with pytest.raises(AssertionError, match="unexpected icon bug"):
+        window_icon.apply_keyrgb_window_icon(BrokenWindow())
+
     window_icon.clear_cached_window_icon_images()
 
 

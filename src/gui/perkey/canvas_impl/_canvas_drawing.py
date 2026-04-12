@@ -17,6 +17,8 @@ from ..profile_management import keymap_cells_for, representative_cell
 
 logger = logging.getLogger(__name__)
 
+_BACKDROP_RENDER_ERRORS = (AttributeError, OSError, RuntimeError, TclError, TypeError, ValueError)
+
 
 def _visible_layout_keys_or_none(canvas: Any) -> list[object] | None:
     try:
@@ -265,7 +267,7 @@ class _KeyboardCanvasDrawingMixin:
                 transparency_pct=t,
                 photo_factory=ImageTk.PhotoImage,
             )
-        except Exception:  # @quality-exception exception-transparency: Pillow/Tk backdrop rendering crosses external runtime seams; must remain best-effort
+        except _BACKDROP_RENDER_ERRORS:
             logger.exception("Deck backdrop render failed; clearing cache and skipping the background image.")
             self._deck_render_cache.clear()
             self._deck_img_tk = None

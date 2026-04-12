@@ -19,6 +19,9 @@ from src.gui.perkey.profile_management import keymap_cells_for
 from .geometry import key_canvas_bbox
 
 
+_LABEL_FIT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+
+
 def redraw_calibration_canvas(
     *,
     canvas: tk.Canvas,
@@ -113,7 +116,7 @@ def _fit_key_label(label: str, *, key_w: int, key_h: int) -> tuple[str, int]:
                 while trimmed and font_obj.measure(trimmed + ellipsis) > max_text_w:
                     trimmed = trimmed[:-1]
                 fitted_label = (trimmed + ellipsis) if trimmed else ellipsis
-    except Exception:  # @quality-exception exception-transparency: canvas text-fitting is a UI rendering boundary; failure returns the best-effort label and font size
+    except _LABEL_FIT_ERRORS:
         pass
 
     return fitted_label, font_size

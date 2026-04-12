@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+
+## 0.22.0 (2026-04-13)
+
+- Build/Packaging: Raise the baseline versions for `setuptools`, `wheel`, `Pillow`, `evdev`, and the dev toolchain; drop the unused optional `PyQt6` dependency and the stale Qt-specific repo references.
+- Build/Validation: Move import validation and import scan onto isolated subprocess probes, relax repo validation around the delegated installer autostart path, and harden the AppImage Python/Tk bundling helpers.
+- Error Handling/Runtime: Replace broad catch-all runtime boundaries with targeted recoverable exception groups across backends, effects, diagnostics, power management, tray code, and config helpers so expected hardware and UI failures stay non-fatal while unexpected bugs still surface during development.
+- GUI/Tk: Continue the window-polish pass across Support Tools, Reactive Typing Settings, Uniform Color, TCC profile windows, the per-key editor, and the covered Settings panels with content-driven geometry, responsive text wrapping, and grid-based control and action rows that stay usable at narrower widths.
+- Tests: Expand unit coverage for the new buildpython import-probe flow, runtime-boundary behavior, tray and power handling, and the refreshed Tk layouts.
+
 ## 0.21.6 (2026-04-10)
 
 - Tray/GNOME: Fix tray icon not appearing on GNOME Shell (issue #6) by selecting the `appindicator` pystray backend on GNOME sessions; `PYSTRAY_BACKEND=appindicator` still works as a per-launch override.

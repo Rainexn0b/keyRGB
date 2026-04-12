@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.gui.utils.window_geometry import compute_centered_window_geometry
+
 
 def build_widgets(
     app: Any,
@@ -97,10 +99,24 @@ def apply_window_geometry(app: Any) -> None:
     app.update_idletasks()
     screen_width = int(app.winfo_screenwidth())
     screen_height = int(app.winfo_screenheight())
-    width = min(1400, int(screen_width * 0.95))
-    height = min(860, int(screen_height * 0.95))
-    app.geometry(f"{width}x{height}")
-    app.minsize(min(1100, width), min(650, height))
+    max_width = int(screen_width * 0.95)
+    max_height = int(screen_height * 0.95)
+    requested_width = int(app.winfo_reqwidth())
+    requested_height = int(app.winfo_reqheight())
+
+    app.geometry(
+        compute_centered_window_geometry(
+            app,
+            content_height_px=requested_height,
+            content_width_px=requested_width,
+            footer_height_px=0,
+            chrome_padding_px=32,
+            default_w=1400,
+            default_h=860,
+            screen_ratio_cap=0.95,
+        )
+    )
+    app.minsize(min(max(requested_width, 1100), max_width), min(max(requested_height + 32, 650), max_height))
 
 
 def finish_init(app: Any, *, tk_runtime_errors: tuple[type[BaseException], ...]) -> None:

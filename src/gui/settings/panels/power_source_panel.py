@@ -6,6 +6,10 @@ import tkinter as tk
 from tkinter import ttk
 
 
+_LABEL_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
+_LABEL_WIDGET_ERRORS = (RuntimeError, tk.TclError)
+
+
 class PowerSourcePanel:
     def __init__(
         self,
@@ -37,6 +41,7 @@ class PowerSourcePanel:
         ac_row.pack(fill="x", pady=(0, 10))
         ac_head = ttk.Frame(ac_row)
         ac_head.pack(fill="x")
+        ac_head.columnconfigure(0, weight=1)
 
         self.chk_ac_enabled = ttk.Checkbutton(
             ac_head,
@@ -44,15 +49,16 @@ class PowerSourcePanel:
             variable=var_ac_enabled,
             command=self._on_toggle,
         )
-        self.chk_ac_enabled.pack(side="left", anchor="w")
+        self.chk_ac_enabled.grid(row=0, column=0, sticky="w")
+
+        ttk.Label(ac_head, text="Brightness", font=("Sans", 9)).grid(row=0, column=1, sticky="e", padx=(12, 6))
 
         self.lbl_ac_brightness_val = ttk.Label(
             ac_head,
             text=str(int(float(var_ac_brightness.get()))),
             font=("Sans", 9),
         )
-        self.lbl_ac_brightness_val.pack(side="right")
-        ttk.Label(ac_head, text="Brightness", font=("Sans", 9)).pack(side="right", padx=(0, 6))
+        self.lbl_ac_brightness_val.grid(row=0, column=2, sticky="e")
 
         self.scale_ac_brightness = ttk.Scale(
             ac_row,
@@ -70,6 +76,7 @@ class PowerSourcePanel:
         batt_row.pack(fill="x")
         batt_head = ttk.Frame(batt_row)
         batt_head.pack(fill="x")
+        batt_head.columnconfigure(0, weight=1)
 
         self.chk_battery_enabled = ttk.Checkbutton(
             batt_head,
@@ -77,15 +84,16 @@ class PowerSourcePanel:
             variable=var_battery_enabled,
             command=self._on_toggle,
         )
-        self.chk_battery_enabled.pack(side="left", anchor="w")
+        self.chk_battery_enabled.grid(row=0, column=0, sticky="w")
+
+        ttk.Label(batt_head, text="Brightness", font=("Sans", 9)).grid(row=0, column=1, sticky="e", padx=(12, 6))
 
         self.lbl_battery_brightness_val = ttk.Label(
             batt_head,
             text=str(int(float(var_battery_brightness.get()))),
             font=("Sans", 9),
         )
-        self.lbl_battery_brightness_val.pack(side="right")
-        ttk.Label(batt_head, text="Brightness", font=("Sans", 9)).pack(side="right", padx=(0, 6))
+        self.lbl_battery_brightness_val.grid(row=0, column=2, sticky="e")
 
         self.scale_battery_brightness = ttk.Scale(
             batt_row,
@@ -111,6 +119,16 @@ class PowerSourcePanel:
     @staticmethod
     def _set_label_int(lbl: ttk.Label, v: float | str) -> None:
         try:
-            lbl.configure(text=str(int(float(v))))
-        except Exception:  # @quality-exception exception-transparency: label update is a UI callback boundary; widget may be in transition state
-            lbl.configure(text="?")
+            text = str(int(float(v)))
+        except _LABEL_VALUE_ERRORS:
+            text = "?"
+
+        try:
+            lbl.configure(text=text)
+        except _LABEL_WIDGET_ERRORS:
+            if text == "?":
+                return
+            try:
+                lbl.configure(text="?")
+            except _LABEL_WIDGET_ERRORS:
+                return

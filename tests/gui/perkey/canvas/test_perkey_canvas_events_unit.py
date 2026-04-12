@@ -247,6 +247,14 @@ def test_on_motion_logs_and_swallows_hover_errors(monkeypatch: pytest.MonkeyPatc
     assert isinstance(kwargs["exc"], RuntimeError)
 
 
+def test_on_motion_propagates_unexpected_errors() -> None:
+    canvas = _FakeCanvas(scope="key", selected_key_id="k1", selected_slot_id="slot_k1")
+    canvas.editor.overlay_scope = _FakeVar("key", exc=AssertionError("boom"))
+
+    with pytest.raises(AssertionError):
+        canvas._on_motion(_event())
+
+
 def test_on_leave_resets_cursor() -> None:
     canvas = _FakeCanvas()
 
@@ -268,6 +276,14 @@ def test_on_leave_logs_configure_errors(monkeypatch: pytest.MonkeyPatch) -> None
     assert args[1] == "perkey.canvas.on_leave"
     assert kwargs["msg"] == "Error resetting cursor"
     assert isinstance(kwargs["exc"], RuntimeError)
+
+
+def test_on_leave_propagates_unexpected_errors() -> None:
+    canvas = _FakeCanvas()
+    canvas.configure_error = AssertionError("boom")
+
+    with pytest.raises(AssertionError):
+        canvas._on_leave(_event())
 
 
 def test_on_click_uses_current_item_pslot_tag_before_hit_test() -> None:
@@ -321,3 +337,11 @@ def test_on_click_falls_back_to_hit_test_when_current_item_has_no_key_tag() -> N
     assert canvas.gettags_calls == [9]
     assert canvas.hit_test_calls == [(8.0, 12.0)]
     assert canvas.editor.clicked_keys == ["esc"]
+
+
+def test_on_click_propagates_unexpected_errors() -> None:
+    canvas = _FakeCanvas()
+    canvas.find_withtag_error = AssertionError("boom")
+
+    with pytest.raises(AssertionError):
+        canvas._on_click(_event())

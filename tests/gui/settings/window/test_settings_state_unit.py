@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 
+import pytest
+
 from src.gui.settings.settings_state import (
     SettingsValues,
     apply_settings_values_to_config,
@@ -103,6 +105,21 @@ def test_load_settings_malformed_property_and_coercion_values_fall_back_safely(c
     assert "Failed coercing settings attribute 'experimental_backends_enabled' to bool" in caplog.text
     assert "Failed coercing settings value to int" in caplog.text
     assert "Failed reading settings integer attribute 'screen_dim_temp_brightness'" in caplog.text
+
+
+def test_load_settings_propagates_unexpected_programming_errors() -> None:
+    class ExplodingBool:
+        def __bool__(self) -> bool:
+            raise AssertionError("boom")
+
+    class Config:
+        brightness = 30
+        battery_saver_enabled = False
+        battery_saver_brightness = 12
+        experimental_backends_enabled = ExplodingBool()
+
+    with pytest.raises(AssertionError):
+        load_settings_values(config=Config(), os_autostart_enabled=True)
 
 
 def test_apply_settings_values_to_config() -> None:

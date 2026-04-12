@@ -162,7 +162,9 @@ def load_deck_image_for_calibrator(app: Any, *, load_backdrop_image: Any, load_b
 def on_show_backdrop_changed(app: Any, *, load_backdrop_image: Any, load_backdrop_mode: Any) -> None:
     """Toggle backdrop display in the calibrator without saving the profile's backdrop mode."""
     if app._show_backdrop_var.get():
-        load_deck_image_for_calibrator(app, load_backdrop_image=load_backdrop_image, load_backdrop_mode=load_backdrop_mode)
+        load_deck_image_for_calibrator(
+            app, load_backdrop_image=load_backdrop_image, load_backdrop_mode=load_backdrop_mode
+        )
     else:
         app._deck_pil = None
         app._deck_render_cache.clear()
@@ -241,9 +243,7 @@ def assign_current_cell(
     )
     default_keymap = default_keymap_for_layout_fn(physical_layout)
     default_owner_by_cell = {
-        cell: str(identity)
-        for identity, cells in (default_keymap or {}).items()
-        for cell in cells
+        cell: str(identity) for identity, cells in (default_keymap or {}).items() for cell in cells
     }
 
     other_owners_by_cell: dict[tuple[int, int], set[str]] = {}
@@ -274,9 +274,7 @@ def assign_current_cell(
             cell
             for cell in existing_cells
             if cell != current_cell
-            and not (
-                cell in selected_cell_set and default_owner_by_cell.get(cell) in {None, key_identity}
-            )
+            and not (cell in selected_cell_set and default_owner_by_cell.get(cell) in {None, key_identity})
         )
         if filtered_cells:
             new_keymap[str(existing_identity)] = filtered_cells

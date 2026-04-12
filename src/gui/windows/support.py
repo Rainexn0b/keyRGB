@@ -17,6 +17,7 @@ from src.core.diagnostics import support as diagnostics_support
 from src.gui.settings import diagnostics_runner
 from src.gui import theme as gui_theme
 from src.gui.utils import tk_async, window_centering, window_icon
+from src.gui.utils.window_geometry import compute_centered_window_geometry
 
 from ._support import _support_window_actions as support_actions
 from ._support import _support_window_jobs as support_jobs
@@ -41,6 +42,7 @@ apply_keyrgb_window_icon = window_icon.apply_keyrgb_window_icon
 logger = logging.getLogger(__name__)
 _TK_RUNTIME_ERRORS = (tk.TclError, RuntimeError)
 _BROWSER_OPEN_ERRORS = (webbrowser.Error, OSError)
+_GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 
 
 class SupportToolsGUI:
@@ -48,9 +50,7 @@ class SupportToolsGUI:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Support Tools")
         apply_keyrgb_window_icon(self.root)
-        _win_h = max(820, self.root.winfo_screenheight() - 80)
-        self.root.geometry(f"1240x{_win_h}")
-        self.root.minsize(1080, 820)
+        self.root.minsize(960, 720)
         self.root.resizable(True, True)
 
         bg_color, fg_color = apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
@@ -66,8 +66,26 @@ class SupportToolsGUI:
         support_window_ui.build_window(
             self, ttk=ttk, scrolledtext=scrolledtext, center_window_on_screen=center_window_on_screen
         )
+        self.root.after(50, self._apply_geometry)
 
         self._sync_button_state()
+
+    def _apply_geometry(self) -> None:
+        try:
+            self.root.update_idletasks()
+            geometry = compute_centered_window_geometry(
+                self.root,
+                content_height_px=int(self._main_frame.winfo_reqheight()),
+                content_width_px=int(self._main_frame.winfo_reqwidth()),
+                footer_height_px=0,
+                chrome_padding_px=48,
+                default_w=1240,
+                default_h=920,
+                screen_ratio_cap=0.95,
+            )
+            self.root.geometry(geometry)
+        except _GEOMETRY_APPLY_ERRORS:
+            return
 
     def _build_debug_section(self, parent: ttk.LabelFrame) -> None:
         return

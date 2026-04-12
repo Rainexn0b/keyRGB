@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from src.gui.perkey.commit_pipeline import PerKeyCommitPipeline
 
 
@@ -223,3 +225,37 @@ def test_commit_pipeline_ensures_full_map_uses_fallback_when_base_black() -> Non
 
     assert full == {(0, 0): (3, 4, 5), (0, 1): (3, 4, 5)}
     assert calls and calls[-1] == full
+
+
+@dataclass
+class _UnexpectedWriteFailConfig:
+    brightness: int = 0
+    effect: str | None = None
+    per_key_colors: dict[tuple[int, int], tuple[int, int, int]] | None = None
+    fail_fields: tuple[str, ...] = ()
+
+    def __setattr__(self, name: str, value) -> None:
+        if name == "fail_fields":
+            object.__setattr__(self, name, value)
+            return
+        if name in self.fail_fields:
+            raise AssertionError(f"unexpected write failure: {name}")
+        object.__setattr__(self, name, value)
+
+
+def test_commit_pipeline_propagates_unexpected_config_write_failures() -> None:
+    cfg = _UnexpectedWriteFailConfig(brightness=10, fail_fields=("effect",))
+    pipeline = PerKeyCommitPipeline(commit_interval_s=0.0)
+
+    with pytest.raises(AssertionError, match="unexpected write failure: effect"):
+        pipeline.commit(
+            kb=object(),
+            colors={(0, 0): (4, 5, 6)},
+            config=cfg,
+            num_rows=1,
+            num_cols=1,
+            base_color=(7, 7, 7),
+            fallback_color=(8, 8, 8),
+            push_fn=lambda current_kb, _colors, *, brightness, enable_user_mode: current_kb,
+            force=True,
+        )

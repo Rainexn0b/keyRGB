@@ -130,13 +130,12 @@ def test_push_per_key_colors_returns_keyboard_for_other_recoverable_exceptions()
     assert out is kb
 
 
-def test_push_per_key_colors_returns_keyboard_for_unexpected_write_exceptions() -> None:
+def test_push_per_key_colors_propagates_unexpected_write_exceptions() -> None:
     class DummyKb:
         def set_key_colors(self, colors, *, brightness: int, enable_user_mode: bool = True):
             raise AssertionError("boom")
 
     kb = DummyKb()
 
-    out = push_per_key_colors(kb, {(0, 0): (1, 2, 3)}, brightness=10, enable_user_mode=False)
-
-    assert out is kb
+    with pytest.raises(AssertionError, match="boom"):
+        push_per_key_colors(kb, {(0, 0): (1, 2, 3)}, brightness=10, enable_user_mode=False)

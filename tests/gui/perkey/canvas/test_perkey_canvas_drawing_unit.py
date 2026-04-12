@@ -473,6 +473,17 @@ def test_draw_deck_background_clears_cache_on_render_error(
     assert "Deck backdrop render failed; clearing cache and skipping the background image." in caplog.text
 
 
+def test_draw_deck_background_propagates_unexpected_render_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    canvas = _FakeCanvas()
+    canvas._deck_img = Image.new("RGBA", (20, 10), color=(10, 20, 30, 255))
+    canvas._deck_render_cache.error = AssertionError("bad image")
+    canvas.editor.backdrop_transparency = _FakeVar(10)
+    monkeypatch.setattr(canvas_drawing, "calc_centered_drawn_bbox", lambda **_kwargs: (1, 2, 30, 15, 1.5))
+
+    with pytest.raises(AssertionError):
+        canvas._draw_deck_background()
+
+
 def test_update_key_visual_updates_fill_stipple_and_text_contrast() -> None:
     canvas = _FakeCanvas()
     canvas.key_rects = {"bright": 1, "dark": 2}

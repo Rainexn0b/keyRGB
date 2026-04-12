@@ -9,6 +9,7 @@ from src.core.utils.logging_utils import log_throttled
 
 
 logger = logging.getLogger(__name__)
+_PERKEY_HARDWARE_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _select_backend() -> Any:
@@ -16,7 +17,7 @@ def _select_backend() -> Any:
 
     try:
         return select_backend()
-    except Exception as exc:  # @quality-exception exception-transparency: backend registry selection involves runtime hardware probing and must degrade to None when unavailable
+    except _PERKEY_HARDWARE_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: backend registry selection involves runtime hardware probing and must degrade to None on recoverable runtime failures
         log_throttled(
             logger,
             "perkey.hardware.select_backend.failed",
@@ -28,15 +29,19 @@ def _select_backend() -> Any:
         return None
 
 
-_backend = _select_backend()
+def _backend_dimensions_or_reference(backend: object) -> tuple[int, int]:
+    if backend is None:
+        return REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
 
-try:
-    if _backend is None:
-        raise RuntimeError("No backend")
-    NUM_ROWS, NUM_COLS = _backend.dimensions()
-    NUM_ROWS, NUM_COLS = int(NUM_ROWS), int(NUM_COLS)
-except Exception:  # @quality-exception exception-transparency: keyboard dimension read at import time falls back to reference matrix; backend may be unavailable
-    NUM_ROWS, NUM_COLS = REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
+    try:
+        num_rows, num_cols = backend.dimensions()
+        return int(num_rows), int(num_cols)
+    except _PERKEY_HARDWARE_RUNTIME_ERRORS:  # @quality-exception exception-transparency: keyboard dimension read falls back to the reference matrix on recoverable backend failures
+        return REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
+
+
+_backend = _select_backend()
+NUM_ROWS, NUM_COLS = _backend_dimensions_or_reference(_backend)
 
 
 def get_keyboard():
@@ -46,7 +51,7 @@ def get_keyboard():
         return None
     try:
         return _backend.get_device()
-    except Exception as exc:  # @quality-exception exception-transparency: USB device open is a runtime hardware boundary and failures must degrade to None
+    except _PERKEY_HARDWARE_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: USB device open is a runtime hardware boundary and recoverable failures must degrade to None
         log_throttled(
             logger,
             "perkey.hardware.get_keyboard",

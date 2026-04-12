@@ -30,6 +30,11 @@ class _BrokenCopyMap:
         raise RuntimeError("copy failed")
 
 
+class _UnexpectedCopyMap:
+    def __iter__(self):
+        raise AssertionError("unexpected copy bug")
+
+
 class _SetAttrFailConfig:
     def __init__(self, *, fail_key: str) -> None:
         object.__setattr__(self, "_fail_key", fail_key)
@@ -48,6 +53,18 @@ class _SetAttrFailConfig:
         self._history.append((name, value))
         if name == self._fail_key:
             raise RuntimeError(f"cannot set {name}")
+        object.__setattr__(self, name, value)
+
+
+class _UnexpectedSetAttrFailConfig(_SetAttrFailConfig):
+    def __setattr__(self, name: str, value) -> None:
+        if name.startswith("_"):
+            object.__setattr__(self, name, value)
+            return
+
+        self._history.append((name, value))
+        if name == self._fail_key:
+            raise AssertionError(f"unexpected setattr bug: {name}")
         object.__setattr__(self, name, value)
 
 
@@ -105,6 +122,13 @@ def test_post_init_logs_and_uses_empty_map_when_per_key_colors_copy_fails(
     assert kwargs["level"] == logging.DEBUG
     assert kwargs["msg"] == "Failed to snapshot per_key_colors; will restore empty map"
     assert isinstance(kwargs["exc"], RuntimeError)
+
+
+def test_post_init_propagates_unexpected_per_key_colors_copy_failures() -> None:
+    cfg = _FakeConfig(per_key_colors=_UnexpectedCopyMap())
+
+    with pytest.raises(AssertionError, match="unexpected copy bug"):
+        KeyboardPreviewSession(cfg=cfg, rows=2, cols=2)
 
 
 @pytest.mark.parametrize(
@@ -168,3 +192,17 @@ def test_restore_continues_after_setattr_failure_and_logs(monkeypatch: pytest.Mo
     assert kwargs["level"] == logging.DEBUG
     assert kwargs["msg"] == "Failed to restore config field: color"
     assert isinstance(kwargs["exc"], RuntimeError)
+
+
+def test_restore_propagates_unexpected_setattr_failures() -> None:
+    cfg = _UnexpectedSetAttrFailConfig(fail_key="color")
+    session = KeyboardPreviewSession(cfg=cfg, rows=1, cols=1)
+
+    object.__setattr__(cfg, "effect", "perkey")
+    object.__setattr__(cfg, "speed", 1)
+    object.__setattr__(cfg, "brightness", 0)
+    object.__setattr__(cfg, "color", (99, 99, 99))
+    object.__setattr__(cfg, "per_key_colors", {(0, 0): (255, 255, 255)})
+
+    with pytest.raises(AssertionError, match="unexpected setattr bug: color"):
+        session.restore()

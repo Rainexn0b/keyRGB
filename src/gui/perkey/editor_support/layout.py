@@ -11,6 +11,9 @@ from ..ui.layout_slots import refresh_layout_slots_ui
 from ..ui.status import layout_slot_label_updated, layout_slot_visibility_updated, set_status
 
 
+_LIGHTBAR_DISCOVERY_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def _layout_setup_controls_or_none(app: Any) -> Any | None:
     try:
         return app._layout_setup_controls
@@ -127,7 +130,7 @@ def load_layout_slot_overrides(app: Any) -> dict[str, dict[str, object]]:
 def detect_lightbar_device(*, collect_device_discovery: Any, log_boundary_exception: Any) -> bool:
     try:
         payload = collect_device_discovery(include_usb=True)
-    except Exception as exc:  # @quality-exception exception-transparency: lightbar discovery is a runtime hardware-detection boundary; failure is reported via log_boundary_exception
+    except _LIGHTBAR_DISCOVERY_ERRORS as exc:
         log_boundary_exception(
             "perkey.editor.lightbar_discovery",
             "Failed to collect perkey lightbar discovery snapshot",

@@ -43,6 +43,7 @@ _BACKDROP_MODE_LABELS = {
     "custom": "Custom image",
 }
 _BACKDROP_UI_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError, TclError)
+_BACKDROP_RELOAD_ERRORS = _BACKDROP_UI_ERRORS + (OSError,)
 
 
 def _parse_default_keymap(layout_id: str) -> dict[str, tuple[tuple[int, int], ...]]:
@@ -192,7 +193,7 @@ def activate_profile_ui(editor: Any) -> None:
     if reload_backdrop_image is not _MISSING:
         try:
             reload_backdrop_image()
-        except Exception:  # @quality-exception exception-transparency: optional per-profile backdrop image reload crosses Tk, image decode, and file/runtime seams and must remain non-fatal for profile activation
+        except _BACKDROP_RELOAD_ERRORS:
             logger.exception("Failed to reload per-profile backdrop image during activation")
 
     # Ensure we're applying a full map, then push it to hardware.

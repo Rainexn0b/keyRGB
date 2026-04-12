@@ -12,6 +12,9 @@ import os
 from pathlib import Path
 
 
+_TEMP_FILE_CLEANUP_ERRORS = (OSError,)
+
+
 def wheel_cache_path(*, size: int, bg_rgb: tuple[int, int, int], center_size: int) -> Path:
     xdg = os.environ.get("XDG_CACHE_HOME")
     cache_root = Path(xdg) if xdg else (Path.home() / ".cache")
@@ -78,5 +81,5 @@ def write_bytes_atomic(path: Path, data: bytes) -> None:
         try:
             if tmp.exists():
                 tmp.unlink(missing_ok=True)
-        except Exception:  # @quality-exception exception-transparency: temp-file cleanup in finally block must not mask the original exception
+        except _TEMP_FILE_CLEANUP_ERRORS:
             pass

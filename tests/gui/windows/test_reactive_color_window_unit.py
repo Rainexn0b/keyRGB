@@ -39,20 +39,38 @@ class _FakeWidget:
         self.parent = parent
         self.kwargs = kwargs
         self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
         self.bind_calls: list[tuple[str, object]] = []
         self.configure_calls: list[dict[str, object]] = []
+        self.columnconfigure_calls: list[tuple[int, int]] = []
 
     def pack(self, **kwargs) -> None:
         self.pack_calls.append(dict(kwargs))
+
+    def grid(self, **kwargs) -> None:
+        self.grid_calls.append(dict(kwargs))
 
     def bind(self, sequence: str, callback) -> None:
         self.bind_calls.append((sequence, callback))
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
+        self.kwargs.update(kwargs)
 
     def config(self, **kwargs) -> None:
         self.configure(**kwargs)
+
+    def columnconfigure(self, index: int, weight: int = 0, **_kwargs) -> None:
+        self.columnconfigure_calls.append((index, weight))
+
+    def winfo_width(self) -> int:
+        return int(self.kwargs.get("width_px", 640))
+
+    def winfo_reqwidth(self) -> int:
+        return int(self.kwargs.get("reqwidth_px", self.winfo_width()))
+
+    def winfo_reqheight(self) -> int:
+        return int(self.kwargs.get("reqheight_px", 820))
 
 
 class _FakeRoot:
@@ -66,6 +84,7 @@ class _FakeRoot:
         self.bind_calls: list[tuple[str, object]] = []
         self.destroy_calls = 0
         self.report_callback_exception = lambda *_args: None
+        self.update_idletasks_calls = 0
 
     def title(self, text: str) -> None:
         self.title_calls.append(text)
@@ -87,6 +106,9 @@ class _FakeRoot:
 
     def bind(self, sequence: str, callback) -> None:
         self.bind_calls.append((sequence, callback))
+
+    def update_idletasks(self) -> None:
+        self.update_idletasks_calls += 1
 
     def winfo_screenwidth(self) -> int:
         return 800
@@ -183,32 +205,106 @@ def test_constructor_handles_programmatic_brightness_sync_callback(monkeypatch) 
         reactive_brightness=14,
         brightness=14,
     )
+    registry: dict[str, list[_FakeWidget]] = {
+        "frames": [],
+        "labels": [],
+        "checks": [],
+        "separators": [],
+        "scales": [],
+    }
+
+    def _frame(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["frames"].append(widget)
+        return widget
+
+    def _label(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["labels"].append(widget)
+        return widget
+
+    def _checkbutton(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["checks"].append(widget)
+        return widget
+
+    def _separator(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["separators"].append(widget)
+        return widget
+
+    def _scale(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["scales"].append(widget)
+        return widget
 
     monkeypatch.setattr(reactive_color.tk, "Tk", lambda: root)
     monkeypatch.setattr(reactive_color.tk, "BooleanVar", _FakeVar)
     monkeypatch.setattr(reactive_color.tk, "DoubleVar", _FakeVar)
-    monkeypatch.setattr(reactive_color.ttk, "Frame", _FakeWidget)
-    monkeypatch.setattr(reactive_color.ttk, "Label", _FakeWidget)
-    monkeypatch.setattr(reactive_color.ttk, "Checkbutton", _FakeWidget)
-    monkeypatch.setattr(reactive_color.ttk, "Separator", _FakeWidget)
-    monkeypatch.setattr(reactive_color.ttk, "Scale", _FakeWidget)
+    monkeypatch.setattr(reactive_color.ttk, "Frame", _frame)
+    monkeypatch.setattr(reactive_color.ttk, "Label", _label)
+    monkeypatch.setattr(reactive_color.ttk, "Checkbutton", _checkbutton)
+    monkeypatch.setattr(reactive_color.ttk, "Separator", _separator)
+    monkeypatch.setattr(reactive_color.ttk, "Scale", _scale)
     monkeypatch.setattr(reactive_color, "ColorWheel", _FakeColorWheelWithCallback)
     monkeypatch.setattr(reactive_color, "Config", lambda: config)
     monkeypatch.setattr(reactive_color, "select_backend", lambda: None)
     monkeypatch.setattr(reactive_color, "apply_clam_theme", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(reactive_color, "apply_keyrgb_window_icon", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(reactive_color, "center_window_on_screen", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(reactive_color.signal, "signal", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(reactive_color.time, "monotonic", lambda: 0.0)
 
     gui = reactive_color.ReactiveColorGUI()
+    brightness_frame = registry["frames"][1]
+    trail_frame = registry["frames"][2]
+    brightness_title = registry["labels"][2]
+    trail_title = registry["labels"][4]
 
     assert gui.color_wheel.brightness_calls == [28]
+    assert root.minsize_calls == [(520, 720)]
+    assert any(delay == 50 for delay, _callback in root.after_calls)
     assert gui._last_drag_commit_ts == 0.0
     assert gui._last_drag_committed_color is None
     assert gui._last_drag_committed_brightness is None
     assert config.reactive_use_manual_color is False
     assert config.reactive_color == (12, 34, 56)
+    assert brightness_frame.columnconfigure_calls == [(1, 1)]
+    assert trail_frame.columnconfigure_calls == [(1, 1)]
+    assert brightness_title.grid_calls == [{"row": 0, "column": 0, "sticky": "w", "padx": (0, 10)}]
+    assert registry["scales"][0].grid_calls == [{"row": 0, "column": 1, "sticky": "ew"}]
+    assert gui._reactive_brightness_label.grid_calls == [{"row": 0, "column": 2, "sticky": "e", "padx": (10, 5)}]
+    assert trail_title.grid_calls == [{"row": 0, "column": 0, "sticky": "w", "padx": (0, 10)}]
+    assert registry["scales"][1].grid_calls == [{"row": 0, "column": 1, "sticky": "ew"}]
+    assert gui._reactive_trail_label.grid_calls == [{"row": 0, "column": 2, "sticky": "e", "padx": (10, 5)}]
+
+
+def test_apply_geometry_uses_requested_content_size(monkeypatch) -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui.root = _FakeRoot()
+    gui._main_frame = _FakeWidget(reqwidth_px=680, reqheight_px=910)
+    seen: dict[str, object] = {}
+
+    def _fake_compute(root, **kwargs):
+        seen["root"] = root
+        seen.update(kwargs)
+        return "680x954+10+20"
+
+    monkeypatch.setattr(reactive_color, "compute_centered_window_geometry", _fake_compute)
+
+    gui._apply_geometry()
+
+    assert gui.root.update_idletasks_calls == 1
+    assert seen == {
+        "root": gui.root,
+        "content_height_px": 910,
+        "content_width_px": 680,
+        "footer_height_px": 0,
+        "chrome_padding_px": 44,
+        "default_w": 629,
+        "default_h": 940,
+        "screen_ratio_cap": 0.95,
+    }
+    assert gui.root.geometry_calls == ["680x954+10+20"]
 
 
 def test_on_color_change_tolerates_missing_drag_state(monkeypatch) -> None:

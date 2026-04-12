@@ -271,6 +271,21 @@ def test_detect_system_prefers_dark_logs_and_skips_unexpected_provider_errors(
     assert "broken override" in caplog.text
 
 
+def test_detect_system_prefers_dark_propagates_unexpected_provider_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def override():
+        raise AssertionError("boom")
+
+    monkeypatch.setattr(detect, "_detect_theme_override", override)
+    monkeypatch.setattr(detect, "_detect_gtk_theme_env", lambda: None)
+    monkeypatch.setattr(detect, "_detect_gsettings_color_scheme", lambda: None)
+    monkeypatch.setattr(detect, "_detect_kde_prefers_dark", lambda: None)
+
+    with pytest.raises(AssertionError):
+        detect.detect_system_prefers_dark()
+
+
 def test_detect_system_prefers_dark_returns_none_when_all_providers_are_unknown(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

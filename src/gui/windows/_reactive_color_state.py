@@ -122,9 +122,7 @@ def sync_reactive_trail_widgets(
         logger.debug("Reactive trail widgets were unavailable during initialization", exc_info=True)
 
 
-def commit_trail_to_config(
-    config: Any, trail_percent: float | int | None, *, logger: logging.Logger
-) -> int | None:
+def commit_trail_to_config(config: Any, trail_percent: float | int | None, *, logger: logging.Logger) -> int | None:
     if trail_percent is None:
         return None
     try:

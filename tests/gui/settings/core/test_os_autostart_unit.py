@@ -15,7 +15,7 @@ def test_autostart_desktop_path_uses_home_config_dir(monkeypatch: pytest.MonkeyP
 
 def test_detect_os_autostart_enabled_reflects_file_existence(monkeypatch: pytest.MonkeyPatch) -> None:
     class _FakePath:
-        def __init__(self, *, exists_result: bool = False, exists_error: Exception | None = None) -> None:
+        def __init__(self, *, exists_result: bool = False, exists_error: BaseException | None = None) -> None:
             self.exists_result = exists_result
             self.exists_error = exists_error
 
@@ -30,8 +30,19 @@ def test_detect_os_autostart_enabled_reflects_file_existence(monkeypatch: pytest
     monkeypatch.setattr(os_autostart, "autostart_desktop_path", lambda: _FakePath(exists_result=False))
     assert os_autostart.detect_os_autostart_enabled() is False
 
-    monkeypatch.setattr(os_autostart, "autostart_desktop_path", lambda: _FakePath(exists_error=RuntimeError("boom")))
+    monkeypatch.setattr(os_autostart, "autostart_desktop_path", lambda: _FakePath(exists_error=OSError("boom")))
     assert os_autostart.detect_os_autostart_enabled() is False
+
+
+def test_detect_os_autostart_enabled_propagates_unexpected_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _FakePath:
+        def exists(self) -> bool:
+            raise AssertionError("boom")
+
+    monkeypatch.setattr(os_autostart, "autostart_desktop_path", lambda: _FakePath())
+
+    with pytest.raises(AssertionError):
+        os_autostart.detect_os_autostart_enabled()
 
 
 def test_set_os_autostart_disables_by_unlinking(monkeypatch: pytest.MonkeyPatch) -> None:

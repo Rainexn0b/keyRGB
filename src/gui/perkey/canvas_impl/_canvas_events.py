@@ -9,6 +9,10 @@ from src.core.utils.logging_utils import log_throttled
 
 logger = logging.getLogger(__name__)
 
+_CANVAS_MOTION_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError, tk.TclError)
+_CANVAS_CURSOR_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+_CANVAS_CLICK_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError, tk.TclError)
+
 
 def _selected_overlay_identity_or_none(editor: Any) -> str | None:
     try:
@@ -137,7 +141,7 @@ class _KeyboardCanvasEventMixin:
                 self.configure(cursor="fleur")
             else:
                 self.configure(cursor="")
-        except Exception as exc:  # @quality-exception exception-transparency: motion handler coordinates Tk geometry calls; must stay non-fatal
+        except _CANVAS_MOTION_ERRORS as exc:
             log_throttled(
                 logger,
                 "perkey.canvas.on_motion",
@@ -150,7 +154,7 @@ class _KeyboardCanvasEventMixin:
     def _on_leave(self, _event) -> None:
         try:
             self.configure(cursor="")
-        except Exception as exc:  # @quality-exception exception-transparency: on_leave cursor reset is a Tk widget call; must stay non-fatal
+        except _CANVAS_CURSOR_ERRORS as exc:
             log_throttled(
                 logger,
                 "perkey.canvas.on_leave",
@@ -174,7 +178,7 @@ class _KeyboardCanvasEventMixin:
                         slot_id = _slot_id_for_key_id_or_none(self.editor, key_id)
                         self.editor.on_slot_clicked(str(slot_id or key_id))
                         return
-        except Exception as exc:  # @quality-exception exception-transparency: Tk canvas tag lookup and slot dispatch; must stay non-fatal
+        except _CANVAS_CLICK_ERRORS as exc:
             log_throttled(
                 logger,
                 "perkey.canvas.on_click",

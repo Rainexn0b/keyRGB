@@ -7,6 +7,9 @@ from src.gui.calibrator.launch import launch_keymap_calibrator
 from .status import calibrator_failed, calibrator_started, set_status
 
 
+_CALIBRATOR_LAUNCH_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def run_keymap_calibrator_ui(editor: Any, *, launch_fn: Callable[[], None] = launch_keymap_calibrator) -> None:
     """Launch the keymap calibrator and report status.
 
@@ -17,5 +20,5 @@ def run_keymap_calibrator_ui(editor: Any, *, launch_fn: Callable[[], None] = lau
     try:
         launch_fn()
         set_status(editor, calibrator_started())
-    except Exception as exc:  # @quality-exception exception-transparency: calibrator launch failure is surfaced via set_status; UI must not crash
+    except _CALIBRATOR_LAUNCH_ERRORS as exc:
         set_status(editor, calibrator_failed(exc))

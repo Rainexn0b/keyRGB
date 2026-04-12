@@ -9,6 +9,9 @@ from PIL import Image
 from src.core.profile import profiles
 
 
+_BACKDROP_CANDIDATE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+
 def backdrop_image_candidates(*, profile_name: str | None, include_cwd_fallback: bool = False) -> tuple[Path, ...]:
     paths: list[Path] = []
 
@@ -16,9 +19,7 @@ def backdrop_image_candidates(*, profile_name: str | None, include_cwd_fallback:
         prof = (profile_name or "").strip()
         if prof:
             paths.append(profiles.paths_for(prof).backdrop_image)
-    except OSError:
-        pass
-    except Exception:  # @quality-exception exception-transparency: profile backdrop candidate lookup crosses profile storage helpers and filesystem state and must remain non-fatal
+    except _BACKDROP_CANDIDATE_ERRORS:
         pass
 
     repo_root = Path(__file__).resolve().parents[3]

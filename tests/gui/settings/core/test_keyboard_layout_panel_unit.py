@@ -12,9 +12,33 @@ class _FakeWidget:
         self.parent = parent
         self.options = dict(kwargs)
         self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
+        self.bind_calls: list[tuple[str, object]] = []
+        self.after_calls: list[tuple[int, object]] = []
+        self.configure_calls: list[dict[str, object]] = []
+        self.columnconfigure_calls: list[tuple[int, int]] = []
 
     def pack(self, **kwargs) -> None:
         self.pack_calls.append(dict(kwargs))
+
+    def grid(self, **kwargs) -> None:
+        self.grid_calls.append(dict(kwargs))
+
+    def bind(self, event: str, callback: object) -> None:
+        self.bind_calls.append((event, callback))
+
+    def after(self, delay_ms: int, callback: object) -> None:
+        self.after_calls.append((delay_ms, callback))
+
+    def configure(self, **kwargs) -> None:
+        self.configure_calls.append(dict(kwargs))
+        self.options.update(kwargs)
+
+    def columnconfigure(self, index: int, weight: int = 0, **_kwargs: object) -> None:
+        self.columnconfigure_calls.append((index, weight))
+
+    def winfo_width(self) -> int:
+        return int(self.options.get("width_px", 540))
 
 
 class _FakeVar:
@@ -75,21 +99,31 @@ def test_keyboard_layout_panel_init_sets_combobox_label_from_layout_id_var(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     registry = _install_fake_ttk(monkeypatch)
+    parent = _FakeWidget(width_px=540)
     layout_var = _FakeVar("iso")
     toggles: list[str] = []
 
     keyboard_layout_panel.KeyboardLayoutPanel(
-        object(),
+        parent,
         var_physical_layout=layout_var,
         on_toggle=lambda: toggles.append("toggled"),
     )
 
+    desc = registry["labels"][1]
+    row = registry["frames"][0]
+    row_label = registry["labels"][2]
     combo = registry["comboboxes"][0]
     labels = [layout.label for layout in keyboard_layout_panel.LAYOUT_CATALOG]
 
+    assert desc.pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 8)}]
+    assert parent.bind_calls[0][0] == "<Configure>"
+    assert parent.after_calls[0][0] == 0
+    assert row.columnconfigure_calls == [(1, 1)]
+    assert row_label.grid_calls == [{"row": 0, "column": 0, "sticky": "w", "padx": (0, 8)}]
     assert combo.options["textvariable"] is layout_var
     assert combo.options["values"] == labels
     assert combo.options["state"] == "readonly"
+    assert combo.grid_calls == [{"row": 0, "column": 1, "sticky": "ew"}]
     assert combo.set_calls == ["ISO (102/105-key)"]
     assert combo.get() == "ISO (102/105-key)"
     assert combo.bind_calls[0][0] == "<<ComboboxSelected>>"
@@ -100,10 +134,11 @@ def test_keyboard_layout_panel_init_falls_back_to_first_label_for_unknown_layout
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     registry = _install_fake_ttk(monkeypatch)
+    parent = _FakeWidget(width_px=540)
     layout_var = _FakeVar("not-a-layout")
 
     keyboard_layout_panel.KeyboardLayoutPanel(
-        object(),
+        parent,
         var_physical_layout=layout_var,
         on_toggle=lambda: None,
     )
@@ -119,10 +154,11 @@ def test_keyboard_layout_panel_init_falls_back_to_first_label_for_unknown_layout
 
 def test_keyboard_layout_panel_builds_expected_label_id_maps(monkeypatch: pytest.MonkeyPatch) -> None:
     _install_fake_ttk(monkeypatch)
+    parent = _FakeWidget(width_px=540)
     layout_var = _FakeVar("ansi")
 
     panel = keyboard_layout_panel.KeyboardLayoutPanel(
-        object(),
+        parent,
         var_physical_layout=layout_var,
         on_toggle=lambda: None,
     )
@@ -135,11 +171,12 @@ def test_keyboard_layout_panel_selection_updates_var_to_layout_id_and_calls_on_t
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     registry = _install_fake_ttk(monkeypatch)
+    parent = _FakeWidget(width_px=540)
     layout_var = _FakeVar("auto")
     toggles: list[str] = []
 
     keyboard_layout_panel.KeyboardLayoutPanel(
-        object(),
+        parent,
         var_physical_layout=layout_var,
         on_toggle=lambda: toggles.append("toggled"),
     )

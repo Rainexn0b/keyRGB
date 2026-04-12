@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import tkinter as tk
 
+from src.gui.utils.window_geometry import compute_centered_window_geometry
+
 
 def apply_perkey_editor_geometry(
     root: tk.Tk,
@@ -35,8 +37,16 @@ def apply_perkey_editor_geometry(
     max_w = int(screen_w * 0.92)
     max_h = int(screen_h * 0.92)
 
-    w = min(int(w0 * 1.5), max_w)
-    h = min(int(h0 * 1.5), max_h)
+    geometry = compute_centered_window_geometry(
+        root,
+        content_height_px=h0,
+        content_width_px=w0,
+        footer_height_px=0,
+        chrome_padding_px=0,
+        default_w=int(w0 * 1.5),
+        default_h=int(h0 * 1.5),
+        screen_ratio_cap=0.92,
+    )
 
-    root.geometry(f"{w}x{h}")
+    root.geometry(geometry)
     root.minsize(min(w0, max_w), min(h0, max_h))

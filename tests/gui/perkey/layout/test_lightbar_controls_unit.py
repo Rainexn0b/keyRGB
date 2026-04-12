@@ -163,6 +163,14 @@ def test_apply_from_vars_tolerates_broken_editor_canvas_redraw() -> None:
     assert local_controls.editor.lightbar_overlay == payload
 
 
+def test_apply_from_vars_propagates_unexpected_editor_canvas_redraw_errors() -> None:
+    local_controls = _controls()
+    local_controls.editor.canvas = _BrokenRedrawCanvas(AssertionError("boom"))
+
+    with pytest.raises(AssertionError):
+        lightbar_controls.LightbarControls.apply_from_vars(local_controls)
+
+
 def test_reset_tweaks_tolerates_missing_editor_canvas_redraw() -> None:
     local_controls = _controls({"visible": False, "length": 0.9, "thickness": 0.2, "dx": 0.1, "dy": 0.1, "inset": 0.1})
     local_controls.editor.canvas = object()

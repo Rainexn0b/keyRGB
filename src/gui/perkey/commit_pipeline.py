@@ -11,6 +11,7 @@ from src.core.utils.safe_attrs import safe_int_attr
 from .ops.color_map_ops import ensure_full_map
 
 logger = logging.getLogger(__name__)
+_CONFIG_WRITE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 Color = Tuple[int, int, int]
 Cell = Tuple[int, int]
@@ -20,7 +21,7 @@ ColorMap = Mapping[Cell, Color]
 def _safe_config_write(config: Any, name: str, value: Any) -> None:
     try:
         setattr(config, name, value)
-    except Exception as exc:  # @quality-exception exception-transparency: per-key commit config writes cross arbitrary config object/runtime boundaries and GUI commits must stay best-effort while still pushing hardware colors
+    except _CONFIG_WRITE_ERRORS as exc:
         log_throttled(
             logger,
             f"perkey.commit_pipeline.config_write.{name}",

@@ -17,6 +17,9 @@ class _FakeWidget:
         self.configure_calls = []
         self.pack_calls = []
         self.grid_calls = []
+        self.bind_calls = []
+        self.after_calls = []
+        self.columnconfigure_calls = []
 
     def configure(self, **kwargs):
         self.configure_calls.append(dict(kwargs))
@@ -27,6 +30,18 @@ class _FakeWidget:
 
     def grid(self, **kwargs):
         self.grid_calls.append(dict(kwargs))
+
+    def bind(self, event, callback):
+        self.bind_calls.append((event, callback))
+
+    def after(self, delay_ms, callback):
+        self.after_calls.append((delay_ms, callback))
+
+    def columnconfigure(self, index, weight=0, **_kwargs):
+        self.columnconfigure_calls.append((index, weight))
+
+    def winfo_width(self):
+        return int(self.options.get("width_px", 620))
 
 
 class _FakeRoot:
@@ -119,9 +134,11 @@ def test_version_panel_init_wires_widgets_and_starts_check(monkeypatch: pytest.M
 
     root = _FakeRoot()
     status_label = _FakeWidget(text="")
-    panel = version_panel.VersionPanel(object(), root=root, get_status_label=lambda: status_label)
+    parent = _FakeWidget(width_px=620)
+    panel = version_panel.VersionPanel(parent, root=root, get_status_label=lambda: status_label)
 
     label_texts = [label.options.get("text") for label in registry["labels"]]
+    desc = registry["labels"][1]
 
     assert started == [panel]
     assert label_texts[:3] == [
@@ -137,6 +154,14 @@ def test_version_panel_init_wires_widgets_and_starts_check(monkeypatch: pytest.M
     assert panel.lbl_latest_stable_version.options["text"] == "Checking…"
     assert panel.lbl_latest_prerelease_version.options["text"] == "Checking…"
     assert panel.lbl_update_status.options["text"] == ""
+    assert desc.options["justify"] == "left"
+    assert desc.options["wraplength"] == 520
+    assert desc.pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 8)}]
+    assert panel.lbl_update_status.options["justify"] == "left"
+    assert panel.lbl_update_status.options["wraplength"] == 520
+    assert panel.lbl_update_status.pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 8)}]
+    assert parent.bind_calls[0][0] == "<Configure>"
+    assert parent.after_calls[0][0] == 0
     assert panel.btn_open_repo.options["text"] == "Open repo"
     assert panel.btn_open_repo.options["command"].__self__ is panel
     assert panel.btn_open_repo.pack_calls == [{"side": "left"}]

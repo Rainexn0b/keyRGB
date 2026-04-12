@@ -71,7 +71,7 @@ def test_apply_perkey_editor_geometry_uses_keyboard_math_chrome_padding_and_scal
 
     assert (w0, h0) == (924, 564)
     assert (w, h) == (1386, 846)
-    assert root.geometry_calls == ["1386x846"]
+    assert root.geometry_calls == ["1386x846+307+377"]
     assert root.minsize_calls == [(924, 564)]
 
 
@@ -118,7 +118,7 @@ def test_apply_perkey_editor_geometry_uses_wheel_height_minimum_when_taller() ->
 
     assert (w0, h0) == (403, 720)
     assert (w, h) == (604, 1080)
-    assert root.geometry_calls == ["604x1080"]
+    assert root.geometry_calls == ["604x1080+698+210"]
     assert root.minsize_calls == [(403, 720)]
 
 
@@ -142,5 +142,5 @@ def test_apply_perkey_editor_geometry_clamps_to_ninety_two_percent_of_screen() -
     assert w0 == 1933
     assert h0 == 1047
     assert (w, h) == (920, 828)
-    assert root.geometry_calls == ["920x828"]
+    assert root.geometry_calls == ["920x828+40+36"]
     assert root.minsize_calls == [(920, 828)]

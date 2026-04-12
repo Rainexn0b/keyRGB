@@ -12,8 +12,11 @@ from typing import Any
 
 _PROBE_AUTO_STEP_DURATION_S = 2.5
 _PROBE_AUTO_SETTLE_DURATION_S = 0.5
+_PROBE_DIALOG_SCREEN_RATIO_CAP = 0.92
 _PROBE_AUTOMATION_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _PROBE_DIALOG_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_SUPPORT_COLLECTION_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_SUPPORT_BUNDLE_BUILD_ERRORS = (AttributeError, LookupError, RuntimeError)
 
 
 def _format_probe_speed_list(values: object) -> str:
@@ -31,16 +34,102 @@ def _format_probe_speed_list(values: object) -> str:
     return ", ".join(out)
 
 
+def _probe_dialog_dimensions(window: Any, *, width: int, height: int) -> tuple[int, int]:
+    try:
+        root = window.root
+        screen_w = int(root.winfo_screenwidth())
+        screen_h = int(root.winfo_screenheight())
+        max_w = max(320, int(screen_w * _PROBE_DIALOG_SCREEN_RATIO_CAP))
+        max_h = max(220, int(screen_h * _PROBE_DIALOG_SCREEN_RATIO_CAP))
+        return min(int(width), max_w), min(int(height), max_h)
+    except _PROBE_DIALOG_ERRORS:
+        return int(width), int(height)
+
+
+def _dialog_wraplength(container: Any, *, padding: int, minimum: int) -> int:
+    try:
+        width = int(container.winfo_width())
+    except _PROBE_DIALOG_ERRORS:
+        return int(minimum)
+    if width <= 1:
+        return int(minimum)
+    return max(int(minimum), width - int(padding))
+
+
+def _sync_dialog_prompt_wrap(label: Any, container: Any, *, padding: int, minimum: int) -> None:
+    try:
+        label.configure(wraplength=_dialog_wraplength(container, padding=padding, minimum=minimum))
+    except _PROBE_DIALOG_ERRORS:
+        return
+
+
+def _bind_dialog_prompt_wrap(dialog: Any, label: Any, container: Any, *, padding: int, minimum: int) -> None:
+    def _sync(_event=None) -> None:
+        _sync_dialog_prompt_wrap(label, container, padding=padding, minimum=minimum)
+
+    for widget in (dialog, container):
+        try:
+            widget.bind("<Configure>", _sync, add="+")
+        except _PROBE_DIALOG_ERRORS:
+            continue
+
+    try:
+        dialog.after(0, _sync)
+    except _PROBE_DIALOG_ERRORS:
+        return
+
+
+def _build_dialog_button_row(
+    container: Any,
+    *,
+    ttk: Any,
+    row: int,
+    pady: tuple[int, int],
+    actions: list[tuple[str, Any]],
+    columns: int,
+) -> list[Any]:
+    button_row = ttk.Frame(container)
+    button_row.grid(row=row, column=0, sticky="ew", pady=pady)
+
+    total_columns = max(1, min(int(columns), len(actions) if actions else 1))
+    for column in range(total_columns):
+        try:
+            button_row.columnconfigure(column, weight=1)
+        except _PROBE_DIALOG_ERRORS:
+            continue
+
+    created_buttons: list[Any] = []
+    for index, (label, command) in enumerate(actions):
+        grid_row = index // total_columns
+        grid_column = index % total_columns
+        button = ttk.Button(button_row, text=str(label), command=command)
+        button.grid(
+            row=grid_row,
+            column=grid_column,
+            sticky="ew",
+            padx=(0 if grid_column == 0 else 8, 0),
+            pady=(0 if grid_row == 0 else 8, 0),
+        )
+        created_buttons.append(button)
+
+    return created_buttons
+
+
 def _probe_dialog_geometry(window: Any, *, width: int, height: int) -> str:
     try:
         root = window.root
         root.update_idletasks()
+        screen_w = int(root.winfo_screenwidth())
+        screen_h = int(root.winfo_screenheight())
+        width, height = _probe_dialog_dimensions(window, width=width, height=height)
         root_x = int(root.winfo_rootx())
         root_y = int(root.winfo_rooty())
         root_w = max(int(root.winfo_width()), width)
         root_h = max(int(root.winfo_height()), height)
         x = root_x + max(24, (root_w - width) // 2)
         y = root_y + max(24, (root_h - height) // 3)
+        x = max(0, min(screen_w - width, x))
+        y = max(0, min(screen_h - height, y))
         return f"{width}x{height}+{x}+{y}"
     except _PROBE_DIALOG_ERRORS:
         return f"{width}x{height}"
@@ -57,11 +146,12 @@ def _show_probe_message_dialog(
     width: int = 720,
     height: int = 560,
 ) -> bool:
+    width, height = _probe_dialog_dimensions(window, width=width, height=height)
     dialog = tk.Toplevel(window.root)
     dialog.title(title)
     dialog.transient(window.root)
     dialog.geometry(_probe_dialog_geometry(window, width=width, height=height))
-    dialog.minsize(560, 360)
+    dialog.minsize(min(560, width), min(360, height))
     dialog.resizable(True, True)
 
     container = ttk.Frame(dialog, padding=14)
@@ -81,9 +171,6 @@ def _show_probe_message_dialog(
     body.insert("1.0", str(message or ""))
     body.configure(state="disabled")
 
-    button_row = ttk.Frame(container)
-    button_row.grid(row=1, column=0, sticky="e", pady=(12, 0))
-
     result = {"ok": False}
 
     def close(*, ok: bool) -> None:
@@ -94,8 +181,15 @@ def _show_probe_message_dialog(
             pass
         dialog.destroy()
 
-    ok_btn = ttk.Button(button_row, text="OK", command=lambda: close(ok=True))
-    ok_btn.pack(side="right")
+    created_buttons = _build_dialog_button_row(
+        container,
+        ttk=ttk,
+        row=1,
+        pady=(12, 0),
+        actions=[("OK", lambda: close(ok=True))],
+        columns=1,
+    )
+    ok_btn = created_buttons[0]
 
     dialog.protocol("WM_DELETE_WINDOW", lambda: close(ok=False))
     try:
@@ -122,20 +216,21 @@ def _ask_probe_choice_dialog(
     width: int = 520,
     height: int = 240,
 ) -> object:
+    width, height = _probe_dialog_dimensions(window, width=width, height=height)
     dialog = tk.Toplevel(window.root)
     dialog.title(title)
     dialog.transient(window.root)
     dialog.geometry(_probe_dialog_geometry(window, width=width, height=height))
-    dialog.minsize(420, 200)
+    dialog.minsize(min(420, width), min(200, height))
     dialog.resizable(True, False)
 
     container = ttk.Frame(dialog, padding=16)
     container.pack(fill="both", expand=True)
     container.columnconfigure(0, weight=1)
 
-    ttk.Label(container, text=str(prompt or ""), justify="left", wraplength=width - 72).grid(
-        row=0, column=0, sticky="w"
-    )
+    prompt_label = ttk.Label(container, text=str(prompt or ""), justify="left", wraplength=width - 72)
+    prompt_label.grid(row=0, column=0, sticky="w")
+    _bind_dialog_prompt_wrap(dialog, prompt_label, container, padding=72, minimum=220)
 
     result = {"value": None}
 
@@ -147,13 +242,14 @@ def _ask_probe_choice_dialog(
             pass
         dialog.destroy()
 
-    button_row = ttk.Frame(container)
-    button_row.grid(row=1, column=0, sticky="e", pady=(18, 0))
-    created_buttons = []
-    for label, value in choices:
-        btn = ttk.Button(button_row, text=str(label), command=lambda v=value: close(v))
-        btn.pack(side="left", padx=(8, 0))
-        created_buttons.append(btn)
+    created_buttons = _build_dialog_button_row(
+        container,
+        ttk=ttk,
+        row=1,
+        pady=(18, 0),
+        actions=[(str(label), (lambda v=value: close(v))) for label, value in choices],
+        columns=2,
+    )
 
     dialog.protocol("WM_DELETE_WINDOW", lambda: close(None))
     try:
@@ -180,11 +276,12 @@ def _ask_probe_notes_dialog(
     width: int = 720,
     height: int = 340,
 ) -> str | None:
+    width, height = _probe_dialog_dimensions(window, width=width, height=height)
     dialog = tk.Toplevel(window.root)
     dialog.title(title)
     dialog.transient(window.root)
     dialog.geometry(_probe_dialog_geometry(window, width=width, height=height))
-    dialog.minsize(560, 260)
+    dialog.minsize(min(560, width), min(260, height))
     dialog.resizable(True, True)
 
     container = ttk.Frame(dialog, padding=16)
@@ -192,9 +289,9 @@ def _ask_probe_notes_dialog(
     container.columnconfigure(0, weight=1)
     container.rowconfigure(1, weight=1)
 
-    ttk.Label(container, text=str(prompt or ""), justify="left", wraplength=width - 72).grid(
-        row=0, column=0, sticky="w", pady=(0, 10)
-    )
+    prompt_label = ttk.Label(container, text=str(prompt or ""), justify="left", wraplength=width - 72)
+    prompt_label.grid(row=0, column=0, sticky="w", pady=(0, 10))
+    _bind_dialog_prompt_wrap(dialog, prompt_label, container, padding=72, minimum=240)
 
     notes_box = scrolledtext.ScrolledText(
         container,
@@ -217,10 +314,14 @@ def _ask_probe_notes_dialog(
             pass
         dialog.destroy()
 
-    button_row = ttk.Frame(container)
-    button_row.grid(row=2, column=0, sticky="e", pady=(12, 0))
-    ttk.Button(button_row, text="Cancel", command=lambda: close(ok=False)).pack(side="right")
-    ttk.Button(button_row, text="OK", command=lambda: close(ok=True)).pack(side="right", padx=(0, 8))
+    _build_dialog_button_row(
+        container,
+        ttk=ttk,
+        row=2,
+        pady=(12, 0),
+        actions=[("OK", lambda: close(ok=True)), ("Cancel", lambda: close(ok=False))],
+        columns=2,
+    )
 
     dialog.protocol("WM_DELETE_WINDOW", lambda: close(ok=False))
     try:
@@ -330,7 +431,7 @@ def run_debug(window: Any, *, collect_diagnostics_text: Any, run_in_thread: Any,
     def work() -> str:
         try:
             return collect_diagnostics_text(include_usb=True)
-        except Exception as exc:  # @quality-exception exception-transparency: diagnostics collection is an arbitrary external boundary and the worker thread must return a safe fallback string instead of raising
+        except _SUPPORT_COLLECTION_ERRORS as exc:
             logger.exception("Failed to collect diagnostics")
             return f"Failed to collect diagnostics: {exc}"
 
@@ -362,7 +463,7 @@ def run_discovery(
         try:
             payload = collect_device_discovery(include_usb=True)
             return json.dumps(payload, indent=2, sort_keys=True), format_device_discovery_text(payload)
-        except Exception as exc:  # @quality-exception exception-transparency: device discovery collection is an arbitrary external boundary and the worker thread must return a safe fallback instead of raising
+        except _SUPPORT_COLLECTION_ERRORS as exc:
             logger.exception("Failed to collect discovery snapshot")
             return "", f"Failed to scan devices: {exc}"
 
@@ -640,7 +741,7 @@ def save_support_bundle(
     except (OSError, TypeError, ValueError):
         window._set_status("Failed to save bundle", ok=False)
         return
-    except Exception:  # @quality-exception exception-transparency: unexpected error saving the support bundle JSON; narrow catch above already handles expected IO/serialization errors
+    except _SUPPORT_BUNDLE_BUILD_ERRORS:
         logger.exception("Failed to save support bundle")
         window._set_status("Failed to save bundle", ok=False)
         return

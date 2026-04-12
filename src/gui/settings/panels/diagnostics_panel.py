@@ -16,6 +16,16 @@ logger = logging.getLogger(__name__)
 _BROWSER_OPEN_ERRORS = (webbrowser.Error, OSError)
 _STATUS_LABEL_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 _CLIPBOARD_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+_WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_DIAGNOSTICS_COLLECTION_ERRORS = (
+    AttributeError,
+    ImportError,
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 class DiagnosticsPanel:
@@ -45,20 +55,43 @@ class DiagnosticsPanel:
                 "This works even if hardware detection fails."
             ),
             font=("Sans", 9),
+            justify="left",
+            wraplength=420,
         )
-        desc.pack(anchor="w", pady=(0, 8))
+        desc.pack(anchor="w", fill="x", pady=(0, 8))
+
+        def _sync_wrap(_event=None) -> None:
+            try:
+                width = int(parent.winfo_width())
+                if width <= 1:
+                    return
+                desc.configure(wraplength=max(260, width - 24))
+            except _WRAP_SYNC_ERRORS:
+                return
+
+        try:
+            parent.bind("<Configure>", _sync_wrap)
+            parent.after(0, _sync_wrap)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
         btn_row = ttk.Frame(parent)
         btn_row.pack(fill="x", pady=(0, 8))
+        try:
+            btn_row.columnconfigure(0, weight=1)
+            btn_row.columnconfigure(1, weight=1)
+            btn_row.columnconfigure(2, weight=1)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
         self.btn_run_diagnostics = ttk.Button(btn_row, text="Run diagnostics", command=self.run_diagnostics)
-        self.btn_run_diagnostics.pack(side="left")
+        self.btn_run_diagnostics.grid(row=0, column=0, sticky="ew")
 
         self.btn_copy_diagnostics = ttk.Button(btn_row, text="Copy output", command=self.copy_output)
-        self.btn_copy_diagnostics.pack(side="left", padx=(8, 0))
+        self.btn_copy_diagnostics.grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
         self.btn_open_issue = ttk.Button(btn_row, text="Open issue", command=self.open_issue_form)
-        self.btn_open_issue.pack(side="left", padx=(8, 0))
+        self.btn_open_issue.grid(row=0, column=2, sticky="ew", padx=(8, 0))
 
         self.txt_diagnostics = scrolledtext.ScrolledText(
             parent,
@@ -95,7 +128,7 @@ class DiagnosticsPanel:
     def _collect_diagnostics_text_best_effort(self) -> str:
         try:
             return collect_diagnostics_text(include_usb=True)
-        except Exception as exc:  # @quality-exception exception-transparency: diagnostics collection crosses backend probing and JSON serialization; best-effort for settings panel
+        except _DIAGNOSTICS_COLLECTION_ERRORS as exc:
             logger.exception("Failed to collect diagnostics for settings panel")
             return f"Failed to collect diagnostics: {exc}"
 

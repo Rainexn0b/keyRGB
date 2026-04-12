@@ -39,9 +39,10 @@ class _ColorWheelUIMixin:
             # Brightness/Value slider
             brightness_frame = ttk.Frame(self)
             brightness_frame.pack(fill="x", padx=20, pady=10)
+            brightness_frame.columnconfigure(1, weight=1)
 
             self.brightness_title_label = ttk.Label(brightness_frame, text=self._brightness_label_text)
-            self.brightness_title_label.pack(side="left", padx=(0, 10))
+            self.brightness_title_label.grid(row=0, column=0, sticky="w", padx=(0, 10))
 
             self.brightness_var = tk.DoubleVar(value=self.current_value * 100)
             self.brightness_slider = ttk.Scale(
@@ -52,18 +53,19 @@ class _ColorWheelUIMixin:
                 variable=self.brightness_var,
                 command=self._on_brightness_change,
             )
-            self.brightness_slider.pack(side="left", fill="x", expand=True)
+            self.brightness_slider.grid(row=0, column=1, sticky="ew")
 
             self.brightness_label = ttk.Label(brightness_frame, text=f"{int(self.current_value * 100)}%")
             # Prevent label width changes from causing layout/geometry jitter and avoid clipping of the percent sign
             self.brightness_label.configure(width=5)
-            self.brightness_label.pack(side="left", padx=(10, 5))
+            self.brightness_label.grid(row=0, column=2, sticky="e", padx=(10, 5))
 
         # Color preview
         preview_frame = ttk.Frame(self)
         preview_frame.pack(fill="x", padx=20, pady=10)
+        preview_frame.columnconfigure(2, weight=1)
 
-        ttk.Label(preview_frame, text="Selected Color:").pack(side="left", padx=(0, 10))
+        ttk.Label(preview_frame, text="Selected Color:").grid(row=0, column=0, sticky="w", padx=(0, 10))
 
         self.preview_canvas = tk.Canvas(
             preview_frame,
@@ -74,18 +76,18 @@ class _ColorWheelUIMixin:
             bg=bg,
         )
         # Fixed-size preview to avoid geometry changes during drag
-        self.preview_canvas.pack(side="left")
+        self.preview_canvas.grid(row=0, column=1, sticky="w")
 
         self.rgb_label = None
         if self.show_rgb_label:
             self.rgb_label = ttk.Label(preview_frame, text="", width=16)
-            self.rgb_label.pack(side="left", padx=(10, 0))
+            self.rgb_label.grid(row=0, column=2, sticky="w", padx=(10, 0))
 
         # Manual RGB input (useful for copying exact values).
         manual_frame = ttk.Frame(self)
         manual_frame.pack(fill="x", padx=20, pady=(0, 10))
 
-        ttk.Label(manual_frame, text="RGB:").pack(side="left", padx=(0, 8))
+        ttk.Label(manual_frame, text="RGB:").grid(row=0, column=0, sticky="w", padx=(0, 8))
 
         self._rgb_entry_syncing = False
         self.rgb_r_var = tk.StringVar(value=str(int(self.current_color[0])))
@@ -95,13 +97,18 @@ class _ColorWheelUIMixin:
         self.rgb_r_entry = ttk.Entry(manual_frame, textvariable=self.rgb_r_var, width=4)
         self.rgb_g_entry = ttk.Entry(manual_frame, textvariable=self.rgb_g_var, width=4)
         self.rgb_b_entry = ttk.Entry(manual_frame, textvariable=self.rgb_b_var, width=4)
-        self.rgb_r_entry.pack(side="left")
-        ttk.Label(manual_frame, text=",").pack(side="left", padx=(2, 2))
-        self.rgb_g_entry.pack(side="left")
-        ttk.Label(manual_frame, text=",").pack(side="left", padx=(2, 2))
-        self.rgb_b_entry.pack(side="left")
+        self.rgb_r_entry.grid(row=0, column=1, sticky="w")
+        ttk.Label(manual_frame, text=",").grid(row=0, column=2, sticky="w", padx=(2, 2))
+        self.rgb_g_entry.grid(row=0, column=3, sticky="w")
+        ttk.Label(manual_frame, text=",").grid(row=0, column=4, sticky="w", padx=(2, 2))
+        self.rgb_b_entry.grid(row=0, column=5, sticky="w")
 
-        ttk.Button(manual_frame, text="Set", command=self._on_manual_rgb_set).pack(side="left", padx=(10, 0))
+        ttk.Button(manual_frame, text="Set", command=self._on_manual_rgb_set).grid(
+            row=0,
+            column=6,
+            sticky="w",
+            padx=(10, 0),
+        )
 
         for ent in (self.rgb_r_entry, self.rgb_g_entry, self.rgb_b_entry):
             ent.bind("<Return>", lambda _e: self._on_manual_rgb_set())

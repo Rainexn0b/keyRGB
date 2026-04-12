@@ -179,3 +179,13 @@ def test_fit_key_label_falls_back_cleanly_on_font_errors(monkeypatch: pytest.Mon
 
     assert label == "Label"
     assert size == 7
+
+
+def test_fit_key_label_propagates_unexpected_font_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_font(*_args: object, **_kwargs: object) -> object:
+        raise AssertionError("unexpected font bug")
+
+    monkeypatch.setattr(canvas_render.tkfont, "Font", raise_font)
+
+    with pytest.raises(AssertionError, match="unexpected font bug"):
+        canvas_render._fit_key_label("Label", key_w=20, key_h=10)

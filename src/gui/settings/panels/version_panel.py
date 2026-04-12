@@ -23,6 +23,7 @@ _GITHUB_RELEASE_FETCH_ERRORS = (OSError, UnicodeError, json.JSONDecodeError)
 _BROWSER_OPEN_ERRORS = (webbrowser.Error, OSError)
 _STATUS_LABEL_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 _CLIPBOARD_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+_WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 
 
 class VersionPanel:
@@ -35,6 +36,7 @@ class VersionPanel:
     ) -> None:
         self._root = root
         self._get_status_label = get_status_label
+        self._wrap_labels: list[ttk.Label] = []
 
         title = ttk.Label(parent, text="Version", font=("Sans", 11, "bold"))
         title.pack(anchor="w", pady=(0, 6))
@@ -46,11 +48,35 @@ class VersionPanel:
                 "whether you're on the latest stable release (and also shows the latest pre-release)."
             ),
             font=("Sans", 9),
+            justify="left",
+            wraplength=520,
         )
-        desc.pack(anchor="w", pady=(0, 8))
+        desc.pack(anchor="w", fill="x", pady=(0, 8))
+        self._wrap_labels.append(desc)
+
+        def _sync_wrap(_event=None) -> None:
+            try:
+                width = int(parent.winfo_width())
+                if width <= 1:
+                    return
+                wrap = max(260, width - 24)
+                for label in self._wrap_labels:
+                    label.configure(wraplength=wrap)
+            except _WRAP_SYNC_ERRORS:
+                return
+
+        try:
+            parent.bind("<Configure>", _sync_wrap)
+            parent.after(0, _sync_wrap)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
         grid = ttk.Frame(parent)
         grid.pack(fill="x", pady=(0, 8))
+        try:
+            grid.columnconfigure(1, weight=1)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
         ttk.Label(grid, text="Installed", font=("Sans", 9)).grid(row=0, column=0, sticky="w")
         self.lbl_installed_version = ttk.Label(grid, text="?", font=("Sans", 9))
@@ -64,8 +90,9 @@ class VersionPanel:
         self.lbl_latest_prerelease_version = ttk.Label(grid, text="Checking…", font=("Sans", 9))
         self.lbl_latest_prerelease_version.grid(row=2, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
 
-        self.lbl_update_status = ttk.Label(parent, text="", font=("Sans", 9))
-        self.lbl_update_status.pack(anchor="w", pady=(0, 8))
+        self.lbl_update_status = ttk.Label(parent, text="", font=("Sans", 9), justify="left", wraplength=520)
+        self.lbl_update_status.pack(anchor="w", fill="x", pady=(0, 8))
+        self._wrap_labels.append(self.lbl_update_status)
 
         btn_row = ttk.Frame(parent)
         btn_row.pack(fill="x", pady=(0, 2))

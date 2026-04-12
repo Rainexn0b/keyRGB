@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +18,10 @@ class _FakeWidget:
     def __init__(self, **kwargs) -> None:
         self.options = dict(kwargs)
         self.configure_calls: list[dict[str, object]] = []
+        self.bind_calls: list[tuple[str, object, object]] = []
+        self.after_calls: list[tuple[int, object]] = []
+        self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
@@ -26,16 +31,31 @@ class _FakeWidget:
         self.options["focused"] = True
 
     def pack(self, *args, **kwargs) -> None:
-        return
+        self.pack_calls.append(dict(kwargs))
 
     def grid(self, *args, **kwargs) -> None:
-        return
+        self.grid_calls.append(dict(kwargs))
+
+    def bind(self, sequence: str, callback: object, add: object = None) -> None:
+        self.bind_calls.append((sequence, callback, add))
+
+    def after(self, delay_ms: int, callback) -> None:
+        self.after_calls.append((delay_ms, callback))
 
     def columnconfigure(self, index: int, weight: int = 0, **kwargs: object) -> None:
         self.options.setdefault("columnconfigure", []).append((index, weight))
 
     def rowconfigure(self, index: int, weight: int = 0, **kwargs: object) -> None:
         self.options.setdefault("rowconfigure", []).append((index, weight))
+
+    def winfo_width(self) -> int:
+        return int(self.options.get("width_px", 640))
+
+    def winfo_reqwidth(self) -> int:
+        return int(self.options.get("reqwidth_px", self.winfo_width()))
+
+    def winfo_reqheight(self) -> int:
+        return int(self.options.get("reqheight_px", 480))
 
 
 class _FakeText(_FakeWidget):
@@ -59,6 +79,13 @@ class _FakeRoot:
         self.geometry_value = ""
         self.minsize_value: tuple[int, int] | None = None
         self.resizable_value: tuple[bool, bool] | None = None
+        self.update_idletasks_calls = 0
+        self.root_x = 100
+        self.root_y = 80
+        self.root_width = 1240
+        self.root_height = 920
+        self.screen_width = 1920
+        self.screen_height = 1080
 
     def clipboard_clear(self) -> None:
         self.clipboard_cleared += 1
@@ -81,8 +108,26 @@ class _FakeRoot:
     def resizable(self, width: bool, height: bool) -> None:
         self.resizable_value = (width, height)
 
+    def update_idletasks(self) -> None:
+        self.update_idletasks_calls += 1
+
     def winfo_screenheight(self) -> int:
-        return 1080
+        return self.screen_height
+
+    def winfo_screenwidth(self) -> int:
+        return self.screen_width
+
+    def winfo_rootx(self) -> int:
+        return self.root_x
+
+    def winfo_rooty(self) -> int:
+        return self.root_y
+
+    def winfo_width(self) -> int:
+        return self.root_width
+
+    def winfo_height(self) -> int:
+        return self.root_height
 
     def mainloop(self) -> None:
         return
@@ -97,6 +142,8 @@ def _flush_after(root: _FakeRoot) -> None:
 def _make_window(*, diagnostics_json: str = "", discovery_json: str = ""):
     window = support_window.SupportToolsGUI.__new__(support_window.SupportToolsGUI)
     window.root = _FakeRoot()
+    window._bg_color = "#111111"
+    window._fg_color = "#eeeeee"
     window.status_label = _FakeWidget(text="")
     window.issue_meta_label = _FakeWidget(text="")
     window.txt_debug = _FakeText("stale debug")
@@ -121,6 +168,51 @@ def _make_window(*, diagnostics_json: str = "", discovery_json: str = ""):
     window._capture_prompt_key = ""
     window._backend_probe_prompt_key = ""
     return window
+
+
+def _build_support_ui_modules() -> tuple[dict[str, list[_FakeWidget]], SimpleNamespace, SimpleNamespace]:
+    registry: dict[str, list[_FakeWidget]] = {"frames": [], "labels": [], "buttons": [], "texts": []}
+
+    def _frame(*args, **kwargs):
+        widget = _FakeWidget(**kwargs)
+        registry["frames"].append(widget)
+        return widget
+
+    def _label(*args, **kwargs):
+        widget = _FakeWidget(**kwargs)
+        registry["labels"].append(widget)
+        return widget
+
+    def _button(*args, **kwargs):
+        widget = _FakeWidget(**kwargs)
+        registry["buttons"].append(widget)
+        return widget
+
+    def _text(*args, **kwargs):
+        widget = _FakeText("")
+        widget.options.update(kwargs)
+        registry["texts"].append(widget)
+        return widget
+
+    fake_ttk = SimpleNamespace(Frame=_frame, Label=_label, Button=_button)
+    fake_scrolledtext = SimpleNamespace(ScrolledText=_text)
+    return registry, fake_ttk, fake_scrolledtext
+
+
+def _build_support_jobs_ttk() -> tuple[dict[str, list[_FakeWidget]], SimpleNamespace]:
+    registry: dict[str, list[_FakeWidget]] = {"frames": [], "buttons": []}
+
+    def _frame(*args, **kwargs):
+        widget = _FakeWidget(**kwargs)
+        registry["frames"].append(widget)
+        return widget
+
+    def _button(*args, **kwargs):
+        widget = _FakeWidget(**kwargs)
+        registry["buttons"].append(widget)
+        return widget
+
+    return registry, SimpleNamespace(Frame=_frame, Button=_button)
 
 
 def test_init_builds_all_sections_before_sync(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -170,9 +262,172 @@ def test_init_builds_all_sections_before_sync(monkeypatch: pytest.MonkeyPatch) -
     assert window.btn_copy_discovery.options["state"] == "disabled"
     assert window.btn_copy_issue.options["state"] == "disabled"
     assert window.root.title_text == "KeyRGB - Support Tools"
+    assert window.root.minsize_value == (960, 720)
     assert window.btn_run_debug.options["style"] == "SupportChecks.Diagnostics.TButton"
     assert window.btn_run_speed_probe.options["style"] == "SupportChecks.Probe.TButton"
     assert window.btn_run_discovery.options["style"] == "SupportChecks.Discovery.TButton"
+    assert any(delay == 50 for delay, _callback in window.root.after_calls)
+
+
+def test_apply_geometry_uses_requested_content_size(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = support_window.SupportToolsGUI.__new__(support_window.SupportToolsGUI)
+    window.root = _FakeRoot()
+    window._main_frame = _FakeWidget(reqwidth_px=1480, reqheight_px=910)
+
+    seen: dict[str, object] = {}
+
+    def _fake_compute(root, **kwargs):
+        seen["root"] = root
+        seen.update(kwargs)
+        return "1480x958+10+20"
+
+    monkeypatch.setattr(support_window, "compute_centered_window_geometry", _fake_compute)
+
+    window._apply_geometry()
+
+    assert window.root.update_idletasks_calls == 1
+    assert seen == {
+        "root": window.root,
+        "content_height_px": 910,
+        "content_width_px": 1480,
+        "footer_height_px": 0,
+        "chrome_padding_px": 48,
+        "default_w": 1240,
+        "default_h": 920,
+        "screen_ratio_cap": 0.95,
+    }
+    assert window.root.geometry_value == "1480x958+10+20"
+
+
+def test_probe_dialog_dimensions_clamp_to_screen_ratio() -> None:
+    window = _make_window()
+    window.root.screen_width = 800
+    window.root.screen_height = 600
+
+    width, height = support_window.support_jobs._probe_dialog_dimensions(window, width=1200, height=900)
+
+    assert (width, height) == (736, 552)
+
+
+def test_probe_dialog_geometry_clamps_position_to_visible_screen() -> None:
+    window = _make_window()
+    window.root.screen_width = 800
+    window.root.screen_height = 600
+    window.root.root_x = 700
+    window.root.root_y = 500
+    window.root.root_width = 500
+    window.root.root_height = 400
+
+    geometry = support_window.support_jobs._probe_dialog_geometry(window, width=1200, height=900)
+
+    assert geometry == "736x552+64+48"
+
+
+def test_dialog_wraplength_uses_container_width_with_floor() -> None:
+    container = _FakeWidget(width_px=510)
+
+    wrap = support_window.support_jobs._dialog_wraplength(container, padding=72, minimum=220)
+
+    assert wrap == 438
+
+
+def test_dialog_wraplength_falls_back_to_minimum_for_unmapped_container() -> None:
+    container = _FakeWidget(width_px=1)
+
+    wrap = support_window.support_jobs._dialog_wraplength(container, padding=72, minimum=220)
+
+    assert wrap == 220
+
+
+def test_sync_dialog_prompt_wrap_updates_label() -> None:
+    label = _FakeWidget()
+    container = _FakeWidget(width_px=510)
+
+    support_window.support_jobs._sync_dialog_prompt_wrap(label, container, padding=72, minimum=220)
+
+    assert label.configure_calls == [{"wraplength": 438}]
+
+
+def test_build_debug_section_uses_responsive_grid_action_row() -> None:
+    registry, fake_ttk, fake_scrolledtext = _build_support_ui_modules()
+    window = _make_window()
+    parent = _FakeWidget(width_px=640)
+
+    support_window.support_window_ui.build_debug_section(window, parent, ttk=fake_ttk, scrolledtext=fake_scrolledtext)
+
+    row = registry["frames"][0]
+
+    assert row.pack_calls == [{"fill": "x", "pady": (0, 8)}]
+    assert row.options["columnconfigure"] == [(0, 1), (1, 1)]
+    assert window.btn_copy_debug.grid_calls == [{"row": 0, "column": 0, "sticky": "ew", "padx": (0, 0), "pady": (0, 0)}]
+    assert window.btn_save_debug.grid_calls == [
+        {"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (0, 0)}
+    ]
+
+
+def test_build_issue_and_bundle_sections_use_width_friendly_button_rows() -> None:
+    registry, fake_ttk, fake_scrolledtext = _build_support_ui_modules()
+    window = _make_window()
+    issue_parent = _FakeWidget(width_px=640)
+    bundle_parent = _FakeWidget(width_px=640)
+
+    support_window.support_window_ui.build_issue_section(window, issue_parent, ttk=fake_ttk, scrolledtext=fake_scrolledtext)
+    support_window.support_window_ui.build_bundle_section(window, bundle_parent, ttk=fake_ttk)
+
+    issue_row = registry["frames"][0]
+    bundle_row = registry["frames"][1]
+
+    assert issue_row.options["columnconfigure"] == [(0, 1), (1, 1)]
+    assert window.btn_copy_issue.grid_calls == [{"row": 0, "column": 0, "sticky": "ew", "padx": (0, 0), "pady": (0, 0)}]
+    assert window.btn_save_issue.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (0, 0)}]
+    assert window.btn_collect_evidence.grid_calls == [
+        {"row": 1, "column": 0, "sticky": "ew", "padx": (0, 0), "pady": (8, 0)}
+    ]
+    assert window.btn_open_issue.grid_calls == [{"row": 1, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (8, 0)}]
+    assert bundle_row.options["columnconfigure"] == [(0, 1)]
+    assert window.btn_save_bundle.grid_calls == [{"row": 0, "column": 0, "sticky": "ew", "padx": (0, 0), "pady": (0, 0)}]
+
+
+def test_support_probe_dialog_button_row_uses_two_column_grid_for_multiple_actions() -> None:
+    registry, fake_ttk = _build_support_jobs_ttk()
+    container = _FakeWidget()
+
+    buttons = support_window.support_jobs._build_dialog_button_row(
+        container,
+        ttk=fake_ttk,
+        row=1,
+        pady=(18, 0),
+        actions=[("Run probe", lambda: None), ("Cancel", lambda: None), ("Help", lambda: None)],
+        columns=2,
+    )
+
+    row = registry["frames"][0]
+
+    assert row.grid_calls == [{"row": 1, "column": 0, "sticky": "ew", "pady": (18, 0)}]
+    assert row.options["columnconfigure"] == [(0, 1), (1, 1)]
+    assert buttons[0].grid_calls == [{"row": 0, "column": 0, "sticky": "ew", "padx": (0, 0), "pady": (0, 0)}]
+    assert buttons[1].grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (0, 0)}]
+    assert buttons[2].grid_calls == [{"row": 1, "column": 0, "sticky": "ew", "padx": (0, 0), "pady": (8, 0)}]
+
+
+def test_support_probe_dialog_button_row_uses_single_column_for_one_action() -> None:
+    registry, fake_ttk = _build_support_jobs_ttk()
+    container = _FakeWidget()
+
+    buttons = support_window.support_jobs._build_dialog_button_row(
+        container,
+        ttk=fake_ttk,
+        row=2,
+        pady=(12, 0),
+        actions=[("OK", lambda: None)],
+        columns=2,
+    )
+
+    row = registry["frames"][0]
+
+    assert row.grid_calls == [{"row": 2, "column": 0, "sticky": "ew", "pady": (12, 0)}]
+    assert row.options["columnconfigure"] == [(0, 1)]
+    assert buttons[0].grid_calls == [{"row": 0, "column": 0, "sticky": "ew", "padx": (0, 0), "pady": (0, 0)}]
 
 
 def test_sync_button_state_tracks_copy_and_save_actions() -> None:
@@ -289,6 +544,20 @@ def test_save_support_bundle_logs_unexpected_builder_errors(
 
     assert window.status_label.options["text"] == "Failed to save bundle"
     assert "Failed to save support bundle" in caplog.text
+
+
+def test_save_support_bundle_propagates_unexpected_builder_failures(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+    window = _make_window(diagnostics_json='{"diag": 1}')
+    out_path = tmp_path / "bundle.json"
+    monkeypatch.setattr(support_window.filedialog, "asksaveasfilename", lambda **kwargs: str(out_path))
+
+    def _raise_unexpected(**kwargs) -> dict[str, object]:
+        raise AssertionError("unexpected bundle bug")
+
+    monkeypatch.setattr(support_window, "build_support_bundle_payload", _raise_unexpected)
+
+    with pytest.raises(AssertionError, match="unexpected bundle bug"):
+        window.save_support_bundle()
 
 
 def test_open_issue_form_copies_url_when_browser_fails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -409,6 +678,74 @@ def test_run_discovery_updates_text_and_enables_buttons(monkeypatch: pytest.Monk
     assert window.btn_copy_discovery.options["state"] == "normal"
     assert window.btn_copy_issue.options["state"] == "normal"
     assert window.txt_issue.contents == "issue draft"
+
+
+def test_run_debug_returns_fallback_text_for_expected_collection_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+    logged: list[str] = []
+
+    monkeypatch.setattr(
+        support_window,
+        "collect_diagnostics_text",
+        lambda *, include_usb: (_ for _ in ()).throw(RuntimeError("busy")),
+    )
+    monkeypatch.setattr(support_window, "run_in_thread", lambda root, work, on_done: on_done(work()))
+    monkeypatch.setattr(support_window.logger, "exception", lambda message: logged.append(message))
+
+    window.run_debug()
+
+    assert window._diagnostics_json == ""
+    assert window.txt_debug.contents == "Failed to collect diagnostics: busy"
+    assert window.btn_run_debug.options["state"] == "normal"
+    assert logged == ["Failed to collect diagnostics"]
+
+
+def test_run_debug_propagates_unexpected_collection_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+
+    monkeypatch.setattr(
+        support_window,
+        "collect_diagnostics_text",
+        lambda *, include_usb: (_ for _ in ()).throw(AssertionError("unexpected diagnostics bug")),
+    )
+    monkeypatch.setattr(support_window, "run_in_thread", lambda root, work, on_done: on_done(work()))
+
+    with pytest.raises(AssertionError, match="unexpected diagnostics bug"):
+        window.run_debug()
+
+
+def test_run_discovery_returns_fallback_text_for_expected_collection_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+    logged: list[str] = []
+
+    monkeypatch.setattr(
+        support_window,
+        "collect_device_discovery",
+        lambda *, include_usb: (_ for _ in ()).throw(RuntimeError("probe busy")),
+    )
+    monkeypatch.setattr(support_window, "run_in_thread", lambda root, work, on_done: on_done(work()))
+    monkeypatch.setattr(support_window.logger, "exception", lambda message: logged.append(message))
+
+    window.run_discovery()
+
+    assert window._discovery_json == ""
+    assert window.txt_discovery.contents == "Failed to scan devices: probe busy"
+    assert window.btn_run_discovery.options["state"] == "normal"
+    assert logged == ["Failed to collect discovery snapshot"]
+
+
+def test_run_discovery_propagates_unexpected_collection_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+
+    monkeypatch.setattr(
+        support_window,
+        "collect_device_discovery",
+        lambda *, include_usb: (_ for _ in ()).throw(AssertionError("unexpected discovery bug")),
+    )
+    monkeypatch.setattr(support_window, "run_in_thread", lambda root, work, on_done: on_done(work()))
+
+    with pytest.raises(AssertionError, match="unexpected discovery bug"):
+        window.run_discovery()
 
 
 def test_collect_missing_evidence_updates_bundle_state(monkeypatch: pytest.MonkeyPatch) -> None:

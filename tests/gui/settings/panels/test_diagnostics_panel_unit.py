@@ -11,10 +11,33 @@ class _FakeWidget:
     def __init__(self, **kwargs) -> None:
         self.options: dict[str, object] = dict(kwargs)
         self.configure_calls: list[dict[str, object]] = []
+        self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
+        self.bind_calls: list[tuple[str, object]] = []
+        self.after_calls: list[tuple[int, object]] = []
+        self.columnconfigure_calls: list[tuple[int, int]] = []
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
         self.options.update(kwargs)
+
+    def pack(self, **kwargs) -> None:
+        self.pack_calls.append(dict(kwargs))
+
+    def grid(self, **kwargs) -> None:
+        self.grid_calls.append(dict(kwargs))
+
+    def bind(self, event: str, callback: object) -> None:
+        self.bind_calls.append((event, callback))
+
+    def after(self, delay_ms: int, callback: object) -> None:
+        self.after_calls.append((delay_ms, callback))
+
+    def columnconfigure(self, index: int, weight: int = 0, **_kwargs: object) -> None:
+        self.columnconfigure_calls.append((index, weight))
+
+    def winfo_width(self) -> int:
+        return int(self.options.get("width_px", 520))
 
 
 class _FakeText(_FakeWidget):
@@ -73,6 +96,72 @@ def _make_panel(
     panel.btn_open_issue = _FakeWidget(state="normal")
     panel.txt_diagnostics = _FakeText("stale output")
     return panel, root, status_label
+
+
+def _install_fake_ui(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[_FakeWidget]]:
+    registry = {"labels": [], "frames": [], "buttons": [], "texts": []}
+
+    def fake_label(_parent, **kwargs):
+        widget = _FakeWidget(**kwargs)
+        registry["labels"].append(widget)
+        return widget
+
+    def fake_frame(_parent, **kwargs):
+        widget = _FakeWidget(**kwargs)
+        registry["frames"].append(widget)
+        return widget
+
+    def fake_button(_parent, **kwargs):
+        widget = _FakeWidget(**kwargs)
+        registry["buttons"].append(widget)
+        return widget
+
+    def fake_scrolled_text(_parent, **kwargs):
+        widget = _FakeText()
+        widget.options.update(kwargs)
+        registry["texts"].append(widget)
+        return widget
+
+    monkeypatch.setattr(diagnostics_panel.ttk, "Label", fake_label)
+    monkeypatch.setattr(diagnostics_panel.ttk, "Frame", fake_frame)
+    monkeypatch.setattr(diagnostics_panel.ttk, "Button", fake_button)
+    monkeypatch.setattr(diagnostics_panel.scrolledtext, "ScrolledText", fake_scrolled_text)
+    return registry
+
+
+def test_diagnostics_panel_init_builds_responsive_description_and_action_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = _install_fake_ui(monkeypatch)
+    parent = _FakeWidget(width_px=520)
+    root = _FakeRoot()
+    status_label = _FakeWidget(text="")
+
+    panel = diagnostics_panel.DiagnosticsPanel(
+        parent,
+        root=root,
+        get_status_label=lambda: status_label,
+        bg_color="#101010",
+        fg_color="#f0f0f0",
+    )
+
+    desc = registry["labels"][1]
+    btn_row = registry["frames"][0]
+
+    assert desc.options["justify"] == "left"
+    assert desc.options["wraplength"] == 420
+    assert desc.pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 8)}]
+    assert parent.bind_calls[0][0] == "<Configure>"
+    assert parent.after_calls[0][0] == 0
+    assert btn_row.columnconfigure_calls == [(0, 1), (1, 1), (2, 1)]
+    assert panel.btn_run_diagnostics.grid_calls == [{"row": 0, "column": 0, "sticky": "ew"}]
+    assert panel.btn_copy_diagnostics.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
+    assert panel.btn_open_issue.grid_calls == [{"row": 0, "column": 2, "sticky": "ew", "padx": (8, 0)}]
+    assert panel.txt_diagnostics.options["background"] == "#101010"
+    assert panel.txt_diagnostics.options["foreground"] == "#f0f0f0"
+    assert panel.txt_diagnostics.options["insertbackground"] == "#f0f0f0"
+    assert panel.txt_diagnostics.contents == "Click 'Run diagnostics', then use 'Copy output' or 'Open issue'.\n"
+    assert panel.btn_copy_diagnostics.options["state"] == "disabled"
 
 
 @pytest.mark.parametrize(
@@ -309,3 +398,16 @@ def test_run_diagnostics_formats_failure_text_and_leaves_copy_disabled(monkeypat
     _flush_after(root)
 
     assert status_label.options["text"] == ""
+
+
+def test_collect_diagnostics_text_best_effort_propagates_unexpected_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    panel, _root, _status = _make_panel()
+
+    def fake_collect_diagnostics_text(*, include_usb: bool) -> str:
+        assert include_usb is True
+        raise AssertionError("boom")
+
+    monkeypatch.setattr(diagnostics_panel, "collect_diagnostics_text", fake_collect_diagnostics_text)
+
+    with pytest.raises(AssertionError):
+        panel._collect_diagnostics_text_best_effort()

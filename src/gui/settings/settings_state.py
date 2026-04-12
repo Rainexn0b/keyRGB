@@ -10,6 +10,11 @@ from src.core.utils.safe_attrs import safe_int_attr
 
 logger = logging.getLogger(__name__)
 
+_SETTINGS_ATTR_READ_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_SETTINGS_INT_COERCE_ERRORS = (RuntimeError,)
+_SETTINGS_BOOL_COERCE_ERRORS = (RuntimeError, TypeError, ValueError)
+_SETTINGS_SAFE_INT_ERRORS = (AttributeError, OverflowError, RuntimeError, TypeError, ValueError)
+
 
 def clamp_brightness(value: int) -> int:
     return max(0, min(50, int(value)))
@@ -18,7 +23,7 @@ def clamp_brightness(value: int) -> int:
 def _safe_getattr_or_default(obj: Any, name: str, default: Any) -> Any:
     try:
         return getattr(obj, name, default)
-    except Exception:  # @quality-exception exception-transparency: settings-state loading may cross user-defined properties/descriptors and must treat those failures as missing config
+    except _SETTINGS_ATTR_READ_ERRORS:
         logger.exception("Failed reading settings attribute '%s'", name)
         return default
 
@@ -28,7 +33,7 @@ def _coerce_int_or_fallback(value: Any, *, fallback: int | None) -> int | None:
         return int(value)
     except (TypeError, ValueError, OverflowError):
         return fallback
-    except Exception:  # @quality-exception exception-transparency: config coercion may execute user-defined __int__ implementations and must stay non-fatal for malformed values
+    except _SETTINGS_INT_COERCE_ERRORS:
         logger.exception("Failed coercing settings value to int")
         return fallback
 
@@ -45,7 +50,7 @@ def _safe_bool(obj: Any, name: str, default: bool) -> bool:
     value = _safe_getattr_or_default(obj, name, default)
     try:
         return bool(value)
-    except Exception:  # @quality-exception exception-transparency: truthiness checks may execute user-defined __bool__/__len__ code and malformed config must fall back to defaults
+    except _SETTINGS_BOOL_COERCE_ERRORS:
         logger.exception("Failed coercing settings attribute '%s' to bool", name)
         return bool(default)
 
@@ -55,7 +60,7 @@ def _safe_int(obj: Any, name: str, default: int) -> int:
     safe_default = 0 if default_value is None else default_value
     try:
         return safe_int_attr(obj, name, default=safe_default)
-    except Exception:  # @quality-exception exception-transparency: settings-state integer loading crosses shared coercion helpers and must stay non-fatal for malformed config values
+    except _SETTINGS_SAFE_INT_ERRORS:
         logger.exception("Failed reading settings integer attribute '%s'", name)
         return safe_default
 

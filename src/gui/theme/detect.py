@@ -151,10 +151,12 @@ def detect_system_prefers_dark() -> bool | None:
         _detect_kde_prefers_dark,
     )
 
+    provider_runtime_errors = (AttributeError, OSError, RuntimeError, TypeError, ValueError, subprocess.SubprocessError)
+
     for provider in providers:
         try:
             val = provider()
-        except Exception as exc:  # @quality-exception exception-transparency: theme detection providers are a best-effort GUI startup boundary and must never fail startup
+        except provider_runtime_errors as exc:
             _log_provider_failure(provider.__name__, exc)
             continue
         if val is not None:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 
+import pytest
 from PIL import Image
 
 from src.gui.reference.deck_image import load_reference_deck_image
@@ -112,6 +113,17 @@ def test_backdrop_image_candidates_keeps_repo_fallback_when_profile_lookup_raise
 
     assert len(candidates) == 1
     assert candidates[0].as_posix().endswith("/assets/y15-pro-deck.png")
+
+
+def test_backdrop_image_candidates_propagates_unexpected_profile_lookup_errors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        backdrop_image_cache.profiles,
+        "paths_for",
+        lambda _name: (_ for _ in ()).throw(AssertionError("broken profile lookup")),
+    )
+
+    with pytest.raises(AssertionError):
+        backdrop_image_cache.backdrop_image_candidates(profile_name="profile-1")
 
 
 def test_backdrop_image_candidates_ignores_cwd_fallback_oserror(tmp_path, monkeypatch) -> None:

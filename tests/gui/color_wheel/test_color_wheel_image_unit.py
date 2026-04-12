@@ -131,3 +131,26 @@ def test_write_bytes_atomic_swallows_unlink_errors_without_masking_replace_failu
         color_wheel_image.write_bytes_atomic(target, b"new-bytes")
 
     assert temp.exists()
+
+
+def test_write_bytes_atomic_propagates_unexpected_cleanup_failures(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "wheel.ppm"
+    temp = target.with_suffix(target.suffix + ".tmp")
+
+    def fail_replace(_src: Path, _dst: Path) -> None:
+        raise OSError("replace failed")
+
+    def fail_unlink(self: Path, missing_ok: bool = False) -> None:
+        assert self == temp
+        assert missing_ok is True
+        raise RuntimeError("cleanup bug")
+
+    monkeypatch.setattr(color_wheel_image.os, "replace", fail_replace)
+    monkeypatch.setattr(color_wheel_image.Path, "unlink", fail_unlink)
+
+    with pytest.raises(RuntimeError, match="cleanup bug"):
+        color_wheel_image.write_bytes_atomic(target, b"new-bytes")
+
+    assert temp.exists()

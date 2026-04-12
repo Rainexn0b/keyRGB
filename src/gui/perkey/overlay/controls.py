@@ -23,20 +23,22 @@ class OverlayControls(ttk.LabelFrame):
     def _build_ui(self):
         scope_row = ttk.Frame(self)
         scope_row.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        scope_row.columnconfigure(0, weight=1)
+        scope_row.columnconfigure(1, weight=1)
         ttk.Radiobutton(
             scope_row,
             text="Global",
             variable=self.editor.overlay_scope,
             value="global",
             command=self.sync_vars_from_scope,
-        ).pack(side="left")
+        ).grid(row=0, column=0, sticky="w")
         ttk.Radiobutton(
             scope_row,
             text="Selected key",
             variable=self.editor.overlay_scope,
             value="key",
             command=self.sync_vars_from_scope,
-        ).pack(side="left", padx=(10, 0))
+        ).grid(row=0, column=1, sticky="w", padx=(10, 0))
 
         def add_row(row: int, label: str, var: tk.DoubleVar):
             ttk.Label(self, text=label, width=6).grid(row=row, column=0, sticky="w")

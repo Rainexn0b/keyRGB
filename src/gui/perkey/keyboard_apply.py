@@ -6,6 +6,7 @@ from src.core.utils.exceptions import is_device_busy, is_device_disconnected
 
 
 _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+_PERKEY_WRITE_RUNTIME_ERRORS = (AttributeError, LookupError, RuntimeError, TypeError, ValueError)
 
 
 def push_per_key_colors(
@@ -49,5 +50,5 @@ def push_per_key_colors(
         if is_device_disconnected(exc):
             return None
         return kb
-    except Exception:  # @quality-exception exception-transparency: per-key hardware writes cross backend/runtime boundaries; GUI apply must remain best-effort for unexpected driver failures
+    except _PERKEY_WRITE_RUNTIME_ERRORS:
         return kb

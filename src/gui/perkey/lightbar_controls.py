@@ -14,6 +14,9 @@ if TYPE_CHECKING:
     from .editor import PerKeyEditor
 
 
+_LIGHTBAR_REDRAW_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+
+
 class LightbarControls(ttk.LabelFrame):
     def __init__(self, parent, editor: PerKeyEditor, **kwargs):
         super().__init__(parent, text="Lightbar", padding=10, **kwargs)
@@ -108,9 +111,7 @@ class LightbarControls(ttk.LabelFrame):
 
         try:
             redraw()
-        except (AttributeError, tk.TclError):
-            return
-        except Exception:  # @quality-exception exception-transparency: per-key lightbar control redraw crosses Tk widget lifetime and canvas implementation callbacks and must remain non-fatal for overlay editing
+        except _LIGHTBAR_REDRAW_ERRORS:
             return
 
     def apply_from_vars(self) -> dict[str, bool | float]:

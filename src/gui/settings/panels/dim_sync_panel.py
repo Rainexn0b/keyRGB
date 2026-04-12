@@ -6,6 +6,10 @@ import tkinter as tk
 from tkinter import ttk
 
 
+_LABEL_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
+_LABEL_WIDGET_ERRORS = (RuntimeError, tk.TclError)
+
+
 class DimSyncPanel:
     def __init__(
         self,
@@ -57,6 +61,7 @@ class DimSyncPanel:
 
         dim_temp_row = ttk.Frame(dim_mode)
         dim_temp_row.pack(fill="x", pady=(6, 0))
+        dim_temp_row.columnconfigure(0, weight=1)
 
         self.rb_dim_temp = ttk.Radiobutton(
             dim_temp_row,
@@ -65,14 +70,14 @@ class DimSyncPanel:
             variable=self.var_dim_sync_mode,
             command=self._on_toggle,
         )
-        self.rb_dim_temp.pack(side="left", anchor="w")
+        self.rb_dim_temp.grid(row=0, column=0, sticky="w")
 
         self.lbl_dim_temp_val = ttk.Label(
             dim_temp_row,
             text=str(int(float(self.var_dim_temp_brightness.get()))),
             font=("Sans", 9),
         )
-        self.lbl_dim_temp_val.pack(side="right")
+        self.lbl_dim_temp_val.grid(row=0, column=1, sticky="e", padx=(12, 0))
 
         self.scale_dim_temp = ttk.Scale(
             dim_mode,
@@ -107,6 +112,16 @@ class DimSyncPanel:
     @staticmethod
     def _set_label_int(lbl: ttk.Label, v: float | str) -> None:
         try:
-            lbl.configure(text=str(int(float(v))))
-        except Exception:  # @quality-exception exception-transparency: label update is a UI callback boundary; widget may be in transition state
-            lbl.configure(text="?")
+            text = str(int(float(v)))
+        except _LABEL_VALUE_ERRORS:
+            text = "?"
+
+        try:
+            lbl.configure(text=text)
+        except _LABEL_WIDGET_ERRORS:
+            if text == "?":
+                return
+            try:
+                lbl.configure(text="?")
+            except _LABEL_WIDGET_ERRORS:
+                return

@@ -11,6 +11,8 @@ from src.core.config import Config
 
 
 logger = logging.getLogger(__name__)
+_PREVIEW_SNAPSHOT_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_PREVIEW_RESTORE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _full_black_map(*, rows: int, cols: int) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
@@ -36,7 +38,7 @@ class KeyboardPreviewSession:
         self._orig_color = tuple(getattr(self.cfg, "color", (255, 0, 0)) or (255, 0, 0))
         try:
             self._orig_per_key_colors = dict(getattr(self.cfg, "per_key_colors", {}) or {})
-        except Exception as exc:  # @quality-exception exception-transparency: per_key_colors property may have arbitrary getter side effects; snapshot must degrade to empty map
+        except _PREVIEW_SNAPSHOT_ERRORS as exc:
             log_throttled(
                 logger,
                 "calibrator.preview.orig_per_key_colors",
@@ -67,7 +69,7 @@ class KeyboardPreviewSession:
         ):
             try:
                 setattr(self.cfg, key, value)
-            except Exception as exc:  # @quality-exception exception-transparency: config property setters may raise arbitrarily; restore must continue to next field on failure
+            except _PREVIEW_RESTORE_ERRORS as exc:
                 log_throttled(
                     logger,
                     f"calibrator.preview.restore.{key}",

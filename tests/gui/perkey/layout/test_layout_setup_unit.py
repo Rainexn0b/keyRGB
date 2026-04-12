@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tkinter as tk
 from types import SimpleNamespace
 
 import pytest
@@ -217,6 +218,41 @@ def test_build_ui_falls_back_to_first_layout_label(monkeypatch: pytest.MonkeyPat
     layout_setup.LayoutSetupControls._build_ui(fake_self)
 
     assert combo_instances[0].value == layout_setup._LAYOUT_LABELS[0]
+
+
+def test_sync_description_wrap_updates_wraplength() -> None:
+    fake_self = _FakeSelf(SimpleNamespace())
+    fake_self._description_label = _FakeWidget()
+    fake_self.width = 320
+
+    layout_setup.LayoutSetupControls._sync_description_wrap(fake_self)
+
+    assert fake_self._description_label.configure_calls == [{"wraplength": 296}]
+
+
+def test_sync_description_wrap_swallows_expected_geometry_errors() -> None:
+    class _BrokenSelf(_FakeSelf):
+        def winfo_width(self) -> int:
+            raise RuntimeError("not mapped yet")
+
+    fake_self = _BrokenSelf(SimpleNamespace())
+    fake_self._description_label = _FakeWidget()
+
+    layout_setup.LayoutSetupControls._sync_description_wrap(fake_self)
+
+    assert fake_self._description_label.configure_calls == []
+
+
+def test_sync_description_wrap_propagates_unexpected_errors() -> None:
+    class _BrokenSelf(_FakeSelf):
+        def winfo_width(self) -> int:
+            raise AssertionError("boom")
+
+    fake_self = _BrokenSelf(SimpleNamespace())
+    fake_self._description_label = _FakeWidget()
+
+    with pytest.raises(AssertionError):
+        layout_setup.LayoutSetupControls._sync_description_wrap(fake_self)
 
 
 def test_sync_description_wrap_updates_wraplength_and_handles_width_errors() -> None:

@@ -398,6 +398,17 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert right.grid_calls == [{"row": 0, "column": 1, "sticky": "ns", "padx": (16, 0)}]
     assert right.pack_propagate_calls == [False]
 
+    backdrop_row = next(
+        frame
+        for frame in registry["frames"]
+        if frame.parent is right and frame.pack_calls == [{"fill": "x", "pady": (0, 6)}]
+    )
+    backdrop_buttons = next(
+        frame
+        for frame in registry["frames"]
+        if frame.parent is right and frame.pack_calls == [{"fill": "x", "pady": (0, 10)}]
+    )
+
     canvas = editor.canvas
     assert canvas is registry["canvases"][0]
     assert canvas.options == {
@@ -455,6 +466,16 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         "Set as Default": "_set_default_profile",
     }
 
+    assert backdrop_row.columnconfigure_calls == [{"index": 1, "weight": 1}]
+    assert editor._backdrop_mode_combo.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
+    assert backdrop_buttons.columnconfigure_calls == [{"index": 0, "weight": 1}, {"index": 1, "weight": 1}]
+    assert next(button for button in registry["buttons"] if button.options["text"] == "Set Backdrop...").grid_calls == [
+        {"row": 0, "column": 0, "sticky": "ew", "padx": (0, 6)}
+    ]
+    assert next(button for button in registry["buttons"] if button.options["text"] == "Reset Backdrop").grid_calls == [
+        {"row": 0, "column": 1, "sticky": "ew", "padx": (6, 0)}
+    ]
+
     button_texts = [button.options["text"] for button in registry["buttons"]]
     assert button_texts[4:7] == [
         "1. Keyboard Setup",
@@ -468,6 +489,7 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert "Setup" in label_texts
     assert "Lighting profile" in label_texts
     assert len(registry["separators"]) == 2
+    assert all(separator.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}] for separator in registry["separators"])
     assert len(registry["dropdowns"]) == 2
     assert editor._backdrop_mode_dropdown is registry["dropdowns"][0]
 

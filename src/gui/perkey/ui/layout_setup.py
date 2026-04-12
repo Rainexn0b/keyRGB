@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tkinter as tk
 from tkinter import ttk
 from typing import Any
 
@@ -15,6 +16,8 @@ _ID_TO_LABEL = {layout.layout_id: layout.label for layout in LAYOUT_CATALOG}
 _LABEL_TO_ID = {layout.label: layout.layout_id for layout in LAYOUT_CATALOG}
 _AUTO_LEGEND_PACK_ID = "auto"
 _AUTO_LEGEND_PACK_LABEL = "Default legends"
+
+_DESCRIPTION_WRAP_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 
 def _legend_pack_choices(layout_id: str) -> list[tuple[str, str]]:
@@ -130,7 +133,7 @@ class LayoutSetupControls(ttk.LabelFrame):
     def _sync_description_wrap(self, _event=None) -> None:
         try:
             width = int(self.winfo_width())
-        except Exception:  # @quality-exception exception-transparency: winfo_width is a UI geometry boundary; widget may not be mapped yet
+        except _DESCRIPTION_WRAP_ERRORS:
             return
         self._description_label.configure(wraplength=max(200, width - 24))
 

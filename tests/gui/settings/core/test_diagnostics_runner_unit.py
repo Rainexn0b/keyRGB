@@ -5,6 +5,8 @@ import logging
 import sys
 from types import ModuleType
 
+import pytest
+
 import src.gui.settings.diagnostics_runner as runner
 
 
@@ -187,6 +189,19 @@ def test_device_busy_warnings_returns_partial_results_on_malformed_holder_data(c
     ]
     assert len(records) == 1
     assert records[0].exc_info is not None
+
+
+def test_device_busy_warnings_propagates_unexpected_programming_errors() -> None:
+    class _BrokenDevice(dict):
+        def get(self, key, default=None):
+            if key == "devnode_open_by_others":
+                raise AssertionError("boom")
+            return super().get(key, default)
+
+    payload = {"usb_devices": [_BrokenDevice(devnode="/dev/hidraw0")]}
+
+    with pytest.raises(AssertionError):
+        runner._device_busy_warnings(payload, expected_holder_pids=set())
 
 
 def test_collect_diagnostics_text_serializes_payload_and_injects_warnings(monkeypatch) -> None:

@@ -20,7 +20,9 @@ def _install_fake_ttk(
             self.options = dict(kwargs)
             self.configure_calls = []
             self.pack_calls = []
+            self.grid_calls = []
             self.pack_forget_calls = 0
+            self.grid_remove_calls = 0
 
         def configure(self, **kwargs):
             self.configure_calls.append(dict(kwargs))
@@ -29,8 +31,14 @@ def _install_fake_ttk(
         def pack(self, **kwargs):
             self.pack_calls.append(dict(kwargs))
 
+        def grid(self, **kwargs):
+            self.grid_calls.append(dict(kwargs))
+
         def pack_forget(self):
             self.pack_forget_calls += 1
+
+        def grid_remove(self):
+            self.grid_remove_calls += 1
 
     class FakeFrame(FakeWidget):
         def __init__(self, parent=None, **kwargs):
@@ -39,6 +47,7 @@ def _install_fake_ttk(
             self.bind_calls = []
             self.bound_callbacks = {}
             self.after_calls = []
+            self.columnconfigure_calls = []
             registry["frames"].append(self)
 
         def bind(self, event, callback):
@@ -51,6 +60,9 @@ def _install_fake_ttk(
             if after_error:
                 raise RuntimeError("after failed")
             self.after_calls.append((delay_ms, callback))
+
+        def columnconfigure(self, index, weight=0, **_kwargs):
+            self.columnconfigure_calls.append((index, weight))
 
         def winfo_width(self):
             return self.width
@@ -80,11 +92,12 @@ def test_bottom_bar_panel_initialization_binds_and_schedules_wrap_sync(monkeypat
     panel = bottom_bar_panel.BottomBarPanel(object(), on_close=lambda: close_calls.append("closed"))
 
     assert panel.frame.options["padding"] == (16, 8, 16, 12)
+    assert panel.frame.columnconfigure_calls == [(0, 1)]
     assert panel.hardware_hint.options["text"] == ""
     assert panel.hardware_hint.options["wraplength"] == 820
     assert panel._hardware_hint_packed is False
-    assert panel.status.pack_calls == [{"side": "left"}]
-    assert panel.close_btn.pack_calls == [{"side": "right"}]
+    assert panel.status.grid_calls == [{"row": 0, "column": 1, "sticky": "w"}]
+    assert panel.close_btn.grid_calls == [{"row": 0, "column": 2, "sticky": "e", "padx": (12, 0)}]
     assert panel.frame.bind_calls[0][0] == "<Configure>"
     assert panel.frame.after_calls[0][0] == 0
 
@@ -126,8 +139,8 @@ def test_bottom_bar_panel_tolerates_bind_and_after_failures(monkeypatch) -> None
     assert panel.frame.bind_calls == []
     assert panel.frame.bound_callbacks == {}
     assert panel.frame.after_calls == []
-    assert panel.status.pack_calls == [{"side": "left"}]
-    assert panel.close_btn.pack_calls == [{"side": "right"}]
+    assert panel.status.grid_calls == [{"row": 0, "column": 1, "sticky": "w"}]
+    assert panel.close_btn.grid_calls == [{"row": 0, "column": 2, "sticky": "e", "padx": (12, 0)}]
 
 
 def test_set_hardware_hint_packs_and_unpacks_idempotently(monkeypatch) -> None:
@@ -137,26 +150,25 @@ def test_set_hardware_hint_packs_and_unpacks_idempotently(monkeypatch) -> None:
     panel.set_hardware_hint("GPU RGB control is unavailable on battery")
 
     assert panel.hardware_hint.options["text"] == "GPU RGB control is unavailable on battery"
-    assert panel.hardware_hint.pack_calls == [
+    assert panel.hardware_hint.grid_calls == [
         {
-            "side": "left",
-            "fill": "x",
-            "expand": True,
+            "row": 0,
+            "column": 0,
+            "sticky": "ew",
             "padx": (0, 12),
-            "before": panel.status,
         }
     ]
     assert panel._hardware_hint_packed is True
 
     panel.set_hardware_hint("Updated hardware hint")
     assert panel.hardware_hint.options["text"] == "Updated hardware hint"
-    assert len(panel.hardware_hint.pack_calls) == 1
+    assert len(panel.hardware_hint.grid_calls) == 1
 
     panel.set_hardware_hint("   ")
     assert panel.hardware_hint.options["text"] == ""
-    assert panel.hardware_hint.pack_forget_calls == 1
+    assert panel.hardware_hint.grid_remove_calls == 1
     assert panel._hardware_hint_packed is False
 
     panel.set_hardware_hint("")
-    assert panel.hardware_hint.pack_forget_calls == 1
+    assert panel.hardware_hint.grid_remove_calls == 1
     assert panel._hardware_hint_packed is False

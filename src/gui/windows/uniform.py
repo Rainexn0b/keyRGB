@@ -13,10 +13,10 @@ from tkinter import ttk
 
 from src.core.backends.registry import select_backend
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
-from src.core.secondary_device_routes import route_for_backend_name, route_for_device_type
+from src.core.secondary_device_routes import SecondaryDeviceRoute, route_for_backend_name, route_for_device_type
 from src.core.utils.exceptions import is_device_busy
+from src.gui.utils.window_geometry import compute_centered_window_geometry
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
-from src.gui.utils.window_centering import center_window_on_screen
 from src.gui.theme import apply_clam_theme
 
 
@@ -25,7 +25,10 @@ _BACKEND_CAPABILITY_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, 
 _BACKEND_SELECTION_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
 _DEVICE_ACQUISITION_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _DEVICE_APPLY_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
+_UNIFORM_DEVICE_WRITE_ERRORS = (AttributeError, LookupError, RuntimeError, TypeError, ValueError)
 _TK_WIDGET_STATE_ERRORS = (AttributeError, RuntimeError, tk.TclError)
+_GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 try:
     from src.gui.widgets.color_wheel import ColorWheel
@@ -39,6 +42,8 @@ except ImportError:
 
 class UniformColorGUI:
     """Simple GUI for selecting a uniform keyboard color."""
+
+    _secondary_route: SecondaryDeviceRoute | None = None
 
     def __init__(self):
         self.target_context = (
@@ -54,13 +59,7 @@ class UniformColorGUI:
         self.root = tk.Tk()
         self.root.title(f"KeyRGB - {self._target_label} Color")
         apply_keyrgb_window_icon(self.root)
-        desired_w, desired_h = 520, 610
-        max_w = int(self.root.winfo_screenwidth() * 0.95)
-        max_h = int(self.root.winfo_screenheight() * 0.95)
-        w = min(desired_w, max_w)
-        h = min(desired_h, max_h)
-        self.root.geometry(f"{w}x{h}")
-        self.root.minsize(w, h)
+        self.root.minsize(460, 520)
         self.root.resizable(True, True)
 
         apply_clam_theme(self.root)
@@ -75,9 +74,25 @@ class UniformColorGUI:
 
         main_frame = ttk.Frame(self.root, padding=20)
         main_frame.pack(fill="both", expand=True)
+        self._main_frame = main_frame
+        self._wrap_labels: list[object] = []
 
         title = ttk.Label(main_frame, text=f"Select Uniform {self._target_label} Color", font=("Sans", 14, "bold"))
         title.pack(pady=(0, 10))
+
+        def _sync_wrap(_event=None) -> None:
+            try:
+                width = int(main_frame.winfo_width())
+                if width <= 1:
+                    return
+                wrap = max(220, width - 24)
+                for label in self._wrap_labels:
+                    label.configure(wraplength=wrap)
+            except _WRAP_SYNC_ERRORS:
+                return
+
+        main_frame.bind("<Configure>", _sync_wrap)
+        self.root.after(0, _sync_wrap)
 
         if not self._color_supported:
             msg = ttk.Label(
@@ -89,9 +104,10 @@ class UniformColorGUI:
                 ),
                 font=("Sans", 9),
                 justify="left",
-                wraplength=max(200, w - 48),
+                wraplength=420,
             )
             msg.pack(pady=(10, 16), fill="x")
+            self._wrap_labels.append(msg)
             self.color_wheel = None
         else:
             self.color_wheel = ColorWheel(
@@ -105,6 +121,11 @@ class UniformColorGUI:
 
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(pady=20, fill="x")
+        try:
+            button_frame.columnconfigure(0, weight=1)
+            button_frame.columnconfigure(1, weight=1)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
         apply_btn = ttk.Button(button_frame, text="Apply", command=self._on_apply)
         if not self._color_supported:
@@ -112,15 +133,16 @@ class UniformColorGUI:
                 apply_btn.configure(state="disabled")
             except _TK_WIDGET_STATE_ERRORS:
                 pass
-        apply_btn.pack(side="left", padx=(0, 10), fill="x", expand=True)
+        apply_btn.grid(row=0, column=0, sticky="ew", padx=(0, 8))
 
         close_btn = ttk.Button(button_frame, text="Close", command=self._on_close)
-        close_btn.pack(side="left", fill="x", expand=True)
+        close_btn.grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
         self.status_label = ttk.Label(main_frame, text="", font=("Sans", 9))
         self.status_label.pack()
 
-        center_window_on_screen(self.root)
+        self._apply_geometry()
+        self.root.after(50, self._apply_geometry)
 
         self._pending_color = None
         self._last_drag_commit_ts = 0.0
@@ -129,9 +151,26 @@ class UniformColorGUI:
         # Throttle config writes while dragging (seconds)
         self._drag_commit_interval = 0.06
 
+    def _apply_geometry(self) -> None:
+        try:
+            self.root.update_idletasks()
+            geometry = compute_centered_window_geometry(
+                self.root,
+                content_height_px=int(self._main_frame.winfo_reqheight()),
+                content_width_px=int(self._main_frame.winfo_reqwidth()),
+                footer_height_px=0,
+                chrome_padding_px=40,
+                default_w=520,
+                default_h=610,
+                screen_ratio_cap=0.95,
+            )
+            self.root.geometry(geometry)
+        except _GEOMETRY_APPLY_ERRORS:
+            return
+
     def _select_backend_best_effort(self):
         try:
-            route = getattr(self, "_secondary_route", None)
+            route = self._secondary_route
             if route is not None:
                 return route.get_backend()
             return select_backend(requested=self.requested_backend)
@@ -251,7 +290,7 @@ class UniformColorGUI:
             setter(
                 str(self._secondary_route.state_key),
                 int(brightness),
-                legacy_key=self._secondary_route.config_brightness_attr,
+                compatibility_key=self._secondary_route.config_brightness_attr,
             )
             return
 
@@ -285,7 +324,7 @@ class UniformColorGUI:
             setter(
                 str(self._secondary_route.state_key),
                 color,
-                legacy_key=self._secondary_route.config_color_attr,
+                compatibility_key=self._secondary_route.config_color_attr,
                 default=(255, 0, 0),
             )
             return
@@ -331,7 +370,7 @@ class UniformColorGUI:
         except _DEVICE_APPLY_ERRORS as e:
             self._log_color_apply_failure(e)
             return False
-        except Exception as e:  # @quality-exception exception-transparency: uniform color apply crosses backend/runtime device writes; GUI apply must remain best-effort
+        except _UNIFORM_DEVICE_WRITE_ERRORS as e:
             self._log_color_apply_failure(e)
             return False
 

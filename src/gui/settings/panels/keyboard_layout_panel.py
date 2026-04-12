@@ -8,6 +8,9 @@ from tkinter import ttk
 from src.core.resources.layouts import LAYOUT_CATALOG
 
 
+_WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+
+
 class KeyboardLayoutPanel:
     """Settings panel for selecting the physical keyboard layout."""
 
@@ -32,18 +35,37 @@ class KeyboardLayoutPanel:
             wraplength=340,
             justify="left",
         )
-        desc.pack(anchor="w", pady=(0, 8))
+        desc.pack(anchor="w", fill="x", pady=(0, 8))
+
+        def _sync_wrap(_event=None) -> None:
+            try:
+                width = int(parent.winfo_width())
+                if width <= 1:
+                    return
+                desc.configure(wraplength=max(240, width - 24))
+            except _WRAP_SYNC_ERRORS:
+                return
+
+        try:
+            parent.bind("<Configure>", _sync_wrap)
+            parent.after(0, _sync_wrap)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
         row = ttk.Frame(parent)
         row.pack(anchor="w", fill="x")
+        try:
+            row.columnconfigure(1, weight=1)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
-        ttk.Label(row, text="Layout:", font=("Sans", 9)).pack(side="left", padx=(0, 8))
+        ttk.Label(row, text="Layout:", font=("Sans", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8))
 
         _labels = [ld.label for ld in LAYOUT_CATALOG]
         _ids = [ld.layout_id for ld in LAYOUT_CATALOG]
 
         self._combo = ttk.Combobox(row, textvariable=var_physical_layout, values=_labels, state="readonly", width=28)
-        self._combo.pack(side="left")
+        self._combo.grid(row=0, column=1, sticky="ew")
 
         # Map label → id and id → label for two-way binding.
         self._label_to_id = {ld.label: ld.layout_id for ld in LAYOUT_CATALOG}

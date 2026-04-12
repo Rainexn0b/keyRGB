@@ -18,6 +18,10 @@ class BottomBarPanel:
         on_close: Callable[[], None],
     ) -> None:
         self.frame = ttk.Frame(parent, padding=(16, 8, 16, 12))
+        try:
+            self.frame.columnconfigure(0, weight=1)
+        except _TK_CALLBACK_SETUP_ERRORS:
+            pass
 
         self.hardware_hint = ttk.Label(
             self.frame,
@@ -30,10 +34,10 @@ class BottomBarPanel:
         self._hardware_hint_packed = False
 
         self.status = ttk.Label(self.frame, text="", font=("Sans", 9))
-        self.status.pack(side="left")
+        self.status.grid(row=0, column=1, sticky="w")
 
         self.close_btn = ttk.Button(self.frame, text="Close", command=on_close)
-        self.close_btn.pack(side="right")
+        self.close_btn.grid(row=0, column=2, sticky="e", padx=(12, 0))
 
         def _sync_wraplength(_e=None) -> None:
             try:
@@ -59,11 +63,11 @@ class BottomBarPanel:
         if text.strip():
             self.hardware_hint.configure(text=text)
             if not self._hardware_hint_packed:
-                self.hardware_hint.pack(side="left", fill="x", expand=True, padx=(0, 12), before=self.status)
+                self.hardware_hint.grid(row=0, column=0, sticky="ew", padx=(0, 12))
                 self._hardware_hint_packed = True
             return
 
         self.hardware_hint.configure(text="")
         if self._hardware_hint_packed:
-            self.hardware_hint.pack_forget()
+            self.hardware_hint.grid_remove()
             self._hardware_hint_packed = False

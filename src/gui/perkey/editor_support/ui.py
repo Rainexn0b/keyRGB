@@ -100,7 +100,8 @@ def build_editor_ui(editor) -> None:
 
     backdrop_row = ttk.Frame(right)
     backdrop_row.pack(fill="x", pady=(0, 6))
-    ttk.Label(backdrop_row, text="Backdrop", font=("Sans", 9)).pack(side="left")
+    backdrop_row.columnconfigure(1, weight=1)
+    ttk.Label(backdrop_row, text="Backdrop", font=("Sans", 9)).grid(row=0, column=0, sticky="w")
     _backdrop_mode_label_list = [_BACKDROP_MODE_LABELS[m] for m in ("none", "builtin", "custom")]
     editor._backdrop_mode_combo = ttk.Combobox(
         backdrop_row,
@@ -109,7 +110,7 @@ def build_editor_ui(editor) -> None:
         values=_backdrop_mode_label_list,
     )
     editor._backdrop_mode_combo.set(_BACKDROP_MODE_LABELS.get(editor._backdrop_mode_var.get(), "Built-in seed"))
-    editor._backdrop_mode_combo.pack(side="left", fill="x", expand=True, padx=(8, 0))
+    editor._backdrop_mode_combo.grid(row=0, column=1, sticky="ew", padx=(8, 0))
     editor._backdrop_mode_dropdown = UpwardListboxDropdown(
         root=editor.root,
         anchor=editor._backdrop_mode_combo,
@@ -124,11 +125,19 @@ def build_editor_ui(editor) -> None:
 
     backdrop_buttons = ttk.Frame(right)
     backdrop_buttons.pack(fill="x", pady=(0, 10))
-    ttk.Button(backdrop_buttons, text="Set Backdrop...", command=editor._set_backdrop).pack(
-        side="left", fill="x", expand=True, padx=(0, 6)
+    backdrop_buttons.columnconfigure(0, weight=1)
+    backdrop_buttons.columnconfigure(1, weight=1)
+    ttk.Button(backdrop_buttons, text="Set Backdrop...", command=editor._set_backdrop).grid(
+        row=0,
+        column=0,
+        sticky="ew",
+        padx=(0, 6),
     )
-    ttk.Button(backdrop_buttons, text="Reset Backdrop", command=editor._reset_backdrop).pack(
-        side="left", fill="x", expand=True
+    ttk.Button(backdrop_buttons, text="Reset Backdrop", command=editor._reset_backdrop).grid(
+        row=0,
+        column=1,
+        sticky="ew",
+        padx=(6, 0),
     )
 
     ttk.Label(right, text="Backdrop transparency", font=("Sans", 9)).pack(anchor="w", pady=(0, 4))
@@ -173,8 +182,9 @@ def build_editor_ui(editor) -> None:
     def _divider(parent: ttk.Frame, title: str) -> None:
         row = ttk.Frame(parent)
         row.pack(fill="x", pady=(4, 6))
-        ttk.Label(row, text=title, font=("Sans", 9)).pack(side="left")
-        ttk.Separator(row, orient="horizontal").pack(side="left", fill="x", expand=True, padx=(8, 0))
+        row.columnconfigure(1, weight=1)
+        ttk.Label(row, text=title, font=("Sans", 9)).grid(row=0, column=0, sticky="w")
+        ttk.Separator(row, orient="horizontal").grid(row=0, column=1, sticky="ew", padx=(8, 0))
 
     _divider(btns, "Config")
     ttk.Button(btns, text="Fill All", command=editor._fill_all).pack(fill="x", pady=(0, 6))

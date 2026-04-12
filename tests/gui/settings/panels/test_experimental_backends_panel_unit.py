@@ -12,9 +12,25 @@ class _FakeWidget:
         self.parent = parent
         self.options = dict(kwargs)
         self.pack_calls = []
+        self.bind_calls = []
+        self.after_calls = []
+        self.configure_calls = []
 
     def pack(self, **kwargs):
         self.pack_calls.append(dict(kwargs))
+
+    def bind(self, sequence, callback):
+        self.bind_calls.append((sequence, callback))
+
+    def after(self, delay_ms, callback):
+        self.after_calls.append((delay_ms, callback))
+
+    def configure(self, **kwargs):
+        self.configure_calls.append(dict(kwargs))
+        self.options.update(kwargs)
+
+    def winfo_width(self):
+        return int(self.options.get("width_px", 520))
 
 
 def _install_fake_ttk(monkeypatch: pytest.MonkeyPatch):
@@ -42,7 +58,7 @@ def test_experimental_backends_panel_init_creates_title_and_description_labels(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     registry = _install_fake_ttk(monkeypatch)
-    parent = object()
+    parent = _FakeWidget(width_px=520)
 
     experimental_backends_panel.ExperimentalBackendsPanel(
         parent,
@@ -68,14 +84,16 @@ def test_experimental_backends_panel_init_creates_title_and_description_labels(
         "justify": "left",
         "wraplength": 420,
     }
-    assert registry["labels"][1].pack_calls == [{"anchor": "w", "pady": (0, 8)}]
+    assert registry["labels"][1].pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 8)}]
+    assert parent.bind_calls[0][0] == "<Configure>"
+    assert parent.after_calls[0][0] == 0
 
 
 def test_experimental_backends_panel_init_wires_checkbox_variable_and_toggle_command(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     registry = _install_fake_ttk(monkeypatch)
-    parent = object()
+    parent = _FakeWidget(width_px=520)
     variable = object()
     toggle_calls: list[str] = []
 

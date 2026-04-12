@@ -6,6 +6,9 @@ import tkinter as tk
 from tkinter import ttk
 
 
+_WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+
+
 class ExperimentalBackendsPanel:
     def __init__(
         self,
@@ -28,7 +31,22 @@ class ExperimentalBackendsPanel:
             justify="left",
             wraplength=420,
         )
-        desc.pack(anchor="w", pady=(0, 8))
+        desc.pack(anchor="w", fill="x", pady=(0, 8))
+
+        def _sync_wrap(_event=None) -> None:
+            try:
+                width = int(parent.winfo_width())
+                if width <= 1:
+                    return
+                desc.configure(wraplength=max(260, width - 24))
+            except _WRAP_SYNC_ERRORS:
+                return
+
+        try:
+            parent.bind("<Configure>", _sync_wrap)
+            parent.after(0, _sync_wrap)
+        except _WRAP_SYNC_ERRORS:
+            pass
 
         self.chk_experimental = ttk.Checkbutton(
             parent,

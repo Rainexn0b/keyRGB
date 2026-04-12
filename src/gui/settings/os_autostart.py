@@ -10,7 +10,7 @@ def autostart_desktop_path() -> Path:
 def detect_os_autostart_enabled() -> bool:
     try:
         return autostart_desktop_path().exists()
-    except Exception:  # @quality-exception exception-transparency: autostart detection is a filesystem boundary; failure degrades to False
+    except OSError:
         return False
 
 

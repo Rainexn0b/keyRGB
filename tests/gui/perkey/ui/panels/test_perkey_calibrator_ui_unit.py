@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from src.gui.perkey.ui.calibrator import run_keymap_calibrator_ui
 
 
@@ -39,3 +41,13 @@ def test_run_keymap_calibrator_ui_sets_failed_message_on_exception() -> None:
 
     assert ed.status_label.text.startswith("Failed to start calibrator")
     assert "Try:" in ed.status_label.text
+
+
+def test_run_keymap_calibrator_ui_propagates_unexpected_failures() -> None:
+    ed = DummyEditor(status_label=DummyLabel())
+
+    def boom() -> None:
+        raise AssertionError("nope")
+
+    with pytest.raises(AssertionError):
+        run_keymap_calibrator_ui(ed, launch_fn=boom)

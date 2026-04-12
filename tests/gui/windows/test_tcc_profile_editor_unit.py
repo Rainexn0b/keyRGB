@@ -15,6 +15,7 @@ class _FakeWidget:
         self.pack_calls: list[dict[str, object]] = []
         self.place_calls: list[dict[str, object]] = []
         self.configure_calls: list[dict[str, object]] = []
+        self.bind_calls: list[tuple[str, object]] = []
 
     def pack(self, **kwargs: object) -> None:
         self.pack_calls.append(dict(kwargs))
@@ -26,6 +27,18 @@ class _FakeWidget:
         self.configure_calls.append(dict(kwargs))
         self.options.update(kwargs)
 
+    def bind(self, sequence: str, callback: object) -> None:
+        self.bind_calls.append((sequence, callback))
+
+    def winfo_width(self) -> int:
+        return int(self.options.get("width_px", 720))
+
+    def winfo_reqwidth(self) -> int:
+        return int(self.options.get("reqwidth_px", self.winfo_width()))
+
+    def winfo_reqheight(self) -> int:
+        return int(self.options.get("reqheight_px", 520))
+
 
 class _FakeToplevel:
     def __init__(self, parent: object, event_log: list[object]) -> None:
@@ -34,6 +47,8 @@ class _FakeToplevel:
         self.title_calls: list[str] = []
         self.geometry_calls: list[str] = []
         self.minsize_calls: list[tuple[int, int]] = []
+        self.after_calls: list[tuple[int, object]] = []
+        self.update_idletasks_calls = 0
         self.destroy_calls = 0
 
     def title(self, value: str) -> None:
@@ -44,6 +59,18 @@ class _FakeToplevel:
 
     def minsize(self, width: int, height: int) -> None:
         self.minsize_calls.append((width, height))
+
+    def after(self, delay: int, callback) -> None:
+        self.after_calls.append((delay, callback))
+
+    def update_idletasks(self) -> None:
+        self.update_idletasks_calls += 1
+
+    def winfo_screenwidth(self) -> int:
+        return 1280
+
+    def winfo_screenheight(self) -> int:
+        return 900
 
     def destroy(self) -> None:
         self.destroy_calls += 1
@@ -180,11 +207,15 @@ def test_open_profile_json_editor_creates_window_populates_text_and_wires_scroll
     window = registry["windows"][0]
     text = registry["texts"][0]
     yscroll, xscroll = registry["scrollbars"]
+    info = registry["labels"][0]
 
     assert window.parent is parent
     assert window.title_calls == ["Edit Profile - Gaming"]
-    assert window.geometry_calls == ["720x520"]
-    assert window.minsize_calls == [(640, 420)]
+    assert window.geometry_calls == ["720x556+280+172"]
+    assert window.minsize_calls == [(560, 360)]
+    assert window.after_calls and window.after_calls[0][0] == 0
+    assert info.options["justify"] == "left"
+    assert info.options["wraplength"] == 640
     assert text.insert_calls == [
         (
             "1.0",
@@ -205,6 +236,40 @@ def test_open_profile_json_editor_creates_window_populates_text_and_wires_scroll
     assert text.xview_calls == [("scroll", 2, "units")]
     assert yscroll.set_calls == [(0.0, 1.0)]
     assert xscroll.set_calls == [(0.25, 0.75)]
+
+
+def test_open_profile_json_editor_uses_requested_content_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _install_fake_ui(monkeypatch)
+    seen: dict[str, object] = {}
+
+    def _fake_compute(root, **kwargs):
+        seen["root"] = root
+        seen.update(kwargs)
+        return "760x560+10+20"
+
+    monkeypatch.setattr(profile_editor, "compute_centered_window_geometry", _fake_compute)
+
+    profile_editor.open_profile_json_editor(
+        object(),
+        profile_name="Gaming",
+        payload={"id": "demo"},
+        on_save=lambda _data: None,
+        on_saved=lambda: None,
+    )
+
+    window = registry["windows"][0]
+    assert window.update_idletasks_calls == 1
+    assert seen == {
+        "root": window,
+        "content_height_px": 520,
+        "content_width_px": 720,
+        "footer_height_px": 0,
+        "chrome_padding_px": 36,
+        "default_w": 720,
+        "default_h": 520,
+        "screen_ratio_cap": 0.95,
+    }
+    assert window.geometry_calls == ["760x560+10+20"]
 
 
 def test_save_success_calls_on_save_then_destroy_then_on_saved(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -317,3 +382,26 @@ def test_save_callback_failure_shows_error_and_does_not_close(monkeypatch: pytes
     ]
     assert registry["windows"][0].destroy_calls == 0
     assert on_saved_calls == []
+
+
+def test_save_callback_propagates_unexpected_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    registry = _install_fake_ui(monkeypatch)
+
+    def on_save(_payload: dict) -> None:
+        raise AssertionError("unexpected save bug")
+
+    profile_editor.open_profile_json_editor(
+        object(),
+        profile_name="Gaming",
+        payload={"id": "original"},
+        on_save=on_save,
+        on_saved=lambda: None,
+    )
+
+    registry["texts"][0].contents = '{"id": "updated"}\n'
+
+    with pytest.raises(AssertionError, match="unexpected save bug"):
+        _save_button(registry).options["command"]()
+
+    assert registry["errors"] == []
+    assert registry["windows"][0].destroy_calls == 0

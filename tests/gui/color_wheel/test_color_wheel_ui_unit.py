@@ -15,6 +15,7 @@ class _FakeCanvas:
         self.delete_calls: list[object] = []
         self.rectangle_calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
         self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
         self.bind_calls: list[tuple[str, object]] = []
 
     def delete(self, tag: object) -> None:
@@ -25,6 +26,9 @@ class _FakeCanvas:
 
     def pack(self, **kwargs: object) -> None:
         self.pack_calls.append(dict(kwargs))
+
+    def grid(self, **kwargs: object) -> None:
+        self.grid_calls.append(dict(kwargs))
 
     def bind(self, event: str, callback) -> None:
         self.bind_calls.append((event, callback))
@@ -38,7 +42,9 @@ class _FakeConfigurable:
         self.options: dict[str, object] = {}
         self.config_calls: list[dict[str, object]] = []
         self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
         self.bind_calls: list[tuple[str, object]] = []
+        self.columnconfigure_calls: list[tuple[int, int]] = []
 
     def config(self, **kwargs: object) -> None:
         self.config_calls.append(dict(kwargs))
@@ -52,8 +58,14 @@ class _FakeConfigurable:
     def pack(self, **kwargs: object) -> None:
         self.pack_calls.append(dict(kwargs))
 
+    def grid(self, **kwargs: object) -> None:
+        self.grid_calls.append(dict(kwargs))
+
     def bind(self, event: str, callback) -> None:
         self.bind_calls.append((event, callback))
+
+    def columnconfigure(self, index: int, weight: int = 0, **_kwargs) -> None:
+        self.columnconfigure_calls.append((index, weight))
 
 
 class _FakeVar:
@@ -163,22 +175,41 @@ def test_create_widgets_builds_slider_preview_and_manual_inputs(monkeypatch: pyt
     assert [event for event, _ in wheel.canvas.bind_calls] == ["<Button-1>", "<B1-Motion>", "<ButtonRelease-1>"]
     assert len(double_vars) == 1
     assert double_vars[0].value == 25.0
+    assert frames[0].columnconfigure_calls == [(1, 1)]
     assert wheel.brightness_title_label.kwargs["text"] == "Initial:"
+    assert wheel.brightness_title_label.grid_calls == [{"row": 0, "column": 0, "sticky": "w", "padx": (0, 10)}]
     assert wheel.brightness_slider.kwargs["variable"] is double_vars[0]
     assert wheel.brightness_slider.kwargs["command"] == wheel._on_brightness_change
+    assert wheel.brightness_slider.grid_calls == [{"row": 0, "column": 1, "sticky": "ew"}]
     assert wheel.brightness_label.kwargs["text"] == "25%"
     assert wheel.brightness_label.options["width"] == 5
+    assert wheel.brightness_label.grid_calls == [{"row": 0, "column": 2, "sticky": "e", "padx": (10, 5)}]
+    selected_color_label = next(label for label in labels if label.kwargs.get("text") == "Selected Color:")
+    manual_rgb_label = next(label for label in labels if label.kwargs.get("text") == "RGB:")
+    comma_labels = [label for label in labels if label.kwargs.get("text") == ","]
+    assert frames[1].columnconfigure_calls == [(2, 1)]
+    assert selected_color_label.grid_calls == [{"row": 0, "column": 0, "sticky": "w", "padx": (0, 10)}]
     assert wheel.preview_canvas.kwargs["highlightbackground"] == "#202020"
+    assert wheel.preview_canvas.grid_calls == [{"row": 0, "column": 1, "sticky": "w"}]
     assert wheel.rgb_label.kwargs["width"] == 16
+    assert wheel.rgb_label.grid_calls == [{"row": 0, "column": 2, "sticky": "w", "padx": (10, 0)}]
+    assert manual_rgb_label.grid_calls == [{"row": 0, "column": 0, "sticky": "w", "padx": (0, 8)}]
     assert [var.value for var in string_vars] == ["4", "5", "6"]
     assert wheel.rgb_r_entry.kwargs["textvariable"] is wheel.rgb_r_var
     assert wheel.rgb_g_entry.kwargs["textvariable"] is wheel.rgb_g_var
     assert wheel.rgb_b_entry.kwargs["textvariable"] is wheel.rgb_b_var
+    assert wheel.rgb_r_entry.grid_calls == [{"row": 0, "column": 1, "sticky": "w"}]
+    assert len(comma_labels) == 2
+    assert comma_labels[0].grid_calls == [{"row": 0, "column": 2, "sticky": "w", "padx": (2, 2)}]
+    assert wheel.rgb_g_entry.grid_calls == [{"row": 0, "column": 3, "sticky": "w"}]
+    assert comma_labels[1].grid_calls == [{"row": 0, "column": 4, "sticky": "w", "padx": (2, 2)}]
+    assert wheel.rgb_b_entry.grid_calls == [{"row": 0, "column": 5, "sticky": "w"}]
     assert [event for event, _ in wheel.rgb_r_entry.bind_calls] == ["<Return>"]
     assert [event for event, _ in wheel.rgb_g_entry.bind_calls] == ["<Return>"]
     assert [event for event, _ in wheel.rgb_b_entry.bind_calls] == ["<Return>"]
     assert buttons[0].kwargs["text"] == "Set"
     assert buttons[0].kwargs["command"] == wheel._on_manual_rgb_set
+    assert buttons[0].grid_calls == [{"row": 0, "column": 6, "sticky": "w", "padx": (10, 0)}]
     assert wheel.update_preview_calls == 1
 
 

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import tkinter as tk
+
 import src.gui.settings.panels.dim_sync_panel as dim_sync_panel
 
 
@@ -12,7 +14,9 @@ class _FakeWidget:
         self.options: dict[str, object] = {}
         self.configure_calls: list[dict[str, object]] = []
         self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
         self.bind_calls: list[tuple[str, object]] = []
+        self.columnconfigure_calls: list[tuple[int, int]] = []
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
@@ -21,8 +25,14 @@ class _FakeWidget:
     def pack(self, **kwargs) -> None:
         self.pack_calls.append(dict(kwargs))
 
+    def grid(self, **kwargs) -> None:
+        self.grid_calls.append(dict(kwargs))
+
     def bind(self, event: str, callback) -> None:
         self.bind_calls.append((event, callback))
+
+    def columnconfigure(self, index: int, weight: int = 0, **_kwargs) -> None:
+        self.columnconfigure_calls.append((index, weight))
 
 
 class _FakeVar:
@@ -67,6 +77,9 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
     assert radios[0].kwargs["value"] == "off"
     assert radios[1].kwargs["value"] == "temp"
     assert panel.lbl_dim_temp_val.kwargs["text"] == "17"
+    assert frames[1].columnconfigure_calls == [(0, 1)]
+    assert radios[1].grid_calls == [{"row": 0, "column": 0, "sticky": "w"}]
+    assert panel.lbl_dim_temp_val.grid_calls == [{"row": 0, "column": 1, "sticky": "e", "padx": (12, 0)}]
     assert panel.scale_dim_temp.kwargs["from_"] == 1
     assert panel.scale_dim_temp.kwargs["to"] == 50
     assert panel.scale_dim_temp.bind_calls[0][0] == "<ButtonRelease-1>"
@@ -157,3 +170,26 @@ def test_set_label_int_falls_back_to_placeholder_on_parse_error() -> None:
 
     assert label.options["text"] == "?"
     assert label.configure_calls == [{"text": "?"}]
+
+
+def test_set_label_int_falls_back_when_widget_rejects_primary_update() -> None:
+    class _RetryLabel(_FakeWidget):
+        def configure(self, **kwargs) -> None:
+            if kwargs.get("text") != "?":
+                raise RuntimeError("widget not ready")
+            super().configure(**kwargs)
+
+    label = _RetryLabel()
+
+    dim_sync_panel.DimSyncPanel._set_label_int(label, "17.9")
+
+    assert label.configure_calls == [{"text": "?"}]
+    assert label.options["text"] == "?"
+
+
+def test_set_label_int_swallows_destroyed_widget_errors() -> None:
+    class _DestroyedLabel:
+        def configure(self, **kwargs) -> None:
+            raise tk.TclError("widget destroyed")
+
+    dim_sync_panel.DimSyncPanel._set_label_int(_DestroyedLabel(), "17.9")

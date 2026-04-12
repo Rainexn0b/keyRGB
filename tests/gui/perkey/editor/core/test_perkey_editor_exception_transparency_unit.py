@@ -230,3 +230,18 @@ def test_detect_lightbar_device_logs_discovery_failures(monkeypatch: pytest.Monk
     assert args[1] == "perkey.editor.lightbar_discovery"
     assert kwargs["msg"] == "Failed to collect perkey lightbar discovery snapshot"
     assert isinstance(kwargs["exc"], RuntimeError)
+
+
+def test_detect_lightbar_device_propagates_unexpected_discovery_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    logs = _capture_logs(monkeypatch)
+
+    def fail_collect(*, include_usb: bool):
+        assert include_usb is True
+        raise AssertionError("unexpected discovery bug")
+
+    monkeypatch.setattr(perkey_editor, "collect_device_discovery", fail_collect)
+
+    with pytest.raises(AssertionError, match="unexpected discovery bug"):
+        PerKeyEditor._detect_lightbar_device(SimpleNamespace())
+
+    assert logs == []

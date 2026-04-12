@@ -17,6 +17,7 @@ _SVG_RASTERIZER_FALLBACK_ERRORS = (AttributeError, ImportError, OSError, Runtime
 _HOME_DISCOVERY_ERRORS = (OSError, RuntimeError)
 _LOGO_PATH_PROBE_ERRORS = (OSError, RuntimeError)
 _WINDOW_ICON_LOAD_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, tk.TclError, TypeError, ValueError)
+_WINDOW_ICON_APPLY_ERRORS = _WINDOW_ICON_LOAD_ERRORS + (LookupError,)
 
 
 def _rasterize_svg_window_icon_with_cairosvg(path_str: str):
@@ -170,6 +171,6 @@ def apply_keyrgb_window_icon(window: tk.Misc) -> None:
                 return
             except _WINDOW_ICON_LOAD_ERRORS:
                 continue
-    except Exception as exc:  # @quality-exception exception-transparency: Tk window icon setup crosses arbitrary Tk/window callback boundaries and must remain non-fatal during window creation
+    except _WINDOW_ICON_APPLY_ERRORS as exc:
         logger.exception("Failed to apply KeyRGB window icon", exc_info=exc)
         return
