@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import importlib
 import importlib.util
-import traceback
 
+from ..utils.import_probe import probe_module_import
+from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
 
@@ -23,16 +23,16 @@ def _has_tkinter() -> bool:
 
 def import_validation_runner() -> RunResult:
     failures: list[str] = []
+    root = repo_root()
 
     has_tk = _has_tkinter()
 
     for mod in DEFAULT_IMPORTS:
         if not has_tk and mod.startswith("src.gui."):
             continue
-        try:
-            importlib.import_module(mod)
-        except Exception as exc:  # @quality-exception exception-transparency: import step intentionally catches all import failures; full traceback is captured in the failures list via traceback.format_exc()
-            failures.append(f"Failed to import {mod}: {exc}\n{traceback.format_exc()}")
+        probe = probe_module_import(mod, cwd=root)
+        if not probe.ok:
+            failures.append(f"Failed to import {mod}: {probe.error_message}\n{probe.stderr}")
 
     if failures:
         return RunResult(

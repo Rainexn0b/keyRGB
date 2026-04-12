@@ -14,9 +14,28 @@ _REQUIRED_FILES = [
     "requirements.txt",
 ]
 
+_AUTOSTART_INSTALLER_FILES = [
+    "install.sh",
+    "scripts/install_user.sh",
+    "scripts/lib/user_integration.sh",
+]
+
+_AUTOSTART_MARKERS = ("~/.config/autostart", ".config/autostart")
+
 
 def _read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
+
+
+def _installer_mentions_autostart(root: Path) -> bool:
+    for relative_path in _AUTOSTART_INSTALLER_FILES:
+        candidate = root / relative_path
+        if not candidate.exists():
+            continue
+        candidate_text = _read_text(candidate)
+        if any(marker in candidate_text for marker in _AUTOSTART_MARKERS):
+            return True
+    return False
 
 
 def repo_validation_runner() -> RunResult:
@@ -29,32 +48,15 @@ def repo_validation_runner() -> RunResult:
     if missing:
         errors.append("Missing required repo files:\n" + "\n".join(f"  - {m}" for m in missing))
 
-    # requirements.txt should not hard-require PyQt6 (it is optional)
-    req_path = root / "requirements.txt"
-    if req_path.exists():
-        req_text = _read_text(req_path)
-        for line in req_text.splitlines():
-            stripped = line.strip()
-            if stripped.startswith("PyQt6") and not stripped.startswith("#"):
-                errors.append("requirements.txt hard-requires PyQt6; it should be optional (commented)")
-                break
-
-    # pyproject.toml should include optional dependency group for qt
     pyproject_path = root / "pyproject.toml"
     if pyproject_path.exists():
         py_text = _read_text(pyproject_path)
-        if "[project.optional-dependencies]" not in py_text or "qt" not in py_text:
-            warnings.append("pyproject.toml: optional dependency group 'qt' not detected")
-
         if "[project.urls]" not in py_text or "github.com/Rainexn0b/keyRGB" not in py_text:
             warnings.append("pyproject.toml: project.urls does not appear to point at Rainexn0b/keyRGB")
 
-    # install.sh should set up autostart
-    install_path = root / "install.sh"
-    if install_path.exists():
-        install_text = _read_text(install_path)
-        if "~/.config/autostart" not in install_text and ".config/autostart" not in install_text:
-            warnings.append("install.sh: autostart entry not detected")
+    # install.sh can be a dispatcher; accept autostart handling in the delegated user installer path.
+    if not _installer_mentions_autostart(root):
+        warnings.append("installer: autostart entry not detected")
 
     stdout_lines: list[str] = []
     stdout_lines.append("Repo validation")

@@ -3,6 +3,10 @@ from __future__ import annotations
 import json
 import re
 
+import pytest
+
+import buildpython.steps.step_architecture_validation as step_architecture_validation
+
 from buildpython.steps.architecture_validation import load_architecture_rules, scan_architecture
 
 
@@ -95,3 +99,35 @@ def test_scan_architecture_reports_matches_and_respects_excludes(tmp_path) -> No
     assert result.findings[0].path == "src/core/bad.py"
     assert result.findings[0].line == 1
     assert result.findings[0].rule_id == "core-boundary"
+
+
+def test_architecture_validation_runner_returns_run_result_for_recoverable_rule_errors(
+    monkeypatch, tmp_path
+) -> None:
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    def fake_load(_config_path):
+        raise ValueError("bad rules")
+
+    monkeypatch.setattr(step_architecture_validation, "load_architecture_rules", fake_load)
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 1
+    assert "Failed to load rules or scan the repo." in result.stdout
+    assert result.stderr == "bad rules\n"
+
+
+def test_architecture_validation_runner_propagates_unexpected_scan_bug(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+    monkeypatch.setattr(step_architecture_validation, "load_architecture_rules", lambda _config_path: [])
+
+    def fake_scan(_root, _rules):
+        raise AssertionError("unexpected scan bug")
+
+    monkeypatch.setattr(step_architecture_validation, "scan_architecture", fake_scan)
+
+    with pytest.raises(AssertionError, match="unexpected scan bug"):
+        step_architecture_validation.architecture_validation_runner()

@@ -53,6 +53,13 @@ print(json.dumps(out))
     return {str(k): str(v) for k, v in data.items()}
 
 
+def _relative_path_under_prefix(*, path: Path, prefix: Path, version: str) -> Path:
+    try:
+        return path.relative_to(prefix)
+    except ValueError:
+        return Path("lib") / f"python{version}"
+
+
 def bundle_python_runtime(*, appdir: Path) -> None:
     manifest = _python_runtime_manifest()
     prefix = Path(manifest.get("prefix", ""))
@@ -71,13 +78,6 @@ def bundle_python_runtime(*, appdir: Path) -> None:
     usr_bin.mkdir(parents=True, exist_ok=True)
     usr_lib.mkdir(parents=True, exist_ok=True)
 
-    def rel_under_prefix(path: Path) -> Path:
-        try:
-            return path.relative_to(prefix)
-        except Exception:  # @quality-exception exception-transparency: relative-to fallback keeps the previous lib layout when the path is outside the prefix
-            # Fallback: keep our previous lib layout.
-            return Path("lib") / f"python{version}"
-
     # Interpreter
     py_src = Path(python_exe())
     py_dst = usr_bin / "python3"
@@ -87,7 +87,7 @@ def bundle_python_runtime(*, appdir: Path) -> None:
     # Standard library (pure + platform stdlib). Some distros use lib64.
     # Place stdlib in the same relative location under prefix so the bundled
     # interpreter can find it via PYTHONHOME.
-    std_rel = rel_under_prefix(stdlib)
+    std_rel = _relative_path_under_prefix(path=stdlib, prefix=prefix, version=version)
     dst_stdlib = appdir / "usr" / std_rel
     if dst_stdlib.exists():
         shutil.rmtree(dst_stdlib)
@@ -95,7 +95,7 @@ def bundle_python_runtime(*, appdir: Path) -> None:
     shutil.copytree(stdlib, dst_stdlib, symlinks=False)
 
     if platstdlib != stdlib and platstdlib.exists():
-        plat_rel = rel_under_prefix(platstdlib)
+        plat_rel = _relative_path_under_prefix(path=platstdlib, prefix=prefix, version=version)
         dst_plat = appdir / "usr" / plat_rel
         if not dst_plat.exists():
             dst_plat.parent.mkdir(parents=True, exist_ok=True)
@@ -114,7 +114,7 @@ def bundle_python_runtime(*, appdir: Path) -> None:
                 break
 
     if lib_src is not None:
-        lib_rel = rel_under_prefix(lib_src)
+        lib_rel = _relative_path_under_prefix(path=lib_src, prefix=prefix, version=version)
         lib_dst = appdir / "usr" / lib_rel
         lib_dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(lib_src, lib_dst)

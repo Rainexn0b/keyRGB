@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import re
 import sys
 import time
@@ -132,11 +133,7 @@ def _write_log(
 
 
 def _is_module_available(module: str) -> bool:
-    try:
-        __import__(module)
-        return True
-    except Exception:  # @quality-exception exception-transparency: module availability probe intentionally catches all import failures to determine step gating
-        return False
+    return importlib.util.find_spec(module) is not None
 
 
 def run_step(

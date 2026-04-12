@@ -6,6 +6,48 @@ import subprocess
 from pathlib import Path
 
 
+def _ldd_deps(binary: Path) -> dict[str, Path]:
+    """Return DT_NEEDED libs resolved by ldd as {soname: path}."""
+    try:
+        proc = subprocess.run(
+            ["ldd", str(binary)],
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+    except OSError:
+        return {}
+
+    if proc.returncode != 0:
+        return {}
+
+    out: dict[str, Path] = {}
+    for raw in (proc.stdout or "").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("linux-vdso"):
+            continue
+
+        if "=>" in line:
+            left, right = line.split("=>", 1)
+            soname = left.strip()
+            right = right.strip()
+            if not soname or right.startswith("not found"):
+                continue
+            path_str = right.split("(", 1)[0].strip()
+            if not path_str.startswith("/"):
+                continue
+            out[soname] = Path(path_str)
+            continue
+
+        if line.startswith("/"):
+            path_str = line.split("(", 1)[0].strip()
+            path = Path(path_str)
+            out[path.name] = path
+
+    return out
+
+
 def bundle_tkinter(*, appdir: Path) -> None:
     """Bundle Tkinter native libraries and Tcl/Tk script libraries into the AppImage.
 
@@ -118,50 +160,6 @@ def _bundle_tk_shared_lib_deps(*, appdir: Path, usr_lib: Path, tk_lib: Path, tcl
             seen.add(current.name)
             break
 
-    def ldd_deps(binary: Path) -> dict[str, Path]:
-        """Return DT_NEEDED libs resolved by ldd as {soname: path}."""
-        try:
-            proc = subprocess.run(
-                ["ldd", str(binary)],
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                check=False,
-            )
-        except Exception:  # @quality-exception exception-transparency: tkinter bundle subprocess is a build-tool boundary; failure returns empty dict to skip optional bundling
-            return {}
-
-        if proc.returncode != 0:
-            return {}
-
-        out: dict[str, Path] = {}
-        for raw in (proc.stdout or "").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("linux-vdso"):
-                continue
-
-            # Formats:
-            #   libXft.so.2 => /usr/lib/x86_64-linux-gnu/libXft.so.2 (0x...)
-            #   /lib64/ld-linux-x86-64.so.2 (0x...)
-            if "=>" in line:
-                left, right = line.split("=>", 1)
-                soname = left.strip()
-                right = right.strip()
-                if not soname or right.startswith("not found"):
-                    continue
-                path_str = right.split("(", 1)[0].strip()
-                if not path_str.startswith("/"):
-                    continue
-                out[soname] = Path(path_str)
-                continue
-
-            if line.startswith("/"):
-                path_str = line.split("(", 1)[0].strip()
-                p = Path(path_str)
-                out[p.name] = p
-
-        return out
-
     def bundle_deps_for(binary: Path) -> None:
         # Avoid bundling glibc/loader core libs.
         skip_names = {
@@ -182,7 +180,7 @@ def _bundle_tk_shared_lib_deps(*, appdir: Path, usr_lib: Path, tk_lib: Path, tcl
             "libfreetype.so.6",
         }
 
-        for soname, src in ldd_deps(binary).items():
+        for soname, src in _ldd_deps(binary).items():
             if soname.startswith(("libfontconfig.so", "libfreetype.so")):
                 continue
             if soname in skip_names:

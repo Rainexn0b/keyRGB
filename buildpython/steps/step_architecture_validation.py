@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import re
 from collections import Counter
 
 from ..utils.paths import buildlog_dir, repo_root
 from ..utils.subproc import RunResult
 from .architecture_validation import load_architecture_rules, scan_architecture
 from .reports import write_csv, write_json, write_md
+
+
+_ARCHITECTURE_VALIDATION_RUNTIME_ERRORS = (OSError, ValueError, re.error)
 
 
 def architecture_validation_runner() -> RunResult:
@@ -20,7 +24,7 @@ def architecture_validation_runner() -> RunResult:
     try:
         rules = load_architecture_rules(config_path)
         result = scan_architecture(root, rules)
-    except Exception as exc:  # @quality-exception exception-transparency: architecture validation step failure is surfaced as a RunResult with the error message; rules load or scan errors must not crash the build runner
+    except _ARCHITECTURE_VALIDATION_RUNTIME_ERRORS as exc:
         return RunResult(
             command_str="(internal) architecture validation",
             stdout="Architecture validation\n\nFailed to load rules or scan the repo.\n",

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import ast
-import importlib
 import logging
 import sys
 from pathlib import Path
 
+from ..utils.import_probe import probe_module_import
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 OPTIONAL_TOPLEVEL = {
-    "PyQt6",  # optional UI sliders
     "gi",  # optional desktop integration / icon rasterization support
     "ruff",  # optional lint/format
     "pystray",  # optional tray icon (headless CI)
@@ -113,9 +112,6 @@ def _parse_imports(path: Path) -> set[str]:
 def import_scan_runner() -> RunResult:
     root = repo_root()
 
-    # Mimic runtime behavior: import from the checkout root.
-    sys.path.insert(0, str(root))
-
     stdlib = _stdlib_modules()
 
     all_imports: set[str] = set()
@@ -131,17 +127,21 @@ def import_scan_runner() -> RunResult:
     ok: list[str] = []
 
     for name in candidates:
-        try:
-            importlib.import_module(name)
-        except Exception as exc:  # @quality-exception exception-transparency: dynamic module import may raise any exception from module-level code; all failures are classified as missing
-            logger.exception("Import scan failed for candidate module '%s'", name)
-            detail = f"{name} ({type(exc).__name__}: {exc})"
-            if name in OPTIONAL_TOPLEVEL:
-                optional_missing.append(detail)
-            else:
-                missing.append(detail)
-        else:
+        probe = probe_module_import(name, cwd=root)
+        if probe.ok:
             ok.append(name)
+            continue
+
+        logger.error(
+            "Import scan failed for candidate module '%s'\n%s",
+            name,
+            probe.stderr.rstrip(),
+        )
+        detail = f"{name} ({probe.failure_detail})"
+        if name in OPTIONAL_TOPLEVEL:
+            optional_missing.append(detail)
+        else:
+            missing.append(detail)
 
     stdout_lines: list[str] = []
     stdout_lines.append("Import scan")
