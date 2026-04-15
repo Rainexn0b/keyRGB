@@ -3,6 +3,11 @@
 ## Unreleased
 
 
+## 0.22.1 (2026-04-15)
+
+- GUI/Per-key Editor: Widen the right-side control panel baseline and refit the toplevel window to the real requested content size after layout, fixing the clipped manual RGB `Set` control and the hidden bottom per-key action buttons while guarding the same panel against theme/font-size layout regressions.
+
+
 ## 0.22.0 (2026-04-13)
 
 - Build/Packaging: Raise the baseline versions for `setuptools`, `wheel`, `Pillow`, `evdev`, and the dev toolchain; drop the unused optional `PyQt6` dependency and the stale Qt-specific repo references.

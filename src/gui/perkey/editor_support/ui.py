@@ -96,7 +96,6 @@ def build_editor_ui(editor) -> None:
 
     right = ttk.Frame(content, width=editor._right_panel_width)
     right.grid(row=0, column=1, sticky="ns", padx=(16, 0))
-    right.pack_propagate(False)
 
     backdrop_row = ttk.Frame(right)
     backdrop_row.pack(fill="x", pady=(0, 6))
@@ -160,6 +159,28 @@ def build_editor_ui(editor) -> None:
         show_rgb_label=False,
     )
     editor.color_wheel.pack()
+
+    def _sync_right_panel_width() -> None:
+        try:
+            required_width = max(
+                int(editor._right_panel_width),
+                *(int(child.winfo_reqwidth()) for child in right.winfo_children()),
+            )
+        except _STATUS_WRAP_SYNC_ERRORS:
+            return
+
+        if required_width <= int(editor._right_panel_width):
+            return
+
+        editor._right_panel_width = required_width
+        try:
+            right.configure(width=required_width)
+        except _STATUS_WRAP_SYNC_ERRORS:
+            return
+
+    # Some themes/font scales make the embedded ColorWheel request more width than
+    # the legacy fixed panel; expand to the real requested width after layout.
+    editor.root.after(0, _sync_right_panel_width)
 
     apply_row = ttk.Frame(right)
     apply_row.pack(fill="x", pady=(8, 0))

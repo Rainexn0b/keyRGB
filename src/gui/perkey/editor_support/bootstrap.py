@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from .. import window_geometry
+
 
 def initialize_editor(
     app: Any,
@@ -31,13 +33,23 @@ def initialize_editor(
     app._key_gap = 2
     app._key_margin = 8
     app._wheel_size = 240
-    app._right_panel_width = 320
+    app._right_panel_width = max(320, app._wheel_size + 128)
     app._resize_job = None
 
     app.root = tk.Tk()
     app.root.title("KeyRGB - Per-key Colors")
     apply_keyrgb_window_icon(app.root)
     app.root.update_idletasks()
+
+    min_content_width, min_content_height = window_geometry.compute_perkey_editor_min_content_size(
+        num_rows=num_rows,
+        num_cols=num_cols,
+        key_margin=app._key_margin,
+        key_size=app._key_size,
+        key_gap=app._key_gap,
+        right_panel_width=app._right_panel_width,
+        wheel_size=app._wheel_size,
+    )
 
     apply_perkey_editor_geometry(
         app.root,
@@ -122,6 +134,19 @@ def initialize_editor(
     app.kb = get_keyboard()
 
     build_ui_fn()
+    window_geometry.fit_perkey_editor_geometry_to_content(
+        app.root,
+        min_content_width_px=min_content_width,
+        min_content_height_px=min_content_height,
+    )
+    app.root.after(
+        50,
+        lambda: window_geometry.fit_perkey_editor_geometry_to_content(
+            app.root,
+            min_content_width_px=min_content_width,
+            min_content_height_px=min_content_height,
+        ),
+    )
     app.canvas.redraw()
 
     if not app.keymap:

@@ -31,6 +31,10 @@ class _FakeWidget:
         self.grid_remove_calls = 0
         self.pack_propagate_calls = []
         self.width = int(kwargs.get("width", 360))
+        self.reqwidth = int(kwargs.get("reqwidth", kwargs.get("width", 0)))
+        self.children = []
+        if hasattr(parent, "children"):
+            parent.children.append(self)
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
@@ -61,6 +65,12 @@ class _FakeWidget:
 
     def winfo_width(self) -> int:
         return int(self.width)
+
+    def winfo_reqwidth(self) -> int:
+        return int(self.reqwidth)
+
+    def winfo_children(self):
+        return list(self.children)
 
 
 class _FakeRoot:
@@ -95,9 +105,15 @@ class _FakeColorWheel:
         self.parent = parent
         self.options = dict(kwargs)
         self.pack_calls = []
+        self.reqwidth = int(kwargs.get("reqwidth", kwargs.get("size", 0)))
+        if hasattr(parent, "children"):
+            parent.children.append(self)
 
     def pack(self, **kwargs) -> None:
         self.pack_calls.append(dict(kwargs))
+
+    def winfo_reqwidth(self) -> int:
+        return int(self.reqwidth)
 
 
 class _FakeDropdown:
@@ -208,7 +224,12 @@ class _FakeEditor:
         return None
 
 
-def _install_fake_ui(monkeypatch: pytest.MonkeyPatch, *, frame_width: int = 360):
+def _install_fake_ui(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    frame_width: int = 360,
+    color_wheel_reqwidth: int = 0,
+):
     registry = {
         "frames": [],
         "labels": [],
@@ -300,7 +321,7 @@ def _install_fake_ui(monkeypatch: pytest.MonkeyPatch, *, frame_width: int = 360)
         return canvas
 
     def fake_color_wheel(parent=None, **kwargs):
-        wheel = _FakeColorWheel(parent, **kwargs)
+        wheel = _FakeColorWheel(parent, reqwidth=color_wheel_reqwidth, **kwargs)
         registry["wheels"].append(wheel)
         return wheel
 
@@ -343,9 +364,14 @@ def _build_ui(
     *,
     bind_error: bool = False,
     frame_width: int = 360,
+    color_wheel_reqwidth: int = 0,
     has_lightbar_device: bool = False,
 ):
-    registry = _install_fake_ui(monkeypatch, frame_width=frame_width)
+    registry = _install_fake_ui(
+        monkeypatch,
+        frame_width=frame_width,
+        color_wheel_reqwidth=color_wheel_reqwidth,
+    )
     root = _FakeRoot(bind_error=bind_error)
     editor = _FakeEditor(root)
     editor.has_lightbar_device = has_lightbar_device
@@ -396,7 +422,7 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert left.columnconfigure_calls == [{"index": 0, "weight": 1}]
     assert left.rowconfigure_calls == [{"index": 0, "weight": 1}, {"index": 1, "weight": 0}]
     assert right.grid_calls == [{"row": 0, "column": 1, "sticky": "ns", "padx": (16, 0)}]
-    assert right.pack_propagate_calls == [False]
+    assert right.pack_propagate_calls == []
 
     backdrop_row = next(
         frame
@@ -572,6 +598,30 @@ def test_build_editor_ui_tolerates_root_bind_failure_and_still_schedules_wrap_sy
 
     root.after_calls[0][1]()
     assert editor.status_label.configure_calls[-1] == {"wraplength": 272}
+
+
+def test_build_editor_ui_expands_right_panel_for_requested_child_width(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    editor, root, registry = _build_ui(monkeypatch, color_wheel_reqwidth=361)
+
+    main = registry["frames"][0]
+    content = next(
+        frame
+        for frame in registry["frames"]
+        if frame.parent is main and frame.pack_calls == [{"fill": "both", "expand": True}]
+    )
+    right = next(
+        frame
+        for frame in registry["frames"]
+        if frame.parent is content and frame.grid_calls == [{"row": 0, "column": 1, "sticky": "ns", "padx": (16, 0)}]
+    )
+
+    root.after_calls[1][1]()
+
+    assert editor._right_panel_width == 361
+    assert right.configure_calls[-1] == {"width": 361}
+    assert right.options["width"] == 361
 
 
 class _UnexpectedStatusWrapError(Exception):
