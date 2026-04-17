@@ -29,7 +29,7 @@ v*.tar.gz
 # Local tooling
 .cache/
 .claude/
-.github/agents
+.github/agents/
 
 # Virtual environments
 venv/
@@ -57,9 +57,6 @@ Thumbs.db
 !docs/
 !docs/**
 
-# Local AI/agent session presets
-.github/agents/
-
 # Local reference build system (not part of KeyRGB)
 scripts/build/
 
@@ -80,3 +77,6 @@ third_party/
 
 # Local debug logs
 keyrgb-debug.log
+
+# Temp/logs
+tmp/
