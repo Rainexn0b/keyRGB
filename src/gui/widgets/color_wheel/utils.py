@@ -1,5 +1,7 @@
 import math
-from typing import Any, Callable, Tuple
+from typing import Tuple
+
+from ._color_wheel_ui import ColorWheelCallback
 
 # Type aliases
 # RGB color is (0..255, 0..255, 0..255)
@@ -46,7 +48,15 @@ def derive_border_hex(bg_rgb: ColorRGB) -> str:
     return rgb_to_hex((rr, gg, bb))
 
 
-def invoke_callback(cb: Callable[..., Any] | None, *args: Any, **kwargs: Any) -> None:
+def invoke_callback(
+    cb: ColorWheelCallback | None,
+    red: int,
+    green: int,
+    blue: int,
+    *,
+    source: str | None = None,
+    brightness_percent: float | None = None,
+) -> None:
     """Invoke a callback, preserving backwards compatibility.
 
     Older callbacks in this codebase expect exactly three positional args
@@ -54,11 +64,25 @@ def invoke_callback(cb: Callable[..., Any] | None, *args: Any, **kwargs: Any) ->
     """
     if cb is None:
         return
+
     try:
-        cb(*args, **kwargs)
+        if source is None and brightness_percent is None:
+            cb(red, green, blue)
+        elif source is None:
+            cb(red, green, blue, brightness_percent=float(brightness_percent))
+        elif brightness_percent is None:
+            cb(red, green, blue, source=str(source))
+        else:
+            cb(
+                red,
+                green,
+                blue,
+                source=str(source),
+                brightness_percent=float(brightness_percent),
+            )
     except TypeError:
         # Fallback for old-style callbacks that don't accept kwargs
-        cb(*args)
+        cb(red, green, blue)
 
 
 def hsv_to_xy(hue: float, saturation: float, radius: float) -> Tuple[float, float]:

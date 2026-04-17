@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import tkinter as tk
-from typing import Any
+from collections.abc import Callable
+from typing import Protocol, SupportsFloat, cast
 
 from src.core.utils.logging_utils import log_throttled
 
@@ -14,9 +15,72 @@ _CANVAS_CURSOR_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 _CANVAS_CLICK_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError, tk.TclError)
 
 
-def _selected_overlay_identity_or_none(editor: Any) -> str | None:
+class _TkVarProtocol(Protocol):
+    def get(self) -> object: ...
+
+
+class _CanvasEventEditorProtocol(Protocol):
+    overlay_scope: _TkVarProtocol
+
+    def on_slot_clicked(self, slot_id: str) -> None: ...
+
+
+class _SelectedOverlayIdentityGetter(Protocol):
+    def _selected_overlay_identity(self) -> object: ...
+
+
+class _SelectedSlotIdHolder(Protocol):
+    selected_slot_id: object | None
+
+
+class _SelectedKeyIdHolder(Protocol):
+    selected_key_id: object | None
+
+
+class _SlotIdForKeyIdLookup(Protocol):
+    def _slot_id_for_key_id(self, key_id: str) -> object: ...
+
+
+class _HitTestSlotIdSurface(Protocol):
+    def _hit_test_slot_id(self, x: float, y: float) -> str | None: ...
+
+
+class _AfterScheduler(Protocol):
+    def __call__(self, delay_ms: int, callback: Callable[[], None]) -> str: ...
+
+
+class _ConfigureCursor(Protocol):
+    def __call__(self, *, cursor: str) -> object: ...
+
+
+class _FindWithTag(Protocol):
+    def __call__(self, tag: str) -> tuple[int, ...]: ...
+
+
+class _GetTags(Protocol):
+    def __call__(self, item: int) -> tuple[str, ...]: ...
+
+
+class _CursorForEdges(Protocol):
+    def __call__(self, edges: str) -> str: ...
+
+
+class _PointInKeyBbox(Protocol):
+    def __call__(self, identity: str, cx: float, cy: float) -> bool: ...
+
+
+class _ResizeEdgesForPoint(Protocol):
+    def __call__(self, identity: str, cx: float, cy: float) -> str: ...
+
+
+class _CanvasPointEvent(Protocol):
+    x: SupportsFloat
+    y: SupportsFloat
+
+
+def _selected_overlay_identity_or_none(editor: object) -> str | None:
     try:
-        identity_getter = editor._selected_overlay_identity
+        identity_getter = cast(_SelectedOverlayIdentityGetter, editor)._selected_overlay_identity
     except AttributeError:
         return None
     if not callable(identity_getter):
@@ -27,9 +91,9 @@ def _selected_overlay_identity_or_none(editor: Any) -> str | None:
     return str(selected_identity)
 
 
-def _selected_slot_id_or_none(editor: Any) -> str | None:
+def _selected_slot_id_or_none(editor: object) -> str | None:
     try:
-        selected_slot_id = editor.selected_slot_id
+        selected_slot_id = cast(_SelectedSlotIdHolder, editor).selected_slot_id
     except AttributeError:
         return None
     if not selected_slot_id:
@@ -37,9 +101,9 @@ def _selected_slot_id_or_none(editor: Any) -> str | None:
     return str(selected_slot_id)
 
 
-def _selected_key_id_or_none(editor: Any) -> str | None:
+def _selected_key_id_or_none(editor: object) -> str | None:
     try:
-        selected_key_id = editor.selected_key_id
+        selected_key_id = cast(_SelectedKeyIdHolder, editor).selected_key_id
     except AttributeError:
         return None
     if not selected_key_id:
@@ -47,9 +111,9 @@ def _selected_key_id_or_none(editor: Any) -> str | None:
     return str(selected_key_id)
 
 
-def _slot_id_for_key_id_or_none(editor: Any, key_id: str) -> str | None:
+def _slot_id_for_key_id_or_none(editor: object, key_id: str) -> str | None:
     try:
-        slot_lookup = editor._slot_id_for_key_id
+        slot_lookup = cast(_SlotIdForKeyIdLookup, editor)._slot_id_for_key_id
     except AttributeError:
         return None
     if not callable(slot_lookup):
@@ -60,9 +124,9 @@ def _slot_id_for_key_id_or_none(editor: Any, key_id: str) -> str | None:
     return str(resolved_slot_id)
 
 
-def _hit_test_slot_id_or_none(canvas: Any, *, x: float, y: float) -> str | None:
+def _hit_test_slot_id_or_none(canvas: object, *, x: float, y: float) -> str | None:
     try:
-        hit_test = canvas._hit_test_slot_id
+        hit_test = cast(_HitTestSlotIdSurface, canvas)._hit_test_slot_id
     except AttributeError:
         return None
     if not callable(hit_test):
@@ -72,17 +136,17 @@ def _hit_test_slot_id_or_none(canvas: Any, *, x: float, y: float) -> str | None:
 
 class _KeyboardCanvasEventMixin:
     # Attributes/methods provided by tk.Canvas and KeyboardCanvas
-    editor: Any
-    _resize_job: Any
-    after: Any
-    after_cancel: Any
-    configure: Any
-    find_withtag: Any
-    gettags: Any
-    _cursor_for_edges: Any
-    _point_in_key_bbox: Any
-    redraw: Any
-    _resize_edges_for_point: Any
+    editor: _CanvasEventEditorProtocol
+    _resize_job: str | None
+    after: _AfterScheduler
+    after_cancel: Callable[[str], None]
+    configure: _ConfigureCursor
+    find_withtag: _FindWithTag
+    gettags: _GetTags
+    _cursor_for_edges: _CursorForEdges
+    _point_in_key_bbox: _PointInKeyBbox
+    redraw: Callable[[], None]
+    _resize_edges_for_point: _ResizeEdgesForPoint
 
     def _selected_slot_identity(self) -> str | None:
         selected_identity = _selected_overlay_identity_or_none(self.editor)
@@ -102,7 +166,7 @@ class _KeyboardCanvasEventMixin:
             return resolved_slot_id
         return str(selected_key_id)
 
-    def _on_resize(self, _event) -> None:
+    def _on_resize(self, _event: object) -> None:
         if self._resize_job is not None:
             try:
                 self.after_cancel(self._resize_job)
@@ -121,7 +185,7 @@ class _KeyboardCanvasEventMixin:
         self._resize_job = None
         self.redraw()
 
-    def _on_motion(self, event) -> None:
+    def _on_motion(self, event: _CanvasPointEvent) -> None:
         # Cursor affordances for overlay move/resize.
         try:
             selected_slot_id = self._selected_slot_identity()
@@ -151,7 +215,7 @@ class _KeyboardCanvasEventMixin:
                 exc=exc,
             )
 
-    def _on_leave(self, _event) -> None:
+    def _on_leave(self, _event: object) -> None:
         try:
             self.configure(cursor="")
         except _CANVAS_CURSOR_ERRORS as exc:
@@ -164,7 +228,7 @@ class _KeyboardCanvasEventMixin:
                 exc=exc,
             )
 
-    def _on_click(self, event) -> None:
+    def _on_click(self, event: _CanvasPointEvent) -> None:
         try:
             current = self.find_withtag("current")
             if current:

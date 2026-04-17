@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from typing import Callable, Iterable, Optional
+from typing import Callable, Iterable, Optional, TypeVar
 
 from .base import KeyboardBackend, ProbeResult
 from .exceptions import BackendError  # noqa: F401 – available for callers and future narrowing
@@ -11,6 +11,7 @@ from .policy import experimental_backends_enabled, selection_allowed_for_backend
 
 logger = logging.getLogger(__name__)
 _BACKEND_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_T = TypeVar("_T")
 
 
 @dataclass(frozen=True)
@@ -18,6 +19,24 @@ class BackendSpec:
     name: str
     priority: int
     factory: Callable[[], KeyboardBackend]
+
+
+def _run_recoverable_backend_boundary(
+    action: Callable[[], _T],
+    *,
+    backend_name: str,
+    log_message: str,
+    on_recoverable: Callable[[Exception], _T],
+) -> _T:
+    try:
+        return action()
+    except _BACKEND_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: backend construction and availability probing cross runtime plugin/hardware boundaries; recoverable runtime failures must be logged and degraded while unexpected defects still propagate
+        logger.exception(log_message, backend_name)
+        return on_recoverable(exc)
+
+
+def _unavailable_probe_result(boundary: str, exc: Exception) -> ProbeResult:
+    return ProbeResult(available=False, reason=f"{boundary} exception: {exc}", confidence=0)
 
 
 def _default_specs() -> list[BackendSpec]:
@@ -90,37 +109,45 @@ def _default_specs() -> list[BackendSpec]:
 def iter_backends(*, specs: Optional[Iterable[BackendSpec]] = None) -> list[KeyboardBackend]:
     out: list[KeyboardBackend] = []
     for spec in list(specs) if specs is not None else _default_specs():
-        try:
-            out.append(spec.factory())
-        except _BACKEND_RUNTIME_ERRORS:  # @quality-exception exception-transparency: backend factories are runtime plugin boundaries and auto iteration must skip broken implementations; device errors are now BackendError subclasses but raised in get_device(), not the factory constructor
-            logger.exception("Failed to construct backend '%s'", spec.name)
-            continue
+        backend = _run_recoverable_backend_boundary(
+            spec.factory,
+            backend_name=spec.name,
+            log_message="Failed to construct backend '%s'",
+            on_recoverable=lambda _exc: None,
+        )
+        if backend is not None:
+            out.append(backend)
     return out
 
 
 def _probe_backend(backend: KeyboardBackend) -> ProbeResult:
     """Probe a backend.
 
-    Backends may implement `probe()` returning a ProbeResult. If not, we fall
-    back to `is_available()` with a generic confidence score.
+    Backends may implement probe() returning a ProbeResult. If not, we fall
+    back to is_available() with a generic confidence score.
     """
 
     probe_fn = getattr(backend, "probe", None)
     if callable(probe_fn):
-        try:
-            result = probe_fn()
-            if isinstance(result, ProbeResult):
-                return result
-        except _BACKEND_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: backend probes are runtime hardware/plugin boundaries and selection must degrade to unavailable
-            logger.exception("Backend probe failed for '%s'", backend.name)
-            return ProbeResult(available=False, reason=f"probe exception: {exc}", confidence=0)
+        result = _run_recoverable_backend_boundary(
+            probe_fn,
+            backend_name=backend.name,
+            log_message="Backend probe failed for '%s'",
+            on_recoverable=lambda exc: _unavailable_probe_result("probe", exc),
+        )
+        if isinstance(result, ProbeResult):
+            return result
 
-    try:
+    def _availability_result() -> ProbeResult:
         ok = bool(backend.is_available())
         return ProbeResult(available=ok, reason="is_available", confidence=(50 if ok else 0))
-    except _BACKEND_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: is_available fallback is a runtime backend boundary and selection must degrade to unavailable
-        logger.exception("Backend availability fallback failed for '%s'", backend.name)
-        return ProbeResult(available=False, reason=f"is_available exception: {exc}", confidence=0)
+
+    return _run_recoverable_backend_boundary(
+        _availability_result,
+        backend_name=backend.name,
+        log_message="Backend availability fallback failed for '%s'",
+        on_recoverable=lambda exc: _unavailable_probe_result("is_available", exc),
+    )
 
 
 def select_backend(

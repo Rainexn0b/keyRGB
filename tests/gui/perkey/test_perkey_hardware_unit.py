@@ -57,6 +57,20 @@ def test_backend_dimensions_or_reference_propagates_unexpected_failure() -> None
         hardware._backend_dimensions_or_reference(BrokenBackend())
 
 
+@pytest.mark.parametrize("dimensions", [(7,), (7, 18, 99)])
+def test_backend_dimensions_or_reference_uses_reference_on_malformed_dimension_shape(
+    dimensions: tuple[int, ...],
+) -> None:
+    class BrokenBackend:
+        def dimensions(self):
+            return dimensions
+
+    assert hardware._backend_dimensions_or_reference(BrokenBackend()) == (
+        REFERENCE_MATRIX_ROWS,
+        REFERENCE_MATRIX_COLS,
+    )
+
+
 def test_get_keyboard_returns_none_on_recoverable_open_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: dict[str, object] = {}
     err = RuntimeError("open boom")

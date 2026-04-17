@@ -2,13 +2,11 @@
 
 import colorsys
 import os
-import tempfile
-from typing import Any, Callable
-
 import tkinter as tk
 from tkinter import ttk
 
-from ._color_wheel_ui import _ColorWheelUIMixin
+from ._color_wheel_ui import ColorWheelCallback, _ColorWheelUIMixin
+from ._color_wheel_runtime import load_wheel_photo_image, resolve_theme_bg_hex
 from .color_wheel_image import (
     build_wheel_ppm_bytes,
     wheel_cache_path,
@@ -33,8 +31,8 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         parent,
         size=300,
         initial_color=(255, 0, 0),
-        callback: Callable[..., Any] | None = None,
-        release_callback: Callable[..., Any] | None = None,
+        callback: ColorWheelCallback | None = None,
+        release_callback: ColorWheelCallback | None = None,
         *,
         show_rgb_label: bool = True,
         brightness_label_text: str = "Brightness:",
@@ -59,8 +57,8 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self.size = size  # type: ignore[assignment]
         self.radius = size // 2
         # RGB is always on the 0..255 per-channel scale.
-        self.callback: Callable[..., Any] | None = callback
-        self.release_callback: Callable[..., Any] | None = release_callback
+        self.callback: ColorWheelCallback | None = callback
+        self.release_callback: ColorWheelCallback | None = release_callback
         self.current_color: tuple[int, int, int] = (
             int(initial_color[0]),
             int(initial_color[1]),
@@ -90,8 +88,31 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self._update_selection()
         self._wheel_ready = True
 
-    def _invoke_callback(self, cb: Callable[..., Any] | None, r: int, g: int, b: int, **kwargs: Any) -> None:
-        invoke_callback(cb, int(r), int(g), int(b), **kwargs)
+    def _invoke_callback(
+        self,
+        cb: ColorWheelCallback | None,
+        r: int,
+        g: int,
+        b: int,
+        *,
+        source: str | None = None,
+        brightness_percent: float | None = None,
+    ) -> None:
+        if source is None and brightness_percent is None:
+            invoke_callback(cb, int(r), int(g), int(b))
+        elif source is None:
+            invoke_callback(cb, int(r), int(g), int(b), brightness_percent=brightness_percent)
+        elif brightness_percent is None:
+            invoke_callback(cb, int(r), int(g), int(b), source=source)
+        else:
+            invoke_callback(
+                cb,
+                int(r),
+                int(g),
+                int(b),
+                source=source,
+                brightness_percent=brightness_percent,
+            )
 
     def _draw_wheel(self):
         """Draw the HSV color wheel as a single cached image."""
@@ -99,48 +120,21 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self.canvas.delete("wheel")
 
         # Keep the background consistent with the rest of the app theme.
-        bg_rgb = self._theme_bg_rgb
         center_size = 20
-
-        wheel_path = wheel_cache_path(size=self.size, bg_rgb=bg_rgb, center_size=center_size)
-        ppm_bytes: bytes | None = None
-
-        try:
-            cache_ready = wheel_path.exists() and wheel_path.stat().st_size >= 16
-        except OSError:
-            cache_ready = False
-
-        if not cache_ready:
-            ppm_bytes = build_wheel_ppm_bytes(size=self.size, bg_rgb=bg_rgb, center_size=center_size)
-            try:
-                wheel_path.parent.mkdir(parents=True, exist_ok=True)
-                write_bytes_atomic(wheel_path, ppm_bytes)
-                cache_ready = wheel_path.stat().st_size >= 16
-            except OSError:
-                # Cache path may be unwritable (restricted envs, sandboxing, etc).
-                cache_ready = False
 
         # PhotoImage needs to be held on the instance to avoid GC.
         # Prefer loading via a file path: it's more reliable across Tk builds than feeding
         # a large base64 "data" payload (some systems intermittently fail to parse PPM data).
-        if cache_ready:
-            self._wheel_image = tk.PhotoImage(file=str(wheel_path))
-        else:
-            # If we couldn't write the cache file, fall back to a temp file for this session.
-            if ppm_bytes is None:
-                ppm_bytes = build_wheel_ppm_bytes(size=self.size, bg_rgb=bg_rgb, center_size=center_size)
-            tmp_path = ""
-            try:
-                with tempfile.NamedTemporaryFile(prefix="keyrgb_color_wheel_", suffix=".ppm", delete=False) as f:
-                    f.write(ppm_bytes)
-                    tmp_path = f.name
-                self._wheel_image = tk.PhotoImage(file=tmp_path)
-            finally:
-                if tmp_path:
-                    try:
-                        os.unlink(tmp_path)
-                    except OSError:
-                        pass
+        self._wheel_image = load_wheel_photo_image(
+            size=self.size,
+            bg_rgb=self._theme_bg_rgb,
+            center_size=center_size,
+            wheel_cache_path_fn=wheel_cache_path,
+            build_wheel_ppm_bytes_fn=build_wheel_ppm_bytes,
+            write_bytes_atomic_fn=write_bytes_atomic,
+            photo_image_factory=tk.PhotoImage,
+            unlink_fn=os.unlink,
+        )
         self.canvas.create_image(0, 0, anchor="nw", image=self._wheel_image, tags="wheel")
 
         # Center outline helps readability (matches older look).
@@ -157,24 +151,12 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
     def _resolve_theme_bg_hex(self) -> str:
         """Best-effort resolve a background color that matches ttk theme."""
 
-        try:
-            style = ttk.Style()
-            bg = style.lookup("TFrame", "background") or style.lookup(".", "background")
-            if bg:
-                return str(bg)
-        except (RuntimeError, tk.TclError):
-            pass
-
-        # Fallback: use this widget's Tk background if available.
-        try:
-            bg = str(self.cget("background"))
-            if bg:
-                return bg
-        except (AttributeError, RuntimeError, tk.TclError):
-            pass
-
-        # Historical default (dark)
-        return "#2b2b2b"
+        return resolve_theme_bg_hex(
+            self,
+            style_factory=ttk.Style,
+            style_errors=(RuntimeError, tk.TclError),
+            widget_bg_errors=(AttributeError, RuntimeError, tk.TclError),
+        )
 
     def _update_selection(self):
         """Update the selection indicator on the wheel."""
@@ -221,7 +203,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         if not self._wheel_ready:
             return
         if self.release_callback:
-            invoke_callback(
+            self._invoke_callback(
                 self.release_callback,
                 *self.current_color,
                 source="wheel_release",
@@ -261,7 +243,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
 
         # Also trigger release callback when brightness changes (treat as a commit)
         if self.release_callback:
-            invoke_callback(
+            self._invoke_callback(
                 self.release_callback,
                 *self.current_color,
                 source="brightness",
@@ -305,7 +287,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
             return
 
         if self.callback:
-            invoke_callback(
+            self._invoke_callback(
                 self.callback,
                 *self.current_color,
                 source=str(source or "wheel"),

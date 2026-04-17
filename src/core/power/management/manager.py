@@ -6,21 +6,12 @@ import logging
 import threading
 import time
 
+from . import _monitor_runner as power_monitor_runner
 from ._manager_config import read_power_management_config_bool, reload_power_management_config
-from ._manager_helpers import (
-    apply_power_source_actions,
-    build_power_source_loop_inputs,
-    is_intentionally_off,
-)
-from ..policies.power_event_policy import (
-    PowerEventInputs,
-    PowerEventPolicy,
-    RestoreKeyboard as RestoreFromEvent,
-    TurnOffKeyboard as TurnOffFromEvent,
-)
-from ..policies.power_source_loop_policy import (
-    PowerSourceLoopPolicy,
-)
+from ._manager_helpers import apply_power_source_actions, build_power_source_loop_inputs, is_intentionally_off
+from ..policies.power_event_policy import PowerEventInputs, PowerEventPolicy
+from ..policies.power_event_policy import RestoreKeyboard as RestoreFromEvent, TurnOffKeyboard as TurnOffFromEvent
+from ..policies.power_source_loop_policy import PowerSourceLoopPolicy
 from src.core.config import Config
 from src.core.power.monitoring.acpi_monitoring import monitor_acpi_events
 from src.core.power.monitoring.lid_monitoring import start_sysfs_lid_monitoring
@@ -74,30 +65,60 @@ class PowerManager:
 
         return self._read_config_bool(name, default=default)
 
+    def _run_recoverable_runtime_boundary(self, action, *, log_message: str, fallback=None):
+        try:
+            return action()
+        except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: shared power-manager policy/controller runtime seams must keep recoverable runtime failures logged and contained while unexpected defects still propagate
+            logger.exception(log_message)
+            return fallback
+
     def start_monitoring(self):
         """Start monitoring power events in background thread."""
-        if self.monitoring:
-            return
-
         # Still start monitoring even if disabled, so enabling it later in config works.
         # Actual actions are gated in the event handlers.
-
-        self.monitoring = True
-        self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
-        self.monitor_thread.start()
-
-        self._battery_thread = threading.Thread(target=self._battery_saver_loop, daemon=True)
-        self._battery_thread.start()
+        power_monitor_runner.start_monitoring(self, thread_factory=threading.Thread)
 
     def stop_monitoring(self):
         """Stop monitoring power events."""
-        self.monitoring = False
-        if self.monitor_thread:
-            self.monitor_thread.join(timeout=2)
-        if self._battery_thread:
-            self._battery_thread.join(timeout=2)
+        power_monitor_runner.stop_monitoring(self, join_timeout_s=2)
 
     # ---- battery saver (dim on AC unplug)
+
+    def _run_battery_saver_iteration(
+        self,
+        policy: PowerSourceLoopPolicy,
+        *,
+        poll_interval_s: float,
+    ) -> bool:
+        on_ac = read_on_ac_power()
+        if on_ac is None:
+            time.sleep(poll_interval_s)
+            return True
+
+        loop_inputs = build_power_source_loop_inputs(
+            self._config,
+            self.kb_controller,
+            on_ac=bool(on_ac),
+            now_mono=float(time.monotonic()),
+            get_active_profile_fn=get_active_profile,
+            safe_int_attr_fn=safe_int_attr,
+        )
+        if loop_inputs is None:
+            time.sleep(poll_interval_s)
+            return True
+
+        result = policy.update(loop_inputs)
+
+        if result.skip:
+            time.sleep(poll_interval_s)
+            return True
+
+        apply_power_source_actions(
+            kb_controller=self.kb_controller,
+            actions=getattr(result, "actions", []) or [],
+            apply_brightness=self._apply_brightness_policy,
+        )
+        return False
 
     def _battery_saver_loop(self) -> None:
         """Poll AC online state and apply a simple dim/restore policy.
@@ -112,38 +133,13 @@ class PowerManager:
         policy = PowerSourceLoopPolicy(debounce_seconds=3.0)
 
         while self.monitoring:
-            try:
-                on_ac = read_on_ac_power()
-                if on_ac is None:
-                    time.sleep(poll_interval_s)
-                    continue
-
-                loop_inputs = build_power_source_loop_inputs(
-                    self._config,
-                    self.kb_controller,
-                    on_ac=bool(on_ac),
-                    now_mono=float(time.monotonic()),
-                    get_active_profile_fn=get_active_profile,
-                    safe_int_attr_fn=safe_int_attr,
-                )
-                if loop_inputs is None:
-                    time.sleep(poll_interval_s)
-                    continue
-
-                result = policy.update(loop_inputs)
-
-                if result.skip:
-                    time.sleep(poll_interval_s)
-                    continue
-
-                apply_power_source_actions(
-                    kb_controller=self.kb_controller,
-                    actions=getattr(result, "actions", []) or [],
-                    apply_brightness=self._apply_brightness_policy,
-                )
-
-            except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: battery-saver polling crosses sysfs monitoring, config/profile reads, policy evaluation, and controller actions and must remain non-fatal for recoverable failures
-                logger.exception("Battery saver monitoring iteration failed")
+            did_sleep = self._run_recoverable_runtime_boundary(
+                lambda: self._run_battery_saver_iteration(policy, poll_interval_s=poll_interval_s),
+                log_message="Battery saver monitoring iteration failed",
+                fallback=False,
+            )
+            if did_sleep:
+                continue
 
             time.sleep(poll_interval_s)
 
@@ -155,7 +151,7 @@ class PowerManager:
 
         brightness = int(brightness)
 
-        try:
+        def _apply() -> None:
             # Prefer a dedicated hook on the controller if present.
             apply_fn = getattr(self.kb_controller, "apply_brightness_from_power_policy", None)
             if callable(apply_fn):
@@ -167,8 +163,8 @@ class PowerManager:
             if engine is not None:
                 self._sync_config_brightness(brightness)
                 engine.set_brightness(brightness)
-        except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: brightness application crosses a runtime controller boundary and must remain best-effort for recoverable failures
-            logger.exception("Battery saver brightness apply failed")
+
+        self._run_recoverable_runtime_boundary(_apply, log_message="Battery saver brightness apply failed")
 
     def _sync_config_brightness(self, brightness: int) -> None:
         try:
@@ -180,39 +176,29 @@ class PowerManager:
 
     def _monitor_loop(self):
         """Main monitoring loop - watches for lid and suspend events."""
-        # Use dbus-monitor to watch systemd-logind signals
-        try:
-            logger.info("Power monitoring started using dbus-monitor")
-
-            monitor_prepare_for_sleep(
-                is_running=lambda: self.monitoring,
-                on_started=self._start_lid_monitor,
-                on_suspend=self._on_suspend,
-                on_resume=self._on_resume,
-            )
-
-        except FileNotFoundError:
-            logger.warning("dbus-monitor not available, trying alternative method")
-            self._monitor_acpi_events()
-        except _POWER_MANAGER_MONITOR_ERRORS:  # @quality-exception exception-transparency: login1 monitoring is an external runtime boundary and power monitoring must remain available on recoverable runtime failures
-            logger.exception("Power monitoring error")
+        power_monitor_runner.run_monitor_loop(
+            self,
+            logger=logger,
+            monitor_prepare_for_sleep_fn=monitor_prepare_for_sleep,
+            monitor_errors=_POWER_MANAGER_MONITOR_ERRORS,
+            start_lid_monitor_fn=self._start_lid_monitor,
+            monitor_acpi_events_fn=self._monitor_acpi_events,
+        )
 
     def _start_lid_monitor(self):
         """Start a separate thread to monitor lid switch via sysfs."""
-        start_sysfs_lid_monitoring(
-            is_running=lambda: self.monitoring,
-            on_lid_close=self._on_lid_close,
-            on_lid_open=self._on_lid_open,
+        power_monitor_runner.start_lid_monitoring(
+            self,
             logger=logger,
+            start_sysfs_lid_monitoring_fn=start_sysfs_lid_monitoring,
         )
 
     def _monitor_acpi_events(self):
         """Fallback method using acpi_listen for lid events."""
-        monitor_acpi_events(
-            is_running=lambda: self.monitoring,
-            on_lid_close=self._on_lid_close,
-            on_lid_open=self._on_lid_open,
+        power_monitor_runner.run_acpi_monitoring(
+            self,
             logger=logger,
+            monitor_acpi_events_fn=monitor_acpi_events,
         )
 
     def _handle_power_event(
@@ -260,7 +246,7 @@ class PowerManager:
             self._invoke_keyboard_method(kb_method_name)
 
     def _evaluate_power_event_policy(self, *, enabled: bool, action_enabled: bool, policy_method):
-        try:
+        def _evaluate():
             return policy_method(
                 PowerEventInputs(
                     enabled=bool(enabled),
@@ -272,17 +258,19 @@ class PowerManager:
                     ),
                 )
             )
-        except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: power-event policy evaluation crosses controller-state sampling and policy boundaries and must remain non-fatal for recoverable failures
-            logger.exception("Power event policy evaluation failed")
-            return None
+
+        return self._run_recoverable_runtime_boundary(_evaluate, log_message="Power event policy evaluation failed")
 
     def _invoke_keyboard_method(self, method_name: str) -> None:
-        try:
+        def _invoke() -> None:
             fn = getattr(self.kb_controller, method_name, None)
             if callable(fn):
                 fn()
-        except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: power-event keyboard actions cross a runtime controller boundary and must remain non-fatal for recoverable monitor-thread failures
-            logger.exception("Power event keyboard action '%s' failed", method_name)
+
+        self._run_recoverable_runtime_boundary(
+            _invoke,
+            log_message=f"Power event keyboard action '{method_name}' failed",
+        )
 
     def _on_suspend(self):
         """Called when system is about to suspend."""

@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from src.core.backends.base import (
     BackendCapabilities,
@@ -167,10 +166,10 @@ class SysfsMouseBackend(KeyboardBackend):
     def dimensions(self) -> tuple[int, int]:
         return (1, max(1, safe_int_attr(self, "_zone_count_hint", default=1)))
 
-    def effects(self) -> dict[str, Any]:
+    def effects(self) -> dict[str, object]:
         return {}
 
-    def colors(self) -> dict[str, Any]:
+    def colors(self) -> dict[str, object]:
         return {}
 
 

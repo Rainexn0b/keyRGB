@@ -11,6 +11,7 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
+import src.gui.windows._support._support_window_backend_probe as support_window_backend_probe
 import src.gui.windows.support as support_window
 
 
@@ -261,12 +262,34 @@ def test_init_builds_all_sections_before_sync(monkeypatch: pytest.MonkeyPatch) -
     assert window.btn_copy_debug.options["state"] == "disabled"
     assert window.btn_copy_discovery.options["state"] == "disabled"
     assert window.btn_copy_issue.options["state"] == "disabled"
+    assert isinstance(window._support_session, support_window.support_window_state.SupportSessionState)
+    assert window._diagnostics_json == ""
+    assert window._discovery_json == ""
     assert window.root.title_text == "KeyRGB - Support Tools"
     assert window.root.minsize_value == (960, 720)
     assert window.btn_run_debug.options["style"] == "SupportChecks.Diagnostics.TButton"
     assert window.btn_run_speed_probe.options["style"] == "SupportChecks.Probe.TButton"
     assert window.btn_run_discovery.options["style"] == "SupportChecks.Discovery.TButton"
     assert any(delay == 50 for delay, _callback in window.root.after_calls)
+
+
+def test_legacy_support_state_bridge_creates_session_when_init_is_bypassed() -> None:
+    window = support_window.SupportToolsGUI.__new__(support_window.SupportToolsGUI)
+
+    window._diagnostics_json = '{"ok": true}'
+    window._discovery_json = '{"candidate": 1}'
+    window._supplemental_evidence = {"captures": {"lsusb_verbose": {"ok": True}}}
+    window._issue_report = {"markdown": "issue draft"}
+    window._capture_prompt_key = "048d:ce00:lsusb_verbose"
+    window._backend_probe_prompt_key = "ite8291r3_speed:ite8291r3"
+
+    assert isinstance(window._support_session, support_window.support_window_state.SupportSessionState)
+    assert window._diagnostics_json == '{"ok": true}'
+    assert window._discovery_json == '{"candidate": 1}'
+    assert window._supplemental_evidence == {"captures": {"lsusb_verbose": {"ok": True}}}
+    assert window._issue_report == {"markdown": "issue draft"}
+    assert window._capture_prompt_key == "048d:ce00:lsusb_verbose"
+    assert window._backend_probe_prompt_key == "ite8291r3_speed:ite8291r3"
 
 
 def test_apply_geometry_uses_requested_content_size(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -777,6 +800,76 @@ def test_collect_missing_evidence_updates_bundle_state(monkeypatch: pytest.Monke
 
     assert window._supplemental_evidence == {"captures": {"lsusb_verbose": {"ok": True, "stdout": "dump"}}}
     assert window.status_label.options["text"] == "Additional evidence collected"
+
+
+def test_probe_config_snapshot_returns_typed_value_object() -> None:
+    class _FakeConfig:
+        def __init__(self) -> None:
+            self._effect = "wave"
+            self._speed = 13
+            self._settings = {"effect_speeds": {"wave": 4}}
+
+        @property
+        def effect(self) -> str:
+            return self._effect
+
+        @property
+        def speed(self) -> int:
+            return self._speed
+
+    config = _FakeConfig()
+
+    snapshot = support_window.support_jobs._probe_config_snapshot(config)
+    config._settings["effect_speeds"]["wave"] = 9
+
+    assert isinstance(snapshot, support_window_backend_probe.ProbeConfigSnapshot)
+    assert snapshot.effect == "wave"
+    assert snapshot.speed == 10
+    assert snapshot.effect_speeds == {"wave": 4}
+
+
+def test_restore_probe_config_accepts_legacy_snapshot_dict_and_clears_empty_effect_speeds() -> None:
+    class _FakeConfig:
+        def __init__(self) -> None:
+            self._effect = "wave"
+            self._speed = 1
+            self._settings = {"effect_speeds": {"wave": 8}}
+            self.calls: list[tuple[object, ...]] = []
+
+        @property
+        def effect(self) -> str:
+            return self._effect
+
+        @effect.setter
+        def effect(self, value: str) -> None:
+            self._effect = str(value)
+            self.calls.append(("effect", str(value)))
+
+        @property
+        def speed(self) -> int:
+            return self._speed
+
+        @speed.setter
+        def speed(self, value: int) -> None:
+            self._speed = int(value)
+            self.calls.append(("speed", int(value)))
+
+        def _save(self) -> None:
+            self.calls.append(("save_effect_speeds", dict(self._settings.get("effect_speeds", {}))))
+
+    config = _FakeConfig()
+
+    support_window.support_jobs._restore_probe_config(
+        config,
+        snapshot={"effect": "color_cycle", "speed": 9, "effect_speeds": {}},
+    )
+
+    assert "effect_speeds" not in config._settings
+    assert config.calls == [
+        ("save_effect_speeds", {}),
+        ("speed", 9),
+        ("effect", "color_cycle"),
+    ]
 
 
 def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyPatch) -> None:

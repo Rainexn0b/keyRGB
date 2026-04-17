@@ -9,6 +9,8 @@ def repo_root_from(anchor: str | Path) -> Path:
     """Best-effort repo root detection for running from a source checkout.
 
     Walks parent directories looking for a typical Python project layout.
+    This also supports packaged layouts that keep the importable ``src/`` tree
+    but do not ship ``pyproject.toml`` alongside the runtime files.
     """
 
     anchor_path = Path(anchor).resolve()
@@ -21,8 +23,21 @@ def repo_root_from(anchor: str | Path) -> Path:
         except OSError:
             continue
 
+    for parent in candidates:
+        try:
+            if (parent / "src").is_dir():
+                return parent
+        except OSError:
+            continue
+
     # Fallback: assume we're somewhere under `<root>/src/...`.
-    # `parents[2]` is usually `<root>` for `<root>/src/<pkg>/file.py`.
+    # Prefer the parent of the `src/` package when we can see it directly.
+    try:
+        src_index = next(index for index, parent in enumerate(anchor_path.parents) if parent.name == "src")
+        return anchor_path.parents[src_index + 1]
+    except (StopIteration, IndexError):
+        pass
+
     try:
         return anchor_path.parents[2]
     except IndexError:

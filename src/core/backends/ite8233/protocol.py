@@ -3,12 +3,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from . import _protocol_support
+
 VENDOR_ID = 0x048D
 SUPPORTED_PRODUCT_IDS: tuple[int, ...] = (0x6010, 0x7000, 0x7001)
 DEFAULT_PRODUCT_ID = 0x7001
 HIDRAW_PATH_ENV = "KEYRGB_ITE8233_HIDRAW_PATH"
 
-PACKET_SIZE = 8
+PACKET_SIZE = _protocol_support.PACKET_SIZE
 UI_BRIGHTNESS_MAX = 50
 RAW_BRIGHTNESS_MAX = 100
 RAW_SPEED_MIN = 1
@@ -24,87 +26,39 @@ INTERRUPT_INTERFACE_INDEX = 1
 INTERRUPT_IN_ENDPOINT = 0x81
 INTERRUPT_OUT_ENDPOINT = 0x02
 
-# Upstream-backed minimal 0x7001 packet set.
-COMMAND_SET_COLOR = 0x14
-COMMAND_SET_MODE = 0x08
-COMMAND_OFF_STAGE_1 = 0x12
-COMMAND_OFF_STAGE_2 = 0x08
-COMMAND_OFF_STAGE_3 = 0x08
-COMMAND_OFF_STAGE_4 = 0x1A
+COMMAND_SET_COLOR = _protocol_support.COMMAND_SET_COLOR
+COMMAND_SET_MODE = _protocol_support.COMMAND_SET_MODE
+COMMAND_OFF_STAGE_1 = _protocol_support.COMMAND_OFF_STAGE_1
+COMMAND_OFF_STAGE_2 = _protocol_support.COMMAND_OFF_STAGE_2
+COMMAND_OFF_STAGE_3 = _protocol_support.COMMAND_OFF_STAGE_3
+COMMAND_OFF_STAGE_4 = _protocol_support.COMMAND_OFF_STAGE_4
 
-MODE_OFF = 0x00
-MODE_DIRECT = 0x01
-MODE_BREATHING = 0x02
-MODE_WAVE = 0x03
-MODE_BOUNCE = 0x04
-MODE_MARQUEE = 0x05
-MODE_SCAN = 0x06
-MODE_FLASH = 0x11
-COLOR_SLOT_COUNT = 7
+MODE_OFF = _protocol_support.MODE_OFF
+MODE_DIRECT = _protocol_support.MODE_DIRECT
+MODE_BREATHING = _protocol_support.MODE_BREATHING
+MODE_WAVE = _protocol_support.MODE_WAVE
+MODE_BOUNCE = _protocol_support.MODE_BOUNCE
+MODE_MARQUEE = _protocol_support.MODE_MARQUEE
+MODE_SCAN = _protocol_support.MODE_SCAN
+MODE_FLASH = _protocol_support.MODE_FLASH
+COLOR_SLOT_COUNT = _protocol_support.COLOR_SLOT_COUNT
 
-FLASH_DIRECTION_NONE = 0x00
-FLASH_DIRECTION_RIGHT = 0x01
-FLASH_DIRECTION_LEFT = 0x02
+FLASH_DIRECTION_NONE = _protocol_support.FLASH_DIRECTION_NONE
+FLASH_DIRECTION_RIGHT = _protocol_support.FLASH_DIRECTION_RIGHT
+FLASH_DIRECTION_LEFT = _protocol_support.FLASH_DIRECTION_LEFT
 
-SUPPORTED_EFFECT_MODES: tuple[int, ...] = (
-    MODE_DIRECT,
-    MODE_BREATHING,
-    MODE_WAVE,
-    MODE_BOUNCE,
-    MODE_MARQUEE,
-    MODE_SCAN,
-)
+SUPPORTED_EFFECT_MODES = _protocol_support.SUPPORTED_EFFECT_MODES
 
-_COLOR_VARIANT: dict[int, int] = {
-    0x6010: 0x00,
-    0x7000: 0x01,
-    0x7001: 0x00,
-}
-
-_MODE_VARIANT: dict[int, int] = {
-    0x6010: 0x02,
-    0x7000: 0x21,
-    0x7001: 0x22,
-}
-
-_MODE_APPLY_BYTE: dict[int, int] = {
-    0x6010: 0x08,
-    0x7000: 0x01,
-    0x7001: 0x01,
-}
-
-_BREATHING_APPLY_BYTE: dict[int, int] = {
-    0x6010: 0x08,
-    0x7000: 0x08,
-}
-
-_WAVE_APPLY_BYTE: dict[int, int] = {
-    0x7000: 0x01,
-}
-
-_BOUNCE_APPLY_BYTE: dict[int, int] = {
-    0x7000: 0x08,
-}
-
-_CATCHUP_APPLY_BYTE: dict[int, int] = {
-    0x7000: 0x01,
-}
-
-_FLASH_APPLY_BYTE: dict[int, int] = {
-    0x6010: 0x08,
-}
-
-_TURN_OFF_STAGE_3: dict[int, bytes] = {
-    0x6010: bytes((COMMAND_OFF_STAGE_3, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)),
-    0x7000: bytes((COMMAND_OFF_STAGE_3, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00)),
-    0x7001: bytes((COMMAND_OFF_STAGE_3, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)),
-}
-
-_TURN_OFF_STAGE_4: dict[int, bytes] = {
-    0x6010: bytes((COMMAND_OFF_STAGE_4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01)),
-    0x7000: bytes((COMMAND_OFF_STAGE_4, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01)),
-    0x7001: bytes((COMMAND_OFF_STAGE_4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01)),
-}
+_COLOR_VARIANT = _protocol_support._COLOR_VARIANT
+_MODE_VARIANT = _protocol_support._MODE_VARIANT
+_MODE_APPLY_BYTE = _protocol_support._MODE_APPLY_BYTE
+_BREATHING_APPLY_BYTE = _protocol_support._BREATHING_APPLY_BYTE
+_WAVE_APPLY_BYTE = _protocol_support._WAVE_APPLY_BYTE
+_BOUNCE_APPLY_BYTE = _protocol_support._BOUNCE_APPLY_BYTE
+_CATCHUP_APPLY_BYTE = _protocol_support._CATCHUP_APPLY_BYTE
+_FLASH_APPLY_BYTE = _protocol_support._FLASH_APPLY_BYTE
+_TURN_OFF_STAGE_3 = _protocol_support._TURN_OFF_STAGE_3
+_TURN_OFF_STAGE_4 = _protocol_support._TURN_OFF_STAGE_4
 
 _COLOR_SCALE_QUIRK_SKUS = frozenset({"STEPOL1XA04", "STELLARIS1XI05", "STELLARIS17I06"})
 
@@ -181,175 +135,175 @@ def scale_color_for_brightness(color, brightness: int) -> tuple[int, int, int]:
     )
 
 
+def _scaled_color(color, *, product_id: int) -> tuple[int, int, int]:
+    red, green, blue = (clamp_channel(channel) for channel in color)
+    return _apply_color_scaling_quirk(red, green, blue, product_id=product_id)
+
+
+def _build_color_report(slot: int, color, *, product_id: int) -> bytes:
+    return _protocol_support.build_color_packet(
+        product_id=product_id,
+        slot=slot,
+        color=_scaled_color(color, product_id=product_id),
+    )
+
+
+def _effect_supported(product_id: int, apply_bytes: dict[int, int]) -> bool:
+    return normalize_product_id(product_id) in apply_bytes
+
+
+def _effect_apply_byte(product_id: int, apply_bytes: dict[int, int], effect_name: str) -> int:
+    try:
+        return apply_bytes[product_id]
+    except KeyError:
+        raise ValueError(f"ITE lightbar {effect_name} is not supported for product id 0x{product_id:04x}") from None
+
+
+def _build_effect_mode_report(
+    *,
+    product_id: int,
+    mode: int,
+    brightness: int,
+    speed: int,
+    apply_bytes: dict[int, int],
+    effect_name: str,
+    direction: int | None = None,
+) -> bytes:
+    return _protocol_support.build_mode_packet(
+        product_id=product_id,
+        mode=mode,
+        brightness=clamp_raw_brightness(brightness),
+        speed=clamp_raw_speed(speed),
+        apply_byte=_effect_apply_byte(product_id, apply_bytes, effect_name),
+        direction=direction,
+    )
+
+
+def _build_color_reports(color, *, product_id: int) -> tuple[bytes, ...]:
+    return tuple(build_color_slot_report(slot, color, product_id=product_id) for slot in range(1, COLOR_SLOT_COUNT + 1))
+
+
 def build_uniform_color_report(color, *, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
     product_id = normalize_product_id(product_id)
-    red, green, blue = (clamp_channel(channel) for channel in color)
-    red, green, blue = _apply_color_scaling_quirk(red, green, blue, product_id=product_id)
-    packet = bytearray(PACKET_SIZE)
-    packet[0] = COMMAND_SET_COLOR
-    packet[1] = _COLOR_VARIANT[product_id]
-    packet[2] = 0x01
-    packet[3] = red
-    packet[4] = green
-    packet[5] = blue
-    return bytes(packet)
+    return _build_color_report(0x01, color, product_id=product_id)
 
 
 def breathing_supported(product_id: int) -> bool:
-    return normalize_product_id(product_id) in _BREATHING_APPLY_BYTE
+    return _effect_supported(product_id, _BREATHING_APPLY_BYTE)
 
 
 def wave_supported(product_id: int) -> bool:
-    return normalize_product_id(product_id) in _WAVE_APPLY_BYTE
+    return _effect_supported(product_id, _WAVE_APPLY_BYTE)
 
 
 def bounce_supported(product_id: int) -> bool:
-    return normalize_product_id(product_id) in _BOUNCE_APPLY_BYTE
+    return _effect_supported(product_id, _BOUNCE_APPLY_BYTE)
 
 
 def catchup_supported(product_id: int) -> bool:
-    return normalize_product_id(product_id) in _CATCHUP_APPLY_BYTE
+    return _effect_supported(product_id, _CATCHUP_APPLY_BYTE)
 
 
 def flash_supported(product_id: int) -> bool:
-    return normalize_product_id(product_id) in _FLASH_APPLY_BYTE
+    return _effect_supported(product_id, _FLASH_APPLY_BYTE)
 
 
 def build_color_slot_report(slot: int, color, *, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
     product_id = normalize_product_id(product_id)
     slot_index = max(1, min(COLOR_SLOT_COUNT, int(slot)))
-    red, green, blue = (clamp_channel(channel) for channel in color)
-    red, green, blue = _apply_color_scaling_quirk(red, green, blue, product_id=product_id)
-
-    packet = bytearray(PACKET_SIZE)
-    packet[0] = COMMAND_SET_COLOR
-    packet[1] = _COLOR_VARIANT[product_id]
-    packet[2] = slot_index
-    packet[3] = red
-    packet[4] = green
-    packet[5] = blue
-    return bytes(packet)
+    return _build_color_report(slot_index, color, product_id=product_id)
 
 
 def build_breathing_report(*, brightness: int, speed: int, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
     product_id = normalize_product_id(product_id)
-    if product_id not in _BREATHING_APPLY_BYTE:
-        raise ValueError(f"ITE lightbar breathing is not supported for product id 0x{product_id:04x}")
-
-    packet = bytearray(PACKET_SIZE)
-    packet[0] = COMMAND_SET_MODE
-    packet[1] = _MODE_VARIANT[product_id]
-    packet[2] = MODE_BREATHING
-    packet[3] = clamp_raw_speed(speed)
-    packet[4] = clamp_raw_brightness(brightness)
-    packet[5] = _BREATHING_APPLY_BYTE[product_id]
-    return bytes(packet)
+    return _build_effect_mode_report(
+        product_id=product_id,
+        mode=MODE_BREATHING,
+        brightness=brightness,
+        speed=speed,
+        apply_bytes=_BREATHING_APPLY_BYTE,
+        effect_name="breathing",
+    )
 
 
 def build_breathing_reports(
     color, *, brightness: int, speed: int, product_id: int = DEFAULT_PRODUCT_ID
 ) -> tuple[bytes, ...]:
     product_id = normalize_product_id(product_id)
-    if product_id not in _BREATHING_APPLY_BYTE:
-        raise ValueError(f"ITE lightbar breathing is not supported for product id 0x{product_id:04x}")
-
-    color_reports = tuple(
-        build_color_slot_report(slot, color, product_id=product_id) for slot in range(1, COLOR_SLOT_COUNT + 1)
-    )
-    return (*color_reports, build_breathing_report(brightness=brightness, speed=speed, product_id=product_id))
+    mode_report = build_breathing_report(brightness=brightness, speed=speed, product_id=product_id)
+    return (*_build_color_reports(color, product_id=product_id), mode_report)
 
 
 def build_wave_report(*, brightness: int, speed: int, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
     product_id = normalize_product_id(product_id)
-    if product_id not in _WAVE_APPLY_BYTE:
-        raise ValueError(f"ITE lightbar wave is not supported for product id 0x{product_id:04x}")
-
-    packet = bytearray(PACKET_SIZE)
-    packet[0] = COMMAND_SET_MODE
-    packet[1] = _MODE_VARIANT[product_id]
-    packet[2] = MODE_WAVE
-    packet[3] = clamp_raw_speed(speed)
-    packet[4] = clamp_raw_brightness(brightness)
-    packet[5] = _WAVE_APPLY_BYTE[product_id]
-    return bytes(packet)
+    return _build_effect_mode_report(
+        product_id=product_id,
+        mode=MODE_WAVE,
+        brightness=brightness,
+        speed=speed,
+        apply_bytes=_WAVE_APPLY_BYTE,
+        effect_name="wave",
+    )
 
 
 def build_bounce_report(*, brightness: int, speed: int, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
     product_id = normalize_product_id(product_id)
-    if product_id not in _BOUNCE_APPLY_BYTE:
-        raise ValueError(f"ITE lightbar bounce is not supported for product id 0x{product_id:04x}")
-
-    packet = bytearray(PACKET_SIZE)
-    packet[0] = COMMAND_SET_MODE
-    packet[1] = _MODE_VARIANT[product_id]
-    packet[2] = MODE_BOUNCE
-    packet[3] = clamp_raw_speed(speed)
-    packet[4] = clamp_raw_brightness(brightness)
-    packet[5] = _BOUNCE_APPLY_BYTE[product_id]
-    return bytes(packet)
+    return _build_effect_mode_report(
+        product_id=product_id,
+        mode=MODE_BOUNCE,
+        brightness=brightness,
+        speed=speed,
+        apply_bytes=_BOUNCE_APPLY_BYTE,
+        effect_name="bounce",
+    )
 
 
 def build_catchup_report(*, brightness: int, speed: int, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
     product_id = normalize_product_id(product_id)
-    if product_id not in _CATCHUP_APPLY_BYTE:
-        raise ValueError(f"ITE lightbar catchup is not supported for product id 0x{product_id:04x}")
-
-    packet = bytearray(PACKET_SIZE)
-    packet[0] = COMMAND_SET_MODE
-    packet[1] = _MODE_VARIANT[product_id]
-    packet[2] = MODE_MARQUEE
-    packet[3] = clamp_raw_speed(speed)
-    packet[4] = clamp_raw_brightness(brightness)
-    packet[5] = _CATCHUP_APPLY_BYTE[product_id]
-    return bytes(packet)
+    return _build_effect_mode_report(
+        product_id=product_id,
+        mode=MODE_MARQUEE,
+        brightness=brightness,
+        speed=speed,
+        apply_bytes=_CATCHUP_APPLY_BYTE,
+        effect_name="catchup",
+    )
 
 
 def build_flash_report(
     *, brightness: int, speed: int, direction: int = FLASH_DIRECTION_NONE, product_id: int = DEFAULT_PRODUCT_ID
 ) -> bytes:
     product_id = normalize_product_id(product_id)
-    if product_id not in _FLASH_APPLY_BYTE:
-        raise ValueError(f"ITE lightbar flash is not supported for product id 0x{product_id:04x}")
-
-    packet = bytearray(PACKET_SIZE)
-    packet[0] = COMMAND_SET_MODE
-    packet[1] = _MODE_VARIANT[product_id]
-    packet[2] = MODE_FLASH
-    packet[3] = clamp_raw_speed(speed)
-    packet[4] = clamp_raw_brightness(brightness)
-    packet[5] = _FLASH_APPLY_BYTE[product_id]
-    packet[6] = int(direction) & 0xFF
-    return bytes(packet)
+    return _build_effect_mode_report(
+        product_id=product_id,
+        mode=MODE_FLASH,
+        brightness=brightness,
+        speed=speed,
+        apply_bytes=_FLASH_APPLY_BYTE,
+        effect_name="flash",
+        direction=direction,
+    )
 
 
 def build_flash_reports(
     color, *, brightness: int, speed: int, direction: int = FLASH_DIRECTION_NONE, product_id: int = DEFAULT_PRODUCT_ID
 ) -> tuple[bytes, ...]:
     product_id = normalize_product_id(product_id)
-    if product_id not in _FLASH_APPLY_BYTE:
-        raise ValueError(f"ITE lightbar flash is not supported for product id 0x{product_id:04x}")
-
-    color_reports = tuple(
-        build_color_slot_report(slot, color, product_id=product_id) for slot in range(1, COLOR_SLOT_COUNT + 1)
-    )
-    return (
-        *color_reports,
-        build_flash_report(brightness=brightness, speed=speed, direction=direction, product_id=product_id),
-    )
+    mode_report = build_flash_report(brightness=brightness, speed=speed, direction=direction, product_id=product_id)
+    return (*_build_color_reports(color, product_id=product_id), mode_report)
 
 
 def build_mode_report(
     *, mode: int, brightness: int, speed: int = RAW_SPEED_MIN, product_id: int = DEFAULT_PRODUCT_ID
 ) -> bytes:
     product_id = normalize_product_id(product_id)
-    packet = bytearray(PACKET_SIZE)
-    packet[0] = COMMAND_SET_MODE
-    packet[1] = _MODE_VARIANT[product_id]
-    packet[2] = int(mode) & 0xFF
-    packet[3] = clamp_raw_speed(speed)
-    packet[4] = clamp_raw_brightness(brightness)
-    packet[5] = _MODE_APPLY_BYTE[product_id]
-    return bytes(packet)
+    return _protocol_support.build_mode_packet(
+        product_id=product_id,
+        mode=mode,
+        brightness=clamp_raw_brightness(brightness),
+        speed=clamp_raw_speed(speed),
+        apply_byte=_MODE_APPLY_BYTE[product_id],
+    )
 
 
 def build_brightness_report(brightness: int, *, product_id: int = DEFAULT_PRODUCT_ID) -> bytes:
@@ -358,12 +312,7 @@ def build_brightness_report(brightness: int, *, product_id: int = DEFAULT_PRODUC
 
 def build_turn_off_reports(*, product_id: int = DEFAULT_PRODUCT_ID) -> tuple[bytes, ...]:
     product_id = normalize_product_id(product_id)
-    sequence: tuple[bytes, ...] = (
-        bytes((COMMAND_OFF_STAGE_1, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00)),
-        bytes((COMMAND_OFF_STAGE_2, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)),
-        _TURN_OFF_STAGE_3[product_id],
-        _TURN_OFF_STAGE_4[product_id],
-    )
+    sequence = _protocol_support.build_turn_off_sequence(product_id=product_id)
     if product_id == 0x6010:
         return (
             build_uniform_color_report((0, 0, 0), product_id=product_id),

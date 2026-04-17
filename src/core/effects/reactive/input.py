@@ -6,13 +6,11 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Optional, Protocol, TypeAlias, cast
 
-from src.core.effects.reactive._evdev_specs import SPECIAL_KEY_NAMES
 from src.core.effects.reactive._evdev_specs import keyboard_control_keys, keyboard_letter_keys
-from src.core.resources.layouts import key_id_for_slot_id, slot_id_for_key_id
 from src.core.utils.logging_utils import log_throttled
 
-Key = tuple[int, int]
-KeyCells = tuple[Key, ...]
+from . import _input_mapping
+from ._input_mapping import KeyCells
 
 
 class EvdevInputEventProtocol(Protocol):
@@ -132,25 +130,7 @@ def evdev_key_name_to_key_id(name: str) -> Optional[str]:
     semantic-looking key ids before translating into canonical slot ids.
     """
 
-    if not name:
-        return None
-    n = str(name).strip().upper()
-    if n.startswith("KEY_"):
-        n = n[4:]
-
-    if n in SPECIAL_KEY_NAMES:
-        return SPECIAL_KEY_NAMES[n]
-
-    if n.startswith("F") and n[1:].isdigit():
-        return n.lower()
-
-    if n.startswith("KP") and n[2:].isdigit():
-        return f"num{n[2:]}"
-
-    if len(n) == 1 and ("A" <= n <= "Z" or "0" <= n <= "9"):
-        return n.lower()
-
-    return None
+    return _input_mapping.evdev_key_name_to_key_id(name)
 
 
 def evdev_key_name_to_slot_id(name: str, *, physical_layout: str = "auto") -> Optional[str]:
@@ -159,7 +139,7 @@ def evdev_key_name_to_slot_id(name: str, *, physical_layout: str = "auto") -> Op
     key_id = evdev_key_name_to_key_id(name)
     if not key_id:
         return None
-    return str(slot_id_for_key_id(physical_layout, key_id) or key_id)
+    return _input_mapping.key_id_to_slot_id(key_id, physical_layout=physical_layout)
 
 
 def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
@@ -236,35 +216,7 @@ def reactive_synthetic_fallback_enabled() -> bool:
 
 
 def _normalize_key_cells(raw_cells: object) -> KeyCells:
-    if isinstance(raw_cells, str):
-        if "," not in raw_cells:
-            return ()
-        row_text, col_text = raw_cells.split(",", 1)
-        try:
-            return ((int(row_text), int(col_text)),)
-        except (TypeError, ValueError):
-            return ()
-
-    if isinstance(raw_cells, (list, tuple)) and len(raw_cells) == 2:
-        first, second = raw_cells
-        if not isinstance(first, (list, tuple, dict)) and not isinstance(second, (list, tuple, dict)):
-            try:
-                return ((int(first), int(second)),)
-            except (TypeError, ValueError):
-                return ()
-
-    if not isinstance(raw_cells, (list, tuple)):
-        return ()
-
-    out: list[Key] = []
-    for cell in raw_cells:
-        normalized = _normalize_key_cells(cell)
-        if not normalized:
-            continue
-        key = normalized[0]
-        if key not in out:
-            out.append(key)
-    return tuple(out)
+    return _input_mapping.normalize_key_cells(raw_cells)
 
 
 def load_active_profile_slot_keymap() -> dict[str, KeyCells]:
@@ -280,12 +232,11 @@ def load_active_profile_slot_keymap() -> dict[str, KeyCells]:
         for key_id, raw_cells in (km or {}).items():
             cells = list(_normalize_key_cells(raw_cells))
             if cells:
-                raw_identity = str(key_id or "").strip()
-                if key_id_for_slot_id("auto", raw_identity):
-                    normalized_identity = raw_identity.lower()
-                else:
-                    mapped_key_id = evdev_key_name_to_key_id(raw_identity) or raw_identity.lower()
-                    normalized_identity = str(slot_id_for_key_id("auto", mapped_key_id) or mapped_key_id).lower()
+                normalized_identity = _input_mapping.normalize_profile_slot_identity(
+                    key_id,
+                    physical_layout="auto",
+                    key_name_to_key_id=evdev_key_name_to_key_id,
+                )
                 out[normalized_identity] = tuple(cells)
         return out
     except (AttributeError, IndexError, KeyError, OSError, TypeError, ValueError) as exc:

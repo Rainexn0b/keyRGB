@@ -1,23 +1,56 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Protocol, cast
 
-from ..ops.color_map_ops import ensure_full_map
+from ..ops.color_map_ops import Color, ColorMap, ensure_full_map
 
 
-def _last_non_black_color_or_none(editor: Any) -> object | None:
+class _ConfigProtocol(Protocol):
+    color: Color
+
+
+class _FullMapEditorProtocol(Protocol):
+    config: _ConfigProtocol
+    colors: ColorMap
+
+
+class _LastNonBlackColorOwner(Protocol):
+    _last_non_black_color: object | None
+
+
+class _EnsureFullMapFn(Protocol):
+    def __call__(
+        self,
+        *,
+        colors: ColorMap,
+        num_rows: int,
+        num_cols: int,
+        base_color: Color,
+        fallback_color: Color,
+    ) -> ColorMap: ...
+
+
+def _config_color(editor: _FullMapEditorProtocol) -> Color:
+    color = editor.config.color
+    return int(color[0]), int(color[1]), int(color[2])
+
+
+def _last_non_black_color_or_none(editor: object) -> Color | None:
     try:
-        return editor._last_non_black_color
+        color = cast(_LastNonBlackColorOwner, editor)._last_non_black_color
     except AttributeError:
         return None
+    if not isinstance(color, (list, tuple)) or len(color) != 3:
+        return None
+    return int(color[0]), int(color[1]), int(color[2])
 
 
 def ensure_full_map_ui(
-    editor: Any,
+    editor: _FullMapEditorProtocol,
     *,
     num_rows: int,
     num_cols: int,
-    ensure_fn: Callable[..., dict] = ensure_full_map,
+    ensure_fn: _EnsureFullMapFn = ensure_full_map,
 ) -> None:
     """Ensure the per-key color map fully covers the keyboard.
 
@@ -27,14 +60,9 @@ def ensure_full_map_ui(
     # Use the last non-black wheel color as the base fill. This matches the
     # expected workflow: start from a unified color, then override a few keys
     # without blanking the rest of the keyboard.
+    fallback = _config_color(editor)
     last = _last_non_black_color_or_none(editor)
-    if isinstance(last, (list, tuple)) and len(last) == 3:
-        base = (int(last[0]), int(last[1]), int(last[2]))
-    else:
-        fallback = tuple(editor.config.color)
-        base = (int(fallback[0]), int(fallback[1]), int(fallback[2]))
-
-    fallback = tuple(editor.config.color)
+    base = last if last is not None else fallback
 
     editor.colors = ensure_fn(
         colors=dict(editor.colors),

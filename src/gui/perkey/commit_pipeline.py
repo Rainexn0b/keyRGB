@@ -3,8 +3,9 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Mapping, Tuple
+from typing import Callable, Mapping, Protocol, Tuple
 
+from src.core.backends.base import KeyboardDevice
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
 
@@ -18,7 +19,18 @@ Cell = Tuple[int, int]
 ColorMap = Mapping[Cell, Color]
 
 
-def _safe_config_write(config: Any, name: str, value: Any) -> None:
+class PerKeyPushFn(Protocol):
+    def __call__(
+        self,
+        kb: KeyboardDevice | None,
+        colors: Mapping[Cell, Color],
+        *,
+        brightness: int,
+        enable_user_mode: bool = True,
+    ) -> KeyboardDevice | None: ...
+
+
+def _safe_config_write(config: object, name: str, value: object) -> None:
     try:
         setattr(config, name, value)
     except _CONFIG_WRITE_ERRORS as exc:
@@ -50,16 +62,16 @@ class PerKeyCommitPipeline:
     def commit(
         self,
         *,
-        kb: Any,
+        kb: KeyboardDevice | None,
         colors: dict[Cell, Color],
-        config: Any,
+        config: object,
         num_rows: int,
         num_cols: int,
         base_color: Color,
         fallback_color: Color,
-        push_fn: Callable[..., Any],
+        push_fn: PerKeyPushFn,
         force: bool = False,
-    ) -> tuple[Any, dict[Cell, Color]]:
+    ) -> tuple[KeyboardDevice | None, dict[Cell, Color]]:
         now = float(self._time_fn())
         if not force and (now - float(self._last_commit_ts)) < float(self.commit_interval_s):
             return kb, colors

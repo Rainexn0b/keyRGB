@@ -249,6 +249,32 @@ def test_secondary_device_state_persists_for_generic_aux_routes(tmp_path, monkey
     assert cfg2.get_secondary_device_color("mouse") == (1, 0, 99)
 
 
+def test_secondary_device_brightness_prefers_first_compatibility_key(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    cfg.DEFAULTS = {"legacy_primary": 5, "legacy_secondary": 10}
+    cfg._settings["legacy_primary"] = 42
+    cfg._settings["legacy_secondary"] = 17
+
+    assert cfg.get_secondary_device_brightness(
+        "mouse",
+        fallback_keys=("legacy_primary", "legacy_secondary"),
+        default=0,
+    ) == 40
+
+
+def test_secondary_device_color_uses_default_fallback_keys_in_order(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    cfg.DEFAULTS = {"legacy_secondary": [4, 5, 6]}
+
+    assert cfg.get_secondary_device_color(
+        "mouse",
+        fallback_keys=("legacy_primary", "legacy_secondary"),
+        default=(255, 0, 0),
+    ) == (4, 5, 6)
+
+
 def test_software_effect_target_persists_and_normalizes(tmp_path, monkeypatch) -> None:
     from src.core.config import Config
 

@@ -139,3 +139,17 @@ def test_backdrop_image_candidates_ignores_cwd_fallback_oserror(tmp_path, monkey
         image_path,
         backdrop_image_cache.Path(__file__).resolve().parents[3] / "assets" / "y15-pro-deck.png",
     )
+
+
+def test_backdrop_image_candidates_uses_structural_repo_root_for_packaged_layout(tmp_path, monkeypatch) -> None:
+    runtime_root = tmp_path / "usr" / "lib" / "keyrgb"
+    anchor = runtime_root / "src" / "gui" / "utils" / "backdrop_image_cache.py"
+    anchor.parent.mkdir(parents=True)
+    anchor.touch()
+    (runtime_root / "src").mkdir(exist_ok=True)
+
+    monkeypatch.setattr(backdrop_image_cache, "__file__", str(anchor))
+
+    candidates = backdrop_image_cache.backdrop_image_candidates(profile_name=None)
+
+    assert candidates == (runtime_root / "assets" / "y15-pro-deck.png",)

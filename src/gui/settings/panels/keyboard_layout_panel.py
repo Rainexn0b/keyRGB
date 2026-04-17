@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Callable
 
 import tkinter as tk
 from tkinter import ttk
@@ -19,7 +19,7 @@ class KeyboardLayoutPanel:
         parent: ttk.Frame,
         *,
         var_physical_layout: tk.StringVar,
-        on_toggle: Any,
+        on_toggle: Callable[[], None],
     ) -> None:
         title = ttk.Label(parent, text="Keyboard layout", font=("Sans", 11, "bold"))
         title.pack(anchor="w", pady=(0, 6))

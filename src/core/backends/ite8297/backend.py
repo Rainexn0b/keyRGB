@@ -1,39 +1,27 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from src.core.utils.exceptions import is_permission_denied, is_device_disconnected, is_device_busy
-from src.core.backends.exceptions import (
-    BACKEND_OPEN_RUNTIME_ERRORS,
-    BackendPermissionError,
-    BackendDisconnectedError,
-    BackendBusyError,
-    BackendIOError,
-)
+import src.core.backends.exceptions as backend_exceptions
+import src.core.utils.exceptions as device_error_checks
 
-from ..base import (
-    BackendCapabilities,
-    BackendStability,
-    ExperimentalEvidence,
-    KeyboardDevice,
-    KeyboardBackend,
-    ProbeResult,
-)
-from ..ite8910.hidraw import HidrawDeviceInfo, HidrawFeatureTransport, find_matching_hidraw_device
-from ..policy import experimental_backends_enabled
-from .device import Ite8297KeyboardDevice
-from . import protocol
+from .. import base, policy
+from ..ite8910 import hidraw as ite8910_hidraw
+from . import device, protocol
 
 
-def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
+find_matching_hidraw_device = ite8910_hidraw.find_matching_hidraw_device
+
+
+def _find_matching_supported_hidraw_device() -> ite8910_hidraw.HidrawDeviceInfo | None:
     forced_path = os.environ.get(protocol.HIDRAW_PATH_ENV)
     if forced_path:
         devnode = Path(forced_path)
         if devnode.exists():
-            return HidrawDeviceInfo(
+            return ite8910_hidraw.HidrawDeviceInfo(
                 hidraw_name=devnode.name,
                 devnode=devnode,
                 sysfs_dir=Path(),
@@ -50,18 +38,21 @@ def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
     return None
 
 
-def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo]:
+def _open_matching_transport() -> tuple[
+    ite8910_hidraw.HidrawFeatureTransport,
+    ite8910_hidraw.HidrawDeviceInfo,
+]:
     info = _find_matching_supported_hidraw_device()
     if info is None:
         raise FileNotFoundError(
             "No hidraw device found for supported ITE 8297 controller IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
         )
-    return HidrawFeatureTransport(info.devnode), info
+    return ite8910_hidraw.HidrawFeatureTransport(info.devnode), info
 
 
 @dataclass
-class Ite8297Backend(KeyboardBackend):
+class Ite8297Backend(base.KeyboardBackend):
     """Experimental ITE 8297 backend for the public 64-byte uniform-color HID path.
 
     This implementation is intentionally conservative: it only enables the
@@ -71,15 +62,15 @@ class Ite8297Backend(KeyboardBackend):
 
     name: str = "ite8297"
     priority: int = 95
-    stability: BackendStability = BackendStability.EXPERIMENTAL
-    experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
+    stability: base.BackendStability = base.BackendStability.EXPERIMENTAL
+    experimental_evidence: base.ExperimentalEvidence = base.ExperimentalEvidence.REVERSE_ENGINEERED
 
     def is_available(self) -> bool:
         return self.probe().available
 
-    def probe(self) -> ProbeResult:
+    def probe(self) -> base.ProbeResult:
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
-            return ProbeResult(
+            return base.ProbeResult(
                 available=False,
                 reason="ite8297 hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
@@ -87,7 +78,7 @@ class Ite8297Backend(KeyboardBackend):
 
         match = _find_matching_supported_hidraw_device()
         if match is None:
-            return ProbeResult(
+            return base.ProbeResult(
                 available=False,
                 reason="no matching hidraw device",
                 confidence=0,
@@ -101,8 +92,8 @@ class Ite8297Backend(KeyboardBackend):
         if match.hid_name:
             identifiers["hid_name"] = str(match.hid_name)
 
-        if not experimental_backends_enabled():
-            return ProbeResult(
+        if not policy.experimental_backends_enabled():
+            return base.ProbeResult(
                 available=False,
                 reason=(
                     "experimental backend disabled (detected "
@@ -113,18 +104,18 @@ class Ite8297Backend(KeyboardBackend):
                 identifiers=identifiers,
             )
 
-        return ProbeResult(
+        return base.ProbeResult(
             available=True,
             reason=f"hidraw device present ({match.devnode})",
             confidence=84,
             identifiers=identifiers,
         )
 
-    def capabilities(self) -> BackendCapabilities:
-        return BackendCapabilities(per_key=False, color=True, hardware_effects=False, palette=False)
+    def capabilities(self) -> base.BackendCapabilities:
+        return base.BackendCapabilities(per_key=False, color=True, hardware_effects=False, palette=False)
 
-    def get_device(self) -> KeyboardDevice:
-        if not experimental_backends_enabled():
+    def get_device(self) -> base.KeyboardDevice:
+        if not policy.experimental_backends_enabled():
             raise RuntimeError(
                 "ITE 8297 is classified as experimental. Enable Experimental backends in Settings "
                 "or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 before using it."
@@ -132,18 +123,22 @@ class Ite8297Backend(KeyboardBackend):
 
         try:
             transport, _info = _open_matching_transport()
-            return Ite8297KeyboardDevice(transport.send_feature_report)
-        except BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
-            if is_permission_denied(exc):
-                raise BackendPermissionError(
+            return device.Ite8297KeyboardDevice(transport.send_feature_report)
+        except backend_exceptions.BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
+            if device_error_checks.is_permission_denied(exc):
+                raise backend_exceptions.BackendPermissionError(
                     "Permission denied opening the ITE 8297 hidraw device. "
                     "Install the KeyRGB udev rules, then reload udev or reboot/log out and back in."
                 ) from exc
-            if is_device_disconnected(exc):
-                raise BackendDisconnectedError("ITE 8297 device disconnected during initialization") from exc
-            if is_device_busy(exc):
-                raise BackendBusyError("ITE 8297 device is busy; another process may own it") from exc
-            raise BackendIOError(f"ITE 8297 HID transport failed: {exc}") from exc
+            if device_error_checks.is_device_disconnected(exc):
+                raise backend_exceptions.BackendDisconnectedError(
+                    "ITE 8297 device disconnected during initialization"
+                ) from exc
+            if device_error_checks.is_device_busy(exc):
+                raise backend_exceptions.BackendBusyError(
+                    "ITE 8297 device is busy; another process may own it"
+                ) from exc
+            raise backend_exceptions.BackendIOError(f"ITE 8297 HID transport failed: {exc}") from exc
 
     def dimensions(self) -> tuple[int, int]:
         return (1, 1)

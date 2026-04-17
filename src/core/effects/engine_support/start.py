@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from operator import attrgetter
 from threading import RLock, Thread
-from typing import Final, Literal, Protocol, cast
+from typing import Final, Literal, cast
 
 from src.core.utils import exceptions as core_exceptions
 
 from .. import catalog as effects_catalog
 from .. import hw_payloads as effects_hw_payloads
 from ..device import Color, KeyboardDeviceProtocol, PerKeyColorMap
+from . import _start_support
 from . import methods as engine_methods
 
 _SW_EFFECTS = effects_catalog.SW_EFFECTS
@@ -18,6 +18,11 @@ is_forced_hardware_effect = effects_catalog.is_forced_hardware_effect
 normalize_effect_name = effects_catalog.normalize_effect_name
 strip_effect_namespace = effects_catalog.strip_effect_namespace
 build_hw_effect_payload = effects_hw_payloads.build_hw_effect_payload
+_ManagedEffectThread = _start_support._ManagedEffectThread
+_mark_device_unavailable_best_effort = _start_support._mark_device_unavailable_best_effort
+_notify_permission_error_callback_best_effort = _start_support._notify_permission_error_callback_best_effort
+_sw_effect_method = _start_support._sw_effect_method
+_thread_generation_or_default = _start_support._thread_generation_or_default
 _clamped_interval_method = engine_methods.clamped_interval_method
 _effect_chase_method = engine_methods.effect_chase_method
 _effect_color_cycle_method = engine_methods.effect_color_cycle_method
@@ -43,96 +48,7 @@ _EFFECT_THREAD_RUNTIME_ERRORS: Final[tuple[type[Exception], ...]] = (
     TypeError,
     ValueError,
 )
-_THREAD_JOIN_CLEANUP_ERRORS: Final[tuple[type[Exception], ...]] = (
-    AttributeError,
-    RuntimeError,
-    TypeError,
-    ValueError,
-)
-_PERMISSION_CALLBACK_RUNTIME_ERRORS: Final[tuple[type[Exception], ...]] = (
-    AttributeError,
-    LookupError,
-    OSError,
-    RuntimeError,
-    TypeError,
-    ValueError,
-)
-_DEVICE_UNAVAILABLE_MARK_RUNTIME_ERRORS: Final[tuple[type[Exception], ...]] = (
-    AttributeError,
-    LookupError,
-    OSError,
-    RuntimeError,
-    TypeError,
-    ValueError,
-)
 HardwareEffectBuilder = Callable[..., object]
-
-
-class _ThreadOwner(Protocol):
-    thread: Thread | None
-
-
-class _ManagedEffectThread(Thread):
-    """Thread wrapper that clears the published engine thread after join."""
-
-    def __init__(self, *, engine: _ThreadOwner, target: Callable[[], None]) -> None:
-        super().__init__(target=target, daemon=True)
-        self._engine = engine
-
-    def join(self, timeout: float | None = None) -> None:
-        super().join(timeout=timeout)
-        if self.is_alive():
-            return
-        try:
-            if self._engine.thread is self:
-                setattr(self._engine, "thread", None)
-        except _THREAD_JOIN_CLEANUP_ERRORS:  # @quality-exception exception-transparency: engine thread join cleanup is a best-effort boundary; partial engine state must not re-raise from join
-            return
-
-
-def _sw_effect_method(engine: "_EngineStart", method_name: str) -> Callable[[], None]:
-    return cast(Callable[[], None], attrgetter(method_name)(engine))
-
-
-def _thread_generation_or_default(engine: "_EngineStart", *, default: int) -> int:
-    try:
-        return int(engine._thread_generation)
-    except AttributeError:
-        return default
-
-
-def _permission_error_callback_or_none(engine: "_EngineStart") -> Callable[[Exception], None] | None:
-    try:
-        return engine._permission_error_cb
-    except AttributeError:
-        return None
-
-
-def _mark_device_unavailable_callback_or_none(engine: object) -> Callable[[], None] | None:
-    try:
-        callback = attrgetter("mark_device_unavailable")(engine)
-    except AttributeError:
-        return None
-    return cast(Callable[[], None] | None, callback if callable(callback) else None)
-
-
-def _notify_permission_error_callback_best_effort(engine: "_EngineStart", exc: Exception) -> None:
-    callback = _permission_error_callback_or_none(engine)
-    if not callable(callback):
-        return
-    try:
-        callback(exc)
-    except _PERMISSION_CALLBACK_RUNTIME_ERRORS:  # @quality-exception exception-transparency: permission error callback is a user-injected boundary and must not break the permission-error handling path
-        logger.exception("Permission error callback failed")
-
-
-def _mark_device_unavailable_best_effort(engine: object) -> None:
-    try:
-        mark = _mark_device_unavailable_callback_or_none(engine)
-        if callable(mark):
-            mark()
-    except _DEVICE_UNAVAILABLE_MARK_RUNTIME_ERRORS:  # @quality-exception exception-transparency: mark_device_unavailable is a hardware-state bookkeeping boundary and failures must not interrupt the disconnect-handling path
-        logger.exception("Failed to mark keyboard device unavailable after disconnect")
 
 
 class _EngineStart:

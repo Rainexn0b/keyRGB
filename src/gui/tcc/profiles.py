@@ -20,6 +20,7 @@ from src.core.power.tcc_profiles.models import is_builtin_profile_id
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.theme import apply_clam_theme
 from src.gui.utils.window_geometry import compute_centered_window_geometry
+from src.gui.tcc._profiles_window_ui import build_profiles_window
 from src.gui.tcc._profile_actions import (
     create_profile,
     delete_profile,
@@ -43,111 +44,22 @@ _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 class TccProfilesGUI:
     def __init__(self) -> None:
-        self.root = tk.Tk()
-        self.root.title("KeyRGB - Power Profiles")
-        apply_keyrgb_window_icon(self.root)
-        self.root.minsize(620, 460)
-        self.root.resizable(True, True)
-
-        apply_clam_theme(self.root)
-
-        main = ttk.Frame(self.root, padding=16)
-        main.pack(fill="both", expand=True)
-        main.columnconfigure(0, weight=1)
-        self._main_frame = main
-        self._wrap_labels: list[object] = []
-
-        title = ttk.Label(main, text="Power Profiles (TCC)", font=("Sans", 14, "bold"))
-        title.pack(anchor="w", pady=(0, 8))
-
-        desc = ttk.Label(
-            main,
-            text=(
-                "These profiles are provided by the TUXEDO Control Center daemon (tccd).\n"
-                "Activation here is temporary (like the TCC tray menu)."
-            ),
-            font=("Sans", 9),
-            justify="left",
-            wraplength=640,
+        build_profiles_window(
+            self,
+            tk_module=tk,
+            ttk_module=ttk,
+            apply_window_icon=apply_keyrgb_window_icon,
+            apply_theme=apply_clam_theme,
+            wrap_sync_errors=_WRAP_SYNC_ERRORS,
+            on_select=self._on_select,
+            on_activate=self._on_activate,
+            on_refresh=self._refresh,
+            on_new=self._on_new,
+            on_duplicate=self._on_duplicate,
+            on_rename=self._on_rename,
+            on_edit=self._on_edit,
+            on_delete=self._on_delete,
         )
-        desc.pack(anchor="w", pady=(0, 12))
-        self._wrap_labels.append(desc)
-
-        def _sync_wrap(_event=None) -> None:
-            try:
-                width = int(main.winfo_width())
-                if width <= 1:
-                    return
-                wrap = max(240, width - 24)
-                for label in self._wrap_labels:
-                    label.configure(wraplength=wrap)
-            except _WRAP_SYNC_ERRORS:
-                return
-
-        main.bind("<Configure>", _sync_wrap)
-        self.root.after(0, _sync_wrap)
-
-        list_frame = ttk.Frame(main)
-        list_frame.pack(fill="both", expand=True)
-
-        self.listbox = tk.Listbox(
-            list_frame,
-            height=9,
-            activestyle="dotbox",
-            exportselection=False,
-        )
-        self.listbox.pack(side="left", fill="both", expand=True)
-        self.listbox.bind("<<ListboxSelect>>", self._on_select)
-
-        scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=self.listbox.yview)
-        scrollbar.pack(side="right", fill="y")
-        self.listbox.configure(yscrollcommand=scrollbar.set)
-
-        details_frame = ttk.LabelFrame(main, text="Selected Profile", padding=12)
-        details_frame.pack(fill="x", pady=(10, 0))
-
-        self.profile_desc = ttk.Label(details_frame, text="", font=("Sans", 9), justify="left", wraplength=640)
-        self.profile_desc.pack(fill="x", anchor="w")
-        self._wrap_labels.append(self.profile_desc)
-
-        btn_row_top = ttk.Frame(main)
-        btn_row_top.pack(fill="x", pady=(16, 0))
-        btn_row_top.columnconfigure(0, weight=3)
-        btn_row_top.columnconfigure(1, weight=2)
-        btn_row_top.columnconfigure(2, weight=2)
-
-        self.btn_activate = ttk.Button(btn_row_top, text="Activate Temporarily", command=self._on_activate)
-        self.btn_activate.grid(row=0, column=0, sticky="ew")
-
-        self.btn_refresh = ttk.Button(btn_row_top, text="Refresh", command=self._refresh)
-        self.btn_refresh.grid(row=0, column=1, sticky="ew", padx=(8, 0))
-
-        self.btn_close = ttk.Button(btn_row_top, text="Close", command=self.root.destroy)
-        self.btn_close.grid(row=0, column=2, sticky="ew", padx=(8, 0))
-
-        btn_row_bottom = ttk.Frame(main)
-        btn_row_bottom.pack(fill="x", pady=(8, 0))
-        for column in range(5):
-            btn_row_bottom.columnconfigure(column, weight=1)
-
-        self.btn_new = ttk.Button(btn_row_bottom, text="New…", command=self._on_new)
-        self.btn_new.grid(row=0, column=0, sticky="ew")
-
-        self.btn_duplicate = ttk.Button(btn_row_bottom, text="Duplicate…", command=self._on_duplicate)
-        self.btn_duplicate.grid(row=0, column=1, sticky="ew", padx=(8, 0))
-
-        self.btn_rename = ttk.Button(btn_row_bottom, text="Rename…", command=self._on_rename)
-        self.btn_rename.grid(row=0, column=2, sticky="ew", padx=(8, 0))
-
-        self.btn_edit = ttk.Button(btn_row_bottom, text="Edit…", command=self._on_edit)
-        self.btn_edit.grid(row=0, column=3, sticky="ew", padx=(8, 0))
-
-        self.btn_delete = ttk.Button(btn_row_bottom, text="Delete", command=self._on_delete)
-        self.btn_delete.grid(row=0, column=4, sticky="ew", padx=(8, 0))
-
-        self.status = ttk.Label(main, text="", font=("Sans", 9), justify="left", wraplength=640)
-        self.status.pack(fill="x", anchor="w", pady=(8, 0))
-        self._wrap_labels.append(self.status)
 
         self._profiles: list[tcc_power_profiles.TccProfile] = []
 

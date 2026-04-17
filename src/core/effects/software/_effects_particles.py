@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Dict, List, Tuple
+from typing import TYPE_CHECKING
 
 from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
@@ -12,8 +12,6 @@ from src.core.effects.transitions import scaled_color_map_nonzero
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer
 from .base import (
     animation_step_s,
-    Color,
-    Key,
     base_color_map,
     frame_dt_s,
     has_per_key,
@@ -25,6 +23,7 @@ from .base import (
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
+    from .base import Color, Key
 
 
 @dataclass
@@ -36,7 +35,7 @@ class _Twinkle:
     color: Color
 
 
-def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_twinkle(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Twinkle (SW): random sparkles that fade out (OpenRGB-style)."""
 
     base = base_color_map(engine)
@@ -44,7 +43,7 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     p = pace(engine)
     color_map = get_engine_color_map_buffer(engine, "_sw_twinkle_frame_map")
 
-    twinkles: List[_Twinkle] = []
+    twinkles: list[_Twinkle] = []
     acc = 0.0
 
     while engine.running and not engine.stop_event.is_set():
@@ -67,14 +66,14 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
                     )
                 )
 
-        alive: List[_Twinkle] = []
+        alive: list[_Twinkle] = []
         for tw in twinkles:
             tw.age_s += step_s
             if tw.age_s <= tw.ttl_s:
                 alive.append(tw)
         twinkles = alive
 
-        overlay: Dict[Key, Tuple[Color, float]] = {}
+        overlay: dict[Key, tuple[Color, float]] = {}
         for tw in twinkles:
             x = 1.0 - (tw.age_s / tw.ttl_s)
             intensity = x * x
@@ -95,7 +94,7 @@ def run_twinkle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         engine.stop_event.wait(nominal_dt)
 
 
-def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_strobe(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Strobe (SW): rapid on/off flashing (OpenRGB-style)."""
 
     base = base_color_map(engine)
@@ -137,7 +136,7 @@ def run_strobe(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         engine.stop_event.wait(nominal_dt)
 
 
-def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_chase(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Chase (SW): moving highlight band across the keyboard (OpenRGB-style)."""
 
     per_key_ok = has_per_key(engine)
@@ -188,7 +187,7 @@ def run_chase(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         engine.stop_event.wait(nominal_dt)
 
 
-def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_rain(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Rain: falling droplets with smooth fades; overlays onto per-key base when present."""
 
     @dataclass
@@ -203,7 +202,7 @@ def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
     p = pace(engine)
     color_map = get_engine_color_map_buffer(engine, "_sw_rain_frame_map")
 
-    droplets: List[_RainDrop] = []
+    droplets: list[_RainDrop] = []
 
     def spawn() -> None:
         col = random.randrange(NUM_COLS)
@@ -217,8 +216,8 @@ def run_rain(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             acc = 0.0
             spawn()
 
-        new_droplets: List[_RainDrop] = []
-        overlay: Dict[Key, float] = {}
+        new_droplets: list[_RainDrop] = []
+        overlay: dict[Key, float] = {}
         for d in droplets:
             d.age_s += step_s
             if d.age_s > d.ttl_s:

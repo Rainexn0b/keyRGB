@@ -8,6 +8,7 @@ from typing import Any
 
 from src.core.resources.layout_legends import get_layout_legend_pack_ids, load_layout_legend_pack
 
+from . import _secondary_device_accessors as secondary_device_accessors
 from ._coercion import normalize_rgb_triplet
 
 logger = logging.getLogger("src.core.config.config")
@@ -163,16 +164,10 @@ class LightingConfigAccessors:
         self._save()
 
     def _secondary_device_state(self) -> dict[str, Any]:
-        raw = self._settings.get("secondary_device_state", None)
-        if isinstance(raw, dict):
-            return raw
-        state: dict[str, Any] = {}
-        self._settings["secondary_device_state"] = state
-        return state
+        return secondary_device_accessors.secondary_device_state(self)
 
     def _normalize_secondary_state_key(self, value: object, *, default: str = "device") -> str:
-        normalized = str(value or default).strip().lower()
-        return normalized or default
+        return secondary_device_accessors.normalize_secondary_state_key(value, default=default)
 
     def get_secondary_device_brightness(
         self,
@@ -181,27 +176,14 @@ class LightingConfigAccessors:
         fallback_keys: tuple[str, ...] = (),
         default: int = 25,
     ) -> int:
-        normalized_key = self._normalize_secondary_state_key(state_key)
-        state = self._secondary_device_state().get(normalized_key, None)
-        if isinstance(state, dict):
-            value = state.get("brightness", _MISSING)
-            if value is not _MISSING:
-                return self._normalize_brightness_value(_coerce_int_setting(value, default=default))
-
-        default_lookup_key = fallback_keys[0] if fallback_keys else normalized_key
-        default_fallback_keys = fallback_keys[1:] if fallback_keys else ()
-        fallback_value = _default_setting(
-            self.DEFAULTS,
-            default_lookup_key,
-            fallback_keys=default_fallback_keys,
+        return secondary_device_accessors.get_secondary_device_brightness(
+            self,
+            state_key,
+            fallback_keys=fallback_keys,
             default=default,
+            default_setting_fn=_default_setting,
+            coerce_int_setting_fn=_coerce_int_setting,
         )
-        for key in fallback_keys:
-            compatibility_value = self._settings.get(key, _MISSING)
-            if compatibility_value is not _MISSING:
-                fallback_value = compatibility_value
-                break
-        return self._normalize_brightness_value(_coerce_int_setting(fallback_value, default=default))
 
     def set_secondary_device_brightness(
         self,
@@ -210,17 +192,12 @@ class LightingConfigAccessors:
         *,
         compatibility_key: str | None = None,
     ) -> None:
-        normalized_key = self._normalize_secondary_state_key(state_key)
-        brightness = self._normalize_brightness_value(value)
-        state = self._secondary_device_state()
-        entry = state.get(normalized_key, None)
-        if not isinstance(entry, dict):
-            entry = {}
-        entry["brightness"] = brightness
-        state[normalized_key] = entry
-        if compatibility_key:
-            self._settings[str(compatibility_key)] = brightness
-        self._save()
+        secondary_device_accessors.set_secondary_device_brightness(
+            self,
+            state_key,
+            value,
+            compatibility_key=compatibility_key,
+        )
 
     def get_secondary_device_color(
         self,
@@ -229,27 +206,13 @@ class LightingConfigAccessors:
         fallback_keys: tuple[str, ...] = (),
         default: tuple[int, int, int] = (255, 0, 0),
     ) -> tuple[int, int, int]:
-        normalized_key = self._normalize_secondary_state_key(state_key)
-        state = self._secondary_device_state().get(normalized_key, None)
-        if isinstance(state, dict):
-            value = state.get("color", _MISSING)
-            if value is not _MISSING:
-                return normalize_rgb_triplet(value, default=default)
-
-        default_lookup_key = fallback_keys[0] if fallback_keys else normalized_key
-        default_fallback_keys = fallback_keys[1:] if fallback_keys else ()
-        fallback_value = _default_setting(
-            self.DEFAULTS,
-            default_lookup_key,
-            fallback_keys=default_fallback_keys,
-            default=list(default),
+        return secondary_device_accessors.get_secondary_device_color(
+            self,
+            state_key,
+            fallback_keys=fallback_keys,
+            default=default,
+            default_setting_fn=_default_setting,
         )
-        for key in fallback_keys:
-            compatibility_value = self._settings.get(key, _MISSING)
-            if compatibility_value is not _MISSING:
-                fallback_value = compatibility_value
-                break
-        return normalize_rgb_triplet(fallback_value, default=default)
 
     def set_secondary_device_color(
         self,
@@ -259,41 +222,36 @@ class LightingConfigAccessors:
         compatibility_key: str | None = None,
         default: tuple[int, int, int] = (255, 0, 0),
     ) -> None:
-        normalized_key = self._normalize_secondary_state_key(state_key)
-        color = list(normalize_rgb_triplet(value, default=default))
-        state = self._secondary_device_state()
-        entry = state.get(normalized_key, None)
-        if not isinstance(entry, dict):
-            entry = {}
-        entry["color"] = color
-        state[normalized_key] = entry
-        if compatibility_key:
-            self._settings[str(compatibility_key)] = list(color)
-        self._save()
+        secondary_device_accessors.set_secondary_device_color(
+            self,
+            state_key,
+            value,
+            compatibility_key=compatibility_key,
+            default=default,
+        )
 
     @property
     def lightbar_brightness(self) -> int:
-        return self.get_secondary_device_brightness(
-            "lightbar",
-            fallback_keys=("lightbar_brightness", "brightness"),
-            default=_coerce_int_setting(self._settings.get("brightness", 0), default=0),
+        return secondary_device_accessors.get_lightbar_brightness(
+            self,
+            default_setting_fn=_default_setting,
+            coerce_int_setting_fn=_coerce_int_setting,
         )
 
     @lightbar_brightness.setter
     def lightbar_brightness(self, value: int) -> None:
-        self.set_secondary_device_brightness("lightbar", value, compatibility_key="lightbar_brightness")
+        secondary_device_accessors.set_lightbar_brightness(self, value)
 
     @property
     def lightbar_color(self) -> tuple[int, int, int]:
-        return self.get_secondary_device_color(
-            "lightbar",
-            fallback_keys=("lightbar_color", "color"),
-            default=(255, 0, 0),
+        return secondary_device_accessors.get_lightbar_color(
+            self,
+            default_setting_fn=_default_setting,
         )
 
     @lightbar_color.setter
     def lightbar_color(self, value: tuple[int, int, int] | tuple) -> None:
-        self.set_secondary_device_color("lightbar", value, compatibility_key="lightbar_color", default=(255, 0, 0))
+        secondary_device_accessors.set_lightbar_color(self, value)
 
     @property
     def direction(self) -> str | None:

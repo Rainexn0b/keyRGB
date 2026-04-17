@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any
+from typing import Protocol, TypeVar
 
 from src.core.resources.layouts.catalog import VALID_LAYOUT_IDS
 from src.core.utils.safe_attrs import safe_int_attr
@@ -15,12 +15,20 @@ _SETTINGS_INT_COERCE_ERRORS = (RuntimeError,)
 _SETTINGS_BOOL_COERCE_ERRORS = (RuntimeError, TypeError, ValueError)
 _SETTINGS_SAFE_INT_ERRORS = (AttributeError, OverflowError, RuntimeError, TypeError, ValueError)
 
+_DefaultT = TypeVar("_DefaultT")
+
+
+class _SettingsConfigLike(Protocol):
+    def __getattribute__(self, name: str) -> object: ...
+
+    def __setattr__(self, name: str, value: object) -> None: ...
+
 
 def clamp_brightness(value: int) -> int:
     return max(0, min(50, int(value)))
 
 
-def _safe_getattr_or_default(obj: Any, name: str, default: Any) -> Any:
+def _safe_getattr_or_default(obj: object, name: str, default: _DefaultT) -> object | _DefaultT:
     try:
         return getattr(obj, name, default)
     except _SETTINGS_ATTR_READ_ERRORS:
@@ -28,7 +36,7 @@ def _safe_getattr_or_default(obj: Any, name: str, default: Any) -> Any:
         return default
 
 
-def _coerce_int_or_fallback(value: Any, *, fallback: int | None) -> int | None:
+def _coerce_int_or_fallback(value: object, *, fallback: int | None) -> int | None:
     try:
         return int(value)
     except (TypeError, ValueError, OverflowError):
@@ -46,7 +54,7 @@ def clamp_nonzero_brightness(value: int, *, default: int = 5) -> int:
     return max(1, min(50, v))
 
 
-def _safe_bool(obj: Any, name: str, default: bool) -> bool:
+def _safe_bool(obj: object, name: str, default: bool) -> bool:
     value = _safe_getattr_or_default(obj, name, default)
     try:
         return bool(value)
@@ -55,7 +63,7 @@ def _safe_bool(obj: Any, name: str, default: bool) -> bool:
         return bool(default)
 
 
-def _safe_int(obj: Any, name: str, default: int) -> int:
+def _safe_int(obj: object, name: str, default: int) -> int:
     default_value = _coerce_int_or_fallback(default, fallback=0)
     safe_default = 0 if default_value is None else default_value
     try:
@@ -65,7 +73,7 @@ def _safe_int(obj: Any, name: str, default: int) -> int:
         return safe_default
 
 
-def _safe_optional_int(obj: Any, name: str) -> int | None:
+def _safe_optional_int(obj: object, name: str) -> int | None:
     value = _safe_getattr_or_default(obj, name, None)
     if value is None:
         return None
@@ -101,7 +109,7 @@ class SettingsValues:
     physical_layout: str = "auto"
 
 
-def load_settings_values(*, config: Any, os_autostart_enabled: bool) -> SettingsValues:
+def load_settings_values(*, config: _SettingsConfigLike, os_autostart_enabled: bool) -> SettingsValues:
     """Best-effort load of GUI settings from a Config-like object.
 
     This is intentionally pure (no Tk, no filesystem) and defensive.
@@ -151,7 +159,7 @@ def load_settings_values(*, config: Any, os_autostart_enabled: bool) -> Settings
     )
 
 
-def apply_settings_values_to_config(*, config: Any, values: SettingsValues) -> None:
+def apply_settings_values_to_config(*, config: _SettingsConfigLike, values: SettingsValues) -> None:
     """Apply GUI settings back onto a Config-like object."""
 
     config.power_management_enabled = bool(values.power_management_enabled)

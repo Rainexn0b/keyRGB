@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING
 
 from src.core.backends.exceptions import (
     BACKEND_OPEN_RUNTIME_ERRORS,
@@ -13,23 +13,49 @@ from src.core.backends.exceptions import (
 )
 from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
 
-from ..base import (
-    BackendCapabilities,
-    BackendStability,
-    ExperimentalEvidence,
-    KeyboardBackend,
-    KeyboardDevice,
-    ProbeResult,
-)
-from ..ite8291.hidraw import (
-    HidrawDeviceInfo,
-    HidrawFeatureOutputTransport,
-    find_matching_hidraw_device,
-    open_matching_hidraw_transport,
-)
+from ..base import BackendCapabilities, BackendStability, ExperimentalEvidence, KeyboardBackend, ProbeResult
 from ..policy import experimental_backends_enabled
 from . import protocol
-from .device import Ite8295ZonesKeyboardDevice
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from ..base import KeyboardDevice
+    from ..ite8291.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
+
+
+def find_matching_hidraw_device(
+    *,
+    product_ids: tuple[int, ...] | None = None,
+    forced_path_env: str | None = None,
+) -> HidrawDeviceInfo | None:
+    from ..ite8291.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
+
+    return _find_matching_hidraw_device(
+        product_ids=tuple(int(product_id) for product_id in (product_ids or protocol.SUPPORTED_PRODUCT_IDS)),
+        forced_path_env=forced_path_env,
+    )
+
+
+def open_matching_hidraw_transport(
+    *,
+    product_ids: tuple[int, ...] | None = None,
+    forced_path_env: str | None = None,
+) -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
+    supported_product_ids = tuple(int(product_id) for product_id in (product_ids or protocol.SUPPORTED_PRODUCT_IDS))
+    info = find_matching_hidraw_device(
+        product_ids=supported_product_ids,
+        forced_path_env=forced_path_env,
+    )
+    if info is None:
+        raise FileNotFoundError(
+            "No hidraw device found for supported ITE 8291 IDs: "
+            + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{product_id:04x}" for product_id in supported_product_ids)
+        )
+
+    from ..ite8291.hidraw import HidrawFeatureOutputTransport
+
+    return HidrawFeatureOutputTransport(info.devnode), info
 
 
 def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
@@ -46,7 +72,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
     )
 
 
-def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):
+def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> Callable[..., dict[str, object]]:
     args = {"speed": None, "brightness": None}
     for key in extra:
         args[key] = None
@@ -143,6 +169,8 @@ class Ite8295ZonesBackend(KeyboardBackend):
 
         try:
             transport, _info = _open_matching_transport()
+            from .device import Ite8295ZonesKeyboardDevice
+
             return Ite8295ZonesKeyboardDevice(transport.send_feature_report)
         except BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
             if is_permission_denied(exc):
@@ -161,12 +189,12 @@ class Ite8295ZonesBackend(KeyboardBackend):
     def dimensions(self) -> tuple[int, int]:
         return (1, protocol.NUM_ZONES)
 
-    def effects(self) -> dict[str, Any]:
+    def effects(self) -> dict[str, Callable[..., dict[str, object]]]:
         return {
             "breathing": _effect_builder("breathing", extra=("color",)),
             "wave": _effect_builder("wave", extra=("direction",)),
             "spectrum_cycle": _effect_builder("spectrum_cycle"),
         }
 
-    def colors(self) -> dict[str, Any]:
+    def colors(self) -> dict[str, object]:
         return {}

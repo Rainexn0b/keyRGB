@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import tkinter as tk
-from typing import Any, Callable
-
-from ..profile_management import keymap_cells_for, representative_cell
+from ..profile_management import keymap_cells_for
+from . import _sample_tool_support as _support
 from .selection import select_visible_identity
 from .wheel_apply import on_wheel_color_release_ui
 from .status import (
@@ -14,82 +12,10 @@ from .status import (
 )
 
 
-_TK_WIDGET_ERRORS = (AttributeError, RuntimeError, tk.TclError)
-_UI_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
-_OVERLAY_SYNC_ERRORS = _TK_WIDGET_ERRORS + _UI_VALUE_ERRORS
-_WHEEL_COLOR_ERRORS = _TK_WIDGET_ERRORS + _UI_VALUE_ERRORS
-
-
-def _physical_layout_or_none(editor: Any) -> object | None:
-    try:
-        return editor._physical_layout
-    except AttributeError:
-        return None
-
-
-def _last_non_black_color_or_default(editor: Any) -> tuple[int, int, int]:
-    try:
-        color = editor._last_non_black_color
-    except AttributeError:
-        color = (255, 0, 0)
-    return tuple(color or (255, 0, 0))
-
-
-def _redraw_canvas_best_effort(editor: Any) -> None:
-    try:
-        editor.canvas.redraw()
-    except _TK_WIDGET_ERRORS:
-        pass
-
-
-def _key_id_for_slot_identity(editor: Any, slot_id: str) -> str | None:
-    try:
-        key_id = editor._key_id_for_slot_id(slot_id)
-    except AttributeError:
-        key_id = None
-    if key_id:
-        return str(key_id)
-
-    try:
-        key = editor._visible_key_for_slot_id(slot_id)
-    except AttributeError:
-        key = None
-    resolved_key_id = getattr(key, "key_id", None) if key is not None else None
-    if resolved_key_id:
-        return str(resolved_key_id)
-    return None
-
-
-def _set_selected_key_without_updating_wheel(editor: Any, key_id: str) -> None:
-    editor.selected_key_id = key_id
-    try:
-        editor.selected_slot_id = editor._slot_id_for_key_id(key_id)
-    except AttributeError:
-        pass
-    editor.selected_cells = keymap_cells_for(
-        getattr(editor, "keymap", {}) or {},
-        key_id,
-        slot_id=getattr(editor, "selected_slot_id", None),
-        physical_layout=_physical_layout_or_none(editor),
-    )
-    editor.selected_cell = representative_cell(editor.selected_cells, colors=getattr(editor, "colors", {}) or {})
-
-    # Keep overlay controls in sync if present.
-    try:
-        if getattr(editor, "overlay_scope", None) is not None and editor.overlay_scope.get() == "key":
-            oc = getattr(editor, "overlay_controls", None)
-            if oc is not None:
-                sync = getattr(oc, "sync_vars_from_scope", None)
-                if callable(sync):
-                    sync()
-    except _OVERLAY_SYNC_ERRORS:
-        pass
-
-
-def on_sample_tool_toggled_ui(editor: Any) -> None:
+def on_sample_tool_toggled_ui(editor: _support._SampleToolToggleEditorProtocol) -> None:
     """Reset sample tool state + set an instructional status message."""
 
-    enabled = bool(getattr(getattr(editor, "sample_tool_enabled", None), "get", lambda: False)())
+    enabled = _support._sample_tool_enabled(editor)
     editor._sample_tool_has_sampled = False
 
     if enabled:
@@ -97,12 +23,12 @@ def on_sample_tool_toggled_ui(editor: Any) -> None:
 
 
 def on_key_clicked_ui(
-    editor: Any,
+    editor: _support._SampleToolEditorProtocol,
     key_id: str,
     *,
     num_rows: int,
     num_cols: int,
-    apply_release_fn: Callable[..., None] = on_wheel_color_release_ui,
+    apply_release_fn: _support._ApplyReleaseFn = on_wheel_color_release_ui,
 ) -> None:
     """Handle a click on a key in the per-key canvas.
 
@@ -114,7 +40,7 @@ def on_key_clicked_ui(
     This provides an "eyedropper then paint" workflow similar to MSPaint.
     """
 
-    enabled = bool(getattr(getattr(editor, "sample_tool_enabled", None), "get", lambda: False)())
+    enabled = _support._sample_tool_enabled(editor)
 
     if not enabled:
         editor._sample_tool_has_sampled = False
@@ -122,75 +48,57 @@ def on_key_clicked_ui(
         return
 
     key_id = str(key_id)
-    keymap = getattr(editor, "keymap", {}) or {}
     cells = keymap_cells_for(
-        keymap,
+        _support._keymap_or_empty(editor),
         key_id,
-        slot_id=getattr(editor, "selected_slot_id", None),
-        physical_layout=_physical_layout_or_none(editor),
+        slot_id=editor.selected_slot_id,
+        physical_layout=_support._physical_layout_or_none(editor),
     )
 
     # Update selection highlight even in sample mode.
-    _set_selected_key_without_updating_wheel(editor, key_id)
+    _support._set_selected_key_without_updating_wheel(editor, key_id)
 
     if not cells:
         set_status(editor, sample_tool_unmapped_key(key_id))
-        _redraw_canvas_best_effort(editor)
+        _support._redraw_canvas_best_effort(editor)
         return
-
-    colors = getattr(editor, "colors", {}) or {}
 
     # Stage 1: sample color into the wheel.
     if not bool(editor._sample_tool_has_sampled):
-        cell = representative_cell(cells, colors=colors)
-        r, g, b = colors.get(cell, (0, 0, 0)) if cell is not None else (0, 0, 0)
-        try:
-            editor.color_wheel.set_color(int(r), int(g), int(b))
-        except _WHEEL_COLOR_ERRORS:
-            pass
-        editor._sample_tool_has_sampled = True
-        set_status(editor, sample_tool_sampled_color(key_id, int(r), int(g), int(b)))
-        _redraw_canvas_best_effort(editor)
+        r, g, b = _support._sample_selected_color_into_wheel(editor, cells)
+        set_status(editor, sample_tool_sampled_color(key_id, r, g, b))
+        _support._redraw_canvas_best_effort(editor)
         return
 
     # Stage 2: apply current wheel color to clicked keys.
-    try:
-        r, g, b = editor.color_wheel.get_color()
-        r, g, b = int(r), int(g), int(b)
-    except _WHEEL_COLOR_ERRORS:
-        # Fallback to last known non-black color.
-        r, g, b = _last_non_black_color_or_default(editor)
-        r, g, b = int(r), int(g), int(b)
+    r, g, b = _support._current_or_fallback_wheel_color(editor)
 
     apply_release_fn(editor, r, g, b, num_rows=num_rows, num_cols=num_cols)
 
-    _redraw_canvas_best_effort(editor)
+    _support._redraw_canvas_best_effort(editor)
 
 
 def on_slot_clicked_ui(
-    editor: Any,
+    editor: _support._SampleToolEditorProtocol,
     slot_id: str,
     *,
     num_rows: int,
     num_cols: int,
-    apply_release_fn: Callable[..., None] = on_wheel_color_release_ui,
+    apply_release_fn: _support._ApplyReleaseFn = on_wheel_color_release_ui,
 ) -> None:
-    enabled = bool(getattr(getattr(editor, "sample_tool_enabled", None), "get", lambda: False)())
+    enabled = _support._sample_tool_enabled(editor)
 
     if not enabled:
         editor._sample_tool_has_sampled = False
-        select_slot = getattr(editor, "select_slot_id", None)
-        if callable(select_slot):
-            select_slot(str(slot_id))
+        if _support._select_slot_id_if_present(editor, str(slot_id)):
             return
 
-        key_id = _key_id_for_slot_identity(editor, str(slot_id))
-        select_key = getattr(editor, "select_key_id", None)
-        if key_id is not None and callable(select_key):
-            select_key(str(key_id))
+        key_id = _support._key_id_for_slot_identity(editor, str(slot_id))
+        if key_id is not None:
+            _support._select_key_id_if_present(editor, str(key_id))
         return
 
-    key_id = _key_id_for_slot_identity(editor, str(slot_id))
+    key_id = _support._key_id_for_slot_identity(editor, str(slot_id))
     if key_id is None:
         return
 

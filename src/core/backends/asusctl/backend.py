@@ -64,6 +64,20 @@ class AsusctlAuraBackend(KeyboardBackend):
             check=False,
         )
 
+    def _run_recoverable(
+        self,
+        args: list[str],
+        *,
+        timeout_s: float = 2.0,
+        log_message: str | None = None,
+    ) -> tuple[subprocess.CompletedProcess[str] | None, Exception | None]:
+        try:
+            return self._run(args, timeout_s=timeout_s), None
+        except _RECOVERABLE_SUBPROCESS_EXCEPTIONS as exc:  # @quality-exception exception-transparency: asusctl probing uses a shared subprocess boundary; recoverable launch and timeout failures are centralized so required info probes degrade to unavailable and optional aura checks stay best-effort while programming bugs still surface
+            if log_message:
+                logger.exception(log_message)
+            return None, exc
+
     def is_available(self) -> bool:
         return self.probe().available
 
@@ -75,11 +89,10 @@ class AsusctlAuraBackend(KeyboardBackend):
         if shutil.which(exe) is None:
             return ProbeResult(available=False, reason="asusctl not found", confidence=0)
 
-        try:
-            info = self._run(["info"], timeout_s=2.0)
-        except _RECOVERABLE_SUBPROCESS_EXCEPTIONS as exc:  # @quality-exception exception-transparency: asusctl probe is a subprocess/hardware boundary; recoverable runtime failures degrade to unavailable while programming bugs still surface
-            logger.exception("asusctl probe failed")
-            return ProbeResult(available=False, reason=f"asusctl info failed: {exc}", confidence=0)
+        info, info_error = self._run_recoverable(["info"], timeout_s=2.0, log_message="asusctl probe failed")
+        if info_error is not None:
+            return ProbeResult(available=False, reason=f"asusctl info failed: {info_error}", confidence=0)
+        assert info is not None
 
         stdout = (info.stdout or "").strip()
         stderr = (info.stderr or "").strip()
@@ -105,12 +118,9 @@ class AsusctlAuraBackend(KeyboardBackend):
                 identifiers[k] = v
 
         # Best-effort check that aura command exists.
-        try:
-            aura_help = self._run(["aura", "--help"], timeout_s=2.0)
-            if aura_help.returncode == 0:
-                identifiers["aura"] = "true"
-        except _RECOVERABLE_SUBPROCESS_EXCEPTIONS:  # @quality-exception exception-transparency: aura capability check is a best-effort subprocess boundary; recoverable runtime failures omit the optional aura identifier
-            pass
+        aura_help, _ = self._run_recoverable(["aura", "--help"], timeout_s=2.0)
+        if aura_help is not None and aura_help.returncode == 0:
+            identifiers["aura"] = "true"
 
         # If asusctl is present and can talk to the system, we're likely the best
         # choice on ASUS hardware compared to generic sysfs kbd_backlight.

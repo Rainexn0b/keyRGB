@@ -3,10 +3,113 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from collections.abc import Callable
+from typing import Protocol, TypeAlias, cast
+
+from ._support_window_text_io import (
+    _ConfigurableWidget,
+    _SupportWindowOutputLike,
+    _TextWidget,
+    copy_text as copy_text,
+    save_text_via_dialog as save_text_via_dialog,
+    set_status as set_status,
+    set_text as set_text,
+)
+
+JsonDict: TypeAlias = dict[str, object]
+CapturePlanFn: TypeAlias = Callable[[], JsonDict]
+BackendSpeedProbePlanFn: TypeAlias = Callable[[], JsonDict | None]
+CanRunBackendSpeedProbeFn: TypeAlias = Callable[[], bool]
 
 
-def parsed_json(text: str) -> dict[str, object] | None:
+class _MessageBoxLike(Protocol):
+    def askyesno(self, title: str, message: str, parent: object | None = None) -> object: ...
+
+
+class _ParsedJsonFn(Protocol):
+    def __call__(self, text: str) -> JsonDict | None: ...
+
+
+class _BuildAdditionalEvidencePlanFn(Protocol):
+    def __call__(self, discovery: JsonDict | None) -> JsonDict: ...
+
+
+class _BuildBackendSpeedProbePlanFn(Protocol):
+    def __call__(self, backend_name: object) -> JsonDict | None: ...
+
+
+class _BuildIssueReportWithEvidenceFn(Protocol):
+    def __call__(
+        self,
+        *,
+        diagnostics: JsonDict | None,
+        discovery: JsonDict | None,
+        supplemental_evidence: JsonDict | None,
+    ) -> JsonDict: ...
+
+
+class _SupportWindowLike(_SupportWindowOutputLike, Protocol):
+    _diagnostics_json: str
+    _discovery_json: str
+    _supplemental_evidence: JsonDict | None
+    _issue_report: JsonDict | None
+    _capture_prompt_key: str
+    _backend_probe_prompt_key: str
+    issue_meta_label: _ConfigurableWidget
+    status_label: _ConfigurableWidget
+    txt_issue: _TextWidget
+    btn_copy_debug: _ConfigurableWidget
+    btn_copy_discovery: _ConfigurableWidget
+    btn_save_debug: _ConfigurableWidget
+    btn_save_discovery: _ConfigurableWidget
+    btn_copy_issue: _ConfigurableWidget
+    btn_save_issue: _ConfigurableWidget
+    btn_open_issue: _ConfigurableWidget
+    btn_collect_evidence: _ConfigurableWidget
+    btn_save_bundle: _ConfigurableWidget
+    btn_run_speed_probe: _ConfigurableWidget
+
+    def _set_text(self, widget: _TextWidget, text: str) -> None: ...
+
+    def _set_status(self, text: str, *, ok: bool = True) -> None: ...
+
+    def collect_missing_evidence(self, *, prompt: bool = True) -> None: ...
+
+    def run_backend_speed_probe(self, *, prompt: bool = True) -> None: ...
+
+
+def _support_window(window: object) -> _SupportWindowLike:
+    return cast(_SupportWindowLike, window)
+
+
+def _json_dict(value: object) -> JsonDict | None:
+    return value if isinstance(value, dict) else None
+
+
+def _selected_backend_name(*, discovery: JsonDict | None, diagnostics: JsonDict | None) -> str:
+    if isinstance(discovery, dict):
+        selected_backend = str(discovery.get("selected_backend") or "").strip().lower()
+        if selected_backend:
+            return selected_backend
+
+    backends = _json_dict(diagnostics.get("backends")) if isinstance(diagnostics, dict) else None
+    return str(backends.get("selected") or "").strip().lower() if isinstance(backends, dict) else ""
+
+
+def _guided_speed_probe_plan(diagnostics: JsonDict | None) -> JsonDict | None:
+    backends = _json_dict(diagnostics.get("backends")) if isinstance(diagnostics, dict) else None
+    plans = backends.get("guided_speed_probes") if isinstance(backends, dict) else None
+    if not isinstance(plans, list):
+        return None
+
+    for plan in plans:
+        plan_dict = _json_dict(plan)
+        if plan_dict is not None:
+            return plan_dict
+    return None
+
+
+def parsed_json(text: str) -> JsonDict | None:
     if not text:
         return None
     try:
@@ -16,77 +119,78 @@ def parsed_json(text: str) -> dict[str, object] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def current_capture_plan(window: Any, *, build_additional_evidence_plan: Any, parsed_json_fn: Any) -> dict[str, object]:
-    return build_additional_evidence_plan(parsed_json_fn(window._discovery_json))
+def current_capture_plan(
+    window: object,
+    *,
+    build_additional_evidence_plan: _BuildAdditionalEvidencePlanFn,
+    parsed_json_fn: _ParsedJsonFn,
+) -> JsonDict:
+    support_window = _support_window(window)
+    return build_additional_evidence_plan(parsed_json_fn(support_window._discovery_json))
 
 
 def current_backend_speed_probe_plan(
-    window: Any,
+    window: object,
     *,
-    build_backend_speed_probe_plan: Any,
-    parsed_json_fn: Any,
-) -> dict[str, object] | None:
-    diagnostics = parsed_json_fn(window._diagnostics_json)
-    if isinstance(diagnostics, dict):
-        backends = diagnostics.get("backends")
-        if isinstance(backends, dict):
-            plans = backends.get("guided_speed_probes")
-            if isinstance(plans, list):
-                for plan in plans:
-                    if isinstance(plan, dict):
-                        return plan
+    build_backend_speed_probe_plan: _BuildBackendSpeedProbePlanFn,
+    parsed_json_fn: _ParsedJsonFn,
+) -> JsonDict | None:
+    support_window = _support_window(window)
+    diagnostics = parsed_json_fn(support_window._diagnostics_json)
+    guided_plan = _guided_speed_probe_plan(diagnostics)
+    if guided_plan is not None:
+        return guided_plan
 
-    discovery = parsed_json_fn(window._discovery_json)
-    backend_name = ""
-    if isinstance(discovery, dict):
-        backend_name = str(discovery.get("selected_backend") or "").strip().lower()
-    if not backend_name and isinstance(diagnostics, dict):
-        backends = diagnostics.get("backends")
-        if isinstance(backends, dict):
-            backend_name = str(backends.get("selected") or "").strip().lower()
+    discovery = parsed_json_fn(support_window._discovery_json)
+    backend_name = _selected_backend_name(discovery=discovery, diagnostics=diagnostics)
     if not backend_name:
         return None
+
     plan = build_backend_speed_probe_plan(backend_name)
     return plan if isinstance(plan, dict) else None
 
 
 def refresh_issue_report(
-    window: Any,
+    window: object,
     *,
-    parsed_json_fn: Any,
-    build_issue_report_with_evidence: Any,
+    parsed_json_fn: _ParsedJsonFn,
+    build_issue_report_with_evidence: _BuildIssueReportWithEvidenceFn,
     issue_url: str,
 ) -> None:
-    diagnostics = parsed_json_fn(window._diagnostics_json)
-    discovery = parsed_json_fn(window._discovery_json)
+    support_window = _support_window(window)
+    diagnostics = parsed_json_fn(support_window._diagnostics_json)
+    discovery = parsed_json_fn(support_window._discovery_json)
     if diagnostics is None and discovery is None:
-        window._issue_report = None
-        window.issue_meta_label.configure(text="Suggested template: run diagnostics or discovery first")
-        window._set_text(
-            window.txt_issue,
+        support_window._issue_report = None
+        support_window.issue_meta_label.configure(text="Suggested template: run diagnostics or discovery first")
+        support_window._set_text(
+            support_window.txt_issue,
             "Run diagnostics or discovery to generate a suggested issue draft and the recommended GitHub form.\n",
         )
         return
-    window._issue_report = build_issue_report_with_evidence(
+    support_window._issue_report = build_issue_report_with_evidence(
         diagnostics=diagnostics,
         discovery=discovery,
-        supplemental_evidence=window._supplemental_evidence
-        if isinstance(window._supplemental_evidence, dict)
+        supplemental_evidence=support_window._supplemental_evidence
+        if isinstance(support_window._supplemental_evidence, dict)
         else None,
     )
-    template_label = str(window._issue_report.get("template_label") or "Issue report")
-    resolved_issue_url = str(window._issue_report.get("issue_url") or issue_url)
-    window.issue_meta_label.configure(text=f"Suggested template: {template_label}\nIssue URL: {resolved_issue_url}")
-    window._set_text(window.txt_issue, str(window._issue_report.get("markdown") or ""))
+    template_label = str(support_window._issue_report.get("template_label") or "Issue report")
+    resolved_issue_url = str(support_window._issue_report.get("issue_url") or issue_url)
+    support_window.issue_meta_label.configure(
+        text=f"Suggested template: {template_label}\nIssue URL: {resolved_issue_url}"
+    )
+    support_window._set_text(support_window.txt_issue, str(support_window._issue_report.get("markdown") or ""))
 
 
 def maybe_prompt_for_missing_evidence(
-    window: Any,
+    window: object,
     *,
-    current_capture_plan_fn: Any,
-    messagebox: Any,
+    current_capture_plan_fn: CapturePlanFn,
+    messagebox: _MessageBoxLike,
     tk_runtime_errors: tuple[type[BaseException], ...],
 ) -> None:
+    support_window = _support_window(window)
     plan = current_capture_plan_fn()
     automated = plan.get("automated") if isinstance(plan, dict) else None
     if not isinstance(automated, list) or not automated:
@@ -94,9 +198,9 @@ def maybe_prompt_for_missing_evidence(
 
     usb_id = str(plan.get("usb_id") or "")
     prompt_key = usb_id + ":" + ",".join(str(item.get("key") or "") for item in automated if isinstance(item, dict))
-    if not prompt_key or prompt_key == window._capture_prompt_key:
+    if not prompt_key or prompt_key == support_window._capture_prompt_key:
         return
-    window._capture_prompt_key = prompt_key
+    support_window._capture_prompt_key = prompt_key
 
     needs_privileged = any(bool(item.get("requires_root")) for item in automated if isinstance(item, dict))
     message = "KeyRGB can collect additional evidence for this unsupported device now."
@@ -105,29 +209,30 @@ def maybe_prompt_for_missing_evidence(
     message += "\n\nCollect missing evidence now?"
 
     try:
-        ok = bool(messagebox.askyesno("Collect Missing Evidence", message, parent=window.root))
+        ok = bool(messagebox.askyesno("Collect Missing Evidence", message, parent=support_window.root))
     except tk_runtime_errors:
         ok = False
     if ok:
-        window.collect_missing_evidence(prompt=False)
+        support_window.collect_missing_evidence(prompt=False)
 
 
 def maybe_prompt_for_backend_speed_probe(
-    window: Any,
+    window: object,
     *,
-    current_backend_speed_probe_plan_fn: Any,
-    can_run_backend_speed_probe_fn: Any,
-    messagebox: Any,
+    current_backend_speed_probe_plan_fn: BackendSpeedProbePlanFn,
+    can_run_backend_speed_probe_fn: CanRunBackendSpeedProbeFn,
+    messagebox: _MessageBoxLike,
     tk_runtime_errors: tuple[type[BaseException], ...],
 ) -> None:
+    support_window = _support_window(window)
     plan = current_backend_speed_probe_plan_fn()
     if not isinstance(plan, dict) or not bool(can_run_backend_speed_probe_fn()):
         return
 
     prompt_key = str(plan.get("key") or "") + ":" + str(plan.get("backend") or "")
-    if not prompt_key or prompt_key == window._backend_probe_prompt_key:
+    if not prompt_key or prompt_key == support_window._backend_probe_prompt_key:
         return
-    window._backend_probe_prompt_key = prompt_key
+    support_window._backend_probe_prompt_key = prompt_key
 
     message = (
         "KeyRGB can guide a backend speed probe for this device now.\n\n"
@@ -135,35 +240,38 @@ def maybe_prompt_for_backend_speed_probe(
         "Run the probe now?"
     )
     try:
-        ok = bool(messagebox.askyesno("Run Backend Speed Probe", message, parent=window.root))
+        ok = bool(messagebox.askyesno("Run Backend Speed Probe", message, parent=support_window.root))
     except tk_runtime_errors:
         ok = False
     if ok:
-        window.run_backend_speed_probe(prompt=False)
+        support_window.run_backend_speed_probe(prompt=False)
 
 
 def sync_button_state(
-    window: Any,
+    window: object,
     *,
-    current_capture_plan_fn: Any,
-    current_backend_speed_probe_plan_fn: Any,
-    can_run_backend_speed_probe_fn: Any,
+    current_capture_plan_fn: CapturePlanFn,
+    current_backend_speed_probe_plan_fn: BackendSpeedProbePlanFn,
+    can_run_backend_speed_probe_fn: CanRunBackendSpeedProbeFn,
 ) -> None:
-    window.btn_copy_debug.configure(state="normal" if window._diagnostics_json else "disabled")
-    window.btn_copy_discovery.configure(state="normal" if window._discovery_json else "disabled")
-    window.btn_save_debug.configure(state="normal" if window._diagnostics_json else "disabled")
-    window.btn_save_discovery.configure(state="normal" if window._discovery_json else "disabled")
+    support_window = _support_window(window)
+    support_window.btn_copy_debug.configure(state="normal" if support_window._diagnostics_json else "disabled")
+    support_window.btn_copy_discovery.configure(state="normal" if support_window._discovery_json else "disabled")
+    support_window.btn_save_debug.configure(state="normal" if support_window._diagnostics_json else "disabled")
+    support_window.btn_save_discovery.configure(state="normal" if support_window._discovery_json else "disabled")
     plan = current_capture_plan_fn()
     has_capture_plan = bool(plan.get("automated"))
-    issue_state = "normal" if window._issue_report and window._issue_report.get("markdown") else "disabled"
-    window.btn_copy_issue.configure(state=issue_state)
-    window.btn_save_issue.configure(state=issue_state)
-    window.btn_open_issue.configure(state=issue_state)
-    window.btn_collect_evidence.configure(state="normal" if has_capture_plan else "disabled")
-    window.btn_save_bundle.configure(
-        state="normal" if (window._diagnostics_json or window._discovery_json) else "disabled"
+    issue_state = (
+        "normal" if support_window._issue_report and support_window._issue_report.get("markdown") else "disabled"
     )
-    window.btn_run_speed_probe.configure(
+    support_window.btn_copy_issue.configure(state=issue_state)
+    support_window.btn_save_issue.configure(state=issue_state)
+    support_window.btn_open_issue.configure(state=issue_state)
+    support_window.btn_collect_evidence.configure(state="normal" if has_capture_plan else "disabled")
+    support_window.btn_save_bundle.configure(
+        state="normal" if (support_window._diagnostics_json or support_window._discovery_json) else "disabled"
+    )
+    support_window.btn_run_speed_probe.configure(
         state=(
             "normal"
             if isinstance(current_backend_speed_probe_plan_fn(), dict) and bool(can_run_backend_speed_probe_fn())
@@ -172,80 +280,19 @@ def sync_button_state(
     )
 
 
-def merge_supplemental_evidence(window: Any, payload: dict[str, object] | None) -> None:
+def merge_supplemental_evidence(window: object, payload: JsonDict | None) -> None:
+    support_window = _support_window(window)
     if not isinstance(payload, dict):
         return
-    base = dict(window._supplemental_evidence) if isinstance(window._supplemental_evidence, dict) else {}
+    base = (
+        dict(support_window._supplemental_evidence) if isinstance(support_window._supplemental_evidence, dict) else {}
+    )
     for key, value in payload.items():
-        if isinstance(value, dict) and isinstance(base.get(key), dict):
-            merged = dict(base.get(key) or {})
+        existing_value = _json_dict(base.get(key))
+        if isinstance(value, dict) and existing_value is not None:
+            merged = dict(existing_value)
             merged.update(value)
             base[key] = merged
         else:
             base[key] = value
-    window._supplemental_evidence = base
-
-
-def set_status(window: Any, text: str, *, ok: bool = True) -> None:
-    color = "#00aa00" if ok else "#bb0000"
-    window.status_label.configure(text=text, foreground=color)
-    window.root.after(2500, lambda: window.status_label.configure(text=""))
-
-
-def set_text(widget: Any, text: str) -> None:
-    widget.configure(state="normal")
-    widget.delete("1.0", "end")
-    widget.insert("1.0", text)
-    widget.configure(state="disabled")
-
-
-def copy_text(
-    window: Any,
-    text: str,
-    *,
-    empty_message: str,
-    ok_message: str,
-    tk_runtime_errors: tuple[type[BaseException], ...],
-) -> None:
-    if not text:
-        window._set_status(empty_message, ok=False)
-        return
-    try:
-        window.root.clipboard_clear()
-        window.root.clipboard_append(text)
-    except tk_runtime_errors:
-        window._set_status("Clipboard copy failed", ok=False)
-        return
-    window._set_status(ok_message, ok=True)
-
-
-def save_text_via_dialog(
-    window: Any,
-    text: str,
-    *,
-    title: str,
-    initialfile: str,
-    empty_message: str,
-    asksaveasfilename: Any,
-) -> None:
-    if not text:
-        window._set_status(empty_message, ok=False)
-        return
-
-    path = asksaveasfilename(
-        title=title,
-        defaultextension=".json",
-        initialfile=initialfile,
-        filetypes=[("JSON files", "*.json"), ("Text files", "*.txt"), ("All files", "*.*")],
-    )
-    if not path:
-        return
-
-    try:
-        with open(path, "w", encoding="utf-8") as handle:
-            handle.write(text)
-    except OSError:
-        window._set_status("Failed to save file", ok=False)
-        return
-
-    window._set_status("Saved output", ok=True)
+    support_window._supplemental_evidence = base

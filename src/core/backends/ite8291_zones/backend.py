@@ -2,16 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any
-
-from src.core.backends.exceptions import (
-    BACKEND_OPEN_RUNTIME_ERRORS,
-    BackendBusyError,
-    BackendDisconnectedError,
-    BackendIOError,
-    BackendPermissionError,
-)
-from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
+from typing import TYPE_CHECKING, Any
 
 from ..base import (
     BackendCapabilities,
@@ -21,15 +12,100 @@ from ..base import (
     KeyboardDevice,
     ProbeResult,
 )
-from ..ite8291.hidraw import (
-    HidrawDeviceInfo,
-    HidrawFeatureOutputTransport,
-    find_matching_hidraw_device,
-    open_matching_hidraw_transport,
-)
-from ..policy import experimental_backends_enabled
 from . import protocol
-from .device import Ite8291ZonesKeyboardDevice
+
+if TYPE_CHECKING:
+    from ..ite8291.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
+
+
+def experimental_backends_enabled() -> bool:
+    from ..policy import experimental_backends_enabled as _experimental_backends_enabled
+
+    return _experimental_backends_enabled()
+
+
+def find_matching_hidraw_device(
+    *,
+    product_ids: tuple[int, ...],
+    forced_path_env: str,
+) -> HidrawDeviceInfo | None:
+    from ..ite8291.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
+
+    return _find_matching_hidraw_device(
+        product_ids=product_ids,
+        forced_path_env=forced_path_env,
+    )
+
+
+def open_matching_hidraw_transport(
+    *,
+    product_ids: tuple[int, ...],
+    forced_path_env: str,
+) -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
+    from ..ite8291.hidraw import open_matching_hidraw_transport as _open_matching_hidraw_transport
+
+    return _open_matching_hidraw_transport(
+        product_ids=product_ids,
+        forced_path_env=forced_path_env,
+    )
+
+
+def _clone_match_with_required_bcd_device(match: HidrawDeviceInfo) -> HidrawDeviceInfo:
+    from ..ite8291.hidraw import HidrawDeviceInfo as _HidrawDeviceInfo
+
+    return _HidrawDeviceInfo(
+        hidraw_name=match.hidraw_name,
+        devnode=match.devnode,
+        sysfs_dir=match.sysfs_dir,
+        vendor_id=match.vendor_id,
+        product_id=match.product_id,
+        hid_id=match.hid_id,
+        hid_name=match.hid_name,
+        bcd_device=protocol.REQUIRED_BCD_DEVICE,
+    )
+
+
+def is_device_busy(exc: BaseException) -> bool:
+    from src.core.utils.exceptions import is_device_busy as _is_device_busy
+
+    return _is_device_busy(exc)
+
+
+def is_device_disconnected(exc: BaseException) -> bool:
+    from src.core.utils.exceptions import is_device_disconnected as _is_device_disconnected
+
+    return _is_device_disconnected(exc)
+
+
+def is_permission_denied(exc: BaseException) -> bool:
+    from src.core.utils.exceptions import is_permission_denied as _is_permission_denied
+
+    return _is_permission_denied(exc)
+
+
+def __getattr__(name: str) -> object:
+    if name in {"HidrawDeviceInfo", "HidrawFeatureOutputTransport"}:
+        from ..ite8291 import hidraw as hidraw_module
+
+        return getattr(hidraw_module, name)
+
+    if name in {
+        "BACKEND_OPEN_RUNTIME_ERRORS",
+        "BackendBusyError",
+        "BackendDisconnectedError",
+        "BackendIOError",
+        "BackendPermissionError",
+    }:
+        from .. import exceptions as backend_exceptions
+
+        return getattr(backend_exceptions, name)
+
+    if name == "Ite8291ZonesKeyboardDevice":
+        from .device import Ite8291ZonesKeyboardDevice as _Ite8291ZonesKeyboardDevice
+
+        return _Ite8291ZonesKeyboardDevice
+
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
@@ -40,16 +116,7 @@ def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
     if match is None:
         return None
     if match.bcd_device is None and os.environ.get(protocol.HIDRAW_PATH_ENV):
-        match = HidrawDeviceInfo(
-            hidraw_name=match.hidraw_name,
-            devnode=match.devnode,
-            sysfs_dir=match.sysfs_dir,
-            vendor_id=match.vendor_id,
-            product_id=match.product_id,
-            hid_id=match.hid_id,
-            hid_name=match.hid_name,
-            bcd_device=protocol.REQUIRED_BCD_DEVICE,
-        )
+        match = _clone_match_with_required_bcd_device(match)
     if int(match.product_id) != int(protocol.PRODUCT_ID):
         return None
     if int(match.bcd_device or 0) != int(protocol.REQUIRED_BCD_DEVICE):
@@ -141,6 +208,15 @@ class Ite8291ZonesBackend(KeyboardBackend):
         return BackendCapabilities(per_key=False, color=True, hardware_effects=False, palette=False)
 
     def get_device(self) -> KeyboardDevice:
+        from ..exceptions import (
+            BACKEND_OPEN_RUNTIME_ERRORS,
+            BackendBusyError,
+            BackendDisconnectedError,
+            BackendIOError,
+            BackendPermissionError,
+        )
+        from .device import Ite8291ZonesKeyboardDevice
+
         if not experimental_backends_enabled():
             raise RuntimeError(
                 "ITE 8291 4-zone support is classified as experimental. Enable Experimental backends in Settings or "

@@ -1,145 +1,71 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
-
 import tkinter as tk
 from tkinter import ttk
 
 from PIL import Image, ImageTk
 
-from src.core.config import Config
-from src.core.profile import profiles
-from src.core.resources.defaults import get_default_keymap
-from src.core.resources import layout as layout_resources, layout_legends, layouts as layout_catalog
-from src.gui.theme import apply_clam_theme
-from src.gui.perkey import hardware as perkey_hardware, profile_management
-from src.gui.reference import overlay_geometry
-from src.gui.utils import deck_render_cache, profile_backdrop_storage
-from src.gui.utils.window_icon import apply_keyrgb_window_icon
-
 from . import _app_bootstrap, _app_logic
-from .helpers import canvas_render, geometry, keyboard_preview, probe, profile_storage
+from ._internal import _app_runtime_deps
 
 
-get_active_profile_name = profile_storage.get_active_profile_name
-keymap_path = profile_storage.keymap_path
-load_keymap = profile_storage.load_keymap
-load_layout_global = profile_storage.load_layout_global
-load_layout_per_key = profile_storage.load_layout_per_key
-load_layout_slots = profile_storage.load_layout_slots
-save_keymap = profile_storage.save_keymap
+Config = _app_runtime_deps.Config
+profiles = _app_runtime_deps.profiles
+get_default_keymap = _app_runtime_deps.get_default_keymap
+layout_resources = _app_runtime_deps.layout_resources
+layout_legends = _app_runtime_deps.layout_legends
+layout_catalog = _app_runtime_deps.layout_catalog
+apply_clam_theme = _app_runtime_deps.apply_clam_theme
+profile_management = _app_runtime_deps.profile_management
+overlay_geometry = _app_runtime_deps.overlay_geometry
+deck_render_cache = _app_runtime_deps.deck_render_cache
+apply_keyrgb_window_icon = _app_runtime_deps.apply_keyrgb_window_icon
+probe = _app_runtime_deps.probe
 
-load_backdrop_image = profile_backdrop_storage.load_backdrop_image
-KeyboardPreviewSession = keyboard_preview.KeyboardPreviewSession
-get_layout_keys = layout_resources.get_layout_keys
-hit_test = geometry.hit_test
-redraw_calibration_canvas = canvas_render.redraw_calibration_canvas
+get_active_profile_name = _app_runtime_deps.get_active_profile_name
+keymap_path = _app_runtime_deps.keymap_path
+load_keymap = _app_runtime_deps.load_keymap
+load_layout_global = _app_runtime_deps.load_layout_global
+load_layout_per_key = _app_runtime_deps.load_layout_per_key
+load_layout_slots = _app_runtime_deps.load_layout_slots
+save_keymap = _app_runtime_deps.save_keymap
 
-
-MATRIX_ROWS = perkey_hardware.NUM_ROWS
-MATRIX_COLS = perkey_hardware.NUM_COLS
-KeyCell = Tuple[int, int]
-KeyCells = Tuple[KeyCell, ...]
-Keymap = Dict[str, KeyCells]
-_LAYOUT_LABELS = {layout.layout_id: layout.label for layout in layout_catalog.LAYOUT_CATALOG}
-_TK_RUNTIME_ERRORS = (tk.TclError, RuntimeError)
-_WRAP_SYNC_ERRORS = _TK_RUNTIME_ERRORS + (TypeError, ValueError)
-
-
-def _keymap_path() -> Path:
-    return _app_logic.keymap_path_for_active_profile(
-        get_active_profile_name=get_active_profile_name,
-        keymap_path=keymap_path,
-    )
+load_backdrop_image = _app_runtime_deps.load_backdrop_image
+KeyboardPreviewSession = _app_runtime_deps.KeyboardPreviewSession
+get_layout_keys = _app_runtime_deps.get_layout_keys
+hit_test = _app_runtime_deps.hit_test
+redraw_calibration_canvas = _app_runtime_deps.redraw_calibration_canvas
 
 
-def _save_keymap(keymap: Keymap, *, physical_layout: str | None = None) -> None:
-    _app_logic.save_keymap_for_active_profile(
-        keymap,
-        physical_layout=physical_layout,
-        get_active_profile_name=get_active_profile_name,
-        save_keymap=save_keymap,
-    )
+MATRIX_ROWS = _app_runtime_deps.MATRIX_ROWS
+MATRIX_COLS = _app_runtime_deps.MATRIX_COLS
+KeyCell = _app_runtime_deps.KeyCell
+KeyCells = _app_runtime_deps.KeyCells
+Keymap = _app_runtime_deps.Keymap
+LayoutTweaks = _app_runtime_deps.LayoutTweaks
+PerKeyLayoutTweaks = _app_runtime_deps.PerKeyLayoutTweaks
+LayoutSlotOverrides = _app_runtime_deps.LayoutSlotOverrides
+_LAYOUT_LABELS = _app_runtime_deps._LAYOUT_LABELS
+_TK_RUNTIME_ERRORS = _app_runtime_deps._TK_RUNTIME_ERRORS
+_WRAP_SYNC_ERRORS = _app_runtime_deps._WRAP_SYNC_ERRORS
+_CalibratorConfigLike = _app_runtime_deps._CalibratorConfigLike
+_CalibratorAppLike = _app_runtime_deps._CalibratorAppLike
 
-
-def _parse_default_keymap(layout_id: str) -> Keymap:
-    return _app_logic.parse_default_keymap(
-        layout_id,
-        profiles=profiles,
-        get_default_keymap=get_default_keymap,
-        sanitize_keymap_cells=profile_management.sanitize_keymap_cells,
-        num_rows=MATRIX_ROWS,
-        num_cols=MATRIX_COLS,
-    )
-
-
-def _resolved_layout_label(layout_id: str) -> str:
-    return _app_logic.resolved_layout_label(
-        layout_id,
-        resolve_layout_id=layout_catalog.resolve_layout_id,
-        layout_labels=_LAYOUT_LABELS,
-    )
-
-
-def _load_profile_state(
-    profile_name: str,
-    *,
-    physical_layout: str,
-) -> tuple[
-    Keymap,
-    Dict[str, float],
-    Dict[str, Dict[str, float]],
-    Dict[str, Dict[str, object]],
-]:
-    return _app_logic.load_profile_state(
-        profile_name,
-        physical_layout=physical_layout,
-        load_keymap=load_keymap,
-        load_layout_global=load_layout_global,
-        load_layout_per_key=load_layout_per_key,
-        load_layout_slots=load_layout_slots,
-        sanitize_keymap_cells=profile_management.sanitize_keymap_cells,
-        num_rows=MATRIX_ROWS,
-        num_cols=MATRIX_COLS,
-    )
-
-
-def _selected_layout_legend_pack(cfg: object, *, physical_layout: str) -> str | None:
-    return _app_logic.selected_layout_legend_pack(
-        cfg,
-        physical_layout=physical_layout,
-        load_layout_legend_pack=layout_legends.load_layout_legend_pack,
-    )
-
-
-def _physical_layout_id(app: Any) -> str:
-    return _app_logic.physical_layout_id(app)
-
-
-def _visible_layout_keys(app: Any) -> list[layout_resources.KeyDef]:
-    return _app_logic.visible_layout_keys(
-        app,
-        get_layout_keys=get_layout_keys,
-        selected_layout_legend_pack_fn=_selected_layout_legend_pack,
-        physical_layout_id_fn=_physical_layout_id,
-    )
-
-
-def _visible_key_for_slot_id(app: Any, slot_id: str | None) -> layout_resources.KeyDef | None:
-    return _app_logic.visible_key_for_slot_id(app, slot_id, visible_layout_keys_fn=_visible_layout_keys)
-
-
-def _probe_selected_slot_id(app: Any) -> str | None:
-    return _app_logic.probe_selected_slot_id(app, visible_layout_keys_fn=_visible_layout_keys)
-
-
-def _probe_selected_key_id(app: Any) -> str | None:
-    return _app_logic.probe_selected_key_id(
-        app,
-        probe_selected_slot_id_fn=_probe_selected_slot_id,
-        visible_key_for_slot_id_fn=_visible_key_for_slot_id,
-    )
+# Keep module-level dependency names explicit so tests can monkeypatch app.py
+# and the bound profile-layout wrappers still resolve through this module.
+(
+    _keymap_path,
+    _save_keymap,
+    _parse_default_keymap,
+    _resolved_layout_label,
+    _load_profile_state,
+    _selected_layout_legend_pack,
+    _physical_layout_id,
+    _visible_layout_keys,
+    _visible_key_for_slot_id,
+    _probe_selected_slot_id,
+    _probe_selected_key_id,
+) = _app_runtime_deps.bind_profile_layout_wrappers(__name__)
 
 
 class KeymapCalibrator(tk.Tk):
@@ -177,12 +103,12 @@ class KeymapCalibrator(tk.Tk):
 
         self.probe = probe.CalibrationProbeState(rows=MATRIX_ROWS, cols=MATRIX_COLS)
 
-        self._deck_pil: Optional[Image.Image] = None
-        self._deck_tk: Optional[ImageTk.PhotoImage] = None
+        self._deck_pil: Image.Image | None = None
+        self._deck_tk: ImageTk.PhotoImage | None = None
         self._deck_render_cache: deck_render_cache.DeckRenderCache[ImageTk.PhotoImage] = (
             deck_render_cache.DeckRenderCache()
         )
-        self._transform: Optional[overlay_geometry.CanvasTransform] = None
+        self._transform: overlay_geometry.CanvasTransform | None = None
 
         _app_bootstrap.build_widgets(
             self,
@@ -277,7 +203,7 @@ class KeymapCalibrator(tk.Tk):
             physical_layout_id_fn=_physical_layout_id,
         )
 
-    def _hit_test(self, x: int, y: int) -> Optional[layout_resources.KeyDef]:
+    def _hit_test(self, x: int, y: int) -> layout_resources.KeyDef | None:
         return _app_logic.hit_test_point(
             self,
             x,

@@ -7,6 +7,7 @@ from typing import Iterable
 from PIL import Image
 
 from src.core.profile import profiles
+from src.core.runtime.imports import repo_root_from
 
 
 _BACKDROP_CANDIDATE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
@@ -22,7 +23,7 @@ def backdrop_image_candidates(*, profile_name: str | None, include_cwd_fallback:
     except _BACKDROP_CANDIDATE_ERRORS:
         pass
 
-    repo_root = Path(__file__).resolve().parents[3]
+    repo_root = repo_root_from(__file__)
     paths.append(repo_root / "assets" / "y15-pro-deck.png")
 
     if include_cwd_fallback:

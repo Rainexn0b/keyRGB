@@ -7,20 +7,38 @@ Keeps message formatting consistent and keeps UI modules from sprinkling direct
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Any
+from typing import Protocol, cast
 
-from src.core.utils.exceptions import is_device_busy
 from src.core.backends import (
     BackendBusyError,
     BackendDisconnectedError,
     BackendPermissionError,
     BackendUnavailableError,
 )
+from src.core.utils.exceptions import is_device_busy
 
 
-def set_status(editor: Any, text: str) -> None:
+class _StatusLabelProtocol(Protocol):
+    def config(self, *, text: str) -> None: ...
+
+
+class _StatusLabelOwner(Protocol):
+    status_label: _StatusLabelProtocol
+
+
+def _status_label_or_none(editor: object) -> _StatusLabelProtocol | None:
     try:
-        editor.status_label.config(text=str(text))
+        return cast(_StatusLabelOwner, editor).status_label
+    except (AttributeError, tk.TclError):
+        return None
+
+
+def set_status(editor: object, text: str) -> None:
+    label = _status_label_or_none(editor)
+    if label is None:
+        return
+    try:
+        label.config(text=str(text))
     except (AttributeError, tk.TclError):
         return
 

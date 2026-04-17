@@ -9,20 +9,140 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
-from typing import Any
+from typing import Protocol, TypeAlias
+
+
+ColorRGB: TypeAlias = tuple[int, int, int]
+
+
+class _PackWidget(Protocol):
+    def pack(self, **kwargs: object) -> None: ...
+
+
+class _GridWidget(Protocol):
+    def grid(self, **kwargs: object) -> None: ...
+
+
+class _BindableWidget(Protocol):
+    def bind(self, sequence: str, callback: object) -> None: ...
+
+
+class _ConfigurableWidget(Protocol):
+    def config(self, **kwargs: object) -> None: ...
+
+    def configure(self, **kwargs: object) -> None: ...
+
+
+class _FrameWidget(_PackWidget, Protocol):
+    def columnconfigure(self, index: int, weight: int = 0, **kwargs: object) -> None: ...
+
+
+class _CanvasWidget(_PackWidget, _GridWidget, _BindableWidget, Protocol):
+    def delete(self, tag: object) -> None: ...
+
+    def create_rectangle(self, *args: object, **kwargs: object) -> None: ...
+
+
+class _LabelWidget(_GridWidget, _ConfigurableWidget, Protocol):
+    pass
+
+
+class _ScaleWidget(_GridWidget, Protocol):
+    pass
+
+
+class _EntryWidget(_GridWidget, _BindableWidget, Protocol):
+    pass
+
+
+class _StringVarProtocol(Protocol):
+    def get(self) -> str: ...
+
+    def set(self, value: str) -> None: ...
+
+
+class _DoubleVarProtocol(Protocol):
+    def set(self, value: float) -> None: ...
+
+
+class _CanvasEventHandler(Protocol):
+    def __call__(self, event: object | None = None) -> None: ...
+
+
+class _BrightnessChangeHandler(Protocol):
+    def __call__(self, value: str | float) -> None: ...
+
+
+class _LegacyColorCallback(Protocol):
+    def __call__(self, red: int, green: int, blue: int) -> object: ...
+
+
+class _MetaColorCallback(Protocol):
+    def __call__(
+        self,
+        red: int,
+        green: int,
+        blue: int,
+        *,
+        source: str = ...,
+        brightness_percent: float = ...,
+    ) -> object: ...
+
+
+ColorWheelCallback: TypeAlias = _LegacyColorCallback | _MetaColorCallback
+
+
+class _SetColorFn(Protocol):
+    def __call__(self, red: int, green: int, blue: int) -> None: ...
+
+
+class _InvokeCallbackFn(Protocol):
+    def __call__(
+        self,
+        callback: ColorWheelCallback | None,
+        red: int,
+        green: int,
+        blue: int,
+        *,
+        source: str,
+        brightness_percent: float,
+    ) -> None: ...
 
 
 class _ColorWheelUIMixin:
     # Attributes/methods provided by ColorWheel
-    callback: Any
-    release_callback: Any
-    current_value: Any
+    callback: ColorWheelCallback | None
+    release_callback: ColorWheelCallback | None
+    canvas: _CanvasWidget
+    preview_canvas: _CanvasWidget
+    current_color: ColorRGB
+    current_value: float
+    size: int
+    show_brightness_slider: bool
+    show_rgb_label: bool
+    _brightness_label_text: str
     _theme_bg_hex: str | None
     _theme_border_hex: str | None
-    set_color: Any
-    _invoke_callback: Any
+    brightness_title_label: _LabelWidget
+    brightness_var: _DoubleVarProtocol
+    brightness_slider: _ScaleWidget
+    brightness_label: _LabelWidget
+    rgb_label: _LabelWidget | None
+    rgb_r_var: _StringVarProtocol
+    rgb_g_var: _StringVarProtocol
+    rgb_b_var: _StringVarProtocol
+    rgb_r_entry: _EntryWidget
+    rgb_g_entry: _EntryWidget
+    rgb_b_entry: _EntryWidget
+    _rgb_entry_syncing: bool
+    set_color: _SetColorFn
+    _invoke_callback: _InvokeCallbackFn
+    _on_click: _CanvasEventHandler
+    _on_drag: _CanvasEventHandler
+    _on_release: _CanvasEventHandler
+    _on_brightness_change: _BrightnessChangeHandler
 
-    def _create_widgets(self):
+    def _create_widgets(self) -> None:
         """Create the canvas, brightness slider, preview, and manual RGB inputs."""
         bg = self._theme_bg_hex or "#2b2b2b"
         border = self._theme_border_hex or "#666666"
@@ -130,7 +250,7 @@ class _ColorWheelUIMixin:
             except (RuntimeError, tk.TclError):
                 pass
 
-    def _update_preview(self):
+    def _update_preview(self) -> None:
         """Update the color preview box."""
         r, g, b = self.current_color
         color_hex = f"#{r:02x}{g:02x}{b:02x}"

@@ -6,8 +6,8 @@ from __future__ import annotations
 import logging
 import tkinter as tk
 from tkinter import ttk
-from typing import Any
 
+from src.core.backends.base import KeyboardDevice
 from src.core.config import Config
 from src.core.diagnostics.device_discovery import collect_device_discovery
 from src.core.resources.defaults import get_default_layout_tweaks
@@ -20,6 +20,7 @@ from . import window_geometry
 from .editor_support import backdrop as editor_backdrop
 from .editor_support import bootstrap as editor_bootstrap
 from .editor_support import layout as editor_layout
+from .editor_support import runtime as editor_runtime
 from .editor_support import selection as editor_selection
 from .editor_support import ui as editor_ui
 from .ui import backdrop, bulk_color, calibrator, full_map, keymap, profile_actions, sample_tool, status, wheel_apply
@@ -40,7 +41,7 @@ def _log_boundary_exception(key: str, msg: str, exc: Exception) -> None:
     log_throttled(logger, key, interval_s=60, level=logging.DEBUG, msg=msg, exc=exc)
 
 
-def _last_non_black_color_or(editor: Any, default: object) -> object:
+def _last_non_black_color_or(editor: object, default: object) -> object:
     try:
         return editor._last_non_black_color
     except AttributeError:
@@ -49,14 +50,14 @@ def _last_non_black_color_or(editor: Any, default: object) -> object:
 
 class PerKeyEditor:
     # Attributes initialized by editor_bootstrap.initialize_editor
-    config: Any
-    kb: Any
-    colors: Any
-    _commit_pipeline: Any
-    per_key_layout_tweaks: Any
-    lightbar_overlay: Any
-    profile_name: Any
-    _physical_layout: Any
+    config: Config
+    kb: KeyboardDevice | None
+    colors: profile_management.PerKeyColors
+    _commit_pipeline: commit_pipeline.PerKeyCommitPipeline
+    per_key_layout_tweaks: dict[str, dict[str, float]]
+    lightbar_overlay: dict[str, bool | float]
+    profile_name: str
+    _physical_layout: str
 
     def __init__(self):
         editor_bootstrap.initialize_editor(
@@ -67,6 +68,8 @@ class PerKeyEditor:
             profiles=profiles,
             apply_keyrgb_window_icon=apply_keyrgb_window_icon,
             apply_perkey_editor_geometry=window_geometry.apply_perkey_editor_geometry,
+            compute_perkey_editor_min_content_size=window_geometry.compute_perkey_editor_min_content_size,
+            fit_perkey_editor_geometry_to_content=window_geometry.fit_perkey_editor_geometry_to_content,
             apply_clam_theme=apply_clam_theme,
             tk_call_errors=_TK_CALL_ERRORS,
             log_boundary_exception=_log_boundary_exception,
@@ -172,40 +175,17 @@ class PerKeyEditor:
         self.overlay_controls.sync_vars_from_scope()
 
     def save_layout_tweaks(self):
-        selected_identity = self._selected_overlay_identity()
-        if self.overlay_scope.get() == "key" and selected_identity:
-            profiles.save_layout_per_key(self.per_key_layout_tweaks, self.profile_name)
-            status.set_status(self, status.saved_overlay_tweaks_for_key(self.selected_key_id or selected_identity))
-        else:
-            profiles.save_layout_global(self.layout_tweaks, self.profile_name)
-            status.set_status(self, status.saved_overlay_tweaks_global())
+        editor_runtime.save_layout_tweaks(self, profiles=profiles, status=status)
 
     def reset_layout_tweaks(self):
-        selected_identity = self._selected_overlay_identity()
-        if self.overlay_scope.get() == "key" and selected_identity:
-            self.per_key_layout_tweaks.pop(selected_identity, None)
-            self.overlay_controls.sync_vars_from_scope()
-            self.canvas.redraw()
-            status.set_status(self, status.reset_overlay_tweaks_for_key(self.selected_key_id or selected_identity))
-            return
-
-        self.layout_tweaks = get_default_layout_tweaks(self._physical_layout)
-        self.overlay_controls.sync_vars_from_scope()
-        self.canvas.redraw()
-        status.set_status(self, status.reset_overlay_tweaks_global())
-
-    def auto_sync_per_key_overlays(self):
-        overlay.auto_sync_per_key_overlays(
-            layout_tweaks=self.layout_tweaks,
-            per_key_layout_tweaks=self.per_key_layout_tweaks,
-            keys=self._get_visible_layout_keys(),
+        editor_runtime.reset_layout_tweaks(
+            self,
+            get_default_layout_tweaks=get_default_layout_tweaks,
+            status=status,
         )
 
-        # Refresh UI.
-        if self._setup_panel_mode == "overlay":
-            self.overlay_controls.sync_vars_from_scope()
-        self.canvas.redraw()
-        status.set_status(self, status.auto_synced_overlay_tweaks())
+    def auto_sync_per_key_overlays(self):
+        editor_runtime.auto_sync_per_key_overlays(self, overlay=overlay, status=status)
 
     def _run_calibrator(self):
         calibrator.run_keymap_calibrator_ui(self)
@@ -214,24 +194,15 @@ class PerKeyEditor:
         keymap.reload_keymap_ui(self)
 
     def _commit(self, *, force: bool = False):
-        prev_kb = self.kb
-        fallback = tuple(self.config.color)
-        base = tuple(_last_non_black_color_or(self, fallback))
-        self.kb, self.colors = self._commit_pipeline.commit(
-            kb=self.kb,
-            colors=dict(self.colors),
-            config=self.config,
-            num_rows=hardware.NUM_ROWS,
-            num_cols=hardware.NUM_COLS,
-            base_color=color_utils.rgb_ints(base),
-            fallback_color=color_utils.rgb_ints(fallback),
-            push_fn=keyboard_apply.push_per_key_colors,
-            force=bool(force),
+        editor_runtime.commit(
+            self,
+            force=force,
+            hardware=hardware,
+            color_utils=color_utils,
+            keyboard_apply=keyboard_apply,
+            status=status,
+            last_non_black_color_or=_last_non_black_color_or,
         )
-
-        # If hardware writes get paused (e.g., device busy), tell the user what to do next.
-        if prev_kb is not None and self.kb is None:
-            status.set_status(self, status.hardware_write_paused())
 
     def _on_color_change(self, r: int, g: int, b: int):
         wheel_apply.on_wheel_color_change_ui(self, r, g, b, num_rows=hardware.NUM_ROWS, num_cols=hardware.NUM_COLS)
@@ -282,10 +253,11 @@ class PerKeyEditor:
         profile_actions.reset_layout_defaults_ui(self)
 
     def _load_keymap(self) -> dict[str, tuple[tuple[int, int], ...]]:
-        return profile_management.sanitize_keymap_cells(
-            profiles.load_keymap(self.profile_name, physical_layout=self._physical_layout),
-            num_rows=hardware.NUM_ROWS,
-            num_cols=hardware.NUM_COLS,
+        return editor_runtime.load_keymap(
+            self,
+            profiles=profiles,
+            profile_management=profile_management,
+            hardware=hardware,
         )
 
     def run(self):

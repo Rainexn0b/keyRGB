@@ -14,12 +14,33 @@ from .system import (
     system_power_mode_snapshot,
     system_snapshot,
 )
+from ..model import DiagnosticsConfigSnapshot
 from ..paths import config_file_path
 
 
 logger = logging.getLogger(__name__)
 
 _CONFIG_STAT_METADATA_ERRORS = (OSError, OverflowError, TypeError, ValueError)
+
+_CONFIG_SNAPSHOT_SETTINGS_WHITELIST = (
+    "effect",
+    "speed",
+    "brightness",
+    "color",
+    "autostart",
+    "os_autostart",
+    "power_management_enabled",
+    "power_off_on_suspend",
+    "power_off_on_lid_close",
+    "power_restore_on_resume",
+    "power_restore_on_lid_open",
+    "battery_saver_enabled",
+    "battery_saver_brightness",
+    "ac_lighting_enabled",
+    "ac_lighting_brightness",
+    "battery_lighting_enabled",
+    "battery_lighting_brightness",
+)
 
 
 def _log_snapshot_boundary(message: str, exc: Exception) -> None:
@@ -44,75 +65,49 @@ def _config_error_text(cfg_path: Path | None, exc: Exception) -> str:
     return message.replace(cfg_path_text, "config.json") if cfg_path_text else message
 
 
-def config_snapshot() -> dict[str, Any]:
+def config_snapshot() -> DiagnosticsConfigSnapshot:
     """Collect a small snapshot of KeyRGB config (best-effort).
 
     Intentionally avoids dumping large maps (like per-key colors) and avoids
     embedding user-specific paths.
     """
 
-    out: dict[str, Any] = {"present": False}
     cfg_path: Path | None = None
-    raw_config = ""
+    mtime: int | None = None
 
     try:
         cfg_path = config_file_path()
         try:
             st = cfg_path.stat()
-            out["mtime"] = int(st.st_mtime)
+            mtime = int(st.st_mtime)
         except FileNotFoundError:
-            return out
+            return DiagnosticsConfigSnapshot(present=False)
         except _CONFIG_STAT_METADATA_ERRORS:
             pass
-        out["present"] = True
 
-        raw_config = cfg_path.read_text(encoding="utf-8", errors="ignore")
-
-        data = json.loads(raw_config)
+        data = json.loads(cfg_path.read_text(encoding="utf-8", errors="ignore"))
         if not isinstance(data, dict):
-            return out
+            return DiagnosticsConfigSnapshot(present=True, mtime=mtime)
 
-        whitelist = (
-            "effect",
-            "speed",
-            "brightness",
-            "color",
-            "autostart",
-            "os_autostart",
-            "power_management_enabled",
-            "power_off_on_suspend",
-            "power_off_on_lid_close",
-            "power_restore_on_resume",
-            "power_restore_on_lid_open",
-            "battery_saver_enabled",
-            "battery_saver_brightness",
-            "ac_lighting_enabled",
-            "ac_lighting_brightness",
-            "battery_lighting_enabled",
-            "battery_lighting_brightness",
-        )
         settings: dict[str, Any] = {}
-        for key in whitelist:
+        for key in _CONFIG_SNAPSHOT_SETTINGS_WHITELIST:
             if key in data:
                 settings[key] = data[key]
-        if settings:
-            out["settings"] = settings
 
         pk = data.get("per_key_colors")
-        if isinstance(pk, dict):
-            out["per_key_colors_count"] = len(pk)
-
-        return out
+        return DiagnosticsConfigSnapshot(
+            present=True,
+            mtime=mtime,
+            settings=settings,
+            per_key_colors_count=len(pk) if isinstance(pk, dict) else None,
+        )
     except json.JSONDecodeError as exc:
-        out["error"] = _config_error_text(cfg_path, exc)
-        return out
+        return DiagnosticsConfigSnapshot(present=True, mtime=mtime, error=_config_error_text(cfg_path, exc))
     except OSError as exc:
-        out["error"] = _config_error_text(cfg_path, exc)
-        return out
+        return DiagnosticsConfigSnapshot(present=True, mtime=mtime, error=_config_error_text(cfg_path, exc))
     except (AttributeError, LookupError, RuntimeError, TypeError, ValueError) as exc:
         _log_snapshot_boundary("Failed to collect config snapshot during diagnostics collection", exc)
-        out["error"] = _config_error_text(cfg_path, exc)
-        return out
+        return DiagnosticsConfigSnapshot(present=True, mtime=mtime, error=_config_error_text(cfg_path, exc))
 
 
 __all__ = [

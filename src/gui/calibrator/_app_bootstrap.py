@@ -1,15 +1,154 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Callable
+import tkinter as _tk
+from typing import Protocol, TypeAlias, cast
 
 from src.gui.utils.window_geometry import compute_centered_window_geometry
 
 
+BindCallback: TypeAlias = Callable[[_tk.Event], None]
+AfterCallback: TypeAlias = Callable[[], None]
+
+
+class _GridWidgetProtocol(Protocol):
+    def grid(self, *args: object, **kwargs: object) -> object: ...
+
+
+class _ConfigurableWidgetProtocol(_GridWidgetProtocol, Protocol):
+    def configure(self, **kwargs: object) -> object: ...
+
+
+class _BindableWidgetProtocol(_ConfigurableWidgetProtocol, Protocol):
+    def bind(self, sequence: str, callback: BindCallback, add: object = None) -> object: ...
+
+
+class _ContainerWidgetProtocol(_BindableWidgetProtocol, Protocol):
+    def columnconfigure(self, index: int, weight: int = 0, **kwargs: object) -> object: ...
+
+    def rowconfigure(self, index: int, weight: int = 0, **kwargs: object) -> object: ...
+
+    def winfo_width(self) -> int: ...
+
+
+class _BoolVarProtocol(Protocol):
+    def get(self) -> bool: ...
+
+
+class _CanvasFactoryProtocol(Protocol):
+    def __call__(self, parent: object | None = None, **kwargs: object) -> _BindableWidgetProtocol: ...
+
+
+class _FrameFactoryProtocol(Protocol):
+    def __call__(self, parent: object | None = None, **kwargs: object) -> _ContainerWidgetProtocol: ...
+
+
+class _LabelFactoryProtocol(Protocol):
+    def __call__(self, parent: object | None = None, **kwargs: object) -> _ConfigurableWidgetProtocol: ...
+
+
+class _ButtonFactoryProtocol(Protocol):
+    def __call__(self, parent: object | None = None, **kwargs: object) -> _GridWidgetProtocol: ...
+
+
+class _CheckbuttonFactoryProtocol(Protocol):
+    def __call__(self, parent: object | None = None, **kwargs: object) -> _GridWidgetProtocol: ...
+
+
+class _BooleanVarFactoryProtocol(Protocol):
+    def __call__(
+        self,
+        master: object | None = None,
+        value: object | None = None,
+        name: str | None = None,
+    ) -> _BoolVarProtocol: ...
+
+
+class _TkModuleProtocol(Protocol):
+    Canvas: _CanvasFactoryProtocol
+    BooleanVar: _BooleanVarFactoryProtocol
+
+
+class _TtkModuleProtocol(Protocol):
+    Frame: _FrameFactoryProtocol
+    Label: _LabelFactoryProtocol
+    Button: _ButtonFactoryProtocol
+    Checkbutton: _CheckbuttonFactoryProtocol
+
+
+class _BuildWidgetsAppProtocol(Protocol):
+    bg_color: str
+    canvas: _BindableWidgetProtocol
+    lbl_cell: _ConfigurableWidgetProtocol
+    lbl_status: _ConfigurableWidgetProtocol
+    _show_backdrop_var: _BoolVarProtocol
+
+    def columnconfigure(self, index: int, weight: int = 0, **kwargs: object) -> object: ...
+
+    def rowconfigure(self, index: int, weight: int = 0, **kwargs: object) -> object: ...
+
+    def bind(self, sequence: str, callback: BindCallback, add: object = None) -> object: ...
+
+    def after(self, delay_ms: int, callback: AfterCallback) -> object: ...
+
+    def destroy(self) -> None: ...
+
+    def _redraw(self) -> None: ...
+
+    def _on_click(self, event: _tk.Event) -> None: ...
+
+    def _prev(self) -> None: ...
+
+    def _next(self) -> None: ...
+
+    def _assign(self) -> None: ...
+
+    def _skip(self) -> None: ...
+
+    def _on_show_backdrop_changed(self) -> None: ...
+
+    def _reset_keymap_defaults(self) -> None: ...
+
+    def _save(self) -> None: ...
+
+    def _save_and_close(self) -> None: ...
+
+
+class _WindowGeometryAppProtocol(Protocol):
+    def update_idletasks(self) -> None: ...
+
+    def winfo_screenwidth(self) -> int: ...
+
+    def winfo_screenheight(self) -> int: ...
+
+    def winfo_reqwidth(self) -> int: ...
+
+    def winfo_reqheight(self) -> int: ...
+
+    def geometry(self, value: str) -> object: ...
+
+    def minsize(self, width: int, height: int) -> object: ...
+
+
+class _FinishInitAppProtocol(Protocol):
+    def _load_deck_image(self) -> None: ...
+
+    def _apply_current_probe(self) -> None: ...
+
+    def _redraw(self) -> None: ...
+
+    def deiconify(self) -> None: ...
+
+    def lift(self) -> None: ...
+
+    def after(self, delay_ms: int, callback: AfterCallback) -> object: ...
+
+
 def build_widgets(
-    app: Any,
+    app: _BuildWidgetsAppProtocol,
     *,
-    tk: Any,
-    ttk: Any,
+    tk: _TkModuleProtocol,
+    ttk: _TtkModuleProtocol,
     tk_runtime_errors: tuple[type[BaseException], ...],
     wrap_sync_errors: tuple[type[BaseException], ...],
 ) -> None:
@@ -24,7 +163,11 @@ def build_widgets(
 
     app.canvas = tk.Canvas(root, background=app.bg_color, highlightthickness=0)
     app.canvas.grid(row=0, column=0, sticky="nsew")
-    app.canvas.bind("<Configure>", lambda _event: app._redraw())
+
+    def _redraw_from_event(_event: _tk.Event) -> None:
+        app._redraw()
+
+    app.canvas.bind("<Configure>", _redraw_from_event)
     app.canvas.bind("<Button-1>", app._on_click)
 
     side = ttk.Frame(root, padding=0)
@@ -50,15 +193,18 @@ def build_widgets(
     )
     app.lbl_status.grid(row=2, column=0, sticky="ew", pady=(0, 12))
 
-    def _sync_side_wrap(_event=None) -> None:
+    def _sync_side_wrap() -> None:
         try:
             width = int(side.winfo_width())
             app.lbl_status.configure(wraplength=max(220, width - 8))
         except wrap_sync_errors:
             return
 
+    def _sync_side_wrap_from_event(_event: _tk.Event) -> None:
+        _sync_side_wrap()
+
     try:
-        side.bind("<Configure>", _sync_side_wrap, add=True)
+        side.bind("<Configure>", _sync_side_wrap_from_event, add=True)
     except tk_runtime_errors:
         pass
     app.after(0, _sync_side_wrap)
@@ -88,14 +234,26 @@ def build_widgets(
     ttk.Button(side, text="Save", command=app._save).grid(row=8, column=0, sticky="ew", pady=(18, 0))
     ttk.Button(side, text="Save && Close", command=app._save_and_close).grid(row=9, column=0, sticky="ew", pady=(6, 0))
 
-    app.bind("<Return>", lambda _event: app._assign())
-    app.bind("<KP_Enter>", lambda _event: app._assign())
-    app.bind("<Right>", lambda _event: app._next())
-    app.bind("<Left>", lambda _event: app._prev())
-    app.bind("<Escape>", lambda _event: app.destroy())
+    def _assign_from_event(_event: _tk.Event) -> None:
+        app._assign()
+
+    def _next_from_event(_event: _tk.Event) -> None:
+        app._next()
+
+    def _prev_from_event(_event: _tk.Event) -> None:
+        app._prev()
+
+    def _destroy_from_event(_event: _tk.Event) -> None:
+        app.destroy()
+
+    app.bind("<Return>", _assign_from_event)
+    app.bind("<KP_Enter>", _assign_from_event)
+    app.bind("<Right>", _next_from_event)
+    app.bind("<Left>", _prev_from_event)
+    app.bind("<Escape>", _destroy_from_event)
 
 
-def apply_window_geometry(app: Any) -> None:
+def apply_window_geometry(app: _WindowGeometryAppProtocol) -> None:
     app.update_idletasks()
     screen_width = int(app.winfo_screenwidth())
     screen_height = int(app.winfo_screenheight())
@@ -106,7 +264,7 @@ def apply_window_geometry(app: Any) -> None:
 
     app.geometry(
         compute_centered_window_geometry(
-            app,
+            cast(_tk.Tk, app),
             content_height_px=requested_height,
             content_width_px=requested_width,
             footer_height_px=0,
@@ -119,7 +277,7 @@ def apply_window_geometry(app: Any) -> None:
     app.minsize(min(max(requested_width, 1100), max_width), min(max(requested_height + 32, 650), max_height))
 
 
-def finish_init(app: Any, *, tk_runtime_errors: tuple[type[BaseException], ...]) -> None:
+def finish_init(app: _FinishInitAppProtocol, *, tk_runtime_errors: tuple[type[BaseException], ...]) -> None:
     def _finish() -> None:
         app._load_deck_image()
         app._apply_current_probe()

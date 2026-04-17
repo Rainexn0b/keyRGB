@@ -20,6 +20,15 @@ def _parse_lid_state(content: str | None) -> str | None:
     return None
 
 
+def _run_lid_monitor_action(*, action: Callable[[], None], logger) -> bool:
+    try:
+        action()
+    except _LID_MONITOR_RUNTIME_ERRORS as e:  # @quality-exception exception-transparency: lid monitor polling crosses a runtime filesystem/hardware boundary; recoverable OS/device failures are logged with traceback while unexpected defects still propagate
+        logger.exception("Error reading lid state: %s", e)
+        return False
+    return True
+
+
 def start_sysfs_lid_monitoring(
     *,
     is_running: Callable[[], bool],
@@ -41,7 +50,9 @@ def start_sysfs_lid_monitoring(
 
         last_state = None
         while is_running():
-            try:
+
+            def poll_once() -> None:
+                nonlocal last_state
                 with open(lid_file) as f:
                     content = f.read()
                     state = _parse_lid_state(content)
@@ -54,8 +65,7 @@ def start_sysfs_lid_monitoring(
                         on_lid_open()
                     last_state = state
 
-            except _LID_MONITOR_RUNTIME_ERRORS as e:  # @quality-exception exception-transparency: sysfs lid state read is a runtime hardware/OS boundary; loop exits gracefully on persistent recoverable failure
-                logger.exception("Error reading lid state: %s", e)
+            if not _run_lid_monitor_action(action=poll_once, logger=logger):
                 break
 
             time.sleep(0.5)
@@ -81,7 +91,7 @@ def poll_lid_state_paths(
     lid_path = None
     for path in lid_paths:
         try:
-            with open(path) as f:
+            with open(path):
                 lid_path = path
                 break
         except OSError:
@@ -93,7 +103,9 @@ def poll_lid_state_paths(
 
     last_state = None
     while is_running():
-        try:
+
+        def poll_once() -> None:
+            nonlocal last_state
             with open(lid_path) as f:
                 state = f.read()
 
@@ -106,7 +118,6 @@ def poll_lid_state_paths(
                     on_lid_open()
                 last_state = state
 
-        except _LID_MONITOR_RUNTIME_ERRORS as e:  # @quality-exception exception-transparency: fallback lid state poll is a runtime filesystem boundary; loop continues on transient recoverable failures
-            logger.exception("Error reading lid state: %s", e)
+        _run_lid_monitor_action(action=poll_once, logger=logger)
 
         time.sleep(1)

@@ -4,6 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
+import src.gui.windows._uniform_color_bootstrap as uniform_color_bootstrap
+import src.gui.windows._uniform_color_ui as uniform_color_ui
 import src.gui.windows.uniform as uniform
 
 
@@ -97,6 +99,19 @@ class _FakeColorWheel:
 
     def get_color(self) -> tuple[int, int, int]:
         return self.initial_color
+
+
+def test_resolve_secondary_route_prefers_requested_backend_route() -> None:
+    sentinel = SimpleNamespace(display_name="Mouse")
+
+    result = uniform_color_bootstrap.resolve_secondary_route(
+        target_context="mouse:external",
+        requested_backend="ite8291r3",
+        route_for_backend_name_fn=lambda name: sentinel if name == "ite8291r3" else None,
+        route_for_device_type_fn=lambda _name: (_ for _ in ()).throw(AssertionError("unexpected device type")),
+    )
+
+    assert result is sentinel
 
 
 def test_probe_color_support_defaults_to_true_when_backend_capability_probe_fails() -> None:
@@ -261,6 +276,58 @@ def test_constructor_uses_content_driven_geometry(monkeypatch) -> None:
     assert close_button.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
 
 
+def test_build_uniform_window_ui_disables_apply_and_syncs_wrap_for_added_labels() -> None:
+    root = _FakeRoot()
+    registry: dict[str, list[_FakeWidget]] = {"frames": [], "labels": [], "buttons": []}
+
+    def _frame(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["frames"].append(widget)
+        return widget
+
+    def _label(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["labels"].append(widget)
+        return widget
+
+    def _button(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        registry["buttons"].append(widget)
+        return widget
+
+    gui = SimpleNamespace(
+        root=root,
+        _target_label="Keyboard",
+        _color_supported=False,
+        _initial_color=lambda: (_ for _ in ()).throw(AssertionError("unexpected initial color lookup")),
+        _on_color_change=lambda *_args, **_kwargs: None,
+        _on_color_release=lambda *_args, **_kwargs: None,
+        _on_apply=lambda: None,
+        _on_close=lambda: None,
+    )
+
+    uniform_color_ui.build_uniform_window_ui(
+        gui,
+        ttk_module=SimpleNamespace(Frame=_frame, Label=_label, Button=_button),
+        color_wheel_cls=lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected ColorWheel")),
+        wrap_sync_errors=(RuntimeError,),
+        tk_widget_state_errors=(RuntimeError,),
+    )
+
+    main_frame = registry["frames"][0]
+    apply_button = registry["buttons"][0]
+    extra_label = _FakeWidget(main_frame)
+    gui._wrap_labels.append(extra_label)
+
+    main_frame.bind_calls[0][1]()
+
+    assert gui._main_frame is main_frame
+    assert gui.color_wheel is None
+    assert apply_button.configure_calls == [{"state": "disabled"}]
+    assert gui._wrap_labels[0].configure_calls[-1] == {"wraplength": 536}
+    assert extra_label.configure_calls == [{"wraplength": 536}]
+
+
 def test_apply_geometry_uses_requested_content_size(monkeypatch) -> None:
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
     gui.root = _FakeRoot()
@@ -312,3 +379,49 @@ def test_on_color_change_updates_secondary_color_without_touching_keyboard_effec
     assert stored == [(7, 8, 9)]
     assert gui.config.effect == "wave"
     assert gui.config.color == (9, 9, 9)
+
+
+def test_on_apply_reports_saved_status_when_apply_is_deferred() -> None:
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    committed: list[tuple[int, int, int]] = []
+    applied: list[tuple[int, int, int, int]] = []
+    statuses: list[tuple[str, bool]] = []
+
+    gui._color_supported = True
+    gui.color_wheel = SimpleNamespace(get_color=lambda: (4, 5, 6))
+    gui._target_label = "Keyboard"
+    gui._ensure_brightness_nonzero = lambda: 25
+    gui._commit_color_to_config = lambda r, g, b: committed.append((r, g, b))
+    gui._apply_color = lambda r, g, b, brightness: applied.append((r, g, b, brightness)) or "deferred"
+    gui._set_status = lambda msg, *, ok: statuses.append((msg, ok))
+
+    gui._on_apply()
+
+    assert committed == [(4, 5, 6)]
+    assert applied == [(4, 5, 6, 25)]
+    assert statuses == [("✓ Saved Keyboard RGB(4, 5, 6)", True)]
+
+
+def test_on_color_release_updates_drag_commit_state_and_reports_applied_status(monkeypatch) -> None:
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    committed: list[tuple[int, int, int]] = []
+    applied: list[tuple[int, int, int, int]] = []
+    statuses: list[tuple[str, bool]] = []
+
+    gui._target_label = "Keyboard"
+    gui._last_drag_committed_color = None
+    gui._last_drag_commit_ts = 0.0
+    gui._ensure_brightness_nonzero = lambda: 40
+    gui._commit_color_to_config = lambda r, g, b: committed.append((r, g, b))
+    gui._apply_color = lambda r, g, b, brightness: applied.append((r, g, b, brightness)) or True
+    gui._set_status = lambda msg, *, ok: statuses.append((msg, ok))
+
+    monkeypatch.setattr(uniform.time, "monotonic", lambda: 12.5)
+
+    gui._on_color_release(7, 8, 9)
+
+    assert committed == [(7, 8, 9)]
+    assert applied == [(7, 8, 9, 40)]
+    assert gui._last_drag_committed_color == (7, 8, 9)
+    assert gui._last_drag_commit_ts == 12.5
+    assert statuses == [("✓ Applied Keyboard RGB(7, 8, 9)", True)]

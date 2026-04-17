@@ -278,6 +278,71 @@ def test_constructor_handles_programmatic_brightness_sync_callback(monkeypatch) 
     assert gui._reactive_trail_label.grid_calls == [{"row": 0, "column": 2, "sticky": "e", "padx": (10, 5)}]
 
 
+def test_probe_color_support_defaults_true_when_backend_probe_fails() -> None:
+    result = reactive_color.reactive_color_bootstrap.probe_color_support(
+        select_backend_fn=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
+        logger=reactive_color.logger,
+    )
+
+    assert result is True
+
+
+def test_build_description_section_syncs_wrap_for_existing_and_later_labels() -> None:
+    root = _FakeRoot()
+    main = _FakeWidget(width_px=640)
+    created_labels: list[_FakeWidget] = []
+
+    def _label(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        created_labels.append(widget)
+        return widget
+
+    gui = SimpleNamespace(root=root, _wrap_labels=[])
+
+    reactive_color.reactive_color_bootstrap.build_description_section(
+        gui,
+        main,
+        ttk_module=SimpleNamespace(Label=_label),
+        wrap_sync_errors=reactive_color._WRAP_SYNC_ERRORS,
+    )
+
+    later_label = _FakeWidget()
+    gui._wrap_labels.append(later_label)
+    main.bind_calls[0][1]()
+
+    assert created_labels[0].configure_calls[-1] == {"wraplength": 616}
+    assert later_label.configure_calls[-1] == {"wraplength": 616}
+
+
+def test_install_lifecycle_bindings_handles_keyboard_interrupt_and_sigint() -> None:
+    root = _FakeRoot()
+    original_callback_calls: list[tuple[object, object, object]] = []
+    root.report_callback_exception = lambda exc, val, tb: original_callback_calls.append((exc, val, tb))
+    close_calls: list[str] = []
+    signal_calls: list[tuple[int, object]] = []
+
+    gui = SimpleNamespace(root=root, _on_close=lambda: close_calls.append("closed"))
+    signal_module = SimpleNamespace(signal=lambda sig, handler: signal_calls.append((sig, handler)))
+
+    reactive_color.reactive_color_bootstrap.install_lifecycle_bindings(
+        gui,
+        signal_module=signal_module,
+        sigint=2,
+    )
+
+    assert [name for name, _callback in root.protocol_calls] == ["WM_DELETE_WINDOW"]
+
+    runtime_error = RuntimeError("boom")
+    root.report_callback_exception(RuntimeError, runtime_error, None)
+    assert original_callback_calls == [(RuntimeError, runtime_error, None)]
+
+    root.report_callback_exception(KeyboardInterrupt, KeyboardInterrupt(), None)
+    assert close_calls == ["closed"]
+
+    signal_calls[0][1]()
+    assert close_calls == ["closed", "closed"]
+
+
 def test_apply_geometry_uses_requested_content_size(monkeypatch) -> None:
     gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
     gui.root = _FakeRoot()

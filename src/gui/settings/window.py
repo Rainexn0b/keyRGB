@@ -16,28 +16,34 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 
-from .panels.bottom_bar_panel import BottomBarPanel
-from .panels.autostart_panel import AutostartPanel
-from .panels.dim_sync_panel import DimSyncPanel
-from .panels.experimental_backends_panel import ExperimentalBackendsPanel
-from .os_autostart import detect_os_autostart_enabled, set_os_autostart
-from .panels.power_management_panel import PowerManagementPanel
-from .panels.power_source_panel import PowerSourcePanel
-from .scrollable_area import ScrollableArea
-from .panels.version_panel import VersionPanel
-from src.gui.utils.window_geometry import compute_centered_window_geometry
-from .settings_state import (
-    SettingsValues,
-    apply_settings_values_to_config,
-    load_settings_values,
-)
-from .hardware_hint import extract_unsupported_rgb_controllers_hint
+from . import hardware_hint, os_autostart, panels, scrollable_area, settings_state
 
-from src.core.config import Config
+from src.core import config as core_config
+from src.gui import theme as gui_theme
+from src.gui.utils import tk_async, window_geometry, window_icon
 
-from src.gui.utils.window_icon import apply_keyrgb_window_icon
-from src.gui.theme import apply_clam_theme
-from src.gui.utils.tk_async import run_in_thread
+
+# Keep module-level dependency names explicit so tests can monkeypatch window.py
+# directly while the implementation still resolves through this module.
+Config = core_config.Config
+extract_unsupported_rgb_controllers_hint = hardware_hint.extract_unsupported_rgb_controllers_hint
+run_in_thread = tk_async.run_in_thread
+BottomBarPanel = panels.BottomBarPanel
+ScrollableArea = scrollable_area.ScrollableArea
+PowerManagementPanel = panels.PowerManagementPanel
+DimSyncPanel = panels.DimSyncPanel
+PowerSourcePanel = panels.PowerSourcePanel
+VersionPanel = panels.VersionPanel
+AutostartPanel = panels.AutostartPanel
+ExperimentalBackendsPanel = panels.ExperimentalBackendsPanel
+set_os_autostart = os_autostart.set_os_autostart
+apply_settings_values_to_config = settings_state.apply_settings_values_to_config
+detect_os_autostart_enabled = os_autostart.detect_os_autostart_enabled
+apply_clam_theme = gui_theme.apply_clam_theme
+apply_keyrgb_window_icon = window_icon.apply_keyrgb_window_icon
+load_settings_values = settings_state.load_settings_values
+SettingsValues = settings_state.SettingsValues
+compute_centered_window_geometry = window_geometry.compute_centered_window_geometry
 
 
 _FOOTER_HARDWARE_PROBE_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)

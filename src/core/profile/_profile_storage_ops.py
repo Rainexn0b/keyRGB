@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Dict, Tuple, cast
 
+from . import _profile_storage_payloads as storage_payloads
+
 
 KeyCell = Tuple[int, int]
 KeyCells = Tuple[KeyCell, ...]
@@ -11,65 +13,18 @@ KeyCells = Tuple[KeyCell, ...]
 def normalize_lightbar_overlay(
     raw: object, *, get_default_lightbar_overlay: Callable[..., object]
 ) -> Dict[str, bool | float]:
-    out: Dict[str, bool | float] = dict(get_default_lightbar_overlay())  # type: ignore[call-overload]
-    if isinstance(raw, dict):
-        visible = raw.get("visible")
-        if isinstance(visible, bool):
-            out["visible"] = visible
-        elif isinstance(visible, (int, float)):
-            out["visible"] = bool(visible)
-
-        for key in ("length", "thickness", "dx", "dy", "inset"):
-            value = raw.get(key)
-            if isinstance(value, (int, float)):
-                out[key] = float(value)
-
-    out["length"] = max(0.20, min(1.0, float(out.get("length", 0.72))))
-    out["thickness"] = max(0.04, min(0.40, float(out.get("thickness", 0.12))))
-    out["dx"] = max(-0.50, min(0.50, float(out.get("dx", 0.0))))
-    out["dy"] = max(-0.50, min(0.50, float(out.get("dy", 0.0))))
-    out["inset"] = max(0.0, min(0.25, float(out.get("inset", 0.04))))
-    out["visible"] = bool(out.get("visible", True))
-    return out
+    return storage_payloads.normalize_lightbar_overlay(
+        raw,
+        get_default_lightbar_overlay=get_default_lightbar_overlay,
+    )
 
 
 def parse_keymap_cell(raw: object) -> KeyCell | None:
-    if isinstance(raw, str) and "," in raw:
-        row_text, col_text = raw.split(",", 1)
-        try:
-            return (int(row_text), int(col_text))
-        except (TypeError, ValueError):
-            return None
-
-    if isinstance(raw, (list, tuple)) and len(raw) == 2:
-        first, second = raw
-        if isinstance(first, (list, tuple, dict)) or isinstance(second, (list, tuple, dict)):
-            return None
-        try:
-            return (int(first), int(second))
-        except (TypeError, ValueError):
-            return None
-
-    return None
+    return storage_payloads.parse_keymap_cell(raw)
 
 
 def parse_keymap_cells(raw: object) -> KeyCells:
-    single = parse_keymap_cell(raw)
-    if single is not None:
-        return (single,)
-
-    if not isinstance(raw, (list, tuple)):
-        return ()
-
-    out: list[KeyCell] = []
-    seen: set[KeyCell] = set()
-    for item in raw:
-        cell = parse_keymap_cell(item)
-        if cell is None or cell in seen:
-            continue
-        seen.add(cell)
-        out.append(cell)
-    return tuple(out)
+    return storage_payloads.parse_keymap_cells(raw)
 
 
 def canonical_layout_identity(
@@ -198,13 +153,9 @@ def save_keymap(
     write_json_atomic: Callable[..., object],
     normalize_keymap_fn: Callable[..., object],
 ) -> None:
-    payload = {}
-    for key_id, raw_cells in sorted(normalize_keymap_fn(keymap or {}, physical_layout=physical_layout).items()):  # type: ignore[attr-defined]
-        cells = parse_keymap_cells(raw_cells)
-        if not cells:
-            continue
-        encoded = [f"{row},{col}" for row, col in cells]
-        payload[key_id] = encoded[0] if len(encoded) == 1 else encoded
+    payload = storage_payloads.encode_keymap_payload(
+        normalize_keymap_fn(keymap or {}, physical_layout=physical_layout)  # type: ignore[arg-type]
+    )
     write_json_atomic(paths_for(name).keymap, payload)  # type: ignore[attr-defined]
 
 
@@ -219,15 +170,7 @@ def load_layout_global(
     raw = read_json(paths_for(name).layout_global)  # type: ignore[attr-defined]
     if raw is None:
         raw = get_default_layout_tweaks(physical_layout)
-
-    out = {"dx": 0.0, "dy": 0.0, "sx": 1.0, "sy": 1.0, "inset": 0.06}
-    if isinstance(raw, dict):
-        for key in list(out.keys()):
-            value = raw.get(key)
-            if isinstance(value, (int, float)):
-                out[key] = float(value)
-    out["inset"] = max(0.0, min(0.20, float(out.get("inset", 0.06))))
-    return out
+    return storage_payloads.normalize_layout_global(raw)
 
 
 def save_layout_global(
@@ -237,13 +180,7 @@ def save_layout_global(
     paths_for: Callable[..., object],
     write_json_atomic: Callable[..., object],
 ) -> None:
-    payload = {
-        "dx": float(tweaks.get("dx", 0.0)),
-        "dy": float(tweaks.get("dy", 0.0)),
-        "sx": float(tweaks.get("sx", 1.0)),
-        "sy": float(tweaks.get("sy", 1.0)),
-        "inset": float(tweaks.get("inset", 0.06)),
-    }
+    payload = storage_payloads.encode_layout_global(tweaks)
     write_json_atomic(paths_for(name).layout_global, payload)  # type: ignore[attr-defined]
 
 
@@ -346,20 +283,7 @@ def load_per_key_colors(
         if prof == "dim":
             return {key: (255, 255, 255) for key in default_colors.keys()}
         return default_colors.copy()
-
-    out: Dict[Tuple[int, int], Tuple[int, int, int]] = {}
-    if not isinstance(raw, dict):
-        return out
-    for key, value in raw.items():
-        try:
-            row_text, col_text = str(key).split(",", 1)
-            row = int(row_text.strip())
-            col = int(col_text.strip())
-            rr, gg, bb = value
-            out[(row, col)] = (int(rr), int(gg), int(bb))
-        except (TypeError, ValueError):
-            continue
-    return out
+    return storage_payloads.parse_per_key_colors(raw)
 
 
 def save_per_key_colors(
@@ -369,11 +293,7 @@ def save_per_key_colors(
     paths_for: Callable[..., object],
     write_json_atomic: Callable[..., object],
 ) -> None:
-    payload: Dict[str, list[int]] = {}
-    for (row, col), rgb in (colors or {}).items():
-        try:
-            rr, gg, bb = rgb
-            payload[f"{int(row)},{int(col)}"] = [int(rr), int(gg), int(bb)]
-        except (TypeError, ValueError):
-            continue
-    write_json_atomic(paths_for(name).per_key_colors, payload)  # type: ignore[attr-defined]
+    write_json_atomic(
+        paths_for(name).per_key_colors,  # type: ignore[attr-defined]
+        storage_payloads.encode_per_key_colors(colors or {}),
+    )

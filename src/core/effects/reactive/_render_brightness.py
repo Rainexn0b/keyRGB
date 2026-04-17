@@ -16,6 +16,26 @@ _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _ENGINE_ATTR_RUNTIME_ERRORS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
+def _run_engine_attr_operation(
+    operation: Callable[[], object],
+    *,
+    handled_errors: tuple[type[BaseException], ...],
+    handled_result: object,
+    runtime_result: object,
+    message: str,
+    name: str,
+    logger: logging.Logger | None = None,
+) -> object:
+    active_logger = logger or _LOGGER
+    try:
+        return operation()
+    except handled_errors:
+        return handled_result
+    except _ENGINE_ATTR_RUNTIME_ERRORS:  # @quality-exception exception-transparency: engine attribute getters/setters may have recoverable runtime side effects during reactive brightness resolution and cleanup
+        active_logger.exception(message, name)
+        return runtime_result
+
+
 def _read_engine_attr(
     engine: "EffectsEngine",
     name: str,
@@ -24,14 +44,15 @@ def _read_engine_attr(
     error_default: object,
     logger: logging.Logger | None = None,
 ) -> object:
-    active_logger = logger or _LOGGER
-    try:
-        return attrgetter(name)(engine)
-    except AttributeError:
-        return missing_default
-    except _ENGINE_ATTR_RUNTIME_ERRORS:  # @quality-exception exception-transparency: engine attribute getters may have arbitrary runtime side effects beyond AttributeError
-        active_logger.exception("Reactive brightness failed to read engine attribute %s", name)
-        return error_default
+    return _run_engine_attr_operation(
+        lambda: attrgetter(name)(engine),
+        handled_errors=(AttributeError,),
+        handled_result=missing_default,
+        runtime_result=error_default,
+        message="Reactive brightness failed to read engine attribute %s",
+        name=name,
+        logger=logger,
+    )
 
 
 def _bool_attr_or_default(engine: "EffectsEngine", name: str, *, default: bool) -> bool:
@@ -287,9 +308,15 @@ def _clear_transition_state(engine: "EffectsEngine") -> None:
         "_reactive_transition_started_at",
         "_reactive_transition_duration_s",
     ):
-        try:
+
+        def clear_attr() -> None:
             setattr(engine, name, None)
-        except (AttributeError, TypeError):
-            continue
-        except _ENGINE_ATTR_RUNTIME_ERRORS:  # @quality-exception exception-transparency: engine attribute setters may fail unexpectedly beyond AttributeError/TypeError during reactive brightness cleanup
-            _LOGGER.exception("Reactive brightness failed to clear engine attribute %s", name)
+
+        _run_engine_attr_operation(
+            clear_attr,
+            handled_errors=(AttributeError, TypeError),
+            handled_result=None,
+            runtime_result=None,
+            message="Reactive brightness failed to clear engine attribute %s",
+            name=name,
+        )

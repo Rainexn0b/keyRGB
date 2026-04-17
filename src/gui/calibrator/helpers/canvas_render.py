@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import font as tkfont
-from typing import Any, Optional
+from typing import Optional, TypeAlias
 
 from PIL import Image, ImageTk
 
@@ -19,6 +19,9 @@ from src.gui.perkey.profile_management import keymap_cells_for
 from .geometry import key_canvas_bbox
 
 
+LayoutTweaks: TypeAlias = dict[str, float]
+PerKeyLayoutTweaks: TypeAlias = dict[str, dict[str, float]]
+
 _LABEL_FIT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 
 
@@ -27,8 +30,8 @@ def redraw_calibration_canvas(
     canvas: tk.Canvas,
     deck_pil: Optional[Image.Image],
     deck_render_cache: DeckRenderCache[ImageTk.PhotoImage],
-    layout_tweaks: Any,
-    per_key_layout_tweaks: Any,
+    layout_tweaks: LayoutTweaks,
+    per_key_layout_tweaks: PerKeyLayoutTweaks,
     keymap: dict[str, object],
     selected_slot_id: str | None = None,
     selected_key_id: str | None = None,

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from collections.abc import Mapping
-from typing import Dict, Tuple
+from typing import Dict, Tuple, TypeVar
 
 from src.core.utils.logging_utils import log_throttled
 
@@ -13,6 +14,7 @@ PER_KEY_MODE_POLICY_INIT_ONCE = "init_once"
 PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME = "reassert_every_frame"
 _PERKEY_CONFIG_LOAD_ERRORS = (AttributeError, ImportError, LookupError, OSError, TypeError, ValueError)
 _ENABLE_USER_MODE_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_T = TypeVar("_T")
 
 
 def normalize_per_key_mode_policy(policy: object) -> str:
@@ -30,24 +32,46 @@ def per_key_mode_requires_frame_reassert(kb: object) -> bool:
     return per_key_mode_policy(kb) == PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME
 
 
+def _run_with_recoverable_logging(
+    *,
+    fn: Callable[[], _T],
+    recoverable_errors: tuple[type[BaseException], ...],
+    throttle_key: str,
+    msg: str,
+    fallback: _T,
+) -> _T:
+    try:
+        return fn()
+    # @quality-exception exception-transparency: recoverable config/property access
+    # and runtime hardware calls must keep logging and degrade behavior explicit.
+    except recoverable_errors as exc:
+        log_throttled(
+            logger,
+            throttle_key,
+            interval_s=120,
+            level=logging.DEBUG,
+            msg=msg,
+            exc=exc,
+        )
+        return fallback
+
+
 def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, int]]:
     """Best-effort load of per-key colors from the legacy config."""
 
-    try:
+    def _load_colors() -> Dict[Tuple[int, int], Tuple[int, int, int]]:
         from src.core.config import Config
 
         cfg = Config()
         return dict(getattr(cfg, "per_key_colors", {}) or {})
-    except _PERKEY_CONFIG_LOAD_ERRORS as exc:  # @quality-exception exception-transparency: config import, instantiation, and property access may fail at runtime; must degrade to empty map
-        log_throttled(
-            logger,
-            "legacy.perkey_animation.load_config",
-            interval_s=120,
-            level=logging.DEBUG,
-            msg="Failed to load per-key colors from config",
-            exc=exc,
-        )
-        return {}
+
+    return _run_with_recoverable_logging(
+        fn=_load_colors,
+        recoverable_errors=_PERKEY_CONFIG_LOAD_ERRORS,
+        throttle_key="legacy.perkey_animation.load_config",
+        msg="Failed to load per-key colors from config",
+        fallback={},
+    )
 
 
 def build_full_color_grid(
@@ -103,15 +127,15 @@ def enable_user_mode_once(*, kb, kb_lock, brightness: int) -> None:
     if not callable(fn):
         return
 
-    try:
-        with kb_lock:
-            fn(brightness=brightness, save=False)
-    except _ENABLE_USER_MODE_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: enable_user_mode is a runtime USB/HID hardware boundary and must degrade gracefully on recoverable failure
-        log_throttled(
-            logger,
-            "perkey_animation.enable_user_mode_once",
-            interval_s=120,
-            level=logging.DEBUG,
-            msg="Failed to enable per-key user mode",
-            exc=exc,
-        )
+    _run_with_recoverable_logging(
+        fn=lambda: _enable_user_mode_locked(kb_lock=kb_lock, fn=fn, brightness=brightness),
+        recoverable_errors=_ENABLE_USER_MODE_RUNTIME_ERRORS,
+        throttle_key="perkey_animation.enable_user_mode_once",
+        msg="Failed to enable per-key user mode",
+        fallback=None,
+    )
+
+
+def _enable_user_mode_locked(*, kb_lock, fn: Callable[..., object], brightness: int) -> None:
+    with kb_lock:
+        fn(brightness=brightness, save=False)

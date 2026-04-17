@@ -4,48 +4,45 @@ from __future__ import annotations
 
 import logging
 import os
-import webbrowser
-
-import tkinter as tk
-from tkinter import filedialog
-from tkinter import messagebox
-from tkinter import scrolledtext, ttk
-
-from src.core.config import Config
-from src.core.diagnostics import device_discovery as diagnostics_device_discovery
-from src.core.diagnostics import support as diagnostics_support
-from src.gui.settings import diagnostics_runner
-from src.gui import theme as gui_theme
-from src.gui.utils import tk_async, window_centering, window_icon
-from src.gui.utils.window_geometry import compute_centered_window_geometry
-
-from ._support import _support_window_actions as support_actions
-from ._support import _support_window_jobs as support_jobs
-from ._support import _support_window_ui as support_window_ui
+from . import _support_window_runtime_deps
 
 
-collect_device_discovery = diagnostics_device_discovery.collect_device_discovery
-format_device_discovery_text = diagnostics_device_discovery.format_device_discovery_text
-ISSUE_URL = diagnostics_support.ISSUE_URL
-build_additional_evidence_plan = diagnostics_support.build_additional_evidence_plan
-build_backend_speed_probe_plan = diagnostics_support.build_backend_speed_probe_plan
-build_issue_report_with_evidence = diagnostics_support.build_issue_report_with_evidence
-build_support_bundle_payload = diagnostics_support.build_support_bundle_payload
-collect_additional_evidence = diagnostics_support.collect_additional_evidence
-collect_diagnostics_text = diagnostics_runner.collect_diagnostics_text
-apply_clam_theme = gui_theme.apply_clam_theme
-run_in_thread = tk_async.run_in_thread
-center_window_on_screen = window_centering.center_window_on_screen
-apply_keyrgb_window_icon = window_icon.apply_keyrgb_window_icon
+tk = _support_window_runtime_deps.tk
+filedialog = _support_window_runtime_deps.filedialog
+messagebox = _support_window_runtime_deps.messagebox
+scrolledtext = _support_window_runtime_deps.scrolledtext
+ttk = _support_window_runtime_deps.ttk
+webbrowser = _support_window_runtime_deps.webbrowser
+
+Config = _support_window_runtime_deps.Config
+collect_device_discovery = _support_window_runtime_deps.collect_device_discovery
+format_device_discovery_text = _support_window_runtime_deps.format_device_discovery_text
+ISSUE_URL = _support_window_runtime_deps.ISSUE_URL
+build_additional_evidence_plan = _support_window_runtime_deps.build_additional_evidence_plan
+build_backend_speed_probe_plan = _support_window_runtime_deps.build_backend_speed_probe_plan
+build_issue_report_with_evidence = _support_window_runtime_deps.build_issue_report_with_evidence
+build_support_bundle_payload = _support_window_runtime_deps.build_support_bundle_payload
+collect_additional_evidence = _support_window_runtime_deps.collect_additional_evidence
+collect_diagnostics_text = _support_window_runtime_deps.collect_diagnostics_text
+apply_clam_theme = _support_window_runtime_deps.apply_clam_theme
+run_in_thread = _support_window_runtime_deps.run_in_thread
+center_window_on_screen = _support_window_runtime_deps.center_window_on_screen
+apply_keyrgb_window_icon = _support_window_runtime_deps.apply_keyrgb_window_icon
+compute_centered_window_geometry = _support_window_runtime_deps.compute_centered_window_geometry
+support_actions = _support_window_runtime_deps.support_actions
+support_jobs = _support_window_runtime_deps.support_jobs
+support_session_bridge = _support_window_runtime_deps.support_session_bridge
+support_window_state = _support_window_runtime_deps.support_window_state
+support_window_ui = _support_window_runtime_deps.support_window_ui
 
 
 logger = logging.getLogger(__name__)
-_TK_RUNTIME_ERRORS = (tk.TclError, RuntimeError)
-_BROWSER_OPEN_ERRORS = (webbrowser.Error, OSError)
-_GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_TK_RUNTIME_ERRORS = _support_window_runtime_deps._TK_RUNTIME_ERRORS
+_BROWSER_OPEN_ERRORS = _support_window_runtime_deps._BROWSER_OPEN_ERRORS
+_GEOMETRY_APPLY_ERRORS = _support_window_runtime_deps._GEOMETRY_APPLY_ERRORS
 
 
-class SupportToolsGUI:
+class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
     def __init__(self) -> None:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Support Tools")
@@ -56,12 +53,7 @@ class SupportToolsGUI:
         bg_color, fg_color = apply_clam_theme(self.root, include_checkbuttons=True, map_checkbutton_state=True)
         self._bg_color = bg_color
         self._fg_color = fg_color
-        self._diagnostics_json = ""
-        self._discovery_json = ""
-        self._supplemental_evidence: dict[str, object] | None = None
-        self._issue_report: dict[str, object] | None = None
-        self._capture_prompt_key = ""
-        self._backend_probe_prompt_key = ""
+        self._support_session = support_window_state.SupportSessionState()
 
         support_window_ui.build_window(
             self, ttk=ttk, scrolledtext=scrolledtext, center_window_on_screen=center_window_on_screen
@@ -69,6 +61,10 @@ class SupportToolsGUI:
         self.root.after(50, self._apply_geometry)
 
         self._sync_button_state()
+
+    @staticmethod
+    def _support_session_cls() -> type[support_window_state.SupportSessionState]:
+        return support_window_state.SupportSessionState
 
     def _apply_geometry(self) -> None:
         try:
@@ -86,15 +82,6 @@ class SupportToolsGUI:
             self.root.geometry(geometry)
         except _GEOMETRY_APPLY_ERRORS:
             return
-
-    def _build_debug_section(self, parent: ttk.LabelFrame) -> None:
-        return
-
-    def _build_discovery_section(self, parent: ttk.LabelFrame) -> None:
-        return
-
-    def _build_issue_section(self, parent: ttk.LabelFrame) -> None:
-        return
 
     def _apply_initial_focus(self) -> None:
         support_window_ui.apply_initial_focus(

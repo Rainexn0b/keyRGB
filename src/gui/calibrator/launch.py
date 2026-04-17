@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import subprocess
 import sys
-from pathlib import Path
+
+from src.core.runtime.imports import repo_root_from
 
 
 def _repo_root_dir() -> str | None:
-    # We want the directory that *contains* the `src/` package.
-    # - Source checkout: <repo>/src/gui/calibrator/launch.py -> parents[3] == <repo>
-    # - AppImage:        .../usr/lib/keyrgb/src/gui/calibrator/launch.py -> parents[3] == .../usr/lib/keyrgb
-    repo_root = Path(__file__).resolve().parents[3]
+    repo_root = repo_root_from(__file__)
     return str(repo_root) if repo_root.exists() else None
 
 

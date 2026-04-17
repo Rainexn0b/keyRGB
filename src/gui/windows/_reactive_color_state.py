@@ -1,10 +1,28 @@
 from __future__ import annotations
-from typing import Any
 
 import logging
+from typing import Protocol, TypeAlias
+
+ReactiveColor: TypeAlias = tuple[int, int, int]
 
 
-def read_reactive_brightness_percent(config: Any, *, logger: logging.Logger) -> int | None:
+class _ReadableVariable(Protocol):
+    def get(self) -> object: ...
+
+
+class _WritableVariable(Protocol):
+    def set(self, value: object) -> None: ...
+
+
+class _ConfigurableWidget(Protocol):
+    def config(self, **kwargs: object) -> None: ...
+
+
+class _BrightnessWheel(Protocol):
+    def set_brightness_percent(self, percent: int) -> None: ...
+
+
+def read_reactive_brightness_percent(config: object, *, logger: logging.Logger) -> int | None:
     raw = getattr(config, "reactive_brightness", getattr(config, "brightness", 0))
     try:
         hw = int(raw or 0)
@@ -19,8 +37,8 @@ def read_reactive_brightness_percent(config: Any, *, logger: logging.Logger) -> 
 
 
 def sync_reactive_brightness_widgets(
-    brightness_var: Any,
-    brightness_label: Any,
+    brightness_var: _WritableVariable,
+    brightness_label: _ConfigurableWidget,
     *,
     percent: int | None,
     tk_error: type[BaseException],
@@ -36,8 +54,8 @@ def sync_reactive_brightness_widgets(
 
 
 def sync_color_wheel_brightness(
-    color_wheel: Any,
-    use_manual_var: Any,
+    color_wheel: _BrightnessWheel | None,
+    use_manual_var: _ReadableVariable,
     *,
     percent: int | None,
     tk_error: type[BaseException],
@@ -56,9 +74,9 @@ def sync_color_wheel_brightness(
 
 
 def commit_color_to_config(
-    config: Any,
-    use_manual_var: Any,
-    color: tuple[int, int, int],
+    config: object,
+    use_manual_var: _WritableVariable,
+    color: ReactiveColor,
     *,
     tk_error: type[BaseException],
     logger: logging.Logger,
@@ -72,7 +90,10 @@ def commit_color_to_config(
 
 
 def commit_brightness_to_config(
-    config: Any, brightness_percent: float | int | None, *, logger: logging.Logger
+    config: object,
+    brightness_percent: float | int | None,
+    *,
+    logger: logging.Logger,
 ) -> int | None:
     if brightness_percent is None:
         return None
@@ -91,7 +112,7 @@ def commit_brightness_to_config(
     return hw
 
 
-def read_reactive_trail_percent(config: Any, *, logger: logging.Logger) -> int | None:
+def read_reactive_trail_percent(config: object, *, logger: logging.Logger) -> int | None:
     raw = getattr(config, "reactive_trail_percent", 50)
     try:
         pct = int(raw or 50)
@@ -106,8 +127,8 @@ def read_reactive_trail_percent(config: Any, *, logger: logging.Logger) -> int |
 
 
 def sync_reactive_trail_widgets(
-    trail_var: Any,
-    trail_label: Any,
+    trail_var: _WritableVariable,
+    trail_label: _ConfigurableWidget,
     *,
     percent: int | None,
     tk_error: type[BaseException],
@@ -122,7 +143,12 @@ def sync_reactive_trail_widgets(
         logger.debug("Reactive trail widgets were unavailable during initialization", exc_info=True)
 
 
-def commit_trail_to_config(config: Any, trail_percent: float | int | None, *, logger: logging.Logger) -> int | None:
+def commit_trail_to_config(
+    config: object,
+    trail_percent: float | int | None,
+    *,
+    logger: logging.Logger,
+) -> int | None:
     if trail_percent is None:
         return None
     try:

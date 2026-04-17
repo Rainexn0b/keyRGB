@@ -20,7 +20,7 @@ import src.core.diagnostics.io as diagnostics_io
 from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
 from src.core.diagnostics.support import ITE8910_SPEED_PROBE_KEY
 from src.core.diagnostics.collectors._backends_sysfs import sysfs_led_candidates_snapshot
-from src.core.diagnostics.model import Diagnostics
+from src.core.diagnostics.model import Diagnostics, DiagnosticsConfigSnapshot
 
 
 def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -54,7 +54,7 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     assert isinstance(diag.power_supply, dict)
     assert isinstance(diag.backends, dict)
     assert isinstance(diag.usb_devices, list)
-    assert isinstance(diag.config, dict)
+    assert isinstance(diag.config, DiagnosticsConfigSnapshot)
     assert isinstance(diag.process, dict)
 
     # Backend diagnostics should include tier/provider/priority metadata.
@@ -122,6 +122,46 @@ def test_format_diagnostics_text_includes_guided_speed_probe_section() -> None:
     assert "guided_speed_probes:" in text
     assert "sample: ui=1 payload=1 raw=0x01" in text
     assert "Higher UI speed values should look faster on ite8910." in text
+
+
+def test_diagnostics_typed_config_snapshot_serializes_without_shape_changes() -> None:
+    diag = Diagnostics(
+        dmi={},
+        leds=[],
+        sysfs_leds=[],
+        usb_ids=[],
+        env={},
+        virt={},
+        system={},
+        hints={},
+        app={},
+        power_supply={},
+        backends={},
+        usb_devices=[],
+        config=DiagnosticsConfigSnapshot(
+            present=True,
+            mtime=123,
+            settings={"effect": "wave", "brightness": 25},
+            per_key_colors_count=4,
+            error="Permission denied",
+        ),
+        process={},
+    )
+
+    assert diag.to_dict()["config"] == {
+        "present": True,
+        "mtime": 123,
+        "settings": {"effect": "wave", "brightness": 25},
+        "per_key_colors_count": 4,
+        "error": "Permission denied",
+    }
+
+    text = format_diagnostics_text(diag)
+    assert "Config:" in text
+    assert "  present: True" in text
+    assert "  mtime: 123" in text
+    assert "  per_key_colors_count: 4" in text
+    assert "Permission denied" not in text
 
 
 def test_format_empty_diagnostics() -> None:
@@ -546,9 +586,10 @@ def test_config_snapshot_ignores_stat_metadata_failures(monkeypatch: pytest.Monk
 
     snapshot = diagnostics_collectors.config_snapshot()
 
-    assert snapshot["present"] is True
-    assert "mtime" not in snapshot
-    assert snapshot["settings"] == {"effect": "wave", "brightness": 25}
+    assert snapshot.present is True
+    assert snapshot.mtime is None
+    assert dict(snapshot.settings) == {"effect": "wave", "brightness": 25}
+    assert snapshot.to_dict() == {"present": True, "settings": {"effect": "wave", "brightness": 25}}
 
 
 def test_config_snapshot_reports_invalid_json_without_crashing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -558,9 +599,9 @@ def test_config_snapshot_reports_invalid_json_without_crashing(monkeypatch: pyte
 
     snapshot = diagnostics_collectors.config_snapshot()
 
-    assert snapshot["present"] is True
-    assert snapshot["error"].startswith("invalid JSON at line 1 column ")
-    assert str(cfg_path) not in snapshot["error"]
+    assert snapshot.present is True
+    assert snapshot.error is not None and snapshot.error.startswith("invalid JSON at line 1 column ")
+    assert snapshot.error is not None and str(cfg_path) not in snapshot.error
 
 
 def test_config_snapshot_sanitizes_unreadable_config_errors(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -580,9 +621,9 @@ def test_config_snapshot_sanitizes_unreadable_config_errors(monkeypatch: pytest.
 
     snapshot = diagnostics_collectors.config_snapshot()
 
-    assert snapshot["present"] is True
-    assert snapshot["error"] == "Permission denied"
-    assert str(cfg_path) not in snapshot["error"]
+    assert snapshot.present is True
+    assert snapshot.error == "Permission denied"
+    assert snapshot.error is not None and str(cfg_path) not in snapshot.error
 
 
 def test_config_snapshot_logs_unexpected_boundary_failures(
@@ -604,8 +645,8 @@ def test_config_snapshot_logs_unexpected_boundary_failures(
     with caplog.at_level(logging.DEBUG, logger=diagnostics_collectors.__name__):
         snapshot = diagnostics_collectors.config_snapshot()
 
-    assert snapshot["present"] is True
-    assert snapshot["error"] == "unexpected failure while reading config.json"
+    assert snapshot.present is True
+    assert snapshot.error == "unexpected failure while reading config.json"
     records = [
         record
         for record in caplog.records

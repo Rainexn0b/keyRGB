@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Tuple
+from typing import Mapping, Protocol, Tuple, cast
 
+from src.core.backends.base import KeyboardDevice
 from src.core.utils.exceptions import is_device_busy, is_device_disconnected
 
 
@@ -9,13 +10,17 @@ _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS = (AttributeError, OSError, RuntimeErro
 _PERKEY_WRITE_RUNTIME_ERRORS = (AttributeError, LookupError, RuntimeError, TypeError, ValueError)
 
 
+class _EnableUserModeKeyboard(Protocol):
+    def enable_user_mode(self, *, brightness: int, save: bool = False) -> None: ...
+
+
 def push_per_key_colors(
-    kb: Any,
+    kb: KeyboardDevice | None,
     colors: Mapping[Tuple[int, int], Tuple[int, int, int]],
     *,
     brightness: int,
     enable_user_mode: bool = True,
-) -> Any:
+) -> KeyboardDevice | None:
     """Best-effort push of per-key colors to the hardware.
 
     Returns the (possibly updated) kb handle. If the device is busy/unavailable,
@@ -28,11 +33,12 @@ def push_per_key_colors(
     try:
         if enable_user_mode and hasattr(kb, "enable_user_mode"):
             try:
-                kb.enable_user_mode(brightness=brightness, save=True)
+                enable_user_mode_kb = cast(_EnableUserModeKeyboard, kb)
+                enable_user_mode_kb.enable_user_mode(brightness=brightness, save=True)
             except TypeError:
                 # Some backends may expose enable_user_mode without a save kwarg.
                 try:
-                    kb.enable_user_mode(brightness=brightness)
+                    enable_user_mode_kb.enable_user_mode(brightness=brightness)
                 except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS:
                     pass
             except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS:

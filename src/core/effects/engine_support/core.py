@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from threading import Event, RLock, Thread
-from typing import Callable, Protocol, cast
+from typing import Callable, Protocol, TypeVar, cast
 
 from ..device import (
     Color,
@@ -18,6 +18,7 @@ logger = logging.getLogger("src.core.effects.engine_core")
 _BACKEND_DISCOVERY_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 HardwareEffectBuilder = Callable[..., object]
+_BackendDiscoveryValue = TypeVar("_BackendDiscoveryValue")
 
 
 class _EffectsBackendProtocol(KeyboardBackendProtocol, Protocol):
@@ -63,6 +64,24 @@ def _thread_generation_or_default(engine: "_EngineCore", *, default: int) -> int
         return int(engine._thread_generation)
     except AttributeError:
         return default
+
+
+def _query_backend_mapping(
+    backend: object | None,
+    query_fn: Callable[[], object] | None,
+    *,
+    mapping_name: str,
+) -> dict[str, _BackendDiscoveryValue]:
+    if not callable(query_fn):
+        return {}
+    try:
+        raw_mapping = query_fn()
+    except _BACKEND_DISCOVERY_ERRORS:  # @quality-exception exception-transparency: backend effect/color discovery is a runtime plugin boundary and engine behavior must degrade to empty backend metadata
+        logger.exception("Failed to query backend %s from '%s'", mapping_name, _backend_name(backend))
+        return {}
+    if not isinstance(raw_mapping, dict):
+        return {}
+    return dict(raw_mapping or {})
 
 
 class _EngineCore:
@@ -128,33 +147,19 @@ class _EngineCore:
 
     def get_backend_effects(self) -> dict[str, HardwareEffectBuilder]:
         backend = self.backend
-        effect_fn = _backend_effects_method_or_none(backend)
-        if not callable(effect_fn):
-            return {}
-        backend_name = _backend_name(backend)
-        try:
-            raw_effects = effect_fn()
-        except _BACKEND_DISCOVERY_ERRORS:  # @quality-exception exception-transparency: backend effect discovery is a runtime plugin boundary and engine behavior must degrade to no backend effects
-            logger.exception("Failed to query backend effects from '%s'", backend_name)
-            return {}
-        if not isinstance(raw_effects, dict):
-            return {}
-        return dict(raw_effects or {})
+        return _query_backend_mapping(
+            backend,
+            _backend_effects_method_or_none(backend),
+            mapping_name="effects",
+        )
 
     def get_backend_colors(self) -> dict[str, object]:
         backend = self.backend
-        colors_fn = _backend_colors_method_or_none(backend)
-        if not callable(colors_fn):
-            return {}
-        backend_name = _backend_name(backend)
-        try:
-            raw_colors = colors_fn()
-        except _BACKEND_DISCOVERY_ERRORS:  # @quality-exception exception-transparency: backend color discovery is a runtime plugin boundary and engine behavior must degrade to no backend colors
-            logger.exception("Failed to query backend colors from '%s'", backend_name)
-            return {}
-        if not isinstance(raw_colors, dict):
-            return {}
-        return dict(raw_colors or {})
+        return _query_backend_mapping(
+            backend,
+            _backend_colors_method_or_none(backend),
+            mapping_name="colors",
+        )
 
     def mark_device_unavailable(self) -> None:
         """Force the engine into a safe 'no device' mode."""

@@ -1,154 +1,71 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Callable, Mapping, Protocol, TypeAlias
+
+from PIL import Image
+
+from ._internal import _app_canvas_interactions, _app_profile_layout
+from ._internal._app_profile_layout import (
+    KeyCell,
+    KeyCells,
+    Keymap,
+    PhysicalLayoutIdFn,
+    _CalibratorAppLike,
+    _ProbeSelectedIdentityFn,
+    _SanitizeKeymapCellsFn,
+)
 
 
-def keymap_path_for_active_profile(*, get_active_profile_name: Any, keymap_path: Any) -> Path:
-    return keymap_path(get_active_profile_name())
+_CalibratorConfigLike = _app_profile_layout._CalibratorConfigLike
+keymap_path_for_active_profile = _app_profile_layout.keymap_path_for_active_profile
+save_keymap_for_active_profile = _app_profile_layout.save_keymap_for_active_profile
+parse_default_keymap = _app_profile_layout.parse_default_keymap
+resolved_layout_label = _app_profile_layout.resolved_layout_label
+load_profile_state = _app_profile_layout.load_profile_state
+selected_layout_legend_pack = _app_profile_layout.selected_layout_legend_pack
+physical_layout_id = _app_profile_layout.physical_layout_id
+visible_layout_keys = _app_profile_layout.visible_layout_keys
+visible_key_for_slot_id = _app_profile_layout.visible_key_for_slot_id
+probe_selected_slot_id = _app_profile_layout.probe_selected_slot_id
+probe_selected_key_id = _app_profile_layout.probe_selected_key_id
 
 
-def save_keymap_for_active_profile(
-    keymap: dict[str, tuple[tuple[int, int], ...]],
+class _LoadBackdropImageFn(Protocol):
+    def __call__(self, profile_name: str, *, backdrop_mode: str | None = None) -> Image.Image | None: ...
+
+
+class _ParseDefaultKeymapFn(Protocol):
+    def __call__(self, layout_id: str) -> Keymap: ...
+
+
+class _KeymapCellsForFn(Protocol):
+    def __call__(
+        self,
+        keymap: Mapping[str, object],
+        key_id: str | None,
+        *,
+        slot_id: str | None = None,
+        physical_layout: str | None = None,
+    ) -> KeyCells: ...
+
+
+class _SaveCurrentKeymapFn(Protocol):
+    def __call__(self, keymap: Keymap, *, physical_layout: str | None = None) -> None: ...
+
+
+LoadBackdropModeFn: TypeAlias = Callable[[str], str]
+ResolvedLayoutLabelFn: TypeAlias = Callable[[str], str]
+DefaultKeymapForLayoutFn: TypeAlias = Callable[[str], Keymap]
+KeymapPathGetter: TypeAlias = Callable[[], Path]
+
+
+def load_deck_image_for_calibrator(
+    app: _CalibratorAppLike,
     *,
-    physical_layout: str | None,
-    get_active_profile_name: Any,
-    save_keymap: Any,
+    load_backdrop_image: _LoadBackdropImageFn,
+    load_backdrop_mode: LoadBackdropModeFn,
 ) -> None:
-    save_keymap(get_active_profile_name(), keymap, physical_layout=physical_layout)
-
-
-def parse_default_keymap(
-    layout_id: str,
-    *,
-    profiles: Any,
-    get_default_keymap: Any,
-    sanitize_keymap_cells: Any,
-    num_rows: int,
-    num_cols: int,
-) -> dict[str, tuple[tuple[int, int], ...]]:
-    return sanitize_keymap_cells(
-        profiles.normalize_keymap(get_default_keymap(layout_id), physical_layout=layout_id),
-        num_rows=num_rows,
-        num_cols=num_cols,
-    )
-
-
-def resolved_layout_label(layout_id: str, *, resolve_layout_id: Any, layout_labels: dict[str, str]) -> str:
-    resolved_layout = resolve_layout_id(layout_id)
-    return layout_labels.get(resolved_layout, resolved_layout.upper())
-
-
-def load_profile_state(
-    profile_name: str,
-    *,
-    physical_layout: str,
-    load_keymap: Any,
-    load_layout_global: Any,
-    load_layout_per_key: Any,
-    load_layout_slots: Any,
-    sanitize_keymap_cells: Any,
-    num_rows: int,
-    num_cols: int,
-) -> tuple[
-    dict[str, tuple[tuple[int, int], ...]],
-    dict[str, float],
-    dict[str, dict[str, float]],
-    dict[str, dict[str, object]],
-]:
-    keymap = sanitize_keymap_cells(
-        load_keymap(profile_name, physical_layout=physical_layout),
-        num_rows=num_rows,
-        num_cols=num_cols,
-    )
-    layout_tweaks = load_layout_global(profile_name, physical_layout=physical_layout)
-    per_key_layout_tweaks = load_layout_per_key(profile_name, physical_layout=physical_layout)
-    layout_slot_overrides = load_layout_slots(profile_name, physical_layout)
-    return keymap, layout_tweaks, per_key_layout_tweaks, layout_slot_overrides
-
-
-def selected_layout_legend_pack(cfg: object, *, physical_layout: str, load_layout_legend_pack: Any) -> str | None:
-    requested = str(getattr(cfg, "layout_legend_pack", "auto") or "auto").strip().lower()
-    if not requested or requested == "auto":
-        return None
-
-    pack = load_layout_legend_pack(requested)
-    if not pack:
-        return None
-
-    resolved_pack_layout = str(pack.get("layout_id") or physical_layout).strip().lower()
-    return requested if resolved_pack_layout == str(physical_layout or "auto").strip().lower() else None
-
-
-def physical_layout_id(app: Any) -> str:
-    cfg = getattr(app, "cfg", None)
-    return str(getattr(cfg, "physical_layout", "auto") or "auto")
-
-
-def visible_layout_keys(
-    app: Any,
-    *,
-    get_layout_keys: Any,
-    selected_layout_legend_pack_fn: Any,
-    physical_layout_id_fn: Any,
-) -> list[Any]:
-    physical_layout = physical_layout_id_fn(app)
-    cfg = getattr(app, "cfg", None)
-    return list(
-        get_layout_keys(
-            physical_layout,
-            legend_pack_id=selected_layout_legend_pack_fn(cfg, physical_layout=physical_layout)
-            if cfg is not None
-            else None,
-            slot_overrides=getattr(app, "layout_slot_overrides", None),
-        )
-    )
-
-
-def visible_key_for_slot_id(app: Any, slot_id: str | None, *, visible_layout_keys_fn: Any) -> Any | None:
-    normalized_slot_id = str(slot_id or "").strip()
-    if not normalized_slot_id:
-        return None
-
-    for key in visible_layout_keys_fn(app):
-        if str(getattr(key, "slot_id", None) or key.key_id) == normalized_slot_id:
-            return key
-    return None
-
-
-def probe_selected_slot_id(app: Any, *, visible_layout_keys_fn: Any) -> str | None:
-    probe = getattr(app, "probe", None)
-    selected_slot_id = str(getattr(probe, "selected_slot_id", "") or "").strip()
-    if selected_slot_id:
-        return selected_slot_id
-
-    selected_key_id = str(getattr(probe, "selected_key_id", "") or "").strip()
-    if not selected_key_id:
-        return None
-
-    for key in visible_layout_keys_fn(app):
-        if str(key.key_id) == selected_key_id:
-            return str(getattr(key, "slot_id", None) or key.key_id)
-    return selected_key_id
-
-
-def probe_selected_key_id(
-    app: Any,
-    *,
-    probe_selected_slot_id_fn: Any,
-    visible_key_for_slot_id_fn: Any,
-) -> str | None:
-    slot_id = probe_selected_slot_id_fn(app)
-    key = visible_key_for_slot_id_fn(app, slot_id)
-    if key is not None:
-        return str(key.key_id)
-
-    probe = getattr(app, "probe", None)
-    selected_key_id = str(getattr(probe, "selected_key_id", "") or "").strip()
-    return selected_key_id or None
-
-
-def load_deck_image_for_calibrator(app: Any, *, load_backdrop_image: Any, load_backdrop_mode: Any) -> None:
     """Load backdrop for calibrator display, treating 'none' mode as 'builtin'."""
     mode = load_backdrop_mode(app.profile_name)
     effective_mode = "builtin" if mode == "none" else mode
@@ -159,11 +76,18 @@ def load_deck_image_for_calibrator(app: Any, *, load_backdrop_image: Any, load_b
     app._deck_render_cache.clear()
 
 
-def on_show_backdrop_changed(app: Any, *, load_backdrop_image: Any, load_backdrop_mode: Any) -> None:
+def on_show_backdrop_changed(
+    app: _CalibratorAppLike,
+    *,
+    load_backdrop_image: _LoadBackdropImageFn,
+    load_backdrop_mode: LoadBackdropModeFn,
+) -> None:
     """Toggle backdrop display in the calibrator without saving the profile's backdrop mode."""
     if app._show_backdrop_var.get():
         load_deck_image_for_calibrator(
-            app, load_backdrop_image=load_backdrop_image, load_backdrop_mode=load_backdrop_mode
+            app,
+            load_backdrop_image=load_backdrop_image,
+            load_backdrop_mode=load_backdrop_mode,
         )
     else:
         app._deck_pil = None
@@ -172,14 +96,14 @@ def on_show_backdrop_changed(app: Any, *, load_backdrop_image: Any, load_backdro
 
 
 def reset_keymap_defaults(
-    app: Any,
+    app: _CalibratorAppLike,
     *,
-    parse_default_keymap_fn: Any,
-    sanitize_keymap_cells: Any,
+    parse_default_keymap_fn: _ParseDefaultKeymapFn,
+    sanitize_keymap_cells: _SanitizeKeymapCellsFn,
     num_rows: int,
     num_cols: int,
-    physical_layout_id_fn: Any,
-    resolved_layout_label_fn: Any,
+    physical_layout_id_fn: PhysicalLayoutIdFn,
+    resolved_layout_label_fn: ResolvedLayoutLabelFn,
 ) -> None:
     physical_layout = physical_layout_id_fn(app)
     app.keymap = sanitize_keymap_cells(parse_default_keymap_fn(physical_layout), num_rows=num_rows, num_cols=num_cols)
@@ -187,46 +111,46 @@ def reset_keymap_defaults(
     app.lbl_status.configure(text=f"Reset keymap to {resolved_layout_label_fn(physical_layout)} defaults")
 
 
-def restore_original_config(app: Any) -> None:
+def restore_original_config(app: _CalibratorAppLike) -> None:
     app.preview.restore()
 
 
-def on_close(app: Any) -> None:
+def on_close(app: _CalibratorAppLike) -> None:
     app._restore_original_config()
     app.destroy()
 
 
-def apply_current_probe(app: Any) -> None:
+def apply_current_probe(app: _CalibratorAppLike) -> None:
     row, col = app.probe.current_cell
     app.lbl_cell.configure(text=f"Probing matrix cell: ({row}, {col})")
     app.preview.apply_probe_cell(row, col)
     app.after(50, lambda: None)
 
 
-def prev_cell(app: Any) -> None:
+def prev_cell(app: _CalibratorAppLike) -> None:
     app.probe.prev_cell()
     app._apply_current_probe()
 
 
-def next_cell(app: Any) -> None:
+def next_cell(app: _CalibratorAppLike) -> None:
     app.probe.next_cell()
     app._apply_current_probe()
 
 
-def skip_cell(app: Any) -> None:
+def skip_cell(app: _CalibratorAppLike) -> None:
     app.probe.clear_selection()
     app.lbl_status.configure(text="Skipped. Move to next cell.")
     app._next()
 
 
 def assign_current_cell(
-    app: Any,
+    app: _CalibratorAppLike,
     *,
-    probe_selected_slot_id_fn: Any,
-    probe_selected_key_id_fn: Any,
-    keymap_cells_for: Any,
-    physical_layout_id_fn: Any,
-    default_keymap_for_layout_fn: Any,
+    probe_selected_slot_id_fn: _ProbeSelectedIdentityFn,
+    probe_selected_key_id_fn: _ProbeSelectedIdentityFn,
+    keymap_cells_for: _KeymapCellsForFn,
+    physical_layout_id_fn: PhysicalLayoutIdFn,
+    default_keymap_for_layout_fn: DefaultKeymapForLayoutFn,
 ) -> None:
     slot_id = probe_selected_slot_id_fn(app)
     key_id = probe_selected_key_id_fn(app)
@@ -242,19 +166,17 @@ def assign_current_cell(
         dict.fromkeys(identity for identity in (key_identity, str(key_id or "").strip()) if identity)
     )
     default_keymap = default_keymap_for_layout_fn(physical_layout)
-    default_owner_by_cell = {
-        cell: str(identity) for identity, cells in (default_keymap or {}).items() for cell in cells
-    }
+    default_owner_by_cell = {cell: str(identity) for identity, cells in default_keymap.items() for cell in cells}
 
-    other_owners_by_cell: dict[tuple[int, int], set[str]] = {}
+    other_owners_by_cell: dict[KeyCell, set[str]] = {}
     for existing_identity, existing_cells in app.keymap.items():
         if existing_identity in selected_identities:
             continue
         for cell in existing_cells:
             other_owners_by_cell.setdefault(cell, set()).add(str(existing_identity))
 
-    selected_cells: list[tuple[int, int]] = []
-    seen_selected_cells: set[tuple[int, int]] = set()
+    selected_cells: list[KeyCell] = []
+    seen_selected_cells: set[KeyCell] = set()
     for identity in selected_identities:
         for cell in app.keymap.get(identity, ()):
             if cell == current_cell or cell in seen_selected_cells:
@@ -266,7 +188,7 @@ def assign_current_cell(
             selected_cells.append(cell)
 
     selected_cell_set = set(selected_cells)
-    new_keymap: dict[str, tuple[tuple[int, int], ...]] = {}
+    new_keymap: Keymap = {}
     for existing_identity, existing_cells in app.keymap.items():
         if existing_identity in selected_identities:
             continue
@@ -297,87 +219,73 @@ def assign_current_cell(
     app._next()
 
 
-def save_current_keymap(app: Any, *, save_keymap_fn: Any, keymap_path_fn: Any, physical_layout_id_fn: Any) -> None:
+def save_current_keymap(
+    app: _CalibratorAppLike,
+    *,
+    save_keymap_fn: _SaveCurrentKeymapFn,
+    keymap_path_fn: KeymapPathGetter,
+    physical_layout_id_fn: PhysicalLayoutIdFn,
+) -> None:
     save_keymap_fn(app.keymap, physical_layout=physical_layout_id_fn(app))
     app.lbl_status.configure(text=f"Saved to {str(keymap_path_fn())}")
 
 
-def save_and_close(app: Any) -> None:
+def save_and_close(app: _CalibratorAppLike) -> None:
     app._save()
     app._restore_original_config()
     app.destroy()
 
 
 def redraw(
-    app: Any,
+    app: _CalibratorAppLike,
     *,
-    redraw_calibration_canvas: Any,
-    probe_selected_slot_id_fn: Any,
-    probe_selected_key_id_fn: Any,
-    physical_layout_id_fn: Any,
-    selected_layout_legend_pack_fn: Any,
+    redraw_calibration_canvas: _app_canvas_interactions._RedrawCalibrationCanvasFn,
+    probe_selected_slot_id_fn: _ProbeSelectedIdentityFn,
+    probe_selected_key_id_fn: _ProbeSelectedIdentityFn,
+    physical_layout_id_fn: PhysicalLayoutIdFn,
+    selected_layout_legend_pack_fn: _app_profile_layout._SelectedLayoutLegendPackFn,
 ) -> None:
-    physical_layout = physical_layout_id_fn(app)
-    app._transform, app._deck_tk = redraw_calibration_canvas(
-        canvas=app.canvas,
-        deck_pil=app._deck_pil,
-        deck_render_cache=app._deck_render_cache,
-        layout_tweaks=app.layout_tweaks,
-        per_key_layout_tweaks=app.per_key_layout_tweaks,
-        keymap=app.keymap,
-        selected_slot_id=probe_selected_slot_id_fn(app),
-        selected_key_id=probe_selected_key_id_fn(app),
-        physical_layout=physical_layout,
-        legend_pack_id=selected_layout_legend_pack_fn(app.cfg, physical_layout=physical_layout),
-        slot_overrides=app.layout_slot_overrides,
+    _app_canvas_interactions.redraw(
+        app,
+        redraw_calibration_canvas=redraw_calibration_canvas,
+        probe_selected_slot_id_fn=probe_selected_slot_id_fn,
+        probe_selected_key_id_fn=probe_selected_key_id_fn,
+        physical_layout_id_fn=physical_layout_id_fn,
+        selected_layout_legend_pack_fn=selected_layout_legend_pack_fn,
     )
 
 
 def on_click(
-    app: Any,
-    event: Any,
+    app: _CalibratorAppLike,
+    event: _app_canvas_interactions._ClickEvent,
     *,
-    hit_test_fn: Any,
-    keymap_cells_for: Any,
-    physical_layout_id_fn: Any,
+    hit_test_fn: _app_canvas_interactions._HitTestByPointFn,
+    keymap_cells_for: _KeymapCellsForFn,
+    physical_layout_id_fn: PhysicalLayoutIdFn,
 ) -> None:
-    if app._transform is None:
-        return
-    hit = hit_test_fn(event.x, event.y)
-    if hit is None:
-        app.probe.clear_selection()
-        app.lbl_status.configure(text="No key hit")
-    else:
-        app.probe.selected_slot_id = str(getattr(hit, "slot_id", None) or hit.key_id)
-        app.probe.selected_key_id = str(hit.key_id)
-        mapped = keymap_cells_for(
-            app.keymap,
-            hit.key_id,
-            slot_id=app.probe.selected_slot_id,
-            physical_layout=physical_layout_id_fn(app),
-        )
-        app.lbl_status.configure(text=f"Selected {hit.label}" + (f" (mapped {mapped})" if mapped else " (unmapped)"))
-    app._redraw()
+    _app_canvas_interactions.on_click(
+        app,
+        event,
+        hit_test_fn=hit_test_fn,
+        keymap_cells_for=keymap_cells_for,
+        physical_layout_id_fn=physical_layout_id_fn,
+    )
 
 
 def hit_test_point(
-    app: Any,
+    app: _CalibratorAppLike,
     x: int,
     y: int,
     *,
-    hit_test: Any,
-    visible_layout_keys_fn: Any,
-    image_size: tuple[int, int],
-) -> Any | None:
-    if app._transform is None:
-        return None
-
-    return hit_test(
-        transform=app._transform,
-        x=x,
-        y=y,
-        layout_tweaks=app.layout_tweaks,
-        per_key_layout_tweaks=app.per_key_layout_tweaks,
-        keys=visible_layout_keys_fn(app),
+    hit_test: _app_canvas_interactions._CanvasHitTestFn,
+    visible_layout_keys_fn: _app_profile_layout._VisibleLayoutKeysFn,
+    image_size: _app_canvas_interactions.ImageSize,
+) -> _app_profile_layout.KeyDef | None:
+    return _app_canvas_interactions.hit_test_point(
+        app,
+        x,
+        y,
+        hit_test=hit_test,
+        visible_layout_keys_fn=visible_layout_keys_fn,
         image_size=image_size,
     )

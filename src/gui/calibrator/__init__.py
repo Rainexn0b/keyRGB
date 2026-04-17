@@ -1,3 +1,5 @@
 """Keymap calibrator GUI package."""
 
-__all__: list[str] = []
+from .app import main
+
+__all__ = ["main"]

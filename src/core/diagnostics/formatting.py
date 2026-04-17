@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from .model import DiagnosticsConfigSnapshot
 from ._formatting_support import append_support_hints, append_sysfs_leds
 
 if TYPE_CHECKING:
@@ -174,20 +175,26 @@ def _append_process(lines: list[str], process: object) -> None:
 
 
 def _append_config(lines: list[str], config: object) -> None:
-    if not isinstance(config, dict) or not config:
+    if isinstance(config, DiagnosticsConfigSnapshot):
+        config_dict = config.to_dict()
+    elif isinstance(config, dict):
+        config_dict = config
+    else:
+        return
+    if not config_dict:
         return
 
     lines.append("Config:")
-    present = config.get("present")
+    present = config_dict.get("present")
     lines.append(f"  present: {present}")
-    if config.get("mtime") is not None:
-        lines.append(f"  mtime: {config.get('mtime')}")
-    if isinstance(config.get("settings"), dict):
+    if config_dict.get("mtime") is not None:
+        lines.append(f"  mtime: {config_dict.get('mtime')}")
+    if isinstance(config_dict.get("settings"), dict):
         lines.append("  settings:")
-        for k in sorted(config["settings"].keys()):
-            lines.append(f"    {k}: {config['settings'][k]}")
-    if config.get("per_key_colors_count") is not None:
-        lines.append(f"  per_key_colors_count: {config.get('per_key_colors_count')}")
+        for k in sorted(config_dict["settings"].keys()):
+            lines.append(f"    {k}: {config_dict['settings'][k]}")
+    if config_dict.get("per_key_colors_count") is not None:
+        lines.append(f"  per_key_colors_count: {config_dict.get('per_key_colors_count')}")
 
 
 def _append_virt(lines: list[str], virt: object) -> None:

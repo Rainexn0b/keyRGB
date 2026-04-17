@@ -7,71 +7,34 @@ import os
 import signal
 import time
 from pathlib import Path
-from typing import Any, Protocol, cast
 
 import tkinter as tk
 from tkinter import ttk
 
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
-from src.gui.windows._reactive_color_state import (
-    commit_brightness_to_config,
-    commit_color_to_config,
-    commit_trail_to_config,
-    read_reactive_brightness_percent,
-    read_reactive_trail_percent,
-    sync_color_wheel_brightness,
-    sync_reactive_brightness_widgets,
-    sync_reactive_trail_widgets,
-)
-from src.gui.utils.window_icon import apply_keyrgb_window_icon
-from src.gui.utils.window_geometry import compute_centered_window_geometry
-from src.gui.theme import apply_clam_theme
 
 logger = logging.getLogger(__name__)
 _GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 
-class _ReactiveColorDragState(Protocol):
-    _last_drag_commit_ts: object
-    _drag_commit_interval: object
-    _last_drag_committed_color: object | None
-
-
-def _last_drag_commit_ts_or_default(gui: object) -> float:
-    try:
-        value = cast(_ReactiveColorDragState, gui)._last_drag_commit_ts
-    except AttributeError:
-        return 0.0
-    return float(value or 0.0)
-
-
-def _drag_commit_interval_or_default(gui: object) -> float:
-    try:
-        value = cast(_ReactiveColorDragState, gui)._drag_commit_interval
-    except AttributeError:
-        return 0.06
-    return float(value or 0.06)
-
-
-def _last_drag_committed_color_or_none(gui: object) -> tuple[int, int, int] | None:
-    try:
-        value = cast(_ReactiveColorDragState, gui)._last_drag_committed_color
-    except AttributeError:
-        return None
-    return cast(tuple[int, int, int] | None, value)
-
-
 try:
-    from src.core.config import Config
-    from src.core.backends.registry import select_backend
-    from src.gui.widgets.color_wheel import ColorWheel
+    from src.gui.windows import _reactive_color_runtime as _runtime
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/windows/reactive_color.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
-    from src.core.config import Config
-    from src.core.backends.registry import select_backend
-    from src.gui.widgets.color_wheel import ColorWheel
+    from src.gui.windows import _reactive_color_runtime as _runtime
+
+
+Config = _runtime.Config
+select_backend = _runtime.select_backend
+ColorWheel = _runtime.ColorWheel
+apply_clam_theme = _runtime.apply_clam_theme
+apply_keyrgb_window_icon = _runtime.apply_keyrgb_window_icon
+compute_centered_window_geometry = _runtime.compute_centered_window_geometry
+reactive_color_bootstrap = _runtime.reactive_color_bootstrap
+reactive_color_interactions = _runtime.reactive_color_interactions
+reactive_color_ui = _runtime.reactive_color_ui
 
 
 class ReactiveColorGUI:
@@ -90,17 +53,10 @@ class ReactiveColorGUI:
         self._drag_commit_interval = 0.06
         self._last_drag_committed_brightness: int | None = None
 
-        self._color_supported = True
-        try:
-            backend = select_backend()
-            caps = backend.capabilities() if backend is not None else None
-            self._color_supported = bool(getattr(caps, "color", True)) if caps is not None else True
-        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
-            logger.debug(
-                "Failed to probe backend capabilities for the reactive color window; assuming RGB support",
-                exc_info=True,
-            )
-            self._color_supported = True
+        self._color_supported = reactive_color_bootstrap.probe_color_support(
+            select_backend_fn=select_backend,
+            logger=logger,
+        )
 
         main = ttk.Frame(self.root, padding=20)
         main.pack(fill="both", expand=True)
@@ -110,178 +66,31 @@ class ReactiveColorGUI:
         title = ttk.Label(main, text="Reactive Typing Settings", font=("Sans", 14, "bold"))
         title.pack(pady=(0, 10))
 
-        desc = ttk.Label(
+        reactive_color_bootstrap.build_description_section(
+            self,
             main,
-            text=(
-                "Sets a manual highlight color used by Reactive Typing effects.\n"
-                "This does not stop the current effect; the tray will pick up changes automatically.\n"
-                "The slider below controls Reactive Typing brightness (pulse/highlight intensity) and is independent from the manual color override."
-            ),
-            font=("Sans", 9),
-            justify="left",
-            wraplength=520,
+            ttk_module=ttk,
+            wrap_sync_errors=_WRAP_SYNC_ERRORS,
         )
-        desc.pack(pady=(0, 10), fill="x")
-        self._wrap_labels.append(desc)
 
-        def _sync_desc_wrap(_event=None) -> None:
-            try:
-                ww = int(main.winfo_width())
-                if ww > 1:
-                    wrap = max(220, ww - 24)
-                    for label in self._wrap_labels:
-                        label.configure(wraplength=wrap)
-            except _WRAP_SYNC_ERRORS:
-                pass
-
-        main.bind("<Configure>", _sync_desc_wrap)
-        self.root.after(0, _sync_desc_wrap)
-
-        self._use_manual_var = tk.BooleanVar(value=bool(getattr(self.config, "reactive_use_manual_color", False)))
-        self._manual_check = ttk.Checkbutton(
+        reactive_color_ui.build_reactive_window_ui(
+            self,
             main,
-            text="Use manual color for reactive typing",
-            variable=self._use_manual_var,
-            command=self._on_toggle_manual,
+            tk_module=tk,
+            ttk_module=ttk,
+            color_wheel_cls=ColorWheel,
+            wrap_sync_errors=_WRAP_SYNC_ERRORS,
+            tk_error=tk.TclError,
         )
-        self._manual_check.pack(anchor="w", pady=(0, 10))
-
-        if not self._color_supported:
-            try:
-                self._use_manual_var.set(False)
-            except tk.TclError:
-                pass
-            try:
-                self._manual_check.configure(state="disabled")
-            except tk.TclError:
-                pass
-            msg = ttk.Label(
-                main,
-                text=(
-                    "RGB color control is not available with the currently selected backend.\n\n"
-                    "Reactive typing can still run, but manual highlight color won’t be applied to the keyboard on brightness-only backends (common with sysfs kbd_backlight)."
-                ),
-                font=("Sans", 9),
-                justify="left",
-                wraplength=520,
-            )
-            msg.pack(pady=(6, 10), fill="x")
-            self._wrap_labels.append(msg)
-
-        if self._color_supported:
-            initial = self.config.reactive_color
-            self.color_wheel = ColorWheel(
-                main,
-                size=350,
-                initial_color=tuple(initial),
-                callback=self._on_color_change,
-                release_callback=self._on_color_release,
-                show_brightness_slider=False,
-            )
-            self.color_wheel.pack()
-        else:
-            self.color_wheel = None
-
-        # Divider + independent reactive brightness slider.
-        ttk.Separator(main, orient="horizontal").pack(fill="x", pady=(18, 12))
-
-        self._reactive_brightness_var = tk.DoubleVar(value=100.0)
-        brightness_frame = ttk.Frame(main)
-        brightness_frame.pack(fill="x", padx=10)
-        try:
-            brightness_frame.columnconfigure(1, weight=1)
-        except _WRAP_SYNC_ERRORS:
-            pass
-
-        ttk.Label(brightness_frame, text="Reactive typing brightness:").grid(
-            row=0,
-            column=0,
-            sticky="w",
-            padx=(0, 10),
-        )
-
-        self._reactive_brightness_scale = ttk.Scale(
-            brightness_frame,
-            from_=0,
-            to=100,
-            orient="horizontal",
-            variable=self._reactive_brightness_var,
-            command=self._on_reactive_brightness_change,
-        )
-        self._reactive_brightness_scale.grid(row=0, column=1, sticky="ew")
-
-        self._reactive_brightness_label = ttk.Label(brightness_frame, text="100%")
-        self._reactive_brightness_label.configure(width=5)
-        self._reactive_brightness_label.grid(row=0, column=2, sticky="e", padx=(10, 5))
-
-        # Commit on mouse release as well.
-        try:
-            self._reactive_brightness_scale.bind("<ButtonRelease-1>", self._on_reactive_brightness_release)
-        except tk.TclError:
-            pass
-
-        # Initialize slider from persisted reactive brightness (0..50 -> 0..100%).
-        self._sync_reactive_brightness_widgets()
-
-        # When manual mode is disabled, mirror the persisted reactive brightness.
-        self._sync_color_wheel_brightness()
-
-        # Divider + wave thickness slider.
-        ttk.Separator(main, orient="horizontal").pack(fill="x", pady=(18, 12))
-
-        self._reactive_trail_var = tk.DoubleVar(value=50.0)
-        trail_frame = ttk.Frame(main)
-        trail_frame.pack(fill="x", padx=10)
-        try:
-            trail_frame.columnconfigure(1, weight=1)
-        except _WRAP_SYNC_ERRORS:
-            pass
-
-        ttk.Label(trail_frame, text="Wave thickness:").grid(row=0, column=0, sticky="w", padx=(0, 10))
-
-        self._reactive_trail_scale = ttk.Scale(
-            trail_frame,
-            from_=1,
-            to=100,
-            orient="horizontal",
-            variable=self._reactive_trail_var,
-            command=self._on_reactive_trail_change,
-        )
-        self._reactive_trail_scale.grid(row=0, column=1, sticky="ew")
-
-        self._reactive_trail_label = ttk.Label(trail_frame, text="50%")
-        self._reactive_trail_label.configure(width=5)
-        self._reactive_trail_label.grid(row=0, column=2, sticky="e", padx=(10, 5))
-
-        try:
-            self._reactive_trail_scale.bind("<ButtonRelease-1>", self._on_reactive_trail_release)
-        except tk.TclError:
-            pass
-
-        self._sync_reactive_trail_widgets()
-
-        # Lightweight feedback for manual RGB entry / release.
-        self.status_label = ttk.Label(main, text="", font=("Sans", 9))
-        self.status_label.pack(pady=(10, 0))
 
         self._apply_geometry()
         self.root.after(50, self._apply_geometry)
 
-        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-
-        _orig_report_callback_exception = self.root.report_callback_exception
-
-        def _report_callback_exception(exc, val, tb):
-            if isinstance(val, KeyboardInterrupt):
-                self._on_close()
-                return
-            _orig_report_callback_exception(exc, val, tb)
-
-        self.root.report_callback_exception = _report_callback_exception  # type: ignore[assignment]
-
-        # When launched from a terminal, Ctrl+C sends SIGINT to the whole process group.
-        # Use a handler to close cleanly without printing a traceback.
-        signal.signal(signal.SIGINT, lambda *_: self._on_close())
+        reactive_color_bootstrap.install_lifecycle_bindings(
+            self,
+            signal_module=signal,
+            sigint=signal.SIGINT,
+        )
 
     def _apply_geometry(self) -> None:
         try:
@@ -306,13 +115,13 @@ class ReactiveColorGUI:
         self.root.after(2000, lambda: self.status_label.config(text=""))
 
     def _read_reactive_brightness_percent(self) -> int | None:
-        return read_reactive_brightness_percent(self.config, logger=logger)
+        return _runtime.read_reactive_brightness_percent(self.config, logger=logger)
 
     def _read_reactive_trail_percent(self) -> int | None:
-        return read_reactive_trail_percent(self.config, logger=logger)
+        return _runtime.read_reactive_trail_percent(self.config, logger=logger)
 
     def _sync_reactive_brightness_widgets(self) -> None:
-        sync_reactive_brightness_widgets(
+        _runtime.sync_reactive_brightness_widgets(
             self._reactive_brightness_var,
             self._reactive_brightness_label,
             percent=self._read_reactive_brightness_percent(),
@@ -321,7 +130,7 @@ class ReactiveColorGUI:
         )
 
     def _sync_reactive_trail_widgets(self) -> None:
-        sync_reactive_trail_widgets(
+        _runtime.sync_reactive_trail_widgets(
             self._reactive_trail_var,
             self._reactive_trail_label,
             percent=self._read_reactive_trail_percent(),
@@ -332,7 +141,7 @@ class ReactiveColorGUI:
     def _sync_color_wheel_brightness(self) -> None:
         if self.color_wheel is None:
             return
-        sync_color_wheel_brightness(
+        _runtime.sync_color_wheel_brightness(
             self.color_wheel,
             self._use_manual_var,
             percent=self._read_reactive_brightness_percent(),
@@ -343,148 +152,55 @@ class ReactiveColorGUI:
     def _commit_color_to_config(self, color: tuple[int, int, int]) -> None:
         if not self._color_supported:
             return
-        commit_color_to_config(self.config, self._use_manual_var, color, tk_error=tk.TclError, logger=logger)
+        _runtime.commit_color_to_config(
+            self.config,
+            self._use_manual_var,
+            color,
+            tk_error=tk.TclError,
+            logger=logger,
+        )
 
     def _commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None:
         """Persist reactive typing brightness (pulse/highlight intensity)."""
-        return commit_brightness_to_config(self.config, brightness_percent, logger=logger)
+        return _runtime.commit_brightness_to_config(self.config, brightness_percent, logger=logger)
 
     def _commit_trail_to_config(self, trail_percent: float | int | None) -> int | None:
         """Persist reactive wave thickness."""
-        return commit_trail_to_config(self.config, trail_percent, logger=logger)
+        return _runtime.commit_trail_to_config(self.config, trail_percent, logger=logger)
 
     def _on_toggle_manual(self) -> None:
-        if not self._color_supported:
-            try:
-                self._use_manual_var.set(False)
-            except tk.TclError:
-                pass
-            return
-        try:
-            self.config.reactive_use_manual_color = bool(self._use_manual_var.get())
-        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
-            logger.debug("Failed to save reactive_use_manual_color", exc_info=True)
+        reactive_color_interactions._on_toggle_manual(self, tk_error=tk.TclError, logger=logger)
 
     def _on_reactive_brightness_change(self, value: str | float) -> None:
-        """Handle reactive brightness slider changes (0..100 UI scale)."""
-
-        try:
-            pct = float(value)
-        except (TypeError, ValueError):
-            pct = 0.0
-        pct = max(0.0, min(100.0, pct))
-
-        try:
-            self._reactive_brightness_label.config(text=f"{int(pct)}%")
-        except tk.TclError:
-            pass
-
-        if not bool(self._use_manual_var.get()):
-            sync_color_wheel_brightness(
-                self.color_wheel,
-                self._use_manual_var,
-                percent=int(round(pct)),
-                tk_error=tk.TclError,
-                logger=logger,
-            )
-
-        last_drag_commit_ts = _last_drag_commit_ts_or_default(self)
-        drag_commit_interval = _drag_commit_interval_or_default(self)
-        now = time.monotonic()
-        if (now - last_drag_commit_ts) < drag_commit_interval:
-            return
-
-        hw = self._commit_brightness_to_config(pct)
-        if hw is not None:
-            self._last_drag_commit_ts = now
-            self._last_drag_committed_brightness = int(round(hw * 2))
+        reactive_color_interactions._on_reactive_brightness_change(
+            self,
+            value,
+            tk_error=tk.TclError,
+            logger=logger,
+            sync_color_wheel_brightness_fn=_runtime.sync_color_wheel_brightness,
+            time_monotonic=time.monotonic,
+        )
 
     def _on_reactive_brightness_release(self, _event=None) -> None:
-        try:
-            pct = float(self._reactive_brightness_var.get())
-        except (TypeError, ValueError, tk.TclError):
-            pct = 0.0
-        pct = max(0.0, min(100.0, pct))
-
-        if not bool(self._use_manual_var.get()):
-            sync_color_wheel_brightness(
-                self.color_wheel,
-                self._use_manual_var,
-                percent=int(round(pct)),
-                tk_error=tk.TclError,
-                logger=logger,
-            )
-
-        hw = self._commit_brightness_to_config(pct)
-        if hw is None:
-            self._set_status("✗ Failed to save reactive brightness", ok=False)
-            return
-
-        pct_i = int(round(hw * 2))
-        self._last_drag_commit_ts = time.monotonic()
-        self._last_drag_committed_brightness = pct_i
-        self._set_status(f"✓ Saved reactive brightness {pct_i}%", ok=True)
+        reactive_color_interactions._on_reactive_brightness_release(
+            self,
+            tk_error=tk.TclError,
+            logger=logger,
+            sync_color_wheel_brightness_fn=_runtime.sync_color_wheel_brightness,
+            time_monotonic=time.monotonic,
+        )
 
     def _on_reactive_trail_change(self, value: str | float) -> None:
-        """Handle wave thickness slider changes (1..100 UI scale)."""
-
-        try:
-            pct = float(value)
-        except (TypeError, ValueError):
-            pct = 50.0
-        pct = max(1.0, min(100.0, pct))
-
-        try:
-            self._reactive_trail_label.config(text=f"{int(pct)}%")
-        except tk.TclError:
-            pass
+        reactive_color_interactions._on_reactive_trail_change(self, value, tk_error=tk.TclError)
 
     def _on_reactive_trail_release(self, _event=None) -> None:
-        try:
-            pct = float(self._reactive_trail_var.get())
-        except (TypeError, ValueError, tk.TclError):
-            pct = 50.0
-        pct = max(1.0, min(100.0, pct))
+        reactive_color_interactions._on_reactive_trail_release(self, tk_error=tk.TclError)
 
-        hw = self._commit_trail_to_config(pct)
-        if hw is None:
-            self._set_status("✗ Failed to save wave thickness", ok=False)
-            return
+    def _on_color_change(self, r: int, g: int, b: int, **meta: object) -> None:
+        reactive_color_interactions._on_color_change(self, r, g, b, time_monotonic=time.monotonic, meta=meta)
 
-        self._set_status(f"✓ Saved wave thickness {hw}%", ok=True)
-
-    def _on_color_change(self, r: int, g: int, b: int, **meta: Any) -> None:
-        if not self._color_supported:
-            return
-        if str(meta.get("source", "")).strip().lower() == "brightness":
-            return
-        color = (int(r), int(g), int(b))
-
-        last_drag_committed_color = _last_drag_committed_color_or_none(self)
-        last_drag_commit_ts = _last_drag_commit_ts_or_default(self)
-        drag_commit_interval = _drag_commit_interval_or_default(self)
-        now = time.monotonic()
-        if last_drag_committed_color == color and (now - last_drag_commit_ts) < drag_commit_interval:
-            return
-        if (now - last_drag_commit_ts) < drag_commit_interval:
-            return
-
-        self._commit_color_to_config(color)
-        self._last_drag_commit_ts = now
-        self._last_drag_committed_color = color
-
-    def _on_color_release(self, r: int, g: int, b: int, **meta: Any) -> None:
-        if not self._color_supported:
-            self._set_status("✗ RGB color control is not supported on this backend", ok=False)
-            return
-        if str(meta.get("source", "")).strip().lower() == "brightness":
-            return
-        color = (int(r), int(g), int(b))
-
-        self._commit_color_to_config(color)
-        self._last_drag_committed_color = color
-        self._last_drag_commit_ts = time.monotonic()
-        self._set_status(f"✓ Saved RGB({color[0]}, {color[1]}, {color[2]})", ok=True)
+    def _on_color_release(self, r: int, g: int, b: int, **meta: object) -> None:
+        reactive_color_interactions._on_color_release(self, r, g, b, time_monotonic=time.monotonic, meta=meta)
 
     def _on_close(self):
         self.root.destroy()

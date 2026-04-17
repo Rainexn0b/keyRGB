@@ -3,16 +3,10 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from src.core.utils.exceptions import is_permission_denied, is_device_disconnected, is_device_busy
-from src.core.backends.exceptions import (
-    BACKEND_OPEN_RUNTIME_ERRORS,
-    BackendPermissionError,
-    BackendDisconnectedError,
-    BackendBusyError,
-    BackendIOError,
-)
+import src.core.backends.exceptions as backend_exceptions
+import src.core.utils.exceptions as core_exceptions
 
 from ..base import (
     BackendCapabilities,
@@ -22,10 +16,36 @@ from ..base import (
     KeyboardBackend,
     ProbeResult,
 )
-from ..ite8910.hidraw import HidrawDeviceInfo, HidrawFeatureTransport, find_matching_hidraw_device
 from ..policy import experimental_backends_enabled
-from .device import Ite8233LightbarDevice
 from . import protocol
+
+if TYPE_CHECKING:
+    from ..ite8910.hidraw import HidrawDeviceInfo, HidrawFeatureTransport
+
+
+def find_matching_hidraw_device(
+    vendor_id: int,
+    product_id: int,
+    *,
+    root: Path | None = None,
+    dev_root: Path | None = None,
+) -> HidrawDeviceInfo | None:
+    from ..ite8910.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
+
+    return _find_matching_hidraw_device(vendor_id, product_id, root=root, dev_root=dev_root)
+
+
+def _forced_hidraw_device_info(devnode: Path) -> HidrawDeviceInfo:
+    from ..ite8910.hidraw import HidrawDeviceInfo
+
+    return HidrawDeviceInfo(
+        hidraw_name=devnode.name,
+        devnode=devnode,
+        sysfs_dir=Path(),
+        vendor_id=protocol.VENDOR_ID,
+        product_id=protocol.DEFAULT_PRODUCT_ID,
+        hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.DEFAULT_PRODUCT_ID:04x}",
+    )
 
 
 def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
@@ -33,14 +53,7 @@ def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
     if forced_path:
         devnode = Path(forced_path)
         if devnode.exists():
-            return HidrawDeviceInfo(
-                hidraw_name=devnode.name,
-                devnode=devnode,
-                sysfs_dir=Path(),
-                vendor_id=protocol.VENDOR_ID,
-                product_id=protocol.DEFAULT_PRODUCT_ID,
-                hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.DEFAULT_PRODUCT_ID:04x}",
-            )
+            return _forced_hidraw_device_info(devnode)
 
     for product_id in protocol.SUPPORTED_PRODUCT_IDS:
         match = find_matching_hidraw_device(protocol.VENDOR_ID, product_id)
@@ -51,6 +64,8 @@ def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
 
 
 def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo]:
+    from ..ite8910.hidraw import HidrawFeatureTransport
+
     info = _find_matching_supported_hidraw_device()
     if info is None:
         raise FileNotFoundError(
@@ -150,18 +165,24 @@ class Ite8233Backend(KeyboardBackend):
 
         try:
             transport, info = _open_matching_transport()
+            from .device import Ite8233LightbarDevice
+
             return Ite8233LightbarDevice(transport.send_feature_report, product_id=int(info.product_id))
-        except BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
-            if is_permission_denied(exc):
-                raise BackendPermissionError(
+        except backend_exceptions.BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
+            if core_exceptions.is_permission_denied(exc):
+                raise backend_exceptions.BackendPermissionError(
                     "Permission denied opening the ITE 8233 hidraw device. "
                     "Install the KeyRGB udev rules, then reload udev or reboot/log out and back in."
                 ) from exc
-            if is_device_disconnected(exc):
-                raise BackendDisconnectedError("ITE 8233 device disconnected during initialization") from exc
-            if is_device_busy(exc):
-                raise BackendBusyError("ITE 8233 device is busy; another process may own it") from exc
-            raise BackendIOError(f"ITE 8233 HID transport failed: {exc}") from exc
+            if core_exceptions.is_device_disconnected(exc):
+                raise backend_exceptions.BackendDisconnectedError(
+                    "ITE 8233 device disconnected during initialization"
+                ) from exc
+            if core_exceptions.is_device_busy(exc):
+                raise backend_exceptions.BackendBusyError(
+                    "ITE 8233 device is busy; another process may own it"
+                ) from exc
+            raise backend_exceptions.BackendIOError(f"ITE 8233 HID transport failed: {exc}") from exc
 
     def dimensions(self) -> tuple[int, int]:
         return (1, 1)

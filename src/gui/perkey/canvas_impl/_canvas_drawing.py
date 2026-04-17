@@ -1,18 +1,27 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Mapping, Sequence
 from tkinter import TclError, font as tkfont
-from typing import Any
+from typing import Protocol, TypeAlias
 
 from PIL import Image, ImageTk
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, get_layout_keys
-from src.gui.reference.overlay_geometry import calc_centered_drawn_bbox, key_canvas_hit_rects, key_canvas_rect
+from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef, get_layout_keys
+from src.gui.reference.overlay_geometry import (
+    CanvasTransform,
+    calc_centered_drawn_bbox,
+    key_canvas_hit_rects,
+    key_canvas_rect,
+)
 from src.gui.utils.profile_backdrop_storage import load_backdrop_image
 from src.gui.utils.key_draw_style import key_draw_style
 
 from ..lightbar_layout import lightbar_rect_for_size
 from ..profile_management import keymap_cells_for, representative_cell
+from . import _canvas_drawing_helpers as drawing_helpers
+from . import _canvas_drawing_render as drawing_render
+from ._canvas_drawing_helpers import ShapeRect
 
 
 logger = logging.getLogger(__name__)
@@ -20,88 +29,129 @@ logger = logging.getLogger(__name__)
 _BACKDROP_RENDER_ERRORS = (AttributeError, OSError, RuntimeError, TclError, TypeError, ValueError)
 
 
-def _visible_layout_keys_or_none(canvas: Any) -> list[object] | None:
-    try:
-        visible_keys_getter = canvas._visible_layout_keys
-    except AttributeError:
-        return None
-    if not callable(visible_keys_getter):
-        return None
-    return list(visible_keys_getter())
+CanvasItemId: TypeAlias = int
+KeyCell: TypeAlias = tuple[int, int]
+RGBColor: TypeAlias = tuple[int, int, int]
+LayoutTweaks: TypeAlias = dict[str, float]
+PerKeyLayoutTweaks: TypeAlias = dict[str, dict[str, float]]
+LayoutSlotOverrides: TypeAlias = dict[str, dict[str, object]]
+DrawnDeckBBox: TypeAlias = tuple[int, int, int, int]
 
 
-def _resolved_layout_legend_pack_id_or_none(editor: Any) -> str | None:
-    try:
-        resolve_legend_pack = editor._resolved_layout_legend_pack_id
-    except AttributeError:
-        return None
-    return resolve_legend_pack() if callable(resolve_legend_pack) else None
+class _DeckRenderCacheProtocol(Protocol):
+    def clear(self) -> None: ...
+
+    def get_or_create(
+        self,
+        *,
+        deck_image: Image.Image | None,
+        draw_size: tuple[int, int],
+        transparency_pct: float,
+        photo_factory: Callable[[Image.Image], object],
+    ) -> object | None: ...
+
+
+class _InsetPixelsProtocol(Protocol):
+    def __call__(self, width_px: float, height_px: float, inset_value: float) -> float: ...
+
+
+class _CanvasCreateImageProtocol(Protocol):
+    def __call__(self, x: float, y: float, **kwargs: object) -> CanvasItemId: ...
+
+
+class _CanvasCreatePolygonProtocol(Protocol):
+    def __call__(self, points: Sequence[float], **kwargs: object) -> CanvasItemId: ...
+
+
+class _CanvasCreateRectangleProtocol(Protocol):
+    def __call__(self, x1: float, y1: float, x2: float, y2: float, **kwargs: object) -> CanvasItemId: ...
+
+
+class _CanvasCreateTextProtocol(Protocol):
+    def __call__(self, x: float, y: float, **kwargs: object) -> CanvasItemId: ...
+
+
+class _CanvasDeleteProtocol(Protocol):
+    def __call__(self, tag_or_id: str) -> None: ...
+
+
+class _CanvasItemConfigProtocol(Protocol):
+    def __call__(self, item_id: CanvasItemId, **kwargs: object) -> None: ...
+
+
+class _CanvasTagBindProtocol(Protocol):
+    def __call__(self, tag_or_id: str, event: str, callback: Callable[[object], None]) -> None: ...
+
+
+class _CanvasSizeGetterProtocol(Protocol):
+    def __call__(self) -> int: ...
+
+
+class _PerKeyCanvasEditorProtocol(Protocol):
+    profile_name: object
+    _physical_layout: str | None
+    layout_slot_overrides: LayoutSlotOverrides | None
+    layout_tweaks: LayoutTweaks
+    per_key_layout_tweaks: PerKeyLayoutTweaks
+    keymap: Mapping[str, object]
+    colors: Mapping[KeyCell, RGBColor]
+    selected_slot_id: str | None
+    has_lightbar_device: bool
+    lightbar_overlay: dict[str, object] | None
+    backdrop_transparency: object
+
+    def on_slot_clicked(self, slot_id: str) -> None: ...
+
+    def _resolved_layout_legend_pack_id(self) -> str | None: ...
+
+
+def _visible_layout_keys_or_none(canvas: object) -> list[KeyDef] | None:
+    return drawing_helpers._visible_layout_keys_or_none(canvas)
+
+
+def _resolved_layout_legend_pack_id_or_none(editor: object) -> str | None:
+    return drawing_helpers._resolved_layout_legend_pack_id_or_none(editor)
 
 
 def _fit_key_label(label: str, *, font_name: str, font_size: int, max_text_w: int) -> tuple[str, int]:
-    try:
-        font = tkfont.Font(font=(font_name, font_size))
-        while font_size > 6 and font.measure(label) > max_text_w:
-            font_size -= 1
-            font.configure(size=font_size)
-        if font.measure(label) > max_text_w:
-            ellipsis = "…"
-            if font.measure(ellipsis) <= max_text_w:
-                trimmed = label
-                while trimmed and font.measure(trimmed + ellipsis) > max_text_w:
-                    trimmed = trimmed[:-1]
-                label = (trimmed + ellipsis) if trimmed else ellipsis
-    except (AttributeError, RuntimeError, TclError, TypeError, ValueError):
-        logger.debug("Failed to measure key label %r; drawing without truncation.", label, exc_info=True)
-    return label, font_size
+    return drawing_helpers._fit_key_label(
+        label,
+        font_name=font_name,
+        font_size=font_size,
+        max_text_w=max_text_w,
+        font_factory=tkfont.Font,
+        logger=logger,
+    )
 
 
 def _coerce_backdrop_transparency(value: object) -> float:
-    raw_value = value
-    getter = getattr(raw_value, "get", None)
-    if callable(getter):
-        try:
-            raw_value = getter()
-        except (AttributeError, RuntimeError, TclError, TypeError, ValueError):
-            logger.debug(
-                "Failed to read backdrop transparency variable; falling back to default coercion.", exc_info=True
-            )
-    try:
-        return max(0.0, min(100.0, float(raw_value or 0)))  # type: ignore[arg-type]
-    except (AttributeError, TypeError, ValueError, OverflowError):
-        logger.debug("Failed to coerce backdrop transparency %r; defaulting to 0.", raw_value, exc_info=True)
-        return 0.0
+    return drawing_helpers._coerce_backdrop_transparency(value, logger=logger)
 
 
-def _shape_polygon_points(shape_rects: list[tuple[float, float, float, float]]) -> list[float]:
-    if len(shape_rects) != 2:
-        left = min(rect[0] for rect in shape_rects)
-        top = min(rect[1] for rect in shape_rects)
-        right = max(rect[2] for rect in shape_rects)
-        bottom = max(rect[3] for rect in shape_rects)
-        return [left, top, right, top, right, bottom, left, bottom]
-
-    upper, lower = sorted(shape_rects, key=lambda rect: (rect[1], rect[0]))
-    ux1, uy1, ux2, uy2 = upper
-    lx1, _ly1, lx2, ly2 = lower
-    return [ux1, uy1, ux2, uy1, ux2, uy2, lx2, uy2, lx2, ly2, lx1, ly2, lx1, uy2, ux1, uy2]
+def _shape_polygon_points(shape_rects: Sequence[ShapeRect]) -> list[float]:
+    return drawing_helpers._shape_polygon_points(shape_rects)
 
 
 class _KeyboardCanvasDrawingMixin:
     # Attributes/methods provided by tk.Canvas and KeyboardCanvas
-    editor: Any
-    _canvas_transform: Any
-    _deck_render_cache: Any
-    _inset_pixels: Any
-    create_image: Any
-    create_polygon: Any
-    create_rectangle: Any
-    create_text: Any
-    delete: Any
-    itemconfig: Any
-    tag_bind: Any
-    winfo_height: Any
-    winfo_width: Any
+    editor: _PerKeyCanvasEditorProtocol
+    _canvas_transform: Callable[[], CanvasTransform | None]
+    _deck_render_cache: _DeckRenderCacheProtocol
+    _inset_pixels: _InsetPixelsProtocol
+    create_image: _CanvasCreateImageProtocol
+    create_polygon: _CanvasCreatePolygonProtocol
+    create_rectangle: _CanvasCreateRectangleProtocol
+    create_text: _CanvasCreateTextProtocol
+    delete: _CanvasDeleteProtocol
+    itemconfig: _CanvasItemConfigProtocol
+    tag_bind: _CanvasTagBindProtocol
+    winfo_height: _CanvasSizeGetterProtocol
+    winfo_width: _CanvasSizeGetterProtocol
+    _deck_img: Image.Image | None
+    _deck_img_tk: object | None
+    _deck_drawn_bbox: DrawnDeckBBox | None
+    key_rects: dict[str, CanvasItemId]
+    key_texts: dict[str, CanvasItemId]
 
     def _load_deck_image(self) -> None:
         prof = getattr(self.editor, "profile_name", None)
@@ -128,116 +178,27 @@ class _KeyboardCanvasDrawingMixin:
 
         editor = self.editor
         physical_layout = editor._physical_layout or "auto"
-        visible_keys = _visible_layout_keys_or_none(self)
-        if visible_keys is None:
-            legend_pack_id = _resolved_layout_legend_pack_id_or_none(editor)
-            visible_keys = list(
-                get_layout_keys(
-                    physical_layout,
-                    legend_pack_id=legend_pack_id,
-                    slot_overrides=getattr(self.editor, "layout_slot_overrides", None),
-                )
-            )
-        else:
-            visible_keys = list(visible_keys)
-
-        for key in visible_keys:
-            x1, y1, x2, y2, inset_value = key_canvas_rect(
-                transform=t,
-                key=key,
-                layout_tweaks=self.editor.layout_tweaks,
-                per_key_layout_tweaks=self.editor.per_key_layout_tweaks,
-                image_size=BASE_IMAGE_SIZE,
-            )
-
-            inset = self._inset_pixels(x2 - x1, y2 - y1, inset_value)
-            x1 += inset
-            y1 += inset
-            x2 -= inset
-            y2 -= inset
-
-            mapped_cells = keymap_cells_for(
-                self.editor.keymap,
-                key.key_id,
-                slot_id=str(getattr(key, "slot_id", None) or key.key_id),
-                physical_layout=physical_layout,
-            )
-            mapped = bool(mapped_cells)
-            mapped_cell = representative_cell(mapped_cells, colors=self.editor.colors)
-            color = self.editor.colors.get(mapped_cell) if mapped_cell is not None else None
-            slot_id = str(getattr(key, "slot_id", None) or key.key_id)
-            style = key_draw_style(
-                mapped=mapped,
-                selected=getattr(self.editor, "selected_slot_id", None) == slot_id,
-                color=color,
-            )
-
-            shape_rects = list(
-                key_canvas_hit_rects(
-                    transform=t,
-                    key=key,
-                    layout_tweaks=self.editor.layout_tweaks,
-                    per_key_layout_tweaks=self.editor.per_key_layout_tweaks,
-                    image_size=BASE_IMAGE_SIZE,
-                )
-            )
-            if len(shape_rects) == 1:
-                sx1, sy1, sx2, sy2 = shape_rects[0]
-                rect_id = self.create_rectangle(
-                    sx1,
-                    sy1,
-                    sx2,
-                    sy2,
-                    fill=style.fill,
-                    stipple=style.stipple,
-                    outline=style.outline,
-                    width=style.width,
-                    dash=style.dash,
-                    tags=(f"pslot_{slot_id}", f"pkey_{key.key_id}", "pkey"),
-                )
-            else:
-                rect_id = self.create_polygon(
-                    _shape_polygon_points(shape_rects),
-                    fill=style.fill,
-                    stipple=style.stipple,
-                    outline=style.outline,
-                    width=style.width,
-                    dash=style.dash,
-                    joinstyle="miter",
-                    tags=(f"pslot_{slot_id}", f"pkey_{key.key_id}", "pkey"),
-                )
-            self.key_rects[key.key_id] = rect_id
-            self.key_rects[slot_id] = rect_id
-
-            key_w = max(1, int(x2 - x1))
-            key_h = max(1, int(y2 - y1))
-            font_name = "TkDefaultFont"
-            font_size = max(7, min(11, int(min(key_w, key_h) * 0.30)))
-            max_text_w = max(1, key_w - 6)
-
-            label, font_size = _fit_key_label(
-                key.label,
-                font_name=font_name,
-                font_size=font_size,
-                max_text_w=max_text_w,
-            )
-
-            text_id = self.create_text(
-                (x1 + x2) / 2,
-                (y1 + y2) / 2,
-                text=label,
-                fill=style.text_fill,
-                font=(font_name, font_size),
-                tags=(f"pslot_{slot_id}", f"pkey_{key.key_id}", "pkey"),
-            )
-            self.key_texts[key.key_id] = text_id
-            self.key_texts[slot_id] = text_id
-
-            self.tag_bind(
-                f"pslot_{slot_id}",
-                "<Button-1>",
-                lambda _e, sid=slot_id: self.editor.on_slot_clicked(sid),
-            )
+        visible_keys = drawing_render.resolve_visible_keys(
+            canvas=self,
+            editor=editor,
+            physical_layout=physical_layout,
+            visible_layout_keys_or_none=_visible_layout_keys_or_none,
+            resolved_layout_legend_pack_id_or_none=_resolved_layout_legend_pack_id_or_none,
+            get_layout_keys=get_layout_keys,
+        )
+        drawing_render.render_visible_keys(
+            canvas=self,
+            transform=t,
+            visible_keys=visible_keys,
+            physical_layout=physical_layout,
+            key_canvas_rect=key_canvas_rect,
+            key_canvas_hit_rects=key_canvas_hit_rects,
+            key_draw_style=key_draw_style,
+            keymap_cells_for=keymap_cells_for,
+            representative_cell=representative_cell,
+            shape_polygon_points=_shape_polygon_points,
+            fit_key_label=_fit_key_label,
+        )
 
     def _draw_deck_background(self) -> None:
         cw = max(1, int(self.winfo_width()))
