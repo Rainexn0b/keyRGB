@@ -3,6 +3,16 @@
 ## Unreleased
 
 
+## 0.23.0 (2026-04-17)
+
+- Maintenance/Baseline: Establish the 0.23.x maintainability baseline for the next minor release cycle by clearing large-file debt, keeping the build health at 100/100, and adding assessment docs for package structure, orchestration hotspots, typed config/state models, module-size hotspots, and exception-boundary policy.
+- Build/Quality: Expand `buildpython` debt reporting around code-hygiene thresholds, exception-transparency inventories, import/delegation scans, and summary output, and add regression coverage that locks the new maintainability metrics into the local quality gate.
+- Core/Runtime: Split dense backend, diagnostics, effects, power-management, profile-storage, and lighting-config helper paths into smaller support modules, including shared ITE 8233 protocol helpers and cleaner secondary-device accessors.
+- GUI/Tk: Break the support tools window, reactive and uniform color windows, TCC profiles window, calibrator flow, color-wheel runtime, and the per-key editor canvas/layout/runtime helpers into narrower UI and orchestration modules while keeping the existing entrypoints intact.
+- Tray/Runtime: Thin the tray application, menu/status builders, config-polling and idle-power loops, and software-target routing into more explicit collaborators, and harden packaged GUI launch root detection for both the tray and calibrator entry paths.
+- Tests: Add focused regression coverage for the new buildpython metrics, diagnostics snapshots, packaged GUI launch helpers, per-key editor support seams, tray menu/status behavior, hardware polling, idle-power runtime, and the reactive, uniform, and support windows.
+
+
 ## 0.22.1 (2026-04-15)
 
 - GUI/Per-key Editor: Widen the right-side control panel baseline and refit the toplevel window to the real requested content size after layout, fixing the clipped manual RGB `Set` control and the hidden bottom per-key action buttons while guarding the same panel against theme/font-size layout regressions.
