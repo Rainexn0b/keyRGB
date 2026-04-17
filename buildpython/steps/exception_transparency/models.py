@@ -13,6 +13,12 @@ class ExceptionTransparencyFinding:
 
 
 @dataclass(frozen=True)
+class ExceptionTransparencyAnnotationInventory:
+    total: int
+    by_subtree: tuple[tuple[str, int], ...] = ()
+
+
+@dataclass(frozen=True)
 class ExceptionTransparencyBaseline:
     counts: dict[str, int]
     gated_categories: set[str]

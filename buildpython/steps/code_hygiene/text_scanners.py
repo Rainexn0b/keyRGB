@@ -49,7 +49,7 @@ _HASATTR_PATTERN = re.compile(r'\bhasattr\s*\(\s*\w+\s*,\s*["\']_')
 _SETATTR_PATTERN = re.compile(r'\bsetattr\s*\(\s*\w+\s*,\s*["\']_')
 _HASATTR_EXCLUDE_PATHS = ["src/tests/", "tests/"]
 
-_ANY_CHECK_PATHS = ["src/core/", "src/tray/controllers/", "src/tray/pollers/"]
+_ANY_CHECK_PREFIX = "src/"
 _TEST_NAME_PATTERN = re.compile(r"^test_[a-z0-9_]+_(unit|integration|e2e)\.py$")
 
 _GETATTR_PATTERN = re.compile(r'\bgetattr\s*\(\s*\w+\s*,\s*["\']_')
@@ -140,7 +140,7 @@ def _detect_any_type_hints(path: Path, root: Path) -> list[HygieneIssue]:
     issues: list[HygieneIssue] = []
     rel = str(path.relative_to(root))
 
-    if not any(check_path in rel for check_path in _ANY_CHECK_PATHS):
+    if not rel.startswith(_ANY_CHECK_PREFIX):
         return issues
 
     try:

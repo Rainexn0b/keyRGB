@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from collections import Counter
+from pathlib import Path
 
 from ...utils.paths import repo_root
 from ...utils.subproc import RunResult
+from .baseline import _load_hygiene_baseline
 from .detectors import (
     HygieneIssue,
     _collect_all_issues,
@@ -26,10 +28,26 @@ CATEGORY_THRESHOLDS = {
     "logged_broad_except": 0,
     "fallback_broad_except": 0,
 }
+_BASELINE_THRESHOLD_CATEGORIES = frozenset({"cleanup_hotspot"})
+
+
+def _resolved_category_thresholds(root: Path) -> dict[str, int]:
+    thresholds = dict(CATEGORY_THRESHOLDS)
+    baseline = _load_hygiene_baseline(root)
+
+    for category in _BASELINE_THRESHOLD_CATEGORIES:
+        if category not in baseline.gated_categories:
+            continue
+        baseline_count = baseline.counts.get(category)
+        if isinstance(baseline_count, int):
+            thresholds[category] = baseline_count
+
+    return thresholds
 
 
 def code_hygiene_runner() -> RunResult:
     root = repo_root()
+    category_thresholds = _resolved_category_thresholds(root)
     issues = _collect_all_issues(root)
 
     active_counts: Counter[str] = Counter()
@@ -40,10 +58,10 @@ def code_hygiene_runner() -> RunResult:
         else:
             active_counts[issue.category] += 1
 
-    stdout_lines = _build_stdout(issues, active_counts, suppressed_counts, category_thresholds=CATEGORY_THRESHOLDS)
-    _write_reports(root, issues, active_counts, suppressed_counts, category_thresholds=CATEGORY_THRESHOLDS)
+    stdout_lines = _build_stdout(issues, active_counts, suppressed_counts, category_thresholds=category_thresholds)
+    _write_reports(root, issues, active_counts, suppressed_counts, category_thresholds=category_thresholds)
 
-    should_fail = any(active_counts.get(category, 0) > threshold for category, threshold in CATEGORY_THRESHOLDS.items())
+    should_fail = any(active_counts.get(category, 0) > threshold for category, threshold in category_thresholds.items())
 
     return RunResult(
         command_str="(internal) code hygiene check",

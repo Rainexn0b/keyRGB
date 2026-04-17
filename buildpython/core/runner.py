@@ -7,13 +7,8 @@ import time
 
 from .debt_index import write_debt_index
 from .model import Step, StepOutcome
-from .summary import (
-    BuildSummary,
-    StepSummary,
-    build_terminal_build_overview,
-    build_terminal_coverage_highlight,
-    write_summary,
-)
+from .summary import BuildSummary, StepSummary, build_terminal_build_overview
+from .summary import build_terminal_coverage_highlight, write_summary
 from .summary_support.debt_terminal import (
     build_terminal_filesize_highlight,
     build_terminal_hygiene_highlight,
@@ -254,9 +249,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     label_width = len(f"[{total_steps}/{total_steps}]")
     build_label = f"\u00b7  {total_steps} steps  \u00b7  Logs in {buildlog_dir()}"
 
-    print(
-        f"\U0001f527  {_color('KeyRGB Build', _BOLD + _CYAN)}  {_color(build_label, _DIM)}"
-    )
+    print(f"\U0001f527  {_color('KeyRGB Build', _BOLD + _CYAN)}  {_color(build_label, _DIM)}")
 
     started = time.time()
     summaries: list[StepSummary] = []

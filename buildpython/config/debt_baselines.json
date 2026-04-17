@@ -9,7 +9,7 @@
       "forbidden_getattr": 0,
       "forbidden_api": 0,
       "resource_leak": 0,
-      "cleanup_hotspot": 96,
+      "cleanup_hotspot": 94,
       "silent_broad_except": 0,
       "logged_broad_except": 0,
       "fallback_broad_except": 0
@@ -109,8 +109,16 @@
         "reason": "intentionally flat per-key editor UI; all 13 files are independent per-panel components sharing a common pattern; intra-panel cross-imports (calibrator\u2192status, keymap\u2192status, layout_setup\u2192layout_slots) and existing test groupings (panels/, tools/) document the conceptual structure without requiring a forced sub-split"
       },
       {
+        "path": "src/gui/perkey/editor_support",
+        "reason": "intentionally flat per-key editor support package; direct modules are peer-level editor backdrop, bootstrap, layout/state, runtime, selection, and UI helpers with no coherent sub-group"
+      },
+      {
         "path": "src/gui/settings",
         "reason": "intentionally flat settings window package; direct modules are root-level window helpers (window.py, __main__.py, diagnostics_runner.py, hardware_hint.py, os_autostart.py, scrollable_area.py, settings_state.py) with no coherent sub-group beyond the existing panels/ subpackage"
+      },
+      {
+        "path": "src/gui/windows/_support",
+        "reason": "intentionally flat support-window helper package; 14 direct modules are peer-level helpers for one support window flow (actions, backend probes, dialogs, jobs, state, tasks, text IO, UI) with no coherent sub-group beyond the existing _support package boundary"
       },
       {
         "path": "src/tray/ui",
@@ -119,6 +127,10 @@
       {
         "path": "src/core/diagnostics",
         "reason": "intentionally flat diagnostics root; 14 files span distinct collection concerns (backends, sysfs, device candidates, formatting) already partially organised into collectors/, device_discovery_support/, support/ subdirectories; remaining direct files are peer-level collection modules"
+      },
+      {
+        "path": "src/core/profile",
+        "reason": "intentionally flat profile package root; 8 direct modules are peer-level profile storage, apply, payload, path, and backdrop units with no coherent sub-group below the existing package boundary"
       },
       {
         "path": "src/core/effects",
@@ -135,6 +147,26 @@
       {
         "path": "src/gui/perkey",
         "reason": "intentionally flat per-key editor root; 12 files are root-level editor concerns (canvas, editor, window_geometry, profile_management, hardware, color_utils, commit_pipeline, lightbar_layout, lightbar_controls, keyboard_apply) with sub-concerns in canvas_impl/, editor_support/, ops/, overlay/, ui/"
+      },
+      {
+        "path": "src/gui/perkey/canvas_impl",
+        "reason": "intentionally flat per-key canvas implementation package; 8 direct modules are peer-level drawing, render, events, identity, services, and hit-testing units with no coherent sub-group"
+      },
+      {
+        "path": "src/gui/windows",
+        "reason": "intentionally flat window package root; 11 direct modules are peer-level reactive, uniform, and support window entry/UI helpers, with support-specific internals already extracted into _support/"
+      },
+      {
+        "path": "src/tray/app",
+        "reason": "intentionally flat tray app package root; 9 direct modules are peer-level lifecycle, startup, callback, notification, binding, and backend wiring units with no coherent sub-group below the existing app boundary"
+      },
+      {
+        "path": "tests/core/backends/ite",
+        "reason": "intentionally flat ITE backend-variant test set; direct files are peer-level backend-variant scenarios with no coherent sub-group"
+      },
+      {
+        "path": "tests/buildpython",
+        "reason": "intentionally flat buildpython validation test root; direct files are one-file-per-build-step and buildpython contract tests with no coherent sub-group"
       }
     ]
   },

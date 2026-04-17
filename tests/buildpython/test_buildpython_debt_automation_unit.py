@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections import Counter
 import json
 from pathlib import Path
 
 import buildpython.steps.code_hygiene.step as step_code_hygiene
 import buildpython.steps.code_hygiene.baseline as step_code_hygiene_baseline
 import buildpython.steps.code_hygiene.text_scanners as text_scanners
+import buildpython.steps.file_size_analysis._ast_scan_helpers as file_size_ast_scan_helpers
 
 from buildpython.core.debt_index import build_debt_index, write_debt_index
 from buildpython.core.summary import (
@@ -19,7 +21,9 @@ from buildpython.core.summary_support.debt_terminal import (
 )
 from buildpython.steps.code_hygiene.baseline import _path_budget_regressions
 from buildpython.steps.code_hygiene.models import HygieneBaseline, HygieneIssue
-from buildpython.steps.exception_transparency.scanner import collect_findings
+from buildpython.steps.exception_transparency.models import ExceptionTransparencyAnnotationInventory
+from buildpython.steps.exception_transparency.reporting import build_stdout, write_reports
+from buildpython.steps.exception_transparency.scanner import collect_annotation_inventory, collect_findings
 from buildpython.steps.coverage_step.step import CoverageBaseline, build_coverage_report
 from buildpython.steps.exception_transparency.step import _scan_python_source
 
@@ -196,6 +200,66 @@ def example():
     }
 
 
+def test_exception_transparency_collect_annotation_inventory_groups_valid_tags_by_subtree(tmp_path) -> None:
+    tray_file = tmp_path / "src" / "tray" / "runtime.py"
+    helper_file = tmp_path / "buildpython" / "core" / "helpers.py"
+    tray_file.parent.mkdir(parents=True)
+    helper_file.parent.mkdir(parents=True)
+    tray_file.write_text(
+        """
+def run_tray():
+    # @quality-exception exception-transparency: tray startup boundary
+    try:
+        launch()
+    except RuntimeError:  # @quality-exception exception-transparency: tray runtime boundary
+        return None
+""".strip(),
+        encoding="utf-8",
+    )
+    helper_file.write_text(
+        """
+def run_helper():
+    # @quality-exception exception-transparency: build helper boundary
+    return True
+
+def ignored_helper():
+    # @quality-exception exception-transparency
+    return False
+""".strip(),
+        encoding="utf-8",
+    )
+
+    inventory = collect_annotation_inventory(tmp_path)
+
+    assert inventory.total == 3
+    assert inventory.by_subtree == (("src/tray", 2), ("buildpython/core", 1))
+
+
+def test_exception_transparency_reports_include_annotation_inventory(tmp_path) -> None:
+    inventory = ExceptionTransparencyAnnotationInventory(
+        total=3,
+        by_subtree=(("src/tray", 2), ("src/core", 1)),
+    )
+
+    stdout_lines = build_stdout([], Counter(), 0, inventory)
+    write_reports(tmp_path, [], Counter(), 0, inventory)
+
+    report_dir = tmp_path / "buildlog" / "keyrgb"
+    payload = json.loads((report_dir / "exception-transparency.json").read_text(encoding="utf-8"))
+    report_md = (report_dir / "exception-transparency.md").read_text(encoding="utf-8")
+
+    assert any("Valid @quality-exception exception-transparency annotations: 3" in line for line in stdout_lines)
+    assert payload["annotation_inventory"] == {
+        "total": 3,
+        "by_subtree": [
+            {"subtree": "src/tray", "count": 2},
+            {"subtree": "src/core", "count": 1},
+        ],
+    }
+    assert "## Runtime-Boundary Annotation Inventory" in report_md
+    assert "| src/tray | 2 |" in report_md
+
+
 def test_path_budget_regressions_flag_specific_hotspots() -> None:
     issues = [
         HygieneIssue(
@@ -242,6 +306,89 @@ def test_load_hygiene_baseline_returns_empty_on_invalid_json(tmp_path) -> None:
     baseline = step_code_hygiene_baseline._load_hygiene_baseline(tmp_path)
 
     assert baseline == HygieneBaseline(counts={}, gated_categories=set(), path_budgets={})
+
+
+def test_code_hygiene_runner_uses_cleanup_hotspot_threshold_from_baseline(tmp_path, monkeypatch) -> None:
+    config_dir = tmp_path / "buildpython" / "config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "debt_baselines.json").write_text(
+        json.dumps(
+            {
+                "code_hygiene": {
+                    "counts": {
+                        "cleanup_hotspot": 94,
+                        "silent_broad_except": 0,
+                    },
+                    "gated_categories": ["cleanup_hotspot", "silent_broad_except"],
+                }
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    issues = [
+        HygieneIssue(
+            category="cleanup_hotspot",
+            path="src/example.py",
+            line=line,
+            message="msg",
+            snippet="# TODO",
+        )
+        for line in range(1, 96)
+    ]
+
+    monkeypatch.setattr(step_code_hygiene, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_code_hygiene, "_collect_all_issues", lambda _root: issues)
+
+    result = step_code_hygiene.code_hygiene_runner()
+    report = json.loads((tmp_path / "buildlog" / "keyrgb" / "code-hygiene.json").read_text(encoding="utf-8"))
+
+    assert result.exit_code == 1
+    assert report["thresholds"]["cleanup_hotspot"] == 94
+    assert report["active_counts"]["cleanup_hotspot"] == 95
+
+
+def test_code_hygiene_runner_keeps_non_cleanup_thresholds_unchanged(tmp_path, monkeypatch) -> None:
+    config_dir = tmp_path / "buildpython" / "config"
+    config_dir.mkdir(parents=True)
+    (config_dir / "debt_baselines.json").write_text(
+        json.dumps(
+            {
+                "code_hygiene": {
+                    "counts": {
+                        "cleanup_hotspot": 94,
+                        "silent_broad_except": 0,
+                    },
+                    "gated_categories": ["cleanup_hotspot", "silent_broad_except"],
+                }
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    issues = [
+        HygieneIssue(
+            category="silent_broad_except",
+            path="src/example.py",
+            line=1,
+            message="msg",
+            snippet="except Exception:",
+        )
+    ]
+
+    monkeypatch.setattr(step_code_hygiene, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_code_hygiene, "_collect_all_issues", lambda _root: issues)
+
+    result = step_code_hygiene.code_hygiene_runner()
+    report = json.loads((tmp_path / "buildlog" / "keyrgb" / "code-hygiene.json").read_text(encoding="utf-8"))
+
+    assert result.exit_code == 0
+    assert report["thresholds"]["cleanup_hotspot"] == 94
+    assert report["thresholds"]["silent_broad_except"] == 4
 
 
 def test_hygiene_detectors_ignore_missing_or_unparseable_sources(tmp_path) -> None:
@@ -303,10 +450,52 @@ compat_layer = True
 
 def test_text_scanners_do_not_self_flag_cleanup_or_defensive_patterns() -> None:
     scanner_path = Path(text_scanners.__file__).resolve()
+    ast_helper_path = Path(file_size_ast_scan_helpers.__file__).resolve()
     root = scanner_path.parents[3]
 
     assert text_scanners._detect_defensive_conversions(scanner_path, root) == []
     assert text_scanners._detect_cleanup_hotspots(scanner_path, root) == []
+    assert text_scanners._detect_cleanup_hotspots(ast_helper_path, root) == []
+
+
+def test_any_type_hint_scanner_covers_all_src_including_gui_paths(tmp_path) -> None:
+    root = tmp_path
+    gui_target = root / "src" / "gui" / "perkey" / "editor.py"
+    helper_target = root / "buildpython" / "helper.py"
+    gui_target.parent.mkdir(parents=True)
+    helper_target.parent.mkdir(parents=True)
+
+    gui_target.write_text(
+        "from typing import Any\n\n"
+        "def initialize_editor(editor: Any) -> Any:\n"
+        "    return editor\n",
+        encoding="utf-8",
+    )
+    helper_target.write_text(
+        "from typing import Any\n\n"
+        "def helper(value: Any) -> Any:\n"
+        "    return value\n",
+        encoding="utf-8",
+    )
+
+    issues = text_scanners._detect_any_type_hints(gui_target, root)
+
+    assert [
+        (issue.path, issue.line, issue.message)
+        for issue in issues
+    ] == [
+        (
+            "src/gui/perkey/editor.py",
+            3,
+            "Parameter typed as Any - consider Protocol or concrete type",
+        ),
+        (
+            "src/gui/perkey/editor.py",
+            3,
+            "Return typed as Any - consider Protocol or concrete type",
+        ),
+    ]
+    assert text_scanners._detect_any_type_hints(helper_target, root) == []
 
 
 def test_build_coverage_report_tracks_prefixes_and_watch_files() -> None:
@@ -385,6 +574,14 @@ def test_write_debt_index_aggregates_reports(tmp_path) -> None:
                     "baseexception_catch": 0,
                 },
                 "waived_total": 205,
+                "annotation_inventory": {
+                    "total": 102,
+                    "by_subtree": [
+                        {"subtree": "src/tray", "count": 63},
+                        {"subtree": "src/core", "count": 36},
+                        {"subtree": "src/gui", "count": 3},
+                    ],
+                },
                 "top_files_by_category": {"broad_except_unlogged": [{"path": "src/core/config/config.py", "count": 3}]},
             }
         ),
@@ -412,8 +609,14 @@ def test_write_debt_index_aggregates_reports(tmp_path) -> None:
     assert payload["summary"]["report_count"] == 4
     assert "coverage" in payload["sections"]
     assert "exception_transparency" in payload["sections"]
+    assert payload["sections"]["exception_transparency"]["annotation_inventory"]["total"] == 102
     assert (buildlog_dir / "debt-index.json").exists()
     assert (buildlog_dir / "debt-index.md").exists()
+
+    debt_index_md = (buildlog_dir / "debt-index.md").read_text(encoding="utf-8")
+
+    assert "Runtime-boundary annotations: 102" in debt_index_md
+    assert "Top annotation subtrees: src/tray (63), src/core (36), src/gui (3)" in debt_index_md
 
 
 def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> None:
@@ -431,6 +634,14 @@ def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> Non
                     "baseexception_catch": 0,
                 },
                 "waived_total": 205,
+                "annotation_inventory": {
+                    "total": 102,
+                    "by_subtree": [
+                        {"subtree": "src/tray", "count": 63},
+                        {"subtree": "src/core", "count": 36},
+                        {"subtree": "src/gui", "count": 3},
+                    ],
+                },
                 "top_files_by_category": {
                     "broad_except_unlogged": [{"path": "src/core/config/config.py", "count": 3}],
                     "broad_except_total": [{"path": "src/core/config/config.py", "count": 4}],
@@ -444,7 +655,54 @@ def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> Non
 
     assert any("total 6 (205)" in line for line in lines)
     assert any("unlogged 4" in line for line in lines)
+    assert any("annotated 102" in line for line in lines)
     assert any("Top unlogged" in line and "src/core/config/config.py" in line for line in lines)
+    assert any("Top annotated" in line and "src/tray" in line for line in lines)
+
+
+def test_write_summary_includes_exception_transparency_annotation_inventory(tmp_path) -> None:
+    buildlog_dir = tmp_path / "buildlog"
+    buildlog_dir.mkdir()
+    (buildlog_dir / "exception-transparency.json").write_text(
+        json.dumps(
+            {
+                "counts": {
+                    "broad_except_total": 0,
+                    "broad_except_unlogged": 0,
+                    "broad_except_logged_no_traceback": 0,
+                    "broad_except_traceback_logged": 0,
+                    "naked_except": 0,
+                    "baseexception_catch": 0,
+                },
+                "waived_total": 0,
+                "annotation_inventory": {
+                    "total": 102,
+                    "by_subtree": [
+                        {"subtree": "src/tray", "count": 63},
+                        {"subtree": "src/core", "count": 36},
+                        {"subtree": "src/gui", "count": 3},
+                    ],
+                },
+                "top_files_by_category": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    write_summary(
+        buildlog_dir,
+        BuildSummary(
+            passed=True,
+            health_score=100,
+            total_duration_s=0.1,
+            steps=[],
+        ),
+    )
+
+    build_summary_md = (buildlog_dir / "build-summary.md").read_text(encoding="utf-8")
+
+    assert "Runtime-boundary annotations: 102" in build_summary_md
+    assert "Top annotation subtrees: src/tray (63), src/core (36), src/gui (3)" in build_summary_md
 
 
 def test_terminal_debt_snapshot_marks_missing_coverage_capture(tmp_path) -> None:

@@ -4,7 +4,12 @@ import json
 from pathlib import Path
 
 import buildpython.steps.file_size_analysis.step as step_size
-from buildpython.steps.file_size_analysis.scanning import load_flat_directory_allowlist, scan_flat_directories
+from buildpython.steps.file_size_analysis.scanning import (
+    load_flat_directory_allowlist,
+    scan_delegation_candidate,
+    scan_flat_directories,
+    scan_import_block,
+)
 
 from buildpython.core.debt_index import build_debt_index, write_debt_index
 from buildpython.core.summary_support.debt_terminal import build_terminal_filesize_highlight
@@ -79,6 +84,63 @@ def _write_delegation_candidate(path: Path) -> None:
         + "\n",
         encoding="utf-8",
     )
+
+
+def _write_export_facade(path: Path, *, extra_leading_imports: int = 0) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    alpha_names = [f"alpha_{index:02d}" for index in range(1, 11)]
+    beta_names = [f"beta_{index:02d}" for index in range(1, 11)]
+    export_names = [*alpha_names, *beta_names]
+
+    lines = ['"""Export facade."""', "", "from __future__ import annotations", "", "from .alpha import ("]
+    lines.extend(f"    {name}," for name in alpha_names)
+    lines.extend(
+        [
+            ")",
+            "from .beta import (",
+        ]
+    )
+    lines.extend(f"    {name}," for name in beta_names)
+    lines.append(")")
+
+    for index in range(extra_leading_imports):
+        name = f"gamma_{index + 1:02d}"
+        lines.append(f"from .gamma import {name}")
+        export_names.append(name)
+
+    lines.extend(["", "__all__ = ["])
+    lines.extend(f'    "{name}",' for name in export_names)
+    lines.append("]")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_small_thin_facade(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    lines = ['"""Thin facade below the refactor threshold."""']
+    lines.extend(f"from pkg import helper_{index:02d}" for index in range(1, 22))
+    lines.extend(
+        [
+            "delegate_one = helper_01",
+            "delegate_two = helper_02",
+            "delegate_three = helper_03",
+            "delegate_four = helper_04",
+        ]
+    )
+    lines.extend(f"FACADE_META_{index:02d} = {index}" for index in range(1, 49))
+    lines.append("class ThinFacade:")
+    for index in range(5, 17):
+        method_name = f"call_{index:02d}"
+        helper_name = f"helper_{index:02d}"
+        lines.extend(
+            [
+                f"    def {method_name}(self):",
+                f"        return {helper_name}()",
+            ]
+        )
+
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def test_file_size_runner_reports_bucketed_sizes_import_blocks_and_flat_directories(tmp_path, monkeypatch) -> None:
@@ -284,6 +346,36 @@ def test_load_flat_directory_allowlist_returns_empty_when_config_missing(tmp_pat
     assert allowlist == {}
 
 
+def test_repo_flat_directory_allowlist_includes_intentional_package_roots() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    allowlist = load_flat_directory_allowlist(repo_root)
+
+    expected_reason_fragments = {
+        "src/core/profile": "profile package root",
+        "src/gui/perkey/editor_support": "editor support package",
+        "src/gui/perkey/canvas_impl": "canvas implementation package",
+        "src/gui/windows": "window package root",
+        "src/gui/windows/_support": "support-window helper package",
+        "src/tray/app": "tray app package root",
+        "tests/core/backends/ite": "backend-variant test set",
+    }
+
+    for path, fragment in expected_reason_fragments.items():
+        assert path in allowlist
+        assert fragment in allowlist[path]
+
+
+def test_repo_flat_directory_allowlist_promotes_tests_buildpython_but_leaves_calibrator_visible() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    allowlist = load_flat_directory_allowlist(repo_root)
+
+    assert "tests/buildpython" in allowlist
+    assert "buildpython validation test root" in allowlist["tests/buildpython"]
+    assert "src/gui/calibrator" not in allowlist
+
+
 def test_scan_flat_directories_splits_hits_and_allowed(tmp_path) -> None:
     # Three directories exceeding threshold=8:
     #   flagged_a  — 9 files, 0 subdirs, NOT in allowlist → hit
@@ -337,3 +429,41 @@ def test_scan_flat_directories_allowlist_entry_appears_in_json_report(tmp_path, 
     assert "## Flat directories suppressed by allowlist" in markdown
     assert "test exemption" in markdown
     assert "[allowed] src/exempt_dir" in result.stdout
+
+
+def test_scan_import_block_skips_small_pure_export_init_facade(tmp_path) -> None:
+    facade_path = tmp_path / "src" / "package" / "__init__.py"
+    _write_export_facade(facade_path)
+
+    assert scan_import_block(facade_path) is None
+
+
+def test_scan_import_block_still_flags_non_init_export_facade(tmp_path) -> None:
+    module_path = tmp_path / "src" / "package" / "exports.py"
+    _write_export_facade(module_path)
+
+    assert scan_import_block(module_path) == (26, 3)
+
+
+def test_scan_import_block_still_flags_init_facade_with_more_than_three_imports(tmp_path) -> None:
+    facade_path = tmp_path / "src" / "package" / "__init__.py"
+    _write_export_facade(facade_path, extra_leading_imports=1)
+
+    assert scan_import_block(facade_path) == (27, 4)
+
+
+def test_scan_delegation_candidate_skips_small_low_density_thin_facade(tmp_path) -> None:
+    facade_path = tmp_path / "src" / "facade.py"
+    _write_small_thin_facade(facade_path)
+
+    assert scan_delegation_candidate(facade_path) is None
+
+
+def test_scan_delegation_candidate_still_flags_dense_small_delegate_module(tmp_path) -> None:
+    candidate_path = tmp_path / "src" / "delegation_candidate.py"
+    _write_delegation_candidate(candidate_path)
+
+    result = scan_delegation_candidate(candidate_path)
+
+    assert result is not None
+    assert result["score"] == 10

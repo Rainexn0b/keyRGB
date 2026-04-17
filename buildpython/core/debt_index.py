@@ -23,6 +23,26 @@ def _coverage_status(coverage: dict[str, Any]) -> str | None:
     return status if isinstance(status, str) else None
 
 
+def _annotation_inventory_summary(payload: dict[str, Any]) -> tuple[int | None, list[str]]:
+    annotation_inventory = payload.get("annotation_inventory", {})
+    if not isinstance(annotation_inventory, dict):
+        return None, []
+
+    total = annotation_inventory.get("total")
+    raw_subtrees = annotation_inventory.get("by_subtree", [])
+    subtree_bits: list[str] = []
+    if isinstance(raw_subtrees, list):
+        for item in raw_subtrees[:3]:
+            if not isinstance(item, dict):
+                continue
+            subtree = item.get("subtree")
+            count = item.get("count")
+            if isinstance(subtree, str) and isinstance(count, int):
+                subtree_bits.append(f"{subtree} ({count})")
+
+    return total if isinstance(total, int) else None, subtree_bits
+
+
 def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
     hygiene = _read_json_if_exists(buildlog_dir / "code-hygiene.json")
     exception_transparency = _read_json_if_exists(buildlog_dir / "exception-transparency.json")
@@ -47,6 +67,7 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
         sections["exception_transparency"] = {
             "counts": exception_transparency.get("counts", {}),
             "waived_total": exception_transparency.get("waived_total", 0),
+            "annotation_inventory": exception_transparency.get("annotation_inventory", {}),
             "top_files_by_category": exception_transparency.get("top_files_by_category", {}),
         }
         report_paths["exception_transparency"] = str(buildlog_dir / "exception-transparency.md")
@@ -148,9 +169,14 @@ def write_debt_index(buildlog_dir: Path) -> None:
         if isinstance(exception_transparency, dict):
             counts = exception_transparency.get("counts", {})
             waived_total = exception_transparency.get("waived_total", 0)
+            inventory_total, subtree_bits = _annotation_inventory_summary(exception_transparency)
             lines.extend(["## Exception transparency", ""])
             if isinstance(waived_total, int) and waived_total:
                 lines.append(f"- Waived via @quality-exception: {waived_total}")
+            if inventory_total is not None:
+                lines.append(f"- Runtime-boundary annotations: {inventory_total}")
+            if subtree_bits:
+                lines.append(f"- Top annotation subtrees: {', '.join(subtree_bits)}")
             for category in [
                 "naked_except",
                 "baseexception_catch",
@@ -190,7 +216,9 @@ def write_debt_index(buildlog_dir: Path) -> None:
                     f"severe={import_counts.get('severe', 0)}"
                 )
             lines.append(f"- Flat directories: {len(flat_directories) if isinstance(flat_directories, list) else 0}")
-            lines.append(f"- Delegation candidates: {len(delegation_candidates) if isinstance(delegation_candidates, list) else 0}")
+            lines.append(
+                f"- Delegation candidates: {len(delegation_candidates) if isinstance(delegation_candidates, list) else 0}"
+            )
             if isinstance(files, list) and files:
                 first = files[0]
                 if isinstance(first, dict):

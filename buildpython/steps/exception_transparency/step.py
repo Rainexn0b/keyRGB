@@ -11,9 +11,8 @@ from collections import Counter
 
 from ...utils.paths import repo_root
 from ...utils.subproc import RunResult
-from .models import ExceptionTransparencyFinding
 from .reporting import build_stdout, write_reports
-from .scanner import collect_findings, count_broad_waivers
+from .scanner import collect_annotation_inventory, collect_findings, count_broad_waivers
 from .scanner import scan_python_source as _scan_python_source
 
 
@@ -24,13 +23,14 @@ def exception_transparency_runner() -> RunResult:
     root = repo_root()
     findings = collect_findings(root)
     waived_total = count_broad_waivers(root)
+    annotation_inventory = collect_annotation_inventory(root)
 
     counts: Counter[str] = Counter()
     for finding in findings:
         counts[finding.category] += 1
 
-    stdout_lines = build_stdout(findings, counts, waived_total)
-    write_reports(root, findings, counts, waived_total)
+    stdout_lines = build_stdout(findings, counts, waived_total, annotation_inventory)
+    write_reports(root, findings, counts, waived_total, annotation_inventory)
 
     should_fail = any(counts.get(cat, 0) > 0 for cat in GATED_CATEGORIES)
     return RunResult(

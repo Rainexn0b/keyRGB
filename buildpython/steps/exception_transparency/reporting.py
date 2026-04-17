@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ..reports import write_csv, write_json, write_md
 from .baseline import COUNT_CATEGORIES
-from .models import ExceptionTransparencyFinding
+from .models import ExceptionTransparencyAnnotationInventory, ExceptionTransparencyFinding
 
 
 def top_files_by_category(findings: list[ExceptionTransparencyFinding]) -> dict[str, list[tuple[str, int]]]:
@@ -19,6 +19,7 @@ def build_stdout(
     findings: list[ExceptionTransparencyFinding],
     counts: Counter[str],
     waived_total: int,
+    annotation_inventory: ExceptionTransparencyAnnotationInventory,
 ) -> list[str]:
     lines: list[str] = []
     top_files = top_files_by_category(findings)
@@ -30,6 +31,14 @@ def build_stdout(
     for category in COUNT_CATEGORIES:
         current = counts.get(category, 0)
         lines.append(f"  {category:<32} {current:>4}")
+
+    lines.append("")
+    lines.append(
+        "Valid @quality-exception exception-transparency annotations: "
+        f"{annotation_inventory.total}"
+    )
+    for subtree, count in annotation_inventory.by_subtree[:10]:
+        lines.append(f"  {count:>3}  {subtree}")
 
     for category, title in [
         ("broad_except_unlogged", "Unlogged broad catch hotspots"),
@@ -62,6 +71,7 @@ def write_reports(
     findings: list[ExceptionTransparencyFinding],
     counts: Counter[str],
     waived_total: int,
+    annotation_inventory: ExceptionTransparencyAnnotationInventory,
 ) -> None:
     report_dir = root / "buildlog" / "keyrgb"
     report_dir.mkdir(parents=True, exist_ok=True)
@@ -73,6 +83,13 @@ def write_reports(
         {
             "counts": {category: int(counts.get(category, 0)) for category in COUNT_CATEGORIES},
             "waived_total": waived_total,
+            "annotation_inventory": {
+                "total": annotation_inventory.total,
+                "by_subtree": [
+                    {"subtree": subtree, "count": count}
+                    for subtree, count in annotation_inventory.by_subtree
+                ],
+            },
             "top_files_by_category": {
                 category: [{"path": path, "count": count} for path, count in file_counts]
                 for category, file_counts in top_files.items()
@@ -112,6 +129,21 @@ def write_reports(
     for category in COUNT_CATEGORIES:
         current = counts.get(category, 0)
         md_lines.append(f"| {category} | {current} |")
+
+    md_lines.extend(
+        [
+            "",
+            "## Runtime-Boundary Annotation Inventory",
+            "",
+            f"- Total valid annotations: {annotation_inventory.total}",
+        ]
+    )
+    if annotation_inventory.by_subtree:
+        md_lines.extend(["", "| Subtree | Count |", "|---------|------:|"])
+        for subtree, count in annotation_inventory.by_subtree:
+            md_lines.append(f"| {subtree} | {count} |")
+    else:
+        md_lines.extend(["", "No valid annotations found."])
 
     for category, title in [
         ("broad_except_unlogged", "Unlogged Broad Catch Hotspots"),

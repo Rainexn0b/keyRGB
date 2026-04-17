@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import ast
+from collections import Counter
 from pathlib import Path
 
 from ..quality_exceptions import explanation_for_quality_exception_step
 from .baseline import iter_python_files
-from .models import ExceptionTransparencyFinding
+from .models import ExceptionTransparencyAnnotationInventory, ExceptionTransparencyFinding
 
 
 MESSAGE_BY_CATEGORY = {
@@ -173,6 +174,37 @@ def line_indent(line: str) -> str:
     return line[: len(line) - len(line.lstrip())]
 
 
+def inventory_subtree(rel_path: str) -> str:
+    normalized = str(rel_path or "").replace("\\", "/")
+    parts = [part for part in normalized.split("/") if part]
+    if not parts:
+        return normalized
+    if len(parts) >= 2 and parts[0] in {"src", "buildpython"}:
+        return "/".join(parts[:2])
+    return parts[0]
+
+
+def _sorted_inventory_rows(counter: Counter[str]) -> tuple[tuple[str, int], ...]:
+    return tuple(sorted(counter.items(), key=lambda item: (-item[1], item[0])))
+
+
+def scan_annotation_inventory(source: str, *, rel_path: str) -> ExceptionTransparencyAnnotationInventory:
+    subtree = inventory_subtree(rel_path) or str(rel_path)
+    total = 0
+    for line in source.splitlines():
+        explanation = explanation_for_quality_exception_step(
+            comment_text(line),
+            step_slug=QUALITY_EXCEPTION_STEP_SLUG,
+        )
+        if explanation:
+            total += 1
+
+    counter: Counter[str] = Counter()
+    if total:
+        counter[subtree] = total
+    return ExceptionTransparencyAnnotationInventory(total=total, by_subtree=_sorted_inventory_rows(counter))
+
+
 def has_quality_exception_waiver(lines: list[str], handler: ast.ExceptHandler) -> bool:
     if not (0 < handler.lineno <= len(lines)):
         return False
@@ -264,6 +296,25 @@ def collect_findings(root: Path) -> list[ExceptionTransparencyFinding]:
         rel_path = str(path.relative_to(root))
         findings.extend(scan_python_source(source, rel_path=rel_path))
     return findings
+
+
+def collect_annotation_inventory(root: Path) -> ExceptionTransparencyAnnotationInventory:
+    total = 0
+    subtree_counts: Counter[str] = Counter()
+    for path in iter_python_files(root):
+        try:
+            source = path.read_text(encoding="utf-8", errors="replace")
+        except _SOURCE_READ_SKIP_EXCEPTIONS:
+            continue
+        rel_path = str(path.relative_to(root))
+        inventory = scan_annotation_inventory(source, rel_path=rel_path)
+        total += inventory.total
+        for subtree, count in inventory.by_subtree:
+            subtree_counts[subtree] += count
+    return ExceptionTransparencyAnnotationInventory(
+        total=total,
+        by_subtree=_sorted_inventory_rows(subtree_counts),
+    )
 
 
 def count_broad_waivers(root: Path) -> int:

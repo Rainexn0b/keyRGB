@@ -6,13 +6,15 @@ import ast
 import json
 from pathlib import Path
 
+from ._ast_scan_helpers import (
+    delegation_candidate_metrics,
+    import_block_metrics,
+    load_module_scan_context,
+    module_docstring_consumes_first_statement as _module_docstring_consumes_first_statement,
+)
 from .constants import (
     DIRECTORY_SCAN_ROOTS,
     DIRECT_PYTHON_FILE_THRESHOLD,
-    DELEGATION_ALIAS_BINDINGS_MIN,
-    DELEGATION_DELEGATING_CALLABLES_MIN,
-    DELEGATION_IMPORT_BLOCK_MIN_LINES,
-    DELEGATION_SCORE_MIN,
     file_bucket,
     import_block_level,
 )
@@ -69,183 +71,21 @@ def read_lines(path: Path) -> list[str] | None:
 
 
 def module_docstring_consumes_first_statement(tree: ast.Module) -> bool:
-    if not tree.body:
-        return False
-    first = tree.body[0]
-    if not isinstance(first, ast.Expr):
-        return False
-    value = first.value
-    return isinstance(value, ast.Constant) and isinstance(value.value, str)
+    return _module_docstring_consumes_first_statement(tree)
 
 
 def scan_import_block(path: Path) -> tuple[int, int] | None:
-    try:
-        source = path.read_text(encoding="utf-8")
-    except OSError:
+    context = load_module_scan_context(path)
+    if context is None:
         return None
-
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return None
-
-    start_index = 1 if module_docstring_consumes_first_statement(tree) else 0
-    import_nodes: list[ast.Import | ast.ImportFrom] = []
-    for node in tree.body[start_index:]:
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            import_nodes.append(node)
-            continue
-        break
-
-    if not import_nodes:
-        return None
-
-    first = import_nodes[0]
-    last = import_nodes[-1]
-    return ((last.end_lineno or last.lineno) - first.lineno + 1, len(import_nodes))
-
-
-def _leading_import_nodes(tree: ast.Module) -> list[ast.Import | ast.ImportFrom]:
-    start_index = 1 if module_docstring_consumes_first_statement(tree) else 0
-    import_nodes: list[ast.Import | ast.ImportFrom] = []
-    for node in tree.body[start_index:]:
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            import_nodes.append(node)
-            continue
-        break
-    return import_nodes
-
-
-def _imported_bindings(import_nodes: list[ast.Import | ast.ImportFrom]) -> set[str]:
-    bindings: set[str] = set()
-    for node in import_nodes:
-        for alias in node.names:
-            bound = alias.asname or alias.name.split(".", 1)[0]
-            if bound:
-                bindings.add(bound)
-    return bindings
-
-
-def _attribute_root_name(expr: ast.expr) -> str | None:
-    current = expr
-    while isinstance(current, ast.Attribute):
-        current = current.value
-    if isinstance(current, ast.Name):
-        return current.id
-    return None
-
-
-def _is_import_alias_expr(expr: ast.expr | None, imported_names: set[str]) -> bool:
-    if expr is None:
-        return False
-    if isinstance(expr, ast.Name):
-        return expr.id in imported_names
-    if isinstance(expr, ast.Attribute):
-        root_name = _attribute_root_name(expr)
-        return root_name in imported_names if root_name is not None else False
-    return False
-
-
-def _count_alias_bindings(tree: ast.Module, imported_names: set[str]) -> int:
-    count = 0
-    for node in tree.body:
-        if isinstance(node, ast.Assign):
-            if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
-                continue
-            if _is_import_alias_expr(node.value, imported_names):
-                count += 1
-        elif isinstance(node, ast.AnnAssign):
-            if not isinstance(node.target, ast.Name):
-                continue
-            if _is_import_alias_expr(node.value, imported_names):
-                count += 1
-    return count
-
-
-def _strip_leading_docstring(body: list[ast.stmt]) -> list[ast.stmt]:
-    if not body:
-        return body
-    first = body[0]
-    if not isinstance(first, ast.Expr):
-        return body
-    value = first.value
-    if isinstance(value, ast.Constant) and isinstance(value.value, str):
-        return body[1:]
-    return body
-
-
-def _is_delegating_stmt(stmt: ast.stmt, imported_names: set[str]) -> bool:
-    if isinstance(stmt, ast.Return) and isinstance(stmt.value, ast.Call):
-        return _is_import_alias_expr(stmt.value.func, imported_names)
-    if isinstance(stmt, ast.Expr) and isinstance(stmt.value, ast.Call):
-        return _is_import_alias_expr(stmt.value.func, imported_names)
-    return False
-
-
-def _count_delegating_callables(tree: ast.Module, imported_names: set[str]) -> tuple[int, int]:
-    total = 0
-    delegating = 0
-
-    def visit_callable(node: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-        nonlocal total, delegating
-        total += 1
-        body = _strip_leading_docstring(list(node.body))
-        if len(body) != 1:
-            return
-        if _is_delegating_stmt(body[0], imported_names):
-            delegating += 1
-
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            visit_callable(node)
-        elif isinstance(node, ast.ClassDef):
-            for item in node.body:
-                if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    visit_callable(item)
-
-    return total, delegating
+    return import_block_metrics(context)
 
 
 def scan_delegation_candidate(path: Path) -> dict[str, Any] | None:
-    try:
-        source = path.read_text(encoding="utf-8")
-    except OSError:
+    context = load_module_scan_context(path)
+    if context is None:
         return None
-
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return None
-
-    import_nodes = _leading_import_nodes(tree)
-    if not import_nodes:
-        return None
-
-    first_import = import_nodes[0]
-    last_import = import_nodes[-1]
-    import_lines = (last_import.end_lineno or last_import.lineno) - first_import.lineno + 1
-    if import_lines < DELEGATION_IMPORT_BLOCK_MIN_LINES:
-        return None
-
-    imported_names = _imported_bindings(import_nodes)
-    alias_bindings = _count_alias_bindings(tree, imported_names)
-    callable_count, delegating_callables = _count_delegating_callables(tree, imported_names)
-    score = alias_bindings + delegating_callables
-
-    if score < DELEGATION_SCORE_MIN:
-        return None
-    if alias_bindings < DELEGATION_ALIAS_BINDINGS_MIN and delegating_callables < DELEGATION_DELEGATING_CALLABLES_MIN:
-        return None
-
-    return {
-        "path": str(path),
-        "import_lines": import_lines,
-        "import_statements": len(import_nodes),
-        "alias_bindings": alias_bindings,
-        "delegating_callables": delegating_callables,
-        "callables": callable_count,
-        "score": score,
-    }
+    return delegation_candidate_metrics(context)
 
 
 def scan_flat_directories(
@@ -260,7 +100,7 @@ def scan_flat_directories(
     ``flat_directories.allowed`` entry in debt_baselines.json.  They are included
     in the report for auditability.
     """
-    _allowlist: dict[str, str] = allowlist if allowlist is not None else load_flat_directory_allowlist(root)
+    flat_directory_allowlist = allowlist if allowlist is not None else load_flat_directory_allowlist(root)
     hits: list[dict[str, Any]] = []
     allowed_entries: list[dict[str, Any]] = []
     for folder_name in DIRECTORY_SCAN_ROOTS:
@@ -293,8 +133,8 @@ def scan_flat_directories(
                 "examples": direct_python_files[:5],
             }
             rel_path = str(directory.relative_to(root)).replace("\\", "/")
-            if rel_path in _allowlist:
-                entry["allowed_reason"] = _allowlist[rel_path]
+            if rel_path in flat_directory_allowlist:
+                entry["allowed_reason"] = flat_directory_allowlist[rel_path]
                 allowed_entries.append(entry)
             else:
                 hits.append(entry)

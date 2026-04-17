@@ -16,6 +16,17 @@ def _top_file(top_files: object, category: str) -> tuple[str, object] | None:
     return (str(path), count) if isinstance(path, str) else None
 
 
+def _top_annotation_subtree(annotation_inventory: object) -> tuple[str, object] | None:
+    if not isinstance(annotation_inventory, dict):
+        return None
+    raw_subtrees = annotation_inventory.get("by_subtree", [])
+    if not isinstance(raw_subtrees, list) or not raw_subtrees or not isinstance(raw_subtrees[0], dict):
+        return None
+    subtree = raw_subtrees[0].get("subtree")
+    count = raw_subtrees[0].get("count")
+    return (str(subtree), count) if isinstance(subtree, str) else None
+
+
 def build_terminal_hygiene_highlight(buildlog_dir: Path) -> list[str]:
     hygiene = read_json_if_exists(buildlog_dir / "code-hygiene.json")
     if hygiene is None:
@@ -42,7 +53,7 @@ def build_terminal_hygiene_highlight(buildlog_dir: Path) -> list[str]:
     if not parts:
         return []
 
-    lines: list[str] = ["\U0001f50d  " + "  \u00b7  ".join(parts)]  # 🔍
+    lines: list[str] = ["\U0001f50d  " + "  \u00b7  ".join(parts)]
     for category, label in [
         ("silent_broad_except", "Top silent"),
         ("logged_broad_except", "Top logged"),
@@ -63,6 +74,7 @@ def build_terminal_transparency_highlight(buildlog_dir: Path) -> list[str]:
 
     counts = exception_transparency.get("counts", {})
     waived_total = exception_transparency.get("waived_total", 0)
+    annotation_inventory = exception_transparency.get("annotation_inventory", {})
 
     parts: list[str] = []
     for key, label in [
@@ -78,10 +90,15 @@ def build_terminal_transparency_highlight(buildlog_dir: Path) -> list[str]:
         else:
             parts.append(f"{label} {current}")
 
+    if isinstance(annotation_inventory, dict):
+        annotation_total = annotation_inventory.get("total")
+        if isinstance(annotation_total, int):
+            parts.append(f"annotated {annotation_total}")
+
     if not parts:
         return []
 
-    lines: list[str] = ["\U0001f9ea  " + "  \u00b7  ".join(parts)]  # 🧪
+    lines: list[str] = ["\U0001f9ea  " + "  \u00b7  ".join(parts)]
     top_files = exception_transparency.get("top_files_by_category", {})
     for category, label in [
         ("broad_except_unlogged", "Top unlogged"),
@@ -90,6 +107,10 @@ def build_terminal_transparency_highlight(buildlog_dir: Path) -> list[str]:
         hit = _top_file(top_files, category)
         if hit:
             lines.append(f"{label + ':':<16}  {hit[0]} ({hit[1]})")
+
+    annotated = _top_annotation_subtree(annotation_inventory)
+    if annotated is not None:
+        lines.append(f"{'Top annotated:':<16}  {annotated[0]} ({annotated[1]})")
 
     return lines
 
@@ -112,7 +133,7 @@ def build_terminal_markers_highlight(buildlog_dir: Path) -> list[str]:
     if not parts:
         return []
 
-    lines: list[str] = ["\U0001f4dd  " + "  \u00b7  ".join(parts)]  # 📝
+    lines: list[str] = ["\U0001f4dd  " + "  \u00b7  ".join(parts)]
     if isinstance(top_marker_files, dict):
         for marker in ["HACK", "FIXME", "TODO", "NOTE"]:
             hit = _top_file(top_marker_files, marker)
@@ -139,7 +160,7 @@ def build_terminal_filesize_highlight(buildlog_dir: Path) -> list[str]:
         f"flat-dirs {flat_directory_count}",
         f"delegations {delegation_candidate_count}",
     ]
-    lines: list[str] = ["\U0001f4c1  " + "  \u00b7  ".join(fs_parts)]  # 📁
+    lines: list[str] = ["\U0001f4c1  " + "  \u00b7  ".join(fs_parts)]
 
     if isinstance(files, list) and files and isinstance(files[0], dict):
         lines.append(f"{'Top large:':<16}  {files[0].get('path')} ({files[0].get('lines')})")
