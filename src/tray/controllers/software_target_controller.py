@@ -2,37 +2,27 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterator
-from threading import RLock
-from typing import Protocol, cast
+from typing import Protocol, TypeAlias, TypeVar, cast
 
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 from src.core.effects.software_targets import normalize_software_effect_target
-from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.core.utils.exceptions import is_permission_denied
-from src.tray.ui.menu_status import device_context_controls_available, device_context_entries
+from src.tray.secondary_device_routes import route_for_context_entry
+from src.tray.ui.menu_status import DeviceContextEntry, device_context_controls_available, device_context_entries
+
+from . import _software_target_auxiliary as software_target_auxiliary
 
 
 logger = logging.getLogger(__name__)
+_ResultT = TypeVar("_ResultT")
+
+_SecondarySoftwareTargetProtocol: TypeAlias = software_target_auxiliary._SecondarySoftwareTargetProtocol
+_CachedSecondarySoftwareTarget = software_target_auxiliary._CachedSecondarySoftwareTarget
+_SECONDARY_TARGET_RUNTIME_EXCEPTIONS = software_target_auxiliary._SECONDARY_TARGET_RUNTIME_EXCEPTIONS
 
 _ENGINE_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
 _CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
-_SECONDARY_TARGET_RUNTIME_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
 _TRAY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-
-
-class _LightbarDeviceProtocol(Protocol):
-    def set_color(self, color: object, *, brightness: int) -> None: ...
-
-    def turn_off(self) -> None: ...
-
-
-class _SecondarySoftwareTargetProtocol(Protocol):
-    key: str
-
-    def set_color(self, color: object, *, brightness: int) -> None: ...
-
-    def turn_off(self) -> None: ...
 
 
 class _SoftwareTargetTrayProtocol(Protocol):
@@ -54,48 +44,45 @@ class _PermissionIssueTrayProtocol(Protocol):
     def _notify_permission_issue(self, exc: Exception) -> None: ...
 
 
-class _CachedSecondarySoftwareTarget:
-    supports_per_key = False
-
-    def __init__(self, *, key: str, route: SecondaryDeviceRoute) -> None:
-        self.key = str(key or "lightbar")
-        self.device_type = str(route.device_type)
-        self._route = route
-        self._lock = RLock()
-        self._device: _LightbarDeviceProtocol | None = None
-
-    @property
-    def device(self) -> "_CachedSecondarySoftwareTarget":
-        return self
-
-    def set_color(self, color: object, *, brightness: int) -> None:
-        def _apply(device: _LightbarDeviceProtocol) -> None:
-            device.set_color(color, brightness=int(brightness))
-
-        self._with_device(_apply)
-
-    def turn_off(self) -> None:
-        self._with_device(lambda device: device.turn_off())
-
-    def _with_device(self, operation: Callable[[_LightbarDeviceProtocol], None]) -> None:
-        with self._lock:
-            device = self._device
-            if device is None:
-                device = self._route.get_device()
-                self._device = device
-            try:
-                operation(device)
-            # @quality-exception exception-transparency: any device-operation failure should invalidate the cached handle before re-raising
-            except _SECONDARY_TARGET_RUNTIME_EXCEPTIONS:
-                self._device = None
-                raise
+def _run_recoverable_boundary(
+    action: Callable[[], _ResultT],
+    *,
+    runtime_exceptions: tuple[type[Exception], ...],
+    on_recoverable: Callable[[Exception], None],
+    fallback: _ResultT,
+    reraise_recoverable: bool = False,
+) -> _ResultT:
+    try:
+        return action()
+    except runtime_exceptions as exc:  # @quality-exception exception-transparency: shared secondary-target device and tray callback runtime seams must either invalidate cached state or degrade to fallback logging while unexpected defects still propagate
+        on_recoverable(exc)
+        if reraise_recoverable:
+            raise
+        return fallback
 
 
 def _try_log_event(tray: _SoftwareTargetTrayProtocol, source: str, action: str, **fields: object) -> None:
-    try:
-        tray._log_event(source, action, **fields)
-    except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
-        logger.exception("Tray event logging failed: %s", exc)
+    _call_tray_callback_best_effort(
+        lambda: tray._log_event(source, action, **fields),
+        on_recoverable=lambda exc: logger.exception("Tray event logging failed: %s", exc),
+    )
+
+
+def _call_tray_callback_best_effort(
+    action: Callable[[], None],
+    *,
+    on_recoverable: Callable[[Exception], None],
+) -> bool:
+    def _call_action() -> bool:
+        action()
+        return True
+
+    return _run_recoverable_boundary(
+        _call_action,
+        runtime_exceptions=_TRAY_CALLBACK_RUNTIME_EXCEPTIONS,
+        on_recoverable=on_recoverable,
+        fallback=False,
+    )
 
 
 def _notify_permission_issue_or_none(tray: _SoftwareTargetTrayProtocol) -> Callable[[Exception], None] | None:
@@ -149,30 +136,26 @@ def apply_software_effect_target_selection(tray: _SoftwareTargetTrayProtocol, ta
 
 
 def software_effect_target_has_auxiliary_devices(tray: object) -> bool:
-    return bool(_secondary_target_entries(tray))
+    return software_target_auxiliary.software_effect_target_has_auxiliary_devices(
+        tray,
+        secondary_target_entries_fn=_secondary_target_entries,
+    )
 
 
 def software_effect_target_routes_aux_devices(tray: _SoftwareTargetTrayProtocol) -> bool:
-    if not software_effect_target_has_auxiliary_devices(tray):
-        return False
-    current = normalize_software_effect_target(getattr(getattr(tray, "config", None), "software_effect_target", None))
-    return current == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+    return software_target_auxiliary.software_effect_target_routes_aux_devices(
+        tray,
+        has_auxiliary_devices_fn=software_effect_target_has_auxiliary_devices,
+    )
 
 
 def secondary_software_render_targets(tray: _SoftwareTargetTrayProtocol) -> list[_SecondarySoftwareTargetProtocol]:
-    cache = _proxy_cache(tray)
-    targets: list[_SecondarySoftwareTargetProtocol] = []
-    for entry in _secondary_target_entries(tray):
-        route = route_for_context_entry(entry)
-        if route is None or not bool(route.supports_uniform_color) or not bool(route.supports_software_target):
-            continue
-        key = str(entry.get("key") or route.device_type)
-        target = cache.get(key)
-        if target is None:
-            target = _CachedSecondarySoftwareTarget(key=key, route=route)
-            cache[key] = target
-        targets.append(target)
-    return targets
+    return software_target_auxiliary.secondary_software_render_targets(
+        tray,
+        secondary_target_entries_fn=_secondary_target_entries,
+        proxy_cache_fn=_proxy_cache,
+        cached_secondary_target_cls=_CachedSecondarySoftwareTarget,
+    )
 
 
 def restore_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> None:
@@ -192,62 +175,45 @@ def turn_off_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> No
 
 
 def software_effect_target_options(tray: object) -> list[dict[str, object]]:
-    aux_available = software_effect_target_has_auxiliary_devices(tray)
-    return [
-        {
-            "key": SOFTWARE_EFFECT_TARGET_KEYBOARD,
-            "label": "Keyboard Only",
-            "enabled": True,
-        },
-        {
-            "key": SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
-            "label": "All Compatible Devices",
-            "enabled": aux_available,
-        },
-    ]
+    return software_target_auxiliary.software_effect_target_options(
+        tray,
+        has_auxiliary_devices_fn=software_effect_target_has_auxiliary_devices,
+    )
 
 
-def _secondary_target_entries(tray: object) -> list[dict[str, str]]:
-    entries: list[dict[str, str]] = []
-    for entry in device_context_entries(tray):
-        if str(entry.get("device_type") or "keyboard").strip().lower() == "keyboard":
-            continue
-        if not device_context_controls_available(tray, entry):
-            continue
-        entries.append(entry)
-    return entries
+def _secondary_target_entries(tray: object) -> list[DeviceContextEntry]:
+    return software_target_auxiliary._secondary_target_entries(
+        tray,
+        device_context_entries_fn=device_context_entries,
+        device_context_controls_available_fn=device_context_controls_available,
+    )
 
 
 def _proxy_cache(tray: _SoftwareTargetTrayProtocol) -> dict[str, _SecondarySoftwareTargetProtocol]:
-    existing = getattr(tray, "software_target_proxy_cache", None)
-    if isinstance(existing, dict):
-        return existing
-    cache: dict[str, _SecondarySoftwareTargetProtocol] = {}
-    try:
-        setattr(tray, "software_target_proxy_cache", cache)
-    except (AttributeError, TypeError):
-        pass
-    except RuntimeError as exc:
-        _log_boundary_exception(tray, "Failed to store software target proxy cache: %s", exc)
-    return cache
+    return software_target_auxiliary._proxy_cache(
+        tray,
+        on_store_cache_failure=lambda exc: _log_boundary_exception(
+            tray,
+            "Failed to store software target proxy cache: %s",
+            exc,
+        ),
+    )
 
 
 def _iter_secondary_targets(
     tray: _SoftwareTargetTrayProtocol,
-) -> Iterator[tuple[dict[str, str], _SecondarySoftwareTargetProtocol]]:
-    targets_by_key = {target.key: target for target in secondary_software_render_targets(tray)}
-    for entry in _secondary_target_entries(tray):
-        key = str(entry.get("key") or "")
-        target = targets_by_key.get(key)
-        if target is None:
-            continue
-        yield entry, target
+) -> Iterator[tuple[DeviceContextEntry, _SecondarySoftwareTargetProtocol]]:
+    return software_target_auxiliary._iter_secondary_targets(
+        tray,
+        secondary_target_entries_fn=_secondary_target_entries,
+        secondary_software_render_targets_fn=secondary_software_render_targets,
+    )
 
 
 def _restore_target_from_config(
     tray: _SoftwareTargetTrayProtocol,
     *,
-    entry: dict[str, str],
+    entry: DeviceContextEntry,
     target: _SecondarySoftwareTargetProtocol,
 ) -> None:
     route = route_for_context_entry(entry)
@@ -271,7 +237,8 @@ def _restore_target_from_config(
         brightness_attr = str(route.config_brightness_attr or "").strip()
         if not brightness_attr:
             return
-        brightness = int(getattr(config, brightness_attr, 0) or 0)
+        raw_brightness = getattr(config, brightness_attr, 0)
+        brightness = 0 if not raw_brightness else int(raw_brightness)
     if brightness <= 0:
         target.turn_off()
         return
@@ -295,13 +262,15 @@ def _handle_secondary_target_error(tray: _SoftwareTargetTrayProtocol, exc: Excep
         if notify_permission_issue is None:
             _log_boundary_exception(tray, f"Error during {action}: %s", exc)
             return
-        try:
-            notify_permission_issue(exc)
+        if _call_tray_callback_best_effort(
+            lambda: notify_permission_issue(exc),
+            on_recoverable=lambda notify_exc: _log_boundary_exception(
+                tray,
+                "Failed to notify permission issue for secondary software target: %s",
+                notify_exc,
+            ),
+        ):
             return
-        except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as notify_exc:  # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging
-            _log_boundary_exception(
-                tray, "Failed to notify permission issue for secondary software target: %s", notify_exc
-            )
 
     _log_boundary_exception(tray, f"Error during {action}: %s", exc)
 
@@ -337,11 +306,13 @@ def _set_config_attr_best_effort(
 
 
 def _log_boundary_exception(tray: _SoftwareTargetTrayProtocol, msg: str, exc: Exception) -> None:
-    try:
-        tray._log_exception(msg, exc)
+    if _call_tray_callback_best_effort(
+        lambda: tray._log_exception(msg, exc),
+        on_recoverable=lambda log_exc: logger.exception(
+            "Tray exception logger failed while logging boundary: %s", log_exc
+        ),
+    ):
         return
-    except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
-        logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
 
     logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 

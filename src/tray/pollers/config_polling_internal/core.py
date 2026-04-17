@@ -12,6 +12,9 @@ from src.core.utils.safe_attrs import safe_int_attr
 from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.protocols import ConfigPollingTrayProtocol
 
+from ._fast_path import classify_fast_path_change
+from ._post_fast_path_apply import apply_post_fast_path_execution
+
 
 ColorTuple = tuple[int, int, int]
 
@@ -138,56 +141,16 @@ def maybe_apply_fast_path(
 ) -> tuple[bool, ConfigApplyState]:
     """Apply fast-path config updates."""
 
-    if last_applied is None:
-        return False, current
+    change_kind = classify_fast_path_change(last_applied=last_applied, current=current)
 
-    try:
-        only_target_changed = (
-            last_applied.effect == current.effect
-            and last_applied.speed == current.speed
-            and last_applied.brightness == current.brightness
-            and last_applied.color == current.color
-            and last_applied.perkey_sig == current.perkey_sig
-            and last_applied.reactive_use_manual == current.reactive_use_manual
-            and last_applied.reactive_color == current.reactive_color
-            and last_applied.reactive_brightness == current.reactive_brightness
-            and last_applied.software_effect_target != current.software_effect_target
-        )
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        only_target_changed = False
-
-    if only_target_changed:
+    if change_kind == "target_only":
         try:
             from .helpers import _sync_software_target_policy
 
             _sync_software_target_policy(tray, current)
         except _FAST_PATH_EXCEPTIONS:
             pass
-        try:
-            tray._refresh_ui()
-        except _FAST_PATH_EXCEPTIONS:
-            pass
-        return True, current
-
-    try:
-        only_reactive_changed = (
-            last_applied.effect == current.effect
-            and last_applied.speed == current.speed
-            and last_applied.brightness == current.brightness
-            and last_applied.color == current.color
-            and last_applied.perkey_sig == current.perkey_sig
-            and last_applied.software_effect_target == current.software_effect_target
-            and (
-                last_applied.reactive_use_manual != current.reactive_use_manual
-                or last_applied.reactive_color != current.reactive_color
-                or last_applied.reactive_brightness != current.reactive_brightness
-                or last_applied.reactive_trail_percent != current.reactive_trail_percent
-            )
-        )
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        only_reactive_changed = False
-
-    if only_reactive_changed:
+    elif change_kind == "reactive_only":
         try:
             tray.engine.reactive_use_manual_color = bool(current.reactive_use_manual)
             tray.engine.reactive_color = current.reactive_color
@@ -195,29 +158,8 @@ def maybe_apply_fast_path(
             tray.engine.reactive_trail_percent = int(current.reactive_trail_percent)
         except _FAST_PATH_EXCEPTIONS:
             pass
-        try:
-            tray._refresh_ui()
-        except _FAST_PATH_EXCEPTIONS:
-            pass
-        return True, current
-
-    try:
-        only_brightness_changed = (
-            last_applied.effect == current.effect
-            and last_applied.speed == current.speed
-            and last_applied.color == current.color
-            and last_applied.perkey_sig == current.perkey_sig
-            and last_applied.software_effect_target == current.software_effect_target
-            and last_applied.reactive_use_manual == current.reactive_use_manual
-            and last_applied.reactive_color == current.reactive_color
-            and last_applied.reactive_brightness == current.reactive_brightness
-            and last_applied.brightness != current.brightness
-        )
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        only_brightness_changed = False
-
-    if (
-        only_brightness_changed
+    elif (
+        change_kind == "brightness_only"
         and str(current.effect) in sw_effects_set
         and bool(getattr(tray.engine, "running", False))
     ):
@@ -225,13 +167,15 @@ def maybe_apply_fast_path(
             tray.engine.set_brightness(int(current.brightness), apply_to_hardware=False)
         except _FAST_PATH_EXCEPTIONS:
             pass
-        try:
-            tray._refresh_ui()
-        except _FAST_PATH_EXCEPTIONS:
-            pass
-        return True, current
+    else:
+        return False, current
 
-    return False, current
+    try:
+        tray._refresh_ui()
+    except _FAST_PATH_EXCEPTIONS:
+        pass
+
+    return True, current
 
 
 def apply_from_config_once(
@@ -318,41 +262,20 @@ def apply_from_config_once(
         last_apply_warn_at = _apply_turn_off(tray, current, cause, monotonic_fn, last_apply_warn_at)
         return current, last_apply_warn_at
 
-    if current.brightness > 0:
-        tray._last_brightness = current.brightness
-
-    _sync_reactive(tray, current)
-
-    try:
-        if current.effect == "perkey":
-            _apply_perkey(tray, current, ite_num_rows, ite_num_cols, cause=cause)
-        elif current.effect == "none":
-            _apply_uniform(tray, current, cause=cause)
-        else:
-            _apply_effect(tray, current, cause=cause)
-    except _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: backend apply is a runtime hardware boundary and recoverable device errors must degrade tray state gracefully
-        if is_device_disconnected_fn(exc):
-            try:
-                tray.engine.mark_device_unavailable()
-            except _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS as mark_exc:  # @quality-exception exception-transparency: marking device unavailable is itself a degraded-hardware boundary
-                now = float(monotonic_fn())
-                if now - last_apply_warn_at > 60:
-                    last_apply_warn_at = now
-                    try:
-                        tray._log_exception("Failed to mark device unavailable: %s", mark_exc)
-                    except (OSError, RuntimeError, ValueError):
-                        pass
-        tray._log_exception("Error applying config change: %s", exc)
-
-    try:
-        tray._refresh_ui()
-    except _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: tray UI refresh is a runtime Tk widget boundary and must not break config apply on widget errors
-        now = float(monotonic_fn())
-        if now - last_apply_warn_at > 60:
-            last_apply_warn_at = now
-            try:
-                tray._log_exception("Failed to refresh tray UI after config apply: %s", exc)
-            except (OSError, RuntimeError, ValueError):
-                pass
+    last_apply_warn_at = apply_post_fast_path_execution(
+        tray,
+        current=current,
+        ite_num_rows=ite_num_rows,
+        ite_num_cols=ite_num_cols,
+        cause=cause,
+        last_apply_warn_at=last_apply_warn_at,
+        monotonic_fn=monotonic_fn,
+        is_device_disconnected_fn=is_device_disconnected_fn,
+        sync_reactive_fn=_sync_reactive,
+        apply_perkey_fn=_apply_perkey,
+        apply_uniform_fn=_apply_uniform,
+        apply_effect_fn=_apply_effect,
+        runtime_boundary_exceptions=_CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS,
+    )
 
     return current, last_apply_warn_at

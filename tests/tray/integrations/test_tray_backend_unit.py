@@ -1,11 +1,32 @@
 from __future__ import annotations
 
 import logging
+from types import TracebackType
 
 import pytest
 from unittest.mock import MagicMock, patch
 
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
+
+
+def _assert_logged_debug_traceback(
+    logger: MagicMock,
+    message: str,
+    *,
+    exc_type: type[BaseException] = RuntimeError,
+    exc_message: str = "boom",
+) -> None:
+    logger.log.assert_called_once()
+    assert logger.log.call_args.args == (logging.DEBUG, message)
+    assert set(logger.log.call_args.kwargs) == {"exc_info"}
+    exc_info = logger.log.call_args.kwargs["exc_info"]
+    assert isinstance(exc_info, tuple)
+    assert len(exc_info) == 3
+    logged_type, logged_exc, logged_tb = exc_info
+    assert logged_type is exc_type
+    assert isinstance(logged_exc, exc_type)
+    assert str(logged_exc) == exc_message
+    assert isinstance(logged_tb, TracebackType)
 
 
 def test_select_backend_with_introspection_happy_path() -> None:
@@ -35,7 +56,7 @@ def test_load_ite_dimensions_falls_back_and_logs_traceback() -> None:
         dims = load_ite_dimensions()
 
     assert dims == (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
-    logger.log.assert_called_once_with(logging.DEBUG, "Falling back to default keyboard dimensions", exc_info=True)
+    _assert_logged_debug_traceback(logger, "Falling back to default keyboard dimensions")
 
 
 def test_load_ite_dimensions_propagates_unexpected_errors() -> None:
@@ -63,7 +84,7 @@ def test_select_backend_with_introspection_handles_probe_exception() -> None:
     assert b is backend
     assert probe is None
     assert caps == "caps"
-    logger.log.assert_called_once_with(logging.DEBUG, "Backend probe failed during tray introspection", exc_info=True)
+    _assert_logged_debug_traceback(logger, "Backend probe failed during tray introspection")
 
 
 def test_select_backend_with_introspection_propagates_unexpected_probe_exception() -> None:
@@ -95,9 +116,7 @@ def test_select_backend_with_introspection_handles_caps_exception() -> None:
     assert b is backend
     assert probe == "probe"
     assert caps is None
-    logger.log.assert_called_once_with(
-        logging.DEBUG, "Backend capabilities lookup failed during tray introspection", exc_info=True
-    )
+    _assert_logged_debug_traceback(logger, "Backend capabilities lookup failed during tray introspection")
 
 
 def test_select_backend_with_introspection_propagates_unexpected_caps_exception() -> None:
@@ -143,7 +162,7 @@ def test_select_device_discovery_snapshot_swallows_errors() -> None:
     ):
         assert select_device_discovery_snapshot() is None
 
-    logger.log.assert_called_once_with(logging.DEBUG, "Tray device discovery snapshot collection failed", exc_info=True)
+    _assert_logged_debug_traceback(logger, "Tray device discovery snapshot collection failed")
 
 
 def test_select_device_discovery_snapshot_propagates_unexpected_errors() -> None:

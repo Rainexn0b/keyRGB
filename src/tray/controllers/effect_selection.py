@@ -72,6 +72,13 @@ def _set_attr_best_effort(obj: object, name: str, value: object) -> bool:
     return True
 
 
+def _notify_permission_issue_best_effort(tray: LightingTrayProtocol, exc: Exception) -> None:
+    try:
+        tray._notify_permission_issue(exc)
+    except _NOTIFY_CALLBACK_RUNTIME_EXCEPTIONS as notify_exc:
+        logger.exception("Failed to notify permission issue during effect selection: %s", notify_exc)
+
+
 def _load_per_key_colors_from_profile(config) -> dict:
     """Load per-key colors from the active profile.
 
@@ -268,10 +275,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         tray.is_off = False
     except _EFFECT_SELECTION_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: effect apply crosses device I/O and tray state; permission/disconnect are dispatched and remaining recoverable runtime errors are logged with traceback
         if is_permission_denied(exc):
-            try:
-                tray._notify_permission_issue(exc)
-            except _NOTIFY_CALLBACK_RUNTIME_EXCEPTIONS as notify_exc:  # @quality-exception exception-transparency: notification callback is a user-injected tray boundary and failures must not break the permission-issue handling path
-                logger.exception("Failed to notify permission issue during effect selection: %s", notify_exc)
+            _notify_permission_issue_best_effort(tray, exc)
             return
         logger.exception("Error applying effect selection: %s", exc)
         return

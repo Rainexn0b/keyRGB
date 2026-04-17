@@ -6,15 +6,14 @@ from typing import Callable, Protocol
 from src.core.utils.exceptions import is_permission_denied
 from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.tray.protocols import LightingTrayProtocol
-from src.tray.ui.menu_status import selected_device_context_entry
+from src.tray.ui.menu_status import DeviceContextEntry, selected_device_context_entry
 
 from ._lighting_controller_helpers import parse_menu_int, try_log_event
 
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
-_SECONDARY_DEVICE_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-_TRAY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class _LightbarDeviceProtocol(Protocol):
@@ -23,7 +22,7 @@ class _LightbarDeviceProtocol(Protocol):
     def turn_off(self) -> None: ...
 
 
-def selected_secondary_context_entry(tray: LightingTrayProtocol) -> dict[str, str] | None:
+def selected_secondary_context_entry(tray: LightingTrayProtocol) -> DeviceContextEntry | None:
     entry = selected_device_context_entry(tray)
     if str(entry.get("device_type") or "").strip().lower() == "keyboard":
         return None
@@ -41,7 +40,7 @@ def selected_secondary_backend_name(tray: LightingTrayProtocol) -> str | None:
     return backend_name or None
 
 
-def _selected_secondary_route(tray: LightingTrayProtocol) -> tuple[dict[str, str], SecondaryDeviceRoute] | None:
+def _selected_secondary_route(tray: LightingTrayProtocol) -> tuple[DeviceContextEntry, SecondaryDeviceRoute] | None:
     entry = selected_secondary_context_entry(tray)
     if entry is None:
         return None
@@ -121,27 +120,39 @@ def _with_secondary_device(
     *,
     error_msg: str,
 ) -> bool:
-    try:
-        device = route.get_device()
-        operation(device)
-        return True
-    except _SECONDARY_DEVICE_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: runtime backend boundary; must remain non-fatal for tray actions on recoverable device failures
+    def _apply_to_selected_device() -> None:
+        operation(route.get_device())
+
+    def _handle_recoverable_device_failure(exc: Exception) -> None:
         if is_permission_denied(exc):
-            try:
-                tray._notify_permission_issue(exc)
-                return False
-            except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as notify_exc:  # @quality-exception exception-transparency: notification callback is a best-effort UI boundary; fall through to traceback logging
-                _log_boundary_exception(tray, "Failed to notify lightbar permission issue: %s", notify_exc)
+            notified = _call_tray_callback_best_effort(
+                lambda: tray._notify_permission_issue(exc),
+                on_recoverable=lambda notify_exc: _log_boundary_exception(
+                    tray,
+                    "Failed to notify lightbar permission issue: %s",
+                    notify_exc,
+                ),
+            )
+            if notified:
+                return
 
         _log_boundary_exception(tray, error_msg, exc)
-        return False
+
+    return _run_recoverable_runtime_boundary(
+        _apply_to_selected_device,
+        on_recoverable=_handle_recoverable_device_failure,
+    )
 
 
 def _refresh_menu_best_effort(tray: LightingTrayProtocol) -> None:
-    try:
-        tray._update_menu()
-    except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: tray menu refresh is a best-effort UI boundary after a successful lightbar action
-        _log_boundary_exception(tray, "Failed to refresh tray menu after lightbar action: %s", exc)
+    _call_tray_callback_best_effort(
+        lambda: tray._update_menu(),
+        on_recoverable=lambda exc: _log_boundary_exception(
+            tray,
+            "Failed to refresh tray menu after lightbar action: %s",
+            exc,
+        ),
+    )
 
 
 def _set_secondary_brightness_best_effort(
@@ -175,12 +186,35 @@ def _log_module_exception(msg: str, exc: Exception) -> None:
     logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 
 
-def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
+def _run_recoverable_runtime_boundary(
+    action: Callable[[], None],
+    *,
+    on_recoverable: Callable[[Exception], None],
+) -> bool:
     try:
-        tray._log_exception(msg, exc)
+        action()
+        return True
+    except _RECOVERABLE_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: runtime tray and device seams must stay non-fatal for recoverable secondary-device failures while unexpected defects still propagate
+        on_recoverable(exc)
+        return False
+
+
+def _call_tray_callback_best_effort(
+    action: Callable[[], None],
+    *,
+    on_recoverable: Callable[[Exception], None],
+) -> bool:
+    return _run_recoverable_runtime_boundary(action, on_recoverable=on_recoverable)
+
+
+def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
+    if _call_tray_callback_best_effort(
+        lambda: tray._log_exception(msg, exc),
+        on_recoverable=lambda log_exc: logger.exception(
+            "Tray exception logger failed while logging secondary device boundary: %s", log_exc
+        ),
+    ):
         return
-    except _TRAY_CALLBACK_RUNTIME_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
-        logger.exception("Tray exception logger failed while logging secondary device boundary: %s", log_exc)
 
     _log_module_exception(msg, exc)
 

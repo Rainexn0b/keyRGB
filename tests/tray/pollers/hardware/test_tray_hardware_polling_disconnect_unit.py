@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from src.tray.pollers import hardware_polling
 
 
@@ -41,6 +43,21 @@ def test_handle_hardware_polling_exception_no_such_device_marks_unavailable():
     assert last == 1.0
 
 
+@pytest.mark.parametrize("recoverable_exc", [OSError, RuntimeError, ValueError])
+def test_handle_hardware_polling_exception_disconnect_swallows_mark_unavailable_exceptions(recoverable_exc):
+    calls = {"log": 0}
+
+    tray = SimpleNamespace(
+        engine=SimpleNamespace(mark_device_unavailable=lambda: (_ for _ in ()).throw(recoverable_exc("bad"))),
+        _log_exception=lambda *a, **k: calls.__setitem__("log", calls["log"] + 1),
+    )
+
+    last = hardware_polling._handle_hardware_polling_exception(tray, RuntimeError("No such device"), last_error_at=7.0)
+
+    assert calls["log"] == 0
+    assert last == 7.0
+
+
 def test_handle_hardware_polling_exception_log_throttled(monkeypatch):
     calls = {"log": 0}
 
@@ -62,10 +79,11 @@ def test_handle_hardware_polling_exception_log_throttled(monkeypatch):
     assert last == 100.0
 
 
-def test_handle_hardware_polling_exception_swallow_log_exceptions(monkeypatch):
+@pytest.mark.parametrize("recoverable_exc", [OSError, RuntimeError, ValueError])
+def test_handle_hardware_polling_exception_swallow_log_exceptions(monkeypatch, recoverable_exc):
     tray = SimpleNamespace(
         engine=SimpleNamespace(mark_device_unavailable=lambda: None),
-        _log_exception=lambda *a, **k: (_ for _ in ()).throw(OSError("bad")),
+        _log_exception=lambda *a, **k: (_ for _ in ()).throw(recoverable_exc("bad")),
     )
 
     monkeypatch.setattr(hardware_polling.time, "monotonic", lambda: 200.0)

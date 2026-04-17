@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal, cast
+
+from PIL import Image
 
 from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.core.effects.perkey_animation import build_full_color_grid
@@ -11,7 +12,13 @@ from src.core.resources.defaults import REFERENCE_MATRIX_COLS as NUM_COLS
 from src.core.resources.defaults import REFERENCE_MATRIX_ROWS as NUM_ROWS
 
 from src.tray.ui.icon._draw import create_icon, create_icon_mosaic, create_icon_rainbow
-from src.tray.ui.icon._color import _per_key_color_mapping, representative_color
+from src.tray.ui.icon._color import (
+    PerKeyColorMap,
+    RGBColor,
+    _TrayIconColorConfig,
+    _per_key_color_mapping,
+    representative_color,
+)
 
 
 _ANIMATED_ICON_PHASE_RATE = 0.008
@@ -19,17 +26,21 @@ _ANIMATED_ICON_SCALE_FLOOR = 0.85
 _CONFIG_READ_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 
+TrayIconConfig = _TrayIconColorConfig
+TrayIconImage = Image.Image
+ColorGrid = tuple[RGBColor, ...]
+
 
 @dataclass(frozen=True)
 class IconVisual:
     mode: Literal["solid", "rainbow", "mosaic"]
-    color: tuple[int, int, int] | None = None
+    color: RGBColor | None = None
     # For rainbow mode we scale the gradient brightness (0..1).
     scale: float = 1.0
     # Phase shifts the gradient hue (0..1).
     phase: float = 0.0
     # For mosaic mode we store the per-key grid (row-major) and dimensions.
-    colors_flat: tuple[tuple[int, int, int], ...] | None = None
+    colors_flat: ColorGrid | None = None
     rows: int = 0
     cols: int = 0
 
@@ -48,7 +59,7 @@ def _animated_icon_phase(now: float) -> float:
     return (float(now) * _ANIMATED_ICON_PHASE_RATE) % 1.0
 
 
-def _config_value_or_default(config: Any, name: str, default: object) -> object:
+def _config_value_or_default(config: TrayIconConfig, name: str, default: object) -> object:
     try:
         value = getattr(config, name, default)
     except _CONFIG_READ_ERRORS:
@@ -56,7 +67,7 @@ def _config_value_or_default(config: Any, name: str, default: object) -> object:
     return default if value is None else value
 
 
-def _config_int_or_default(config: Any, name: str, default: int) -> int:
+def _config_int_or_default(config: TrayIconConfig, name: str, default: int) -> int:
     value = _config_value_or_default(config, name, default)
     try:
         return int(value)  # type: ignore[call-overload]
@@ -64,7 +75,7 @@ def _config_int_or_default(config: Any, name: str, default: int) -> int:
         return default
 
 
-def _normalized_rgb_or_none(value: object) -> tuple[int, int, int] | None:
+def _normalized_rgb_or_none(value: object) -> RGBColor | None:
     try:
         if not isinstance(value, (tuple, list)) or len(value) != 3:
             return None
@@ -75,8 +86,8 @@ def _normalized_rgb_or_none(value: object) -> tuple[int, int, int] | None:
 
 def _has_non_uniform_perkey_base(
     *,
-    base_color: tuple[int, int, int],
-    per_key_colors: Mapping[tuple[int, int], tuple[int, int, int]],
+    base_color: RGBColor,
+    per_key_colors: PerKeyColorMap,
 ) -> bool:
     for color in per_key_colors.values():
         normalized = _normalized_rgb_or_none(color)
@@ -85,7 +96,7 @@ def _has_non_uniform_perkey_base(
     return False
 
 
-def _is_non_uniform_effect(config: Any, *, backend: object | None = None) -> bool:
+def _is_non_uniform_effect(config: TrayIconConfig, *, backend: object | None = None) -> bool:
     effect = resolve_effect_name_for_backend(
         str(_config_value_or_default(config, "effect", "none") or "none"),
         backend,
@@ -96,10 +107,11 @@ def _is_non_uniform_effect(config: Any, *, backend: object | None = None) -> boo
         if not per_key:
             return False
 
+        typed_per_key = cast(PerKeyColorMap, per_key)
         base_color = _normalized_rgb_or_none(_config_value_or_default(config, "color", (255, 0, 128)) or (255, 0, 128))
         if base_color is None:
             return True
-        return _has_non_uniform_perkey_base(base_color=base_color, per_key_colors=per_key)
+        return _has_non_uniform_perkey_base(base_color=base_color, per_key_colors=typed_per_key)
 
     # Known multi-color / non-uniform effects.
     if effect in {
@@ -124,7 +136,7 @@ def _is_non_uniform_effect(config: Any, *, backend: object | None = None) -> boo
     return False
 
 
-def _build_perkey_mosaic_visual(*, config: Any, brightness: int) -> IconVisual | None:
+def _build_perkey_mosaic_visual(*, config: TrayIconConfig, brightness: int) -> IconVisual | None:
     """Build a mosaic visual from the configured base per-key map.
 
     Returns ``None`` if there is no usable non-uniform per-key base map.
@@ -134,6 +146,7 @@ def _build_perkey_mosaic_visual(*, config: Any, brightness: int) -> IconVisual |
     if not per_key:
         return None
 
+    typed_per_key = cast(PerKeyColorMap, per_key)
     base_color = _normalized_rgb_or_none(_config_value_or_default(config, "color", (255, 0, 128)) or (255, 0, 128))
     if base_color is None:
         return None
@@ -141,7 +154,7 @@ def _build_perkey_mosaic_visual(*, config: Any, brightness: int) -> IconVisual |
     try:
         full = build_full_color_grid(
             base_color=base_color,
-            per_key_colors=per_key,
+            per_key_colors=typed_per_key,
             num_rows=NUM_ROWS,
             num_cols=NUM_COLS,
         )
@@ -163,7 +176,7 @@ def _build_perkey_mosaic_visual(*, config: Any, brightness: int) -> IconVisual |
     return None
 
 
-def render_icon_visual(visual: IconVisual):
+def render_icon_visual(visual: IconVisual) -> TrayIconImage:
     """Render an ``IconVisual`` into a concrete tray icon image."""
 
     if visual.mode == "rainbow":
@@ -178,13 +191,25 @@ def render_icon_visual(visual: IconVisual):
     return create_icon(visual.color or (255, 0, 128))
 
 
-def create_icon_for_state(*, config: Any, is_off: bool, now: float | None = None, backend: object | None = None):
+def create_icon_for_state(
+    *,
+    config: TrayIconConfig,
+    is_off: bool,
+    now: float | None = None,
+    backend: object | None = None,
+) -> TrayIconImage:
     """Create the tray icon image for the current state."""
 
     return render_icon_visual(icon_visual(config=config, is_off=is_off, now=now, backend=backend))
 
 
-def icon_visual(*, config: Any, is_off: bool, now: float | None = None, backend: object | None = None) -> IconVisual:
+def icon_visual(
+    *,
+    config: TrayIconConfig,
+    is_off: bool,
+    now: float | None = None,
+    backend: object | None = None,
+) -> IconVisual:
     """Describe how the tray icon should look for the current state."""
 
     if now is None:

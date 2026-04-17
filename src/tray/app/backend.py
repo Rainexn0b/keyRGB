@@ -7,16 +7,25 @@ application constructor.
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Callable
 
 import logging
 
-from src.core.diagnostics.device_discovery import collect_device_discovery
+from ._startup import _run_best_effort
+from src.core.backends.base import KeyboardBackend
 from src.core.backends.registry import select_backend
+from src.core.diagnostics.device_discovery import collect_device_discovery
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 
 _TRAY_BACKEND_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
+def _log_debug_boundary(*, logger: logging.Logger, message: str) -> Callable[[Exception], None]:
+    def _log(exc: Exception) -> None:
+        logger.log(logging.DEBUG, message, exc_info=(type(exc), exc, exc.__traceback__))
+
+    return _log
 
 
 def load_ite_dimensions() -> tuple[int, int]:
@@ -27,18 +36,25 @@ def load_ite_dimensions() -> tuple[int, int]:
 
     logger = logging.getLogger(__name__)
 
-    try:
+    def _load_dimensions() -> tuple[int, int]:
         backend = select_backend()
         if backend is None:
             return REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
         r, c = backend.dimensions()
         return int(r), int(c)
-    except _TRAY_BACKEND_RUNTIME_ERRORS:  # @quality-exception exception-transparency: runtime hardware/plugin boundary; tray startup degrades to reference defaults
-        logger.log(logging.DEBUG, "Falling back to default keyboard dimensions", exc_info=True)
-        return REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
+
+    return _run_best_effort(
+        _load_dimensions,
+        fallback=(REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS),
+        recoverable_errors=_TRAY_BACKEND_RUNTIME_ERRORS,
+        on_recoverable=_log_debug_boundary(
+            logger=logger,
+            message="Falling back to default keyboard dimensions",
+        ),
+    )
 
 
-def select_backend_with_introspection() -> tuple[Any, Any, Any]:
+def select_backend_with_introspection() -> tuple[KeyboardBackend | None, object | None, object | None]:
     """Select a backend and best-effort introspect its probe/capabilities.
 
     Returns `(backend, backend_probe, backend_caps)`; any item may be `None`.
@@ -48,30 +64,36 @@ def select_backend_with_introspection() -> tuple[Any, Any, Any]:
     logger = logging.getLogger(__name__)
     backend = select_backend()
 
-    backend_probe = None
-    try:
+    def _load_probe() -> object | None:
         probe_fn = getattr(backend, "probe", None) if backend is not None else None
         if callable(probe_fn):
-            backend_probe = probe_fn()
-    except (
-        _TRAY_BACKEND_RUNTIME_ERRORS
-    ):  # @quality-exception exception-transparency: runtime hardware boundary; best-effort probe
-        logger.log(logging.DEBUG, "Backend probe failed during tray introspection", exc_info=True)
-        backend_probe = None
+            return probe_fn()
+        return None
 
-    backend_caps = None
-    try:
-        backend_caps = backend.capabilities() if backend is not None else None
-    except (
-        _TRAY_BACKEND_RUNTIME_ERRORS
-    ):  # @quality-exception exception-transparency: runtime hardware boundary; best-effort capabilities
-        logger.log(logging.DEBUG, "Backend capabilities lookup failed during tray introspection", exc_info=True)
-        backend_caps = None
+    backend_probe = _run_best_effort(
+        _load_probe,
+        fallback=None,
+        recoverable_errors=_TRAY_BACKEND_RUNTIME_ERRORS,
+        on_recoverable=_log_debug_boundary(
+            logger=logger,
+            message="Backend probe failed during tray introspection",
+        ),
+    )
+
+    backend_caps = _run_best_effort(
+        lambda: backend.capabilities() if backend is not None else None,
+        fallback=None,
+        recoverable_errors=_TRAY_BACKEND_RUNTIME_ERRORS,
+        on_recoverable=_log_debug_boundary(
+            logger=logger,
+            message="Backend capabilities lookup failed during tray introspection",
+        ),
+    )
 
     return backend, backend_probe, backend_caps
 
 
-def select_device_discovery_snapshot() -> dict[str, Any] | None:
+def select_device_discovery_snapshot() -> dict[str, object] | None:
     """Collect a best-effort device discovery snapshot for tray status lines.
 
     This must stay non-fatal: tray startup should continue even if diagnostics
@@ -80,10 +102,14 @@ def select_device_discovery_snapshot() -> dict[str, Any] | None:
 
     logger = logging.getLogger(__name__)
 
-    try:
-        payload = collect_device_discovery(include_usb=True)
-    except _TRAY_BACKEND_RUNTIME_ERRORS:  # @quality-exception exception-transparency: best-effort diagnostics boundary; tray status display must stay non-fatal
-        logger.log(logging.DEBUG, "Tray device discovery snapshot collection failed", exc_info=True)
-        return None
+    payload = _run_best_effort(
+        lambda: collect_device_discovery(include_usb=True),
+        fallback=None,
+        recoverable_errors=_TRAY_BACKEND_RUNTIME_ERRORS,
+        on_recoverable=_log_debug_boundary(
+            logger=logger,
+            message="Tray device discovery snapshot collection failed",
+        ),
+    )
 
     return payload if isinstance(payload, dict) else None

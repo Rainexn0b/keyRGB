@@ -57,6 +57,86 @@ def test_build_device_context_menu_items_shows_uniform_controls_for_mouse_route(
     assert items[1].text == "Brightness"
     assert items[3].text == "Turn Off"
 
+def test_build_device_context_menu_items_shows_unsupported_generic_device_with_footer() -> None:
+    tray = SimpleNamespace(
+        _on_support_debug_clicked=lambda *_args, **_kwargs: None,
+        _on_power_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_quit_clicked=lambda *_args, **_kwargs: None,
+    )
+    context_entry = {
+        "device_type": "touchpad",
+        "status": "known_unavailable",
+    }
+
+    items = menu_sections.build_device_context_menu_items(tray, pystray=_Pystray(), item=_item, context_entry=context_entry)
+    texts = [entry.text for entry in items if hasattr(entry, "text")]
+
+    assert texts == [
+        "Touchpad was identified, but it is not currently available for control",
+        "Support Tools…",
+        "Settings",
+        "Quit",
+    ]
+    assert items[0].kwargs["enabled"] is False
+
+
+def test_build_device_context_menu_items_uses_facade_collaborators_for_fallback_brightness_checked_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    collaborator_calls: list[tuple[str, str]] = []
+    safe_int_calls: list[tuple[object, str, int, object, object]] = []
+    route = SimpleNamespace(
+        display_name="Rear Lightbar",
+        supports_uniform_color=True,
+        state_key="lightbar",
+        config_brightness_attr="lightbar_brightness",
+    )
+
+    monkeypatch.setattr(
+        menu_sections,
+        "route_for_context_entry",
+        lambda context_entry: collaborator_calls.append(("route", str(context_entry["device_type"]))) or route,
+    )
+    monkeypatch.setattr(
+        menu_sections,
+        "device_context_controls_available",
+        lambda tray, context_entry: collaborator_calls.append(("controls", str(context_entry["device_type"]))) or True,
+    )
+    monkeypatch.setattr(
+        menu_sections,
+        "safe_int_attr",
+        lambda config, attr_name, *, default=0, min_v=None, max_v=None: safe_int_calls.append(
+            (config, attr_name, default, min_v, max_v)
+        ) or 15,
+    )
+
+    tray = SimpleNamespace(
+        config=SimpleNamespace(lightbar_brightness=0),
+        _on_selected_device_color_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_brightness_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_turn_off_clicked=lambda *_args, **_kwargs: None,
+        _on_support_debug_clicked=lambda *_args, **_kwargs: None,
+        _on_power_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_quit_clicked=lambda *_args, **_kwargs: None,
+    )
+
+    items = menu_sections.build_device_context_menu_items(
+        tray,
+        pystray=_Pystray(),
+        item=_item,
+        context_entry={"device_type": "lightbar", "status": "supported"},
+    )
+
+    brightness_items = items[1].action
+    checked_entry = next(entry for entry in brightness_items if entry.text == "3")
+
+    assert checked_entry.kwargs["checked"](checked_entry) is True
+    assert collaborator_calls == [("route", "lightbar"), ("controls", "lightbar")]
+    assert len(safe_int_calls) == 1
+    assert safe_int_calls[0][1] == "lightbar_brightness"
+    assert safe_int_calls[0][2] == 0
+
+
 def test_sw_effects_menu_first_item_is_reactive_typing_settings() -> None:
     """The Software Effects submenu must open with 'Reactive Typing Settings...' -
     confirmed after the rename from 'Reactive Typing Color...'."""

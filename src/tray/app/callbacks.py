@@ -7,6 +7,8 @@ into this module to keep the class smaller.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from src.tray.protocols import LightingTrayProtocol
 
 import src.core.power.tcc_profiles as tcc_power_profiles
@@ -34,22 +36,19 @@ launch_uniform_gui = gui_launch.launch_uniform_gui
 _RECOVERABLE_UI_CALLBACK_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
-def _refresh_ui_best_effort(tray: LightingTrayProtocol) -> None:
+def _run_ui_callback_best_effort(action: Callable[[], None]) -> None:
     try:
-        tray._refresh_ui()
-    except (
-        _RECOVERABLE_UI_CALLBACK_ERRORS
-    ):  # @quality-exception exception-transparency: tray UI refresh is a best-effort runtime boundary
+        action()
+    except _RECOVERABLE_UI_CALLBACK_ERRORS:  # @quality-exception exception-transparency: tray refresh/menu callbacks share a best-effort runtime boundary so recoverable UI failures stay non-fatal while unexpected bugs still propagate
         pass
+
+
+def _refresh_ui_best_effort(tray: LightingTrayProtocol) -> None:
+    _run_ui_callback_best_effort(lambda: tray._refresh_ui())
 
 
 def _update_menu_best_effort(tray: LightingTrayProtocol) -> None:
-    try:
-        tray._update_menu()
-    except (
-        _RECOVERABLE_UI_CALLBACK_ERRORS
-    ):  # @quality-exception exception-transparency: tray menu rebuild is a best-effort runtime boundary
-        pass
+    _run_ui_callback_best_effort(lambda: tray._update_menu())
 
 
 def on_effect_clicked(tray: LightingTrayProtocol, item: object) -> None:

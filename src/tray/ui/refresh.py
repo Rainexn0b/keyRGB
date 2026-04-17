@@ -3,12 +3,70 @@
 from __future__ import annotations
 
 import time
-from typing import Any
+from typing import Protocol, cast
 
 from ..integrations import runtime
 from ..protocols import ensure_tray_icon_state
 from . import icon as icon_mod
-from . import menu as menu_mod
+from . import menu as menu_mod, menu_sections
+
+
+class _ReloadableConfigProtocol(icon_mod.TrayIconConfig, Protocol):
+    def reload(self) -> None: ...
+
+
+class _IconRefreshTrayProtocol(Protocol):
+    config: icon_mod.TrayIconConfig
+    is_off: bool
+
+
+class _MenuRefreshTrayProtocol(Protocol):
+    config: _ReloadableConfigProtocol
+
+
+class _TrayIconImageSurfaceProtocol(Protocol):
+    icon: object
+
+
+class _TrayIconMenuSurfaceProtocol(Protocol):
+    menu: object
+
+
+class _MenuFactoryProtocol(Protocol):
+    def __call__(self, *items: object) -> object: ...
+
+
+class _PystrayProtocol(Protocol):
+    Menu: _MenuFactoryProtocol
+
+
+class _MenuItemFactoryProtocol(Protocol):
+    def __call__(self, text: str, action: object | None = None, **kwargs: object) -> object: ...
+
+
+def _icon_refresh_tray(tray: object) -> _IconRefreshTrayProtocol:
+    return cast(_IconRefreshTrayProtocol, tray)
+
+
+def _menu_refresh_tray(tray: object) -> _MenuRefreshTrayProtocol:
+    return cast(_MenuRefreshTrayProtocol, tray)
+
+
+def _icon_surface(icon: object | None) -> _TrayIconImageSurfaceProtocol | None:
+    if not icon:
+        return None
+    return cast(_TrayIconImageSurfaceProtocol, icon)
+
+
+def _menu_surface(icon: object | None) -> _TrayIconMenuSurfaceProtocol | None:
+    if not icon:
+        return None
+    return cast(_TrayIconMenuSurfaceProtocol, icon)
+
+
+def _menu_runtime() -> tuple[menu_sections._PystrayProtocol, menu_sections._ItemFactoryProtocol]:
+    pystray, item = runtime.get_pystray()
+    return cast(menu_sections._PystrayProtocol, pystray), cast(menu_sections._ItemFactoryProtocol, item)
 
 
 def _clamp_u8(v: float) -> int:
@@ -45,67 +103,75 @@ def _fade_factor(t: float, *, floor: float = 0.15) -> float:
     return float(floor + (1.0 - floor) * a)
 
 
-def update_icon(tray: Any, *, animate: bool = True) -> None:
+def update_icon(tray: object, *, animate: bool = True) -> None:
     """Update the tray icon image based on current config state."""
 
-    if getattr(tray, "icon", None):
-        st = ensure_tray_icon_state(tray)
-        now = time.time()
-        target = icon_mod.icon_visual(
-            config=tray.config,
-            is_off=tray.is_off,
-            now=now,
-            backend=getattr(tray, "backend", None),
-        )
+    tray_icon = _icon_surface(getattr(tray, "icon", None))
+    if tray_icon is None:
+        return
 
-        last = st.visual
+    typed_tray = _icon_refresh_tray(tray)
+    st = ensure_tray_icon_state(tray)
+    now = time.time()
+    target = icon_mod.icon_visual(
+        config=typed_tray.config,
+        is_off=typed_tray.is_off,
+        now=now,
+        backend=getattr(tray, "backend", None),
+    )
 
-        # Fast path: no previous state, or animation disabled.
-        if not animate or last is None or last == target:
-            tray.icon.icon = icon_mod.render_icon_visual(target)
-            st.visual = target
-            return
+    last = st.visual
 
-        # Avoid overlapping animations (can happen when multiple pollers/menu actions
-        # trigger close together). In that case, just snap to the latest target.
-        if st.animating:
-            tray.icon.icon = icon_mod.render_icon_visual(target)
-            st.visual = target
-            return
-        st.animating = True
+    # Fast path: no previous state, or animation disabled.
+    if not animate or last is None or last == target:
+        tray_icon.icon = icon_mod.render_icon_visual(target)
+        st.visual = target
+        return
 
-        try:
-            frames = 8
-            dt = 0.03
+    # Avoid overlapping animations (can happen when multiple pollers/menu actions
+    # trigger close together). In that case, just snap to the latest target.
+    if st.animating:
+        tray_icon.icon = icon_mod.render_icon_visual(target)
+        st.visual = target
+        return
+    st.animating = True
 
-            for i in range(frames):
-                t = float(i + 1) / float(frames)
-                f = _fade_factor(t)
-                # First half fades the previous visual down, second half fades the
-                # new visual up.
-                if t <= 0.5:
-                    frame = _scaled_visual(last, f)
-                else:
-                    frame = _scaled_visual(target, f)
-                tray.icon.icon = icon_mod.render_icon_visual(frame)
-                time.sleep(dt)
+    try:
+        frames = 8
+        dt = 0.03
 
-            tray.icon.icon = icon_mod.render_icon_visual(target)
-            st.visual = target
-        finally:
-            st.animating = False
+        for i in range(frames):
+            t = float(i + 1) / float(frames)
+            f = _fade_factor(t)
+            # First half fades the previous visual down, second half fades the
+            # new visual up.
+            if t <= 0.5:
+                frame = _scaled_visual(last, f)
+            else:
+                frame = _scaled_visual(target, f)
+            tray_icon.icon = icon_mod.render_icon_visual(frame)
+            time.sleep(dt)
+
+        tray_icon.icon = icon_mod.render_icon_visual(target)
+        st.visual = target
+    finally:
+        st.animating = False
 
 
-def update_menu(tray: Any) -> None:
+def update_menu(tray: object) -> None:
     """Rebuild the tray menu from current config/backend state."""
 
-    if getattr(tray, "icon", None):
-        tray.config.reload()
-        pystray, item = runtime.get_pystray()
-        tray.icon.menu = menu_mod.build_menu(tray, pystray=pystray, item=item)
+    tray_icon = _menu_surface(getattr(tray, "icon", None))
+    if tray_icon is None:
+        return
+
+    typed_tray = _menu_refresh_tray(tray)
+    typed_tray.config.reload()
+    pystray, item = _menu_runtime()
+    tray_icon.menu = menu_mod.build_menu(tray, pystray=pystray, item=item)
 
 
-def refresh_ui(tray: Any) -> None:
+def refresh_ui(tray: object) -> None:
     """Refresh both icon and menu."""
 
     update_icon(tray)

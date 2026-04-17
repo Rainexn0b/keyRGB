@@ -1,63 +1,100 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import logging
+from typing import TypeVar
 
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from src.core.effects.software_targets import normalize_software_effect_target
-from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers.software_target_controller import configure_engine_software_targets
 from src.tray.controllers.software_target_controller import restore_secondary_software_targets
 from src.tray.controllers.software_target_controller import turn_off_secondary_software_targets
 from src.tray.protocols import ConfigPollingTrayProtocol
 
+from ._apply_support import build_perkey_color_map
+from ._apply_support import current_software_effect_target
+from ._apply_support import has_all_uniform_capable_target
+from ._apply_support import reactive_sync_values
+
 
 logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
+
 _CONFIG_POLLING_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_TRAY_LOG_WRITE_EXCEPTIONS = (OSError, RuntimeError, ValueError)
+_ENGINE_ATTR_SYNC_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+_ENABLE_USER_MODE_SAVE_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, ValueError)
+_CONFIG_PERSIST_SYNC_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_module_exception(msg: str, exc: Exception) -> None:
     logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 
 
-def _log_tray_exception(tray: ConfigPollingTrayProtocol, msg: str, exc: Exception) -> None:
+def _run_recoverable_boundary(
+    action: Callable[[], _T],
+    *,
+    runtime_exceptions: tuple[type[Exception], ...],
+    on_recoverable: Callable[[Exception], _T],
+) -> _T:
     try:
-        tray._log_exception(msg, exc)
-        return
-    except _CONFIG_POLLING_RUNTIME_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray exception logger is a best-effort diagnostic boundary
+        return action()
+    except runtime_exceptions as exc:  # @quality-exception exception-transparency: diagnostic-only helper callbacks and best-effort tray logger writes must contain recoverable runtime failures while unexpected defects still propagate
+        return on_recoverable(exc)
+
+
+def _log_tray_exception(tray: ConfigPollingTrayProtocol, msg: str, exc: Exception) -> None:
+    def _recover_logger_write(log_exc: Exception) -> None:
         _log_module_exception("Config polling tray exception logger failed: %s", log_exc)
-    _log_module_exception(msg, exc)
+        _log_module_exception(msg, exc)
+
+    _run_recoverable_boundary(
+        lambda: tray._log_exception(msg, exc),
+        runtime_exceptions=_TRAY_LOG_WRITE_EXCEPTIONS,
+        on_recoverable=_recover_logger_write,
+    )
+
+
+def _run_diagnostic_boundary(
+    tray: ConfigPollingTrayProtocol,
+    action: Callable[[], _T],
+    *,
+    error_msg: str,
+    default: _T | None = None,
+    runtime_exceptions: tuple[type[Exception], ...] = _CONFIG_POLLING_RUNTIME_EXCEPTIONS,
+) -> _T | None:
+    def _recover_boundary(exc: Exception) -> _T | None:
+        _log_tray_exception(tray, error_msg, exc)
+        return default
+
+    return _run_recoverable_boundary(
+        action,
+        runtime_exceptions=runtime_exceptions,
+        on_recoverable=_recover_boundary,
+    )
 
 
 def _try_log_event(tray: ConfigPollingTrayProtocol, source: str, action: str, **fields: object) -> None:
-    try:
-        tray._log_event(source, action, **fields)
-    except (
-        _CONFIG_POLLING_RUNTIME_EXCEPTIONS
-    ) as exc:  # @quality-exception exception-transparency: event logging must never break config polling
-        _log_tray_exception(tray, "Config polling event logging failed: %s", exc)
+    _run_diagnostic_boundary(
+        tray,
+        lambda: tray._log_event(source, action, **fields),
+        error_msg="Config polling event logging failed: %s",
+    )
 
 
 def _safe_state_for_log(tray: ConfigPollingTrayProtocol, state_for_log_fn, state):
-    try:
-        return state_for_log_fn(state)
-    except (
-        _CONFIG_POLLING_RUNTIME_EXCEPTIONS
-    ) as exc:  # @quality-exception exception-transparency: debug-state serialization; best-effort
-        _log_tray_exception(tray, "Failed to serialize config polling state for logs: %s", exc)
-        return None
+    return _run_diagnostic_boundary(
+        tray,
+        lambda: state_for_log_fn(state),
+        error_msg="Failed to serialize config polling state for logs: %s",
+    )
 
 
 def _call_tray_callback(tray: ConfigPollingTrayProtocol, callback_name: str, *, error_msg: str) -> None:
     callback = getattr(tray, callback_name, None)
     if not callable(callback):
         return
-    try:
-        callback()
-    except (
-        _CONFIG_POLLING_RUNTIME_EXCEPTIONS
-    ) as exc:  # @quality-exception exception-transparency: tray callbacks are best-effort during config polling
-        _log_tray_exception(tray, error_msg, exc)
+    _run_diagnostic_boundary(tray, callback, error_msg=error_msg)
 
 
 def _set_engine_attr_best_effort(
@@ -68,14 +105,17 @@ def _set_engine_attr_best_effort(
     error_msg: str,
 ) -> None:
     engine = getattr(tray, "engine", None)
+    if engine is None:
+        return
     try:
-        setattr(engine, attr, value)
+        _run_diagnostic_boundary(
+            tray,
+            lambda: setattr(engine, attr, value),
+            error_msg=error_msg,
+            runtime_exceptions=_ENGINE_ATTR_SYNC_EXCEPTIONS,
+        )
     except AttributeError:
         return
-    except (
-        _CONFIG_POLLING_RUNTIME_EXCEPTIONS
-    ) as exc:  # @quality-exception exception-transparency: engine sync; tolerates backend-specific setters
-        _log_tray_exception(tray, error_msg, exc)
 
 
 def _throttled_log_exception(
@@ -99,16 +139,18 @@ def _enable_user_mode_best_effort(tray: ConfigPollingTrayProtocol, *, brightness
     if not callable(enable_user_mode):
         return
     try:
-        enable_user_mode(brightness=brightness, save=True)
+        _run_diagnostic_boundary(
+            tray,
+            lambda: enable_user_mode(brightness=brightness, save=True),
+            error_msg="Failed to enable per-key user mode: %s",
+            runtime_exceptions=_ENABLE_USER_MODE_SAVE_EXCEPTIONS,
+        )
     except TypeError:
-        try:
-            enable_user_mode(brightness=brightness)
-        except _CONFIG_POLLING_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: per-key backend fallback still crosses a runtime backend boundary
-            _log_tray_exception(tray, "Failed to enable per-key user mode fallback: %s", exc)
-    except (
-        _CONFIG_POLLING_RUNTIME_EXCEPTIONS
-    ) as exc:  # @quality-exception exception-transparency: user-mode enable; runtime backend boundary
-        _log_tray_exception(tray, "Failed to enable per-key user mode: %s", exc)
+        _run_diagnostic_boundary(
+            tray,
+            lambda: enable_user_mode(brightness=brightness),
+            error_msg="Failed to enable per-key user mode fallback: %s",
+        )
 
 
 def _log_detected_change(tray: ConfigPollingTrayProtocol, last_applied, current, cause: str, state_for_log_fn):
@@ -158,9 +200,9 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
         cause=str(cause or "unknown"),
         brightness=0,
     )
-    try:
-        tray.engine.turn_off()
-    except _CONFIG_POLLING_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: engine shutdown is a runtime backend boundary during config polling
+
+    def _recover_turn_off(exc: Exception) -> None:
+        nonlocal last_apply_warn_at
         last_apply_warn_at = _throttled_log_exception(
             tray,
             "Failed to turn off engine: %s",
@@ -168,10 +210,13 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
             monotonic_fn=monotonic_fn,
             last_warn_at=last_apply_warn_at,
         )
-    if (
-        str(getattr(current, "software_effect_target", "keyboard") or "keyboard")
-        == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-    ):
+
+    _run_recoverable_boundary(
+        lambda: tray.engine.turn_off(),
+        runtime_exceptions=_CONFIG_POLLING_RUNTIME_EXCEPTIONS,
+        on_recoverable=_recover_turn_off,
+    )
+    if has_all_uniform_capable_target(current):
         turn_off_secondary_software_targets(tray)
     tray.is_off = True
     _call_tray_callback(
@@ -183,19 +228,7 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
 
 
 def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
-    reactive_brightness = getattr(
-        current,
-        "reactive_brightness",
-        safe_int_attr(
-            tray.config,
-            "reactive_brightness",
-            default=safe_int_attr(tray.config, "brightness", default=0),
-        ),
-    )
-    try:
-        reactive_brightness = int(reactive_brightness or 0)
-    except (TypeError, ValueError, OverflowError):
-        reactive_brightness = 0
+    reactive_brightness, reactive_trail_percent = reactive_sync_values(current, tray.config)
 
     _set_engine_attr_best_effort(
         tray,
@@ -215,14 +248,6 @@ def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
         reactive_brightness,
         error_msg="Failed to apply reactive brightness during config polling: %s",
     )
-
-    reactive_trail_percent = getattr(current, "reactive_trail_percent", None)
-    if reactive_trail_percent is None:
-        reactive_trail_percent = safe_int_attr(tray.config, "reactive_trail_percent", default=50)
-    try:
-        reactive_trail_percent = int(reactive_trail_percent or 50)
-    except (TypeError, ValueError, OverflowError):
-        reactive_trail_percent = 50
     _set_engine_attr_best_effort(
         tray,
         "reactive_trail_percent",
@@ -232,13 +257,16 @@ def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
 
 
 def _sync_software_target_policy(tray: ConfigPollingTrayProtocol, current) -> None:
-    target = normalize_software_effect_target(getattr(current, "software_effect_target", "keyboard"))
+    target = current_software_effect_target(current)
     try:
-        tray.config.software_effect_target = target
+        _run_diagnostic_boundary(
+            tray,
+            lambda: setattr(tray.config, "software_effect_target", target),
+            error_msg="Failed to persist software effect target during config polling: %s",
+            runtime_exceptions=_CONFIG_PERSIST_SYNC_EXCEPTIONS,
+        )
     except AttributeError:
         pass
-    except _CONFIG_POLLING_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: config persistence failure must not block runtime target sync
-        _log_tray_exception(tray, "Failed to persist software effect target during config polling: %s", exc)
     configure_engine_software_targets(tray)
     if target != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
         if not bool(getattr(tray, "is_off", False)):
@@ -258,17 +286,12 @@ def _apply_perkey(
         perkey_keys=int(perkey_keys),
     )
     tray.engine.stop()
-    configured_map = getattr(tray.config, "per_key_colors", None)
-    if configured_map is None:
-        configured_map = {}
-    color_map = configured_map
-
-    if 0 < len(configured_map) < (ite_num_rows * ite_num_cols):
-        color_map = dict(configured_map)
-        base = tuple(current.color)
-        for r in range(ite_num_rows):
-            for c in range(ite_num_cols):
-                color_map.setdefault((r, c), base)
+    color_map = build_perkey_color_map(
+        tray.config,
+        ite_num_rows=ite_num_rows,
+        ite_num_cols=ite_num_cols,
+        base_color=tuple(current.color),
+    )
 
     with tray.engine.kb_lock:
         _enable_user_mode_best_effort(tray, brightness=int(current.brightness))
@@ -277,10 +300,7 @@ def _apply_perkey(
             brightness=current.brightness,
             enable_user_mode=True,
         )
-    if (
-        str(getattr(current, "software_effect_target", "keyboard") or "keyboard")
-        == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-    ):
+    if has_all_uniform_capable_target(current):
         restore_secondary_software_targets(tray)
 
 
@@ -296,10 +316,7 @@ def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> N
     tray.engine.stop()
     with tray.engine.kb_lock:
         tray.engine.kb.set_color(current.color, brightness=current.brightness)
-    if (
-        str(getattr(current, "software_effect_target", "keyboard") or "keyboard")
-        == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-    ):
+    if has_all_uniform_capable_target(current):
         restore_secondary_software_targets(tray)
 
 

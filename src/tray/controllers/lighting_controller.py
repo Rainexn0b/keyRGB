@@ -32,6 +32,7 @@ is_software_effect = lighting_controller_helpers.is_software_effect
 parse_menu_int = lighting_controller_helpers.parse_menu_int
 set_engine_perkey_from_config_for_sw_effect = lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect
 try_log_event = lighting_controller_helpers.try_log_event
+run_diagnostic_boundary = lighting_controller_helpers._run_diagnostic_boundary
 restore_secondary_software_targets = software_target_controller.restore_secondary_software_targets
 software_effect_target_routes_aux_devices = software_target_controller.software_effect_target_routes_aux_devices
 turn_off_secondary_software_targets = software_target_controller.turn_off_secondary_software_targets
@@ -61,11 +62,15 @@ def _coerce_brightness_override(brightness_override: object, *, default: int) ->
 
 
 def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
-    try:
-        tray._log_exception(msg, exc)
-    except _TRAY_LOGGER_CALLBACK_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray._log_exception is an injected dependency and this boundary logger must not raise on failure
+    def _recover_tray_logging(log_exc: Exception) -> None:
         logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
         logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
+
+    run_diagnostic_boundary(
+        lambda: tray._log_exception(msg, exc),
+        runtime_exceptions=_TRAY_LOGGER_CALLBACK_EXCEPTIONS,
+        on_recoverable=_recover_tray_logging,
+    )
 
 
 def start_current_effect(
@@ -210,11 +215,7 @@ def start_current_effect(
             except _LOCAL_COMPATIBILITY_FALLBACK_EXCEPTIONS as notify_exc:
                 _log_boundary_exception(tray, "Failed to notify permission issue: %s", notify_exc)
             return
-        try:
-            tray._log_exception("Error starting effect: %s", exc)
-        except _TRAY_LOGGER_CALLBACK_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray._log_exception is an injected dependency and this last-resort fallback must not raise
-            logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
-            logger.error("Error starting effect: %s", exc, exc_info=(type(exc), exc, exc.__traceback__))
+        _log_boundary_exception(tray, "Error starting effect: %s", exc)
 
 
 def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:

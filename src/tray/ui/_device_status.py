@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from src.core.backends.policy import (
     experimental_evidence_for_backend,
     experimental_evidence_label,
@@ -28,7 +26,7 @@ def backend_display_name(backend_name: str) -> str:
     return backend_name
 
 
-def backend_status_suffix(backend: Any) -> str:
+def backend_status_suffix(backend: object | None) -> str:
     if backend is None:
         return ""
 

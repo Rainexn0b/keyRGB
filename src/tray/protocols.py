@@ -1,7 +1,7 @@
 """Typed state protocols for the tray application.
 
 This module defines Protocol classes for duck-typed objects passed throughout
-the tray codebase. Using Protocols instead of `Any` enables:
+the tray codebase. Using Protocols instead of untyped parameters enables:
 1. Static type checking
 2. IDE autocompletion
 3. Explicit documentation of required interfaces
@@ -96,7 +96,7 @@ class TrayStateProtocol(Protocol):
     """Protocol defining the expected interface for tray objects.
 
     This allows static type checking while maintaining duck typing.
-    Functions accepting `tray: Any` can be migrated to `tray: TrayStateProtocol`.
+    Functions with untyped `tray` parameters can be migrated to `tray: TrayStateProtocol`.
     """
 
     # Core components

@@ -8,14 +8,11 @@ from typing import Optional, Protocol, cast
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers._power._transition_constants import (
-    SOFT_OFF_FADE_DURATION_S,
     SOFT_ON_FADE_DURATION_S,
     SOFT_ON_START_BRIGHTNESS,
 )
+from src.tray.pollers.idle_power._action_execution import execute_idle_action
 from src.tray.pollers.idle_power._transition_actions import (
-    apply_dim_temp_brightness,
-    apply_restore_brightness,
-    read_effect_name,
     refresh_ui_best_effort,
     start_current_effect_for_idle_restore,
 )
@@ -25,7 +22,6 @@ from src.tray.protocols import IdlePowerTrayProtocol
 logger = logging.getLogger(__name__)
 _RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, ValueError)
-_IDLE_POWER_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
@@ -49,14 +45,21 @@ def _log_idle_power_exception(
 def _call_runtime_boundary(
     fn: Callable[[], object],
     *,
-    key: str,
-    level: int,
-    msg: str,
+    key: str | None = None,
+    level: int = logging.ERROR,
+    msg: str | None = None,
+    on_recoverable: Callable[[Exception], None] | None = None,
 ) -> bool:
     try:
         fn()
         return True
     except _IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: idle-power actions cross tray callbacks and runtime boundaries; must remain non-fatal for the polling loop
+        if on_recoverable is not None:
+            on_recoverable(exc)
+            return False
+
+        assert key is not None
+        assert msg is not None
         _log_idle_power_exception(key=key, level=level, msg=msg, exc=exc)
         return False
 
@@ -101,17 +104,13 @@ def _log_tray_boundary_exception(
     fallback_msg: str,
 ) -> None:
     log_exception = _tray_log_exception_or_none(tray)
-    if callable(log_exception):
-        try:
-            log_exception(msg, exc)
-            return
-        except _IDLE_POWER_CALLBACK_RUNTIME_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray exception logging is a best-effort callback boundary during idle-power recovery
-            _log_idle_power_exception(
-                key=f"{fallback_key}.logger",
-                level=logging.ERROR,
-                msg="Idle-power tray exception logger failed",
-                exc=log_exc,
-            )
+    if callable(log_exception) and _call_runtime_boundary(
+        lambda: log_exception(msg, exc),
+        key=f"{fallback_key}.logger",
+        level=logging.ERROR,
+        msg="Idle-power tray exception logger failed",
+    ):
+        return
 
     _log_idle_power_exception(
         key=fallback_key,
@@ -224,21 +223,21 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     except (AttributeError, TypeError, ValueError):
         pass
 
-    try:
-        start_current_effect_for_idle_restore(
+    _call_runtime_boundary(
+        lambda: start_current_effect_for_idle_restore(
             tray,
             brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
-        )
-    except _IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: idle-power restore crosses tray callback wiring and lighting startup boundaries; best-effort
-        _log_tray_boundary_exception(
+        ),
+        on_recoverable=lambda exc: _log_tray_boundary_exception(
             tray,
             msg="Failed to restore lighting after idle: %s",
             exc=exc,
             fallback_key="idle_power.restore_from_idle",
             fallback_level=logging.ERROR,
             fallback_msg="Failed to restore lighting after idle",
-        )
+        ),
+    )
 
     refresh_ui_best_effort(
         tray,
@@ -258,104 +257,18 @@ def apply_idle_action(
     reactive_effects_set: frozenset[str],
     sw_effects_set: frozenset[str],
 ) -> None:
-    if action == "turn_off":
-        tray._dim_temp_active = False
-        tray._dim_temp_target_brightness = None
-        _set_engine_hw_brightness_cap(tray.engine, None)
-        _call_runtime_boundary(
-            lambda: tray.engine.stop(),
-            key="idle_power.turn_off.stop_engine",
-            level=logging.WARNING,
-            msg="Idle-power turn-off failed while stopping engine",
-        )
-        _call_runtime_boundary(
-            lambda: tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S),
-            key="idle_power.turn_off.turn_off",
-            level=logging.WARNING,
-            msg="Idle-power turn-off failed while writing off state",
-        )
-
-        tray.is_off = True
-        tray._idle_forced_off = True
-        refresh_ui_best_effort(
-            tray,
-            key="idle_power.turn_off.refresh_ui",
-            msg="Idle-power UI refresh failed after turn-off",
-            call_runtime_boundary=_call_runtime_boundary,
-            warning_level=logging.WARNING,
-        )
-        return
-
-    if action == "dim_to_temp":
-        if not bool(tray.is_off):
-            if _dim_temp_state_matches(tray, target_brightness=dim_temp_brightness):
-                return
-            tray._dim_temp_active = True
-            tray._dim_temp_target_brightness = int(dim_temp_brightness)
-            effect = read_effect_name(
-                tray.config,
-                log_key="idle_power.dim_to_temp.effect_name",
-                log_msg="Idle-power dim-to-temp could not read effect name; falling back to none",
-                log_idle_power_exception=_log_idle_power_exception,
-                warning_level=logging.WARNING,
-                recoverable_effect_name_exceptions=_RECOVERABLE_EFFECT_NAME_EXCEPTIONS,
-            )
-            _call_runtime_boundary(
-                lambda: apply_dim_temp_brightness(
-                    tray,
-                    effect=effect,
-                    dim_temp_brightness=dim_temp_brightness,
-                    reactive_effects_set=reactive_effects_set,
-                    sw_effects_set=sw_effects_set,
-                    soft_off_fade_duration_s=SOFT_OFF_FADE_DURATION_S,
-                    set_reactive_transition=_set_reactive_transition,
-                    set_brightness_best_effort=_set_brightness_best_effort,
-                ),
-                key="idle_power.dim_to_temp.apply",
-                level=logging.WARNING,
-                msg="Idle-power dim-to-temp apply failed",
-            )
-        return
-
-    if action == "restore_brightness":
-        tray._dim_temp_active = False
-        tray._dim_temp_target_brightness = None
-        config = tray.config
-        target = safe_int_attr(config, "brightness", default=0)
-        perkey_target = safe_int_attr(config, "perkey_brightness", default=0)
-        effect = read_effect_name(
-            config,
-            log_key="idle_power.restore_brightness.read_state",
-            log_msg="Idle-power restore could not read brightness state; using safe defaults",
-            log_idle_power_exception=_log_idle_power_exception,
-            warning_level=logging.WARNING,
-            recoverable_effect_name_exceptions=_RECOVERABLE_EFFECT_NAME_EXCEPTIONS,
-        )
-        if target > 0 and not bool(tray.is_off):
-            _call_runtime_boundary(
-                lambda: apply_restore_brightness(
-                    tray,
-                    effect=effect,
-                    target=target,
-                    perkey_target=perkey_target,
-                    reactive_effects_set=reactive_effects_set,
-                    sw_effects_set=sw_effects_set,
-                    soft_on_fade_duration_s=SOFT_ON_FADE_DURATION_S,
-                    set_reactive_transition=_set_reactive_transition,
-                    set_engine_hw_brightness_cap=_set_engine_hw_brightness_cap,
-                    set_brightness_best_effort=_set_brightness_best_effort,
-                ),
-                key="idle_power.restore_brightness.apply",
-                level=logging.WARNING,
-                msg="Idle-power restore-brightness apply failed",
-            )
-        return
-
-    if action == "restore":
-        if not bool(tray._user_forced_off) and not bool(tray._power_forced_off):
-            tray._dim_temp_active = False
-            tray._dim_temp_target_brightness = None
-            if hasattr(tray, "engine"):
-                _set_engine_hw_brightness_cap(tray.engine, None)
-            restore_from_idle_fn(tray)
-        return
+    execute_idle_action(
+        tray,
+        action=action,
+        dim_temp_brightness=dim_temp_brightness,
+        restore_from_idle_fn=restore_from_idle_fn,
+        reactive_effects_set=reactive_effects_set,
+        sw_effects_set=sw_effects_set,
+        call_runtime_boundary=_call_runtime_boundary,
+        dim_temp_state_matches=_dim_temp_state_matches,
+        log_idle_power_exception=_log_idle_power_exception,
+        set_engine_hw_brightness_cap=_set_engine_hw_brightness_cap,
+        set_reactive_transition=_set_reactive_transition,
+        set_brightness_best_effort=_set_brightness_best_effort,
+        recoverable_effect_name_exceptions=_RECOVERABLE_EFFECT_NAME_EXCEPTIONS,
+    )

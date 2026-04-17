@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import threading
 import time
+from typing import TypeVar
 
 from src.core.utils.exceptions import is_device_disconnected
 from src.tray.protocols import IdlePowerTrayProtocol
@@ -9,7 +11,8 @@ from src.tray.protocols import IdlePowerTrayProtocol
 
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _HARDWARE_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-_HARDWARE_POLL_EVENT_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_HARDWARE_POLL_RECOVERY_EXCEPTIONS = (OSError, RuntimeError, ValueError)
+_T = TypeVar("_T")
 
 
 def _coerce_poll_int(value: object, *, default: int) -> int:
@@ -19,15 +22,27 @@ def _coerce_poll_int(value: object, *, default: int) -> int:
         return int(default)
 
 
+def _run_recoverable_hardware_poll_boundary(
+    action: Callable[[], _T],
+    *,
+    on_recoverable: Callable[[Exception], None],
+) -> _T | None:
+    try:
+        return action()
+    except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: hardware polling crosses runtime backend I/O and best-effort tray callback seams; recoverable runtime failures must stay non-fatal while unexpected defects still propagate
+        on_recoverable(exc)
+        return None
+
+
 def _log_polled_hardware_event(tray_vars: dict[str, object], action: str, **fields: object) -> None:
     log_event = tray_vars.get("_log_event")
     if not callable(log_event):
         return
 
-    try:
-        log_event("hardware", action, **fields)
-    except _HARDWARE_POLL_EVENT_RUNTIME_EXCEPTIONS:  # @quality-exception exception-transparency: tray event logging crosses an arbitrary callback boundary and hardware polling must remain non-fatal
-        return
+    _run_recoverable_hardware_poll_boundary(
+        lambda: log_event("hardware", action, **fields),
+        on_recoverable=lambda _exc: None,
+    )
 
 
 def _normalize_brightness_to_config_scale(brightness: int, *, expected: int | None = None) -> int:
@@ -142,23 +157,50 @@ def _apply_polled_hardware_state(
     return current_brightness, current_off
 
 
+def _poll_hardware_once(
+    tray: IdlePowerTrayProtocol,
+    *,
+    last_brightness,
+    last_off_state,
+) -> tuple[int, bool]:
+    with tray.engine.kb_lock:
+        current_brightness = tray.engine.kb.get_brightness()
+        current_off = tray.engine.kb.is_off()
+
+    return _apply_polled_hardware_state(
+        tray,
+        raw_brightness=int(current_brightness),
+        current_brightness=int(current_brightness),
+        current_off=bool(current_off),
+        last_brightness=last_brightness,
+        last_off_state=last_off_state,
+    )
+
+
+def _mark_device_unavailable_best_effort(tray: IdlePowerTrayProtocol) -> None:
+    try:
+        tray.engine.mark_device_unavailable()
+    except _HARDWARE_POLL_RECOVERY_EXCEPTIONS:
+        return
+
+
+def _log_hardware_polling_error_best_effort(tray: IdlePowerTrayProtocol, exc: Exception) -> None:
+    try:
+        tray._log_exception("Hardware polling error: %s", exc)
+    except _HARDWARE_POLL_RECOVERY_EXCEPTIONS:
+        return
+
+
 def _handle_hardware_polling_exception(tray: IdlePowerTrayProtocol, exc: Exception, *, last_error_at: float) -> float:
     # Device disconnects can happen at any time.
     if is_device_disconnected(exc):
-        try:
-            tray.engine.mark_device_unavailable()
-        except (OSError, RuntimeError, ValueError):
-            # Best-effort; continue polling.
-            pass
+        _mark_device_unavailable_best_effort(tray)
         return float(last_error_at)
 
     now = time.monotonic()
     if now - float(last_error_at) > 30:
         last_error_at = now
-        try:
-            tray._log_exception("Hardware polling error: %s", exc)
-        except (OSError, RuntimeError, ValueError):
-            pass
+        _log_hardware_polling_error_best_effort(tray, exc)
     return float(last_error_at)
 
 
@@ -170,27 +212,25 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
         last_off_state = None
         last_error_at = 0.0
 
-        while True:
-            try:
-                with tray.engine.kb_lock:
-                    current_brightness = tray.engine.kb.get_brightness()
-                    current_off = tray.engine.kb.is_off()
+        def _recover_polling_error(exc: Exception) -> None:
+            nonlocal last_error_at
+            last_error_at = _handle_hardware_polling_exception(
+                tray,
+                exc,
+                last_error_at=last_error_at,
+            )
 
-                last_brightness, last_off_state = _apply_polled_hardware_state(
+        while True:
+            polled_state = _run_recoverable_hardware_poll_boundary(
+                lambda: _poll_hardware_once(
                     tray,
-                    raw_brightness=int(current_brightness),
-                    current_brightness=int(current_brightness),
-                    current_off=bool(current_off),
                     last_brightness=last_brightness,
                     last_off_state=last_off_state,
-                )
-
-            except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: hardware polling crosses backend I/O, tray state sync, and callback boundaries and must remain non-fatal for recoverable runtime failures
-                last_error_at = _handle_hardware_polling_exception(
-                    tray,
-                    exc,
-                    last_error_at=last_error_at,
-                )
+                ),
+                on_recoverable=_recover_polling_error,
+            )
+            if polled_state is not None:
+                last_brightness, last_off_state = polled_state
 
             time.sleep(2)
 

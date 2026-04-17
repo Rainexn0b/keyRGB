@@ -284,8 +284,14 @@ def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -
 
     monkeypatch.setattr(ipp, "_apply_idle_action", fake_apply)
 
+    sleep_calls: list[float] = []
+
     # Stop after the first loop.
-    monkeypatch.setattr(ipp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+    def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(float(seconds))
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(ipp.time, "sleep", fake_sleep)
 
     events = {"n": 0}
 
@@ -313,6 +319,7 @@ def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -
 
     assert applied["n"] == 1
     assert events["n"] == 1
+    assert sleep_calls == [0.5]
 
 
 def test_start_idle_power_polling_suppresses_dim_sync_for_asusctl_backend(monkeypatch) -> None:
@@ -338,7 +345,13 @@ def test_start_idle_power_polling_suppresses_dim_sync_for_asusctl_backend(monkey
 
     monkeypatch.setattr(ipp, "_compute_idle_action", assert_dim_sync_suppressed)
     monkeypatch.setattr(ipp, "_apply_idle_action", lambda *_a, **_kw: None)
-    monkeypatch.setattr(ipp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+    sleep_calls: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(float(seconds))
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(ipp.time, "sleep", fake_sleep)
 
     tray = SimpleNamespace(
         backend=SimpleNamespace(name="asusctl-aura"),
@@ -359,6 +372,8 @@ def test_start_idle_power_polling_suppresses_dim_sync_for_asusctl_backend(monkey
 
     with pytest.raises(KeyboardInterrupt):
         created["t"].target()
+
+    assert sleep_calls == [0.5]
 
 
 def test_start_idle_power_polling_allows_dim_sync_for_asusctl_with_env_override(monkeypatch) -> None:
@@ -385,7 +400,13 @@ def test_start_idle_power_polling_allows_dim_sync_for_asusctl_with_env_override(
 
     monkeypatch.setattr(ipp, "_compute_idle_action", assert_dim_sync_allowed)
     monkeypatch.setattr(ipp, "_apply_idle_action", lambda *_a, **_kw: None)
-    monkeypatch.setattr(ipp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+    sleep_calls: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(float(seconds))
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(ipp.time, "sleep", fake_sleep)
 
     tray = SimpleNamespace(
         backend=SimpleNamespace(name="asusctl-aura"),
@@ -448,6 +469,7 @@ def test_start_idle_power_polling_logs_loop_errors_with_module_fallback(monkeypa
     created = {}
     module_logs: list[tuple[str, Exception]] = []
     run_calls = {"count": 0}
+    sleep_calls: list[float] = []
 
     def fake_thread(*, target, daemon: bool):
         t = _FakeThread(target=target, daemon=daemon)
@@ -465,7 +487,12 @@ def test_start_idle_power_polling_logs_loop_errors_with_module_fallback(monkeypa
     monkeypatch.setattr(ipp, "_get_session_id", lambda: None)
     monkeypatch.setattr(ipp, "_log_module_exception", lambda msg, exc: module_logs.append((msg, exc)))
     monkeypatch.setattr(ipp.time, "monotonic", lambda: 31.0)
-    monkeypatch.setattr(ipp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(float(seconds))
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(ipp.time, "sleep", fake_sleep)
 
     tray = SimpleNamespace(
         config=SimpleNamespace(),
@@ -477,7 +504,8 @@ def test_start_idle_power_polling_logs_loop_errors_with_module_fallback(monkeypa
     with pytest.raises(KeyboardInterrupt):
         created["t"].target()
 
-    assert run_calls["count"] == 2
+    assert run_calls["count"] == 1
+    assert sleep_calls == [0.5]
     assert [entry[0] for entry in module_logs] == [
         "Idle power tray exception logger failed: %s",
         "Idle power polling error: %s",
@@ -493,6 +521,7 @@ def test_start_idle_power_polling_propagates_unexpected_logger_failures(monkeypa
 
     created = {}
     run_calls = {"count": 0}
+    sleep_calls: list[float] = []
 
     def fake_thread(*, target, daemon: bool):
         t = _FakeThread(target=target, daemon=daemon)
@@ -509,7 +538,12 @@ def test_start_idle_power_polling_propagates_unexpected_logger_failures(monkeypa
     monkeypatch.setattr(ipp, "run_idle_power_iteration", fake_iteration)
     monkeypatch.setattr(ipp, "_get_session_id", lambda: None)
     monkeypatch.setattr(ipp.time, "monotonic", lambda: 31.0)
-    monkeypatch.setattr(ipp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    def fake_sleep(seconds: float) -> None:
+        sleep_calls.append(float(seconds))
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(ipp.time, "sleep", fake_sleep)
 
     tray = SimpleNamespace(
         config=SimpleNamespace(),

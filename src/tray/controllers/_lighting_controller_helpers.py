@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
-from typing import Optional
+from collections.abc import Callable, Mapping
+from typing import Optional, TypeVar
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import is_forced_hardware_effect, resolve_effect_name_for_backend, strip_effect_namespace
@@ -12,6 +12,7 @@ from src.tray.protocols import LightingTrayProtocol
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 logger = logging.getLogger(__name__)
+_T = TypeVar("_T")
 _ENGINE_FALLBACK_UNSET = object()
 _RECOVERABLE_CONFIG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_ENGINE_ATTR_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
@@ -25,13 +26,28 @@ def _log_module_exception(msg: str, exc: Exception) -> None:
     logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
 
 
-def _log_tray_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
+def _run_diagnostic_boundary(
+    action: Callable[[], _T],
+    *,
+    runtime_exceptions: tuple[type[Exception], ...],
+    on_recoverable: Callable[[Exception], _T],
+) -> _T:
     try:
-        tray._log_exception(msg, exc)
-        return
-    except _RECOVERABLE_TRAY_LOGGING_EXCEPTIONS as log_exc:  # @quality-exception exception-transparency: tray logger callback may raise arbitrary runtime errors; fallback to module logging
+        return action()
+    except runtime_exceptions as exc:  # @quality-exception exception-transparency: diagnostic-only helper callbacks and stringification cross runtime/user seams and must stay best-effort for recoverable failures
+        return on_recoverable(exc)
+
+
+def _log_tray_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
+    def _recover_tray_logging(log_exc: Exception) -> None:
         logger.exception("Tray exception logger failed while logging boundary: %s", log_exc)
-    _log_module_exception(msg, exc)
+        _log_module_exception(msg, exc)
+
+    _run_diagnostic_boundary(
+        lambda: tray._log_exception(msg, exc),
+        runtime_exceptions=_RECOVERABLE_TRAY_LOGGING_EXCEPTIONS,
+        on_recoverable=_recover_tray_logging,
+    )
 
 
 def _set_engine_attr_best_effort(
@@ -83,10 +99,19 @@ def _config_per_key_colors_ref(config: object) -> Mapping[object, object] | None
 
 
 def parse_menu_int(item: object) -> Optional[int]:
-    try:
-        s = str(item)
-    except _RECOVERABLE_STRINGIFICATION_EXCEPTIONS as exc:  # @quality-exception exception-transparency: menu item stringification crosses user-defined __str__ and must stay non-fatal
+    def _stringify_item() -> str | None:
+        return str(item)
+
+    def _recover_stringification(exc: Exception) -> str | None:
         _log_module_exception("Failed parsing tray menu integer item: %s", exc)
+        return None
+
+    s = _run_diagnostic_boundary(
+        _stringify_item,
+        runtime_exceptions=_RECOVERABLE_STRINGIFICATION_EXCEPTIONS,
+        on_recoverable=_recover_stringification,
+    )
+    if s is None:
         return None
 
     s = s.replace("🔘", "").replace("⚪", "").strip()
@@ -97,10 +122,11 @@ def parse_menu_int(item: object) -> Optional[int]:
 
 
 def try_log_event(tray: LightingTrayProtocol, source: str, action: str, **fields: object) -> None:
-    try:
-        tray._log_event(source, action, **fields)
-    except _RECOVERABLE_TRAY_LOGGING_EXCEPTIONS as exc:  # @quality-exception exception-transparency: tray event logging is a best-effort runtime boundary and must never block tray actions
-        _log_module_exception("Tray event logging failed: %s", exc)
+    _run_diagnostic_boundary(
+        lambda: tray._log_event(source, action, **fields),
+        runtime_exceptions=_RECOVERABLE_TRAY_LOGGING_EXCEPTIONS,
+        on_recoverable=lambda exc: _log_module_exception("Tray event logging failed: %s", exc),
+    )
 
 
 def get_effect_name(tray: LightingTrayProtocol) -> str:

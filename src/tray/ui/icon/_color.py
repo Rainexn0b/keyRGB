@@ -5,7 +5,7 @@ import logging
 import math
 import time
 from collections.abc import Iterable, Mapping, Sequence
-from typing import Any
+from typing import Protocol, cast
 
 from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.core.effects.perkey_animation import build_full_color_grid
@@ -16,9 +16,25 @@ from src.core.utils.logging_utils import log_throttled
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_COLOR = (255, 0, 128)
-_OFF_COLOR = (64, 64, 64)
-_RECOVERABLE_CONFIG_READ_ERRORS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+RGBColor = tuple[int, int, int]
+KeyCoord = tuple[int, int]
+PerKeyColorMap = Mapping[KeyCoord, RGBColor]
+RawPerKeyColorMap = Mapping[object, object]
+
+
+class _TrayIconColorConfig(Protocol):
+    """Marker protocol for config-like objects read via getattr boundaries."""
+
+
+_DEFAULT_COLOR: RGBColor = (255, 0, 128)
+_OFF_COLOR: RGBColor = (64, 64, 64)
+_RECOVERABLE_CONFIG_READ_ERRORS: tuple[type[Exception], ...] = (
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
 
 
 def _log_config_read_failure(name: str, exc: Exception) -> None:
@@ -32,7 +48,7 @@ def _log_config_read_failure(name: str, exc: Exception) -> None:
     )
 
 
-def _config_value(config: Any, name: str, default: Any) -> Any:
+def _config_value(config: _TrayIconColorConfig, name: str, default: object) -> object:
     try:
         value = getattr(config, name, default)
     except AttributeError:
@@ -50,11 +66,11 @@ def _int_or_default(value: object, default: int) -> int:
         return default
 
 
-def _config_int(config: Any, name: str, default: int) -> int:
+def _config_int(config: _TrayIconColorConfig, name: str, default: int) -> int:
     return _int_or_default(_config_value(config, name, default), default)
 
 
-def _normalized_rgb_or_none(value: object) -> tuple[int, int, int] | None:
+def _normalized_rgb_or_none(value: object) -> RGBColor | None:
     if isinstance(value, (str, bytes)) or not isinstance(value, Sequence) or len(value) != 3:
         return None
     try:
@@ -64,23 +80,23 @@ def _normalized_rgb_or_none(value: object) -> tuple[int, int, int] | None:
 
 
 def _config_color(
-    config: Any,
+    config: _TrayIconColorConfig,
     name: str,
-    default: tuple[int, int, int] = _DEFAULT_COLOR,
-) -> tuple[int, int, int]:
+    default: RGBColor = _DEFAULT_COLOR,
+) -> RGBColor:
     value = _config_value(config, name, default)
     return _normalized_rgb_or_none(value) or default
 
 
-def _config_optional_color(config: Any, name: str) -> tuple[int, int, int] | None:
+def _config_optional_color(config: _TrayIconColorConfig, name: str) -> RGBColor | None:
     value = _config_value(config, name, None)
     if value is None:
         return None
     return _normalized_rgb_or_none(value)
 
 
-def _normalized_color_values(colors: Iterable[object]) -> tuple[tuple[int, int, int], ...]:
-    normalized: list[tuple[int, int, int]] = []
+def _normalized_color_values(colors: Iterable[object]) -> tuple[RGBColor, ...]:
+    normalized: list[RGBColor] = []
     for color in colors:
         rgb = _normalized_rgb_or_none(color)
         if rgb is not None:
@@ -96,12 +112,12 @@ def _pace_from_speed(speed: int) -> float:
     return float(0.25 + (10.0 - 0.25) * t)
 
 
-def _per_key_color_mapping(config: Any) -> Mapping[tuple[int, int], tuple[int, int, int]]:
+def _per_key_color_mapping(config: _TrayIconColorConfig) -> RawPerKeyColorMap:
     per_key = _config_value(config, "per_key_colors", {})
     return per_key if isinstance(per_key, Mapping) else {}
 
 
-def _weighted_hsv_mean(colors: Iterable[tuple[int, int, int]]) -> tuple[int, int, int]:
+def _weighted_hsv_mean(colors: Iterable[RGBColor]) -> RGBColor:
     # Avoid muddy greys when averaging multi-color maps by averaging hue on the
     # unit circle and weighting by saturation/value.
     total = 0.0
@@ -148,7 +164,7 @@ def _weighted_hsv_mean(colors: Iterable[tuple[int, int, int]]) -> tuple[int, int
     return (int(rr * 255), int(gg * 255), int(bb * 255))
 
 
-def _representative_perkey_color(config: Any) -> tuple[int, int, int] | None:
+def _representative_perkey_color(config: _TrayIconColorConfig) -> RGBColor | None:
     per_key = _per_key_color_mapping(config)
     if not per_key:
         return None
@@ -161,7 +177,7 @@ def _representative_perkey_color(config: Any) -> tuple[int, int, int] | None:
     try:
         full = build_full_color_grid(
             base_color=base_color,
-            per_key_colors=per_key,
+            per_key_colors=cast(PerKeyColorMap, per_key),
             num_rows=NUM_ROWS,
             num_cols=NUM_COLS,
         )
@@ -172,7 +188,7 @@ def _representative_perkey_color(config: Any) -> tuple[int, int, int] | None:
     return _weighted_hsv_mean(full_colors or normalized_per_key)
 
 
-def _representative_saved_perkey_color(config: Any) -> tuple[int, int, int] | None:
+def _representative_saved_perkey_color(config: _TrayIconColorConfig) -> RGBColor | None:
     per_key = _per_key_color_mapping(config)
     if not per_key:
         return None
@@ -183,11 +199,11 @@ def _representative_saved_perkey_color(config: Any) -> tuple[int, int, int] | No
 
 def representative_color(
     *,
-    config: Any,
+    config: _TrayIconColorConfig,
     is_off: bool,
     now: float | None = None,
     backend: object | None = None,
-) -> tuple[int, int, int]:
+) -> RGBColor:
     """Pick an RGB color representative of the currently applied state."""
 
     if now is None:

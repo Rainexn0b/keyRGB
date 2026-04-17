@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from collections.abc import Callable
+from typing import Protocol, cast
 
-import src.core.power.tcc_profiles as tcc_power_profiles
 import src.core.effects.catalog as effects_catalog
 import src.core.power.system as system_power
+import src.core.power.tcc_profiles as tcc_power_profiles
 
 from ..controllers import software_target_controller
 from . import _menu_callbacks as menu_callbacks
@@ -15,6 +16,59 @@ from . import menu_sections, menu_status
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_SYSTEM_POWER_STATUS_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+_MenuAction = Callable[[object, object], None]
+
+
+class _MenuConfigProtocol(Protocol):
+    effect: object
+    speed: int
+    brightness: int
+    software_effect_target: object
+
+
+class _ReloadableMenuConfigProtocol(_MenuConfigProtocol, Protocol):
+    def reload(self) -> None: ...
+
+
+class _MenuTrayProtocol(Protocol):
+    backend: object | None
+    backend_caps: object | None
+    config: _MenuConfigProtocol
+    is_off: bool
+
+    _on_reactive_color_clicked: _MenuAction
+    _on_speed_clicked: _MenuAction
+    _on_brightness_clicked: _MenuAction
+    _on_hardware_static_mode_clicked: _MenuAction
+    _on_hardware_color_clicked: _MenuAction
+    _on_support_debug_clicked: _MenuAction
+    _on_power_settings_clicked: _MenuAction
+    _on_off_clicked: _MenuAction
+    _on_turn_on_clicked: _MenuAction
+    _on_quit_clicked: _MenuAction
+
+    def _on_effect_key_clicked(self, effect: str) -> None: ...
+
+    def _on_device_context_clicked(self, context_key: str) -> None: ...
+
+    def _on_software_effect_target_clicked(self, target_key: str) -> None: ...
+
+
+class _ReloadableMenuTrayProtocol(Protocol):
+    config: _ReloadableMenuConfigProtocol
+
+
+def _menu_tray(tray: object) -> _MenuTrayProtocol:
+    return cast(_MenuTrayProtocol, tray)
+
+
+def _reloadable_menu_tray(tray: object) -> _ReloadableMenuTrayProtocol:
+    return cast(_ReloadableMenuTrayProtocol, tray)
+
+
+def _tcc_profiles_provider() -> menu_sections._TccProfilesProviderProtocol:
+    return cast(menu_sections._TccProfilesProviderProtocol, tcc_power_profiles)
 
 
 def normalize_effect_label(label: str) -> str:
@@ -35,10 +89,16 @@ def normalize_effect_label(label: str) -> str:
     return effects_catalog.normalize_effect_name(s)
 
 
-def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
+def build_menu_items(
+    tray: object,
+    *,
+    pystray: menu_sections._PystrayProtocol,
+    item: menu_sections._ItemFactoryProtocol,
+) -> list[object]:
     """Build menu items list for dynamic menu updates."""
 
-    caps = getattr(tray, "backend_caps", None)
+    tray_state = _menu_tray(tray)
+    caps = getattr(tray_state, "backend_caps", None)
     per_key_supported = bool(getattr(caps, "per_key", True)) if caps is not None else True
     hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
     color_supported = bool(getattr(caps, "color", True)) if caps is not None else True
@@ -52,7 +112,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     device_entries = menu_status.device_context_entries(tray)
     selected_context = menu_status.selected_device_context_entry(tray)
 
-    hw_effect_names = effects_catalog.detected_backend_hw_effect_names(getattr(tray, "backend", None))
+    hw_effect_names = effects_catalog.detected_backend_hw_effect_names(getattr(tray_state, "backend", None))
     hw_effects_label = menu_status.hardware_effects_menu_text(tray)
 
     # HW effects menu - animated effects lock when in SW mode.
@@ -61,9 +121,9 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         *[
             item(
                 effects_catalog.title_for_effect(effect),
-                menu_callbacks.effect_key_callback(tray, effects_catalog.hardware_effect_selection_key(effect)),
+                menu_callbacks.effect_key_callback(tray_state, effects_catalog.hardware_effect_selection_key(effect)),
                 checked=menu_callbacks.checked_hw_effect(
-                    tray,
+                    tray_state,
                     effects_catalog.hardware_effect_selection_key(effect),
                     hw_mode=hw_mode,
                 ),
@@ -79,21 +139,21 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     sw_items = [
         item(
             "Reactive Typing Settings…",
-            tray._on_reactive_color_clicked,
+            tray_state._on_reactive_color_clicked,
         ),
         pystray.Menu.SEPARATOR,
         item(
             "None (static per-key)",
-            menu_callbacks.effect_key_callback(tray, "perkey"),
-            checked=menu_callbacks.checked_perkey(tray),
+            menu_callbacks.effect_key_callback(tray_state, "perkey"),
+            checked=menu_callbacks.checked_perkey(tray_state),
             radio=True,
         ),
         pystray.Menu.SEPARATOR,
         *[
             item(
                 effects_catalog.title_for_effect(effect),
-                menu_callbacks.effect_key_callback(tray, effect),
-                checked=menu_callbacks.checked_sw_effect(tray, effect, sw_mode=sw_mode),
+                menu_callbacks.effect_key_callback(tray_state, effect),
+                checked=menu_callbacks.checked_sw_effect(tray_state, effect, sw_mode=sw_mode),
                 radio=True,
                 enabled=sw_mode,
             )
@@ -103,8 +163,8 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         *[
             item(
                 effects_catalog.title_for_effect(effect),
-                menu_callbacks.effect_key_callback(tray, effect),
-                checked=menu_callbacks.checked_sw_effect(tray, effect, sw_mode=sw_mode),
+                menu_callbacks.effect_key_callback(tray_state, effect),
+                checked=menu_callbacks.checked_sw_effect(tray_state, effect, sw_mode=sw_mode),
                 radio=True,
                 enabled=sw_mode,
             )
@@ -118,8 +178,8 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         *[
             item(
                 str(speed),
-                tray._on_speed_clicked,
-                checked=menu_callbacks.checked_speed(tray, speed),
+                tray_state._on_speed_clicked,
+                checked=menu_callbacks.checked_speed(tray_state, speed),
                 radio=True,
             )
             for speed in range(0, 11)
@@ -130,8 +190,8 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         *[
             item(
                 str(brightness),
-                tray._on_brightness_clicked,
-                checked=menu_callbacks.checked_brightness(tray, brightness * 5),
+                tray_state._on_brightness_clicked,
+                checked=menu_callbacks.checked_brightness(tray_state, brightness * 5),
                 radio=True,
             )
             for brightness in range(0, 11)
@@ -142,8 +202,8 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         *[
             item(
                 str(option.get("label") or "Keyboard Only"),
-                menu_callbacks.software_target_callback(tray, str(option.get("key") or "keyboard")),
-                checked=menu_callbacks.checked_software_target(tray, str(option.get("key") or "keyboard")),
+                menu_callbacks.software_target_callback(tray_state, str(option.get("key") or "keyboard")),
+                checked=menu_callbacks.checked_software_target(tray_state, str(option.get("key") or "keyboard")),
                 enabled=bool(option.get("enabled", True)),
                 radio=True,
             )
@@ -152,10 +212,19 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     )
 
     # TUXEDO Control Center power profiles (via DBus). If not available, hide the submenu.
-    tcc_profiles_menu = menu_sections.build_tcc_profiles_menu(tray, pystray=pystray, item=item, tcc=tcc_power_profiles)
+    tcc_profiles_menu = menu_sections.build_tcc_profiles_menu(
+        cast(menu_sections._TccProfilesTrayProtocol, tray),
+        pystray=pystray,
+        item=item,
+        tcc=_tcc_profiles_provider(),
+    )
 
     # Lightweight system power mode toggle (cpufreq sysfs). If not available, hide.
-    system_power_menu = menu_sections.build_system_power_mode_menu(tray, pystray=pystray, item=item)
+    system_power_menu = menu_sections.build_system_power_mode_menu(
+        cast(menu_sections._SystemPowerMenuTrayProtocol, tray),
+        pystray=pystray,
+        item=item,
+    )
 
     # Avoid collisions: only show one power-control menu.
     system_power_can_apply = False
@@ -166,7 +235,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         system_power_can_apply = False
 
     perkey_menu = menu_sections.build_perkey_profiles_menu(
-        tray,
+        cast(menu_sections._PerkeyMenuTrayProtocol, tray),
         pystray=pystray,
         item=item,
         per_key_supported=per_key_supported,
@@ -184,7 +253,7 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
     header_items = [
         item(
             str(entry.get("text") or menu_status.keyboard_status_text(tray)),
-            menu_callbacks.device_context_callback(tray, str(entry.get("key") or "keyboard")),
+            menu_callbacks.device_context_callback(tray_state, str(entry.get("key") or "keyboard")),
             checked=menu_callbacks.checked_device_context(selected_context, str(entry.get("key") or "keyboard")),
             radio=True,
         )
@@ -196,7 +265,10 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
             *header_items,
             pystray.Menu.SEPARATOR,
             *menu_sections.build_device_context_menu_items(
-                tray, pystray=pystray, item=item, context_entry=selected_context
+                cast(menu_sections._DeviceContextMenuTrayProtocol, tray),
+                pystray=pystray,
+                item=item,
+                context_entry=selected_context,
             ),
         ]
 
@@ -206,14 +278,14 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         # === HARDWARE MODE ===
         item(
             "Hardware Static Mode",
-            tray._on_hardware_static_mode_clicked,
-            checked=menu_callbacks.checked_hw_static(tray, hw_mode=hw_mode),
+            tray_state._on_hardware_static_mode_clicked,
+            checked=menu_callbacks.checked_hw_static(tray_state, hw_mode=hw_mode),
         ),
         *(
             [
                 item(
                     "Hardware Uniform Color…",
-                    tray._on_hardware_color_clicked,
+                    tray_state._on_hardware_color_clicked,
                 )
             ]
             if color_supported
@@ -244,26 +316,32 @@ def build_menu_items(tray: Any, *, pystray: Any, item: Any) -> list[Any]:
         pystray.Menu.SEPARATOR,
         # power mode / settings
         *([item("Power Mode", power_menu)] if power_menu is not None else []),
-        item("Support Tools…", tray._on_support_debug_clicked),
-        item("Settings", tray._on_power_settings_clicked),
+        item("Support Tools…", tray_state._on_support_debug_clicked),
+        item("Settings", tray_state._on_power_settings_clicked),
         pystray.Menu.SEPARATOR,
         # off/on / (active mode) / quit
         item(
-            "Turn Off" if not tray.is_off else "Turn On",
-            tray._on_off_clicked if not tray.is_off else tray._on_turn_on_clicked,
-            checked=lambda _i: tray.is_off,
+            "Turn Off" if not tray_state.is_off else "Turn On",
+            tray_state._on_off_clicked if not tray_state.is_off else tray_state._on_turn_on_clicked,
+            checked=lambda _i: tray_state.is_off,
         ),
         item(
             menu_status.tray_lighting_mode_text(tray),
             lambda _icon, _item: None,
             enabled=False,
         ),
-        item("Quit", tray._on_quit_clicked),
+        item("Quit", tray_state._on_quit_clicked),
     ]
 
 
-def build_menu(tray: Any, *, pystray: Any, item: Any) -> Any:
+def build_menu(
+    tray: object,
+    *,
+    pystray: menu_sections._PystrayProtocol,
+    item: menu_sections._ItemFactoryProtocol,
+) -> object:
     """Build a pystray.Menu object."""
 
-    tray.config.reload()
+    tray_state = _reloadable_menu_tray(tray)
+    tray_state.config.reload()
     return pystray.Menu(*build_menu_items(tray, pystray=pystray, item=item))

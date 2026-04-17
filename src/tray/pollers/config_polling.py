@@ -103,6 +103,28 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
             last_apply_warn_at=last_apply_warn_at,
         )
 
+    def reload_and_apply_config(
+        *,
+        cause: str,
+        error_message: str,
+        last_error_at: float = 0.0,
+        throttle_s: float | None = None,
+    ) -> float:
+        try:
+            tray.config.reload()
+            apply_from_config(cause=cause)
+        except _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: config reload/apply in the polling thread is a best-effort runtime boundary; recoverable config or device failures must be logged and contained while unexpected defects still propagate
+            if throttle_s is None:
+                _log_polling_exception(error_message, exc)
+                return last_error_at
+
+            now = time.monotonic()
+            if now - last_error_at > float(throttle_s):
+                last_error_at = now
+                _log_polling_exception(error_message, exc)
+
+        return last_error_at
+
     def poll_config():
         nonlocal last_mtime
         nonlocal last_digest
@@ -116,15 +138,12 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
             last_mtime = None
             last_digest = None
 
-        try:
-            tray.config.reload()
-            apply_from_config(cause="startup")
-        except _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: startup reload/apply is a best-effort tray-thread runtime boundary and polling must survive config or device failures
-            # Don't crash the polling thread; but also don't silently eat errors.
-            now = time.monotonic()
-            if now - last_startup_error_at > 30:
-                last_startup_error_at = now
-                _log_polling_exception("Error loading config on startup: %s", exc)
+        last_startup_error_at = reload_and_apply_config(
+            cause="startup",
+            error_message="Error loading config on startup: %s",
+            last_error_at=last_startup_error_at,
+            throttle_s=30.0,
+        )
 
         while True:
             try:
@@ -134,17 +153,16 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
 
             if mtime != last_mtime:
                 last_mtime = mtime
-                try:
-                    # Avoid noisy reload/apply cycles when the file is rewritten
-                    # without any content change (e.g., redundant saves).
-                    digest = _file_digest(config_path) if mtime is not None else None
-                    if digest is not None and digest == last_digest:
-                        continue
-                    last_digest = digest
-                    tray.config.reload()
-                    apply_from_config(cause="mtime_change")
-                except _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: mtime-triggered reload/apply is a best-effort runtime boundary and the polling loop must continue after failures
-                    _log_polling_exception("Error reloading config: %s", exc)
+                # Avoid noisy reload/apply cycles when the file is rewritten
+                # without any content change (e.g., redundant saves).
+                digest = _file_digest(config_path) if mtime is not None else None
+                if digest is not None and digest == last_digest:
+                    continue
+                last_digest = digest
+                reload_and_apply_config(
+                    cause="mtime_change",
+                    error_message="Error reloading config: %s",
+                )
 
             time.sleep(0.1)
 
