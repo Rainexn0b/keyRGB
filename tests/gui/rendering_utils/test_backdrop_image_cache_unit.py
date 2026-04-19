@@ -6,9 +6,8 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from src.gui.reference.deck_image import load_reference_deck_image
 from src.gui.utils import backdrop_image_cache
-from src.gui.utils.backdrop_image_cache import clear_cached_backdrop_images
+from src.gui.utils.backdrop_image_cache import clear_cached_backdrop_images, load_cached_backdrop_image
 from src.gui.utils.profile_backdrop_storage import load_backdrop_image
 
 
@@ -16,7 +15,7 @@ def _save_rgba(path, color: tuple[int, int, int, int]) -> None:
     Image.new("RGBA", (4, 4), color=color).save(path)
 
 
-def test_backdrop_loaders_share_cached_rgba_image(tmp_path, monkeypatch) -> None:
+def test_backdrop_loader_and_cache_share_cached_rgba_image(tmp_path, monkeypatch) -> None:
     clear_cached_backdrop_images()
     image_path = tmp_path / "deck.png"
     _save_rgba(image_path, (255, 0, 0, 255))
@@ -29,7 +28,7 @@ def test_backdrop_loaders_share_cached_rgba_image(tmp_path, monkeypatch) -> None
     monkeypatch.setattr(backdrop_image_cache.profiles, "load_backdrop_mode", lambda _name: "custom")
 
     first = load_backdrop_image("profile-1")
-    second = load_reference_deck_image(profile_name="profile-1")
+    second = load_cached_backdrop_image(candidates=(image_path,))
 
     assert first is not None
     assert first is second
@@ -67,7 +66,7 @@ def test_backdrop_cache_invalidates_when_file_changes(tmp_path, monkeypatch) -> 
     clear_cached_backdrop_images()
 
 
-def test_backdrop_loaders_return_none_when_mode_is_none(tmp_path, monkeypatch) -> None:
+def test_backdrop_loader_returns_none_when_mode_is_none(tmp_path, monkeypatch) -> None:
     clear_cached_backdrop_images()
     image_path = tmp_path / "deck.png"
     _save_rgba(image_path, (255, 0, 0, 255))
@@ -80,12 +79,11 @@ def test_backdrop_loaders_return_none_when_mode_is_none(tmp_path, monkeypatch) -
     monkeypatch.setattr(backdrop_image_cache.profiles, "load_backdrop_mode", lambda _name: "none")
 
     assert load_backdrop_image("profile-1") is None
-    assert load_reference_deck_image(profile_name="profile-1") is None
 
     clear_cached_backdrop_images()
 
 
-def test_backdrop_loaders_return_none_when_custom_mode_has_no_saved_image(tmp_path, monkeypatch) -> None:
+def test_backdrop_loader_returns_none_when_custom_mode_has_no_saved_image(tmp_path, monkeypatch) -> None:
     clear_cached_backdrop_images()
     missing_image_path = tmp_path / "missing-deck.png"
 
@@ -97,7 +95,6 @@ def test_backdrop_loaders_return_none_when_custom_mode_has_no_saved_image(tmp_pa
     monkeypatch.setattr(backdrop_image_cache.profiles, "load_backdrop_mode", lambda _name: "custom")
 
     assert load_backdrop_image("profile-1") is None
-    assert load_reference_deck_image(profile_name="profile-1") is not None
 
     clear_cached_backdrop_images()
 

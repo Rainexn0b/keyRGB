@@ -110,6 +110,29 @@ def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
     assert calls["refresh"] == 1
 
 
+def test_restore_from_idle_records_resume_timestamp(monkeypatch) -> None:
+    import src.tray.pollers.idle_power._actions as actions_module
+    import src.tray.pollers.idle_power.polling as ipp
+
+    monkeypatch.setattr(actions_module.time, "monotonic", lambda: 123.0)
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        _last_resume_at=0.0,
+        config=SimpleNamespace(brightness=0),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _log_exception=lambda *_a, **_kw: None,
+        _start_current_effect=lambda **_kwargs: None,
+        _refresh_ui=lambda: None,
+    )
+
+    ipp._restore_from_idle(tray)
+
+    assert tray._last_resume_at == pytest.approx(123.0)
+
+
 def test_restore_from_idle_logs_tray_logger_failure_with_fallback(monkeypatch) -> None:
     import src.tray.pollers.idle_power._actions as actions_module
     import src.tray.pollers.idle_power.polling as ipp

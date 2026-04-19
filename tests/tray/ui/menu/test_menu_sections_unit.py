@@ -191,6 +191,35 @@ def test_tcc_profile_callback_propagates_unexpected_errors() -> None:
         menu_items[2].action(None, None)
 
 
+def test_system_power_callback_uses_runtime_helper_collaborators(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[str, object]] = []
+
+    monkeypatch.setattr(
+        menu_sections,
+        "get_status",
+        lambda: SimpleNamespace(supported=True, identifiers={"can_apply": "true"}, mode=None),
+    )
+    monkeypatch.setattr(menu_sections, "set_mode", lambda _mode: True)
+    monkeypatch.setattr(
+        menu_sections.profile_power_menu_actions,
+        "set_system_power_last_ok",
+        lambda tray, ok: calls.append(("status", ok)),
+    )
+    monkeypatch.setattr(
+        menu_sections.profile_power_menu_actions,
+        "update_menu_if_present",
+        lambda tray: calls.append(("refresh", tray)),
+    )
+
+    tray = SimpleNamespace()
+    menu_items = menu_sections.build_system_power_mode_menu(tray, pystray=_Pystray(), item=_item)
+
+    assert isinstance(menu_items, list)
+    menu_items[0].action(None, None)
+
+    assert calls == [("status", True), ("refresh", tray)]
+
+
 def test_perkey_profile_callback_logs_recoverable_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     from src.core.profile import profiles as core_profiles
 
@@ -231,6 +260,34 @@ def test_perkey_profile_callback_logs_recoverable_runtime_errors(monkeypatch: py
     assert len(logged) == 1
     assert logged[0][0] == "tray.menu.perkey_profile_click"
     assert isinstance(logged[0][2], RuntimeError)
+
+
+def test_perkey_profile_callback_uses_profile_activation_helper(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[tuple[object, str]] = []
+
+    monkeypatch.setattr(menu_sections.profile_power_menu_actions, "list_perkey_profiles", lambda: ["gaming"])
+    monkeypatch.setattr(menu_sections.profile_power_menu_actions, "get_active_perkey_profile", lambda: None)
+    monkeypatch.setattr(
+        menu_sections.profile_power_menu_actions,
+        "activate_perkey_profile",
+        lambda tray, profile_name: calls.append((tray, profile_name)),
+    )
+
+    tray = SimpleNamespace(
+        _on_perkey_clicked=lambda *_args, **_kwargs: None,
+    )
+
+    menu_items = menu_sections.build_perkey_profiles_menu(
+        tray,
+        pystray=_Pystray(),
+        item=_item,
+        per_key_supported=True,
+    )
+
+    assert isinstance(menu_items, list)
+    menu_items[2].action(None, None)
+
+    assert calls == [(tray, "gaming")]
 
 
 def test_perkey_profile_callback_propagates_unexpected_errors(monkeypatch: pytest.MonkeyPatch) -> None:

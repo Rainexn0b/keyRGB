@@ -49,6 +49,14 @@ class _UnexpectedEnsureFailure(AssertionError):
     pass
 
 
+class _ActiveProfileLookupFailure(RuntimeError):
+    pass
+
+
+class _UnexpectedActiveProfileLookupFailure(AssertionError):
+    pass
+
+
 def test_selected_device_context_key_returns_fallback_when_context_sync_attrs_are_blocked() -> None:
     tray = _BlockedSelectedDeviceContextTray()
 
@@ -122,6 +130,62 @@ def test_probe_device_available_propagates_unexpected_ensure_errors() -> None:
 
     with pytest.raises(_UnexpectedEnsureFailure, match="unexpected ensure bug"):
         menu_status.probe_device_available(tray)
+
+
+def test_tray_lighting_mode_text_uses_active_perkey_profile_name(monkeypatch) -> None:
+    monkeypatch.setattr(menu_status, "get_active_perkey_profile_name", lambda: "profile-z")
+
+    tray = SimpleNamespace(
+        backend=None,
+        config=SimpleNamespace(effect="perkey", brightness=50),
+        is_off=False,
+    )
+
+    assert menu_status.tray_lighting_mode_text(tray) == "Mode: Software (profile-z)"
+
+
+def test_tray_lighting_mode_text_logs_and_falls_back_when_active_profile_lookup_is_recoverable(monkeypatch) -> None:
+    logged: list[tuple[str, str, Exception]] = []
+
+    monkeypatch.setattr(
+        menu_status,
+        "_log_menu_debug",
+        lambda key, msg, exc, *, interval_s=60: logged.append((key, msg, exc)),
+    )
+    monkeypatch.setattr(
+        menu_status,
+        "get_active_perkey_profile_name",
+        lambda: (_ for _ in ()).throw(_ActiveProfileLookupFailure("boom")),
+    )
+
+    tray = SimpleNamespace(
+        backend=None,
+        config=SimpleNamespace(effect="perkey", brightness=50),
+        is_off=False,
+    )
+
+    assert menu_status.tray_lighting_mode_text(tray) == "Mode: Software ((unknown))"
+    assert len(logged) == 1
+    assert logged[0][0] == "tray.menu.active_profile"
+    assert "active per-key profile" in logged[0][1].lower()
+    assert isinstance(logged[0][2], _ActiveProfileLookupFailure)
+
+
+def test_tray_lighting_mode_text_propagates_unexpected_active_profile_lookup_errors(monkeypatch) -> None:
+    monkeypatch.setattr(
+        menu_status,
+        "get_active_perkey_profile_name",
+        lambda: (_ for _ in ()).throw(_UnexpectedActiveProfileLookupFailure("unexpected profile bug")),
+    )
+
+    tray = SimpleNamespace(
+        backend=None,
+        config=SimpleNamespace(effect="perkey", brightness=50),
+        is_off=False,
+    )
+
+    with pytest.raises(_UnexpectedActiveProfileLookupFailure, match="unexpected profile bug"):
+        menu_status.tray_lighting_mode_text(tray)
 
 
 def test_keyboard_status_text_uses_ite8291r3_backend_display_name(monkeypatch) -> None:

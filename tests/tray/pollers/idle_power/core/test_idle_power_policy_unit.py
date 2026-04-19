@@ -119,6 +119,27 @@ def test_compute_idle_action_restore_brightness_when_undimmed_and_dim_temp_activ
     assert action == "restore_brightness"
 
 
+def test_compute_idle_action_suppresses_screen_off_bounce_shortly_after_resume() -> None:
+    action = compute_idle_action(
+        dimmed=False,
+        screen_off=True,
+        is_off=False,
+        idle_forced_off=False,
+        dim_temp_active=False,
+        idle_timeout_s=60.0,
+        power_management_enabled=True,
+        screen_dim_sync_enabled=True,
+        screen_dim_sync_mode="temp",
+        screen_dim_temp_brightness=5,
+        brightness=25,
+        user_forced_off=False,
+        power_forced_off=False,
+        last_resume_at=100.0,
+        now=101.0,
+    )
+    assert action is None
+
+
 @pytest.mark.parametrize("forced_flag", ["user", "power"])
 def test_compute_idle_action_does_not_restore_brightness_if_forced_off(
     forced_flag: str,
