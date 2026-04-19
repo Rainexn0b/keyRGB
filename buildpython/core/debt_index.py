@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from .summary_support.common import loc_bucket_parts, loc_check_counts
+
 
 def _read_json_if_exists(path: Path) -> dict[str, Any] | None:
     if not path.exists():
@@ -87,13 +89,18 @@ def build_debt_index(buildlog_dir: Path) -> dict[str, Any]:
             "import_blocks": file_size.get("import_blocks", []),
             "flat_directories": file_size.get("flat_directories", []),
             "delegation_candidates": file_size.get("delegation_candidates", []),
+            "middleman_modules": file_size.get("middleman_modules", []),
+            "unreferenced_files": file_size.get("unreferenced_files", []),
         }
         report_paths["file_size"] = str(buildlog_dir / "file-size-analysis.md")
 
     if loc_check is not None:
         sections["loc_check"] = {
             "threshold": loc_check.get("threshold"),
+            "thresholds": loc_check.get("thresholds"),
             "count": loc_check.get("count"),
+            "counts": loc_check.get("counts", {}),
+            "counts_by_scope": loc_check.get("counts_by_scope", {}),
             "files": loc_check.get("files", []),
         }
         report_paths["loc_check"] = str(buildlog_dir / "loc-check.md")
@@ -199,6 +206,8 @@ def write_debt_index(buildlog_dir: Path) -> None:
             import_blocks = file_size.get("import_blocks", [])
             flat_directories = file_size.get("flat_directories", [])
             delegation_candidates = file_size.get("delegation_candidates", [])
+            middleman_modules = file_size.get("middleman_modules", [])
+            unreferenced_files = file_size.get("unreferenced_files", [])
             lines.extend(["## File size", ""])
             if isinstance(file_counts, dict):
                 lines.append(
@@ -219,6 +228,10 @@ def write_debt_index(buildlog_dir: Path) -> None:
             lines.append(
                 f"- Delegation candidates: {len(delegation_candidates) if isinstance(delegation_candidates, list) else 0}"
             )
+            lines.append(f"- Middle-man modules: {len(middleman_modules) if isinstance(middleman_modules, list) else 0}")
+            lines.append(
+                f"- Unreferenced file candidates: {len(unreferenced_files) if isinstance(unreferenced_files, list) else 0}"
+            )
             if isinstance(files, list) and files:
                 first = files[0]
                 if isinstance(first, dict):
@@ -237,6 +250,31 @@ def write_debt_index(buildlog_dir: Path) -> None:
                 first = delegation_candidates[0]
                 if isinstance(first, dict):
                     lines.append(f"- Top delegation candidate: {first.get('path')} (score={first.get('score')})")
+            if isinstance(middleman_modules, list) and middleman_modules:
+                first = middleman_modules[0]
+                if isinstance(first, dict):
+                    lines.append(f"- Top middle-man module: {first.get('path')} (exports={first.get('exports')})")
+            if isinstance(unreferenced_files, list) and unreferenced_files:
+                first = unreferenced_files[0]
+                if isinstance(first, dict):
+                    lines.append(f"- Top dead-file candidate: {first.get('path')} ({first.get('lines')} lines)")
+            lines.append("")
+
+        loc_check = sections.get("loc_check")
+        if isinstance(loc_check, dict):
+            loc_counts, default_counts, test_counts = loc_check_counts(loc_check)
+            files = loc_check.get("files", [])
+            bucket_parts = loc_bucket_parts(loc_counts, assignment=True)
+            lines.extend(["## LOC check", ""])
+            lines.append(f"- File buckets: {', '.join(bucket_parts) if bucket_parts else 'none'}")
+            if default_counts.get("total", 0):
+                lines.append(f"- Default-scope hits: {default_counts['total']}")
+            if test_counts.get("total", 0):
+                lines.append(f"- Test-scope hits: {test_counts['total']}")
+            if isinstance(files, list) and files:
+                first = files[0]
+                if isinstance(first, dict):
+                    lines.append(f"- Largest file: {first.get('path')} ({first.get('lines')} lines, {first.get('bucket')})")
             lines.append("")
 
         coverage = sections.get("coverage")

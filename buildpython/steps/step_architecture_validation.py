@@ -60,6 +60,20 @@ def architecture_validation_runner() -> RunResult:
                     }
                     for pattern in rule.patterns
                 ],
+                "imports": [
+                    {
+                        "module": item.module,
+                        "message": item.message,
+                    }
+                    for item in rule.imports
+                ],
+                "attributes": [
+                    {
+                        "name": item.name,
+                        "message": item.message,
+                    }
+                    for item in rule.attributes
+                ],
             }
             for rule in rules
         ],

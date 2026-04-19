@@ -467,3 +467,53 @@ def test_scan_delegation_candidate_still_flags_dense_small_delegate_module(tmp_p
 
     assert result is not None
     assert result["score"] == 10
+
+
+def test_file_size_runner_suppresses_file_level_quality_exception_waivers(tmp_path, monkeypatch) -> None:
+    _write_python_file(
+        tmp_path / "src" / "waived_large.py",
+        total_lines=420,
+        import_lines=24,
+    )
+    waived_large = tmp_path / "src" / "waived_large.py"
+    waived_large.write_text(
+        "# @quality-exception file-size-analysis: generated compatibility shim module\n"
+        + waived_large.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    _write_delegation_candidate(tmp_path / "src" / "waived_delegation.py")
+    waived_delegation = tmp_path / "src" / "waived_delegation.py"
+    waived_delegation.write_text(
+        "# @quality-exception file-size-analysis: temporary facade retained for API stability\n"
+        + waived_delegation.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    _write_python_file(tmp_path / "src" / "active_large.py", total_lines=410, import_lines=22)
+
+    monkeypatch.setattr(step_size, "repo_root", lambda: tmp_path)
+
+    result = step_size.file_size_runner()
+
+    assert result.exit_code == 0
+    assert "Quality-exception waivers: 2" in result.stdout
+    assert "[waived] src/waived_large.py" in result.stdout
+    assert "[waived] src/waived_delegation.py" in result.stdout
+
+    payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.json").read_text(encoding="utf-8"))
+
+    assert payload["counts"]["waived_files"] == 2
+    assert payload["waivers"]["step_slug"] == "file-size-analysis"
+    assert payload["waivers"]["files_total"] == 2
+    waived_paths = {item["path"] for item in payload["waivers"]["files"]}
+    assert waived_paths == {"src/waived_large.py", "src/waived_delegation.py"}
+
+    assert all(item["path"] != "src/waived_large.py" for item in payload["files"])
+    assert all(item["path"] != "src/waived_large.py" for item in payload["import_blocks"])
+    assert all(item["path"] != "src/waived_delegation.py" for item in payload["delegation_candidates"])
+    assert any(item["path"] == "src/active_large.py" for item in payload["files"])
+
+    markdown = (tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.md").read_text(encoding="utf-8")
+    assert "## Quality-exception waivers" in markdown
+    assert "src/waived_large.py" in markdown

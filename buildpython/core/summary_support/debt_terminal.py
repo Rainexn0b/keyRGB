@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .common import file_size_counts, read_json_if_exists
+from .common import (
+    file_size_counts,
+    file_size_structure_candidate_counts,
+    loc_bucket_parts,
+    loc_check_counts,
+    read_json_if_exists,
+)
 
 
 def _top_file(top_files: object, category: str) -> tuple[str, object] | None:
@@ -149,10 +155,13 @@ def build_terminal_filesize_highlight(buildlog_dir: Path) -> list[str]:
         return []
 
     file_counts, import_counts, flat_directory_count, delegation_candidate_count = file_size_counts(file_size)
+    middleman_candidate_count, unreferenced_candidate_count = file_size_structure_candidate_counts(file_size)
     files = file_size.get("files", [])
     import_blocks = file_size.get("import_blocks", [])
     flat_directories = file_size.get("flat_directories", [])
     delegation_candidates = file_size.get("delegation_candidates", [])
+    middleman_modules = file_size.get("middleman_modules", [])
+    unreferenced_files = file_size.get("unreferenced_files", [])
 
     fs_parts = [
         f"refactor {file_counts.get('refactor', 0)}",
@@ -160,6 +169,10 @@ def build_terminal_filesize_highlight(buildlog_dir: Path) -> list[str]:
         f"flat-dirs {flat_directory_count}",
         f"delegations {delegation_candidate_count}",
     ]
+    if middleman_candidate_count:
+        fs_parts.append(f"middlemen {middleman_candidate_count}")
+    if unreferenced_candidate_count:
+        fs_parts.append(f"dead-files {unreferenced_candidate_count}")
     lines: list[str] = ["\U0001f4c1  " + "  \u00b7  ".join(fs_parts)]
 
     if isinstance(files, list) and files and isinstance(files[0], dict):
@@ -175,5 +188,43 @@ def build_terminal_filesize_highlight(buildlog_dir: Path) -> list[str]:
         lines.append(
             f"{'Top delegation:':<16}  {delegation_candidates[0].get('path')} (score={delegation_candidates[0].get('score')})"
         )
+    if isinstance(middleman_modules, list) and middleman_modules and isinstance(middleman_modules[0], dict):
+        lines.append(
+            f"{'Top middleman:':<16}  {middleman_modules[0].get('path')} "
+            f"(exports={middleman_modules[0].get('exports')})"
+        )
+    if isinstance(unreferenced_files, list) and unreferenced_files and isinstance(unreferenced_files[0], dict):
+        lines.append(
+            f"{'Top dead-file:':<16}  {unreferenced_files[0].get('path')} "
+            f"({unreferenced_files[0].get('lines')} lines)"
+        )
+
+    return lines
+
+
+def build_terminal_loc_check_highlight(buildlog_dir: Path) -> list[str]:
+    loc_check = read_json_if_exists(buildlog_dir / "loc-check.json")
+    if loc_check is None:
+        return []
+
+    counts, _default_counts, test_counts = loc_check_counts(loc_check)
+    parts = loc_bucket_parts(counts, assignment=False)
+    if test_counts.get("total", 0):
+        parts.append(f"tests {test_counts['total']}")
+    if not parts:
+        return []
+
+    lines: list[str] = ["\U0001f4cf  " + "  \u00b7  ".join(parts)]
+    files = loc_check.get("files", [])
+    if isinstance(files, list) and files and isinstance(files[0], dict):
+        path = files[0].get("path")
+        line_count = files[0].get("lines")
+        bucket = files[0].get("bucket")
+        if isinstance(path, str):
+            detail = f"{path} ({line_count}"
+            if isinstance(bucket, str):
+                detail += f", {bucket}"
+            detail += ")"
+            lines.append(f"{'Top LOC:':<16}  {detail}")
 
     return lines

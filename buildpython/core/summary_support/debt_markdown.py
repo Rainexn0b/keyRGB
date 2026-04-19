@@ -2,7 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .common import coverage_status, file_size_counts, read_json_if_exists
+from .common import (
+    coverage_status,
+    file_size_counts,
+    file_size_structure_candidate_counts,
+    loc_bucket_parts,
+    loc_check_counts,
+    read_json_if_exists,
+)
 
 
 def _annotation_inventory_summary(exception_transparency: dict[str, object]) -> tuple[int | None, list[str]]:
@@ -31,6 +38,7 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
     markers = read_json_if_exists(buildlog_dir / "code-markers.json")
     coverage = read_json_if_exists(buildlog_dir / "coverage-summary.json")
     file_size = read_json_if_exists(buildlog_dir / "file-size-analysis.json")
+    loc_check = read_json_if_exists(buildlog_dir / "loc-check.json")
 
     if (
         hygiene is None
@@ -38,6 +46,7 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
         and markers is None
         and coverage is None
         and file_size is None
+        and loc_check is None
     ):
         return
 
@@ -154,10 +163,13 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
 
     if file_size is not None:
         file_counts, import_counts, flat_directory_count, delegation_candidate_count = file_size_counts(file_size)
+        middleman_candidate_count, unreferenced_candidate_count = file_size_structure_candidate_counts(file_size)
         files = file_size.get("files", [])
         import_blocks = file_size.get("import_blocks", [])
         flat_directories = file_size.get("flat_directories", [])
         delegation_candidates = file_size.get("delegation_candidates", [])
+        middleman_modules = file_size.get("middleman_modules", [])
+        unreferenced_files = file_size.get("unreferenced_files", [])
 
         lines.append("### File Size")
         lines.append(
@@ -175,6 +187,8 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
         )
         lines.append(f"- Flat directories: {flat_directory_count}")
         lines.append(f"- Delegation candidates: {delegation_candidate_count}")
+        lines.append(f"- Middle-man modules: {middleman_candidate_count}")
+        lines.append(f"- Unreferenced file candidates: {unreferenced_candidate_count}")
         if isinstance(files, list) and files:
             first = files[0]
             if isinstance(first, dict):
@@ -193,7 +207,35 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
             first = delegation_candidates[0]
             if isinstance(first, dict):
                 lines.append(f"- Top delegation candidate: {first.get('path')} (score={first.get('score')})")
+        if isinstance(middleman_modules, list) and middleman_modules:
+            first = middleman_modules[0]
+            if isinstance(first, dict):
+                lines.append(f"- Top middle-man module: {first.get('path')} (exports={first.get('exports')})")
+        if isinstance(unreferenced_files, list) and unreferenced_files:
+            first = unreferenced_files[0]
+            if isinstance(first, dict):
+                lines.append(f"- Top dead-file candidate: {first.get('path')} ({first.get('lines')} lines)")
         lines.append(f"- Report: {buildlog_dir / 'file-size-analysis.md'}")
+        lines.append("")
+
+    if loc_check is not None:
+        loc_counts, default_counts, test_counts = loc_check_counts(loc_check)
+        files = loc_check.get("files", [])
+        bucket_parts = loc_bucket_parts(loc_counts, assignment=True)
+
+        lines.append("### LOC Check")
+        lines.append(f"- File buckets: {', '.join(bucket_parts) if bucket_parts else 'none'}")
+        if default_counts.get("total", 0):
+            lines.append(f"- Default-scope hits: {default_counts['total']}")
+        if test_counts.get("total", 0):
+            lines.append(f"- Test-scope hits: {test_counts['total']}")
+        if isinstance(files, list) and files:
+            first = files[0]
+            if isinstance(first, dict):
+                lines.append(
+                    f"- Largest file: {first.get('path')} ({first.get('lines')} lines, {first.get('bucket')})"
+                )
+        lines.append(f"- Report: {buildlog_dir / 'loc-check.md'}")
         lines.append("")
 
     if markers is not None:

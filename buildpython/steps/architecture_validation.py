@@ -4,8 +4,16 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from pathlib import PurePosixPath
 from typing import Iterable
+
+from ._architecture_validation_helpers import _iter_rule_files
+from ._architecture_validation_helpers import _line_number
+from ._architecture_validation_helpers import _line_snippet
+from ._architecture_validation_helpers import _module_matches_import_rule
+from ._architecture_validation_helpers import _rel_path
+from ._architecture_validation_helpers import _ScannedAttribute
+from ._architecture_validation_helpers import _ScannedImport
+from ._architecture_validation_helpers import _scan_python_signals
 
 
 @dataclass(frozen=True)
@@ -17,6 +25,18 @@ class ArchitecturePattern:
 
 
 @dataclass(frozen=True)
+class ArchitectureImportRule:
+    module: str
+    message: str
+
+
+@dataclass(frozen=True)
+class ArchitectureAttributeRule:
+    name: str
+    message: str
+
+
+@dataclass(frozen=True)
 class ArchitectureRule:
     rule_id: str
     description: str
@@ -24,6 +44,8 @@ class ArchitectureRule:
     include_globs: tuple[str, ...]
     exclude_globs: tuple[str, ...]
     patterns: tuple[ArchitecturePattern, ...]
+    imports: tuple[ArchitectureImportRule, ...]
+    attributes: tuple[ArchitectureAttributeRule, ...]
 
 
 @dataclass(frozen=True)
@@ -88,8 +110,24 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 )
             )
 
-        if not patterns:
-            raise ValueError(f"architecture rule {rule_id!r} has no patterns")
+        imports: list[ArchitectureImportRule] = []
+        for raw_import in raw_rule.get("imports", []) or []:
+            module = str(raw_import.get("module", "")).strip()
+            message = str(raw_import.get("message", "")).strip()
+            if not module or not message:
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid import entry")
+            imports.append(ArchitectureImportRule(module=module, message=message))
+
+        attributes: list[ArchitectureAttributeRule] = []
+        for raw_attribute in raw_rule.get("attributes", []) or []:
+            name = str(raw_attribute.get("name", "")).strip()
+            message = str(raw_attribute.get("message", "")).strip()
+            if not name or not message:
+                raise ValueError(f"architecture rule {rule_id!r} has an invalid attribute entry")
+            attributes.append(ArchitectureAttributeRule(name=name, message=message))
+
+        if not patterns and not imports and not attributes:
+            raise ValueError(f"architecture rule {rule_id!r} has no patterns, import rules, or attribute rules")
 
         rules.append(
             ArchitectureRule(
@@ -99,6 +137,8 @@ def load_architecture_rules(config_path: Path) -> list[ArchitectureRule]:
                 include_globs=include_globs,
                 exclude_globs=exclude_globs,
                 patterns=tuple(patterns),
+                imports=tuple(imports),
+                attributes=tuple(attributes),
             )
         )
 
@@ -109,6 +149,7 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
     findings: list[ArchitectureFinding] = []
     seen_findings: set[tuple[str, str, int, str, str]] = set()
     scanned_files: set[str] = set()
+    scanned_python_signals: dict[str, tuple[tuple[_ScannedImport, ...], tuple[_ScannedAttribute, ...]]] = {}
     rules_list = list(rules)
 
     for rule in rules_list:
@@ -141,6 +182,63 @@ def scan_architecture(root: Path, rules: Iterable[ArchitectureRule]) -> Architec
                         )
                     )
 
+            if rule.imports or rule.attributes:
+                signals = scanned_python_signals.get(rel)
+                if signals is None:
+                    signals = _scan_python_signals(text)
+                    scanned_python_signals[rel] = signals
+                imports, attributes = signals
+
+            if rule.imports:
+                for import_rule in rule.imports:
+                    finding_token = f"import:{import_rule.module}"
+                    for scanned_import in imports:
+                        if not _module_matches_import_rule(scanned_import.module, import_rule.module):
+                            continue
+
+                        line = scanned_import.line
+                        snippet = _line_snippet(lines=lines, line=line)
+                        finding_key = (rule.rule_id, rel, line, import_rule.message, finding_token)
+                        if finding_key in seen_findings:
+                            continue
+                        seen_findings.add(finding_key)
+                        findings.append(
+                            ArchitectureFinding(
+                                rule_id=rule.rule_id,
+                                severity=rule.severity,
+                                path=rel,
+                                line=line,
+                                message=import_rule.message,
+                                snippet=snippet,
+                                regex=finding_token,
+                            )
+                        )
+
+            if rule.attributes:
+                for attribute_rule in rule.attributes:
+                    finding_token = f"attribute:{attribute_rule.name}"
+                    for scanned_attribute in attributes:
+                        if scanned_attribute.name != attribute_rule.name:
+                            continue
+
+                        line = scanned_attribute.line
+                        snippet = _line_snippet(lines=lines, line=line)
+                        finding_key = (rule.rule_id, rel, line, attribute_rule.message, finding_token)
+                        if finding_key in seen_findings:
+                            continue
+                        seen_findings.add(finding_key)
+                        findings.append(
+                            ArchitectureFinding(
+                                rule_id=rule.rule_id,
+                                severity=rule.severity,
+                                path=rel,
+                                line=line,
+                                message=attribute_rule.message,
+                                snippet=snippet,
+                                regex=finding_token,
+                            )
+                        )
+
     findings.sort(key=lambda item: (item.severity != "error", item.path, item.line, item.rule_id))
     return ArchitectureScanResult(
         findings=tuple(findings),
@@ -154,30 +252,3 @@ def _regex_flags(raw_flags: str) -> int:
     for flag in raw_flags:
         flags |= _FLAG_MAP.get(flag, 0)
     return flags
-
-
-def _iter_rule_files(*, root: Path, rule: ArchitectureRule) -> list[Path]:
-    matched: dict[str, Path] = {}
-    for pattern in rule.include_globs:
-        for path in root.glob(pattern):
-            if not path.is_file():
-                continue
-            rel = _rel_path(root, path)
-            if any(PurePosixPath(rel).match(exclude) for exclude in rule.exclude_globs):
-                continue
-            matched[rel] = path
-    return [matched[key] for key in sorted(matched)]
-
-
-def _rel_path(root: Path, path: Path) -> str:
-    return path.relative_to(root).as_posix()
-
-
-def _line_number(*, text: str, offset: int) -> int:
-    return text.count("\n", 0, offset) + 1
-
-
-def _line_snippet(*, lines: list[str], line: int) -> str:
-    if line <= 0 or line > len(lines):
-        return ""
-    return lines[line - 1].strip()[:200]

@@ -6,20 +6,27 @@ import ast
 import json
 from pathlib import Path
 
-from ._ast_scan_helpers import (
-    delegation_candidate_metrics,
-    import_block_metrics,
-    load_module_scan_context,
-    module_docstring_consumes_first_statement as _module_docstring_consumes_first_statement,
-)
-from .constants import (
-    DIRECTORY_SCAN_ROOTS,
-    DIRECT_PYTHON_FILE_THRESHOLD,
-    file_bucket,
-    import_block_level,
-)
+from . import _ast_scan_helpers as _scan_helpers
+from . import constants as _constants
+from . import usage_graph as _usage_graph
+from ..quality_exceptions import explanation_for_quality_exception_step
+
+delegation_candidate_metrics = _scan_helpers.delegation_candidate_metrics
+import_block_metrics = _scan_helpers.import_block_metrics
+load_module_scan_context = _scan_helpers.load_module_scan_context
+middleman_candidate_metrics = _scan_helpers.middleman_candidate_metrics
+_module_docstring_consumes_first_statement = _scan_helpers.module_docstring_consumes_first_statement
+
+DIRECTORY_SCAN_ROOTS = _constants.DIRECTORY_SCAN_ROOTS
+DIRECT_PYTHON_FILE_THRESHOLD = _constants.DIRECT_PYTHON_FILE_THRESHOLD
+file_bucket = _constants.file_bucket
+import_block_level = _constants.import_block_level
+
+build_usage_graph = _usage_graph.build_usage_graph
+inbound_import_count = _usage_graph.inbound_import_count
 
 _FLAT_DIRECTORY_ALLOWLIST_PATH = Path("buildpython/config/debt_baselines.json")
+_QUALITY_EXCEPTION_STEP_SLUG = "file-size-analysis"
 
 
 def load_flat_directory_allowlist(root: Path) -> dict[str, str]:
@@ -70,6 +77,24 @@ def read_lines(path: Path) -> list[str] | None:
         return None
 
 
+def _comment_text(line: str) -> str | None:
+    comment_index = line.find("#")
+    if comment_index == -1:
+        return None
+    return line[comment_index + 1 :].strip()
+
+
+def file_size_quality_exception_reason(lines: list[str]) -> str | None:
+    for line in lines:
+        explanation = explanation_for_quality_exception_step(
+            _comment_text(line),
+            step_slug=_QUALITY_EXCEPTION_STEP_SLUG,
+        )
+        if explanation:
+            return explanation
+    return None
+
+
 def module_docstring_consumes_first_statement(tree: ast.Module) -> bool:
     return _module_docstring_consumes_first_statement(tree)
 
@@ -86,6 +111,13 @@ def scan_delegation_candidate(path: Path) -> dict[str, Any] | None:
     if context is None:
         return None
     return delegation_candidate_metrics(context)
+
+
+def scan_middleman_candidate(path: Path) -> dict[str, Any] | None:
+    context = load_module_scan_context(path)
+    if context is None:
+        return None
+    return middleman_candidate_metrics(context)
 
 
 def scan_flat_directories(
@@ -150,11 +182,22 @@ def collect_hotspots(
     *,
     roots: tuple[str, ...],
 ) -> tuple[
-    list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, Any]],
+    list[dict[str, str]],
 ]:
     file_rows: list[dict[str, Any]] = []
     import_rows: list[dict[str, Any]] = []
     delegation_rows: list[dict[str, Any]] = []
+    middleman_rows: list[dict[str, Any]] = []
+    waived_rows: list[dict[str, str]] = []
+    waived_paths: set[str] = set()
+    usage_graph = build_usage_graph(root, roots=roots)
 
     for path in iter_py_files(root, roots=roots):
         lines = read_lines(path)
@@ -164,6 +207,12 @@ def collect_hotspots(
         line_count = len(lines)
         bucket = file_bucket(line_count)
         rel = str(path.relative_to(root))
+        waiver_reason = file_size_quality_exception_reason(lines)
+        if waiver_reason is not None:
+            waived_paths.add(rel)
+            waived_rows.append({"path": rel, "reason": waiver_reason})
+            continue
+
         if bucket is not None:
             file_rows.append({"lines": line_count, "bucket": bucket, "path": rel})
 
@@ -186,6 +235,14 @@ def collect_hotspots(
             delegation_candidate["path"] = rel
             delegation_rows.append(delegation_candidate)
 
+        middleman_candidate = scan_middleman_candidate(path)
+        if middleman_candidate is not None:
+            inbound_count = inbound_import_count(usage_graph, path)
+            if inbound_count and (not usage_graph.root_paths or path in usage_graph.reachable):
+                middleman_candidate["path"] = rel
+                middleman_candidate["inbound_imports"] = inbound_count
+                middleman_rows.append(middleman_candidate)
+
     file_rows.sort(key=lambda item: (-int(item["lines"]), str(item["path"])))
     import_rows.sort(key=lambda item: (-int(item["lines"]), -int(item["statements"]), str(item["path"])))
     delegation_rows.sort(
@@ -196,5 +253,66 @@ def collect_hotspots(
             str(item["path"]),
         )
     )
+    middleman_rows.sort(
+        key=lambda item: (
+            -int(item["inbound_imports"]),
+            -int(item["exports"]),
+            -int(item["import_statements"]),
+            str(item["path"]),
+        )
+    )
     flat_directories, flat_directories_allowed = scan_flat_directories(root)
-    return file_rows, import_rows, flat_directories, flat_directories_allowed, delegation_rows
+    unreferenced_rows = scan_unreferenced_file_candidates(
+        root,
+        roots=roots,
+        usage_graph=usage_graph,
+        waived_paths=waived_paths,
+    )
+    waived_rows.sort(key=lambda item: str(item["path"]))
+    return (
+        file_rows,
+        import_rows,
+        flat_directories,
+        flat_directories_allowed,
+        delegation_rows,
+        middleman_rows,
+        unreferenced_rows,
+        waived_rows,
+    )
+
+
+def scan_unreferenced_file_candidates(
+    root: Path,
+    *,
+    roots: tuple[str, ...],
+    usage_graph: Any | None = None,
+    waived_paths: set[str] | None = None,
+) -> list[dict[str, Any]]:
+    graph = usage_graph if usage_graph is not None else build_usage_graph(root, roots=roots)
+    if not graph.root_paths:
+        return []
+
+    waived = waived_paths or set()
+    rows: list[dict[str, Any]] = []
+    for path in iter_py_files(root, roots=roots):
+        rel = str(path.relative_to(root))
+        if path.name == "__init__.py" or path in graph.reachable or rel in waived:
+            continue
+        lines = read_lines(path)
+        if lines is None:
+            continue
+        inbound_count = inbound_import_count(graph, path)
+        reason = "Not reachable from configured entrypoints"
+        if inbound_count:
+            reason += f" ({inbound_count} inbound import{'s' if inbound_count != 1 else ''})"
+        rows.append(
+            {
+                "path": rel,
+                "lines": len(lines),
+                "inbound_imports": inbound_count,
+                "reason": reason,
+            }
+        )
+
+    rows.sort(key=lambda item: (-int(item["lines"]), -int(item["inbound_imports"]), str(item["path"])))
+    return rows

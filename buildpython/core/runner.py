@@ -5,16 +5,10 @@ import re
 import sys
 import time
 
+from . import summary as summary_module
 from .debt_index import write_debt_index
 from .model import Step, StepOutcome
-from .summary import BuildSummary, StepSummary, build_terminal_build_overview
-from .summary import build_terminal_coverage_highlight, write_summary
-from .summary_support.debt_terminal import (
-    build_terminal_filesize_highlight,
-    build_terminal_hygiene_highlight,
-    build_terminal_markers_highlight,
-    build_terminal_transparency_highlight,
-)
+from .summary_support import debt_terminal
 from ..utils.log_format import StepLogRecord, format_standard_log
 from ..utils.paths import buildlog_dir
 
@@ -91,17 +85,19 @@ def _step_highlights(step: Step, *, stdout: str, stderr: str) -> list[str]:
         if pytest_line is not None:
             highlights.append(pytest_line)
     elif step.name == "Code Markers":
-        highlights.extend(build_terminal_markers_highlight(buildlog_dir()))
+        highlights.extend(debt_terminal.build_terminal_markers_highlight(buildlog_dir()))
     elif step.name == "File Size":
-        highlights.extend(build_terminal_filesize_highlight(buildlog_dir()))
+        highlights.extend(debt_terminal.build_terminal_filesize_highlight(buildlog_dir()))
+    elif step.name == "LOC Check":
+        highlights.extend(debt_terminal.build_terminal_loc_check_highlight(buildlog_dir()))
     elif step.name == "Coverage":
-        coverage_line = build_terminal_coverage_highlight(buildlog_dir())
+        coverage_line = summary_module.build_terminal_coverage_highlight(buildlog_dir())
         if coverage_line is not None:
             highlights.append(coverage_line)
     elif step.name == "Code Hygiene":
-        highlights.extend(build_terminal_hygiene_highlight(buildlog_dir()))
+        highlights.extend(debt_terminal.build_terminal_hygiene_highlight(buildlog_dir()))
     elif step.name == "Exception Transparency":
-        highlights.extend(build_terminal_transparency_highlight(buildlog_dir()))
+        highlights.extend(debt_terminal.build_terminal_transparency_highlight(buildlog_dir()))
     return highlights
 
 
@@ -252,7 +248,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     print(f"\U0001f527  {_color('KeyRGB Build', _BOLD + _CYAN)}  {_color(build_label, _DIM)}")
 
     started = time.time()
-    summaries: list[StepSummary] = []
+    summaries: list[summary_module.StepSummary] = []
 
     def _health_score() -> int:
         considered = [s for s in summaries if s.status != "skipped"]
@@ -267,7 +263,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         )
 
         summaries.append(
-            StepSummary(
+            summary_module.StepSummary(
                 number=step.number,
                 name=step.name,
                 status=outcome.status,
@@ -281,9 +277,9 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
 
             score = _health_score()
 
-            write_summary(
+            summary_module.write_summary(
                 buildlog_dir(),
-                BuildSummary(
+                summary_module.BuildSummary(
                     passed=False,
                     health_score=score,
                     total_duration_s=time.time() - started,
@@ -292,13 +288,13 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
             )
             write_debt_index(buildlog_dir())
 
-            final_summary = BuildSummary(
+            final_summary = summary_module.BuildSummary(
                 passed=False,
                 health_score=score,
                 total_duration_s=time.time() - started,
                 steps=summaries,
             )
-            for line in build_terminal_build_overview(buildlog_dir(), final_summary):
+            for line in summary_module.build_terminal_build_overview(buildlog_dir(), final_summary):
                 print(line)
 
             return outcome.exit_code
@@ -306,9 +302,9 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     passed = all(s.status != "failure" for s in summaries)
     score = _health_score()
 
-    write_summary(
+    summary_module.write_summary(
         buildlog_dir(),
-        BuildSummary(
+        summary_module.BuildSummary(
             passed=passed,
             health_score=score,
             total_duration_s=time.time() - started,
@@ -317,13 +313,13 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     )
     write_debt_index(buildlog_dir())
 
-    final_summary = BuildSummary(
+    final_summary = summary_module.BuildSummary(
         passed=passed,
         health_score=score,
         total_duration_s=time.time() - started,
         steps=summaries,
     )
-    for line in build_terminal_build_overview(buildlog_dir(), final_summary):
+    for line in summary_module.build_terminal_build_overview(buildlog_dir(), final_summary):
         print(line)
 
     return 0

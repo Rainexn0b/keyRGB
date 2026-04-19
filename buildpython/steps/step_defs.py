@@ -43,7 +43,7 @@ def steps() -> list[Step]:
     from .step_format import ruff_format_check_runner
     from .step_import_scan import import_scan_runner
     from .step_imports import import_validation_runner
-    from .step_loc_check import loc_over_400_runner
+    from .step_loc_check import loc_check_runner
     from .step_pip import pip_check_runner
     from .step_quality import code_markers_runner
     from .step_repo_validation import repo_validation_runner
@@ -130,9 +130,9 @@ def steps() -> list[Step]:
         Step(
             number=12,
             name="LOC Check",
-            description="Report Python files >= 400 lines (refactor flag)",
+            description="Report large Python files by LOC buckets (tests use relaxed thresholds)",
             log_file=_log("step-12-loc-check.log"),
-            runner=loc_over_400_runner,
+            runner=loc_check_runner,
         ),
         Step(
             number=13,

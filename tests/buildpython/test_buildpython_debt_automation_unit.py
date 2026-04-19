@@ -17,6 +17,7 @@ from buildpython.core.summary import (
     write_summary,
 )
 from buildpython.core.summary_support.debt_terminal import (
+    build_terminal_loc_check_highlight,
     build_terminal_transparency_highlight,
 )
 from buildpython.steps.code_hygiene.baseline import _path_budget_regressions
@@ -784,6 +785,52 @@ def test_write_summary_and_debt_index_render_missing_capture_state(tmp_path) -> 
     assert "Total coverage: 0.0%" not in build_summary_md
     assert "Status: waiting for pytest coverage capture" in debt_index_md
     assert "Total coverage: 0.0%" not in debt_index_md
+
+
+def test_write_summary_and_debt_index_include_loc_check_snapshot(tmp_path) -> None:
+    buildlog_dir = tmp_path / "buildlog"
+    buildlog_dir.mkdir()
+    (buildlog_dir / "loc-check.json").write_text(
+        json.dumps(
+            {
+                "count": 3,
+                "counts": {"monitor": 1, "refactor": 1, "critical": 0, "severe": 1, "total": 3},
+                "counts_by_scope": {
+                    "default": {"monitor": 1, "refactor": 1, "critical": 0, "severe": 0, "total": 2},
+                    "tests": {"monitor": 0, "refactor": 0, "critical": 0, "severe": 1, "total": 1},
+                },
+                "files": [{"path": "tests/test_big.py", "lines": 620, "bucket": "SEVERE", "scope": "tests"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    write_summary(
+        buildlog_dir,
+        BuildSummary(
+            passed=True,
+            health_score=100,
+            total_duration_s=0.1,
+            steps=[],
+        ),
+    )
+    write_debt_index(buildlog_dir)
+
+    build_summary_md = (buildlog_dir / "build-summary.md").read_text(encoding="utf-8")
+    debt_index_md = (buildlog_dir / "debt-index.md").read_text(encoding="utf-8")
+    terminal_lines = build_terminal_loc_check_highlight(buildlog_dir)
+
+    assert "### LOC Check" in build_summary_md
+    assert "File buckets: monitor=1, refactor=1, severe=1" in build_summary_md
+    assert "Test-scope hits: 1" in build_summary_md
+    assert "Largest file: tests/test_big.py (620 lines, SEVERE)" in build_summary_md
+
+    assert "## LOC check" in debt_index_md
+    assert "File buckets: monitor=1, refactor=1, severe=1" in debt_index_md
+    assert "Default-scope hits: 2" in debt_index_md
+    assert "Test-scope hits: 1" in debt_index_md
+
+    assert any("tests 1" in line for line in terminal_lines)
 
 
 def test_terminal_coverage_highlight_summarizes_total_and_prefixes(tmp_path) -> None:

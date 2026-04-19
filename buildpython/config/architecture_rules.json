@@ -52,6 +52,89 @@
       ]
     },
     {
+      "id": "gui-window-no-direct-backend-selection",
+      "description": "Public GUI window modules should not import backend selection directly.",
+      "severity": "warning",
+      "corpus": {
+        "include": [
+          "src/gui/windows/**/*.py"
+        ],
+        "exclude": [
+          "src/gui/windows/_*.py"
+        ]
+      },
+      "imports": [
+        {
+          "module": "src.core.backends.registry",
+          "message": "GUI window modules should not import backend selection directly; move selection into bootstrap or target adapters."
+        },
+        {
+          "module": "src.core.secondary_device_routes",
+          "message": "GUI window modules should not import secondary-device route registries directly; resolve routes in bootstrap or adapters."
+        }
+      ]
+    },
+    {
+      "id": "gui-perkey-no-direct-backend-selection",
+      "description": "Per-key GUI helpers should not import backend selection directly.",
+      "severity": "warning",
+      "corpus": {
+        "include": [
+          "src/gui/perkey/**/*.py"
+        ]
+      },
+      "imports": [
+        {
+          "module": "src.core.backends.registry",
+          "message": "Per-key GUI helpers should not import backend selection directly; expose backend and device access through bootstrap or injected helpers."
+        }
+      ]
+    },
+    {
+      "id": "tray-ui-no-direct-profile-storage",
+      "description": "Tray UI should not import core profile storage directly.",
+      "severity": "warning",
+      "corpus": {
+        "include": [
+          "src/tray/ui/**/*.py"
+        ]
+      },
+      "imports": [
+        {
+          "module": "src.core.profile.profiles",
+          "message": "Tray UI should not import core profile storage directly; use callbacks, app services, or controller adapters."
+        }
+      ]
+    },
+    {
+      "id": "tray-ui-no-private-runtime-hooks",
+      "description": "Tray UI should not call or mutate private tray runtime hooks directly.",
+      "severity": "warning",
+      "corpus": {
+        "include": [
+          "src/tray/ui/**/*.py"
+        ]
+      },
+      "attributes": [
+        {
+          "name": "_update_menu",
+          "message": "Tray UI should not call private tray menu refresh hooks directly; route through callbacks or app services."
+        },
+        {
+          "name": "_update_icon",
+          "message": "Tray UI should not call private tray icon refresh hooks directly; route through callbacks or app services."
+        },
+        {
+          "name": "_start_current_effect",
+          "message": "Tray UI should not start private tray effect hooks directly; delegate through effect-selection or controller adapters."
+        },
+        {
+          "name": "_system_power_last_ok",
+          "message": "Tray UI should not mutate private tray runtime state directly; use an app-owned state or service boundary."
+        }
+      ]
+    },
+    {
       "id": "no-legacy-effects-shim",
       "description": "The removed legacy effects ite_backend shim must stay unused.",
       "severity": "error",
