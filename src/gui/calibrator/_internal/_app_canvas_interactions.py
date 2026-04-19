@@ -1,24 +1,25 @@
 from __future__ import annotations
 
-from typing import Iterable, Mapping, Protocol, TypeAlias
+from typing import TYPE_CHECKING, Iterable, Mapping, Protocol, TypeAlias
 
-from PIL import Image
+if TYPE_CHECKING:
+    from PIL import Image
 
-from src.core.resources.layout import KeyDef
+    from src.core.resources.layout import KeyDef
 
-from ._app_profile_layout import (
-    KeyCells,
-    Keymap,
-    LayoutSlotOverrides,
-    LayoutTweaks,
-    PerKeyLayoutTweaks,
-    PhysicalLayoutIdFn,
-    _CalibratorAppLike,
-    _DeckRenderCacheLike,
-    _ProbeSelectedIdentityFn,
-    _SelectedLayoutLegendPackFn,
-    _VisibleLayoutKeysFn,
-)
+    from ._app_profile_layout import (
+        KeyCells,
+        Keymap,
+        LayoutSlotOverrides,
+        LayoutTweaks,
+        PerKeyLayoutTweaks,
+        PhysicalLayoutIdFn,
+        _CalibratorAppLike,
+        _DeckRenderCacheLike,
+        _ProbeSelectedIdentityFn,
+        _SelectedLayoutLegendPackFn,
+        _VisibleLayoutKeysFn,
+    )
 
 
 ImageSize: TypeAlias = tuple[int, int]

@@ -3,25 +3,31 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable, Mapping, Sequence
 from tkinter import TclError, font as tkfont
-from typing import Protocol, TypeAlias
+from typing import TYPE_CHECKING, Protocol, TypeAlias
 
 from PIL import Image, ImageTk
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef, get_layout_keys
-from src.gui.reference.overlay_geometry import (
-    CanvasTransform,
-    calc_centered_drawn_bbox,
-    key_canvas_hit_rects,
-    key_canvas_rect,
-)
-from src.gui.utils.profile_backdrop_storage import load_backdrop_image
-from src.gui.utils.key_draw_style import key_draw_style
-
-from ..lightbar_layout import lightbar_rect_for_size
-from ..profile_management import keymap_cells_for, representative_cell
 from . import _canvas_drawing_helpers as drawing_helpers
 from . import _canvas_drawing_render as drawing_render
-from ._canvas_drawing_helpers import ShapeRect
+from ._canvas_drawing_runtime import DEFAULT_CANVAS_DRAWING_RUNTIME
+
+if TYPE_CHECKING:
+    from src.core.resources.layout import KeyDef
+    from src.gui.reference.overlay_geometry import CanvasTransform
+
+    from ._canvas_drawing_helpers import ShapeRect
+
+
+BASE_IMAGE_SIZE = DEFAULT_CANVAS_DRAWING_RUNTIME.base_image_size
+calc_centered_drawn_bbox = DEFAULT_CANVAS_DRAWING_RUNTIME.calc_centered_drawn_bbox
+get_layout_keys = DEFAULT_CANVAS_DRAWING_RUNTIME.get_layout_keys
+key_canvas_hit_rects = DEFAULT_CANVAS_DRAWING_RUNTIME.key_canvas_hit_rects
+key_canvas_rect = DEFAULT_CANVAS_DRAWING_RUNTIME.key_canvas_rect
+key_draw_style = DEFAULT_CANVAS_DRAWING_RUNTIME.key_draw_style
+keymap_cells_for = DEFAULT_CANVAS_DRAWING_RUNTIME.keymap_cells_for
+lightbar_rect_for_size = DEFAULT_CANVAS_DRAWING_RUNTIME.lightbar_rect_for_size
+load_backdrop_image = DEFAULT_CANVAS_DRAWING_RUNTIME.load_backdrop_image
+representative_cell = DEFAULT_CANVAS_DRAWING_RUNTIME.representative_cell
 
 
 logger = logging.getLogger(__name__)

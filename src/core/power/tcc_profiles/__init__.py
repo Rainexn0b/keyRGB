@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: public tcc profile facade kept flat for stable imports
+
 from typing import Any, Optional
 
 from .busctl import _busctl_call, _parse_busctl_bool_reply

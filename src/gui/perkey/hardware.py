@@ -5,8 +5,8 @@ import logging
 from typing import TypeVar
 
 from src.core.backends.base import KeyboardBackend, KeyboardDevice
-from src.core.backends.registry import select_backend
 from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
+from src.gui._backend_runtime import select_backend
 from src.core.utils.logging_utils import log_throttled
 
 

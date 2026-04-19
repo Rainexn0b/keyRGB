@@ -63,20 +63,8 @@ class _SetModeProtocol(Protocol):
     def __call__(self, mode: PowerMode) -> object: ...
 
 
-class _SystemPowerMenuTrayProtocol(Protocol):
-    _system_power_last_ok: bool
-
-
 class _PerkeyMenuTrayProtocol(Protocol):
-    config: object
-    is_off: bool
     _on_perkey_clicked: _MenuAction
-
-    def _start_current_effect(self, **kwargs: object) -> None: ...
-
-    def _update_icon(self, *, animate: bool = True) -> None: ...
-
-    def _update_menu(self) -> None: ...
 
 
 class _LogMenuDebugProtocol(Protocol):
@@ -93,14 +81,37 @@ class _MakeProfileActivationCallbackProtocol(Protocol):
     ) -> _MenuAction: ...
 
 
+class _SetSystemPowerResultProtocol(Protocol):
+    def __call__(self, tray: object, ok: bool) -> None: ...
+
+
+class _RefreshSystemPowerMenuProtocol(Protocol):
+    def __call__(self, tray: object) -> None: ...
+
+
+class _ListPerkeyProfilesProtocol(Protocol):
+    def __call__(self) -> Sequence[str]: ...
+
+
+class _GetActivePerkeyProfileProtocol(Protocol):
+    def __call__(self) -> str | None: ...
+
+
+class _ActivatePerkeyProfileProtocol(Protocol):
+    def __call__(self, tray: object, profile_name: str) -> None: ...
+
+
 @dataclass(frozen=True)
 class ProfilePowerMenuBuilder:
     make_profile_activation_callback: _MakeProfileActivationCallbackProtocol
     log_menu_debug: _LogMenuDebugProtocol
     get_status: _GetStatus
     set_mode: _SetModeProtocol
-    call_update_menu_if_present: Callable[[object], None]
-    power_forced_off_or_false: Callable[[object], bool]
+    set_system_power_result: _SetSystemPowerResultProtocol
+    refresh_system_power_menu: _RefreshSystemPowerMenuProtocol
+    list_perkey_profiles: _ListPerkeyProfilesProtocol
+    get_active_perkey_profile: _GetActivePerkeyProfileProtocol
+    activate_perkey_profile: _ActivatePerkeyProfileProtocol
 
     def build_tcc_profiles_menu(
         self,
@@ -152,7 +163,7 @@ class ProfilePowerMenuBuilder:
 
     def build_system_power_mode_menu(
         self,
-        tray: _SystemPowerMenuTrayProtocol,
+        tray: object,
         *,
         pystray: _PystrayProtocol,
         item: _ItemFactoryProtocol,
@@ -207,10 +218,8 @@ class ProfilePowerMenuBuilder:
             return None
 
         try:
-            from src.core.profile import profiles as core_profiles
-
-            perkey_profiles = core_profiles.list_profiles()
-            active_profile = core_profiles.get_active_profile()
+            perkey_profiles = self.list_perkey_profiles()
+            active_profile = self.get_active_perkey_profile()
 
             profile_items = [
                 item(
@@ -236,13 +245,13 @@ class ProfilePowerMenuBuilder:
             )
             return pystray.Menu(item("Open Color Editor…", tray._on_perkey_clicked))
 
-    def _system_power_callback(self, tray: _SystemPowerMenuTrayProtocol, mode: PowerMode) -> _MenuAction:
+    def _system_power_callback(self, tray: object, mode: PowerMode) -> _MenuAction:
         def _cb(_icon: object, _item: object) -> None:
             try:
                 ok = self.set_mode(mode)
-                tray._system_power_last_ok = bool(ok)
+                self.set_system_power_result(tray, bool(ok))
             except _SYSTEM_POWER_CALLBACK_EXCEPTIONS as exc:
-                tray._system_power_last_ok = False
+                self.set_system_power_result(tray, False)
                 self.log_menu_debug(
                     "tray.menu.system_power.click",
                     "System power mode activation failed",
@@ -250,7 +259,7 @@ class ProfilePowerMenuBuilder:
                     interval_s=60,
                 )
             finally:
-                self.call_update_menu_if_present(tray)
+                self.refresh_system_power_menu(tray)
 
         return _cb
 
@@ -264,18 +273,7 @@ class ProfilePowerMenuBuilder:
 
     def _perkey_profile_callback(self, tray: _PerkeyMenuTrayProtocol, profile_name: str) -> _MenuAction:
         def _activate_profile() -> None:
-            from src.core.profile import profiles as core_profiles
-
-            name = core_profiles.set_active_profile(profile_name)
-            colors = core_profiles.load_per_key_colors(name)
-            core_profiles.apply_profile_to_config(tray.config, colors)
-
-            if not self.power_forced_off_or_false(tray):
-                tray.is_off = False
-                tray._start_current_effect()
-
-            tray._update_icon()
-            tray._update_menu()
+            self.activate_perkey_profile(tray, profile_name)
 
         return self.make_profile_activation_callback(
             _activate_profile,

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: intentionally broad diagnostics support export surface
+
 from .evidence import build_additional_evidence_plan, collect_additional_evidence
 from .speed_probe import (
     ITE8291R3_SPEED_PROBE_EFFECT,

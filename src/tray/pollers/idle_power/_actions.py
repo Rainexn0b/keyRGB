@@ -206,6 +206,11 @@ def _set_brightness_best_effort(
 
 
 def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
+    try:
+        tray._last_resume_at = float(time.monotonic())
+    except (AttributeError, TypeError, ValueError, RuntimeError):
+        pass
+
     tray.is_off = False
     tray._idle_forced_off = False
     if hasattr(tray, "engine"):

@@ -11,9 +11,7 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk
 
-from src.core.backends.registry import select_backend
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
-from src.core.secondary_device_routes import SecondaryDeviceRoute, route_for_backend_name, route_for_device_type
 from src.core.utils.exceptions import is_device_busy
 from src.gui.utils.window_geometry import compute_centered_window_geometry
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
@@ -40,6 +38,12 @@ except ImportError:
     from src.gui.windows import _uniform_color_bootstrap as uniform_color_bootstrap
     from src.gui.windows import _uniform_color_interactions as uniform_color_interactions
     from src.gui.windows import _uniform_color_ui as uniform_color_ui
+
+
+SecondaryDeviceRoute = uniform_color_bootstrap.SecondaryDeviceRoute
+select_backend = uniform_color_bootstrap.select_backend
+route_for_backend_name = uniform_color_bootstrap.route_for_backend_name
+route_for_device_type = uniform_color_bootstrap.route_for_device_type
 
 
 class UniformColorGUI:

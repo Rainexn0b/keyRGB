@@ -4,7 +4,8 @@ import logging
 from collections.abc import Callable
 from typing import Protocol, TypeAlias, cast
 
-from src.core.secondary_device_routes import SecondaryDeviceRoute
+from src.core.backends.registry import select_backend
+from src.core.secondary_device_routes import SecondaryDeviceRoute, route_for_backend_name, route_for_device_type
 
 
 class _ColorCapabilitiesProtocol(Protocol):
@@ -27,6 +28,17 @@ IsDeviceBusyFn: TypeAlias = Callable[[BaseException], bool]
 _BACKEND_CAPABILITY_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _BACKEND_SELECTION_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
 _DEVICE_ACQUISITION_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+__all__ = [
+    "SecondaryDeviceRoute",
+    "acquire_device_best_effort",
+    "probe_color_support",
+    "resolve_secondary_route",
+    "route_for_backend_name",
+    "route_for_device_type",
+    "select_backend",
+    "select_backend_best_effort",
+]
 
 
 def resolve_secondary_route(

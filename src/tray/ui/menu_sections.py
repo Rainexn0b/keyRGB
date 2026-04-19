@@ -7,6 +7,7 @@ from typing import Protocol, cast
 from src.core.power.tcc_profiles.models import TccProfile
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
+from src.tray.controllers import menu_adapters as profile_power_menu_actions
 from src.tray.secondary_device_routes import route_for_context_entry
 
 from src.core.power.system import get_status, set_mode
@@ -59,52 +60,17 @@ class _TccProfilesTrayProtocol(Protocol):
 
 
 class _SystemPowerMenuTrayProtocol(Protocol):
-    _system_power_last_ok: bool
-
-    def _update_menu(self) -> None: ...
-
-
-class _OptionalUpdateMenuTrayProtocol(Protocol):
-    _update_menu: object
-
-
-class _OptionalPowerForcedOffTrayProtocol(Protocol):
-    _power_forced_off: object
+    pass
 
 
 class _PerkeyMenuTrayProtocol(Protocol):
-    config: object
-    is_off: bool
     _on_perkey_clicked: _MenuAction
-
-    def _start_current_effect(self, **kwargs: object) -> None: ...
-
-    def _update_icon(self, *, animate: bool = True) -> None: ...
-
-    def _update_menu(self) -> None: ...
 
 
 logger = logging.getLogger(__name__)
 
 _MENU_BUILD_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
 _PROFILE_CALLBACK_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-
-
-def _call_update_menu_if_present(tray: object) -> None:
-    try:
-        update_menu = cast(_OptionalUpdateMenuTrayProtocol, tray)._update_menu
-    except AttributeError:
-        return
-    if not callable(update_menu):
-        return
-    cast(Callable[[], None], update_menu)()
-
-
-def _power_forced_off_or_false(tray: object) -> bool:
-    try:
-        return bool(cast(_OptionalPowerForcedOffTrayProtocol, tray)._power_forced_off)
-    except AttributeError:
-        return False
 
 
 def _device_context_controls_available_typed(tray: object, context_entry: DeviceContextEntry) -> bool:
@@ -179,8 +145,11 @@ def _profile_power_menu_builder() -> ProfilePowerMenuBuilder:
         log_menu_debug=_log_menu_debug,
         get_status=get_status,
         set_mode=set_mode,
-        call_update_menu_if_present=_call_update_menu_if_present,
-        power_forced_off_or_false=_power_forced_off_or_false,
+        set_system_power_result=profile_power_menu_actions.set_system_power_last_ok,
+        refresh_system_power_menu=profile_power_menu_actions.update_menu_if_present,
+        list_perkey_profiles=profile_power_menu_actions.list_perkey_profiles,
+        get_active_perkey_profile=profile_power_menu_actions.get_active_perkey_profile,
+        activate_perkey_profile=profile_power_menu_actions.activate_perkey_profile,
     )
 
 

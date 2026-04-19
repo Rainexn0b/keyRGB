@@ -9,6 +9,7 @@ from src.core.effects.catalog import backend_hw_effect_names, detected_backend_h
 from src.core.effects.catalog import is_forced_hardware_effect, resolve_effect_name_for_backend, strip_effect_namespace
 from src.core.effects.catalog import title_for_effect
 from src.core.utils.logging_utils import log_throttled
+from src.tray.controllers.menu_adapters import get_active_perkey_profile_name
 
 from . import _menu_status_devices
 
@@ -245,9 +246,7 @@ def tray_lighting_mode_text(tray: object) -> str:
 
     if effect_base == "perkey":
         try:
-            from src.core.profile import profiles
-
-            active_profile = str(profiles.get_active_profile())
+            active_profile = get_active_perkey_profile_name()
         except _RECOVERABLE_PROFILE_LOOKUP_EXCEPTIONS as exc:
             _log_menu_debug(
                 "tray.menu.active_profile",

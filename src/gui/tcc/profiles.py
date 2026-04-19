@@ -12,26 +12,27 @@ from __future__ import annotations
 
 import logging
 
-import tkinter as tk
-from tkinter import messagebox, ttk
-
-from src.core.utils.logging_utils import log_throttled
-from src.core.power.tcc_profiles.models import is_builtin_profile_id
-from src.gui.utils.window_icon import apply_keyrgb_window_icon
-from src.gui.theme import apply_clam_theme
-from src.gui.utils.window_geometry import compute_centered_window_geometry
-from src.gui.tcc._profiles_window_ui import build_profiles_window
-from src.gui.tcc._profile_actions import (
-    create_profile,
-    delete_profile,
-    duplicate_profile,
-    edit_profile,
-    rename_profile,
-)
 import src.core.power.tcc_profiles as tcc_power_profiles
+
+from ._profiles_runtime_deps import TccProfilesRuntimeDeps as _runtime_deps
 
 
 logger = logging.getLogger(__name__)
+
+tk = _runtime_deps.tk
+ttk = _runtime_deps.ttk
+messagebox = _runtime_deps.messagebox
+log_throttled = _runtime_deps.log_throttled
+is_builtin_profile_id = _runtime_deps.is_builtin_profile_id
+apply_keyrgb_window_icon = _runtime_deps.apply_keyrgb_window_icon
+apply_clam_theme = _runtime_deps.apply_clam_theme
+compute_centered_window_geometry = _runtime_deps.compute_centered_window_geometry
+build_profiles_window = _runtime_deps.build_profiles_window
+create_profile = _runtime_deps.create_profile
+delete_profile = _runtime_deps.delete_profile
+duplicate_profile = _runtime_deps.duplicate_profile
+edit_profile = _runtime_deps.edit_profile
+rename_profile = _runtime_deps.rename_profile
 
 
 _SELECTION_INDEX_ERRORS = (IndexError, TypeError, ValueError)

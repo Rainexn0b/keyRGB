@@ -1,3 +1,4 @@
+# @quality-exception file-size-analysis: overlay autosync re-export facade for gui callers
 from src.core.resources.layout_tweak_autosync import (
     _apply_global_factory,
     _apply_per_key,

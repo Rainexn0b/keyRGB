@@ -1,6 +1,6 @@
-"""Tray application class.
+"""Tray application facade.
 
-This module holds the `KeyRGBTray` class implementation.
+This module keeps the stable `KeyRGBTray` surface and tray monkeypatch seams.
 """
 
 from __future__ import annotations
@@ -12,44 +12,38 @@ import time
 
 from . import _application_bindings as application_bindings
 from . import _application_notifications as application_notifications
-from . import callbacks as tray_callbacks
+from . import _runtime_deps as app_runtime_deps
 from . import _startup as tray_startup
 from ._delegates import KeyRGBTrayDelegateMixin
-from . import backend as tray_backend
-from . import lifecycle as tray_lifecycle
-from ..controllers import lighting_controller, software_target_controller
-from ..integrations import runtime
-from ..integrations import dependencies as tray_dependencies
-from ..ui import icon as icon_mod
-from ..ui import menu as menu_mod
-from ..ui import refresh as tray_refresh
 from src.core.backends import BackendError, format_backend_error
-from src.core.utils import exceptions as core_exceptions
 from src.core.utils.safe_attrs import safe_str_attr
 
 
-select_backend_with_introspection = tray_backend.select_backend_with_introspection
-select_device_discovery_snapshot = tray_backend.select_device_discovery_snapshot
-load_ite_dimensions = tray_backend.load_ite_dimensions
+select_backend_with_introspection = app_runtime_deps.select_backend_with_introspection
+select_device_discovery_snapshot = app_runtime_deps.select_device_discovery_snapshot
+load_ite_dimensions = app_runtime_deps.load_ite_dimensions
 build_permission_denied_message = tray_startup.build_permission_denied_message
 create_effects_engine = tray_startup.create_effects_engine
 flush_pending_notifications = tray_startup.flush_pending_notifications
 install_permission_error_callback_best_effort = tray_startup.install_permission_error_callback_best_effort
 migrate_builtin_profile_brightness_best_effort = tray_startup.migrate_builtin_profile_brightness_best_effort
-apply_brightness_from_power_policy = lighting_controller.apply_brightness_from_power_policy
-power_restore = lighting_controller.power_restore
-power_turn_off = lighting_controller.power_turn_off
-start_current_effect = lighting_controller.start_current_effect
-configure_engine_software_targets = software_target_controller.configure_engine_software_targets
-load_tray_dependencies = tray_dependencies.load_tray_dependencies
-maybe_autostart_effect = tray_lifecycle.maybe_autostart_effect
-start_all_polling = tray_lifecycle.start_all_polling
-start_power_monitoring = tray_lifecycle.start_power_monitoring
-update_tray_icon = tray_refresh.update_icon
-update_tray_menu = tray_refresh.update_menu
-is_permission_denied = core_exceptions.is_permission_denied
+apply_brightness_from_power_policy = app_runtime_deps.apply_brightness_from_power_policy
+power_restore = app_runtime_deps.power_restore
+power_turn_off = app_runtime_deps.power_turn_off
+start_current_effect = app_runtime_deps.start_current_effect
+configure_engine_software_targets = app_runtime_deps.configure_engine_software_targets
+load_tray_dependencies = app_runtime_deps.load_tray_dependencies
+maybe_autostart_effect = app_runtime_deps.maybe_autostart_effect
+start_all_polling = app_runtime_deps.start_all_polling
+start_power_monitoring = app_runtime_deps.start_power_monitoring
+runtime = app_runtime_deps.runtime
+icon_mod = app_runtime_deps.icon_mod
+menu_mod = app_runtime_deps.menu_mod
+update_tray_icon = app_runtime_deps.update_tray_icon
+update_tray_menu = app_runtime_deps.update_tray_menu
+is_permission_denied = app_runtime_deps.is_permission_denied
 logger = logging.getLogger(__name__)
-callbacks = tray_callbacks
+callbacks = app_runtime_deps.callbacks
 
 
 def _init_bindings() -> application_bindings.TrayInitBindings:

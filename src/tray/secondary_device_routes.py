@@ -1,3 +1,4 @@
+# @quality-exception file-size-analysis: compatibility facade for tray route imports
 from src.core.secondary_device_routes import (
     SecondaryDeviceRoute,
     route_for_backend_name,

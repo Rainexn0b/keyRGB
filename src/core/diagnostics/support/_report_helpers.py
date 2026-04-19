@@ -2,26 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from ._report_text import (
-    discovery_summary_text,
-    environment_text,
-    experimental_enabled_text,
-    hardware_label,
-    join_non_empty_sections,
-    json_text,
-    optional_capture_commands_text,
-    primary_candidate,
-    primary_usb_id,
-    selected_backend_name,
-    selected_backend_probe as _selected_backend_probe,
-    supplemental_evidence_text,
-    usb_ids_text,
-    version_text,
-    candidate_label,
-)
+from . import _report_text as report_text
 
 
-selected_backend_probe = _selected_backend_probe
+selected_backend_probe = report_text.selected_backend_probe
 
 
 ISSUE_URL = "https://github.com/Rainexn0b/keyRGB/issues/new/choose"
@@ -80,10 +64,10 @@ def hardware_support_fields(
     discovery: dict[str, Any] | None,
     supplemental_evidence: dict[str, Any] | None,
 ) -> dict[str, str]:
-    selected_backend = selected_backend_name(diagnostics, discovery)
-    primary = primary_candidate(discovery)
-    candidate = candidate_label(primary)
-    usb_ids = usb_ids_text(discovery, diagnostics)
+    selected_backend = report_text.selected_backend_name(diagnostics, discovery)
+    primary = report_text.primary_candidate(discovery)
+    candidate = report_text.candidate_label(primary)
+    usb_ids = report_text.usb_ids_text(discovery, diagnostics)
 
     what_happened_lines = [
         f"- Selected backend: {selected_backend or 'none'}",
@@ -99,14 +83,14 @@ def hardware_support_fields(
 
     fields = {
         "what_happened": "\n".join(what_happened_lines),
-        "diagnostics": json_text(diagnostics),
+        "diagnostics": report_text.json_text(diagnostics),
         "debug_logs": "Paste KEYRGB_DEBUG=1 keyrgb output here if available.",
         "lsusb": usb_ids,
     }
-    capture_commands = optional_capture_commands_text(discovery)
+    capture_commands = report_text.optional_capture_commands_text(discovery)
     if capture_commands:
         fields["extra_capture_commands"] = capture_commands
-    capture_results = supplemental_evidence_text(supplemental_evidence)
+    capture_results = report_text.supplemental_evidence_text(supplemental_evidence)
     if capture_results:
         fields["additional_evidence"] = capture_results
     return fields
@@ -118,14 +102,14 @@ def experimental_confirmation_fields(
     discovery: dict[str, Any] | None,
     supplemental_evidence: dict[str, Any] | None,
 ) -> dict[str, str]:
-    selected_backend = selected_backend_name(diagnostics, discovery)
+    selected_backend = report_text.selected_backend_name(diagnostics, discovery)
     return {
         "backend": selected_backend or "Other experimental backend",
-        "hardware": hardware_label(diagnostics, discovery),
-        "usb_id": primary_usb_id(discovery, diagnostics),
+        "hardware": report_text.hardware_label(diagnostics, discovery),
+        "usb_id": report_text.primary_usb_id(discovery, diagnostics),
         "confirmation": "\n".join(
             [
-                f"- Experimental backends enabled via: {experimental_enabled_text(diagnostics)}",
+                f"- Experimental backends enabled via: {report_text.experimental_enabled_text(diagnostics)}",
                 f"- Selected backend shown by KeyRGB: {selected_backend or 'unknown'}",
                 "- Uniform color works:",
                 "- Brightness works:",
@@ -136,13 +120,16 @@ def experimental_confirmation_fields(
                 "- How many launches / reboots / days you tested:",
             ]
         ),
-        "environment": environment_text(diagnostics),
-        "diagnostics": json_text(diagnostics),
+        "environment": report_text.environment_text(diagnostics),
+        "diagnostics": report_text.json_text(diagnostics),
         "logs": "Paste KEYRGB_DEBUG=1 keyrgb output from a successful run here if available.",
-        "extra_notes": join_non_empty_sections(
-            discovery_summary_text(discovery),
-            optional_capture_commands_text(discovery, prefix="Optional deeper-evidence commands:"),
-            supplemental_evidence_text(supplemental_evidence, prefix="Collected additional evidence:"),
+        "extra_notes": report_text.join_non_empty_sections(
+            report_text.discovery_summary_text(discovery),
+            report_text.optional_capture_commands_text(discovery, prefix="Optional deeper-evidence commands:"),
+            report_text.supplemental_evidence_text(
+                supplemental_evidence,
+                prefix="Collected additional evidence:",
+            ),
         ),
     }
 
@@ -163,16 +150,19 @@ def bug_report_fields(
                 "Expected:",
                 "Actual:",
                 "",
-                f"Selected backend: {selected_backend_name(diagnostics, discovery) or 'unknown'}",
-                f"Detected hardware: {hardware_label(diagnostics, discovery)}",
+                f"Selected backend: {report_text.selected_backend_name(diagnostics, discovery) or 'unknown'}",
+                f"Detected hardware: {report_text.hardware_label(diagnostics, discovery)}",
             ]
         ),
-        "version": version_text(diagnostics),
-        "environment": environment_text(diagnostics),
-        "diagnostics": json_text(diagnostics),
-        "logs": join_non_empty_sections(
+        "version": report_text.version_text(diagnostics),
+        "environment": report_text.environment_text(diagnostics),
+        "diagnostics": report_text.json_text(diagnostics),
+        "logs": report_text.join_non_empty_sections(
             "Paste KEYRGB_DEBUG=1 keyrgb output around the failure here if available.",
-            supplemental_evidence_text(supplemental_evidence, prefix="Collected additional evidence:"),
+            report_text.supplemental_evidence_text(
+                supplemental_evidence,
+                prefix="Collected additional evidence:",
+            ),
         ),
     }
 
@@ -183,9 +173,9 @@ def title_for_template(
     diagnostics: dict[str, Any] | None,
     discovery: dict[str, Any] | None,
 ) -> str:
-    hardware = hardware_label(diagnostics, discovery)
-    usb_id = primary_usb_id(discovery, diagnostics)
-    selected_backend = selected_backend_name(diagnostics, discovery)
+    hardware = report_text.hardware_label(diagnostics, discovery)
+    usb_id = report_text.primary_usb_id(discovery, diagnostics)
+    selected_backend = report_text.selected_backend_name(diagnostics, discovery)
     if template == EXPERIMENTAL_CONFIRMATION_TEMPLATE:
         return f"Experimental backend confirmation: {selected_backend or '<backend>'} on {hardware}"
     if template == BUG_REPORT_TEMPLATE:

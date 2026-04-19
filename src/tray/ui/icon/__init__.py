@@ -6,18 +6,12 @@ from typing import Literal, cast
 
 from PIL import Image
 
+from . import _color, _draw
 from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.core.effects.perkey_animation import build_full_color_grid
-from src.core.resources.defaults import REFERENCE_MATRIX_COLS as NUM_COLS
-from src.core.resources.defaults import REFERENCE_MATRIX_ROWS as NUM_ROWS
-
-from src.tray.ui.icon._draw import create_icon, create_icon_mosaic, create_icon_rainbow
-from src.tray.ui.icon._color import (
-    PerKeyColorMap,
-    RGBColor,
-    _TrayIconColorConfig,
-    _per_key_color_mapping,
-    representative_color,
+from src.core.resources.defaults import (
+    REFERENCE_MATRIX_COLS as NUM_COLS,
+    REFERENCE_MATRIX_ROWS as NUM_ROWS,
 )
 
 
@@ -26,9 +20,16 @@ _ANIMATED_ICON_SCALE_FLOOR = 0.85
 _CONFIG_READ_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 
-TrayIconConfig = _TrayIconColorConfig
+create_icon = _draw.create_icon
+create_icon_mosaic = _draw.create_icon_mosaic
+create_icon_rainbow = _draw.create_icon_rainbow
+PerKeyColorMap = _color.PerKeyColorMap
+RGBColor = _color.RGBColor
+TrayIconConfig = _color._TrayIconColorConfig
 TrayIconImage = Image.Image
 ColorGrid = tuple[RGBColor, ...]
+_per_key_color_mapping = _color._per_key_color_mapping
+representative_color = _color.representative_color
 
 
 @dataclass(frozen=True)

@@ -5,9 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-import src.core.backends.exceptions as backend_exceptions
-import src.core.utils.exceptions as core_exceptions
-
 from ..base import (
     BackendCapabilities,
     BackendStability,
@@ -23,6 +20,13 @@ if TYPE_CHECKING:
     from ..ite8910.hidraw import HidrawDeviceInfo, HidrawFeatureTransport
 
 
+def _hidraw_module() -> Any:
+    # Keep hidraw dependency lazy to avoid pulling USB internals during backend discovery import.
+    from ..ite8910 import hidraw
+
+    return hidraw
+
+
 def find_matching_hidraw_device(
     vendor_id: int,
     product_id: int,
@@ -30,15 +34,13 @@ def find_matching_hidraw_device(
     root: Path | None = None,
     dev_root: Path | None = None,
 ) -> HidrawDeviceInfo | None:
-    from ..ite8910.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
-
-    return _find_matching_hidraw_device(vendor_id, product_id, root=root, dev_root=dev_root)
+    hidraw = _hidraw_module()
+    return hidraw.find_matching_hidraw_device(vendor_id, product_id, root=root, dev_root=dev_root)
 
 
 def _forced_hidraw_device_info(devnode: Path) -> HidrawDeviceInfo:
-    from ..ite8910.hidraw import HidrawDeviceInfo
-
-    return HidrawDeviceInfo(
+    hidraw = _hidraw_module()
+    return hidraw.HidrawDeviceInfo(
         hidraw_name=devnode.name,
         devnode=devnode,
         sysfs_dir=Path(),
@@ -64,15 +66,14 @@ def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
 
 
 def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo]:
-    from ..ite8910.hidraw import HidrawFeatureTransport
-
+    hidraw = _hidraw_module()
     info = _find_matching_supported_hidraw_device()
     if info is None:
         raise FileNotFoundError(
             "No hidraw device found for supported ITE 8233 lightbar IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
         )
-    return HidrawFeatureTransport(info.devnode), info
+    return hidraw.HidrawFeatureTransport(info.devnode), info
 
 
 @dataclass
@@ -157,6 +158,9 @@ class Ite8233Backend(KeyboardBackend):
         )
 
     def get_device(self) -> KeyboardDevice:
+        import src.core.backends.exceptions as backend_exceptions
+        import src.core.utils.exceptions as core_exceptions
+
         if not experimental_backends_enabled():
             raise RuntimeError(
                 "ITE 8233 is classified as experimental. Enable Experimental backends in Settings "
