@@ -24,6 +24,27 @@ ensure_polkit_best_effort() {
   pkg_install_best_effort polkit || true
 }
 
+ensure_appimage_runtime_best_effort() {
+  detect_pkg_manager || return 0
+
+  case "${PKG_MGR:-}" in
+    pacman)
+      if system_has_libfuse2; then
+        return 0
+      fi
+
+      log_info "Installing FUSE 2 runtime for direct AppImage support (best-effort)..."
+      if pkg_install_best_effort fuse2; then
+        log_ok "Installed fuse2"
+      else
+        log_warn "Failed to install fuse2 automatically (best-effort)."
+        log_warn "Direct AppImage launches may fail until you install: sudo pacman -S fuse2"
+        log_info "The installed ~/.local/bin/keyrgb launcher will still fall back to --appimage-extract-and-run."
+      fi
+      ;;
+  esac
+}
+
 install_tcc_app_best_effort() {
   local state_dir="$HOME/.local/share/keyrgb"
   local marker="$state_dir/tcc-installed-by-keyrgb"

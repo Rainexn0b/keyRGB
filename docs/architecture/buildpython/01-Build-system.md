@@ -88,13 +88,13 @@ Debt-focused steps write structured reports under the same directory when they r
 
 - `code-markers.{json,csv,md}`
 - `file-size-analysis.{json,csv,md}`
-- `loc-check.{json,csv,md}`
+- `loc-check.{json,csv,md}` for bucketed LOC hotspots, with relaxed thresholds for test files
 - `code-hygiene.{json,csv,md}`
 - `architecture-validation.{json,csv,md}`
 - `coverage-summary.{json,csv,md}`
 - `exception-transparency.{json,csv,md}`
 
-`build-summary.md` includes the overall build state plus a debt snapshot of available structured reports. `debt-index.md` is the combined report index for debt-oriented outputs.
+`build-summary.md` includes the overall build state plus a debt snapshot of available structured reports. `debt-index.md` is the combined report index for debt-oriented outputs. When present, both surfaces summarize file-size and LOC hotspots so debt-oriented size issues are visible without opening each standalone report.
 
 ## Related docs
 

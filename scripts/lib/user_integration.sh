@@ -47,6 +47,32 @@ refresh_desktop_integration_caches_best_effort() {
   fi
 }
 
+system_has_libfuse2() {
+  if command -v ldconfig >/dev/null 2>&1; then
+    if ldconfig -p 2>/dev/null | grep -Fq "libfuse.so.2"; then
+      return 0
+    fi
+  fi
+
+  local candidate
+  for candidate in \
+    /lib/libfuse.so.2 \
+    /lib/libfuse.so.2.* \
+    /lib64/libfuse.so.2 \
+    /lib64/libfuse.so.2.* \
+    /usr/lib/libfuse.so.2 \
+    /usr/lib/libfuse.so.2.* \
+    /usr/lib64/libfuse.so.2 \
+    /usr/lib64/libfuse.so.2.*
+  do
+    if [ -e "$candidate" ]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 local_icon_asset_path() {
   local relative_path="$1"
   local repo_dir

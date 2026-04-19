@@ -33,8 +33,9 @@ When their steps run, debt-focused checks write structured reports under the sam
 
 - `code-markers.{json,csv,md}`
 - `file-size-analysis.{json,csv,md}`
-	Contains file-size buckets (`350-399`, `400-499`, `500-599`, `600+`), long import-block hotspots, and flat-directory hotspots.
+	Contains file-size buckets (`350-399`, `400-499`, `500-599`, `600+`), long import-block hotspots, flat-directory hotspots, middle-man modules, and unreferenced-file candidates.
 - `loc-check.{json,csv,md}`
+	Contains LOC buckets for non-test Python files (`350-399`, `400-449`, `450-549`, `550+`) and relaxed test-file buckets (`400-449`, `450-499`, `500-600`, `601+`).
 - `code-hygiene.{json,csv,md}`
 - `architecture-validation.{json,csv,md}`
 - `coverage-summary.{json,csv,md}`

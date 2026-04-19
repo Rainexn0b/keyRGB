@@ -27,7 +27,7 @@ Options:
   --asset <name>        AppImage filename (default: keyrgb-x86_64.AppImage)
   --prerelease          Allow picking prereleases when auto-resolving latest
   --update-appimage     Only update the AppImage (non-interactive); still refreshes desktop integration
-  --no-system-deps      Skip best-effort system package changes (kernel drivers / TCC app / polkit)
+  --no-system-deps      Skip best-effort system package changes (AppImage runtime / kernel drivers / TCC app / polkit)
 
 Env vars:
   KEYRGB_ALLOW_PRERELEASE=y|n
@@ -122,6 +122,10 @@ needs_system_package_changes() {
     return 1
   fi
 
+  if [ "$(distro_support_profile)" = "arch" ] && ! system_has_libfuse2; then
+    return 0
+  fi
+
   if is_truthy "${KEYRGB_INSTALL_TCC_APP:-n}" || is_truthy "${KEYRGB_INSTALL_KERNEL_DRIVERS:-n}"; then
     return 0
   fi
@@ -148,6 +152,8 @@ if [ "$UPDATE_ONLY" -ne 1 ] && needs_system_package_changes; then
       ;;
   esac
   detect_pkg_manager || true
+
+  ensure_appimage_runtime_best_effort
 
   # If the user will use pkexec helpers, ensure polkit exists best-effort.
   if ! is_truthy "${KEYRGB_SKIP_PRIVILEGED_HELPERS:-n}"; then
