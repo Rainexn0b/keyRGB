@@ -3,6 +3,14 @@
 ## Unreleased
 
 
+## 0.23.1 (2026-04-19)
+
+- Build/Quality: Continue the maintainability pass by splitting architecture validation, LOC check constants, and file-size scan/report components into smaller modules, and expand regression coverage for usage-graph and LOC/file-size reporting behavior.
+- Runtime/Tray/GUI: Continue extracting runtime dependency facades and controller helpers across tray app/menu paths, per-key editor canvas/runtime wiring, and TCC/support window entry flows while preserving existing public entrypoints.
+- Core/Effects: Refine particle-effect internals, backend/config helper organization, and support-report helper boundaries to keep large modules under control without changing user-facing behavior.
+- Packaging/Install: Keep installer integration scripts aligned with the current optional-component and user-integration plumbing paths used by local and packaged installs.
+
+
 ## 0.23.0 (2026-04-17)
 
 - Maintenance/Baseline: Establish the 0.23.x maintainability baseline for the next minor release cycle by clearing large-file debt, keeping the build health at 100/100, and adding assessment docs for package structure, orchestration hotspots, typed config/state models, module-size hotspots, and exception-boundary policy.
