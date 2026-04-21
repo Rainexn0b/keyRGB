@@ -40,6 +40,7 @@ def steps() -> list[Step]:
     from .file_size_analysis.step import file_size_runner
     from .step_architecture_validation import architecture_validation_runner
     from .step_black import black_check_runner
+    from .step_dead_code import dead_code_runner
     from .step_format import ruff_format_check_runner
     from .step_import_scan import import_scan_runner
     from .step_imports import import_validation_runner
@@ -182,5 +183,12 @@ def steps() -> list[Step]:
             description="Track broad exception debt and silent-failure hotspots",
             log_file=_log("step-19-exception-transparency.log"),
             runner=exception_transparency_runner,
+        ),
+        Step(
+            number=20,
+            name="Dead Code",
+            description="Scan for likely dead symbols with vulture (optional, informational)",
+            log_file=_log("step-20-dead-code.log"),
+            runner=dead_code_runner,
         ),
     ]

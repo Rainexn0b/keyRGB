@@ -352,13 +352,19 @@ def test_repo_flat_directory_allowlist_includes_intentional_package_roots() -> N
     allowlist = load_flat_directory_allowlist(repo_root)
 
     expected_reason_fragments = {
+        "src/core/config": "config package root",
+        "src/core/power/management": "power-management package root",
         "src/core/profile": "profile package root",
         "src/gui/perkey/editor_support": "editor support package",
         "src/gui/perkey/canvas_impl": "canvas implementation package",
         "src/gui/windows": "window package root",
         "src/gui/windows/_support": "support-window helper package",
         "src/tray/app": "tray app package root",
+        "src/tray/pollers/config_polling_internal": "config-polling internal package",
         "tests/core/backends/ite": "backend-variant test set",
+        "tests/core/power/manager": "power-manager test root",
+        "tests/core/effects/reactive/core": "reactive-effects-core test root",
+        "tests/tray/app": "tray-app test root",
     }
 
     for path, fragment in expected_reason_fragments.items():

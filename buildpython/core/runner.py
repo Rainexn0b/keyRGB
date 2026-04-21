@@ -210,6 +210,25 @@ def run_step(
         _print_step_footer(outcome, ["coverage or pytest not installed"])
         return outcome
 
+    if step.name == "Dead Code" and not _is_module_available("vulture"):
+        duration = time.time() - start
+        _write_log(
+            step,
+            "python -m vulture ...",
+            "(skipped: vulture not installed)\n",
+            "",
+            0,
+            duration,
+        )
+        outcome = StepOutcome(
+            status="skipped",
+            exit_code=0,
+            duration_s=duration,
+            message="vulture not installed",
+        )
+        _print_step_footer(outcome, ["vulture not installed"])
+        return outcome
+
     result = step.runner()
     duration = time.time() - start
 

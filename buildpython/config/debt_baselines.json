@@ -133,6 +133,10 @@
         "reason": "intentionally flat profile package root; 8 direct modules are peer-level profile storage, apply, payload, path, and backdrop units with no coherent sub-group below the existing package boundary"
       },
       {
+        "path": "src/core/config",
+        "reason": "intentionally flat config package root; 8 direct modules are peer-level config concerns (defaults, paths, storage, per-key colors, logging, version checks) behind the stable config facade"
+      },
+      {
         "path": "src/core/effects",
         "reason": "intentionally flat effects root; 13 files are module-level coordination and type objects (catalog, colors, demo, device, engine, fades, hw_payloads, matrix_layout, perkey_animation, software_targets, timing, transitions) with subsystems already in engine_support/, reactive/, software/"
       },
@@ -161,12 +165,36 @@
         "reason": "intentionally flat tray app package root; 9 direct modules are peer-level lifecycle, startup, callback, notification, binding, and backend wiring units with no coherent sub-group below the existing app boundary"
       },
       {
+        "path": "src/tray/controllers",
+        "reason": "intentionally flat tray controllers root; direct modules are peer-level controller facades and seam/coordination helpers, with specialised concerns already grouped under _power/ and menu_adapters/"
+      },
+      {
+        "path": "src/tray/pollers/config_polling_internal",
+        "reason": "intentionally flat config-polling internal package; direct modules are peer-level state, planning, fast-path, and apply-support helpers behind the stable src.tray.pollers.config_polling facade"
+      },
+      {
+        "path": "src/core/power/management",
+        "reason": "intentionally flat power-management package root; direct modules are peer-level manager orchestration units (runtime deps, config helpers, source iteration, event handling, monitor loop) behind the stable manager facade"
+      },
+      {
         "path": "tests/core/backends/ite",
         "reason": "intentionally flat ITE backend-variant test set; direct files are peer-level backend-variant scenarios with no coherent sub-group"
       },
       {
+        "path": "tests/core/power/manager",
+        "reason": "intentionally flat power-manager test root; direct test modules are peer-level behavior slices (brightness, config gating, event handlers/plans, source iteration/loops, helpers) around one manager boundary"
+      },
+      {
         "path": "tests/buildpython",
         "reason": "intentionally flat buildpython validation test root; direct files are one-file-per-build-step and buildpython contract tests with no coherent sub-group"
+      },
+      {
+        "path": "tests/core/effects/reactive/core",
+        "reason": "intentionally flat reactive-effects-core test root; direct test modules are peer-level behavior slices (backdrop, color config, math, engine state, evdev specs, input lifecycle, memory buffers, ripple) for the reactive effects subsystem with no coherent sub-group"
+      },
+      {
+        "path": "tests/tray/app",
+        "reason": "intentionally flat tray-app test root; direct test modules are peer-level behavior slices (application, backend seam, callbacks, entrypoint, lifecycle, protocols, startup bootstrap) around one tray-app boundary"
       }
     ]
   },
