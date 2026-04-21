@@ -3,6 +3,14 @@
 ## Unreleased
 
 
+## 0.23.3 (2026-04-22)
+
+- Tray/Runtime: Thin tray bootstrap, effect-start policy, and config-polling apply planning into typed pre-bootstrap state and explicit policy helpers while keeping the existing config-polling compatibility export intact.
+- GUI/Launch: Extract per-key and calibrator launch helpers, reactive and uniform init adapters, and support-window backend probe runtime seams so packaged and source launches share the same subprocess and runtime-root handling.
+- Config/Settings: Return detached effect-speed override copies from config, widen settings-state loading to direct typed sources, and make shared runtime and test path helpers resolve lazily to reduce bootstrap-time import coupling.
+- Docs/Tests: Replace the ad hoc improvement roadmap with active chunked maintainability docs and add regression coverage for tray policy dispatch, GUI entrypoints and launch helpers, settings loading, runtime path helpers, and config-apply compatibility.
+
+
 ## 0.23.2 (2026-04-21)
 
 - Tray/Power: Improve idle and power restore behavior by restarting looped software and reactive effects in place, avoiding soft-on flashes for those effects, and extending the post-resume guard so the keyboard does not immediately bounce back into idle handling after wake.
