@@ -96,12 +96,36 @@ def test_classify_apply_from_config_delegates_without_mutating_inputs() -> None:
     assert current.effect == "rainbow_wave"
 
 
+def test_resolve_apply_from_config_policy_reads_effect_then_delegates() -> None:
+    current = ConfigApplyState(
+        effect="rainbow_wave",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=None,
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+    )
+    config = SimpleNamespace(effect="wave")
+    plan = ConfigApplyPlan(persist_effect="rainbow_wave", execution_kind="apply")
+
+    with patch.object(_planning, "classify_apply_from_config", return_value=plan) as planner:
+        returned = _planning.resolve_apply_from_config_policy(
+            config,
+            current=current,
+            read_str_attr_fn=config_polling_core.safe_str_attr,
+        )
+
+    assert returned is plan
+    planner.assert_called_once_with(configured_effect="wave", current=current)
+
+
 def test_apply_from_config_once_uses_planning_output_contract_as_is() -> None:
     tray = _mk_tray_base(effect="rainbow_wave", brightness=10)
 
     with patch.object(
         config_polling_core,
-        "classify_apply_from_config",
+        "resolve_apply_from_config_policy",
         return_value=ConfigApplyPlan(persist_effect="wave", execution_kind="apply"),
     ):
         _apply_from_config_once(

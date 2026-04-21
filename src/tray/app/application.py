@@ -19,11 +19,12 @@ from ._application_state import TrayBootstrapState
 from ._delegates import KeyRGBTrayDelegateMixin
 from src.core.backends import BackendError, format_backend_error
 from src.core.utils.safe_attrs import safe_str_attr
-from src.tray.protocols import TrayIconState, ensure_tray_idle_power_state
+from src.tray.protocols import TrayIconState
 
 
 if TYPE_CHECKING:
     from src.core.config import Config
+    from src.tray.idle_power_state import TrayIdlePowerState
 
 
 select_backend_with_introspection = app_runtime_deps.select_backend_with_introspection
@@ -86,6 +87,9 @@ def _run_bindings() -> application_bindings.TrayRunBindings:
 class KeyRGBTray(KeyRGBTrayDelegateMixin):
     """System tray application for KeyRGB."""
 
+    icon: object | None
+    is_off: bool
+    tray_idle_power_state: TrayIdlePowerState
     config: Config
     engine: object
     power_manager: object | None
@@ -95,32 +99,26 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
     device_discovery: object | None
     selected_device_context: str
     tray_icon_state: TrayIconState
+    _power_forced_off: bool
+    _user_forced_off: bool
+    _idle_forced_off: bool
+    _dim_temp_active: bool
+    _dim_temp_target_brightness: int | None
+    _dim_backlight_baselines: dict[str, int]
+    _dim_backlight_dimmed: dict[str, bool]
+    _dim_screen_off: bool
+    _dim_sync_suppressed_logged: bool
+    _last_brightness: int
+    _last_resume_at: float
+    _event_last_at: dict[str, float]
+    _permission_notice_sent: bool
+    _pending_notifications: list[tuple[str, str]]
     _ite_rows: int
     _ite_cols: int
 
     def __init__(self) -> None:
-        self.icon: object | None = None
-        self.is_off = False
-        self.tray_icon_state = TrayIconState()
-        idle_power_state = ensure_tray_idle_power_state(self)
-        self._power_forced_off = idle_power_state.power_forced_off
-        self._user_forced_off = idle_power_state.user_forced_off
-        self._idle_forced_off = idle_power_state.idle_forced_off
-        self._dim_temp_active = idle_power_state.dim_temp_active
-        self._dim_temp_target_brightness = idle_power_state.dim_temp_target_brightness
-        self._dim_backlight_baselines = idle_power_state.dim_backlight_baselines
-        self._dim_backlight_dimmed = idle_power_state.dim_backlight_dimmed
-        self._dim_screen_off = idle_power_state.dim_screen_off
-        self._dim_sync_suppressed_logged = idle_power_state.dim_sync_suppressed_logged
-        self._last_brightness = 25
-        self._last_resume_at = idle_power_state.last_resume_at
-
-        # Event log throttling state (key -> last log monotonic time).
-        self._event_last_at: dict[str, float] = {}
-
-        # Notification state.
-        self._permission_notice_sent: bool = False
-        self._pending_notifications: list[tuple[str, str]] = []
+        prebootstrap_state = application_bindings.build_tray_prebootstrap_state(self)
+        prebootstrap_state.apply_to(self)
 
         # Backend selection and startup wiring are used for capability-driven UI gating.
         bindings = _init_bindings()

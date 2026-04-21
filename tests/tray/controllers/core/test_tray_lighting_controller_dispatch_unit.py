@@ -156,6 +156,42 @@ class TestHelperBoundaries:
 
 
 class TestStartCurrentEffect:
+    def test_resolve_start_current_effect_policy_keeps_config_unchanged(self):
+        from src.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
+
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "none"
+        mock_tray.config.brightness = 30
+
+        policy = _resolve_start_current_effect_policy(mock_tray, brightness_override=None)
+
+        assert policy.effect == "none"
+        assert policy.persist_effect is None
+        assert policy.target_brightness == 30
+        assert policy.start_brightness == 30
+        assert policy.start_plan.is_none_mode is True
+        assert mock_tray.config.effect == "none"
+
+    def test_resolve_start_current_effect_policy_reports_canonical_effect_persist(self):
+        from src.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
+
+        backend = MagicMock()
+        backend.effects.return_value = {"rainbow_wave": object()}
+
+        mock_tray = MagicMock()
+        mock_tray.backend = backend
+        mock_tray.config.effect = "hw:rainbow_wave"
+        mock_tray.config.brightness = 40
+
+        policy = _resolve_start_current_effect_policy(mock_tray, brightness_override=10)
+
+        assert policy.effect == "rainbow_wave"
+        assert policy.persist_effect == "rainbow_wave"
+        assert policy.target_brightness == 40
+        assert policy.start_brightness == 10
+        # Policy resolver computes persistence intent but does not mutate config.
+        assert mock_tray.config.effect == "hw:rainbow_wave"
+
     def test_classify_start_current_effect_marks_perkey_static_path(self):
         from src.tray.controllers.lighting_controller import _classify_start_current_effect
 
@@ -203,6 +239,36 @@ class TestStartCurrentEffect:
         assert plan.will_fade is True
         assert plan.is_loop_effect is False
         assert plan.apply_to_hardware is True
+
+    def test_prepare_effect_engine_state_loads_perkey_for_software_effect(self):
+        from src.tray.controllers import _lighting_effect_coordination
+
+        mock_tray = MagicMock()
+        _lighting_effect_coordination.prepare_effect_engine_state(
+            mock_tray,
+            effect="reactive_ripple",
+            is_software_effect_fn=lambda e: e == "reactive_ripple",
+            set_engine_perkey_from_config_fn=lambda t: t.engine.mark_sw(),
+            clear_engine_perkey_state_fn=lambda t: t.engine.mark_cleared(),
+        )
+
+        mock_tray.engine.mark_sw.assert_called_once()
+        mock_tray.engine.mark_cleared.assert_not_called()
+
+    def test_prepare_effect_engine_state_clears_perkey_for_hardware_effect(self):
+        from src.tray.controllers import _lighting_effect_coordination
+
+        mock_tray = MagicMock()
+        _lighting_effect_coordination.prepare_effect_engine_state(
+            mock_tray,
+            effect="breathe",
+            is_software_effect_fn=lambda e: e == "reactive_ripple",
+            set_engine_perkey_from_config_fn=lambda t: t.engine.mark_sw(),
+            clear_engine_perkey_state_fn=lambda t: t.engine.mark_cleared(),
+        )
+
+        mock_tray.engine.mark_cleared.assert_called_once()
+        mock_tray.engine.mark_sw.assert_not_called()
 
     def test_start_current_effect_fade_for_loop_effect_uses_non_hardware_brightness_write(self):
         from src.tray.controllers.lighting_controller import start_current_effect

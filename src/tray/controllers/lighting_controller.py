@@ -78,6 +78,29 @@ def _plan_effect_fade_ramp(
     )
 
 
+def _resolve_start_current_effect_policy(
+    tray: LightingTrayProtocol,
+    *,
+    brightness_override: Optional[int],
+) -> lighting_effect_coordination._StartCurrentEffectPolicy:
+    """Resolve start_current_effect policy before invoking engine side effects."""
+    return lighting_effect_coordination._resolve_start_current_effect_policy(
+        tray,
+        brightness_override=brightness_override,
+        safe_int_attr_fn=safe_attrs.safe_int_attr,
+        safe_str_attr_fn=safe_attrs.safe_str_attr,
+        resolve_effect_name_for_backend_fn=effects_catalog.resolve_effect_name_for_backend,
+        coerce_brightness_override_fn=lambda value: _coerce_brightness_override(
+            value,
+            default=safe_attrs.safe_int_attr(tray.config, "brightness", default=0),
+        ),
+        classify_start_current_effect_fn=lambda target_tray, effect: _classify_start_current_effect(
+            target_tray,
+            effect=effect,
+        ),
+    )
+
+
 def _run_static_effect_mode(
     tray: LightingTrayProtocol,
     *,
@@ -134,16 +157,14 @@ def start_current_effect(
     try:
         lighting_controller_helpers.ensure_device_best_effort(tray)
 
-        target_brightness = safe_attrs.safe_int_attr(tray.config, "brightness", default=0)
-        start_brightness = target_brightness
-        if brightness_override is not None:
-            start_brightness = _coerce_brightness_override(brightness_override, default=target_brightness)
+        policy = _resolve_start_current_effect_policy(tray, brightness_override=brightness_override)
+        effect = policy.effect
+        start_plan = policy.start_plan
+        target_brightness = policy.target_brightness
+        start_brightness = policy.start_brightness
 
-        raw_effect = safe_attrs.safe_str_attr(tray.config, "effect", default="none") or "none"
-        effect = effects_catalog.resolve_effect_name_for_backend(raw_effect, getattr(tray, "backend", None))
-        if effect != raw_effect:
-            tray.config.effect = effect
-        start_plan = _classify_start_current_effect(tray, effect=effect)
+        if policy.persist_effect is not None:
+            tray.config.effect = policy.persist_effect
 
         if start_plan.is_perkey_mode:
             _run_static_effect_mode(
@@ -171,10 +192,13 @@ def start_current_effect(
 
         # Prepare per-key state in case the effect is a software effect that needs it.
         # This handles cases like 'reactive_ripple' running on startup where the menu logic hasn't run.
-        if effect in SW_EFFECTS:
-            lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect(tray)
-        else:
-            lighting_controller_helpers.clear_engine_perkey_state(tray)
+        lighting_effect_coordination.prepare_effect_engine_state(
+            tray,
+            effect=effect,
+            is_software_effect_fn=lighting_controller_helpers.is_software_effect,
+            set_engine_perkey_from_config_fn=lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect,
+            clear_engine_perkey_state_fn=lighting_controller_helpers.clear_engine_perkey_state,
+        )
 
         # Decide ramp strategy separately from I/O side effects.
         fade_plan = _plan_effect_fade_ramp(

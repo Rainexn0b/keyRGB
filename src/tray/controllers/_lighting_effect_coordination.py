@@ -32,6 +32,17 @@ class _StartCurrentEffectPlan:
     restore_secondary_targets: bool
 
 
+@dataclass(frozen=True)
+class _StartCurrentEffectPolicy:
+    """Resolved start-current-effect policy before side effects run."""
+
+    effect: str
+    persist_effect: str | None
+    target_brightness: int
+    start_brightness: int
+    start_plan: _StartCurrentEffectPlan
+
+
 def _coerce_brightness_override(brightness_override: object, *, default: int) -> int:
     """Coerce brightness override to valid range [0, 50]; return default on error."""
     try:
@@ -73,6 +84,37 @@ def _classify_start_current_effect(
         is_none_mode=is_none_mode,
         is_loop_effect=is_loop_effect,
         restore_secondary_targets=restore_secondary_targets,
+    )
+
+
+def _resolve_start_current_effect_policy(
+    tray: LightingTrayProtocol,
+    *,
+    brightness_override: int | None,
+    safe_int_attr_fn: Callable[..., int],
+    safe_str_attr_fn: Callable[..., str],
+    resolve_effect_name_for_backend_fn: Callable[[str, object | None], str],
+    coerce_brightness_override_fn: Callable[[object], int],
+    classify_start_current_effect_fn: Callable[[LightingTrayProtocol, str], _StartCurrentEffectPlan],
+) -> _StartCurrentEffectPolicy:
+    """Resolve policy inputs for start_current_effect without executing engine I/O."""
+
+    target_brightness = safe_int_attr_fn(tray.config, "brightness", default=0)
+    start_brightness = target_brightness
+    if brightness_override is not None:
+        start_brightness = coerce_brightness_override_fn(brightness_override)
+
+    raw_effect = safe_str_attr_fn(tray.config, "effect", default="none") or "none"
+    effect = resolve_effect_name_for_backend_fn(raw_effect, getattr(tray, "backend", None))
+    persist_effect = effect if effect != raw_effect else None
+    start_plan = classify_start_current_effect_fn(tray, effect)
+
+    return _StartCurrentEffectPolicy(
+        effect=effect,
+        persist_effect=persist_effect,
+        target_brightness=target_brightness,
+        start_brightness=start_brightness,
+        start_plan=start_plan,
     )
 
 
@@ -144,4 +186,20 @@ def _apply_effect_fade_ramp(
             tray.engine.per_key_brightness = int(saved_perkey_br)
         except (AttributeError, TypeError, ValueError, OverflowError):
             pass
+
+
+def prepare_effect_engine_state(
+    tray: LightingTrayProtocol,
+    *,
+    effect: str,
+    is_software_effect_fn: Callable[[str], bool],
+    set_engine_perkey_from_config_fn: Callable[[LightingTrayProtocol], None],
+    clear_engine_perkey_state_fn: Callable[[LightingTrayProtocol], None],
+) -> None:
+    """Prepare engine per-key state before starting an effect."""
+
+    if is_software_effect_fn(effect):
+        set_engine_perkey_from_config_fn(tray)
+    else:
+        clear_engine_perkey_state_fn(tray)
 

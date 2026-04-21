@@ -3,14 +3,14 @@ from __future__ import annotations
 from src.core.effects.catalog import REACTIVE_EFFECTS, resolve_effect_name_for_backend
 from src.core.effects.software_targets import normalize_software_effect_target
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
-from src.tray.protocols import ConfigPollingTrayProtocol
+from src.tray.protocols import ConfigPollingTrayProtocol, ConfigStateResolveTrayProtocol
 
 from ._config_apply_state import _CONFIG_FALLBACK_EXCEPTIONS
 from ._config_apply_state import _safe_perkey_signature, _safe_tuple_attr
 from ._config_apply_state import ConfigApplyState, build_config_apply_state
 from ._fast_path import apply_fast_path_change, classify_fast_path_change
 from ._post_fast_path_apply import apply_post_fast_path_execution, execute_non_fast_path_plan
-from ._planning import classify_apply_from_config
+from ._planning import classify_apply_from_config, resolve_apply_from_config_policy
 from .helpers import _apply_effect, _apply_perkey, _apply_turn_off, _apply_uniform, _handle_forced_off, _sync_reactive, _sync_software_target_policy
 
 
@@ -19,7 +19,7 @@ _FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, Value
 _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
-def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
+def compute_config_apply_state(tray: ConfigStateResolveTrayProtocol) -> ConfigApplyState:
     def _resolve_effect_name(effect_name: str) -> str:
         return resolve_effect_name_for_backend(effect_name, getattr(tray, "backend", None))
 
@@ -112,8 +112,11 @@ def apply_from_config_once(
     if current == last_applied:
         return last_applied, last_apply_warn_at
 
-    configured_effect = safe_str_attr(tray.config, "effect", default="none") or "none"
-    apply_plan = classify_apply_from_config(configured_effect=configured_effect, current=current)
+    apply_plan = resolve_apply_from_config_policy(
+        tray.config,
+        current=current,
+        read_str_attr_fn=safe_str_attr,
+    )
 
     if apply_plan.persist_effect is not None:
         try:

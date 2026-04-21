@@ -17,3 +17,15 @@ def classify_apply_from_config(*, configured_effect: str, current: ConfigApplySt
     """
 
     return classify_config_apply_plan(configured_effect=configured_effect, current=current)
+
+
+def resolve_apply_from_config_policy(
+    config: object,
+    *,
+    current: ConfigApplyState,
+    read_str_attr_fn,
+) -> ConfigApplyPlan:
+    """Resolve config-apply policy from config state without executing side effects."""
+
+    configured_effect = read_str_attr_fn(config, "effect", default="none") or "none"
+    return classify_apply_from_config(configured_effect=configured_effect, current=current)

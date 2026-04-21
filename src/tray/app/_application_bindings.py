@@ -7,8 +7,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast, overload
 
-from ._application_state import TrayBootstrapState
+from ._application_state import TrayBootstrapState, TrayPreBootstrapState
 from .lifecycle import _AutostartEffectTray, _LifecyclePollingTray, _MonitoringPowerManager
+from src.tray.idle_power_state import ensure_tray_idle_power_state
+from src.tray.protocols import TrayIconState
 
 
 if TYPE_CHECKING:
@@ -159,6 +161,30 @@ class TrayRunState:
     config: Config
     is_off: bool
     backend: object | None
+
+
+def build_tray_prebootstrap_state(tray: object) -> TrayPreBootstrapState:
+    idle_power_state = ensure_tray_idle_power_state(tray)
+    return TrayPreBootstrapState(
+        icon=None,
+        is_off=False,
+        tray_icon_state=TrayIconState(),
+        tray_idle_power_state=idle_power_state,
+        power_forced_off=idle_power_state.power_forced_off,
+        user_forced_off=idle_power_state.user_forced_off,
+        idle_forced_off=idle_power_state.idle_forced_off,
+        dim_temp_active=idle_power_state.dim_temp_active,
+        dim_temp_target_brightness=idle_power_state.dim_temp_target_brightness,
+        dim_backlight_baselines=idle_power_state.dim_backlight_baselines,
+        dim_backlight_dimmed=idle_power_state.dim_backlight_dimmed,
+        dim_screen_off=idle_power_state.dim_screen_off,
+        dim_sync_suppressed_logged=idle_power_state.dim_sync_suppressed_logged,
+        last_brightness=25,
+        last_resume_at=idle_power_state.last_resume_at,
+        event_last_at={},
+        permission_notice_sent=False,
+        pending_notifications=[],
+    )
 
 
 def build_tray_bootstrap_state(*, bindings: TrayInitBindings) -> TrayBootstrapState:
