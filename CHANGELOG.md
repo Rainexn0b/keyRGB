@@ -3,6 +3,13 @@
 ## Unreleased
 
 
+## 0.23.2 (2026-04-21)
+
+- Tray/Power: Improve idle and power restore behavior by restarting looped software and reactive effects in place, avoiding soft-on flashes for those effects, and extending the post-resume guard so the keyboard does not immediately bounce back into idle handling after wake.
+- Effects/Reactive: Smooth reactive pulse brightness ramping and suppress temporary pulse-driven hardware brightness lifts during dim and restore transitions, reducing visible brightness spikes and flicker on uniform-brightness hardware.
+- Tray/Icon: Improve tray icon representative-color selection and icon rendering across per-key, reactive, low-brightness, and light-theme cases so the tray state stays more legible and tracks active lighting more closely.
+- GUI/Launch: Make tray-launched windows resolve the correct runtime root in both source checkouts and packaged installs, improving launch reliability for Settings, Support Tools, Uniform Color, Reactive Typing Settings, TCC Profiles, and the per-key editor.
+
 ## 0.23.1 (2026-04-19)
 
 - Build/Quality: Continue the maintainability pass by splitting architecture validation, LOC check constants, and file-size scan/report components into smaller modules, and expand regression coverage for usage-graph and LOC/file-size reporting behavior.
