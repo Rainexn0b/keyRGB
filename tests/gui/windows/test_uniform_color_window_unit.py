@@ -276,6 +276,40 @@ def test_constructor_uses_content_driven_geometry(monkeypatch) -> None:
     assert close_button.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
 
 
+def test_constructor_delegates_bootstrap_state_to_adapter(monkeypatch) -> None:
+    root = _FakeRoot()
+    config = SimpleNamespace(color=(12, 34, 56), brightness=25, effect="none")
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr(uniform.tk, "Tk", lambda: root)
+    monkeypatch.setattr(uniform, "Config", lambda: config)
+    monkeypatch.setattr(uniform, "apply_clam_theme", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(uniform, "apply_keyrgb_window_icon", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(uniform, "compute_centered_window_geometry", lambda *_args, **_kwargs: "520x570+10+20")
+    monkeypatch.setattr(uniform_color_ui, "build_uniform_window_ui", lambda *_args, **_kwargs: None)
+
+    def _fake_init_adapter(**kwargs):
+        calls.append(dict(kwargs))
+        return uniform.uniform_init_adapter.UniformInitState(
+            backend="backend",
+            color_supported=False,
+            device="device",
+        )
+
+    monkeypatch.setattr(uniform.uniform_init_adapter, "initialize_device_bootstrap_state", _fake_init_adapter)
+
+    gui = uniform.UniformColorGUI()
+
+    assert len(calls) == 1
+    assert calls[0]["secondary_route"] is None
+    assert calls[0]["requested_backend"] is None
+    assert calls[0]["select_backend_fn"] is uniform.select_backend
+    assert calls[0]["is_device_busy_fn"] is uniform.is_device_busy
+    assert gui._backend == "backend"
+    assert gui._color_supported is False
+    assert gui.kb == "device"
+
+
 def test_build_uniform_window_ui_disables_apply_and_syncs_wrap_for_added_labels() -> None:
     root = _FakeRoot()
     registry: dict[str, list[_FakeWidget]] = {"frames": [], "labels": [], "buttons": []}

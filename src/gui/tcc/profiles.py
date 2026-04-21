@@ -160,6 +160,12 @@ class TccProfilesGUI:
         except _SELECTION_INDEX_ERRORS:
             return None
 
+    def _selected_profile(self) -> tcc_power_profiles.TccProfile | None:
+        idx = self._selected_index()
+        if idx is None or idx < 0 or idx >= len(self._profiles):
+            return None
+        return self._profiles[idx]
+
     def _update_desc(self, index: int) -> None:
         if index < 0 or index >= len(self._profiles):
             self.profile_desc.configure(text="")
@@ -189,65 +195,61 @@ class TccProfilesGUI:
         )
 
     def _on_duplicate(self) -> None:
-        idx = self._selected_index()
-        if idx is None or idx < 0 or idx >= len(self._profiles):
+        profile = self._selected_profile()
+        if profile is None:
             return
         duplicate_profile(
             self.root,
             logger=logger,
             set_status=self._set_status,
             refresh=self._refresh,
-            profile=self._profiles[idx],
+            profile=profile,
             write_errors=_TCC_PROFILE_WRITE_ERRORS,
         )
 
     def _on_rename(self) -> None:
-        idx = self._selected_index()
-        if idx is None or idx < 0 or idx >= len(self._profiles):
+        profile = self._selected_profile()
+        if profile is None:
             return
         rename_profile(
             self.root,
             logger=logger,
             set_status=self._set_status,
             refresh=self._refresh,
-            profile=self._profiles[idx],
+            profile=profile,
             write_errors=_TCC_PROFILE_WRITE_ERRORS,
         )
 
     def _on_delete(self) -> None:
-        idx = self._selected_index()
-        if idx is None or idx < 0 or idx >= len(self._profiles):
+        profile = self._selected_profile()
+        if profile is None:
             return
         delete_profile(
             self.root,
             logger=logger,
             set_status=self._set_status,
             refresh=self._refresh,
-            profile=self._profiles[idx],
+            profile=profile,
             write_errors=_TCC_PROFILE_WRITE_ERRORS,
         )
 
     def _on_edit(self) -> None:
-        idx = self._selected_index()
-        if idx is None or idx < 0 or idx >= len(self._profiles):
+        profile = self._selected_profile()
+        if profile is None:
             return
         edit_profile(
             self.root,
             logger=logger,
             set_status=self._set_status,
             refresh=self._refresh,
-            profile=self._profiles[idx],
+            profile=profile,
             write_errors=_TCC_PROFILE_WRITE_ERRORS,
         )
 
     def _on_activate(self) -> None:
-        idx = self._selected_index()
-        if idx is None:
+        profile = self._selected_profile()
+        if profile is None:
             return
-        if idx < 0 or idx >= len(self._profiles):
-            return
-
-        profile = self._profiles[idx]
         ok = False
         try:
             ok = tcc_power_profiles.set_temp_profile_by_id(profile.id)

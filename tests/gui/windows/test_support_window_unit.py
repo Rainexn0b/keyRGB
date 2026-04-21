@@ -737,6 +737,24 @@ def test_run_debug_propagates_unexpected_collection_failures(monkeypatch: pytest
         window.run_debug()
 
 
+def test_run_debug_builds_job_inputs_without_changing_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+    seen: dict[str, object] = {}
+
+    def _capture(window_arg, **kwargs) -> None:
+        seen["window"] = window_arg
+        seen.update(kwargs)
+
+    monkeypatch.setattr(support_window.support_jobs, "run_debug", _capture)
+
+    window.run_debug()
+
+    assert seen["window"] is window
+    assert seen["collect_diagnostics_text"] is support_window.collect_diagnostics_text
+    assert seen["run_in_thread"] is support_window.run_in_thread
+    assert seen["logger"] is support_window.logger
+
+
 def test_run_discovery_returns_fallback_text_for_expected_collection_failures(monkeypatch: pytest.MonkeyPatch) -> None:
     window = _make_window()
     logged: list[str] = []
@@ -771,6 +789,25 @@ def test_run_discovery_propagates_unexpected_collection_failures(monkeypatch: py
         window.run_discovery()
 
 
+def test_run_discovery_builds_job_inputs_without_changing_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+    seen: dict[str, object] = {}
+
+    def _capture(window_arg, **kwargs) -> None:
+        seen["window"] = window_arg
+        seen.update(kwargs)
+
+    monkeypatch.setattr(support_window.support_jobs, "run_discovery", _capture)
+
+    window.run_discovery()
+
+    assert seen["window"] is window
+    assert seen["collect_device_discovery"] is support_window.collect_device_discovery
+    assert seen["format_device_discovery_text"] is support_window.format_device_discovery_text
+    assert seen["run_in_thread"] is support_window.run_in_thread
+    assert seen["logger"] is support_window.logger
+
+
 def test_collect_missing_evidence_updates_bundle_state(monkeypatch: pytest.MonkeyPatch) -> None:
     window = _make_window(
         discovery_json='{"candidates": [{"usb_vid": "0x048d", "usb_pid": "0x7001", "status": "known_dormant"}]}'
@@ -800,6 +837,27 @@ def test_collect_missing_evidence_updates_bundle_state(monkeypatch: pytest.Monke
 
     assert window._supplemental_evidence == {"captures": {"lsusb_verbose": {"ok": True, "stdout": "dump"}}}
     assert window.status_label.options["text"] == "Additional evidence collected"
+
+
+def test_collect_missing_evidence_builds_job_inputs_without_changing_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+    seen: dict[str, object] = {}
+
+    def _capture(window_arg, **kwargs) -> None:
+        seen["window"] = window_arg
+        seen.update(kwargs)
+
+    monkeypatch.setattr(support_window.support_jobs, "collect_missing_evidence", _capture)
+
+    window.collect_missing_evidence(prompt=False)
+
+    assert seen["window"] is window
+    assert seen["prompt"] is False
+    assert callable(seen["current_capture_plan_fn"])
+    assert seen["messagebox"] is support_window.messagebox
+    assert seen["tk_runtime_errors"] == support_window._TK_RUNTIME_ERRORS
+    assert seen["collect_additional_evidence"] is support_window.collect_additional_evidence
+    assert seen["run_in_thread"] is support_window.run_in_thread
 
 
 def test_probe_config_snapshot_returns_typed_value_object() -> None:
@@ -1050,6 +1108,71 @@ def test_run_backend_speed_probe_can_auto_run_via_tray_config(monkeypatch: pytes
     assert showinfo_calls
     assert "temporarily switch the tray to the probe effect" in showinfo_calls[0]
     assert "Each speed will stay active for about 2.5 seconds" in showinfo_calls[0]
+
+
+def test_run_backend_speed_probe_builds_job_inputs_without_changing_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window = _make_window()
+    seen: dict[str, object] = {}
+
+    def _capture(window_arg, **kwargs) -> None:
+        seen["window"] = window_arg
+        seen.update(kwargs)
+
+    monkeypatch.setenv("KEYRGB_TRAY_PID", "4242")
+    monkeypatch.setattr(support_window.support_jobs, "run_backend_speed_probe", _capture)
+
+    window.run_backend_speed_probe(prompt=False)
+
+    assert seen["window"] is window
+    assert seen["prompt"] is False
+    assert callable(seen["current_backend_speed_probe_plan_fn"])
+    assert seen["messagebox"] is support_window.messagebox
+    assert seen["tk_runtime_errors"] == support_window._TK_RUNTIME_ERRORS
+    assert seen["run_in_thread"] is support_window.run_in_thread
+    assert seen["config_cls"] is support_window.Config
+    assert seen["tray_pid"] == "4242"
+    assert seen["tk"] is support_window.tk
+    assert seen["ttk"] is support_window.ttk
+    assert seen["scrolledtext"] is support_window.scrolledtext
+
+
+def test_save_support_bundle_builds_job_inputs_without_changing_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+    seen: dict[str, object] = {}
+
+    def _capture(window_arg, **kwargs) -> None:
+        seen["window"] = window_arg
+        seen.update(kwargs)
+
+    monkeypatch.setattr(support_window.support_jobs, "save_support_bundle", _capture)
+
+    window.save_support_bundle()
+
+    assert seen["window"] is window
+    assert seen["asksaveasfilename"] is support_window.filedialog.asksaveasfilename
+    assert seen["build_support_bundle_payload"] is support_window.build_support_bundle_payload
+    assert seen["logger"] is support_window.logger
+
+
+def test_open_issue_form_builds_job_inputs_without_changing_signature(monkeypatch: pytest.MonkeyPatch) -> None:
+    window = _make_window()
+    seen: dict[str, object] = {}
+
+    def _capture(window_arg, **kwargs) -> None:
+        seen["window"] = window_arg
+        seen.update(kwargs)
+
+    monkeypatch.setattr(support_window.support_jobs, "open_issue_form", _capture)
+
+    window.open_issue_form()
+
+    assert seen["window"] is window
+    assert seen["issue_url"] == support_window.ISSUE_URL
+    assert seen["open_browser"] is support_window.webbrowser.open
+    assert seen["browser_open_errors"] == support_window._BROWSER_OPEN_ERRORS
+    assert seen["tk_runtime_errors"] == support_window._TK_RUNTIME_ERRORS
 
 
 def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.MonkeyPatch) -> None:

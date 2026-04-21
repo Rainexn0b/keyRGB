@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import os
 from . import _support_window_runtime_deps
+from ._support import _support_window_geometry
 
 
 tk = _support_window_runtime_deps.tk
@@ -67,21 +68,12 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         return support_window_state.SupportSessionState
 
     def _apply_geometry(self) -> None:
-        try:
-            self.root.update_idletasks()
-            geometry = compute_centered_window_geometry(
-                self.root,
-                content_height_px=int(self._main_frame.winfo_reqheight()),
-                content_width_px=int(self._main_frame.winfo_reqwidth()),
-                footer_height_px=0,
-                chrome_padding_px=48,
-                default_w=1240,
-                default_h=920,
-                screen_ratio_cap=0.95,
-            )
-            self.root.geometry(geometry)
-        except _GEOMETRY_APPLY_ERRORS:
-            return
+        _support_window_geometry.apply_window_geometry(
+            root=self.root,
+            main_frame=self._main_frame,
+            compute_centered_window_geometry=compute_centered_window_geometry,
+            geometry_apply_errors=_GEOMETRY_APPLY_ERRORS,
+        )
 
     def _apply_initial_focus(self) -> None:
         support_window_ui.apply_initial_focus(
@@ -175,7 +167,10 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
 
     def run_debug(self) -> None:
         support_jobs.run_debug(
-            self, collect_diagnostics_text=collect_diagnostics_text, run_in_thread=run_in_thread, logger=logger
+            self,
+            collect_diagnostics_text=collect_diagnostics_text,
+            run_in_thread=run_in_thread,
+            logger=logger,
         )
 
     def run_discovery(self) -> None:

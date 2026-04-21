@@ -132,6 +132,30 @@ class _RunInThreadFn(Protocol):
     ) -> None: ...
 
 
+def _build_backend_speed_probe_messages(
+    plan: _ProbePlan,
+    *,
+    format_probe_speed_list_fn: _FormatProbeSpeedListFn,
+) -> tuple[str, str]:
+    requested_speed_text = format_probe_speed_list_fn(plan.get("requested_ui_speeds"))
+    prompt_message = (
+        "Run the guided backend speed probe through the tray now?\n\n"
+        "KeyRGB will temporarily switch to the probe effect, hold each test speed for about "
+        f"{_PROBE_AUTO_STEP_DURATION_S:.1f} seconds"
+        + (f" ({requested_speed_text})" if requested_speed_text else "")
+        + ", restore the previous tray effect, and then ask for your observation."
+    )
+    info_message = (
+        "KeyRGB will temporarily switch the tray to the probe effect, play each listed speed step, "
+        "and then restore the previous tray effect.\n\n"
+        + (f"Requested speeds: {requested_speed_text}.\n" if requested_speed_text else "")
+        + f"Each speed will stay active for about {_PROBE_AUTO_STEP_DURATION_S:.1f} seconds "
+        "with a short settle gap before the next step.\n\n"
+        "Watch the keyboard now. When the auto-run finishes, KeyRGB will ask for your observation."
+    )
+    return prompt_message, info_message
+
+
 def run_backend_speed_probe(
     window: _SupportWindowLike,
     *,
@@ -164,15 +188,12 @@ def run_backend_speed_probe(
         window._set_status("Backend speed probe requires the running tray session", ok=False)
         return
 
+    prompt_message, info_message = _build_backend_speed_probe_messages(
+        plan,
+        format_probe_speed_list_fn=format_probe_speed_list_fn,
+    )
+
     if prompt:
-        requested_speed_text = format_probe_speed_list_fn(plan.get("requested_ui_speeds"))
-        prompt_message = (
-            "Run the guided backend speed probe through the tray now?\n\n"
-            "KeyRGB will temporarily switch to the probe effect, hold each test speed for about "
-            f"{_PROBE_AUTO_STEP_DURATION_S:.1f} seconds"
-            + (f" ({requested_speed_text})" if requested_speed_text else "")
-            + ", restore the previous tray effect, and then ask for your observation."
-        )
         try:
             ok = ask_probe_choice_dialog(
                 window,
@@ -191,18 +212,10 @@ def run_backend_speed_probe(
 
     started_at = datetime.now(timezone.utc).isoformat()
     try:
-        requested_speed_text = format_probe_speed_list_fn(plan.get("requested_ui_speeds"))
         show_probe_message_dialog(
             window,
             title="Backend Speed Probe",
-            message=(
-                "KeyRGB will temporarily switch the tray to the probe effect, play each listed speed step, "
-                "and then restore the previous tray effect.\n\n"
-                + (f"Requested speeds: {requested_speed_text}.\n" if requested_speed_text else "")
-                + f"Each speed will stay active for about {_PROBE_AUTO_STEP_DURATION_S:.1f} seconds "
-                "with a short settle gap before the next step.\n\n"
-                "Watch the keyboard now. When the auto-run finishes, KeyRGB will ask for your observation."
-            ),
+            message=info_message,
             tk=tk,
             ttk=ttk,
             scrolledtext=scrolledtext,

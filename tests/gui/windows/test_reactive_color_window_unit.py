@@ -158,6 +158,42 @@ class _FakeColorWheelWithCallback:
             )
 
 
+class _RecordingSettingsAdapter:
+    def __init__(self) -> None:
+        self.calls: list[tuple[object, ...]] = []
+
+    def set_status(self, msg: str, *, ok: bool) -> None:
+        self.calls.append(("set_status", msg, ok))
+
+    def read_reactive_brightness_percent(self) -> int | None:
+        self.calls.append(("read_reactive_brightness_percent",))
+        return 28
+
+    def read_reactive_trail_percent(self) -> int | None:
+        self.calls.append(("read_reactive_trail_percent",))
+        return 75
+
+    def sync_reactive_brightness_widgets(self) -> None:
+        self.calls.append(("sync_reactive_brightness_widgets",))
+
+    def sync_reactive_trail_widgets(self) -> None:
+        self.calls.append(("sync_reactive_trail_widgets",))
+
+    def sync_color_wheel_brightness(self) -> None:
+        self.calls.append(("sync_color_wheel_brightness",))
+
+    def commit_color_to_config(self, color: tuple[int, int, int]) -> None:
+        self.calls.append(("commit_color_to_config", color))
+
+    def commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None:
+        self.calls.append(("commit_brightness_to_config", brightness_percent))
+        return 14
+
+    def commit_trail_to_config(self, trail_percent: float | int | None) -> int | None:
+        self.calls.append(("commit_trail_to_config", trail_percent))
+        return 55
+
+
 def test_read_reactive_brightness_percent_returns_none_for_invalid_config_value() -> None:
     gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
     gui.config = SimpleNamespace(reactive_brightness="bad", brightness=17)
@@ -195,6 +231,34 @@ def test_sync_color_wheel_brightness_applies_percent_when_manual_mode_is_disable
     gui._sync_color_wheel_brightness()
 
     assert gui.color_wheel.calls == [28]
+
+
+def test_state_and_settings_facade_methods_delegate_to_adapter() -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui._settings_adapter = _RecordingSettingsAdapter()
+
+    gui._set_status("saved", ok=True)
+    assert gui._read_reactive_brightness_percent() == 28
+    assert gui._read_reactive_trail_percent() == 75
+
+    gui._sync_reactive_brightness_widgets()
+    gui._sync_reactive_trail_widgets()
+    gui._sync_color_wheel_brightness()
+    gui._commit_color_to_config((1, 2, 3))
+
+    assert gui._commit_brightness_to_config(28.0) == 14
+    assert gui._commit_trail_to_config(75.0) == 55
+    assert gui._settings_adapter.calls == [
+        ("set_status", "saved", True),
+        ("read_reactive_brightness_percent",),
+        ("read_reactive_trail_percent",),
+        ("sync_reactive_brightness_widgets",),
+        ("sync_reactive_trail_widgets",),
+        ("sync_color_wheel_brightness",),
+        ("commit_color_to_config", (1, 2, 3)),
+        ("commit_brightness_to_config", 28.0),
+        ("commit_trail_to_config", 75.0),
+    ]
 
 
 def test_constructor_handles_programmatic_brightness_sync_callback(monkeypatch) -> None:

@@ -7,31 +7,29 @@ from collections.abc import Callable
 
 from . import _support_window_backend_probe as _backend_probe
 from . import _support_window_exports as _exports
+# Retained for external support window callers.
+from . import _support_window_job_wiring as _job_wiring
 from . import _support_window_probe_dialogs as _probe_dialogs
 from . import _support_window_tasks as _tasks
 
-
-_PROBE_AUTO_STEP_DURATION_S = _backend_probe._PROBE_AUTO_STEP_DURATION_S
-_PROBE_AUTO_SETTLE_DURATION_S = _backend_probe._PROBE_AUTO_SETTLE_DURATION_S
-_PROBE_AUTOMATION_ERRORS = _backend_probe._PROBE_AUTOMATION_ERRORS
-_SUPPORT_COLLECTION_ERRORS = _tasks._SUPPORT_COLLECTION_ERRORS
-_SUPPORT_BUNDLE_BUILD_ERRORS = _exports._SUPPORT_BUNDLE_BUILD_ERRORS
-
-_PROBE_DIALOG_SCREEN_RATIO_CAP = _probe_dialogs._PROBE_DIALOG_SCREEN_RATIO_CAP
-_PROBE_DIALOG_ERRORS = _probe_dialogs._PROBE_DIALOG_ERRORS
+# Retained for external tests.
 _probe_dialog_dimensions = _probe_dialogs._probe_dialog_dimensions
+# Retained for external tests.
 _dialog_wraplength = _probe_dialogs._dialog_wraplength
+# Retained for external tests.
 _sync_dialog_prompt_wrap = _probe_dialogs._sync_dialog_prompt_wrap
-_bind_dialog_prompt_wrap = _probe_dialogs._bind_dialog_prompt_wrap
+# Retained for external tests.
 _build_dialog_button_row = _probe_dialogs._build_dialog_button_row
+# Retained for external tests.
 _probe_dialog_geometry = _probe_dialogs._probe_dialog_geometry
 _show_probe_message_dialog = _probe_dialogs._show_probe_message_dialog
 _ask_probe_choice_dialog = _probe_dialogs._ask_probe_choice_dialog
 _ask_probe_notes_dialog = _probe_dialogs._ask_probe_notes_dialog
-
-_format_probe_speed_list = _backend_probe._format_probe_speed_list
+# Retained for external support window callers.
 _tray_process_alive = _backend_probe._tray_process_alive
+# Retained for external tests.
 _probe_config_snapshot = _backend_probe._probe_config_snapshot
+# Retained for external tests.
 _restore_probe_config = _backend_probe._restore_probe_config
 
 run_debug = _tasks.run_debug
@@ -47,10 +45,11 @@ def _auto_run_backend_speed_probe_via_tray_config(
     config_cls: _backend_probe._ProbeConfigFactory,
     sleep_fn: Callable[[float], None],
 ) -> dict[str, object]:
-    return _backend_probe._auto_run_backend_speed_probe_via_tray_config(
+    return _job_wiring.auto_run_backend_speed_probe_via_tray_config(
         plan,
         config_cls=config_cls,
         sleep_fn=sleep_fn,
+        auto_run_backend_speed_probe_fn=_backend_probe._auto_run_backend_speed_probe_via_tray_config,
         probe_config_snapshot_fn=_probe_config_snapshot,
         restore_probe_config_fn=_restore_probe_config,
     )
@@ -73,6 +72,33 @@ def run_backend_speed_probe(
     _ = messagebox
     return _backend_probe.run_backend_speed_probe(
         window,
+        **_backend_speed_probe_run_kwargs(
+            prompt=prompt,
+            current_backend_speed_probe_plan_fn=current_backend_speed_probe_plan_fn,
+            tk_runtime_errors=tk_runtime_errors,
+            run_in_thread=run_in_thread,
+            config_cls=config_cls,
+            tray_pid=tray_pid,
+            tk=tk,
+            ttk=ttk,
+            scrolledtext=scrolledtext,
+        ),
+    )
+
+
+def _backend_speed_probe_run_kwargs(
+    *,
+    prompt: bool,
+    current_backend_speed_probe_plan_fn: _backend_probe._CurrentBackendSpeedProbePlanFn,
+    tk_runtime_errors: tuple[type[BaseException], ...],
+    run_in_thread: _backend_probe._RunInThreadFn,
+    config_cls: _backend_probe._ProbeConfigFactory,
+    tray_pid: str,
+    tk: object,
+    ttk: object,
+    scrolledtext: object,
+) -> dict[str, object]:
+    return _job_wiring.build_backend_speed_probe_run_kwargs(
         prompt=prompt,
         current_backend_speed_probe_plan_fn=current_backend_speed_probe_plan_fn,
         tk_runtime_errors=tk_runtime_errors,
@@ -80,12 +106,12 @@ def run_backend_speed_probe(
         config_cls=config_cls,
         tray_pid=tray_pid,
         sleep_fn=time.sleep,
-        format_probe_speed_list_fn=_format_probe_speed_list,
-        tray_process_alive_fn=_tray_process_alive,
         auto_run_backend_speed_probe_fn=_auto_run_backend_speed_probe_via_tray_config,
         complete_backend_speed_probe_fn=_complete_backend_speed_probe,
         show_probe_message_dialog=_show_probe_message_dialog,
         ask_probe_choice_dialog=_ask_probe_choice_dialog,
+        format_probe_speed_list_fn=_backend_probe._format_probe_speed_list,
+        tray_process_alive_fn=_tray_process_alive,
         tk=tk,
         ttk=ttk,
         scrolledtext=scrolledtext,

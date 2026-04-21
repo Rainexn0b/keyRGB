@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
+from src.core.config._lighting._effect_speed_overrides import EffectSpeedOverrides
+
 
 _PROBE_AUTO_STEP_DURATION_S = 2.5
 _PROBE_AUTO_SETTLE_DURATION_S = 0.5
@@ -22,6 +24,13 @@ class _ProbeConfigLike(Protocol):
     def set_effect_speed(self, effect_name: str, speed: int) -> None: ...
 
 
+def _copy_effect_speeds(raw: object) -> dict[str, object] | None:
+    effect_speed_overrides = EffectSpeedOverrides.from_settings(raw)
+    if effect_speed_overrides is None:
+        return None
+    return dict(effect_speed_overrides.values)
+
+
 @dataclass(frozen=True, slots=True)
 class ProbeConfigSnapshot:
     effect: str = "none"
@@ -33,9 +42,7 @@ class ProbeConfigSnapshot:
         effect_speeds = None
         settings = config._settings
         if isinstance(settings, dict):
-            raw_effect_speeds = settings.get("effect_speeds")
-            if isinstance(raw_effect_speeds, dict):
-                effect_speeds = dict(raw_effect_speeds)
+            effect_speeds = _copy_effect_speeds(settings.get("effect_speeds"))
 
         try:
             speed = int(getattr(config, "speed", 0))
@@ -53,8 +60,7 @@ class ProbeConfigSnapshot:
         if isinstance(snapshot, cls):
             return snapshot
 
-        raw_effect_speeds = snapshot.get("effect_speeds")
-        effect_speeds = dict(raw_effect_speeds) if isinstance(raw_effect_speeds, dict) else None
+        effect_speeds = _copy_effect_speeds(snapshot.get("effect_speeds"))
 
         try:
             speed = int(snapshot.get("speed") or 0)
@@ -68,7 +74,7 @@ class ProbeConfigSnapshot:
         )
 
     def effect_speeds_copy(self) -> dict[str, object] | None:
-        return dict(self.effect_speeds) if isinstance(self.effect_speeds, dict) else None
+        return _copy_effect_speeds(self.effect_speeds)
 
 
 _ProbePlan = dict[str, object]

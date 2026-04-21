@@ -12,6 +12,8 @@ from src.gui.settings.settings_state import (
     clamp_nonzero_brightness,
     load_settings_values,
 )
+from src.core.config._settings_view import ConfigSettingsView
+from src.core.diagnostics.model import DiagnosticsConfigSnapshot
 
 
 def test_clamp_brightness() -> None:
@@ -122,6 +124,99 @@ def test_load_settings_propagates_unexpected_programming_errors() -> None:
         load_settings_values(config=Config(), os_autostart_enabled=True)
 
 
+def test_load_settings_malformed_string_values_fall_back_safely(caplog) -> None:
+    class ExplodingString:
+        def __str__(self) -> str:
+            raise RuntimeError("boom")
+
+    class Config:
+        brightness = 30
+        battery_saver_enabled = False
+        battery_saver_brightness = 12
+        screen_dim_sync_mode = ExplodingString()
+
+        @property
+        def physical_layout(self) -> str:
+            raise RuntimeError("boom")
+
+    with caplog.at_level(logging.ERROR, logger="src.gui.settings.settings_state"):
+        values = load_settings_values(config=Config(), os_autostart_enabled=True)
+
+    assert values.screen_dim_sync_mode == "off"
+    assert values.physical_layout == "auto"
+    assert "Failed coercing settings attribute 'screen_dim_sync_mode' to normalized string" in caplog.text
+    assert "Failed reading settings attribute 'physical_layout'" in caplog.text
+
+
+def test_load_settings_prefers_typed_settings_view_when_available() -> None:
+    class Config:
+        def settings_view(self) -> ConfigSettingsView:
+            return ConfigSettingsView.from_mapping(
+                {
+                    "brightness": 40,
+                    "battery_saver_enabled": True,
+                    "battery_saver_brightness": 11,
+                    "autostart": False,
+                    "experimental_backends_enabled": True,
+                    "screen_dim_sync_mode": "TEMP",
+                    "physical_layout": "JIS",
+                }
+            )
+
+        @property
+        def brightness(self) -> int:
+            raise AssertionError("typed settings_view path should avoid raw attribute reads")
+
+    values = load_settings_values(config=Config(), os_autostart_enabled=True)
+
+    assert values.ac_lighting_brightness == 40
+    assert values.battery_lighting_brightness == 11
+    assert values.autostart is False
+    assert values.experimental_backends_enabled is True
+    assert values.screen_dim_sync_mode == "temp"
+    assert values.physical_layout == "jis"
+
+
+def test_load_settings_uses_settings_mapping_when_settings_view_method_is_absent() -> None:
+    class Config:
+        settings = {
+            "brightness": 41,
+            "battery_saver_enabled": True,
+            "battery_saver_brightness": 13,
+            "power_off_on_suspend": False,
+            "physical_layout": "JIS",
+        }
+
+        @property
+        def brightness(self) -> int:
+            raise AssertionError("settings mapping path should avoid raw attribute reads")
+
+    values = load_settings_values(config=Config(), os_autostart_enabled=True)
+
+    assert values.ac_lighting_brightness == 41
+    assert values.battery_lighting_brightness == 13
+    assert values.power_off_on_suspend is False
+    assert values.physical_layout == "jis"
+
+
+def test_load_settings_accepts_diagnostics_snapshot_settings_mapping() -> None:
+    class Config:
+        settings = DiagnosticsConfigSnapshot(
+            settings={
+                "brightness": 19,
+                "ac_lighting_brightness": 28,
+                "battery_lighting_brightness": 7,
+                "power_off_on_lid_close": False,
+            }
+        ).settings
+
+    values = load_settings_values(config=Config(), os_autostart_enabled=False)
+
+    assert values.ac_lighting_brightness == 28
+    assert values.battery_lighting_brightness == 7
+    assert values.power_off_on_lid_close is False
+
+
 def test_apply_settings_values_to_config() -> None:
     cfg = SimpleNamespace()
 
@@ -191,3 +286,55 @@ def test_apply_settings_values_to_config_invalid_layout_falls_back_to_auto() -> 
     apply_settings_values_to_config(config=cfg, values=values)
 
     assert cfg.physical_layout == "auto"
+
+
+def test_load_settings_partial_typed_view_falls_back_to_raw_attributes() -> None:
+    """Verify that partial ConfigSettingsView keys fall back to raw config attributes.
+    
+    This seam test ensures the typed-loader consolidation works correctly when:
+    - A ConfigSettingsView exists with some (but not all) settings
+    - Missing keys should fall back to raw config attributes
+    - The fallback mechanism is properly integrated in _SettingsReader
+    """
+    class Config:
+        # Settings provided via typed view (partial)
+        def settings_view(self) -> ConfigSettingsView:
+            return ConfigSettingsView.from_mapping(
+                {
+                    "brightness": 35,
+                    "battery_saver_enabled": True,
+                    # Note: missing battery_saver_brightness, power_management_enabled, etc.
+                }
+            )
+
+        # Fallback raw attributes for missing keys
+        battery_saver_brightness = 20
+        power_management_enabled = False
+        power_off_on_suspend = False
+        power_off_on_lid_close = True
+        power_restore_on_resume = True
+        power_restore_on_lid_open = False
+        autostart = True
+        experimental_backends_enabled = False
+        ac_lighting_enabled = True
+        battery_lighting_enabled = False
+        screen_dim_sync_enabled = False
+        physical_layout = "DVORAK"
+
+    values = load_settings_values(config=Config(), os_autostart_enabled=False)
+
+    # From typed ConfigSettingsView
+    assert values.ac_lighting_brightness == 35  # base brightness from typed view
+    assert values.battery_lighting_brightness == 20  # battery_saver_brightness from fallback
+    
+    # From raw config fallback (keys not in ConfigSettingsView)
+    assert values.power_management_enabled is False
+    assert values.power_off_on_suspend is False
+    assert values.power_off_on_lid_close is True
+    assert values.power_restore_on_resume is True
+    assert values.power_restore_on_lid_open is False
+    
+    # Optional keys: if not in view and not in raw config, use defaults
+    assert values.screen_dim_sync_enabled is False  # from raw config fallback
+    # physical_layout from raw config fallback, normalized
+    assert values.physical_layout == "dvorak"
