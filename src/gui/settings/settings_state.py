@@ -26,9 +26,18 @@ class _SettingsConfigLike(Protocol):
     def __setattr__(self, name: str, value: object) -> None: ...
 
 
+_SettingsSourceLike = _SettingsConfigLike | ConfigSettingsView | Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class _ResolvedSettingsSource:
+    fallback_obj: object | None
+    settings_view: ConfigSettingsView | None
+
+
 @dataclass(frozen=True, slots=True)
 class _SettingsReader:
-    config: _SettingsConfigLike
+    fallback_obj: object | None
     settings_view: ConfigSettingsView | None
 
     def read_bool(self, key: str, *, default: bool, fallback_attr: str | None = None) -> bool:
@@ -38,10 +47,12 @@ class _SettingsReader:
                 self.settings_view,
                 key,
                 default=default,
-                fallback_obj=self.config,
+                fallback_obj=self.fallback_obj,
                 fallback_attr=attr,
             )
-        return _safe_bool(self.config, attr, default)
+        if self.fallback_obj is None:
+            return bool(default)
+        return _safe_bool(self.fallback_obj, attr, default)
 
     def read_int(self, key: str, *, default: int, fallback_attr: str | None = None) -> int:
         attr = fallback_attr or key
@@ -50,10 +61,12 @@ class _SettingsReader:
                 self.settings_view,
                 key,
                 default=default,
-                fallback_obj=self.config,
+                fallback_obj=self.fallback_obj,
                 fallback_attr=attr,
             )
-        return _safe_int(self.config, attr, default)
+        if self.fallback_obj is None:
+            return int(default)
+        return _safe_int(self.fallback_obj, attr, default)
 
     def read_optional_int(self, key: str, *, fallback_attr: str | None = None) -> int | None:
         attr = fallback_attr or key
@@ -61,10 +74,12 @@ class _SettingsReader:
             return _read_view_optional_int(
                 self.settings_view,
                 key,
-                fallback_obj=self.config,
+                fallback_obj=self.fallback_obj,
                 fallback_attr=attr,
             )
-        return _safe_optional_int(self.config, attr)
+        if self.fallback_obj is None:
+            return None
+        return _safe_optional_int(self.fallback_obj, attr)
 
     def read_normalized_str(self, key: str, *, default: str, fallback_attr: str | None = None) -> str:
         attr = fallback_attr or key
@@ -73,10 +88,20 @@ class _SettingsReader:
                 self.settings_view,
                 key,
                 default=default,
-                fallback_obj=self.config,
+                fallback_obj=self.fallback_obj,
                 fallback_attr=attr,
             )
-        return _safe_normalized_str(self.config, attr, default)
+        if self.fallback_obj is None:
+            return str(default).strip().lower()
+        return _safe_normalized_str(self.fallback_obj, attr, default)
+
+
+def _resolve_settings_source(config: _SettingsSourceLike) -> _ResolvedSettingsSource:
+    if isinstance(config, ConfigSettingsView):
+        return _ResolvedSettingsSource(fallback_obj=None, settings_view=config)
+    if isinstance(config, Mapping):
+        return _ResolvedSettingsSource(fallback_obj=None, settings_view=ConfigSettingsView.from_mapping(config))
+    return _ResolvedSettingsSource(fallback_obj=config, settings_view=_settings_view_from_config(config))
 
 
 def _settings_view_from_config(config: _SettingsConfigLike) -> ConfigSettingsView | None:
@@ -257,14 +282,14 @@ class SettingsValues:
     physical_layout: str = "auto"
 
 
-def load_settings_values(*, config: _SettingsConfigLike, os_autostart_enabled: bool) -> SettingsValues:
+def load_settings_values(*, config: _SettingsSourceLike, os_autostart_enabled: bool) -> SettingsValues:
     """Best-effort load of GUI settings from a Config-like object.
 
     This is intentionally pure (no Tk, no filesystem) and defensive.
     """
 
-    settings_view = _settings_view_from_config(config)
-    reader = _SettingsReader(config=config, settings_view=settings_view)
+    source = _resolve_settings_source(config)
+    reader = _SettingsReader(fallback_obj=source.fallback_obj, settings_view=source.settings_view)
 
     base_brightness = reader.read_int("brightness", default=25)
     bs_enabled = reader.read_bool("battery_saver_enabled", default=False)

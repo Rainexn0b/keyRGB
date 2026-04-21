@@ -177,6 +177,26 @@ def test_load_settings_prefers_typed_settings_view_when_available() -> None:
     assert values.physical_layout == "jis"
 
 
+def test_load_settings_accepts_direct_config_settings_view() -> None:
+    values = load_settings_values(
+        config=ConfigSettingsView.from_mapping(
+            {
+                "brightness": 37,
+                "battery_saver_enabled": True,
+                "battery_saver_brightness": 9,
+                "experimental_backends_enabled": True,
+                "screen_dim_sync_mode": "TEMP",
+            }
+        ),
+        os_autostart_enabled=False,
+    )
+
+    assert values.ac_lighting_brightness == 37
+    assert values.battery_lighting_brightness == 9
+    assert values.experimental_backends_enabled is True
+    assert values.screen_dim_sync_mode == "temp"
+
+
 def test_load_settings_uses_settings_mapping_when_settings_view_method_is_absent() -> None:
     class Config:
         settings = {
@@ -215,6 +235,24 @@ def test_load_settings_accepts_diagnostics_snapshot_settings_mapping() -> None:
     assert values.ac_lighting_brightness == 28
     assert values.battery_lighting_brightness == 7
     assert values.power_off_on_lid_close is False
+
+
+def test_load_settings_accepts_direct_diagnostics_config_snapshot() -> None:
+    values = load_settings_values(
+        config=DiagnosticsConfigSnapshot(
+            settings={
+                "brightness": 26,
+                "battery_saver_enabled": True,
+                "battery_saver_brightness": 8,
+                "physical_layout": "JIS",
+            }
+        ),
+        os_autostart_enabled=False,
+    )
+
+    assert values.ac_lighting_brightness == 26
+    assert values.battery_lighting_brightness == 8
+    assert values.physical_layout == "jis"
 
 
 def test_apply_settings_values_to_config() -> None:

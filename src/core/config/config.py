@@ -188,12 +188,9 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         self._save()
 
     def _get_effect_speeds(self) -> dict[str, Any] | None:
-        boundary = _effect_speed_boundary.EffectSpeedOverrides.from_settings(
+        return _effect_speed_boundary.EffectSpeedOverrides.copied_from_settings(
             self._get_optional_scalar("effect_speeds")
         )
-        if boundary is None:
-            return None
-        return boundary.values
 
     def _effect_speed_overrides(self) -> _effect_speed_boundary.EffectSpeedOverrides | None:
         return _effect_speed_boundary.EffectSpeedOverrides.from_settings(self._get_optional_scalar("effect_speeds"))

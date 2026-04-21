@@ -67,10 +67,10 @@ def test_set_reactive_active_pulse_mix_ramps_up_instead_of_single_frame_jump() -
     engine = _Engine()
 
     effects._set_reactive_active_pulse_mix(engine, target=1.0)
-    assert 0.40 <= float(engine._reactive_active_pulse_mix) <= 0.50
+    assert 0.15 <= float(engine._reactive_active_pulse_mix) <= 0.22
 
     effects._set_reactive_active_pulse_mix(engine, target=1.0)
-    assert 0.85 <= float(engine._reactive_active_pulse_mix) <= 0.95
+    assert 0.60 <= float(engine._reactive_active_pulse_mix) <= 0.68
 
     effects._set_reactive_active_pulse_mix(engine, target=1.0)
     assert float(engine._reactive_active_pulse_mix) == 1.0
@@ -86,6 +86,22 @@ def test_set_reactive_active_pulse_mix_preserves_tail_decay_on_drop_to_zero() ->
     effects._set_reactive_active_pulse_mix(engine, target=0.0)
 
     assert 0.60 <= float(engine._reactive_active_pulse_mix) <= 0.70
+
+
+def test_set_reactive_active_pulse_mix_sets_first_activity_lift_holdoff() -> None:
+    from src.core.effects.reactive import effects
+
+    class _Engine:
+        _reactive_active_pulse_mix = 0.0
+        _reactive_disable_pulse_hw_lift_until = None
+
+    engine = _Engine()
+    before = effects.time.monotonic()
+
+    effects._set_reactive_active_pulse_mix(engine, target=1.0)
+
+    assert float(engine._reactive_active_pulse_mix) > 0.0
+    assert float(engine._reactive_disable_pulse_hw_lift_until) > before
 
 
 def test_fade_loop_per_key_backdrop_applies_pulse_scale_to_mix_weight() -> None:
