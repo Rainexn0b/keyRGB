@@ -258,7 +258,9 @@ class PerKeyEditor:
 
 
 def main():
-    PerKeyEditor().run()
+    from .launch import main as launch_main
+
+    launch_main()
 
 
 if __name__ == "__main__":

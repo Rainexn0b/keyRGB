@@ -156,11 +156,31 @@ def auto_run_backend_speed_probe_via_tray_config(
 ) -> dict[str, object]:
     return auto_run_backend_speed_probe_fn(
         plan,
-        config_cls=config_cls,
-        sleep_fn=sleep_fn,
-        probe_config_snapshot_fn=probe_config_snapshot_fn,
-        restore_probe_config_fn=restore_probe_config_fn,
+        **build_auto_run_backend_speed_probe_kwargs(
+            config_cls=config_cls,
+            sleep_fn=sleep_fn,
+            auto_run_backend_speed_probe_fn=auto_run_backend_speed_probe_fn,
+            probe_config_snapshot_fn=probe_config_snapshot_fn,
+            restore_probe_config_fn=restore_probe_config_fn,
+        ),
     )
+
+
+def build_auto_run_backend_speed_probe_kwargs(
+    *,
+    config_cls: object,
+    sleep_fn: Callable[[float], None],
+    auto_run_backend_speed_probe_fn: Callable[..., dict[str, object]],
+    probe_config_snapshot_fn: Callable[..., object],
+    restore_probe_config_fn: Callable[..., None],
+) -> dict[str, object]:
+    _ = auto_run_backend_speed_probe_fn
+    return {
+        "config_cls": config_cls,
+        "sleep_fn": sleep_fn,
+        "probe_config_snapshot_fn": probe_config_snapshot_fn,
+        "restore_probe_config_fn": restore_probe_config_fn,
+    }
 
 
 def build_backend_speed_probe_run_kwargs(
@@ -176,6 +196,7 @@ def build_backend_speed_probe_run_kwargs(
     complete_backend_speed_probe_fn: Callable[..., None],
     show_probe_message_dialog: Callable[..., object],
     ask_probe_choice_dialog: Callable[..., object],
+    ask_probe_notes_dialog: Callable[..., object],
     format_probe_speed_list_fn: Callable[..., str],
     tray_process_alive_fn: Callable[[str], bool],
     tk: object,
@@ -196,6 +217,7 @@ def build_backend_speed_probe_run_kwargs(
         "complete_backend_speed_probe_fn": complete_backend_speed_probe_fn,
         "show_probe_message_dialog": show_probe_message_dialog,
         "ask_probe_choice_dialog": ask_probe_choice_dialog,
+        "ask_probe_notes_dialog": ask_probe_notes_dialog,
         "tk": tk,
         "ttk": ttk,
         "scrolledtext": scrolledtext,

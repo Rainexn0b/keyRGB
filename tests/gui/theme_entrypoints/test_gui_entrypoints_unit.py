@@ -10,7 +10,7 @@ import pytest
     ("run_module_name", "target_module_name"),
     [
         ("src.gui.calibrator.__main__", "src.gui.calibrator.app"),
-        ("src.gui.perkey.__main__", "src.gui.perkey.editor"),
+        ("src.gui.perkey.__main__", "src.gui.perkey.launch"),
         ("src.gui.settings.__main__", "src.gui.settings.window"),
     ],
 )

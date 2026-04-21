@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .editor import main
+from .launch import main
 
 if __name__ == "__main__":
     main()

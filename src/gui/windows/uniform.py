@@ -56,12 +56,16 @@ class UniformColorGUI:
     _secondary_route: SecondaryDeviceRoute | None = None
 
     def __init__(self):
-        uniform_color_state.initialize_target_route_state(
-            self,
+        target_state = uniform_init_adapter.resolve_target_route_state(
             target_context=os.environ.get("KEYRGB_UNIFORM_TARGET_CONTEXT", "keyboard"),
             requested_backend=os.environ.get("KEYRGB_UNIFORM_BACKEND", ""),
             resolve_secondary_route_fn=self._resolve_secondary_route,
         )
+        self.target_context = target_state.target_context
+        self.requested_backend = target_state.requested_backend
+        self._secondary_route = target_state.secondary_route
+        self._target_is_secondary = target_state.target_is_secondary
+        self._target_label = target_state.target_label
 
         self.root = tk.Tk()
         self.root.title(f"KeyRGB - {self._target_label} Color")

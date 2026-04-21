@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sys
+import subprocess
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -73,6 +75,32 @@ def launcher_cwd_from(anchor: str | Path) -> str:
     launcher_cwd = repo_root_cwd_from(anchor, require_exists=True)
     assert launcher_cwd is not None
     return launcher_cwd
+
+
+def launcher_python_argv(module_name: str, *, no_bytecode: bool = True) -> list[str]:
+    """Build Python argv for launching a module as a subprocess."""
+
+    argv = [sys.executable]
+    if no_bytecode:
+        argv.append("-B")
+    argv.extend(["-m", str(module_name)])
+    return argv
+
+
+def launch_module_subprocess(
+    module_name: str,
+    *,
+    anchor: str | Path,
+    env: Mapping[str, str] | None = None,
+    no_bytecode: bool = True,
+) -> subprocess.Popen[bytes]:
+    """Launch a Python module with launcher cwd rooted from *anchor*."""
+
+    argv = launcher_python_argv(module_name, no_bytecode=no_bytecode)
+    cwd = launcher_cwd_from(anchor)
+    if env is None:
+        return subprocess.Popen(argv, cwd=cwd)
+    return subprocess.Popen(argv, cwd=cwd, env=dict(env))
 
 
 def ensure_on_sys_path(path: Path) -> bool:

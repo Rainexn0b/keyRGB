@@ -19,6 +19,7 @@ _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 
 try:
+    from src.gui.windows import _reactive_color_init_adapter as _init_adapter
     from src.gui.windows import _reactive_color_runtime as _runtime
     from src.gui.windows import _reactive_color_geometry as _geometry
     from src.gui.windows import _reactive_color_settings_adapter as _settings_adapter
@@ -26,6 +27,7 @@ try:
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/windows/reactive_color.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
+    from src.gui.windows import _reactive_color_init_adapter as _init_adapter
     from src.gui.windows import _reactive_color_runtime as _runtime
     from src.gui.windows import _reactive_color_geometry as _geometry
     from src.gui.windows import _reactive_color_settings_adapter as _settings_adapter
@@ -59,10 +61,12 @@ class ReactiveColorGUI:
         self._settings_adapter: _settings_adapter.ReactiveColorSettingsAdapter | None = None
         self._get_settings_adapter().initialize_drag_state()
 
-        self._color_supported = reactive_color_bootstrap.probe_color_support(
+        init_state = _init_adapter.initialize_runtime_state(
             select_backend_fn=select_backend,
+            probe_color_support_fn=reactive_color_bootstrap.probe_color_support,
             logger=logger,
         )
+        self._color_supported = init_state.color_supported
 
         main = ttk.Frame(self.root, padding=20)
         main.pack(fill="both", expand=True)

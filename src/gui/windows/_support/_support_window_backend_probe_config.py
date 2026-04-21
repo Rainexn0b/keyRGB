@@ -25,10 +25,7 @@ class _ProbeConfigLike(Protocol):
 
 
 def _copy_effect_speeds(raw: object) -> dict[str, object] | None:
-    effect_speed_overrides = EffectSpeedOverrides.from_settings(raw)
-    if effect_speed_overrides is None:
-        return None
-    return dict(effect_speed_overrides.values)
+    return EffectSpeedOverrides.copied_from_settings(raw)
 
 
 @dataclass(frozen=True, slots=True)
