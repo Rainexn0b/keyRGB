@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from typing import Protocol, cast
 
@@ -34,7 +35,8 @@ def _refresh_ui_or_none(tray: object) -> Callable[[], None] | None:
 def start_current_effect_for_idle_restore(
     tray: IdlePowerTrayProtocol,
     *,
-    brightness_override: int,
+    brightness_override: int | None,
+    fade_in: bool,
     fade_in_duration_s: float,
 ) -> None:
     start_fn = _start_current_effect_or_none(tray)
@@ -42,7 +44,7 @@ def start_current_effect_for_idle_restore(
         try:
             start_fn(
                 brightness_override=brightness_override,
-                fade_in=True,
+                fade_in=bool(fade_in),
                 fade_in_duration_s=fade_in_duration_s,
             )
         except TypeError:
@@ -54,7 +56,7 @@ def start_current_effect_for_idle_restore(
     start_current_effect(
         cast(LightingTrayProtocol, tray),
         brightness_override=brightness_override,
-        fade_in=True,
+        fade_in=bool(fade_in),
         fade_in_duration_s=fade_in_duration_s,
     )
 
@@ -73,6 +75,7 @@ def apply_dim_temp_brightness(
     is_sw_effect = effect in sw_effects_set
     if effect in reactive_effects_set:
         with tray.engine.kb_lock:
+            tray.engine._reactive_disable_pulse_hw_lift_until = float(time.monotonic()) + 2.0  # type: ignore[attr-defined]
             tray.engine._dim_temp_active = True  # type: ignore[attr-defined]
             set_reactive_transition(
                 tray.engine,
@@ -115,6 +118,10 @@ def apply_restore_brightness(
     if effect in reactive_effects_set:
         restore_target_hw = max(int(target), int(perkey_target))
         with tray.engine.kb_lock:
+            tray.engine._reactive_disable_pulse_hw_lift_until = float(time.monotonic()) + max(
+                2.0,
+                float(soft_on_fade_duration_s) + 0.75,
+            )  # type: ignore[attr-defined]
             set_reactive_transition(
                 tray.engine,
                 target_brightness=restore_target_hw,

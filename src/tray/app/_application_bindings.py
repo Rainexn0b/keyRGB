@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast, overload
 
+from ._application_state import TrayBootstrapState
 from .lifecycle import _AutostartEffectTray, _LifecyclePollingTray, _MonitoringPowerManager
 
 
@@ -153,57 +154,86 @@ class TrayRunBindings:
     logger: logging.Logger
 
 
-def initialize_tray_state(
-    tray: object,
-    *,
-    bindings: TrayInitBindings,
-    notify_permission_issue: _PermissionIssueCallback,
-) -> None:
+@dataclass(frozen=True)
+class TrayRunState:
+    config: Config
+    is_off: bool
+    backend: object | None
+
+
+def build_tray_bootstrap_state(*, bindings: TrayInitBindings) -> TrayBootstrapState:
     EffectsEngine, Config, PowerManager = bindings.load_tray_dependencies()
 
     config = Config()
     bindings.migrate_builtin_profile_brightness_best_effort(config)
-    setattr(tray, "config", config)
 
     backend, backend_probe, backend_caps = bindings.select_backend_with_introspection()
-    setattr(tray, "backend", backend)
-    setattr(tray, "backend_probe", backend_probe)
-    setattr(tray, "backend_caps", backend_caps)
-    setattr(tray, "device_discovery", bindings.select_device_discovery_snapshot())
-    setattr(tray, "selected_device_context", str(getattr(config, "tray_device_context", "keyboard") or "keyboard"))
-
     engine = bindings.create_effects_engine(EffectsEngine, backend=backend)
-    setattr(tray, "engine", engine)
 
     ite_rows, ite_cols = bindings.load_ite_dimensions()
-    setattr(tray, "_ite_rows", ite_rows)
-    setattr(tray, "_ite_cols", ite_cols)
 
+    return TrayBootstrapState(
+        config=config,
+        engine=engine,
+        power_manager_factory=PowerManager,
+        backend=backend,
+        backend_probe=backend_probe,
+        backend_caps=backend_caps,
+        device_discovery=bindings.select_device_discovery_snapshot(),
+        selected_device_context=str(getattr(config, "tray_device_context", "keyboard") or "keyboard"),
+        ite_rows=ite_rows,
+        ite_cols=ite_cols,
+    )
+
+
+def start_tray_runtime(
+    tray: object,
+    *,
+    state: TrayBootstrapState,
+    bindings: TrayInitBindings,
+    notify_permission_issue: _PermissionIssueCallback,
+) -> _MonitoringPowerManager:
     runtime_tray = cast(_LifecyclePollingTray, tray)
-    bindings.install_permission_error_callback_best_effort(engine, notify_permission_issue)
+
+    bindings.install_permission_error_callback_best_effort(state.engine, notify_permission_issue)
     bindings.configure_engine_software_targets(runtime_tray)
 
-    power_manager = bindings.start_power_monitoring(runtime_tray, power_manager_cls=PowerManager, config=config)
-    setattr(tray, "power_manager", power_manager)
-
-    bindings.start_all_polling(runtime_tray, ite_num_rows=ite_rows, ite_num_cols=ite_cols)
+    power_manager = bindings.start_power_monitoring(
+        runtime_tray,
+        power_manager_cls=cast(_PowerManagerFactory, state.power_manager_factory),
+        config=state.config,
+    )
+    bindings.start_all_polling(runtime_tray, ite_num_rows=state.ite_rows, ite_num_cols=state.ite_cols)
     bindings.maybe_autostart_effect(cast(_AutostartEffectTray, tray))
+    return power_manager
 
 
-def run_tray(tray: _TrayStartupProtocol, *, bindings: TrayRunBindings) -> None:
+def build_tray_run_state(tray: _TrayStartupProtocol) -> TrayRunState:
+    return TrayRunState(config=tray.config, is_off=tray.is_off, backend=tray.backend)
+
+
+def run_tray(
+    tray: _TrayStartupProtocol,
+    *,
+    bindings: TrayRunBindings,
+    state: TrayRunState | None = None,
+) -> None:
+    if state is None:
+        state = build_tray_run_state(tray)
+
     pystray, item = bindings.get_pystray()
 
     bindings.logger.info("Creating tray icon...")
     icon = pystray.Icon(
         "keyrgb",
-        bindings.create_icon_for_state(config=tray.config, is_off=tray.is_off, backend=tray.backend),
+        bindings.create_icon_for_state(config=state.config, is_off=state.is_off, backend=state.backend),
         "KeyRGB",
         menu=bindings.build_menu(tray, pystray=pystray, item=item),
     )
     tray.icon = icon
 
     bindings.logger.info("KeyRGB tray app started")
-    bindings.logger.info("Current effect: %s", tray.config.effect)
-    bindings.logger.info("Speed: %s, Brightness: %s", tray.config.speed, tray.config.brightness)
+    bindings.logger.info("Current effect: %s", state.config.effect)
+    bindings.logger.info("Speed: %s, Brightness: %s", state.config.speed, state.config.brightness)
     bindings.flush_pending_notifications(tray)
     icon.run()

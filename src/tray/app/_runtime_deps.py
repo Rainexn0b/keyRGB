@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from importlib import import_module
-from typing import TYPE_CHECKING, Any
+from types import ModuleType
+from typing import TYPE_CHECKING, Protocol, cast
 
 
 if TYPE_CHECKING:
@@ -40,25 +41,81 @@ if TYPE_CHECKING:
     )
 
 
+class _CallbacksModule(Protocol):
+    def on_effect_clicked(self, tray: object, item: object) -> None: ...
+
+    def on_effect_key_clicked(self, tray: object, effect_name: str) -> None: ...
+
+    def on_speed_clicked_cb(self, tray: object, item: object) -> None: ...
+
+    def on_brightness_clicked_cb(self, tray: object, item: object) -> None: ...
+
+    def on_device_context_clicked(self, tray: object, context_key: str) -> None: ...
+
+    def on_selected_device_color_clicked(self, tray: object) -> None: ...
+
+    def on_selected_device_brightness_clicked(self, tray: object, item: object) -> None: ...
+
+    def on_selected_device_turn_off_clicked(self, tray: object) -> None: ...
+
+    def on_software_effect_target_clicked(self, tray: object, target_key: str) -> None: ...
+
+    def on_off_clicked(self, tray: object) -> None: ...
+
+    def on_turn_on_clicked(self, tray: object) -> None: ...
+
+    def on_perkey_clicked(self) -> None: ...
+
+    def on_uniform_gui_clicked(self) -> None: ...
+
+    def on_reactive_color_gui_clicked(self) -> None: ...
+
+    def on_hardware_static_mode_clicked(self, tray: object) -> None: ...
+
+    def on_hardware_color_clicked(self, tray: object) -> None: ...
+
+    def on_power_settings_clicked(self) -> None: ...
+
+    def on_support_debug_clicked(self) -> None: ...
+
+    def on_backend_discovery_clicked(self) -> None: ...
+
+    def on_tcc_profiles_gui_clicked(self) -> None: ...
+
+    def on_tcc_profile_clicked(self, tray: object, profile_id: str) -> None: ...
+
+
+class _RuntimeModule(Protocol):
+    def get_pystray(self) -> tuple[object, object]: ...
+
+
+class _IconModule(Protocol):
+    def create_icon_for_state(self, *, config: object, is_off: bool, backend: object | None) -> object: ...
+
+
+class _MenuModule(Protocol):
+    def build_menu(self, tray: object, *, pystray: object, item: object) -> object: ...
+
+
 class LazyModuleRef:
     """Module-like proxy that imports its target on first attribute access."""
 
     def __init__(self, module_path: str) -> None:
         self._module_path = module_path
-        self._module: Any | None = None
+        self._module: ModuleType | None = None
 
-    def _load(self) -> Any:
+    def _load(self) -> ModuleType:
         module = self._module
         if module is None:
             module = import_module(self._module_path)
             self._module = module
         return module
 
-    def __getattr__(self, name: str) -> Any:
+    def __getattr__(self, name: str) -> object:
         return getattr(self._load(), name)
 
 
-def _module(module_path: str) -> Any:
+def _module(module_path: str) -> ModuleType:
     return import_module(module_path)
 
 
@@ -135,7 +192,7 @@ def is_permission_denied(exc: BaseException) -> bool:
     return bool(_module("src.core.utils.exceptions").is_permission_denied(exc))
 
 
-callbacks: Any = LazyModuleRef("src.tray.app.callbacks")
-runtime: Any = LazyModuleRef("src.tray.integrations.runtime")
-icon_mod: Any = LazyModuleRef("src.tray.ui.icon")
-menu_mod: Any = LazyModuleRef("src.tray.ui.menu")
+callbacks: _CallbacksModule = cast(_CallbacksModule, LazyModuleRef("src.tray.app.callbacks"))
+runtime: _RuntimeModule = cast(_RuntimeModule, LazyModuleRef("src.tray.integrations.runtime"))
+icon_mod: _IconModule = cast(_IconModule, LazyModuleRef("src.tray.ui.icon"))
+menu_mod: _MenuModule = cast(_MenuModule, LazyModuleRef("src.tray.ui.menu"))

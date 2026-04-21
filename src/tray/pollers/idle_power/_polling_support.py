@@ -4,6 +4,7 @@ from collections.abc import Callable
 import os
 from typing import TYPE_CHECKING, Optional, cast
 
+from src.tray.protocols import sync_idle_power_state_field
 from src.core.utils.safe_attrs import safe_str_attr
 
 
@@ -72,28 +73,25 @@ def recover_idle_power_polling_error(
 
 
 def ensure_idle_state(tray: IdlePowerTrayProtocol) -> None:
-    tray_vars = vars(tray)
+    bridge_fields: tuple[tuple[str, str], ...] = (
+        ("_idle_forced_off", "idle_forced_off"),
+        ("_user_forced_off", "user_forced_off"),
+        ("_power_forced_off", "power_forced_off"),
+        ("_dim_backlight_baselines", "dim_backlight_baselines"),
+        ("_dim_backlight_dimmed", "dim_backlight_dimmed"),
+        ("_dim_temp_active", "dim_temp_active"),
+        ("_dim_temp_target_brightness", "dim_temp_target_brightness"),
+        ("_dim_screen_off", "dim_screen_off"),
+        ("_last_resume_at", "last_resume_at"),
+        ("_dim_sync_suppressed_logged", "dim_sync_suppressed_logged"),
+    )
 
-    if "_idle_forced_off" not in tray_vars:
-        tray._idle_forced_off = False
-    if "_user_forced_off" not in tray_vars:
-        tray._user_forced_off = False
-    if "_power_forced_off" not in tray_vars:
-        tray._power_forced_off = False
-    if "_dim_backlight_baselines" not in tray_vars:
-        tray._dim_backlight_baselines = {}
-    if "_dim_backlight_dimmed" not in tray_vars:
-        tray._dim_backlight_dimmed = {}
-    if "_dim_temp_active" not in tray_vars:
-        tray._dim_temp_active = False
-    if "_dim_temp_target_brightness" not in tray_vars:
-        tray._dim_temp_target_brightness = None
-    if "_dim_screen_off" not in tray_vars:
-        tray._dim_screen_off = False
-    if "_last_resume_at" not in tray_vars:
-        tray._last_resume_at = 0.0
-    if "_dim_sync_suppressed_logged" not in tray_vars:
-        tray._dim_sync_suppressed_logged = False
+    for attr_name, state_name in bridge_fields:
+        sync_idle_power_state_field(
+            tray,
+            attr_name=attr_name,
+            state_name=state_name,
+        )
 
 
 def effective_screen_dim_sync_enabled(

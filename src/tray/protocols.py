@@ -10,41 +10,29 @@ the tray codebase. Using Protocols instead of untyped parameters enables:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
+
+from src.tray.idle_power_state import (
+    TrayIdlePowerState,
+    ensure_tray_idle_power_state,
+    read_idle_power_state_bool_field,
+    read_idle_power_state_optional_int_field,
+    set_idle_power_state_field,
+    sync_idle_power_state_field,
+)
+from src.tray._power_restore_policy import (
+    LightingPowerRestoreGuardState,
+    LightingPowerRestorePolicyState,
+    read_lighting_power_restore_guard_state,
+    normalize_lighting_power_restore_policy_state,
+)
 
 
 if TYPE_CHECKING:
     from src.core.config import Config
     from src.core.effects.engine import EffectsEngine
     from src.tray.ui.icon import IconVisual
-
-
-# ---------------------------------------------------------------------------
-# Idle/Power state
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class IdlePowerState:
-    """Typed state for idle/power management tracking.
-
-    Holds idle and power-management state in one typed container.
-    """
-
-    idle_forced_off: bool = False
-    user_forced_off: bool = False
-    power_forced_off: bool = False
-
-    # Screen dim sync state
-    dim_backlight_baselines: dict[str, int] = field(default_factory=dict)
-    dim_backlight_dimmed: dict[str, bool] = field(default_factory=dict)
-    dim_temp_active: bool = False
-    dim_temp_target_brightness: Optional[int] = None
-    dim_screen_off: bool = False
-
-    # Resume tracking
-    last_resume_at: float = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -69,8 +57,7 @@ class TrayIconState:
 class HasConfig(Protocol):
     """Protocol for objects with a Config-like attribute."""
 
-    @property
-    def config(self) -> "Config": ...
+    config: "Config"
 
 
 # ---------------------------------------------------------------------------
@@ -82,8 +69,70 @@ class HasConfig(Protocol):
 class HasEngine(Protocol):
     """Protocol for objects with an EffectsEngine."""
 
+    engine: "EffectsEngine"
+
+
+# ---------------------------------------------------------------------------
+# Shared tray runtime state building blocks
+# ---------------------------------------------------------------------------
+
+
+class _HasBackend(Protocol):
+    backend: object | None
+
+
+class _HasLightingPowerState(Protocol):
+    is_off: bool
+    _idle_forced_off: bool
+    _user_forced_off: bool
+    _power_forced_off: bool
+
+
+class _HasLastBrightness(Protocol):
     @property
-    def engine(self) -> "EffectsEngine": ...
+    def _last_brightness(self) -> int: ...
+
+    @_last_brightness.setter
+    def _last_brightness(self, value: int) -> None: ...
+
+
+class _HasLastResumeAt(Protocol):
+    _last_resume_at: float
+
+
+class _HasSelectedDeviceContext(Protocol):
+    selected_device_context: str
+
+
+class _HasIdleDimState(Protocol):
+    _dim_backlight_baselines: dict[str, int]
+    _dim_backlight_dimmed: dict[str, bool]
+    _dim_temp_active: bool
+    _dim_temp_target_brightness: Optional[int]
+    _dim_screen_off: bool
+    _dim_sync_suppressed_logged: bool
+
+
+class _RefreshUi(Protocol):
+    def _refresh_ui(self) -> None: ...
+
+
+class _RefreshTrayUi(_RefreshUi, Protocol):
+    def _update_menu(self) -> None: ...
+
+
+class _StartsCurrentEffect(Protocol):
+    def _start_current_effect(self, **kwargs: object) -> None: ...
+
+
+class _TrayLogging(Protocol):
+    def _log_exception(self, msg: str, exc: Exception) -> None: ...
+
+    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
+
+
+class _PermissionIssueNotifier(Protocol):
+    def _notify_permission_issue(self, exc: Exception) -> None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -92,31 +141,19 @@ class HasEngine(Protocol):
 
 
 @runtime_checkable
-class TrayStateProtocol(Protocol):
-    """Protocol defining the expected interface for tray objects.
+class TrayStateProtocol(
+    HasConfig,
+    HasEngine,
+    _HasLightingPowerState,
+    _HasLastBrightness,
+    _RefreshTrayUi,
+    Protocol,
+):
+    """Core runtime state shared across tray controllers and pollers.
 
     This allows static type checking while maintaining duck typing.
     Functions with untyped `tray` parameters can be migrated to `tray: TrayStateProtocol`.
     """
-
-    # Core components
-    config: "Config"
-    engine: "EffectsEngine"
-
-    # Lighting state
-    is_off: bool
-
-    # Last known brightness (for restore operations)
-    @property
-    def _last_brightness(self) -> int: ...
-
-    @_last_brightness.setter
-    def _last_brightness(self, value: int) -> None: ...
-
-    # UI refresh hooks
-    def _refresh_ui(self) -> None: ...
-
-    def _update_menu(self) -> None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -125,52 +162,31 @@ class TrayStateProtocol(Protocol):
 
 
 @runtime_checkable
-class IdlePowerTrayProtocol(Protocol):
+class IdlePowerTrayProtocol(
+    HasConfig,
+    HasEngine,
+    _HasBackend,
+    _HasLightingPowerState,
+    _HasIdleDimState,
+    _HasLastResumeAt,
+    _RefreshUi,
+    _TrayLogging,
+    Protocol,
+):
     """Minimal protocol for idle/power polling functions.
 
     Narrower than TrayStateProtocol - only requires what idle_power_polling needs.
     """
 
-    config: "Config"
-    engine: "EffectsEngine"
-    backend: object | None
-    is_off: bool
-
-    # Idle power state (can be the IdlePowerState dataclass or duck-typed)
-    _idle_forced_off: bool
-    _user_forced_off: bool
-    _power_forced_off: bool
-    _dim_backlight_baselines: dict[str, int]
-    _dim_backlight_dimmed: dict[str, bool]
-    _dim_temp_active: bool
-    _dim_temp_target_brightness: Optional[int]
-    _dim_screen_off: bool
-    _dim_sync_suppressed_logged: bool
-
-    # Resume tracking
-    _last_resume_at: float
-
-    def _refresh_ui(self) -> None: ...
-
-    # Logging helpers (best-effort, but present on the real tray implementation)
-    def _log_exception(self, msg: str, exc: Exception) -> None: ...
-
-    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
-
 
 # ---------------------------------------------------------------------------
 def ensure_tray_icon_state(tray: object) -> TrayIconState:
-    """Ensure a tray has a `tray_icon_state` attribute and return it."""
+    """Return the tray icon state. The state must already be owned by the tray at init."""
 
-    existing = getattr(tray, "tray_icon_state", None)
-    if isinstance(existing, TrayIconState):
-        return existing
-
-    st = TrayIconState()
-    try:
-        setattr(tray, "tray_icon_state", st)
-    except AttributeError:
-        pass
+    st = getattr(tray, "tray_icon_state", None)
+    if not isinstance(st, TrayIconState):
+        # Fallback for objects outside the normal tray lifecycle (e.g. test stubs).
+        return TrayIconState()
     return st
 
 
@@ -180,33 +196,17 @@ def ensure_tray_icon_state(tray: object) -> TrayIconState:
 
 
 @runtime_checkable
-class ConfigPollingTrayProtocol(Protocol):
+class ConfigPollingTrayProtocol(
+    HasConfig,
+    HasEngine,
+    _HasLightingPowerState,
+    _HasLastBrightness,
+    _RefreshTrayUi,
+    _StartsCurrentEffect,
+    _TrayLogging,
+    Protocol,
+):
     """Minimal protocol for config polling + apply-from-config helpers."""
-
-    config: "Config"
-    engine: "EffectsEngine"
-
-    is_off: bool
-
-    _idle_forced_off: bool
-    _user_forced_off: bool
-    _power_forced_off: bool
-
-    @property
-    def _last_brightness(self) -> int: ...
-
-    @_last_brightness.setter
-    def _last_brightness(self, value: int) -> None: ...
-
-    def _refresh_ui(self) -> None: ...
-
-    def _update_menu(self) -> None: ...
-
-    def _start_current_effect(self, **kwargs: object) -> None: ...
-
-    def _log_exception(self, msg: str, exc: Exception) -> None: ...
-
-    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
 
 
 # ---------------------------------------------------------------------------
@@ -215,32 +215,19 @@ class ConfigPollingTrayProtocol(Protocol):
 
 
 @runtime_checkable
-class LightingTrayProtocol(Protocol):
+class LightingTrayProtocol(
+    HasConfig,
+    HasEngine,
+    _HasLightingPowerState,
+    _HasLastBrightness,
+    _HasLastResumeAt,
+    _HasSelectedDeviceContext,
+    _RefreshTrayUi,
+    _TrayLogging,
+    _PermissionIssueNotifier,
+    Protocol,
+):
     """Minimal protocol for tray lighting controller functions."""
 
-    config: "Config"
-    engine: "EffectsEngine"
-    selected_device_context: str
 
-    is_off: bool
 
-    _idle_forced_off: bool
-    _user_forced_off: bool
-    _power_forced_off: bool
-    _last_resume_at: float
-
-    @property
-    def _last_brightness(self) -> int: ...
-
-    @_last_brightness.setter
-    def _last_brightness(self, value: int) -> None: ...
-
-    def _refresh_ui(self) -> None: ...
-
-    def _update_menu(self) -> None: ...
-
-    def _log_exception(self, msg: str, exc: Exception) -> None: ...
-
-    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
-
-    def _notify_permission_issue(self, exc: Exception) -> None: ...

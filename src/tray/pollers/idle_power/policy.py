@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 
 IdleAction = Optional[Literal["turn_off", "restore", "dim_to_temp", "restore_brightness"]]
+_POST_RESUME_IDLE_ACTION_SUPPRESSION_S = 10.0
 
 
 def compute_idle_action(
@@ -25,7 +26,7 @@ def compute_idle_action(
     now: float = 0.0,
 ) -> IdleAction:
     if now > 0 and last_resume_at > 0:
-        if (now - last_resume_at) < 3.0:
+        if (now - last_resume_at) < _POST_RESUME_IDLE_ACTION_SUPPRESSION_S:
             return None
 
     if not power_management_enabled:

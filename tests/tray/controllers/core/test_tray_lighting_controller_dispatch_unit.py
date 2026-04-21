@@ -156,6 +156,109 @@ class TestHelperBoundaries:
 
 
 class TestStartCurrentEffect:
+    def test_classify_start_current_effect_marks_perkey_static_path(self):
+        from src.tray.controllers.lighting_controller import _classify_start_current_effect
+
+        tray = MagicMock()
+        plan = _classify_start_current_effect(tray, effect="perkey")
+
+        assert plan.is_perkey_mode is True
+        assert plan.is_none_mode is False
+        assert plan.is_loop_effect is False
+
+    def test_classify_start_current_effect_marks_loop_effect(self):
+        from src.tray.controllers.lighting_controller import _classify_start_current_effect
+
+        tray = MagicMock()
+        plan = _classify_start_current_effect(tray, effect="rainbow_wave")
+
+        assert plan.is_perkey_mode is False
+        assert plan.is_none_mode is False
+        assert plan.is_loop_effect is True
+
+    def test_plan_effect_fade_ramp_marks_loop_effect_as_non_hardware(self):
+        from src.tray.controllers.lighting_controller import _plan_effect_fade_ramp
+
+        plan = _plan_effect_fade_ramp(
+            effect="rainbow_wave",
+            fade_in=True,
+            start_brightness=10,
+            target_brightness=50,
+        )
+
+        assert plan.will_fade is True
+        assert plan.is_loop_effect is True
+        assert plan.apply_to_hardware is False
+
+    def test_plan_effect_fade_ramp_marks_hardware_effect_as_hardware(self):
+        from src.tray.controllers.lighting_controller import _plan_effect_fade_ramp
+
+        plan = _plan_effect_fade_ramp(
+            effect="breathe",
+            fade_in=True,
+            start_brightness=10,
+            target_brightness=50,
+        )
+
+        assert plan.will_fade is True
+        assert plan.is_loop_effect is False
+        assert plan.apply_to_hardware is True
+
+    def test_start_current_effect_fade_for_loop_effect_uses_non_hardware_brightness_write(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "rainbow_wave"
+        mock_tray.config.brightness = 50
+        mock_tray.config.speed = 3
+        mock_tray.config.get_effect_speed.return_value = 3
+        mock_tray.config.color = (0, 255, 0)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
+
+        start_current_effect(mock_tray, brightness_override=10, fade_in=True, fade_in_duration_s=0.42)
+
+        mock_tray.engine.start_effect.assert_called_once_with(
+            "rainbow_wave",
+            speed=3,
+            brightness=10,
+            color=(0, 255, 0),
+            reactive_color=None,
+            reactive_use_manual_color=False,
+            direction=mock_tray.config.direction,
+        )
+        mock_tray.engine.set_brightness.assert_called_once_with(50, apply_to_hardware=False)
+
+    def test_start_current_effect_fade_for_hardware_effect_uses_hardware_fade(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "breathe"
+        mock_tray.config.brightness = 50
+        mock_tray.config.speed = 3
+        mock_tray.config.get_effect_speed.return_value = 3
+        mock_tray.config.color = (0, 255, 0)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
+
+        start_current_effect(mock_tray, brightness_override=10, fade_in=True, fade_in_duration_s=0.42)
+
+        mock_tray.engine.start_effect.assert_called_once_with(
+            "breathe",
+            speed=3,
+            brightness=10,
+            color=(0, 255, 0),
+            reactive_color=None,
+            reactive_use_manual_color=False,
+            direction=mock_tray.config.direction,
+        )
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            50,
+            apply_to_hardware=True,
+            fade=True,
+            fade_duration_s=0.42,
+        )
+
     def test_perkey_effect_calls_set_key_colors(self):
         from src.tray.controllers.lighting_controller import start_current_effect
 
@@ -338,6 +441,58 @@ class TestStartCurrentEffect:
 
         with pytest.raises(AssertionError, match="unexpected logger bug"):
             _log_boundary_exception(tray, "Failed to mark device unavailable: %s", RuntimeError("boom"))
+
+    def test_start_current_effect_runtime_exception_tuple_is_runtime_category(self):
+        from src.tray.controllers.lighting_controller import _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS
+
+        assert _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS == (
+            AttributeError,
+            LookupError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        )
+
+    def test_tray_logger_callback_exception_tuple_is_runtime_category(self):
+        from src.tray.controllers.lighting_controller import _TRAY_LOGGER_CALLBACK_EXCEPTIONS
+
+        assert _TRAY_LOGGER_CALLBACK_EXCEPTIONS == (
+            AttributeError,
+            LookupError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        )
+
+    def test_log_boundary_exception_falls_back_to_module_logger_with_traceback(self):
+        from src.tray.controllers.lighting_controller import _log_boundary_exception
+
+        tray = MagicMock()
+        tray._log_exception = MagicMock(side_effect=RuntimeError("logger failed"))
+        original_exc = None
+
+        try:
+            raise RuntimeError("hardware error")
+        except RuntimeError as raised_exc:
+            original_exc = raised_exc
+            with patch("src.tray.controllers.lighting_controller.logger.exception") as log_exception:
+                with patch("src.tray.controllers.lighting_controller.logger.error") as log_error:
+                    _log_boundary_exception(tray, "Error starting effect: %s", original_exc)
+
+        assert original_exc is not None
+        tray._log_exception.assert_called_once_with("Error starting effect: %s", original_exc)
+        log_exception.assert_called_once_with(
+            "Tray exception logger failed while logging boundary: %s",
+            tray._log_exception.side_effect,
+        )
+        log_error.assert_called_once_with(
+            "Error starting effect: %s",
+            original_exc,
+            exc_info=(RuntimeError, original_exc, original_exc.__traceback__),
+        )
+        assert original_exc.__traceback__ is not None
 
     def test_start_current_effect_logs_mark_unavailable_failure_on_disconnect(self):
         from src.tray.controllers.lighting_controller import start_current_effect

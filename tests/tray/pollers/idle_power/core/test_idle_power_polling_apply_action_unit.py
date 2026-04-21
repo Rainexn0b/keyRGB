@@ -271,6 +271,38 @@ def test_restore_does_not_restore_when_user_forced_off(
     restore.assert_not_called()
 
 
+def test_restore_does_not_restore_when_owner_user_forced_off_and_legacy_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.tray.pollers.idle_power.polling as module
+    from src.tray.protocols import TrayIdlePowerState
+
+    tray = SimpleNamespace(
+        engine=MagicMock(),
+        config=SimpleNamespace(effect="wave", brightness=25),
+        is_off=False,
+        _dim_temp_active=True,
+        _dim_temp_target_brightness=5,
+        tray_idle_power_state=TrayIdlePowerState(
+            user_forced_off=True,
+            power_forced_off=False,
+            dim_temp_active=True,
+            dim_temp_target_brightness=5,
+        ),
+        _refresh_ui=MagicMock(),
+        _start_current_effect=MagicMock(),
+    )
+
+    restore = MagicMock()
+    monkeypatch.setattr(module, "_restore_from_idle", restore)
+
+    _apply_idle_action(tray, action="restore", dim_temp_brightness=5)
+
+    restore.assert_not_called()
+    assert tray._user_forced_off is True
+    assert tray._power_forced_off is False
+
+
 def test_restore_does_restore_when_not_forced_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -284,6 +316,33 @@ def test_restore_does_restore_when_not_forced_off(
     _apply_idle_action(tray, action="restore", dim_temp_brightness=5)
 
     restore.assert_called_once_with(tray)
+
+
+def test_dim_to_temp_skips_when_owner_state_matches_and_legacy_values_are_invalid() -> None:
+    from src.tray.protocols import TrayIdlePowerState
+
+    tray = SimpleNamespace(
+        engine=MagicMock(),
+        config=SimpleNamespace(effect="wave", brightness=25),
+        is_off=False,
+        _idle_forced_off=False,
+        _user_forced_off=False,
+        _power_forced_off=False,
+        _dim_temp_active=object(),
+        _dim_temp_target_brightness=object(),
+        tray_idle_power_state=TrayIdlePowerState(
+            dim_temp_active=True,
+            dim_temp_target_brightness=7,
+        ),
+        _refresh_ui=MagicMock(),
+        _start_current_effect=MagicMock(),
+    )
+
+    _apply_idle_action(tray, action="dim_to_temp", dim_temp_brightness=7)
+
+    tray.engine.set_brightness.assert_not_called()
+    assert tray._dim_temp_active is True
+    assert tray._dim_temp_target_brightness == 7
 
 
 class _CountingLock(AbstractContextManager[None]):

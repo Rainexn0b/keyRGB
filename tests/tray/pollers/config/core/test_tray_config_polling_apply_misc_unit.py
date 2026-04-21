@@ -7,6 +7,9 @@ import pytest
 
 from src.tray.pollers import config_polling
 from src.tray.pollers.config_polling import ConfigApplyState, _apply_from_config_once
+from src.tray.pollers.config_polling_internal._apply_plan import ConfigApplyPlan
+from src.tray.pollers.config_polling_internal import _planning
+from src.tray.pollers.config_polling_internal import core as config_polling_core
 
 
 def _mk_tray_base(*, effect: str, brightness: int) -> MagicMock:
@@ -67,6 +70,52 @@ def test_apply_from_config_once_returns_early_when_state_unchanged() -> None:
     assert warn_at == 0.0
     tray._start_current_effect.assert_not_called()
     tray.engine.set_brightness.assert_not_called()
+
+
+def test_classify_apply_from_config_delegates_without_mutating_inputs() -> None:
+    current = ConfigApplyState(
+        effect="rainbow_wave",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=None,
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+    )
+
+    plan = ConfigApplyPlan(persist_effect="wave", execution_kind="apply")
+
+    with patch.object(_planning, "classify_config_apply_plan", return_value=plan) as planner:
+        returned = _planning.classify_apply_from_config(
+            configured_effect="rainbow_wave",
+            current=current,
+        )
+
+    assert returned is plan
+    planner.assert_called_once_with(configured_effect="rainbow_wave", current=current)
+    assert current.effect == "rainbow_wave"
+
+
+def test_apply_from_config_once_uses_planning_output_contract_as_is() -> None:
+    tray = _mk_tray_base(effect="rainbow_wave", brightness=10)
+
+    with patch.object(
+        config_polling_core,
+        "classify_apply_from_config",
+        return_value=ConfigApplyPlan(persist_effect="wave", execution_kind="apply"),
+    ):
+        _apply_from_config_once(
+            tray,
+            ite_num_rows=6,
+            ite_num_cols=21,
+            cause="mtime_change",
+            last_applied=None,
+            last_apply_warn_at=0.0,
+        )
+
+    assert tray.config.effect == "wave"
+    tray.engine.turn_off.assert_not_called()
+    tray._start_current_effect.assert_called_once()
 
 
 def test_apply_from_config_once_logs_signature_exception_throttled() -> None:

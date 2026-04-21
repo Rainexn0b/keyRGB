@@ -135,9 +135,30 @@ def test_compute_idle_action_suppresses_screen_off_bounce_shortly_after_resume()
         user_forced_off=False,
         power_forced_off=False,
         last_resume_at=100.0,
-        now=101.0,
+        now=108.5,
     )
     assert action is None
+
+
+def test_compute_idle_action_allows_screen_off_after_resume_guard_expires() -> None:
+    action = compute_idle_action(
+        dimmed=False,
+        screen_off=True,
+        is_off=False,
+        idle_forced_off=False,
+        dim_temp_active=False,
+        idle_timeout_s=60.0,
+        power_management_enabled=True,
+        screen_dim_sync_enabled=True,
+        screen_dim_sync_mode="temp",
+        screen_dim_temp_brightness=5,
+        brightness=25,
+        user_forced_off=False,
+        power_forced_off=False,
+        last_resume_at=100.0,
+        now=110.5,
+    )
+    assert action == "turn_off"
 
 
 @pytest.mark.parametrize("forced_flag", ["user", "power"])

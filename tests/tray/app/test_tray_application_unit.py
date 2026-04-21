@@ -97,6 +97,14 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
     assert tray.backend_caps == {"caps": True}
     assert tray.device_discovery == {"candidates": [{"device_type": "lightbar"}]}
     assert tray.selected_device_context == "lightbar:048d:7001"
+    assert tray.tray_idle_power_state.idle_forced_off is False
+    assert tray.tray_idle_power_state.user_forced_off is False
+    assert tray.tray_idle_power_state.power_forced_off is False
+    from src.tray.protocols import TrayIconState
+    assert isinstance(tray.tray_icon_state, TrayIconState)
+    assert tray._idle_forced_off is False
+    assert tray._user_forced_off is False
+    assert tray._power_forced_off is False
 
 
 def test_init_handles_profile_migration_engine_fallback_and_permission_cb_failure(monkeypatch):
@@ -397,6 +405,31 @@ def test_run_flushes_queued_notifications(monkeypatch):
 
     assert flushed == [("Title 1", "Body 1"), ("Title 2", "Body 2")]
     assert tray._pending_notifications == []
+
+
+def test_run_passes_explicit_runtime_state_to_bindings(monkeypatch):
+    tray = SimpleNamespace()
+    sentinel_state = object()
+    seen = {}
+
+    monkeypatch.setattr(
+        app.application_bindings,
+        "build_tray_run_state",
+        lambda _tray: sentinel_state,
+    )
+
+    def _run_tray(_tray, *, bindings, state=None):
+        seen["tray"] = _tray
+        seen["bindings"] = bindings
+        seen["state"] = state
+
+    monkeypatch.setattr(app.application_bindings, "run_tray", _run_tray)
+
+    app.KeyRGBTray.run(tray)
+
+    assert seen["tray"] is tray
+    assert seen["state"] is sentinel_state
+    assert isinstance(seen["bindings"], app.application_bindings.TrayRunBindings)
 
 
 def test_notify_queues_early_notifications_without_icon() -> None:

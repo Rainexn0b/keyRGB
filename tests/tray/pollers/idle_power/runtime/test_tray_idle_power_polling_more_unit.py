@@ -16,6 +16,7 @@ class _FakeThread:
 
 def test_ensure_idle_state_sets_defaults() -> None:
     from src.tray.pollers.idle_power.polling import _ensure_idle_state
+    from src.tray.protocols import TrayIdlePowerState
 
     tray = SimpleNamespace()
     _ensure_idle_state(tray)
@@ -26,6 +27,38 @@ def test_ensure_idle_state_sets_defaults() -> None:
     assert tray._dim_backlight_baselines == {}
     assert tray._dim_temp_active is False
     assert tray._dim_temp_target_brightness is None
+    assert isinstance(tray.tray_idle_power_state, TrayIdlePowerState)
+
+
+def test_ensure_idle_state_syncs_existing_legacy_values_into_state_owner() -> None:
+    from src.tray.pollers.idle_power.polling import _ensure_idle_state
+
+    tray = SimpleNamespace(
+        _idle_forced_off=True,
+        _user_forced_off=True,
+        _power_forced_off=False,
+        _dim_backlight_baselines={"kbd": 40},
+        _dim_backlight_dimmed={"kbd": True},
+        _dim_temp_active=True,
+        _dim_temp_target_brightness=12,
+        _dim_screen_off=True,
+        _dim_sync_suppressed_logged=True,
+        _last_resume_at=7.5,
+    )
+
+    _ensure_idle_state(tray)
+
+    state = tray.tray_idle_power_state
+    assert state.idle_forced_off is True
+    assert state.user_forced_off is True
+    assert state.power_forced_off is False
+    assert state.dim_backlight_baselines == {"kbd": 40}
+    assert state.dim_backlight_dimmed == {"kbd": True}
+    assert state.dim_temp_active is True
+    assert state.dim_temp_target_brightness == 12
+    assert state.dim_screen_off is True
+    assert state.dim_sync_suppressed_logged is True
+    assert state.last_resume_at == pytest.approx(7.5)
 
 
 def test_read_logind_idle_seconds_parsing_and_monotonic(monkeypatch) -> None:
@@ -131,6 +164,87 @@ def test_restore_from_idle_records_resume_timestamp(monkeypatch) -> None:
     ipp._restore_from_idle(tray)
 
     assert tray._last_resume_at == pytest.approx(123.0)
+
+
+def test_restore_from_idle_syncs_owner_state_fields(monkeypatch) -> None:
+    import src.tray.pollers.idle_power._actions as actions_module
+    import src.tray.pollers.idle_power.polling as ipp
+    from src.tray.protocols import TrayIdlePowerState
+
+    monkeypatch.setattr(actions_module.time, "monotonic", lambda: 456.0)
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        _last_resume_at=0.0,
+        tray_idle_power_state=TrayIdlePowerState(idle_forced_off=True, last_resume_at=0.0),
+        config=SimpleNamespace(brightness=0),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _log_exception=lambda *_a, **_kw: None,
+        _start_current_effect=lambda **_kwargs: None,
+        _refresh_ui=lambda: None,
+    )
+
+    ipp._restore_from_idle(tray)
+
+    assert tray._idle_forced_off is False
+    assert tray._last_resume_at == pytest.approx(456.0)
+    assert tray.tray_idle_power_state.idle_forced_off is False
+    assert tray.tray_idle_power_state.last_resume_at == pytest.approx(456.0)
+
+
+def test_restore_from_idle_loop_effect_uses_in_place_restart() -> None:
+    import src.tray.pollers.idle_power.polling as ipp
+
+    received: dict[str, object] = {}
+
+    def capture_start(**kwargs):
+        received.update(kwargs)
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        _last_resume_at=0.0,
+        config=SimpleNamespace(brightness=33, effect="reactive_ripple"),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _log_exception=lambda *_a, **_kw: None,
+        _start_current_effect=capture_start,
+        _refresh_ui=lambda: None,
+    )
+
+    ipp._restore_from_idle(tray)
+
+    assert received["brightness_override"] is None
+    assert received["fade_in"] is False
+
+
+def test_restore_from_idle_non_loop_effect_uses_soft_on_start() -> None:
+    import src.tray.controllers._power._transition_constants as transition_constants
+    import src.tray.pollers.idle_power.polling as ipp
+
+    received: dict[str, object] = {}
+
+    def capture_start(**kwargs):
+        received.update(kwargs)
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        _last_resume_at=0.0,
+        config=SimpleNamespace(brightness=33, effect="static"),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _log_exception=lambda *_a, **_kw: None,
+        _start_current_effect=capture_start,
+        _refresh_ui=lambda: None,
+    )
+
+    ipp._restore_from_idle(tray)
+
+    assert received["brightness_override"] == transition_constants.SOFT_ON_START_BRIGHTNESS
+    assert received["fade_in"] is True
 
 
 def test_restore_from_idle_logs_tray_logger_failure_with_fallback(monkeypatch) -> None:

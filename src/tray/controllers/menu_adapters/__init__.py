@@ -23,6 +23,10 @@ class _OptionalPowerForcedOffTrayProtocol(Protocol):
     _power_forced_off: object
 
 
+class _HasSystemPowerLastOk(Protocol):
+    _system_power_last_ok: bool
+
+
 class _PerkeyProfileActivationTrayProtocol(Protocol):
     config: object
     is_off: bool
@@ -50,7 +54,7 @@ def get_active_perkey_profile_name() -> str:
 
 
 def set_system_power_last_ok(tray: object, ok: bool) -> None:
-    setattr(tray, "_system_power_last_ok", bool(ok))
+    cast(_HasSystemPowerLastOk, tray)._system_power_last_ok = bool(ok)
 
 
 def update_menu_if_present(tray: object) -> None:

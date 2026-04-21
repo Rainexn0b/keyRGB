@@ -1,117 +1,38 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass
-from typing import cast
-
-from src.core.effects.catalog import REACTIVE_EFFECTS
-from src.core.effects.catalog import resolve_effect_name_for_backend
+from src.core.effects.catalog import REACTIVE_EFFECTS, resolve_effect_name_for_backend
 from src.core.effects.software_targets import normalize_software_effect_target
-from src.core.utils.safe_attrs import safe_bool_attr
-from src.core.utils.safe_attrs import safe_int_attr
-from src.core.utils.safe_attrs import safe_str_attr
+from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
 from src.tray.protocols import ConfigPollingTrayProtocol
 
-from ._fast_path import classify_fast_path_change
-from ._post_fast_path_apply import apply_post_fast_path_execution
+from ._config_apply_state import _CONFIG_FALLBACK_EXCEPTIONS
+from ._config_apply_state import _safe_perkey_signature, _safe_tuple_attr
+from ._config_apply_state import ConfigApplyState, build_config_apply_state
+from ._fast_path import apply_fast_path_change, classify_fast_path_change
+from ._post_fast_path_apply import apply_post_fast_path_execution, execute_non_fast_path_plan
+from ._planning import classify_apply_from_config
+from .helpers import _apply_effect, _apply_perkey, _apply_turn_off, _apply_uniform, _handle_forced_off, _sync_reactive, _sync_software_target_policy
 
-
-ColorTuple = tuple[int, int, int]
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
-_CONFIG_FALLBACK_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
 _FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
-def _safe_tuple_attr(config: object, name: str, *, default: ColorTuple) -> ColorTuple:
-    try:
-        raw = getattr(config, name, default)
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        return default
-
-    if not isinstance(raw, Iterable):
-        return default
-
-    try:
-        value = tuple(raw)
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        return default
-
-    if len(value) != 3:
-        return default
-
-    return cast(ColorTuple, value)
-
-
-def _safe_perkey_signature(config: object) -> tuple | None:
-    try:
-        per_key_colors = getattr(config, "per_key_colors", None)
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        return None
-
-    if per_key_colors is None:
-        return None
-
-    try:
-        return tuple(sorted(per_key_colors.items()))
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        return None
-
-
-@dataclass(frozen=True)
-class ConfigApplyState:
-    effect: str
-    speed: int
-    brightness: int
-    color: ColorTuple
-    perkey_sig: tuple | None
-    reactive_use_manual: bool
-    reactive_color: ColorTuple
-    reactive_brightness: int = 0
-    reactive_trail_percent: int = 50
-    software_effect_target: str = "keyboard"
-
-
 def compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
-    try:
-        effect = resolve_effect_name_for_backend(
-            safe_str_attr(tray.config, "effect", default="none") or "none",
-            getattr(tray, "backend", None),
-        )
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        effect = "none"
+    def _resolve_effect_name(effect_name: str) -> str:
+        return resolve_effect_name_for_backend(effect_name, getattr(tray, "backend", None))
 
-    perkey_sig = None
-    if effect == "perkey":
-        perkey_sig = _safe_perkey_signature(tray.config)
-
-    reactive_use_manual = safe_bool_attr(tray.config, "reactive_use_manual_color", default=False)
-    reactive_color = _safe_tuple_attr(tray.config, "reactive_color", default=(255, 255, 255))
-
-    base_brightness = safe_int_attr(tray.config, "brightness", default=0)
-    reactive_brightness = 0
-    reactive_trail_percent = 50
-    if effect in REACTIVE_EFFECTS_SET:
-        reactive_brightness = safe_int_attr(tray.config, "reactive_brightness", default=base_brightness)
-        reactive_trail_percent = safe_int_attr(tray.config, "reactive_trail_percent", default=50)
-
-    color = _safe_tuple_attr(tray.config, "color", default=(255, 255, 255))
-    software_effect_target = normalize_software_effect_target(
-        safe_str_attr(tray.config, "software_effect_target", default="keyboard") or "keyboard"
-    )
-
-    return ConfigApplyState(
-        effect=str(effect),
-        speed=safe_int_attr(tray.config, "speed", default=0),
-        brightness=base_brightness,
-        color=color,
-        perkey_sig=perkey_sig,
-        software_effect_target=software_effect_target,
-        reactive_use_manual=bool(reactive_use_manual),
-        reactive_color=reactive_color,
-        reactive_brightness=int(reactive_brightness),
-        reactive_trail_percent=int(reactive_trail_percent),
+    return build_config_apply_state(
+        tray.config,
+        resolve_effect_name=_resolve_effect_name,
+        read_bool_attr=safe_bool_attr,
+        read_int_attr=safe_int_attr,
+        read_str_attr=safe_str_attr,
+        read_tuple_attr=_safe_tuple_attr,
+        read_perkey_signature=_safe_perkey_signature,
+        normalize_software_effect_target_fn=normalize_software_effect_target,
+        reactive_effects_set=REACTIVE_EFFECTS_SET,
     )
 
 
@@ -143,31 +64,13 @@ def maybe_apply_fast_path(
 
     change_kind = classify_fast_path_change(last_applied=last_applied, current=current)
 
-    if change_kind == "target_only":
-        try:
-            from .helpers import _sync_software_target_policy
-
-            _sync_software_target_policy(tray, current)
-        except _FAST_PATH_EXCEPTIONS:
-            pass
-    elif change_kind == "reactive_only":
-        try:
-            tray.engine.reactive_use_manual_color = bool(current.reactive_use_manual)
-            tray.engine.reactive_color = current.reactive_color
-            tray.engine.reactive_brightness = int(current.reactive_brightness)
-            tray.engine.reactive_trail_percent = int(current.reactive_trail_percent)
-        except _FAST_PATH_EXCEPTIONS:
-            pass
-    elif (
-        change_kind == "brightness_only"
-        and str(current.effect) in sw_effects_set
-        and bool(getattr(tray.engine, "running", False))
-    ):
-        try:
-            tray.engine.set_brightness(int(current.brightness), apply_to_hardware=False)
-        except _FAST_PATH_EXCEPTIONS:
-            pass
-    else:
+    handled = apply_fast_path_change(
+        tray,
+        change_kind=change_kind,
+        current=current,
+        sw_effects_set=sw_effects_set,
+    )
+    if not handled:
         return False, current
 
     try:
@@ -210,21 +113,13 @@ def apply_from_config_once(
         return last_applied, last_apply_warn_at
 
     configured_effect = safe_str_attr(tray.config, "effect", default="none") or "none"
-    if configured_effect != current.effect:
+    apply_plan = classify_apply_from_config(configured_effect=configured_effect, current=current)
+
+    if apply_plan.persist_effect is not None:
         try:
-            tray.config.effect = current.effect
+            tray.config.effect = apply_plan.persist_effect
         except _CONFIG_FALLBACK_EXCEPTIONS:
             pass
-
-    from .helpers import (
-        _apply_effect,
-        _apply_perkey,
-        _apply_turn_off,
-        _apply_uniform,
-        _handle_forced_off,
-        _sync_reactive,
-        _sync_software_target_policy,
-    )
 
     _sync_software_target_policy(tray, current)
 
@@ -245,36 +140,24 @@ def apply_from_config_once(
     if handled:
         return new_last_applied, last_apply_warn_at
 
-    try:
-        old_state = state_for_log_fn(last_applied)
-        new_state = state_for_log_fn(current)
-        tray._log_event(
-            "config",
-            "detected_change",
-            cause=str(cause or "unknown"),
-            old=old_state,
-            new=new_state,
-        )
-    except _CONFIG_FALLBACK_EXCEPTIONS:
-        pass
-
-    if current.brightness == 0:
-        last_apply_warn_at = _apply_turn_off(tray, current, cause, monotonic_fn, last_apply_warn_at)
-        return current, last_apply_warn_at
-
-    last_apply_warn_at = apply_post_fast_path_execution(
+    last_apply_warn_at = execute_non_fast_path_plan(
         tray,
+        apply_plan=apply_plan,
         current=current,
-        ite_num_rows=ite_num_rows,
-        ite_num_cols=ite_num_cols,
+        last_applied=last_applied,
         cause=cause,
         last_apply_warn_at=last_apply_warn_at,
+        state_for_log_fn=state_for_log_fn,
         monotonic_fn=monotonic_fn,
+        ite_num_rows=ite_num_rows,
+        ite_num_cols=ite_num_cols,
         is_device_disconnected_fn=is_device_disconnected_fn,
+        apply_turn_off_fn=_apply_turn_off,
         sync_reactive_fn=_sync_reactive,
         apply_perkey_fn=_apply_perkey,
         apply_uniform_fn=_apply_uniform,
         apply_effect_fn=_apply_effect,
+        config_fallback_exceptions=_CONFIG_FALLBACK_EXCEPTIONS,
         runtime_boundary_exceptions=_CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS,
     )
 

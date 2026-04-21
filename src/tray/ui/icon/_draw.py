@@ -95,7 +95,7 @@ def _tray_k_mask() -> Image.Image | None:
 
 
 @lru_cache(maxsize=64)
-def _create_cached_solid_icon(color: tuple[int, int, int], outline_color: tuple[int, int, int]) -> Image.Image:
+def _create_cached_solid_icon(color: tuple[int, int, int]) -> Image.Image:
     k_mask = _tray_k_mask()
     if k_mask is not None:
         fill = Image.new("RGBA", _ICON_SIZE, color=(*color, 255))
@@ -139,7 +139,7 @@ def _scale_cache_key(scale: float) -> int:
 def create_icon(color: tuple[int, int, int]) -> Image.Image:
     """Create tray icon image."""
 
-    return _create_cached_solid_icon(tuple(color), _outline_color_for_theme())
+    return _create_cached_solid_icon(tuple(color))
 
 
 def _clamp_u8(v: float) -> int:
@@ -180,7 +180,6 @@ def _rainbow_gradient_64(phase_q: int) -> Image.Image:
 def _create_cached_rainbow_icon(
     phase_q: int,
     scale_key: int,
-    outline_color: tuple[int, int, int],
 ) -> Image.Image:
     k_mask = _tray_k_mask()
     scale = float(scale_key) / 1000.0
@@ -219,7 +218,7 @@ def create_icon_rainbow(*, scale: float = 1.0, phase: float = 0.0) -> Image.Imag
     """Create tray icon where the 'K' cutout is filled with a rainbow gradient."""
 
     phase_q = int(round((float(phase) % 1.0) * 63.0))
-    return _create_cached_rainbow_icon(phase_q, _scale_cache_key(scale), _outline_color_for_theme())
+    return _create_cached_rainbow_icon(phase_q, _scale_cache_key(scale))
 
 
 def create_icon_mosaic(

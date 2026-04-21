@@ -3,20 +3,17 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from typing import Optional, Protocol, cast
+from typing import Optional, cast
 
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
-from src.tray.controllers._power._transition_constants import (
-    SOFT_ON_FADE_DURATION_S,
-    SOFT_ON_START_BRIGHTNESS,
+from src.tray.pollers.idle_power._restore_policy import classify_idle_restore_start
+from src.tray.protocols import (
+    IdlePowerTrayProtocol,
+    read_idle_power_state_bool_field,
+    read_idle_power_state_optional_int_field,
+    set_idle_power_state_field,
 )
-from src.tray.pollers.idle_power._action_execution import execute_idle_action
-from src.tray.pollers.idle_power._transition_actions import (
-    refresh_ui_best_effort,
-    start_current_effect_for_idle_restore,
-)
-from src.tray.protocols import IdlePowerTrayProtocol
 
 
 logger = logging.getLogger(__name__)
@@ -74,24 +71,23 @@ def _tray_log_exception_or_none(tray: object) -> Callable[[str, Exception], None
     return cast(Callable[[str, Exception], None], log_exception)
 
 
-class _DimTempStateTray(Protocol):
-    _dim_temp_active: bool
-    _dim_temp_target_brightness: int | None
-
-
 def _dim_temp_state_matches(tray: object, *, target_brightness: int) -> bool:
-    try:
-        dim_temp_active = cast(_DimTempStateTray, tray)._dim_temp_active
-    except AttributeError:
-        dim_temp_active = False
-    try:
-        dim_temp_target = cast(_DimTempStateTray, tray)._dim_temp_target_brightness
-    except AttributeError:
-        dim_temp_target = -1
-    try:
-        return bool(dim_temp_active) and int(dim_temp_target or -1) == int(target_brightness)
-    except (TypeError, ValueError):
+    dim_temp_active = read_idle_power_state_bool_field(
+        tray,
+        attr_name="_dim_temp_active",
+        state_name="dim_temp_active",
+        default=False,
+    )
+    dim_temp_target = read_idle_power_state_optional_int_field(
+        tray,
+        attr_name="_dim_temp_target_brightness",
+        state_name="dim_temp_target_brightness",
+        default=None,
+    )
+    if dim_temp_target is None:
         return False
+
+    return bool(dim_temp_active) and int(dim_temp_target) == int(target_brightness)
 
 
 def _log_tray_boundary_exception(
@@ -206,13 +202,27 @@ def _set_brightness_best_effort(
 
 
 def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
+    from src.tray.controllers._power._transition_constants import (
+        SOFT_ON_FADE_DURATION_S,
+        SOFT_ON_START_BRIGHTNESS,
+    )
+    from src.tray.pollers.idle_power._transition_actions import (
+        refresh_ui_best_effort,
+        start_current_effect_for_idle_restore,
+    )
+
     try:
-        tray._last_resume_at = float(time.monotonic())
+        set_idle_power_state_field(
+            tray,
+            attr_name="_last_resume_at",
+            state_name="last_resume_at",
+            value=float(time.monotonic()),
+        )
     except (AttributeError, TypeError, ValueError, RuntimeError):
         pass
 
     tray.is_off = False
-    tray._idle_forced_off = False
+    set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=False)
     if hasattr(tray, "engine"):
         _set_engine_hw_brightness_cap(tray.engine, None)
 
@@ -228,10 +238,16 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     except (AttributeError, TypeError, ValueError):
         pass
 
+    restore_start_policy = classify_idle_restore_start(
+        tray.config,
+        soft_on_start_brightness=SOFT_ON_START_BRIGHTNESS,
+    )
+
     _call_runtime_boundary(
         lambda: start_current_effect_for_idle_restore(
             tray,
-            brightness_override=SOFT_ON_START_BRIGHTNESS,
+            brightness_override=restore_start_policy.brightness_override,
+            fade_in=restore_start_policy.fade_in,
             fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
         ),
         on_recoverable=lambda exc: _log_tray_boundary_exception(
@@ -262,6 +278,8 @@ def apply_idle_action(
     reactive_effects_set: frozenset[str],
     sw_effects_set: frozenset[str],
 ) -> None:
+    from src.tray.pollers.idle_power._action_execution import execute_idle_action
+
     execute_idle_action(
         tray,
         action=action,

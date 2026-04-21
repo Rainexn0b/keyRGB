@@ -12,7 +12,21 @@ from src.tray.pollers.idle_power._transition_actions import (
     read_effect_name,
     refresh_ui_best_effort,
 )
-from src.tray.protocols import IdlePowerTrayProtocol
+from src.tray.protocols import IdlePowerTrayProtocol, set_idle_power_state_field, sync_idle_power_state_field
+
+
+def _set_idle_state_field(
+    tray: IdlePowerTrayProtocol,
+    *,
+    prior_name: str,
+    state_name: str,
+    value: object,
+) -> None:
+    set_idle_power_state_field(tray, attr_name=prior_name, state_name=state_name, value=value)
+
+
+def _sync_idle_state_field(tray: IdlePowerTrayProtocol, *, prior_name: str, state_name: str) -> object:
+    return sync_idle_power_state_field(tray, attr_name=prior_name, state_name=state_name)
 
 
 def execute_idle_action(
@@ -82,8 +96,13 @@ def _execute_turn_off(
     call_runtime_boundary: Callable[..., bool],
     set_engine_hw_brightness_cap: Callable[..., None],
 ) -> None:
-    tray._dim_temp_active = False
-    tray._dim_temp_target_brightness = None
+    _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=False)
+    _set_idle_state_field(
+        tray,
+        prior_name="_dim_temp_target_brightness",
+        state_name="dim_temp_target_brightness",
+        value=None,
+    )
     set_engine_hw_brightness_cap(tray.engine, None)
     call_runtime_boundary(
         lambda: tray.engine.stop(),
@@ -99,7 +118,7 @@ def _execute_turn_off(
     )
 
     tray.is_off = True
-    tray._idle_forced_off = True
+    _set_idle_state_field(tray, prior_name="_idle_forced_off", state_name="idle_forced_off", value=True)
     refresh_ui_best_effort(
         tray,
         key="idle_power.turn_off.refresh_ui",
@@ -128,8 +147,13 @@ def _execute_dim_to_temp(
     if dim_temp_state_matches(tray, target_brightness=dim_temp_brightness):
         return
 
-    tray._dim_temp_active = True
-    tray._dim_temp_target_brightness = int(dim_temp_brightness)
+    _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=True)
+    _set_idle_state_field(
+        tray,
+        prior_name="_dim_temp_target_brightness",
+        state_name="dim_temp_target_brightness",
+        value=int(dim_temp_brightness),
+    )
     effect = read_effect_name(
         tray.config,
         log_key="idle_power.dim_to_temp.effect_name",
@@ -167,8 +191,13 @@ def _execute_restore_brightness(
     set_brightness_best_effort: Callable[..., None],
     recoverable_effect_name_exceptions: tuple[type[BaseException], ...],
 ) -> None:
-    tray._dim_temp_active = False
-    tray._dim_temp_target_brightness = None
+    _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=False)
+    _set_idle_state_field(
+        tray,
+        prior_name="_dim_temp_target_brightness",
+        state_name="dim_temp_target_brightness",
+        value=None,
+    )
     config = tray.config
     target = safe_int_attr(config, "brightness", default=0)
     perkey_target = safe_int_attr(config, "perkey_brightness", default=0)
@@ -206,11 +235,20 @@ def _execute_restore(
     restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], None],
     set_engine_hw_brightness_cap: Callable[..., None],
 ) -> None:
-    if bool(tray._user_forced_off) or bool(tray._power_forced_off):
+    user_forced_off = bool(_sync_idle_state_field(tray, prior_name="_user_forced_off", state_name="user_forced_off"))
+    power_forced_off = bool(
+        _sync_idle_state_field(tray, prior_name="_power_forced_off", state_name="power_forced_off")
+    )
+    if user_forced_off or power_forced_off:
         return
 
-    tray._dim_temp_active = False
-    tray._dim_temp_target_brightness = None
+    _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=False)
+    _set_idle_state_field(
+        tray,
+        prior_name="_dim_temp_target_brightness",
+        state_name="dim_temp_target_brightness",
+        value=None,
+    )
     if hasattr(tray, "engine"):
         set_engine_hw_brightness_cap(tray.engine, None)
     restore_from_idle_fn(tray)

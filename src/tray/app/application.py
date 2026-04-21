@@ -9,14 +9,21 @@ import logging
 import shutil
 import subprocess
 import time
+from typing import TYPE_CHECKING
 
 from . import _application_bindings as application_bindings
 from . import _application_notifications as application_notifications
 from . import _runtime_deps as app_runtime_deps
 from . import _startup as tray_startup
+from ._application_state import TrayBootstrapState
 from ._delegates import KeyRGBTrayDelegateMixin
 from src.core.backends import BackendError, format_backend_error
 from src.core.utils.safe_attrs import safe_str_attr
+from src.tray.protocols import TrayIconState, ensure_tray_idle_power_state
+
+
+if TYPE_CHECKING:
+    from src.core.config import Config
 
 
 select_backend_with_introspection = app_runtime_deps.select_backend_with_introspection
@@ -68,7 +75,7 @@ def _run_bindings() -> application_bindings.TrayRunBindings:
     """Read current runtime collaborators at call time to preserve tests."""
 
     return application_bindings.TrayRunBindings(
-        get_pystray=runtime.get_pystray,
+        get_pystray=runtime.get_pystray,  # type: ignore[arg-type]
         create_icon_for_state=icon_mod.create_icon_for_state,
         build_menu=menu_mod.build_menu,
         flush_pending_notifications=flush_pending_notifications,
@@ -79,22 +86,34 @@ def _run_bindings() -> application_bindings.TrayRunBindings:
 class KeyRGBTray(KeyRGBTrayDelegateMixin):
     """System tray application for KeyRGB."""
 
+    config: Config
+    engine: object
+    power_manager: object | None
     backend: object | None
+    backend_probe: object | None
+    backend_caps: object | None
+    device_discovery: object | None
+    selected_device_context: str
+    tray_icon_state: TrayIconState
+    _ite_rows: int
+    _ite_cols: int
 
     def __init__(self) -> None:
         self.icon: object | None = None
         self.is_off = False
-        self._power_forced_off = False
-        self._user_forced_off = False
-        self._idle_forced_off = False
-        self._dim_temp_active = False
-        self._dim_temp_target_brightness: int | None = None
-        self._dim_backlight_baselines: dict[str, int] = {}
-        self._dim_backlight_dimmed: dict[str, bool] = {}
-        self._dim_screen_off = False
-        self._dim_sync_suppressed_logged = False
+        self.tray_icon_state = TrayIconState()
+        idle_power_state = ensure_tray_idle_power_state(self)
+        self._power_forced_off = idle_power_state.power_forced_off
+        self._user_forced_off = idle_power_state.user_forced_off
+        self._idle_forced_off = idle_power_state.idle_forced_off
+        self._dim_temp_active = idle_power_state.dim_temp_active
+        self._dim_temp_target_brightness = idle_power_state.dim_temp_target_brightness
+        self._dim_backlight_baselines = idle_power_state.dim_backlight_baselines
+        self._dim_backlight_dimmed = idle_power_state.dim_backlight_dimmed
+        self._dim_screen_off = idle_power_state.dim_screen_off
+        self._dim_sync_suppressed_logged = idle_power_state.dim_sync_suppressed_logged
         self._last_brightness = 25
-        self._last_resume_at = 0.0
+        self._last_resume_at = idle_power_state.last_resume_at
 
         # Event log throttling state (key -> last log monotonic time).
         self._event_last_at: dict[str, float] = {}
@@ -104,11 +123,18 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
         self._pending_notifications: list[tuple[str, str]] = []
 
         # Backend selection and startup wiring are used for capability-driven UI gating.
-        application_bindings.initialize_tray_state(
+        bindings = _init_bindings()
+        bootstrap_state = application_bindings.build_tray_bootstrap_state(bindings=bindings)
+        self._apply_bootstrap_state(bootstrap_state)
+        self.power_manager = application_bindings.start_tray_runtime(
             self,
-            bindings=_init_bindings(),
+            state=bootstrap_state,
+            bindings=bindings,
             notify_permission_issue=self._notify_permission_issue,
         )
+
+    def _apply_bootstrap_state(self, state: TrayBootstrapState) -> None:
+        state.apply_to(self)
 
     # ---- notifications
 
@@ -166,4 +192,8 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
     # ---- run
 
     def run(self):
-        application_bindings.run_tray(self, bindings=_run_bindings())
+        application_bindings.run_tray(
+            self,
+            bindings=_run_bindings(),
+            state=application_bindings.build_tray_run_state(self),
+        )
