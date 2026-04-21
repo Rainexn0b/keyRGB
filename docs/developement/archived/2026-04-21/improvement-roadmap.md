@@ -1,8 +1,10 @@
 # Agent Improvement Roadmap
 
+> Archived snapshot from `2026-04-21`. The active coordination docs now live in `docs/developement/improvement-roadmap.md` and the three chunk specs under `docs/developement/chunk-*.md`.
+
 ## Purpose
 
-This document is the active roadmap for the next KeyRGB improvement campaign.
+This document was the active roadmap for the `2026-04-21` KeyRGB improvement campaign snapshot.
 
 It is intended to do two things:
 
