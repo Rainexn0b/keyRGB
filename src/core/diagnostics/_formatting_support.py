@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+
 from .io import parse_hex_int
 
 
@@ -10,19 +12,19 @@ def append_support_hints(
     usb_ids: object = None,
     hints: object = None,
 ) -> None:
-    if not isinstance(backends, dict) or not backends:
+    if not isinstance(backends, Mapping) or not backends:
         return
 
     probes = backends.get("probes")
-    if not isinstance(probes, list) or not probes:
+    if not isinstance(probes, Sequence) or isinstance(probes, str) or not probes:
         return
 
     support_lines: list[str] = []
 
     usb_label_by_id: dict[tuple[str, str], str] = {}
-    if isinstance(usb_devices, list):
+    if isinstance(usb_devices, Sequence) and not isinstance(usb_devices, str):
         for dev in usb_devices:
-            if not isinstance(dev, dict):
+            if not isinstance(dev, Mapping):
                 continue
             vid = dev.get("idVendor")
             pid = dev.get("idProduct")
@@ -34,11 +36,11 @@ def append_support_hints(
 
     unsupported_usb: list[dict[str, str]] = []
     for probe in probes:
-        if not isinstance(probe, dict) or bool(probe.get("available")):
+        if not isinstance(probe, Mapping) or bool(probe.get("available")):
             continue
 
         ids = probe.get("identifiers")
-        if not isinstance(ids, dict):
+        if not isinstance(ids, Mapping):
             continue
 
         vid_txt = ids.get("usb_vid")
@@ -91,14 +93,14 @@ def append_support_hints(
                 )
 
     seen_candidate_usb_ids = _collect_candidate_usb_ids(usb_ids=usb_ids, usb_devices=usb_devices)
-    sysfs_available, sysfs_reason = _read_sysfs_backend_probe(probes)
+    sysfs_available, sysfs_reason = _read_sysfs_backend_probe(probes)  # type: ignore[arg-type]
     selected = backends.get("selected")
     selected_name = str(selected).strip().lower() if selected is not None else ""
 
     module_names: set[str] = set()
-    if isinstance(hints, dict):
+    if isinstance(hints, Mapping):
         modules = hints.get("modules")
-        if isinstance(modules, list):
+        if isinstance(modules, Sequence) and not isinstance(modules, str):
             for name in modules:
                 if isinstance(name, str) and name.strip():
                     module_names.add(name.strip().lower())
@@ -175,7 +177,7 @@ def append_sysfs_leds(
     leds: object,
     backends: object,
 ) -> None:
-    if isinstance(sysfs_leds, list) and sysfs_leds:
+    if isinstance(sysfs_leds, Sequence) and not isinstance(sysfs_leds, str) and sysfs_leds:
         lines.append("Sysfs LEDs:")
         for entry in sysfs_leds:
             lines.append(f"  - {entry.get('name')} ({entry.get('path')})")
@@ -196,20 +198,20 @@ def append_sysfs_leds(
                 if trigger_extra:
                     lines.append(f"      {' '.join(trigger_extra)}")
 
-    if isinstance(leds, list) and leds and sysfs_leds != leds:
+    if isinstance(leds, Sequence) and not isinstance(leds, str) and leds and sysfs_leds != leds:
         lines.append("Keyboard LEDs (filtered):")
         for entry in leds:
             lines.append(f"  - {entry.get('name')} ({entry.get('path')})")
 
-    sysfs_cand = backends.get("sysfs_led_candidates") if isinstance(backends, dict) else None
-    if isinstance(sysfs_cand, dict) and sysfs_cand:
+    sysfs_cand = backends.get("sysfs_led_candidates") if isinstance(backends, Mapping) else None
+    if isinstance(sysfs_cand, Mapping) and sysfs_cand:
         lines.append("  sysfs_led_candidates:")
         for key in ("root", "exists", "candidates_count"):
             if key in sysfs_cand:
                 lines.append(f"    {key}: {sysfs_cand.get(key)}")
 
         power_helper = sysfs_cand.get("power_helper")
-        if isinstance(power_helper, dict) and power_helper:
+        if isinstance(power_helper, Mapping) and power_helper:
             path = power_helper.get("path")
             exists = power_helper.get("exists")
             supports = power_helper.get("supports_led_apply")
@@ -228,10 +230,10 @@ def append_sysfs_leds(
                 lines.append(f"    {key}: {sysfs_cand.get(key)}")
 
         top = sysfs_cand.get("top")
-        if isinstance(top, list) and top:
+        if isinstance(top, Sequence) and not isinstance(top, str) and top:
             lines.append("    top:")
             for entry in top[:5]:
-                if not isinstance(entry, dict):
+                if not isinstance(entry, Mapping):
                     continue
                 top_extra: list[str] = []
                 if entry.get("brightness_writable") is not None:
@@ -249,18 +251,18 @@ def append_sysfs_leds(
                 suffix = (" " + " ".join(top_extra)) if top_extra else ""
                 lines.append(f"      - {entry.get('name')} score={entry.get('score')}{suffix}")
 
-    sysfs_mouse_cand = backends.get("sysfs_mouse_candidates") if isinstance(backends, dict) else None
-    if isinstance(sysfs_mouse_cand, dict) and sysfs_mouse_cand:
+    sysfs_mouse_cand = backends.get("sysfs_mouse_candidates") if isinstance(backends, Mapping) else None
+    if isinstance(sysfs_mouse_cand, Mapping) and sysfs_mouse_cand:
         lines.append("  sysfs_mouse_candidates:")
         for key in ("root", "exists", "candidates_count", "matched_count", "eligible_count"):
             if key in sysfs_mouse_cand:
                 lines.append(f"    {key}: {sysfs_mouse_cand.get(key)}")
 
         top = sysfs_mouse_cand.get("top")
-        if isinstance(top, list) and top:
+        if isinstance(top, Sequence) and not isinstance(top, str) and top:
             lines.append("    top:")
             for entry in top[:5]:
-                if not isinstance(entry, dict):
+                if not isinstance(entry, Mapping):
                     continue
                 status_parts = [
                     f"matched={entry.get('matched')}",
@@ -269,7 +271,7 @@ def append_sysfs_leds(
                 ]
                 lines.append(f"      - {entry.get('name')} {' '.join(status_parts)}")
                 reasons = entry.get("reasons")
-                if isinstance(reasons, list) and reasons:
+                if isinstance(reasons, Sequence) and not isinstance(reasons, str) and reasons:
                     lines.append(f"        reasons: {'; '.join(str(reason) for reason in reasons if reason)}")
                 metadata = str(entry.get("metadata") or "").strip()
                 if metadata:
@@ -288,7 +290,7 @@ def append_sysfs_leds(
 def _collect_candidate_usb_ids(*, usb_ids: object, usb_devices: object) -> list[str]:
     seen_candidate_usb_ids: list[str] = []
 
-    if isinstance(usb_ids, list):
+    if isinstance(usb_ids, Sequence) and not isinstance(usb_ids, str):
         for entry in usb_ids:
             if not isinstance(entry, str):
                 continue

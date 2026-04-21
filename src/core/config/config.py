@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 from copy import deepcopy
-from typing import Any
+from typing import Any, Literal, overload
 
 from src.core.effects import software_targets as _software_targets
 
@@ -13,8 +13,10 @@ from . import defaults as _defaults
 from . import file_storage as _file_storage
 from . import paths as _paths
 from . import perkey_colors as _perkey_colors
+from ._settings_view import ConfigSettingsView
 from ._lighting import _coercion as _lighting_coercion
 from ._lighting import _lighting_accessors as _lighting_accessors
+from ._lighting import _effect_speed_overrides as _effect_speed_boundary
 from ._lighting import _props as _lighting_props
 
 logger = logging.getLogger(__name__)
@@ -126,18 +128,44 @@ class Config(_lighting_accessors.LightingConfigAccessors):
             save_fn=self._save,
         )
 
+    def settings_view(self) -> ConfigSettingsView:
+        """Return a readonly typed snapshot view of current settings."""
+
+        return ConfigSettingsView.from_mapping(self._settings)
+
+    @overload
+    def _get_required_scalar(self, key: Literal["effect"]) -> str: ...
+
+    @overload
+    def _get_required_scalar(self, key: Literal["speed"]) -> int: ...
+
+    def _get_required_scalar(self, key: str) -> object:
+        return self._settings[key]
+
+    @overload
+    def _get_optional_scalar(self, key: Literal["return_effect_after_effect"], default: None = None) -> object | None: ...
+
+    @overload
+    def _get_optional_scalar(self, key: Literal["effect_speeds"], default: None = None) -> object | None: ...
+
+    def _get_optional_scalar(self, key: str, default: object | None = None) -> object | None:
+        return self._settings.get(key, default)
+
+    def _set_scalar(self, key: str, value: object) -> None:
+        self._settings[key] = value
+
     @property
     def effect(self) -> str:
-        return self._settings["effect"]
+        return self._get_required_scalar("effect")
 
     @effect.setter
     def effect(self, value: str):
-        self._settings["effect"] = value.lower()
+        self._set_scalar("effect", value.lower())
         self._save()
 
     @property
     def return_effect_after_effect(self) -> str | None:
-        value = _normalized_optional_string(self._settings.get("return_effect_after_effect", None))
+        value = _normalized_optional_string(self._get_optional_scalar("return_effect_after_effect"))
         if value == "perkey":
             return "perkey"
         return None
@@ -145,40 +173,60 @@ class Config(_lighting_accessors.LightingConfigAccessors):
     @return_effect_after_effect.setter
     def return_effect_after_effect(self, value: str | None):
         if value is None:
-            self._settings["return_effect_after_effect"] = None
+            self._set_scalar("return_effect_after_effect", None)
         else:
-            self._settings["return_effect_after_effect"] = str(value).strip().lower() or None
+            self._set_scalar("return_effect_after_effect", str(value).strip().lower() or None)
         self._save()
 
     @property
     def speed(self) -> int:
-        return self._settings["speed"]
+        return self._get_required_scalar("speed")
 
     @speed.setter
     def speed(self, value: int):
-        self._settings["speed"] = max(0, min(10, value))
+        self._set_scalar("speed", max(0, min(10, value)))
         self._save()
+
+    def _get_effect_speeds(self) -> dict[str, Any] | None:
+        boundary = _effect_speed_boundary.EffectSpeedOverrides.from_settings(
+            self._get_optional_scalar("effect_speeds")
+        )
+        if boundary is None:
+            return None
+        return boundary.values
+
+    def _effect_speed_overrides(self) -> _effect_speed_boundary.EffectSpeedOverrides | None:
+        return _effect_speed_boundary.EffectSpeedOverrides.from_settings(self._get_optional_scalar("effect_speeds"))
+
+    def _ensure_effect_speed_overrides(self) -> _effect_speed_boundary.EffectSpeedOverrides:
+        return _effect_speed_boundary.EffectSpeedOverrides.ensure_in_settings(self._settings)
+
+    def _ensure_effect_speeds(self) -> dict[str, Any]:
+        return self._ensure_effect_speed_overrides().values
+
+    @staticmethod
+    def _normalize_effect_speed(value: object, *, default: int) -> int:
+        return max(0, min(10, _lighting_accessors._coerce_int_setting(value, default=default)))
 
     def get_effect_speed(self, effect_name: str) -> int:
         """Return the saved per-effect speed, falling back to the global speed."""
-        speeds = self._settings.get("effect_speeds", None) or {}
-        if isinstance(speeds, dict) and effect_name in speeds:
-            return max(
-                0,
-                min(10, _lighting_accessors._coerce_int_setting(speeds[effect_name], default=self.speed)),
-            )
-        return self.speed
+        global_speed = self.speed
+        overrides = self._effect_speed_overrides()
+        if overrides is None:
+            return global_speed
+
+        has_override, raw_override = overrides.lookup(effect_name)
+        if not has_override:
+            return global_speed
+        return self._normalize_effect_speed(raw_override, default=global_speed)
 
     def set_effect_speed(self, effect_name: str, speed: int) -> None:
         """Persist a per-effect speed override."""
         if not isinstance(effect_name, str):
             raise TypeError("effect_name must be a str")
 
-        speeds = self._settings.get("effect_speeds", None)
-        if not isinstance(speeds, dict):
-            speeds = {}
-        speeds[effect_name] = max(0, min(10, _lighting_accessors._coerce_int_setting(speed, default=0)))
-        self._settings["effect_speeds"] = speeds
+        overrides = self._ensure_effect_speed_overrides()
+        overrides.assign(effect_name, self._normalize_effect_speed(speed, default=0))
         self._save()
 
     # ---- common boolean/int settings

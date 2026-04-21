@@ -5,22 +5,42 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from typing import TYPE_CHECKING
 
-from . import _monitor_runner as power_monitor_runner
+from . import _manager_brightness_execution as _brightness_execution, _manager_power_events as _power_events
+from . import _manager_runtime_deps, _monitor_runner as power_monitor_runner
 from ._manager_config import read_power_management_config_bool, reload_power_management_config
 from ._manager_helpers import apply_power_source_actions, build_power_source_loop_inputs, is_intentionally_off
-from ..policies.power_event_policy import PowerEventInputs, PowerEventPolicy
-from ..policies.power_event_policy import RestoreKeyboard as RestoreFromEvent, TurnOffKeyboard as TurnOffFromEvent
+from ._manager_source_iteration import PowerSourceIterationPlan, classify_power_source_iteration
+from ..policies import power_event_policy as _power_event_policy
 from ..policies.power_source_loop_policy import PowerSourceLoopPolicy
-from src.core.config import Config
-from src.core.power.monitoring.acpi_monitoring import monitor_acpi_events
-from src.core.power.monitoring.lid_monitoring import start_sysfs_lid_monitoring
-from src.core.power.monitoring.login1_monitoring import monitor_prepare_for_sleep
-from src.core.power.monitoring.power_supply_sysfs import read_on_ac_power
-from src.core.profile.paths import get_active_profile
-from src.core.utils.safe_attrs import safe_int_attr
+
+if TYPE_CHECKING:
+    from src.core.config import Config
 
 logger = logging.getLogger(__name__)
+
+PowerEventInputs = _power_event_policy.PowerEventInputs
+PowerEventPolicy = _power_event_policy.PowerEventPolicy
+RestoreFromEvent = _power_event_policy.RestoreKeyboard
+TurnOffFromEvent = _power_event_policy.TurnOffKeyboard
+
+classify_brightness_execution = _brightness_execution.classify_brightness_execution
+execute_brightness_execution = _brightness_execution.execute_brightness_execution
+apply_brightness_policy = _brightness_execution.apply_brightness_policy
+sync_config_brightness = _brightness_execution.sync_config_brightness
+
+build_power_event_inputs = _power_events.build_power_event_inputs
+execute_power_event_plan = _power_events.execute_power_event_plan
+invoke_keyboard_method = _power_events.invoke_keyboard_method
+orchestrate_power_event = _power_events.orchestrate_power_event
+
+get_active_profile = _manager_runtime_deps.get_active_profile
+monitor_acpi_events = _manager_runtime_deps.monitor_acpi_events
+monitor_prepare_for_sleep = _manager_runtime_deps.monitor_prepare_for_sleep
+read_on_ac_power = _manager_runtime_deps.read_on_ac_power
+safe_int_attr = _manager_runtime_deps.safe_int_attr
+start_sysfs_lid_monitoring = _manager_runtime_deps.start_sysfs_lid_monitoring
 
 _POWER_MANAGER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _POWER_MANAGER_MONITOR_ERRORS = _POWER_MANAGER_RUNTIME_ERRORS + (ImportError,)
@@ -36,8 +56,10 @@ class PowerManager:
             keyboard_controller: The keyboard controller instance (should have turn_off/restore methods)
         """
 
+        from src.core.config import Config as _Config
+
         self.kb_controller = keyboard_controller
-        self._config = config or Config()
+        self._config = config or _Config()
         self.monitoring = False
         self.monitor_thread = None
         self._battery_thread = None
@@ -90,32 +112,39 @@ class PowerManager:
         *,
         poll_interval_s: float,
     ) -> bool:
-        on_ac = read_on_ac_power()
-        if on_ac is None:
-            time.sleep(poll_interval_s)
-            return True
+        plan = self._classify_battery_saver_iteration(policy)
+        return self._execute_battery_saver_iteration_plan(plan, poll_interval_s=poll_interval_s)
 
-        loop_inputs = build_power_source_loop_inputs(
-            self._config,
-            self.kb_controller,
-            on_ac=bool(on_ac),
-            now_mono=float(time.monotonic()),
-            get_active_profile_fn=get_active_profile,
-            safe_int_attr_fn=safe_int_attr,
+    def _classify_battery_saver_iteration(
+        self,
+        policy: PowerSourceLoopPolicy,
+    ) -> PowerSourceIterationPlan:
+        return classify_power_source_iteration(
+            raw_on_ac=read_on_ac_power(),
+            build_loop_inputs_fn=lambda on_ac: build_power_source_loop_inputs(
+                self._config,
+                self.kb_controller,
+                on_ac=on_ac,
+                now_mono=float(time.monotonic()),
+                get_active_profile_fn=get_active_profile,
+                safe_int_attr_fn=safe_int_attr,
+            ),
+            policy=policy,
         )
-        if loop_inputs is None:
-            time.sleep(poll_interval_s)
-            return True
 
-        result = policy.update(loop_inputs)
-
-        if result.skip:
+    def _execute_battery_saver_iteration_plan(
+        self,
+        plan: PowerSourceIterationPlan,
+        *,
+        poll_interval_s: float,
+    ) -> bool:
+        if plan.should_sleep:
             time.sleep(poll_interval_s)
             return True
 
         apply_power_source_actions(
             kb_controller=self.kb_controller,
-            actions=getattr(result, "actions", []) or [],
+            actions=plan.actions,
             apply_brightness=self._apply_brightness_policy,
         )
         return False
@@ -145,32 +174,15 @@ class PowerManager:
 
     def _apply_brightness_policy(self, brightness: int) -> None:
         """Best-effort brightness change driven by power policy."""
-
-        if brightness < 0:
-            return
-
-        brightness = int(brightness)
-
-        def _apply() -> None:
-            # Prefer a dedicated hook on the controller if present.
-            apply_fn = getattr(self.kb_controller, "apply_brightness_from_power_policy", None)
-            if callable(apply_fn):
-                apply_fn(brightness)
-                return
-
-            # Fallback: try a few known patterns.
-            engine = getattr(self.kb_controller, "engine", None)
-            if engine is not None:
-                self._sync_config_brightness(brightness)
-                engine.set_brightness(brightness)
-
-        self._run_recoverable_runtime_boundary(_apply, log_message="Battery saver brightness apply failed")
+        apply_brightness_policy(
+            self.kb_controller,
+            brightness,
+            run_boundary_fn=self._run_recoverable_runtime_boundary,
+            sync_config_fn=self._sync_config_brightness,
+        )
 
     def _sync_config_brightness(self, brightness: int) -> None:
-        try:
-            self._config.brightness = brightness
-        except (AttributeError, TypeError, ValueError, RuntimeError):
-            logger.warning("Failed to mirror power-policy brightness into config", exc_info=True)
+        sync_config_brightness(self._config, brightness, logger=logger)
 
     # ---- lid/suspend monitoring
 
@@ -212,73 +224,89 @@ class PowerManager:
         expected_action_type,
         kb_method_name: str,
     ) -> None:
-        if not enabled:
-            return
-
-        # Always feed events into the policy so it can record pre-event state
-        # even when actions are disabled via configuration.
-        result = self._evaluate_power_event_policy(
+        orchestrate_power_event(
             enabled=enabled,
             action_enabled=action_enabled,
+            delay_s=delay_s,
             policy_method=policy_method,
+            expected_action_type=expected_action_type,
+            evaluate_policy_fn=self._evaluate_power_event_policy,
+            execute_plan_fn=lambda plan: self._execute_power_event_plan(
+                plan,
+                log_message=log_message,
+                kb_method_name=kb_method_name,
+            ),
         )
-        if result is None:
-            return
 
-        did_delay = False
-        did_log = False
-
-        for action in getattr(result, "actions", []) or []:
-            if not isinstance(action, expected_action_type):
-                continue
-
-            if not bool(action_enabled):
-                continue
-
-            if not did_log:
-                did_log = True
-                logger.info(log_message)
-
-            if delay_s > 0 and not did_delay:
-                did_delay = True
-                time.sleep(float(delay_s))
-
-            self._invoke_keyboard_method(kb_method_name)
+    def _get_keyboard_intent_state(self):
+        return self._run_recoverable_runtime_boundary(
+            lambda: is_intentionally_off(
+                kb_controller=self.kb_controller,
+                config=self._config,
+                safe_int_attr_fn=safe_int_attr,
+            ),
+            log_message="Power event intent-state evaluation failed",
+        )
 
     def _evaluate_power_event_policy(self, *, enabled: bool, action_enabled: bool, policy_method):
-        def _evaluate():
-            return policy_method(
-                PowerEventInputs(
-                    enabled=bool(enabled),
-                    action_enabled=bool(action_enabled),
-                    is_off=is_intentionally_off(
-                        kb_controller=self.kb_controller,
-                        config=self._config,
-                        safe_int_attr_fn=safe_int_attr,
-                    ),
-                )
-            )
+        is_off = self._get_keyboard_intent_state()
+        if is_off is None:
+            return None
 
-        return self._run_recoverable_runtime_boundary(_evaluate, log_message="Power event policy evaluation failed")
+        inputs = build_power_event_inputs(
+            enabled=enabled,
+            action_enabled=action_enabled,
+            is_off=is_off,
+        )
+
+        return self._run_recoverable_runtime_boundary(
+            lambda: policy_method(inputs),
+            log_message="Power event policy evaluation failed",
+        )
+
+    def _execute_power_event_plan(self, plan, *, log_message: str, kb_method_name: str) -> None:
+        execute_power_event_plan(
+            plan=plan,
+            log_message=log_message,
+            kb_method_name=kb_method_name,
+            log_info_fn=logger.info,
+            sleep_fn=time.sleep,
+            invoke_keyboard_method_fn=self._invoke_keyboard_method,
+        )
 
     def _invoke_keyboard_method(self, method_name: str) -> None:
-        def _invoke() -> None:
-            fn = getattr(self.kb_controller, method_name, None)
-            if callable(fn):
-                fn()
+        invoke_keyboard_method(
+            kb_controller=self.kb_controller,
+            method_name=method_name,
+            run_recoverable_runtime_boundary_fn=self._run_recoverable_runtime_boundary,
+        )
 
-        self._run_recoverable_runtime_boundary(
-            _invoke,
-            log_message=f"Power event keyboard action '{method_name}' failed",
+    def _dispatch_power_event_route(
+        self,
+        *,
+        flag_name: str,
+        log_message: str,
+        policy_method,
+        expected_action_type,
+        kb_method_name: str,
+        delay_s: float = 0.0,
+    ) -> None:
+        enabled = self._is_enabled()
+        action_enabled = self._flag(flag_name, True)
+        self._handle_power_event(
+            enabled=enabled,
+            action_enabled=action_enabled,
+            log_message=log_message,
+            delay_s=delay_s,
+            policy_method=policy_method,
+            expected_action_type=expected_action_type,
+            kb_method_name=kb_method_name,
         )
 
     def _on_suspend(self):
         """Called when system is about to suspend."""
-        enabled = self._is_enabled()
-        allow = self._flag("power_off_on_suspend", True)
-        self._handle_power_event(
-            enabled=bool(enabled),
-            action_enabled=bool(allow),
+        self._dispatch_power_event_route(
+            flag_name="power_off_on_suspend",
             log_message="System suspending - turning off keyboard backlight",
             policy_method=self._event_policy.handle_power_off_event,
             expected_action_type=TurnOffFromEvent,
@@ -287,13 +315,10 @@ class PowerManager:
 
     def _on_resume(self):
         """Called when system resumes from suspend."""
-        enabled = self._is_enabled()
-        allow = self._flag("power_restore_on_resume", True)
-        self._handle_power_event(
-            enabled=bool(enabled),
-            action_enabled=bool(allow),
+        self._dispatch_power_event_route(
+            flag_name="power_restore_on_resume",
             log_message="System resumed - restoring keyboard backlight",
-            delay_s=0.5,  # Give hardware time to wake up
+            delay_s=0.5,
             policy_method=self._event_policy.handle_power_restore_event,
             expected_action_type=RestoreFromEvent,
             kb_method_name="restore",
@@ -301,11 +326,8 @@ class PowerManager:
 
     def _on_lid_close(self):
         """Called when lid is closed."""
-        enabled = self._is_enabled()
-        allow = self._flag("power_off_on_lid_close", True)
-        self._handle_power_event(
-            enabled=bool(enabled),
-            action_enabled=bool(allow),
+        self._dispatch_power_event_route(
+            flag_name="power_off_on_lid_close",
             log_message="Lid closed - turning off keyboard backlight",
             policy_method=self._event_policy.handle_power_off_event,
             expected_action_type=TurnOffFromEvent,
@@ -314,11 +336,8 @@ class PowerManager:
 
     def _on_lid_open(self):
         """Called when lid is opened."""
-        enabled = self._is_enabled()
-        allow = self._flag("power_restore_on_lid_open", True)
-        self._handle_power_event(
-            enabled=bool(enabled),
-            action_enabled=bool(allow),
+        self._dispatch_power_event_route(
+            flag_name="power_restore_on_lid_open",
             log_message="Lid opened - restoring keyboard backlight",
             policy_method=self._event_policy.handle_power_restore_event,
             expected_action_type=RestoreFromEvent,

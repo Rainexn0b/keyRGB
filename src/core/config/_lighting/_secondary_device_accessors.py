@@ -3,7 +3,8 @@
 
 from __future__ import annotations
 
-from typing import Protocol, cast
+from dataclasses import dataclass
+from typing import Callable, Protocol, cast
 
 from ._coercion import normalize_rgb_triplet
 
@@ -37,13 +38,57 @@ class SecondaryDeviceAccessorConfig(Protocol):
     def _normalize_brightness_value(value: int) -> int: ...
 
 
+@dataclass
+class _SecondaryDeviceEntry:
+    """Typed boundary over a secondary-device state entry map."""
+
+    values: dict[str, object]
+
+    def brightness(self) -> object:
+        return self.values.get("brightness", _MISSING)
+
+    def color(self) -> object:
+        return self.values.get("color", _MISSING)
+
+    def set_brightness(self, value: int) -> None:
+        self.values["brightness"] = value
+
+    def set_color(self, value: list[int]) -> None:
+        self.values["color"] = value
+
+
+@dataclass
+class _SecondaryDeviceStateBoundary:
+    """Typed boundary for the per-device secondary state map in settings."""
+
+    values: dict[str, object]
+
+    @classmethod
+    def from_config(cls, config: SecondaryDeviceAccessorConfig) -> _SecondaryDeviceStateBoundary:
+        raw = config._settings.get("secondary_device_state", None)
+        if isinstance(raw, dict):
+            return cls(values=cast(dict[str, object], raw))
+        state: dict[str, object] = {}
+        config._settings["secondary_device_state"] = state
+        return cls(values=state)
+
+    def entry(self, key: str) -> _SecondaryDeviceEntry:
+        raw = self.values.get(key, None)
+        if isinstance(raw, dict):
+            return _SecondaryDeviceEntry(values=cast(dict[str, object], raw))
+        created: dict[str, object] = {}
+        self.values[key] = created
+        return _SecondaryDeviceEntry(values=created)
+
+    def existing_entry(self, key: str) -> _SecondaryDeviceEntry | None:
+        raw = self.values.get(key, None)
+        if not isinstance(raw, dict):
+            return None
+        return _SecondaryDeviceEntry(values=cast(dict[str, object], raw))
+
+
 def secondary_device_state(config: SecondaryDeviceAccessorConfig) -> dict[str, object]:
-    raw = config._settings.get("secondary_device_state", None)
-    if isinstance(raw, dict):
-        return cast(dict[str, object], raw)
-    state: dict[str, object] = {}
-    config._settings["secondary_device_state"] = state
-    return state
+    return _SecondaryDeviceStateBoundary.from_config(config).values
 
 
 def normalize_secondary_state_key(value: object, *, default: str = "device") -> str:
@@ -51,22 +96,14 @@ def normalize_secondary_state_key(value: object, *, default: str = "device") -> 
     return normalized or default
 
 
-def get_secondary_device_brightness(
+def _resolve_fallback_value(
     config: SecondaryDeviceAccessorConfig,
-    state_key: str,
+    normalized_key: str,
     *,
-    fallback_keys: tuple[str, ...] = (),
-    default: int = 25,
+    fallback_keys: tuple[str, ...],
+    default: object,
     default_setting_fn: DefaultSettingFn,
-    coerce_int_setting_fn: CoerceIntSettingFn,
-) -> int:
-    normalized_key = normalize_secondary_state_key(state_key)
-    state = secondary_device_state(config).get(normalized_key, None)
-    if isinstance(state, dict):
-        value = state.get("brightness", _MISSING)
-        if value is not _MISSING:
-            return config._normalize_brightness_value(coerce_int_setting_fn(value, default=default))
-
+) -> object:
     default_lookup_key = fallback_keys[0] if fallback_keys else normalized_key
     default_fallback_keys = fallback_keys[1:] if fallback_keys else ()
     fallback_value = default_setting_fn(
@@ -78,9 +115,53 @@ def get_secondary_device_brightness(
     for key in fallback_keys:
         compatibility_value = config._settings.get(key, _MISSING)
         if compatibility_value is not _MISSING:
-            fallback_value = compatibility_value
-            break
-    return config._normalize_brightness_value(coerce_int_setting_fn(fallback_value, default=default))
+            return compatibility_value
+    return fallback_value
+
+
+def _entry_value_or_fallback(
+    config: SecondaryDeviceAccessorConfig,
+    state_key: str,
+    *,
+    fallback_keys: tuple[str, ...],
+    default: object,
+    default_setting_fn: DefaultSettingFn,
+    getter: Callable[[_SecondaryDeviceEntry], object],
+) -> object:
+    normalized_key = normalize_secondary_state_key(state_key)
+    state = _SecondaryDeviceStateBoundary.from_config(config)
+    entry = state.existing_entry(normalized_key)
+    if entry is not None:
+        value = getter(entry)
+        if value is not _MISSING:
+            return value
+    return _resolve_fallback_value(
+        config,
+        normalized_key,
+        fallback_keys=fallback_keys,
+        default=default,
+        default_setting_fn=default_setting_fn,
+    )
+
+
+def get_secondary_device_brightness(
+    config: SecondaryDeviceAccessorConfig,
+    state_key: str,
+    *,
+    fallback_keys: tuple[str, ...] = (),
+    default: int = 25,
+    default_setting_fn: DefaultSettingFn,
+    coerce_int_setting_fn: CoerceIntSettingFn,
+) -> int:
+    raw_value = _entry_value_or_fallback(
+        config,
+        state_key,
+        fallback_keys=fallback_keys,
+        default=default,
+        default_setting_fn=default_setting_fn,
+        getter=_SecondaryDeviceEntry.brightness,
+    )
+    return config._normalize_brightness_value(coerce_int_setting_fn(raw_value, default=default))
 
 
 def set_secondary_device_brightness(
@@ -92,12 +173,9 @@ def set_secondary_device_brightness(
 ) -> None:
     normalized_key = normalize_secondary_state_key(state_key)
     brightness = config._normalize_brightness_value(value)
-    state = secondary_device_state(config)
-    entry = state.get(normalized_key, None)
-    if not isinstance(entry, dict):
-        entry = {}
-    entry["brightness"] = brightness
-    state[normalized_key] = entry
+    state = _SecondaryDeviceStateBoundary.from_config(config)
+    entry = state.entry(normalized_key)
+    entry.set_brightness(brightness)
     if compatibility_key:
         config._settings[str(compatibility_key)] = brightness
     config._save()
@@ -111,27 +189,15 @@ def get_secondary_device_color(
     default: RgbTriplet = (255, 0, 0),
     default_setting_fn: DefaultSettingFn,
 ) -> RgbTriplet:
-    normalized_key = normalize_secondary_state_key(state_key)
-    state = secondary_device_state(config).get(normalized_key, None)
-    if isinstance(state, dict):
-        value = state.get("color", _MISSING)
-        if value is not _MISSING:
-            return normalize_rgb_triplet(value, default=default)
-
-    default_lookup_key = fallback_keys[0] if fallback_keys else normalized_key
-    default_fallback_keys = fallback_keys[1:] if fallback_keys else ()
-    fallback_value = default_setting_fn(
-        config.DEFAULTS,
-        default_lookup_key,
-        fallback_keys=default_fallback_keys,
+    raw_value = _entry_value_or_fallback(
+        config,
+        state_key,
+        fallback_keys=fallback_keys,
         default=list(default),
+        default_setting_fn=default_setting_fn,
+        getter=_SecondaryDeviceEntry.color,
     )
-    for key in fallback_keys:
-        compatibility_value = config._settings.get(key, _MISSING)
-        if compatibility_value is not _MISSING:
-            fallback_value = compatibility_value
-            break
-    return normalize_rgb_triplet(fallback_value, default=default)
+    return normalize_rgb_triplet(raw_value, default=default)
 
 
 def set_secondary_device_color(
@@ -144,12 +210,9 @@ def set_secondary_device_color(
 ) -> None:
     normalized_key = normalize_secondary_state_key(state_key)
     color = list(normalize_rgb_triplet(value, default=default))
-    state = secondary_device_state(config)
-    entry = state.get(normalized_key, None)
-    if not isinstance(entry, dict):
-        entry = {}
-    entry["color"] = color
-    state[normalized_key] = entry
+    state = _SecondaryDeviceStateBoundary.from_config(config)
+    entry = state.entry(normalized_key)
+    entry.set_color(color)
     if compatibility_key:
         config._settings[str(compatibility_key)] = list(color)
     config._save()

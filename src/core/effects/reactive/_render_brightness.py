@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-import os
 import time
-from operator import attrgetter
 from typing import TYPE_CHECKING, Callable, Optional
+
+from ._render_brightness_guard import apply_brightness_step_guard
+from . import _render_brightness_support as _support
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -12,91 +13,60 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _MISSING = object()
-_INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
-_ENGINE_ATTR_RUNTIME_ERRORS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+_UNIFORM_PULSE_HW_LIFT_STREAK_MIN = 6
 
 
-def _run_engine_attr_operation(
-    operation: Callable[[], object],
-    *,
-    handled_errors: tuple[type[BaseException], ...],
-    handled_result: object,
-    runtime_result: object,
-    message: str,
-    name: str,
-    logger: logging.Logger | None = None,
-) -> object:
-    active_logger = logger or _LOGGER
-    try:
-        return operation()
-    except handled_errors:
-        return handled_result
-    except _ENGINE_ATTR_RUNTIME_ERRORS:  # @quality-exception exception-transparency: engine attribute getters/setters may have recoverable runtime side effects during reactive brightness resolution and cleanup
-        active_logger.exception(message, name)
-        return runtime_result
-
-
-def _read_engine_attr(
+def _resolve_hw_brightness_with_pulse_mix(
     engine: "EffectsEngine",
-    name: str,
     *,
-    missing_default: object,
-    error_default: object,
-    logger: logging.Logger | None = None,
-) -> object:
-    return _run_engine_attr_operation(
-        lambda: attrgetter(name)(engine),
-        handled_errors=(AttributeError,),
-        handled_result=missing_default,
-        runtime_result=error_default,
-        message="Reactive brightness failed to read engine attribute %s",
-        name=name,
-        logger=logger,
+    global_hw: int,
+    base: int,
+    eff: int,
+    dim_temp_active: bool,
+    clamp01_fn: Callable[[float], float],
+    logger: logging.Logger,
+) -> tuple[int, int, bool, bool]:
+    per_key_hw = bool(
+        _support.device_attr_or_none(_support.keyboard_or_none(engine), "set_key_colors")
     )
+    if per_key_hw:
+        _support.set_uniform_hw_streak(engine, value=0, logger=_LOGGER)
+        uniform_hw_streak_count = 0
+    else:
+        uniform_hw_streak_count = _support.uniform_hw_streak(engine, logger=_LOGGER) + 1
+        _support.set_uniform_hw_streak(engine, value=uniform_hw_streak_count, logger=_LOGGER)
 
+    allow_pulse_hw_lift = False
+    if dim_temp_active:
+        hw = global_hw
+        idle_hw = hw
+    else:
+        raw_pulse_mix = _support.read_engine_attr(
+            engine,
+            "_reactive_active_pulse_mix",
+            missing_default=0.0,
+            error_default=0.0,
+            logger=logger,
+        )
+        pulse_mix = _support.coerce_float(raw_pulse_mix or 0.0, default=0.0) or 0.0
+        if pulse_mix is None:
+            pulse_mix = 0.0
+        pulse_mix = clamp01_fn(pulse_mix)
 
-def _bool_attr_or_default(engine: "EffectsEngine", name: str, *, default: bool) -> bool:
-    try:
-        return bool(attrgetter(name)(engine))
-    except AttributeError:
-        return default
+        hw = max(global_hw, base)
+        idle_hw = hw
+        allow_pulse_hw_lift = (
+            (not per_key_hw)
+            and uniform_hw_streak_count >= _UNIFORM_PULSE_HW_LIFT_STREAK_MIN
+            and pulse_mix > 0.0
+            and eff > hw
+            and (not _support.pulse_hw_lift_temporarily_disabled(engine, logger=_LOGGER))
+        )
+        if allow_pulse_hw_lift:
+            pulse_hw = int(round(float(hw) + (float(eff - hw) * pulse_mix)))
+            hw = max(hw, pulse_hw)
 
-
-def _keyboard_or_none(engine: "EffectsEngine") -> object | None:
-    try:
-        return engine.kb
-    except AttributeError:
-        return None
-
-
-def _device_attr_or_none(device: object | None, name: str) -> object | None:
-    if device is None:
-        return None
-    try:
-        return attrgetter(name)(device)
-    except AttributeError:
-        return None
-
-
-def _coerce_int(value: object, *, default: int | None) -> int | None:
-    try:
-        return int(value)  # type: ignore[call-overload]
-    except _INT_COERCION_ERRORS:
-        return default
-
-
-def _coerce_float(value: object, *, default: float | None) -> float | None:
-    try:
-        return float(value)  # type: ignore[arg-type]
-    except _INT_COERCION_ERRORS:
-        return default
-
-
-def _coerce_brightness(value: object, *, default: int | None) -> int | None:
-    coerced = _coerce_int(value, default=default)
-    if coerced is None:
-        return None
-    return max(0, min(50, coerced))
+    return hw, idle_hw, allow_pulse_hw_lift, per_key_hw
 
 
 def resolve_reactive_transition_brightness(
@@ -106,25 +76,25 @@ def resolve_reactive_transition_brightness(
 ) -> Optional[tuple[int, bool]]:
     """Return the current transition brightness for reactive temp-dim flows."""
 
-    start = _read_engine_attr(
+    start = _support.read_engine_attr(
         engine,
         "_reactive_transition_from_brightness",
         missing_default=None,
         error_default=None,
     )
-    end = _read_engine_attr(
+    end = _support.read_engine_attr(
         engine,
         "_reactive_transition_to_brightness",
         missing_default=None,
         error_default=None,
     )
-    started_at = _read_engine_attr(
+    started_at = _support.read_engine_attr(
         engine,
         "_reactive_transition_started_at",
         missing_default=None,
         error_default=None,
     )
-    duration_s = _read_engine_attr(
+    duration_s = _support.read_engine_attr(
         engine,
         "_reactive_transition_duration_s",
         missing_default=None,
@@ -134,22 +104,22 @@ def resolve_reactive_transition_brightness(
     if start is None or end is None or started_at is None or duration_s is None:
         return None
 
-    start_i = _coerce_brightness(start, default=None)
-    end_i = _coerce_brightness(end, default=None)
-    duration = _coerce_float(duration_s, default=None)
-    started = _coerce_float(started_at, default=None)
+    start_i = _support.coerce_brightness(start, default=None)
+    end_i = _support.coerce_brightness(end, default=None)
+    duration = _support.coerce_float(duration_s, default=None)
+    started = _support.coerce_float(started_at, default=None)
     if start_i is None or end_i is None or duration is None or started is None:
         return None
 
     duration = max(0.0, duration)
 
     if duration <= 0.0 or start_i == end_i:
-        _clear_transition_state(engine)
+        _support.clear_transition_state(engine, logger=_LOGGER)
         return end_i, bool(end_i >= start_i)
 
     elapsed = max(0.0, float(time.monotonic()) - started)
     if elapsed >= duration:
-        _clear_transition_state(engine)
+        _support.clear_transition_state(engine, logger=_LOGGER)
         return end_i, bool(end_i >= start_i)
 
     t = clamp01_fn(elapsed / duration)
@@ -166,7 +136,7 @@ def resolve_brightness(
 ) -> tuple[int, int, int]:
     """Resolve (base_hw, effect_hw, hw_brightness) for mixed-content rendering."""
 
-    raw_eff = _read_engine_attr(
+    raw_eff = _support.read_engine_attr(
         engine,
         "reactive_brightness",
         missing_default=_MISSING,
@@ -174,44 +144,44 @@ def resolve_brightness(
         logger=logger,
     )
     if raw_eff is _MISSING:
-        raw_eff = _read_engine_attr(
+        raw_eff = _support.read_engine_attr(
             engine,
             "brightness",
             missing_default=25,
             error_default=25,
             logger=logger,
         )
-    eff = _coerce_brightness(raw_eff or 0, default=25)
+    eff = _support.coerce_brightness(raw_eff or 0, default=25)
     if eff is None:
         eff = 25
 
-    raw_global_hw = _read_engine_attr(
+    raw_global_hw = _support.read_engine_attr(
         engine,
         "brightness",
         missing_default=25,
         error_default=25,
         logger=logger,
     )
-    global_hw = _coerce_brightness(raw_global_hw or 0, default=25)
+    global_hw = _support.coerce_brightness(raw_global_hw or 0, default=25)
     if global_hw is None:
         global_hw = 25
 
     base = 0
-    if _read_engine_attr(
+    if _support.read_engine_attr(
         engine,
         "per_key_colors",
         missing_default=None,
         error_default=None,
         logger=logger,
     ):
-        raw_base = _read_engine_attr(
+        raw_base = _support.read_engine_attr(
             engine,
             "per_key_brightness",
             missing_default=0,
             error_default=0,
             logger=logger,
         )
-        base = _coerce_brightness(raw_base or 0, default=0) or 0
+        base = _support.coerce_brightness(raw_base or 0, default=0) or 0
 
     transition = resolve_reactive_transition_brightness(engine, clamp01_fn=clamp01_fn)
     if transition is not None:
@@ -224,36 +194,19 @@ def resolve_brightness(
             global_hw = max(global_hw, transition_brightness)
             base = max(base, transition_brightness)
 
-    dim_temp_active = _bool_attr_or_default(engine, "_dim_temp_active", default=False)
-    per_key_hw = bool(_device_attr_or_none(_keyboard_or_none(engine), "set_key_colors"))
-
-    pulse_mix = 0.0
-    allow_pulse_hw_lift = False
-    if dim_temp_active:
-        hw = global_hw
-        idle_hw = hw
-    else:
-        raw_pulse_mix = _read_engine_attr(
-            engine,
-            "_reactive_active_pulse_mix",
-            missing_default=0.0,
-            error_default=0.0,
-            logger=logger,
-        )
-        pulse_mix = _coerce_float(raw_pulse_mix or 0.0, default=0.0) or 0.0
-        if pulse_mix is None:
-            pulse_mix = 0.0
-        pulse_mix = clamp01_fn(pulse_mix)
-
-        hw = max(global_hw, base)
-        idle_hw = hw
-        allow_pulse_hw_lift = (not per_key_hw) and pulse_mix > 0.0 and eff > hw
-        if allow_pulse_hw_lift:
-            pulse_hw = int(round(float(hw) + (float(eff - hw) * pulse_mix)))
-            hw = max(hw, pulse_hw)
+    dim_temp_active = _support.bool_attr_or_default(engine, "_dim_temp_active", default=False)
+    hw, idle_hw, allow_pulse_hw_lift, per_key_hw = _resolve_hw_brightness_with_pulse_mix(
+        engine,
+        global_hw=global_hw,
+        base=base,
+        eff=eff,
+        dim_temp_active=dim_temp_active,
+        clamp01_fn=clamp01_fn,
+        logger=logger,
+    )
 
     policy_cap: int | None = None
-    raw_cap = _read_engine_attr(
+    raw_cap = _support.read_engine_attr(
         engine,
         "_hw_brightness_cap",
         missing_default=None,
@@ -261,62 +214,37 @@ def resolve_brightness(
         logger=logger,
     )
     if raw_cap is not None:
-        policy_cap = _coerce_brightness(raw_cap, default=None)
+        policy_cap = _support.coerce_brightness(raw_cap, default=None)
 
     if policy_cap is not None:
         hw = min(hw, policy_cap)
 
     hw = max(0, min(50, hw))
 
-    prev = _read_engine_attr(
+    prev = _support.read_engine_attr(
         engine,
         "_last_rendered_brightness",
         missing_default=None,
         error_default=None,
         logger=logger,
     )
-    prev_i = 0 if prev is None else _coerce_int(prev, default=None)
-    if prev_i is not None:
-        delta = hw - prev_i
-        guard_active = abs(delta) > max_step_per_frame
-        if guard_active and dim_temp_active and delta < 0:
-            guard_active = False
-        if guard_active and allow_pulse_hw_lift and delta > 0:
-            guard_active = False
-        if guard_active and (not per_key_hw) and delta < 0 and prev_i > idle_hw and eff > idle_hw:
-            guard_active = False
-        if guard_active:
-            hw = prev_i + (max_step_per_frame if delta > 0 else -max_step_per_frame)
-            hw = max(0, min(50, hw))
-            if os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1":
-                logger.info(
-                    "brightness_guard: clamped %s->%s (prev=%s, cap=%s, dim=%s)",
-                    prev_i + delta,
-                    hw,
-                    prev_i,
-                    policy_cap,
-                    dim_temp_active,
-                )
+    prev_i = 0 if prev is None else _support.coerce_int(prev, default=None)
+    hw = apply_brightness_step_guard(
+        hw=hw,
+        prev_i=prev_i,
+        max_step_per_frame=max_step_per_frame,
+        dim_temp_active=dim_temp_active,
+        allow_pulse_hw_lift=allow_pulse_hw_lift,
+        per_key_hw=per_key_hw,
+        idle_hw=idle_hw,
+        eff=eff,
+        policy_cap=policy_cap,
+        logger=logger,
+    )
 
     return base, eff, hw
 
 
 def _clear_transition_state(engine: "EffectsEngine") -> None:
-    for name in (
-        "_reactive_transition_from_brightness",
-        "_reactive_transition_to_brightness",
-        "_reactive_transition_started_at",
-        "_reactive_transition_duration_s",
-    ):
+    _support.clear_transition_state(engine, logger=_LOGGER)
 
-        def clear_attr() -> None:
-            setattr(engine, name, None)
-
-        _run_engine_attr_operation(
-            clear_attr,
-            handled_errors=(AttributeError, TypeError),
-            handled_result=None,
-            runtime_result=None,
-            message="Reactive brightness failed to clear engine attribute %s",
-            name=name,
-        )

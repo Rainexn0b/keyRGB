@@ -13,6 +13,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.core.config._settings_view import ConfigSettingsView
+
 
 def _make_config(tmp_path, monkeypatch):
     from src.core.config import Config
@@ -134,6 +136,18 @@ def test_reactive_and_optional_brightness_getters_fall_back_safely(tmp_path, mon
     assert cfg.ac_lighting_brightness == 15
     assert cfg.battery_lighting_brightness is None
     assert cfg.reactive_use_manual_color is False
+
+
+def test_settings_view_exposes_readonly_typed_snapshot(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg._settings["brightness"] = "27"
+
+    view = cfg.settings_view()
+
+    assert isinstance(view, ConfigSettingsView)
+    assert view.read_int("brightness", 0) == 27
+    with pytest.raises(TypeError):
+        view["brightness"] = 5  # type: ignore[index]
 
 
 def test_reactive_color_per_key_colors_and_screen_dim_props_normalize_values(tmp_path, monkeypatch) -> None:
@@ -427,6 +441,23 @@ def test_get_effect_speed_ignores_corrupt_effect_speeds(tmp_path, monkeypatch) -
 
     cfg.reactive_use_manual_color = 1
     assert cfg.reactive_use_manual_color is True
+
+
+def test_get_effect_speed_treats_explicit_none_override_as_fallback(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg._settings["speed"] = 3
+    cfg._settings["effect_speeds"] = {"breathe": None}
+
+    assert cfg.get_effect_speed("breathe") == 3
+
+
+def test_set_effect_speed_replaces_non_dict_overrides_container(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg._settings["effect_speeds"] = "bad-data"
+
+    cfg.set_effect_speed("wave", 6)
+
+    assert cfg._settings["effect_speeds"] == {"wave": 6}
 
 
 def test_set_effect_speed_raises_type_error_for_non_string_effect_name(tmp_path, monkeypatch) -> None:

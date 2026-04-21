@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
 from .model import DiagnosticsConfigSnapshot
@@ -10,7 +11,7 @@ if TYPE_CHECKING:
 
 
 def _append_environment(lines: list[str], env: object) -> None:
-    if not isinstance(env, dict) or not env:
+    if not isinstance(env, Mapping) or not env:
         return
 
     lines.append("Environment:")
@@ -19,13 +20,13 @@ def _append_environment(lines: list[str], env: object) -> None:
 
 
 def _append_system(lines: list[str], system: object) -> None:
-    if not isinstance(system, dict) or not system:
+    if not isinstance(system, Mapping) or not system:
         return
 
     lines.append("System:")
     for k in sorted(system.keys()):
         v = system[k]
-        if isinstance(v, dict):
+        if isinstance(v, Mapping):
             lines.append(f"  {k}:")
             for kk in sorted(v.keys()):
                 lines.append(f"    {kk}: {v[kk]}")
@@ -34,7 +35,7 @@ def _append_system(lines: list[str], system: object) -> None:
 
 
 def _append_app(lines: list[str], app: object) -> None:
-    if not isinstance(app, dict) or not app:
+    if not isinstance(app, Mapping) or not app:
         return
 
     lines.append("App:")
@@ -43,20 +44,20 @@ def _append_app(lines: list[str], app: object) -> None:
 
 
 def _append_power_supply(lines: list[str], power_supply: object) -> None:
-    if not isinstance(power_supply, dict) or not power_supply:
+    if not isinstance(power_supply, Mapping) or not power_supply:
         return
 
     lines.append("Power supply:")
     for name in sorted(power_supply.keys()):
         lines.append(f"  {name}:")
         entry = power_supply[name]
-        if isinstance(entry, dict):
+        if isinstance(entry, Mapping):
             for k in sorted(entry.keys()):
                 lines.append(f"    {k}: {entry[k]}")
 
 
 def _append_backends(lines: list[str], backends: object) -> None:
-    if not isinstance(backends, dict) or not backends:
+    if not isinstance(backends, Mapping) or not backends:
         return
 
     lines.append("Backends:")
@@ -66,9 +67,9 @@ def _append_backends(lines: list[str], backends: object) -> None:
         lines.append(f"  requested: {req}")
     lines.append(f"  selected: {sel}")
     probes = backends.get("probes")
-    if isinstance(probes, list):
+    if isinstance(probes, Sequence) and not isinstance(probes, str):
         for p in probes:
-            if not isinstance(p, dict):
+            if not isinstance(p, Mapping):
                 continue
             lines.append(
                 "  - {name}: available={available} stability={stability} evidence={evidence} confidence={confidence} reason={reason}".format(
@@ -81,15 +82,15 @@ def _append_backends(lines: list[str], backends: object) -> None:
                 )
             )
             ids = p.get("identifiers")
-            if isinstance(ids, dict) and ids:
+            if isinstance(ids, Mapping) and ids:
                 for k in sorted(ids.keys()):
                     lines.append(f"      {k}: {ids[k]}")
 
     guided_speed_probes = backends.get("guided_speed_probes")
-    if isinstance(guided_speed_probes, list) and guided_speed_probes:
+    if isinstance(guided_speed_probes, Sequence) and not isinstance(guided_speed_probes, str) and guided_speed_probes:
         lines.append("  guided_speed_probes:")
         for probe in guided_speed_probes:
-            if not isinstance(probe, dict):
+            if not isinstance(probe, Mapping):
                 continue
             lines.append(
                 "    - {backend}: effect={effect} ui_speeds={ui_speeds}".format(
@@ -99,7 +100,7 @@ def _append_backends(lines: list[str], backends: object) -> None:
                 )
             )
             for sample in probe.get("samples") or []:
-                if not isinstance(sample, dict):
+                if not isinstance(sample, Mapping):
                     continue
                 lines.append(
                     "      sample: ui={ui_speed} payload={payload_speed} raw={raw_speed_hex}".format(
@@ -114,12 +115,12 @@ def _append_backends(lines: list[str], backends: object) -> None:
 
 
 def _append_usb_devices(lines: list[str], usb_devices: object) -> None:
-    if not isinstance(usb_devices, list) or not usb_devices:
+    if not isinstance(usb_devices, Sequence) or isinstance(usb_devices, str) or not usb_devices:
         return
 
     lines.append("USB devices (sysfs):")
     for dev in usb_devices:
-        if not isinstance(dev, dict):
+        if not isinstance(dev, Mapping):
             continue
         lines.append(
             "  - {idVendor}:{idProduct} {product}".format(
@@ -140,14 +141,14 @@ def _append_usb_devices(lines: list[str], usb_devices: object) -> None:
                 lines.append(f"      {k}: {dev.get(k)}")
 
         acc = dev.get("devnode_access")
-        if isinstance(acc, dict):
+        if isinstance(acc, Mapping):
             lines.append(f"      devnode_access: read={acc.get('read')} write={acc.get('write')}")
 
         holders = dev.get("devnode_open_by")
-        if isinstance(holders, list) and holders:
+        if isinstance(holders, Sequence) and not isinstance(holders, str) and holders:
             lines.append("      devnode_open_by:")
             for h in holders:
-                if not isinstance(h, dict):
+                if not isinstance(h, Mapping):
                     continue
                 self_tag = " (self)" if h.get("is_self") else ""
                 lines.append(
@@ -157,16 +158,16 @@ def _append_usb_devices(lines: list[str], usb_devices: object) -> None:
                     lines.append(f"          cmdline: {h.get('cmdline')}")
 
         others = dev.get("devnode_open_by_others")
-        if isinstance(others, list) and others:
+        if isinstance(others, Sequence) and not isinstance(others, str) and others:
             lines.append("      devnode_open_by_others:")
             for h in others:
-                if not isinstance(h, dict):
+                if not isinstance(h, Mapping):
                     continue
                 lines.append(f"        - pid={h.get('pid')} comm={h.get('comm', '')} exe={h.get('exe', '')}".rstrip())
 
 
 def _append_process(lines: list[str], process: object) -> None:
-    if not isinstance(process, dict) or not process:
+    if not isinstance(process, Mapping) or not process:
         return
 
     lines.append("Process:")
@@ -177,8 +178,8 @@ def _append_process(lines: list[str], process: object) -> None:
 def _append_config(lines: list[str], config: object) -> None:
     if isinstance(config, DiagnosticsConfigSnapshot):
         config_dict = config.to_dict()
-    elif isinstance(config, dict):
-        config_dict = config
+    elif isinstance(config, Mapping):
+        config_dict = dict(config)
     else:
         return
     if not config_dict:
@@ -189,7 +190,7 @@ def _append_config(lines: list[str], config: object) -> None:
     lines.append(f"  present: {present}")
     if config_dict.get("mtime") is not None:
         lines.append(f"  mtime: {config_dict.get('mtime')}")
-    if isinstance(config_dict.get("settings"), dict):
+    if isinstance(config_dict.get("settings"), Mapping):
         lines.append("  settings:")
         for k in sorted(config_dict["settings"].keys()):
             lines.append(f"    {k}: {config_dict['settings'][k]}")
@@ -198,7 +199,7 @@ def _append_config(lines: list[str], config: object) -> None:
 
 
 def _append_virt(lines: list[str], virt: object) -> None:
-    if not isinstance(virt, dict) or not virt:
+    if not isinstance(virt, Mapping) or not virt:
         return
 
     lines.append("Virtualization:")
@@ -207,13 +208,13 @@ def _append_virt(lines: list[str], virt: object) -> None:
 
 
 def _append_dmi(lines: list[str], dmi: object, backends: object) -> None:
-    if not isinstance(dmi, dict) or not dmi:
+    if not isinstance(dmi, Mapping) or not dmi:
         return
 
     lines.append("DMI:")
 
-    selection = backends.get("selection") if isinstance(backends, dict) else None
-    if isinstance(selection, dict):
+    selection = backends.get("selection") if isinstance(backends, Mapping) else None
+    if isinstance(selection, Mapping):
         pol = selection.get("policy")
         if pol:
             lines.append(f"  policy: {pol}")
@@ -224,7 +225,7 @@ def _append_dmi(lines: list[str], dmi: object, backends: object) -> None:
 
 
 def _append_usb_ids(lines: list[str], usb_ids: object) -> None:
-    if not isinstance(usb_ids, list) or not usb_ids:
+    if not isinstance(usb_ids, Sequence) or isinstance(usb_ids, str) or not usb_ids:
         return
 
     lines.append("USB IDs (best-effort):")
@@ -233,7 +234,7 @@ def _append_usb_ids(lines: list[str], usb_ids: object) -> None:
 
 
 def _append_hints(lines: list[str], hints: object) -> None:
-    if not isinstance(hints, dict) or not hints:
+    if not isinstance(hints, Mapping) or not hints:
         return
 
     lines.append("Hints:")

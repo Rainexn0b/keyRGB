@@ -8,8 +8,8 @@ from typing import Any
 
 from src.core.resources.layout_legends import get_layout_legend_pack_ids, load_layout_legend_pack
 
-from . import _secondary_device_accessors as secondary_device_accessors
 from ._coercion import normalize_rgb_triplet
+from ._lighting_secondary_device_facade import LightingSecondaryDeviceFacade
 
 logger = logging.getLogger("src.core.config.config")
 _MISSING = object()
@@ -68,7 +68,7 @@ def _normalize_layout_legend_pack(value: object, *, default: str = "auto") -> st
     return str(default or "auto").strip().lower() or "auto"
 
 
-class LightingConfigAccessors:
+class LightingConfigAccessors(LightingSecondaryDeviceFacade):
     """Color and brightness accessors for the Config model."""
 
     _settings: dict[str, Any]
@@ -98,13 +98,50 @@ class LightingConfigAccessors:
     def _serialize_per_key_colors(color_map: dict) -> dict:  # type: ignore[empty-body]
         ...
 
+    def _setting(self, key: str, default: object) -> object:
+        return self._settings.get(key, default)
+
+    def _default_setting_value(
+        self,
+        key: str,
+        *,
+        fallback_keys: tuple[str, ...] = (),
+        default: object,
+    ) -> object:
+        return _default_setting(self.DEFAULTS, key, fallback_keys=fallback_keys, default=default)
+
+    def _setting_or_default_on_none(
+        self,
+        key: str,
+        *,
+        fallback_keys: tuple[str, ...] = (),
+        default: object,
+    ) -> object:
+        value = self._setting(key, None)
+        if value is None:
+            return self._default_setting_value(key, fallback_keys=fallback_keys, default=default)
+        return value
+
+    def _default_setting_adapter(
+        self,
+        defaults: object,
+        key: str,
+        *,
+        fallback_keys: tuple[str, ...] = (),
+        default: object,
+    ) -> object:
+        return _default_setting(defaults, key, fallback_keys=fallback_keys, default=default)
+
+    def _brightness_default_int(self) -> int:
+        return _coerce_int_setting(self._setting("brightness", 0), default=0)
+
+    def _perkey_brightness_raw(self) -> object:
+        return self._settings.get("perkey_brightness", self._settings.get("brightness", 0))
+
     @property
     def brightness(self) -> int:
         if self._settings.get("effect", "none") == "perkey":
-            return _coerce_int_setting(
-                self._settings.get("perkey_brightness", self._settings.get("brightness", 0)),
-                default=0,
-            )
+            return _coerce_int_setting(self._perkey_brightness_raw(), default=0)
         return _coerce_int_setting(self._settings.get("brightness", 0), default=0)
 
     @brightness.setter
@@ -126,7 +163,7 @@ class LightingConfigAccessors:
 
     @property
     def perkey_brightness(self) -> int:
-        return int(self._settings.get("perkey_brightness", self._settings.get("brightness", 0)) or 0)
+        return int(self._perkey_brightness_raw() or 0)  # type: ignore[call-overload]
 
     @perkey_brightness.setter
     def perkey_brightness(self, value: int):
@@ -136,8 +173,8 @@ class LightingConfigAccessors:
     @property
     def reactive_brightness(self) -> int:
         return _coerce_int_setting(
-            self._settings.get("reactive_brightness", self._settings.get("brightness", 0)),
-            default=_coerce_int_setting(self._settings.get("brightness", 0), default=0),
+            self._setting("reactive_brightness", self._setting("brightness", 0)),
+            default=self._brightness_default_int(),
         )
 
     @reactive_brightness.setter
@@ -162,96 +199,6 @@ class LightingConfigAccessors:
     def color(self, value: tuple):
         self._settings["color"] = list(value)
         self._save()
-
-    def _secondary_device_state(self) -> dict[str, Any]:
-        return secondary_device_accessors.secondary_device_state(self)
-
-    def _normalize_secondary_state_key(self, value: object, *, default: str = "device") -> str:
-        return secondary_device_accessors.normalize_secondary_state_key(value, default=default)
-
-    def get_secondary_device_brightness(
-        self,
-        state_key: str,
-        *,
-        fallback_keys: tuple[str, ...] = (),
-        default: int = 25,
-    ) -> int:
-        return secondary_device_accessors.get_secondary_device_brightness(
-            self,
-            state_key,
-            fallback_keys=fallback_keys,
-            default=default,
-            default_setting_fn=_default_setting,
-            coerce_int_setting_fn=_coerce_int_setting,
-        )
-
-    def set_secondary_device_brightness(
-        self,
-        state_key: str,
-        value: int,
-        *,
-        compatibility_key: str | None = None,
-    ) -> None:
-        secondary_device_accessors.set_secondary_device_brightness(
-            self,
-            state_key,
-            value,
-            compatibility_key=compatibility_key,
-        )
-
-    def get_secondary_device_color(
-        self,
-        state_key: str,
-        *,
-        fallback_keys: tuple[str, ...] = (),
-        default: tuple[int, int, int] = (255, 0, 0),
-    ) -> tuple[int, int, int]:
-        return secondary_device_accessors.get_secondary_device_color(
-            self,
-            state_key,
-            fallback_keys=fallback_keys,
-            default=default,
-            default_setting_fn=_default_setting,
-        )
-
-    def set_secondary_device_color(
-        self,
-        state_key: str,
-        value: tuple[int, int, int] | tuple,
-        *,
-        compatibility_key: str | None = None,
-        default: tuple[int, int, int] = (255, 0, 0),
-    ) -> None:
-        secondary_device_accessors.set_secondary_device_color(
-            self,
-            state_key,
-            value,
-            compatibility_key=compatibility_key,
-            default=default,
-        )
-
-    @property
-    def lightbar_brightness(self) -> int:
-        return secondary_device_accessors.get_lightbar_brightness(
-            self,
-            default_setting_fn=_default_setting,
-            coerce_int_setting_fn=_coerce_int_setting,
-        )
-
-    @lightbar_brightness.setter
-    def lightbar_brightness(self, value: int) -> None:
-        secondary_device_accessors.set_lightbar_brightness(self, value)
-
-    @property
-    def lightbar_color(self) -> tuple[int, int, int]:
-        return secondary_device_accessors.get_lightbar_color(
-            self,
-            default_setting_fn=_default_setting,
-        )
-
-    @lightbar_color.setter
-    def lightbar_color(self, value: tuple[int, int, int] | tuple) -> None:
-        secondary_device_accessors.set_lightbar_color(self, value)
 
     @property
     def direction(self) -> str | None:
@@ -286,9 +233,7 @@ class LightingConfigAccessors:
 
     @property
     def reactive_color(self) -> tuple[int, int, int]:
-        raw = self._settings.get("reactive_color", None)
-        if raw is None:
-            raw = _default_setting(self.DEFAULTS, "reactive_color", default=[255, 255, 255])
+        raw = self._setting_or_default_on_none("reactive_color", default=[255, 255, 255])
         return normalize_rgb_triplet(raw)
 
     @reactive_color.setter

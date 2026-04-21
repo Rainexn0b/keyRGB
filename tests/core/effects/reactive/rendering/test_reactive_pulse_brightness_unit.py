@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from types import SimpleNamespace
 
 
@@ -74,6 +75,22 @@ def test_active_pulse_mix_can_lift_hw_on_uniform_backends() -> None:
     _base, eff, hw = _resolve_brightness(eng)
 
     assert eff == 50
+    assert hw == 10
+
+
+def test_active_pulse_mix_can_lift_after_uniform_backend_streak() -> None:
+    from src.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
+    eng._last_rendered_brightness = 10
+    eng._reactive_active_pulse_mix = 1.0
+
+    hw = 10
+    for _ in range(7):
+        _base, eff, hw = _resolve_brightness(eng)
+        eng._last_rendered_brightness = hw
+
+    assert eff == 50
     assert hw == 50
 
 
@@ -103,4 +120,18 @@ def test_pulse_return_to_idle_skips_guard_tail() -> None:
     assert eff == 50
     # When a pulse has finished, return directly to the idle baseline instead
     # of stepping down through a bright tail frame.
+    assert hw == 10
+
+
+def test_active_pulse_mix_lift_is_suppressed_during_post_transition_cooldown() -> None:
+    from src.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
+    eng._last_rendered_brightness = 10
+    eng._reactive_active_pulse_mix = 1.0
+    eng._reactive_disable_pulse_hw_lift_until = time.monotonic() + 5.0
+
+    _base, eff, hw = _resolve_brightness(eng)
+
+    assert eff == 50
     assert hw == 10

@@ -122,6 +122,8 @@ class _EngineCore:
         self._reactive_transition_to_brightness: int | None = None
         self._reactive_transition_started_at: float | None = None
         self._reactive_transition_duration_s: float | None = None
+        self._reactive_disable_pulse_hw_lift_until: float | None = None
+        self._reactive_uniform_hw_streak: int = 0
 
         self._reactive_active_pulse_mix: float = 0.0
 
@@ -182,6 +184,8 @@ class _EngineCore:
         self._reactive_transition_to_brightness = None
         self._reactive_transition_started_at = None
         self._reactive_transition_duration_s = None
+        self._reactive_disable_pulse_hw_lift_until = None
+        self._reactive_uniform_hw_streak = 0
         self._reactive_active_pulse_mix = 0.0
 
         if not self.running and not self.thread:

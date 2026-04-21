@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from ..base import (
     BackendCapabilities,
@@ -20,7 +20,21 @@ if TYPE_CHECKING:
     from ..ite8910.hidraw import HidrawDeviceInfo, HidrawFeatureTransport
 
 
-def _hidraw_module() -> Any:
+class _HidrawModule(Protocol):
+    HidrawDeviceInfo: type[HidrawDeviceInfo]  # type: ignore[valid-type]
+    HidrawFeatureTransport: type[HidrawFeatureTransport]
+
+    def find_matching_hidraw_device(
+        self,
+        vendor_id: int,
+        product_id: int,
+        *,
+        root: Path | None = None,
+        dev_root: Path | None = None,
+    ) -> HidrawDeviceInfo | None: ...  # type: ignore[valid-type]
+
+
+def _hidraw_module() -> _HidrawModule:
     # Keep hidraw dependency lazy to avoid pulling USB internals during backend discovery import.
     from ..ite8910 import hidraw
 

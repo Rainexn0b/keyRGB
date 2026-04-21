@@ -12,6 +12,8 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+_PULSE_MIX_DECAY_STEP = 0.34
+_PULSE_MIX_RISE_STEP = 0.45
 
 bind_reactive_effect_exports(globals())
 
@@ -39,7 +41,11 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
 
     target_f = max(0.0, min(1.0, float(target)))
     if target_f <= 0.0 and prev > 0.0:
-        next_mix = max(0.0, prev - 0.34)
+        next_mix = max(0.0, prev - _PULSE_MIX_DECAY_STEP)
+    elif target_f > prev:
+        # Prevent a single-frame jump (for example on first overlapping keypresses
+        # after idle) from immediately reaching full pulse-lift strength.
+        next_mix = min(target_f, prev + _PULSE_MIX_RISE_STEP)
     else:
         next_mix = target_f
 

@@ -44,6 +44,37 @@ def repo_root_from(anchor: str | Path) -> Path:
         return anchor_path.parent
 
 
+def repo_root_str_from(anchor: str | Path) -> str:
+    """Return :func:`repo_root_from` as a string path."""
+
+    return str(repo_root_from(anchor))
+
+
+def repo_root_cwd_from(anchor: str | Path, *, require_exists: bool = False) -> str | None:
+    """Return a launcher ``cwd`` rooted at :func:`repo_root_from`.
+
+    When ``require_exists`` is true, return ``None`` if the derived root does
+    not currently exist on disk.
+    """
+
+    root = repo_root_from(anchor)
+    if require_exists and not root.exists():
+        return None
+    return str(root)
+
+
+def launcher_cwd_from(anchor: str | Path) -> str:
+    """Return launcher cwd rooted at :func:`repo_root_from`.
+
+    Launcher modules expect this path to exist because subprocess targets are
+    imported from the checked-out or packaged ``src`` tree.
+    """
+
+    launcher_cwd = repo_root_cwd_from(anchor, require_exists=True)
+    assert launcher_cwd is not None
+    return launcher_cwd
+
+
 def ensure_on_sys_path(path: Path) -> bool:
     """Ensure *path* is present on sys.path (at front)."""
 
@@ -60,6 +91,12 @@ def ensure_repo_root_on_sys_path(anchor: str | Path) -> Path:
     root = repo_root_from(anchor)
     ensure_on_sys_path(root)
     return root
+
+
+def ensure_repo_root_on_sys_path_str(anchor: str | Path) -> str:
+    """Ensure the repo root is on ``sys.path`` and return it as ``str``."""
+
+    return str(ensure_repo_root_on_sys_path(anchor))
 
 
 def add_first_existing_to_sys_path(paths: Iterable[Path]) -> Optional[Path]:

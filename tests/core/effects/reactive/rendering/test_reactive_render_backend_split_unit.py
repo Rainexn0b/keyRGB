@@ -103,6 +103,7 @@ def test_per_key_reactive_reassert_policy_reinitializes_each_frame() -> None:
         _hw_brightness_cap=None,
         _dim_temp_active=False,
         _reactive_active_pulse_mix=1.0,
+        _reactive_uniform_hw_streak=6,
         _last_rendered_brightness=15,
         _last_hw_mode_brightness=15,
     )
@@ -128,6 +129,7 @@ def test_uniform_reactive_pulse_can_still_lift_hw_brightness() -> None:
         _hw_brightness_cap=None,
         _dim_temp_active=False,
         _reactive_active_pulse_mix=1.0,
+        _reactive_uniform_hw_streak=6,
         _last_rendered_brightness=15,
         _last_hw_mode_brightness=15,
     )

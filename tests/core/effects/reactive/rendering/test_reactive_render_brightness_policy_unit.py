@@ -250,3 +250,13 @@ def test_clear_transition_state_propagates_unexpected_setter_failures() -> None:
 
     with pytest.raises(AssertionError, match="unexpected setter bug"):
         _clear_transition_state(_BrokenEngine())
+
+
+def test_set_uniform_hw_streak_clamps_negative_values_to_zero() -> None:
+    from src.core.effects.reactive._render_brightness_support import set_uniform_hw_streak
+
+    engine = SimpleNamespace(_reactive_uniform_hw_streak=9)
+
+    set_uniform_hw_streak(engine, value=-4, logger=logging.getLogger("test"))
+
+    assert engine._reactive_uniform_hw_streak == 0

@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,6 @@ from tests._paths import ensure_repo_root_on_sys_path
 ensure_repo_root_on_sys_path()
 
 import src.core.backends.sysfs.common as sysfs_common
-import src.core.backends.sysfs_mouse.common as sysfs_mouse_common
 import src.core.diagnostics.collectors as diagnostics_collectors
 import src.core.diagnostics.collectors.backends as collectors_backends
 import src.core.diagnostics.io as diagnostics_io
@@ -21,6 +21,7 @@ from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
 from src.core.diagnostics.support import ITE8910_SPEED_PROBE_KEY
 from src.core.diagnostics.collectors._backends_sysfs import sysfs_led_candidates_snapshot
 from src.core.diagnostics.model import Diagnostics, DiagnosticsConfigSnapshot
+from src.core.config._settings_view import ConfigSettingsView
 
 
 def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -48,18 +49,18 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     assert any(e.get("name") == "tongfang::kbd_backlight" for e in diag.leds)
     assert any(e.get("name") == "tongfang::kbd_backlight" for e in diag.sysfs_leds)
     assert any(e.get("name") == "input3::capslock" for e in diag.sysfs_leds)
-    assert isinstance(diag.system, dict)
-    assert isinstance(diag.hints, dict)
-    assert isinstance(diag.app, dict)
-    assert isinstance(diag.power_supply, dict)
-    assert isinstance(diag.backends, dict)
-    assert isinstance(diag.usb_devices, list)
+    assert isinstance(diag.system, Mapping)
+    assert isinstance(diag.hints, Mapping)
+    assert isinstance(diag.app, Mapping)
+    assert isinstance(diag.power_supply, Mapping)
+    assert isinstance(diag.backends, Mapping)
+    assert isinstance(diag.usb_devices, Sequence) and not isinstance(diag.usb_devices, str)
     assert isinstance(diag.config, DiagnosticsConfigSnapshot)
-    assert isinstance(diag.process, dict)
+    assert isinstance(diag.process, Mapping)
 
     # Backend diagnostics should include tier/provider/priority metadata.
     probes = diag.backends.get("probes")
-    assert isinstance(probes, list)
+    assert isinstance(probes, Sequence) and not isinstance(probes, str)
     assert any(isinstance(p, dict) and p.get("name") == "sysfs-leds" for p in probes)
     sysfs_probe = next(p for p in probes if isinstance(p, dict) and p.get("name") == "sysfs-leds")
     assert sysfs_probe.get("tier") == 1
@@ -67,15 +68,15 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     assert isinstance(sysfs_probe.get("priority"), int)
 
     guided_speed_probes = diag.backends.get("guided_speed_probes")
-    assert isinstance(guided_speed_probes, list)
+    assert isinstance(guided_speed_probes, Sequence) and not isinstance(guided_speed_probes, str)
 
     # Sysfs candidate snapshot should exist (root is sanitized when overridden).
     sysfs_cand = diag.backends.get("sysfs_led_candidates")
-    assert isinstance(sysfs_cand, dict)
-    assert "exists" in sysfs_cand
+    assert isinstance(sysfs_cand, Mapping) or sysfs_cand is None
+    assert sysfs_cand is not None and "exists" in sysfs_cand
     sysfs_mouse_cand = diag.backends.get("sysfs_mouse_candidates")
-    assert isinstance(sysfs_mouse_cand, dict)
-    assert "exists" in sysfs_mouse_cand
+    assert isinstance(sysfs_mouse_cand, Mapping) or sysfs_mouse_cand is None
+    assert sysfs_mouse_cand is not None and "exists" in sysfs_mouse_cand
 
     text = format_diagnostics_text(diag)
     assert "DMI:" in text
@@ -162,6 +163,45 @@ def test_diagnostics_typed_config_snapshot_serializes_without_shape_changes() ->
     assert "  mtime: 123" in text
     assert "  per_key_colors_count: 4" in text
     assert "Permission denied" not in text
+
+
+def test_diagnostics_config_snapshot_wraps_settings_in_typed_settings_view() -> None:
+    snap = DiagnosticsConfigSnapshot(settings={"brightness": "25", "effect": "wave"})
+
+    assert isinstance(snap.settings, ConfigSettingsView)
+    assert isinstance(snap.settings_view(), ConfigSettingsView)
+    assert snap.settings.read_int("brightness", 0) == 25
+    with pytest.raises(TypeError):
+        snap.settings["effect"] = "rainbow"  # type: ignore[index]
+
+    assert snap.to_dict()["settings"] == {"brightness": "25", "effect": "wave"}
+
+
+def test_diagnostics_mapping_config_is_readonly_but_keeps_caller_mapping_values() -> None:
+    config_mapping = {"backend": "auto"}
+
+    diag = Diagnostics(
+        dmi={},
+        leds=[],
+        sysfs_leds=[],
+        usb_ids=[],
+        env={},
+        virt={},
+        system={},
+        hints={},
+        app={},
+        power_supply={},
+        backends={},
+        usb_devices=[],
+        config=config_mapping,
+        process={},
+    )
+
+    with pytest.raises(TypeError):
+        diag.config["backend"] = "ite8291r3"  # type: ignore[index]
+
+    config_mapping["backend"] = "ite8291r3"
+    assert diag.to_dict()["config"] == {"backend": "ite8291r3"}
 
 
 def test_format_empty_diagnostics() -> None:
