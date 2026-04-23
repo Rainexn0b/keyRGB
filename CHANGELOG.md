@@ -3,12 +3,22 @@
 ## Unreleased
 
 
+## 0.23.4 (2026-04-23)
+
+- Install/Security: Verify AppImage SHA-256 integrity after download; abort and remove the file on hash mismatch so a corrupted or tampered release asset is never executed.
+- Install/Security: Validate `KEYRGB_REPO_OWNER` and `KEYRGB_REPO_NAME` against GitHub naming rules before constructing any download URL, preventing URL manipulation via environment variable injection.
+- Install/Security: Warn when `KEYRGB_BOOTSTRAP_REF` resolves to a mutable branch (`main`, `master`, `HEAD`, `develop`) and print the tagged-URL alternative for reproducible installs.
+- Install: Change telemetry to opt-in (`KEYRGB_TELEMETRY=1`); nothing is sent during a normal install unless explicitly enabled. The default endpoint remains `.invalid` and no data leaves the machine.
+- CI/Release: Publish a `keyrgb-x86_64.AppImage.sha256` sidecar alongside every AppImage on GitHub Releases; the installer `verify_downloaded_sha256()` in `scripts/lib/common_core.sh` consumes it.
+- Effects/Runtime: Persist hardware brightness on first per-key user-mode init across fade, reactive, and software render paths (`save=True` on first init only; force-reinit paths do not clobber saved brightness).
+- Effects/Reactive: Route reactive pulse hardware-brightness lifts through the per-frame step guard instead of bypassing it, preventing single-frame brightness spikes on uniform-brightness hardware.
+
+
 ## 0.23.3 (2026-04-22)
 
 - Tray/Runtime: Thin tray bootstrap, effect-start policy, and config-polling apply planning into typed pre-bootstrap state and explicit policy helpers while keeping the existing config-polling compatibility export intact.
 - GUI/Launch: Extract per-key and calibrator launch helpers, reactive and uniform init adapters, and support-window backend probe runtime seams so packaged and source launches share the same subprocess and runtime-root handling.
 - Config/Settings: Return detached effect-speed override copies from config, widen settings-state loading to direct typed sources, and make shared runtime and test path helpers resolve lazily to reduce bootstrap-time import coupling.
-- Docs/Tests: Replace the ad hoc improvement roadmap with active chunked maintainability docs and add regression coverage for tray policy dispatch, GUI entrypoints and launch helpers, settings loading, runtime path helpers, and config-apply compatibility.
 
 
 ## 0.23.2 (2026-04-21)
