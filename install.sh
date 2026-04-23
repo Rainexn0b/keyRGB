@@ -159,6 +159,25 @@ run_local() {
     exec bash "$target" "$@"
 }
 
+# Validate GitHub owner/repo identifiers to prevent URL manipulation.
+# GitHub usernames/org names: alphanumeric + hyphens, 1-39 chars.
+# GitHub repo names: alphanumeric + hyphens + underscores + dots, 1-100 chars.
+_validate_github_owner() {
+    local value="$1"
+    if ! printf '%s' "$value" | grep -Eq '^[a-zA-Z0-9-]{1,39}$'; then
+        echo "❌ Invalid KEYRGB_REPO_OWNER '${value}': only alphanumeric characters and hyphens (1-39 chars) are allowed" >&2
+        exit 1
+    fi
+}
+
+_validate_github_repo() {
+    local value="$1"
+    if ! printf '%s' "$value" | grep -Eq '^[a-zA-Z0-9._-]{1,100}$'; then
+        echo "❌ Invalid KEYRGB_REPO_NAME '${value}': only alphanumeric characters, hyphens, underscores, and dots (1-100 chars) are allowed" >&2
+        exit 1
+    fi
+}
+
 bootstrap_and_run() {
     local target_rel="$1"; shift
 
@@ -166,6 +185,16 @@ bootstrap_and_run() {
         echo "❌ curl is required for curl-pipe installs" >&2
         exit 1
     }
+
+    _validate_github_owner "$KEYRGB_REPO_OWNER"
+    _validate_github_repo "$KEYRGB_REPO_NAME"
+
+    case "$KEYRGB_BOOTSTRAP_REF" in
+        main|master|HEAD|develop)
+            echo "⚠️  Bootstrap ref is '${KEYRGB_BOOTSTRAP_REF}' (mutable branch). For reproducible and safer installs, use a tagged release URL, e.g.:" >&2
+            echo "   curl -fsSL https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/v<VERSION>/install.sh | bash" >&2
+            ;;
+    esac
 
     local tmp
     tmp="$(mktemp -d)"

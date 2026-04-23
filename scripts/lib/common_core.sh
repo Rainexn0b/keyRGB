@@ -459,6 +459,52 @@ download_url_quiet() {
   _download_url_impl "$1" "$2" "quiet"
 }
 
+# verify_downloaded_sha256: verify a downloaded file against a .sha256 sidecar URL.
+# Usage: verify_downloaded_sha256 <file_path> <sha256_url>
+# - Exits non-zero and removes the file on hash mismatch.
+# - Warns and returns 0 (non-fatal) when sha256sum is unavailable or no sidecar is found,
+#   so that installs against older releases that pre-date checksum publishing still work.
+verify_downloaded_sha256() {
+  local file_path="$1" sha256_url="$2"
+
+  if ! have_cmd sha256sum; then
+    log_warn "sha256sum not found; skipping integrity check of $(basename "$file_path")."
+    return 0
+  fi
+
+  local sha256_tmp
+  sha256_tmp="$(mktemp)"
+
+  if ! download_url_quiet "$sha256_url" "$sha256_tmp" 2>/dev/null; then
+    rm -f "$sha256_tmp" 2>/dev/null || true
+    log_warn "No SHA-256 sidecar found at: $sha256_url"
+    log_warn "Integrity of $(basename "$file_path") could not be verified. Ensure the release publishes a .sha256 file."
+    return 0
+  fi
+
+  local expected_hash
+  expected_hash="$(awk 'NR==1{print $1}' "$sha256_tmp")"
+  rm -f "$sha256_tmp" 2>/dev/null || true
+
+  if [ -z "$expected_hash" ]; then
+    log_warn "Checksum sidecar was empty or unreadable; skipping integrity check of $(basename "$file_path")."
+    return 0
+  fi
+
+  local actual_hash
+  actual_hash="$(sha256sum "$file_path" | awk '{print $1}')"
+
+  if [ "$actual_hash" = "$expected_hash" ]; then
+    log_ok "Integrity verified (SHA-256 match: ${actual_hash:0:16}…)"
+  else
+    rm -f "$file_path" 2>/dev/null || true
+    die "SHA-256 mismatch for $(basename "$file_path").
+  Expected: $expected_hash
+  Got:      $actual_hash
+  The downloaded file has been removed. Aborting for safety."
+  fi
+}
+
 
 # --- GitHub release resolution (no jq dependency) ---
 resolve_release_with_asset() {

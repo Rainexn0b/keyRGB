@@ -45,8 +45,8 @@ Env vars:
   KEYRGB_INSTALL_TCC_APP=y|n            Best-effort install tuxedo-control-center + marker file for uninstall
   KEYRGB_INSTALL_KERNEL_DRIVERS=y|n     Best-effort install tuxedo driver packages + marker file for uninstall
 
-  # Telemetry (best-effort)
-  KEYRGB_TELEMETRY=0            Disable success ping (default enabled)
+  # Telemetry (opt-in, disabled by default)
+  KEYRGB_TELEMETRY=1            Enable success ping (default: disabled)
   KEYRGB_TELEMETRY_URL=<url>    Override endpoint (default: https://telemetry.invalid/keyrgb/install-success)
 EOF
 }
@@ -288,7 +288,8 @@ install_icon_and_desktop_entries "$LAUNCHER_DST" "$RAW_REF"
 save_appimage_prefs_best_effort
 
 success_hook() {
-  if is_truthy "${KEYRGB_TELEMETRY:-1}"; then
+  # Telemetry is opt-in. Nothing is sent unless KEYRGB_TELEMETRY=1 is explicitly set.
+  if is_truthy "${KEYRGB_TELEMETRY:-0}"; then
     if ! have_cmd curl; then
       log_warn "Telemetry: curl not found; skipping success ping."
       return 0
