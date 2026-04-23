@@ -52,11 +52,19 @@ jobs:
           ls -la dist || true
           test -f dist/keyrgb-x86_64.AppImage
 
+      - name: Generate SHA-256 sidecar
+        working-directory: dist
+        run: |
+          sha256sum keyrgb-x86_64.AppImage > keyrgb-x86_64.AppImage.sha256
+          echo "Checksum:"
+          cat keyrgb-x86_64.AppImage.sha256
+
       - name: Upload AppImage to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.AppImage
+            dist/*.AppImage.sha256
           fail_on_unmatched_files: true
           generate_release_notes: true
         env:
