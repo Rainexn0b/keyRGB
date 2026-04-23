@@ -214,6 +214,7 @@ def render(engine: "EffectsEngine", *, color_map: Mapping[Key, Color]) -> None:
                         kb=engine.kb,
                         kb_lock=engine.kb_lock,
                         brightness=brightness_hw,
+                        save=last_hw_brightness is None,
                     )
                     engine._last_hw_mode_brightness = brightness_hw
 

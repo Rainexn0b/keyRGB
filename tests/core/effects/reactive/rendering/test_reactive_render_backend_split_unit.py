@@ -136,8 +136,10 @@ def test_uniform_reactive_pulse_can_still_lift_hw_brightness() -> None:
 
     render(engine, color_map={(0, 0): (255, 255, 255)})
 
-    assert ("set_color", 50) in kb.calls
-    assert ("set_brightness", 50) in kb.calls
+    # Pulse-time lift still occurs on uniform backends, but it now ramps through
+    # the brightness stability guard instead of jumping to max in one frame.
+    assert ("set_color", 23) in kb.calls
+    assert ("set_brightness", 23) in kb.calls
 
 
 def test_uniform_reactive_pulse_returns_directly_to_idle_brightness() -> None:

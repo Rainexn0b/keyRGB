@@ -86,7 +86,9 @@ def test_active_pulse_mix_can_lift_after_uniform_backend_streak() -> None:
     eng._reactive_active_pulse_mix = 1.0
 
     hw = 10
-    for _ in range(7):
+    # Lift starts only after the uniform-backend streak gate, then ramps through
+    # the per-frame brightness guard.
+    for _ in range(12):
         _base, eff, hw = _resolve_brightness(eng)
         eng._last_rendered_brightness = hw
 

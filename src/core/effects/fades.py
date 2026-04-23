@@ -131,7 +131,7 @@ def fade_in_per_key(
 
     dt = duration / float(steps)
 
-    enable_user_mode_once(kb=kb, kb_lock=kb_lock, brightness=brightness_hw)
+    enable_user_mode_once(kb=kb, kb_lock=kb_lock, brightness=brightness_hw, save=True)
 
     for i in range(1, steps + 1):
         scale = float(i) / float(steps)

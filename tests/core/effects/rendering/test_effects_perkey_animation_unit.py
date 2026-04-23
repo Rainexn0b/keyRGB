@@ -92,3 +92,22 @@ def test_enable_user_mode_once_propagates_unexpected_errors() -> None:
 
     with pytest.raises(AssertionError, match="unexpected user mode bug"):
         enable_user_mode_once(kb=_Kb(), kb_lock=_Lock(), brightness=25)
+
+
+def test_enable_user_mode_once_passes_save_flag() -> None:
+    seen: list[tuple[int, bool]] = []
+
+    class _Kb:
+        def enable_user_mode(self, *, brightness: int, save: bool = False):
+            seen.append((int(brightness), bool(save)))
+
+    class _Lock:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    enable_user_mode_once(kb=_Kb(), kb_lock=_Lock(), brightness=25, save=True)
+
+    assert seen == [(25, True)]

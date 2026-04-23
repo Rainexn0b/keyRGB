@@ -120,7 +120,7 @@ def scaled_color_map(
     return out
 
 
-def enable_user_mode_once(*, kb, kb_lock, brightness: int) -> None:
+def enable_user_mode_once(*, kb, kb_lock, brightness: int, save: bool = False) -> None:
     """Enable user mode once without saving, to avoid flicker."""
 
     fn = getattr(kb, "enable_user_mode", None)
@@ -128,7 +128,7 @@ def enable_user_mode_once(*, kb, kb_lock, brightness: int) -> None:
         return
 
     _run_with_recoverable_logging(
-        fn=lambda: _enable_user_mode_locked(kb_lock=kb_lock, fn=fn, brightness=brightness),
+        fn=lambda: _enable_user_mode_locked(kb_lock=kb_lock, fn=fn, brightness=brightness, save=save),
         recoverable_errors=_ENABLE_USER_MODE_RUNTIME_ERRORS,
         throttle_key="perkey_animation.enable_user_mode_once",
         msg="Failed to enable per-key user mode",
@@ -136,6 +136,6 @@ def enable_user_mode_once(*, kb, kb_lock, brightness: int) -> None:
     )
 
 
-def _enable_user_mode_locked(*, kb_lock, fn: Callable[..., object], brightness: int) -> None:
+def _enable_user_mode_locked(*, kb_lock, fn: Callable[..., object], brightness: int, save: bool) -> None:
     with kb_lock:
-        fn(brightness=brightness, save=False)
+        fn(brightness=brightness, save=bool(save))

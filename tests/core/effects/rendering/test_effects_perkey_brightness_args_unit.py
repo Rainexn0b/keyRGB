@@ -48,6 +48,9 @@ def test_perkey_fade_passes_brightness_kwarg() -> None:
     engine._fade_in_per_key(duration_s=0.01, steps=3)
 
     assert any(c["fn"] == "enable_user_mode" for c in spy.calls)
+    enable_calls = [c for c in spy.calls if c["fn"] == "enable_user_mode"]
+    assert enable_calls
+    assert all(c["save"] is True for c in enable_calls)
     set_calls = [c for c in spy.calls if c["fn"] == "set_key_colors"]
     assert set_calls
     assert all(c["brightness"] == 25 for c in set_calls)

@@ -36,7 +36,12 @@ def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_re
 
     prev = _last_hw_mode_brightness_or_none(engine)
     if force_reinit or prev is None:
-        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(brightness_hw))
+        enable_user_mode_once(
+            kb=engine.kb,
+            kb_lock=engine.kb_lock,
+            brightness=int(brightness_hw),
+            save=prev is None,
+        )
         engine._last_hw_mode_brightness = int(brightness_hw)
         return
 
