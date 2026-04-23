@@ -70,7 +70,7 @@ Notes:
 - `--no-system-deps` only skips system package changes; it still downloads and installs the AppImage.
 - On Arch/CachyOS, install `fuse2` for native AppImage/FUSE launching: `sudo pacman -S --needed fuse2`. KeyRGB also installs a launcher wrapper that falls back to `--appimage-extract-and-run` when `libfuse.so.2` is unavailable.
 - On Debian/Ubuntu/Linux Mint, the AppImage path is usually enough for a first install. Optional kernel-driver installs are best-effort and may require TUXEDO package sources; KeyRGB does not add third-party apt repos automatically.
-- To pin a release tag instead of `main`, use both `--ref <tag>` and `--version <tag>`.
+- The installer bootstraps sub-scripts from the pinned release tag by default. To override, pass `--ref <git-ref>` or set `KEYRGB_BOOTSTRAP_REF=<git-ref>`.
 
 ### Uninstall
 
