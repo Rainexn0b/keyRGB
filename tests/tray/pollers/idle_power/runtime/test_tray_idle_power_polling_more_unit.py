@@ -194,8 +194,34 @@ def test_restore_from_idle_syncs_owner_state_fields(monkeypatch) -> None:
     assert tray.tray_idle_power_state.last_resume_at == pytest.approx(456.0)
 
 
-def test_restore_from_idle_loop_effect_uses_in_place_restart() -> None:
+def test_restore_from_idle_refreshes_icon_without_animation_when_supported() -> None:
     import src.tray.pollers.idle_power.polling as ipp
+
+    calls: dict[str, object] = {"animate_icon": None}
+
+    def capture_refresh(*, animate_icon=True):
+        calls["animate_icon"] = animate_icon
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        _last_resume_at=0.0,
+        config=SimpleNamespace(brightness=33, effect="reactive_ripple"),
+        engine=SimpleNamespace(current_color=(12, 34, 56)),
+        _log_exception=lambda *_a, **_kw: None,
+        _start_current_effect=lambda **_kwargs: None,
+        _refresh_ui=capture_refresh,
+    )
+
+    ipp._restore_from_idle(tray)
+
+    assert calls["animate_icon"] is False
+
+
+def test_restore_from_idle_loop_effect_uses_soft_on_start() -> None:
+    import src.tray.pollers.idle_power.polling as ipp
+    from src.tray.controllers._power._transition_constants import SOFT_ON_START_BRIGHTNESS
 
     received: dict[str, object] = {}
 
@@ -216,8 +242,8 @@ def test_restore_from_idle_loop_effect_uses_in_place_restart() -> None:
 
     ipp._restore_from_idle(tray)
 
-    assert received["brightness_override"] is None
-    assert received["fade_in"] is False
+    assert received["brightness_override"] == SOFT_ON_START_BRIGHTNESS
+    assert received["fade_in"] is True
 
 
 def test_restore_from_idle_non_loop_effect_uses_soft_on_start() -> None:

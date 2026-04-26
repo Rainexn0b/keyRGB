@@ -4,6 +4,7 @@ from typing import Literal, Optional
 
 
 IdleAction = Optional[Literal["turn_off", "restore", "dim_to_temp", "restore_brightness"]]
+_POST_TURN_OFF_RESTORE_SUPPRESSION_S = 2.5
 _POST_RESUME_IDLE_ACTION_SUPPRESSION_S = 10.0
 
 
@@ -22,6 +23,7 @@ def compute_idle_action(
     brightness: int,
     user_forced_off: bool,
     power_forced_off: bool,
+    last_idle_turn_off_at: float = 0.0,
     last_resume_at: float = 0.0,
     now: float = 0.0,
 ) -> IdleAction:
@@ -77,6 +79,9 @@ def compute_idle_action(
             return "restore_brightness"
 
         if is_off:
+            if (not bool(screen_off)) and now > 0 and last_idle_turn_off_at > 0:
+                if (now - last_idle_turn_off_at) < _POST_TURN_OFF_RESTORE_SUPPRESSION_S:
+                    return None
             return "restore"
         return None
 

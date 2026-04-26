@@ -114,6 +114,38 @@ def test_icon_color_polling_loop_updates_once(monkeypatch) -> None:
     assert calls["n"] == 1
 
 
+def test_icon_color_polling_skips_first_repaint_during_resume_holdoff(monkeypatch) -> None:
+    import src.tray.pollers.icon_color_polling as icp
+
+    created = {}
+
+    def fake_thread(*, target, daemon: bool):
+        t = _FakeThread(target=target, daemon=daemon)
+        created["t"] = t
+        return t
+
+    monkeypatch.setattr(icp.threading, "Thread", fake_thread)
+    monkeypatch.setattr(icp, "_compute_icon_sig", lambda _tray: (False, "reactive_ripple", 1, 1, (0, 0, 0), True))
+    monkeypatch.setattr(icp, "_should_update_icon", lambda _sig, _last: True)
+    monkeypatch.setattr(icp.time, "monotonic", lambda: 100.1)
+    monkeypatch.setattr(icp.time, "sleep", lambda _s: (_ for _ in ()).throw(KeyboardInterrupt()))
+
+    calls = {"n": 0}
+
+    tray = SimpleNamespace(
+        _last_resume_at=100.0,
+        _update_icon=lambda **_kw: calls.__setitem__("n", calls["n"] + 1),
+        _log_exception=lambda *_a, **_kw: None,
+    )
+
+    icp.start_icon_color_polling(tray)
+
+    with pytest.raises(KeyboardInterrupt):
+        created["t"].target()
+
+    assert calls["n"] == 0
+
+
 def test_icon_color_polling_loop_propagates_unexpected_update_errors(monkeypatch) -> None:
     import src.tray.pollers.icon_color_polling as icp
 

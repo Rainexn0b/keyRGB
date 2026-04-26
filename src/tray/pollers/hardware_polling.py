@@ -61,6 +61,13 @@ def _normalize_brightness_to_config_scale(brightness: int, *, expected: int | No
     return max(0, min(50, b))
 
 
+def _refresh_ui_without_icon_animation(tray: IdlePowerTrayProtocol) -> None:
+    try:
+        tray._refresh_ui(animate_icon=False)
+    except TypeError:
+        tray._refresh_ui()
+
+
 def _apply_polled_hardware_state(
     tray: IdlePowerTrayProtocol,
     *,
@@ -127,7 +134,7 @@ def _apply_polled_hardware_state(
                 ):
                     tray.is_off = False
 
-        tray._refresh_ui()
+        _refresh_ui_without_icon_animation(tray)
         return current_brightness, current_off
 
     if last_off_state is not None and current_off != last_off_state:
@@ -151,7 +158,7 @@ def _apply_polled_hardware_state(
                 and not bool(tray_vars.get("_idle_forced_off", False))
             ):
                 tray.is_off = False
-        tray._refresh_ui()
+        _refresh_ui_without_icon_animation(tray)
         return current_brightness, current_off
 
     return current_brightness, current_off

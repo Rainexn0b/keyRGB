@@ -154,6 +154,16 @@ def _apply_effect_fade_ramp(
     if not plan.will_fade:
         return
 
+    if plan.is_loop_effect and getattr(tray, "_idle_restore_legacy_loop_effect_ramp", False) is True:
+        tray.engine.set_brightness(
+            target_brightness,
+            apply_to_hardware=False,
+            fade=True,
+            fade_duration_s=float(fade_in_duration_s),
+        )
+        return
+
+    follow_global_flag = False
     saved_reactive_br = None
     saved_perkey_br = None
     if plan.apply_to_hardware:
@@ -162,6 +172,9 @@ def _apply_effect_fade_ramp(
         saved_perkey_br = getattr(tray.engine, "per_key_brightness", None)
         if saved_perkey_br is not None:
             tray.engine.per_key_brightness = start_brightness
+    else:
+        follow_global_flag = True
+        tray.engine._reactive_follow_global_brightness = True
 
     if plan.apply_to_hardware:
         tray.engine.set_brightness(
@@ -174,7 +187,15 @@ def _apply_effect_fade_ramp(
         tray.engine.set_brightness(
             target_brightness,
             apply_to_hardware=False,
+            fade=True,
+            fade_duration_s=float(fade_in_duration_s),
         )
+
+    if follow_global_flag:
+        try:
+            tray.engine._reactive_follow_global_brightness = False
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            pass
 
     if saved_reactive_br is not None:
         try:

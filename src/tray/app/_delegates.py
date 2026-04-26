@@ -21,13 +21,16 @@ class KeyRGBTrayDelegateMixin:
     def _update_menu(self):
         _application_module().update_tray_menu(self)
 
-    def _refresh_ui(self) -> None:
+    def _refresh_ui(self, *, animate_icon: bool = True) -> None:
         """Refresh both icon and menu.
 
         Convenience wrapper to keep call sites small.
         """
 
-        self._update_icon()
+        try:
+            self._update_icon(animate=animate_icon)
+        except TypeError:
+            self._update_icon()
         self._update_menu()
 
     def _start_current_effect(self, **kwargs):

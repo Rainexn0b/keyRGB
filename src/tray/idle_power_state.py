@@ -23,6 +23,7 @@ class TrayIdlePowerState:
     dim_temp_target_brightness: Optional[int] = None
     dim_screen_off: bool = False
     dim_sync_suppressed_logged: bool = False
+    last_idle_turn_off_at: float = 0.0
     last_resume_at: float = 0.0
 
 

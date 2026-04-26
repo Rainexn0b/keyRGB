@@ -41,6 +41,41 @@ def test_turn_off_stops_engine_turns_off_and_sets_idle_forced_flag() -> None:
     assert tray._dim_temp_active is False
     assert tray._dim_temp_target_brightness is None
     tray._refresh_ui.assert_called_once()
+    assert float(tray._last_idle_turn_off_at) > 0.0
+
+
+def test_turn_off_skips_soft_fade_for_reactive_per_key_effects() -> None:
+    tray = _mk_tray(effect="reactive_ripple", brightness=25)
+    tray.engine.kb = SimpleNamespace(set_key_colors=MagicMock())
+
+    _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
+
+    tray.engine.stop.assert_called_once()
+    tray.engine.turn_off.assert_called_once_with(fade=False, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    assert tray.is_off is True
+    assert tray._idle_forced_off is True
+
+
+def test_turn_off_records_idle_turn_off_timestamp(monkeypatch: pytest.MonkeyPatch) -> None:
+    tray = _mk_tray(effect="wave", brightness=25)
+
+    monkeypatch.setattr("src.tray.pollers.idle_power._action_execution.time.monotonic", lambda: 123.0)
+
+    _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
+
+    assert tray._last_idle_turn_off_at == pytest.approx(123.0)
+
+
+def test_turn_off_keeps_soft_fade_for_reactive_uniform_backend() -> None:
+    tray = _mk_tray(effect="reactive_ripple", brightness=25)
+    tray.engine.kb = SimpleNamespace()
+
+    _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
+
+    tray.engine.stop.assert_called_once()
+    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    assert tray.is_off is True
+    assert tray._idle_forced_off is True
 
 
 def test_turn_off_logs_recoverable_stop_failure_and_continues(monkeypatch: pytest.MonkeyPatch) -> None:

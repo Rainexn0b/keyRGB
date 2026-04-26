@@ -161,6 +161,48 @@ def test_compute_idle_action_allows_screen_off_after_resume_guard_expires() -> N
     assert action == "turn_off"
 
 
+def test_compute_idle_action_suppresses_restore_shortly_after_idle_turn_off_without_screen_off() -> None:
+    action = compute_idle_action(
+        dimmed=False,
+        screen_off=False,
+        is_off=True,
+        idle_forced_off=True,
+        dim_temp_active=False,
+        idle_timeout_s=60.0,
+        power_management_enabled=True,
+        screen_dim_sync_enabled=True,
+        screen_dim_sync_mode="off",
+        screen_dim_temp_brightness=5,
+        brightness=25,
+        user_forced_off=False,
+        power_forced_off=False,
+        last_idle_turn_off_at=100.0,
+        now=101.5,
+    )
+    assert action is None
+
+
+def test_compute_idle_action_allows_restore_after_idle_turn_off_guard_expires() -> None:
+    action = compute_idle_action(
+        dimmed=False,
+        screen_off=False,
+        is_off=True,
+        idle_forced_off=True,
+        dim_temp_active=False,
+        idle_timeout_s=60.0,
+        power_management_enabled=True,
+        screen_dim_sync_enabled=True,
+        screen_dim_sync_mode="off",
+        screen_dim_temp_brightness=5,
+        brightness=25,
+        user_forced_off=False,
+        power_forced_off=False,
+        last_idle_turn_off_at=100.0,
+        now=103.0,
+    )
+    assert action == "restore"
+
+
 @pytest.mark.parametrize("forced_flag", ["user", "power"])
 def test_compute_idle_action_does_not_restore_brightness_if_forced_off(
     forced_flag: str,

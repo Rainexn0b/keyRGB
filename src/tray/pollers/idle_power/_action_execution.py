@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from collections.abc import Callable
 from typing import Optional
 
@@ -48,8 +49,11 @@ def execute_idle_action(
     if action == "turn_off":
         _execute_turn_off(
             tray,
+            reactive_effects_set=reactive_effects_set,
             call_runtime_boundary=call_runtime_boundary,
             set_engine_hw_brightness_cap=set_engine_hw_brightness_cap,
+            log_idle_power_exception=log_idle_power_exception,
+            recoverable_effect_name_exceptions=recoverable_effect_name_exceptions,
         )
         return
 
@@ -90,12 +94,32 @@ def execute_idle_action(
         )
 
 
+def _engine_supports_per_key_output(engine: object) -> bool:
+    kb = getattr(engine, "kb", None)
+    return callable(getattr(kb, "set_key_colors", None))
+
+
 def _execute_turn_off(
     tray: IdlePowerTrayProtocol,
     *,
+    reactive_effects_set: frozenset[str],
     call_runtime_boundary: Callable[..., bool],
     set_engine_hw_brightness_cap: Callable[..., None],
+    log_idle_power_exception: Callable[..., None],
+    recoverable_effect_name_exceptions: tuple[type[BaseException], ...],
 ) -> None:
+    effect = read_effect_name(
+        tray.config,
+        log_key="idle_power.turn_off.effect_name",
+        log_msg="Idle-power turn-off could not read effect name; falling back to none",
+        log_idle_power_exception=log_idle_power_exception,
+        warning_level=logging.WARNING,
+        recoverable_effect_name_exceptions=recoverable_effect_name_exceptions,
+    )
+    use_soft_fade = not (
+        effect in reactive_effects_set and _engine_supports_per_key_output(tray.engine)
+    )
+
     _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=False)
     _set_idle_state_field(
         tray,
@@ -111,12 +135,18 @@ def _execute_turn_off(
         msg="Idle-power turn-off failed while stopping engine",
     )
     call_runtime_boundary(
-        lambda: tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S),
+        lambda: tray.engine.turn_off(fade=use_soft_fade, fade_duration_s=SOFT_OFF_FADE_DURATION_S),
         key="idle_power.turn_off.turn_off",
         level=logging.WARNING,
         msg="Idle-power turn-off failed while writing off state",
     )
 
+    _set_idle_state_field(
+        tray,
+        prior_name="_last_idle_turn_off_at",
+        state_name="last_idle_turn_off_at",
+        value=float(time.monotonic()),
+    )
     tray.is_off = True
     _set_idle_state_field(tray, prior_name="_idle_forced_off", state_name="idle_forced_off", value=True)
     refresh_ui_best_effort(

@@ -22,6 +22,7 @@ _ANIMATED_ICON_EFFECTS = frozenset(
 )
 
 _ICON_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_ICON_RESUME_HOLDOFF_S = 1.0
 
 
 def _has_animated_icon_state(*, effect: str, config: object | None) -> bool:
@@ -91,6 +92,19 @@ def _should_update_icon(sig, last_sig) -> bool:
     return bool(dynamic) or (sig != last_sig)
 
 
+def _resume_icon_holdoff_active(tray, *, now_monotonic: float) -> bool:
+    try:
+        resume_at = float(getattr(tray, "_last_resume_at", 0.0) or 0.0)
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+    if resume_at <= 0.0:
+        return False
+
+    elapsed = float(now_monotonic) - float(resume_at)
+    return 0.0 <= elapsed < _ICON_RESUME_HOLDOFF_S
+
+
 def start_icon_color_polling(tray) -> None:
     """Update tray icon color periodically for dynamic effects."""
 
@@ -99,7 +113,12 @@ def start_icon_color_polling(tray) -> None:
         last_error_at = 0.0
         while True:
             try:
+                now = time.monotonic()
                 sig = _compute_icon_sig(tray)
+                if _resume_icon_holdoff_active(tray, now_monotonic=now):
+                    last_sig = sig
+                    time.sleep(0.8)
+                    continue
                 if _should_update_icon(sig, last_sig):
                     try:
                         tray._update_icon(animate=False)

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from typing import Optional, cast
 
 from src.core.utils.logging_utils import log_throttled
-from src.core.utils.safe_attrs import safe_int_attr
+from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
 from src.tray.pollers.idle_power._restore_policy import classify_idle_restore_start
 from src.tray.protocols import (
     IdlePowerTrayProtocol,
@@ -241,6 +241,14 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     restore_start_policy = classify_idle_restore_start(
         tray.config,
         soft_on_start_brightness=SOFT_ON_START_BRIGHTNESS,
+    )
+    logger.info(
+        "EVENT idle_power:restore_start_policy effect=%s dim_sync_mode=%s brightness_override=%s fade_in=%s fade_in_duration_s=%.2f",
+        safe_str_attr(tray.config, "effect", default="none") or "none",
+        safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off",
+        restore_start_policy.brightness_override,
+        restore_start_policy.fade_in,
+        float(SOFT_ON_FADE_DURATION_S),
     )
 
     _call_runtime_boundary(

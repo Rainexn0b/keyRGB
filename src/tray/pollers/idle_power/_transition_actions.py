@@ -4,8 +4,12 @@ import time
 from collections.abc import Callable
 from typing import Protocol, cast
 
+from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET
 from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
+
+
+_LOOP_EFFECTS = frozenset(REACTIVE_EFFECTS) | frozenset(SW_EFFECTS_SET)
 
 
 class _IdleRestoreStartTray(Protocol):
@@ -22,14 +26,21 @@ def _start_current_effect_or_none(tray: object) -> Callable[..., object] | None:
     return cast(Callable[..., object], start_fn)
 
 
-def _refresh_ui_or_none(tray: object) -> Callable[[], None] | None:
+def _refresh_ui_or_none(tray: object) -> Callable[..., None] | None:
     try:
         refresh_fn = cast(IdlePowerTrayProtocol, tray)._refresh_ui
     except AttributeError:
         return None
     if not callable(refresh_fn):
         return None
-    return cast(Callable[[], None], refresh_fn)
+    return cast(Callable[..., None], refresh_fn)
+
+
+def _use_legacy_loop_effect_idle_restore_ramp(tray: IdlePowerTrayProtocol, *, fade_in: bool) -> bool:
+    if not bool(fade_in):
+        return False
+    effect = safe_str_attr(getattr(tray, "config", None), "effect", default="none") or "none"
+    return effect in _LOOP_EFFECTS
 
 
 def start_current_effect_for_idle_restore(
@@ -39,26 +50,40 @@ def start_current_effect_for_idle_restore(
     fade_in: bool,
     fade_in_duration_s: float,
 ) -> None:
-    start_fn = _start_current_effect_or_none(tray)
-    if callable(start_fn):
+    legacy_loop_effect_ramp = _use_legacy_loop_effect_idle_restore_ramp(tray, fade_in=fade_in)
+    if legacy_loop_effect_ramp:
         try:
-            start_fn(
-                brightness_override=brightness_override,
-                fade_in=bool(fade_in),
-                fade_in_duration_s=fade_in_duration_s,
-            )
-        except TypeError:
-            start_fn()
-        return
+            setattr(tray, "_idle_restore_legacy_loop_effect_ramp", True)
+        except (AttributeError, TypeError):
+            legacy_loop_effect_ramp = False
 
-    from src.tray.controllers.lighting_controller import start_current_effect
+    start_fn = _start_current_effect_or_none(tray)
+    try:
+        if callable(start_fn):
+            try:
+                start_fn(
+                    brightness_override=brightness_override,
+                    fade_in=bool(fade_in),
+                    fade_in_duration_s=fade_in_duration_s,
+                )
+            except TypeError:
+                start_fn()
+            return
 
-    start_current_effect(
-        cast(LightingTrayProtocol, tray),
-        brightness_override=brightness_override,
-        fade_in=bool(fade_in),
-        fade_in_duration_s=fade_in_duration_s,
-    )
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        start_current_effect(
+            cast(LightingTrayProtocol, tray),
+            brightness_override=brightness_override,
+            fade_in=bool(fade_in),
+            fade_in_duration_s=fade_in_duration_s,
+        )
+    finally:
+        if legacy_loop_effect_ramp:
+            try:
+                setattr(tray, "_idle_restore_legacy_loop_effect_ramp", False)
+            except (AttributeError, TypeError):
+                pass
 
 
 def apply_dim_temp_brightness(
@@ -157,7 +182,13 @@ def refresh_ui_best_effort(
 ) -> None:
     refresh_fn = _refresh_ui_or_none(tray)
     if callable(refresh_fn):
-        call_runtime_boundary(refresh_fn, key=key, level=warning_level, msg=msg)
+        def refresh_without_icon_animation() -> None:
+            try:
+                refresh_fn(animate_icon=False)
+            except TypeError:
+                refresh_fn()
+
+        call_runtime_boundary(refresh_without_icon_animation, key=key, level=warning_level, msg=msg)
 
 
 def read_effect_name(

@@ -187,6 +187,22 @@ def test_refresh_ui_calls_instance_update_methods():
     assert calls == {"icon": 1, "menu": 1}
 
 
+def test_refresh_ui_can_disable_icon_animation():
+    calls = {"animate": None, "menu": 0}
+
+    class Dummy:
+        def _update_icon(self, *, animate=True):
+            calls["animate"] = animate
+
+        def _update_menu(self):
+            calls["menu"] += 1
+
+    dummy = Dummy()
+    app.KeyRGBTray._refresh_ui(dummy, animate_icon=False)
+
+    assert calls == {"animate": False, "menu": 1}
+
+
 def test_log_event_formats_fields_sorted_and_throttles(monkeypatch):
     tray = SimpleNamespace(_event_last_at={})
     logged = []

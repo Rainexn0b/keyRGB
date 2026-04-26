@@ -58,6 +58,7 @@ def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> N
     from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
     refreshed = {"n": 0}
+    animate_flags: list[bool] = []
 
     def boom(*_a, **_kw):
         raise RuntimeError("boom")
@@ -68,7 +69,10 @@ def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> N
         _power_forced_off=False,
         _user_forced_off=False,
         _idle_forced_off=False,
-        _refresh_ui=lambda: refreshed.__setitem__("n", refreshed["n"] + 1),
+        _refresh_ui=lambda *, animate_icon=True: (
+            refreshed.__setitem__("n", refreshed["n"] + 1),
+            animate_flags.append(bool(animate_icon)),
+        ),
         _log_event=boom,
         is_off=False,
     )
@@ -85,6 +89,7 @@ def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> N
     assert (b, off) == (5, True)
     assert tray.is_off is True
     assert refreshed["n"] == 1
+    assert animate_flags == [False]
 
 
 def test_apply_polled_state_propagates_unexpected_log_event_errors() -> None:

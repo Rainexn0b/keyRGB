@@ -276,11 +276,23 @@ class TestStartCurrentEffect:
         mock_tray = MagicMock()
         mock_tray.config.effect = "rainbow_wave"
         mock_tray.config.brightness = 50
+        mock_tray.config.perkey_brightness = 50
+        mock_tray.config.per_key_colors = {}
         mock_tray.config.speed = 3
         mock_tray.config.get_effect_speed.return_value = 3
         mock_tray.config.color = (0, 255, 0)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
+        mock_tray.engine._reactive_follow_global_brightness = False
+        mock_tray.engine.reactive_brightness = 50
+        mock_tray.engine.per_key_brightness = 50
+
+        def _assert_fade_state(*args, **kwargs):
+            assert mock_tray.engine._reactive_follow_global_brightness is True
+            assert mock_tray.engine.reactive_brightness == 50
+            assert mock_tray.engine.per_key_brightness == 50
+
+        mock_tray.engine.set_brightness.side_effect = _assert_fade_state
 
         start_current_effect(mock_tray, brightness_override=10, fade_in=True, fade_in_duration_s=0.42)
 
@@ -293,7 +305,54 @@ class TestStartCurrentEffect:
             reactive_use_manual_color=False,
             direction=mock_tray.config.direction,
         )
-        mock_tray.engine.set_brightness.assert_called_once_with(50, apply_to_hardware=False)
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            50,
+            apply_to_hardware=False,
+            fade=True,
+            fade_duration_s=0.42,
+        )
+        assert mock_tray.engine._reactive_follow_global_brightness is False
+        assert mock_tray.engine.reactive_brightness == 50
+        assert mock_tray.engine.per_key_brightness == 50
+
+    def test_start_current_effect_idle_restore_loop_effect_uses_legacy_non_hardware_fade_without_follow_global(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        mock_tray = MagicMock()
+        mock_tray._idle_restore_legacy_loop_effect_ramp = True
+        mock_tray.config.effect = "rainbow_wave"
+        mock_tray.config.brightness = 50
+        mock_tray.config.perkey_brightness = 50
+        mock_tray.config.per_key_colors = {}
+        mock_tray.config.speed = 3
+        mock_tray.config.get_effect_speed.return_value = 3
+        mock_tray.config.color = (0, 255, 0)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
+        mock_tray.engine._reactive_follow_global_brightness = False
+        mock_tray.engine.reactive_brightness = 50
+        mock_tray.engine.per_key_brightness = 50
+
+        start_current_effect(mock_tray, brightness_override=10, fade_in=True, fade_in_duration_s=0.42)
+
+        mock_tray.engine.start_effect.assert_called_once_with(
+            "rainbow_wave",
+            speed=3,
+            brightness=10,
+            color=(0, 255, 0),
+            reactive_color=None,
+            reactive_use_manual_color=False,
+            direction=mock_tray.config.direction,
+        )
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            50,
+            apply_to_hardware=False,
+            fade=True,
+            fade_duration_s=0.42,
+        )
+        assert mock_tray.engine._reactive_follow_global_brightness is False
+        assert mock_tray.engine.reactive_brightness == 50
+        assert mock_tray.engine.per_key_brightness == 50
 
     def test_start_current_effect_fade_for_hardware_effect_uses_hardware_fade(self):
         from src.tray.controllers.lighting_controller import start_current_effect

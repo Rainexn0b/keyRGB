@@ -135,6 +135,7 @@ def run_idle_power_iteration(
         brightness=int(brightness),
         user_forced_off=bool(tray._user_forced_off),
         power_forced_off=bool(tray._power_forced_off),
+        last_idle_turn_off_at=float(getattr(tray, "_last_idle_turn_off_at", 0.0) or 0.0),
         last_resume_at=float(tray._last_resume_at),
         now=now_monotonic_fn(),
     )

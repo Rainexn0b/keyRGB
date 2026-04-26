@@ -54,6 +54,13 @@ def test_compute_icon_sig_marks_reactive_ripple_as_animated_without_manual_color
     assert sig[5] is True
 
 
+def test_resume_icon_holdoff_active_only_shortly_after_resume() -> None:
+    tray = SimpleNamespace(_last_resume_at=100.0)
+
+    assert icp._resume_icon_holdoff_active(tray, now_monotonic=100.5) is True
+    assert icp._resume_icon_holdoff_active(tray, now_monotonic=101.5) is False
+
+
 def test_normalize_color_falls_back_on_invalid():
     assert icp._normalize_color(None) == (0, 0, 0)
     assert icp._normalize_color((1, 2, 3)) == (1, 2, 3)

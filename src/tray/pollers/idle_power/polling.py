@@ -121,6 +121,7 @@ def _compute_idle_action(
     brightness: int,
     user_forced_off: bool,
     power_forced_off: bool,
+    last_idle_turn_off_at: float = 0.0,
     last_resume_at: float = 0.0,
     now: float = 0.0,
 ) -> IdleAction:
@@ -140,6 +141,7 @@ def _compute_idle_action(
         brightness=brightness,
         user_forced_off=user_forced_off,
         power_forced_off=power_forced_off,
+        last_idle_turn_off_at=last_idle_turn_off_at,
         last_resume_at=last_resume_at,
         now=now,
     )

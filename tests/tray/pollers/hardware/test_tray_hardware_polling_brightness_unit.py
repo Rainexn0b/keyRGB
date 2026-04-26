@@ -17,9 +17,11 @@ class _DummyTray:
         self._power_forced_off = power_forced_off
         self._last_brightness = brightness
         self.refresh_count = 0
+        self.last_animate_icon = None
 
-    def _refresh_ui(self) -> None:
+    def _refresh_ui(self, *, animate_icon: bool = True) -> None:
         self.refresh_count += 1
+        self.last_animate_icon = bool(animate_icon)
 
 
 def test_hardware_polling_does_not_persist_zero_brightness() -> None:
@@ -41,6 +43,7 @@ def test_hardware_polling_does_not_persist_zero_brightness() -> None:
     assert tray.config.brightness == 25
     assert tray.is_off is True
     assert tray.refresh_count == 1
+    assert tray.last_animate_icon is False
 
 
 def test_hardware_polling_does_not_persist_nonzero_brightness_and_clears_off() -> None:
@@ -61,6 +64,7 @@ def test_hardware_polling_does_not_persist_nonzero_brightness_and_clears_off() -
     assert tray.config.brightness == 25
     assert tray.is_off is False
     assert tray.refresh_count == 1
+    assert tray.last_animate_icon is False
 
 
 def test_hardware_polling_ignores_forced_off_zero_changes() -> None:
@@ -99,6 +103,7 @@ def test_hardware_polling_does_not_convert_small_brightness_values() -> None:
     # But do not persist into config.
     assert tray.config.brightness == 25
     assert tray.refresh_count == 1
+    assert tray.last_animate_icon is False
 
 
 def test_hardware_polling_clamps_over_50_brightness_values() -> None:
@@ -138,3 +143,4 @@ def test_hardware_polling_does_not_scale_up_when_config_expects_low_value() -> N
     assert last_brightness == 10
     assert last_off is False
     assert tray.refresh_count == 1
+    assert tray.last_animate_icon is False

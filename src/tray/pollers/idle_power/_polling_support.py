@@ -82,6 +82,7 @@ def ensure_idle_state(tray: IdlePowerTrayProtocol) -> None:
         ("_dim_temp_active", "dim_temp_active"),
         ("_dim_temp_target_brightness", "dim_temp_target_brightness"),
         ("_dim_screen_off", "dim_screen_off"),
+        ("_last_idle_turn_off_at", "last_idle_turn_off_at"),
         ("_last_resume_at", "last_resume_at"),
         ("_dim_sync_suppressed_logged", "dim_sync_suppressed_logged"),
     )
