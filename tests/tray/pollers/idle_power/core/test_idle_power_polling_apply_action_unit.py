@@ -294,6 +294,7 @@ def test_restore_brightness_for_reactive_effect_seeds_longer_visual_damp_window(
     assert tray.engine._reactive_disable_pulse_hw_lift_until == pytest.approx(expected_hw_lift_until)
     assert tray.engine._reactive_post_restore_visual_damp_until == pytest.approx(expected_visual_damp_until)
     assert tray.engine._reactive_post_restore_visual_damp_until > tray.engine._reactive_disable_pulse_hw_lift_until
+    assert tray.engine._reactive_post_restore_visual_damp_pending is True
 
 
 def test_restore_brightness_does_nothing_if_tray_is_off() -> None:

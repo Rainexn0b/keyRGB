@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.23.7 (2026-04-27)
+
+- Effects/Reactive: Reseed the post-restore visual damp window on the first keystroke after wake so the suppress-first-pulse guard stays effective even when the user starts typing after the initial holdoff has already expired.
+- Build/CI: Restructure the quality gate — split CI into a `quality` job (Python 3.12, full Ruff/Ruff Format/Type Check/Code Hygiene/Dead Code lint pass via `buildpython --profile=ci`) and a `test` matrix job (Python 3.10/3.11/3.12, runtime steps only, gated on `quality`); release workflow now installs dev extras so the same quality gates run before the AppImage build.
+- Build/Release: Add `./scripts/release/version.sh X.Y.Z` (and `scripts/release/bump_version.py`) to atomically update `pyproject.toml`, `CHANGELOG.md`, `install.sh`, and `uninstall.sh` on each release, replacing four manual edits with a single command.
+
 
 ## 0.23.6 (2026-04-26)
 

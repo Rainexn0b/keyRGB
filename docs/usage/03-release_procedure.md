@@ -1,9 +1,25 @@
 # Release procedure
 
-Update the version and changelog first:
+Prepare the release metadata first:
+
+```bash
+./scripts/release/version.sh X.Y.Z
+```
+
+Alternative (without wrapper):
+
+```bash
+.venv/bin/python scripts/release/bump_version.py X.Y.Z
+```
+
+That command updates all manual release metadata:
 
 - `pyproject.toml` -> `[project].version`
-- `CHANGELOG.md` -> add the matching release heading and notes
+- `CHANGELOG.md` -> adds `## X.Y.Z (YYYY-MM-DD)` right below `## Unreleased`
+- `install.sh` -> updates `KEYRGB_BOOTSTRAP_REF` and default release examples
+- `uninstall.sh` -> updates `KEYRGB_BOOTSTRAP_REF`
+
+Then add release notes under the new changelog heading.
 
 Then run the safe release flow:
 

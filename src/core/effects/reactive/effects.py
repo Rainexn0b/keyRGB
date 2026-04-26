@@ -17,6 +17,7 @@ _PULSE_MIX_DECAY_STEP = 0.34
 _PULSE_MIX_RISE_STEP = 0.45
 _PULSE_MIX_INITIAL_RISE_STEP = 0.18
 _FIRST_ACTIVITY_PULSE_LIFT_HOLDOFF_S = 0.30
+_FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S = 2.0
 
 bind_reactive_effect_exports(globals())
 
@@ -53,6 +54,24 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
             engine._reactive_disable_pulse_hw_lift_until = max(current_until, holdoff_until)
         except (AttributeError, TypeError, ValueError):
             logger.exception("Failed to set reactive first-activity pulse-lift holdoff")
+
+        try:
+            post_restore_pending = bool(engine._reactive_post_restore_visual_damp_pending)
+        except AttributeError:
+            post_restore_pending = False
+        except (TypeError, ValueError):
+            post_restore_pending = False
+        if post_restore_pending:
+            visual_damp_until = float(time.monotonic()) + _FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S
+            try:
+                current_visual_until = float(engine._reactive_post_restore_visual_damp_until or 0.0)
+            except (AttributeError, TypeError, ValueError):
+                current_visual_until = 0.0
+            try:
+                engine._reactive_post_restore_visual_damp_until = max(current_visual_until, visual_damp_until)
+                engine._reactive_post_restore_visual_damp_pending = False
+            except (AttributeError, TypeError, ValueError):
+                logger.exception("Failed to refresh restore-only visual damp on first post-restore pulse")
 
     if target_f <= 0.0 and prev > 0.0:
         next_mix = max(0.0, prev - _PULSE_MIX_DECAY_STEP)

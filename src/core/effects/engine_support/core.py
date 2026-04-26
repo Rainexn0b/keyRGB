@@ -124,6 +124,7 @@ class _EngineCore:
         self._reactive_transition_duration_s: float | None = None
         self._reactive_disable_pulse_hw_lift_until: float | None = None
         self._reactive_post_restore_visual_damp_until: float | None = None
+        self._reactive_post_restore_visual_damp_pending: bool = False
         self._reactive_uniform_hw_streak: int = 0
         self._reactive_follow_global_brightness: bool = False
 
@@ -188,6 +189,7 @@ class _EngineCore:
         self._reactive_transition_duration_s = None
         self._reactive_disable_pulse_hw_lift_until = None
         self._reactive_post_restore_visual_damp_until = None
+        self._reactive_post_restore_visual_damp_pending = False
         self._reactive_uniform_hw_streak = 0
         self._reactive_active_pulse_mix = 0.0
 

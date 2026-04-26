@@ -63,6 +63,7 @@ def _seed_reactive_restore_windows(engine: object, *, fade_in_duration_s: float)
         )
         engine._reactive_disable_pulse_hw_lift_until = hw_lift_holdoff_until  # type: ignore[attr-defined]
         engine._reactive_post_restore_visual_damp_until = visual_damp_until  # type: ignore[attr-defined]
+        engine._reactive_post_restore_visual_damp_pending = True  # type: ignore[attr-defined]
     except (AttributeError, TypeError, ValueError):
         return
 

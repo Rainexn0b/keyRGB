@@ -103,9 +103,7 @@ def _post_restore_visual_damp(engine: "EffectsEngine") -> tuple[float, float]:
         return 1.0, 0.0
 
     progress = 1.0 - min(1.0, remaining_s / _POST_RESTORE_PULSE_VISUAL_HOLDOFF_S)
-    damp = _POST_RESTORE_PULSE_VISUAL_MIN_FACTOR + (
-        (1.0 - _POST_RESTORE_PULSE_VISUAL_MIN_FACTOR) * progress
-    )
+    damp = _POST_RESTORE_PULSE_VISUAL_MIN_FACTOR + ((1.0 - _POST_RESTORE_PULSE_VISUAL_MIN_FACTOR) * progress)
     return damp, remaining_s
 
 

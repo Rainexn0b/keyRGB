@@ -61,6 +61,26 @@ def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
         render_module.time.monotonic = original_monotonic
 
 
+def test_pulse_brightness_reseeds_restore_damp_on_first_post_restore_pulse() -> None:
+    from src.core.effects.reactive import effects
+
+    eng = _DummyEngine(brightness=5, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 5
+    eng._reactive_post_restore_visual_damp_until = 99.0
+    eng._reactive_post_restore_visual_damp_pending = True
+
+    import src.core.effects.reactive.render as render_module
+
+    original_monotonic = render_module.time.monotonic
+    render_module.time.monotonic = lambda: 100.0
+    try:
+        effects._set_reactive_active_pulse_mix(eng, target=1.0)
+        assert pulse_brightness_scale_factor(eng) == pytest.approx(0.415)
+    finally:
+        render_module.time.monotonic = original_monotonic
+
+
 def test_pulse_brightness_logs_visual_scale_under_debug(monkeypatch, caplog) -> None:
     eng = _DummyEngine(brightness=5, reactive_brightness=50)
     eng.per_key_colors = {(0, 0): (0, 0, 0)}

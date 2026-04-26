@@ -13,7 +13,7 @@ set -euo pipefail
 
 KEYRGB_REPO_OWNER="${KEYRGB_REPO_OWNER:-Rainexn0b}"
 KEYRGB_REPO_NAME="${KEYRGB_REPO_NAME:-keyRGB}"
-KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.23.6}"
+KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.23.7}"
 
 usage() {
     cat <<'EOF'
@@ -25,7 +25,7 @@ Modes:
     --dev      Dev install: build deps + pip editable install
 
 Bootstrap (curl installs):
-    --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.23.6)
+    --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.23.7)
     KEYRGB_BOOTSTRAP_REF can also be used.
 
 Examples:
@@ -192,7 +192,7 @@ bootstrap_and_run() {
     case "$KEYRGB_BOOTSTRAP_REF" in
         main|master|HEAD|develop)
             echo "⚠️  Bootstrap ref is '${KEYRGB_BOOTSTRAP_REF}' (mutable branch). For reproducible and safer installs, use a tagged release URL, e.g.:" >&2
-            echo "   curl -fsSL https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/v0.23.5/install.sh | bash" >&2
+            echo "   curl -fsSL https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/v0.23.7/install.sh | bash" >&2
             ;;
     esac
 

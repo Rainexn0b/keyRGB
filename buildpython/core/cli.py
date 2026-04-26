@@ -14,7 +14,9 @@ def _parse_csv(raw: str | None) -> list[str] | None:
     raw = raw.strip()
     if not raw:
         return []
-    return [p.strip() for p in raw.replace(" ", ",").split(",") if p.strip()]
+    if "," in raw:
+        return [p.strip() for p in raw.split(",") if p.strip()]
+    return [p for p in raw.split() if p]
 
 
 def _list_profiles() -> None:
@@ -47,11 +49,19 @@ def _select_steps(run_steps: list[str] | None, skip_steps: list[str] | None, pro
             raise SystemExit(f"Unknown step selector: {token!r}")
     elif profile is not None:
         prof = PROFILES[profile]
-        include = {n.lower() for n in prof.include_steps}
-        selected = [s for s in steps if s.name.lower() in include]
+        for name in prof.include_steps:
+            s = by_name.get(name.lower())
+            if s is None:
+                raise SystemExit(f"Profile '{profile}' references unknown step: {name!r}")
+            selected.append(s)
     else:
-        # Default run: keep black opt-in via --with-black.
-        selected = [s for s in steps if s.name.lower() != "black"]
+        # Default run: use the full profile while keeping black opt-in.
+        prof = PROFILES["full"]
+        for name in prof.include_steps:
+            s = by_name.get(name.lower())
+            if s is None:
+                raise SystemExit(f"Profile 'full' references unknown step: {name!r}")
+            selected.append(s)
 
     if skip_steps:
         skip = {t.lower() for t in skip_steps}
