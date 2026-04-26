@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from operator import attrgetter
 from typing import TYPE_CHECKING, Callable, Protocol, cast
@@ -101,6 +102,10 @@ def coerce_brightness(value: object, *, default: int | None) -> int | None:
     return max(0, min(50, coerced))
 
 
+def debug_brightness_enabled() -> bool:
+    return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1"
+
+
 def pulse_hw_lift_temporarily_disabled(engine: "EffectsEngine", *, logger: logging.Logger) -> bool:
     raw_until = read_engine_attr(
         engine,
@@ -142,6 +147,82 @@ def uniform_hw_streak(engine: "EffectsEngine", *, logger: logging.Logger) -> int
     )
     value = coerce_int(raw, default=0) or 0
     return max(0, int(value))
+
+
+def log_hw_lift_decision_change(
+    engine: "EffectsEngine",
+    *,
+    logger: logging.Logger,
+    reason: str,
+    per_key_hw: bool,
+    uniform_hw_streak_count: int,
+    pulse_mix: float,
+    cooldown_active: bool,
+    cooldown_remaining_s: float,
+    allow_pulse_hw_lift: bool,
+    global_hw: int,
+    base: int,
+    eff: int,
+    idle_hw: int,
+    hw: int,
+    dim_temp_active: bool,
+) -> None:
+    if not debug_brightness_enabled():
+        return
+
+    state = (
+        str(reason),
+        bool(per_key_hw),
+        int(uniform_hw_streak_count),
+        round(float(pulse_mix), 3),
+        bool(cooldown_active),
+        round(max(0.0, float(cooldown_remaining_s)), 1),
+        bool(allow_pulse_hw_lift),
+        int(global_hw),
+        int(base),
+        int(eff),
+        int(idle_hw),
+        int(hw),
+        bool(dim_temp_active),
+    )
+    previous = read_engine_attr(
+        engine,
+        "_reactive_debug_hw_lift_state",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    if previous == state:
+        return
+
+    def set_state() -> None:
+        setattr(engine, "_reactive_debug_hw_lift_state", state)
+
+    run_engine_attr_operation(
+        set_state,
+        handled_errors=(AttributeError, TypeError, ValueError),
+        handled_result=None,
+        runtime_result=None,
+        message="Reactive brightness failed to set engine attribute %s",
+        name="_reactive_debug_hw_lift_state",
+        logger=logger,
+    )
+    logger.info(
+        "reactive_hw_lift: reason=%s per_key=%s streak=%s pulse_mix=%.3f cooldown=%s cooldown_remaining_s=%.2f allow=%s global=%s base=%s eff=%s idle=%s hw=%s dim=%s",
+        reason,
+        bool(per_key_hw),
+        int(uniform_hw_streak_count),
+        float(pulse_mix),
+        bool(cooldown_active),
+        max(0.0, float(cooldown_remaining_s)),
+        bool(allow_pulse_hw_lift),
+        int(global_hw),
+        int(base),
+        int(eff),
+        int(idle_hw),
+        int(hw),
+        bool(dim_temp_active),
+    )
 
 
 def clear_transition_state(engine: "EffectsEngine", *, logger: logging.Logger) -> None:

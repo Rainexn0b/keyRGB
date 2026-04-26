@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from types import SimpleNamespace
 
 import pytest
 
@@ -31,6 +32,7 @@ class FakeEngine:
         # Simulate active per-key colors if dict provided
         self.per_key_colors = per_key_colors
         self._dim_temp_active = dim_temp_active
+        self.kb = SimpleNamespace(set_key_colors=object()) if per_key_colors is not None else SimpleNamespace()
         # Default to 50 (steady-state running) so the stability guard does
         # not interfere with tests that verify base brightness calculations.
         self._last_rendered_brightness = last_rendered
@@ -92,9 +94,11 @@ def test_scaling_factors_dim_base_bright_effect() -> None:
     b_factor = backdrop_brightness_scale_factor(engine, effect_brightness_hw=50)
     assert abs(b_factor - 1.0) < 1e-9
 
-    # Pulse scale: eff >= hw (50 >= 5) => 1.0
+    # Pulse scale is softened when the requested pulse brightness far exceeds
+    # the steady-state hardware brightness on per-key backends, but it should
+    # still leave visible feedback above the backdrop baseline.
     p_factor = pulse_brightness_scale_factor(engine)
-    assert abs(p_factor - 1.0) < 1e-9
+    assert p_factor == pytest.approx(0.6923024947075771)
 
 
 def test_scaling_factors_bright_base_dim_effect() -> None:

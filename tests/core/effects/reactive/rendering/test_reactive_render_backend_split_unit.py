@@ -14,6 +14,7 @@ class _DummyLock:
 class _DummyKB:
     def __init__(self, *, per_key_mode_policy: str = "init_once"):
         self.calls: list[tuple[str, int]] = []
+        self.frames: list[dict[tuple[int, int], tuple[int, int, int]]] = []
         self.keyrgb_per_key_mode_policy = str(per_key_mode_policy)
 
     def enable_user_mode(self, *, brightness: int, save: bool = False):
@@ -23,6 +24,7 @@ class _DummyKB:
         self.calls.append(("set_brightness", int(brightness)))
 
     def set_key_colors(self, _color_map, *, brightness: int, enable_user_mode: bool = False):
+        self.frames.append(dict(_color_map))
         self.calls.append(("set_key_colors", int(brightness)))
 
 
@@ -164,3 +166,33 @@ def test_uniform_reactive_pulse_returns_directly_to_idle_brightness() -> None:
 
     assert ("set_color", 15) in kb.calls
     assert ("set_brightness", 15) in kb.calls
+
+
+def test_per_key_restore_transition_scales_frame_between_hw_steps(monkeypatch) -> None:
+    from src.core.effects.reactive.render import render
+
+    kb = _DummyKB()
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        brightness=5,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=5,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=0.0,
+        _reactive_transition_from_brightness=1,
+        _reactive_transition_to_brightness=5,
+        _reactive_transition_started_at=100.0,
+        _reactive_transition_duration_s=1.0,
+        _last_rendered_brightness=1,
+        _last_hw_mode_brightness=1,
+    )
+
+    monkeypatch.setattr("src.core.effects.reactive._render_brightness.time.monotonic", lambda: 100.35)
+
+    render(engine, color_map={(0, 0): (100, 50, 25)})
+
+    assert ("set_key_colors", 3) in kb.calls
+    assert kb.frames[-1][(0, 0)] == (80, 40, 20)

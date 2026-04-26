@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import logging
 import time
 from types import SimpleNamespace
 
+import pytest
 
 from src.core.effects.reactive.render import pulse_brightness_scale_factor
 
@@ -33,9 +35,13 @@ def test_pulse_brightness_uniform_backend_still_uses_eff_over_hw_ratio() -> None
     assert pulse_brightness_scale_factor(eng) == 0.5
 
 
-def test_pulse_brightness_caps_when_reactive_exceeds_hw() -> None:
+def test_pulse_brightness_tempers_per_key_flash_when_reactive_exceeds_hw() -> None:
     eng = _DummyEngine(brightness=10, reactive_brightness=50)
-    # 50/50 -> full intensity.
+    assert pulse_brightness_scale_factor(eng) == pytest.approx(0.7788854381999832)
+
+
+def test_pulse_brightness_keeps_full_scale_when_reactive_matches_hw() -> None:
+    eng = _DummyEngine(brightness=50, reactive_brightness=50)
     assert pulse_brightness_scale_factor(eng) == 1.0
 
 
@@ -109,6 +115,22 @@ def test_idle_without_active_pulse_keeps_hw_at_profile_brightness() -> None:
     assert hw == 10
 
 
+def test_follow_global_brightness_clamps_reactive_backdrop_during_soft_start() -> None:
+    from src.core.effects.reactive.render import _resolve_brightness
+
+    eng = _DummyEngine(brightness=2, reactive_brightness=50)
+    eng._last_rendered_brightness = 2
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 5
+    eng._reactive_follow_global_brightness = True
+
+    base, eff, hw = _resolve_brightness(eng)
+
+    assert base == 2
+    assert eff == 2
+    assert hw == 2
+
+
 def test_pulse_return_to_idle_skips_guard_tail() -> None:
     from src.core.effects.reactive.render import _resolve_brightness
 
@@ -137,3 +159,29 @@ def test_active_pulse_mix_lift_is_suppressed_during_post_transition_cooldown() -
 
     assert eff == 50
     assert hw == 10
+
+
+def test_resolve_brightness_logs_hw_lift_cooldown_reason_under_debug(monkeypatch, caplog) -> None:
+    from src.core.effects.reactive.render import _resolve_brightness
+
+    now = 100.0
+    eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
+    eng._last_rendered_brightness = 10
+    eng._reactive_active_pulse_mix = 1.0
+    eng._reactive_uniform_hw_streak = 5
+    eng._reactive_disable_pulse_hw_lift_until = now + 2.5
+
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    monkeypatch.setattr("src.core.effects.reactive._render_brightness.time.monotonic", lambda: now)
+    monkeypatch.setattr(
+        "src.core.effects.reactive._render_brightness_support.time.monotonic",
+        lambda: now,
+    )
+
+    with caplog.at_level(logging.INFO, logger="src.core.effects.reactive.render"):
+        _resolve_brightness(eng)
+
+    messages = [record.getMessage() for record in caplog.records if "reactive_hw_lift:" in record.getMessage()]
+    assert messages
+    assert "reason=cooldown" in messages[-1]
+    assert "cooldown_remaining_s=2.50" in messages[-1]

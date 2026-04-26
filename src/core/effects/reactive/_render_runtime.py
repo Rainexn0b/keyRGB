@@ -68,12 +68,17 @@ def render_per_key_frame(
     *,
     color_map: Mapping[Key, Color],
     resolve_brightness: Callable[["EffectsEngine"], tuple[int, int, int]],
+    resolve_transition_visual_scale: Callable[["EffectsEngine"], float],
     logger: logging.Logger,
 ) -> bool:
     try:
         brightness_hw = 0
+        rendered_color_map: Mapping[Key, Color] = color_map
         with engine.kb_lock:
             _, _, brightness_hw = resolve_brightness(engine)
+            transition_visual_scale = resolve_transition_visual_scale(engine)
+            if transition_visual_scale < 0.999:
+                rendered_color_map = _scale_color_map(color_map, factor=transition_visual_scale)
             engine._last_rendered_brightness = brightness_hw
 
             reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
@@ -82,7 +87,7 @@ def render_per_key_frame(
                 apply_hw_brightness(engine, brightness_hw, force_reinit=reassert_every_frame)
 
             try:
-                engine.kb.set_key_colors(color_map, brightness=int(brightness_hw), enable_user_mode=False)
+                engine.kb.set_key_colors(rendered_color_map, brightness=int(brightness_hw), enable_user_mode=False)
             except _REACTIVE_RENDER_RUNTIME_ERRORS as exc:
                 if is_device_disconnected(exc):
                     try:
@@ -103,7 +108,7 @@ def render_per_key_frame(
                 apply_hw_brightness(engine, brightness_hw)
         render_secondary_uniform_rgb(
             engine,
-            rgb=average_color_map(color_map),
+            rgb=average_color_map(rendered_color_map),
             brightness_hw=brightness_hw,
             logger=logger,
             log_key="effects.reactive.secondary",
@@ -156,3 +161,19 @@ def render_uniform_frame(
 
 def average_color_map(color_map: Mapping[Key, Color]) -> Color:
     return average_color_map_impl(color_map)
+
+
+def _scale_color_map(color_map: Mapping[Key, Color], *, factor: float) -> Mapping[Key, Color]:
+    f = max(0.0, min(1.0, float(factor)))
+    if f >= 0.999:
+        return color_map
+    if f <= 0.0:
+        return {key: (0, 0, 0) for key in color_map}
+    return {
+        key: (
+            int(round(rgb[0] * f)),
+            int(round(rgb[1] * f)),
+            int(round(rgb[2] * f)),
+        )
+        for key, rgb in color_map.items()
+    }

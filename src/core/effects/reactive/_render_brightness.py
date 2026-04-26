@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import time
 from typing import TYPE_CHECKING, Callable, Optional
 
@@ -37,9 +38,14 @@ def _resolve_hw_brightness_with_pulse_mix(
         _support.set_uniform_hw_streak(engine, value=uniform_hw_streak_count, logger=_LOGGER)
 
     allow_pulse_hw_lift = False
+    pulse_mix = 0.0
+    cooldown_active = False
+    cooldown_remaining_s = 0.0
+    reason = "idle"
     if dim_temp_active:
         hw = global_hw
         idle_hw = hw
+        reason = "dim_temp_active"
     else:
         raw_pulse_mix = _support.read_engine_attr(
             engine,
@@ -53,19 +59,61 @@ def _resolve_hw_brightness_with_pulse_mix(
             pulse_mix = 0.0
         pulse_mix = clamp01_fn(pulse_mix)
 
+        raw_until = _support.read_engine_attr(
+            engine,
+            "_reactive_disable_pulse_hw_lift_until",
+            missing_default=None,
+            error_default=None,
+            logger=logger,
+        )
+        until_s = _support.coerce_float(raw_until, default=None)
+        if until_s is not None:
+            cooldown_remaining_s = max(0.0, float(until_s) - float(time.monotonic()))
+
         hw = max(global_hw, base)
         idle_hw = hw
+        cooldown_active = _support.pulse_hw_lift_temporarily_disabled(engine, logger=_LOGGER)
         allow_pulse_hw_lift = (
             (not per_key_hw)
             and uniform_hw_streak_count >= _UNIFORM_PULSE_HW_LIFT_STREAK_MIN
             and pulse_mix > 0.0
             and eff > hw
-            and (not _support.pulse_hw_lift_temporarily_disabled(engine, logger=_LOGGER))
+            and (not cooldown_active)
         )
         if allow_pulse_hw_lift:
             pulse_hw = int(round(float(hw) + (float(eff - hw) * pulse_mix)))
             hw = max(hw, pulse_hw)
 
+        if per_key_hw:
+            reason = "per_key_hw"
+        elif pulse_mix <= 0.0:
+            reason = "no_pulse"
+        elif uniform_hw_streak_count < _UNIFORM_PULSE_HW_LIFT_STREAK_MIN:
+            reason = "streak_gate"
+        elif eff <= hw:
+            reason = "eff_not_above_hw"
+        elif cooldown_active:
+            reason = "cooldown"
+        elif allow_pulse_hw_lift:
+            reason = "allowed"
+
+    _support.log_hw_lift_decision_change(
+        engine,
+        logger=logger,
+        reason=reason,
+        per_key_hw=per_key_hw,
+        uniform_hw_streak_count=uniform_hw_streak_count,
+        pulse_mix=float(pulse_mix),
+        cooldown_active=cooldown_active,
+        cooldown_remaining_s=float(cooldown_remaining_s),
+        allow_pulse_hw_lift=allow_pulse_hw_lift,
+        global_hw=global_hw,
+        base=base,
+        eff=eff,
+        idle_hw=idle_hw,
+        hw=hw,
+        dim_temp_active=dim_temp_active,
+    )
     return hw, idle_hw, allow_pulse_hw_lift, per_key_hw
 
 
@@ -75,6 +123,53 @@ def resolve_reactive_transition_brightness(
     clamp01_fn: Callable[[float], float],
 ) -> Optional[tuple[int, bool]]:
     """Return the current transition brightness for reactive temp-dim flows."""
+
+    transition = _resolve_reactive_transition_progress(engine, clamp01_fn=clamp01_fn)
+    if transition is None:
+        return None
+
+    current_f, rising = transition
+    if rising:
+        return int(math.ceil(current_f)), True
+
+    return int(round(current_f)), False
+
+
+def resolve_reactive_transition_visual_scale(
+    engine: "EffectsEngine",
+    *,
+    clamp01_fn: Callable[[float], float],
+) -> float:
+    """Return a fractional scale for rising per-key transitions.
+
+    During low-brightness restore ramps the hardware brightness must stay
+    integer-valued, which can make `1 -> 5` restores visibly step.  We smooth
+    the written per-key frame by scaling it against the ceiled transition level
+    so the overall visible intensity can still move fractionally between those
+    hardware steps.
+    """
+
+    transition = _resolve_reactive_transition_progress(engine, clamp01_fn=clamp01_fn)
+    if transition is None:
+        return 1.0
+
+    current_f, rising = transition
+    if not rising:
+        return 1.0
+
+    quantized = int(math.ceil(current_f))
+    if quantized <= 0:
+        return 0.0
+
+    return clamp01_fn(float(current_f) / float(quantized))
+
+
+def _resolve_reactive_transition_progress(
+    engine: "EffectsEngine",
+    *,
+    clamp01_fn: Callable[[float], float],
+) -> Optional[tuple[float, bool]]:
+    """Return the in-flight reactive transition brightness as a float."""
 
     start = _support.read_engine_attr(
         engine,
@@ -112,19 +207,20 @@ def resolve_reactive_transition_brightness(
         return None
 
     duration = max(0.0, duration)
+    rising = bool(end_i >= start_i)
 
     if duration <= 0.0 or start_i == end_i:
         _support.clear_transition_state(engine, logger=_LOGGER)
-        return end_i, bool(end_i >= start_i)
+        return float(end_i), rising
 
     elapsed = max(0.0, float(time.monotonic()) - started)
     if elapsed >= duration:
         _support.clear_transition_state(engine, logger=_LOGGER)
-        return end_i, bool(end_i >= start_i)
+        return float(end_i), rising
 
     t = clamp01_fn(elapsed / duration)
-    current = int(round(start_i + (end_i - start_i) * t))
-    return current, bool(end_i >= start_i)
+    current = float(start_i) + (float(end_i - start_i) * t)
+    return current, rising
 
 
 def resolve_brightness(
@@ -193,6 +289,10 @@ def resolve_brightness(
         else:
             global_hw = max(global_hw, transition_brightness)
             base = max(base, transition_brightness)
+
+    if _support.bool_attr_or_default(engine, "_reactive_follow_global_brightness", default=False):
+        eff = min(eff, global_hw)
+        base = min(base, global_hw)
 
     dim_temp_active = _support.bool_attr_or_default(engine, "_dim_temp_active", default=False)
     hw, idle_hw, allow_pulse_hw_lift, per_key_hw = _resolve_hw_brightness_with_pulse_mix(

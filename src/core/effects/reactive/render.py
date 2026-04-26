@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import logging
 import time as _time
 from operator import attrgetter
@@ -11,6 +12,7 @@ from src.core.effects.perkey_animation import build_full_color_grid
 from ._render_brightness import (
     resolve_brightness as _resolve_brightness_impl,
     resolve_reactive_transition_brightness as _resolve_reactive_transition_brightness_impl,
+    resolve_reactive_transition_visual_scale as _resolve_reactive_transition_visual_scale_impl,
 )
 from ._render_runtime import render_per_key_frame, render_uniform_frame
 
@@ -78,6 +80,10 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
     )
 
 
+def _resolve_transition_visual_scale(engine: "EffectsEngine") -> float:
+    return _resolve_reactive_transition_visual_scale_impl(engine, clamp01_fn=clamp01)
+
+
 def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:
     """Compute scaling factor to keep the backdrop at its target brightness.
 
@@ -103,14 +109,27 @@ def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
     brightness to make bright pulses possible over a dim backdrop; per-key
     backends keep hardware brightness fixed and rely on per-key color contrast.
     For per-key hardware the reactive slider should therefore control the pulse
-    color intensity directly across the full 0..50 range instead of saturating
-    as soon as ``reactive_brightness >= hw``.
+    color intensity directly across the full 0..50 range. When the requested
+    pulse brightness far exceeds the current steady-state hardware brightness,
+    temper that extra contrast so low-brightness typing does not read as a
+    flash.
     """
 
-    _, eff, hw = _resolve_brightness(engine)
+    base, eff, hw = _resolve_brightness(engine)
 
     if has_per_key(engine):
-        return float(max(0, min(50, int(eff)))) / 50.0
+        pulse_scale = float(max(0, min(50, int(eff)))) / 50.0
+        target_hw = _steady_target_hw_brightness(engine, base=base)
+        visual_hw = min(int(hw), int(target_hw))
+        if visual_hw <= 0:
+            return 0.0
+        if eff <= visual_hw:
+            return pulse_scale
+        baseline_scale = float(visual_hw) / 50.0
+        extra_scale = max(0.0, pulse_scale - baseline_scale)
+        contrast_ratio = float(visual_hw) / float(eff)
+        contrast_compression = 0.5 + (0.5 * math.sqrt(contrast_ratio))
+        return baseline_scale + (extra_scale * contrast_compression)
 
     if hw <= 0:
         return 0.0
@@ -130,6 +149,16 @@ def apply_backdrop_brightness_scale(color_map: Dict[Key, Color], *, factor: floa
     if f <= 0.0:
         return {k: (0, 0, 0) for k in color_map.keys()}
     return {k: scale(rgb, f) for k, rgb in color_map.items()}
+
+
+def _steady_target_hw_brightness(engine: "EffectsEngine", *, base: int) -> int:
+    raw_global_hw = _engine_attr_or_default(engine, "brightness", default=25)
+    try:
+        global_hw = int(raw_global_hw or 0)  # type: ignore[call-overload]
+    except _INT_COERCION_ERRORS:
+        global_hw = 25
+    global_hw = max(0, min(50, global_hw))
+    return max(int(base), global_hw)
 
 
 def frame_dt_s() -> float:
@@ -195,6 +224,7 @@ def render(engine: "EffectsEngine", *, color_map: Dict[Key, Color]) -> None:
         engine,
         color_map=color_map,
         resolve_brightness=_resolve_brightness,
+        resolve_transition_visual_scale=_resolve_transition_visual_scale,
         logger=logger,
     ):
         return
