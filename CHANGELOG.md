@@ -3,6 +3,14 @@
 ## Unreleased
 
 
+## 0.23.5 (2026-04-26)
+
+- Effects/Reactive: Soften low-brightness reactive pulse contrast on per-key hardware, smooth restore ramps between hardware brightness steps, and add debug logging around temporary pulse hardware-lift cooldown decisions.
+- Tray/Idle Power: Use a consistent soft-on restart after idle turn-off, suppress immediate restore rebounds after an idle-forced off transition, and skip the soft fade on per-key reactive turn-off paths where it causes visible flashes.
+- Tray/Icon: Refresh hardware-polling and idle-power UI state without forcing icon animation, and briefly hold icon repaints after resume to reduce reactive tray flicker.
+- Install/Bootstrap: Pin the default install and uninstall bootstrap ref to `v0.23.5` so curl-based installs and updates resolve the tagged release by default.
+
+
 ## 0.23.4 (2026-04-23)
 
 - Install/Security: Verify AppImage SHA-256 integrity after download; abort and remove the file on hash mismatch so a corrupted or tampered release asset is never executed.
