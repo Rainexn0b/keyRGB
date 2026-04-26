@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Callable, Optional
 
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
-from src.tray.protocols import IdlePowerTrayProtocol
+from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_float_field
 
 from .policy import IdleAction
 
@@ -135,7 +135,12 @@ def run_idle_power_iteration(
         brightness=int(brightness),
         user_forced_off=bool(tray._user_forced_off),
         power_forced_off=bool(tray._power_forced_off),
-        last_idle_turn_off_at=float(getattr(tray, "_last_idle_turn_off_at", 0.0) or 0.0),
+        last_idle_turn_off_at=read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_idle_turn_off_at",
+            state_name="last_idle_turn_off_at",
+            default=0.0,
+        ),
         last_resume_at=float(tray._last_resume_at),
         now=now_monotonic_fn(),
     )

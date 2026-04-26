@@ -4,6 +4,7 @@ This module encapsulates the non-public coordination logic extracted from
 lighting_controller.py to reduce file size while preserving the stable
 start_current_effect() public facade.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -53,7 +54,13 @@ def _coerce_brightness_override(brightness_override: object, *, default: int) ->
 
 
 def _plan_effect_fade_ramp(
-    *, effect: str, fade_in: bool, start_brightness: int, target_brightness: int, is_software_effect_fn: Callable[[str], bool], is_reactive_effect_fn: Callable[[str], bool]
+    *,
+    effect: str,
+    fade_in: bool,
+    start_brightness: int,
+    target_brightness: int,
+    is_software_effect_fn: Callable[[str], bool],
+    is_reactive_effect_fn: Callable[[str], bool],
 ) -> _FadeRampPlan:
     """Classify the fade ramp strategy for an effect."""
     will_fade = bool(fade_in and target_brightness > start_brightness and target_brightness > 0)
@@ -154,7 +161,12 @@ def _apply_effect_fade_ramp(
     if not plan.will_fade:
         return
 
-    if plan.is_loop_effect and getattr(tray, "_idle_restore_legacy_loop_effect_ramp", False) is True:
+    try:
+        legacy_loop_effect_ramp = vars(tray).get("_idle_restore_legacy_loop_effect_ramp", False) is True
+    except TypeError:
+        legacy_loop_effect_ramp = False
+
+    if plan.is_loop_effect and legacy_loop_effect_ramp:
         tray.engine.set_brightness(
             target_brightness,
             apply_to_hardware=False,
@@ -223,4 +235,3 @@ def prepare_effect_engine_state(
         set_engine_perkey_from_config_fn(tray)
     else:
         clear_engine_perkey_state_fn(tray)
-

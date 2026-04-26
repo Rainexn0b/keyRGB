@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 import logging
-from typing import Protocol, cast
+from typing import Protocol
 
 from src.core.power.tcc_profiles.models import TccProfile
 from src.core.utils.logging_utils import log_throttled

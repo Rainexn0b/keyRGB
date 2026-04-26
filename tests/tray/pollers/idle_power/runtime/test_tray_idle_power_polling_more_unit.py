@@ -246,6 +246,41 @@ def test_restore_from_idle_loop_effect_uses_soft_on_start() -> None:
     assert received["fade_in"] is True
 
 
+def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
+    monkeypatch,
+) -> None:
+    import src.tray.pollers.idle_power.polling as ipp
+    from src.tray.controllers._power._transition_constants import SOFT_ON_FADE_DURATION_S
+
+    monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
+
+    tray = SimpleNamespace(
+        is_off=True,
+        _idle_forced_off=True,
+        _last_brightness=33,
+        _last_resume_at=0.0,
+        config=SimpleNamespace(brightness=33, effect="reactive_ripple"),
+        engine=SimpleNamespace(
+            current_color=(12, 34, 56),
+            _reactive_disable_pulse_hw_lift_until=None,
+            _reactive_post_restore_visual_damp_until=None,
+        ),
+        _log_exception=lambda *_a, **_kw: None,
+        _start_current_effect=lambda **_kwargs: None,
+        _refresh_ui=lambda: None,
+    )
+
+    ipp._restore_from_idle(tray)
+
+    assert tray.engine._reactive_disable_pulse_hw_lift_until == pytest.approx(
+        100.0 + max(2.0, float(SOFT_ON_FADE_DURATION_S) + 0.75)
+    )
+    assert tray.engine._reactive_post_restore_visual_damp_until == pytest.approx(
+        100.0 + max(4.0, float(SOFT_ON_FADE_DURATION_S) + 2.75)
+    )
+    assert tray.engine._reactive_post_restore_visual_damp_until > tray.engine._reactive_disable_pulse_hw_lift_until
+
+
 def test_restore_from_idle_non_loop_effect_uses_soft_on_start() -> None:
     import src.tray.controllers._power._transition_constants as transition_constants
     import src.tray.pollers.idle_power.polling as ipp

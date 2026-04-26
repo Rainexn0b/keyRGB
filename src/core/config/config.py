@@ -143,7 +143,9 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         return self._settings[key]
 
     @overload
-    def _get_optional_scalar(self, key: Literal["return_effect_after_effect"], default: None = None) -> object | None: ...
+    def _get_optional_scalar(
+        self, key: Literal["return_effect_after_effect"], default: None = None
+    ) -> object | None: ...
 
     @overload
     def _get_optional_scalar(self, key: Literal["effect_speeds"], default: None = None) -> object | None: ...

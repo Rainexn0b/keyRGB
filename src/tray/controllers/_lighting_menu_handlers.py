@@ -42,7 +42,9 @@ def on_speed_clicked_impl(
         tray.config.set_effect_speed(effect, speed)
 
     if not tray.is_off:
-        is_loop = lighting_controller_helpers.is_software_effect(effect) or lighting_controller_helpers.is_reactive_effect(effect)
+        is_loop = lighting_controller_helpers.is_software_effect(
+            effect
+        ) or lighting_controller_helpers.is_reactive_effect(effect)
         if is_loop:
             # SW/reactive loops read engine.speed on every frame - update in-place
             # without restarting the loop (avoids flicker and state loss).
@@ -67,6 +69,7 @@ def on_brightness_clicked_impl(
         return
 
     brightness_hw = brightness * 5
+    brightness_int = int(brightness_hw)
     if brightness_hw > 0:
         tray._last_brightness = brightness_hw
 
@@ -85,7 +88,7 @@ def on_brightness_clicked_impl(
         "menu",
         "set_brightness",
         old=safe_attrs.safe_int_attr(tray.config, "brightness", default=0),
-        new=int(brightness_hw),
+        new=brightness_int,
     )
 
     tray.config.brightness = brightness_hw
@@ -96,11 +99,19 @@ def on_brightness_clicked_impl(
     # pulse intensity.
     if is_reactive:
         try:
-            tray.config.reactive_brightness = int(brightness_hw)
+            tray.config.perkey_brightness = brightness_int
         except (AttributeError, TypeError, ValueError, OverflowError):
             pass
         try:
-            tray.engine.reactive_brightness = int(brightness_hw)
+            tray.config.reactive_brightness = brightness_int
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            pass
+        try:
+            tray.engine.per_key_brightness = brightness_int
+        except (AttributeError, TypeError, ValueError, OverflowError):
+            pass
+        try:
+            tray.engine.reactive_brightness = brightness_int
         except (AttributeError, TypeError, ValueError, OverflowError):
             pass
 

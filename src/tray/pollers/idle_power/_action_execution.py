@@ -116,9 +116,7 @@ def _execute_turn_off(
         warning_level=logging.WARNING,
         recoverable_effect_name_exceptions=recoverable_effect_name_exceptions,
     )
-    use_soft_fade = not (
-        effect in reactive_effects_set and _engine_supports_per_key_output(tray.engine)
-    )
+    use_soft_fade = not (effect in reactive_effects_set and _engine_supports_per_key_output(tray.engine))
 
     _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=False)
     _set_idle_state_field(
@@ -266,9 +264,7 @@ def _execute_restore(
     set_engine_hw_brightness_cap: Callable[..., None],
 ) -> None:
     user_forced_off = bool(_sync_idle_state_field(tray, prior_name="_user_forced_off", state_name="user_forced_off"))
-    power_forced_off = bool(
-        _sync_idle_state_field(tray, prior_name="_power_forced_off", state_name="power_forced_off")
-    )
+    power_forced_off = bool(_sync_idle_state_field(tray, prior_name="_power_forced_off", state_name="power_forced_off"))
     if user_forced_off or power_forced_off:
         return
 

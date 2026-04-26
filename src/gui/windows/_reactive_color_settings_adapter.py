@@ -6,26 +6,21 @@ from typing import Protocol
 
 
 class _StatusLabel(Protocol):
-    def config(self, **kwargs: object) -> object:
-        ...
+    def config(self, **kwargs: object) -> object: ...
 
 
 class _Root(Protocol):
-    def after(self, delay: int, callback: Callable[[], object]) -> object:
-        ...
+    def after(self, delay: int, callback: Callable[[], object]) -> object: ...
 
 
 class _Variable(Protocol):
-    def get(self) -> object:
-        ...
+    def get(self) -> object: ...
 
-    def set(self, value: object) -> object:
-        ...
+    def set(self, value: object) -> object: ...
 
 
 class _ColorWheel(Protocol):
-    def set_brightness_percent(self, pct: int) -> object:
-        ...
+    def set_brightness_percent(self, pct: int) -> object: ...
 
 
 class _ReactiveColorSettingsGUI(Protocol):
@@ -44,19 +39,15 @@ class _ReactiveColorSettingsGUI(Protocol):
     _drag_commit_interval: float
     _last_drag_committed_brightness: int | None
 
-    def _read_reactive_brightness_percent(self) -> int | None:
-        ...
+    def _read_reactive_brightness_percent(self) -> int | None: ...
 
-    def _read_reactive_trail_percent(self) -> int | None:
-        ...
+    def _read_reactive_trail_percent(self) -> int | None: ...
 
 
 class _ReactiveColorRuntime(Protocol):
-    def read_reactive_brightness_percent(self, config: object, *, logger: logging.Logger) -> int | None:
-        ...
+    def read_reactive_brightness_percent(self, config: object, *, logger: logging.Logger) -> int | None: ...
 
-    def read_reactive_trail_percent(self, config: object, *, logger: logging.Logger) -> int | None:
-        ...
+    def read_reactive_trail_percent(self, config: object, *, logger: logging.Logger) -> int | None: ...
 
     def sync_reactive_brightness_widgets(
         self,
@@ -66,8 +57,7 @@ class _ReactiveColorRuntime(Protocol):
         percent: int | None,
         tk_error: type[BaseException],
         logger: logging.Logger,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def sync_reactive_trail_widgets(
         self,
@@ -77,8 +67,7 @@ class _ReactiveColorRuntime(Protocol):
         percent: int | None,
         tk_error: type[BaseException],
         logger: logging.Logger,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def sync_color_wheel_brightness(
         self,
@@ -88,8 +77,7 @@ class _ReactiveColorRuntime(Protocol):
         percent: int | None,
         tk_error: type[BaseException],
         logger: logging.Logger,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def commit_color_to_config(
         self,
@@ -99,8 +87,7 @@ class _ReactiveColorRuntime(Protocol):
         *,
         tk_error: type[BaseException],
         logger: logging.Logger,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def commit_brightness_to_config(
         self,
@@ -108,8 +95,7 @@ class _ReactiveColorRuntime(Protocol):
         brightness_percent: float | int | None,
         *,
         logger: logging.Logger,
-    ) -> int | None:
-        ...
+    ) -> int | None: ...
 
     def commit_trail_to_config(
         self,
@@ -117,8 +103,7 @@ class _ReactiveColorRuntime(Protocol):
         trail_percent: float | int | None,
         *,
         logger: logging.Logger,
-    ) -> int | None:
-        ...
+    ) -> int | None: ...
 
 
 class ReactiveColorSettingsAdapter:

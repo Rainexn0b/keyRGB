@@ -38,6 +38,14 @@ def _apply_reactive_brightness_best_effort(
                     exc,
                 )
             try:
+                tray.engine.reactive_brightness = brightness_int
+            except _REACTIVE_ENGINE_ATTR_EXCEPTIONS as exc:
+                _log_tray_exception(
+                    tray,
+                    "Failed to sync reactive engine pulse brightness from power policy: %s",
+                    exc,
+                )
+            try:
                 tray.engine.set_brightness(
                     brightness_int,
                     apply_to_hardware=False,
@@ -93,6 +101,7 @@ def apply_brightness_from_power_policy_impl(
         if is_reactive:
             tray.config.perkey_brightness = brightness_int
             tray.config.brightness = brightness_int
+            tray.config.reactive_brightness = brightness_int
             _apply_reactive_brightness_best_effort(
                 tray,
                 brightness_int,

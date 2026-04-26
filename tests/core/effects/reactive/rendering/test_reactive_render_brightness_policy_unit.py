@@ -163,6 +163,37 @@ def test_per_key_reactive_pulse_respects_dim_temp_lock() -> None:
     assert not [call for call in kb.calls if call == ("set_brightness", 50)]
 
 
+def test_render_logs_visual_scale_under_debug(monkeypatch, caplog) -> None:
+    from src.core.effects.reactive.render import render
+
+    kb = _DummyKB()
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        brightness=5,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=5,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=0.709,
+        _reactive_debug_last_pulse_scale=1.0,
+        _last_rendered_brightness=5,
+        _last_hw_mode_brightness=5,
+    )
+
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+
+    with caplog.at_level(logging.INFO, logger="src.core.effects.reactive.render"):
+        render(engine, color_map={(0, 0): (255, 255, 255)})
+
+    messages = [record.getMessage() for record in caplog.records if "reactive_render_visual:" in record.getMessage()]
+    assert messages
+    assert "pulse_scale=1.000" in messages[-1]
+    assert "transition_scale=1.000" in messages[-1]
+    assert "combined_scale=1.000" in messages[-1]
+
+
 def test_resolve_brightness_logs_traceback_when_engine_attr_read_raises(caplog) -> None:
     from src.core.effects.reactive import render as render_module
 

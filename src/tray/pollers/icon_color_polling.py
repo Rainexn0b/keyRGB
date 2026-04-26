@@ -4,6 +4,7 @@ import threading
 import time
 
 from src.core.effects.catalog import resolve_effect_name_for_backend
+from src.tray.protocols import read_idle_power_state_float_field
 
 
 _ANIMATED_ICON_EFFECTS = frozenset(
@@ -94,7 +95,12 @@ def _should_update_icon(sig, last_sig) -> bool:
 
 def _resume_icon_holdoff_active(tray, *, now_monotonic: float) -> bool:
     try:
-        resume_at = float(getattr(tray, "_last_resume_at", 0.0) or 0.0)
+        resume_at = read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_resume_at",
+            state_name="last_resume_at",
+            default=0.0,
+        )
     except (TypeError, ValueError, OverflowError):
         return False
 

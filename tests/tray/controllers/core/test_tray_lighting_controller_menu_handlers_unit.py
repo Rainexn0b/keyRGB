@@ -150,7 +150,10 @@ class TestOnBrightnessClicked:
             on_brightness_clicked(mock_tray, "🔘 20")
 
         assert mock_tray.config.brightness == 100
+        assert mock_tray.config.perkey_brightness == 100
         assert mock_tray.config.reactive_brightness == 100
+        assert mock_tray.engine.per_key_brightness == 100
+        assert mock_tray.engine.reactive_brightness == 100
         mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=False)
         mock_start.assert_not_called()
 

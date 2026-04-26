@@ -43,6 +43,30 @@ def _use_legacy_loop_effect_idle_restore_ramp(tray: IdlePowerTrayProtocol, *, fa
     return effect in _LOOP_EFFECTS
 
 
+def _should_seed_reactive_restore_windows(tray: object, *, fade_in: bool) -> bool:
+    if not bool(fade_in):
+        return False
+    effect = safe_str_attr(getattr(tray, "config", None), "effect", default="none") or "none"
+    return effect in REACTIVE_EFFECTS
+
+
+def _seed_reactive_restore_windows(engine: object, *, fade_in_duration_s: float) -> None:
+    try:
+        now = float(time.monotonic())
+        hw_lift_holdoff_until = now + max(
+            2.0,
+            float(fade_in_duration_s) + 0.75,
+        )
+        visual_damp_until = now + max(
+            4.0,
+            float(fade_in_duration_s) + 2.75,
+        )
+        engine._reactive_disable_pulse_hw_lift_until = hw_lift_holdoff_until  # type: ignore[attr-defined]
+        engine._reactive_post_restore_visual_damp_until = visual_damp_until  # type: ignore[attr-defined]
+    except (AttributeError, TypeError, ValueError):
+        return
+
+
 def start_current_effect_for_idle_restore(
     tray: IdlePowerTrayProtocol,
     *,
@@ -51,6 +75,7 @@ def start_current_effect_for_idle_restore(
     fade_in_duration_s: float,
 ) -> None:
     legacy_loop_effect_ramp = _use_legacy_loop_effect_idle_restore_ramp(tray, fade_in=fade_in)
+    seed_reactive_restore_windows = _should_seed_reactive_restore_windows(tray, fade_in=fade_in)
     if legacy_loop_effect_ramp:
         try:
             setattr(tray, "_idle_restore_legacy_loop_effect_ramp", True)
@@ -68,6 +93,8 @@ def start_current_effect_for_idle_restore(
                 )
             except TypeError:
                 start_fn()
+            if seed_reactive_restore_windows:
+                _seed_reactive_restore_windows(getattr(tray, "engine", None), fade_in_duration_s=fade_in_duration_s)
             return
 
         from src.tray.controllers.lighting_controller import start_current_effect
@@ -78,6 +105,8 @@ def start_current_effect_for_idle_restore(
             fade_in=bool(fade_in),
             fade_in_duration_s=fade_in_duration_s,
         )
+        if seed_reactive_restore_windows:
+            _seed_reactive_restore_windows(getattr(tray, "engine", None), fade_in_duration_s=fade_in_duration_s)
     finally:
         if legacy_loop_effect_ramp:
             try:
@@ -143,10 +172,10 @@ def apply_restore_brightness(
     if effect in reactive_effects_set:
         restore_target_hw = max(int(target), int(perkey_target))
         with tray.engine.kb_lock:
-            tray.engine._reactive_disable_pulse_hw_lift_until = float(time.monotonic()) + max(
-                2.0,
-                float(soft_on_fade_duration_s) + 0.75,
-            )  # type: ignore[attr-defined]
+            _seed_reactive_restore_windows(
+                tray.engine,
+                fade_in_duration_s=soft_on_fade_duration_s,
+            )
             set_reactive_transition(
                 tray.engine,
                 target_brightness=restore_target_hw,
@@ -182,6 +211,7 @@ def refresh_ui_best_effort(
 ) -> None:
     refresh_fn = _refresh_ui_or_none(tray)
     if callable(refresh_fn):
+
         def refresh_without_icon_animation() -> None:
             try:
                 refresh_fn(animate_icon=False)

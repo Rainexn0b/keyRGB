@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from src.tray.controllers.software_target_controller import configure_engine_software_targets
-from src.tray.controllers.software_target_controller import restore_secondary_software_targets
-from src.tray.controllers.software_target_controller import turn_off_secondary_software_targets
+import importlib
+
+from src.tray.controllers import software_target_controller as _software_target_controller
 from src.tray.protocols import ConfigPollingTrayProtocol
 
-from ._apply_support import build_perkey_color_map
-from ._apply_support import current_software_effect_target
-from ._apply_support import has_all_uniform_capable_target
-from ._apply_support import reactive_sync_values
 from . import _boundaries
 
 
@@ -18,6 +13,9 @@ _TRAY_LOG_WRITE_EXCEPTIONS = _boundaries._TRAY_LOG_WRITE_EXCEPTIONS
 _ENGINE_ATTR_SYNC_EXCEPTIONS = _boundaries._ENGINE_ATTR_SYNC_EXCEPTIONS
 _ENABLE_USER_MODE_SAVE_EXCEPTIONS = _boundaries._ENABLE_USER_MODE_SAVE_EXCEPTIONS
 _CONFIG_PERSIST_SYNC_EXCEPTIONS = _boundaries._CONFIG_PERSIST_SYNC_EXCEPTIONS
+configure_engine_software_targets = _software_target_controller.configure_engine_software_targets
+restore_secondary_software_targets = _software_target_controller.restore_secondary_software_targets
+turn_off_secondary_software_targets = _software_target_controller.turn_off_secondary_software_targets
 
 
 def _log_module_exception(msg: str, exc: Exception) -> None:
@@ -155,7 +153,7 @@ def _log_detected_change(tray: ConfigPollingTrayProtocol, last_applied, current,
 
 # Import and re-export callback implementations for test monkeypatch compatibility.
 # The actual implementation is in _apply_callbacks.py.
-from . import _apply_callbacks
+_apply_callbacks = importlib.import_module(f"{__package__}._apply_callbacks")
 
 _handle_forced_off = _apply_callbacks._handle_forced_off
 _apply_turn_off = _apply_callbacks._apply_turn_off

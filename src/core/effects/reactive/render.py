@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import logging
 import time as _time
 from operator import attrgetter
@@ -9,6 +8,7 @@ from typing import TYPE_CHECKING, Dict, Optional, Tuple
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import build_full_color_grid
 
+from . import _render_brightness_support as _support
 from ._render_brightness import (
     resolve_brightness as _resolve_brightness_impl,
     resolve_reactive_transition_brightness as _resolve_reactive_transition_brightness_impl,
@@ -23,6 +23,8 @@ time = _time
 # clamps. Prevents single-frame jumps (e.g. 3 -> 50) caused by race
 # conditions between concurrent brightness writers.
 _MAX_BRIGHTNESS_STEP_PER_FRAME: int = 8
+_POST_RESTORE_PULSE_VISUAL_HOLDOFF_S: float = 2.0
+_POST_RESTORE_PULSE_VISUAL_MIN_FACTOR: float = 0.35
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -84,6 +86,29 @@ def _resolve_transition_visual_scale(engine: "EffectsEngine") -> float:
     return _resolve_reactive_transition_visual_scale_impl(engine, clamp01_fn=clamp01)
 
 
+def _post_restore_visual_damp(engine: "EffectsEngine") -> tuple[float, float]:
+    raw_until = _support.read_engine_attr(
+        engine,
+        "_reactive_post_restore_visual_damp_until",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    until_s = _support.coerce_float(raw_until, default=None)
+    if until_s is None:
+        return 1.0, 0.0
+
+    remaining_s = max(0.0, float(until_s) - float(time.monotonic()))
+    if remaining_s <= 0.0:
+        return 1.0, 0.0
+
+    progress = 1.0 - min(1.0, remaining_s / _POST_RESTORE_PULSE_VISUAL_HOLDOFF_S)
+    damp = _POST_RESTORE_PULSE_VISUAL_MIN_FACTOR + (
+        (1.0 - _POST_RESTORE_PULSE_VISUAL_MIN_FACTOR) * progress
+    )
+    return damp, remaining_s
+
+
 def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:
     """Compute scaling factor to keep the backdrop at its target brightness.
 
@@ -109,10 +134,9 @@ def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
     brightness to make bright pulses possible over a dim backdrop; per-key
     backends keep hardware brightness fixed and rely on per-key color contrast.
     For per-key hardware the reactive slider should therefore control the pulse
-    color intensity directly across the full 0..50 range. When the requested
-    pulse brightness far exceeds the current steady-state hardware brightness,
-    temper that extra contrast so low-brightness typing does not read as a
-    flash.
+    color intensity directly across the full 0..50 range. Any extra suppression
+    must stay scoped to explicit post-restore recovery windows so normal low-
+    brightness typing still uses the configured reactive level.
     """
 
     base, eff, hw = _resolve_brightness(engine)
@@ -122,14 +146,65 @@ def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
         target_hw = _steady_target_hw_brightness(engine, base=base)
         visual_hw = min(int(hw), int(target_hw))
         if visual_hw <= 0:
+            _support.log_pulse_visual_scale_change(
+                engine,
+                logger=logger,
+                base=base,
+                eff=eff,
+                hw=hw,
+                target_hw=target_hw,
+                visual_hw=visual_hw,
+                pulse_scale=0.0,
+                contrast_ratio=0.0,
+                contrast_compression=0.0,
+                very_dim_curve=False,
+                post_restore_holdoff_remaining_s=0.0,
+                post_restore_damp=1.0,
+            )
             return 0.0
         if eff <= visual_hw:
+            _support.log_pulse_visual_scale_change(
+                engine,
+                logger=logger,
+                base=base,
+                eff=eff,
+                hw=hw,
+                target_hw=target_hw,
+                visual_hw=visual_hw,
+                pulse_scale=pulse_scale,
+                contrast_ratio=1.0,
+                contrast_compression=1.0,
+                very_dim_curve=False,
+                post_restore_holdoff_remaining_s=0.0,
+                post_restore_damp=1.0,
+            )
             return pulse_scale
         baseline_scale = float(visual_hw) / 50.0
-        extra_scale = max(0.0, pulse_scale - baseline_scale)
         contrast_ratio = float(visual_hw) / float(eff)
-        contrast_compression = 0.5 + (0.5 * math.sqrt(contrast_ratio))
-        return baseline_scale + (extra_scale * contrast_compression)
+        contrast_compression = 1.0
+        very_dim_curve = visual_hw < 10
+        final_scale = pulse_scale
+        post_restore_damp = 1.0
+        post_restore_holdoff_remaining_s = 0.0
+        if very_dim_curve and pulse_scale > baseline_scale:
+            post_restore_damp, post_restore_holdoff_remaining_s = _post_restore_visual_damp(engine)
+            final_scale = baseline_scale + ((pulse_scale - baseline_scale) * post_restore_damp)
+        _support.log_pulse_visual_scale_change(
+            engine,
+            logger=logger,
+            base=base,
+            eff=eff,
+            hw=hw,
+            target_hw=target_hw,
+            visual_hw=visual_hw,
+            pulse_scale=final_scale,
+            contrast_ratio=contrast_ratio,
+            contrast_compression=contrast_compression,
+            very_dim_curve=very_dim_curve,
+            post_restore_holdoff_remaining_s=post_restore_holdoff_remaining_s,
+            post_restore_damp=post_restore_damp,
+        )
+        return final_scale
 
     if hw <= 0:
         return 0.0

@@ -13,7 +13,7 @@ set -euo pipefail
 
 KEYRGB_REPO_OWNER="${KEYRGB_REPO_OWNER:-Rainexn0b}"
 KEYRGB_REPO_NAME="${KEYRGB_REPO_NAME:-keyRGB}"
-KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.23.5}"
+KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.23.6}"
 
 usage() {
     cat <<'EOF'
@@ -25,7 +25,7 @@ Modes:
     --dev      Dev install: build deps + pip editable install
 
 Bootstrap (curl installs):
-    --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.23.5)
+    --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.23.6)
     KEYRGB_BOOTSTRAP_REF can also be used.
 
 Examples:

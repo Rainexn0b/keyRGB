@@ -22,7 +22,6 @@ from src.tray.protocols import (
 # repeated scanner markers at callsites.
 
 
-
 def _set_user_forced_off(tray: LightingTrayProtocol, value: bool) -> None:
     """Set user_forced_off state via idle power state bridge."""
     set_idle_power_state_field(tray, attr_name="_user_forced_off", state_name="user_forced_off", value=value)

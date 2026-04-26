@@ -35,9 +35,83 @@ def test_pulse_brightness_uniform_backend_still_uses_eff_over_hw_ratio() -> None
     assert pulse_brightness_scale_factor(eng) == 0.5
 
 
-def test_pulse_brightness_tempers_per_key_flash_when_reactive_exceeds_hw() -> None:
+def test_pulse_brightness_uses_direct_slider_scale_when_reactive_exceeds_hw() -> None:
     eng = _DummyEngine(brightness=10, reactive_brightness=50)
-    assert pulse_brightness_scale_factor(eng) == pytest.approx(0.7788854381999832)
+    assert pulse_brightness_scale_factor(eng) == 1.0
+
+
+def test_pulse_brightness_keeps_direct_slider_scale_on_very_dim_backdrops() -> None:
+    eng = _DummyEngine(brightness=5, reactive_brightness=50)
+    assert pulse_brightness_scale_factor(eng) == 1.0
+
+
+def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
+    eng = _DummyEngine(brightness=5, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 5
+    eng._reactive_post_restore_visual_damp_until = 102.0
+
+    import src.core.effects.reactive.render as render_module
+
+    original_monotonic = render_module.time.monotonic
+    render_module.time.monotonic = lambda: 100.0
+    try:
+        assert pulse_brightness_scale_factor(eng) == pytest.approx(0.415)
+    finally:
+        render_module.time.monotonic = original_monotonic
+
+
+def test_pulse_brightness_logs_visual_scale_under_debug(monkeypatch, caplog) -> None:
+    eng = _DummyEngine(brightness=5, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 5
+
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+
+    with caplog.at_level(logging.INFO, logger="src.core.effects.reactive.render"):
+        pulse_brightness_scale_factor(eng)
+
+    messages = [record.getMessage() for record in caplog.records if "reactive_pulse_visual:" in record.getMessage()]
+    assert messages
+    assert "visual_hw=5" in messages[-1]
+    assert "pulse_scale=1.000" in messages[-1]
+    assert "very_dim_curve=True" in messages[-1]
+    assert "post_restore_damp=1.000" in messages[-1]
+
+
+def test_pulse_brightness_logs_post_restore_damp_under_debug(monkeypatch, caplog) -> None:
+    eng = _DummyEngine(brightness=5, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 5
+    eng._reactive_post_restore_visual_damp_until = 102.0
+
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    monkeypatch.setattr("src.core.effects.reactive.render.time.monotonic", lambda: 100.0)
+
+    with caplog.at_level(logging.INFO, logger="src.core.effects.reactive.render"):
+        pulse_brightness_scale_factor(eng)
+
+    messages = [record.getMessage() for record in caplog.records if "reactive_pulse_visual:" in record.getMessage()]
+    assert messages
+    assert "pulse_scale=0.415" in messages[-1]
+    assert "holdoff_remaining_s=2.00" in messages[-1]
+    assert "post_restore_damp=0.350" in messages[-1]
+
+
+def test_pulse_brightness_does_not_damp_normal_first_activity_holdoff() -> None:
+    eng = _DummyEngine(brightness=5, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 5
+    eng._reactive_disable_pulse_hw_lift_until = 102.0
+
+    import src.core.effects.reactive.render as render_module
+
+    original_monotonic = render_module.time.monotonic
+    render_module.time.monotonic = lambda: 100.0
+    try:
+        assert pulse_brightness_scale_factor(eng) == 1.0
+    finally:
+        render_module.time.monotonic = original_monotonic
 
 
 def test_pulse_brightness_keeps_full_scale_when_reactive_matches_hw() -> None:

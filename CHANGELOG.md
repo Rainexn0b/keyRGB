@@ -3,6 +3,14 @@
 ## Unreleased
 
 
+## 0.23.6 (2026-04-26)
+
+- Effects/Reactive: Restore direct reactive slider scaling for normal low-brightness per-key typing, scope extra pulse suppression to explicit post-restore windows only, and add pulse/render visual debug traces that separate software-side composition from hardware-brightness decisions.
+- Tray/Idle Power: Reseed reactive restore holdoff and visual-damp timers after full idle off -> on wake effect restarts so the first post-undim typing burst stays suppressed on the real wake path instead of bypassing restore-time flash protection.
+- Tray/Brightness: Keep tray and power-policy brightness overrides synchronized across `brightness`, `perkey_brightness`, and `reactive_brightness` for reactive effects so dim and manual brightness changes do not leave the pulse layer out of sync with the steady-state backdrop.
+- Docs/Debugging: Add the reactive typing flicker post-mortem and refresh the reactive debug agent guidance with the final clean validation artifacts and late-session wake-path findings.
+
+
 ## 0.23.5 (2026-04-26)
 
 - Effects/Reactive: Soften low-brightness reactive pulse contrast on per-key hardware, smooth restore ramps between hardware brightness steps, and add debug logging around temporary pulse hardware-lift cooldown decisions.

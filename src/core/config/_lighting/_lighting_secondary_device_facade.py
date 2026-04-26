@@ -38,8 +38,7 @@ class LightingSecondaryDeviceFacade:
         *,
         fallback_keys: tuple[str, ...] = (),
         default: object,
-    ) -> object:
-        ...
+    ) -> object: ...
 
     def _secondary_device_state(self) -> dict[str, Any]:
         return secondary_device_accessors.secondary_device_state(self)

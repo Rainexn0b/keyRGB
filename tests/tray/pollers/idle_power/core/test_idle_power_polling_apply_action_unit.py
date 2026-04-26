@@ -276,6 +276,26 @@ def test_restore_brightness_for_reactive_effect_restores_perkey_brightness() -> 
     assert tray.engine.per_key_brightness == 55
 
 
+def test_restore_brightness_for_reactive_effect_seeds_longer_visual_damp_window(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tray = _mk_tray(effect="reactive_ripple", brightness=30)
+    tray.config.perkey_brightness = 55
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 5
+
+    monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
+
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
+
+    expected_hw_lift_until = 100.0 + max(2.0, float(SOFT_ON_FADE_DURATION_S) + 0.75)
+    expected_visual_damp_until = 100.0 + max(4.0, float(SOFT_ON_FADE_DURATION_S) + 2.75)
+
+    assert tray.engine._reactive_disable_pulse_hw_lift_until == pytest.approx(expected_hw_lift_until)
+    assert tray.engine._reactive_post_restore_visual_damp_until == pytest.approx(expected_visual_damp_until)
+    assert tray.engine._reactive_post_restore_visual_damp_until > tray.engine._reactive_disable_pulse_hw_lift_until
+
+
 def test_restore_brightness_does_nothing_if_tray_is_off() -> None:
     tray = _mk_tray(effect="wave", brightness=30)
     tray.is_off = True

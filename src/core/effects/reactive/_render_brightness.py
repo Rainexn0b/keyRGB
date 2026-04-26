@@ -27,9 +27,7 @@ def _resolve_hw_brightness_with_pulse_mix(
     clamp01_fn: Callable[[float], float],
     logger: logging.Logger,
 ) -> tuple[int, int, bool, bool]:
-    per_key_hw = bool(
-        _support.device_attr_or_none(_support.keyboard_or_none(engine), "set_key_colors")
-    )
+    per_key_hw = bool(_support.device_attr_or_none(_support.keyboard_or_none(engine), "set_key_colors"))
     if per_key_hw:
         _support.set_uniform_hw_streak(engine, value=0, logger=_LOGGER)
         uniform_hw_streak_count = 0
@@ -347,4 +345,3 @@ def resolve_brightness(
 
 def _clear_transition_state(engine: "EffectsEngine") -> None:
     _support.clear_transition_state(engine, logger=_LOGGER)
-

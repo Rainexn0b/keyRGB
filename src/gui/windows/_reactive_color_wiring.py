@@ -110,7 +110,9 @@ def dispatch_color_release(
     )
 
 
-def build_description_section_kwargs(*, ttk_module: object, wrap_sync_errors: tuple[type[BaseException], ...]) -> dict[str, object]:
+def build_description_section_kwargs(
+    *, ttk_module: object, wrap_sync_errors: tuple[type[BaseException], ...]
+) -> dict[str, object]:
     return {
         "ttk_module": ttk_module,
         "wrap_sync_errors": wrap_sync_errors,

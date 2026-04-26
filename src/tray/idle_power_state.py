@@ -152,6 +152,19 @@ def _coerce_idle_power_optional_int(value: object) -> tuple[Optional[int], bool]
     return None, False
 
 
+def _coerce_idle_power_float(value: object) -> tuple[float, bool]:
+    if isinstance(value, bool):
+        return 0.0, False
+
+    if isinstance(value, (int, float, str, bytes, bytearray)):
+        try:
+            return float(value), True
+        except (TypeError, ValueError):
+            return 0.0, False
+
+    return 0.0, False
+
+
 def _read_idle_power_state_field_converged(
     tray: object,
     *,
@@ -236,6 +249,32 @@ def read_idle_power_state_optional_int_field(
     if isinstance(value, (int, float, str, bytes, bytearray)):
         return int(value)
     return default
+
+
+def read_idle_power_state_float_field(
+    tray: object,
+    *,
+    attr_name: object = None,
+    state_name: object = None,
+    default: float = 0.0,
+    **alias_kwargs: object,
+) -> float:
+    """Read a float idle/power field with safe owner fallback and convergence."""
+
+    value = _read_idle_power_state_field_converged(
+        tray,
+        attr_name=attr_name,
+        state_name=state_name,
+        default=float(default),
+        coerce=_coerce_idle_power_float,
+        **alias_kwargs,
+    )
+    if isinstance(value, (int, float, str, bytes, bytearray)):
+        try:
+            return float(value)
+        except (TypeError, ValueError, OverflowError):
+            return float(default)
+    return float(default)
 
 
 def set_idle_power_state_field(

@@ -13,26 +13,27 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
-from src.tray.idle_power_state import (
-    TrayIdlePowerState,
-    ensure_tray_idle_power_state,
-    read_idle_power_state_bool_field,
-    read_idle_power_state_optional_int_field,
-    set_idle_power_state_field,
-    sync_idle_power_state_field,
-)
-from src.tray._power_restore_policy import (
-    LightingPowerRestoreGuardState,
-    LightingPowerRestorePolicyState,
-    read_lighting_power_restore_guard_state,
-    normalize_lighting_power_restore_policy_state,
-)
+from src.tray import _power_restore_policy as _power_restore_policy
+from src.tray import idle_power_state as _idle_power_state
 
 
 if TYPE_CHECKING:
     from src.core.config import Config
     from src.core.effects.engine import EffectsEngine
     from src.tray.ui.icon import IconVisual
+
+
+TrayIdlePowerState = _idle_power_state.TrayIdlePowerState
+ensure_tray_idle_power_state = _idle_power_state.ensure_tray_idle_power_state
+read_idle_power_state_bool_field = _idle_power_state.read_idle_power_state_bool_field
+read_idle_power_state_float_field = _idle_power_state.read_idle_power_state_float_field
+read_idle_power_state_optional_int_field = _idle_power_state.read_idle_power_state_optional_int_field
+set_idle_power_state_field = _idle_power_state.set_idle_power_state_field
+sync_idle_power_state_field = _idle_power_state.sync_idle_power_state_field
+LightingPowerRestoreGuardState = _power_restore_policy.LightingPowerRestoreGuardState
+LightingPowerRestorePolicyState = _power_restore_policy.LightingPowerRestorePolicyState
+read_lighting_power_restore_guard_state = _power_restore_policy.read_lighting_power_restore_guard_state
+normalize_lighting_power_restore_policy_state = _power_restore_policy.normalize_lighting_power_restore_policy_state
 
 
 # ---------------------------------------------------------------------------
@@ -114,7 +115,7 @@ class _HasIdleDimState(Protocol):
 
 
 class _RefreshUi(Protocol):
-    def _refresh_ui(self) -> None: ...
+    def _refresh_ui(self, *, animate_icon: bool = True) -> None: ...
 
 
 class _RefreshTrayUi(_RefreshUi, Protocol):
@@ -244,6 +245,3 @@ class LightingTrayProtocol(
     Protocol,
 ):
     """Minimal protocol for tray lighting controller functions."""
-
-
-

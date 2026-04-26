@@ -52,12 +52,16 @@ class TestApplyBrightnessFromPowerPolicy:
 
         mock_tray = _mk_tray(effect="reactive_ripple", brightness=200)
         mock_tray.config.perkey_brightness = 50
+        mock_tray.config.reactive_brightness = 50
 
         with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             apply_brightness_from_power_policy(mock_tray, 25)
 
         assert mock_tray.config.perkey_brightness == 25
         assert mock_tray.config.brightness == 25
+        assert mock_tray.config.reactive_brightness == 25
+        assert mock_tray.engine.per_key_brightness == 25
+        assert mock_tray.engine.reactive_brightness == 25
         mock_tray.engine.set_brightness.assert_called_once_with(
             25, apply_to_hardware=False, fade=True, fade_duration_s=0.25
         )
@@ -69,6 +73,7 @@ class TestApplyBrightnessFromPowerPolicy:
 
         mock_tray = _mk_tray(effect="reactive_ripple", brightness=200)
         mock_tray.config.perkey_brightness = 50
+        mock_tray.config.reactive_brightness = 50
         mock_tray.engine.set_brightness.side_effect = RuntimeError("engine failed")
         logs = []
 
@@ -84,6 +89,9 @@ class TestApplyBrightnessFromPowerPolicy:
 
         assert mock_tray.config.perkey_brightness == 25
         assert mock_tray.config.brightness == 25
+        assert mock_tray.config.reactive_brightness == 25
+        assert mock_tray.engine.per_key_brightness == 25
+        assert mock_tray.engine.reactive_brightness == 25
         mock_tray.engine.set_brightness.assert_called_once_with(
             25, apply_to_hardware=False, fade=True, fade_duration_s=0.25
         )

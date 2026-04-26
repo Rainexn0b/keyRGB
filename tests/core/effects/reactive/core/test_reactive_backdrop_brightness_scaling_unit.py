@@ -94,11 +94,11 @@ def test_scaling_factors_dim_base_bright_effect() -> None:
     b_factor = backdrop_brightness_scale_factor(engine, effect_brightness_hw=50)
     assert abs(b_factor - 1.0) < 1e-9
 
-    # Pulse scale is softened when the requested pulse brightness far exceeds
-    # the steady-state hardware brightness on per-key backends, but it should
-    # still leave visible feedback above the backdrop baseline.
+    # Normal per-key typing uses direct reactive slider scaling again. Extra
+    # suppression is now reserved for explicit post-restore windows and is
+    # covered by the dedicated pulse-brightness tests.
     p_factor = pulse_brightness_scale_factor(engine)
-    assert p_factor == pytest.approx(0.6923024947075771)
+    assert p_factor == pytest.approx(1.0)
 
 
 def test_scaling_factors_bright_base_dim_effect() -> None:

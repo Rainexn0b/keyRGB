@@ -5,18 +5,30 @@ from src.core.effects.software_targets import normalize_software_effect_target
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
 from src.tray.protocols import ConfigPollingTrayProtocol, ConfigStateResolveTrayProtocol
 
+from . import _planning as _planning
+from . import _post_fast_path_apply as _post_fast_path_apply
 from ._config_apply_state import _CONFIG_FALLBACK_EXCEPTIONS
 from ._config_apply_state import _safe_perkey_signature, _safe_tuple_attr
 from ._config_apply_state import ConfigApplyState, build_config_apply_state
 from ._fast_path import apply_fast_path_change, classify_fast_path_change
-from ._post_fast_path_apply import apply_post_fast_path_execution, execute_non_fast_path_plan
-from ._planning import classify_apply_from_config, resolve_apply_from_config_policy
-from .helpers import _apply_effect, _apply_perkey, _apply_turn_off, _apply_uniform, _handle_forced_off, _sync_reactive, _sync_software_target_policy
+from .helpers import (
+    _apply_effect,
+    _apply_perkey,
+    _apply_turn_off,
+    _apply_uniform,
+    _handle_forced_off,
+    _sync_reactive,
+    _sync_software_target_policy,
+)
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 _FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+apply_post_fast_path_execution = _post_fast_path_apply.apply_post_fast_path_execution
+execute_non_fast_path_plan = _post_fast_path_apply.execute_non_fast_path_plan
+classify_apply_from_config = _planning.classify_apply_from_config
+resolve_apply_from_config_policy = _planning.resolve_apply_from_config_policy
 
 
 def compute_config_apply_state(tray: ConfigStateResolveTrayProtocol) -> ConfigApplyState:
