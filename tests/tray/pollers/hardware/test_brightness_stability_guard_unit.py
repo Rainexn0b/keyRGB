@@ -308,6 +308,7 @@ def test_dim_temp_active_cleared_on_engine_on_restore() -> None:
 def test_engine_init_has_proper_dim_attributes() -> None:
     """EffectsEngine.__init__ should declare _hw_brightness_cap and _dim_temp_active."""
     from src.core.effects.engine import EffectsEngine
+    from src.core.effects.reactive._render_brightness_support import ensure_reactive_state
 
     engine = EffectsEngine()
     assert hasattr(engine, "_hw_brightness_cap")
@@ -316,9 +317,8 @@ def test_engine_init_has_proper_dim_attributes() -> None:
     assert engine._dim_temp_active is False
     assert hasattr(engine, "_last_rendered_brightness")
     assert engine._last_rendered_brightness is None
-    assert hasattr(engine, "_reactive_transition_from_brightness")
-    assert engine._reactive_transition_from_brightness is None
-    assert hasattr(engine, "_reactive_transition_to_brightness")
-    assert engine._reactive_transition_to_brightness is None
-    assert hasattr(engine, "_reactive_active_pulse_mix")
-    assert engine._reactive_active_pulse_mix == 0.0
+
+    state = ensure_reactive_state(engine)
+    assert state._reactive_transition_from_brightness is None
+    assert state._reactive_transition_to_brightness is None
+    assert state._reactive_active_pulse_mix == 0.0

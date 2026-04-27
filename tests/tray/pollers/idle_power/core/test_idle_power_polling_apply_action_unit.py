@@ -279,6 +279,8 @@ def test_restore_brightness_for_reactive_effect_restores_perkey_brightness() -> 
 def test_restore_brightness_for_reactive_effect_seeds_longer_visual_damp_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    from src.core.effects.reactive import _render_brightness_support as reactive_support
+
     tray = _mk_tray(effect="reactive_ripple", brightness=30)
     tray.config.perkey_brightness = 55
     tray._dim_temp_active = True
@@ -290,11 +292,12 @@ def test_restore_brightness_for_reactive_effect_seeds_longer_visual_damp_window(
 
     expected_hw_lift_until = 100.0 + max(2.0, float(SOFT_ON_FADE_DURATION_S) + 0.75)
     expected_visual_damp_until = 100.0 + max(4.0, float(SOFT_ON_FADE_DURATION_S) + 2.75)
+    state = reactive_support.ensure_reactive_state(tray.engine)
 
-    assert tray.engine._reactive_disable_pulse_hw_lift_until == pytest.approx(expected_hw_lift_until)
-    assert tray.engine._reactive_post_restore_visual_damp_until == pytest.approx(expected_visual_damp_until)
-    assert tray.engine._reactive_post_restore_visual_damp_until > tray.engine._reactive_disable_pulse_hw_lift_until
-    assert tray.engine._reactive_post_restore_visual_damp_pending is True
+    assert state._reactive_disable_pulse_hw_lift_until == pytest.approx(expected_hw_lift_until)
+    assert state._reactive_restore_damp_until == pytest.approx(expected_visual_damp_until)
+    assert state._reactive_restore_damp_until > state._reactive_disable_pulse_hw_lift_until
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING
 
 
 def test_restore_brightness_does_nothing_if_tray_is_off() -> None:
@@ -439,6 +442,8 @@ class _StrictEngine:
 
 
 def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
+    from src.core.effects.reactive._render_brightness_support import ensure_reactive_state
+
     engine = _StrictEngine()
     tray = SimpleNamespace()
     tray.engine = engine
@@ -466,9 +471,10 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     # _resolve_brightness() can see it.
     assert getattr(engine, "_dim_temp_active", None) is True
     assert engine.set_brightness_calls == [(3, False, False, 0.0)]
-    assert getattr(engine, "_reactive_transition_from_brightness", None) == 25
-    assert getattr(engine, "_reactive_transition_to_brightness", None) == 3
-    assert getattr(engine, "_reactive_transition_duration_s", None) == SOFT_OFF_FADE_DURATION_S
+    state = ensure_reactive_state(engine)
+    assert state._reactive_transition_from_brightness == 25
+    assert state._reactive_transition_to_brightness == 3
+    assert state._reactive_transition_duration_s == SOFT_OFF_FADE_DURATION_S
 
     # Restore must also be atomic + instant, keep reactive_brightness intact.
     tray._dim_temp_active = True
@@ -483,13 +489,14 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     assert getattr(engine, "_hw_brightness_cap", "MISSING") is None
     assert getattr(engine, "_dim_temp_active", None) is False
     assert engine.set_brightness_calls[-1] == (5, False, False, 0.0)
-    assert getattr(engine, "_reactive_transition_from_brightness", None) == 3
+    state = ensure_reactive_state(engine)
+    assert state._reactive_transition_from_brightness == 3
     # restore_target_hw = max(config.brightness=5, perkey=5) = 5
     # reactive_brightness is excluded from the target because _resolve_brightness
     # no longer raises hw above global_hw.  Targeting reactive_brightness=50 would
     # overshoot steady-state hw=5 and produce a visible flash on every undim.
-    assert getattr(engine, "_reactive_transition_to_brightness", None) == 5
-    assert getattr(engine, "_reactive_transition_duration_s", None) == SOFT_ON_FADE_DURATION_S
+    assert state._reactive_transition_to_brightness == 5
+    assert state._reactive_transition_duration_s == SOFT_ON_FADE_DURATION_S
 
 
 class _SequencingLock(AbstractContextManager[None]):

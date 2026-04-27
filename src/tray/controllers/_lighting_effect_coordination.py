@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.tray.protocols import LightingTrayProtocol
 
 
@@ -186,7 +187,7 @@ def _apply_effect_fade_ramp(
             tray.engine.per_key_brightness = start_brightness
     else:
         follow_global_flag = True
-        tray.engine._reactive_follow_global_brightness = True
+        _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", True)
 
     if plan.apply_to_hardware:
         tray.engine.set_brightness(
@@ -204,10 +205,7 @@ def _apply_effect_fade_ramp(
         )
 
     if follow_global_flag:
-        try:
-            tray.engine._reactive_follow_global_brightness = False
-        except (AttributeError, TypeError, ValueError, OverflowError):
-            pass
+        _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", False)
 
     if saved_reactive_br is not None:
         try:

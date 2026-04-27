@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable
 from typing import Optional, cast
 
+from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
 from src.tray.pollers.idle_power._restore_policy import classify_idle_restore_start
@@ -154,10 +155,18 @@ def _set_reactive_transition(
             max_v=50,
         )
         target_i = max(0, min(50, int(target_brightness)))
-        engine._reactive_transition_from_brightness = current_i  # type: ignore[attr-defined]
-        engine._reactive_transition_to_brightness = target_i  # type: ignore[attr-defined]
-        engine._reactive_transition_started_at = float(time.monotonic())  # type: ignore[attr-defined]
-        engine._reactive_transition_duration_s = max(0.0, float(duration_s))  # type: ignore[attr-defined]
+        _reactive_support.set_engine_attr(engine, "_reactive_transition_from_brightness", current_i)
+        _reactive_support.set_engine_attr(engine, "_reactive_transition_to_brightness", target_i)
+        _reactive_support.set_engine_attr(
+            engine,
+            "_reactive_transition_started_at",
+            float(time.monotonic()),
+        )
+        _reactive_support.set_engine_attr(
+            engine,
+            "_reactive_transition_duration_s",
+            max(0.0, float(duration_s)),
+        )
     except (AttributeError, TypeError, ValueError):
         return
 

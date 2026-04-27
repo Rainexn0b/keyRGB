@@ -251,6 +251,7 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
 ) -> None:
     import src.tray.pollers.idle_power.polling as ipp
     from src.tray.controllers._power._transition_constants import SOFT_ON_FADE_DURATION_S
+    from src.core.effects.reactive import _render_brightness_support as reactive_support
 
     monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
 
@@ -263,8 +264,8 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
         engine=SimpleNamespace(
             current_color=(12, 34, 56),
             _reactive_disable_pulse_hw_lift_until=None,
-            _reactive_post_restore_visual_damp_until=None,
-            _reactive_post_restore_visual_damp_pending=False,
+            _reactive_restore_damp_until=None,
+            _reactive_restore_phase=reactive_support.ReactiveRestorePhase.NORMAL,
         ),
         _log_exception=lambda *_a, **_kw: None,
         _start_current_effect=lambda **_kwargs: None,
@@ -272,15 +273,16 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
     )
 
     ipp._restore_from_idle(tray)
+    state = reactive_support.ensure_reactive_state(tray.engine)
 
-    assert tray.engine._reactive_disable_pulse_hw_lift_until == pytest.approx(
+    assert state._reactive_disable_pulse_hw_lift_until == pytest.approx(
         100.0 + max(2.0, float(SOFT_ON_FADE_DURATION_S) + 0.75)
     )
-    assert tray.engine._reactive_post_restore_visual_damp_until == pytest.approx(
+    assert state._reactive_restore_damp_until == pytest.approx(
         100.0 + max(4.0, float(SOFT_ON_FADE_DURATION_S) + 2.75)
     )
-    assert tray.engine._reactive_post_restore_visual_damp_until > tray.engine._reactive_disable_pulse_hw_lift_until
-    assert tray.engine._reactive_post_restore_visual_damp_pending is True
+    assert state._reactive_restore_damp_until > state._reactive_disable_pulse_hw_lift_until
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING
 
 
 def test_restore_from_idle_non_loop_effect_uses_soft_on_start() -> None:

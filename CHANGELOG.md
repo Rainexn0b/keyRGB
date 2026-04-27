@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.23.8 (2026-04-27)
+
+- Effects/Reactive: Move reactive restore and render bookkeeping onto a structured state path (`ReactiveRenderState`) with explicit restore phases (`normal`, `first_pulse_pending`, `damping`), keeping the first-post-restore damp flow deterministic and easier to reason about.
+- Tray/Idle Power: Align tray lighting coordination and idle-power transition actions with the new reactive state helpers so restore windows, damp timers, and pulse cache updates stay synchronized across wake and restart paths.
+- Effects/Reactive: Refactor temporary hardware-brightness lift eligibility into explicit support helpers and preserve the per-key policy that prevents whole-keyboard brightness spikes while still allowing uniform-only fallback visibility.
+- Docs: Reorganize bug-report and reactive flicker investigation docs under `docs/developement/bug-reports/` and `docs/developement/bug-ongoing/`, and update build-runner guidance to reflect the current quality/release profile flow.
+
 ## 0.23.7 (2026-04-27)
 
 - Effects/Reactive: Reseed the post-restore visual damp window on the first keystroke after wake so the suppress-first-pulse guard stays effective even when the user starts typing after the initial holdoff has already expired.

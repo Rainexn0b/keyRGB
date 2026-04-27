@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
+from src.core.effects.reactive import _render_brightness_support as reactive_support
+
 
 def _lock_mock() -> MagicMock:
     return MagicMock(__enter__=lambda s: None, __exit__=lambda s, *args: None)
@@ -283,12 +285,12 @@ class TestStartCurrentEffect:
         mock_tray.config.color = (0, 255, 0)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
-        mock_tray.engine._reactive_follow_global_brightness = False
+        reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness = False
         mock_tray.engine.reactive_brightness = 50
         mock_tray.engine.per_key_brightness = 50
 
         def _assert_fade_state(*args, **kwargs):
-            assert mock_tray.engine._reactive_follow_global_brightness is True
+            assert reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness is True
             assert mock_tray.engine.reactive_brightness == 50
             assert mock_tray.engine.per_key_brightness == 50
 
@@ -311,7 +313,7 @@ class TestStartCurrentEffect:
             fade=True,
             fade_duration_s=0.42,
         )
-        assert mock_tray.engine._reactive_follow_global_brightness is False
+        assert reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness is False
         assert mock_tray.engine.reactive_brightness == 50
         assert mock_tray.engine.per_key_brightness == 50
 
@@ -329,7 +331,7 @@ class TestStartCurrentEffect:
         mock_tray.config.color = (0, 255, 0)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
-        mock_tray.engine._reactive_follow_global_brightness = False
+        reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness = False
         mock_tray.engine.reactive_brightness = 50
         mock_tray.engine.per_key_brightness = 50
 
@@ -350,7 +352,7 @@ class TestStartCurrentEffect:
             fade=True,
             fade_duration_s=0.42,
         )
-        assert mock_tray.engine._reactive_follow_global_brightness is False
+        assert reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness is False
         assert mock_tray.engine.reactive_brightness == 50
         assert mock_tray.engine.per_key_brightness == 50
 

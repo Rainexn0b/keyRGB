@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Protocol, cast
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET
+from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
 
@@ -61,9 +62,21 @@ def _seed_reactive_restore_windows(engine: object, *, fade_in_duration_s: float)
             4.0,
             float(fade_in_duration_s) + 2.75,
         )
-        engine._reactive_disable_pulse_hw_lift_until = hw_lift_holdoff_until  # type: ignore[attr-defined]
-        engine._reactive_post_restore_visual_damp_until = visual_damp_until  # type: ignore[attr-defined]
-        engine._reactive_post_restore_visual_damp_pending = True  # type: ignore[attr-defined]
+        _reactive_support.set_engine_attr(
+            cast(object, engine),
+            "_reactive_disable_pulse_hw_lift_until",
+            hw_lift_holdoff_until,
+        )
+        _reactive_support.set_engine_attr(
+            cast(object, engine),
+            "_reactive_restore_damp_until",
+            visual_damp_until,
+        )
+        _reactive_support.set_engine_attr(
+            cast(object, engine),
+            "_reactive_restore_phase",
+            _reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING,
+        )
     except (AttributeError, TypeError, ValueError):
         return
 
@@ -130,7 +143,11 @@ def apply_dim_temp_brightness(
     is_sw_effect = effect in sw_effects_set
     if effect in reactive_effects_set:
         with tray.engine.kb_lock:
-            tray.engine._reactive_disable_pulse_hw_lift_until = float(time.monotonic()) + 2.0  # type: ignore[attr-defined]
+            _reactive_support.set_engine_attr(
+                tray.engine,
+                "_reactive_disable_pulse_hw_lift_until",
+                float(time.monotonic()) + 2.0,
+            )
             tray.engine._dim_temp_active = True  # type: ignore[attr-defined]
             set_reactive_transition(
                 tray.engine,
