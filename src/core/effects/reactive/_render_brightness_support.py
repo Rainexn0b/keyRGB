@@ -1,22 +1,111 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from enum import Enum
 import logging
 import os
 import time
 from operator import attrgetter
-from typing import TYPE_CHECKING, Callable, Protocol, cast
-
-if TYPE_CHECKING:
-    from src.core.effects.engine import EffectsEngine
-
+from typing import Callable
 
 _LOGGER = logging.getLogger(__name__)
 _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _ENGINE_ATTR_RUNTIME_ERRORS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
-class _UniformHwStreakEngine(Protocol):
-    _reactive_uniform_hw_streak: int
+class ReactiveRestorePhase(str, Enum):
+    NORMAL = "normal"
+    FIRST_PULSE_PENDING = "first_pulse_pending"
+    DAMPING = "damping"
+
+
+@dataclass(slots=True)
+class ReactiveRenderState:
+    _compat_mirror_to_engine: bool = True
+    _reactive_transition_from_brightness: int | None = None
+    _reactive_transition_to_brightness: int | None = None
+    _reactive_transition_started_at: float | None = None
+    _reactive_transition_duration_s: float | None = None
+    _reactive_disable_pulse_hw_lift_until: float | None = None
+    _reactive_restore_phase: ReactiveRestorePhase = ReactiveRestorePhase.NORMAL
+    _reactive_restore_damp_until: float | None = None
+    _reactive_uniform_hw_streak: int = 0
+    _reactive_follow_global_brightness: bool = False
+    _reactive_active_pulse_mix: float = 0.0
+    _reactive_debug_hw_lift_state: tuple[object, ...] | None = None
+    _reactive_debug_pulse_visual_state: tuple[object, ...] | None = None
+    _reactive_debug_last_pulse_scale: float = 1.0
+    _reactive_debug_render_visual_state: tuple[object, ...] | None = None
+
+
+_REACTIVE_STATE_ATTR_NAMES = frozenset(
+    name for name in ReactiveRenderState.__annotations__ if name != "_compat_mirror_to_engine"
+)
+
+
+def _is_reactive_state_attr(name: str) -> bool:
+    return name in _REACTIVE_STATE_ATTR_NAMES
+
+
+def _copy_reactive_state_attrs(source: object, state: ReactiveRenderState) -> None:
+    for name in _REACTIVE_STATE_ATTR_NAMES:
+        try:
+            value = attrgetter(name)(source)
+        except AttributeError:
+            continue
+        try:
+            setattr(state, name, value)
+        except (AttributeError, TypeError, ValueError):
+            continue
+
+    try:
+        legacy_until = attrgetter("_reactive_post_restore_visual_damp_until")(source)
+    except AttributeError:
+        legacy_until = None
+    try:
+        legacy_pending = bool(attrgetter("_reactive_post_restore_visual_damp_pending")(source))
+    except AttributeError:
+        legacy_pending = False
+    except (TypeError, ValueError):
+        legacy_pending = False
+
+    legacy_until_value: float | None
+    try:
+        legacy_until_value = float(legacy_until) if legacy_until is not None else None
+    except _INT_COERCION_ERRORS:
+        legacy_until_value = None
+
+    if legacy_pending:
+        state._reactive_restore_phase = ReactiveRestorePhase.FIRST_PULSE_PENDING
+        state._reactive_restore_damp_until = legacy_until_value
+    elif legacy_until_value is not None:
+        state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
+        state._reactive_restore_damp_until = legacy_until_value
+
+
+def ensure_reactive_state(engine: object) -> ReactiveRenderState:
+    try:
+        state = attrgetter("_reactive_state")(engine)
+    except AttributeError:
+        state = None
+    if isinstance(state, ReactiveRenderState):
+        return state
+
+    hydrated = ReactiveRenderState()
+    if state is not None:
+        _copy_reactive_state_attrs(state, hydrated)
+    _copy_reactive_state_attrs(engine, hydrated)
+    try:
+        setattr(engine, "_reactive_state", hydrated)
+    except (AttributeError, TypeError, ValueError):
+        pass
+    return hydrated
+
+
+def _attr_target(engine: object, name: str) -> object:
+    if _is_reactive_state_attr(name):
+        return ensure_reactive_state(engine)
+    return engine
 
 
 def run_engine_attr_operation(
@@ -40,15 +129,16 @@ def run_engine_attr_operation(
 
 
 def read_engine_attr(
-    engine: "EffectsEngine",
+    engine: object,
     name: str,
     *,
     missing_default: object,
     error_default: object,
     logger: logging.Logger | None = None,
 ) -> object:
+    target = _attr_target(engine, name)
     return run_engine_attr_operation(
-        lambda: attrgetter(name)(engine),
+        lambda: attrgetter(name)(target),
         handled_errors=(AttributeError,),
         handled_result=missing_default,
         runtime_result=error_default,
@@ -58,16 +148,94 @@ def read_engine_attr(
     )
 
 
-def bool_attr_or_default(engine: "EffectsEngine", name: str, *, default: bool) -> bool:
+def bool_attr_or_default(engine: object, name: str, *, default: bool) -> bool:
+    target = _attr_target(engine, name)
     try:
-        return bool(attrgetter(name)(engine))
+        return bool(attrgetter(name)(target))
     except AttributeError:
         return default
 
 
-def keyboard_or_none(engine: "EffectsEngine") -> object | None:
+def restore_phase_or_default(
+    engine: object,
+    *,
+    default: ReactiveRestorePhase,
+    logger: logging.Logger | None = None,
+) -> ReactiveRestorePhase:
+    raw_value = read_engine_attr(
+        engine,
+        "_reactive_restore_phase",
+        missing_default=default,
+        error_default=default,
+        logger=logger,
+    )
+    if isinstance(raw_value, ReactiveRestorePhase):
+        return raw_value
     try:
-        return engine.kb
+        return ReactiveRestorePhase(str(raw_value))
+    except ValueError:
+        return default
+
+
+def set_engine_attr(
+    engine: object,
+    name: str,
+    value: object,
+    *,
+    logger: logging.Logger | None = None,
+    message: str = "Reactive brightness failed to set engine attribute %s",
+) -> None:
+    target = _attr_target(engine, name)
+
+    def set_attr() -> None:
+        setattr(target, name, value)
+
+    run_engine_attr_operation(
+        set_attr,
+        handled_errors=(AttributeError, TypeError, ValueError),
+        handled_result=None,
+        runtime_result=None,
+        message=message,
+        name=name,
+        logger=logger,
+    )
+
+
+def set_engine_compat_attr(
+    engine: object,
+    name: str,
+    value: object,
+    *,
+    logger: logging.Logger | None = None,
+    message: str = "Reactive brightness failed to set engine attribute %s",
+) -> None:
+    target = _attr_target(engine, name)
+    if target is engine:
+        return
+    try:
+        compat_mirror_to_engine = bool(attrgetter("_compat_mirror_to_engine")(target))
+    except AttributeError:
+        compat_mirror_to_engine = True
+    if not compat_mirror_to_engine:
+        return
+
+    def set_attr() -> None:
+        setattr(engine, name, value)
+
+    run_engine_attr_operation(
+        set_attr,
+        handled_errors=(AttributeError, TypeError, ValueError),
+        handled_result=None,
+        runtime_result=None,
+        message=message,
+        name=name,
+        logger=logger,
+    )
+
+
+def keyboard_or_none(engine: object) -> object | None:
+    try:
+        return getattr(engine, "kb")
     except AttributeError:
         return None
 
@@ -106,7 +274,7 @@ def debug_brightness_enabled() -> bool:
     return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1"
 
 
-def pulse_hw_lift_temporarily_disabled(engine: "EffectsEngine", *, logger: logging.Logger) -> bool:
+def pulse_hw_lift_temporarily_disabled(engine: object, *, logger: logging.Logger) -> bool:
     raw_until = read_engine_attr(
         engine,
         "_reactive_disable_pulse_hw_lift_until",
@@ -122,22 +290,11 @@ def pulse_hw_lift_temporarily_disabled(engine: "EffectsEngine", *, logger: loggi
     return float(time.monotonic()) < float(until_s)
 
 
-def set_uniform_hw_streak(engine: "EffectsEngine", *, value: int, logger: logging.Logger) -> None:
-    def set_streak() -> None:
-        cast(_UniformHwStreakEngine, engine)._reactive_uniform_hw_streak = max(0, int(value))
-
-    run_engine_attr_operation(
-        set_streak,
-        handled_errors=(AttributeError, TypeError, ValueError),
-        handled_result=None,
-        runtime_result=None,
-        message="Reactive brightness failed to set engine attribute %s",
-        name="_reactive_uniform_hw_streak",
-        logger=logger,
-    )
+def set_uniform_hw_streak(engine: object, *, value: int, logger: logging.Logger) -> None:
+    set_engine_attr(engine, "_reactive_uniform_hw_streak", max(0, int(value)), logger=logger)
 
 
-def uniform_hw_streak(engine: "EffectsEngine", *, logger: logging.Logger) -> int:
+def uniform_hw_streak(engine: object, *, logger: logging.Logger) -> int:
     raw = read_engine_attr(
         engine,
         "_reactive_uniform_hw_streak",
@@ -150,7 +307,7 @@ def uniform_hw_streak(engine: "EffectsEngine", *, logger: logging.Logger) -> int
 
 
 def log_hw_lift_decision_change(
-    engine: "EffectsEngine",
+    engine: object,
     *,
     logger: logging.Logger,
     reason: str,
@@ -195,18 +352,7 @@ def log_hw_lift_decision_change(
     if previous == state:
         return
 
-    def set_state() -> None:
-        setattr(engine, "_reactive_debug_hw_lift_state", state)
-
-    run_engine_attr_operation(
-        set_state,
-        handled_errors=(AttributeError, TypeError, ValueError),
-        handled_result=None,
-        runtime_result=None,
-        message="Reactive brightness failed to set engine attribute %s",
-        name="_reactive_debug_hw_lift_state",
-        logger=logger,
-    )
+    set_engine_attr(engine, "_reactive_debug_hw_lift_state", state, logger=logger)
     logger.info(
         "reactive_hw_lift: reason=%s per_key=%s streak=%s pulse_mix=%.3f cooldown=%s cooldown_remaining_s=%.2f allow=%s global=%s base=%s eff=%s idle=%s hw=%s dim=%s",
         reason,
@@ -226,7 +372,7 @@ def log_hw_lift_decision_change(
 
 
 def log_pulse_visual_scale_change(
-    engine: "EffectsEngine",
+    engine: object,
     *,
     logger: logging.Logger,
     base: int,
@@ -267,19 +413,8 @@ def log_pulse_visual_scale_change(
     if previous == state:
         return
 
-    def set_state() -> None:
-        setattr(engine, "_reactive_debug_pulse_visual_state", state)
-        setattr(engine, "_reactive_debug_last_pulse_scale", float(pulse_scale))
-
-    run_engine_attr_operation(
-        set_state,
-        handled_errors=(AttributeError, TypeError, ValueError),
-        handled_result=None,
-        runtime_result=None,
-        message="Reactive brightness failed to set engine attribute %s",
-        name="_reactive_debug_pulse_visual_state",
-        logger=logger,
-    )
+    set_engine_attr(engine, "_reactive_debug_pulse_visual_state", state, logger=logger)
+    set_engine_attr(engine, "_reactive_debug_last_pulse_scale", float(pulse_scale), logger=logger)
     logger.info(
         "reactive_pulse_visual: base=%s eff=%s hw=%s target_hw=%s visual_hw=%s pulse_scale=%.3f contrast_ratio=%.3f contrast_compression=%.3f very_dim_curve=%s holdoff_remaining_s=%.2f post_restore_damp=%.3f",
         int(base),
@@ -297,7 +432,7 @@ def log_pulse_visual_scale_change(
 
 
 def log_render_visual_scale_change(
-    engine: "EffectsEngine",
+    engine: object,
     *,
     logger: logging.Logger,
     brightness_hw: int,
@@ -347,18 +482,7 @@ def log_render_visual_scale_change(
     if previous == state:
         return
 
-    def set_state() -> None:
-        setattr(engine, "_reactive_debug_render_visual_state", state)
-
-    run_engine_attr_operation(
-        set_state,
-        handled_errors=(AttributeError, TypeError, ValueError),
-        handled_result=None,
-        runtime_result=None,
-        message="Reactive brightness failed to set engine attribute %s",
-        name="_reactive_debug_render_visual_state",
-        logger=logger,
-    )
+    set_engine_attr(engine, "_reactive_debug_render_visual_state", state, logger=logger)
     logger.info(
         "reactive_render_visual: hw=%s pulse_scale=%.3f transition_scale=%.3f combined_scale=%.3f pulse_mix=%.3f",
         int(brightness_hw),
@@ -369,23 +493,24 @@ def log_render_visual_scale_change(
     )
 
 
-def clear_transition_state(engine: "EffectsEngine", *, logger: logging.Logger) -> None:
+def clear_transition_state(engine: object, *, logger: logging.Logger) -> None:
     for name in (
         "_reactive_transition_from_brightness",
         "_reactive_transition_to_brightness",
         "_reactive_transition_started_at",
         "_reactive_transition_duration_s",
     ):
-
-        def clear_attr() -> None:
-            setattr(engine, name, None)
-
-        run_engine_attr_operation(
-            clear_attr,
-            handled_errors=(AttributeError, TypeError),
-            handled_result=None,
-            runtime_result=None,
-            message="Reactive brightness failed to clear engine attribute %s",
-            name=name,
+        set_engine_attr(
+            engine,
+            name,
+            None,
             logger=logger,
+            message="Reactive brightness failed to clear engine attribute %s",
+        )
+        set_engine_compat_attr(
+            engine,
+            name,
+            None,
+            logger=logger,
+            message="Reactive brightness failed to clear engine attribute %s",
         )

@@ -12,6 +12,7 @@ from ..device import (
     PerKeyColorMap,
     acquire_keyboard,
 )
+from ..reactive._render_brightness_support import ReactiveRenderState
 from ..software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 
 logger = logging.getLogger("src.core.effects.engine_core")
@@ -117,18 +118,7 @@ class _EngineCore:
         self._dim_temp_active: bool = False
         self._last_rendered_brightness: int | None = None
         self._last_hw_mode_brightness: int | None = None
-
-        self._reactive_transition_from_brightness: int | None = None
-        self._reactive_transition_to_brightness: int | None = None
-        self._reactive_transition_started_at: float | None = None
-        self._reactive_transition_duration_s: float | None = None
-        self._reactive_disable_pulse_hw_lift_until: float | None = None
-        self._reactive_post_restore_visual_damp_until: float | None = None
-        self._reactive_post_restore_visual_damp_pending: bool = False
-        self._reactive_uniform_hw_streak: int = 0
-        self._reactive_follow_global_brightness: bool = False
-
-        self._reactive_active_pulse_mix: float = 0.0
+        self._reactive_state = ReactiveRenderState(_compat_mirror_to_engine=False)
 
         self._brightness_fade_token: int = 0
         self._brightness_fade_lock = RLock()
@@ -183,15 +173,7 @@ class _EngineCore:
 
         self._last_rendered_brightness = None
         self._last_hw_mode_brightness = None
-        self._reactive_transition_from_brightness = None
-        self._reactive_transition_to_brightness = None
-        self._reactive_transition_started_at = None
-        self._reactive_transition_duration_s = None
-        self._reactive_disable_pulse_hw_lift_until = None
-        self._reactive_post_restore_visual_damp_until = None
-        self._reactive_post_restore_visual_damp_pending = False
-        self._reactive_uniform_hw_streak = 0
-        self._reactive_active_pulse_mix = 0.0
+        self._reactive_state = ReactiveRenderState(_compat_mirror_to_engine=False)
 
         if not self.running and not self.thread:
             self.current_effect = None

@@ -1,113 +1,67 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Any
+from typing import Any, cast
 
 
-def dispatch_brightness_change(
-    gui: object,
-    value: str | float,
-    *,
-    interactions_module: object,
-    tk_error: type[BaseException],
-    logger: object,
-    sync_color_wheel_brightness_fn: object,
-    time_monotonic: Callable[[], float],
-) -> None:
-    interactions_module._on_reactive_brightness_change(
-        gui,
-        value,
-        **build_brightness_interaction_kwargs(
-            tk_error=tk_error,
-            logger=logger,
-            sync_color_wheel_brightness_fn=sync_color_wheel_brightness_fn,
-            time_monotonic=time_monotonic,
-        ),
-    )
+def _dispatch_handler(interactions_module: object, handler_name: str) -> Callable[..., None]:
+    return cast(Callable[..., None], getattr(interactions_module, handler_name))
 
 
-def dispatch_brightness_release(
-    gui: object,
-    *,
-    interactions_module: object,
-    tk_error: type[BaseException],
-    logger: object,
-    sync_color_wheel_brightness_fn: object,
-    time_monotonic: Callable[[], float],
-) -> None:
-    interactions_module._on_reactive_brightness_release(
-        gui,
-        **build_brightness_interaction_kwargs(
-            tk_error=tk_error,
-            logger=logger,
-            sync_color_wheel_brightness_fn=sync_color_wheel_brightness_fn,
-            time_monotonic=time_monotonic,
-        ),
-    )
+def _build_value_dispatcher(
+    handler_name: str,
+    kwargs_builder: Callable[..., dict[str, object]],
+) -> Callable[..., None]:
+    def _dispatch(
+        gui: object,
+        value: str | float,
+        *,
+        interactions_module: object,
+        **kwargs: object,
+    ) -> None:
+        _dispatch_handler(interactions_module, handler_name)(gui, value, **kwargs_builder(**kwargs))
+
+    _dispatch.__name__ = handler_name.removeprefix("_on_")
+    return _dispatch
 
 
-def dispatch_trail_change(
-    gui: object,
-    value: str | float,
-    *,
-    interactions_module: object,
-    tk_error: type[BaseException],
-) -> None:
-    interactions_module._on_reactive_trail_change(
-        gui,
-        value,
-        **build_trail_interaction_kwargs(tk_error=tk_error),
-    )
+def _build_release_dispatcher(
+    handler_name: str,
+    kwargs_builder: Callable[..., dict[str, object]],
+) -> Callable[..., None]:
+    def _dispatch(
+        gui: object,
+        *,
+        interactions_module: object,
+        **kwargs: object,
+    ) -> None:
+        _dispatch_handler(interactions_module, handler_name)(gui, **kwargs_builder(**kwargs))
+
+    _dispatch.__name__ = handler_name.removeprefix("_on_")
+    return _dispatch
 
 
-def dispatch_trail_release(
-    gui: object,
-    *,
-    interactions_module: object,
-    tk_error: type[BaseException],
-) -> None:
-    interactions_module._on_reactive_trail_release(
-        gui,
-        **build_trail_interaction_kwargs(tk_error=tk_error),
-    )
+def _build_color_dispatcher(handler_name: str) -> Callable[..., None]:
+    def _dispatch(
+        gui: object,
+        r: int,
+        g: int,
+        b: int,
+        *,
+        interactions_module: object,
+        time_monotonic: Callable[[], float],
+        meta: Mapping[str, object],
+    ) -> None:
+        _dispatch_handler(interactions_module, handler_name)(
+            gui,
+            r,
+            g,
+            b,
+            **build_color_interaction_kwargs(time_monotonic=time_monotonic, meta=meta),
+        )
 
-
-def dispatch_color_change(
-    gui: object,
-    r: int,
-    g: int,
-    b: int,
-    *,
-    interactions_module: object,
-    time_monotonic: Callable[[], float],
-    meta: Mapping[str, object],
-) -> None:
-    interactions_module._on_color_change(
-        gui,
-        r,
-        g,
-        b,
-        **build_color_interaction_kwargs(time_monotonic=time_monotonic, meta=meta),
-    )
-
-
-def dispatch_color_release(
-    gui: object,
-    r: int,
-    g: int,
-    b: int,
-    *,
-    interactions_module: object,
-    time_monotonic: Callable[[], float],
-    meta: Mapping[str, object],
-) -> None:
-    interactions_module._on_color_release(
-        gui,
-        r,
-        g,
-        b,
-        **build_color_interaction_kwargs(time_monotonic=time_monotonic, meta=meta),
-    )
+    _dispatch.__name__ = handler_name.removeprefix("_on_")
+    return _dispatch
 
 
 def build_description_section_kwargs(
@@ -164,3 +118,23 @@ def build_color_interaction_kwargs(
 
 def build_trail_interaction_kwargs(*, tk_error: type[BaseException]) -> dict[str, Any]:
     return {"tk_error": tk_error}
+
+
+dispatch_brightness_change = _build_value_dispatcher(
+    "_on_reactive_brightness_change",
+    build_brightness_interaction_kwargs,
+)
+dispatch_brightness_release = _build_release_dispatcher(
+    "_on_reactive_brightness_release",
+    build_brightness_interaction_kwargs,
+)
+dispatch_trail_change = _build_value_dispatcher(
+    "_on_reactive_trail_change",
+    build_trail_interaction_kwargs,
+)
+dispatch_trail_release = _build_release_dispatcher(
+    "_on_reactive_trail_release",
+    build_trail_interaction_kwargs,
+)
+dispatch_color_change = _build_color_dispatcher("_on_color_change")
+dispatch_color_release = _build_color_dispatcher("_on_color_release")

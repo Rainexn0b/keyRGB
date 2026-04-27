@@ -87,19 +87,42 @@ def _resolve_transition_visual_scale(engine: "EffectsEngine") -> float:
 
 
 def _post_restore_visual_damp(engine: "EffectsEngine") -> tuple[float, float]:
+    restore_phase = _support.restore_phase_or_default(
+        engine,
+        default=_support.ReactiveRestorePhase.NORMAL,
+        logger=logger,
+    )
+    if restore_phase is _support.ReactiveRestorePhase.NORMAL:
+        return 1.0, 0.0
+
     raw_until = _support.read_engine_attr(
         engine,
-        "_reactive_post_restore_visual_damp_until",
+        "_reactive_restore_damp_until",
         missing_default=None,
         error_default=None,
         logger=logger,
     )
     until_s = _support.coerce_float(raw_until, default=None)
     if until_s is None:
+        if restore_phase is _support.ReactiveRestorePhase.DAMPING:
+            _support.set_engine_attr(
+                engine,
+                "_reactive_restore_phase",
+                _support.ReactiveRestorePhase.NORMAL,
+                logger=logger,
+            )
         return 1.0, 0.0
 
     remaining_s = max(0.0, float(until_s) - float(time.monotonic()))
     if remaining_s <= 0.0:
+        if restore_phase is _support.ReactiveRestorePhase.DAMPING:
+            _support.set_engine_attr(
+                engine,
+                "_reactive_restore_phase",
+                _support.ReactiveRestorePhase.NORMAL,
+                logger=logger,
+            )
+            _support.set_engine_attr(engine, "_reactive_restore_damp_until", None, logger=logger)
         return 1.0, 0.0
 
     progress = 1.0 - min(1.0, remaining_s / _POST_RESTORE_PULSE_VISUAL_HOLDOFF_S)

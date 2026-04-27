@@ -17,6 +17,30 @@ _MISSING = object()
 _UNIFORM_PULSE_HW_LIFT_STREAK_MIN = 6
 
 
+def _can_lift_hw_brightness(
+    *,
+    per_key_hw: bool,
+    uniform_hw_streak_count: int,
+    pulse_mix: float,
+    effective_brightness: int,
+    current_hw_brightness: int,
+    cooldown_active: bool,
+) -> bool:
+    """Return whether a uniform-only backend may temporarily raise hardware brightness.
+
+    Per-key backends keep hardware brightness fixed and express reactive intensity
+    through per-key color contrast instead. Uniform-only backends need a short
+    stable-frame gate before lifting hardware brightness so the first keypress of
+    a burst does not produce an immediate full-frame spike.
+    """
+
+    if per_key_hw:
+        return False
+    if uniform_hw_streak_count < _UNIFORM_PULSE_HW_LIFT_STREAK_MIN:
+        return False
+    return pulse_mix > 0.0 and effective_brightness > current_hw_brightness and not cooldown_active
+
+
 def _resolve_hw_brightness_with_pulse_mix(
     engine: "EffectsEngine",
     *,
@@ -71,12 +95,13 @@ def _resolve_hw_brightness_with_pulse_mix(
         hw = max(global_hw, base)
         idle_hw = hw
         cooldown_active = _support.pulse_hw_lift_temporarily_disabled(engine, logger=_LOGGER)
-        allow_pulse_hw_lift = (
-            (not per_key_hw)
-            and uniform_hw_streak_count >= _UNIFORM_PULSE_HW_LIFT_STREAK_MIN
-            and pulse_mix > 0.0
-            and eff > hw
-            and (not cooldown_active)
+        allow_pulse_hw_lift = _can_lift_hw_brightness(
+            per_key_hw=per_key_hw,
+            uniform_hw_streak_count=uniform_hw_streak_count,
+            pulse_mix=pulse_mix,
+            effective_brightness=eff,
+            current_hw_brightness=hw,
+            cooldown_active=cooldown_active,
         )
         if allow_pulse_hw_lift:
             pulse_hw = int(round(float(hw) + (float(eff - hw) * pulse_mix)))

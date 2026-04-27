@@ -81,6 +81,71 @@ def test_pulse_brightness_reseeds_restore_damp_on_first_post_restore_pulse() -> 
         render_module.time.monotonic = original_monotonic
 
 
+def test_wake_path_reseeds_restore_damp_after_initial_window_expires(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.core.effects.reactive import _render_brightness_support as reactive_support
+    from src.core.effects.reactive import effects
+    from src.core.effects.reactive.render import _resolve_brightness
+    from src.tray.pollers.idle_power._transition_actions import _seed_reactive_restore_windows
+
+    class _Clock:
+        def __init__(self, now: float) -> None:
+            self.now = now
+
+        def monotonic(self) -> float:
+            return self.now
+
+    clock = _Clock(100.0)
+    monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("src.core.effects.reactive.effects.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("src.core.effects.reactive.render.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("src.core.effects.reactive._render_brightness.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("src.core.effects.reactive._render_brightness_support.time.monotonic", clock.monotonic)
+
+    eng = _DummyEngine(brightness=5, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 5
+    eng._last_rendered_brightness = 5
+
+    _seed_reactive_restore_windows(eng, fade_in_duration_s=1.0)
+    state = reactive_support.ensure_reactive_state(eng)
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING
+    assert state._reactive_restore_damp_until == pytest.approx(104.0)
+
+    clock.now = 105.0
+    effects._set_reactive_active_pulse_mix(eng, target=1.0)
+
+    state = reactive_support.ensure_reactive_state(eng)
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.DAMPING
+    assert state._reactive_restore_damp_until == pytest.approx(107.0)
+    assert pulse_brightness_scale_factor(eng) == pytest.approx(0.415)
+
+    _base, eff, hw = _resolve_brightness(eng)
+    assert eff == 50
+    assert hw == 5
+
+    clock.now = 107.1
+    assert pulse_brightness_scale_factor(eng) == 1.0
+    state = reactive_support.ensure_reactive_state(eng)
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.NORMAL
+
+    reactive_support.set_engine_attr(eng, "_reactive_active_pulse_mix", 0.0)
+
+    clock.now = 200.0
+    _seed_reactive_restore_windows(eng, fade_in_duration_s=1.0)
+    state = reactive_support.ensure_reactive_state(eng)
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING
+    assert state._reactive_restore_damp_until == pytest.approx(204.0)
+
+    clock.now = 205.0
+    effects._set_reactive_active_pulse_mix(eng, target=1.0)
+    assert pulse_brightness_scale_factor(eng) == pytest.approx(0.415)
+    state = reactive_support.ensure_reactive_state(eng)
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.DAMPING
+    assert state._reactive_restore_damp_until == pytest.approx(207.0)
+
+
 def test_pulse_brightness_logs_visual_scale_under_debug(monkeypatch, caplog) -> None:
     eng = _DummyEngine(brightness=5, reactive_brightness=50)
     eng.per_key_colors = {(0, 0): (0, 0, 0)}

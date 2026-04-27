@@ -90,6 +90,7 @@ def test_set_reactive_active_pulse_mix_preserves_tail_decay_on_drop_to_zero() ->
 
 def test_set_reactive_active_pulse_mix_sets_first_activity_lift_holdoff() -> None:
     from src.core.effects.reactive import effects
+    from src.core.effects.reactive import _render_brightness_support as reactive_support
 
     class _Engine:
         _reactive_active_pulse_mix = 0.0
@@ -99,31 +100,34 @@ def test_set_reactive_active_pulse_mix_sets_first_activity_lift_holdoff() -> Non
     before = effects.time.monotonic()
 
     effects._set_reactive_active_pulse_mix(engine, target=1.0)
+    state = reactive_support.ensure_reactive_state(engine)
 
     assert float(engine._reactive_active_pulse_mix) > 0.0
-    assert float(engine._reactive_disable_pulse_hw_lift_until) > before
+    assert float(state._reactive_disable_pulse_hw_lift_until) > before
 
 
 def test_set_reactive_active_pulse_mix_refreshes_restore_visual_damp_on_first_pulse(
     monkeypatch,
 ) -> None:
     from src.core.effects.reactive import effects
+    from src.core.effects.reactive import _render_brightness_support as reactive_support
 
     class _Engine:
         _reactive_active_pulse_mix = 0.0
         _reactive_disable_pulse_hw_lift_until = None
-        _reactive_post_restore_visual_damp_until = 99.0
-        _reactive_post_restore_visual_damp_pending = True
+        _reactive_restore_damp_until = 99.0
+        _reactive_restore_phase = reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING
 
     engine = _Engine()
 
     monkeypatch.setattr(effects.time, "monotonic", lambda: 100.0)
 
     effects._set_reactive_active_pulse_mix(engine, target=1.0)
+    state = reactive_support.ensure_reactive_state(engine)
 
     assert float(engine._reactive_active_pulse_mix) > 0.0
-    assert engine._reactive_post_restore_visual_damp_until == 100.0 + effects._FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S
-    assert engine._reactive_post_restore_visual_damp_pending is False
+    assert state._reactive_restore_damp_until == 100.0 + effects._FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S
+    assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.DAMPING
 
 
 def test_fade_loop_per_key_backdrop_applies_pulse_scale_to_mix_weight() -> None:
