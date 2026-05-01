@@ -118,7 +118,7 @@ class _EngineCore:
         self._dim_temp_active: bool = False
         self._last_rendered_brightness: int | None = None
         self._last_hw_mode_brightness: int | None = None
-        self._reactive_state = ReactiveRenderState(_compat_mirror_to_engine=False)
+        self._reactive_state = ReactiveRenderState()
 
         self._brightness_fade_token: int = 0
         self._brightness_fade_lock = RLock()
@@ -161,7 +161,34 @@ class _EngineCore:
 
         self.device_available = False
         with self.kb_lock:
+            old_kb = self.kb
             self.kb = NullKeyboard()
+
+        # Best-effort close of the old device.
+        close_fn = getattr(old_kb, "close", None)
+        if callable(close_fn):
+            try:
+                close_fn()
+            except (AttributeError, OSError, RuntimeError, ValueError):
+                logger.debug("Error closing keyboard device on mark_device_unavailable", exc_info=True)
+
+    def close(self) -> None:
+        """Stop the current effect and release the keyboard device."""
+
+        self.stop()
+
+        with self.kb_lock:
+            old_kb = self.kb
+            self.kb = NullKeyboard()
+
+        self.device_available = False
+
+        close_fn = getattr(old_kb, "close", None)
+        if callable(close_fn):
+            try:
+                close_fn()
+            except (AttributeError, OSError, RuntimeError, ValueError):
+                logger.debug("Error closing keyboard device on engine close", exc_info=True)
 
     def stop(self) -> None:
         """Stop current effect."""
@@ -173,7 +200,7 @@ class _EngineCore:
 
         self._last_rendered_brightness = None
         self._last_hw_mode_brightness = None
-        self._reactive_state = ReactiveRenderState(_compat_mirror_to_engine=False)
+        self._reactive_state = ReactiveRenderState()
 
         if not self.running and not self.thread:
             self.current_effect = None
@@ -191,6 +218,5 @@ class _EngineCore:
             thread.join(timeout=2.0)
             if thread.is_alive():
                 logger.warning("Effect thread did not stop within timeout")
-                return
 
         self.stop_event.clear()

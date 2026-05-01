@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 from collections.abc import Callable, Iterable, Iterator
 from typing import Optional
+
+_logger = logging.getLogger(__name__)
 
 
 def iter_prepare_for_sleep_events(lines: Iterable[str]) -> Iterator[bool]:
@@ -56,20 +59,48 @@ def monitor_prepare_for_sleep(
     # For type-checkers: stdout is only None if stdout=DEVNULL/None.
     assert process.stdout is not None
 
-    if on_started is not None:
-        on_started()
+    try:
+        if on_started is not None:
+            on_started()
 
-    # Read incrementally to preserve the original behavior.
-    while is_running():
-        line = process.stdout.readline()
-        if not line:
-            break
+        # Read incrementally to preserve the original behavior.
+        while is_running():
+            line = process.stdout.readline()
+            if not line:
+                break
 
-        if "PrepareForSleep" not in line:
-            continue
+            if "PrepareForSleep" not in line:
+                continue
 
-        next_line = process.stdout.readline()
-        if "boolean true" in next_line:
-            on_suspend()
-        elif "boolean false" in next_line:
-            on_resume()
+            next_line = process.stdout.readline()
+            if "boolean true" in next_line:
+                on_suspend()
+            elif "boolean false" in next_line:
+                on_resume()
+    finally:
+        _terminate_process(process)
+
+
+def _terminate_process(process: subprocess.Popen) -> None:
+    """Best-effort termination and cleanup of a Popen subprocess."""
+    terminate = getattr(process, "terminate", None)
+    if callable(terminate):
+        try:
+            terminate()
+        except OSError:
+            _logger.debug("Could not terminate dbus-monitor process", exc_info=True)
+
+    wait = getattr(process, "wait", None)
+    if callable(wait):
+        try:
+            wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            _logger.debug("dbus-monitor process did not exit within timeout after terminate; killing")
+            kill = getattr(process, "kill", None)
+            if callable(kill):
+                try:
+                    kill()
+                except OSError:
+                    _logger.debug("Could not kill dbus-monitor process", exc_info=True)
+        except OSError:
+            pass

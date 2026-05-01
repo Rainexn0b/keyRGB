@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import fcntl
 import json
+import logging
 import os
 import tempfile
 import time
@@ -8,13 +10,50 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any
 
+_config_logger = logging.getLogger(__name__)
 
 _CONFIG_LOAD_TERMINAL_ERRORS = (OSError, RecursionError, TypeError, ValueError)
 _CONFIG_SAVE_ERRORS = (OSError, RecursionError, TypeError, ValueError)
 
 
 def _log_warning_with_traceback(logger, message: str, exc: Exception) -> None:
-    logger.warning(message, exc, exc_info=(type(exc), exc, exc.__traceback__))
+    logger.warning(message, exc_info=(type(exc), exc, exc.__traceback__))
+
+
+def _acquire_lock(config_dir: Path, *, exclusive: bool) -> int | None:
+    """Acquire a file lock on config_dir/config.lock.
+
+    Returns the file descriptor if successful, None on failure.
+    The caller is responsible for closing the fd.
+    """
+    try:
+        config_dir.mkdir(parents=True, exist_ok=True)
+        lock_path = config_dir / "config.lock"
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o644)
+    except OSError:
+        return None
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH)
+        return fd
+    except OSError:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        return None
+
+
+def _release_lock(fd: int) -> None:
+    """Release and close a file lock acquired by _acquire_lock."""
+    try:
+        fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    try:
+        os.close(fd)
+    except OSError:
+        pass
 
 
 def load_config_settings(
@@ -27,6 +66,9 @@ def load_config_settings(
 ) -> dict[str, Any] | None:
     """Load config JSON with retries for transient partial writes.
 
+    Uses a shared file lock (LOCK_SH) on config_dir/config.lock to prevent
+    reads during concurrent writes from other processes (tray, GUI windows).
+
     Returns a merged dict of `{**defaults, **loaded}` when successful.
     Returns a copy of `defaults` when the file does not exist.
     Returns None when loading fails after retries.
@@ -35,6 +77,31 @@ def load_config_settings(
     if not config_file.exists():
         return deepcopy(defaults)
 
+    config_dir = config_file.parent
+    lock_fd = _acquire_lock(config_dir, exclusive=False)
+
+    try:
+        return _load_config_inner(
+            config_file=config_file,
+            defaults=defaults,
+            retries=retries,
+            retry_delay=retry_delay,
+            logger=logger,
+        )
+    finally:
+        if lock_fd is not None:
+            _release_lock(lock_fd)
+
+
+def _load_config_inner(
+    *,
+    config_file: Path,
+    defaults: dict[str, Any],
+    retries: int,
+    retry_delay: float,
+    logger,
+) -> dict[str, Any] | None:
+    """Inner load implementation, called under a shared lock."""
     last_error: Exception | None = None
     for _ in range(max(1, retries)):
         try:
@@ -73,8 +140,24 @@ def load_config_settings(
 
 
 def save_config_settings_atomic(*, config_dir: Path, config_file: Path, settings: dict[str, Any], logger) -> None:
-    """Save config JSON atomically (write temp file then replace)."""
+    """Save config JSON atomically with exclusive file lock.
 
+    Acquires LOCK_EX on config_dir/config.lock, then writes to a temp file
+    and atomically replaces the config file via os.replace(). This prevents
+    concurrent readers (tray, GUI windows) from seeing a partial write, and
+    prevents concurrent writers from interleaving their changes.
+    """
+
+    lock_fd = _acquire_lock(config_dir, exclusive=True)
+    try:
+        _save_config_inner(config_dir=config_dir, config_file=config_file, settings=settings, logger=logger)
+    finally:
+        if lock_fd is not None:
+            _release_lock(lock_fd)
+
+
+def _save_config_inner(*, config_dir: Path, config_file: Path, settings: dict[str, Any], logger) -> None:
+    """Inner save implementation, called under an exclusive lock."""
     try:
         config_dir.mkdir(parents=True, exist_ok=True)
 

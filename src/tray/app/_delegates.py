@@ -102,6 +102,12 @@ class KeyRGBTrayDelegateMixin:
     def _on_quit_clicked(self, icon, _item):
         self.power_manager.stop_monitoring()
         self.engine.stop()
+        engine_close = getattr(self.engine, "close", None)
+        if callable(engine_close):
+            try:
+                engine_close()
+            except (AttributeError, OSError, RuntimeError, ValueError):
+                pass
         icon.stop()
 
     def turn_off(self):

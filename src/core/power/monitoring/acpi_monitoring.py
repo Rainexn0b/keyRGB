@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
 import subprocess
 from collections.abc import Callable
+from typing import Optional
 
 from .lid_monitoring import poll_lid_state_paths
+
+_logger = logging.getLogger(__name__)
 
 
 def _parse_acpi_lid_event(line: str | None) -> str | None:
@@ -19,6 +23,31 @@ def _parse_acpi_lid_event(line: str | None) -> str | None:
     return None
 
 
+def _terminate_process(process: subprocess.Popen) -> None:
+    """Best-effort termination and cleanup of a Popen subprocess."""
+    terminate = getattr(process, "terminate", None)
+    if callable(terminate):
+        try:
+            terminate()
+        except OSError:
+            _logger.debug("Could not terminate acpi_listen process", exc_info=True)
+
+    wait = getattr(process, "wait", None)
+    if callable(wait):
+        try:
+            wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            _logger.debug("acpi_listen process did not exit within timeout after terminate; killing")
+            kill = getattr(process, "kill", None)
+            if callable(kill):
+                try:
+                    kill()
+                except OSError:
+                    _logger.debug("Could not kill acpi_listen process", exc_info=True)
+        except OSError:
+            pass
+
+
 def monitor_acpi_events(
     *,
     is_running: Callable[[], bool],
@@ -30,6 +59,8 @@ def monitor_acpi_events(
 
     If `acpi_listen` isn't available, falls back to polling lid state paths.
     """
+
+    process: Optional[subprocess.Popen] = None
 
     try:
         process = subprocess.Popen(
@@ -60,3 +91,6 @@ def monitor_acpi_events(
             on_lid_open=on_lid_open,
             logger=logger,
         )
+    finally:
+        if process is not None:
+            _terminate_process(process)

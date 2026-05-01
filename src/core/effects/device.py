@@ -60,6 +60,13 @@ class KeyboardDeviceProtocol(Protocol):
 
     def is_off(self) -> bool: ...
 
+    def close(self) -> None:
+        """Release hardware resources held by this device.
+
+        Safe to call multiple times. The default implementation is a no-op.
+        """
+        ...
+
 
 class KeyboardBackendProtocol(Protocol):
     def get_device(self) -> KeyboardDeviceProtocol: ...
@@ -97,6 +104,9 @@ class NullKeyboard:
 
     def is_off(self) -> bool:
         return True
+
+    def close(self) -> None:
+        return
 
 
 def _debug_brightness_enabled() -> bool:
@@ -252,6 +262,11 @@ class _BrightnessLoggingKeyboardProxy:
                 float(time.monotonic()),
             )
         return self._inner.set_palette_color(int(slot), color)
+
+    def close(self) -> None:
+        close_fn = getattr(self._inner, "close", None)
+        if callable(close_fn):
+            close_fn()
 
 
 def acquire_keyboard(
