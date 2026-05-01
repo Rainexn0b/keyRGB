@@ -46,10 +46,17 @@ def test_pulse_brightness_keeps_direct_slider_scale_on_very_dim_backdrops() -> N
 
 
 def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
+    from src.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+
     eng = _DummyEngine(brightness=5, reactive_brightness=50)
     eng.per_key_colors = {(0, 0): (0, 0, 0)}
     eng.per_key_brightness = 5
-    eng._reactive_post_restore_visual_damp_until = 102.0
+    state = ensure_reactive_state(eng)
+    state._reactive_restore_damp_until = 102.0
+    state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
 
     import src.core.effects.reactive.render as render_module
 
@@ -63,12 +70,17 @@ def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
 
 def test_pulse_brightness_reseeds_restore_damp_on_first_post_restore_pulse() -> None:
     from src.core.effects.reactive import effects
+    from src.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
 
     eng = _DummyEngine(brightness=5, reactive_brightness=50)
     eng.per_key_colors = {(0, 0): (0, 0, 0)}
     eng.per_key_brightness = 5
-    eng._reactive_post_restore_visual_damp_until = 99.0
-    eng._reactive_post_restore_visual_damp_pending = True
+    state = ensure_reactive_state(eng)
+    state._reactive_restore_damp_until = 99.0
+    state._reactive_restore_phase = ReactiveRestorePhase.FIRST_PULSE_PENDING
 
     import src.core.effects.reactive.render as render_module
 
@@ -165,10 +177,17 @@ def test_pulse_brightness_logs_visual_scale_under_debug(monkeypatch, caplog) -> 
 
 
 def test_pulse_brightness_logs_post_restore_damp_under_debug(monkeypatch, caplog) -> None:
+    from src.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+
     eng = _DummyEngine(brightness=5, reactive_brightness=50)
     eng.per_key_colors = {(0, 0): (0, 0, 0)}
     eng.per_key_brightness = 5
-    eng._reactive_post_restore_visual_damp_until = 102.0
+    state = ensure_reactive_state(eng)
+    state._reactive_restore_damp_until = 102.0
+    state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
 
     monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
     monkeypatch.setattr("src.core.effects.reactive.render.time.monotonic", lambda: 100.0)

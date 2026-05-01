@@ -4,13 +4,16 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 import os
+import threading
 import time
 from operator import attrgetter
 from typing import Callable
 
 _LOGGER = logging.getLogger(__name__)
 _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
-_ENGINE_ATTR_RUNTIME_ERRORS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+_ENGINE_RECOVERABLE_RUNTIME_ERRORS = (LookupError, OSError, RuntimeError)
+_ENGINE_PROGRAMMING_ERRORS = (TypeError, ValueError)
+_ENGINE_ATTR_RUNTIME_ERRORS = _ENGINE_RECOVERABLE_RUNTIME_ERRORS + _ENGINE_PROGRAMMING_ERRORS
 
 
 class ReactiveRestorePhase(str, Enum):
@@ -21,26 +24,58 @@ class ReactiveRestorePhase(str, Enum):
 
 @dataclass(slots=True)
 class ReactiveRenderState:
-    _compat_mirror_to_engine: bool = True
+    """Consolidated state for reactive brightness rendering.
+
+    Lifecycle:
+    - Initialised in EffectsEngine.__init__ as ReactiveRenderState()
+    - Reset on engine.stop() to clear stale timers
+    - Seeded by idle-power transitions for dim/restore ramps
+    - Read every frame by resolve_brightness() and the render loop
+    - Transition fields are written atomically via seed_transition_atomic()
+      under engine.reactive_lock
+    """
+
+    # --- Brightness transition animation ---
+    # When set, resolve_brightness() animates from _from to _to
+    # over _duration_s seconds starting at _started_at.
+    # Cleared when the transition completes.
     _reactive_transition_from_brightness: int | None = None
     _reactive_transition_to_brightness: int | None = None
     _reactive_transition_started_at: float | None = None
     _reactive_transition_duration_s: float | None = None
+
+    # --- Post-restore pulse damp ---
+    # After an idle wake or temp-dim restore, hardware brightness is
+    # low (e.g. 1) and needs to ramp up. During this ramp, reactive
+    # pulses would appear as a bright flash if allowed at full intensity.
+    # The holdoff delays the streak gate for hardware lifts, and the
+    # damp reduces pulse visual scale during the window.
     _reactive_disable_pulse_hw_lift_until: float | None = None
     _reactive_restore_phase: ReactiveRestorePhase = ReactiveRestorePhase.NORMAL
     _reactive_restore_damp_until: float | None = None
+
+    # --- Uniform backend streak gate ---
+    # Counts consecutive frames with active pulse on uniform-only backends.
+    # Must reach UNIFORM_PULSE_HW_LIFT_STREAK_MIN (6) before a hardware
+    # brightness lift is permitted. Reset to 0 on per-key backends.
     _reactive_uniform_hw_streak: int = 0
+
+    # --- Pulse mix tracking ---
+    # Tracks the current pulse intensity (0.0..1.0) for the streak gate
+    # and visual scale calculation. Rises on keypress, decays per frame.
     _reactive_follow_global_brightness: bool = False
     _reactive_active_pulse_mix: float = 0.0
+
+    # --- Debug-only state change logs ---
+    # Each field stores the last-logged tuple so that repeated identical
+    # states are suppressed. Only active when KEYRGB_DEBUG_BRIGHTNESS=1.
     _reactive_debug_hw_lift_state: tuple[object, ...] | None = None
     _reactive_debug_pulse_visual_state: tuple[object, ...] | None = None
     _reactive_debug_last_pulse_scale: float = 1.0
     _reactive_debug_render_visual_state: tuple[object, ...] | None = None
 
 
-_REACTIVE_STATE_ATTR_NAMES = frozenset(
-    name for name in ReactiveRenderState.__annotations__ if name != "_compat_mirror_to_engine"
-)
+_REACTIVE_STATE_ATTR_NAMES = frozenset(ReactiveRenderState.__annotations__)
 
 
 def _is_reactive_state_attr(name: str) -> bool:
@@ -57,30 +92,6 @@ def _copy_reactive_state_attrs(source: object, state: ReactiveRenderState) -> No
             setattr(state, name, value)
         except (AttributeError, TypeError, ValueError):
             continue
-
-    try:
-        legacy_until = attrgetter("_reactive_post_restore_visual_damp_until")(source)
-    except AttributeError:
-        legacy_until = None
-    try:
-        legacy_pending = bool(attrgetter("_reactive_post_restore_visual_damp_pending")(source))
-    except AttributeError:
-        legacy_pending = False
-    except (TypeError, ValueError):
-        legacy_pending = False
-
-    legacy_until_value: float | None
-    try:
-        legacy_until_value = float(legacy_until) if legacy_until is not None else None
-    except _INT_COERCION_ERRORS:
-        legacy_until_value = None
-
-    if legacy_pending:
-        state._reactive_restore_phase = ReactiveRestorePhase.FIRST_PULSE_PENDING
-        state._reactive_restore_damp_until = legacy_until_value
-    elif legacy_until_value is not None:
-        state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
-        state._reactive_restore_damp_until = legacy_until_value
 
 
 def ensure_reactive_state(engine: object) -> ReactiveRenderState:
@@ -123,7 +134,10 @@ def run_engine_attr_operation(
         return operation()
     except handled_errors:
         return handled_result
-    except _ENGINE_ATTR_RUNTIME_ERRORS:  # @quality-exception exception-transparency: engine attribute getters/setters may have recoverable runtime side effects during reactive brightness resolution and cleanup
+    except _ENGINE_PROGRAMMING_ERRORS as exc:
+        active_logger.warning("%s (programming error for attribute %s)", message, name, exc_info=exc)
+        return runtime_result
+    except _ENGINE_RECOVERABLE_RUNTIME_ERRORS:  # @quality-exception exception-transparency: engine attribute getters/setters may have recoverable runtime side effects during reactive brightness resolution and cleanup
         active_logger.exception(message, name)
         return runtime_result
 
@@ -189,38 +203,6 @@ def set_engine_attr(
 
     def set_attr() -> None:
         setattr(target, name, value)
-
-    run_engine_attr_operation(
-        set_attr,
-        handled_errors=(AttributeError, TypeError, ValueError),
-        handled_result=None,
-        runtime_result=None,
-        message=message,
-        name=name,
-        logger=logger,
-    )
-
-
-def set_engine_compat_attr(
-    engine: object,
-    name: str,
-    value: object,
-    *,
-    logger: logging.Logger | None = None,
-    message: str = "Reactive brightness failed to set engine attribute %s",
-) -> None:
-    target = _attr_target(engine, name)
-    if target is engine:
-        return
-    try:
-        compat_mirror_to_engine = bool(attrgetter("_compat_mirror_to_engine")(target))
-    except AttributeError:
-        compat_mirror_to_engine = True
-    if not compat_mirror_to_engine:
-        return
-
-    def set_attr() -> None:
-        setattr(engine, name, value)
 
     run_engine_attr_operation(
         set_attr,
@@ -304,6 +286,21 @@ def uniform_hw_streak(engine: object, *, logger: logging.Logger) -> int:
     )
     value = coerce_int(raw, default=0) or 0
     return max(0, int(value))
+
+
+def increment_uniform_hw_streak(
+    engine: object,
+    *,
+    per_key_hw: bool,
+    logger: logging.Logger,
+) -> int:
+    if per_key_hw:
+        set_engine_attr(engine, "_reactive_uniform_hw_streak", 0, logger=logger)
+        return 0
+    current = uniform_hw_streak(engine, logger=logger)
+    new_value = current + 1
+    set_engine_attr(engine, "_reactive_uniform_hw_streak", new_value, logger=logger)
+    return new_value
 
 
 def log_hw_lift_decision_change(
@@ -507,10 +504,43 @@ def clear_transition_state(engine: object, *, logger: logging.Logger) -> None:
             logger=logger,
             message="Reactive brightness failed to clear engine attribute %s",
         )
-        set_engine_compat_attr(
-            engine,
-            name,
-            None,
-            logger=logger,
-            message="Reactive brightness failed to clear engine attribute %s",
+
+
+def seed_transition_atomic(
+    state: ReactiveRenderState,
+    lock: threading.Lock,
+    *,
+    from_brightness: int,
+    to_brightness: int,
+    started_at: float,
+    duration_s: float,
+) -> None:
+    with lock:
+        state._reactive_transition_from_brightness = from_brightness
+        state._reactive_transition_to_brightness = to_brightness
+        state._reactive_transition_started_at = started_at
+        state._reactive_transition_duration_s = duration_s
+
+
+def read_transition_atomic(
+    state: ReactiveRenderState,
+    lock: threading.Lock,
+) -> tuple[int | None, int | None, float | None, float | None]:
+    with lock:
+        return (
+            state._reactive_transition_from_brightness,
+            state._reactive_transition_to_brightness,
+            state._reactive_transition_started_at,
+            state._reactive_transition_duration_s,
         )
+
+
+def clear_transition_atomic(
+    state: ReactiveRenderState,
+    lock: threading.Lock,
+) -> None:
+    with lock:
+        state._reactive_transition_from_brightness = None
+        state._reactive_transition_to_brightness = None
+        state._reactive_transition_started_at = None
+        state._reactive_transition_duration_s = None

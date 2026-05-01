@@ -7,6 +7,13 @@ from typing import TYPE_CHECKING
 from . import _fade_loop
 from . import _ripple_loop
 from . import _render_brightness_support as _support
+from ._constants import (
+    FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S,
+    FIRST_ACTIVITY_PULSE_LIFT_HOLDOFF_S,
+    PULSE_MIX_DECAY_STEP,
+    PULSE_MIX_INITIAL_RISE_STEP,
+    PULSE_MIX_RISE_STEP,
+)
 from ._effects_api import bind_reactive_effect_exports, reactive_fade_api_for, reactive_ripple_api_for
 
 if TYPE_CHECKING:
@@ -14,11 +21,8 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
-_PULSE_MIX_DECAY_STEP = 0.34
-_PULSE_MIX_RISE_STEP = 0.45
-_PULSE_MIX_INITIAL_RISE_STEP = 0.18
-_FIRST_ACTIVITY_PULSE_LIFT_HOLDOFF_S = 0.30
-_FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S = 2.0
+
+# see _constants.py
 
 bind_reactive_effect_exports(globals())
 
@@ -59,7 +63,7 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
             logger=logger,
         )
         current_until = _support.coerce_float(current_until_raw, default=0.0) or 0.0
-        holdoff_until = float(time.monotonic()) + _FIRST_ACTIVITY_PULSE_LIFT_HOLDOFF_S
+        holdoff_until = float(time.monotonic()) + FIRST_ACTIVITY_PULSE_LIFT_HOLDOFF_S
         _support.set_engine_attr(
             engine,
             "_reactive_disable_pulse_hw_lift_until",
@@ -73,7 +77,7 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
             logger=logger,
         )
         if restore_phase is _support.ReactiveRestorePhase.FIRST_PULSE_PENDING:
-            visual_damp_until = float(time.monotonic()) + _FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S
+            visual_damp_until = float(time.monotonic()) + FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S
             current_visual_until_raw = _support.read_engine_attr(
                 engine,
                 "_reactive_restore_damp_until",
@@ -96,20 +100,16 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
             )
 
     if target_f <= 0.0 and prev > 0.0:
-        next_mix = max(0.0, prev - _PULSE_MIX_DECAY_STEP)
+        next_mix = max(0.0, prev - PULSE_MIX_DECAY_STEP)
     elif target_f > prev:
         # Prevent a single-frame jump (for example on first overlapping keypresses
         # after idle) from immediately reaching full pulse-lift strength.
-        rise_step = _PULSE_MIX_INITIAL_RISE_STEP if prev <= 0.0 else _PULSE_MIX_RISE_STEP
+        rise_step = PULSE_MIX_INITIAL_RISE_STEP if prev <= 0.0 else PULSE_MIX_RISE_STEP
         next_mix = min(target_f, prev + rise_step)
     else:
         next_mix = target_f
 
     _support.set_engine_attr(engine, "_reactive_active_pulse_mix", float(next_mix), logger=logger)
-    try:
-        setattr(engine, "_reactive_active_pulse_mix", float(next_mix))
-    except (AttributeError, TypeError, ValueError):
-        logger.exception("Failed to cache reactive pulse mix")
 
 
 def _render_uniform_fallback(engine: "EffectsEngine", *, rgb: tuple[int, int, int]) -> None:

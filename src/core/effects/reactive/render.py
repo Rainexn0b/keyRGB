@@ -9,6 +9,11 @@ from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import build_full_color_grid
 
 from . import _render_brightness_support as _support
+from ._constants import (
+    MAX_BRIGHTNESS_STEP_PER_FRAME,
+    POST_RESTORE_PULSE_VISUAL_HOLDOFF_S,
+    POST_RESTORE_PULSE_VISUAL_MIN_FACTOR,
+)
 from ._render_brightness import (
     resolve_brightness as _resolve_brightness_impl,
     resolve_reactive_transition_brightness as _resolve_reactive_transition_brightness_impl,
@@ -19,12 +24,7 @@ from ._render_runtime import render_per_key_frame, render_uniform_frame
 logger = logging.getLogger(__name__)
 time = _time
 
-# Maximum brightness change per render frame before the stability guard
-# clamps. Prevents single-frame jumps (e.g. 3 -> 50) caused by race
-# conditions between concurrent brightness writers.
-_MAX_BRIGHTNESS_STEP_PER_FRAME: int = 8
-_POST_RESTORE_PULSE_VISUAL_HOLDOFF_S: float = 2.0
-_POST_RESTORE_PULSE_VISUAL_MIN_FACTOR: float = 0.35
+# see _constants.py
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -76,7 +76,7 @@ def _resolve_reactive_transition_brightness(engine: "EffectsEngine") -> Optional
 def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
     return _resolve_brightness_impl(
         engine,
-        max_step_per_frame=_MAX_BRIGHTNESS_STEP_PER_FRAME,
+        max_step_per_frame=MAX_BRIGHTNESS_STEP_PER_FRAME,
         clamp01_fn=clamp01,
         logger=logger,
     )
@@ -87,6 +87,21 @@ def _resolve_transition_visual_scale(engine: "EffectsEngine") -> float:
 
 
 def _post_restore_visual_damp(engine: "EffectsEngine") -> tuple[float, float]:
+    """Compute the visual damp factor and remaining seconds for post-restore pulses.
+
+    After an idle wake or temp-dim restore, the keyboard brightness is ramping
+    up from a low value. If reactive pulses fired at full intensity during this
+    ramp, they would appear as a bright flash. This function returns a damp
+    factor (0..1) that scales pulse intensity down during the restore window.
+
+    The damp window is approximately 2 seconds and starts from the first
+    post-restore keypress (FIRST_PULSE_PENDING → DAMPING transition). After
+    the window expires, the damp factor returns to 1.0 (no suppression).
+
+    Returns:
+        (damp_factor, remaining_seconds) — damp_factor is 1.0 when no damp
+        is active; remaining_seconds is 0.0 when no damp is active.
+    """
     restore_phase = _support.restore_phase_or_default(
         engine,
         default=_support.ReactiveRestorePhase.NORMAL,
@@ -125,16 +140,23 @@ def _post_restore_visual_damp(engine: "EffectsEngine") -> tuple[float, float]:
             _support.set_engine_attr(engine, "_reactive_restore_damp_until", None, logger=logger)
         return 1.0, 0.0
 
-    progress = 1.0 - min(1.0, remaining_s / _POST_RESTORE_PULSE_VISUAL_HOLDOFF_S)
-    damp = _POST_RESTORE_PULSE_VISUAL_MIN_FACTOR + ((1.0 - _POST_RESTORE_PULSE_VISUAL_MIN_FACTOR) * progress)
+    progress = 1.0 - min(1.0, remaining_s / POST_RESTORE_PULSE_VISUAL_HOLDOFF_S)
+    damp = POST_RESTORE_PULSE_VISUAL_MIN_FACTOR + ((1.0 - POST_RESTORE_PULSE_VISUAL_MIN_FACTOR) * progress)
     return damp, remaining_s
 
 
 def backdrop_brightness_scale_factor(engine: "EffectsEngine", *, effect_brightness_hw: int) -> float:
     """Compute scaling factor to keep the backdrop at its target brightness.
 
-    If the global hardware brightness is driven higher (by the effect brightness),
-    we scale the backdrop down.
+    When uniform-only backends lift hardware brightness for a pulse, the
+    backdrop must be scaled down proportionally so its perceived brightness
+    stays at the user's configured base level. This avoids the backdrop
+    becoming too bright during pulse-lift frames.
+
+    Per-key backends never lift hardware brightness (invariant #2), so this
+    factor is always 1.0 for per-key rendering and only relevant for uniform.
+
+    The factor is: base_hw / hw_brightness, clamped to [0, 1].
     """
     base, _, hw = _resolve_brightness(engine)
 
@@ -261,7 +283,7 @@ def frame_dt_s() -> float:
     return 1.0 / 60.0
 
 
-def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float = 2.2) -> float:
+def pace(engine: "EffectsEngine", *, min_factor: float = 0.25, max_factor: float = 10.0) -> float:
     """Map UI speed (0..10) to an effect pace multiplier.
 
     Matches the quadratic mapping used by the SW loops: speed=10 is much faster.
@@ -277,13 +299,7 @@ def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float 
     t = float(s) / 10.0
     t = t * t
 
-    min_factor = float(min_factor)
-    max_factor = float(max_factor)
-    if min_factor == 0.8 and max_factor == 2.2:
-        min_factor = 0.25
-        max_factor = 10.0
-
-    return float(min_factor + (max_factor - min_factor) * t)
+    return float(float(min_factor) + (float(max_factor) - float(min_factor)) * t)
 
 
 def has_per_key(engine: "EffectsEngine") -> bool:

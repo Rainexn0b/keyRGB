@@ -5,6 +5,7 @@ import math
 import time
 from typing import TYPE_CHECKING, Callable, Optional
 
+from ._constants import UNIFORM_PULSE_HW_LIFT_STREAK_MIN
 from ._render_brightness_guard import apply_brightness_step_guard
 from . import _render_brightness_support as _support
 
@@ -14,7 +15,8 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _MISSING = object()
-_UNIFORM_PULSE_HW_LIFT_STREAK_MIN = 6
+
+# see _constants.py
 
 
 def _can_lift_hw_brightness(
@@ -29,14 +31,29 @@ def _can_lift_hw_brightness(
     """Return whether a uniform-only backend may temporarily raise hardware brightness.
 
     Per-key backends keep hardware brightness fixed and express reactive intensity
-    through per-key color contrast instead. Uniform-only backends need a short
-    stable-frame gate before lifting hardware brightness so the first keypress of
-    a burst does not produce an immediate full-frame spike.
+    through per-key color contrast instead (invariant #2). Uniform-only backends
+    need a short stable-frame gate before lifting hardware brightness so the first
+    keypress of a burst does not produce an immediate full-frame spike.
+
+    The 6-frame streak gate ensures that at least 6 consecutive frames of active
+    pulse have been observed before allowing a brightness lift. This prevents
+    single-frame brightness spikes on the first keypress after idle.
+
+    Args:
+        per_key_hw: True if the backend supports per-key colors.
+        uniform_hw_streak_count: Consecutive frames with active pulse on uniform.
+        pulse_mix: Current pulse intensity (0.0..1.0).
+        effective_brightness: The effect (reactive) brightness target.
+        current_hw_brightness: The current idle hardware brightness.
+        cooldown_active: True if pulse-hw-lift is in cooldown (post-restore holdoff).
+
+    Returns:
+        True if hardware brightness should be lifted for the pulse.
     """
 
     if per_key_hw:
         return False
-    if uniform_hw_streak_count < _UNIFORM_PULSE_HW_LIFT_STREAK_MIN:
+    if uniform_hw_streak_count < UNIFORM_PULSE_HW_LIFT_STREAK_MIN:
         return False
     return pulse_mix > 0.0 and effective_brightness > current_hw_brightness and not cooldown_active
 
@@ -51,13 +68,28 @@ def _resolve_hw_brightness_with_pulse_mix(
     clamp01_fn: Callable[[float], float],
     logger: logging.Logger,
 ) -> tuple[int, int, bool, bool]:
+    """Resolve hardware brightness considering pulse-time lifts and dim-temp.
+
+    This is the core brightness resolution for reactive effects. It determines
+    the actual hardware brightness to send to the keyboard, considering:
+
+    1. Per-key backends: hardware brightness stays fixed at max(global_hw, base).
+       Pulses are expressed through per-key color contrast only (invariant #2).
+    2. Uniform backends: may temporarily raise hardware brightness above the
+       idle level to make pulses visible, but only after the streak gate
+       (6 consecutive frames of active pulse) and only when not in cooldown.
+    3. Dim-temp mode: hardware brightness is clamped to the dim target and
+       pulse lifts are completely suppressed (invariant #4).
+
+    Returns:
+        (hw, idle_hw, allow_pulse_hw_lift, per_key_hw) where:
+        - hw: the final hardware brightness to send
+        - idle_hw: the idle (non-pulse) hardware brightness
+        - allow_pulse_hw_lift: whether a uniform pulse lift was applied
+        - per_key_hw: whether this is a per-key backend
+    """
     per_key_hw = bool(_support.device_attr_or_none(_support.keyboard_or_none(engine), "set_key_colors"))
-    if per_key_hw:
-        _support.set_uniform_hw_streak(engine, value=0, logger=_LOGGER)
-        uniform_hw_streak_count = 0
-    else:
-        uniform_hw_streak_count = _support.uniform_hw_streak(engine, logger=_LOGGER) + 1
-        _support.set_uniform_hw_streak(engine, value=uniform_hw_streak_count, logger=_LOGGER)
+    uniform_hw_streak_count = _support.increment_uniform_hw_streak(engine, per_key_hw=per_key_hw, logger=_LOGGER)
 
     allow_pulse_hw_lift = False
     pulse_mix = 0.0
@@ -111,7 +143,7 @@ def _resolve_hw_brightness_with_pulse_mix(
             reason = "per_key_hw"
         elif pulse_mix <= 0.0:
             reason = "no_pulse"
-        elif uniform_hw_streak_count < _UNIFORM_PULSE_HW_LIFT_STREAK_MIN:
+        elif uniform_hw_streak_count < UNIFORM_PULSE_HW_LIFT_STREAK_MIN:
             reason = "streak_gate"
         elif eff <= hw:
             reason = "eff_not_above_hw"
@@ -194,30 +226,39 @@ def _resolve_reactive_transition_progress(
 ) -> Optional[tuple[float, bool]]:
     """Return the in-flight reactive transition brightness as a float."""
 
-    start = _support.read_engine_attr(
-        engine,
-        "_reactive_transition_from_brightness",
-        missing_default=None,
-        error_default=None,
-    )
-    end = _support.read_engine_attr(
-        engine,
-        "_reactive_transition_to_brightness",
-        missing_default=None,
-        error_default=None,
-    )
-    started_at = _support.read_engine_attr(
-        engine,
-        "_reactive_transition_started_at",
-        missing_default=None,
-        error_default=None,
-    )
-    duration_s = _support.read_engine_attr(
-        engine,
-        "_reactive_transition_duration_s",
-        missing_default=None,
-        error_default=None,
-    )
+    state = _support.ensure_reactive_state(engine)
+    lock = getattr(engine, "reactive_lock", None)
+    start: object
+    end: object
+    started_at: object
+    duration_s: object
+    if lock is not None:
+        start, end, started_at, duration_s = _support.read_transition_atomic(state, lock)
+    else:
+        start = _support.read_engine_attr(
+            engine,
+            "_reactive_transition_from_brightness",
+            missing_default=None,
+            error_default=None,
+        )
+        end = _support.read_engine_attr(
+            engine,
+            "_reactive_transition_to_brightness",
+            missing_default=None,
+            error_default=None,
+        )
+        started_at = _support.read_engine_attr(
+            engine,
+            "_reactive_transition_started_at",
+            missing_default=None,
+            error_default=None,
+        )
+        duration_s = _support.read_engine_attr(
+            engine,
+            "_reactive_transition_duration_s",
+            missing_default=None,
+            error_default=None,
+        )
 
     if start is None or end is None or started_at is None or duration_s is None:
         return None
@@ -233,12 +274,18 @@ def _resolve_reactive_transition_progress(
     rising = bool(end_i >= start_i)
 
     if duration <= 0.0 or start_i == end_i:
-        _support.clear_transition_state(engine, logger=_LOGGER)
+        if lock is not None:
+            _support.clear_transition_atomic(state, lock)
+        else:
+            _support.clear_transition_state(engine, logger=_LOGGER)
         return float(end_i), rising
 
     elapsed = max(0.0, float(time.monotonic()) - started)
     if elapsed >= duration:
-        _support.clear_transition_state(engine, logger=_LOGGER)
+        if lock is not None:
+            _support.clear_transition_atomic(state, lock)
+        else:
+            _support.clear_transition_state(engine, logger=_LOGGER)
         return float(end_i), rising
 
     t = clamp01_fn(elapsed / duration)
@@ -369,4 +416,9 @@ def resolve_brightness(
 
 
 def _clear_transition_state(engine: "EffectsEngine") -> None:
-    _support.clear_transition_state(engine, logger=_LOGGER)
+    state = _support.ensure_reactive_state(engine)
+    lock = getattr(engine, "reactive_lock", None)
+    if lock is not None:
+        _support.clear_transition_atomic(state, lock)
+    else:
+        _support.clear_transition_state(engine, logger=_LOGGER)
