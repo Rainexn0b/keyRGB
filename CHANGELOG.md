@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.23.9 (2026-05-01)
+
+- Backends/Lifecycle: Wire `close()` through all HID backend device wrappers (ITE 8291r3, 8291, 8910, 8291 zones, 8295 zones, 8233, 8297, 8258) so open transports are released deterministically instead of leaking file descriptors. Add `close()` to the `KeyboardDevice` protocol; implement idempotent, exception-safe release in every device.
+- Backends/USB: Add `PyUsbTransport.close()`, `__del__`, and kernel-driver re-attach tracking so USB devices are detached cleanly on shutdown and kernel ownership is restored when possible.
+- Effects/Engine: Ensure `stop_event.clear()` runs unconditionally in `_EngineCore.stop()` even if the effect thread join times out, preventing stale event state on restart.
+- Power/Monitoring: Harden subprocess cleanup in `login1_monitoring` and `acpi_monitoring` — terminate, wait, then kill in `finally` blocks so dbus-monitor and acpi_listen children never outlive the parent tray app.
+- Config/Persistence: Add advisory file-locking (`fcntl.flock`) around config reads and writes with a dedicated `config.lock`, degrading gracefully when locking is unavailable.
+- Tray/Shutdown: Call `engine.close()` from `_on_quit_clicked` so the tray app releases keyboard devices and stops the effect thread before exiting.
+- Effects/Reactive: Route reactive render state through a typed `ReactiveRenderState` dataclass with `ensure_reactive_state()` / `set_engine_attr()` helpers, fixing attribute-shadowing issues in tests and making transition state explicit.
+- Tests: Fix `MAX_BRIGHTNESS_STEP_PER_FRAME` import path in brightness stability guard tests and update idle-power sensor tests to use `BacklightState` directly, matching the new typed API.
+- Docs: Add stability-and-RAM audit report documenting runtime safety gaps, fix rationale, and validation results.
+
 ## 0.23.8 (2026-04-27)
 
 - Effects/Reactive: Move reactive restore and render bookkeeping onto a structured state path (`ReactiveRenderState`) with explicit restore phases (`normal`, `first_pulse_pending`, `damping`), keeping the first-post-restore damp flow deterministic and easier to reason about.
