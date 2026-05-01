@@ -18,13 +18,12 @@ def test_read_dimmed_state_sets_baseline_first_observation(tmp_path):
     _write_text(backlight / "brightness", "100\n")
     _write_text(backlight / "max_brightness", "200\n")
 
-    tray = SimpleNamespace()
-    dimmed = sensors.read_dimmed_state(tray, backlight_base=tmp_path / "sys" / "class" / "backlight")
+    state = sensors.BacklightState()
+    dimmed = sensors.read_dimmed_state(state, backlight_base=tmp_path / "sys" / "class" / "backlight")
 
     assert dimmed is False
-    assert getattr(tray, "_dim_screen_off") is False
-    baselines = getattr(tray, "_dim_backlight_baselines")
-    assert baselines[str(backlight)] == 100
+    assert state.screen_off is False
+    assert state.baselines[str(backlight)] == 100
 
 
 def test_read_dimmed_state_detects_significant_drop(tmp_path):
@@ -32,12 +31,12 @@ def test_read_dimmed_state_detects_significant_drop(tmp_path):
     dev = base / "intel_backlight"
     _write_text(dev / "max_brightness", "200\n")
 
-    tray = SimpleNamespace()
+    state = sensors.BacklightState()
     _write_text(dev / "brightness", "100\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
 
     _write_text(dev / "brightness", "80\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is True
+    assert sensors.read_dimmed_state(state, backlight_base=base) is True
 
 
 def test_read_dimmed_state_tracks_manual_changes_when_not_dimmed(tmp_path):
@@ -45,15 +44,14 @@ def test_read_dimmed_state_tracks_manual_changes_when_not_dimmed(tmp_path):
     dev = base / "intel_backlight"
     _write_text(dev / "max_brightness", "200\n")
 
-    tray = SimpleNamespace()
+    state = sensors.BacklightState()
     _write_text(dev / "brightness", "100\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
 
     _write_text(dev / "brightness", "110\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
 
-    baselines = getattr(tray, "_dim_backlight_baselines")
-    assert baselines[str(dev)] == 110
+    assert state.baselines[str(dev)] == 110
 
 
 def test_read_dimmed_state_detects_gradual_drop_without_chasing_baseline(tmp_path):
@@ -61,17 +59,17 @@ def test_read_dimmed_state_detects_gradual_drop_without_chasing_baseline(tmp_pat
     dev = base / "intel_backlight"
     _write_text(dev / "max_brightness", "200\n")
 
-    tray = SimpleNamespace()
+    state = sensors.BacklightState()
     _write_text(dev / "brightness", "100\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
 
     # Simulate desktop dimming gradually (e.g., animations / stepwise fades).
     _write_text(dev / "brightness", "95\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
 
     # Once the cumulative drop crosses the 10% threshold, it should be detected.
     _write_text(dev / "brightness", "90\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is True
+    assert sensors.read_dimmed_state(state, backlight_base=base) is True
 
 
 def test_read_dimmed_state_uses_hysteresis_to_avoid_flapping(tmp_path):
@@ -79,22 +77,22 @@ def test_read_dimmed_state_uses_hysteresis_to_avoid_flapping(tmp_path):
     dev = base / "intel_backlight"
     _write_text(dev / "max_brightness", "200\n")
 
-    tray = SimpleNamespace()
+    state = sensors.BacklightState()
 
     _write_text(dev / "brightness", "100\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
 
     # Enter dim state at/below the 90% threshold.
     _write_text(dev / "brightness", "90\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is True
+    assert sensors.read_dimmed_state(state, backlight_base=base) is True
 
     # Small bounce above 90% should remain dimmed (hysteresis).
     _write_text(dev / "brightness", "92\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is True
+    assert sensors.read_dimmed_state(state, backlight_base=base) is True
 
     # Clear undim: above exit threshold.
     _write_text(dev / "brightness", "99\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
 
 
 def test_read_dimmed_state_sets_screen_off_flag_when_any_device_zero(tmp_path):
@@ -102,15 +100,15 @@ def test_read_dimmed_state_sets_screen_off_flag_when_any_device_zero(tmp_path):
     dev = base / "intel_backlight"
     _write_text(dev / "max_brightness", "200\n")
 
-    tray = SimpleNamespace()
+    state = sensors.BacklightState()
     _write_text(dev / "brightness", "100\n")
-    assert sensors.read_dimmed_state(tray, backlight_base=base) is False
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
 
     _write_text(dev / "brightness", "0\n")
-    dimmed = sensors.read_dimmed_state(tray, backlight_base=base)
+    dimmed = sensors.read_dimmed_state(state, backlight_base=base)
 
     assert dimmed is True
-    assert getattr(tray, "_dim_screen_off") is True
+    assert state.screen_off is True
 
 
 def test_read_dimmed_state_skips_unreadable_brightness_file(tmp_path, monkeypatch):
@@ -128,7 +126,7 @@ def test_read_dimmed_state_skips_unreadable_brightness_file(tmp_path, monkeypatc
 
     monkeypatch.setattr(Path, "read_text", fake_read_text)
 
-    assert sensors.read_dimmed_state(SimpleNamespace(), backlight_base=base) is None
+    assert sensors.read_dimmed_state(sensors.BacklightState(), backlight_base=base) is None
 
 
 def test_read_screen_off_state_drm_returns_none_when_no_candidates(tmp_path):

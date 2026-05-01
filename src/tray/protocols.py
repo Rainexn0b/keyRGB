@@ -106,6 +106,8 @@ class _HasSelectedDeviceContext(Protocol):
 
 
 class _HasIdleDimState(Protocol):
+    """Legacy — prefer BacklightState for new code."""
+
     _dim_backlight_baselines: dict[str, int]
     _dim_backlight_dimmed: dict[str, bool]
     _dim_temp_active: bool

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from collections.abc import Callable
 from typing import Optional, cast
@@ -20,7 +21,9 @@ from src.tray.protocols import (
 logger = logging.getLogger(__name__)
 _RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, ValueError)
-_IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_RUNTIME_ERRORS = (OSError, LookupError)
+_PROGRAMMING_ERRORS = (TypeError, ValueError)
+_IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, OSError, LookupError, RuntimeError, TypeError, ValueError)
 
 
 def _log_idle_power_exception(
@@ -51,11 +54,28 @@ def _call_runtime_boundary(
     try:
         fn()
         return True
+    except _RECOVERABLE_RUNTIME_ERRORS as exc:
+        if on_recoverable is not None:
+            on_recoverable(exc)
+            return False
+        assert key is not None
+        assert msg is not None
+        _log_idle_power_exception(key=key, level=level, msg=msg, exc=exc)
+        return False
+    except _PROGRAMMING_ERRORS as exc:
+        if os.environ.get("KEYRGB_DEV") == "1":
+            raise
+        _log_idle_power_exception(
+            key=key or "idle_power.programming_error",
+            level=logging.WARNING,
+            msg=msg or "Programming error in idle-power boundary",
+            exc=exc,
+        )
+        return False
     except _IDLE_POWER_RUNTIME_BOUNDARY_EXCEPTIONS as exc:  # @quality-exception exception-transparency: idle-power actions cross tray callbacks and runtime boundaries; must remain non-fatal for the polling loop
         if on_recoverable is not None:
             on_recoverable(exc)
             return False
-
         assert key is not None
         assert msg is not None
         _log_idle_power_exception(key=key, level=level, msg=msg, exc=exc)
@@ -124,18 +144,20 @@ def _set_engine_hw_brightness_cap(engine: object, brightness: int | None) -> Non
     brightness above a temporary policy target. Also propagates the
     ``_dim_temp_active`` flag so ``_resolve_brightness()`` can lock HW
     brightness to the dim target.
+
+    Engine-level state boundary: ``_hw_brightness_cap`` and
+    ``_dim_temp_active`` are internal engine attributes not declared on
+    any typed protocol. Access goes through ``set_engine_attr`` so that
+    attribute errors are handled gracefully across engine implementations.
     """
 
-    try:
-        if brightness is None:
-            engine._hw_brightness_cap = None  # type: ignore[attr-defined]
-            engine._dim_temp_active = False  # type: ignore[attr-defined]
-            return
-
-        engine._hw_brightness_cap = max(0, min(50, int(brightness)))  # type: ignore[attr-defined]
-        engine._dim_temp_active = True  # type: ignore[attr-defined]
-    except (AttributeError, TypeError, ValueError):
+    if brightness is None:
+        _reactive_support.set_engine_attr(engine, "_hw_brightness_cap", None)
+        _reactive_support.set_engine_attr(engine, "_dim_temp_active", False)
         return
+
+    _reactive_support.set_engine_attr(engine, "_hw_brightness_cap", max(0, min(50, int(brightness))))
+    _reactive_support.set_engine_attr(engine, "_dim_temp_active", True)
 
 
 def _set_reactive_transition(
@@ -155,18 +177,30 @@ def _set_reactive_transition(
             max_v=50,
         )
         target_i = max(0, min(50, int(target_brightness)))
-        _reactive_support.set_engine_attr(engine, "_reactive_transition_from_brightness", current_i)
-        _reactive_support.set_engine_attr(engine, "_reactive_transition_to_brightness", target_i)
-        _reactive_support.set_engine_attr(
-            engine,
-            "_reactive_transition_started_at",
-            float(time.monotonic()),
-        )
-        _reactive_support.set_engine_attr(
-            engine,
-            "_reactive_transition_duration_s",
-            max(0.0, float(duration_s)),
-        )
+        state = _reactive_support.ensure_reactive_state(engine)
+        lock = getattr(engine, "reactive_lock", None)
+        if lock is not None:
+            _reactive_support.seed_transition_atomic(
+                state,
+                lock,
+                from_brightness=current_i,
+                to_brightness=target_i,
+                started_at=float(time.monotonic()),
+                duration_s=max(0.0, float(duration_s)),
+            )
+        else:
+            _reactive_support.set_engine_attr(engine, "_reactive_transition_from_brightness", current_i)
+            _reactive_support.set_engine_attr(engine, "_reactive_transition_to_brightness", target_i)
+            _reactive_support.set_engine_attr(
+                engine,
+                "_reactive_transition_started_at",
+                float(time.monotonic()),
+            )
+            _reactive_support.set_engine_attr(
+                engine,
+                "_reactive_transition_duration_s",
+                max(0.0, float(duration_s)),
+            )
     except (AttributeError, TypeError, ValueError):
         return
 

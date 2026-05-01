@@ -2,31 +2,20 @@ from __future__ import annotations
 
 import os
 import subprocess
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Protocol, cast
-
-from src.tray.protocols import IdlePowerTrayProtocol
+from typing import Optional
 
 
-_RECOVERABLE_SYSFS_READ_EXCEPTIONS = (OSError, UnicodeError, ValueError)
+_RECOVERABLE_SYSFS_READ_EXCEPTIONS = (OSError, UnicodeError, ValueError, InterruptedError, BlockingIOError)
 _RECOVERABLE_SUBPROCESS_EXCEPTIONS = (OSError, ValueError, subprocess.SubprocessError)
 
 
-class _BacklightStateTray(Protocol):
-    _dim_backlight_baselines: dict[str, int]
-    _dim_backlight_dimmed: dict[str, bool]
-
-
-def _backlight_state_or_defaults(tray: object) -> tuple[dict[str, int], dict[str, bool]]:
-    try:
-        baselines = cast(_BacklightStateTray, tray)._dim_backlight_baselines
-    except AttributeError:
-        baselines = {}
-    try:
-        dimmed_states = cast(_BacklightStateTray, tray)._dim_backlight_dimmed
-    except AttributeError:
-        dimmed_states = {}
-    return baselines, dimmed_states
+@dataclass
+class BacklightState:
+    baselines: dict[str, int] = field(default_factory=dict)
+    dimmed: dict[str, bool] = field(default_factory=dict)
+    screen_off: bool = False
 
 
 def _read_int(path: Path) -> Optional[int]:
@@ -36,14 +25,13 @@ def _read_int(path: Path) -> Optional[int]:
         return None
 
 
-def read_dimmed_state(tray: IdlePowerTrayProtocol, *, backlight_base: Path | None = None) -> Optional[bool]:
+def read_dimmed_state(state: BacklightState, *, backlight_base: Path | None = None) -> Optional[bool]:
     """Best-effort: infer 'dimmed' from kernel backlight brightness drops."""
 
     base = backlight_base or Path("/sys/class/backlight")
     if not base.exists():
         return None
 
-    baselines, dimmed_states = _backlight_state_or_defaults(tray)
     dimmed_any: Optional[bool] = None
     screen_off_any = False
     observed_any = 0
@@ -60,10 +48,10 @@ def read_dimmed_state(tray: IdlePowerTrayProtocol, *, backlight_base: Path | Non
         observed_any += 1
 
         key = str(child)
-        baseline = baselines.get(key)
+        baseline = state.baselines.get(key)
         if baseline is None or baseline <= 0:
-            baselines[key] = int(current)
-            dimmed_states[key] = False
+            state.baselines[key] = int(current)
+            state.dimmed[key] = False
             dimmed_any = False if dimmed_any is None else dimmed_any
             continue
 
@@ -75,26 +63,24 @@ def read_dimmed_state(tray: IdlePowerTrayProtocol, *, backlight_base: Path | Non
 
         enter_dim_threshold = int(baseline_i * 0.90)
         exit_dim_threshold = int(baseline_i * 0.98)
-        prev_dimmed = bool(dimmed_states.get(key, False))
+        prev_dimmed = bool(state.dimmed.get(key, False))
 
         enter_dim = (current_i <= enter_dim_threshold) and ((baseline_i - current_i) >= 1)
         exit_dim = (current_i >= exit_dim_threshold) or (current_i >= baseline_i)
         dimmed = (not exit_dim) if prev_dimmed else bool(enter_dim)
-        dimmed_states[key] = bool(dimmed)
+        state.dimmed[key] = bool(dimmed)
 
         if dimmed:
             dimmed_any = True
         else:
             dimmed_any = False if dimmed_any is None else dimmed_any
             if current_i > baseline_i:
-                baselines[key] = current_i
+                state.baselines[key] = current_i
 
     if observed_any <= 0:
         return None
 
-    tray._dim_backlight_baselines = baselines
-    tray._dim_backlight_dimmed = dimmed_states
-    tray._dim_screen_off = bool(screen_off_any)
+    state.screen_off = bool(screen_off_any)
     return dimmed_any
 
 

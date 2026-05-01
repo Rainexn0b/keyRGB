@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Optional
 
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
 from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_float_field
 
 from .policy import IdleAction
+from .sensors import BacklightState
 
 
 _IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -19,6 +20,7 @@ class IdlePollLoopState:
     dimmed_true_streak: int = 0
     dimmed_false_streak: int = 0
     screen_off_true_streak: int = 0
+    backlight_state: BacklightState = field(default_factory=BacklightState)
 
 
 def _run_idle_power_runtime_boundary_best_effort(operation: Callable[[], None]) -> None:
@@ -75,7 +77,7 @@ def run_idle_power_iteration(
     session_id: str | None,
     now_monotonic_fn: Callable[[], float],
     ensure_idle_state_fn: Callable[[IdlePowerTrayProtocol], None],
-    read_dimmed_state_fn: Callable[[IdlePowerTrayProtocol], Optional[bool]],
+    read_dimmed_state_fn: Callable[[BacklightState], Optional[bool]],
     read_screen_off_state_drm_fn: Callable[[], Optional[bool]],
     debounce_dim_and_screen_off_fn: Callable[..., tuple[Optional[bool], bool, int, int, int]],
     read_logind_idle_seconds_fn: Callable[..., Optional[float]],
@@ -89,8 +91,8 @@ def run_idle_power_iteration(
 
     _reload_idle_power_config_best_effort(tray)
 
-    dimmed = read_dimmed_state_fn(tray)
-    screen_off = bool(tray._dim_screen_off) or bool(read_screen_off_state_drm_fn())
+    dimmed = read_dimmed_state_fn(loop_state.backlight_state)
+    screen_off = bool(loop_state.backlight_state.screen_off) or bool(read_screen_off_state_drm_fn())
 
     (
         dimmed,

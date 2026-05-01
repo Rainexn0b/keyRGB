@@ -13,6 +13,7 @@ from src.tray.pollers.idle_power._transition_actions import (
     read_effect_name,
     refresh_ui_best_effort,
 )
+from src.tray.idle_power_state import reset_dim_state_on_tray
 from src.tray.protocols import IdlePowerTrayProtocol, set_idle_power_state_field, sync_idle_power_state_field
 
 
@@ -118,13 +119,7 @@ def _execute_turn_off(
     )
     use_soft_fade = not (effect in reactive_effects_set and _engine_supports_per_key_output(tray.engine))
 
-    _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=False)
-    _set_idle_state_field(
-        tray,
-        prior_name="_dim_temp_target_brightness",
-        state_name="dim_temp_target_brightness",
-        value=None,
-    )
+    reset_dim_state_on_tray(tray)
     set_engine_hw_brightness_cap(tray.engine, None)
     call_runtime_boundary(
         lambda: tray.engine.stop(),
@@ -219,13 +214,7 @@ def _execute_restore_brightness(
     set_brightness_best_effort: Callable[..., None],
     recoverable_effect_name_exceptions: tuple[type[BaseException], ...],
 ) -> None:
-    _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=False)
-    _set_idle_state_field(
-        tray,
-        prior_name="_dim_temp_target_brightness",
-        state_name="dim_temp_target_brightness",
-        value=None,
-    )
+    reset_dim_state_on_tray(tray)
     config = tray.config
     target = safe_int_attr(config, "brightness", default=0)
     perkey_target = safe_int_attr(config, "perkey_brightness", default=0)
@@ -268,13 +257,7 @@ def _execute_restore(
     if user_forced_off or power_forced_off:
         return
 
-    _set_idle_state_field(tray, prior_name="_dim_temp_active", state_name="dim_temp_active", value=False)
-    _set_idle_state_field(
-        tray,
-        prior_name="_dim_temp_target_brightness",
-        state_name="dim_temp_target_brightness",
-        value=None,
-    )
+    reset_dim_state_on_tray(tray)
     if hasattr(tray, "engine"):
         set_engine_hw_brightness_cap(tray.engine, None)
     restore_from_idle_fn(tray)

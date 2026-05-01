@@ -22,6 +22,7 @@ if TYPE_CHECKING:
 
     from ._runtime import IdlePollLoopState
     from .policy import IdleAction
+    from .sensors import BacklightState
 else:
     IdlePowerTrayProtocol = object
 
@@ -151,10 +152,10 @@ def _ensure_idle_state(tray: IdlePowerTrayProtocol) -> None:
     _ensure_idle_state_impl(tray)
 
 
-def _read_dimmed_state(tray: IdlePowerTrayProtocol) -> Optional[bool]:
+def _read_dimmed_state(state: BacklightState) -> Optional[bool]:
     from .sensors import read_dimmed_state
 
-    return read_dimmed_state(tray)
+    return read_dimmed_state(state)
 
 
 def _read_screen_off_state_drm() -> Optional[bool]:

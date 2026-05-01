@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
+from ._constants import (
+    POST_RESUME_IDLE_ACTION_SUPPRESSION_S,
+    POST_TURN_OFF_RESTORE_SUPPRESSION_S,
+)
 
 IdleAction = Optional[Literal["turn_off", "restore", "dim_to_temp", "restore_brightness"]]
-_POST_TURN_OFF_RESTORE_SUPPRESSION_S = 2.5
-_POST_RESUME_IDLE_ACTION_SUPPRESSION_S = 10.0
+
+# see _constants.py
 
 
 def compute_idle_action(
@@ -28,7 +32,7 @@ def compute_idle_action(
     now: float = 0.0,
 ) -> IdleAction:
     if now > 0 and last_resume_at > 0:
-        if (now - last_resume_at) < _POST_RESUME_IDLE_ACTION_SUPPRESSION_S:
+        if (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S:
             return None
 
     if not power_management_enabled:
@@ -80,7 +84,7 @@ def compute_idle_action(
 
         if is_off:
             if (not bool(screen_off)) and now > 0 and last_idle_turn_off_at > 0:
-                if (now - last_idle_turn_off_at) < _POST_TURN_OFF_RESTORE_SUPPRESSION_S:
+                if (now - last_idle_turn_off_at) < POST_TURN_OFF_RESTORE_SUPPRESSION_S:
                     return None
             return "restore"
         return None

@@ -72,26 +72,29 @@ def _mk_engine(
 # ---------------------------------------------------------------------------
 
 
+from src.core.effects.reactive._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
+
+
 def test_guard_clamps_large_upward_jump() -> None:
-    """Brightness jump > _MAX_BRIGHTNESS_STEP_PER_FRAME is clamped."""
-    from src.core.effects.reactive.render import _resolve_brightness, _MAX_BRIGHTNESS_STEP_PER_FRAME
+    """Brightness jump > MAX_BRIGHTNESS_STEP_PER_FRAME is clamped."""
+    from src.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=50, last_rendered=3)
     _, _, hw = _resolve_brightness(engine)
-    assert hw <= 3 + _MAX_BRIGHTNESS_STEP_PER_FRAME
+    assert hw <= 3 + MAX_BRIGHTNESS_STEP_PER_FRAME
 
 
 def test_guard_clamps_large_downward_jump() -> None:
-    """Brightness drop > _MAX_BRIGHTNESS_STEP_PER_FRAME is clamped."""
-    from src.core.effects.reactive.render import _resolve_brightness, _MAX_BRIGHTNESS_STEP_PER_FRAME
+    """Brightness drop > MAX_BRIGHTNESS_STEP_PER_FRAME is clamped."""
+    from src.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=3, per_key_brightness=3, reactive_brightness=3, last_rendered=50)
     _, _, hw = _resolve_brightness(engine)
-    assert hw >= 50 - _MAX_BRIGHTNESS_STEP_PER_FRAME
+    assert hw >= 50 - MAX_BRIGHTNESS_STEP_PER_FRAME
 
 
 def test_guard_allows_small_change() -> None:
-    """Changes within _MAX_BRIGHTNESS_STEP_PER_FRAME are not clamped."""
+    """Changes within MAX_BRIGHTNESS_STEP_PER_FRAME are not clamped."""
     from src.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=45, last_rendered=50)
@@ -104,17 +107,17 @@ def test_guard_ramps_from_zero_on_first_frame_after_restart() -> None:
     """After stop() resets _last_rendered_brightness to None, the guard treats
     None as 0 so the first rendered frame ramps up from dark instead of
     jumping straight to target brightness."""
-    from src.core.effects.reactive.render import _resolve_brightness, _MAX_BRIGHTNESS_STEP_PER_FRAME
+    from src.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=50, last_rendered=None)
     _, _, hw = _resolve_brightness(engine)
-    # Guard treats None as 0: first frame is clamped to _MAX_BRIGHTNESS_STEP_PER_FRAME.
-    assert hw == _MAX_BRIGHTNESS_STEP_PER_FRAME
+    # Guard treats None as 0: first frame is clamped to MAX_BRIGHTNESS_STEP_PER_FRAME.
+    assert hw == MAX_BRIGHTNESS_STEP_PER_FRAME
 
 
 def test_guard_converges_over_multiple_frames() -> None:
     """Repeated frames should ramp brightness toward the target."""
-    from src.core.effects.reactive.render import _resolve_brightness, _MAX_BRIGHTNESS_STEP_PER_FRAME
+    from src.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=50, last_rendered=3)
     frames = []
@@ -125,9 +128,9 @@ def test_guard_converges_over_multiple_frames() -> None:
 
     # Should have ramped up toward 50
     assert frames[-1] == 50
-    # Each frame-to-frame delta should be <= _MAX_BRIGHTNESS_STEP_PER_FRAME
+    # Each frame-to-frame delta should be <= MAX_BRIGHTNESS_STEP_PER_FRAME
     for i in range(1, len(frames)):
-        assert abs(frames[i] - frames[i - 1]) <= _MAX_BRIGHTNESS_STEP_PER_FRAME
+        assert abs(frames[i] - frames[i - 1]) <= MAX_BRIGHTNESS_STEP_PER_FRAME
 
 
 def test_guard_works_with_dim_temp_cap() -> None:
@@ -219,22 +222,22 @@ def test_render_updates_last_rendered_brightness() -> None:
     """render() should update engine._last_rendered_brightness after each frame.
 
     When starting from None (post-stop), the guard ramps from 0 so the first
-    frame value is _MAX_BRIGHTNESS_STEP_PER_FRAME, not the raw target.
+    frame value is MAX_BRIGHTNESS_STEP_PER_FRAME, not the raw target.
     """
-    from src.core.effects.reactive.render import render, _MAX_BRIGHTNESS_STEP_PER_FRAME
+    from src.core.effects.reactive.render import render
 
     engine = _mk_engine(brightness=25, last_rendered=None)
     color_map = {(0, 0): (255, 255, 255)}
 
     render(engine, color_map=color_map)
     assert engine._last_rendered_brightness is not None
-    # First frame: guard ramps from 0 → _MAX_BRIGHTNESS_STEP_PER_FRAME (8).
-    assert engine._last_rendered_brightness == _MAX_BRIGHTNESS_STEP_PER_FRAME
+    # First frame: guard ramps from 0 → MAX_BRIGHTNESS_STEP_PER_FRAME (8).
+    assert engine._last_rendered_brightness == MAX_BRIGHTNESS_STEP_PER_FRAME
 
 
 def test_render_ramps_brightness_over_multiple_frames() -> None:
     """Simulated dim → restore: brightness should ramp smoothly, not jump."""
-    from src.core.effects.reactive.render import render, _MAX_BRIGHTNESS_STEP_PER_FRAME
+    from src.core.effects.reactive.render import render
 
     # Start at dim brightness
     engine = _mk_engine(
@@ -269,11 +272,11 @@ def test_render_ramps_brightness_over_multiple_frames() -> None:
     # Should converge to 50
     assert brightness_values[-1] == 50
 
-    # Each step should be <= _MAX_BRIGHTNESS_STEP_PER_FRAME from the previous
+    # Each step should be <= MAX_BRIGHTNESS_STEP_PER_FRAME from the previous
     prev = 3
     for v in brightness_values:
-        assert abs(v - prev) <= _MAX_BRIGHTNESS_STEP_PER_FRAME, (
-            f"Jump {prev} -> {v} exceeds max step {_MAX_BRIGHTNESS_STEP_PER_FRAME}"
+        assert abs(v - prev) <= MAX_BRIGHTNESS_STEP_PER_FRAME, (
+            f"Jump {prev} -> {v} exceeds max step {MAX_BRIGHTNESS_STEP_PER_FRAME}"
         )
         prev = v
 

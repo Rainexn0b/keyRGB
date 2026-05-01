@@ -148,13 +148,13 @@ def apply_dim_temp_brightness(
                 "_reactive_disable_pulse_hw_lift_until",
                 float(time.monotonic()) + 2.0,
             )
-            tray.engine._dim_temp_active = True  # type: ignore[attr-defined]
+            _reactive_support.set_engine_attr(tray.engine, "_dim_temp_active", True)
             set_reactive_transition(
                 tray.engine,
                 target_brightness=int(dim_temp_brightness),
                 duration_s=soft_off_fade_duration_s,
             )
-            tray.engine.per_key_brightness = dim_temp_brightness
+            _reactive_support.set_engine_attr(tray.engine, "per_key_brightness", dim_temp_brightness)
             set_brightness_best_effort(
                 tray.engine,
                 dim_temp_brightness,
@@ -200,7 +200,7 @@ def apply_restore_brightness(
                 duration_s=soft_on_fade_duration_s,
             )
             set_engine_hw_brightness_cap(tray.engine, None)
-            tray.engine.per_key_brightness = perkey_target
+            _reactive_support.set_engine_attr(tray.engine, "per_key_brightness", perkey_target)
             set_brightness_best_effort(
                 tray.engine,
                 target,

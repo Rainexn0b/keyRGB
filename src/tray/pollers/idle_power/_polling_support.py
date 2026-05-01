@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from src.tray.protocols import IdlePowerTrayProtocol
 
     from ._runtime import IdlePollLoopState
+    from .sensors import BacklightState
 else:
     IdlePowerTrayProtocol = object
 
@@ -139,7 +140,7 @@ def poll_idle_power_loop(
     now_monotonic_fn: Callable[[], float],
     sleep_fn: Callable[[float], None],
     ensure_idle_state_fn: Callable[[IdlePowerTrayProtocol], None],
-    read_dimmed_state_fn: Callable[[IdlePowerTrayProtocol], Optional[bool]],
+    read_dimmed_state_fn: Callable[[BacklightState], Optional[bool]],
     read_screen_off_state_drm_fn: Callable[[], Optional[bool]],
     debounce_dim_and_screen_off_fn: Callable[..., tuple[Optional[bool], bool, int, int, int]],
     read_logind_idle_seconds_fn: Callable[..., Optional[float]],

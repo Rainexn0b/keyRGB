@@ -3,7 +3,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
+
+if TYPE_CHECKING:
+    from src.tray.pollers.idle_power.sensors import BacklightState
+
+
+def _default_backlight_state() -> "BacklightState":
+    from src.tray.pollers.idle_power.sensors import BacklightState
+
+    return BacklightState()
 
 
 @dataclass
@@ -17,14 +26,21 @@ class TrayIdlePowerState:
     idle_forced_off: bool = False
     user_forced_off: bool = False
     power_forced_off: bool = False
+    # Legacy fields — prefer backlight_state for new code.
     dim_backlight_baselines: dict[str, int] = field(default_factory=dict)
     dim_backlight_dimmed: dict[str, bool] = field(default_factory=dict)
     dim_temp_active: bool = False
     dim_temp_target_brightness: Optional[int] = None
+    # Legacy field — prefer backlight_state for new code.
     dim_screen_off: bool = False
     dim_sync_suppressed_logged: bool = False
     last_idle_turn_off_at: float = 0.0
     last_resume_at: float = 0.0
+    backlight_state: BacklightState = field(default_factory=_default_backlight_state)
+
+    def reset_dim_state(self) -> None:
+        self.dim_temp_active = False
+        self.dim_temp_target_brightness = None
 
 
 def ensure_tray_idle_power_state(tray: object) -> TrayIdlePowerState:
@@ -298,3 +314,16 @@ def set_idle_power_state_field(
     except AttributeError:
         pass
     setattr(ensure_tray_idle_power_state(tray), state_name, value)
+
+
+def reset_dim_state_on_tray(tray: object) -> None:
+    """Reset dim-temporary state on both the tray and typed owner.
+
+    Convenience helper that clears ``dim_temp_active`` and
+    ``dim_temp_target_brightness`` in a single call, keeping the legacy
+    tray attributes and the ``TrayIdlePowerState`` owner in sync.
+    """
+    set_idle_power_state_field(tray, attr_name="_dim_temp_active", state_name="dim_temp_active", value=False)
+    set_idle_power_state_field(
+        tray, attr_name="_dim_temp_target_brightness", state_name="dim_temp_target_brightness", value=None
+    )
