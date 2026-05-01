@@ -21,5 +21,9 @@ class SysfsMouseDevice(SysfsLedKeyboardDevice):
             palette=False,
         )
 
+    def close(self) -> None:
+        # No persistent transport to release for sysfs mouse.
+        return
+
 
 __all__ = ["SysfsMouseDevice"]

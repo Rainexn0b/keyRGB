@@ -164,3 +164,7 @@ class AsusctlAuraKeyboardDevice(KeyboardDevice):
     def set_effect(self, effect_data) -> None:
         # Not wired yet. No-op.
         return
+
+    def close(self) -> None:
+        # No persistent transport to release for asusctl.
+        return

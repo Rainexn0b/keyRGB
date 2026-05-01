@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Iterable
-from typing import SupportsIndex, SupportsInt, cast
+from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
 from . import protocol
+
+if TYPE_CHECKING:
+    from .usb import PyUsbTransport
+
+_logger = logging.getLogger(__name__)
 
 ControlWriter = Callable[[bytes], int | None]
 ControlReader = Callable[[int], bytes | bytearray | list[int]]
@@ -94,6 +100,8 @@ class Ite8291r3KeyboardDevice:
         send_control_report: ControlWriter,
         read_control_report: ControlReader,
         write_row_data: RowWriter,
+        *,
+        transport: PyUsbTransport | None = None,
     ) -> None:
         if not callable(send_control_report):
             raise TypeError("send_control_report must be callable")
@@ -105,6 +113,7 @@ class Ite8291r3KeyboardDevice:
         self._send_control_report = send_control_report
         self._read_control_report = read_control_report
         self._write_row_data = write_row_data
+        self._transport = transport
 
     def _send_control(self, report: bytes) -> None:
         result = self._send_control_report(bytes(report))
@@ -251,3 +260,13 @@ class Ite8291r3KeyboardDevice:
         for row_idx, row_colors in enumerate(rows):
             self._set_row_index(row_idx)
             self._write_row(protocol.build_row_data_report(row_colors))
+
+    def close(self) -> None:
+        """Release the USB transport if one was provided."""
+        transport = self._transport
+        if transport is not None:
+            self._transport = None
+            try:
+                transport.close()
+            except (AttributeError, OSError, RuntimeError, ValueError):
+                _logger.debug("Error closing ITE 8291r3 USB transport", exc_info=True)

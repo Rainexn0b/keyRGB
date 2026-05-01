@@ -62,6 +62,7 @@ class Ite8291KeyboardDevice:
         write_output_report: OutputReportWriter,
         *,
         current_brightness: int = 0,
+        transport: object | None = None,
     ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
@@ -73,6 +74,7 @@ class Ite8291KeyboardDevice:
         self._current_brightness = protocol.clamp_ui_brightness(current_brightness)
         self._current_matrix = _blank_matrix()
         self._is_off = self._current_brightness <= 0
+        self._transport = transport
 
     def _send_feature(self, report: bytes) -> None:
         result = self._send_feature_report(bytes(report))
@@ -148,3 +150,15 @@ class Ite8291KeyboardDevice:
     def set_effect(self, effect_data) -> None:
         del effect_data
         return
+
+    def close(self) -> None:
+        """Release the HID transport if one was provided."""
+        transport = self._transport
+        if transport is not None:
+            self._transport = None
+            close_fn = getattr(transport, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    pass

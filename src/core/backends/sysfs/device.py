@@ -326,3 +326,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
     def set_effect(self, effect_data) -> None:
         # Not supported. No-op.
         return
+
+    def close(self) -> None:
+        # No persistent transport to release for sysfs.
+        return

@@ -185,7 +185,9 @@ class Ite8233Backend(KeyboardBackend):
             transport, info = _open_matching_transport()
             from .device import Ite8233LightbarDevice
 
-            return Ite8233LightbarDevice(transport.send_feature_report, product_id=int(info.product_id))
+            return Ite8233LightbarDevice(
+                transport.send_feature_report, product_id=int(info.product_id), transport=transport
+            )
         except backend_exceptions.BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
             if core_exceptions.is_permission_denied(exc):
                 raise backend_exceptions.BackendPermissionError(

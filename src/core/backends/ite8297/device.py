@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from typing import Callable
 
 from . import protocol
+
+_logger = logging.getLogger(__name__)
 
 FeatureReportWriter = Callable[[bytes], int | None]
 
@@ -23,11 +26,14 @@ def _coerce_rgb(color) -> tuple[int, int, int]:
 class Ite8297KeyboardDevice:
     """Minimal device wrapper for the public ITE 8297 uniform-color HID path."""
 
-    def __init__(self, send_feature_report: FeatureReportWriter, *, current_brightness: int = 50) -> None:
+    def __init__(
+        self, send_feature_report: FeatureReportWriter, *, current_brightness: int = 50, transport: object | None = None
+    ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
 
         self._send_feature_report = send_feature_report
+        self._transport = transport
         self._current_color = (0, 0, 0)
         self._current_brightness = protocol.clamp_ui_brightness(current_brightness)
 
@@ -81,3 +87,15 @@ class Ite8297KeyboardDevice:
     def set_effect(self, effect_data: object) -> None:
         del effect_data
         return
+
+    def close(self) -> None:
+        """Release the HID transport if one was provided."""
+        transport = self._transport
+        if transport is not None:
+            self._transport = None
+            close_fn = getattr(transport, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    _logger.debug("Error closing ITE 8297 HID transport", exc_info=True)

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping
 from typing import SupportsIndex, SupportsInt, cast
 
 from . import protocol
+
+_logger = logging.getLogger(__name__)
 
 FeatureReportWriter = Callable[[bytes], int | None]
 IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
@@ -59,11 +62,14 @@ class Ite8295ZonesKeyboardDevice:
 
     keyrgb_hw_speed_policy = "direct"
 
-    def __init__(self, send_feature_report: FeatureReportWriter, *, current_brightness: int = 0) -> None:
+    def __init__(
+        self, send_feature_report: FeatureReportWriter, *, current_brightness: int = 0, transport: object | None = None
+    ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
 
         self._send_feature_report = send_feature_report
+        self._transport = transport
         self._zone_colors: list[tuple[int, int, int]] = [(0, 0, 0) for _ in range(protocol.NUM_ZONES)]
         self._brightness = protocol.clamp_ui_brightness(current_brightness)
         self._effect_name = "static"
@@ -219,3 +225,15 @@ class Ite8295ZonesKeyboardDevice:
             self._zone_colors = [rgb for _ in range(protocol.NUM_ZONES)]
 
         self._apply_current_state()
+
+    def close(self) -> None:
+        """Release the HID transport if one was provided."""
+        transport = self._transport
+        if transport is not None:
+            self._transport = None
+            close_fn = getattr(transport, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    _logger.debug("Error closing ITE 8295 4-zone HID transport", exc_info=True)

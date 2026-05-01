@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Sequence
 
 from . import protocol
+
+_logger = logging.getLogger(__name__)
 
 FeatureReportWriter = Callable[[bytes], int | None]
 
@@ -23,11 +26,14 @@ def _coerce_rgb(color) -> tuple[int, int, int]:
 class Ite8291ZonesKeyboardDevice:
     """4-zone HID wrapper for the legacy ce00 bcdDevice 0x0002 firmware path."""
 
-    def __init__(self, send_feature_report: FeatureReportWriter, *, current_brightness: int = 0) -> None:
+    def __init__(
+        self, send_feature_report: FeatureReportWriter, *, current_brightness: int = 0, transport: object | None = None
+    ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
 
         self._send_feature_report = send_feature_report
+        self._transport = transport
         self._current_brightness = protocol.clamp_ui_brightness(current_brightness)
         self._zone_colors: list[tuple[int, int, int]] = [(0, 0, 0) for _ in range(protocol.NUM_ZONES)]
         self._is_off = self._current_brightness <= 0
@@ -96,3 +102,15 @@ class Ite8291ZonesKeyboardDevice:
     def set_effect(self, effect_data) -> None:
         del effect_data
         return
+
+    def close(self) -> None:
+        """Release the HID transport if one was provided."""
+        transport = self._transport
+        if transport is not None:
+            self._transport = None
+            close_fn = getattr(transport, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    _logger.debug("Error closing ITE 8291 4-zone HID transport", exc_info=True)

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Sequence
 
 from . import protocol
+
+_logger = logging.getLogger(__name__)
 
 FeatureReportWriter = Callable[[bytes], int]
 
@@ -18,11 +21,13 @@ class Ite8233LightbarDevice:
         *,
         product_id: int = protocol.DEFAULT_PRODUCT_ID,
         current_brightness: int = 50,
+        transport: object | None = None,
     ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
 
         self._send_feature_report = send_feature_report
+        self._transport = transport
         self._product_id = protocol.normalize_product_id(product_id)
         self._brightness = protocol.clamp_ui_brightness(current_brightness)
         self._current_color = (255, 255, 255)
@@ -200,3 +205,15 @@ class Ite8233LightbarDevice:
         self._current_color = tuple(int(channel) for channel in color)  # type: ignore[assignment]
         self._brightness = brightness
         self._is_off = False
+
+    def close(self) -> None:
+        """Release the HID transport if one was provided."""
+        transport = self._transport
+        if transport is not None:
+            self._transport = None
+            close_fn = getattr(transport, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    _logger.debug("Error closing ITE 8233 HID transport", exc_info=True)

@@ -213,6 +213,7 @@ class Ite8291r3Backend(KeyboardBackend):
                 transport.send_control_report,
                 transport.read_control_report,
                 transport.write_data,
+                transport=transport,
             )
         except (
             ImportError,

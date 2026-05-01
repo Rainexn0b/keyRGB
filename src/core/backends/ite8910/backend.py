@@ -89,7 +89,7 @@ class Ite8910Backend(KeyboardBackend):
     def get_device(self) -> KeyboardDevice:
         try:
             transport, _info = open_matching_hidraw_transport(protocol.VENDOR_ID, protocol.PRODUCT_ID)
-            return Ite8910KeyboardDevice(transport.send_feature_report)
+            return Ite8910KeyboardDevice(transport.send_feature_report, transport=transport)
         except BACKEND_OPEN_RUNTIME_ERRORS as exc:
             if is_permission_denied(exc):
                 raise BackendPermissionError(

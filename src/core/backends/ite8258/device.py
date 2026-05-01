@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping, Sequence
 from typing import SupportsIndex, SupportsInt, cast
 
 from . import protocol
+
+_logger = logging.getLogger(__name__)
 
 FeatureReportWriter = Callable[[bytes], int | None]
 IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
@@ -55,11 +58,13 @@ class Ite8258KeyboardDevice:
         *,
         profile_id: int = protocol.DEFAULT_PROFILE_ID,
         current_brightness: int = protocol.UI_BRIGHTNESS_MAX,
+        transport: object | None = None,
     ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
 
         self._send_feature_report = send_feature_report
+        self._transport = transport
         self._profile_id = int(profile_id) & 0xFF
         self._current_brightness = protocol.clamp_ui_brightness(current_brightness)
         self._is_off = self._current_brightness <= 0
@@ -146,3 +151,15 @@ class Ite8258KeyboardDevice:
 
         groups = protocol.build_effect_groups(effect_name, speed=speed_raw, color=color, direction=direction)
         self._apply_groups(groups, brightness=brightness)
+
+    def close(self) -> None:
+        """Release the HID transport if one was provided."""
+        transport = self._transport
+        if transport is not None:
+            self._transport = None
+            close_fn = getattr(transport, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    _logger.debug("Error closing ITE 8258 HID transport", exc_info=True)

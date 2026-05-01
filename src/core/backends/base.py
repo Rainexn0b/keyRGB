@@ -25,6 +25,13 @@ class KeyboardDevice(Protocol):
 
     def set_effect(self, effect_data) -> None: ...
 
+    def close(self) -> None:
+        """Release hardware resources held by this device.
+
+        Safe to call multiple times. The default implementation is a no-op.
+        """
+        ...
+
 
 @dataclass(frozen=True)
 class BackendCapabilities:

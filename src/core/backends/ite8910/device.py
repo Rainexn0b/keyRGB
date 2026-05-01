@@ -79,6 +79,7 @@ class Ite8910KeyboardDevice:
         *,
         current_brightness: int = 0,
         current_speed_raw: int = 0,
+        transport: object | None = None,
     ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
@@ -89,6 +90,7 @@ class Ite8910KeyboardDevice:
             current_speed_raw=protocol.clamp_raw_speed(current_speed_raw),
         )
         self._current_brightness = _clamp_ui_brightness(current_brightness)
+        self._transport = transport
 
     @property
     def current_brightness_raw(self) -> int:
@@ -197,3 +199,15 @@ class Ite8910KeyboardDevice:
         self.set_effect_index(_coerce_effect_value(effect_data), colors=colors, direction=direction)
         if apply_brightness_speed:
             self.set_brightness_and_speed_raw(brightness_raw, speed_raw)
+
+    def close(self) -> None:
+        """Release the HID transport if one was provided."""
+        transport = self._transport
+        if transport is not None:
+            self._transport = None
+            close_fn = getattr(transport, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    pass
