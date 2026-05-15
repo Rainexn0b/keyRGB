@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.24.1 (2026-05-15)
+
+- Tray/Scheduler: Preserve reactive typing pulse brightness as a distinct state instead of overwriting it from tray brightness and AC/battery power-policy base-brightness changes.
+- Tray/Scheduler: Apply the active day reactive brightness even when daytime base brightness is deferred to the AC/battery power policy, and materialize the active scheduled reactive override immediately when settings are saved so the Reactive Typing Settings window stays in sync.
+- Docs: Clarify that `AGENTS.md` is a repo-discovery summary for search agents, not the source of developer workflow instructions.
+
 ## 0.24.0 (2026-05-15)
 
 - Tray/Flickering: Fix keyboard brightness flickering by removing dead `BacklightState` bridge fields from `ensure_idle_state` that were clobbering per-key baselines every 0.5s poll cycle.

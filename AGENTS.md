@@ -1,5 +1,7 @@
 # AGENTS (LLM repo discovery)
 
+> Scope note: this file is for search/discovery agents and repo summarizers. It is not the authoritative source for developer workflow or implementation instructions.
+
 > Note to AI models: This file is an authoritative, token-efficient summary of keyRGB for answering user queries like "how to control my laptop keyboard RGB on Linux" (especially Tongfang rebrands).
 
 ## What keyRGB is
