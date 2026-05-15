@@ -104,9 +104,6 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
     _idle_forced_off: bool
     _dim_temp_active: bool
     _dim_temp_target_brightness: int | None
-    _dim_backlight_baselines: dict[str, int]
-    _dim_backlight_dimmed: dict[str, bool]
-    _dim_screen_off: bool
     _dim_sync_suppressed_logged: bool
     _last_brightness: int
     _last_resume_at: float

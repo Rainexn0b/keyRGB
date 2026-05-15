@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.24.0 (2026-05-15)
+
+- Tray/Flickering: Fix keyboard brightness flickering by removing dead `BacklightState` bridge fields from `ensure_idle_state` that were clobbering per-key baselines every 0.5s poll cycle.
+- Tray/Idle Power: Add GPU backlight filtering — exclude sysfs backlights belonging to inactive DRM GPUs so inactive `nvidia_0` phantom backlights no longer corrupt idle-dim decisions on hybrid-GPU laptops.
+- Tray/Settings: Make idle-dim debounce thresholds user-configurable via Settings (`Dim / Enter delay polls`, `Dim / Exit delay polls`) with Tkinter Spinbox widgets, replacing the previous hardcoded constants.
+- Tray/Scheduler: Add a time-of-day brightness scheduler as a new brightness-override layer. During the day (08:00–20:00), power-source (AC/battery) brightness takes precedence; at night, configurable base and reactive brightness values always apply. Exposes a new `TimeSchedulerPanel` in Settings with 4 brightness sliders and 2 time pickers.
+- Profiles: Remove the redundant built-in `dim` and `dark` profiles — `dim` is fully replaced by the time scheduler; `dark` (all-black keys) is now a user-saved profile instead of a built-in. Simplify to a single built-in profile: `default` (was `light`). The old `light` profile name is aliased for backward compatibility.
+- Settings/UI: Reduce Settings window padding and separator margins to reclaim ~34px of vertical space, eliminating the small scrollbar on typical displays.
+- Build/Quality: Add `str_prop()` helper to config props; extend unit coverage for the new time scheduler panel and poller, profile storage/apply seams, and the window layout geometry calculations. 
+
 ## 0.23.9 (2026-05-01)
 
 - Backends/Lifecycle: Wire `close()` through all HID backend device wrappers (ITE 8291r3, 8291, 8910, 8291 zones, 8295 zones, 8233, 8297, 8258) so open transports are released deterministically instead of leaking file descriptors. Add `close()` to the `KeyboardDevice` protocol; implement idempotent, exception-safe release in every device.

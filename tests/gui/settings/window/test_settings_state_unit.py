@@ -273,6 +273,15 @@ def test_apply_settings_values_to_config() -> None:
         screen_dim_sync_enabled=False,
         screen_dim_sync_mode="temp",
         screen_dim_temp_brightness=1,
+        idle_dim_debounce_enter_polls=6,
+        idle_dim_debounce_exit_polls=10,
+        time_scheduler_enabled=True,
+        day_start_time="07:00",
+        night_start_time="21:00",
+        day_base_brightness=30,
+        day_reactive_brightness=35,
+        night_base_brightness=5,
+        night_reactive_brightness=8,
         os_autostart_enabled=True,
         physical_layout="jis",
     )
@@ -296,6 +305,17 @@ def test_apply_settings_values_to_config() -> None:
     assert cfg.screen_dim_sync_enabled is False
     assert cfg.screen_dim_sync_mode == "temp"
     assert cfg.screen_dim_temp_brightness == 1
+    assert cfg.idle_dim_debounce_enter_polls == 6
+    assert cfg.idle_dim_debounce_exit_polls == 10
+
+    assert cfg.time_scheduler_enabled is True
+    assert cfg.day_start_time == "07:00"
+    assert cfg.night_start_time == "21:00"
+    assert cfg.day_base_brightness == 30
+    assert cfg.day_reactive_brightness == 35
+    assert cfg.night_base_brightness == 5
+    assert cfg.night_reactive_brightness == 8
+
     assert cfg.physical_layout == "jis"
 
 
@@ -317,6 +337,15 @@ def test_apply_settings_values_to_config_invalid_layout_falls_back_to_auto() -> 
         screen_dim_sync_enabled=True,
         screen_dim_sync_mode="off",
         screen_dim_temp_brightness=5,
+        idle_dim_debounce_enter_polls=3,
+        idle_dim_debounce_exit_polls=5,
+        time_scheduler_enabled=False,
+        day_start_time="08:00",
+        night_start_time="20:00",
+        day_base_brightness=40,
+        day_reactive_brightness=50,
+        night_base_brightness=20,
+        night_reactive_brightness=50,
         os_autostart_enabled=False,
         physical_layout="not-a-layout",
     )

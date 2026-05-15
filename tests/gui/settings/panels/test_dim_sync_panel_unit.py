@@ -50,6 +50,8 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
     frames: list[_FakeWidget] = []
     scales: list[_FakeWidget] = []
 
+    spinboxes: list[_FakeWidget] = []
+
     monkeypatch.setattr(
         dim_sync_panel,
         "ttk",
@@ -59,6 +61,7 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
             Radiobutton=lambda parent=None, **kwargs: radios.append(_FakeWidget(parent, **kwargs)) or radios[-1],
             Frame=lambda parent=None, **kwargs: frames.append(_FakeWidget(parent, **kwargs)) or frames[-1],
             Scale=lambda parent=None, **kwargs: scales.append(_FakeWidget(parent, **kwargs)) or scales[-1],
+            Spinbox=lambda parent=None, **kwargs: spinboxes.append(_FakeWidget(parent, **kwargs)) or spinboxes[-1],
         ),
     )
 
@@ -68,6 +71,8 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
         var_dim_sync_enabled=_FakeVar(True),
         var_dim_sync_mode=_FakeVar("temp"),
         var_dim_temp_brightness=_FakeVar(17.2),
+        var_debounce_enter=_FakeVar(6),
+        var_debounce_exit=_FakeVar(10),
         on_toggle=lambda: toggle_calls.append("toggle"),
     )
 
@@ -107,6 +112,8 @@ def _make_panel(*, dim_sync_enabled: bool, dim_sync_mode: str) -> dim_sync_panel
     panel.rb_dim_off = _FakeWidget()
     panel.rb_dim_temp = _FakeWidget()
     panel.scale_dim_temp = _FakeWidget()
+    panel.spn_enter = _FakeWidget()
+    panel.spn_exit = _FakeWidget()
     return panel
 
 
@@ -119,6 +126,8 @@ def test_apply_enabled_state_disables_all_controls_when_power_management_disable
     assert panel.rb_dim_off.options["state"] == "disabled"
     assert panel.rb_dim_temp.options["state"] == "disabled"
     assert panel.scale_dim_temp.options["state"] == "disabled"
+    assert panel.spn_enter.options["state"] == "disabled"
+    assert panel.spn_exit.options["state"] == "disabled"
 
 
 def test_apply_enabled_state_disables_temp_scale_when_dim_sync_is_disabled() -> None:
@@ -130,6 +139,8 @@ def test_apply_enabled_state_disables_temp_scale_when_dim_sync_is_disabled() -> 
     assert panel.rb_dim_off.options["state"] == "normal"
     assert panel.rb_dim_temp.options["state"] == "normal"
     assert panel.scale_dim_temp.options["state"] == "disabled"
+    assert panel.spn_enter.options["state"] == "normal"
+    assert panel.spn_exit.options["state"] == "normal"
 
 
 def test_apply_enabled_state_enables_temp_scale_for_temp_mode() -> None:
@@ -141,6 +152,8 @@ def test_apply_enabled_state_enables_temp_scale_for_temp_mode() -> None:
     assert panel.rb_dim_off.options["state"] == "normal"
     assert panel.rb_dim_temp.options["state"] == "normal"
     assert panel.scale_dim_temp.options["state"] == "normal"
+    assert panel.spn_enter.options["state"] == "normal"
+    assert panel.spn_exit.options["state"] == "normal"
 
 
 def test_apply_enabled_state_disables_temp_scale_for_off_mode() -> None:
@@ -152,6 +165,8 @@ def test_apply_enabled_state_disables_temp_scale_for_off_mode() -> None:
     assert panel.rb_dim_off.options["state"] == "normal"
     assert panel.rb_dim_temp.options["state"] == "normal"
     assert panel.scale_dim_temp.options["state"] == "disabled"
+    assert panel.spn_enter.options["state"] == "normal"
+    assert panel.spn_exit.options["state"] == "normal"
 
 
 def test_set_label_int_updates_label_with_integer_text() -> None:

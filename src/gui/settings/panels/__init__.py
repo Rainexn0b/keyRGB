@@ -6,6 +6,7 @@ from .dim_sync_panel import DimSyncPanel
 from .experimental_backends_panel import ExperimentalBackendsPanel
 from .power_management_panel import PowerManagementPanel
 from .power_source_panel import PowerSourcePanel
+from .time_scheduler_panel import TimeSchedulerPanel
 from .version_panel import VersionPanel
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "ExperimentalBackendsPanel",
     "PowerManagementPanel",
     "PowerSourcePanel",
+    "TimeSchedulerPanel",
     "VersionPanel",
 ]

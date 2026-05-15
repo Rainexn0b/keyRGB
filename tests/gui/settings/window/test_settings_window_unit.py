@@ -145,6 +145,15 @@ def _values() -> SettingsValues:
         screen_dim_sync_enabled=True,
         screen_dim_sync_mode="temp",
         screen_dim_temp_brightness=7,
+        idle_dim_debounce_enter_polls=6,
+        idle_dim_debounce_exit_polls=10,
+        time_scheduler_enabled=False,
+        day_start_time="08:00",
+        night_start_time="20:00",
+        day_base_brightness=40,
+        day_reactive_brightness=50,
+        night_base_brightness=20,
+        night_reactive_brightness=50,
         os_autostart_enabled=False,
         physical_layout="auto",
     )
@@ -278,6 +287,7 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     bool_vars: list[_FakeVar] = []
     double_vars: list[_FakeVar] = []
     string_vars: list[_FakeVar] = []
+    int_vars: list[_FakeVar] = []
 
     monkeypatch.setattr(
         settings_window,
@@ -286,6 +296,7 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
             BooleanVar=lambda value=False: bool_vars.append(_FakeVar(value)) or bool_vars[-1],
             DoubleVar=lambda value=0.0: double_vars.append(_FakeVar(value)) or double_vars[-1],
             StringVar=lambda value="": string_vars.append(_FakeVar(value)) or string_vars[-1],
+            IntVar=lambda value=0: int_vars.append(_FakeVar(value)) or int_vars[-1],
         ),
     )
 
@@ -309,9 +320,17 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_dim_sync_enabled.get() is True
     assert gui.var_dim_sync_mode.get() == "temp"
     assert gui.var_dim_temp_brightness.get() == 7.0
-    assert len(bool_vars) == 11
-    assert len(double_vars) == 3
-    assert len(string_vars) == 1
+    assert gui.var_scheduler_enabled.get() is False
+    assert gui.var_day_start.get() == "08:00"
+    assert gui.var_night_start.get() == "20:00"
+    assert gui.var_day_base.get() == 40.0
+    assert gui.var_day_reactive.get() == 50.0
+    assert gui.var_night_base.get() == 20.0
+    assert gui.var_night_reactive.get() == 50.0
+    assert len(bool_vars) == 12
+    assert len(double_vars) == 7
+    assert len(string_vars) == 3
+    assert len(int_vars) == 2
 
 
 def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -337,6 +356,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     monkeypatch.setattr(settings_window, "PowerManagementPanel", make_panel("management"))
     monkeypatch.setattr(settings_window, "DimSyncPanel", make_panel("dim_sync"))
     monkeypatch.setattr(settings_window, "PowerSourcePanel", make_panel("power_source"))
+    monkeypatch.setattr(settings_window, "TimeSchedulerPanel", make_panel("time_scheduler"))
     monkeypatch.setattr(settings_window, "VersionPanel", make_panel("version"))
     monkeypatch.setattr(settings_window, "AutostartPanel", make_panel("autostart"))
     monkeypatch.setattr(settings_window, "ExperimentalBackendsPanel", make_panel("experimental"))
@@ -357,6 +377,15 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_dim_sync_mode = _FakeVar("off")
     gui.var_dim_temp_brightness = _FakeVar(5.0)
+    gui.var_debounce_enter = _FakeVar(6)
+    gui.var_debounce_exit = _FakeVar(10)
+    gui.var_scheduler_enabled = _FakeVar(False)
+    gui.var_day_start = _FakeVar("08:00")
+    gui.var_night_start = _FakeVar("20:00")
+    gui.var_day_base = _FakeVar(40.0)
+    gui.var_day_reactive = _FakeVar(50.0)
+    gui.var_night_base = _FakeVar(20.0)
+    gui.var_night_reactive = _FakeVar(50.0)
     gui.var_autostart = _FakeVar(True)
     gui.var_os_autostart = _FakeVar(False)
     gui.var_experimental_backends = _FakeVar(False)
@@ -366,15 +395,16 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
 
     assert created["management"].args == (gui._left,)
     assert created["power_source"].kwargs["var_ac_brightness"] is gui.var_ac_brightness
+    assert created["time_scheduler"].kwargs["var_enabled"] is gui.var_scheduler_enabled
     assert created["version"].kwargs["root"] is gui.root
     assert created["version"].kwargs["get_status_label"]() is gui.status
-    assert len(separators) == 5
+    assert len(separators) == 6
 
 
 def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=16)
+    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=12)
     gui.bottom_bar = _FakeWidget()
     calls: list[str] = []
     gui._apply_enabled_state = lambda: calls.append("enabled")
@@ -394,7 +424,7 @@ def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.M
 def test_finalize_layout_swallows_scrollregion_errors() -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=16)
+    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=12)
     gui.scroll.canvas.configure = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
     gui.bottom_bar = _FakeWidget()
     gui._apply_enabled_state = lambda: None
@@ -429,9 +459,9 @@ def test_apply_geometry_uses_centered_geometry_helper(monkeypatch: pytest.Monkey
             "content_height_px": 700,
             "content_width_px": 900,
             "footer_height_px": 44,
-            "chrome_padding_px": 40,
+            "chrome_padding_px": 32,
             "default_w": 1100,
-            "default_h": 850,
+            "default_h": 900,
             "screen_ratio_cap": 0.95,
         }
     ]
@@ -443,12 +473,14 @@ def test_apply_enabled_state_delegates_to_panels() -> None:
     gui.management_panel = _FakePanel()
     gui.dim_sync_panel = _FakePanel()
     gui.power_source_panel = _FakePanel()
+    gui.time_scheduler_panel = _FakePanel()
 
     gui._apply_enabled_state()
 
     assert gui.management_panel.apply_calls == [{}]
     assert gui.dim_sync_panel.apply_calls == [{"power_management_enabled": False}]
     assert gui.power_source_panel.apply_calls == [{"power_management_enabled": False}]
+    assert gui.time_scheduler_panel.apply_calls == [{}]
 
 
 def test_on_toggle_preserves_best_effort_status_when_settings_apply_fails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -506,6 +538,15 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_dim_sync_mode = _FakeVar("temp")
     gui.var_dim_temp_brightness = _FakeVar(4.4)
+    gui.var_debounce_enter = _FakeVar(6)
+    gui.var_debounce_exit = _FakeVar(10)
+    gui.var_scheduler_enabled = _FakeVar(False)
+    gui.var_day_start = _FakeVar("08:00")
+    gui.var_night_start = _FakeVar("20:00")
+    gui.var_day_base = _FakeVar(40.0)
+    gui.var_day_reactive = _FakeVar(50.0)
+    gui.var_night_base = _FakeVar(20.0)
+    gui.var_night_reactive = _FakeVar(50.0)
     gui.var_os_autostart = _FakeVar(True)
     apply_calls: list[SettingsValues] = []
     monkeypatch.setattr(

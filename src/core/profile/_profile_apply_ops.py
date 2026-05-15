@@ -75,10 +75,8 @@ def set_attr_value(
 
 def builtin_profile_brightness(name: str, *, safe_profile_name: Callable[..., object]) -> int | None:
     profile_name = safe_profile_name(name)
-    if profile_name == "light":
+    if profile_name == "default":
         return 50
-    if profile_name == "dim":
-        return 5
     return None
 
 
@@ -140,9 +138,7 @@ def migrate_builtin_profile_brightness(
     perkey = coerce_int(perkey_raw, default=brightness)
 
     should_migrate = False
-    if profile_name == "dim":
-        should_migrate = perkey in {10, 15} or brightness in {10, 15} or (perkey == 5 and brightness != 5)
-    elif profile_name == "light":
+    if profile_name == "default":
         should_migrate = brightness in {5, 10, 15} and perkey in {5, 10, 15}
 
     if not should_migrate:

@@ -24,7 +24,6 @@ def test_ensure_idle_state_sets_defaults() -> None:
     assert tray._idle_forced_off is False
     assert tray._user_forced_off is False
     assert tray._power_forced_off is False
-    assert tray._dim_backlight_baselines == {}
     assert tray._dim_temp_active is False
     assert tray._dim_temp_target_brightness is None
     assert isinstance(tray.tray_idle_power_state, TrayIdlePowerState)
@@ -37,11 +36,8 @@ def test_ensure_idle_state_syncs_existing_legacy_values_into_state_owner() -> No
         _idle_forced_off=True,
         _user_forced_off=True,
         _power_forced_off=False,
-        _dim_backlight_baselines={"kbd": 40},
-        _dim_backlight_dimmed={"kbd": True},
         _dim_temp_active=True,
         _dim_temp_target_brightness=12,
-        _dim_screen_off=True,
         _dim_sync_suppressed_logged=True,
         _last_resume_at=7.5,
     )
@@ -52,13 +48,109 @@ def test_ensure_idle_state_syncs_existing_legacy_values_into_state_owner() -> No
     assert state.idle_forced_off is True
     assert state.user_forced_off is True
     assert state.power_forced_off is False
-    assert state.dim_backlight_baselines == {"kbd": 40}
-    assert state.dim_backlight_dimmed == {"kbd": True}
     assert state.dim_temp_active is True
     assert state.dim_temp_target_brightness == 12
-    assert state.dim_screen_off is True
     assert state.dim_sync_suppressed_logged is True
     assert state.last_resume_at == pytest.approx(7.5)
+
+
+def test_backlight_state_baselines_persist_across_ensure_idle_state(tmp_path) -> None:
+    """Regression: ensure_idle_state must not reset BacklightState baselines.
+
+    After commit 7eda2a4, read_dimmed_state writes to BacklightState owned by
+    IdlePollLoopState, but ensure_idle_state still synced legacy tray attrs
+    (_dim_backlight_baselines etc.) into the TrayIdlePowerState owner. Because
+    the tray attrs were initialized to empty defaults, the second polling
+    iteration would copy empty dicts back into state, clobbering baselines and
+    causing dim/undim oscillation (visible as keyboard flickering).
+    """
+    import src.tray.pollers.idle_power.polling as ipp
+    from src.tray.pollers.idle_power._runtime import IdlePollLoopState, run_idle_power_iteration
+    from src.tray.pollers.idle_power.sensors import BacklightState, read_dimmed_state
+
+    backlight = tmp_path / "sys" / "class" / "backlight" / "intel_backlight"
+    backlight.mkdir(parents=True, exist_ok=True)
+    (backlight / "max_brightness").write_text("200\n", encoding="utf-8")
+    (backlight / "brightness").write_text("100\n", encoding="utf-8")
+
+    tray = SimpleNamespace(
+        config=SimpleNamespace(
+            reload=lambda: None,
+            power_management_enabled=True,
+            brightness=25,
+            screen_dim_sync_enabled=True,
+            screen_dim_sync_mode="off",
+            screen_dim_temp_brightness=5,
+        ),
+        is_off=False,
+        _idle_forced_off=False,
+        _user_forced_off=False,
+        _power_forced_off=False,
+        _dim_temp_active=False,
+        _dim_temp_target_brightness=None,
+        _dim_sync_suppressed_logged=False,
+        _last_resume_at=0.0,
+        _log_event=lambda *_a, **_kw: None,
+        engine=SimpleNamespace(),
+    )
+
+    loop_state = IdlePollLoopState()
+    base = tmp_path / "sys" / "class" / "backlight"
+
+    # First iteration: establishes baseline.
+    run_idle_power_iteration(
+        tray,
+        loop_state=loop_state,
+        idle_timeout_s=60.0,
+        session_id=None,
+        now_monotonic_fn=lambda: 1.0,
+        ensure_idle_state_fn=ipp._ensure_idle_state,
+        read_dimmed_state_fn=lambda state: read_dimmed_state(state, backlight_base=base),
+        read_screen_off_state_drm_fn=lambda: False,
+        debounce_dim_and_screen_off_fn=lambda **kwargs: (
+            kwargs["dimmed_raw"],
+            kwargs["screen_off_raw"],
+            kwargs["dimmed_true_streak"],
+            kwargs["dimmed_false_streak"],
+            kwargs["screen_off_true_streak"],
+        ),
+        read_logind_idle_seconds_fn=lambda **_kwargs: None,
+        effective_screen_dim_sync_enabled_fn=lambda _tray, requested_enabled: requested_enabled,
+        compute_idle_action_fn=lambda **_kwargs: None,
+        build_idle_action_key_fn=lambda **_kwargs: "none",
+        should_log_idle_action_fn=lambda **_kwargs: False,
+        apply_idle_action_fn=lambda *_a, **_kw: None,
+    )
+
+    baseline_key = str(backlight)
+    assert loop_state.backlight_state.baselines.get(baseline_key) == 100
+
+    # Second iteration: without the fix, ensure_idle_state would clobber baselines.
+    run_idle_power_iteration(
+        tray,
+        loop_state=loop_state,
+        idle_timeout_s=60.0,
+        session_id=None,
+        now_monotonic_fn=lambda: 1.5,
+        ensure_idle_state_fn=ipp._ensure_idle_state,
+        read_dimmed_state_fn=lambda state: read_dimmed_state(state, backlight_base=base),
+        read_screen_off_state_drm_fn=lambda: False,
+        debounce_dim_and_screen_off_fn=lambda **kwargs: (
+            kwargs["dimmed_raw"],
+            kwargs["screen_off_raw"],
+            kwargs["dimmed_true_streak"],
+            kwargs["dimmed_false_streak"],
+            kwargs["screen_off_true_streak"],
+        ),
+        read_logind_idle_seconds_fn=lambda **_kwargs: None,
+        effective_screen_dim_sync_enabled_fn=lambda _tray, requested_enabled: requested_enabled,
+        compute_idle_action_fn=lambda **_kwargs: None,
+        build_idle_action_key_fn=lambda **_kwargs: "none",
+        should_log_idle_action_fn=lambda **_kwargs: False,
+        apply_idle_action_fn=lambda *_a, **_kw: None,
+    )
+
+    assert loop_state.backlight_state.baselines.get(baseline_key) == 100
 
 
 def test_read_logind_idle_seconds_parsing_and_monotonic(monkeypatch) -> None:

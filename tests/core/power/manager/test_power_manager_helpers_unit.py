@@ -55,7 +55,7 @@ def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> Non
         kb_controller=MagicMock(is_off=False),
         on_ac=True,
         now_mono=123.0,
-        get_active_profile_fn=MagicMock(return_value="light"),
+        get_active_profile_fn=MagicMock(return_value="default"),
         safe_int_attr_fn=lambda obj, name, default=0: {"brightness": 35, "battery_saver_brightness": 20}.get(name, default),
     )
 

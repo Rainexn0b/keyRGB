@@ -71,6 +71,21 @@ DEFAULTS: dict = {
     "screen_dim_sync_mode": "off",
     # 1-50 (same brightness scale as `brightness`). Used when mode == 'temp'.
     "screen_dim_temp_brightness": 5,
+    # Debounce polls for idle-power dimming decisions.
+    # Each poll is 0.5s. 6 = 3s, 10 = 5s.
+    "idle_dim_debounce_enter_polls": 6,
+    "idle_dim_debounce_exit_polls": 10,
+    # Time-of-day brightness scheduler.
+    # When enabled, automatically adjusts brightness based on local time.
+    # During the day, power-source (AC/battery) brightness takes precedence.
+    # At night, these scheduler values always apply.
+    "time_scheduler_enabled": False,
+    "day_start_time": "08:00",
+    "night_start_time": "20:00",
+    "day_base_brightness": 40,
+    "day_reactive_brightness": 50,
+    "night_base_brightness": 20,
+    "night_reactive_brightness": 50,
     # Physical keyboard layout for the per-key editor / calibrator overlay.
     # 'auto' probes sysfs conservatively; manual options expose common desktop
     # and laptop physical variants directly in the editor dropdown.

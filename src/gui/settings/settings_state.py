@@ -275,6 +275,18 @@ class SettingsValues:
     # 1-50 (same brightness scale as `brightness`). Only used when mode == 'temp'.
     screen_dim_temp_brightness: int
 
+    # Debounce polls for idle-power dimming decisions (each poll = 0.5s).
+    idle_dim_debounce_enter_polls: int
+    idle_dim_debounce_exit_polls: int
+
+    time_scheduler_enabled: bool
+    day_start_time: str
+    night_start_time: str
+    day_base_brightness: int
+    day_reactive_brightness: int
+    night_base_brightness: int
+    night_reactive_brightness: int
+
     os_autostart_enabled: bool
 
     # Physical keyboard layout for per-key editor / calibrator overlay.
@@ -312,6 +324,23 @@ def load_settings_values(*, config: _SettingsSourceLike, os_autostart_enabled: b
         reader.read_int("screen_dim_temp_brightness", default=5),
         default=5,
     )
+    idle_dim_debounce_enter_polls = max(
+        1,
+        min(60, reader.read_int("idle_dim_debounce_enter_polls", default=6)),
+    )
+    idle_dim_debounce_exit_polls = max(
+        1,
+        min(60, reader.read_int("idle_dim_debounce_exit_polls", default=10)),
+    )
+
+    time_scheduler_enabled = reader.read_bool("time_scheduler_enabled", default=False)
+    day_start_time = reader.read_normalized_str("day_start_time", default="08:00")
+    night_start_time = reader.read_normalized_str("night_start_time", default="20:00")
+    day_base_brightness = max(0, min(50, reader.read_int("day_base_brightness", default=40)))
+    day_reactive_brightness = max(0, min(50, reader.read_int("day_reactive_brightness", default=50)))
+    night_base_brightness = max(0, min(50, reader.read_int("night_base_brightness", default=20)))
+    night_reactive_brightness = max(0, min(50, reader.read_int("night_reactive_brightness", default=50)))
+
     physical_layout = reader.read_normalized_str("physical_layout", default="auto")
 
     ac_brightness = ac_override if ac_override is not None else base_brightness
@@ -336,6 +365,15 @@ def load_settings_values(*, config: _SettingsSourceLike, os_autostart_enabled: b
         screen_dim_sync_enabled=screen_dim_sync_enabled,
         screen_dim_sync_mode=screen_dim_sync_mode,
         screen_dim_temp_brightness=screen_dim_temp_brightness,
+        idle_dim_debounce_enter_polls=idle_dim_debounce_enter_polls,
+        idle_dim_debounce_exit_polls=idle_dim_debounce_exit_polls,
+        time_scheduler_enabled=time_scheduler_enabled,
+        day_start_time=day_start_time,
+        night_start_time=night_start_time,
+        day_base_brightness=day_base_brightness,
+        day_reactive_brightness=day_reactive_brightness,
+        night_base_brightness=night_base_brightness,
+        night_reactive_brightness=night_reactive_brightness,
         os_autostart_enabled=bool(os_autostart_enabled),
         physical_layout=physical_layout,
     )
@@ -365,6 +403,17 @@ def apply_settings_values_to_config(*, config: _SettingsConfigLike, values: Sett
     config.screen_dim_sync_mode = mode if mode in {"off", "temp"} else "off"
 
     config.screen_dim_temp_brightness = clamp_nonzero_brightness(values.screen_dim_temp_brightness, default=5)
+
+    config.idle_dim_debounce_enter_polls = max(1, min(60, int(values.idle_dim_debounce_enter_polls)))
+    config.idle_dim_debounce_exit_polls = max(1, min(60, int(values.idle_dim_debounce_exit_polls)))
+
+    config.time_scheduler_enabled = bool(values.time_scheduler_enabled)
+    config.day_start_time = str(values.day_start_time or "08:00")
+    config.night_start_time = str(values.night_start_time or "22:00")
+    config.day_base_brightness = max(0, min(50, int(values.day_base_brightness)))
+    config.day_reactive_brightness = max(0, min(50, int(values.day_reactive_brightness)))
+    config.night_base_brightness = max(0, min(50, int(values.night_base_brightness)))
+    config.night_reactive_brightness = max(0, min(50, int(values.night_reactive_brightness)))
 
     layout = str(values.physical_layout or "auto").strip().lower()
     config.physical_layout = layout if layout in VALID_LAYOUT_IDS else "auto"

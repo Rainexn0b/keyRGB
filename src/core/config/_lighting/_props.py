@@ -113,3 +113,23 @@ def optional_brightness_prop(key: str) -> property:
         self._save()
 
     return property(_get, _set)
+
+
+def str_prop(key: str, *, default: str) -> property:
+    def _get(self) -> str:
+        v = self._settings.get(key, default)
+        if v is None:
+            return str(default)
+        try:
+            return str(v)
+        except _CONFIG_HELPER_RUNTIME_ERRORS:
+            return str(default)
+
+    def _set(self, value: str) -> None:
+        try:
+            self._settings[key] = str(value)
+        except _CONFIG_HELPER_RUNTIME_ERRORS:
+            self._settings[key] = str(default)
+        self._save()
+
+    return property(_get, _set)

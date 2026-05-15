@@ -13,7 +13,8 @@ from ..pollers.config_polling import start_config_polling
 from ..pollers.hardware_polling import start_hardware_polling
 from ..pollers.icon_color_polling import start_icon_color_polling
 from ..pollers.idle_power import start_idle_power_polling
-from ..protocols import ConfigPollingTrayProtocol, IdlePowerTrayProtocol
+from ..pollers.time_scheduler import start_time_scheduler_polling
+from ..protocols import ConfigPollingTrayProtocol, IdlePowerTrayProtocol, LightingTrayProtocol
 
 if TYPE_CHECKING:
     from src.core.config import Config
@@ -44,6 +45,7 @@ class _IconColorPollingTray(Protocol):
 class _LifecyclePollingTray(
     ConfigPollingTrayProtocol,
     IdlePowerTrayProtocol,
+    LightingTrayProtocol,
     _IconColorPollingTray,
     Protocol,
 ):
@@ -80,6 +82,7 @@ def start_all_polling(tray: _LifecyclePollingTray, *, ite_num_rows: int, ite_num
     start_config_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols)
     start_icon_color_polling(tray)
     start_idle_power_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols)
+    start_time_scheduler_polling(tray)
 
 
 def maybe_autostart_effect(tray: _AutostartEffectTray) -> None:

@@ -263,6 +263,22 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         min_v=1,
         max_v=50,
     )
+    idle_dim_debounce_enter_polls = _lighting_props.int_prop(
+        "idle_dim_debounce_enter_polls", default=6, min_v=1, max_v=60
+    )
+    idle_dim_debounce_exit_polls = _lighting_props.int_prop(
+        "idle_dim_debounce_exit_polls", default=10, min_v=1, max_v=60
+    )
+
+    # ---- time-of-day brightness scheduler
+
+    time_scheduler_enabled = _lighting_props.bool_prop("time_scheduler_enabled", default=False)
+    day_start_time = _lighting_props.str_prop("day_start_time", default="08:00")
+    night_start_time = _lighting_props.str_prop("night_start_time", default="20:00")
+    day_base_brightness = _lighting_props.int_prop("day_base_brightness", default=40, min_v=0, max_v=50)
+    day_reactive_brightness = _lighting_props.int_prop("day_reactive_brightness", default=50, min_v=0, max_v=50)
+    night_base_brightness = _lighting_props.int_prop("night_base_brightness", default=20, min_v=0, max_v=50)
+    night_reactive_brightness = _lighting_props.int_prop("night_reactive_brightness", default=50, min_v=0, max_v=50)
 
     # Physical keyboard layout for the per-key editor / calibrator overlay.
     physical_layout = _lighting_props.enum_prop(

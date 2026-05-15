@@ -11,16 +11,16 @@ from src.core.utils.logging_utils import log_throttled
 from src.core.config import Config
 
 
-DEFAULT_PROFILE_NAME = "light"
+DEFAULT_PROFILE_NAME = "default"
 
 # Older profile names that still resolve to the current built-ins.
 _PROFILE_NAME_ALIASES = {
-    "default": DEFAULT_PROFILE_NAME,
+    "light": DEFAULT_PROFILE_NAME,
 }
 
 # Built-in profiles are always shown in the per-key editor, even if the user has
 # not created them yet.
-BUILTIN_PROFILE_NAMES = (DEFAULT_PROFILE_NAME, "dark", "dim")
+BUILTIN_PROFILE_NAMES = (DEFAULT_PROFILE_NAME,)
 
 
 logger = logging.getLogger(__name__)

@@ -4,20 +4,20 @@ from src.core.config import Config
 from src.core.profile import paths
 
 
-def test_safe_profile_name_aliases_default_and_sanitizes() -> None:
-    assert paths.safe_profile_name(" default ") == "light"
+def test_safe_profile_name_aliases_light_and_sanitizes() -> None:
+    assert paths.safe_profile_name(" light ") == "default"
     assert paths.safe_profile_name(" Custom Profile! ") == "Custom_Profile"
-    assert paths.safe_profile_name("!!!") == "light"
+    assert paths.safe_profile_name("!!!") == "default"
 
 
-def test_paths_for_renames_previous_default_dir_and_y15_pro_files(
+def test_paths_for_renames_previous_light_dir_and_y15_pro_files(
     tmp_path,
     monkeypatch,
 ) -> None:
     cfg_dir = tmp_path / "config"
     monkeypatch.setattr(Config, "CONFIG_DIR", cfg_dir, raising=False)
 
-    old_root = cfg_dir / "profiles" / "default"
+    old_root = cfg_dir / "profiles" / "light"
     old_root.mkdir(parents=True)
 
     old_files = {
@@ -30,9 +30,9 @@ def test_paths_for_renames_previous_default_dir_and_y15_pro_files(
     for filename, content in old_files.items():
         (old_root / filename).write_text(content, encoding="utf-8")
 
-    resolved = paths.paths_for("default")
+    resolved = paths.paths_for("light")
 
-    new_root = cfg_dir / "profiles" / "light"
+    new_root = cfg_dir / "profiles" / "default"
     assert resolved.root == new_root
     assert not old_root.exists()
 

@@ -33,6 +33,7 @@ ScrollableArea = scrollable_area.ScrollableArea
 PowerManagementPanel = panels.PowerManagementPanel
 DimSyncPanel = panels.DimSyncPanel
 PowerSourcePanel = panels.PowerSourcePanel
+TimeSchedulerPanel = panels.TimeSchedulerPanel
 VersionPanel = panels.VersionPanel
 AutostartPanel = panels.AutostartPanel
 ExperimentalBackendsPanel = panels.ExperimentalBackendsPanel
@@ -117,7 +118,7 @@ class PowerSettingsGUI:
         content_area = ttk.Frame(outer)
         content_area.pack(side="top", fill="both", expand=True)
 
-        self.scroll = ScrollableArea(content_area, bg_color=bg_color, padding=16)
+        self.scroll = ScrollableArea(content_area, bg_color=bg_color, padding=12)
         main = self.scroll.frame
 
         title = ttk.Label(main, text="Settings", font=("Sans", 14, "bold"))
@@ -150,6 +151,16 @@ class PowerSettingsGUI:
         self.var_dim_sync_enabled = tk.BooleanVar(value=bool(values.screen_dim_sync_enabled))
         self.var_dim_sync_mode = tk.StringVar(value=str(values.screen_dim_sync_mode or "off"))
         self.var_dim_temp_brightness = tk.DoubleVar(value=float(values.screen_dim_temp_brightness))
+        self.var_debounce_enter = tk.IntVar(value=int(values.idle_dim_debounce_enter_polls))
+        self.var_debounce_exit = tk.IntVar(value=int(values.idle_dim_debounce_exit_polls))
+
+        self.var_scheduler_enabled = tk.BooleanVar(value=bool(values.time_scheduler_enabled))
+        self.var_day_start = tk.StringVar(value=str(values.day_start_time or "08:00"))
+        self.var_night_start = tk.StringVar(value=str(values.night_start_time or "22:00"))
+        self.var_day_base = tk.DoubleVar(value=float(values.day_base_brightness))
+        self.var_day_reactive = tk.DoubleVar(value=float(values.day_reactive_brightness))
+        self.var_night_base = tk.DoubleVar(value=float(values.night_base_brightness))
+        self.var_night_reactive = tk.DoubleVar(value=float(values.night_reactive_brightness))
 
     def _init_panels(self) -> None:
         left = self._left
@@ -165,17 +176,19 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(left).pack(fill="x", pady=(14, 10))
+        ttk.Separator(left).pack(fill="x", pady=(10, 8))
 
         self.dim_sync_panel = DimSyncPanel(
             left,
             var_dim_sync_enabled=self.var_dim_sync_enabled,
             var_dim_sync_mode=self.var_dim_sync_mode,
             var_dim_temp_brightness=self.var_dim_temp_brightness,
+            var_debounce_enter=self.var_debounce_enter,
+            var_debounce_exit=self.var_debounce_exit,
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(left).pack(fill="x", pady=(14, 10))
+        ttk.Separator(left).pack(fill="x", pady=(10, 8))
 
         self.power_source_panel = PowerSourcePanel(
             left,
@@ -186,7 +199,21 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(0, 10))
+        ttk.Separator(left).pack(fill="x", pady=(10, 8))
+
+        self.time_scheduler_panel = TimeSchedulerPanel(
+            left,
+            var_enabled=self.var_scheduler_enabled,
+            var_day_start=self.var_day_start,
+            var_night_start=self.var_night_start,
+            var_day_base=self.var_day_base,
+            var_day_reactive=self.var_day_reactive,
+            var_night_base=self.var_night_base,
+            var_night_reactive=self.var_night_reactive,
+            on_toggle=self._on_toggle,
+        )
+
+        ttk.Separator(right).pack(fill="x", pady=(0, 8))
 
         self.version_panel = VersionPanel(
             right,
@@ -194,7 +221,7 @@ class PowerSettingsGUI:
             get_status_label=lambda: self.status,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(14, 10))
+        ttk.Separator(right).pack(fill="x", pady=(10, 8))
 
         self.autostart_panel = AutostartPanel(
             right,
@@ -203,7 +230,7 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(14, 10))
+        ttk.Separator(right).pack(fill="x", pady=(10, 8))
 
         self.experimental_backends_panel = ExperimentalBackendsPanel(
             right,
@@ -238,9 +265,9 @@ class PowerSettingsGUI:
             content_height_px=int(self.scroll.frame.winfo_reqheight()),
             content_width_px=int(self.scroll.frame.winfo_reqwidth()),
             footer_height_px=int(self.bottom_bar.winfo_reqheight()),
-            chrome_padding_px=40,
+            chrome_padding_px=32,
             default_w=1100,
-            default_h=850,
+            default_h=900,
             screen_ratio_cap=0.95,
         )
         self.root.geometry(geometry)
@@ -251,6 +278,7 @@ class PowerSettingsGUI:
         self.management_panel.apply_enabled_state()
         self.dim_sync_panel.apply_enabled_state(power_management_enabled=enabled)
         self.power_source_panel.apply_enabled_state(power_management_enabled=enabled)
+        self.time_scheduler_panel.apply_enabled_state()
 
     def _on_toggle(self) -> None:
         try:
@@ -269,6 +297,15 @@ class PowerSettingsGUI:
                 screen_dim_sync_enabled=bool(self.var_dim_sync_enabled.get()),
                 screen_dim_sync_mode=str(self.var_dim_sync_mode.get() or "off"),
                 screen_dim_temp_brightness=int(float(self.var_dim_temp_brightness.get())),
+                idle_dim_debounce_enter_polls=int(self.var_debounce_enter.get()),
+                idle_dim_debounce_exit_polls=int(self.var_debounce_exit.get()),
+                time_scheduler_enabled=bool(self.var_scheduler_enabled.get()),
+                day_start_time=str(self.var_day_start.get() or "08:00"),
+                night_start_time=str(self.var_night_start.get() or "22:00"),
+                day_base_brightness=int(float(self.var_day_base.get())),
+                day_reactive_brightness=int(float(self.var_day_reactive.get())),
+                night_base_brightness=int(float(self.var_night_base.get())),
+                night_reactive_brightness=int(float(self.var_night_reactive.get())),
                 os_autostart_enabled=bool(self.var_os_autostart.get()),
                 physical_layout=str(getattr(self.config, "physical_layout", "auto") or "auto"),
             )

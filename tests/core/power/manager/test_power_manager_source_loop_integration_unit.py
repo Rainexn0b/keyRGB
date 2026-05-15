@@ -164,7 +164,7 @@ def test_pipeline_on_ac_enabled_no_overrides_does_not_turn_off_keyboard() -> Non
         kb_controller=kb,
         on_ac=True,
         now_mono=1000.0,
-        get_active_profile_fn=lambda: "light",
+        get_active_profile_fn=lambda: "default",
         safe_int_attr_fn=lambda obj, name, default=0: _values.get(name, default),
     )
 

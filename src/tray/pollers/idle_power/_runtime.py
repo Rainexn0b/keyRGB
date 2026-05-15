@@ -106,8 +106,12 @@ def run_idle_power_iteration(
         dimmed_true_streak=loop_state.dimmed_true_streak,
         dimmed_false_streak=loop_state.dimmed_false_streak,
         screen_off_true_streak=loop_state.screen_off_true_streak,
-        debounce_polls_dimmed_true=3,
-        debounce_polls_dimmed_false=6,
+        debounce_polls_dimmed_true=safe_int_attr(
+            tray.config, "idle_dim_debounce_enter_polls", default=6, min_v=1, max_v=60
+        ),
+        debounce_polls_dimmed_false=safe_int_attr(
+            tray.config, "idle_dim_debounce_exit_polls", default=10, min_v=1, max_v=60
+        ),
         debounce_polls_screen_off_true=4,
     )
 

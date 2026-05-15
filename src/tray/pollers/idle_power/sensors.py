@@ -25,12 +25,126 @@ def _read_int(path: Path) -> Optional[int]:
         return None
 
 
-def read_dimmed_state(state: BacklightState, *, backlight_base: Path | None = None) -> Optional[bool]:
+def _device_pci_path(device_dir: Path) -> Optional[str]:
+    """Return the canonical PCI device path for a sysfs object (e.g. backlight or DRM card)."""
+    device_link = device_dir / "device"
+    if not device_link.exists():
+        return None
+    try:
+        resolved = device_link.resolve(strict=False)
+    except _RECOVERABLE_SYSFS_READ_EXCEPTIONS:
+        return None
+    # Defensive: if resolution just gives us the link path itself, the target
+    # is missing or not a real sysfs symlink — treat as unknown.
+    if str(resolved) == str(device_link):
+        return None
+    return str(resolved)
+
+
+def _all_drm_pci_paths(*, drm_base: Path | None = None) -> set[str]:
+    """Return PCI device paths for all GPUs visible in DRM."""
+    base = drm_base or Path("/sys/class/drm")
+    if not base.exists():
+        return set()
+
+    all_paths: set[str] = set()
+    for child in base.iterdir():
+        if not child.is_dir():
+            continue
+        name = child.name
+        # Only actual cards (card0, card1), not connectors (card0-eDP-1)
+        if not (name.startswith("card") and "-" not in name):
+            continue
+        pci_path = _device_pci_path(child)
+        if pci_path is not None:
+            all_paths.add(pci_path)
+    return all_paths
+
+
+def _active_drm_pci_paths(*, drm_base: Path | None = None) -> set[str]:
+    """Return PCI device paths for GPUs currently driving a connected enabled display."""
+    base = drm_base or Path("/sys/class/drm")
+    if not base.exists():
+        return set()
+
+    active: set[str] = set()
+    enabled_true = {"enabled", "1", "yes", "true"}
+
+    for child in base.iterdir():
+        if not child.is_dir():
+            continue
+        name = child.name
+        # Only card connectors (card0-eDP-1), not the card itself (card0)
+        if not (name.startswith("card") and "-" in name):
+            continue
+
+        try:
+            status_s = (child / "status").read_text(encoding="utf-8").strip().lower()
+        except _RECOVERABLE_SYSFS_READ_EXCEPTIONS:
+            continue
+        if status_s != "connected":
+            continue
+
+        try:
+            enabled_s = (child / "enabled").read_text(encoding="utf-8").strip().lower()
+        except _RECOVERABLE_SYSFS_READ_EXCEPTIONS:
+            enabled_s = ""
+
+        if enabled_s and enabled_s not in enabled_true:
+            continue
+
+        # Walk up to the card directory (e.g. card0 from card0-eDP-1)
+        card_dir = child.parent / name.split("-")[0]
+        pci_path = _device_pci_path(card_dir)
+        if pci_path is not None:
+            active.add(pci_path)
+
+    return active
+
+
+def _is_active_backlight(
+    child: Path,
+    active_pci_paths: set[str],
+    inactive_pci_paths: set[str],
+) -> bool:
+    """Return True if this backlight should be used for dim-sync.
+
+    Logic:
+    - If DRM discovery fails (empty sets), include all backlights defensively.
+    - If the backlight has no device link, include it defensively.
+    - If the backlight's device path matches an ACTIVE GPU, include it.
+    - If the backlight's device path matches an INACTIVE GPU, EXCLUDE it.
+      This is the phantom-GPU case (e.g. nvidia_0 on hybrid laptops).
+    - If the backlight's device path is unknown (e.g. platform driver),
+      include it defensively.
+    """
+    if not active_pci_paths and not inactive_pci_paths:
+        return True
+    pci_path = _device_pci_path(child)
+    if pci_path is None:
+        return True
+    if pci_path in active_pci_paths:
+        return True
+    if pci_path in inactive_pci_paths:
+        return False
+    return True
+
+
+def read_dimmed_state(
+    state: BacklightState,
+    *,
+    backlight_base: Path | None = None,
+    drm_base: Path | None = None,
+) -> Optional[bool]:
     """Best-effort: infer 'dimmed' from kernel backlight brightness drops."""
 
     base = backlight_base or Path("/sys/class/backlight")
     if not base.exists():
         return None
+
+    active_pci_paths = _active_drm_pci_paths(drm_base=drm_base)
+    all_pci_paths = _all_drm_pci_paths(drm_base=drm_base)
+    inactive_pci_paths = all_pci_paths - active_pci_paths
 
     dimmed_any: Optional[bool] = None
     screen_off_any = False
@@ -38,6 +152,9 @@ def read_dimmed_state(state: BacklightState, *, backlight_base: Path | None = No
 
     for child in base.iterdir():
         if not child.is_dir():
+            continue
+
+        if not _is_active_backlight(child, active_pci_paths, inactive_pci_paths):
             continue
 
         current = _read_int(child / "brightness")

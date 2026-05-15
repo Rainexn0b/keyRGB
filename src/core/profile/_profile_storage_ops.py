@@ -277,11 +277,6 @@ def load_per_key_colors(
 ) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
     raw = read_json(paths_for(name).per_key_colors)  # type: ignore[attr-defined]
     if raw is None:
-        prof = safe_profile_name(name or "")
-        if prof == "dark":
-            return {key: (0, 0, 0) for key in default_colors.keys()}
-        if prof == "dim":
-            return {key: (255, 255, 255) for key in default_colors.keys()}
         return default_colors.copy()
     return storage_payloads.parse_per_key_colors(raw)
 

@@ -23,9 +23,6 @@ class _TrayPreBootstrapWritable(Protocol):
     _idle_forced_off: bool
     _dim_temp_active: bool
     _dim_temp_target_brightness: int | None
-    _dim_backlight_baselines: dict[str, int]
-    _dim_backlight_dimmed: dict[str, bool]
-    _dim_screen_off: bool
     _dim_sync_suppressed_logged: bool
     _last_brightness: int
     _last_resume_at: float
@@ -45,9 +42,6 @@ class TrayPreBootstrapState:
     idle_forced_off: bool
     dim_temp_active: bool
     dim_temp_target_brightness: int | None
-    dim_backlight_baselines: dict[str, int]
-    dim_backlight_dimmed: dict[str, bool]
-    dim_screen_off: bool
     dim_sync_suppressed_logged: bool
     last_brightness: int
     last_resume_at: float
@@ -65,9 +59,6 @@ class TrayPreBootstrapState:
         tray._idle_forced_off = self.idle_forced_off
         tray._dim_temp_active = self.dim_temp_active
         tray._dim_temp_target_brightness = self.dim_temp_target_brightness
-        tray._dim_backlight_baselines = self.dim_backlight_baselines
-        tray._dim_backlight_dimmed = self.dim_backlight_dimmed
-        tray._dim_screen_off = self.dim_screen_off
         tray._dim_sync_suppressed_logged = self.dim_sync_suppressed_logged
         tray._last_brightness = self.last_brightness
         tray._last_resume_at = self.last_resume_at

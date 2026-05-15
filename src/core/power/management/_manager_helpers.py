@@ -64,17 +64,6 @@ def build_power_source_loop_inputs(
     ac_brightness_override = getattr(config, "ac_lighting_brightness", None)
     battery_brightness_override = getattr(config, "battery_lighting_brightness", None)
 
-    try:
-        active_profile = get_active_profile_fn()
-    except _ACTIVE_PROFILE_LOOKUP_ERRORS:
-        active_profile = ""
-
-    if active_profile in {"dim", "dark"}:
-        ac_enabled = True
-        battery_enabled = True
-        ac_brightness_override = None
-        battery_brightness_override = None
-
     return PowerSourceLoopInputs(
         on_ac=bool(on_ac),
         now=float(now_mono),
