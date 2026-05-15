@@ -44,8 +44,7 @@ class VersionPanel:
         desc = ttk.Label(
             parent,
             text=(
-                "Shows the KeyRGB version you're running and checks GitHub to see\n"
-                "whether you're on the latest stable release (and also shows the latest pre-release)."
+                "Shows the installed KeyRGB version and checks GitHub for the latest stable and pre-release versions."
             ),
             font=("Sans", 9),
             justify="left",
@@ -95,7 +94,7 @@ class VersionPanel:
         self._wrap_labels.append(self.lbl_update_status)
 
         btn_row = ttk.Frame(parent)
-        btn_row.pack(fill="x", pady=(0, 2))
+        btn_row.pack(fill="x", pady=(0, 0))
 
         self.btn_open_repo = ttk.Button(btn_row, text="Open repo", command=self._open_repo)
         self.btn_open_repo.pack(side="left")

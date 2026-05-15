@@ -2,9 +2,11 @@
 full input→policy→action pipeline in _manager_helpers.py."""
 from __future__ import annotations
 
+from datetime import datetime as _datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+import src.core.power.management._manager_helpers as manager_helpers
 
 
 # ---------------------------------------------------------------------------
@@ -181,3 +183,46 @@ def test_pipeline_on_ac_enabled_no_overrides_does_not_turn_off_keyboard() -> Non
     )
 
     kb.turn_off.assert_not_called()
+
+
+def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from src.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
+
+    class _NightConfig(_FakeConfig):
+        time_scheduler_enabled = True
+        day_start_time = "08:00"
+        night_start_time = "20:00"
+        night_base_brightness = 20
+        ac_lighting_brightness = 25
+
+    class FakeDateTime:
+        @staticmethod
+        def now() -> _datetime:
+            return _datetime(2024, 1, 1, 22, 24)
+
+    monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
+
+    values = {
+        "brightness": 25,
+        "battery_saver_brightness": 25,
+        "night_base_brightness": 20,
+    }
+
+    kb = MagicMock()
+    kb.is_off = False
+
+    inputs = build_power_source_loop_inputs(
+        _NightConfig(),
+        kb_controller=kb,
+        on_ac=True,
+        now_mono=1000.0,
+        get_active_profile_fn=lambda: "default",
+        safe_int_attr_fn=lambda obj, name, default=0: values.get(name, default),
+    )
+
+    assert inputs is not None
+
+    result = PowerSourceLoopPolicy().update(inputs)
+
+    assert result.actions == (ApplyBrightness(20),)

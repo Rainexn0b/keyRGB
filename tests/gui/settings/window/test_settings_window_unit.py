@@ -278,6 +278,7 @@ def test_init_layout_builds_frames_bottom_bar_and_scroll(monkeypatch: pytest.Mon
     assert gui.status is gui.bottom_bar_panel.status
     assert isinstance(gui.scroll, _FakeScrollArea)
     assert gui.scroll.bg_color == "#123456"
+    assert gui.scroll.padding == 10
     assert labels[0].kwargs["text"] == "Settings"
     assert gui._left.parent is frames[2]
     assert gui._right.parent is frames[2]
@@ -404,7 +405,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
 def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=12)
+    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=10)
     gui.bottom_bar = _FakeWidget()
     calls: list[str] = []
     gui._apply_enabled_state = lambda: calls.append("enabled")
@@ -424,7 +425,7 @@ def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.M
 def test_finalize_layout_swallows_scrollregion_errors() -> None:
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
-    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=12)
+    gui.scroll = _FakeScrollArea(None, bg_color="#000", padding=10)
     gui.scroll.canvas.configure = lambda **kwargs: (_ for _ in ()).throw(RuntimeError("boom"))
     gui.bottom_bar = _FakeWidget()
     gui._apply_enabled_state = lambda: None
@@ -459,7 +460,7 @@ def test_apply_geometry_uses_centered_geometry_helper(monkeypatch: pytest.Monkey
             "content_height_px": 700,
             "content_width_px": 900,
             "footer_height_px": 44,
-            "chrome_padding_px": 32,
+            "chrome_padding_px": 40,
             "default_w": 1100,
             "default_h": 900,
             "screen_ratio_cap": 0.95,

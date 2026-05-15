@@ -77,7 +77,7 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
     )
 
     assert labels[0].kwargs["text"] == "Screen dim/brightness sync"
-    assert labels[1].kwargs["text"].startswith("Optionally react to your desktop")
+    assert labels[1].kwargs["text"].startswith("React to screen dimming or brightness changes")
     assert checks[0].kwargs["text"] == "Sync keyboard lighting with screen dimming/brightness"
     assert radios[0].kwargs["value"] == "off"
     assert radios[1].kwargs["value"] == "temp"

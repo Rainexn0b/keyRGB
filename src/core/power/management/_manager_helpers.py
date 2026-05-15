@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Iterable
+from datetime import datetime
 
 from src.core.utils.safe_attrs import _safe_getattr_or_none
 
@@ -44,6 +45,47 @@ def _power_management_enabled(config: object) -> bool:
     )
 
 
+def _parse_scheduler_time(value: object) -> tuple[int, int] | None:
+    try:
+        parts = str(value or "").strip().split(":")
+        if len(parts) != 2:
+            return None
+        hour = int(parts[0])
+        minute = int(parts[1])
+    except (TypeError, ValueError, OverflowError):
+        return None
+    if not (0 <= hour <= 23 and 0 <= minute <= 59):
+        return None
+    return hour, minute
+
+
+def _is_scheduler_night(now: datetime, day_start: tuple[int, int], night_start: tuple[int, int]) -> bool:
+    current_minutes = now.hour * 60 + now.minute
+    day_start_minutes = day_start[0] * 60 + day_start[1]
+    night_start_minutes = night_start[0] * 60 + night_start[1]
+
+    if night_start_minutes == day_start_minutes:
+        return False
+    if night_start_minutes < day_start_minutes:
+        return night_start_minutes <= current_minutes < day_start_minutes
+    return current_minutes >= night_start_minutes or current_minutes < day_start_minutes
+
+
+def _scheduler_night_base_override(config: object, *, safe_int_attr_fn: Callable[..., int]) -> int | None:
+    if not bool(getattr(config, "time_scheduler_enabled", False)):
+        return None
+
+    day_start = _parse_scheduler_time(getattr(config, "day_start_time", "08:00"))
+    night_start = _parse_scheduler_time(getattr(config, "night_start_time", "20:00"))
+    if day_start is None or night_start is None:
+        return None
+
+    if not _is_scheduler_night(datetime.now(), day_start, night_start):
+        return None
+
+    return int(safe_int_attr_fn(config, "night_base_brightness", default=0))
+
+
 def build_power_source_loop_inputs(
     config: object,
     kb_controller: object,
@@ -63,6 +105,10 @@ def build_power_source_loop_inputs(
     battery_enabled = bool(getattr(config, "battery_lighting_enabled", True))
     ac_brightness_override = getattr(config, "ac_lighting_brightness", None)
     battery_brightness_override = getattr(config, "battery_lighting_brightness", None)
+    scheduler_night_brightness = _scheduler_night_base_override(config, safe_int_attr_fn=safe_int_attr_fn)
+    if scheduler_night_brightness is not None:
+        ac_brightness_override = scheduler_night_brightness
+        battery_brightness_override = scheduler_night_brightness
 
     return PowerSourceLoopInputs(
         on_ac=bool(on_ac),

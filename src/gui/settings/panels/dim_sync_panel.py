@@ -35,13 +35,14 @@ class DimSyncPanel:
         dim_desc = ttk.Label(
             parent,
             text=(
-                "Optionally react to your desktop's screen dimming/brightness changes\n"
-                "(e.g. KDE brightness slider) by turning keyboard LEDs off or dimming\n"
-                "them to a temporary brightness."
+                "React to screen dimming or brightness changes by turning keyboard LEDs off "
+                "or dropping them to a temporary brightness."
             ),
             font=("Sans", 9),
+            justify="left",
+            wraplength=520,
         )
-        dim_desc.pack(anchor="w", pady=(0, 10))
+        dim_desc.pack(anchor="w", fill="x", pady=(0, 8))
 
         self.chk_dim_sync = ttk.Checkbutton(
             parent,
@@ -95,7 +96,7 @@ class DimSyncPanel:
         self.scale_dim_temp.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
 
         debounce_frame = ttk.Frame(parent)
-        debounce_frame.pack(fill="x", pady=(12, 0))
+        debounce_frame.pack(fill="x", pady=(10, 0))
         debounce_desc = ttk.Label(
             debounce_frame,
             text="Delay before reacting to screen dimming/brightening (polls x 0.5s each).",

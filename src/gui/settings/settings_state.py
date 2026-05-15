@@ -258,6 +258,25 @@ def _active_scheduler_reactive_brightness(values: SettingsValues, *, now: dateti
     return clamp_brightness(values.day_reactive_brightness)
 
 
+def _load_scheduler_brightness(
+    reader: _SettingsReader,
+    *,
+    key: str,
+    live_default: int,
+) -> int:
+    if reader.settings_view is not None:
+        if key in reader.settings_view:
+            return clamp_brightness(reader.settings_view.read_int(key, live_default))
+        return clamp_brightness(live_default)
+
+    if reader.fallback_obj is not None:
+        explicit_value = _safe_optional_int(reader.fallback_obj, key)
+        if explicit_value is not None:
+            return clamp_brightness(explicit_value)
+
+    return clamp_brightness(live_default)
+
+
 def _safe_bool(obj: object, name: str, default: bool) -> bool:
     value = _safe_getattr_or_default(obj, name, default)
     try:
@@ -344,7 +363,8 @@ def load_settings_values(*, config: _SettingsSourceLike, os_autostart_enabled: b
     source = _resolve_settings_source(config)
     reader = _SettingsReader(fallback_obj=source.fallback_obj, settings_view=source.settings_view)
 
-    base_brightness = reader.read_int("brightness", default=25)
+    base_brightness = clamp_brightness(reader.read_int("brightness", default=25))
+    reactive_brightness = clamp_brightness(reader.read_int("reactive_brightness", default=base_brightness))
     bs_enabled = reader.read_bool("battery_saver_enabled", default=False)
     bs_brightness = reader.read_int("battery_saver_brightness", default=25)
 
@@ -377,10 +397,26 @@ def load_settings_values(*, config: _SettingsSourceLike, os_autostart_enabled: b
     time_scheduler_enabled = reader.read_bool("time_scheduler_enabled", default=False)
     day_start_time = reader.read_normalized_str("day_start_time", default="08:00")
     night_start_time = reader.read_normalized_str("night_start_time", default="20:00")
-    day_base_brightness = max(0, min(50, reader.read_int("day_base_brightness", default=40)))
-    day_reactive_brightness = max(0, min(50, reader.read_int("day_reactive_brightness", default=50)))
-    night_base_brightness = max(0, min(50, reader.read_int("night_base_brightness", default=20)))
-    night_reactive_brightness = max(0, min(50, reader.read_int("night_reactive_brightness", default=50)))
+    day_base_brightness = _load_scheduler_brightness(
+        reader,
+        key="day_base_brightness",
+        live_default=base_brightness,
+    )
+    day_reactive_brightness = _load_scheduler_brightness(
+        reader,
+        key="day_reactive_brightness",
+        live_default=reactive_brightness,
+    )
+    night_base_brightness = _load_scheduler_brightness(
+        reader,
+        key="night_base_brightness",
+        live_default=base_brightness,
+    )
+    night_reactive_brightness = _load_scheduler_brightness(
+        reader,
+        key="night_reactive_brightness",
+        live_default=reactive_brightness,
+    )
 
     physical_layout = reader.read_normalized_str("physical_layout", default="auto")
 

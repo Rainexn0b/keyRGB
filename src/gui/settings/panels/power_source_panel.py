@@ -28,17 +28,16 @@ class PowerSourcePanel:
 
         ps_desc = ttk.Label(
             parent,
-            text=(
-                "Choose whether the keyboard lighting should be on/off and what\n"
-                "brightness to use when plugged in vs running on battery."
-            ),
+            text="Choose whether keyboard lighting stays on, and what brightness to use on AC and on battery.",
             font=("Sans", 9),
+            justify="left",
+            wraplength=520,
         )
-        ps_desc.pack(anchor="w", pady=(0, 10))
+        ps_desc.pack(anchor="w", fill="x", pady=(0, 8))
 
         # AC row
         ac_row = ttk.Frame(parent)
-        ac_row.pack(fill="x", pady=(0, 10))
+        ac_row.pack(fill="x", pady=(0, 8))
         ac_head = ttk.Frame(ac_row)
         ac_head.pack(fill="x")
         ac_head.columnconfigure(0, weight=1)

@@ -40,14 +40,15 @@ class TimeSchedulerPanel:
         desc = ttk.Label(
             parent,
             text=(
-                "Automatically adjust brightness based on local time.\n"
-                "During the day, 'Plugged In vs Battery' takes precedence for base brightness.\n"
-                "Reactive brightness still follows the day schedule.\n"
-                "At night, these values always apply."
+                "Adjust keyboard brightness by local time. During the day, 'Plugged In vs Battery' "
+                "still controls base brightness. Reactive brightness follows the schedule, and at "
+                "night these values always apply."
             ),
             font=("Sans", 9),
+            justify="left",
+            wraplength=520,
         )
-        desc.pack(anchor="w", pady=(0, 10))
+        desc.pack(anchor="w", fill="x", pady=(0, 8))
 
         self.chk_enabled = ttk.Checkbutton(
             parent,
@@ -55,11 +56,11 @@ class TimeSchedulerPanel:
             variable=self.var_enabled,
             command=self._on_toggle,
         )
-        self.chk_enabled.pack(anchor="w", pady=(0, 8))
+        self.chk_enabled.pack(anchor="w", pady=(0, 6))
 
         # Schedule row
         schedule_frame = ttk.Frame(parent)
-        schedule_frame.pack(fill="x", pady=(0, 10))
+        schedule_frame.pack(fill="x", pady=(0, 8))
         schedule_frame.columnconfigure(0, weight=1)
         schedule_frame.columnconfigure(2, weight=1)
 
@@ -86,7 +87,7 @@ class TimeSchedulerPanel:
         self.ent_night_start.bind("<FocusOut>", lambda _e: self._on_toggle())
 
         # Day values
-        day_frame = ttk.LabelFrame(parent, text="Day values", padding=(8, 6))
+        day_frame = ttk.LabelFrame(parent, text="Day values", padding=(8, 5))
         day_frame.pack(fill="x", pady=(0, 8))
 
         self._build_brightness_row(
@@ -103,7 +104,7 @@ class TimeSchedulerPanel:
         )
 
         # Night values
-        night_frame = ttk.LabelFrame(parent, text="Night values (always used at night)", padding=(8, 6))
+        night_frame = ttk.LabelFrame(parent, text="Night values (always used at night)", padding=(8, 5))
         night_frame.pack(fill="x", pady=(0, 0))
 
         self._build_brightness_row(
@@ -128,7 +129,7 @@ class TimeSchedulerPanel:
         row: int,
     ) -> None:
         row_frame = ttk.Frame(parent)
-        row_frame.pack(fill="x", pady=(4, 0))
+        row_frame.pack(fill="x", pady=(3, 0))
         row_frame.columnconfigure(0, weight=1)
 
         ttk.Label(row_frame, text=label, font=("Sans", 9)).grid(row=0, column=0, sticky="w")
@@ -144,7 +145,7 @@ class TimeSchedulerPanel:
             variable=var,
             command=lambda v, lbl=lbl_val: self._set_label_int(lbl, v),
         )
-        scale.pack(fill="x", pady=(2, 0))
+        scale.pack(fill="x", pady=(1, 0))
         scale.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
         self._scales.append(scale)
 

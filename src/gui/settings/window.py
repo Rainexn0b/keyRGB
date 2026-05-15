@@ -118,11 +118,11 @@ class PowerSettingsGUI:
         content_area = ttk.Frame(outer)
         content_area.pack(side="top", fill="both", expand=True)
 
-        self.scroll = ScrollableArea(content_area, bg_color=bg_color, padding=12)
+        self.scroll = ScrollableArea(content_area, bg_color=bg_color, padding=10)
         main = self.scroll.frame
 
         title = ttk.Label(main, text="Settings", font=("Sans", 14, "bold"))
-        title.pack(anchor="w", pady=(4, 8))
+        title.pack(anchor="w", pady=(4, 6))
 
         cols = ttk.Frame(main)
         cols.pack(fill="both", expand=True)
@@ -176,7 +176,7 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(left).pack(fill="x", pady=(10, 8))
+        ttk.Separator(left).pack(fill="x", pady=(8, 6))
 
         self.dim_sync_panel = DimSyncPanel(
             left,
@@ -188,7 +188,7 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(left).pack(fill="x", pady=(10, 8))
+        ttk.Separator(left).pack(fill="x", pady=(8, 6))
 
         self.power_source_panel = PowerSourcePanel(
             left,
@@ -199,7 +199,7 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(left).pack(fill="x", pady=(10, 8))
+        ttk.Separator(left).pack(fill="x", pady=(8, 6))
 
         self.time_scheduler_panel = TimeSchedulerPanel(
             left,
@@ -213,7 +213,7 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(0, 8))
+        ttk.Separator(right).pack(fill="x", pady=(0, 6))
 
         self.version_panel = VersionPanel(
             right,
@@ -221,7 +221,7 @@ class PowerSettingsGUI:
             get_status_label=lambda: self.status,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(10, 8))
+        ttk.Separator(right).pack(fill="x", pady=(8, 6))
 
         self.autostart_panel = AutostartPanel(
             right,
@@ -230,7 +230,7 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(right).pack(fill="x", pady=(10, 8))
+        ttk.Separator(right).pack(fill="x", pady=(8, 6))
 
         self.experimental_backends_panel = ExperimentalBackendsPanel(
             right,
@@ -265,7 +265,7 @@ class PowerSettingsGUI:
             content_height_px=int(self.scroll.frame.winfo_reqheight()),
             content_width_px=int(self.scroll.frame.winfo_reqwidth()),
             footer_height_px=int(self.bottom_bar.winfo_reqheight()),
-            chrome_padding_px=32,
+            chrome_padding_px=40,
             default_w=1100,
             default_h=900,
             screen_ratio_cap=0.95,

@@ -60,6 +60,7 @@ def test_clamp_brightness() -> None:
 def test_load_settings_defaults_without_overrides() -> None:
     cfg = SimpleNamespace(
         brightness=30,
+        reactive_brightness=18,
         battery_saver_enabled=False,
         battery_saver_brightness=10,
         # no ac/battery overrides
@@ -81,6 +82,10 @@ def test_load_settings_defaults_without_overrides() -> None:
     assert values.screen_dim_sync_enabled is True
     assert values.screen_dim_sync_mode in {"off", "temp"}
     assert clamp_nonzero_brightness(values.screen_dim_temp_brightness) == values.screen_dim_temp_brightness
+    assert values.day_base_brightness == 30
+    assert values.day_reactive_brightness == 18
+    assert values.night_base_brightness == 30
+    assert values.night_reactive_brightness == 18
 
 
 def test_load_settings_battery_defaults_to_battery_saver_when_enabled() -> None:
@@ -271,6 +276,25 @@ def test_load_settings_accepts_diagnostics_snapshot_settings_mapping() -> None:
     assert values.power_off_on_lid_close is False
 
 
+def test_load_settings_scheduler_defaults_follow_live_brightness_when_view_keys_are_absent() -> None:
+    class Config:
+        def settings_view(self) -> ConfigSettingsView:
+            return ConfigSettingsView.from_mapping(
+                {
+                    "brightness": 33,
+                    "reactive_brightness": 14,
+                    "time_scheduler_enabled": True,
+                }
+            )
+
+    values = load_settings_values(config=Config(), os_autostart_enabled=False)
+
+    assert values.day_base_brightness == 33
+    assert values.day_reactive_brightness == 14
+    assert values.night_base_brightness == 33
+    assert values.night_reactive_brightness == 14
+
+
 def test_load_settings_accepts_direct_diagnostics_config_snapshot() -> None:
     values = load_settings_values(
         config=DiagnosticsConfigSnapshot(
@@ -454,12 +478,13 @@ def test_apply_settings_values_leaves_reactive_brightness_when_scheduler_disable
 
 def test_load_settings_partial_typed_view_falls_back_to_raw_attributes() -> None:
     """Verify that partial ConfigSettingsView keys fall back to raw config attributes.
-    
+
     This seam test ensures the typed-loader consolidation works correctly when:
     - A ConfigSettingsView exists with some (but not all) settings
     - Missing keys should fall back to raw config attributes
     - The fallback mechanism is properly integrated in _SettingsReader
     """
+
     class Config:
         # Settings provided via typed view (partial)
         def settings_view(self) -> ConfigSettingsView:
@@ -490,14 +515,14 @@ def test_load_settings_partial_typed_view_falls_back_to_raw_attributes() -> None
     # From typed ConfigSettingsView
     assert values.ac_lighting_brightness == 35  # base brightness from typed view
     assert values.battery_lighting_brightness == 20  # battery_saver_brightness from fallback
-    
+
     # From raw config fallback (keys not in ConfigSettingsView)
     assert values.power_management_enabled is False
     assert values.power_off_on_suspend is False
     assert values.power_off_on_lid_close is True
     assert values.power_restore_on_resume is True
     assert values.power_restore_on_lid_open is False
-    
+
     # Optional keys: if not in view and not in raw config, use defaults
     assert values.screen_dim_sync_enabled is False  # from raw config fallback
     # physical_layout from raw config fallback, normalized

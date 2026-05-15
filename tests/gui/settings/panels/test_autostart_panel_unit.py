@@ -54,14 +54,14 @@ def test_autostart_panel_init_creates_expected_labels_and_checkbuttons(monkeypat
     assert [label.parent for label in registry["labels"]] == [parent, parent]
     assert [label.options["text"] for label in registry["labels"]] == [
         "Autostart",
-        "Control what happens when KeyRGB launches, and whether it\nstarts automatically when you log in.",
+        "Control what happens when KeyRGB launches, and whether it starts automatically when you log in.",
     ]
     assert [label.options["font"] for label in registry["labels"]] == [
         ("Sans", 11, "bold"),
         ("Sans", 9),
     ]
     assert registry["labels"][0].pack_calls == [{"anchor": "w", "pady": (0, 6)}]
-    assert registry["labels"][1].pack_calls == [{"anchor": "w", "pady": (0, 8)}]
+    assert registry["labels"][1].pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 6)}]
 
     assert panel.chk_autostart is registry["checkbuttons"][0]
     assert panel.chk_os_autostart is registry["checkbuttons"][1]

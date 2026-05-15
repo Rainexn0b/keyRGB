@@ -143,8 +143,7 @@ def test_version_panel_init_wires_widgets_and_starts_check(monkeypatch: pytest.M
     assert started == [panel]
     assert label_texts[:3] == [
         "Version",
-        "Shows the KeyRGB version you're running and checks GitHub to see\n"
-        "whether you're on the latest stable release (and also shows the latest pre-release).",
+        "Shows the installed KeyRGB version and checks GitHub for the latest stable and pre-release versions.",
         "Installed",
     ]
     assert "Latest (stable)" in label_texts

@@ -25,13 +25,12 @@ class PowerManagementPanel:
 
         desc = ttk.Label(
             parent,
-            text=(
-                "Control whether KeyRGB turns the keyboard LEDs off/on\n"
-                "when the lid closes/opens or the system suspends/resumes."
-            ),
+            text="Control whether KeyRGB turns keyboard LEDs off or on for lid and suspend events.",
             font=("Sans", 9),
+            justify="left",
+            wraplength=520,
         )
-        desc.pack(anchor="w", pady=(0, 12))
+        desc.pack(anchor="w", fill="x", pady=(0, 10))
 
         self.chk_enabled = ttk.Checkbutton(
             parent,

@@ -23,9 +23,8 @@ class ExperimentalBackendsPanel:
         desc = ttk.Label(
             parent,
             text=(
-                "Experimental backends are opt-in. Some are speculative. Others are research-backed, "
-                "which means KeyRGB has public protocol notes or reverse-engineering references, but the "
-                "backend is still not broadly validated on user hardware. Use at your own risk."
+                "Experimental backends are opt-in. Some are speculative; others have protocol notes or "
+                "reverse-engineering references but still need broader user validation."
             ),
             font=("Sans", 9),
             justify="left",

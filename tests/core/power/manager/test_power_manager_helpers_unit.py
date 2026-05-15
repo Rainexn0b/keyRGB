@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime as _datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
+import src.core.power.management._manager_helpers as manager_helpers
 
 
 def test_build_power_source_loop_inputs_preserves_overrides_when_profile_lookup_raises() -> None:
@@ -60,6 +62,51 @@ def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> Non
     )
 
     assert inputs is None
+
+
+def test_build_power_source_loop_inputs_uses_night_scheduler_base_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+
+    class _Config:
+        power_management_enabled = True
+        brightness = 35
+        ac_lighting_enabled = True
+        battery_lighting_enabled = True
+        ac_lighting_brightness = 45
+        battery_lighting_brightness = 15
+        battery_saver_enabled = False
+        battery_saver_brightness = 20
+        time_scheduler_enabled = True
+        day_start_time = "08:00"
+        night_start_time = "20:00"
+        night_base_brightness = 20
+
+        def reload(self) -> None:
+            return None
+
+    class FakeDateTime:
+        @staticmethod
+        def now() -> _datetime:
+            return _datetime(2024, 1, 1, 22, 24)
+
+    monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
+
+    inputs = build_power_source_loop_inputs(
+        _Config(),
+        kb_controller=MagicMock(is_off=False),
+        on_ac=True,
+        now_mono=123.0,
+        get_active_profile_fn=MagicMock(return_value="default"),
+        safe_int_attr_fn=lambda obj, name, default=0: {
+            "brightness": 35,
+            "battery_saver_brightness": 20,
+            "night_base_brightness": 20,
+        }.get(name, default),
+    )
+
+    assert inputs is not None
+    assert inputs.ac_brightness_override == 20
+    assert inputs.battery_brightness_override == 20
 
 
 def test_apply_power_source_actions_logs_controller_failures_and_keeps_processing() -> None:

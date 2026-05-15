@@ -103,7 +103,7 @@ def test_init_builds_controls_and_wires_callbacks(monkeypatch: pytest.MonkeyPatc
     )
 
     assert labels[0].kwargs["text"] == "Plugged In vs Battery"
-    assert labels[1].kwargs["text"].startswith("Choose whether the keyboard lighting")
+    assert labels[1].kwargs["text"].startswith("Choose whether keyboard lighting")
     assert panel.chk_ac_enabled.kwargs["text"] == "When plugged in (AC): enable lighting"
     assert panel.chk_battery_enabled.kwargs["text"] == "On battery: enable lighting"
     assert panel.lbl_ac_brightness_val.kwargs["text"] == "12"
