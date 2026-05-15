@@ -124,12 +124,6 @@ class DummyTray:
     def _on_quit_clicked(self, *_a, **_k):
         return
 
-    def _on_tcc_profiles_gui_clicked(self, *_a, **_k):
-        return
-
-    def _on_tcc_profile_clicked(self, *_a, **_k):
-        return
-
     def _log_exception(self, *_a, **_k):
         return
 
@@ -137,9 +131,6 @@ class DummyTray:
 def test_menu_uses_detected_backend_hardware_effects_count(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     class DummyBackend:
         def effects(self):
             return {"rainbow": object(), "breathing": object(), "wave": object()}
@@ -156,10 +147,6 @@ def test_menu_uses_detected_backend_hardware_effects_count(
 def test_menu_hides_items_when_capabilities_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # Avoid DBus/TCC calls in the menu builder.
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     labels = [i["text"] for i in items if isinstance(i, dict)]
@@ -176,9 +163,6 @@ def test_menu_hides_items_when_capabilities_disabled(
 def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False, color=False))
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     labels = [i["text"] for i in items if isinstance(i, dict)]
@@ -189,9 +173,6 @@ def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
 
 
 def test_menu_includes_keyboard_status_header(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
 
@@ -201,9 +182,6 @@ def test_menu_includes_keyboard_status_header(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     class DummyBackend:
         name = "ite8291r3"
 
@@ -219,9 +197,6 @@ def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_menu_includes_lightbar_status_header_when_discovered(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.device_discovery = {
         "candidates": [
@@ -241,9 +216,6 @@ def test_menu_includes_lightbar_status_header_when_discovered(monkeypatch: pytes
 
 
 def test_menu_switches_body_when_lightbar_context_is_selected(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
     tray.device_discovery = {
         "candidates": [
@@ -269,9 +241,6 @@ def test_menu_switches_body_when_lightbar_context_is_selected(monkeypatch: pytes
 
 
 def test_menu_uses_lightbar_context_builder_when_controls_are_available(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
     tray.device_discovery = {
         "candidates": [
@@ -300,9 +269,6 @@ def test_menu_uses_lightbar_context_builder_when_controls_are_available(monkeypa
 def test_menu_includes_software_target_submenu_when_keyboard_context_is_selected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
     tray.device_discovery = {
         "candidates": [
@@ -325,9 +291,6 @@ def test_menu_includes_software_target_submenu_when_keyboard_context_is_selected
 
 
 def test_software_target_submenu_actions_use_pystray_compatible_arity(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
     tray.device_discovery = {
         "candidates": [
@@ -350,9 +313,6 @@ def test_software_target_submenu_actions_use_pystray_compatible_arity(monkeypatc
 
 
 def test_menu_resets_invalid_selected_context_to_keyboard(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.selected_device_context = "missing:device"
 
@@ -364,9 +324,6 @@ def test_menu_resets_invalid_selected_context_to_keyboard(monkeypatch: pytest.Mo
 
 
 def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     class DummyBackend:
         name = "ite8910"
         stability = "experimental"
@@ -390,9 +347,6 @@ def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch
 def test_keyboard_status_shows_warning_when_not_detected(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.engine.device_available = False
 
@@ -403,9 +357,6 @@ def test_keyboard_status_shows_warning_when_not_detected(
 def test_menu_includes_active_mode_indicator_between_off_and_quit(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.config.effect = "none"
     tray.is_off = False
@@ -421,9 +372,6 @@ def test_menu_includes_active_mode_indicator_between_off_and_quit(
 def test_tray_active_indicator_shows_perkey_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     from src.core.profile import profiles as core_profiles
 
     monkeypatch.setattr(core_profiles, "get_active_profile", lambda: "default")
@@ -443,9 +391,6 @@ def test_tray_active_indicator_shows_perkey_profile(
 def test_tray_active_indicator_falls_back_to_unknown_when_profile_lookup_raises(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-
     from src.core.profile import profiles as core_profiles
 
     monkeypatch.setattr(core_profiles, "get_active_profile", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
@@ -460,29 +405,6 @@ def test_tray_active_indicator_falls_back_to_unknown_when_profile_lookup_raises(
     assert "mode:" in mode_text
     assert "software" in mode_text
     assert "unknown" in mode_text
-
-
-def test_tcc_profiles_menu_returns_none_when_tcc_query_raises_runtime_error() -> None:
-    from src.tray.ui import menu_sections
-
-    class BrokenTcc:
-        def list_profiles(self):
-            raise RuntimeError("boom")
-
-        def get_active_profile(self):
-            return None
-
-    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
-
-    assert (
-        menu_sections.build_tcc_profiles_menu(
-            tray,
-            pystray=FakePystray,
-            item=fake_item,
-            tcc=BrokenTcc(),
-        )
-        is None
-    )
 
 
 def test_system_power_mode_menu_returns_none_when_status_lookup_raises_runtime_error(
@@ -504,21 +426,13 @@ def test_system_power_mode_menu_returns_none_when_status_lookup_raises_runtime_e
     )
 
 
-def test_menu_keeps_system_power_item_when_followup_status_lookup_raises_runtime_error(
+def test_menu_includes_system_power_item_when_builder_returns_menu(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-    monkeypatch.setattr(tray_menu.menu_sections, "build_tcc_profiles_menu", lambda *args, **kwargs: None)
     monkeypatch.setattr(
         tray_menu.menu_sections,
         "build_system_power_mode_menu",
         lambda *args, **kwargs: fake_item("Power Mode", lambda *_a, **_k: None),
-    )
-    monkeypatch.setattr(
-        tray_menu.system_power,
-        "get_status",
-        lambda: (_ for _ in ()).throw(RuntimeError("power status boom")),
     )
 
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
@@ -527,29 +441,6 @@ def test_menu_keeps_system_power_item_when_followup_status_lookup_raises_runtime
     labels = [i["text"] for i in items if isinstance(i, dict)]
 
     assert "Power Mode" in labels
-
-
-def test_menu_propagates_unexpected_system_power_status_errors(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "list_profiles", lambda: [])
-    monkeypatch.setattr(tray_menu.tcc_power_profiles, "get_active_profile", lambda: None)
-    monkeypatch.setattr(tray_menu.menu_sections, "build_tcc_profiles_menu", lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        tray_menu.menu_sections,
-        "build_system_power_mode_menu",
-        lambda *args, **kwargs: fake_item("Power Mode", lambda *_a, **_k: None),
-    )
-    monkeypatch.setattr(
-        tray_menu.system_power,
-        "get_status",
-        lambda: (_ for _ in ()).throw(AssertionError("unexpected power status bug")),
-    )
-
-    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
-
-    with pytest.raises(AssertionError, match="unexpected power status bug"):
-        tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
 
 
 def test_perkey_profiles_menu_falls_back_to_editor_when_profile_listing_raises_runtime_error(

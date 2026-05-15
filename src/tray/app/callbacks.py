@@ -11,8 +11,6 @@ from collections.abc import Callable
 
 from src.tray.protocols import LightingTrayProtocol
 
-import src.core.power.tcc_profiles as tcc_power_profiles
-
 from ..controllers import effect_selection, lighting_controller, secondary_device_controller, software_target_controller
 from ..ui import menu as menu_mod
 from ..ui import gui_launch
@@ -31,7 +29,6 @@ launch_perkey_gui = gui_launch.launch_perkey_gui
 launch_power_gui = gui_launch.launch_power_gui
 launch_reactive_color_gui = gui_launch.launch_reactive_color_gui
 launch_support_gui = gui_launch.launch_support_gui
-launch_tcc_profiles_gui = gui_launch.launch_tcc_profiles_gui
 launch_uniform_gui = gui_launch.launch_uniform_gui
 _RECOVERABLE_UI_CALLBACK_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
@@ -172,17 +169,3 @@ def on_support_debug_clicked() -> None:
 
 def on_backend_discovery_clicked() -> None:
     launch_support_gui(focus="discovery")
-
-
-def on_tcc_profiles_gui_clicked() -> None:
-    launch_tcc_profiles_gui()
-
-
-def on_tcc_profile_clicked(tray: LightingTrayProtocol, profile_id: str) -> None:
-    """Switch TUXEDO Control Center power profile (temporary) via DBus."""
-
-    try:
-        tcc_power_profiles.set_temp_profile_by_id(profile_id)
-    finally:
-        # Reflect updated active profile state.
-        _update_menu_best_effort(tray)

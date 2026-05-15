@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 import logging
 from typing import Protocol
 
-from src.core.power.tcc_profiles.models import TccProfile
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers import menu_adapters as profile_power_menu_actions
@@ -45,18 +44,6 @@ class _DeviceContextMenuTrayProtocol(Protocol):
     _on_support_debug_clicked: _MenuAction
     _on_power_settings_clicked: _MenuAction
     _on_quit_clicked: _MenuAction
-
-
-class _TccProfilesProviderProtocol(Protocol):
-    def list_profiles(self) -> Sequence[TccProfile]: ...
-
-    def get_active_profile(self) -> TccProfile | None: ...
-
-
-class _TccProfilesTrayProtocol(Protocol):
-    _on_tcc_profiles_gui_clicked: _MenuAction
-
-    def _on_tcc_profile_clicked(self, profile_id: str) -> None: ...
 
 
 class _SystemPowerMenuTrayProtocol(Protocol):
@@ -150,22 +137,6 @@ def _profile_power_menu_builder() -> ProfilePowerMenuBuilder:
         list_perkey_profiles=profile_power_menu_actions.list_perkey_profiles,
         get_active_perkey_profile=profile_power_menu_actions.get_active_perkey_profile,
         activate_perkey_profile=profile_power_menu_actions.activate_perkey_profile,
-    )
-
-
-def build_tcc_profiles_menu(
-    tray: _TccProfilesTrayProtocol,
-    *,
-    pystray: _PystrayProtocol,
-    item: _ItemFactoryProtocol,
-    tcc: _TccProfilesProviderProtocol,
-) -> object | None:
-    """Build the TCC profiles submenu (or return None if unavailable)."""
-    return _profile_power_menu_builder().build_tcc_profiles_menu(
-        tray,
-        pystray=pystray,
-        item=item,
-        tcc=tcc,
     )
 
 

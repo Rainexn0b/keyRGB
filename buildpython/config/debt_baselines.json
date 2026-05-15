@@ -33,7 +33,6 @@
         "src/core/effects/engine_start.py": 10
       },
       "logged_broad_except": {
-        "src/gui/tcc/profiles.py": 4,
         "src/tray/pollers/config_polling_internal/core.py": 5,
         "src/gui/windows/reactive_color.py": 3,
         "src/core/power/management/manager.py": 5

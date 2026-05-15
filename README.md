@@ -118,7 +118,7 @@ This installs system dependencies as needed and installs KeyRGB in editable mode
 | `--version <tag>` | Install a specific tag such as `v0.17.2`. |
 | `--asset <name>` | Override the AppImage filename. |
 | `--prerelease` | Allow prereleases when resolving the latest AppImage. |
-| `--no-system-deps` | Skip system package changes such as kernel-driver, TCC, or polkit installs. |
+| `--no-system-deps` | Skip system package changes such as kernel-driver or polkit installs. |
 | `--update-appimage` | Refresh an existing AppImage install and desktop integration. |
 | `--ref <git-ref>` | Download installer modules from a specific git ref. |
 
@@ -128,8 +128,6 @@ Full non-interactive install example:
 curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o install.sh && \
 	KEYRGB_INSTALL_KERNEL_DRIVERS=y \
 	KEYRGB_INSTALL_INPUT_UDEV=y \
-	KEYRGB_INSTALL_TUXEDO=y \
-	KEYRGB_INSTALL_TCC_APP=y \
 	bash install.sh
 ```
 
@@ -148,7 +146,6 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | `keyrgb-reactive-color` | Open the reactive typing color GUI.                       |
 | `keyrgb-calibrate`      | Open the keymap calibrator UI.                            |
 | `keyrgb-settings`       | Open the settings GUI.                                    |
-| `keyrgb-tcc-profiles`   | Open the TCC power profiles GUI (if `tccd` is available). |
 | `keyrgb-diagnostics`    | Print hardware diagnostics JSON.                          |
 
 ### Environment variables
@@ -162,7 +159,6 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | `KEYRGB_ITE8233_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8233` lightbar backend (mainly for diagnostics / testing).                                                                     |
 | `KEYRGB_DEBUG=1`                        | Enable verbose debug logging.                                                                                                                                                                     |
 | `KEYRGB_TK_SCALING`                     | Float override for UI scaling (High-DPI / fractional scaling).                                                                                                                                    |
-| `KEYRGB_TCCD_BIN`                       | Override the `tccd` helper path for TCC integration.                                                                                                                                              |
 | `KEYRGB_ITE8910_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the `ite8910` backend (mainly for diagnostics / testing).                                                                                           |
 | `KEYRGB_DEBUG_BRIGHTNESS`               | When set to `1`, emits detailed logs for brightness actions and sysfs writes (useful when investigating flashes when restoring from dim). Example: `KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb dev state` |
 

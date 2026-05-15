@@ -27,7 +27,7 @@ Options:
   --asset <name>        AppImage filename (default: keyrgb-x86_64.AppImage)
   --prerelease          Allow picking prereleases when auto-resolving latest
   --update-appimage     Only update the AppImage (non-interactive); still refreshes desktop integration
-  --no-system-deps      Skip best-effort system package changes (AppImage runtime / kernel drivers / TCC app / polkit)
+  --no-system-deps      Skip best-effort system package changes (AppImage runtime / kernel drivers / polkit)
 
 Env vars:
   KEYRGB_ALLOW_PRERELEASE=y|n
@@ -36,13 +36,11 @@ Env vars:
   KEYRGB_DISTRO_PROFILE=auto|fedora|debian|arch|other
   KEYRGB_SKIP_SYSTEM_DEPS=y|n
 
-  # Legacy parity (optional components)
-  KEYRGB_INSTALL_POWER_HELPER=y|n     Install Power Mode pkexec helper (mutually exclusive with KEYRGB_INSTALL_TUXEDO)
-  KEYRGB_INSTALL_TUXEDO=y|n           Prefer Tuxedo Control Center (TCC) integration for power profiles
+  # Optional power controls
+  KEYRGB_INSTALL_POWER_HELPER=y|n     Install Power Mode pkexec helper
 
   # Optional parity with legacy installer (off by default)
   KEYRGB_INSTALL_INPUT_UDEV=y|n         Install /dev/input uaccess rule for Reactive Typing (security-sensitive)
-  KEYRGB_INSTALL_TCC_APP=y|n            Best-effort install tuxedo-control-center + marker file for uninstall
   KEYRGB_INSTALL_KERNEL_DRIVERS=y|n     Best-effort install tuxedo driver packages + marker file for uninstall
 
   # Telemetry (opt-in, disabled by default)
@@ -126,7 +124,7 @@ needs_system_package_changes() {
     return 0
   fi
 
-  if is_truthy "${KEYRGB_INSTALL_TCC_APP:-n}" || is_truthy "${KEYRGB_INSTALL_KERNEL_DRIVERS:-n}"; then
+  if is_truthy "${KEYRGB_INSTALL_KERNEL_DRIVERS:-n}"; then
     return 0
   fi
 
@@ -161,9 +159,6 @@ if [ "$UPDATE_ONLY" -ne 1 ] && needs_system_package_changes; then
   fi
 
   # Optional components that require system packages.
-  if is_truthy "${KEYRGB_INSTALL_TCC_APP:-n}"; then
-    install_tcc_app_best_effort
-  fi
   if is_truthy "${KEYRGB_INSTALL_KERNEL_DRIVERS:-n}"; then
     install_kernel_drivers_best_effort
   fi

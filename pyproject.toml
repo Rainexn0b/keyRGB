@@ -55,7 +55,6 @@ keyrgb-uniform = "src.gui.windows.uniform:main"
 keyrgb-reactive-color = "src.gui.windows.reactive_color:main"
 keyrgb-calibrate = "src.gui.calibrator:main"
 keyrgb-settings = "src.gui.settings:main"
-keyrgb-tcc-profiles = "src.gui.tcc.profiles:main"
 keyrgb-diagnostics = "src.core.diagnostics:main"
 
 [tool.setuptools]

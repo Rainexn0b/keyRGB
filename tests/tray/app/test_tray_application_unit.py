@@ -634,7 +634,6 @@ def test_effect_and_power_wrappers_delegate(monkeypatch):
         ("_on_turn_on_clicked", "on_turn_on_clicked", (None, None)),
         ("_on_hardware_static_mode_clicked", "on_hardware_static_mode_clicked", (None, None)),
         ("_on_hardware_color_clicked", "on_hardware_color_clicked", (None, None)),
-        ("_on_tcc_profile_clicked", "on_tcc_profile_clicked", ("silent",)),
     ],
 )
 def test_callback_wrapper_methods_delegate(monkeypatch, method_name, cb_attr, args):
@@ -662,7 +661,6 @@ def test_callback_wrapper_methods_delegate(monkeypatch, method_name, cb_attr, ar
         ("_on_power_settings_clicked", "on_power_settings_clicked"),
         ("_on_support_debug_clicked", "on_support_debug_clicked"),
         ("_on_backend_discovery_clicked", "on_backend_discovery_clicked"),
-        ("_on_tcc_profiles_gui_clicked", "on_tcc_profiles_gui_clicked"),
     ],
 )
 def test_callback_wrapper_methods_delegate_without_self(monkeypatch, method_name, cb_attr):

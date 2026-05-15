@@ -6,8 +6,6 @@ from collections.abc import Callable
 from typing import Protocol, cast
 
 import src.core.effects.catalog as effects_catalog
-import src.core.power.system as system_power
-import src.core.power.tcc_profiles as tcc_power_profiles
 
 from ..controllers import software_target_controller
 from . import _menu_callbacks as menu_callbacks
@@ -15,7 +13,6 @@ from . import menu_sections, menu_status
 
 
 logger = logging.getLogger(__name__)
-_RECOVERABLE_SYSTEM_POWER_STATUS_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 _MenuAction = Callable[[object, object], None]
 
@@ -65,10 +62,6 @@ def _menu_tray(tray: object) -> _MenuTrayProtocol:
 
 def _reloadable_menu_tray(tray: object) -> _ReloadableMenuTrayProtocol:
     return cast(_ReloadableMenuTrayProtocol, tray)
-
-
-def _tcc_profiles_provider() -> menu_sections._TccProfilesProviderProtocol:
-    return cast(menu_sections._TccProfilesProviderProtocol, tcc_power_profiles)
 
 
 def normalize_effect_label(label: str) -> str:
@@ -211,14 +204,6 @@ def build_menu_items(
         ]
     )
 
-    # TUXEDO Control Center power profiles (via DBus). If not available, hide the submenu.
-    tcc_profiles_menu = menu_sections.build_tcc_profiles_menu(
-        cast(menu_sections._TccProfilesTrayProtocol, tray),
-        pystray=pystray,
-        item=item,
-        tcc=_tcc_profiles_provider(),
-    )
-
     # Lightweight system power mode toggle (cpufreq sysfs). If not available, hide.
     system_power_menu = menu_sections.build_system_power_mode_menu(
         cast(menu_sections._SystemPowerMenuTrayProtocol, tray),
@@ -226,29 +211,13 @@ def build_menu_items(
         item=item,
     )
 
-    # Avoid collisions: only show one power-control menu.
-    system_power_can_apply = False
-    try:
-        st = system_power.get_status()
-        system_power_can_apply = bool(st.supported and st.identifiers.get("can_apply") == "true")
-    except _RECOVERABLE_SYSTEM_POWER_STATUS_ERRORS:  # @quality-exception exception-transparency: system power status read is a runtime probe boundary; failure degrades to hiding the menu item
-        system_power_can_apply = False
-
     perkey_menu = menu_sections.build_perkey_profiles_menu(
         cast(menu_sections._PerkeyMenuTrayProtocol, tray),
         pystray=pystray,
         item=item,
         per_key_supported=per_key_supported,
     )
-    # Choose which power menu to show as "Power Mode".
-    # Prefer system power when it can apply; otherwise fall back to TCC if present.
-    power_menu = None
-    if system_power_menu is not None and system_power_can_apply:
-        power_menu = system_power_menu
-    elif tcc_profiles_menu is not None:
-        power_menu = tcc_profiles_menu
-    elif system_power_menu is not None:
-        power_menu = system_power_menu
+    power_menu = system_power_menu
 
     header_items = [
         item(

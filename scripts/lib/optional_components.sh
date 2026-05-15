@@ -45,22 +45,6 @@ ensure_appimage_runtime_best_effort() {
   esac
 }
 
-install_tcc_app_best_effort() {
-  local state_dir="$HOME/.local/share/keyrgb"
-  local marker="$state_dir/tcc-installed-by-keyrgb"
-
-  mkdir -p "$state_dir" 2>/dev/null || true
-
-  log_info "Installing Tuxedo Control Center (best-effort)..."
-  if pkg_install_best_effort tuxedo-control-center; then
-    printf '%s\n' "tuxedo-control-center" >"$marker" 2>/dev/null || true
-    log_ok "Installed tuxedo-control-center"
-  else
-    log_warn "Failed to install tuxedo-control-center (best-effort)."
-    log_warn "You can install it manually; KeyRGB will use it when present."
-  fi
-}
-
 install_kernel_drivers_best_effort() {
   local state_dir="$HOME/.local/share/keyrgb"
   local marker="$state_dir/kernel-drivers-installed-by-keyrgb"

@@ -46,9 +46,3 @@ def launch_support_gui(*, focus: str = "debug") -> None:
     env["KEYRGB_TRAY_PID"] = str(os.getpid())
     env["KEYRGB_SUPPORT_FOCUS"] = str(focus or "debug").strip().lower()
     launch_module_subprocess("src.gui.windows.support", anchor=__file__, env=env)
-
-
-def launch_tcc_profiles_gui() -> None:
-    """Launch the TCC power profiles GUI as a subprocess."""
-
-    launch_module_subprocess("src.gui.tcc.profiles", anchor=__file__)

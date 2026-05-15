@@ -18,7 +18,7 @@ Usage: uninstall.sh [--yes] [--purge-config] [--remove-appimage]
 
 Notes:
   - Removes both AppImage-mode and pip-mode installs (with prompts).
-  - Does NOT remove system packages installed by install.sh (except optional TCC removal when KeyRGB installed it).
+  - Does NOT remove system packages installed by install.sh.
 EOF
 }
 
@@ -56,7 +56,6 @@ file_has_marker() {
 }
 
 STATE_DIR="$HOME/.local/share/keyrgb"
-TCC_MARKER="$STATE_DIR/tcc-installed-by-keyrgb"
 KERNEL_DRIVERS_MARKER="$STATE_DIR/kernel-drivers-installed-by-keyrgb"
 
 log_info "=== KeyRGB Uninstall ==="
@@ -263,23 +262,6 @@ remove_helper_and_rule_if_match() {
 }
 
 remove_helper_and_rule_if_match "$POWER_HELPER_DST" "$POWER_HELPER_SRC" "$POWER_POLKIT_DST" "$POWER_POLKIT_SRC" "Power Mode"
-
-# Remove TCC if marker exists and package still installed.
-if [ -f "$TCC_MARKER" ]; then
-  if detect_pkg_manager; then
-    if confirm "Uninstall Tuxedo Control Center (tuxedo-control-center) that was installed by KeyRGB (requires sudo)?"; then
-      if pkg_remove_best_effort tuxedo-control-center; then
-        rm -f "$TCC_MARKER" || true
-        log_ok "Removed tuxedo-control-center"
-      else
-        log_warn "Failed to remove tuxedo-control-center; marker file left: $TCC_MARKER"
-      fi
-    fi
-  else
-    log_warn "No supported package manager found; cannot remove tuxedo-control-center automatically."
-    log_warn "Marker file: $TCC_MARKER"
-  fi
-fi
 
 # Kernel drivers marker: prompt per entry.
 if [ -f "$KERNEL_DRIVERS_MARKER" ]; then

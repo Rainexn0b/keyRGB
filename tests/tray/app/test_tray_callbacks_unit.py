@@ -289,38 +289,6 @@ def test_on_selected_device_turn_off_clicked_delegates_to_secondary_controller()
     turn_off_secondary.assert_called_once_with(tray)
 
 
-def test_on_tcc_profile_clicked_updates_menu_on_success() -> None:
-    from src.tray.app.callbacks import on_tcc_profile_clicked
-
-    tray = MagicMock()
-    tray._update_menu = MagicMock()
-
-    with patch("src.tray.app.callbacks.tcc_power_profiles.set_temp_profile_by_id") as setp:
-        on_tcc_profile_clicked(tray, profile_id="balanced")
-
-    setp.assert_called_once_with("balanced")
-    tray._update_menu.assert_called_once()
-
-
-def test_on_tcc_profile_clicked_updates_menu_even_on_failure() -> None:
-    from src.tray.app.callbacks import on_tcc_profile_clicked
-
-    tray = MagicMock()
-    tray._update_menu = MagicMock()
-
-    with patch(
-        "src.tray.app.callbacks.tcc_power_profiles.set_temp_profile_by_id",
-        side_effect=RuntimeError("boom"),
-    ) as setp:
-        try:
-            on_tcc_profile_clicked(tray, profile_id="balanced")
-        except RuntimeError:
-            pass
-
-    setp.assert_called_once_with("balanced")
-    tray._update_menu.assert_called_once()
-
-
 def test_support_window_callbacks_launch_with_expected_focus() -> None:
     from src.tray.app.callbacks import on_backend_discovery_clicked, on_support_debug_clicked
 

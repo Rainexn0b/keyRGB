@@ -79,12 +79,11 @@ maybe_prompt_release_channel() {
 configure_optional_components() {
   # Sets/updates these vars:
   # - KEYRGB_INSTALL_POWER_HELPER
-  # - KEYRGB_INSTALL_TCC_APP
   # - KEYRGB_INSTALL_KERNEL_DRIVERS
   # - KEYRGB_INSTALL_INPUT_UDEV
   # Respects:
   # - UPDATE_ONLY
-  # - KEYRGB_INSTALL_POWER_HELPER, KEYRGB_INSTALL_TUXEDO env overrides
+  # - KEYRGB_INSTALL_POWER_HELPER env override
 
   if [ "${UPDATE_ONLY:-0}" -eq 1 ]; then
     return 0
@@ -98,67 +97,32 @@ configure_optional_components() {
   if is_truthy "${KEYRGB_SKIP_SYSTEM_DEPS:-n}"; then
     if [ -t 0 ]; then
       echo
-      echo "Note: --no-system-deps is set; skipping optional system package installs (kernel drivers / TCC app / polkit)."
+      echo "Note: --no-system-deps is set; skipping optional system package installs (kernel drivers / polkit)."
     fi
-    KEYRGB_INSTALL_TCC_APP="n"
     KEYRGB_INSTALL_KERNEL_DRIVERS="n"
   fi
 
   local install_power_helper="y"
-  local install_tuxedo="n"
 
-  if [ "${KEYRGB_INSTALL_POWER_HELPER:-}" != "" ] || [ "${KEYRGB_INSTALL_TUXEDO:-}" != "" ]; then
-    local ph tc
-    ph="$(ask_yes_no "" "y" "KEYRGB_INSTALL_POWER_HELPER")"
-    tc="$(ask_yes_no "" "n" "KEYRGB_INSTALL_TUXEDO")"
-    if [ "$ph" = "y" ]; then
-      install_power_helper="y"; install_tuxedo="n"
-    elif [ "$tc" = "y" ]; then
-      install_power_helper="n"; install_tuxedo="y"
-    else
-      install_power_helper="n"; install_tuxedo="n"
-    fi
+  if [ "${KEYRGB_INSTALL_POWER_HELPER:-}" != "" ]; then
+    install_power_helper="$(ask_yes_no "" "y" "KEYRGB_INSTALL_POWER_HELPER")"
   else
-    local power_choice
     if [ -t 0 ]; then
       echo
       echo "Optional components:"
-      echo "Choose ONE power integration (to avoid collisions):"
-      echo "  1) Lightweight Power Mode toggle (recommended)"
-      echo "     - Adds 'Extreme Saver/Balanced/Performance' tray menu"
-      echo "     - Installs a helper + polkit rule for passwordless switching"
-      echo "  2) Tuxedo Control Center (TCC) integration (advanced)"
-      echo "     - Enables the existing 'Power Profiles (TCC)' UI if TCC is installed"
-      read -r -p "Select [1-2] (default: 1): " power_choice || power_choice=""
-      power_choice="${power_choice:-1}"
+      echo "Power Mode toggle:"
+      echo "  - Adds 'Extreme Saver/Balanced/Performance' tray menu"
+      echo "  - Installs a helper + polkit rule for passwordless switching"
+      install_power_helper="$(ask_yes_no "Install lightweight Power Mode helper?" "y")"
     else
-      power_choice="1"
+      install_power_helper="y"
     fi
-
-    case "$power_choice" in
-      2) install_power_helper="n"; install_tuxedo="y" ;;
-      *) install_power_helper="y"; install_tuxedo="n" ;;
-    esac
   fi
 
   if [ "$install_power_helper" = "y" ]; then
     KEYRGB_INSTALL_POWER_HELPER="y"
   else
     KEYRGB_INSTALL_POWER_HELPER="n"
-  fi
-
-  if [ "$install_tuxedo" = "y" ] && ! is_truthy "${KEYRGB_SKIP_SYSTEM_DEPS:-n}"; then
-    if [ "${KEYRGB_INSTALL_TCC_APP:-}" = "" ] && [ -t 0 ]; then
-      echo
-      echo "TCC integration was selected."
-      local ans
-      ans="$(ask_yes_no "Install Tuxedo Control Center app (best-effort, may not be available in your repos)?" "n")"
-      if [ "$ans" = "y" ]; then
-        KEYRGB_INSTALL_TCC_APP="y"
-      else
-        KEYRGB_INSTALL_TCC_APP="n"
-      fi
-    fi
   fi
 
   if ! is_truthy "${KEYRGB_SKIP_SYSTEM_DEPS:-n}" && [ "${KEYRGB_INSTALL_KERNEL_DRIVERS:-}" = "" ] && [ -t 0 ]; then

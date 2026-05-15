@@ -93,12 +93,6 @@ class KeyRGBTrayDelegateMixin:
     def _on_backend_discovery_clicked(self, _icon, _item):
         _application_module().callbacks.on_backend_discovery_clicked()
 
-    def _on_tcc_profiles_gui_clicked(self, _icon, _item):
-        _application_module().callbacks.on_tcc_profiles_gui_clicked()
-
-    def _on_tcc_profile_clicked(self, profile_id: str) -> None:
-        _application_module().callbacks.on_tcc_profile_clicked(self, profile_id)
-
     def _on_quit_clicked(self, icon, _item):
         self.power_manager.stop_monitoring()
         self.engine.stop()

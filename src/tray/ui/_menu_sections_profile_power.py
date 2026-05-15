@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
 from src.core.power.system import PowerMode
-from src.core.power.tcc_profiles.models import TccProfile
 
 
 _MenuAction = Callable[[object, object], None]
@@ -13,7 +12,6 @@ _MenuChecked = Callable[[object], bool]
 _ProfileActivationAction = Callable[[], None]
 
 _MENU_BUILD_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
-_TCC_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (OSError,)
 _SYSTEM_POWER_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (OSError,)
 _SYSTEM_POWER_CALLBACK_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _PERKEY_MENU_EXCEPTIONS = _MENU_BUILD_EXCEPTIONS + (ImportError, OSError)
@@ -31,18 +29,6 @@ class _PystrayProtocol(Protocol):
 
 class _ItemFactoryProtocol(Protocol):
     def __call__(self, text: str, action: object | None = None, **kwargs: object) -> object: ...
-
-
-class _TccProfilesProviderProtocol(Protocol):
-    def list_profiles(self) -> Sequence[TccProfile]: ...
-
-    def get_active_profile(self) -> TccProfile | None: ...
-
-
-class _TccProfilesTrayProtocol(Protocol):
-    _on_tcc_profiles_gui_clicked: _MenuAction
-
-    def _on_tcc_profile_clicked(self, profile_id: str) -> None: ...
 
 
 class _SystemPowerStatusProtocol(Protocol):
@@ -112,54 +98,6 @@ class ProfilePowerMenuBuilder:
     list_perkey_profiles: _ListPerkeyProfilesProtocol
     get_active_perkey_profile: _GetActivePerkeyProfileProtocol
     activate_perkey_profile: _ActivatePerkeyProfileProtocol
-
-    def build_tcc_profiles_menu(
-        self,
-        tray: _TccProfilesTrayProtocol,
-        *,
-        pystray: _PystrayProtocol,
-        item: _ItemFactoryProtocol,
-        tcc: _TccProfilesProviderProtocol,
-    ) -> object | None:
-        try:
-            tcc_profiles = tcc.list_profiles()
-            active = tcc.get_active_profile()
-            if not tcc_profiles:
-                return None
-
-            profile_items = [
-                item(
-                    profile.name,
-                    self._tcc_profile_callback(tray, profile.id),
-                    checked=lambda _i, pid=profile.id: active is not None and active.id == pid,
-                    radio=True,
-                )
-                for profile in tcc_profiles
-            ]
-
-            return pystray.Menu(
-                item("Open Power Profiles…", tray._on_tcc_profiles_gui_clicked),
-                pystray.Menu.SEPARATOR,
-                *profile_items,
-            )
-        except _TCC_MENU_EXCEPTIONS as exc:
-            self.log_menu_debug(
-                "tray.menu.tcc_profiles",
-                "Failed to populate TCC profiles menu",
-                exc,
-                interval_s=120,
-            )
-            return None
-
-    def _tcc_profile_callback(self, tray: _TccProfilesTrayProtocol, profile_id: str) -> _MenuAction:
-        def _activate_profile() -> None:
-            tray._on_tcc_profile_clicked(profile_id)
-
-        return self.make_profile_activation_callback(
-            _activate_profile,
-            debug_key="tray.menu.tcc_profile_click",
-            debug_msg="TCC profile activation callback failed",
-        )
 
     def build_system_power_mode_menu(
         self,
