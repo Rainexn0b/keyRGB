@@ -47,40 +47,42 @@ class TestApplyBrightnessFromPowerPolicy:
         )
         mock_start.assert_not_called()
 
-    def test_apply_brightness_from_power_policy_updates_perkey_brightness_for_reactive_effect(self):
+    def test_apply_brightness_from_power_policy_preserves_reactive_brightness_for_reactive_effect(self):
         from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy
 
         mock_tray = _mk_tray(effect="reactive_ripple", brightness=200)
         mock_tray.config.perkey_brightness = 50
-        mock_tray.config.reactive_brightness = 50
+        mock_tray.config.reactive_brightness = 40
+        mock_tray.engine.reactive_brightness = 40
 
         with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             apply_brightness_from_power_policy(mock_tray, 25)
 
         assert mock_tray.config.perkey_brightness == 25
         assert mock_tray.config.brightness == 25
-        assert mock_tray.config.reactive_brightness == 25
+        assert mock_tray.config.reactive_brightness == 40
         assert mock_tray.engine.per_key_brightness == 25
-        assert mock_tray.engine.reactive_brightness == 25
+        assert mock_tray.engine.reactive_brightness == 40
         mock_tray.engine.set_brightness.assert_called_once_with(
             25, apply_to_hardware=False, fade=True, fade_duration_s=0.25
         )
         mock_start.assert_not_called()
 
     def test_apply_brightness_from_power_policy_logs_reactive_engine_failure_but_keeps_ui_flow(self):
-        from src.tray.controllers._power import _lighting_power_policy as power_policy_module
+        from src.tray.controllers import _lighting_controller_helpers as helper_module
         from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy
 
         mock_tray = _mk_tray(effect="reactive_ripple", brightness=200)
         mock_tray.config.perkey_brightness = 50
-        mock_tray.config.reactive_brightness = 50
+        mock_tray.config.reactive_brightness = 40
+        mock_tray.engine.reactive_brightness = 40
         mock_tray.engine.set_brightness.side_effect = RuntimeError("engine failed")
         logs = []
 
         with (
             patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start,
             patch.object(
-                power_policy_module,
+                helper_module,
                 "_log_tray_exception",
                 side_effect=lambda _tray, msg, exc: logs.append((msg, exc)),
             ),
@@ -89,16 +91,16 @@ class TestApplyBrightnessFromPowerPolicy:
 
         assert mock_tray.config.perkey_brightness == 25
         assert mock_tray.config.brightness == 25
-        assert mock_tray.config.reactive_brightness == 25
+        assert mock_tray.config.reactive_brightness == 40
         assert mock_tray.engine.per_key_brightness == 25
-        assert mock_tray.engine.reactive_brightness == 25
+        assert mock_tray.engine.reactive_brightness == 40
         mock_tray.engine.set_brightness.assert_called_once_with(
             25, apply_to_hardware=False, fade=True, fade_duration_s=0.25
         )
         mock_tray._refresh_ui.assert_called_once_with()
         mock_start.assert_not_called()
         assert len(logs) == 1
-        assert logs[0][0] == "Failed to apply reactive power-policy brightness: %s"
+        assert logs[0][0] == "Failed to apply power policy reactive brightness: %s"
         assert isinstance(logs[0][1], RuntimeError)
 
     def test_apply_brightness_from_power_policy_logs_outer_boundary_failure_without_raising(self):

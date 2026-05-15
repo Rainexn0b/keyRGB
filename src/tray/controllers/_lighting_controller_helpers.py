@@ -20,6 +20,7 @@ _RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, Ty
 _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_TRAY_LOGGING_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_STRINGIFICATION_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+_RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_module_exception(msg: str, exc: Exception) -> None:
@@ -184,6 +185,74 @@ def clear_engine_perkey_state(tray: LightingTrayProtocol) -> None:
         None,
         error_msg="Failed to clear engine per-key brightness: %s",
     )
+
+
+def sync_reactive_effect_brightness_state(
+    tray: LightingTrayProtocol,
+    *,
+    source: str,
+    base_brightness: int | None = None,
+    reactive_brightness: int | None = None,
+    fade: bool | None = None,
+    fade_duration_s: float | None = None,
+) -> None:
+    if base_brightness is None and reactive_brightness is None:
+        return
+
+    try:
+        with tray.engine.kb_lock:
+            if base_brightness is not None:
+                try:
+                    tray.engine.per_key_brightness = int(base_brightness)
+                except _RECOVERABLE_ENGINE_ATTR_EXCEPTIONS as exc:
+                    _log_tray_exception(
+                        tray,
+                        f"Failed to sync {source} reactive engine per-key brightness: %s",
+                        exc,
+                    )
+            if reactive_brightness is not None:
+                try:
+                    tray.engine.reactive_brightness = int(reactive_brightness)
+                except _RECOVERABLE_ENGINE_ATTR_EXCEPTIONS as exc:
+                    _log_tray_exception(
+                        tray,
+                        f"Failed to sync {source} reactive engine pulse brightness: %s",
+                        exc,
+                    )
+            if base_brightness is None:
+                return
+
+            try:
+                if fade is None:
+                    tray.engine.set_brightness(
+                        int(base_brightness),
+                        apply_to_hardware=False,
+                    )
+                elif fade_duration_s is None:
+                    tray.engine.set_brightness(
+                        int(base_brightness),
+                        apply_to_hardware=False,
+                        fade=bool(fade),
+                    )
+                else:
+                    tray.engine.set_brightness(
+                        int(base_brightness),
+                        apply_to_hardware=False,
+                        fade=bool(fade),
+                        fade_duration_s=float(fade_duration_s),
+                    )
+            except _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS as exc:
+                _log_tray_exception(
+                    tray,
+                    f"Failed to apply {source} reactive brightness: %s",
+                    exc,
+                )
+    except _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS as exc:
+        _log_tray_exception(
+            tray,
+            f"Failed to enter {source} reactive engine update boundary: %s",
+            exc,
+        )
 
 
 def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Optional[int] = None) -> None:

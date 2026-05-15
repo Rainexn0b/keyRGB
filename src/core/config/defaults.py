@@ -77,7 +77,9 @@ DEFAULTS: dict = {
     "idle_dim_debounce_exit_polls": 10,
     # Time-of-day brightness scheduler.
     # When enabled, automatically adjusts brightness based on local time.
-    # During the day, power-source (AC/battery) brightness takes precedence.
+    # During the day, power-source (AC/battery) brightness takes precedence
+    # for base brightness, while reactive_brightness still follows the day
+    # schedule.
     # At night, these scheduler values always apply.
     "time_scheduler_enabled": False,
     "day_start_time": "08:00",

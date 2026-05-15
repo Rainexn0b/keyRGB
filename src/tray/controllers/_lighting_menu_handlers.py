@@ -94,28 +94,20 @@ def on_brightness_clicked_impl(
     tray.config.brightness = brightness_hw
 
     # For reactive typing effects, keep the tray brightness menu behaving like
-    # an overall brightness control so the user sees an immediate change.
-    # The dedicated reactive UI slider can still be used to set a different
-    # pulse intensity.
+    # an overall keyboard brightness control so the user sees an immediate
+    # change without collapsing the separate reactive pulse-intensity state.
     if is_reactive:
         try:
             tray.config.perkey_brightness = brightness_int
         except (AttributeError, TypeError, ValueError, OverflowError):
             pass
-        try:
-            tray.config.reactive_brightness = brightness_int
-        except (AttributeError, TypeError, ValueError, OverflowError):
-            pass
-        try:
-            tray.engine.per_key_brightness = brightness_int
-        except (AttributeError, TypeError, ValueError, OverflowError):
-            pass
-        try:
-            tray.engine.reactive_brightness = brightness_int
-        except (AttributeError, TypeError, ValueError, OverflowError):
-            pass
-
-    tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_loop_effect)
+        lighting_controller_helpers.sync_reactive_effect_brightness_state(
+            tray,
+            source="tray brightness",
+            base_brightness=brightness_int,
+        )
+    else:
+        tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_loop_effect)
     if not tray.is_off and not is_loop_effect:
         start_current_effect(tray)
     tray._update_menu()

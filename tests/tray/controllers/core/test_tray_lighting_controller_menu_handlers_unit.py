@@ -136,24 +136,25 @@ class TestOnBrightnessClicked:
         mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=False)
         mock_start.assert_not_called()
 
-    def test_on_brightness_clicked_updates_perkey_brightness_for_reactive_effect(self):
+    def test_on_brightness_clicked_preserves_reactive_brightness_for_reactive_effect(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
 
         mock_tray = MagicMock()
         mock_tray.is_off = False
         mock_tray.config.effect = "reactive_fade"
         mock_tray.config.brightness = 25
-        mock_tray.config.reactive_brightness = 25
+        mock_tray.config.reactive_brightness = 40
         mock_tray.config.perkey_brightness = 25
+        mock_tray.engine.reactive_brightness = 40
 
         with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             on_brightness_clicked(mock_tray, "🔘 20")
 
         assert mock_tray.config.brightness == 100
         assert mock_tray.config.perkey_brightness == 100
-        assert mock_tray.config.reactive_brightness == 100
+        assert mock_tray.config.reactive_brightness == 40
         assert mock_tray.engine.per_key_brightness == 100
-        assert mock_tray.engine.reactive_brightness == 100
+        assert mock_tray.engine.reactive_brightness == 40
         mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=False)
         mock_start.assert_not_called()
 

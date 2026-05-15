@@ -12,6 +12,7 @@ from src.tray.controllers._lighting_controller_helpers import (
     get_effect_name,
     is_reactive_effect,
     is_software_effect,
+    sync_reactive_effect_brightness_state,
     try_log_event,
 )
 from src.tray.controllers.lighting_controller import start_current_effect
@@ -24,62 +25,26 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _BRIGHTNESS_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
-_REACTIVE_ENGINE_ATTR_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
-_REACTIVE_ENGINE_BRIGHTNESS_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _SCHEDULER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-
-
-def _apply_reactive_brightness_best_effort(
-    tray: LightingTrayProtocol,
-    base_brightness: int,
-    reactive_brightness: int,
-    *,
-    fade_down: bool,
-    fade_s: float,
-) -> None:
-    try:
-        with tray.engine.kb_lock:
-            try:
-                tray.engine.per_key_brightness = base_brightness
-            except _REACTIVE_ENGINE_ATTR_EXCEPTIONS as exc:
-                _log_tray_exception(
-                    tray,
-                    "Failed to sync time-scheduler per-key brightness: %s",
-                    exc,
-                )
-            try:
-                tray.engine.reactive_brightness = reactive_brightness
-            except _REACTIVE_ENGINE_ATTR_EXCEPTIONS as exc:
-                _log_tray_exception(
-                    tray,
-                    "Failed to sync time-scheduler reactive brightness: %s",
-                    exc,
-                )
-            try:
-                tray.engine.set_brightness(
-                    base_brightness,
-                    apply_to_hardware=False,
-                    fade=fade_down,
-                    fade_duration_s=fade_s,
-                )
-            except _REACTIVE_ENGINE_BRIGHTNESS_EXCEPTIONS as exc:
-                _log_tray_exception(tray, "Failed to apply time-scheduler reactive brightness: %s", exc)
-    except _REACTIVE_ENGINE_BRIGHTNESS_EXCEPTIONS as exc:
-        _log_tray_exception(tray, "Failed to enter time-scheduler engine update boundary: %s", exc)
 
 
 def _apply_time_scheduler_brightness(
     tray: LightingTrayProtocol,
-    base_brightness: int,
-    reactive_brightness: int,
+    base_brightness: int | None,
+    reactive_brightness: int | None,
 ) -> None:
     try:
-        base_brightness_int = int(base_brightness)
-        reactive_brightness_int = int(reactive_brightness)
+        base_brightness_int = None if base_brightness is None else int(base_brightness)
+        reactive_brightness_int = None if reactive_brightness is None else int(reactive_brightness)
     except _BRIGHTNESS_COERCION_EXCEPTIONS:
         return
 
-    if base_brightness_int < 0 or reactive_brightness_int < 0:
+    if base_brightness_int is None and reactive_brightness_int is None:
+        return
+
+    if base_brightness_int is not None and base_brightness_int < 0:
+        return
+    if reactive_brightness_int is not None and reactive_brightness_int < 0:
         return
 
     if tray._user_forced_off:
@@ -89,7 +54,7 @@ def _apply_time_scheduler_brightness(
         return
 
     try:
-        if base_brightness_int > 0:
+        if base_brightness_int is not None and base_brightness_int > 0:
             tray._last_brightness = base_brightness_int
 
         try_log_event(
@@ -105,21 +70,29 @@ def _apply_time_scheduler_brightness(
         is_reactive = is_reactive_effect(effect)
 
         prev_cfg_brightness = getattr(tray.config, "brightness", 0)
-        fade_down = bool(base_brightness_int < prev_cfg_brightness)
-        fade_s = 0.12 if base_brightness_int <= 0 else 0.25
+        fade_down = bool(base_brightness_int is not None and base_brightness_int < prev_cfg_brightness)
+        fade_s = 0.12 if base_brightness_int is not None and base_brightness_int <= 0 else 0.25
 
         if is_reactive:
-            tray.config.perkey_brightness = base_brightness_int
-            tray.config.brightness = base_brightness_int
-            tray.config.reactive_brightness = reactive_brightness_int
-            _apply_reactive_brightness_best_effort(
+            if base_brightness_int is not None:
+                tray.config.perkey_brightness = base_brightness_int
+                tray.config.brightness = base_brightness_int
+            if reactive_brightness_int is not None:
+                tray.config.reactive_brightness = reactive_brightness_int
+            sync_reactive_effect_brightness_state(
                 tray,
-                base_brightness_int,
-                reactive_brightness_int,
-                fade_down=fade_down,
-                fade_s=fade_s,
+                source="time-scheduler",
+                base_brightness=base_brightness_int,
+                reactive_brightness=reactive_brightness_int,
+                fade=fade_down,
+                fade_duration_s=fade_s,
             )
             tray._refresh_ui()
+            return
+
+        if reactive_brightness_int is not None:
+            tray.config.reactive_brightness = reactive_brightness_int
+        if base_brightness_int is None:
             return
 
         tray.config.brightness = base_brightness_int
@@ -208,11 +181,10 @@ def _run_scheduler_iteration(tray: LightingTrayProtocol) -> None:
         reactive_brightness = cfg["night_reactive"]
         _apply_time_scheduler_brightness(tray, base_brightness, reactive_brightness)
     else:
-        # Day: only apply if power management is disabled (no AC/battery policy)
-        if not cfg["power_management_enabled"]:
-            base_brightness = cfg["day_base"]
-            reactive_brightness = cfg["day_reactive"]
-            _apply_time_scheduler_brightness(tray, base_brightness, reactive_brightness)
+        if cfg["power_management_enabled"]:
+            _apply_time_scheduler_brightness(tray, None, cfg["day_reactive"])
+        else:
+            _apply_time_scheduler_brightness(tray, cfg["day_base"], cfg["day_reactive"])
 
 
 def _scheduler_loop(
@@ -248,11 +220,16 @@ def _scheduler_loop(
                             _apply_time_scheduler_brightness(tray, cfg["night_base"], cfg["night_reactive"])
                             try_log_event(tray, "time_scheduler", "night_applied")
                         else:
-                            if not cfg["power_management_enabled"]:
+                            if cfg["power_management_enabled"]:
+                                _apply_time_scheduler_brightness(tray, None, cfg["day_reactive"])
+                                try_log_event(
+                                    tray,
+                                    "time_scheduler",
+                                    "day_reactive_applied_base_deferred_to_power_policy",
+                                )
+                            else:
                                 _apply_time_scheduler_brightness(tray, cfg["day_base"], cfg["day_reactive"])
                                 try_log_event(tray, "time_scheduler", "day_applied")
-                            else:
-                                try_log_event(tray, "time_scheduler", "day_deferred_to_power_policy")
                         last_applied_key = apply_key
         except _SCHEDULER_RUNTIME_EXCEPTIONS as exc:
             logger.error("Time-scheduler iteration error: %s", exc, exc_info=True)

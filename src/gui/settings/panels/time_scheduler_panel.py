@@ -41,7 +41,8 @@ class TimeSchedulerPanel:
             parent,
             text=(
                 "Automatically adjust brightness based on local time.\n"
-                "During the day, 'Plugged In vs Battery' takes precedence.\n"
+                "During the day, 'Plugged In vs Battery' takes precedence for base brightness.\n"
+                "Reactive brightness still follows the day schedule.\n"
                 "At night, these values always apply."
             ),
             font=("Sans", 9),
@@ -85,12 +86,12 @@ class TimeSchedulerPanel:
         self.ent_night_start.bind("<FocusOut>", lambda _e: self._on_toggle())
 
         # Day values
-        day_frame = ttk.LabelFrame(parent, text="Day values (fallback when power policy is off)", padding=(8, 6))
+        day_frame = ttk.LabelFrame(parent, text="Day values", padding=(8, 6))
         day_frame.pack(fill="x", pady=(0, 8))
 
         self._build_brightness_row(
             day_frame,
-            label="Base brightness",
+            label="Base brightness (used when power policy is off)",
             var=self.var_day_base,
             row=0,
         )

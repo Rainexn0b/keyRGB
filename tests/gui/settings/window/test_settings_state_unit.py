@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime as _datetime
 from types import SimpleNamespace
 
 import pytest
+import src.gui.settings.settings_state as settings_state
 
 from src.gui.settings.settings_state import (
     SettingsValues,
@@ -14,6 +16,38 @@ from src.gui.settings.settings_state import (
 )
 from src.core.config._settings_view import ConfigSettingsView
 from src.core.diagnostics.model import DiagnosticsConfigSnapshot
+
+
+def _settings_values(**overrides) -> SettingsValues:
+    values = {
+        "power_management_enabled": True,
+        "power_off_on_suspend": True,
+        "power_off_on_lid_close": True,
+        "power_restore_on_resume": True,
+        "power_restore_on_lid_open": True,
+        "autostart": True,
+        "experimental_backends_enabled": False,
+        "ac_lighting_enabled": True,
+        "battery_lighting_enabled": True,
+        "ac_lighting_brightness": 25,
+        "battery_lighting_brightness": 25,
+        "screen_dim_sync_enabled": True,
+        "screen_dim_sync_mode": "off",
+        "screen_dim_temp_brightness": 5,
+        "idle_dim_debounce_enter_polls": 3,
+        "idle_dim_debounce_exit_polls": 5,
+        "time_scheduler_enabled": False,
+        "day_start_time": "08:00",
+        "night_start_time": "20:00",
+        "day_base_brightness": 40,
+        "day_reactive_brightness": 50,
+        "night_base_brightness": 20,
+        "night_reactive_brightness": 50,
+        "os_autostart_enabled": False,
+        "physical_layout": "auto",
+    }
+    values.update(overrides)
+    return SettingsValues(**values)
 
 
 def test_clamp_brightness() -> None:
@@ -353,6 +387,69 @@ def test_apply_settings_values_to_config_invalid_layout_falls_back_to_auto() -> 
     apply_settings_values_to_config(config=cfg, values=values)
 
     assert cfg.physical_layout == "auto"
+
+
+def test_apply_settings_values_materializes_active_day_reactive_brightness(monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = SimpleNamespace(reactive_brightness=50)
+
+    class FakeDateTime:
+        @staticmethod
+        def now() -> _datetime:
+            return _datetime(2024, 1, 1, 12, 0)
+
+    monkeypatch.setattr(settings_state, "datetime", FakeDateTime)
+
+    apply_settings_values_to_config(
+        config=cfg,
+        values=_settings_values(
+            time_scheduler_enabled=True,
+            day_start_time="08:00",
+            night_start_time="20:00",
+            day_reactive_brightness=42,
+            night_reactive_brightness=17,
+        ),
+    )
+
+    assert cfg.reactive_brightness == 42
+
+
+def test_apply_settings_values_materializes_active_night_reactive_brightness(monkeypatch: pytest.MonkeyPatch) -> None:
+    cfg = SimpleNamespace(reactive_brightness=50)
+
+    class FakeDateTime:
+        @staticmethod
+        def now() -> _datetime:
+            return _datetime(2024, 1, 1, 22, 0)
+
+    monkeypatch.setattr(settings_state, "datetime", FakeDateTime)
+
+    apply_settings_values_to_config(
+        config=cfg,
+        values=_settings_values(
+            time_scheduler_enabled=True,
+            day_start_time="08:00",
+            night_start_time="20:00",
+            day_reactive_brightness=42,
+            night_reactive_brightness=17,
+        ),
+    )
+
+    assert cfg.reactive_brightness == 17
+
+
+def test_apply_settings_values_leaves_reactive_brightness_when_scheduler_disabled() -> None:
+    cfg = SimpleNamespace(reactive_brightness=50)
+
+    apply_settings_values_to_config(
+        config=cfg,
+        values=_settings_values(
+            time_scheduler_enabled=False,
+            day_reactive_brightness=42,
+            night_reactive_brightness=17,
+        ),
+    )
+
+    assert cfg.reactive_brightness == 50
 
 
 def test_load_settings_partial_typed_view_falls_back_to_raw_attributes() -> None:

@@ -10,52 +10,13 @@ from src.tray.controllers._lighting_controller_helpers import (
     get_effect_name,
     is_reactive_effect,
     is_software_effect,
+    sync_reactive_effect_brightness_state,
     try_log_event,
 )
 
 
 _BRIGHTNESS_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
-_REACTIVE_ENGINE_ATTR_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
-_REACTIVE_ENGINE_BRIGHTNESS_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _POWER_POLICY_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-
-
-def _apply_reactive_brightness_best_effort(
-    tray: LightingTrayProtocol,
-    brightness_int: int,
-    *,
-    fade_down: bool,
-    fade_s: float,
-) -> None:
-    try:
-        with tray.engine.kb_lock:
-            try:
-                tray.engine.per_key_brightness = brightness_int
-            except _REACTIVE_ENGINE_ATTR_EXCEPTIONS as exc:
-                _log_tray_exception(
-                    tray,
-                    "Failed to sync reactive engine per-key brightness from power policy: %s",
-                    exc,
-                )
-            try:
-                tray.engine.reactive_brightness = brightness_int
-            except _REACTIVE_ENGINE_ATTR_EXCEPTIONS as exc:
-                _log_tray_exception(
-                    tray,
-                    "Failed to sync reactive engine pulse brightness from power policy: %s",
-                    exc,
-                )
-            try:
-                tray.engine.set_brightness(
-                    brightness_int,
-                    apply_to_hardware=False,
-                    fade=fade_down,
-                    fade_duration_s=fade_s,
-                )
-            except _REACTIVE_ENGINE_BRIGHTNESS_EXCEPTIONS as exc:
-                _log_tray_exception(tray, "Failed to apply reactive power-policy brightness: %s", exc)
-    except _REACTIVE_ENGINE_BRIGHTNESS_EXCEPTIONS as exc:
-        _log_tray_exception(tray, "Failed to enter reactive power-policy engine update boundary: %s", exc)
 
 
 def apply_brightness_from_power_policy_impl(
@@ -101,12 +62,12 @@ def apply_brightness_from_power_policy_impl(
         if is_reactive:
             tray.config.perkey_brightness = brightness_int
             tray.config.brightness = brightness_int
-            tray.config.reactive_brightness = brightness_int
-            _apply_reactive_brightness_best_effort(
+            sync_reactive_effect_brightness_state(
                 tray,
-                brightness_int,
-                fade_down=fade_down,
-                fade_s=fade_s,
+                source="power policy",
+                base_brightness=brightness_int,
+                fade=fade_down,
+                fade_duration_s=fade_s,
             )
             tray._refresh_ui()
             return
