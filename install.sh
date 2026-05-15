@@ -233,5 +233,3 @@ else
 fi
 
 exit 0
-
-# Legacy monolithic installer has been moved to scripts/legacy/install.legacy.sh

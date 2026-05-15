@@ -6,6 +6,7 @@ import textwrap
 
 import buildpython.steps.file_size_analysis.step as step_size
 from buildpython.steps.file_size_analysis.scanning import scan_middleman_candidate, scan_unreferenced_file_candidates
+from buildpython.steps.file_size_analysis.usage_graph import build_usage_graph
 
 from buildpython.core.debt_index import build_debt_index, write_debt_index
 from buildpython.core.summary import BuildSummary, write_summary
@@ -168,6 +169,91 @@ def test_unreferenced_scan_treats_reachable_python_m_launches_as_roots(tmp_path,
     assert result.exit_code == 0
     assert payload["counts"]["unreferenced_files"] == 0
     assert payload["unreferenced_files"] == []
+
+
+def test_unreferenced_scan_treats_launch_module_subprocess_targets_as_roots(tmp_path) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "src" / "app.py",
+        '''
+        from src.gui_launch import launch_support
+
+
+        def main() -> None:
+            launch_support()
+        ''',
+    )
+    _write_python_file(
+        tmp_path / "src" / "gui_launch.py",
+        '''
+        from src.core.runtime.imports import launch_module_subprocess
+
+
+        def launch_support() -> None:
+            launch_module_subprocess("src.support")
+        ''',
+    )
+    _write_python_file(
+        tmp_path / "src" / "support.py",
+        '''
+        from src.support_impl import VALUE
+        ''',
+    )
+    _write_python_file(
+        tmp_path / "src" / "support_impl.py",
+        '''
+        VALUE = 1
+        ''',
+    )
+    _write_python_file(
+        tmp_path / "src" / "core" / "runtime" / "imports.py",
+        '''
+        def launch_module_subprocess(module_name: str) -> None:
+            pass
+        ''',
+    )
+
+    rows = scan_unreferenced_file_candidates(tmp_path, roots=("src",))
+
+    assert rows == []
+
+
+def test_usage_graph_treats_package_relative_import_module_calls_as_roots(tmp_path) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "src" / "app.py",
+        '''
+        from src.pkg.helpers import VALUE
+
+
+        def main() -> int:
+            return VALUE
+        ''',
+    )
+    _write_python_file(
+        tmp_path / "src" / "pkg" / "__init__.py",
+        "",
+    )
+    _write_python_file(
+        tmp_path / "src" / "pkg" / "helpers.py",
+        '''
+        import importlib
+
+        _impl = importlib.import_module(f"{__package__}._impl")
+        VALUE = _impl.VALUE
+        ''',
+    )
+    impl_path = tmp_path / "src" / "pkg" / "_impl.py"
+    _write_python_file(
+        impl_path,
+        '''
+        VALUE = 1
+        ''',
+    )
+
+    graph = build_usage_graph(tmp_path, roots=("src",))
+
+    assert impl_path in graph.reachable
 
 
 def test_file_size_runner_suppresses_middleman_and_unreferenced_for_waived_files(tmp_path, monkeypatch) -> None:

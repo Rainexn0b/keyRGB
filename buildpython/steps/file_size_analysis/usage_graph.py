@@ -303,6 +303,7 @@ def _launched_module_names(path: Path) -> set[str]:
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
             continue
+        module_names.update(_dynamic_module_call_names(node, path=path))
         for expr in node.args:
             tokens = _string_tokens(expr)
             if not tokens:
@@ -314,6 +315,62 @@ def _launched_module_names(path: Path) -> set[str]:
                 if module_name.startswith(("src.", "buildpython.")):
                     module_names.add(module_name)
     return module_names
+
+
+def _dynamic_module_call_names(node: ast.Call, *, path: Path) -> set[str]:
+    if not _is_dynamic_module_call(node):
+        return set()
+
+    names: set[str] = set()
+    for expr in node.args[:1]:
+        module_name = _module_name_string(expr, path=path)
+        if module_name is not None and module_name.startswith(("src.", "buildpython.")):
+            names.add(module_name)
+    return names
+
+
+def _is_dynamic_module_call(node: ast.Call) -> bool:
+    func = node.func
+    if isinstance(func, ast.Name):
+        return func.id in {"launch_module_subprocess", "import_module"}
+    if isinstance(func, ast.Attribute):
+        return func.attr in {"import_module"}
+    return False
+
+
+def _module_name_string(expr: ast.expr, *, path: Path) -> str | None:
+    if isinstance(expr, ast.Constant) and isinstance(expr.value, str):
+        return expr.value
+    if isinstance(expr, ast.JoinedStr):
+        return _joined_module_name_string(expr, path=path)
+    return None
+
+
+def _joined_module_name_string(expr: ast.JoinedStr, *, path: Path) -> str | None:
+    parts: list[str] = []
+    for value in expr.values:
+        if isinstance(value, ast.Constant) and isinstance(value.value, str):
+            parts.append(value.value)
+            continue
+        if isinstance(value, ast.FormattedValue) and _is_package_name_expr(value.value):
+            package_name = _module_name_for_path(_repo_root_for_module_path(path), path)
+            if package_name is None:
+                return None
+            parts.append(_package_name_for_module(package_name, path))
+            continue
+        return None
+    return "".join(parts)
+
+
+def _repo_root_for_module_path(path: Path) -> Path:
+    for parent in [path.parent, *path.parents]:
+        if parent.name in {"src", "buildpython"}:
+            return parent.parent
+    return path.parent
+
+
+def _is_package_name_expr(expr: ast.expr) -> bool:
+    return isinstance(expr, ast.Name) and expr.id == "__package__"
 
 
 def _string_tokens(expr: ast.expr) -> list[str]:

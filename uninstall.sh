@@ -90,5 +90,3 @@ curl -fsSL "$base/scripts/uninstall.sh" -o "$tmp/scripts/uninstall.sh"
 exec bash "$tmp/scripts/uninstall.sh" "${NEW_ARGS[@]}"
 
 exit 0
-
-# Legacy monolithic uninstaller has been moved to scripts/legacy/uninstall.legacy.sh

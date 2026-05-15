@@ -31,6 +31,7 @@ v*.tar.gz
 .claude/
 .github/agents/
 .opencode/
+.codex/
 memories/
 
 # Virtual environments
