@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.24.2 (2026-05-16)
+
+- Installer/Maintenance: Remove the legacy monolithic installer and uninstaller artifacts, drop stale wrapper comments, and keep `.codex/` out of the repo.
+- Build/Scanner: Teach the file-usage scanner to treat `launch_module_subprocess()` targets and package-relative `import_module(f"{__package__}...")` calls as reachable modules, reducing false dead-code findings.
+- Docs: Convert the research-device-support `.docx` files to Markdown and remove the heavy binary originals.
+- Tray/Scheduler: Apply the active night base-brightness override through the power-source loop so AC/battery brightness policies do not override the configured night brightness.
+- Settings/UI: Tighten Settings copy, wrapping, padding, and scheduler defaults so the window is denser while preserving current live brightness values as scheduler defaults.
+- Installer/Power: Prune the TUXEDO Control Center profile integration and installer choices; KeyRGB now exposes only the canonical lightweight Power Mode path while retaining optional Tuxedo/Clevo kernel-driver guidance for sysfs support.
+- Tray/Power: Remove TCC profile menu fallback, `tccd` calls, the `keyrgb-tcc-profiles` entrypoint, TCC GUI/runtime modules, and their dedicated tests.
+
 ## 0.24.1 (2026-05-15)
 
 - Tray/Scheduler: Preserve reactive typing pulse brightness as a distinct state instead of overwriting it from tray brightness and AC/battery power-policy base-brightness changes.
