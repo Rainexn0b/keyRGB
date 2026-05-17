@@ -39,7 +39,8 @@ class TestPowerManagerBatterySaverLoop:
             mock_kb,
             on_ac=False,
             now_mono=123.0,
-            get_active_profile_fn=manager_module.get_active_profile,
+            get_power_mode_status_fn=manager_module.get_system_power_status,
+            get_active_perkey_profile_fn=manager_module.get_active_perkey_profile,
             safe_int_attr_fn=manager_module.safe_int_attr,
         )
 
@@ -81,6 +82,8 @@ class TestPowerManagerBatterySaverLoop:
             kb_controller=mock_kb,
             actions=plan.actions,
             apply_brightness=pm._apply_brightness_policy,
+            activate_power_mode=pm._activate_power_source_mode,
+            activate_perkey_profile=pm._activate_power_source_perkey_profile,
         )
 
     def test_run_battery_saver_iteration_delegates_classification_then_execution(self):
@@ -264,8 +267,8 @@ class TestPowerManagerBatterySaverLoop:
                 return_value=True,
             ),
             patch(
-                "src.core.power.management.manager.get_active_profile",
-                return_value="default",
+                "src.core.power.management.manager.get_system_power_status",
+                return_value=SimpleNamespace(supported=True, mode=None),
             ),
             patch(
                 "src.core.power.management.manager.PowerSourceLoopPolicy",
@@ -288,3 +291,19 @@ class TestPowerManagerBatterySaverLoop:
         assert inputs.battery_enabled is True
         assert inputs.ac_brightness_override == 25
         assert inputs.battery_brightness_override == 5
+
+    def test_activate_power_source_perkey_profile_skips_missing_profile(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+
+        pm = PowerManager(MagicMock(), config=MagicMock())
+
+        with (
+            patch.object(manager_module, "list_perkey_profiles", return_value=["default", "gaming"]),
+            patch.object(manager_module, "activate_perkey_profile") as activate_profile,
+            patch.object(manager_module.logger, "warning") as warning,
+        ):
+            pm._activate_power_source_perkey_profile("battery")
+
+        activate_profile.assert_not_called()
+        warning.assert_called_once_with("Skipping missing power-source lighting profile '%s'", "battery")

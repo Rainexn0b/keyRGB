@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from types import SimpleNamespace
 
 import pytest
 from src.core.resources.layouts import slot_id_for_key_id
@@ -94,6 +95,10 @@ class DummyEditor:
     canvas: DummyCanvas
     status_label: DummyLabel
     _profiles_combo: DummyCombo
+    _ac_power_source_profile_var: DummyVar | None = None
+    _battery_power_source_profile_var: DummyVar | None = None
+    _ac_power_source_profile_combo: DummyCombo | None = None
+    _battery_power_source_profile_combo: DummyCombo | None = None
     selected_cells: tuple[tuple[int, int], ...] = ()
     commit_calls: int = 0
     select_calls: list[str] = None  # type: ignore[assignment]
@@ -186,6 +191,10 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
     )
     ed._backdrop_mode_var = DummyVar("none")
     ed.backdrop_transparency = DummyVar(0.0)
@@ -253,6 +262,10 @@ def test_activate_profile_ui_keeps_activation_on_optional_backdrop_reload_failur
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
     )
     ed._backdrop_mode_var = FailingVar()
     ed.backdrop_transparency = FailingVar()
@@ -312,6 +325,10 @@ def test_activate_profile_ui_propagates_unexpected_backdrop_reload_failures(monk
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
     )
     ed.canvas.reload_backdrop_error = AssertionError("broken reload")
 
@@ -367,6 +384,10 @@ def test_activate_profile_ui_handles_missing_optional_methods(monkeypatch) -> No
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
     )
     ed._backdrop_mode_var = DummyVar("none")
     ed.backdrop_transparency = DummyVar(0.0)
@@ -410,6 +431,10 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
     )
 
     actions.delete_profile_ui(ed)
@@ -418,6 +443,91 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
     assert ed._profile_name_var.get() == "default"
     assert ed._profiles_combo.values == ["default", "p3"]
     assert ed.status_label.text == "Deleted lighting profile: p2"
+
+
+def test_save_power_source_profile_policy_ui_persists_selection_and_refreshes_options(monkeypatch) -> None:
+    monkeypatch.setattr(actions.profiles, "list_profiles", lambda: ["default", "gaming"])  # type: ignore[attr-defined]
+
+    config = SimpleNamespace(ac_perkey_profile_name=None, battery_perkey_profile_name="movie")
+    ed = DummyEditor(
+        _profile_name_var=DummyVar("default"),
+        config=config,
+        colors={},
+        keymap={},
+        _physical_layout="ansi",
+        layout_tweaks={},
+        per_key_layout_tweaks={},
+        layout_slot_overrides={},
+        profile_name="default",
+        selected_key_id=None,
+        selected_slot_id=None,
+        overlay_controls=DummyOverlayControls(),
+        lightbar_controls=None,
+        lightbar_overlay={},
+        canvas=DummyCanvas(),
+        status_label=DummyLabel(),
+        _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar("gaming"),
+        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
+    )
+
+    actions.save_power_source_profile_policy_ui(ed)
+
+    assert config.ac_perkey_profile_name == "gaming"
+    assert config.battery_perkey_profile_name is None
+    assert ed._ac_power_source_profile_combo.values == [
+        "Keep current profile",
+        "default",
+        "gaming",
+    ]
+    assert ed._battery_power_source_profile_combo.values == [
+        "Keep current profile",
+        "default",
+        "gaming",
+    ]
+    assert ed.status_label.text == "Saved AC/battery lighting profile policy"
+
+
+def test_sync_power_source_profile_policy_controls_keeps_missing_configured_profile_visible(monkeypatch) -> None:
+    monkeypatch.setattr(actions.profiles, "list_profiles", lambda: ["default", "gaming"])  # type: ignore[attr-defined]
+
+    config = SimpleNamespace(ac_perkey_profile_name="movie", battery_perkey_profile_name=None)
+    ed = DummyEditor(
+        _profile_name_var=DummyVar("default"),
+        config=config,
+        colors={},
+        keymap={},
+        _physical_layout="ansi",
+        layout_tweaks={},
+        per_key_layout_tweaks={},
+        layout_slot_overrides={},
+        profile_name="default",
+        selected_key_id=None,
+        selected_slot_id=None,
+        overlay_controls=DummyOverlayControls(),
+        lightbar_controls=None,
+        lightbar_overlay={},
+        canvas=DummyCanvas(),
+        status_label=DummyLabel(),
+        _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
+    )
+
+    actions.sync_power_source_profile_policy_controls(ed)
+
+    assert ed._ac_power_source_profile_var.get() == "movie"
+    assert ed._battery_power_source_profile_var.get() == actions.KEEP_CURRENT_PROFILE_LABEL
+    assert ed._ac_power_source_profile_combo.values == [
+        "Keep current profile",
+        "default",
+        "gaming",
+        "movie",
+    ]
 
 
 def test_reset_layout_defaults_ui_reloads_selected_layout_bundle(monkeypatch) -> None:

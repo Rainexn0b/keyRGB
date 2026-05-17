@@ -115,6 +115,33 @@ def optional_brightness_prop(key: str) -> property:
     return property(_get, _set)
 
 
+def optional_str_prop(key: str) -> property:
+    def _get(self) -> str | None:
+        value = _read_setting(self._settings, key, None)
+        if value is None:
+            return None
+        try:
+            normalized = str(value).strip()
+        except _CONFIG_HELPER_RUNTIME_ERRORS as exc:
+            _log_config_exception("Failed coercing config optional string value: %s", exc)
+            return None
+        return normalized or None
+
+    def _set(self, value: str | None) -> None:
+        if value is None:
+            self._settings[key] = None
+        else:
+            try:
+                normalized = str(value).strip()
+            except _CONFIG_HELPER_RUNTIME_ERRORS as exc:
+                _log_config_exception("Failed coercing config optional string value: %s", exc)
+                normalized = ""
+            self._settings[key] = normalized or None
+        self._save()
+
+    return property(_get, _set)
+
+
 def str_prop(key: str, *, default: str) -> property:
     def _get(self) -> str:
         v = self._settings.get(key, default)

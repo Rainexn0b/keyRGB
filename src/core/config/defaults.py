@@ -48,6 +48,9 @@ DEFAULTS: dict = {
     "power_off_on_lid_close": True,
     "power_restore_on_resume": True,
     "power_restore_on_lid_open": True,
+    # Lightweight system power mode tuning.
+    # Stored in kHz because cpufreq sysfs uses kHz units.
+    "system_power_extreme_cap_khz": 800000,
     # Battery saver (dim on AC unplug)
     "battery_saver_enabled": False,
     # Uses the same brightness scale as `brightness`.
@@ -58,8 +61,12 @@ DEFAULTS: dict = {
     # (and can optionally fall back to battery_saver_* behavior on battery).
     "ac_lighting_enabled": True,
     "ac_lighting_brightness": None,
+    "ac_power_mode": None,
+    "ac_perkey_profile_name": None,
     "battery_lighting_enabled": True,
     "battery_lighting_brightness": None,
+    "battery_power_mode": None,
+    "battery_perkey_profile_name": None,
     # Per-key colors stored as {"row,col": [r,g,b]}
     "per_key_colors": {},
     # Screen dim sync (best-effort, DE-specific). When enabled, KeyRGB will

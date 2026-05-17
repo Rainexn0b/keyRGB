@@ -27,10 +27,16 @@ def read_on_ac_power(*args, **kwargs):
     return _read_on_ac_power(*args, **kwargs)
 
 
-def get_active_profile(*args, **kwargs):
-    from src.core.profile.paths import get_active_profile as _get_active_profile
+def get_system_power_status(*args, **kwargs):
+    from src.core.power.system import get_status as _get_status
 
-    return _get_active_profile(*args, **kwargs)
+    return _get_status(*args, **kwargs)
+
+
+def set_system_power_mode(*args, **kwargs):
+    from src.core.power.system import set_mode as _set_mode
+
+    return _set_mode(*args, **kwargs)
 
 
 def safe_int_attr(*args, **kwargs):

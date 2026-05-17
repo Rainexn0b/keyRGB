@@ -51,6 +51,22 @@ def test_experimental_backends_enabled_persists(tmp_path, monkeypatch) -> None:
     assert cfg2.experimental_backends_enabled is True
 
 
+def test_system_power_extreme_cap_khz_persists_and_clamps(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    cfg = _make_config(tmp_path, monkeypatch)
+    assert cfg.system_power_extreme_cap_khz == 800000
+
+    cfg.system_power_extreme_cap_khz = 123456
+    assert cfg.system_power_extreme_cap_khz == 400000
+
+    cfg.system_power_extreme_cap_khz = 1300000
+    assert cfg.system_power_extreme_cap_khz == 1300000
+
+    cfg2 = Config()
+    assert cfg2.system_power_extreme_cap_khz == 1300000
+
+
 def test_brightness_property_tracks_effect_mode_without_overwriting_other_mode(tmp_path, monkeypatch) -> None:
     cfg = _make_config(tmp_path, monkeypatch)
     cfg._settings["brightness"] = 35
@@ -120,6 +136,8 @@ def test_reactive_and_optional_brightness_getters_fall_back_safely(tmp_path, mon
     cfg._settings["reactive_brightness"] = object()
     cfg._settings["ac_lighting_brightness"] = "13"
     cfg._settings["battery_lighting_brightness"] = "bad"
+    cfg._settings["ac_perkey_profile_name"] = "  gaming  "
+    cfg._settings["battery_perkey_profile_name"] = object()
 
     class BadBool:
         def __bool__(self):
@@ -135,7 +153,31 @@ def test_reactive_and_optional_brightness_getters_fall_back_safely(tmp_path, mon
     assert cfg.reactive_brightness == 22
     assert cfg.ac_lighting_brightness == 15
     assert cfg.battery_lighting_brightness is None
+    assert cfg.ac_perkey_profile_name == "gaming"
+    assert cfg.battery_perkey_profile_name is not None
     assert cfg.reactive_use_manual_color is False
+
+
+def test_ac_battery_perkey_profile_props_persist_and_normalize(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    assert cfg.ac_perkey_profile_name is None
+    assert cfg.battery_perkey_profile_name is None
+
+    cfg.ac_perkey_profile_name = " Gaming "
+    cfg.battery_perkey_profile_name = " battery "
+
+    assert cfg.ac_perkey_profile_name == "Gaming"
+    assert cfg.battery_perkey_profile_name == "battery"
+
+    cfg2 = Config()
+    assert cfg2.ac_perkey_profile_name == "Gaming"
+    assert cfg2.battery_perkey_profile_name == "battery"
+
+    cfg.ac_perkey_profile_name = ""
+    assert cfg.ac_perkey_profile_name is None
 
 
 def test_settings_view_exposes_readonly_typed_snapshot(tmp_path, monkeypatch) -> None:

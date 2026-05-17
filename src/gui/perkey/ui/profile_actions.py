@@ -20,6 +20,7 @@ from ._profile_actions_support import (
 from ..hardware import NUM_COLS, NUM_ROWS
 
 logger = logging.getLogger(__name__)
+KEEP_CURRENT_PROFILE_LABEL = "Keep current profile"
 
 
 # Keep module-backed seams patchable while deferring heavier imports until use.
@@ -196,6 +197,71 @@ def reset_layout_defaults_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     set_status(editor, layout_defaults_reset(_layout_labels().get(resolved_layout, resolved_layout.upper())))
 
 
+def _configured_power_source_profile_names(editor: _PerKeyProfileEditorProtocol) -> list[str]:
+    configured: list[str] = []
+    config = getattr(editor, "config", None)
+    for attr_name in ("ac_perkey_profile_name", "battery_perkey_profile_name"):
+        value = str(getattr(config, attr_name, "") or "").strip()
+        if value and value not in configured:
+            configured.append(value)
+    for var in (
+        editor._ac_power_source_profile_var,
+        editor._battery_power_source_profile_var,
+    ):
+        value = str(var.get() or "").strip()
+        if value and value != KEEP_CURRENT_PROFILE_LABEL and value not in configured:
+            configured.append(value)
+    return configured
+
+
+def power_source_profile_options(editor: _PerKeyProfileEditorProtocol) -> tuple[str, ...]:
+    names = list(profiles.list_profiles())
+    for configured_name in _configured_power_source_profile_names(editor):
+        if configured_name not in names:
+            names.append(configured_name)
+    return (KEEP_CURRENT_PROFILE_LABEL, *names)
+
+
+def _power_source_profile_selection(value: object) -> str:
+    normalized = str(value or "").strip()
+    return normalized or KEEP_CURRENT_PROFILE_LABEL
+
+
+def _selected_power_source_profile_name(value: object) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized or normalized == KEEP_CURRENT_PROFILE_LABEL:
+        return None
+    return normalized
+
+
+def sync_power_source_profile_policy_controls(editor: _PerKeyProfileEditorProtocol) -> None:
+    options = power_source_profile_options(editor)
+    config = getattr(editor, "config", None)
+    ac_selection = _power_source_profile_selection(getattr(config, "ac_perkey_profile_name", None))
+    battery_selection = _power_source_profile_selection(getattr(config, "battery_perkey_profile_name", None))
+
+    editor._ac_power_source_profile_var.set(ac_selection)
+    editor._battery_power_source_profile_var.set(battery_selection)
+
+    for combo in (
+        editor._ac_power_source_profile_combo,
+        editor._battery_power_source_profile_combo,
+    ):
+        if combo is not None:
+            combo.configure(values=options)
+
+
+def save_power_source_profile_policy_ui(editor: _PerKeyProfileEditorProtocol) -> None:
+    editor.config.ac_perkey_profile_name = _selected_power_source_profile_name(
+        editor._ac_power_source_profile_var.get()
+    )
+    editor.config.battery_perkey_profile_name = _selected_power_source_profile_name(
+        editor._battery_power_source_profile_var.get()
+    )
+    sync_power_source_profile_policy_controls(editor)
+    set_status(editor, "Saved AC/battery lighting profile policy")
+
+
 def activate_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     result = activate_profile(
         editor._profile_name_var.get(),
@@ -248,6 +314,7 @@ def save_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     )
     editor.profile_name = name
     editor._profile_name_var.set(name)
+    sync_power_source_profile_policy_controls(editor)
 
     ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
@@ -292,6 +359,7 @@ def new_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     editor.profile_name = name
     editor._profile_name_var.set(name)
     editor._profiles_combo.configure(values=profiles.list_profiles())
+    sync_power_source_profile_policy_controls(editor)
 
     ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
@@ -308,6 +376,7 @@ def delete_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     editor.profile_name = result.active_profile
     editor._profile_name_var.set(result.active_profile)
     editor._profiles_combo.configure(values=profiles.list_profiles())
+    sync_power_source_profile_policy_controls(editor)
     set_status(editor, result.message)
 
 

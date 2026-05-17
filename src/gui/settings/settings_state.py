@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Protocol, TypeVar
 
 from src.core.config._settings_view import ConfigSettingsView
+from src.core.power.system import PowerMode
 from src.core.resources.layouts.catalog import VALID_LAYOUT_IDS
 from src.core.utils.safe_attrs import safe_int_attr
 
@@ -81,6 +82,19 @@ class _SettingsReader:
         if self.fallback_obj is None:
             return None
         return _safe_optional_int(self.fallback_obj, attr)
+
+    def read_optional_str(self, key: str, *, fallback_attr: str | None = None) -> str | None:
+        attr = fallback_attr or key
+        if self.settings_view is not None:
+            return _read_view_optional_str(
+                self.settings_view,
+                key,
+                fallback_obj=self.fallback_obj,
+                fallback_attr=attr,
+            )
+        if self.fallback_obj is None:
+            return None
+        return _safe_optional_str(self.fallback_obj, attr)
 
     def read_normalized_str(self, key: str, *, default: str, fallback_attr: str | None = None) -> str:
         attr = fallback_attr or key
@@ -170,6 +184,20 @@ def _read_view_optional_int(
         return settings_view.read_optional_int(key)
     if fallback_obj is not None and fallback_attr is not None:
         return _safe_optional_int(fallback_obj, fallback_attr)
+    return None
+
+
+def _read_view_optional_str(
+    settings_view: ConfigSettingsView,
+    key: str,
+    *,
+    fallback_obj: object | None = None,
+    fallback_attr: str | None = None,
+) -> str | None:
+    if key in settings_view:
+        return settings_view.read_optional_str(key)
+    if fallback_obj is not None and fallback_attr is not None:
+        return _safe_optional_str(fallback_obj, fallback_attr)
     return None
 
 
@@ -303,6 +331,18 @@ def _safe_optional_int(obj: object, name: str) -> int | None:
     return _coerce_int_or_fallback(value, fallback=None)
 
 
+def _safe_optional_str(obj: object, name: str) -> str | None:
+    value = _safe_getattr_or_default(obj, name, None)
+    if value is None:
+        return None
+    try:
+        normalized = str(value).strip()
+    except _SETTINGS_ATTR_READ_ERRORS:
+        logger.exception("Failed coercing settings attribute '%s' to optional string", name)
+        return None
+    return normalized or None
+
+
 def _safe_normalized_str(obj: object, name: str, default: str) -> str:
     value = _safe_getattr_or_default(obj, name, default)
     try:
@@ -311,6 +351,16 @@ def _safe_normalized_str(obj: object, name: str, default: str) -> str:
         logger.exception("Failed coercing settings attribute '%s' to normalized string", name)
         return str(default).strip().lower()
     return normalized or str(default).strip().lower()
+
+
+def _normalize_optional_power_mode(value: object) -> str | None:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return None
+    try:
+        return PowerMode(normalized).value
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -328,6 +378,8 @@ class SettingsValues:
     battery_lighting_enabled: bool
     ac_lighting_brightness: int
     battery_lighting_brightness: int
+    ac_power_mode: str | None
+    battery_power_mode: str | None
 
     screen_dim_sync_enabled: bool
     # 'off' | 'temp'
@@ -370,6 +422,8 @@ def load_settings_values(*, config: _SettingsSourceLike, os_autostart_enabled: b
 
     ac_override = reader.read_optional_int("ac_lighting_brightness")
     batt_override = reader.read_optional_int("battery_lighting_brightness")
+    ac_power_mode = _normalize_optional_power_mode(reader.read_optional_str("ac_power_mode"))
+    battery_power_mode = _normalize_optional_power_mode(reader.read_optional_str("battery_power_mode"))
 
     power_management_enabled = reader.read_bool(
         "power_management_enabled",
@@ -439,6 +493,8 @@ def load_settings_values(*, config: _SettingsSourceLike, os_autostart_enabled: b
         battery_lighting_enabled=battery_lighting_enabled,
         ac_lighting_brightness=clamp_brightness(ac_brightness),
         battery_lighting_brightness=clamp_brightness(batt_brightness),
+        ac_power_mode=ac_power_mode,
+        battery_power_mode=battery_power_mode,
         screen_dim_sync_enabled=screen_dim_sync_enabled,
         screen_dim_sync_mode=screen_dim_sync_mode,
         screen_dim_temp_brightness=screen_dim_temp_brightness,
@@ -473,6 +529,8 @@ def apply_settings_values_to_config(*, config: _SettingsConfigLike, values: Sett
     config.battery_lighting_enabled = bool(values.battery_lighting_enabled)
     config.ac_lighting_brightness = clamp_brightness(values.ac_lighting_brightness)
     config.battery_lighting_brightness = clamp_brightness(values.battery_lighting_brightness)
+    config.ac_power_mode = _normalize_optional_power_mode(values.ac_power_mode)
+    config.battery_power_mode = _normalize_optional_power_mode(values.battery_power_mode)
 
     config.screen_dim_sync_enabled = bool(values.screen_dim_sync_enabled)
 

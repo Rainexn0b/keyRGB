@@ -6,6 +6,7 @@ from types import ModuleType, SimpleNamespace
 import pytest
 
 import src.gui.settings.window as settings_window
+from src.core.power.system import PowerMode
 from src.gui.settings.settings_state import SettingsValues
 
 
@@ -142,6 +143,8 @@ def _values() -> SettingsValues:
         battery_lighting_enabled=False,
         ac_lighting_brightness=21,
         battery_lighting_brightness=9,
+        ac_power_mode=PowerMode.BALANCED.value,
+        battery_power_mode=None,
         screen_dim_sync_enabled=True,
         screen_dim_sync_mode="temp",
         screen_dim_temp_brightness=7,
@@ -162,6 +165,7 @@ def _values() -> SettingsValues:
 def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch) -> None:
     root = _FakeRoot()
     calls: list[tuple[str, tuple[object, ...], dict[str, object]]] = []
+    values = _values()
 
     monkeypatch.setattr(settings_window.tk, "Tk", lambda: root)
     monkeypatch.setattr(
@@ -177,7 +181,7 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
         settings_window, "detect_os_autostart_enabled", lambda: calls.append(("detect", (), {})) or True
     )
     monkeypatch.setattr(
-        settings_window, "load_settings_values", lambda **kwargs: calls.append(("load", (), kwargs)) or "values"
+        settings_window, "load_settings_values", lambda **kwargs: calls.append(("load", (), kwargs)) or values
     )
     monkeypatch.setattr(
         settings_window.PowerSettingsGUI, "_init_layout", lambda self, **kwargs: calls.append(("layout", (), kwargs))
@@ -207,7 +211,7 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
         ("detect", (), {}),
         ("load", (), {"config": "config-obj", "os_autostart_enabled": True}),
         ("layout", (), {"bg_color": "#111"}),
-        ("vars", ("values",), {}),
+        ("vars", (values,), {}),
         ("panels", (), {}),
         ("finalize", (), {}),
         ("probe", (), {}),
@@ -318,6 +322,8 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_battery_enabled.get() is False
     assert gui.var_ac_brightness.get() == 21.0
     assert gui.var_battery_brightness.get() == 9.0
+    assert gui.var_ac_power_mode.get() == "Balanced"
+    assert gui.var_battery_power_mode.get() == "Keep current power mode"
     assert gui.var_dim_sync_enabled.get() is True
     assert gui.var_dim_sync_mode.get() == "temp"
     assert gui.var_dim_temp_brightness.get() == 7.0
@@ -330,7 +336,7 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_night_reactive.get() == 50.0
     assert len(bool_vars) == 12
     assert len(double_vars) == 7
-    assert len(string_vars) == 3
+    assert len(string_vars) == 5
     assert len(int_vars) == 2
 
 
@@ -375,6 +381,8 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui.var_battery_enabled = _FakeVar(True)
     gui.var_ac_brightness = _FakeVar(12.0)
     gui.var_battery_brightness = _FakeVar(5.0)
+    gui.var_ac_power_mode = _FakeVar("Balanced")
+    gui.var_battery_power_mode = _FakeVar("Keep current power mode")
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_dim_sync_mode = _FakeVar("off")
     gui.var_dim_temp_brightness = _FakeVar(5.0)
@@ -396,6 +404,14 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
 
     assert created["management"].args == (gui._left,)
     assert created["power_source"].kwargs["var_ac_brightness"] is gui.var_ac_brightness
+    assert created["power_source"].kwargs["var_ac_power_mode"] is gui.var_ac_power_mode
+    assert created["power_source"].kwargs["var_battery_power_mode"] is gui.var_battery_power_mode
+    assert created["power_source"].kwargs["power_mode_options"] == (
+        "Keep current power mode",
+        "Extreme Saver",
+        "Balanced",
+        "Performance",
+    )
     assert created["time_scheduler"].kwargs["var_enabled"] is gui.var_scheduler_enabled
     assert created["version"].kwargs["root"] is gui.root
     assert created["version"].kwargs["get_status_label"]() is gui.status
@@ -500,6 +516,8 @@ def test_on_toggle_preserves_best_effort_status_when_settings_apply_fails(monkey
     gui.var_battery_enabled = _FakeVar(False)
     gui.var_ac_brightness = _FakeVar(12.9)
     gui.var_battery_brightness = _FakeVar(8.2)
+    gui.var_ac_power_mode = _FakeVar("Balanced")
+    gui.var_battery_power_mode = _FakeVar("Keep current power mode")
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_dim_sync_mode = _FakeVar("temp")
     gui.var_dim_temp_brightness = _FakeVar(4.4)
@@ -536,6 +554,8 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
     gui.var_battery_enabled = _FakeVar(False)
     gui.var_ac_brightness = _FakeVar(12.9)
     gui.var_battery_brightness = _FakeVar(8.2)
+    gui.var_ac_power_mode = _FakeVar("Balanced")
+    gui.var_battery_power_mode = _FakeVar("Keep current power mode")
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_dim_sync_mode = _FakeVar("temp")
     gui.var_dim_temp_brightness = _FakeVar(4.4)
@@ -561,6 +581,8 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
 
     assert apply_calls and apply_calls[0].ac_lighting_brightness == 12
     assert apply_calls[0].battery_lighting_brightness == 8
+    assert apply_calls[0].ac_power_mode == PowerMode.BALANCED.value
+    assert apply_calls[0].battery_power_mode is None
     assert apply_calls[0].physical_layout == "ansi"
     assert gui.config.os_autostart is True
     assert enabled_calls == ["enabled"]
@@ -586,6 +608,8 @@ def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.
     gui.var_battery_enabled = _FakeVar(True)
     gui.var_ac_brightness = _FakeVar(10.0)
     gui.var_battery_brightness = _FakeVar(9.0)
+    gui.var_ac_power_mode = _FakeVar("Keep current power mode")
+    gui.var_battery_power_mode = _FakeVar("Performance")
     gui.var_dim_sync_enabled = _FakeVar(False)
     gui.var_dim_sync_mode = _FakeVar("off")
     gui.var_dim_temp_brightness = _FakeVar(5.0)
@@ -601,6 +625,14 @@ def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.
 
     assert gui.var_os_autostart.set_calls == [False]
     assert gui.status.configure_calls[0] == {"text": "✓ Saved"}
+
+
+def test_power_mode_selection_helpers_translate_between_labels_and_values() -> None:
+    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
+    assert gui._power_mode_selection_value(PowerMode.PERFORMANCE.value) == "Performance"
+    assert gui._power_mode_selection_value(None) == "Keep current power mode"
+    assert gui._selected_power_mode("Extreme Saver") == PowerMode.EXTREME_SAVER.value
+    assert gui._selected_power_mode("Keep current power mode") is None
 
 
 def test_on_close_and_run_delegate_to_root() -> None:

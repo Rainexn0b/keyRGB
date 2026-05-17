@@ -19,6 +19,7 @@ from tkinter import ttk
 from . import hardware_hint, os_autostart, panels, scrollable_area, settings_state
 
 from src.core import config as core_config
+from src.core.power.system import PowerMode
 from src.gui import theme as gui_theme
 from src.gui.utils import tk_async, window_geometry, window_icon
 
@@ -53,6 +54,19 @@ _SCROLLREGION_CONFIGURE_ERRORS = (RuntimeError, tk.TclError)
 _SETTINGS_VALUE_READ_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 _SETTINGS_APPLY_ERRORS = (AttributeError, OSError, RecursionError, RuntimeError, TypeError, ValueError)
 _OS_AUTOSTART_WRITE_ERRORS = (OSError, RuntimeError)
+_KEEP_CURRENT_POWER_MODE_LABEL = "Keep current power mode"
+_POWER_MODE_OPTIONS = (
+    _KEEP_CURRENT_POWER_MODE_LABEL,
+    "Extreme Saver",
+    "Balanced",
+    "Performance",
+)
+_POWER_MODE_LABEL_TO_VALUE = {
+    "Extreme Saver": PowerMode.EXTREME_SAVER.value,
+    "Balanced": PowerMode.BALANCED.value,
+    "Performance": PowerMode.PERFORMANCE.value,
+}
+_POWER_MODE_VALUE_TO_LABEL = {value: label for label, value in _POWER_MODE_LABEL_TO_VALUE.items()}
 
 
 class PowerSettingsGUI:
@@ -147,6 +161,8 @@ class PowerSettingsGUI:
         self.var_battery_enabled = tk.BooleanVar(value=bool(values.battery_lighting_enabled))
         self.var_ac_brightness = tk.DoubleVar(value=float(values.ac_lighting_brightness))
         self.var_battery_brightness = tk.DoubleVar(value=float(values.battery_lighting_brightness))
+        self.var_ac_power_mode = tk.StringVar(value=self._power_mode_selection_value(values.ac_power_mode))
+        self.var_battery_power_mode = tk.StringVar(value=self._power_mode_selection_value(values.battery_power_mode))
 
         self.var_dim_sync_enabled = tk.BooleanVar(value=bool(values.screen_dim_sync_enabled))
         self.var_dim_sync_mode = tk.StringVar(value=str(values.screen_dim_sync_mode or "off"))
@@ -196,6 +212,9 @@ class PowerSettingsGUI:
             var_battery_enabled=self.var_battery_enabled,
             var_ac_brightness=self.var_ac_brightness,
             var_battery_brightness=self.var_battery_brightness,
+            var_ac_power_mode=self.var_ac_power_mode,
+            var_battery_power_mode=self.var_battery_power_mode,
+            power_mode_options=_POWER_MODE_OPTIONS,
             on_toggle=self._on_toggle,
         )
 
@@ -294,6 +313,8 @@ class PowerSettingsGUI:
                 battery_lighting_enabled=bool(self.var_battery_enabled.get()),
                 ac_lighting_brightness=int(float(self.var_ac_brightness.get())),
                 battery_lighting_brightness=int(float(self.var_battery_brightness.get())),
+                ac_power_mode=self._selected_power_mode(self.var_ac_power_mode.get()),
+                battery_power_mode=self._selected_power_mode(self.var_battery_power_mode.get()),
                 screen_dim_sync_enabled=bool(self.var_dim_sync_enabled.get()),
                 screen_dim_sync_mode=str(self.var_dim_sync_mode.get() or "off"),
                 screen_dim_temp_brightness=int(float(self.var_dim_temp_brightness.get())),
@@ -336,6 +357,16 @@ class PowerSettingsGUI:
 
     def run(self) -> None:
         self.root.mainloop()
+
+    @staticmethod
+    def _power_mode_selection_value(power_mode: str | None) -> str:
+        normalized = str(power_mode or "").strip().lower()
+        return _POWER_MODE_VALUE_TO_LABEL.get(normalized, _KEEP_CURRENT_POWER_MODE_LABEL)
+
+    @staticmethod
+    def _selected_power_mode(selection: object) -> str | None:
+        normalized = str(selection or "").strip()
+        return _POWER_MODE_LABEL_TO_VALUE.get(normalized)
 
 
 def main() -> None:

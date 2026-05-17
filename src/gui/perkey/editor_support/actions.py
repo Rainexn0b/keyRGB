@@ -141,6 +141,12 @@ def set_default_profile(editor: object) -> None:
     profile_actions.set_default_profile_ui(editor)
 
 
+def save_power_source_profile_policy(editor: object) -> None:
+    from ..ui import profile_actions
+
+    profile_actions.save_power_source_profile_policy_ui(editor)
+
+
 def reset_layout_defaults(editor: object) -> None:
     from ..ui import profile_actions
 

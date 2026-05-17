@@ -16,6 +16,7 @@ from src.gui.settings.settings_state import (
 )
 from src.core.config._settings_view import ConfigSettingsView
 from src.core.diagnostics.model import DiagnosticsConfigSnapshot
+from src.core.power.system import PowerMode
 
 
 def _settings_values(**overrides) -> SettingsValues:
@@ -31,6 +32,8 @@ def _settings_values(**overrides) -> SettingsValues:
         "battery_lighting_enabled": True,
         "ac_lighting_brightness": 25,
         "battery_lighting_brightness": 25,
+        "ac_power_mode": None,
+        "battery_power_mode": None,
         "screen_dim_sync_enabled": True,
         "screen_dim_sync_mode": "off",
         "screen_dim_temp_brightness": 5,
@@ -77,6 +80,8 @@ def test_load_settings_defaults_without_overrides() -> None:
     values = load_settings_values(config=cfg, os_autostart_enabled=False)
     assert values.ac_lighting_brightness == 30
     assert values.battery_lighting_brightness == 30
+    assert values.ac_power_mode is None
+    assert values.battery_power_mode is None
     assert values.os_autostart_enabled is False
     assert values.experimental_backends_enabled is False
     assert values.screen_dim_sync_enabled is True
@@ -112,6 +117,21 @@ def test_load_settings_uses_explicit_overrides_and_clamps() -> None:
     values = load_settings_values(config=cfg, os_autostart_enabled=True)
     assert values.ac_lighting_brightness == 50
     assert values.battery_lighting_brightness == 0
+
+
+def test_load_settings_reads_optional_power_source_modes() -> None:
+    cfg = SimpleNamespace(
+        brightness=25,
+        battery_saver_enabled=False,
+        battery_saver_brightness=12,
+        ac_power_mode=" Balanced ",
+        battery_power_mode="invalid",
+    )
+
+    values = load_settings_values(config=cfg, os_autostart_enabled=True)
+
+    assert values.ac_power_mode == PowerMode.BALANCED.value
+    assert values.battery_power_mode is None
 
 
 def test_load_settings_malformed_property_and_coercion_values_fall_back_safely(caplog) -> None:
@@ -328,6 +348,8 @@ def test_apply_settings_values_to_config() -> None:
         battery_lighting_enabled=False,
         ac_lighting_brightness=49,
         battery_lighting_brightness=51,
+        ac_power_mode=PowerMode.BALANCED.value,
+        battery_power_mode=None,
         screen_dim_sync_enabled=False,
         screen_dim_sync_mode="temp",
         screen_dim_temp_brightness=1,
@@ -359,6 +381,8 @@ def test_apply_settings_values_to_config() -> None:
     assert cfg.battery_lighting_enabled is False
     assert cfg.ac_lighting_brightness == 49
     assert cfg.battery_lighting_brightness == 50
+    assert cfg.ac_power_mode == PowerMode.BALANCED.value
+    assert cfg.battery_power_mode is None
 
     assert cfg.screen_dim_sync_enabled is False
     assert cfg.screen_dim_sync_mode == "temp"
@@ -392,6 +416,8 @@ def test_apply_settings_values_to_config_invalid_layout_falls_back_to_auto() -> 
         battery_lighting_enabled=True,
         ac_lighting_brightness=25,
         battery_lighting_brightness=25,
+        ac_power_mode=None,
+        battery_power_mode=PowerMode.PERFORMANCE.value,
         screen_dim_sync_enabled=True,
         screen_dim_sync_mode="off",
         screen_dim_temp_brightness=5,

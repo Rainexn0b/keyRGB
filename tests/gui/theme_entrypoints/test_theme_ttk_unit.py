@@ -104,6 +104,10 @@ def test_apply_clam_light_theme_uses_ttk_lookups_and_optional_checkbutton_mappin
     assert configured["TCheckbutton"] == {"background": "#fafafa", "foreground": "#111111"}
 
     mapped = _mapped_calls(style)
+    assert mapped["TCombobox"] == {
+        "fieldbackground": [("readonly", "#ffffff"), ("disabled", "#ffffff")],
+        "foreground": [("readonly", "#111111"), ("disabled", "#777777"), ("!disabled", "#111111")],
+    }
     assert mapped["TCheckbutton"] == {
         "background": [("disabled", "#fafafa"), ("active", "#fafafa")],
         "foreground": [("disabled", "#777777"), ("!disabled", "#111111")],
@@ -142,6 +146,10 @@ def test_apply_clam_light_theme_falls_back_to_default_colors_and_tolerates_root_
     assert configured["TCheckbutton"] == {"background": "#f0f0f0", "foreground": "#000000"}
 
     mapped = _mapped_calls(style)
+    assert mapped["TCombobox"] == {
+        "fieldbackground": [("readonly", "#ffffff"), ("disabled", "#ffffff")],
+        "foreground": [("readonly", "#000000"), ("disabled", "#777777"), ("!disabled", "#000000")],
+    }
     assert "TCheckbutton" not in mapped
     assert mapped["TRadiobutton"] == {
         "background": [("disabled", "#f0f0f0"), ("active", "#f0f0f0")],
@@ -184,6 +192,10 @@ def test_apply_clam_dark_theme_configures_dark_palette_and_optional_checkbutton_
 
     mapped = _mapped_calls(style)
     assert mapped["TButton"] == {"background": [("active", "#505050")]}
+    assert mapped["TCombobox"] == {
+        "fieldbackground": [("readonly", "#3a3a3a"), ("disabled", "#3a3a3a")],
+        "foreground": [("readonly", "#e0e0e0"), ("disabled", "#777777"), ("!disabled", "#e0e0e0")],
+    }
     assert mapped["TCheckbutton"] == {
         "background": [("disabled", "#2b2b2b"), ("active", "#2b2b2b")],
         "foreground": [("disabled", "#777777"), ("!disabled", "#e0e0e0")],

@@ -171,6 +171,10 @@ class _FakeEditor:
         self.apply_all_keys = _FakeVar(False)
         self.sample_tool_enabled = _FakeVar(True)
         self._profile_name_var = _FakeVar("gaming")
+        self.config = SimpleNamespace(ac_perkey_profile_name="movie", battery_perkey_profile_name=None)
+        self._ac_power_source_profile_var = _FakeVar("movie")
+        self._battery_power_source_profile_var = _FakeVar("Keep current profile")
+        self._save_power_source_profile_policy_calls = 0
 
     def _set_backdrop(self) -> None:
         return None
@@ -222,6 +226,9 @@ class _FakeEditor:
 
     def _set_default_profile(self) -> None:
         return None
+
+    def _save_power_source_profile_policy(self) -> None:
+        self._save_power_source_profile_policy_calls += 1
 
 
 def _install_fake_ui(
@@ -514,9 +521,11 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert "Config" in label_texts
     assert "Setup" in label_texts
     assert "Lighting profile" in label_texts
+    assert "Use on AC" in label_texts
+    assert "Use on battery" in label_texts
     assert len(registry["separators"]) == 2
     assert all(separator.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}] for separator in registry["separators"])
-    assert len(registry["dropdowns"]) == 2
+    assert len(registry["dropdowns"]) == 4
     assert editor._backdrop_mode_dropdown is registry["dropdowns"][0]
 
     assert editor._profiles_frame.options["text"] == "Lighting profiles"
@@ -533,7 +542,7 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
 
     dropdown = editor._profiles_dropdown
     assert dropdown is registry["dropdowns"][1]
-    assert registry["profiles_list_calls"] == 1
+    assert registry["profiles_list_calls"] == 2
     assert dropdown.kwargs["root"] is root
     assert dropdown.kwargs["anchor"] is combo
     assert dropdown.kwargs["values_provider"]() == ["default", "gaming", "movie"]
@@ -546,6 +555,40 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     for _event, callback, _add in combo.bind_calls:
         assert callback.__self__ is dropdown
         assert callback.__func__.__name__ == "open"
+
+    ac_combo = editor._ac_power_source_profile_combo
+    battery_combo = editor._battery_power_source_profile_combo
+    assert ac_combo.options["textvariable"] is editor._ac_power_source_profile_var
+    assert battery_combo.options["textvariable"] is editor._battery_power_source_profile_var
+    assert ac_combo.options["width"] == 22
+    assert battery_combo.options["width"] == 22
+    assert ac_combo.options["state"] == "readonly"
+    assert battery_combo.options["state"] == "readonly"
+    assert ac_combo.grid_calls == [{"row": 3, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (10, 0)}]
+    assert battery_combo.grid_calls == [{"row": 4, "column": 1, "sticky": "ew", "padx": (8, 0), "pady": (8, 0)}]
+    assert editor._ac_power_source_profile_var.get() == "movie"
+    assert editor._battery_power_source_profile_var.get() == "Keep current profile"
+    assert ac_combo.options["values"] == (
+        "Keep current profile",
+        "default",
+        "gaming",
+        "movie",
+    )
+    assert battery_combo.options["values"] == (
+        "Keep current profile",
+        "default",
+        "gaming",
+        "movie",
+    )
+    assert [call[0] for call in ac_combo.bind_calls] == ["<Button-1>", "<Down>", "<<ComboboxSelected>>"]
+    assert [call[0] for call in battery_combo.bind_calls] == ["<Button-1>", "<Down>", "<<ComboboxSelected>>"]
+    assert editor._ac_power_source_profile_dropdown is registry["dropdowns"][2]
+    assert editor._battery_power_source_profile_dropdown is registry["dropdowns"][3]
+    editor._ac_power_source_profile_dropdown.kwargs["set_value"]("gaming")
+    editor._battery_power_source_profile_dropdown.kwargs["set_value"]("default")
+    assert editor._ac_power_source_profile_var.get() == "gaming"
+    assert editor._battery_power_source_profile_var.get() == "default"
+    assert editor._save_power_source_profile_policy_calls == 2
 
     layout_controls = editor._layout_setup_controls
     overlay_controls = editor.overlay_controls

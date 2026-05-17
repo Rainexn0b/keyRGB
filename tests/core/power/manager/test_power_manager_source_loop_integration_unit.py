@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import src.core.power.management._manager_helpers as manager_helpers
+from src.core.power.system import PowerMode
 
 
 # ---------------------------------------------------------------------------
@@ -23,6 +24,8 @@ def test_apply_power_source_actions_turn_off_calls_kb_turn_off() -> None:
         kb_controller=kb,
         actions=(TurnOffKeyboard(),),
         apply_brightness=MagicMock(),
+        activate_power_mode=MagicMock(),
+        activate_perkey_profile=MagicMock(),
     )
 
     kb.turn_off.assert_called_once_with()
@@ -38,6 +41,8 @@ def test_apply_power_source_actions_restore_calls_kb_restore() -> None:
         kb_controller=kb,
         actions=(RestoreKeyboard(),),
         apply_brightness=MagicMock(),
+        activate_power_mode=MagicMock(),
+        activate_perkey_profile=MagicMock(),
     )
 
     kb.restore.assert_called_once_with()
@@ -53,6 +58,8 @@ def test_apply_power_source_actions_apply_brightness_calls_callback_with_value()
         kb_controller=MagicMock(),
         actions=(ApplyBrightness(42),),
         apply_brightness=apply_brightness,
+        activate_power_mode=MagicMock(),
+        activate_perkey_profile=MagicMock(),
     )
 
     apply_brightness.assert_called_once_with(42)
@@ -87,6 +94,8 @@ def test_apply_power_source_actions_mixed_list_triggers_all_side_effects_in_sequ
         kb_controller=_OrderedController(),
         actions=(TurnOffKeyboard(), RestoreKeyboard(), ApplyBrightness(30)),
         apply_brightness=_track_brightness,
+        activate_power_mode=lambda mode: call_order.append(f"power_mode:{mode.value}"),
+        activate_perkey_profile=lambda profile_name: call_order.append(f"profile:{profile_name}"),
     )
 
     assert call_order == ["turn_off", "restore", "brightness:30"]
@@ -113,6 +122,8 @@ def test_apply_power_source_actions_controller_runtime_error_is_swallowed_and_lo
             kb_controller=_FailingController(),
             actions=(TurnOffKeyboard(), ApplyBrightness(15)),
             apply_brightness=apply_brightness,
+            activate_power_mode=MagicMock(),
+            activate_perkey_profile=MagicMock(),
         )
 
     # Exception must have been logged, not re-raised.
@@ -166,7 +177,8 @@ def test_pipeline_on_ac_enabled_no_overrides_does_not_turn_off_keyboard() -> Non
         kb_controller=kb,
         on_ac=True,
         now_mono=1000.0,
-        get_active_profile_fn=lambda: "default",
+        get_power_mode_status_fn=lambda: MagicMock(supported=True, mode=PowerMode.BALANCED),
+        get_active_perkey_profile_fn=lambda: "default",
         safe_int_attr_fn=lambda obj, name, default=0: _values.get(name, default),
     )
 
@@ -180,9 +192,55 @@ def test_pipeline_on_ac_enabled_no_overrides_does_not_turn_off_keyboard() -> Non
         kb_controller=kb,
         actions=result.actions,
         apply_brightness=apply_brightness,
+        activate_power_mode=MagicMock(),
+        activate_perkey_profile=MagicMock(),
     )
 
     kb.turn_off.assert_not_called()
+
+
+def test_apply_power_source_actions_activate_power_mode_calls_callback() -> None:
+    from src.core.power.management._manager_helpers import apply_power_source_actions
+    from src.core.power.policies.power_source_loop_policy import ActivatePowerMode
+
+    activate_power_mode = MagicMock()
+    apply_power_source_actions(
+        kb_controller=MagicMock(),
+        actions=(ActivatePowerMode(PowerMode.PERFORMANCE),),
+        apply_brightness=MagicMock(),
+        activate_power_mode=activate_power_mode,
+        activate_perkey_profile=MagicMock(),
+    )
+
+    activate_power_mode.assert_called_once_with(PowerMode.PERFORMANCE)
+
+
+def test_pipeline_emits_power_mode_activation_for_configured_ac_mode() -> None:
+    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from src.core.power.policies.power_source_loop_policy import ActivatePowerMode, PowerSourceLoopPolicy
+
+    class _PowerModeConfig(_FakeConfig):
+        ac_power_mode = PowerMode.BALANCED.value
+
+    values = {"brightness": 50, "battery_saver_brightness": 25}
+    kb = MagicMock()
+    kb.is_off = False
+
+    inputs = build_power_source_loop_inputs(
+        _PowerModeConfig(),
+        kb_controller=kb,
+        on_ac=True,
+        now_mono=1000.0,
+        get_power_mode_status_fn=lambda: MagicMock(supported=True, mode=PowerMode.PERFORMANCE),
+        get_active_perkey_profile_fn=lambda: "default",
+        safe_int_attr_fn=lambda obj, name, default=0: values.get(name, default),
+    )
+
+    assert inputs is not None
+
+    result = PowerSourceLoopPolicy(debounce_seconds=0.0).update(inputs)
+
+    assert ActivatePowerMode(PowerMode.BALANCED) in result.actions
 
 
 def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -217,7 +275,8 @@ def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: py
         kb_controller=kb,
         on_ac=True,
         now_mono=1000.0,
-        get_active_profile_fn=lambda: "default",
+        get_power_mode_status_fn=lambda: MagicMock(supported=True, mode=PowerMode.BALANCED),
+        get_active_perkey_profile_fn=lambda: "default",
         safe_int_attr_fn=lambda obj, name, default=0: values.get(name, default),
     )
 
@@ -226,3 +285,31 @@ def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: py
     result = PowerSourceLoopPolicy().update(inputs)
 
     assert result.actions == (ApplyBrightness(20),)
+
+
+def test_pipeline_emits_perkey_profile_activation_for_configured_ac_profile() -> None:
+    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from src.core.power.policies.power_source_loop_policy import ActivatePerkeyProfile, PowerSourceLoopPolicy
+
+    class _PerkeyProfileConfig(_FakeConfig):
+        ac_perkey_profile_name = "gaming"
+
+    values = {"brightness": 50, "battery_saver_brightness": 25}
+    kb = MagicMock()
+    kb.is_off = False
+
+    inputs = build_power_source_loop_inputs(
+        _PerkeyProfileConfig(),
+        kb_controller=kb,
+        on_ac=True,
+        now_mono=1000.0,
+        get_power_mode_status_fn=lambda: MagicMock(supported=True, mode=PowerMode.BALANCED),
+        get_active_perkey_profile_fn=lambda: "default",
+        safe_int_attr_fn=lambda obj, name, default=0: values.get(name, default),
+    )
+
+    assert inputs is not None
+
+    result = PowerSourceLoopPolicy(debounce_seconds=0.0).update(inputs)
+
+    assert ActivatePerkeyProfile("gaming") in result.actions

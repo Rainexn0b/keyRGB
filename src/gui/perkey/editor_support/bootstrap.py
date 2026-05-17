@@ -107,6 +107,8 @@ class _PerKeyEditorBootstrapApp(Protocol):
     _sample_tool_has_sampled: bool
     _setup_panel_mode: str | None
     _profile_name_var: _TkVarProtocol
+    _ac_power_source_profile_var: _TkVarProtocol
+    _battery_power_source_profile_var: _TkVarProtocol
     selected_key_id: str | None
     selected_slot_id: str | None
     selected_cells: KeyCells
@@ -261,6 +263,12 @@ def initialize_editor(
     editor._sample_tool_has_sampled = False
     editor._setup_panel_mode = None
     editor._profile_name_var = tk_module.StringVar(value=editor.profile_name)
+    editor._ac_power_source_profile_var = tk_module.StringVar(
+        value=str(editor.config.ac_perkey_profile_name or "").strip() or "Keep current profile"
+    )
+    editor._battery_power_source_profile_var = tk_module.StringVar(
+        value=str(editor.config.battery_perkey_profile_name or "").strip() or "Keep current profile"
+    )
     editor.selected_key_id = None
     editor.selected_slot_id = None
     editor.selected_cells = ()

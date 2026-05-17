@@ -5,6 +5,7 @@ from typing import Optional, Union
 
 from .battery_saver_policy import BatterySaverPolicy
 from .power_source_policy import compute_power_source_policy
+from ..system import PowerMode
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,23 @@ class ApplyBrightness:
     brightness: int
 
 
-PowerAction = Union[TurnOffKeyboard, RestoreKeyboard, ApplyBrightness]
+@dataclass(frozen=True)
+class ActivatePowerMode:
+    mode: PowerMode
+
+
+@dataclass(frozen=True)
+class ActivatePerkeyProfile:
+    profile_name: str
+
+
+PowerAction = Union[
+    TurnOffKeyboard,
+    RestoreKeyboard,
+    ApplyBrightness,
+    ActivatePowerMode,
+    ActivatePerkeyProfile,
+]
 
 
 @dataclass(frozen=True)
@@ -36,12 +53,18 @@ class PowerSourceLoopInputs:
     # Current state (best-effort)
     current_brightness: int
     is_off: bool
+    active_power_mode: PowerMode | None
+    active_perkey_profile_name: str | None
 
     # Per power-source configuration
     ac_enabled: bool
     battery_enabled: bool
     ac_brightness_override: int | float | str | None
     battery_brightness_override: int | float | str | None
+    ac_power_mode: PowerMode | None
+    battery_power_mode: PowerMode | None
+    ac_perkey_profile_name: str | None
+    battery_perkey_profile_name: str | None
 
     # Battery saver policy configuration
     battery_saver_enabled: bool
@@ -73,6 +96,8 @@ class PowerSourceLoopPolicy:
 
         self._last_desired_enabled: Optional[bool] = None
         self._last_desired_brightness: Optional[int] = None
+        self._last_desired_power_mode: Optional[str] = None
+        self._last_desired_perkey_profile: Optional[str] = None
 
         self._battery_saver_policy = battery_saver_policy or BatterySaverPolicy()
 
@@ -105,6 +130,12 @@ class PowerSourceLoopPolicy:
             ac_brightness_override=inputs.ac_brightness_override,
             battery_brightness_override=inputs.battery_brightness_override,
         )
+        desired_power_mode = inputs.ac_power_mode if bool(on_ac) else inputs.battery_power_mode
+        desired_perkey_profile_name = (
+            inputs.ac_perkey_profile_name if bool(on_ac) else inputs.battery_perkey_profile_name
+        )
+        current_power_mode = inputs.active_power_mode
+        current_perkey_profile_name = str(inputs.active_perkey_profile_name or "").strip() or None
 
         actions: list[PowerAction] = []
 
@@ -125,7 +156,29 @@ class PowerSourceLoopPolicy:
 
         # If disabled in this power state, do not apply brightness policies.
         if not bool(desired_enabled):
+            self._last_desired_power_mode = desired_power_mode.value if desired_power_mode is not None else None
+            self._last_desired_perkey_profile = desired_perkey_profile_name
             return PowerSourceLoopResult(skip=False, actions=tuple(actions))
+
+        should_apply_power_mode = False
+        if desired_power_mode is not None:
+            if self._last_desired_power_mode is None:
+                should_apply_power_mode = desired_power_mode != current_power_mode
+            else:
+                should_apply_power_mode = desired_power_mode.value != self._last_desired_power_mode
+        if should_apply_power_mode and desired_power_mode is not None:
+            actions.append(ActivatePowerMode(desired_power_mode))
+        self._last_desired_power_mode = desired_power_mode.value if desired_power_mode is not None else None
+
+        should_apply_perkey_profile = False
+        if desired_perkey_profile_name is not None:
+            if self._last_desired_perkey_profile is None:
+                should_apply_perkey_profile = desired_perkey_profile_name != current_perkey_profile_name
+            else:
+                should_apply_perkey_profile = desired_perkey_profile_name != self._last_desired_perkey_profile
+        if should_apply_perkey_profile and desired_perkey_profile_name is not None:
+            actions.append(ActivatePerkeyProfile(desired_perkey_profile_name))
+        self._last_desired_perkey_profile = desired_perkey_profile_name
 
         if desired_brightness is not None:
             # Apply only when it actually changes.

@@ -5,7 +5,9 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
+
+from src.core.profile import profiles as perkey_profiles
 
 from . import _manager_brightness_execution as _brightness_execution, _manager_power_events as _power_events
 from . import _manager_runtime_deps, _monitor_runner as power_monitor_runner
@@ -35,12 +37,48 @@ execute_power_event_plan = _power_events.execute_power_event_plan
 invoke_keyboard_method = _power_events.invoke_keyboard_method
 orchestrate_power_event = _power_events.orchestrate_power_event
 
-get_active_profile = _manager_runtime_deps.get_active_profile
+get_system_power_status = _manager_runtime_deps.get_system_power_status
 monitor_acpi_events = _manager_runtime_deps.monitor_acpi_events
 monitor_prepare_for_sleep = _manager_runtime_deps.monitor_prepare_for_sleep
 read_on_ac_power = _manager_runtime_deps.read_on_ac_power
 safe_int_attr = _manager_runtime_deps.safe_int_attr
+set_system_power_mode = _manager_runtime_deps.set_system_power_mode
 start_sysfs_lid_monitoring = _manager_runtime_deps.start_sysfs_lid_monitoring
+
+get_active_perkey_profile = perkey_profiles.get_active_profile
+list_perkey_profiles = perkey_profiles.list_profiles
+
+
+class _PerkeyActivationTrayProtocol(Protocol):
+    config: object
+    is_off: bool
+    _power_forced_off: object
+
+    def _start_current_effect(self, **kwargs: object) -> None: ...
+
+    def _update_icon(self, *, animate: bool = True) -> None: ...
+
+    def _update_menu(self) -> None: ...
+
+
+def activate_perkey_profile(tray: object, profile_name: str) -> None:
+    activation_tray = cast(_PerkeyActivationTrayProtocol, tray)
+    name = perkey_profiles.set_active_profile(profile_name)
+    colors = perkey_profiles.load_per_key_colors(name)
+    perkey_profiles.apply_profile_to_config(activation_tray.config, colors)
+
+    try:
+        power_forced_off = bool(activation_tray._power_forced_off)
+    except AttributeError:
+        power_forced_off = False
+
+    if not power_forced_off:
+        activation_tray.is_off = False
+        activation_tray._start_current_effect()
+
+    activation_tray._update_icon()
+    activation_tray._update_menu()
+
 
 _POWER_MANAGER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _POWER_MANAGER_MONITOR_ERRORS = _POWER_MANAGER_RUNTIME_ERRORS + (ImportError,)
@@ -126,7 +164,8 @@ class PowerManager:
                 self.kb_controller,
                 on_ac=on_ac,
                 now_mono=float(time.monotonic()),
-                get_active_profile_fn=get_active_profile,
+                get_power_mode_status_fn=get_system_power_status,
+                get_active_perkey_profile_fn=get_active_perkey_profile,
                 safe_int_attr_fn=safe_int_attr,
             ),
             policy=policy,
@@ -146,6 +185,8 @@ class PowerManager:
             kb_controller=self.kb_controller,
             actions=plan.actions,
             apply_brightness=self._apply_brightness_policy,
+            activate_power_mode=self._activate_power_source_mode,
+            activate_perkey_profile=self._activate_power_source_perkey_profile,
         )
         return False
 
@@ -183,6 +224,21 @@ class PowerManager:
 
     def _sync_config_brightness(self, brightness: int) -> None:
         sync_config_brightness(self._config, brightness, logger=logger)
+
+    def _activate_power_source_mode(self, mode) -> None:
+        try:
+            set_system_power_mode(mode)
+        finally:
+            update_menu = getattr(self.kb_controller, "_update_menu", None)
+            if callable(update_menu):
+                update_menu()
+
+    def _activate_power_source_perkey_profile(self, profile_name: str) -> None:
+        available_profiles = {str(name) for name in list_perkey_profiles()}
+        if str(profile_name) not in available_profiles:
+            logger.warning("Skipping missing power-source lighting profile '%s'", profile_name)
+            return
+        activate_perkey_profile(self.kb_controller, str(profile_name))
 
     # ---- lid/suspend monitoring
 

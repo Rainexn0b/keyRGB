@@ -5,9 +5,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import src.core.power.management._manager_helpers as manager_helpers
+from src.core.power.system import PowerMode
 
 
-def test_build_power_source_loop_inputs_preserves_overrides_when_profile_lookup_raises() -> None:
+def test_build_power_source_loop_inputs_preserves_overrides_when_power_mode_lookup_raises() -> None:
     from src.core.power.management._manager_helpers import build_power_source_loop_inputs
 
     class _Config:
@@ -17,6 +18,8 @@ def test_build_power_source_loop_inputs_preserves_overrides_when_profile_lookup_
         battery_lighting_enabled = True
         ac_lighting_brightness = 45
         battery_lighting_brightness = 15
+        ac_perkey_profile_name = "gaming"
+        battery_perkey_profile_name = "battery"
         battery_saver_enabled = True
         battery_saver_brightness = 20
 
@@ -33,7 +36,8 @@ def test_build_power_source_loop_inputs_preserves_overrides_when_profile_lookup_
         kb_controller=MagicMock(is_off=False),
         on_ac=True,
         now_mono=123.0,
-        get_active_profile_fn=MagicMock(side_effect=RuntimeError("profile failed")),
+        get_power_mode_status_fn=MagicMock(side_effect=RuntimeError("status failed")),
+        get_active_perkey_profile_fn=MagicMock(side_effect=RuntimeError("profile failed")),
         safe_int_attr_fn=lambda obj, name, default=0: values.get(name, default),
     )
 
@@ -42,6 +46,12 @@ def test_build_power_source_loop_inputs_preserves_overrides_when_profile_lookup_
     assert inputs.battery_enabled is True
     assert inputs.ac_brightness_override == 45
     assert inputs.battery_brightness_override == 15
+    assert inputs.active_power_mode is None
+    assert inputs.active_perkey_profile_name is None
+    assert inputs.ac_power_mode is None
+    assert inputs.battery_power_mode is None
+    assert inputs.ac_perkey_profile_name == "gaming"
+    assert inputs.battery_perkey_profile_name == "battery"
 
 
 def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> None:
@@ -57,7 +67,8 @@ def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> Non
         kb_controller=MagicMock(is_off=False),
         on_ac=True,
         now_mono=123.0,
-        get_active_profile_fn=MagicMock(return_value="default"),
+        get_power_mode_status_fn=MagicMock(return_value=MagicMock(supported=True, mode=PowerMode.BALANCED)),
+        get_active_perkey_profile_fn=MagicMock(return_value="gaming"),
         safe_int_attr_fn=lambda obj, name, default=0: {"brightness": 35, "battery_saver_brightness": 20}.get(name, default),
     )
 
@@ -74,6 +85,8 @@ def test_build_power_source_loop_inputs_uses_night_scheduler_base_override(monke
         battery_lighting_enabled = True
         ac_lighting_brightness = 45
         battery_lighting_brightness = 15
+        ac_perkey_profile_name = "gaming"
+        battery_perkey_profile_name = "battery"
         battery_saver_enabled = False
         battery_saver_brightness = 20
         time_scheduler_enabled = True
@@ -96,7 +109,8 @@ def test_build_power_source_loop_inputs_uses_night_scheduler_base_override(monke
         kb_controller=MagicMock(is_off=False),
         on_ac=True,
         now_mono=123.0,
-        get_active_profile_fn=MagicMock(return_value="default"),
+        get_power_mode_status_fn=MagicMock(return_value=MagicMock(supported=True, mode=PowerMode.BALANCED)),
+        get_active_perkey_profile_fn=MagicMock(return_value="movie"),
         safe_int_attr_fn=lambda obj, name, default=0: {
             "brightness": 35,
             "battery_saver_brightness": 20,
@@ -107,6 +121,9 @@ def test_build_power_source_loop_inputs_uses_night_scheduler_base_override(monke
     assert inputs is not None
     assert inputs.ac_brightness_override == 20
     assert inputs.battery_brightness_override == 20
+    assert inputs.active_perkey_profile_name == "movie"
+    assert inputs.ac_perkey_profile_name == "gaming"
+    assert inputs.battery_perkey_profile_name == "battery"
 
 
 def test_apply_power_source_actions_logs_controller_failures_and_keeps_processing() -> None:
@@ -127,6 +144,8 @@ def test_apply_power_source_actions_logs_controller_failures_and_keeps_processin
             kb_controller=_Controller(),
             actions=(TurnOffKeyboard(), RestoreKeyboard(), ApplyBrightness(25)),
             apply_brightness=apply_brightness,
+            activate_power_mode=MagicMock(),
+            activate_perkey_profile=MagicMock(),
         )
 
     apply_brightness.assert_called_once_with(25)
@@ -149,9 +168,49 @@ def test_apply_power_source_actions_propagates_unexpected_controller_failures() 
                 kb_controller=_Controller(),
                 actions=(TurnOffKeyboard(),),
                 apply_brightness=MagicMock(),
+                activate_power_mode=MagicMock(),
+                activate_perkey_profile=MagicMock(),
             )
 
     exc.assert_not_called()
+
+
+def test_apply_power_source_actions_dispatches_power_mode_activation_and_logs_runtime_failures() -> None:
+    from src.core.power.management._manager_helpers import apply_power_source_actions
+    from src.core.power.policies.power_source_loop_policy import ActivatePowerMode
+
+    activate_power_mode = MagicMock(side_effect=RuntimeError("mode failed"))
+
+    with patch("src.core.power.management._manager_helpers.logger.exception") as exc:
+        apply_power_source_actions(
+            kb_controller=MagicMock(),
+            actions=(ActivatePowerMode(PowerMode.BALANCED),),
+            apply_brightness=MagicMock(),
+            activate_power_mode=activate_power_mode,
+            activate_perkey_profile=MagicMock(),
+        )
+
+    activate_power_mode.assert_called_once_with(PowerMode.BALANCED)
+    exc.assert_called_once_with("Power-source mode activation failed for %s", PowerMode.BALANCED.value)
+
+
+def test_apply_power_source_actions_dispatches_profile_activation_and_logs_runtime_failures() -> None:
+    from src.core.power.management._manager_helpers import apply_power_source_actions
+    from src.core.power.policies.power_source_loop_policy import ActivatePerkeyProfile
+
+    activate_perkey_profile = MagicMock(side_effect=RuntimeError("profile failed"))
+
+    with patch("src.core.power.management._manager_helpers.logger.exception") as exc:
+        apply_power_source_actions(
+            kb_controller=MagicMock(),
+            actions=(ActivatePerkeyProfile("gaming"),),
+            apply_brightness=MagicMock(),
+            activate_power_mode=MagicMock(),
+            activate_perkey_profile=activate_perkey_profile,
+        )
+
+    activate_perkey_profile.assert_called_once_with("gaming")
+    exc.assert_called_once_with("Power-source profile activation failed for %s", "gaming")
 
 
 def test_is_intentionally_off_requires_literal_true_for_controller_flags() -> None:

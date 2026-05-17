@@ -96,6 +96,10 @@ class _PerKeyProfileEditorProtocol(Protocol):
     canvas: _CanvasProtocol
     _profile_name_var: _ProfileNameVarProtocol
     _profiles_combo: _ProfilesComboProtocol
+    _ac_power_source_profile_var: _ProfileNameVarProtocol
+    _battery_power_source_profile_var: _ProfileNameVarProtocol
+    _ac_power_source_profile_combo: _ProfilesComboProtocol
+    _battery_power_source_profile_combo: _ProfilesComboProtocol
 
     def _slot_id_for_key_id(self, key_id: str | None) -> str | None: ...
 

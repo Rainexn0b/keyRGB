@@ -247,6 +247,9 @@ class PerKeyEditor:
     def _set_default_profile(self):
         editor_actions.set_default_profile(self)
 
+    def _save_power_source_profile_policy(self):
+        editor_actions.save_power_source_profile_policy(self)
+
     def _reset_layout_defaults(self):
         editor_actions.reset_layout_defaults(self)
 

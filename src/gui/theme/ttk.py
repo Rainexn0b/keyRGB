@@ -49,6 +49,11 @@ def apply_clam_light_theme(
     style.configure("TEntry", fieldbackground=field_bg, foreground=fg_color)
     style.configure("TCombobox", fieldbackground=field_bg, foreground=fg_color)
     style.configure("TSpinbox", fieldbackground=field_bg, foreground=fg_color)
+    style.map(
+        "TCombobox",
+        fieldbackground=[("readonly", field_bg), ("disabled", field_bg)],
+        foreground=[("readonly", fg_color), ("disabled", "#777777"), ("!disabled", fg_color)],
+    )
 
     trough = style.lookup("TScale", "troughcolor") or field_bg
     style.configure("TScale", background=bg_color, troughcolor=trough)
@@ -114,6 +119,11 @@ def apply_clam_dark_theme(
     style.configure("TEntry", fieldbackground=field_bg, foreground=fg_color)
     style.configure("TCombobox", fieldbackground=field_bg, foreground=fg_color)
     style.configure("TSpinbox", fieldbackground=field_bg, foreground=fg_color)
+    style.map(
+        "TCombobox",
+        fieldbackground=[("readonly", field_bg), ("disabled", field_bg)],
+        foreground=[("readonly", fg_color), ("disabled", "#777777"), ("!disabled", fg_color)],
+    )
 
     # Sliders/scrollbars often have light troughs by default.
     style.configure("TScale", background=bg_color, troughcolor=field_bg)

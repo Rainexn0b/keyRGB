@@ -53,6 +53,16 @@ class ConfigSettingsView(Mapping[str, object]):
         except (RuntimeError, TypeError, ValueError):
             return bool(default)
 
+    def read_optional_str(self, key: str) -> str | None:
+        value = self._values.get(key, None)
+        if value is None:
+            return None
+        try:
+            normalized = str(value).strip()
+        except (RuntimeError, TypeError, ValueError):
+            return None
+        return normalized or None
+
     def read_normalized_str(self, key: str, default: str) -> str:
         value = self._values.get(key, default)
         fallback = str(default).strip().lower()

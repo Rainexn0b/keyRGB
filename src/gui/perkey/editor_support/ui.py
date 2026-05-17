@@ -6,6 +6,7 @@ from tkinter import TclError, ttk
 from src.core.profile import profiles
 from src.gui.widgets.color_wheel import ColorWheel
 from src.gui.widgets.dropdown import UpwardListboxDropdown
+from src.gui.perkey.ui import profile_actions as profile_action_ui
 
 from ..canvas import KeyboardCanvas
 from ..lightbar_controls import LightbarControls
@@ -280,6 +281,60 @@ def build_editor_ui(editor) -> None:
         sticky="ew",
         pady=(8, 0),
     )
+
+    ttk.Label(editor._profiles_frame, text="Use on AC").grid(row=3, column=0, sticky="w", pady=(10, 0))
+    editor._ac_power_source_profile_combo = ttk.Combobox(
+        editor._profiles_frame,
+        textvariable=editor._ac_power_source_profile_var,
+        width=22,
+        state="readonly",
+    )
+    editor._ac_power_source_profile_combo.grid(row=3, column=1, sticky="ew", padx=(8, 0), pady=(10, 0))
+    editor._ac_power_source_profile_dropdown = UpwardListboxDropdown(
+        root=editor.root,
+        anchor=editor._ac_power_source_profile_combo,
+        values_provider=lambda: profile_action_ui.power_source_profile_options(editor),
+        get_current_value=lambda: editor._ac_power_source_profile_var.get(),
+        set_value=lambda value: (
+            editor._ac_power_source_profile_var.set(value),
+            editor._save_power_source_profile_policy(),
+        ),
+        bg=getattr(editor, "bg_color", "#2b2b2b"),
+        fg=getattr(editor, "fg_color", "#ffffff"),
+    )
+    editor._ac_power_source_profile_combo.bind("<Button-1>", editor._ac_power_source_profile_dropdown.open)
+    editor._ac_power_source_profile_combo.bind("<Down>", editor._ac_power_source_profile_dropdown.open)
+    editor._ac_power_source_profile_combo.bind(
+        "<<ComboboxSelected>>", lambda _e: editor._save_power_source_profile_policy()
+    )
+
+    ttk.Label(editor._profiles_frame, text="Use on battery").grid(row=4, column=0, sticky="w", pady=(8, 0))
+    editor._battery_power_source_profile_combo = ttk.Combobox(
+        editor._profiles_frame,
+        textvariable=editor._battery_power_source_profile_var,
+        width=22,
+        state="readonly",
+    )
+    editor._battery_power_source_profile_combo.grid(row=4, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
+    editor._battery_power_source_profile_dropdown = UpwardListboxDropdown(
+        root=editor.root,
+        anchor=editor._battery_power_source_profile_combo,
+        values_provider=lambda: profile_action_ui.power_source_profile_options(editor),
+        get_current_value=lambda: editor._battery_power_source_profile_var.get(),
+        set_value=lambda value: (
+            editor._battery_power_source_profile_var.set(value),
+            editor._save_power_source_profile_policy(),
+        ),
+        bg=getattr(editor, "bg_color", "#2b2b2b"),
+        fg=getattr(editor, "fg_color", "#ffffff"),
+    )
+    editor._battery_power_source_profile_combo.bind("<Button-1>", editor._battery_power_source_profile_dropdown.open)
+    editor._battery_power_source_profile_combo.bind("<Down>", editor._battery_power_source_profile_dropdown.open)
+    editor._battery_power_source_profile_combo.bind(
+        "<<ComboboxSelected>>",
+        lambda _e: editor._save_power_source_profile_policy(),
+    )
+    profile_action_ui.sync_power_source_profile_policy_controls(editor)
 
     editor._layout_setup_controls = LayoutSetupControls(extras_setup, editor=editor)
     editor._layout_setup_controls.grid(row=0, column=0, sticky="nsew")

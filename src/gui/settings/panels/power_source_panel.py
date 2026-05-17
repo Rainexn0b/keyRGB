@@ -19,6 +19,9 @@ class PowerSourcePanel:
         var_battery_enabled: tk.BooleanVar,
         var_ac_brightness: tk.DoubleVar,
         var_battery_brightness: tk.DoubleVar,
+        var_ac_power_mode: tk.StringVar,
+        var_battery_power_mode: tk.StringVar,
+        power_mode_options: tuple[str, ...],
         on_toggle: Callable[[], None],
     ) -> None:
         self._on_toggle = on_toggle
@@ -70,6 +73,20 @@ class PowerSourcePanel:
         self.scale_ac_brightness.pack(fill="x", pady=(6, 0))
         self.scale_ac_brightness.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
 
+        ac_profile_row = ttk.Frame(ac_row)
+        ac_profile_row.pack(fill="x", pady=(6, 0))
+        ac_profile_row.columnconfigure(1, weight=1)
+
+        ttk.Label(ac_profile_row, text="Power mode", font=("Sans", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.combo_ac_power_mode = ttk.Combobox(
+            ac_profile_row,
+            textvariable=var_ac_power_mode,
+            values=power_mode_options,
+            state="readonly",
+        )
+        self.combo_ac_power_mode.grid(row=0, column=1, sticky="ew")
+        self.combo_ac_power_mode.bind("<<ComboboxSelected>>", lambda _e: self._on_toggle())
+
         # Battery row
         batt_row = ttk.Frame(parent)
         batt_row.pack(fill="x")
@@ -105,8 +122,23 @@ class PowerSourcePanel:
         self.scale_battery_brightness.pack(fill="x", pady=(6, 0))
         self.scale_battery_brightness.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
 
+        batt_profile_row = ttk.Frame(batt_row)
+        batt_profile_row.pack(fill="x", pady=(6, 0))
+        batt_profile_row.columnconfigure(1, weight=1)
+
+        ttk.Label(batt_profile_row, text="Power mode", font=("Sans", 9)).grid(row=0, column=0, sticky="w", padx=(0, 8))
+        self.combo_battery_power_mode = ttk.Combobox(
+            batt_profile_row,
+            textvariable=var_battery_power_mode,
+            values=power_mode_options,
+            state="readonly",
+        )
+        self.combo_battery_power_mode.grid(row=0, column=1, sticky="ew")
+        self.combo_battery_power_mode.bind("<<ComboboxSelected>>", lambda _e: self._on_toggle())
+
     def apply_enabled_state(self, *, power_management_enabled: bool) -> None:
         state = "normal" if power_management_enabled else "disabled"
+        combo_state = "readonly" if power_management_enabled else "disabled"
         for w in (
             self.chk_ac_enabled,
             self.chk_battery_enabled,
@@ -114,6 +146,8 @@ class PowerSourcePanel:
             self.scale_battery_brightness,
         ):
             w.configure(state=state)
+        for w in (self.combo_ac_power_mode, self.combo_battery_power_mode):
+            w.configure(state=combo_state)
 
     @staticmethod
     def _set_label_int(lbl: ttk.Label, v: float | str) -> None:

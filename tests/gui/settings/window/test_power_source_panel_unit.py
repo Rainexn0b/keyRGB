@@ -51,6 +51,8 @@ def _make_panel() -> power_source_panel.PowerSourcePanel:
     panel.chk_battery_enabled = _FakeWidget()
     panel.scale_ac_brightness = _FakeWidget()
     panel.scale_battery_brightness = _FakeWidget()
+    panel.combo_ac_power_mode = _FakeWidget()
+    panel.combo_battery_power_mode = _FakeWidget()
     return panel
 
 
@@ -59,6 +61,7 @@ def test_init_builds_controls_and_wires_callbacks(monkeypatch: pytest.MonkeyPatc
     frames: list[_FakeWidget] = []
     checks: list[_FakeWidget] = []
     scales: list[_FakeWidget] = []
+    combos: list[_FakeWidget] = []
 
     def make_label(parent=None, **kwargs):
         widget = _FakeWidget(parent, **kwargs)
@@ -80,6 +83,11 @@ def test_init_builds_controls_and_wires_callbacks(monkeypatch: pytest.MonkeyPatc
         scales.append(widget)
         return widget
 
+    def make_combo(parent=None, **kwargs):
+        widget = _FakeWidget(parent, **kwargs)
+        combos.append(widget)
+        return widget
+
     monkeypatch.setattr(
         power_source_panel,
         "ttk",
@@ -88,6 +96,7 @@ def test_init_builds_controls_and_wires_callbacks(monkeypatch: pytest.MonkeyPatc
             Frame=make_frame,
             Checkbutton=make_check,
             Scale=make_scale,
+            Combobox=make_combo,
         ),
     )
 
@@ -99,6 +108,9 @@ def test_init_builds_controls_and_wires_callbacks(monkeypatch: pytest.MonkeyPatc
         var_battery_enabled=_FakeVar(False),
         var_ac_brightness=_FakeVar(12.7),
         var_battery_brightness=_FakeVar(7.2),
+        var_ac_power_mode=_FakeVar("Keep current power mode"),
+        var_battery_power_mode=_FakeVar("Balanced"),
+        power_mode_options=("Keep current power mode", "Extreme Saver", "Balanced", "Performance"),
         on_toggle=lambda: toggle_calls.append("toggle"),
     )
 
@@ -109,21 +121,35 @@ def test_init_builds_controls_and_wires_callbacks(monkeypatch: pytest.MonkeyPatc
     assert panel.lbl_ac_brightness_val.kwargs["text"] == "12"
     assert panel.lbl_battery_brightness_val.kwargs["text"] == "7"
     assert frames[1].columnconfigure_calls == [(0, 1)]
-    assert frames[3].columnconfigure_calls == [(0, 1)]
+    assert frames[4].columnconfigure_calls == [(0, 1)]
+    assert frames[2].columnconfigure_calls == [(1, 1)]
+    assert frames[5].columnconfigure_calls == [(1, 1)]
     assert panel.chk_ac_enabled.grid_calls == [{"row": 0, "column": 0, "sticky": "w"}]
     assert panel.lbl_ac_brightness_val.grid_calls == [{"row": 0, "column": 2, "sticky": "e"}]
     assert panel.chk_battery_enabled.grid_calls == [{"row": 0, "column": 0, "sticky": "w"}]
     assert panel.lbl_battery_brightness_val.grid_calls == [{"row": 0, "column": 2, "sticky": "e"}]
     assert panel.scale_ac_brightness.kwargs["variable"].get() == 12.7
     assert panel.scale_battery_brightness.kwargs["variable"].get() == 7.2
+    assert panel.combo_ac_power_mode.kwargs["values"] == (
+        "Keep current power mode",
+        "Extreme Saver",
+        "Balanced",
+        "Performance",
+    )
+    assert panel.combo_ac_power_mode.kwargs["state"] == "readonly"
+    assert panel.combo_battery_power_mode.kwargs["textvariable"].get() == "Balanced"
     assert panel.scale_ac_brightness.bind_calls[0][0] == "<ButtonRelease-1>"
     assert panel.scale_battery_brightness.bind_calls[0][0] == "<ButtonRelease-1>"
+    assert panel.combo_ac_power_mode.bind_calls[0][0] == "<<ComboboxSelected>>"
+    assert panel.combo_battery_power_mode.bind_calls[0][0] == "<<ComboboxSelected>>"
 
     panel.chk_ac_enabled.kwargs["command"]()
     panel.chk_battery_enabled.kwargs["command"]()
     panel.scale_ac_brightness.bind_calls[0][1](None)
     panel.scale_battery_brightness.bind_calls[0][1](None)
-    assert toggle_calls == ["toggle", "toggle", "toggle", "toggle"]
+    panel.combo_ac_power_mode.bind_calls[0][1](None)
+    panel.combo_battery_power_mode.bind_calls[0][1](None)
+    assert toggle_calls == ["toggle", "toggle", "toggle", "toggle", "toggle", "toggle"]
 
     panel.scale_ac_brightness.kwargs["command"]("19.9")
     panel.scale_battery_brightness.kwargs["command"]("3.1")
@@ -191,7 +217,15 @@ def test_apply_enabled_state_updates_ac_and_battery_controls(
     assert panel.chk_battery_enabled.configure_calls == [{"state": expected_state}]
     assert panel.scale_ac_brightness.configure_calls == [{"state": expected_state}]
     assert panel.scale_battery_brightness.configure_calls == [{"state": expected_state}]
+    assert panel.combo_ac_power_mode.configure_calls == [
+        {"state": "readonly" if power_management_enabled else "disabled"}
+    ]
+    assert panel.combo_battery_power_mode.configure_calls == [
+        {"state": "readonly" if power_management_enabled else "disabled"}
+    ]
     assert panel.chk_ac_enabled.options["state"] == expected_state
     assert panel.chk_battery_enabled.options["state"] == expected_state
     assert panel.scale_ac_brightness.options["state"] == expected_state
     assert panel.scale_battery_brightness.options["state"] == expected_state
+    assert panel.combo_ac_power_mode.options["state"] == ("readonly" if power_management_enabled else "disabled")
+    assert panel.combo_battery_power_mode.options["state"] == ("readonly" if power_management_enabled else "disabled")
