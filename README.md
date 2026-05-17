@@ -252,6 +252,8 @@ Access **Settings** via the tray menu to configure:
 - **Autostart**: enable “Start KeyRGB on login”.
 - **Backend policy**: opt in to experimental backends. Currently `ite8297`, `ite8233`, `ite8258`, `ite8291`, `ite8291-zones`, and `ite8295-zones` are experimental; the UI labels experimental paths as speculative or research-backed.
 
+The tray's **Power Mode** submenu exposes the lightweight CPU power controls. Use **Power Mode Settings…** there to adjust the Extreme Saver target and review what each mode does.
+
 ### Profiles
 
 Profiles are stored in:

@@ -41,6 +41,7 @@ def test_build_device_context_menu_items_shows_uniform_controls_for_mouse_route(
         _on_selected_device_turn_off_clicked=lambda *_args, **_kwargs: None,
         _on_support_debug_clicked=lambda *_args, **_kwargs: None,
         _on_power_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
         _on_quit_clicked=lambda *_args, **_kwargs: None,
     )
     context_entry = {
@@ -61,6 +62,7 @@ def test_build_device_context_menu_items_shows_unsupported_generic_device_with_f
     tray = SimpleNamespace(
         _on_support_debug_clicked=lambda *_args, **_kwargs: None,
         _on_power_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
         _on_quit_clicked=lambda *_args, **_kwargs: None,
     )
     context_entry = {
@@ -117,6 +119,7 @@ def test_build_device_context_menu_items_uses_facade_collaborators_for_fallback_
         _on_selected_device_turn_off_clicked=lambda *_args, **_kwargs: None,
         _on_support_debug_clicked=lambda *_args, **_kwargs: None,
         _on_power_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
         _on_quit_clicked=lambda *_args, **_kwargs: None,
     )
 
@@ -166,13 +169,37 @@ def test_system_power_callback_uses_runtime_helper_collaborators(monkeypatch: py
         lambda tray: calls.append(("refresh", tray)),
     )
 
-    tray = SimpleNamespace()
+    tray = SimpleNamespace(_on_power_mode_settings_clicked=lambda *_args, **_kwargs: None)
     menu_items = menu_sections.build_system_power_mode_menu(tray, pystray=_Pystray(), item=_item)
 
     assert isinstance(menu_items, list)
     menu_items[0].action(None, None)
 
     assert calls == [("status", True), ("refresh", tray)]
+
+
+def test_system_power_menu_includes_settings_entry() -> None:
+    tray = SimpleNamespace(_on_power_mode_settings_clicked=lambda *_args, **_kwargs: None)
+
+    menu_items = menu_sections.ProfilePowerMenuBuilder(
+        make_profile_activation_callback=lambda action, **_kwargs: lambda *_a, **_k: action(),
+        log_menu_debug=lambda *_args, **_kwargs: None,
+        get_status=lambda: SimpleNamespace(supported=True, identifiers={"can_apply": "true"}, mode=None),
+        set_mode=lambda _mode: True,
+        set_system_power_result=lambda *_args, **_kwargs: None,
+        refresh_system_power_menu=lambda *_args, **_kwargs: None,
+        list_perkey_profiles=lambda: [],
+        get_active_perkey_profile=lambda: None,
+        activate_perkey_profile=lambda *_args, **_kwargs: None,
+    ).build_system_power_mode_menu(tray, pystray=_Pystray(), item=_item)
+
+    assert isinstance(menu_items, list)
+    assert [entry.text for entry in menu_items if hasattr(entry, "text")] == [
+        "Extreme Saver",
+        "Balanced",
+        "Performance",
+        "Power Mode Settings…",
+    ]
 
 
 def test_perkey_profile_callback_logs_recoverable_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:

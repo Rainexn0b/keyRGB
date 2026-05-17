@@ -659,6 +659,7 @@ def test_callback_wrapper_methods_delegate(monkeypatch, method_name, cb_attr, ar
         ("_on_tuxedo_gui_clicked", "on_uniform_gui_clicked"),
         ("_on_reactive_color_clicked", "on_reactive_color_gui_clicked"),
         ("_on_power_settings_clicked", "on_power_settings_clicked"),
+        ("_on_power_mode_settings_clicked", "on_power_mode_settings_clicked"),
         ("_on_support_debug_clicked", "on_support_debug_clicked"),
         ("_on_backend_discovery_clicked", "on_backend_discovery_clicked"),
     ],

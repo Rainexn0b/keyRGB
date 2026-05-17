@@ -47,7 +47,7 @@ class _DeviceContextMenuTrayProtocol(Protocol):
 
 
 class _SystemPowerMenuTrayProtocol(Protocol):
-    pass
+    _on_power_mode_settings_clicked: _MenuAction
 
 
 class _PerkeyMenuTrayProtocol(Protocol):

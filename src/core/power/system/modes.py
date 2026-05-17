@@ -10,6 +10,10 @@ from typing import Optional
 
 
 _CPUFREQ_ROOT_DEFAULT = Path("/sys/devices/system/cpu/cpufreq")
+DEFAULT_EXTREME_SAVER_CAP_KHZ = 800_000
+MIN_EXTREME_SAVER_CAP_KHZ = 400_000
+MAX_EXTREME_SAVER_CAP_KHZ = 5_000_000
+_EXTREME_SAVER_DETECTION_MARGIN_KHZ = 100_000
 
 
 class PowerMode(str, Enum):
@@ -25,6 +29,26 @@ class PowerModeStatus:
     mode: PowerMode
     reason: str
     identifiers: dict[str, str]
+
+
+def normalize_extreme_saver_cap_khz(value: object) -> int:
+    try:
+        if isinstance(value, (int, str, bytes, bytearray)):
+            khz = int(value)
+        else:
+            khz = int(str(value))
+    except (TypeError, ValueError, OverflowError):
+        khz = DEFAULT_EXTREME_SAVER_CAP_KHZ
+    return max(MIN_EXTREME_SAVER_CAP_KHZ, min(MAX_EXTREME_SAVER_CAP_KHZ, khz))
+
+
+def configured_extreme_saver_cap_khz() -> int:
+    try:
+        from src.core.config import Config
+
+        return normalize_extreme_saver_cap_khz(Config().system_power_extreme_cap_khz)
+    except (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError):
+        return DEFAULT_EXTREME_SAVER_CAP_KHZ
 
 
 def _cpufreq_root() -> Path:
@@ -54,6 +78,14 @@ def _write_text(path: Path, text: str) -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def _normalized_lower_text(path: Path) -> str | None:
+    value = _read_text(path)
+    if value is None:
+        return None
+    normalized = str(value).strip().lower()
+    return normalized or None
+
+
 def _policy_dirs(root: Path) -> list[Path]:
     if not root.exists():
         return []
@@ -65,6 +97,76 @@ def _policy_dirs(root: Path) -> list[Path]:
     except OSError:
         return []
     return sorted(out, key=lambda p: p.name)
+
+
+def _available_governors(policy: Path) -> set[str]:
+    raw = _normalized_lower_text(policy / "scaling_available_governors")
+    if not raw:
+        return set()
+    return {part for part in raw.split() if part}
+
+
+def _driver_name(policy: Path) -> str | None:
+    return _normalized_lower_text(policy / "scaling_driver")
+
+
+def _epp_path(policy: Path) -> Path:
+    return policy / "energy_performance_preference"
+
+
+def _available_epp_preferences(policy: Path) -> set[str]:
+    raw = _normalized_lower_text(policy / "energy_performance_available_preferences")
+    if not raw:
+        return set()
+    return {part for part in raw.split() if part}
+
+
+def _read_epp(policy: Path) -> str | None:
+    return _normalized_lower_text(_epp_path(policy))
+
+
+def _has_epp(policy: Path) -> bool:
+    return _epp_path(policy).exists()
+
+
+def _pick_epp_value(mode: PowerMode, *, available: set[str]) -> str | None:
+    if not available:
+        return None
+
+    if mode == PowerMode.EXTREME_SAVER:
+        for candidate in ("power", "balance_power", "default"):
+            if candidate in available:
+                return candidate
+        return next(iter(sorted(available)))
+
+    if mode == PowerMode.BALANCED:
+        for candidate in ("balance_performance", "balance_power", "default", "power"):
+            if candidate in available:
+                return candidate
+        return next(iter(sorted(available)))
+
+    if mode == PowerMode.PERFORMANCE:
+        for candidate in ("performance", "balance_performance", "default"):
+            if candidate in available:
+                return candidate
+        return next(iter(sorted(available)))
+
+    return None
+
+
+def _write_epp(policy: Path, value: str) -> None:
+    _write_text(_epp_path(policy), f"{value}\n")
+
+
+def _write_mode_epp_preferences(mode: PowerMode, *, policies: list[Path]) -> None:
+    for pol in policies:
+        epp_choice = _pick_epp_value(mode, available=_available_epp_preferences(pol))
+        if epp_choice is None or not _has_epp(pol):
+            continue
+        try:
+            _write_epp(pol, epp_choice)
+        except OSError:
+            pass
 
 
 def _boost_paths() -> list[Path]:
@@ -108,6 +210,30 @@ def _set_boost_enabled(enabled: bool) -> None:
         return
 
 
+def _write_scaling_freq_range(policy: Path, *, min_khz: int | None, max_khz: int | None) -> None:
+    min_path = policy / "scaling_min_freq"
+    max_path = policy / "scaling_max_freq"
+    current_min = _read_int(min_path) if min_path.exists() else None
+    current_max = _read_int(max_path) if max_path.exists() else None
+
+    # Expand the current range first so the follow-up tightening writes do not
+    # trip cpufreq validation when the requested target moves up or down.
+    if min_khz is not None and min_path.exists() and current_min is not None and int(min_khz) < current_min:
+        _write_text(min_path, f"{int(min_khz)}\n")
+        current_min = int(min_khz)
+
+    if max_khz is not None and max_path.exists() and current_max is not None and int(max_khz) > current_max:
+        _write_text(max_path, f"{int(max_khz)}\n")
+        current_max = int(max_khz)
+
+    if max_khz is not None and max_path.exists() and current_max != int(max_khz):
+        _write_text(max_path, f"{int(max_khz)}\n")
+        current_max = int(max_khz)
+
+    if min_khz is not None and min_path.exists() and current_min != int(min_khz):
+        _write_text(min_path, f"{int(min_khz)}\n")
+
+
 def is_supported() -> bool:
     root = _cpufreq_root()
     policies = _policy_dirs(root)
@@ -117,11 +243,12 @@ def is_supported() -> bool:
     return any((p / "scaling_max_freq").exists() for p in policies)
 
 
-def _infer_mode(*, policies: list[Path]) -> PowerMode:
+def _infer_mode(*, policies: list[Path], extreme_cap_khz: int) -> PowerMode:
     # Infer from a couple of strong signals.
     max_freqs: list[int] = []
     max_possible: list[int] = []
     governors: list[str] = []
+    epp_values: list[str] = []
 
     for pol in policies:
         m = _read_int(pol / "scaling_max_freq")
@@ -132,7 +259,10 @@ def _infer_mode(*, policies: list[Path]) -> PowerMode:
             max_possible.append(cm)
         g = _read_text(pol / "scaling_governor")
         if g:
-            governors.append(g)
+            governors.append(g.strip().lower())
+        epp = _read_epp(pol)
+        if epp:
+            epp_values.append(epp)
 
     boost = _read_boost_enabled()
 
@@ -140,14 +270,50 @@ def _infer_mode(*, policies: list[Path]) -> PowerMode:
     if governors and all(g == "performance" for g in governors) and boost is True:
         return PowerMode.PERFORMANCE
 
+    # EPP-driven policies (for example amd-pstate-epp) often keep the governor
+    # at powersave and express the effective mode via the EPP preference.
+    if epp_values and all(value == "performance" for value in epp_values) and boost is True:
+        return PowerMode.PERFORMANCE
+
     # Extreme saver: capped hard and boost off.
     if max_freqs:
         cap = min(max_freqs)
-        if cap <= 900_000 and (boost is False or boost is None):
+        threshold = int(extreme_cap_khz) + _EXTREME_SAVER_DETECTION_MARGIN_KHZ
+        epp_extreme = not epp_values or all(value in {"power", "balance_power"} for value in epp_values)
+        if cap <= threshold and (boost is False or boost is None) and epp_extreme:
             return PowerMode.EXTREME_SAVER
 
     # Balanced by default when supported.
     return PowerMode.BALANCED
+
+
+def get_current_freq_stats_khz() -> tuple[int | None, int | None]:
+    root = _cpufreq_root()
+    policies = _policy_dirs(root)
+    if not policies:
+        return (None, None)
+
+    current_freqs: list[int] = []
+    for pol in policies:
+        current_khz = _read_int(pol / "scaling_cur_freq")
+        if current_khz is not None:
+            current_freqs.append(current_khz)
+
+    if not current_freqs:
+        return (None, None)
+    average_khz = int(round(sum(current_freqs) / len(current_freqs)))
+    max_khz = max(current_freqs)
+    return (average_khz, max_khz)
+
+
+def get_average_current_freq_khz() -> int | None:
+    average_khz, _max_khz = get_current_freq_stats_khz()
+    return average_khz
+
+
+def get_max_current_freq_khz() -> int | None:
+    _average_khz, max_khz = get_current_freq_stats_khz()
+    return max_khz
 
 
 def get_status() -> PowerModeStatus:
@@ -169,11 +335,19 @@ def get_status() -> PowerModeStatus:
             identifiers={"cpufreq_root": str(root)},
         )
 
-    mode = _infer_mode(policies=policies)
+    extreme_cap_khz = configured_extreme_saver_cap_khz()
+    mode = _infer_mode(policies=policies, extreme_cap_khz=extreme_cap_khz)
     ids: dict[str, str] = {
         "cpufreq_root": str(root),
         "policies": str(len(policies)),
+        "configured_extreme_cap_khz": str(extreme_cap_khz),
     }
+    driver_name = _driver_name(policies[0])
+    if driver_name:
+        ids["driver"] = driver_name
+    epp = _read_epp(policies[0])
+    if epp:
+        ids["epp"] = epp
 
     # Can we likely apply changes without prompting every time?
     helper = os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
@@ -190,13 +364,18 @@ def get_status() -> PowerModeStatus:
     return PowerModeStatus(supported=True, mode=mode, reason="ok", identifiers=ids)
 
 
-def _apply_mode_sysfs(mode: PowerMode, *, root: Path) -> None:
+def _apply_mode_sysfs(mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> None:
     policies = _policy_dirs(root)
     if not policies:
         raise FileNotFoundError(f"No cpufreq policies under {root}")
 
-    # Desired cap for extreme saver: 0.8 GHz (kHz units).
-    extreme_cap_khz = 800_000
+    target_extreme_cap_khz = normalize_extreme_saver_cap_khz(extreme_cap_khz)
+
+    if mode in (PowerMode.BALANCED, PowerMode.PERFORMANCE):
+        try:
+            _set_boost_enabled(True)
+        except OSError:
+            pass
 
     for pol in policies:
         max_path = pol / "scaling_max_freq"
@@ -205,17 +384,18 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path) -> None:
 
         min_khz = _read_int(pol / "cpuinfo_min_freq") or 0
         max_khz = _read_int(pol / "cpuinfo_max_freq")
+        available_governors = _available_governors(pol)
 
         if mode == PowerMode.EXTREME_SAVER:
-            target = extreme_cap_khz
+            target = target_extreme_cap_khz
             if min_khz:
                 target = max(target, min_khz)
             if max_khz:
                 target = min(target, max_khz)
-            _write_text(max_path, f"{int(target)}\n")
+            _write_scaling_freq_range(pol, min_khz=int(target), max_khz=int(target))
 
             gov = pol / "scaling_governor"
-            if gov.exists():
+            if gov.exists() and "powersave" in available_governors:
                 # Best-effort; may not be supported.
                 try:
                     _write_text(gov, "powersave\n")
@@ -223,17 +403,26 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path) -> None:
                     pass
 
         elif mode in (PowerMode.BALANCED, PowerMode.PERFORMANCE):
-            # Restore max to cpuinfo max.
-            if max_khz:
-                _write_text(max_path, f"{int(max_khz)}\n")
+            restore_min_khz = int(min_khz) if min_khz else None
+            restore_max_khz = int(max_khz) if max_khz else None
+            _write_scaling_freq_range(pol, min_khz=restore_min_khz, max_khz=restore_max_khz)
 
             gov = pol / "scaling_governor"
             if gov.exists():
                 try:
-                    _write_text(
-                        gov,
-                        ("performance\n" if mode == PowerMode.PERFORMANCE else "schedutil\n"),
-                    )
+                    governor_value: str | None = None
+                    if mode == PowerMode.PERFORMANCE:
+                        if "performance" in available_governors:
+                            governor_value = "performance\n"
+                        elif "powersave" in available_governors:
+                            governor_value = "powersave\n"
+                    else:
+                        if _has_epp(pol) and "powersave" in available_governors:
+                            governor_value = "powersave\n"
+                        elif "schedutil" in available_governors:
+                            governor_value = "schedutil\n"
+                    if governor_value is not None:
+                        _write_text(gov, governor_value)
                 except OSError:
                     pass
 
@@ -243,16 +432,22 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path) -> None:
             _set_boost_enabled(False)
         except OSError:
             pass
-    elif mode in (PowerMode.BALANCED, PowerMode.PERFORMANCE):
-        try:
-            _set_boost_enabled(True)
-        except OSError:
-            pass
+
+    # Some drivers expose mode-dependent EPP choices. amd-pstate-epp, for
+    # example, can show only "performance" while the governor is performance.
+    # Re-read and write EPP after governor/boost changes settle.
+    _write_mode_epp_preferences(mode, policies=policies)
 
 
-def _run_privileged_helper(mode: PowerMode) -> bool:
+def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int) -> bool:
     helper = os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
-    argv = [helper, "apply", str(mode.value)]
+    argv = [
+        helper,
+        "apply",
+        str(mode.value),
+        "--extreme-cap-khz",
+        str(normalize_extreme_saver_cap_khz(extreme_cap_khz)),
+    ]
 
     if os.geteuid() == 0:
         cp = subprocess.run(argv, check=False, capture_output=True, text=True)
@@ -282,10 +477,11 @@ def set_mode(mode: PowerMode) -> bool:
         return False
 
     root = _cpufreq_root()
+    extreme_cap_khz = configured_extreme_saver_cap_khz()
 
     # First try direct writes (works if user already has permissions).
     try:
-        _apply_mode_sysfs(mode, root=root)
+        _apply_mode_sysfs(mode, root=root, extreme_cap_khz=extreme_cap_khz)
         return True
     except PermissionError:
         pass
@@ -293,4 +489,4 @@ def set_mode(mode: PowerMode) -> bool:
         # If direct write fails for other reasons, still allow helper.
         pass
 
-    return _run_privileged_helper(mode)
+    return _run_privileged_helper(mode, extreme_cap_khz=extreme_cap_khz)

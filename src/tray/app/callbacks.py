@@ -27,6 +27,7 @@ turn_off_selected_secondary_device = secondary_device_controller.turn_off_select
 apply_software_effect_target_selection = software_target_controller.apply_software_effect_target_selection
 launch_perkey_gui = gui_launch.launch_perkey_gui
 launch_power_gui = gui_launch.launch_power_gui
+launch_power_mode_settings_gui = gui_launch.launch_power_mode_settings_gui
 launch_reactive_color_gui = gui_launch.launch_reactive_color_gui
 launch_support_gui = gui_launch.launch_support_gui
 launch_uniform_gui = gui_launch.launch_uniform_gui
@@ -161,6 +162,10 @@ def on_selected_device_turn_off_clicked(tray: LightingTrayProtocol) -> None:
 
 def on_power_settings_clicked() -> None:
     launch_power_gui()
+
+
+def on_power_mode_settings_clicked() -> None:
+    launch_power_mode_settings_gui()
 
 
 def on_support_debug_clicked() -> None:

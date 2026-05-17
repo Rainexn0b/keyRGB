@@ -49,6 +49,10 @@ class _SetModeProtocol(Protocol):
     def __call__(self, mode: PowerMode) -> object: ...
 
 
+class _SystemPowerMenuTrayProtocol(Protocol):
+    _on_power_mode_settings_clicked: _MenuAction
+
+
 class _PerkeyMenuTrayProtocol(Protocol):
     _on_perkey_clicked: _MenuAction
 
@@ -101,7 +105,7 @@ class ProfilePowerMenuBuilder:
 
     def build_system_power_mode_menu(
         self,
-        tray: object,
+        tray: _SystemPowerMenuTrayProtocol,
         *,
         pystray: _PystrayProtocol,
         item: _ItemFactoryProtocol,
@@ -134,6 +138,8 @@ class ProfilePowerMenuBuilder:
                     enabled=can_apply,
                     radio=True,
                 ),
+                pystray.Menu.SEPARATOR,
+                item("Power Mode Settings…", tray._on_power_mode_settings_clicked),
             )
         except _SYSTEM_POWER_MENU_EXCEPTIONS as exc:
             self.log_menu_debug(

@@ -9,6 +9,9 @@ from pathlib import Path
 
 CPUFREQ_ROOT_DEFAULT = Path("/sys/devices/system/cpu/cpufreq")
 LEDS_ROOT_DEFAULT = Path("/sys/class/leds")
+DEFAULT_EXTREME_SAVER_CAP_KHZ = 800_000
+MIN_EXTREME_SAVER_CAP_KHZ = 400_000
+MAX_EXTREME_SAVER_CAP_KHZ = 5_000_000
 
 
 def _cpufreq_root() -> Path:
@@ -55,6 +58,10 @@ def _validate_led_name(name: str) -> str:
 
 def _clamp_int(value: int, *, lo: int, hi: int) -> int:
     return max(int(lo), min(int(hi), int(value)))
+
+
+def _normalize_extreme_cap_khz(value: int) -> int:
+    return _clamp_int(int(value), lo=MIN_EXTREME_SAVER_CAP_KHZ, hi=MAX_EXTREME_SAVER_CAP_KHZ)
 
 
 def _led_dir(led_name: str) -> Path:
@@ -115,6 +122,79 @@ def _policy_dirs(root: Path) -> list[Path]:
     return sorted(out, key=lambda p: p.name)
 
 
+def _read_text(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8").strip()
+    except Exception:
+        return None
+
+
+def _normalized_lower_text(path: Path) -> str | None:
+    raw = _read_text(path)
+    if raw is None:
+        return None
+    normalized = str(raw).strip().lower()
+    return normalized or None
+
+
+def _available_governors(policy: Path) -> set[str]:
+    raw = _normalized_lower_text(policy / "scaling_available_governors")
+    if not raw:
+        return set()
+    return {part for part in raw.split() if part}
+
+
+def _epp_path(policy: Path) -> Path:
+    return policy / "energy_performance_preference"
+
+
+def _available_epp_preferences(policy: Path) -> set[str]:
+    raw = _normalized_lower_text(policy / "energy_performance_available_preferences")
+    if not raw:
+        return set()
+    return {part for part in raw.split() if part}
+
+
+def _has_epp(policy: Path) -> bool:
+    return _epp_path(policy).exists()
+
+
+def _pick_epp_value(mode: str, *, available: set[str]) -> str | None:
+    if not available:
+        return None
+
+    if mode == "extreme-saver":
+        for candidate in ("power", "balance_power", "default"):
+            if candidate in available:
+                return candidate
+        return next(iter(sorted(available)))
+
+    if mode == "balanced":
+        for candidate in ("balance_performance", "balance_power", "default", "power"):
+            if candidate in available:
+                return candidate
+        return next(iter(sorted(available)))
+
+    if mode == "performance":
+        for candidate in ("performance", "balance_performance", "default"):
+            if candidate in available:
+                return candidate
+        return next(iter(sorted(available)))
+
+    return None
+
+
+def _write_mode_epp_preferences(mode: str, *, policies: list[Path]) -> None:
+    for pol in policies:
+        epp_choice = _pick_epp_value(mode, available=_available_epp_preferences(pol))
+        if epp_choice is None or not _has_epp(pol):
+            continue
+        try:
+            _write(_epp_path(pol), f"{epp_choice}\n")
+        except Exception:
+            pass
+
+
 def _set_boost(enabled: bool) -> None:
     p = Path("/sys/devices/system/cpu/intel_pstate/no_turbo")
     if p.exists():
@@ -127,7 +207,31 @@ def _set_boost(enabled: bool) -> None:
         return
 
 
-def apply_mode(mode: str) -> None:
+def _write_scaling_freq_range(policy: Path, *, min_khz: int | None, max_khz: int | None) -> None:
+    min_path = policy / "scaling_min_freq"
+    max_path = policy / "scaling_max_freq"
+    current_min = _read_int(min_path) if min_path.exists() else None
+    current_max = _read_int(max_path) if max_path.exists() else None
+
+    # Expand the active range first so the final tightening writes stay valid
+    # when the requested target moves above or below the current value.
+    if min_khz is not None and min_path.exists() and current_min is not None and int(min_khz) < current_min:
+        _write(min_path, f"{int(min_khz)}\n")
+        current_min = int(min_khz)
+
+    if max_khz is not None and max_path.exists() and current_max is not None and int(max_khz) > current_max:
+        _write(max_path, f"{int(max_khz)}\n")
+        current_max = int(max_khz)
+
+    if max_khz is not None and max_path.exists() and current_max != int(max_khz):
+        _write(max_path, f"{int(max_khz)}\n")
+        current_max = int(max_khz)
+
+    if min_khz is not None and min_path.exists() and current_min != int(min_khz):
+        _write(min_path, f"{int(min_khz)}\n")
+
+
+def apply_mode(mode: str, *, extreme_cap_khz: int = DEFAULT_EXTREME_SAVER_CAP_KHZ) -> None:
     mode = (mode or "").strip().lower()
     if mode not in {"extreme-saver", "balanced", "performance"}:
         raise SystemExit(f"Unknown mode: {mode}")
@@ -137,7 +241,13 @@ def apply_mode(mode: str) -> None:
     if not policies:
         raise SystemExit(f"No cpufreq policies under {root}")
 
-    extreme_cap_khz = 800_000
+    target_extreme_cap_khz = _normalize_extreme_cap_khz(extreme_cap_khz)
+
+    if mode != "extreme-saver":
+        try:
+            _set_boost(True)
+        except Exception:
+            pass
 
     for pol in policies:
         max_path = pol / "scaling_max_freq"
@@ -146,30 +256,44 @@ def apply_mode(mode: str) -> None:
 
         min_khz = _read_int(pol / "cpuinfo_min_freq") or 0
         max_khz = _read_int(pol / "cpuinfo_max_freq")
+        available_governors = _available_governors(pol)
 
         if mode == "extreme-saver":
-            target = extreme_cap_khz
+            target = target_extreme_cap_khz
             if min_khz:
                 target = max(target, min_khz)
             if max_khz:
                 target = min(target, max_khz)
-            _write(max_path, f"{int(target)}\n")
+            _write_scaling_freq_range(pol, min_khz=int(target), max_khz=int(target))
 
             gov = pol / "scaling_governor"
-            if gov.exists():
+            if gov.exists() and "powersave" in available_governors:
                 try:
                     _write(gov, "powersave\n")
                 except Exception:
                     pass
 
         else:
-            if max_khz is not None:
-                _write(max_path, f"{int(max_khz)}\n")
+            restore_min_khz = int(min_khz) if min_khz else None
+            restore_max_khz = int(max_khz) if max_khz else None
+            _write_scaling_freq_range(pol, min_khz=restore_min_khz, max_khz=restore_max_khz)
 
             gov = pol / "scaling_governor"
             if gov.exists():
                 try:
-                    _write(gov, "performance\n" if mode == "performance" else "schedutil\n")
+                    governor_value = None
+                    if mode == "performance":
+                        if "performance" in available_governors:
+                            governor_value = "performance\n"
+                        elif "powersave" in available_governors:
+                            governor_value = "powersave\n"
+                    else:
+                        if _has_epp(pol) and "powersave" in available_governors:
+                            governor_value = "powersave\n"
+                        elif "schedutil" in available_governors:
+                            governor_value = "schedutil\n"
+                    if governor_value is not None:
+                        _write(gov, governor_value)
                 except Exception:
                     pass
 
@@ -178,11 +302,11 @@ def apply_mode(mode: str) -> None:
             _set_boost(False)
         except Exception:
             pass
-    else:
-        try:
-            _set_boost(True)
-        except Exception:
-            pass
+
+    # Some drivers expose mode-dependent EPP choices. amd-pstate-epp, for
+    # example, can show only "performance" while the governor is performance.
+    # Re-read and write EPP after governor/boost changes settle.
+    _write_mode_epp_preferences(mode, policies=policies)
 
 
 def main() -> int:
@@ -191,6 +315,12 @@ def main() -> int:
 
     a = sub.add_parser("apply", help="Apply a power mode")
     a.add_argument("mode", help="extreme-saver | balanced | performance")
+    a.add_argument(
+        "--extreme-cap-khz",
+        type=int,
+        default=DEFAULT_EXTREME_SAVER_CAP_KHZ,
+        help="Configured Extreme Saver cap in kHz",
+    )
 
     l = sub.add_parser(
         "led-apply",
@@ -206,7 +336,7 @@ def main() -> int:
         raise SystemExit("keyrgb-power-helper must run as root")
 
     if ns.cmd == "apply":
-        apply_mode(ns.mode)
+        apply_mode(ns.mode, extreme_cap_khz=int(ns.extreme_cap_khz))
         return 0
 
     if ns.cmd == "led-apply":

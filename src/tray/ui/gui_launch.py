@@ -39,6 +39,12 @@ def launch_power_gui() -> None:
     launch_module_subprocess("src.gui.settings", anchor=__file__, env=env)
 
 
+def launch_power_mode_settings_gui() -> None:
+    """Launch the lightweight power mode settings GUI as a subprocess."""
+
+    launch_module_subprocess("src.gui.windows.power_mode", anchor=__file__)
+
+
 def launch_support_gui(*, focus: str = "debug") -> None:
     """Launch the support tools window as a subprocess."""
 

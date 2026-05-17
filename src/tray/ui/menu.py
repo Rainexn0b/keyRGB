@@ -41,6 +41,7 @@ class _MenuTrayProtocol(Protocol):
     _on_hardware_color_clicked: _MenuAction
     _on_support_debug_clicked: _MenuAction
     _on_power_settings_clicked: _MenuAction
+    _on_power_mode_settings_clicked: _MenuAction
     _on_off_clicked: _MenuAction
     _on_turn_on_clicked: _MenuAction
     _on_quit_clicked: _MenuAction

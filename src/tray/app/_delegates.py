@@ -87,6 +87,9 @@ class KeyRGBTrayDelegateMixin:
     def _on_power_settings_clicked(self, _icon, _item):
         _application_module().callbacks.on_power_settings_clicked()
 
+    def _on_power_mode_settings_clicked(self, _icon, _item):
+        _application_module().callbacks.on_power_mode_settings_clicked()
+
     def _on_support_debug_clicked(self, _icon, _item):
         _application_module().callbacks.on_support_debug_clicked()
 

@@ -94,6 +94,9 @@ class DummyTray:
     def _on_power_settings_clicked(self, *_a, **_k):
         return
 
+    def _on_power_mode_settings_clicked(self, *_a, **_k):
+        return
+
     def _on_support_debug_clicked(self, *_a, **_k):
         return
 
@@ -441,6 +444,23 @@ def test_menu_includes_system_power_item_when_builder_returns_menu(
     labels = [i["text"] for i in items if isinstance(i, dict)]
 
     assert "Power Mode" in labels
+
+
+def test_system_power_menu_contains_power_mode_settings_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.tray.ui import menu_sections
+
+    monkeypatch.setattr(
+        menu_sections,
+        "get_status",
+        lambda: type("Status", (), {"supported": True, "identifiers": {"can_apply": "true"}, "mode": None})(),
+    )
+
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+    power_menu = menu_sections.build_system_power_mode_menu(tray, pystray=FakePystray, item=fake_item)
+
+    assert isinstance(power_menu, FakeMenu)
+    labels = [entry["text"] for entry in power_menu.items if isinstance(entry, dict)]
+    assert labels[-1] == "Power Mode Settings…"
 
 
 def test_perkey_profiles_menu_falls_back_to_editor_when_profile_listing_raises_runtime_error(

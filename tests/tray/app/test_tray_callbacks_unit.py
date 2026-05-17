@@ -298,3 +298,12 @@ def test_support_window_callbacks_launch_with_expected_focus() -> None:
 
     assert launch.call_args_list[0].kwargs == {"focus": "debug"}
     assert launch.call_args_list[1].kwargs == {"focus": "discovery"}
+
+
+def test_on_power_mode_settings_clicked_launches_power_mode_settings_gui() -> None:
+    from src.tray.app.callbacks import on_power_mode_settings_clicked
+
+    with patch("src.tray.app.callbacks.launch_power_mode_settings_gui") as launch:
+        on_power_mode_settings_clicked()
+
+    launch.assert_called_once_with()
