@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.25.0 (2026-05-17)
+
+- Power/System: Add lightweight Linux CPU power controls with tray `Power Mode` switching, a dedicated `Power Mode Settings…` window, configurable Extreme Saver target frequency, and a privileged helper path for cpufreq writes.
+- Power/System: Make Extreme Saver pin the CPU min/max frequency target instead of only applying a ceiling, reapply the target immediately when it changes, and clarify the live status readout with avg/max frequency reporting.
+- Power/Automation: Extend the existing AC/battery power-source policy so users can pick different system power modes for AC and battery directly from Settings.
+- Profiles/Automation: Add per-key lighting profile automation for AC and battery in the Per-key Editor, reusing the existing power-source loop so lighting profiles can switch automatically with power-source changes.
+- GUI/Theme: Fix readonly combobox highlight/readability in the dark theme so the new AC/battery selectors stay legible across Settings and per-key editor flows.
+
 ## 0.24.2 (2026-05-16)
 
 - Installer/Maintenance: Remove the legacy monolithic installer and uninstaller artifacts, drop stale wrapper comments, and keep `.codex/` out of the repo.
