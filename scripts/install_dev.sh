@@ -18,6 +18,8 @@ Usage:
 Behavior:
   - Installs build tools (gcc, pkg-config) and common libs (libusb) best-effort.
   - Performs pip editable install of this repo (or cloned repo).
+  - Installs the power-mode helper + polkit rule best-effort unless system
+    dependency changes are skipped.
 
 Options:
   --clone              Clone the repo then install from that directory.
@@ -68,6 +70,10 @@ if ! is_truthy "$KEYRGB_SKIP_SYSTEM_DEPS"; then
       pkg_install_best_effort git python3 python3-pip gcc pkg-config libusb || true
       ;;
   esac
+
+  if ! is_truthy "${KEYRGB_SKIP_PRIVILEGED_HELPERS:-n}"; then
+    ensure_polkit_best_effort
+  fi
 else
   log_info "Skipping system dependency installation (--no-system-deps / KEYRGB_SKIP_SYSTEM_DEPS)."
 fi
@@ -98,6 +104,12 @@ python3 -m pip install --user -r "$REPO_DIR/requirements.txt"
 
 log_info "Installing KeyRGB (editable)..."
 python3 -m pip install --user -e "$REPO_DIR"
+
+if ! is_truthy "$KEYRGB_SKIP_SYSTEM_DEPS"; then
+  install_privileged_helpers_local "$REPO_DIR" || true
+else
+  log_info "Skipping privileged helper installation (--no-system-deps / KEYRGB_SKIP_SYSTEM_DEPS)."
+fi
 
 log_ok "Dev installation complete"
 log_info "Next: run 'keyrgb' (ensure ~/.local/bin is on PATH)"

@@ -197,6 +197,12 @@ class Ite8291r3KeyboardDevice:
         return self._read_control(8)[1] == 0x01
 
     def get_brightness(self) -> int:
+        # Some TongFang EC/firmware combinations briefly leave the normal
+        # user-mode contract during AC unplug/replug.  In that window the
+        # controller may report transient brightness bytes such as 0 or 60 and
+        # visibly blank the keyboard before userspace can repaint it.  Treat
+        # those reads as controller state observations, not as proof that a
+        # prior KeyRGB write requested an off transition.
         effect = self.get_effect()
         return int(effect[protocol.EffectAttrs.BRIGHTNESS])
 

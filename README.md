@@ -199,6 +199,7 @@ Uses a priority-based backend system plus a backend-stability policy to select t
 
 2.  **USB / HID Direct**: Uses an implemented userspace backend such as `ite8291r3` or `ite8910`.
     *   **TongFang**: Supports per-key RGB on devices without kernel drivers (XMG, Wootbook, Eluktronics, older Tuxedo models) if the hardware supports it.
+    *   **Known limitation**: some `ite8291r3` laptops briefly blank the keyboard on AC unplug/replug before KeyRGB can repaint it; see [docs/usage/05-backend-limitations.md](docs/usage/05-backend-limitations.md).
 
 3.  **ASUS Aura**: Uses the `asusctl-aura` backend when the ASUS userspace stack is available.
 	*   **ASUS**: Best for laptops that already expose lighting control through `asusctl` / `rog-control-center`.
