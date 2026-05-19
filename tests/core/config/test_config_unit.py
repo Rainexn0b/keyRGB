@@ -459,7 +459,11 @@ def test_reactive_color_defaults_and_manual_toggle_cover_defensive_paths(tmp_pat
 
     cfg.DEFAULTS = BrokenDefaults()
     cfg._settings["reactive_color"] = None
+    cfg._settings["reactive_visual_mode"] = "LOUD"
     assert cfg.reactive_color == (255, 255, 255)
+    assert cfg.reactive_visual_mode == "subtle"
+    cfg.reactive_visual_mode = "VIVID"
+    assert cfg.reactive_visual_mode == "vivid"
 
 
 def test_get_effect_speed_returns_per_effect_when_set(tmp_path, monkeypatch) -> None:

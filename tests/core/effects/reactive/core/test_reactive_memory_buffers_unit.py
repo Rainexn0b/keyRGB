@@ -186,6 +186,34 @@ def test_build_ripple_color_map_into_no_per_key_backdrop_still_scales_rgb() -> N
     assert sum(result_dim[(0, 0)]) < sum(result_bright[(0, 0)])
 
 
+def test_build_ripple_color_map_into_auto_pulse_saturation_softens_auto_colors() -> None:
+    base_dark = {(0, 0): (5, 5, 5)}
+    overlay_full = {(0, 0): (1.0, 120.0)}
+
+    vivid = build_ripple_color_map_into(
+        {},
+        base=base_dark,
+        base_unscaled=base_dark,
+        overlay=overlay_full,
+        per_key_backdrop_active=False,
+        manual=None,
+        pulse_scale=1.0,
+        auto_pulse_saturation=1.0,
+    )
+    subtle = build_ripple_color_map_into(
+        {},
+        base=base_dark,
+        base_unscaled=base_dark,
+        overlay=overlay_full,
+        per_key_backdrop_active=False,
+        manual=None,
+        pulse_scale=1.0,
+        auto_pulse_saturation=0.72,
+    )
+
+    assert vivid[(0, 0)] != subtle[(0, 0)]
+
+
 def test_build_ripple_color_map_into_dark_profile_per_key_backdrop_scales_mix_weight() -> None:
     """Dark profile (all-black per-key backdrop) with no manual color: pulse_scale controls
     mix weight so the reactive brightness slider remains effective. The brightness-boost

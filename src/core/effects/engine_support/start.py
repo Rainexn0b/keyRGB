@@ -98,6 +98,7 @@ class _EngineStart:
         color: Color | None = None,
         reactive_color: Color | None = None,
         reactive_use_manual_color: bool | None = None,
+        reactive_visual_mode: str | None = None,
         direction: str | None = None,
     ):
         """Start an effect (hardware or software)."""
@@ -130,6 +131,12 @@ class _EngineStart:
 
         if reactive_use_manual_color is not None:
             self.reactive_use_manual_color = bool(reactive_use_manual_color)
+
+        if reactive_visual_mode is not None:
+            normalized_visual_mode = str(reactive_visual_mode or "subtle").strip().lower()
+            self.reactive_visual_mode = (
+                normalized_visual_mode if normalized_visual_mode in {"subtle", "vivid"} else "subtle"
+            )
 
         if direction is not None:
             self.direction = direction

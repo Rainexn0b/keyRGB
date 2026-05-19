@@ -15,6 +15,7 @@ from ._lighting_secondary_device_facade import LightingSecondaryDeviceFacade
 logger = logging.getLogger("src.core.config.config")
 _MISSING = object()
 _DEFAULT_SETTING_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_REACTIVE_VISUAL_MODES = frozenset({"subtle", "vivid"})
 
 
 def _log_config_exception(message: str, exc: Exception) -> None:
@@ -204,11 +205,32 @@ class LightingConfigAccessors(LightingSecondaryDeviceFacade):
 
     @property
     def reactive_trail_percent(self) -> int:
-        return _coerce_int_setting(self._settings.get("reactive_trail_percent", 50), default=50)
+        return _coerce_int_setting(
+            self._setting_or_default_on_none("reactive_trail_percent", default=40),
+            default=40,
+        )
 
     @reactive_trail_percent.setter
     def reactive_trail_percent(self, value: int):
         self._settings["reactive_trail_percent"] = self._normalize_reactive_trail_value(value)
+        self._save()
+
+    @property
+    def reactive_visual_mode(self) -> str:
+        raw = self._setting_or_default_on_none("reactive_visual_mode", default="subtle")
+        try:
+            normalized = str(raw or "subtle").strip().lower()
+        except _DEFAULT_SETTING_ERRORS:
+            return "subtle"
+        return normalized if normalized in _REACTIVE_VISUAL_MODES else "subtle"
+
+    @reactive_visual_mode.setter
+    def reactive_visual_mode(self, value: str) -> None:
+        try:
+            normalized = str(value or "subtle").strip().lower()
+        except _DEFAULT_SETTING_ERRORS:
+            normalized = "subtle"
+        self._settings["reactive_visual_mode"] = normalized if normalized in _REACTIVE_VISUAL_MODES else "subtle"
         self._save()
 
     @property

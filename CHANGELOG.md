@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.25.2 (2026-05-19)
+
+- Effects/Reactive: Add a persisted reactive visual-mode setting (`Subtle` vs `Vivid`), lower the default wave thickness for new/unset configs to `40`, soften mid-range reactive pulse intensity, and reduce auto-generated ripple saturation so reactive typing feels clearer without being as harsh by default.
+- Tray/Menu: Hide the hardware-only color/effects rows while software mode is active, keep the hardware-mode row checked whenever hardware mode is active, and make `Hardware Static Mode` behave as a real mode toggle instead of a one-way switch.
+- Tray/Mode Switching: Preserve both the last software state and the last hardware state when moving between software effects, hardware static, and hardware effects, so returning to either side restores the expected effect, colors, and software-target routing instead of flattening back to uniform hardware color.
+
 ## 0.25.1 (2026-05-19)
 
 - Tray/Power: Rework AC/battery per-key profile switching and backend recovery on `ite8291r3`, with typed transition state, faster stabilized power-source polling, duplicate-apply suppression, and better restore behavior when the controller blanks on AC changes.

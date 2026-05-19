@@ -28,6 +28,11 @@ class TrayIdlePowerState:
     hidden_perkey_restore_brightness_hint: Optional[int] = None
     hidden_perkey_restore_device_off_hint: Optional[bool] = None
     last_power_source_blank_recovery_at: float = 0.0
+    hardware_toggle_restore_effect: str = "none"
+    hardware_toggle_restore_per_key_colors: dict[object, object] | None = None
+    hardware_toggle_restore_software_target: str = "keyboard"
+    hardware_toggle_restore_hardware_effect: str = "none"
+    hardware_toggle_restore_hardware_color: object = None
 
     def reset_dim_state(self) -> None:
         self.dim_temp_active = False

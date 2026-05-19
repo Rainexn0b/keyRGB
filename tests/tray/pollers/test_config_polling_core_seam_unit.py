@@ -29,7 +29,7 @@ def _mk_state(*, brightness: int = 20, software_effect_target: str = "keyboard")
         reactive_use_manual=False,
         reactive_color=(255, 255, 255),
         reactive_brightness=0,
-        reactive_trail_percent=50,
+        reactive_trail_percent=40,
         software_effect_target=software_effect_target,
     )
 
@@ -57,7 +57,7 @@ def test_compute_config_apply_state_happy_path_minimal_fake_config() -> None:
         reactive_use_manual=True,
         reactive_color=(4, 5, 6),
         reactive_brightness=0,
-        reactive_trail_percent=50,
+        reactive_trail_percent=40,
         software_effect_target="keyboard",
     )
 
@@ -85,7 +85,7 @@ def test_compute_config_apply_state_degenerate_values_fall_back_to_defaults() ->
         reactive_use_manual=False,
         reactive_color=(255, 255, 255),
         reactive_brightness=0,
-        reactive_trail_percent=50,
+        reactive_trail_percent=40,
         software_effect_target="keyboard",
     )
 

@@ -265,6 +265,7 @@ def test_constructor_handles_programmatic_brightness_sync_callback(monkeypatch) 
     root = _FakeRoot()
     config = SimpleNamespace(
         reactive_use_manual_color=False,
+        reactive_visual_mode="subtle",
         reactive_color=(12, 34, 56),
         reactive_brightness=14,
         brightness=14,
@@ -332,6 +333,8 @@ def test_constructor_handles_programmatic_brightness_sync_callback(monkeypatch) 
     assert gui._last_drag_committed_brightness is None
     assert config.reactive_use_manual_color is False
     assert config.reactive_color == (12, 34, 56)
+    assert len(registry["checks"]) == 2
+    assert registry["checks"][1].kwargs["text"] == "Use vivid reactive visuals"
     assert brightness_frame.columnconfigure_calls == [(1, 1)]
     assert trail_frame.columnconfigure_calls == [(1, 1)]
     assert brightness_title.grid_calls == [{"row": 0, "column": 0, "sticky": "w", "padx": (0, 10)}]
@@ -480,13 +483,26 @@ def test_on_reactive_brightness_change_tolerates_missing_drag_state(monkeypatch)
     assert gui._last_drag_committed_brightness == 28
 
 
+def test_on_toggle_reactive_visual_mode_persists_vivid_and_subtle() -> None:
+    gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
+    gui._reactive_vivid_visuals_var = _FakeVar(True)
+    gui.config = SimpleNamespace(reactive_visual_mode="subtle")
+
+    gui._on_toggle_reactive_visual_mode()
+    assert gui.config.reactive_visual_mode == "vivid"
+
+    gui._reactive_vivid_visuals_var = _FakeVar(False)
+    gui._on_toggle_reactive_visual_mode()
+    assert gui.config.reactive_visual_mode == "subtle"
+
+
 def test_read_reactive_trail_percent_returns_default_for_missing_attribute() -> None:
     gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
     gui.config = SimpleNamespace()  # no reactive_trail_percent attribute
 
     result = gui._read_reactive_trail_percent()
 
-    assert result == 50
+    assert result == 40
 
 
 def test_read_reactive_trail_percent_returns_clamped_values() -> None:
@@ -500,13 +516,13 @@ def test_read_reactive_trail_percent_returns_clamped_values() -> None:
 
 def test_sync_reactive_trail_widgets_keeps_defaults_when_config_is_invalid() -> None:
     gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
-    gui._reactive_trail_var = _FakeVar(50.0)
+    gui._reactive_trail_var = _FakeVar(40.0)
     gui._reactive_trail_label = _FakeLabel()
     gui._read_reactive_trail_percent = lambda: None
 
     gui._sync_reactive_trail_widgets()
 
-    assert gui._reactive_trail_var.get() == 50.0
+    assert gui._reactive_trail_var.get() == 40.0
     assert gui._reactive_trail_label.config_calls == []
 
 
@@ -526,7 +542,7 @@ def test_on_reactive_trail_release_saves_and_sets_status() -> None:
 
 def test_on_reactive_trail_release_reports_failure_when_commit_returns_none() -> None:
     gui = reactive_color.ReactiveColorGUI.__new__(reactive_color.ReactiveColorGUI)
-    gui._reactive_trail_var = _FakeVar(50.0)
+    gui._reactive_trail_var = _FakeVar(40.0)
     status_calls: list[dict] = []
     gui._set_status = lambda msg, ok: status_calls.append({"msg": msg, "ok": ok})
     gui._commit_trail_to_config = lambda pct: None

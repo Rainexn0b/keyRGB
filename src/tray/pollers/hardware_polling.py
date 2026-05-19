@@ -224,6 +224,16 @@ def _apply_polled_hardware_state(
 
     current_brightness = _normalize_brightness_to_config_scale(current_brightness)
 
+    # Temp-dim is a "screen dimmed" brightness policy, not an off-state. Some
+    # backends can briefly report 0 / off while dim-sync brightness is being
+    # restored; ignore that transient so we do not bounce through a full
+    # off -> on restore path.
+    if dim_temp_active and dim_temp_target is not None:
+        if current_brightness == 0:
+            return current_brightness, False
+        if bool(current_off):
+            return current_brightness, False
+
     if current_brightness == 0:
         current_off = True
 

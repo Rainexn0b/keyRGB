@@ -246,6 +246,24 @@ def test_restore_brightness_clears_dim_temp_and_updates_engine_for_running_sw_ef
     tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False, fade=True, fade_duration_s=0.25)
 
 
+def test_restore_brightness_keeps_dim_temp_active_until_write_completes() -> None:
+    tray = _mk_tray(effect="rainbow_wave", brightness=30)
+    tray._dim_temp_active = True
+    tray._dim_temp_target_brightness = 5
+    state_during_write: list[bool] = []
+
+    def capture_set_brightness(*_args, **_kwargs) -> None:
+        state_during_write.append(bool(tray._dim_temp_active))
+
+    tray.engine.set_brightness.side_effect = capture_set_brightness
+
+    _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
+
+    assert state_during_write == [True]
+    assert tray._dim_temp_active is False
+    assert tray._dim_temp_target_brightness is None
+
+
 def test_dim_to_temp_for_reactive_effect_also_updates_perkey_brightness() -> None:
     tray = _mk_tray(effect="reactive_fade", brightness=25)
     tray.config.perkey_brightness = 50

@@ -258,7 +258,7 @@ def build_menu_items(
                     tray_state._on_hardware_color_clicked,
                 )
             ]
-            if color_supported
+            if color_supported and hw_mode
             else []
         ),
         *(
@@ -270,7 +270,7 @@ def build_menu_items(
                     # Menu always enabled, individual animated effects locked when in SW mode
                 )
             ]
-            if hw_effects_supported
+            if hw_effects_supported and hw_mode
             else []
         ),
         pystray.Menu.SEPARATOR,

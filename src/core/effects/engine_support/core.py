@@ -106,7 +106,8 @@ class _EngineCore:
         self.software_effect_target = SOFTWARE_EFFECT_TARGET_KEYBOARD
         self.secondary_software_targets_provider: Callable[[], list[object]] | None = None
         self.reactive_brightness = 25
-        self.reactive_trail_percent = 50
+        self.reactive_trail_percent = 40
+        self.reactive_visual_mode = "subtle"
         self.current_color: Color = (255, 0, 0)
         self.reactive_color: Color | None = None
         self.reactive_use_manual_color: bool = False

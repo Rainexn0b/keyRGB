@@ -113,9 +113,9 @@ def commit_brightness_to_config(
 
 
 def read_reactive_trail_percent(config: object, *, logger: logging.Logger) -> int | None:
-    raw = getattr(config, "reactive_trail_percent", 50)
+    raw = getattr(config, "reactive_trail_percent", 40)
     try:
-        pct = int(raw or 50)
+        pct = int(raw or 40)
     except (TypeError, ValueError):
         logger.debug(
             "Invalid persisted reactive_trail_percent %r; leaving trail widgets unchanged",

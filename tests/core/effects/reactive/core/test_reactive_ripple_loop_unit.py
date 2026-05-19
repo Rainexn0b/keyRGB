@@ -130,6 +130,7 @@ class _MockApi:
         base_map: dict | None = None,
         manual_color: tuple | None = None,
         pulse_scale: float = 1.0,
+        auto_pulse_saturation: float = 1.0,
         mapped_cells: list | None = None,
         per_key_backdrop_active: bool = False,
     ) -> None:
@@ -138,6 +139,7 @@ class _MockApi:
         self._base_map: dict = base_map if base_map is not None else {(0, 0): (100, 100, 100)}
         self._manual_color = manual_color
         self._pulse_scale = pulse_scale
+        self._auto_pulse_saturation = auto_pulse_saturation
         self._mapped_cells: list = mapped_cells if mapped_cells is not None else []
         self._per_key_backdrop_active = per_key_backdrop_active
 
@@ -146,6 +148,7 @@ class _MockApi:
         self.render_calls: list = []
         self.render_uniform_calls: list = []
         self.build_ripple_cm_calls: int = 0
+        self.overlay_band_calls: list[float] = []
 
         # Protocol-required factory attributes
         self._PressSource = None  # unused – create_press_source returns self._press directly
@@ -197,13 +200,17 @@ class _MockApi:
         return dict(self._overlay_values)
 
     def build_ripple_overlay_into(self, dest, pulses, *, band: float) -> None:
-        pass  # overlay values come pre-populated from get_engine_overlay_buffer
+        self.overlay_band_calls.append(float(band))
+        # overlay values come pre-populated from get_engine_overlay_buffer
 
     def get_engine_manual_reactive_color(self, engine):
         return self._manual_color
 
     def pulse_brightness_scale_factor(self, engine) -> float:
         return self._pulse_scale
+
+    def reactive_auto_pulse_saturation(self, engine) -> float:
+        return self._auto_pulse_saturation
 
     def hsv_to_rgb(self, h: float, s: float, v: float) -> tuple:
         return (255, 0, 0)
@@ -220,7 +227,18 @@ class _MockApi:
     def get_engine_color_map_buffer(self, engine, attr_name: str) -> dict:
         return {}
 
-    def build_ripple_color_map_into(self, dest, *, base, base_unscaled, overlay, per_key_backdrop_active, manual, pulse_scale):
+    def build_ripple_color_map_into(
+        self,
+        dest,
+        *,
+        base,
+        base_unscaled,
+        overlay,
+        per_key_backdrop_active,
+        manual,
+        pulse_scale,
+        auto_pulse_saturation=1.0,
+    ):
         self.build_ripple_cm_calls += 1
         return dest
 
@@ -240,7 +258,7 @@ def _make_engine(*, reactive_brightness: int = 0, has_per_key_writer: bool = Fal
         stop_event=stop_event,
         reactive_brightness=reactive_brightness,
         brightness=25,
-        reactive_trail_percent=50,
+        reactive_trail_percent=40,
         kb=kb,
     )
     stop_event.bind(engine)
@@ -394,6 +412,27 @@ class TestRunReactiveRippleLoop:
         run_reactive_ripple_loop(engine, api=api)
 
         assert api.render_uniform_calls
+
+    def test_trail_width_is_decoupled_from_speed_pace(self):
+        """Wave thickness should depend on reactive_trail_percent, not on pace."""
+        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+
+        slow_engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
+        slow_engine.reactive_trail_percent = 50
+        slow_api = _MockApi(press_source=_MockPressSource(slot_id_sequence=(None,)))
+        slow_api.pace = lambda _engine, **_kwargs: 0.8  # type: ignore[method-assign]
+
+        run_reactive_ripple_loop(slow_engine, api=slow_api)
+
+        fast_engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
+        fast_engine.reactive_trail_percent = 50
+        fast_api = _MockApi(press_source=_MockPressSource(slot_id_sequence=(None,)))
+        fast_api.pace = lambda _engine, **_kwargs: 2.2  # type: ignore[method-assign]
+
+        run_reactive_ripple_loop(fast_engine, api=fast_api)
+
+        assert slow_api.overlay_band_calls == [2.15]
+        assert fast_api.overlay_band_calls == [2.15]
 
     def test_per_key_writer_path_with_per_key_backdrop_active(self):
         """per_key_backdrop_active=True flows correctly through build_ripple_color_map_into."""

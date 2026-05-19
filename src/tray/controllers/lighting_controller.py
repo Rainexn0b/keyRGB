@@ -156,6 +156,13 @@ def start_current_effect(
 
     try:
         lighting_controller_helpers.ensure_device_best_effort(tray)
+        try:
+            raw_reactive_visual_mode = getattr(tray.config, "reactive_visual_mode", "subtle")
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+            raw_reactive_visual_mode = "subtle"
+        reactive_visual_mode = str(raw_reactive_visual_mode or "subtle").strip().lower()
+        if reactive_visual_mode not in {"subtle", "vivid"}:
+            reactive_visual_mode = "subtle"
 
         policy = _resolve_start_current_effect_policy(tray, brightness_override=brightness_override)
         effect = policy.effect
@@ -215,6 +222,7 @@ def start_current_effect(
             color=tray.config.color,
             reactive_color=getattr(tray.config, "reactive_color", None),
             reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
+            reactive_visual_mode=reactive_visual_mode,
             direction=getattr(tray.config, "direction", None),
         )
         tray.is_off = False

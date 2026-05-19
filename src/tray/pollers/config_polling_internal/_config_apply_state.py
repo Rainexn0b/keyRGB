@@ -18,6 +18,7 @@ PerkeySignatureReader = Callable[[object], tuple | None]
 SoftwareEffectTargetNormalizer = Callable[[str], str]
 
 _CONFIG_FALLBACK_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
+_REACTIVE_VISUAL_MODES = frozenset({"subtle", "vivid"})
 
 
 def _safe_tuple_attr(config: object, name: str, *, default: ColorTuple) -> ColorTuple:
@@ -71,7 +72,8 @@ class ConfigApplyState:
     reactive_color: ColorTuple
     selected_effect: str | None = None
     reactive_brightness: int = 0
-    reactive_trail_percent: int = 50
+    reactive_trail_percent: int = 40
+    reactive_visual_mode: str = "subtle"
     software_effect_target: str = "keyboard"
 
     def __post_init__(self) -> None:
@@ -91,6 +93,13 @@ def build_config_apply_state(
     normalize_software_effect_target_fn: SoftwareEffectTargetNormalizer,
     reactive_effects_set: set[str] | frozenset[str],
 ) -> ConfigApplyState:
+    def _normalize_reactive_visual_mode(value: object, *, default: str = "subtle") -> str:
+        try:
+            normalized = str(value or default).strip().lower()
+        except _CONFIG_FALLBACK_EXCEPTIONS:
+            return default
+        return normalized if normalized in _REACTIVE_VISUAL_MODES else default
+
     try:
         selected_effect = resolve_effect_name(read_str_attr(config, "effect", default="none") or "none")
     except _CONFIG_FALLBACK_EXCEPTIONS:
@@ -107,10 +116,14 @@ def build_config_apply_state(
 
     base_brightness = read_int_attr(config, "brightness", default=0)
     reactive_brightness = 0
-    reactive_trail_percent = 50
+    reactive_trail_percent = 40
+    reactive_visual_mode = "subtle"
     if effect in reactive_effects_set:
         reactive_brightness = read_int_attr(config, "reactive_brightness", default=base_brightness)
-        reactive_trail_percent = read_int_attr(config, "reactive_trail_percent", default=50)
+        reactive_trail_percent = read_int_attr(config, "reactive_trail_percent", default=40)
+        reactive_visual_mode = _normalize_reactive_visual_mode(
+            read_str_attr(config, "reactive_visual_mode", default="subtle") or "subtle"
+        )
 
     color = read_tuple_attr(config, "color", default=(255, 255, 255))
     software_effect_target = normalize_software_effect_target_fn(
@@ -129,4 +142,5 @@ def build_config_apply_state(
         reactive_color=reactive_color,
         reactive_brightness=int(reactive_brightness),
         reactive_trail_percent=int(reactive_trail_percent),
+        reactive_visual_mode=str(reactive_visual_mode),
     )

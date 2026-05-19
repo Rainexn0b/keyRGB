@@ -320,6 +320,8 @@ class TestStartCurrentEffect:
         mock_tray.config.color = (0, 255, 0)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
+        mock_tray.config.reactive_visual_mode = "subtle"
+        mock_tray.config.reactive_visual_mode = "subtle"
         reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness = False
         mock_tray.engine.reactive_brightness = 50
         mock_tray.engine.per_key_brightness = 50
@@ -340,6 +342,7 @@ class TestStartCurrentEffect:
             color=(0, 255, 0),
             reactive_color=None,
             reactive_use_manual_color=False,
+            reactive_visual_mode="subtle",
             direction=mock_tray.config.direction,
         )
         mock_tray.engine.set_brightness.assert_called_once_with(
@@ -372,6 +375,7 @@ class TestStartCurrentEffect:
         mock_tray.config.color = (0, 255, 0)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
+        mock_tray.config.reactive_visual_mode = "subtle"
         reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness = False
         mock_tray.engine.reactive_brightness = 50
         mock_tray.engine.per_key_brightness = 50
@@ -385,6 +389,7 @@ class TestStartCurrentEffect:
             color=(0, 255, 0),
             reactive_color=None,
             reactive_use_manual_color=False,
+            reactive_visual_mode="subtle",
             direction=mock_tray.config.direction,
         )
         mock_tray.engine.set_brightness.assert_called_once_with(
@@ -408,6 +413,7 @@ class TestStartCurrentEffect:
         mock_tray.config.color = (0, 255, 0)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
+        mock_tray.config.reactive_visual_mode = "subtle"
 
         start_current_effect(mock_tray, brightness_override=10, fade_in=True, fade_in_duration_s=0.42)
 
@@ -418,6 +424,7 @@ class TestStartCurrentEffect:
             color=(0, 255, 0),
             reactive_color=None,
             reactive_use_manual_color=False,
+            reactive_visual_mode="subtle",
             direction=mock_tray.config.direction,
         )
         mock_tray.engine.set_brightness.assert_called_once_with(
@@ -633,6 +640,7 @@ class TestStartCurrentEffect:
             color=(0, 255, 0),
             reactive_color=None,
             reactive_use_manual_color=False,
+            reactive_visual_mode="subtle",
             direction=mock_tray.config.direction,
         )
         assert mock_tray.is_off is False
@@ -823,6 +831,7 @@ class TestStartCurrentEffect:
         mock_tray.config.color = (1, 2, 3)
         mock_tray.config.reactive_color = None
         mock_tray.config.reactive_use_manual_color = False
+        mock_tray.config.reactive_visual_mode = "subtle"
 
         start_current_effect(mock_tray)
 
@@ -834,6 +843,7 @@ class TestStartCurrentEffect:
             color=(1, 2, 3),
             reactive_color=None,
             reactive_use_manual_color=False,
+            reactive_visual_mode="subtle",
             direction=mock_tray.config.direction,
         )
 

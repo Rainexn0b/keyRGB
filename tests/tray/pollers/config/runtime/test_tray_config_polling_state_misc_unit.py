@@ -109,14 +109,16 @@ def test_compute_config_apply_state_includes_trail_percent_for_reactive_effect()
         reactive_color=(10, 20, 30),
         reactive_brightness=20,
         reactive_trail_percent=75,
+        reactive_visual_mode="vivid",
     )
 
     state = _compute_config_apply_state(tray)
 
     assert state.reactive_trail_percent == 75
+    assert state.reactive_visual_mode == "vivid"
 
 
-def test_compute_config_apply_state_defaults_trail_percent_to_50_for_non_reactive_effect() -> None:
+def test_compute_config_apply_state_defaults_trail_percent_to_40_for_non_reactive_effect() -> None:
     tray = MagicMock()
     tray.config = SimpleNamespace(
         effect="rainbow_wave",
@@ -130,7 +132,7 @@ def test_compute_config_apply_state_defaults_trail_percent_to_50_for_non_reactiv
 
     state = _compute_config_apply_state(tray)
 
-    assert state.reactive_trail_percent == 50
+    assert state.reactive_trail_percent == 40
 
 
 def test_sync_reactive_sets_trail_percent_on_engine() -> None:
@@ -140,6 +142,7 @@ def test_sync_reactive_sets_trail_percent_on_engine() -> None:
         reactive_color=(10, 20, 30),
         reactive_brightness=25,
         reactive_trail_percent=80,
+        reactive_visual_mode="vivid",
         brightness=25,
     )
     current = ConfigApplyState(
@@ -151,11 +154,13 @@ def test_sync_reactive_sets_trail_percent_on_engine() -> None:
         reactive_use_manual=False,
         reactive_color=(10, 20, 30),
         reactive_trail_percent=80,
+        reactive_visual_mode="vivid",
     )
 
     _sync_reactive(tray, current)
 
     assert tray.engine.reactive_trail_percent == 80
+    assert tray.engine.reactive_visual_mode == "vivid"
 
 
 def test_sync_reactive_falls_back_to_config_when_state_lacks_trail_percent() -> None:
@@ -165,6 +170,7 @@ def test_sync_reactive_falls_back_to_config_when_state_lacks_trail_percent() -> 
         reactive_color=(10, 20, 30),
         reactive_brightness=25,
         reactive_trail_percent=60,
+        reactive_visual_mode="vivid",
         brightness=25,
     )
     # current has no reactive_trail_percent attribute
@@ -176,3 +182,4 @@ def test_sync_reactive_falls_back_to_config_when_state_lacks_trail_percent() -> 
     _sync_reactive(tray, current)
 
     assert tray.engine.reactive_trail_percent == 60
+    assert tray.engine.reactive_visual_mode == "vivid"

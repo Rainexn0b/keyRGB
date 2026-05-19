@@ -45,6 +45,9 @@ class _FastPathComparableState(Protocol):
     def reactive_trail_percent(self) -> int: ...
 
     @property
+    def reactive_visual_mode(self) -> str: ...
+
+    @property
     def software_effect_target(self) -> str: ...
 
 
@@ -123,6 +126,7 @@ def apply_fast_path_change(
             tray.engine.reactive_color = current.reactive_color
             tray.engine.reactive_brightness = int(current.reactive_brightness)
             tray.engine.reactive_trail_percent = int(current.reactive_trail_percent)
+            tray.engine.reactive_visual_mode = str(current.reactive_visual_mode or "subtle")
         except _FAST_PATH_EXECUTION_EXCEPTIONS:
             pass
         return True
@@ -168,6 +172,7 @@ def _is_target_only_change(
         and last_applied.reactive_use_manual == current.reactive_use_manual
         and last_applied.reactive_color == current.reactive_color
         and last_applied.reactive_brightness == current.reactive_brightness
+        and last_applied.reactive_visual_mode == current.reactive_visual_mode
         and last_applied.software_effect_target != current.software_effect_target
     )
 
@@ -188,6 +193,7 @@ def _is_reactive_only_change(
             or last_applied.reactive_color != current.reactive_color
             or last_applied.reactive_brightness != current.reactive_brightness
             or last_applied.reactive_trail_percent != current.reactive_trail_percent
+            or last_applied.reactive_visual_mode != current.reactive_visual_mode
         )
     )
 
@@ -205,6 +211,7 @@ def _is_brightness_only_change(
         and last_applied.reactive_use_manual == current.reactive_use_manual
         and last_applied.reactive_color == current.reactive_color
         and last_applied.reactive_brightness == current.reactive_brightness
+        and last_applied.reactive_visual_mode == current.reactive_visual_mode
         and last_applied.brightness != current.brightness
     )
 
@@ -223,5 +230,6 @@ def _is_base_only_change(
         and last_applied.reactive_color == current.reactive_color
         and last_applied.reactive_brightness == current.reactive_brightness
         and last_applied.reactive_trail_percent == current.reactive_trail_percent
+        and last_applied.reactive_visual_mode == current.reactive_visual_mode
         and last_applied.perkey_sig != current.perkey_sig
     )

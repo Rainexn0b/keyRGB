@@ -22,6 +22,7 @@ def _mk_tray(*, engine_running: bool = True) -> MagicMock:
         per_key_colors={},
         reactive_use_manual_color=False,
         reactive_color=(10, 20, 30),
+        reactive_visual_mode="subtle",
     )
     return tray
 
@@ -37,6 +38,7 @@ def test_fastpath_reactive_change_updates_engine_without_restart() -> None:
         perkey_sig=None,
         reactive_use_manual=False,
         reactive_color=(10, 20, 30),
+        reactive_visual_mode="subtle",
     )
     current = ConfigApplyState(
         effect="rainbow_wave",
@@ -46,6 +48,7 @@ def test_fastpath_reactive_change_updates_engine_without_restart() -> None:
         perkey_sig=None,
         reactive_use_manual=True,
         reactive_color=(10, 20, 30),
+        reactive_visual_mode="vivid",
     )
 
     handled, new_last = _maybe_apply_fast_path(tray, last_applied=last, current=current)
@@ -54,6 +57,7 @@ def test_fastpath_reactive_change_updates_engine_without_restart() -> None:
     assert new_last == current
     assert tray.engine.reactive_use_manual_color is True
     assert tray.engine.reactive_color == (10, 20, 30)
+    assert tray.engine.reactive_visual_mode == "vivid"
     tray.engine.set_brightness.assert_not_called()
 
 

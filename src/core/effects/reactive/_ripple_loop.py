@@ -158,6 +158,8 @@ class _ReactiveRippleApiProtocol(Protocol):
 
     def pulse_brightness_scale_factor(self, engine: "EffectsEngine") -> float: ...
 
+    def reactive_auto_pulse_saturation(self, engine: "EffectsEngine") -> float: ...
+
     def hsv_to_rgb(self, h: float, s: float, v: float) -> Color: ...
 
     def scale(self, rgb: Color, s: float) -> Color: ...
@@ -178,6 +180,7 @@ class _ReactiveRippleApiProtocol(Protocol):
         per_key_backdrop_active: bool,
         manual: Color | None,
         pulse_scale: float,
+        auto_pulse_saturation: float = 1.0,
     ) -> ColorMap: ...
 
     def render(self, engine: "EffectsEngine", *, color_map: ColorMap) -> None: ...
@@ -248,9 +251,9 @@ def run_reactive_ripple_loop(engine: "EffectsEngine", *, api: _ReactiveRippleApi
             # constant and the user perceives a wider/narrower illuminated ring rather
             # than a faster/slower expanding wavefront.
             trail_pct = _engine_int_attr_or_fallback(
-                engine, "reactive_trail_percent", missing_default=50, error_default=50
+                engine, "reactive_trail_percent", missing_default=40, error_default=40
             )
-            trail_scale = max(0.1, min(4.0, ((int(trail_pct) or 50) / 50.0) ** 2))
+            trail_scale = max(0.1, min(4.0, ((int(trail_pct) or 40) / 50.0) ** 2))
             band = 2.15 * trail_scale
             overlay = api.get_engine_overlay_buffer(engine, "_reactive_ripple_overlay")
             api.build_ripple_overlay_into(overlay, pulses, band=band)
@@ -263,6 +266,7 @@ def run_reactive_ripple_loop(engine: "EffectsEngine", *, api: _ReactiveRippleApi
 
             manual = api.get_engine_manual_reactive_color(engine)
             pulse_scale = api.pulse_brightness_scale_factor(engine)
+            auto_pulse_saturation = api.reactive_auto_pulse_saturation(engine)
 
             if not _has_per_key_writer(engine):
                 best_weight = 0.0
@@ -284,7 +288,7 @@ def run_reactive_ripple_loop(engine: "EffectsEngine", *, api: _ReactiveRippleApi
                 if manual is not None:
                     pulse_rgb = manual
                 else:
-                    pulse_rgb = api.hsv_to_rgb(best_hue / 360.0, 1.0, 1.0)
+                    pulse_rgb = api.hsv_to_rgb(best_hue / 360.0, auto_pulse_saturation, 1.0)
 
                 # RGB scaling is safe here: hsv_to_rgb(h, 1.0, 1.0) always returns a
                 # fully-bright colour, avoiding the black edge-case that requires
@@ -309,6 +313,7 @@ def run_reactive_ripple_loop(engine: "EffectsEngine", *, api: _ReactiveRippleApi
                 per_key_backdrop_active=per_key_backdrop_active,
                 manual=manual,
                 pulse_scale=pulse_scale,
+                auto_pulse_saturation=auto_pulse_saturation,
             )
 
             api.render(engine, color_map=color_map)

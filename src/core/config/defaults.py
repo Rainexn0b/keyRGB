@@ -31,6 +31,12 @@ DEFAULTS: dict = {
     # overall keyboard brightness so power policies can dim the keyboard
     # without overriding the user's reactive intensity preference.
     "reactive_brightness": 25,
+    # Reactive typing wave thickness (1..100).
+    "reactive_trail_percent": 40,
+    # Overall reactive visual style.
+    # 'subtle' softens mid-range pulses and reduces ripple saturation;
+    # 'vivid' preserves the stronger legacy presentation.
+    "reactive_visual_mode": "subtle",
     # When a non-per-key effect is started from a per-key state, we can remember
     # which per-key mode to restore when the user stops the effect.
     # None | 'perkey'

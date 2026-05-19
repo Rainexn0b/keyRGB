@@ -57,7 +57,7 @@ def normalize_trail_percent_value(value: object) -> int:
     try:
         normalized = _coerce_int(value)
     except _BRIGHTNESS_COERCION_ERRORS:
-        return 50
+        return 40
 
     return max(1, min(100, normalized))
 

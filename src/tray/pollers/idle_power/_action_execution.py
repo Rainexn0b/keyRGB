@@ -214,7 +214,6 @@ def _execute_restore_brightness(
     set_brightness_best_effort: Callable[..., None],
     recoverable_effect_name_exceptions: tuple[type[BaseException], ...],
 ) -> None:
-    reset_dim_state_on_tray(tray)
     config = tray.config
     target = safe_int_attr(config, "brightness", default=0)
     perkey_target = safe_int_attr(config, "perkey_brightness", default=0)
@@ -227,7 +226,7 @@ def _execute_restore_brightness(
         recoverable_effect_name_exceptions=recoverable_effect_name_exceptions,
     )
     if target > 0 and not bool(tray.is_off):
-        call_runtime_boundary(
+        applied = call_runtime_boundary(
             lambda: apply_restore_brightness(
                 tray,
                 effect=effect,
@@ -244,6 +243,11 @@ def _execute_restore_brightness(
             level=logging.WARNING,
             msg="Idle-power restore-brightness apply failed",
         )
+        if applied:
+            reset_dim_state_on_tray(tray)
+        return
+
+    reset_dim_state_on_tray(tray)
 
 
 def _execute_restore(

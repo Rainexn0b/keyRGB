@@ -101,8 +101,10 @@ def build_ripple_color_map_into(
     per_key_backdrop_active: bool,
     manual: Color | None,
     pulse_scale: float,
+    auto_pulse_saturation: float = 1.0,
 ) -> Dict[Key, Color]:
     dest.clear()
+    saturation = max(0.0, min(1.0, float(auto_pulse_saturation)))
     for key, base_rgb in base.items():
         base_rgb_unscaled = base_unscaled.get(key, base_rgb)
         if key in overlay:
@@ -110,7 +112,7 @@ def build_ripple_color_map_into(
             if manual is not None:
                 pulse_rgb = manual
             else:
-                pulse_rgb = hsv_to_rgb(hue / 360.0, 1.0, 1.0)
+                pulse_rgb = hsv_to_rgb(hue / 360.0, saturation, 1.0)
             if per_key_backdrop_active and manual is None:
                 pulse_rgb = _pick_contrasting_highlight(base_rgb=base_rgb_unscaled, preferred_rgb=pulse_rgb)
                 dest[key] = mix(base_rgb, pulse_rgb, t=min(1.0, w * pulse_scale))
@@ -131,6 +133,7 @@ def build_ripple_color_map(
     per_key_backdrop_active: bool,
     manual: Color | None,
     pulse_scale: float,
+    auto_pulse_saturation: float = 1.0,
 ) -> Dict[Key, Color]:
     return build_ripple_color_map_into(
         {},
@@ -140,4 +143,5 @@ def build_ripple_color_map(
         per_key_backdrop_active=per_key_backdrop_active,
         manual=manual,
         pulse_scale=pulse_scale,
+        auto_pulse_saturation=auto_pulse_saturation,
     )

@@ -170,6 +170,8 @@ class _ReactiveColorWindowState(Protocol):
     _wrap_labels: list[object]
     _use_manual_var: _BoolVarLike
     _manual_check: _CheckbuttonWidget
+    _reactive_vivid_visuals_var: _BoolVarLike
+    _reactive_vivid_visuals_check: _CheckbuttonWidget
     color_wheel: _ColorWheelLike | None
     _reactive_brightness_var: _DoubleVarLike
     _reactive_brightness_scale: _ScaleWidget
@@ -180,6 +182,8 @@ class _ReactiveColorWindowState(Protocol):
     status_label: _LabelWidget
 
     def _on_toggle_manual(self) -> None: ...
+
+    def _on_toggle_reactive_visual_mode(self) -> None: ...
 
     def _on_color_change(
         self,
@@ -238,6 +242,19 @@ def build_reactive_window_ui(
         command=gui_state._on_toggle_manual,
     )
     gui_state._manual_check.pack(anchor="w", pady=(0, 10))
+
+    gui_state._reactive_vivid_visuals_var = tk_module.BooleanVar(
+        value=bool(
+            str(getattr(gui_state.config, "reactive_visual_mode", "subtle") or "subtle").strip().lower() == "vivid"
+        )
+    )
+    gui_state._reactive_vivid_visuals_check = ttk_module.Checkbutton(
+        main,
+        text="Use vivid reactive visuals",
+        variable=gui_state._reactive_vivid_visuals_var,
+        command=gui_state._on_toggle_reactive_visual_mode,
+    )
+    gui_state._reactive_vivid_visuals_check.pack(anchor="w", pady=(0, 12))
 
     if not gui_state._color_supported:
         try:
@@ -314,7 +331,7 @@ def build_reactive_window_ui(
 
     ttk_module.Separator(main, orient="horizontal").pack(fill="x", pady=(18, 12))
 
-    gui_state._reactive_trail_var = tk_module.DoubleVar(value=50.0)
+    gui_state._reactive_trail_var = tk_module.DoubleVar(value=40.0)
     trail_frame = ttk_module.Frame(main)
     trail_frame.pack(fill="x", padx=10)
     try:
@@ -334,7 +351,7 @@ def build_reactive_window_ui(
     )
     gui_state._reactive_trail_scale.grid(row=0, column=1, sticky="ew")
 
-    gui_state._reactive_trail_label = ttk_module.Label(trail_frame, text="50%")
+    gui_state._reactive_trail_label = ttk_module.Label(trail_frame, text="40%")
     gui_state._reactive_trail_label.configure(width=5)
     gui_state._reactive_trail_label.grid(row=0, column=2, sticky="e", padx=(10, 5))
 

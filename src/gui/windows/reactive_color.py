@@ -158,6 +158,9 @@ class ReactiveColorGUI:
     def _on_toggle_manual(self) -> None:
         reactive_color_interactions._on_toggle_manual(self, tk_error=tk.TclError, logger=logger)
 
+    def _on_toggle_reactive_visual_mode(self) -> None:
+        reactive_color_interactions._on_toggle_reactive_visual_mode(self, logger=logger)
+
     def _on_reactive_brightness_change(self, value: str | float) -> None:
         _wiring.dispatch_brightness_change(
             self,

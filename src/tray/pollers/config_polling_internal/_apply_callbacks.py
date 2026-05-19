@@ -15,6 +15,7 @@ from ._apply_support import build_perkey_color_map
 from ._apply_support import current_software_effect_target
 from ._apply_support import has_all_uniform_capable_target
 from ._apply_support import reactive_sync_values
+from ._apply_support import reactive_visual_mode_value
 from . import helpers as _helpers
 
 
@@ -92,6 +93,7 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
 
 def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
     reactive_brightness, reactive_trail_percent = reactive_sync_values(current, tray.config)
+    reactive_visual_mode = reactive_visual_mode_value(current, tray.config)
 
     _helpers._set_engine_attr_best_effort(
         tray,
@@ -116,6 +118,12 @@ def _sync_reactive(tray: ConfigPollingTrayProtocol, current) -> None:
         "reactive_trail_percent",
         reactive_trail_percent,
         error_msg="Failed to apply reactive trail percent during config polling: %s",
+    )
+    _helpers._set_engine_attr_best_effort(
+        tray,
+        "reactive_visual_mode",
+        reactive_visual_mode,
+        error_msg="Failed to apply reactive visual mode during config polling: %s",
     )
 
 

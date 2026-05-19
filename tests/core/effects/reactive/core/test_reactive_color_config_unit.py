@@ -21,6 +21,7 @@ def test_config_has_reactive_color_defaults(monkeypatch) -> None:
     assert all(isinstance(x, int) for x in cfg.reactive_color)
 
     assert cfg.reactive_use_manual_color is False
+    assert cfg.reactive_visual_mode == "subtle"
 
 
 def test_config_persists_reactive_color(monkeypatch) -> None:
@@ -32,7 +33,9 @@ def test_config_persists_reactive_color(monkeypatch) -> None:
     cfg = Config()
     cfg.reactive_color = (12, 34, 56)
     cfg.reactive_use_manual_color = True
+    cfg.reactive_visual_mode = "vivid"
 
     cfg2 = Config()
     assert cfg2.reactive_color == (12, 34, 56)
     assert cfg2.reactive_use_manual_color is True
+    assert cfg2.reactive_visual_mode == "vivid"

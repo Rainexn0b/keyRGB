@@ -23,6 +23,7 @@ from ._render_runtime import render_per_key_frame, render_uniform_frame
 
 logger = logging.getLogger(__name__)
 time = _time
+_REACTIVE_VISUAL_MODES = frozenset({"subtle", "vivid"})
 
 # see _constants.py
 
@@ -53,6 +54,26 @@ def _keyboard_attr_or_none(engine: "EffectsEngine", attr_name: str) -> object | 
 
 def clamp01(x: float) -> float:
     return 0.0 if x <= 0.0 else (1.0 if x >= 1.0 else x)
+
+
+def reactive_visual_mode(engine: "EffectsEngine", *, default: str = "vivid") -> str:
+    raw = _engine_attr_or_default(engine, "reactive_visual_mode", default=default)
+    try:
+        normalized = str(raw or default).strip().lower()
+    except _INT_COERCION_ERRORS:
+        return default
+    return normalized if normalized in _REACTIVE_VISUAL_MODES else default
+
+
+def reactive_auto_pulse_saturation(engine: "EffectsEngine") -> float:
+    return 0.72 if reactive_visual_mode(engine, default="vivid") == "subtle" else 1.0
+
+
+def _apply_reactive_pulse_visual_curve(scale: float, *, visual_mode: str) -> float:
+    clamped = clamp01(scale)
+    if visual_mode != "subtle":
+        return clamped
+    return clamp01(clamped**1.35)
 
 
 def mix(a: Color, b: Color, t: float) -> Color:
@@ -183,9 +204,13 @@ def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
     """
 
     base, eff, hw = _resolve_brightness(engine)
+    visual_mode = reactive_visual_mode(engine, default="vivid")
 
     if has_per_key(engine):
-        pulse_scale = float(max(0, min(50, int(eff)))) / 50.0
+        pulse_scale = _apply_reactive_pulse_visual_curve(
+            float(max(0, min(50, int(eff)))) / 50.0,
+            visual_mode=visual_mode,
+        )
         target_hw = _steady_target_hw_brightness(engine, base=base)
         visual_hw = min(int(hw), int(target_hw))
         if visual_hw <= 0:
@@ -255,7 +280,7 @@ def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
     if eff >= hw:
         return 1.0
 
-    return float(eff) / float(hw)
+    return _apply_reactive_pulse_visual_curve(float(eff) / float(hw), visual_mode=visual_mode)
 
 
 def apply_backdrop_brightness_scale(color_map: Dict[Key, Color], *, factor: float) -> Dict[Key, Color]:

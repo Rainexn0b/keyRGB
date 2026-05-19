@@ -10,12 +10,21 @@ from src.core.effects.reactive.render import pulse_brightness_scale_factor
 
 
 class _DummyEngine:
-    def __init__(self, *, brightness: int, reactive_brightness: int, has_per_key: bool = True):
+    def __init__(
+        self,
+        *,
+        brightness: int,
+        reactive_brightness: int,
+        has_per_key: bool = True,
+        reactive_visual_mode: str | None = None,
+    ):
         self.brightness = brightness
         self.reactive_brightness = reactive_brightness
         self.per_key_colors = None
         self.per_key_brightness = None
         self.kb = SimpleNamespace(set_key_colors=object()) if has_per_key else SimpleNamespace()
+        if reactive_visual_mode is not None:
+            self.reactive_visual_mode = reactive_visual_mode
         self._reactive_active_pulse_mix = 0.0
         # Set to 50 (steady-state) so the stability guard does not interfere
         # with tests that verify raw brightness scaling formulas.
@@ -234,6 +243,13 @@ def test_pulse_brightness_scale_changes_across_range() -> None:
     eng_high.per_key_brightness = 50
 
     assert pulse_brightness_scale_factor(eng_low) < pulse_brightness_scale_factor(eng_high)
+
+
+def test_subtle_visual_mode_softens_midrange_per_key_pulse_scale() -> None:
+    eng_vivid = _DummyEngine(brightness=40, reactive_brightness=20, reactive_visual_mode="vivid")
+    eng_subtle = _DummyEngine(brightness=40, reactive_brightness=20, reactive_visual_mode="subtle")
+
+    assert pulse_brightness_scale_factor(eng_subtle) < pulse_brightness_scale_factor(eng_vivid)
 
 
 def test_active_pulse_mix_does_not_lift_hw_on_per_key_backends() -> None:

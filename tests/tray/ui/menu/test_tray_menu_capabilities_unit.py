@@ -175,6 +175,26 @@ def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
     assert "Hardware Effects" not in labels
 
 
+def test_menu_hides_hardware_color_and_effect_rows_in_software_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True, color=True))
+    tray.config.effect = "reactive_ripple"
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [i["text"] for i in items if isinstance(i, dict)]
+
+    assert "Hardware Static Mode" in labels
+    assert "Hardware Uniform Color…" not in labels
+    assert "Hardware Effects" not in labels
+
+
+def test_hardware_static_row_checked_state_represents_hardware_mode_not_only_static_effect() -> None:
+    checked = tray_menu.menu_callbacks.checked_hw_static(type("Tray", (), {"is_off": False, "config": DummyConfig()})(), hw_mode=True)
+
+    assert checked(object()) is True
+
+
 def test_menu_includes_keyboard_status_header(monkeypatch: pytest.MonkeyPatch) -> None:
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)

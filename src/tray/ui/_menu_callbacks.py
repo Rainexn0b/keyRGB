@@ -81,7 +81,7 @@ def checked_brightness(tray: _HasMenuConfig, brightness: int) -> _MenuChecked:
 
 def checked_hw_static(tray: _HasMenuPowerState, *, hw_mode: bool) -> _MenuChecked:
     def _checked(_item: object) -> bool:
-        return tray.config.effect == "none" and hw_mode and not tray.is_off
+        return hw_mode and not tray.is_off
 
     return _checked
 

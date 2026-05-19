@@ -49,6 +49,8 @@ _REACTIVE_EFFECT_EXPORTS: dict[str, object] = {
     "mix": render_runtime.mix,
     "pace": render_runtime.pace,
     "pulse_brightness_scale_factor": render_runtime.pulse_brightness_scale_factor,
+    "reactive_auto_pulse_saturation": render_runtime.reactive_auto_pulse_saturation,
+    "reactive_visual_mode": render_runtime.reactive_visual_mode,
     "random": random,
     "render": render_runtime.render,
     "scale": render_runtime.scale,

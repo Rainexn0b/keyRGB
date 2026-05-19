@@ -32,7 +32,7 @@ def test_normalize_precise_brightness_value_preserves_nonzero_single_steps() -> 
 
 
 def test_normalize_trail_percent_value_clamps_and_defaults() -> None:
-    assert normalize_trail_percent_value(object()) == 50
+    assert normalize_trail_percent_value(object()) == 40
     assert normalize_trail_percent_value(0) == 1
     assert normalize_trail_percent_value(-5) == 1
     assert normalize_trail_percent_value(1) == 1

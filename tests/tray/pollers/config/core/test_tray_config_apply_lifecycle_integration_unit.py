@@ -18,7 +18,7 @@ def _mk_tray(*, effect: str = "static", speed: int = 4, brightness: int = 30, co
         reactive_use_manual_color=False,
         reactive_color=(10, 20, 30),
         reactive_brightness=brightness,
-        reactive_trail_percent=50,
+        reactive_trail_percent=40,
         software_effect_target="keyboard",
     )
     return SimpleNamespace(config=config, backend=None)
@@ -38,7 +38,7 @@ def test_compute_config_apply_state_reads_static_effect_config() -> None:
         reactive_use_manual=False,
         reactive_color=(10, 20, 30),
         reactive_brightness=0,
-        reactive_trail_percent=50,
+        reactive_trail_percent=40,
         software_effect_target="keyboard",
     )
 
@@ -67,7 +67,7 @@ def test_compute_config_apply_state_falls_back_to_none_when_effect_read_raises()
         reactive_use_manual_color = False
         reactive_color = (10, 20, 30)
         reactive_brightness = 30
-        reactive_trail_percent = 50
+        reactive_trail_percent = 40
         software_effect_target = "keyboard"
 
         @property

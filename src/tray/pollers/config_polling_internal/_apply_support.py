@@ -42,12 +42,26 @@ def reactive_sync_values(current: object, config: object) -> tuple[int, int]:
     reactive_brightness = getattr(current, "reactive_brightness", default_brightness)
     reactive_trail_percent = getattr(current, "reactive_trail_percent", None)
     if reactive_trail_percent is None:
-        reactive_trail_percent = safe_int_attr(config, "reactive_trail_percent", default=50)
+        reactive_trail_percent = safe_int_attr(config, "reactive_trail_percent", default=40)
 
     return (
         _coerce_int(reactive_brightness, default=0),
-        _coerce_int(reactive_trail_percent, default=50),
+        _coerce_int(reactive_trail_percent, default=40),
     )
+
+
+def reactive_visual_mode_value(current: object, config: object) -> str:
+    try:
+        raw_value = getattr(current, "reactive_visual_mode", None)
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        raw_value = None
+    if raw_value is None:
+        try:
+            raw_value = getattr(config, "reactive_visual_mode", "subtle")
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+            raw_value = "subtle"
+    normalized = str(raw_value or "subtle").strip().lower()
+    return normalized if normalized in {"subtle", "vivid"} else "subtle"
 
 
 def build_perkey_color_map(

@@ -41,6 +41,7 @@ class _BrightnessSyncFn(Protocol):
 
 class _ReactiveManualConfig(Protocol):
     reactive_use_manual_color: bool
+    reactive_visual_mode: str
 
 
 class _ReactiveColorDragState(Protocol):
@@ -52,6 +53,11 @@ class _ReactiveColorDragState(Protocol):
 class _ManualToggleGui(Protocol):
     _color_supported: bool
     _use_manual_var: _MutableVariable
+    config: _ReactiveManualConfig
+
+
+class _ReactiveVisualModeGui(Protocol):
+    _reactive_vivid_visuals_var: _MutableVariable
     config: _ReactiveManualConfig
 
 
@@ -132,6 +138,17 @@ def _on_toggle_manual(
         gui.config.reactive_use_manual_color = bool(gui._use_manual_var.get())
     except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
         logger.debug("Failed to save reactive_use_manual_color", exc_info=True)
+
+
+def _on_toggle_reactive_visual_mode(
+    gui: _ReactiveVisualModeGui,
+    *,
+    logger: logging.Logger,
+) -> None:
+    try:
+        gui.config.reactive_visual_mode = "vivid" if bool(gui._reactive_vivid_visuals_var.get()) else "subtle"
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        logger.debug("Failed to save reactive_visual_mode", exc_info=True)
 
 
 def _on_reactive_brightness_change(
@@ -222,7 +239,7 @@ def _on_reactive_trail_change(
     try:
         pct = float(value)
     except (TypeError, ValueError):
-        pct = 50.0
+        pct = 40.0
     pct = max(1.0, min(100.0, pct))
 
     try:
@@ -235,7 +252,7 @@ def _on_reactive_trail_release(gui: _ReactiveTrailGui, *, tk_error: type[BaseExc
     try:
         pct = float(gui._reactive_trail_var.get())
     except (TypeError, ValueError, tk_error):
-        pct = 50.0
+        pct = 40.0
     pct = max(1.0, min(100.0, pct))
 
     hw = gui._commit_trail_to_config(pct)
