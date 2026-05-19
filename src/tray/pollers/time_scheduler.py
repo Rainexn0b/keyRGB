@@ -7,14 +7,11 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from src.tray.controllers._lighting_controller_helpers import (
-    _log_tray_exception,
-    get_effect_name,
-    is_reactive_effect,
-    is_software_effect,
-    sync_reactive_effect_brightness_state,
-    try_log_event,
-)
+from src.core.brightness_layers import is_scheduler_night
+from src.core.brightness_layers import parse_scheduler_time
+from src.core.brightness_layers import resolve_scheduler_brightness_state
+from src.tray.controllers._brightness_layer import apply_layered_brightness_update
+from src.tray.controllers._lighting_controller_helpers import _log_tray_exception, try_log_event
 from src.tray.controllers.lighting_controller import start_current_effect
 
 
@@ -54,137 +51,47 @@ def _apply_time_scheduler_brightness(
         return
 
     try:
-        if base_brightness_int is not None and base_brightness_int > 0:
-            tray._last_brightness = base_brightness_int
-
-        try_log_event(
+        apply_layered_brightness_update(
             tray,
-            "time_scheduler",
-            "apply_brightness",
-            base=base_brightness_int,
-            reactive=reactive_brightness_int,
+            source="time_scheduler",
+            base_brightness=base_brightness_int,
+            reactive_brightness=reactive_brightness_int,
+            reactive_source_label="time-scheduler",
+            start_current_effect=start_current_effect,
         )
-
-        effect = get_effect_name(tray)
-        is_sw_effect = is_software_effect(effect)
-        is_reactive = is_reactive_effect(effect)
-
-        prev_cfg_brightness = getattr(tray.config, "brightness", 0)
-        fade_down = bool(base_brightness_int is not None and base_brightness_int < prev_cfg_brightness)
-        fade_s = 0.12 if base_brightness_int is not None and base_brightness_int <= 0 else 0.25
-
-        if is_reactive:
-            if base_brightness_int is not None:
-                tray.config.perkey_brightness = base_brightness_int
-                tray.config.brightness = base_brightness_int
-            if reactive_brightness_int is not None:
-                tray.config.reactive_brightness = reactive_brightness_int
-            sync_reactive_effect_brightness_state(
-                tray,
-                source="time-scheduler",
-                base_brightness=base_brightness_int,
-                reactive_brightness=reactive_brightness_int,
-                fade=fade_down,
-                fade_duration_s=fade_s,
-            )
-            tray._refresh_ui()
-            return
-
-        if reactive_brightness_int is not None:
-            tray.config.reactive_brightness = reactive_brightness_int
-        if base_brightness_int is None:
-            return
-
-        tray.config.brightness = base_brightness_int
-        tray.engine.set_brightness(
-            tray.config.brightness,
-            apply_to_hardware=not is_sw_effect,
-            fade=fade_down,
-            fade_duration_s=fade_s,
-        )
-        if not bool(getattr(tray, "is_off", False)) and not is_sw_effect:
-            start_current_effect(tray)
-        tray._refresh_ui()
     except _SCHEDULER_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: time-scheduler brightness application crosses config setters, backend runtime calls, and UI callbacks; must remain non-fatal
         _log_tray_exception(tray, "Failed to apply time-scheduler brightness: %s", exc)
         return
 
 
 def _parse_time(time_str: str) -> tuple[int, int] | None:
-    try:
-        parts = str(time_str).strip().split(":")
-        if len(parts) != 2:
-            return None
-        hour = int(parts[0])
-        minute = int(parts[1])
-        if not (0 <= hour <= 23 and 0 <= minute <= 59):
-            return None
-        return (hour, minute)
-    except (TypeError, ValueError):
-        return None
+    return parse_scheduler_time(time_str)
 
 
 def _is_night(now: datetime, day_start: tuple[int, int], night_start: tuple[int, int]) -> bool:
-    """Return True if `now` is in the night period.
-
-    Night is defined as the period from night_start to day_start.
-    If day_start == night_start, the whole day is treated as day.
-    """
-    current_minutes = now.hour * 60 + now.minute
-    day_start_minutes = day_start[0] * 60 + day_start[1]
-    night_start_minutes = night_start[0] * 60 + night_start[1]
-
-    if night_start_minutes == day_start_minutes:
-        return False
-
-    if night_start_minutes < day_start_minutes:
-        # Night is a contiguous block during the day (e.g. 02:00 to 14:00)
-        return night_start_minutes <= current_minutes < day_start_minutes
-    else:
-        # Night wraps around midnight (e.g. 22:00 to 08:00)
-        return current_minutes >= night_start_minutes or current_minutes < day_start_minutes
-
-
-def _read_scheduler_config(tray: LightingTrayProtocol) -> dict:
-    """Read time-scheduler config values safely."""
-    cfg = tray.config
-    return {
-        "enabled": bool(getattr(cfg, "time_scheduler_enabled", False)),
-        "day_start": str(getattr(cfg, "day_start_time", "08:00")),
-        "night_start": str(getattr(cfg, "night_start_time", "22:00")),
-        "day_base": max(0, min(50, int(getattr(cfg, "day_base_brightness", 25)))),
-        "day_reactive": max(0, min(50, int(getattr(cfg, "day_reactive_brightness", 25)))),
-        "night_base": max(0, min(50, int(getattr(cfg, "night_base_brightness", 10)))),
-        "night_reactive": max(0, min(50, int(getattr(cfg, "night_reactive_brightness", 10)))),
-        "power_management_enabled": bool(getattr(cfg, "power_management_enabled", True)),
-    }
+    return is_scheduler_night(now, day_start, night_start)
 
 
 def _run_scheduler_iteration(tray: LightingTrayProtocol) -> None:
-    cfg = _read_scheduler_config(tray)
-
-    if not cfg["enabled"]:
+    state = resolve_scheduler_brightness_state(
+        tray.config,
+        now=datetime.now(),
+        power_management_enabled=bool(getattr(tray.config, "power_management_enabled", True)),
+    )
+    if not state.enabled:
         return
-
-    day_start = _parse_time(cfg["day_start"])
-    night_start = _parse_time(cfg["night_start"])
-
-    if day_start is None or night_start is None:
-        logger.warning("Invalid time-scheduler times: day=%s night=%s", cfg["day_start"], cfg["night_start"])
+    if not state.times_valid:
+        logger.warning(
+            "Invalid time-scheduler times: day=%s night=%s",
+            getattr(tray.config, "day_start_time", "08:00"),
+            getattr(tray.config, "night_start_time", "20:00"),
+        )
         return
-
-    now = datetime.now()
-    in_night = _is_night(now, day_start, night_start)
-
-    if in_night:
-        base_brightness = cfg["night_base"]
-        reactive_brightness = cfg["night_reactive"]
-        _apply_time_scheduler_brightness(tray, base_brightness, reactive_brightness)
-    else:
-        if cfg["power_management_enabled"]:
-            _apply_time_scheduler_brightness(tray, None, cfg["day_reactive"])
-        else:
-            _apply_time_scheduler_brightness(tray, cfg["day_base"], cfg["day_reactive"])
+    _apply_time_scheduler_brightness(
+        tray,
+        state.applied_base_brightness,
+        state.active_reactive_brightness,
+    )
 
 
 def _scheduler_loop(
@@ -202,35 +109,37 @@ def _scheduler_loop(
 
     while True:
         try:
-            cfg = _read_scheduler_config(tray)
+            state = resolve_scheduler_brightness_state(
+                tray.config,
+                now=now_fn(),
+                power_management_enabled=bool(getattr(tray.config, "power_management_enabled", True)),
+            )
+            if state.enabled and state.times_valid:
+                apply_key = (
+                    f"{state.in_night}:{state.active_base_brightness}:{state.active_reactive_brightness}:"
+                    f"{state.defer_base_to_power_policy}"
+                )
 
-            if cfg["enabled"]:
-                day_start = _parse_time(cfg["day_start"])
-                night_start = _parse_time(cfg["night_start"])
-
-                if day_start is not None and night_start is not None:
-                    now = now_fn()
-                    in_night = _is_night(now, day_start, night_start)
-
-                    # Build an apply key so we only apply when the period or config changes
-                    apply_key = f"{in_night}:{cfg['night_base']}:{cfg['night_reactive']}:{cfg['day_base']}:{cfg['day_reactive']}:{cfg['power_management_enabled']}"
-
-                    if apply_key != last_applied_key:
-                        if in_night:
-                            _apply_time_scheduler_brightness(tray, cfg["night_base"], cfg["night_reactive"])
-                            try_log_event(tray, "time_scheduler", "night_applied")
-                        else:
-                            if cfg["power_management_enabled"]:
-                                _apply_time_scheduler_brightness(tray, None, cfg["day_reactive"])
-                                try_log_event(
-                                    tray,
-                                    "time_scheduler",
-                                    "day_reactive_applied_base_deferred_to_power_policy",
-                                )
-                            else:
-                                _apply_time_scheduler_brightness(tray, cfg["day_base"], cfg["day_reactive"])
-                                try_log_event(tray, "time_scheduler", "day_applied")
-                        last_applied_key = apply_key
+                if apply_key != last_applied_key:
+                    _apply_time_scheduler_brightness(
+                        tray,
+                        state.applied_base_brightness,
+                        state.active_reactive_brightness,
+                    )
+                    try_log_event(
+                        tray,
+                        "time_scheduler",
+                        (
+                            "night_reactive_applied_base_deferred_to_power_policy"
+                            if state.in_night and state.defer_base_to_power_policy
+                            else "night_applied"
+                            if state.in_night
+                            else "day_reactive_applied_base_deferred_to_power_policy"
+                            if state.defer_base_to_power_policy
+                            else "day_applied"
+                        ),
+                    )
+                    last_applied_key = apply_key
         except _SCHEDULER_RUNTIME_EXCEPTIONS as exc:
             logger.error("Time-scheduler iteration error: %s", exc, exc_info=True)
 

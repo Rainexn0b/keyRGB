@@ -68,6 +68,47 @@ class TestApplyBrightnessFromPowerPolicy:
         )
         mock_start.assert_not_called()
 
+    def test_apply_brightness_from_power_policy_updates_perkey_mode_in_place_without_restart(self):
+        from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+
+        mock_tray = _mk_tray(effect="perkey", brightness=40)
+        mock_tray.config.perkey_brightness = 40
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            apply_brightness_from_power_policy(mock_tray, 20)
+
+        assert mock_tray.config.brightness == 20
+        assert mock_tray.config.perkey_brightness == 20
+        assert mock_tray.engine.per_key_brightness == 20
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            20,
+            apply_to_hardware=True,
+            fade=True,
+            fade_duration_s=0.25,
+        )
+        mock_start.assert_not_called()
+
+    def test_apply_brightness_from_power_policy_updates_base_only_perkey_runtime_without_restart(self):
+        from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy
+
+        mock_tray = _mk_tray(effect="none", brightness=40)
+        mock_tray.config.perkey_brightness = 40
+        mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            apply_brightness_from_power_policy(mock_tray, 18)
+
+        assert mock_tray.config.brightness == 18
+        assert mock_tray.config.perkey_brightness == 18
+        assert mock_tray.engine.per_key_brightness == 18
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            18,
+            apply_to_hardware=True,
+            fade=True,
+            fade_duration_s=0.25,
+        )
+        mock_start.assert_not_called()
+
     def test_apply_brightness_from_power_policy_logs_reactive_engine_failure_but_keeps_ui_flow(self):
         from src.tray.controllers import _lighting_controller_helpers as helper_module
         from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy

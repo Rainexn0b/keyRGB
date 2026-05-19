@@ -6,8 +6,16 @@ from typing import Optional, TypeVar
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import is_forced_hardware_effect, resolve_effect_name_for_backend, strip_effect_namespace
+from src.core.effects.perkey_animation import per_key_mode_requires_frame_reassert
+from src.core.effects.perkey_animation import restore_hidden_per_key_rows_once
+from src.core.lighting_layers import resolve_render_effect
 from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
-from src.tray.protocols import LightingTrayProtocol
+from src.tray.protocols import (
+    LightingTrayProtocol,
+    clear_idle_power_state_field,
+    read_idle_power_state_optional_bool_field,
+    read_idle_power_state_optional_int_field,
+)
 
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
@@ -131,7 +139,24 @@ def try_log_event(tray: LightingTrayProtocol, source: str, action: str, **fields
 
 
 def get_effect_name(tray: LightingTrayProtocol) -> str:
-    effect = safe_str_attr(getattr(tray, "config", None), "effect", default="none") or "none"
+    engine_effect = None
+    try:
+        engine_effect = getattr(getattr(tray, "engine", None), "current_effect", None)
+    except _RECOVERABLE_EFFECT_NAME_EXCEPTIONS as exc:
+        _log_tray_exception(tray, "Failed to read current engine effect name: %s", exc)
+
+    if isinstance(engine_effect, str) and engine_effect.strip():
+        effect = engine_effect
+    else:
+        config = getattr(tray, "config", None)
+        effect = resolve_render_effect(
+            selected_effect=safe_str_attr(config, "effect", default="none") or "none",
+            per_key_colors=getattr(config, "per_key_colors", None),
+            resolve_effect_name_fn=lambda effect_name: resolve_effect_name_for_backend(
+                effect_name,
+                getattr(tray, "backend", None),
+            ),
+        )
     try:
         return resolve_effect_name_for_backend(effect, getattr(tray, "backend", None))
     except _RECOVERABLE_EFFECT_NAME_EXCEPTIONS as exc:
@@ -185,6 +210,14 @@ def clear_engine_perkey_state(tray: LightingTrayProtocol) -> None:
         None,
         error_msg="Failed to clear engine per-key brightness: %s",
     )
+
+
+def _perkey_backend_requires_reassert(tray: LightingTrayProtocol) -> bool:
+    try:
+        kb = getattr(getattr(tray, "engine", None), "kb", None)
+        return bool(per_key_mode_requires_frame_reassert(kb))
+    except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS:
+        return False
 
 
 def sync_reactive_effect_brightness_state(
@@ -255,13 +288,35 @@ def sync_reactive_effect_brightness_state(
         )
 
 
-def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Optional[int] = None) -> None:
-    tray.engine.stop()
+def apply_perkey_mode(
+    tray: LightingTrayProtocol,
+    *,
+    brightness_override: Optional[int] = None,
+    reassert_user_mode: bool = True,
+) -> None:
+    def _clear_hidden_restore_hints() -> None:
+        clear_idle_power_state_field(
+            tray,
+            attr_name="_hidden_perkey_restore_brightness_hint",
+            state_name="hidden_perkey_restore_brightness_hint",
+            value=None,
+        )
+        clear_idle_power_state_field(
+            tray,
+            attr_name="_hidden_perkey_restore_device_off_hint",
+            state_name="hidden_perkey_restore_device_off_hint",
+            value=None,
+        )
+
+    should_reassert_user_mode = bool(reassert_user_mode) or _perkey_backend_requires_reassert(tray)
+    should_pre_enable_user_mode = bool(reassert_user_mode)
     if brightness_override is not None:
         effective_brightness = _coerce_brightness_override(brightness_override)
     else:
         effective_brightness = safe_int_attr(tray.config, "brightness", default=0)
     if int(effective_brightness) == 0:
+        if should_reassert_user_mode:
+            tray.engine.stop()
         tray.engine.turn_off()
         tray.is_off = True
         return
@@ -284,23 +339,54 @@ def apply_perkey_mode(tray: LightingTrayProtocol, *, brightness_override: Option
         error_msg="Failed to apply per-key brightness to engine: %s",
         fallback=None,
     )
+    if (
+        should_reassert_user_mode
+        and not should_pre_enable_user_mode
+        and restore_hidden_per_key_rows_once(
+            kb=tray.engine.kb,
+            kb_lock=tray.engine.kb_lock,
+            color_map=tray.config.per_key_colors,
+            brightness=int(effective_brightness),
+            known_brightness=read_idle_power_state_optional_int_field(
+                tray,
+                attr_name="_hidden_perkey_restore_brightness_hint",
+                state_name="hidden_perkey_restore_brightness_hint",
+                default=None,
+            ),
+            known_is_off=read_idle_power_state_optional_bool_field(
+                tray,
+                attr_name="_hidden_perkey_restore_device_off_hint",
+                state_name="hidden_perkey_restore_device_off_hint",
+                default=None,
+            ),
+        )
+    ):
+        _clear_hidden_restore_hints()
+        tray.is_off = False
+        return
+
+    _clear_hidden_restore_hints()
+
+    if should_reassert_user_mode:
+        tray.engine.stop()
 
     with tray.engine.kb_lock:
-        enable_user_mode = getattr(tray.engine.kb, "enable_user_mode", None)
-        if callable(enable_user_mode):
-            try:
-                enable_user_mode(brightness=effective_brightness, save=True)
-            except TypeError:
+        if should_pre_enable_user_mode:
+            enable_user_mode = getattr(tray.engine.kb, "enable_user_mode", None)
+            if callable(enable_user_mode):
                 try:
-                    enable_user_mode(brightness=effective_brightness)
+                    enable_user_mode(brightness=effective_brightness, save=True)
+                except TypeError:
+                    try:
+                        enable_user_mode(brightness=effective_brightness)
+                    except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS as exc:
+                        _log_tray_exception(tray, "Failed to enable per-key user mode: %s", exc)
                 except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS as exc:
                     _log_tray_exception(tray, "Failed to enable per-key user mode: %s", exc)
-            except _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS as exc:
-                _log_tray_exception(tray, "Failed to enable per-key user mode: %s", exc)
         tray.engine.kb.set_key_colors(
             tray.config.per_key_colors,
             brightness=effective_brightness,
-            enable_user_mode=True,
+            enable_user_mode=should_reassert_user_mode,
         )
 
     tray.is_off = False

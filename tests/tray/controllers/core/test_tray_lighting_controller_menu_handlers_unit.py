@@ -112,14 +112,21 @@ class TestOnBrightnessClicked:
 
         mock_tray = MagicMock()
         mock_tray.is_off = False
+        mock_tray.config.effect = "none"
         mock_tray.config.brightness = 25
 
         with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             on_brightness_clicked(mock_tray, "🔘 20")
 
         assert mock_tray.config.brightness == 100
-        mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=True)
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            100,
+            apply_to_hardware=True,
+            fade=False,
+            fade_duration_s=0.25,
+        )
         mock_start.assert_called_once_with(mock_tray)
+        mock_tray._refresh_ui.assert_called_once_with()
 
     def test_on_brightness_clicked_does_not_restart_software_effect(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
@@ -133,8 +140,14 @@ class TestOnBrightnessClicked:
             on_brightness_clicked(mock_tray, "🔘 20")
 
         assert mock_tray.config.brightness == 100
-        mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=False)
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            100,
+            apply_to_hardware=False,
+            fade=False,
+            fade_duration_s=0.25,
+        )
         mock_start.assert_not_called()
+        mock_tray._refresh_ui.assert_called_once_with()
 
     def test_on_brightness_clicked_preserves_reactive_brightness_for_reactive_effect(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
@@ -155,8 +168,64 @@ class TestOnBrightnessClicked:
         assert mock_tray.config.reactive_brightness == 40
         assert mock_tray.engine.per_key_brightness == 100
         assert mock_tray.engine.reactive_brightness == 40
-        mock_tray.engine.set_brightness.assert_called_once_with(100, apply_to_hardware=False)
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            100,
+            apply_to_hardware=False,
+            fade=False,
+            fade_duration_s=0.25,
+        )
         mock_start.assert_not_called()
+        mock_tray._refresh_ui.assert_called_once_with()
+
+    def test_on_brightness_clicked_updates_rendered_perkey_state_without_restart(self):
+        from src.tray.controllers.lighting_controller import on_brightness_clicked
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        mock_tray.config.effect = "perkey"
+        mock_tray.config.brightness = 25
+        mock_tray.config.perkey_brightness = 25
+        mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            on_brightness_clicked(mock_tray, "🔘 20")
+
+        assert mock_tray.config.brightness == 100
+        assert mock_tray.config.perkey_brightness == 100
+        assert mock_tray.engine.per_key_brightness == 100
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            100,
+            apply_to_hardware=True,
+            fade=False,
+            fade_duration_s=0.25,
+        )
+        mock_start.assert_not_called()
+        mock_tray._refresh_ui.assert_called_once_with()
+
+    def test_on_brightness_clicked_updates_rendered_base_only_perkey_state_without_restart(self):
+        from src.tray.controllers.lighting_controller import on_brightness_clicked
+
+        mock_tray = MagicMock()
+        mock_tray.is_off = False
+        mock_tray.config.effect = "none"
+        mock_tray.config.brightness = 25
+        mock_tray.config.perkey_brightness = 25
+        mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
+
+        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+            on_brightness_clicked(mock_tray, "🔘 20")
+
+        assert mock_tray.config.brightness == 100
+        assert mock_tray.config.perkey_brightness == 100
+        assert mock_tray.engine.per_key_brightness == 100
+        mock_tray.engine.set_brightness.assert_called_once_with(
+            100,
+            apply_to_hardware=True,
+            fade=False,
+            fade_duration_s=0.25,
+        )
+        mock_start.assert_not_called()
+        mock_tray._refresh_ui.assert_called_once_with()
 
     def test_on_brightness_clicked_saves_nonzero_to_last_brightness(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked

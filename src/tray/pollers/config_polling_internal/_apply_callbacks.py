@@ -6,6 +6,8 @@ They rely on helpers.py scaffold for "how to apply safely" infrastructure.
 
 from __future__ import annotations
 
+from src.core.effects.perkey_animation import per_key_mode_requires_frame_reassert
+from src.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from src.tray.protocols import ConfigPollingTrayProtocol
 
@@ -14,6 +16,17 @@ from ._apply_support import current_software_effect_target
 from ._apply_support import has_all_uniform_capable_target
 from ._apply_support import reactive_sync_values
 from . import helpers as _helpers
+
+
+_PERKEY_POLICY_READ_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+
+def _backend_requires_perkey_reassert(tray: ConfigPollingTrayProtocol) -> bool:
+    try:
+        kb = getattr(getattr(tray, "engine", None), "kb", None)
+        return bool(per_key_mode_requires_frame_reassert(kb))
+    except _PERKEY_POLICY_READ_EXCEPTIONS:
+        return False
 
 
 def _handle_forced_off(tray: ConfigPollingTrayProtocol, last_applied, current, cause: str, state_for_log_fn):
@@ -123,9 +136,41 @@ def _sync_software_target_policy(tray: ConfigPollingTrayProtocol, current) -> No
             _helpers.restore_secondary_software_targets(tray)
 
 
-def _apply_perkey(
-    tray: ConfigPollingTrayProtocol, current, ite_num_rows: int, ite_num_cols: int, *, cause: str
+def _sync_perkey_brightness_state(
+    tray: ConfigPollingTrayProtocol,
+    *,
+    brightness: int,
+    source: str,
 ) -> None:
+    brightness_int = int(brightness)
+    try:
+        _helpers._run_diagnostic_boundary(
+            tray,
+            lambda: setattr(tray.config, "perkey_brightness", brightness_int),
+            error_msg=f"Failed to sync {source} per-key brightness into config: %s",
+            runtime_exceptions=_helpers._CONFIG_PERSIST_SYNC_EXCEPTIONS,
+        )
+    except AttributeError:
+        pass
+    _helpers._set_engine_attr_best_effort(
+        tray,
+        "per_key_brightness",
+        brightness_int,
+        error_msg=f"Failed to sync {source} per-key brightness into engine: %s",
+    )
+
+
+def _apply_perkey(
+    tray: ConfigPollingTrayProtocol,
+    current,
+    ite_num_rows: int,
+    ite_num_cols: int,
+    *,
+    cause: str,
+    reassert_user_mode: bool = True,
+) -> None:
+    should_reassert_user_mode = bool(reassert_user_mode) or _backend_requires_perkey_reassert(tray)
+    should_pre_enable_user_mode = bool(reassert_user_mode)
     perkey_keys = 0 if current.perkey_sig is None else len(current.perkey_sig)
     _helpers._try_log_event(
         tray,
@@ -135,7 +180,11 @@ def _apply_perkey(
         brightness=int(current.brightness),
         perkey_keys=int(perkey_keys),
     )
-    tray.engine.stop()
+    _sync_perkey_brightness_state(
+        tray,
+        brightness=int(current.brightness),
+        source="config-poller per-key apply",
+    )
     color_map = build_perkey_color_map(
         tray.config,
         ite_num_rows=ite_num_rows,
@@ -143,13 +192,33 @@ def _apply_perkey(
         base_color=tuple(current.color),
     )
 
+    if (
+        should_reassert_user_mode
+        and not should_pre_enable_user_mode
+        and restore_hidden_per_key_rows_once(
+            kb=tray.engine.kb,
+            kb_lock=tray.engine.kb_lock,
+            color_map=color_map,
+            brightness=int(current.brightness),
+        )
+    ):
+        tray.is_off = False
+        if has_all_uniform_capable_target(current):
+            _helpers.restore_secondary_software_targets(tray)
+        return
+
+    if should_reassert_user_mode:
+        tray.engine.stop()
+
     with tray.engine.kb_lock:
-        _helpers._enable_user_mode_best_effort(tray, brightness=int(current.brightness))
+        if should_pre_enable_user_mode:
+            _helpers._enable_user_mode_best_effort(tray, brightness=int(current.brightness))
         tray.engine.kb.set_key_colors(
             color_map,
             brightness=current.brightness,
-            enable_user_mode=True,
+            enable_user_mode=should_reassert_user_mode,
         )
+    tray.is_off = False
     if has_all_uniform_capable_target(current):
         _helpers.restore_secondary_software_targets(tray)
 
@@ -166,6 +235,7 @@ def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> N
     tray.engine.stop()
     with tray.engine.kb_lock:
         tray.engine.kb.set_color(current.color, brightness=current.brightness)
+    tray.is_off = False
     if has_all_uniform_capable_target(current):
         _helpers.restore_secondary_software_targets(tray)
 

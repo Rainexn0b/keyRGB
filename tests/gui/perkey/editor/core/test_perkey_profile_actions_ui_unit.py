@@ -447,6 +447,7 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
 
 def test_save_power_source_profile_policy_ui_persists_selection_and_refreshes_options(monkeypatch) -> None:
     monkeypatch.setattr(actions.profiles, "list_profiles", lambda: ["default", "gaming"])  # type: ignore[attr-defined]
+    monkeypatch.setattr(actions, "read_on_ac_power", lambda: None)
 
     config = SimpleNamespace(ac_perkey_profile_name=None, battery_perkey_profile_name="movie")
     ed = DummyEditor(
@@ -488,6 +489,53 @@ def test_save_power_source_profile_policy_ui_persists_selection_and_refreshes_op
         "gaming",
     ]
     assert ed.status_label.text == "Saved AC/battery lighting profile policy"
+
+
+def test_save_power_source_profile_policy_ui_activates_current_ac_profile_when_needed(monkeypatch) -> None:
+    monkeypatch.setattr(actions.profiles, "list_profiles", lambda: ["Blue", "Purple"])  # type: ignore[attr-defined]
+    monkeypatch.setattr(actions, "read_on_ac_power", lambda: True)
+
+    activation_calls: list[str] = []
+
+    def fake_activate_profile_ui(editor) -> None:
+        activation_calls.append(editor._profile_name_var.get())
+        editor.profile_name = editor._profile_name_var.get()
+
+    monkeypatch.setattr(actions, "activate_profile_ui", fake_activate_profile_ui)
+
+    config = SimpleNamespace(ac_perkey_profile_name=None, battery_perkey_profile_name="Blue")
+    ed = DummyEditor(
+        _profile_name_var=DummyVar("Blue"),
+        config=config,
+        colors={},
+        keymap={},
+        _physical_layout="ansi",
+        layout_tweaks={},
+        per_key_layout_tweaks={},
+        layout_slot_overrides={},
+        profile_name="Blue",
+        selected_key_id=None,
+        selected_slot_id=None,
+        overlay_controls=DummyOverlayControls(),
+        lightbar_controls=None,
+        lightbar_overlay={},
+        canvas=DummyCanvas(),
+        status_label=DummyLabel(),
+        _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar("Purple"),
+        _battery_power_source_profile_var=DummyVar("Blue"),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
+    )
+
+    actions.save_power_source_profile_policy_ui(ed)
+
+    assert config.ac_perkey_profile_name == "Purple"
+    assert config.battery_perkey_profile_name == "Blue"
+    assert ed.profile_name == "Purple"
+    assert ed._profile_name_var.get() == "Purple"
+    assert activation_calls == ["Purple"]
+    assert ed.status_label.text == "Saved AC/battery lighting profile policy and activated 'Purple' for AC"
 
 
 def test_sync_power_source_profile_policy_controls_keeps_missing_configured_profile_visible(monkeypatch) -> None:

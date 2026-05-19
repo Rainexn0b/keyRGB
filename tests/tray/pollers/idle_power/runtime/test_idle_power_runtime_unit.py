@@ -104,6 +104,56 @@ def test_run_idle_power_iteration_continues_when_config_reload_fails() -> None:
     assert applied == [("turn_off", 5)]
 
 
+def test_run_idle_power_iteration_suppresses_dim_sync_during_power_source_change() -> None:
+    loop_state = _runtime.IdlePollLoopState(
+        dimmed_true_streak=3,
+        dimmed_false_streak=0,
+        screen_off_true_streak=2,
+        last_on_ac_power=True,
+    )
+    loop_state.backlight_state.baselines["panel"] = 100
+    loop_state.backlight_state.dimmed["panel"] = True
+    loop_state.backlight_state.screen_off = True
+
+    applied: list[tuple[str | None, int]] = []
+    tray = _make_tray(reload_fn=lambda: None, log_event_fn=lambda *_args, **_kwargs: None)
+
+    _runtime.run_idle_power_iteration(
+        tray,
+        loop_state=loop_state,
+        idle_timeout_s=60.0,
+        session_id=None,
+        now_monotonic_fn=lambda: 100.0,
+        ensure_idle_state_fn=lambda _tray: None,
+        read_dimmed_state_fn=lambda _state: True,
+        read_screen_off_state_drm_fn=lambda: True,
+        debounce_dim_and_screen_off_fn=lambda **kwargs: (
+            kwargs["dimmed_raw"],
+            kwargs["screen_off_raw"],
+            kwargs["dimmed_true_streak"],
+            kwargs["dimmed_false_streak"],
+            kwargs["screen_off_true_streak"],
+        ),
+        read_logind_idle_seconds_fn=lambda **_kwargs: None,
+        effective_screen_dim_sync_enabled_fn=lambda _tray, requested_enabled: requested_enabled,
+        compute_idle_action_fn=lambda **_kwargs: "turn_off",
+        build_idle_action_key_fn=lambda **kwargs: str(kwargs["action"]),
+        should_log_idle_action_fn=lambda **_kwargs: False,
+        apply_idle_action_fn=lambda _tray, *, action, dim_temp_brightness: applied.append(
+            (action, dim_temp_brightness)
+        ),
+        read_on_ac_power_fn=lambda: False,
+    )
+
+    assert applied == [(None, 5)]
+    assert loop_state.last_on_ac_power is False
+    assert loop_state.last_power_source_change_at == pytest.approx(100.0)
+    assert loop_state.backlight_state.baselines == {}
+    assert loop_state.backlight_state.dimmed == {}
+    assert loop_state.dimmed_true_streak == 0
+    assert loop_state.screen_off_true_streak == 0
+
+
 def test_run_idle_power_iteration_propagates_unexpected_config_reload_failure() -> None:
     def fail_reload() -> None:
         raise AssertionError("unexpected reload bug")

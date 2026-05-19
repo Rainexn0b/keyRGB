@@ -144,7 +144,7 @@ def test_apply_probe_cell_updates_preview_and_only_forces_non_positive_brightnes
 
     session.apply_probe_cell(1, 2)
 
-    assert cfg.effect == "perkey"
+    assert cfg.effect == "rainbow"
     assert cfg.brightness == expected_brightness
     assert cfg.per_key_colors == {
         (0, 0): (0, 0, 0),

@@ -3,25 +3,28 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
+
 import pytest
 
 
 class TestApplyProfileToConfig:
     """Test apply_profile_to_config logic."""
 
-    def test_apply_profile_sets_effect_and_colors(self):
-        """apply_profile_to_config should set effect='perkey' and per_key_colors."""
+    def test_apply_profile_preserves_selected_effect_and_sets_colors(self):
+        """apply_profile_to_config should update the base map without forcing the selected effect."""
         from src.core.config import Config
         from src.core.profile.profiles import apply_profile_to_config
 
         cfg = Config()
+        cfg.effect = "rainbow"
         cfg.brightness = 75
 
         colors = {(0, 0): (255, 0, 0), (1, 1): (0, 255, 0)}
 
         apply_profile_to_config(cfg, colors)
 
-        assert cfg.effect == "perkey"
+        assert cfg.effect == "rainbow"
         assert cfg.per_key_colors == colors
 
     def test_apply_profile_bumps_brightness_if_zero(self):
@@ -30,12 +33,37 @@ class TestApplyProfileToConfig:
         from src.core.profile.profiles import apply_profile_to_config
 
         cfg = Config()
+        cfg.effect = "none"
         cfg.brightness = 0
 
         apply_profile_to_config(cfg, {})
 
         assert cfg.brightness == 50
-        assert cfg.effect == "perkey"
+        assert cfg.effect == "none"
+
+    def test_apply_profile_persists_single_complete_config_snapshot(self, monkeypatch):
+        """Profile switches should not expose intermediate config states to pollers."""
+        from src.core.config import Config
+        from src.core.profile.profiles import apply_profile_to_config
+
+        cfg = Config()
+        cfg._settings["effect"] = "none"
+        cfg._settings["brightness"] = 25
+        cfg._settings["perkey_brightness"] = 25
+        cfg._settings["per_key_colors"] = {"0,0": [255, 0, 0]}
+
+        snapshots: list[dict] = []
+        monkeypatch.setattr(cfg, "_save", lambda: snapshots.append(deepcopy(cfg._settings)))
+
+        colors = {(0, 0): (0, 0, 255), (0, 1): (0, 0, 255)}
+
+        apply_profile_to_config(cfg, colors)
+
+        assert len(snapshots) == 1
+        assert snapshots[0]["effect"] == "none"
+        assert snapshots[0]["per_key_colors"] == {"0,0": [0, 0, 255], "0,1": [0, 0, 255]}
+        assert cfg.effect == "none"
+        assert cfg.per_key_colors == colors
 
     def test_apply_light_profile_restores_built_in_baseline_brightness(self, monkeypatch):
         """The built-in light profile should restore the normal full baseline."""
@@ -142,7 +170,7 @@ class TestApplyProfileToConfig:
 
         profiles.apply_profile_to_config(cfg, colors)
 
-        assert cfg.effect == "perkey"
+        assert cfg.effect == "wave"
         assert cfg.per_key_colors == colors
         assert cfg.effect_brightness == 25
         assert cfg.brightness == 25

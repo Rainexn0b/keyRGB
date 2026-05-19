@@ -91,7 +91,6 @@ def clear_all_ui(
 
     editor.colors = clear_fn(num_rows=num_rows, num_cols=num_cols)
     editor.canvas.redraw()
-    editor.config.effect = "perkey"
     editor.config.per_key_colors = editor.colors
 
     editor.kb = push_fn(

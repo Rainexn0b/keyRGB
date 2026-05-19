@@ -6,6 +6,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from src.core.lighting_layers import render_effect_from_selected_effect
 from src.core.resources.layout_legends import get_layout_legend_pack_ids, load_layout_legend_pack
 
 from ._coercion import normalize_rgb_triplet
@@ -138,15 +139,34 @@ class LightingConfigAccessors(LightingSecondaryDeviceFacade):
     def _perkey_brightness_raw(self) -> object:
         return self._settings.get("perkey_brightness", self._settings.get("brightness", 0))
 
+    def _render_effect_for_brightness(self) -> str:
+        try:
+            selected_effect = str(self._settings.get("effect", "none") or "none").strip().lower() or "none"
+        except _DEFAULT_SETTING_ERRORS:
+            selected_effect = "none"
+
+        try:
+            per_key_colors = self._settings.get("per_key_colors", None)
+        except _DEFAULT_SETTING_ERRORS:
+            per_key_colors = None
+
+        try:
+            return render_effect_from_selected_effect(
+                selected_effect=selected_effect,
+                per_key_colors=per_key_colors,
+            )
+        except _DEFAULT_SETTING_ERRORS:
+            return selected_effect
+
     @property
     def brightness(self) -> int:
-        if self._settings.get("effect", "none") == "perkey":
+        if self._render_effect_for_brightness() == "perkey":
             return _coerce_int_setting(self._perkey_brightness_raw(), default=0)
         return _coerce_int_setting(self._settings.get("brightness", 0), default=0)
 
     @brightness.setter
     def brightness(self, value: int):
-        if self._settings.get("effect", "none") == "perkey":
+        if self._render_effect_for_brightness() == "perkey":
             self._settings["perkey_brightness"] = self._normalize_brightness_value(value)
         else:
             self._settings["brightness"] = self._normalize_brightness_value(value)

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
+from src.tray.controllers._lighting_controller_helpers import (
+    is_reactive_effect,
+    set_engine_perkey_from_config_for_sw_effect,
+)
+from src.tray.protocols import LightingTrayProtocol
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from . import helpers
 
 
-FastPathChangeKind = Literal["none", "target_only", "reactive_only", "brightness_only"]
+FastPathChangeKind = Literal["none", "target_only", "reactive_only", "brightness_only", "base_only"]
 ColorTuple = tuple[int, int, int]
 
 
@@ -47,6 +52,22 @@ _FAST_PATH_CLASSIFICATION_EXCEPTIONS = (AttributeError, RuntimeError, TypeError,
 _FAST_PATH_EXECUTION_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
+def _sync_reactive_base_perkey_brightness(
+    tray: ConfigPollingTrayProtocol,
+    *,
+    brightness: int,
+) -> None:
+    brightness_int = int(brightness)
+    try:
+        tray.config.perkey_brightness = brightness_int
+    except _FAST_PATH_EXECUTION_EXCEPTIONS:
+        pass
+    try:
+        tray.engine.per_key_brightness = brightness_int
+    except _FAST_PATH_EXECUTION_EXCEPTIONS:
+        pass
+
+
 def classify_fast_path_change(
     *,
     last_applied: _FastPathComparableState | None,
@@ -70,6 +91,12 @@ def classify_fast_path_change(
     try:
         if _is_brightness_only_change(last_applied, current):
             return "brightness_only"
+    except _FAST_PATH_CLASSIFICATION_EXCEPTIONS:
+        pass
+
+    try:
+        if _is_base_only_change(last_applied, current):
+            return "base_only"
     except _FAST_PATH_CLASSIFICATION_EXCEPTIONS:
         pass
 
@@ -101,13 +128,25 @@ def apply_fast_path_change(
         return True
 
     if change_kind != "brightness_only":
-        return False
+        if change_kind != "base_only":
+            return False
+        if str(current.effect) == "perkey":
+            return False
+        if str(current.effect) not in sw_effects_set:
+            return True
+        if not bool(getattr(tray.engine, "running", False)):
+            return False
+        set_engine_perkey_from_config_for_sw_effect(cast(LightingTrayProtocol, tray))
+        return True
 
     if str(current.effect) not in sw_effects_set:
         return False
 
     if not bool(getattr(tray.engine, "running", False)):
         return False
+
+    if is_reactive_effect(str(current.effect)):
+        _sync_reactive_base_perkey_brightness(tray, brightness=int(current.brightness))
 
     try:
         tray.engine.set_brightness(int(current.brightness), apply_to_hardware=False)
@@ -167,4 +206,22 @@ def _is_brightness_only_change(
         and last_applied.reactive_color == current.reactive_color
         and last_applied.reactive_brightness == current.reactive_brightness
         and last_applied.brightness != current.brightness
+    )
+
+
+def _is_base_only_change(
+    last_applied: _FastPathComparableState,
+    current: _FastPathComparableState,
+) -> bool:
+    return (
+        last_applied.effect == current.effect
+        and last_applied.speed == current.speed
+        and last_applied.brightness == current.brightness
+        and last_applied.color == current.color
+        and last_applied.software_effect_target == current.software_effect_target
+        and last_applied.reactive_use_manual == current.reactive_use_manual
+        and last_applied.reactive_color == current.reactive_color
+        and last_applied.reactive_brightness == current.reactive_brightness
+        and last_applied.reactive_trail_percent == current.reactive_trail_percent
+        and last_applied.perkey_sig != current.perkey_sig
     )

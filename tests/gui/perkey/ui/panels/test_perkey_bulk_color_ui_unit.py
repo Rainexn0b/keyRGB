@@ -106,7 +106,7 @@ def test_clear_all_ui_clears_redraws_pushes_and_sets_status() -> None:
 
     assert ed.colors == {}
     assert ed.canvas.redraw_calls == 1
-    assert ed.config.effect == "perkey"
+    assert ed.config.effect is None
     assert ed.config.per_key_colors == {}
     assert ed.kb is kb1
     assert pushed == {

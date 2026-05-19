@@ -56,16 +56,16 @@ DEFAULTS: dict = {
     # Uses the same brightness scale as `brightness`.
     "battery_saver_brightness": 25,
     # Power-source lighting profiles (AC vs battery)
-    # These default to "enabled" with no brightness override (None).
-    # When brightness is None, KeyRGB will keep using the current brightness
-    # (and can optionally fall back to battery_saver_* behavior on battery).
+    # New installs default to a brighter AC setup and a dimmer battery setup.
+    # Existing user configs keep their saved values; these defaults only apply
+    # when the keys are absent.
     "ac_lighting_enabled": True,
-    "ac_lighting_brightness": None,
-    "ac_power_mode": None,
+    "ac_lighting_brightness": 40,
+    "ac_power_mode": "performance",
     "ac_perkey_profile_name": None,
     "battery_lighting_enabled": True,
-    "battery_lighting_brightness": None,
-    "battery_power_mode": None,
+    "battery_lighting_brightness": 20,
+    "battery_power_mode": "balanced",
     "battery_perkey_profile_name": None,
     # Per-key colors stored as {"row,col": [r,g,b]}
     "per_key_colors": {},

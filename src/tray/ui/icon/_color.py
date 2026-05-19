@@ -9,6 +9,7 @@ from typing import Protocol, cast
 
 from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.core.effects.perkey_animation import build_full_color_grid
+from src.core.lighting_layers import resolve_render_effect
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS as NUM_COLS
 from src.core.resources.defaults import REFERENCE_MATRIX_ROWS as NUM_ROWS
 from src.core.utils.logging_utils import log_throttled
@@ -213,9 +214,10 @@ def representative_color(
     if is_off or _config_value(config, "brightness", 0) == 0:
         return _OFF_COLOR
 
-    effect = resolve_effect_name_for_backend(
-        str(_config_value(config, "effect", "none") or "none"),
-        backend,
+    effect = resolve_render_effect(
+        selected_effect=str(_config_value(config, "effect", "none") or "none"),
+        per_key_colors=_per_key_color_mapping(config),
+        resolve_effect_name_fn=lambda effect_name: resolve_effect_name_for_backend(effect_name, backend),
     )
     brightness = _config_int(config, "brightness", 25)
 

@@ -275,6 +275,52 @@ def test_start_hardware_polling_exception_path_calls_handler(monkeypatch) -> Non
     assert calls["handled"] == 1
 
 
+def test_start_hardware_polling_uses_fast_poll_interval_after_power_source_transition(monkeypatch) -> None:
+    import src.tray.pollers.hardware_polling as hp
+
+    created = {}
+
+    def fake_thread(*, target, daemon: bool):
+        t = _FakeThread(target=target, daemon=daemon)
+        created["t"] = t
+        return t
+
+    monkeypatch.setattr(hp.threading, "Thread", fake_thread)
+    monkeypatch.setattr(hp, "_apply_polled_hardware_state", lambda *_a, **_kw: (1, False))
+
+    sleep_calls: list[float] = []
+
+    def fake_sleep(seconds: float):
+        sleep_calls.append(float(seconds))
+        raise KeyboardInterrupt()
+
+    monkeypatch.setattr(hp.time, "sleep", fake_sleep)
+    monkeypatch.setattr(hp.time, "monotonic", lambda: 101.0)
+
+    class _Lock:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    tray = SimpleNamespace(
+        _last_power_source_transition_at=100.0,
+        engine=SimpleNamespace(
+            kb_lock=_Lock(),
+            kb=SimpleNamespace(get_brightness=lambda: 5, is_off=lambda: False),
+        ),
+    )
+
+    hp.start_hardware_polling(tray)
+
+    t = created["t"]
+    with pytest.raises(KeyboardInterrupt):
+        t.target()
+
+    assert sleep_calls == [0.25]
+
+
 def test_start_hardware_polling_propagates_unexpected_loop_errors(monkeypatch) -> None:
     import src.tray.pollers.hardware_polling as hp
 

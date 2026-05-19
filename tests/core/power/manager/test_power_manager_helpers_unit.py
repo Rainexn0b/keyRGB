@@ -75,7 +75,9 @@ def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> Non
     assert inputs is None
 
 
-def test_build_power_source_loop_inputs_uses_night_scheduler_base_override(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_power_source_loop_inputs_composes_night_scheduler_base_with_power_source_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from src.core.power.management._manager_helpers import build_power_source_loop_inputs
 
     class _Config:
@@ -120,10 +122,58 @@ def test_build_power_source_loop_inputs_uses_night_scheduler_base_override(monke
 
     assert inputs is not None
     assert inputs.ac_brightness_override == 20
-    assert inputs.battery_brightness_override == 20
+    assert inputs.battery_brightness_override == 15
     assert inputs.active_perkey_profile_name == "movie"
     assert inputs.ac_perkey_profile_name == "gaming"
     assert inputs.battery_perkey_profile_name == "battery"
+
+
+def test_build_power_source_loop_inputs_composes_day_scheduler_base_with_power_source_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+
+    class _Config:
+        power_management_enabled = True
+        brightness = 35
+        ac_lighting_enabled = True
+        battery_lighting_enabled = True
+        ac_lighting_brightness = 45
+        battery_lighting_brightness = 15
+        battery_saver_enabled = False
+        battery_saver_brightness = 20
+        time_scheduler_enabled = True
+        day_start_time = "08:00"
+        night_start_time = "20:00"
+        day_base_brightness = 30
+
+        def reload(self) -> None:
+            return None
+
+    class FakeDateTime:
+        @staticmethod
+        def now() -> _datetime:
+            return _datetime(2024, 1, 1, 12, 0)
+
+    monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
+
+    inputs = build_power_source_loop_inputs(
+        _Config(),
+        kb_controller=MagicMock(is_off=False),
+        on_ac=True,
+        now_mono=123.0,
+        get_power_mode_status_fn=MagicMock(return_value=MagicMock(supported=True, mode=PowerMode.BALANCED)),
+        get_active_perkey_profile_fn=MagicMock(return_value="movie"),
+        safe_int_attr_fn=lambda obj, name, default=0: {
+            "brightness": 35,
+            "battery_saver_brightness": 20,
+            "day_base_brightness": 30,
+        }.get(name, default),
+    )
+
+    assert inputs is not None
+    assert inputs.ac_brightness_override == 30
+    assert inputs.battery_brightness_override == 15
 
 
 def test_apply_power_source_actions_logs_controller_failures_and_keeps_processing() -> None:

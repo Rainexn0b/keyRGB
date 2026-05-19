@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Callable
 
 from src.core.utils import safe_attrs
+from src.tray.controllers._brightness_layer import apply_layered_brightness_update
 from src.tray.controllers import _lighting_controller_helpers as lighting_controller_helpers
 from src.tray.protocols import LightingTrayProtocol
 
@@ -68,46 +69,11 @@ def on_brightness_clicked_impl(
     if brightness is None:
         return
 
-    brightness_hw = brightness * 5
-    brightness_int = int(brightness_hw)
-    if brightness_hw > 0:
-        tray._last_brightness = brightness_hw
-
-    effect = lighting_controller_helpers.get_effect_name(tray)
-    is_sw_effect = lighting_controller_helpers.is_software_effect(effect)
-    is_reactive = lighting_controller_helpers.is_reactive_effect(effect)
-
-    # Any effect that runs a loop (software or reactive typing) reads
-    # engine.brightness on each frame. For these, avoid restarting the loop
-    # and avoid issuing an extra hardware brightness write (some firmware
-    # flashes on separate brightness commands).
-    is_loop_effect = bool(is_sw_effect or is_reactive)
-
-    lighting_controller_helpers.try_log_event(
+    apply_layered_brightness_update(
         tray,
-        "menu",
-        "set_brightness",
-        old=safe_attrs.safe_int_attr(tray.config, "brightness", default=0),
-        new=brightness_int,
+        source="menu",
+        base_brightness=int(brightness * 5),
+        reactive_brightness=None,
+        reactive_source_label="tray brightness",
+        start_current_effect=start_current_effect,
     )
-
-    tray.config.brightness = brightness_hw
-
-    # For reactive typing effects, keep the tray brightness menu behaving like
-    # an overall keyboard brightness control so the user sees an immediate
-    # change without collapsing the separate reactive pulse-intensity state.
-    if is_reactive:
-        try:
-            tray.config.perkey_brightness = brightness_int
-        except (AttributeError, TypeError, ValueError, OverflowError):
-            pass
-        lighting_controller_helpers.sync_reactive_effect_brightness_state(
-            tray,
-            source="tray brightness",
-            base_brightness=brightness_int,
-        )
-    else:
-        tray.engine.set_brightness(tray.config.brightness, apply_to_hardware=not is_loop_effect)
-    if not tray.is_off and not is_loop_effect:
-        start_current_effect(tray)
-    tray._update_menu()

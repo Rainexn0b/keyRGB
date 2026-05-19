@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any, Literal, overload
 
@@ -106,6 +107,22 @@ class Config(_lighting_accessors.LightingConfigAccessors):
             settings=self._settings,
             logger=logger,
         )
+
+    def apply_perkey_profile_state(
+        self,
+        colors: Mapping[object, object] | None,
+        *,
+        effect_brightness: int | None = None,
+        perkey_brightness: int | None = None,
+    ) -> None:
+        """Persist a complete per-key base-profile switch in one config snapshot."""
+
+        if effect_brightness is not None:
+            self._settings["brightness"] = self._normalize_brightness_value(effect_brightness)
+        if perkey_brightness is not None:
+            self._settings["perkey_brightness"] = self._normalize_brightness_value(perkey_brightness)
+        self._settings["per_key_colors"] = self._serialize_per_key_colors(dict(colors or {}))
+        self._save()
 
     @staticmethod
     def _normalize_brightness_value(value: int) -> int:

@@ -6,11 +6,13 @@ from typing import Callable, Optional
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
 from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_float_field
 
+from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 from .policy import IdleAction
 from .sensors import BacklightState
 
 
 _IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_IDLE_POWER_IMPORT_EXCEPTIONS = (ImportError,) + _IDLE_POWER_RUNTIME_EXCEPTIONS
 
 
 @dataclass
@@ -20,6 +22,8 @@ class IdlePollLoopState:
     dimmed_true_streak: int = 0
     dimmed_false_streak: int = 0
     screen_off_true_streak: int = 0
+    last_on_ac_power: Optional[bool] = None
+    last_power_source_change_at: float = 0.0
     backlight_state: BacklightState = field(default_factory=BacklightState)
 
 
@@ -69,6 +73,56 @@ def _reload_idle_power_config_best_effort(tray: IdlePowerTrayProtocol) -> None:
     _run_idle_power_runtime_boundary_best_effort(reload_config)
 
 
+def _read_on_ac_power_best_effort() -> Optional[bool]:
+    try:
+        from src.core.power.monitoring.power_supply_sysfs import read_on_ac_power
+    except _IDLE_POWER_IMPORT_EXCEPTIONS:
+        return None
+
+    try:
+        return read_on_ac_power()
+    except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+        return None
+
+
+def _reset_power_source_sensitive_idle_state(loop_state: IdlePollLoopState) -> None:
+    loop_state.dimmed_true_streak = 0
+    loop_state.dimmed_false_streak = 0
+    loop_state.screen_off_true_streak = 0
+    loop_state.backlight_state.baselines.clear()
+    loop_state.backlight_state.dimmed.clear()
+    loop_state.backlight_state.screen_off = False
+
+
+def _update_power_source_idle_guard(
+    *,
+    loop_state: IdlePollLoopState,
+    on_ac_power: Optional[bool],
+    now: float,
+) -> None:
+    if on_ac_power is None:
+        return
+
+    on_ac = bool(on_ac_power)
+    if loop_state.last_on_ac_power is None:
+        loop_state.last_on_ac_power = on_ac
+        return
+
+    if on_ac == bool(loop_state.last_on_ac_power):
+        return
+
+    loop_state.last_on_ac_power = on_ac
+    loop_state.last_power_source_change_at = float(now)
+    _reset_power_source_sensitive_idle_state(loop_state)
+
+
+def _power_source_idle_guard_active(*, loop_state: IdlePollLoopState, now: float) -> bool:
+    changed_at = float(loop_state.last_power_source_change_at or 0.0)
+    if changed_at <= 0.0:
+        return False
+    return (float(now) - changed_at) < POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
+
+
 def run_idle_power_iteration(
     tray: IdlePowerTrayProtocol,
     *,
@@ -86,10 +140,18 @@ def run_idle_power_iteration(
     build_idle_action_key_fn: Callable[..., str],
     should_log_idle_action_fn: Callable[..., bool],
     apply_idle_action_fn: Callable[..., None],
+    read_on_ac_power_fn: Callable[[], Optional[bool]] | None = None,
 ) -> None:
     ensure_idle_state_fn(tray)
 
     _reload_idle_power_config_best_effort(tray)
+    now = float(now_monotonic_fn())
+    read_on_ac = read_on_ac_power_fn or _read_on_ac_power_best_effort
+    _update_power_source_idle_guard(
+        loop_state=loop_state,
+        on_ac_power=read_on_ac(),
+        now=now,
+    )
 
     dimmed = read_dimmed_state_fn(loop_state.backlight_state)
     screen_off = bool(loop_state.backlight_state.screen_off) or bool(read_screen_off_state_drm_fn())
@@ -148,8 +210,10 @@ def run_idle_power_iteration(
             default=0.0,
         ),
         last_resume_at=float(tray._last_resume_at),
-        now=now_monotonic_fn(),
+        now=now,
     )
+    if _power_source_idle_guard_active(loop_state=loop_state, now=now):
+        action = None
 
     action_key = build_idle_action_key_fn(
         action=action,

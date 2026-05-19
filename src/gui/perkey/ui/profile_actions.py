@@ -21,6 +21,7 @@ from ..hardware import NUM_COLS, NUM_ROWS
 
 logger = logging.getLogger(__name__)
 KEEP_CURRENT_PROFILE_LABEL = "Keep current profile"
+_POWER_SOURCE_READ_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
 # Keep module-backed seams patchable while deferring heavier imports until use.
@@ -132,6 +133,12 @@ def save_profile(*args, **kwargs):
     return _save_profile(*args, **kwargs)
 
 
+def read_on_ac_power(*args, **kwargs):
+    from src.core.power.monitoring.power_supply_sysfs import read_on_ac_power as _read_on_ac_power
+
+    return _read_on_ac_power(*args, **kwargs)
+
+
 def reset_layout_defaults_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     resolved_layout = resolve_layout_id(editor._physical_layout)
     slot_lookup = editor._slot_id_for_key_id
@@ -234,6 +241,29 @@ def _selected_power_source_profile_name(value: object) -> str | None:
     return normalized
 
 
+def _maybe_activate_current_power_source_profile_ui(
+    editor: _PerKeyProfileEditorProtocol,
+) -> tuple[str, str] | None:
+    try:
+        on_ac = read_on_ac_power()
+    except _POWER_SOURCE_READ_ERRORS:
+        return None
+
+    if on_ac is None:
+        return None
+
+    source_label = "AC" if bool(on_ac) else "battery"
+    desired_profile_name = _selected_power_source_profile_name(
+        editor._ac_power_source_profile_var.get() if bool(on_ac) else editor._battery_power_source_profile_var.get()
+    )
+    if desired_profile_name is None or desired_profile_name == editor.profile_name:
+        return None
+
+    editor._profile_name_var.set(desired_profile_name)
+    activate_profile_ui(editor)
+    return source_label, desired_profile_name
+
+
 def sync_power_source_profile_policy_controls(editor: _PerKeyProfileEditorProtocol) -> None:
     options = power_source_profile_options(editor)
     config = getattr(editor, "config", None)
@@ -258,8 +288,13 @@ def save_power_source_profile_policy_ui(editor: _PerKeyProfileEditorProtocol) ->
     editor.config.battery_perkey_profile_name = _selected_power_source_profile_name(
         editor._battery_power_source_profile_var.get()
     )
+    activated_profile = _maybe_activate_current_power_source_profile_ui(editor)
     sync_power_source_profile_policy_controls(editor)
-    set_status(editor, "Saved AC/battery lighting profile policy")
+    if activated_profile is None:
+        set_status(editor, "Saved AC/battery lighting profile policy")
+        return
+    source_label, profile_name = activated_profile
+    set_status(editor, f"Saved AC/battery lighting profile policy and activated '{profile_name}' for {source_label}")
 
 
 def activate_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:

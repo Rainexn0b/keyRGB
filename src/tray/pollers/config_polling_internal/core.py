@@ -3,7 +3,11 @@ from __future__ import annotations
 from src.core.effects.catalog import REACTIVE_EFFECTS, resolve_effect_name_for_backend
 from src.core.effects.software_targets import normalize_software_effect_target
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
-from src.tray.protocols import ConfigPollingTrayProtocol, ConfigStateResolveTrayProtocol
+from src.tray.protocols import (
+    ConfigPollingTrayProtocol,
+    ConfigStateResolveTrayProtocol,
+    read_idle_power_state_float_field,
+)
 
 from . import _planning as _planning
 from . import _post_fast_path_apply as _post_fast_path_apply
@@ -25,6 +29,7 @@ from .helpers import (
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 _FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _CONFIG_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_POWER_SOURCE_CONFIG_SUPPRESSION_WINDOW_S = 1.5
 apply_post_fast_path_execution = _post_fast_path_apply.apply_post_fast_path_execution
 execute_non_fast_path_plan = _post_fast_path_apply.execute_non_fast_path_plan
 classify_apply_from_config = _planning.classify_apply_from_config
@@ -55,6 +60,7 @@ def state_for_log(state: ConfigApplyState | None):
         perkey_keys = 0 if state.perkey_sig is None else len(state.perkey_sig)
         return {
             "effect": state.effect,
+            "selected_effect": state.selected_effect,
             "speed": state.speed,
             "brightness": state.brightness,
             "color": tuple(state.color) if state.color is not None else None,
@@ -63,6 +69,18 @@ def state_for_log(state: ConfigApplyState | None):
         }
     except _CONFIG_FALLBACK_EXCEPTIONS:
         return None
+
+
+def _recent_power_source_transition_active(tray: object, *, now: float) -> bool:
+    changed_at = read_idle_power_state_float_field(
+        tray,
+        attr_name="_last_power_source_transition_at",
+        state_name="last_power_source_transition_at",
+        default=0.0,
+    )
+    if changed_at <= 0:
+        return False
+    return now - changed_at <= _POWER_SOURCE_CONFIG_SUPPRESSION_WINDOW_S
 
 
 def maybe_apply_fast_path(
@@ -123,6 +141,22 @@ def apply_from_config_once(
 
     if current == last_applied:
         return last_applied, last_apply_warn_at
+
+    if str(cause or "") == "mtime_change" and current.perkey_sig is not None:
+        now = float(monotonic_fn())
+        if _recent_power_source_transition_active(tray, now=now):
+            try:
+                tray._log_event(
+                    "config",
+                    "skipped_recent_power_source_transition",
+                    cause=str(cause or "unknown"),
+                    effect=str(current.effect),
+                    selected_effect=str(current.selected_effect or current.effect),
+                    brightness=int(current.brightness),
+                )
+            except _CONFIG_FALLBACK_EXCEPTIONS:
+                pass
+            return current, last_apply_warn_at
 
     apply_plan = resolve_apply_from_config_policy(
         tray.config,

@@ -40,9 +40,9 @@ class TimeSchedulerPanel:
         desc = ttk.Label(
             parent,
             text=(
-                "Adjust keyboard brightness by local time. During the day, 'Plugged In vs Battery' "
-                "still controls base brightness. Reactive brightness follows the schedule, and at "
-                "night these values always apply."
+                "Adjust keyboard brightness by local time. Reactive brightness follows the schedule. "
+                "If 'Plugged In vs Battery' brightness is also configured, the lower active base "
+                "brightness wins; otherwise the scheduled base brightness is applied directly."
             ),
             font=("Sans", 9),
             justify="left",

@@ -18,6 +18,7 @@ from src.core.effects.catalog import is_backend_hardware_effect
 from src.core.effects.catalog import is_forced_hardware_effect
 from src.core.effects.catalog import normalize_effect_name
 from src.core.effects.catalog import strip_effect_namespace
+from src.core.lighting_layers import has_nonempty_per_key_base
 from src.core.utils.exceptions import is_permission_denied
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.protocols import LightingTrayProtocol
@@ -200,12 +201,11 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
             tray.engine.stop()
 
             per_key = _config_per_key_colors_ref(tray.config)
-            if per_key and per_key_supported:
-                tray.config.effect = "perkey"
+            tray.config.effect = "none"
+            if has_nonempty_per_key_base(per_key) and per_key_supported:
                 _ensure_software_mode(tray)
                 effect_tray._start_current_effect()
             else:
-                tray.config.effect = "none"
                 _ensure_hardware_mode(tray)
                 with tray.engine.kb_lock:
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
@@ -233,7 +233,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                 tray.config.per_key_colors = colors
 
             _ensure_software_mode(tray)
-            tray.config.effect = "perkey"
+            tray.config.effect = "none"
             effect_tray._start_current_effect()
             tray.is_off = False
             return

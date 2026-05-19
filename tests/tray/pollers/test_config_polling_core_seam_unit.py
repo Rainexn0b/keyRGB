@@ -185,10 +185,12 @@ def test_execute_non_fast_path_plan_uses_local_post_fast_path_executor(monkeypat
         apply_uniform_fn: object,
         apply_effect_fn: object,
         runtime_boundary_exceptions: tuple[type[Exception], ...],
+        last_applied: object | None = None,
     ) -> float:
         captured["apply"] = {
             "tray": _tray,
             "current": current,
+            "last_applied": last_applied,
             "ite_num_rows": ite_num_rows,
             "ite_num_cols": ite_num_cols,
             "cause": cause,
@@ -240,6 +242,7 @@ def test_execute_non_fast_path_plan_uses_local_post_fast_path_executor(monkeypat
     )
     assert captured["apply"]["tray"] is tray
     assert captured["apply"]["current"] is current
+    assert captured["apply"]["last_applied"] is last_applied
     assert captured["apply"]["ite_num_rows"] == 6
     assert captured["apply"]["ite_num_cols"] == 21
     assert captured["apply"]["cause"] == "mtime_change"

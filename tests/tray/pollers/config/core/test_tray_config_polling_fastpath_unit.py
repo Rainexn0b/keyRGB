@@ -86,6 +86,44 @@ def test_fastpath_brightness_change_for_running_sw_effect_does_not_restart_and_n
     tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False)
 
 
+def test_fastpath_brightness_change_for_running_reactive_effect_syncs_perkey_brightness() -> None:
+    tray = _mk_tray(engine_running=True)
+    tray.config.effect = "reactive_ripple"
+    tray.config.perkey_brightness = 10
+    tray.engine.per_key_brightness = 10
+    tray.engine.reactive_brightness = 40
+
+    last = ConfigApplyState(
+        effect="reactive_ripple",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=None,
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+        reactive_brightness=40,
+    )
+    current = ConfigApplyState(
+        effect="reactive_ripple",
+        speed=4,
+        brightness=30,
+        color=(1, 2, 3),
+        perkey_sig=None,
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+        reactive_brightness=40,
+    )
+
+    handled, new_last = _maybe_apply_fast_path(tray, last_applied=last, current=current)
+
+    assert handled is True
+    assert new_last == current
+    assert tray.config.perkey_brightness == 30
+    assert tray.engine.per_key_brightness == 30
+    assert tray.engine.reactive_brightness == 40
+    tray.engine.set_brightness.assert_called_once_with(30, apply_to_hardware=False)
+
+
 def test_fastpath_brightness_change_not_taken_if_engine_not_running() -> None:
     tray = _mk_tray(engine_running=False)
 
@@ -269,4 +307,37 @@ def test_fastpath_trail_percent_change_updates_engine_without_restart() -> None:
     assert handled is True
     assert new_last == current
     assert tray.engine.reactive_trail_percent == 80
+    tray.engine.set_brightness.assert_not_called()
+
+
+def test_fastpath_base_only_change_updates_running_software_effect_without_restart() -> None:
+    tray = _mk_tray(engine_running=True)
+    tray.config.per_key_colors = {(0, 0): (9, 9, 9)}
+    tray.config.perkey_brightness = 12
+
+    last = ConfigApplyState(
+        effect="reactive_ripple",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=(((0, 0), (1, 2, 3)),),
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+    )
+    current = ConfigApplyState(
+        effect="reactive_ripple",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=(((0, 0), (9, 9, 9)),),
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+    )
+
+    handled, new_last = _maybe_apply_fast_path(tray, last_applied=last, current=current)
+
+    assert handled is True
+    assert new_last == current
+    assert tray.engine.per_key_colors is tray.config.per_key_colors
+    assert tray.engine.per_key_brightness == 12
     tray.engine.set_brightness.assert_not_called()

@@ -4,6 +4,7 @@ from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from src.core.effects.catalog import normalize_effect_name
+from src.core.lighting_layers import render_effect_from_selected_effect
 
 from .menu_status import DeviceContextEntry
 
@@ -118,6 +119,10 @@ def checked_software_target(tray: _HasMenuConfig, target_key: str) -> _MenuCheck
 
 def checked_perkey(tray: _HasMenuPowerState) -> _MenuChecked:
     def _checked(_item: object) -> bool:
-        return tray.config.effect == "perkey" and not tray.is_off
+        effect = render_effect_from_selected_effect(
+            selected_effect=normalize_effect_name(str(getattr(tray.config, "effect", "none") or "none")),
+            per_key_colors=getattr(tray.config, "per_key_colors", None),
+        )
+        return effect == "perkey" and not tray.is_off
 
     return _checked

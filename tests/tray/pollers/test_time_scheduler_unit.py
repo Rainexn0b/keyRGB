@@ -4,8 +4,6 @@ from datetime import datetime
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
-import pytest
-
 from src.tray.pollers.time_scheduler import _is_night, _parse_time, _run_scheduler_iteration
 
 
@@ -64,7 +62,7 @@ class TestIsNight:
         assert _is_night(datetime(2024, 1, 1, 23, 59), day_start, night_start) is False
 
 
-def test_run_scheduler_iteration_applies_day_reactive_brightness_while_base_is_deferred_to_power_policy() -> None:
+def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_has_no_base_override() -> None:
     tray = MagicMock()
     tray._user_forced_off = False
     tray._power_forced_off = False
@@ -77,6 +75,47 @@ def test_run_scheduler_iteration_applies_day_reactive_brightness_while_base_is_d
     tray.config.night_base_brightness = 10
     tray.config.night_reactive_brightness = 15
     tray.config.power_management_enabled = True
+    tray.config.effect = "reactive_ripple"
+    tray.config.brightness = 25
+    tray.config.perkey_brightness = 25
+    tray.config.reactive_brightness = 25
+    tray.engine.reactive_brightness = 25
+
+    class _FakeDateTime:
+        @staticmethod
+        def now() -> datetime:
+            return datetime(2024, 1, 1, 12, 0)
+
+    with patch("src.tray.pollers.time_scheduler.datetime", _FakeDateTime):
+        _run_scheduler_iteration(tray)
+
+    assert tray.config.brightness == 25
+    tray.engine.set_brightness.assert_called_once_with(
+        25,
+        apply_to_hardware=False,
+        fade=False,
+        fade_duration_s=0.25,
+    )
+    assert tray.config.reactive_brightness == 40
+    assert tray.engine.reactive_brightness == 40
+    tray._refresh_ui.assert_called_once_with()
+
+
+def test_run_scheduler_iteration_defers_day_base_brightness_when_power_source_overrides_are_configured() -> None:
+    tray = MagicMock()
+    tray._user_forced_off = False
+    tray._power_forced_off = False
+    tray._idle_forced_off = False
+    tray.config.time_scheduler_enabled = True
+    tray.config.day_start_time = "08:00"
+    tray.config.night_start_time = "20:00"
+    tray.config.day_base_brightness = 25
+    tray.config.day_reactive_brightness = 40
+    tray.config.night_base_brightness = 10
+    tray.config.night_reactive_brightness = 15
+    tray.config.power_management_enabled = True
+    tray.config.ac_lighting_brightness = 35
+    tray.config.battery_lighting_brightness = 20
     tray.config.effect = "reactive_ripple"
     tray.config.brightness = 25
     tray.config.perkey_brightness = 25

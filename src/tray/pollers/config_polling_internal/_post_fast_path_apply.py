@@ -36,6 +36,7 @@ class ApplyPerkeyFn(Protocol):
         ite_num_cols: int,
         *,
         cause: str,
+        reassert_user_mode: bool = True,
     ) -> None: ...
 
 
@@ -152,6 +153,7 @@ def apply_post_fast_path_execution(
     apply_uniform_fn: ApplyUniformFn,
     apply_effect_fn: ApplyEffectFn,
     runtime_boundary_exceptions: tuple[type[Exception], ...],
+    last_applied: object | None = None,
 ) -> float:
     brightness = current.brightness
     if brightness > 0:
@@ -162,7 +164,21 @@ def apply_post_fast_path_execution(
     def _apply_current() -> None:
         effect = current.effect
         if effect == "perkey":
-            apply_perkey_fn(tray, current, ite_num_rows, ite_num_cols, cause=cause)
+            reassert_user_mode = True
+            try:
+                already_perkey = getattr(last_applied, "effect", None) == "perkey"
+                currently_on = not bool(getattr(tray, "is_off", False))
+                reassert_user_mode = not (already_perkey and currently_on and int(current.brightness) > 0)
+            except (AttributeError, TypeError, ValueError, OverflowError):
+                reassert_user_mode = True
+            apply_perkey_fn(
+                tray,
+                current,
+                ite_num_rows,
+                ite_num_cols,
+                cause=cause,
+                reassert_user_mode=bool(reassert_user_mode),
+            )
         elif effect == "none":
             apply_uniform_fn(tray, current, cause=cause)
         else:
@@ -246,4 +262,5 @@ def execute_non_fast_path_plan(
         apply_uniform_fn=apply_uniform_fn,
         apply_effect_fn=apply_effect_fn,
         runtime_boundary_exceptions=runtime_boundary_exceptions,
+        last_applied=last_applied,
     )

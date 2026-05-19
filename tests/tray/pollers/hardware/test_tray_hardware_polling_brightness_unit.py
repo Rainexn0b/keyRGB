@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from unittest.mock import MagicMock
 
 from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
@@ -144,3 +145,49 @@ def test_hardware_polling_does_not_scale_up_when_config_expects_low_value() -> N
     assert last_off is False
     assert tray.refresh_count == 1
     assert tray.last_animate_icon is False
+
+
+def test_hardware_polling_recovers_recent_power_source_blank_without_marking_off(monkeypatch) -> None:
+    tray = _DummyTray(brightness=25, is_off=False)
+    tray._last_power_source_transition_at = 100.0
+    tray._apply_power_source_perkey_profile_transition = MagicMock(return_value=True)
+
+    monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=25,
+        last_off_state=False,
+    )
+
+    tray._apply_power_source_perkey_profile_transition.assert_called_once_with()
+    assert last_brightness == 0
+    assert last_off is False
+    assert tray.is_off is False
+    assert tray.refresh_count == 1
+    assert tray.last_animate_icon is False
+    assert tray.tray_idle_power_state.hidden_perkey_restore_brightness_hint is None
+    assert tray.tray_idle_power_state.hidden_perkey_restore_device_off_hint is None
+    assert tray.tray_idle_power_state.last_power_source_blank_recovery_at == 101.0
+
+
+def test_hardware_polling_keeps_recent_power_source_blank_in_recovery_window(monkeypatch) -> None:
+    tray = _DummyTray(brightness=25, is_off=False)
+    tray._last_power_source_transition_at = 100.0
+
+    monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=True,
+        last_brightness=0,
+        last_off_state=False,
+    )
+
+    assert last_brightness == 0
+    assert last_off is False
+    assert tray.is_off is False
+    assert tray.refresh_count == 0

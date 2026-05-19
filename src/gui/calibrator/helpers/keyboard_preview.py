@@ -53,7 +53,6 @@ class KeyboardPreviewSession:
         colors = _full_black_map(rows=self.rows, cols=self.cols)
         colors[(row, col)] = (255, 255, 255)
 
-        self.cfg.effect = "perkey"
         if getattr(self.cfg, "brightness", 0) <= 0:
             self.cfg.brightness = 50
         self.cfg.per_key_colors = colors

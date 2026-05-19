@@ -6,12 +6,21 @@ import time
 from typing import TypeVar
 
 from src.core.utils.exceptions import is_device_disconnected
-from src.tray.protocols import IdlePowerTrayProtocol
+from src.tray.protocols import (
+    IdlePowerTrayProtocol,
+    clear_idle_power_state_field,
+    read_idle_power_state_float_field,
+    set_idle_power_state_field,
+)
 
 
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _HARDWARE_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _HARDWARE_POLL_RECOVERY_EXCEPTIONS = (OSError, RuntimeError, ValueError)
+_POWER_SOURCE_RECOVERY_WINDOW_S = 6.0
+_POWER_SOURCE_RECOVERY_COOLDOWN_S = 0.75
+_DEFAULT_HARDWARE_POLL_INTERVAL_S = 2.0
+_FAST_HARDWARE_POLL_INTERVAL_S = 0.25
 _T = TypeVar("_T")
 
 
@@ -34,8 +43,8 @@ def _run_recoverable_hardware_poll_boundary(
         return None
 
 
-def _log_polled_hardware_event(tray_vars: dict[str, object], action: str, **fields: object) -> None:
-    log_event = tray_vars.get("_log_event")
+def _log_polled_hardware_event(tray: IdlePowerTrayProtocol, action: str, **fields: object) -> None:
+    log_event = _resolve_tray_callback(tray, "_log_event")
     if not callable(log_event):
         return
 
@@ -68,6 +77,131 @@ def _refresh_ui_without_icon_animation(tray: IdlePowerTrayProtocol) -> None:
         tray._refresh_ui()
 
 
+def _resolve_tray_callback(tray: object, name: str):
+    instance_callback = vars(tray).get(name)
+    if callable(instance_callback):
+        return instance_callback
+
+    class_callback = getattr(type(tray), name, None)
+    if not callable(class_callback):
+        return None
+
+    return lambda *args, **kwargs: class_callback(tray, *args, **kwargs)
+
+
+def _power_source_recovery_window_active(tray: IdlePowerTrayProtocol, *, now: float) -> bool:
+    changed_at = read_idle_power_state_float_field(
+        tray,
+        attr_name="_last_power_source_transition_at",
+        state_name="last_power_source_transition_at",
+        default=0.0,
+    )
+    if changed_at <= 0:
+        return False
+
+    return now - changed_at <= _POWER_SOURCE_RECOVERY_WINDOW_S
+
+
+def _hardware_poll_interval_s(tray: IdlePowerTrayProtocol, *, now: float) -> float:
+    if _power_source_recovery_window_active(tray, now=now):
+        return _FAST_HARDWARE_POLL_INTERVAL_S
+    return _DEFAULT_HARDWARE_POLL_INTERVAL_S
+
+
+def _configured_brightness_intent(tray: IdlePowerTrayProtocol) -> int:
+    try:
+        return int(getattr(getattr(tray, "config", None), "brightness", 0))
+    except _BRIGHTNESS_COERCION_ERRORS:
+        return 0
+
+
+def _recover_recent_power_source_blank_best_effort(
+    tray: IdlePowerTrayProtocol,
+    *,
+    current_brightness: int,
+) -> bool:
+    tray_vars = vars(tray)
+    now = time.monotonic()
+    if not _power_source_recovery_window_active(tray, now=now):
+        return False
+
+    if bool(tray_vars.get("_user_forced_off", False)):
+        return False
+    if bool(tray_vars.get("_power_forced_off", False)):
+        return False
+    if bool(tray_vars.get("_idle_forced_off", False)):
+        return False
+    if _configured_brightness_intent(tray) <= 0:
+        return False
+
+    try:
+        last_recovery_at = read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_power_source_blank_recovery_at",
+            state_name="last_power_source_blank_recovery_at",
+            default=0.0,
+        )
+    except _BRIGHTNESS_COERCION_ERRORS:
+        last_recovery_at = 0.0
+    if now - last_recovery_at < _POWER_SOURCE_RECOVERY_COOLDOWN_S:
+        return False
+
+    apply_transition = _resolve_tray_callback(tray, "_apply_power_source_perkey_profile_transition")
+    start_current_effect = _resolve_tray_callback(tray, "_start_current_effect")
+
+    try:
+        set_idle_power_state_field(
+            tray,
+            attr_name="_hidden_perkey_restore_brightness_hint",
+            state_name="hidden_perkey_restore_brightness_hint",
+            value=int(current_brightness),
+        )
+        set_idle_power_state_field(
+            tray,
+            attr_name="_hidden_perkey_restore_device_off_hint",
+            state_name="hidden_perkey_restore_device_off_hint",
+            value=False,
+        )
+        handled = bool(apply_transition()) if callable(apply_transition) else False
+        if not handled and callable(start_current_effect):
+            start_current_effect()
+            handled = True
+    except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
+        _log_hardware_polling_error_best_effort(tray, exc)
+        return False
+    finally:
+        clear_idle_power_state_field(
+            tray,
+            attr_name="_hidden_perkey_restore_brightness_hint",
+            state_name="hidden_perkey_restore_brightness_hint",
+            value=None,
+        )
+        clear_idle_power_state_field(
+            tray,
+            attr_name="_hidden_perkey_restore_device_off_hint",
+            state_name="hidden_perkey_restore_device_off_hint",
+            value=None,
+        )
+
+    if not handled:
+        return False
+
+    set_idle_power_state_field(
+        tray,
+        attr_name="_last_power_source_blank_recovery_at",
+        state_name="last_power_source_blank_recovery_at",
+        value=float(now),
+    )
+    tray.is_off = False
+    _log_polled_hardware_event(
+        tray,
+        "power_source_blank_recover",
+        brightness=int(current_brightness),
+    )
+    _refresh_ui_without_icon_animation(tray)
+    return True
+
+
 def _apply_polled_hardware_state(
     tray: IdlePowerTrayProtocol,
     *,
@@ -95,7 +229,7 @@ def _apply_polled_hardware_state(
 
     if last_brightness is not None and current_brightness != last_brightness:
         _log_polled_hardware_event(
-            tray_vars,
+            tray,
             "brightness_change",
             raw=_coerce_poll_int(raw_brightness, default=current_brightness),
             old=_coerce_poll_int(last_brightness, default=current_brightness),
@@ -120,6 +254,8 @@ def _apply_polled_hardware_state(
         # transiently report 0 during mode transitions; persisting it resets the
         # user's configured brightness to 0 (and writes it to disk).
         if current_brightness == 0:
+            if _recover_recent_power_source_blank_best_effort(tray, current_brightness=current_brightness):
+                return current_brightness, False
             tray.is_off = True
         else:
             # Do not persist hardware-polled brightness into config.json.
@@ -139,7 +275,7 @@ def _apply_polled_hardware_state(
 
     if last_off_state is not None and current_off != last_off_state:
         _log_polled_hardware_event(
-            tray_vars,
+            tray,
             "off_state_change",
             old=bool(last_off_state),
             new=bool(current_off),
@@ -149,6 +285,10 @@ def _apply_polled_hardware_state(
             return current_brightness, current_off
 
         if current_off:
+            if _recover_recent_power_source_blank_best_effort(tray, current_brightness=current_brightness):
+                return current_brightness, False
+            if _power_source_recovery_window_active(tray, now=time.monotonic()):
+                return current_brightness, False
             tray.is_off = True
         else:
             # Avoid overriding explicit forced-off states.
@@ -239,6 +379,6 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
             if polled_state is not None:
                 last_brightness, last_off_state = polled_state
 
-            time.sleep(2)
+            time.sleep(_hardware_poll_interval_s(tray, now=time.monotonic()))
 
     threading.Thread(target=poll_hardware, daemon=True).start()

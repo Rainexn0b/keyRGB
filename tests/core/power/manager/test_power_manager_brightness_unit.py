@@ -37,7 +37,32 @@ class TestPowerManagerBrightnessPolicyApplication:
         pm = PowerManager(mock_kb, config=cfg)
         pm._apply_brightness_policy(75)
 
-        mock_kb.engine.set_brightness.assert_called_once_with(75)
+        mock_kb.engine.set_brightness.assert_called_once_with(50)
+        assert cfg.effect_brightness == 50
+
+    def test_apply_brightness_fallback_syncs_base_only_perkey_state(self):
+        from src.core.config import Config
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        del mock_kb.apply_brightness_from_power_policy
+        mock_kb.engine = MagicMock()
+
+        cfg = Config()
+        cfg.effect = "none"
+        cfg.effect_brightness = 40
+        cfg.perkey_brightness = 22
+        cfg.per_key_colors = {(0, 0): (1, 2, 3)}
+        assert cfg.brightness == 20
+
+        pm = PowerManager(mock_kb, config=cfg)
+        pm._apply_brightness_policy(18)
+
+        mock_kb.engine.set_brightness.assert_called_once_with(20)
+        assert mock_kb.engine.per_key_brightness == 20
+        assert cfg.brightness == 20
+        assert cfg.effect_brightness == 20
+        assert cfg.perkey_brightness == 20
 
     def test_apply_brightness_handles_missing_engine_gracefully(self):
         """If engine is missing or raises, don't crash."""
@@ -66,15 +91,18 @@ class TestPowerManagerApplyBrightnessExceptionPaths:
         from src.core.power.management.manager import PowerManager
 
         class _ConfigRaisingOnSet:
+            effect = "wave"
+            per_key_colors = {}
+
             def reload(self):
                 return None
 
             @property
-            def brightness(self):
+            def effect_brightness(self):
                 return 50
 
-            @brightness.setter
-            def brightness(self, _value):
+            @effect_brightness.setter
+            def effect_brightness(self, _value):
                 raise RuntimeError("nope")
 
         mock_kb = MagicMock(spec=["engine"])

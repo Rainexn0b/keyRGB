@@ -9,6 +9,27 @@ import pytest
 
 
 class TestPowerManagerBatterySaverLoop:
+    def test_stabilize_on_ac_state_requires_two_consecutive_changed_samples(self):
+        from src.core.power.management.manager import PowerManager
+
+        pm = PowerManager(MagicMock(), config=MagicMock())
+
+        assert pm._stabilize_on_ac_state(True) is True
+        assert pm._stabilize_on_ac_state(False) is True
+        assert pm._stabilize_on_ac_state(False) is False
+        assert pm._stabilize_on_ac_state(True) is False
+        assert pm._stabilize_on_ac_state(True) is True
+
+    def test_stabilize_on_ac_state_reuses_last_stable_value_when_read_is_unavailable(self):
+        from src.core.power.management.manager import PowerManager
+
+        pm = PowerManager(MagicMock(), config=MagicMock())
+
+        assert pm._stabilize_on_ac_state(True) is True
+        assert pm._stabilize_on_ac_state(None) is True
+        assert pm._stabilize_on_ac_state(False) is True
+        assert pm._stabilize_on_ac_state(False) is False
+
     def test_classify_battery_saver_iteration_returns_classifier_plan_with_existing_runtime_inputs(self):
         from src.core.power.management import manager as manager_module
         from src.core.power.management.manager import PowerManager
@@ -307,3 +328,64 @@ class TestPowerManagerBatterySaverLoop:
 
         activate_profile.assert_not_called()
         warning.assert_called_once_with("Skipping missing power-source lighting profile '%s'", "battery")
+
+    def test_activate_power_source_perkey_profile_uses_tray_transition_when_available(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        mock_kb.config = SimpleNamespace(brightness=25, effect="perkey", per_key_colors={(0, 0): (1, 2, 3)})
+        mock_kb._power_forced_off = False
+        mock_kb._apply_power_source_perkey_profile_transition = MagicMock(return_value=True)
+
+        pm = PowerManager(mock_kb, config=MagicMock())
+
+        with (
+            patch.object(manager_module, "list_perkey_profiles", return_value=["battery"]),
+            patch.object(manager_module.perkey_profiles, "set_active_profile", return_value="battery") as set_active,
+            patch.object(
+                manager_module.perkey_profiles,
+                "load_per_key_colors",
+                return_value={(0, 0): (9, 9, 9)},
+            ) as load_colors,
+            patch.object(manager_module.perkey_profiles, "apply_profile_to_config") as apply_profile,
+            patch.object(manager_module.time, "monotonic", return_value=123.0),
+        ):
+            pm._activate_power_source_perkey_profile("battery")
+
+        set_active.assert_called_once_with("battery")
+        load_colors.assert_called_once_with("battery")
+        apply_profile.assert_called_once_with(mock_kb.config, {(0, 0): (9, 9, 9)})
+        mock_kb._apply_power_source_perkey_profile_transition.assert_called_once_with()
+        mock_kb._start_current_effect.assert_not_called()
+        assert mock_kb._last_power_source_transition_at == 123.0
+        assert mock_kb._last_power_source_transition_profile_name == "battery"
+        mock_kb._update_icon.assert_called_once()
+        mock_kb._update_menu.assert_called_once()
+
+    def test_activate_power_source_perkey_profile_restarts_when_tray_transition_declines(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        mock_kb.config = SimpleNamespace(brightness=25, effect="reactive_ripple", per_key_colors={(0, 0): (1, 2, 3)})
+        mock_kb._power_forced_off = False
+        mock_kb._apply_power_source_perkey_profile_transition = MagicMock(return_value=False)
+
+        pm = PowerManager(mock_kb, config=MagicMock())
+
+        with (
+            patch.object(manager_module, "list_perkey_profiles", return_value=["battery"]),
+            patch.object(manager_module.perkey_profiles, "set_active_profile", return_value="battery"),
+            patch.object(manager_module.perkey_profiles, "load_per_key_colors", return_value={(0, 0): (9, 9, 9)}),
+            patch.object(manager_module.perkey_profiles, "apply_profile_to_config"),
+            patch.object(manager_module.time, "monotonic", return_value=123.0),
+        ):
+            pm._activate_power_source_perkey_profile("battery")
+
+        mock_kb._apply_power_source_perkey_profile_transition.assert_called_once_with()
+        mock_kb._start_current_effect.assert_called_once_with()
+        assert mock_kb._last_power_source_transition_at == 123.0
+        assert mock_kb._last_power_source_transition_profile_name == "battery"
+        mock_kb._update_icon.assert_called_once()
+        mock_kb._update_menu.assert_called_once()

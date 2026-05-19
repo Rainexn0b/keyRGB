@@ -121,8 +121,6 @@ def on_color_change(
     if (now - gui._last_drag_commit_ts) < gui._drag_commit_interval:
         return
 
-    if not gui._target_is_secondary and gui.config.effect != "none":
-        gui.config.effect = "none"
     if gui._target_is_secondary:
         gui._store_secondary_color(color)
     else:

@@ -415,38 +415,67 @@ def test_on_color_change_updates_secondary_color_without_touching_keyboard_effec
     assert gui.config.color == (9, 9, 9)
 
 
-def test_on_apply_reports_saved_status_when_apply_is_deferred() -> None:
+def test_on_color_change_preserves_keyboard_effect_while_updating_base_color() -> None:
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
-    committed: list[tuple[int, int, int]] = []
+
+    class _Config:
+        effect = "wave"
+        color = (1, 2, 3)
+
+    gui.config = _Config()
+    gui._target_is_secondary = False
+    gui._pending_color = None
+    gui._last_drag_commit_ts = 0.0
+    gui._last_drag_committed_color = None
+    gui._drag_commit_interval = 0.0
+
+    gui._on_color_change(7, 8, 9)
+
+    assert gui.config.effect == "wave"
+    assert gui.config.color == (7, 8, 9)
+
+
+def test_on_apply_preserves_keyboard_effect_when_apply_is_deferred() -> None:
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
     applied: list[tuple[int, int, int, int]] = []
     statuses: list[tuple[str, bool]] = []
 
+    class _Config:
+        effect = "wave"
+        color = (1, 2, 3)
+        brightness = 25
+
     gui._color_supported = True
+    gui.config = _Config()
+    gui._target_is_secondary = False
     gui.color_wheel = SimpleNamespace(get_color=lambda: (4, 5, 6))
     gui._target_label = "Keyboard"
-    gui._ensure_brightness_nonzero = lambda: 25
-    gui._commit_color_to_config = lambda r, g, b: committed.append((r, g, b))
     gui._apply_color = lambda r, g, b, brightness: applied.append((r, g, b, brightness)) or "deferred"
     gui._set_status = lambda msg, *, ok: statuses.append((msg, ok))
 
     gui._on_apply()
 
-    assert committed == [(4, 5, 6)]
+    assert gui.config.effect == "wave"
+    assert gui.config.color == (4, 5, 6)
     assert applied == [(4, 5, 6, 25)]
     assert statuses == [("✓ Saved Keyboard RGB(4, 5, 6)", True)]
 
 
-def test_on_color_release_updates_drag_commit_state_and_reports_applied_status(monkeypatch) -> None:
+def test_on_color_release_preserves_keyboard_effect_and_reports_applied_status(monkeypatch) -> None:
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
-    committed: list[tuple[int, int, int]] = []
     applied: list[tuple[int, int, int, int]] = []
     statuses: list[tuple[str, bool]] = []
 
+    class _Config:
+        effect = "wave"
+        color = (1, 2, 3)
+        brightness = 40
+
+    gui.config = _Config()
+    gui._target_is_secondary = False
     gui._target_label = "Keyboard"
     gui._last_drag_committed_color = None
     gui._last_drag_commit_ts = 0.0
-    gui._ensure_brightness_nonzero = lambda: 40
-    gui._commit_color_to_config = lambda r, g, b: committed.append((r, g, b))
     gui._apply_color = lambda r, g, b, brightness: applied.append((r, g, b, brightness)) or True
     gui._set_status = lambda msg, *, ok: statuses.append((msg, ok))
 
@@ -454,7 +483,8 @@ def test_on_color_release_updates_drag_commit_state_and_reports_applied_status(m
 
     gui._on_color_release(7, 8, 9)
 
-    assert committed == [(7, 8, 9)]
+    assert gui.config.effect == "wave"
+    assert gui.config.color == (7, 8, 9)
     assert applied == [(7, 8, 9, 40)]
     assert gui._last_drag_committed_color == (7, 8, 9)
     assert gui._last_drag_commit_ts == 12.5

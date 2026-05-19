@@ -18,6 +18,7 @@ class ConfigApplyPlan:
 
 
 def classify_config_apply_plan(*, configured_effect: str, current: ConfigApplyState) -> ConfigApplyPlan:
-    persist_effect = current.effect if configured_effect != current.effect else None
+    target_effect = current.selected_effect or current.effect
+    persist_effect = target_effect if configured_effect != target_effect else None
     execution_kind: ApplyExecutionKind = "turn_off" if current.brightness == 0 else "apply"
     return ConfigApplyPlan(persist_effect=persist_effect, execution_kind=execution_kind)

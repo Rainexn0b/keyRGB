@@ -22,6 +22,12 @@ class TrayIdlePowerState:
     dim_sync_suppressed_logged: bool = False
     last_idle_turn_off_at: float = 0.0
     last_resume_at: float = 0.0
+    idle_restore_loop_effect_ramp: bool = False
+    last_power_source_transition_at: float = 0.0
+    last_power_source_transition_profile_name: Optional[str] = None
+    hidden_perkey_restore_brightness_hint: Optional[int] = None
+    hidden_perkey_restore_device_off_hint: Optional[bool] = None
+    last_power_source_blank_recovery_at: float = 0.0
 
     def reset_dim_state(self) -> None:
         self.dim_temp_active = False
@@ -153,6 +159,16 @@ def _coerce_idle_power_optional_int(value: object) -> tuple[Optional[int], bool]
     return None, False
 
 
+def _coerce_idle_power_optional_bool(value: object) -> tuple[Optional[bool], bool]:
+    if value is None:
+        return None, True
+
+    bool_value, ok = _coerce_idle_power_bool(value)
+    if ok:
+        return bool_value, True
+    return None, False
+
+
 def _coerce_idle_power_float(value: object) -> tuple[float, bool]:
     if isinstance(value, bool):
         return 0.0, False
@@ -252,6 +268,29 @@ def read_idle_power_state_optional_int_field(
     return default
 
 
+def read_idle_power_state_optional_bool_field(
+    tray: object,
+    *,
+    attr_name: object = None,
+    state_name: object = None,
+    default: Optional[bool] = None,
+    **alias_kwargs: object,
+) -> Optional[bool]:
+    """Read an optional-bool idle/power field with safe owner fallback and convergence."""
+
+    value = _read_idle_power_state_field_converged(
+        tray,
+        attr_name=attr_name,
+        state_name=state_name,
+        default=default,
+        coerce=_coerce_idle_power_optional_bool,
+        **alias_kwargs,
+    )
+    if value is None:
+        return None
+    return bool(value)
+
+
 def read_idle_power_state_float_field(
     tray: object,
     *,
@@ -298,6 +337,36 @@ def set_idle_power_state_field(
         setattr(tray, attr_name, value)
     except AttributeError:
         pass
+    setattr(ensure_tray_idle_power_state(tray), state_name, value)
+
+
+def clear_idle_power_state_field(
+    tray: object,
+    *,
+    attr_name: object = None,
+    state_name: object = None,
+    value: object,
+    **alias_kwargs: object,
+) -> None:
+    """Clear a legacy idle/power attr while updating the typed owner state."""
+
+    attr_name, state_name = _normalize_idle_power_field_names(
+        attr_name=attr_name,
+        state_name=state_name,
+        alias_kwargs=dict(alias_kwargs),
+    )
+
+    try:
+        tray_vars = vars(tray)
+    except TypeError:
+        tray_vars = {}
+    tray_vars.pop(attr_name, None)
+
+    try:
+        tray.__delattr__(attr_name)
+    except AttributeError:
+        pass
+
     setattr(ensure_tray_idle_power_state(tray), state_name, value)
 
 

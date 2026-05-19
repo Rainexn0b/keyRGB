@@ -7,7 +7,11 @@ from typing import Protocol, cast
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET
 from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.core.utils.safe_attrs import safe_str_attr
-from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
+from src.tray.protocols import (
+    IdlePowerTrayProtocol,
+    LightingTrayProtocol,
+    set_idle_power_state_field,
+)
 
 
 _LOOP_EFFECTS = frozenset(REACTIVE_EFFECTS) | frozenset(SW_EFFECTS_SET)
@@ -37,7 +41,7 @@ def _refresh_ui_or_none(tray: object) -> Callable[..., None] | None:
     return cast(Callable[..., None], refresh_fn)
 
 
-def _use_legacy_loop_effect_idle_restore_ramp(tray: IdlePowerTrayProtocol, *, fade_in: bool) -> bool:
+def _use_idle_restore_loop_effect_ramp(tray: IdlePowerTrayProtocol, *, fade_in: bool) -> bool:
     if not bool(fade_in):
         return False
     effect = safe_str_attr(getattr(tray, "config", None), "effect", default="none") or "none"
@@ -88,13 +92,18 @@ def start_current_effect_for_idle_restore(
     fade_in: bool,
     fade_in_duration_s: float,
 ) -> None:
-    legacy_loop_effect_ramp = _use_legacy_loop_effect_idle_restore_ramp(tray, fade_in=fade_in)
+    use_loop_effect_ramp = _use_idle_restore_loop_effect_ramp(tray, fade_in=fade_in)
     seed_reactive_restore_windows = _should_seed_reactive_restore_windows(tray, fade_in=fade_in)
-    if legacy_loop_effect_ramp:
+    if use_loop_effect_ramp:
         try:
-            setattr(tray, "_idle_restore_legacy_loop_effect_ramp", True)
+            set_idle_power_state_field(
+                tray,
+                attr_name="_idle_restore_loop_effect_ramp",
+                state_name="idle_restore_loop_effect_ramp",
+                value=True,
+            )
         except (AttributeError, TypeError):
-            legacy_loop_effect_ramp = False
+            use_loop_effect_ramp = False
 
     start_fn = _start_current_effect_or_none(tray)
     try:
@@ -122,9 +131,14 @@ def start_current_effect_for_idle_restore(
         if seed_reactive_restore_windows:
             _seed_reactive_restore_windows(getattr(tray, "engine", None), fade_in_duration_s=fade_in_duration_s)
     finally:
-        if legacy_loop_effect_ramp:
+        if use_loop_effect_ramp:
             try:
-                setattr(tray, "_idle_restore_legacy_loop_effect_ramp", False)
+                set_idle_power_state_field(
+                    tray,
+                    attr_name="_idle_restore_loop_effect_ramp",
+                    state_name="idle_restore_loop_effect_ramp",
+                    value=False,
+                )
             except (AttributeError, TypeError):
                 pass
 

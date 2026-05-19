@@ -283,6 +283,7 @@ def test_apply_from_config_once_perkey_enable_user_mode_runtimeerror_is_logged()
 
 def test_apply_from_config_once_uniform_effect_sets_color() -> None:
     tray = _mk_tray_base(effect="none", brightness=10)
+    tray.is_off = True
 
     _apply_from_config_once(
         tray,
@@ -295,6 +296,7 @@ def test_apply_from_config_once_uniform_effect_sets_color() -> None:
 
     tray.engine.stop.assert_called_once()
     tray.engine.kb.set_color.assert_called_once_with((1, 2, 3), brightness=10)
+    assert tray.is_off is False
 
 
 def test_apply_from_config_once_other_effect_starts_current_effect() -> None:

@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import pytest
-
 from src.tray.pollers.config_polling_internal._apply_plan import (
-    ConfigApplyPlan,
     classify_config_apply_plan,
 )
 from src.tray.pollers.config_polling_internal.core import ConfigApplyState
@@ -31,6 +28,21 @@ def test_persist_effect_equals_current_effect_when_effects_differ() -> None:
     state = _mk_state(effect="static", brightness=25)
     plan = classify_config_apply_plan(configured_effect="rainbow_wave", current=state)
     assert plan.persist_effect == "static"
+
+
+def test_persist_effect_uses_selected_effect_not_runtime_render_effect() -> None:
+    state = ConfigApplyState(
+        effect="perkey",
+        selected_effect="none",
+        speed=4,
+        brightness=25,
+        color=(1, 2, 3),
+        perkey_sig=(((0, 0), (1, 2, 3)),),
+        reactive_use_manual=False,
+        reactive_color=(10, 20, 30),
+    )
+    plan = classify_config_apply_plan(configured_effect="none", current=state)
+    assert plan.persist_effect is None
 
 
 def test_execution_kind_is_turn_off_when_brightness_zero() -> None:

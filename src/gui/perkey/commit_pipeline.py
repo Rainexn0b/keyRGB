@@ -88,7 +88,6 @@ class PerKeyCommitPipeline:
         if safe_int_attr(config, "brightness", default=0) == 0:
             _safe_config_write(config, "brightness", 25)
 
-        _safe_config_write(config, "effect", "perkey")
         _safe_config_write(config, "per_key_colors", full)
 
         brightness = safe_int_attr(config, "brightness", default=0)

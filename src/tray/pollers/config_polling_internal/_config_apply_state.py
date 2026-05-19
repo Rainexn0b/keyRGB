@@ -4,6 +4,8 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import cast
 
+from src.core.lighting_layers import render_effect_from_selected_effect
+
 
 ColorTuple = tuple[int, int, int]
 
@@ -46,6 +48,11 @@ def _safe_perkey_signature(config: object) -> tuple | None:
 
     if per_key_colors is None:
         return None
+    try:
+        if len(per_key_colors) <= 0:  # type: ignore[arg-type]
+            return None
+    except _CONFIG_FALLBACK_EXCEPTIONS:
+        return None
 
     try:
         return tuple(sorted(per_key_colors.items()))
@@ -62,9 +69,14 @@ class ConfigApplyState:
     perkey_sig: tuple | None
     reactive_use_manual: bool
     reactive_color: ColorTuple
+    selected_effect: str | None = None
     reactive_brightness: int = 0
     reactive_trail_percent: int = 50
     software_effect_target: str = "keyboard"
+
+    def __post_init__(self) -> None:
+        if self.selected_effect is None:
+            object.__setattr__(self, "selected_effect", self.effect)
 
 
 def build_config_apply_state(
@@ -80,13 +92,15 @@ def build_config_apply_state(
     reactive_effects_set: set[str] | frozenset[str],
 ) -> ConfigApplyState:
     try:
-        effect = resolve_effect_name(read_str_attr(config, "effect", default="none") or "none")
+        selected_effect = resolve_effect_name(read_str_attr(config, "effect", default="none") or "none")
     except _CONFIG_FALLBACK_EXCEPTIONS:
-        effect = "none"
+        selected_effect = "none"
 
-    perkey_sig = None
-    if effect == "perkey":
-        perkey_sig = read_perkey_signature(config)
+    perkey_sig = read_perkey_signature(config)
+    effect = render_effect_from_selected_effect(
+        selected_effect=str(selected_effect),
+        per_key_colors=perkey_sig,
+    )
 
     reactive_use_manual = read_bool_attr(config, "reactive_use_manual_color", default=False)
     reactive_color = read_tuple_attr(config, "reactive_color", default=(255, 255, 255))
@@ -109,6 +123,7 @@ def build_config_apply_state(
         brightness=base_brightness,
         color=color,
         perkey_sig=perkey_sig,
+        selected_effect=str(selected_effect),
         software_effect_target=software_effect_target,
         reactive_use_manual=bool(reactive_use_manual),
         reactive_color=reactive_color,

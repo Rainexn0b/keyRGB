@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from collections.abc import Mapping
-from typing import Dict, Tuple, TypeVar
+from typing import Dict, Tuple, TypeVar, cast
 
 from src.core.utils.logging_utils import log_throttled
 
@@ -14,6 +14,7 @@ PER_KEY_MODE_POLICY_INIT_ONCE = "init_once"
 PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME = "reassert_every_frame"
 _PERKEY_CONFIG_LOAD_ERRORS = (AttributeError, ImportError, LookupError, OSError, TypeError, ValueError)
 _ENABLE_USER_MODE_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_HIDDEN_PERKEY_RESTORE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _T = TypeVar("_T")
 
 
@@ -139,3 +140,57 @@ def enable_user_mode_once(*, kb, kb_lock, brightness: int, save: bool = False) -
 def _enable_user_mode_locked(*, kb_lock, fn: Callable[..., object], brightness: int, save: bool) -> None:
     with kb_lock:
         fn(brightness=brightness, save=bool(save))
+
+
+def restore_hidden_per_key_rows_once(
+    *,
+    kb,
+    kb_lock,
+    color_map,
+    brightness: int,
+    known_brightness: int | None = None,
+    known_is_off: bool | None = None,
+) -> bool:
+    """Update per-key rows while brightness is already 0, then raise brightness.
+
+    Some ITE backends keep user mode active during AC transition blanks: the
+    device reports brightness 0 but does not report `is_off()`. In that window
+    a full user-mode reassert can briefly flash the last programmed colors
+    before the new row writes land. Prefer a hidden row rewrite first, then
+    restore brightness.
+    """
+
+    def _restore_hidden_rows() -> bool:
+        get_brightness = getattr(kb, "get_brightness", None)
+        is_off = getattr(kb, "is_off", None)
+        set_key_colors = getattr(kb, "set_key_colors", None)
+        set_brightness = getattr(kb, "set_brightness", None)
+        if known_brightness is None and not callable(get_brightness):
+            return False
+        if known_is_off is None and not callable(is_off):
+            return False
+        if not callable(set_key_colors) or not callable(set_brightness):
+            return False
+
+        current_brightness = (
+            int(known_brightness) if known_brightness is not None else int(cast(Callable[[], int], get_brightness)())
+        )
+        current_is_off = bool(known_is_off) if known_is_off is not None else bool(cast(Callable[[], bool], is_off)())
+
+        if current_brightness > 0:
+            return False
+        if current_is_off:
+            return False
+
+        with kb_lock:
+            set_key_colors(color_map, brightness=int(brightness), enable_user_mode=False)
+            set_brightness(int(brightness))
+        return True
+
+    return _run_with_recoverable_logging(
+        fn=_restore_hidden_rows,
+        recoverable_errors=_HIDDEN_PERKEY_RESTORE_ERRORS,
+        throttle_key="perkey_animation.restore_hidden_rows_once",
+        msg="Failed to restore hidden per-key rows",
+        fallback=False,
+    )

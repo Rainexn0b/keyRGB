@@ -10,8 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from src.core.lighting_layers import resolve_render_effect
 from src.core.effects.reactive import _render_brightness_support as _reactive_support
-from src.tray.protocols import LightingTrayProtocol
+from src.tray.protocols import LightingTrayProtocol, read_idle_power_state_bool_field
 
 
 @dataclass(frozen=True)
@@ -113,8 +114,14 @@ def _resolve_start_current_effect_policy(
         start_brightness = coerce_brightness_override_fn(brightness_override)
 
     raw_effect = safe_str_attr_fn(tray.config, "effect", default="none") or "none"
-    effect = resolve_effect_name_for_backend_fn(raw_effect, getattr(tray, "backend", None))
-    persist_effect = effect if effect != raw_effect else None
+    backend = getattr(tray, "backend", None)
+    selected_effect = resolve_effect_name_for_backend_fn(raw_effect, backend)
+    effect = resolve_render_effect(
+        selected_effect=selected_effect,
+        per_key_colors=getattr(tray.config, "per_key_colors", None),
+        resolve_effect_name_fn=lambda effect_name: resolve_effect_name_for_backend_fn(effect_name, backend),
+    )
+    persist_effect = selected_effect if selected_effect != raw_effect else None
     start_plan = classify_start_current_effect_fn(tray, effect)
 
     return _StartCurrentEffectPolicy(
@@ -162,12 +169,14 @@ def _apply_effect_fade_ramp(
     if not plan.will_fade:
         return
 
-    try:
-        legacy_loop_effect_ramp = vars(tray).get("_idle_restore_legacy_loop_effect_ramp", False) is True
-    except TypeError:
-        legacy_loop_effect_ramp = False
+    use_loop_effect_ramp = read_idle_power_state_bool_field(
+        tray,
+        attr_name="_idle_restore_loop_effect_ramp",
+        state_name="idle_restore_loop_effect_ramp",
+        default=False,
+    )
 
-    if plan.is_loop_effect and legacy_loop_effect_ramp:
+    if plan.is_loop_effect and use_loop_effect_ramp:
         tray.engine.set_brightness(
             target_brightness,
             apply_to_hardware=False,

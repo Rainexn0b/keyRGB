@@ -14,6 +14,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.config._settings_view import ConfigSettingsView
+from src.core.power.system import PowerMode
 
 
 def _make_config(tmp_path, monkeypatch):
@@ -67,6 +68,18 @@ def test_system_power_extreme_cap_khz_persists_and_clamps(tmp_path, monkeypatch)
     assert cfg2.system_power_extreme_cap_khz == 1300000
 
 
+def test_new_config_uses_power_source_policy_defaults(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    assert cfg.ac_lighting_enabled is True
+    assert cfg.ac_lighting_brightness == 40
+    assert cfg.ac_power_mode == PowerMode.PERFORMANCE.value
+
+    assert cfg.battery_lighting_enabled is True
+    assert cfg.battery_lighting_brightness == 20
+    assert cfg.battery_power_mode == PowerMode.BALANCED.value
+
+
 def test_brightness_property_tracks_effect_mode_without_overwriting_other_mode(tmp_path, monkeypatch) -> None:
     cfg = _make_config(tmp_path, monkeypatch)
     cfg._settings["brightness"] = 35
@@ -85,6 +98,23 @@ def test_brightness_property_tracks_effect_mode_without_overwriting_other_mode(t
 
     assert cfg._settings["brightness"] == 10
     assert cfg._settings["perkey_brightness"] == 20
+
+
+def test_brightness_property_uses_rendered_perkey_state_for_saved_base_map(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg._settings["effect"] = "none"
+    cfg._settings["brightness"] = 35
+    cfg._settings["perkey_brightness"] = 15
+    cfg._settings["per_key_colors"] = {"0,0": [1, 2, 3]}
+
+    assert cfg.brightness == 15
+    assert cfg.effect_brightness == 35
+
+    cfg.brightness = 18
+
+    assert cfg._settings["perkey_brightness"] == 20
+    assert cfg._settings["brightness"] == 35
+    assert cfg.effect_brightness == 35
 
 
 def test_reload_skips_disk_load_when_mtime_is_unchanged(tmp_path, monkeypatch) -> None:

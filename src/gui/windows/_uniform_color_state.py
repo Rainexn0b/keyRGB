@@ -95,7 +95,6 @@ def commit_color_to_config(gui: _UniformTargetState, r: int, g: int, b: int) -> 
         store_secondary_color(gui, (r, g, b))
         return
 
-    gui.config.effect = "none"
     gui.config.color = (r, g, b)
 
 

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-import pytest
-
 from src.gui.perkey.commit_pipeline import PerKeyCommitPipeline
 
 
@@ -112,7 +110,7 @@ def test_commit_pipeline_sets_brightness_when_zero() -> None:
 
     assert kb2 is kb
     assert cfg.brightness == 25
-    assert cfg.effect == "perkey"
+    assert cfg.effect is None
     assert cfg.per_key_colors == colors2
     assert calls == [25]
 
@@ -170,14 +168,14 @@ def test_commit_pipeline_keeps_pushing_when_brightness_write_fails() -> None:
         force=True,
     )
 
-    assert cfg.write_history == ["brightness", "effect", "per_key_colors"]
+    assert cfg.write_history == ["brightness", "per_key_colors"]
     assert cfg.brightness == 0
-    assert cfg.effect == "perkey"
+    assert cfg.effect is None
     assert cfg.per_key_colors == full
     assert push_calls == [{"kb": kb, "colors": full, "brightness": 0, "enable_user_mode": True}]
 
 
-def test_commit_pipeline_still_updates_colors_when_effect_write_fails() -> None:
+def test_commit_pipeline_updates_colors_without_touching_effect() -> None:
     cfg = _SelectiveWriteFailConfig(brightness=10, fail_fields=("effect",))
     pipeline = PerKeyCommitPipeline(commit_interval_s=0.0)
 
@@ -194,7 +192,7 @@ def test_commit_pipeline_still_updates_colors_when_effect_write_fails() -> None:
         force=True,
     )
 
-    assert cfg.write_history == ["effect", "per_key_colors"]
+    assert cfg.write_history == ["per_key_colors"]
     assert cfg.effect is None
     assert cfg.per_key_colors == full
     assert kb2 == (kb, 10, True)
@@ -243,19 +241,22 @@ class _UnexpectedWriteFailConfig:
         object.__setattr__(self, name, value)
 
 
-def test_commit_pipeline_propagates_unexpected_config_write_failures() -> None:
+def test_commit_pipeline_does_not_touch_effect_field() -> None:
     cfg = _UnexpectedWriteFailConfig(brightness=10, fail_fields=("effect",))
     pipeline = PerKeyCommitPipeline(commit_interval_s=0.0)
 
-    with pytest.raises(AssertionError, match="unexpected write failure: effect"):
-        pipeline.commit(
-            kb=object(),
-            colors={(0, 0): (4, 5, 6)},
-            config=cfg,
-            num_rows=1,
-            num_cols=1,
-            base_color=(7, 7, 7),
-            fallback_color=(8, 8, 8),
-            push_fn=lambda current_kb, _colors, *, brightness, enable_user_mode: current_kb,
-            force=True,
-        )
+    kb2, full = pipeline.commit(
+        kb=object(),
+        colors={(0, 0): (4, 5, 6)},
+        config=cfg,
+        num_rows=1,
+        num_cols=1,
+        base_color=(7, 7, 7),
+        fallback_color=(8, 8, 8),
+        push_fn=lambda current_kb, _colors, *, brightness, enable_user_mode: current_kb,
+        force=True,
+    )
+
+    assert cfg.effect is None
+    assert cfg.per_key_colors == full
+    assert kb2 is not None

@@ -247,6 +247,30 @@ def start_current_effect(
         )
 
 
+def apply_power_source_perkey_profile_transition(tray: LightingTrayProtocol) -> bool:
+    """Apply a power-source per-key profile transition without a full restart when possible."""
+
+    try:
+        effect = lighting_controller_helpers.get_effect_name(tray)
+        if effect == "perkey":
+            lighting_controller_helpers.apply_perkey_mode(
+                tray,
+                brightness_override=safe_attrs.safe_int_attr(tray.config, "brightness", default=0),
+                reassert_user_mode=False,
+            )
+            return True
+
+        if lighting_controller_helpers.is_software_effect(effect):
+            lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect(tray)
+            tray.is_off = False
+            return True
+
+        return False
+    except _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: power-source profile transitions cross runtime engine/config seams and must gracefully fall back to full restart when recoverable issues occur
+        _log_boundary_exception(tray, "Failed to apply power-source per-key profile transition: %s", exc)
+        return False
+
+
 def on_speed_clicked(tray: LightingTrayProtocol, item: object) -> None:
     lighting_menu_handlers.on_speed_clicked_impl(
         tray,

@@ -36,6 +36,9 @@ class KeyRGBTrayDelegateMixin:
     def _start_current_effect(self, **kwargs):
         _application_module().start_current_effect(self, **kwargs)
 
+    def _apply_power_source_perkey_profile_transition(self) -> bool:
+        return bool(_application_module().apply_power_source_perkey_profile_transition(self))
+
     def _on_effect_clicked(self, _icon, item):
         _application_module().callbacks.on_effect_clicked(self, item)
 

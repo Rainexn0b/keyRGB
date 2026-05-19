@@ -95,7 +95,7 @@ class TestApplyEffectSelection:
 
         apply_effect_selection(mock_tray, effect_name="perkey")
 
-        assert mock_tray.config.effect == "perkey"
+        assert mock_tray.config.effect == "none"
         load_spy.assert_called_once()
         assert mock_tray.config.per_key_colors == expected_colors
         mock_tray._start_current_effect.assert_called_once()
@@ -126,7 +126,7 @@ class TestApplyEffectSelection:
         assert mock_tray.config.effect == "rainbow"
 
         apply_effect_selection(mock_tray, effect_name="perkey")
-        assert mock_tray.config.effect == "perkey"
+        assert mock_tray.config.effect == "none"
 
     def test_hardware_effects_list_blocked_correctly(self):
         """All hardware effects in the list should be blocked when not supported."""
@@ -191,7 +191,7 @@ class TestApplyEffectSelection:
         apply_effect_selection(mock_tray, effect_name="none")
 
         mock_tray.engine.stop.assert_called()
-        assert mock_tray.config.effect == "perkey"
+        assert mock_tray.config.effect == "none"
         assert mock_tray.engine.per_key_colors is mock_tray.config.per_key_colors
         mock_tray._start_current_effect.assert_called_once()
 

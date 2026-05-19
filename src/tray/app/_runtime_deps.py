@@ -145,6 +145,10 @@ def start_current_effect(tray: object, **kwargs: object) -> None:
     _module("src.tray.controllers.lighting_controller").start_current_effect(tray, **kwargs)
 
 
+def apply_power_source_perkey_profile_transition(tray: object) -> bool:
+    return bool(_module("src.tray.controllers.lighting_controller").apply_power_source_perkey_profile_transition(tray))
+
+
 def configure_engine_software_targets(tray: object) -> None:
     _module("src.tray.controllers.software_target_controller").configure_engine_software_targets(tray)
 

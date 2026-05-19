@@ -188,55 +188,14 @@ def apply_profile_to_config(
         logger=logger,
     )
 
-    def set_profile_brightness(value: int) -> None:
-        effect_brightness = read_attr_value(
-            cfg,
-            "effect_brightness",
-            log_key="profiles.apply_profile_to_config.effect_brightness",
-            log_msg="Failed to read effect brightness while applying a profile",
-            log_throttled=log_throttled,
-            logger=logger,
-        )
-        if effect_brightness is _MISSING:
-            set_attr_value(
-                cfg,
-                "brightness",
-                value,
-                log_key="profiles.apply_profile_to_config.set_brightness",
-                log_msg="Failed to set brightness while applying a profile",
-                log_throttled=log_throttled,
-                logger=logger,
-            )
-        elif effect_brightness is not _READ_FAILED:
-            set_attr_value(
-                cfg,
-                "effect_brightness",
-                value,
-                log_key="profiles.apply_profile_to_config.set_effect_brightness",
-                log_msg="Failed to set effect brightness while applying a profile",
-                log_throttled=log_throttled,
-                logger=logger,
-            )
-
-        perkey_brightness = read_attr_value(
-            cfg,
-            "perkey_brightness",
-            log_key="profiles.apply_profile_to_config.perkey_brightness",
-            log_msg="Failed to read per-key brightness while applying a profile",
-            log_throttled=log_throttled,
-            logger=logger,
-        )
-        if perkey_brightness is not _MISSING and perkey_brightness is not _READ_FAILED:
-            set_attr_value(
-                cfg,
-                "perkey_brightness",
-                value,
-                log_key="profiles.apply_profile_to_config.set_perkey_brightness",
-                log_msg="Failed to set per-key brightness while applying a profile",
-                log_throttled=log_throttled,
-                logger=logger,
-            )
-
+    effect_brightness = read_attr_value(
+        cfg,
+        "effect_brightness",
+        log_key="profiles.apply_profile_to_config.effect_brightness",
+        log_msg="Failed to read effect brightness while applying a profile",
+        log_throttled=log_throttled,
+        logger=logger,
+    )
     perkey_brightness = read_attr_value(
         cfg,
         "perkey_brightness",
@@ -245,6 +204,60 @@ def apply_profile_to_config(
         log_throttled=log_throttled,
         logger=logger,
     )
+
+    try:
+        atomic_apply_profile_state = getattr(cfg, "apply_perkey_profile_state")
+    except AttributeError:
+        atomic_apply_profile_state = None
+    use_atomic_profile_apply = callable(atomic_apply_profile_state)
+    effect_brightness_update: int | None = None
+    perkey_brightness_update: int | None = None
+
+    def set_profile_brightness(value: int) -> None:
+        nonlocal effect_brightness_update
+        nonlocal perkey_brightness_update
+
+        if effect_brightness is _MISSING:
+            if use_atomic_profile_apply:
+                effect_brightness_update = int(value)
+            else:
+                set_attr_value(
+                    cfg,
+                    "brightness",
+                    value,
+                    log_key="profiles.apply_profile_to_config.set_brightness",
+                    log_msg="Failed to set brightness while applying a profile",
+                    log_throttled=log_throttled,
+                    logger=logger,
+                )
+        elif effect_brightness is not _READ_FAILED:
+            if use_atomic_profile_apply:
+                effect_brightness_update = int(value)
+            else:
+                set_attr_value(
+                    cfg,
+                    "effect_brightness",
+                    value,
+                    log_key="profiles.apply_profile_to_config.set_effect_brightness",
+                    log_msg="Failed to set effect brightness while applying a profile",
+                    log_throttled=log_throttled,
+                    logger=logger,
+                )
+
+        if perkey_brightness is not _MISSING and perkey_brightness is not _READ_FAILED:
+            if use_atomic_profile_apply:
+                perkey_brightness_update = int(value)
+            else:
+                set_attr_value(
+                    cfg,
+                    "perkey_brightness",
+                    value,
+                    log_key="profiles.apply_profile_to_config.set_perkey_brightness",
+                    log_msg="Failed to set per-key brightness while applying a profile",
+                    log_throttled=log_throttled,
+                    logger=logger,
+                )
+
     if perkey_brightness is _MISSING:
         perkey_value = coerce_int(
             read_attr_value(
@@ -263,7 +276,11 @@ def apply_profile_to_config(
         perkey_value = coerce_int(perkey_brightness, default=0)
 
     if perkey_value <= 0:
-        if hasattr(cfg, "perkey_brightness"):
+        if use_atomic_profile_apply and perkey_brightness is not _MISSING and perkey_brightness is not _READ_FAILED:
+            perkey_brightness_update = 50
+        elif use_atomic_profile_apply:
+            effect_brightness_update = 50
+        elif hasattr(cfg, "perkey_brightness"):
             cfg.perkey_brightness = 50
         else:
             cfg.brightness = 50  # type: ignore[attr-defined]
@@ -271,5 +288,11 @@ def apply_profile_to_config(
     builtin_target = builtin_profile_brightness(profile_name, safe_profile_name=safe_profile_name)
     if builtin_target is not None:
         set_profile_brightness(builtin_target)
-    cfg.effect = "perkey"  # type: ignore[attr-defined]
+    if use_atomic_profile_apply:
+        atomic_apply_profile_state(
+            colors,
+            effect_brightness=effect_brightness_update,
+            perkey_brightness=perkey_brightness_update,
+        )
+        return
     cfg.per_key_colors = colors  # type: ignore[attr-defined]

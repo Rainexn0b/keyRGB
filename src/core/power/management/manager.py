@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING, cast
 
 from src.core.profile import profiles as perkey_profiles
+from src.core.profile import runtime_activation as profile_runtime_activation
 
 from . import _manager_brightness_execution as _brightness_execution, _manager_power_events as _power_events
 from . import _manager_runtime_deps, _monitor_runner as power_monitor_runner
@@ -26,6 +27,7 @@ PowerEventInputs = _power_event_policy.PowerEventInputs
 PowerEventPolicy = _power_event_policy.PowerEventPolicy
 RestoreFromEvent = _power_event_policy.RestoreKeyboard
 TurnOffFromEvent = _power_event_policy.TurnOffKeyboard
+_DEFAULT_POWER_SOURCE_POLL_INTERVAL_S = 0.5
 
 classify_brightness_execution = _brightness_execution.classify_brightness_execution
 execute_brightness_execution = _brightness_execution.execute_brightness_execution
@@ -49,35 +51,16 @@ get_active_perkey_profile = perkey_profiles.get_active_profile
 list_perkey_profiles = perkey_profiles.list_profiles
 
 
-class _PerkeyActivationTrayProtocol(Protocol):
-    config: object
-    is_off: bool
-    _power_forced_off: object
-
-    def _start_current_effect(self, **kwargs: object) -> None: ...
-
-    def _update_icon(self, *, animate: bool = True) -> None: ...
-
-    def _update_menu(self) -> None: ...
-
-
 def activate_perkey_profile(tray: object, profile_name: str) -> None:
-    activation_tray = cast(_PerkeyActivationTrayProtocol, tray)
-    name = perkey_profiles.set_active_profile(profile_name)
-    colors = perkey_profiles.load_per_key_colors(name)
-    perkey_profiles.apply_profile_to_config(activation_tray.config, colors)
-
-    try:
-        power_forced_off = bool(activation_tray._power_forced_off)
-    except AttributeError:
-        power_forced_off = False
-
-    if not power_forced_off:
-        activation_tray.is_off = False
-        activation_tray._start_current_effect()
-
-    activation_tray._update_icon()
-    activation_tray._update_menu()
+    profile_runtime_activation.activate_perkey_profile_runtime(
+        cast(object, tray),
+        profile_name,
+        set_active_profile_fn=perkey_profiles.set_active_profile,
+        load_per_key_colors_fn=perkey_profiles.load_per_key_colors,
+        apply_profile_to_config_fn=perkey_profiles.apply_profile_to_config,
+        mark_power_source_transition=True,
+        monotonic_fn=time.monotonic,
+    )
 
 
 _POWER_MANAGER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -103,6 +86,8 @@ class PowerManager:
         self._battery_thread = None
         self._saved_state = None
         self._event_policy = PowerEventPolicy()
+        self._stable_on_ac: bool | None = None
+        self._pending_on_ac: bool | None = None
 
     def _reload_config(self, *, context: str) -> bool:
         return reload_power_management_config(self._config, context=context, logger=logger)
@@ -157,13 +142,16 @@ class PowerManager:
         self,
         policy: PowerSourceLoopPolicy,
     ) -> PowerSourceIterationPlan:
+        now_mono = float(time.monotonic())
+        raw_on_ac = read_on_ac_power()
+        stable_on_ac = self._stabilize_on_ac_state(raw_on_ac)
         return classify_power_source_iteration(
-            raw_on_ac=read_on_ac_power(),
+            raw_on_ac=stable_on_ac,
             build_loop_inputs_fn=lambda on_ac: build_power_source_loop_inputs(
                 self._config,
                 self.kb_controller,
                 on_ac=on_ac,
-                now_mono=float(time.monotonic()),
+                now_mono=now_mono,
                 get_power_mode_status_fn=get_system_power_status,
                 get_active_perkey_profile_fn=get_active_perkey_profile,
                 safe_int_attr_fn=safe_int_attr,
@@ -199,10 +187,10 @@ class PowerManager:
         - don't fight manual brightness changes while on battery
         """
 
-        poll_interval_s = 2.0
         policy = PowerSourceLoopPolicy(debounce_seconds=3.0)
 
         while self.monitoring:
+            poll_interval_s = _DEFAULT_POWER_SOURCE_POLL_INTERVAL_S
             did_sleep = self._run_recoverable_runtime_boundary(
                 lambda: self._run_battery_saver_iteration(policy, poll_interval_s=poll_interval_s),
                 log_message="Battery saver monitoring iteration failed",
@@ -213,17 +201,41 @@ class PowerManager:
 
             time.sleep(poll_interval_s)
 
+    def _stabilize_on_ac_state(self, raw_on_ac: bool | None) -> bool | None:
+        if raw_on_ac is None:
+            self._pending_on_ac = None
+            return self._stable_on_ac
+
+        current_raw = bool(raw_on_ac)
+        if self._stable_on_ac is None:
+            self._stable_on_ac = current_raw
+            self._pending_on_ac = None
+            return self._stable_on_ac
+
+        if current_raw == self._stable_on_ac:
+            self._pending_on_ac = None
+            return self._stable_on_ac
+
+        if self._pending_on_ac != current_raw:
+            self._pending_on_ac = current_raw
+            return self._stable_on_ac
+
+        self._stable_on_ac = current_raw
+        self._pending_on_ac = None
+        return self._stable_on_ac
+
     def _apply_brightness_policy(self, brightness: int) -> None:
         """Best-effort brightness change driven by power policy."""
         apply_brightness_policy(
             self.kb_controller,
             brightness,
             run_boundary_fn=self._run_recoverable_runtime_boundary,
+            config=self._config,
             sync_config_fn=self._sync_config_brightness,
         )
 
-    def _sync_config_brightness(self, brightness: int) -> None:
-        sync_config_brightness(self._config, brightness, logger=logger)
+    def _sync_config_brightness(self, brightness: int) -> int:
+        return sync_config_brightness(self._config, brightness, logger=logger)
 
     def _activate_power_source_mode(self, mode) -> None:
         try:
