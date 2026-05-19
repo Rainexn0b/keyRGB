@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.25.1 (2026-05-19)
+
+- Tray/Power: Rework AC/battery per-key profile switching and backend recovery on `ite8291r3`, with typed transition state, faster stabilized power-source polling, duplicate-apply suppression, and better restore behavior when the controller blanks on AC changes.
+- Architecture/Lighting: Formalize the 3-layer lighting model so base profiles, brightness policy, and the selected effect stay separate; stop base-profile and uniform-color edits from rewriting the selected effect; and unify manual plus AC/battery profile activation through one runtime path.
+- Tray/Scheduler: Fix the time-of-day and AC/battery brightness interaction so scheduled base brightness applies when no explicit power-source override exists, and explicit AC/battery overrides are composed with the active scheduler base brightness instead of fighting it.
+- Installer/Docs: Install the privileged power helper and polkit rule from `install_dev.sh`, and document the known `ite8291r3` AC-unplug blank limitation on affected TongFang systems.
+
 ## 0.25.0 (2026-05-17)
 
 - Power/System: Add lightweight Linux CPU power controls with tray `Power Mode` switching, a dedicated `Power Mode Settings…` window, configurable Extreme Saver target frequency, and a privileged helper path for cpufreq writes.
