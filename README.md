@@ -4,6 +4,16 @@ A lightweight Linux tray app and per-key editor for laptop keyboard lighting, wi
 
 > LLM note: For a concise, LLM-optimized summary of supported hardware, backends, and repo-discovery hints, see `AGENTS.md`.
 
+## Project Links
+
+- [Install and troubleshooting](#quickstart)
+- [Hardware support issue chooser](https://github.com/Rainexn0b/keyRGB/issues/new/choose)
+- [Contributing guide](CONTRIBUTING.md)
+- [Support guide](SUPPORT.md)
+- [Architecture notes](docs/architecture/src/00-index.md)
+- [Changelog](CHANGELOG.md)
+- [Security policy](SECURITY.md)
+
 ## Screenshots
 
 | **Tray Menu (Effects)** | **Power Management** |
@@ -287,6 +297,8 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 ## Hardware support and contributing
 
 If KeyRGB detects your device but behaves oddly, or if you have a new laptop model (TongFang/Clevo/etc.), please help us support it.
+
+For support routing, see [SUPPORT.md](SUPPORT.md). For contributor workflow details, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 1) Run diagnostics:
 

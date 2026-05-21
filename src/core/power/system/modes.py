@@ -266,13 +266,16 @@ def _infer_mode(*, policies: list[Path], extreme_cap_khz: int) -> PowerMode:
 
     boost = _read_boost_enabled()
 
-    # If we can see an explicit performance governor, treat it as a hint.
-    if governors and all(g == "performance" for g in governors) and boost is True:
+    # If boost state is unavailable, explicit performance governor/EPP is still
+    # the strongest signal. Only reject performance when boost is explicitly off.
+    boost_allows_performance = boost is not False
+
+    if governors and all(g == "performance" for g in governors) and boost_allows_performance:
         return PowerMode.PERFORMANCE
 
     # EPP-driven policies (for example amd-pstate-epp) often keep the governor
     # at powersave and express the effective mode via the EPP preference.
-    if epp_values and all(value == "performance" for value in epp_values) and boost is True:
+    if epp_values and all(value == "performance" for value in epp_values) and boost_allows_performance:
         return PowerMode.PERFORMANCE
 
     # Extreme saver: capped hard and boost off.
@@ -439,7 +442,7 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> N
     _write_mode_epp_preferences(mode, policies=policies)
 
 
-def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int) -> bool:
+def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_interactive: bool = True) -> bool:
     helper = os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
     argv = [
         helper,
@@ -455,18 +458,28 @@ def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int) -> bool:
 
     pkexec = shutil.which("pkexec")
     if pkexec:
-        cp = subprocess.run([pkexec, *argv], check=False, capture_output=True, text=True)
-        return cp.returncode == 0
+        pkexec_argv = [pkexec, *argv] if allow_interactive else [pkexec, "--disable-internal-agent", *argv]
+        cp = subprocess.run(pkexec_argv, check=False, capture_output=True, text=True)
+        if cp.returncode == 0:
+            return True
+        if allow_interactive:
+            return False
 
     sudo = shutil.which("sudo")
     if sudo:
-        cp = subprocess.run([sudo, *argv], check=False, capture_output=True, text=True)
+        sudo_argv = [sudo, *argv] if allow_interactive else [sudo, "-n", *argv]
+        cp = subprocess.run(sudo_argv, check=False, capture_output=True, text=True)
         return cp.returncode == 0
 
     return False
 
 
-def set_mode(mode: PowerMode) -> bool:
+def _mode_is_active(mode: PowerMode) -> bool:
+    status = get_status()
+    return bool(status.supported and status.mode == mode)
+
+
+def set_mode(mode: PowerMode, *, allow_interactive: bool = True) -> bool:
     if not isinstance(mode, PowerMode):
         try:
             mode = PowerMode(str(mode))
@@ -482,11 +495,19 @@ def set_mode(mode: PowerMode) -> bool:
     # First try direct writes (works if user already has permissions).
     try:
         _apply_mode_sysfs(mode, root=root, extreme_cap_khz=extreme_cap_khz)
-        return True
+        if _mode_is_active(mode):
+            return True
     except PermissionError:
         pass
     except OSError:
         # If direct write fails for other reasons, still allow helper.
         pass
 
-    return _run_privileged_helper(mode, extreme_cap_khz=extreme_cap_khz)
+    helper_applied = _run_privileged_helper(
+        mode,
+        extreme_cap_khz=extreme_cap_khz,
+        allow_interactive=allow_interactive,
+    )
+    if not helper_applied:
+        return False
+    return _mode_is_active(mode)

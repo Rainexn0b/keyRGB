@@ -41,12 +41,14 @@ class TimeSchedulerPanel:
             parent,
             text=(
                 "Adjust keyboard brightness by local time. Reactive brightness follows the schedule. "
-                "If 'Plugged In vs Battery' brightness is also configured, the lower active base "
-                "brightness wins; otherwise the scheduled base brightness is applied directly."
+                "For nights from 20:00 to 08:00, set Day starts at 08:00 and Night starts at 20:00. "
+                "At night the lower value wins when 'Plugged In vs Battery' brightness is also configured. "
+                "During the day, plugged-in/battery brightness wins when configured; otherwise the scheduled "
+                "base brightness is used."
             ),
             font=("Sans", 9),
             justify="left",
-            wraplength=520,
+            wraplength=400,
         )
         desc.pack(anchor="w", fill="x", pady=(0, 8))
 

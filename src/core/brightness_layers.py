@@ -105,16 +105,28 @@ def compose_power_source_brightness_overrides(
     ac_brightness_override: int | None,
     battery_brightness_override: int | None,
     scheduler_base_brightness: int | None,
+    scheduler_in_night: bool = False,
 ) -> tuple[int | None, int | None]:
     if scheduler_base_brightness is None:
         return ac_brightness_override, battery_brightness_override
 
-    effective_ac = ac_brightness_override
-    effective_battery = battery_brightness_override
-    if effective_ac is not None:
-        effective_ac = min(int(effective_ac), int(scheduler_base_brightness))
-    if effective_battery is not None:
-        effective_battery = min(int(effective_battery), int(scheduler_base_brightness))
+    if bool(scheduler_in_night):
+        effective_ac = (
+            int(scheduler_base_brightness)
+            if ac_brightness_override is None
+            else min(int(ac_brightness_override), int(scheduler_base_brightness))
+        )
+        effective_battery = (
+            int(scheduler_base_brightness)
+            if battery_brightness_override is None
+            else min(int(battery_brightness_override), int(scheduler_base_brightness))
+        )
+        return effective_ac, effective_battery
+
+    effective_ac = int(scheduler_base_brightness) if ac_brightness_override is None else int(ac_brightness_override)
+    effective_battery = (
+        int(scheduler_base_brightness) if battery_brightness_override is None else int(battery_brightness_override)
+    )
     return effective_ac, effective_battery
 
 

@@ -128,7 +128,7 @@ def test_build_power_source_loop_inputs_composes_night_scheduler_base_with_power
     assert inputs.battery_perkey_profile_name == "battery"
 
 
-def test_build_power_source_loop_inputs_composes_day_scheduler_base_with_power_source_overrides(
+def test_build_power_source_loop_inputs_keeps_power_source_brightness_primary_by_day(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from src.core.power.management._manager_helpers import build_power_source_loop_inputs
@@ -172,7 +172,7 @@ def test_build_power_source_loop_inputs_composes_day_scheduler_base_with_power_s
     )
 
     assert inputs is not None
-    assert inputs.ac_brightness_override == 30
+    assert inputs.ac_brightness_override == 45
     assert inputs.battery_brightness_override == 15
 
 

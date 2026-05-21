@@ -7,9 +7,12 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
 
+from src.core.brightness_layers import SchedulerBrightnessState
+from src.core.brightness_layers import compose_power_source_brightness_overrides
 from src.core.brightness_layers import is_scheduler_night
 from src.core.brightness_layers import parse_scheduler_time
 from src.core.brightness_layers import resolve_scheduler_brightness_state
+from src.core.power.monitoring.power_supply_sysfs import read_on_ac_power
 from src.tray.controllers._brightness_layer import apply_layered_brightness_update
 from src.tray.controllers._lighting_controller_helpers import _log_tray_exception, try_log_event
 from src.tray.controllers.lighting_controller import start_current_effect
@@ -23,6 +26,26 @@ logger = logging.getLogger(__name__)
 
 _BRIGHTNESS_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 _SCHEDULER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
+def _active_power_source_base_brightness(
+    state: SchedulerBrightnessState,
+    *,
+    on_ac: bool | None,
+) -> int | None:
+    if not state.defer_base_to_power_policy:
+        return state.applied_base_brightness
+
+    if on_ac is None:
+        return state.applied_base_brightness
+
+    ac_override, battery_override = compose_power_source_brightness_overrides(
+        ac_brightness_override=state.ac_brightness_override,
+        battery_brightness_override=state.battery_brightness_override,
+        scheduler_base_brightness=state.active_base_brightness,
+        scheduler_in_night=state.in_night,
+    )
+    return ac_override if bool(on_ac) else battery_override
 
 
 def _apply_time_scheduler_brightness(
@@ -87,9 +110,10 @@ def _run_scheduler_iteration(tray: LightingTrayProtocol) -> None:
             getattr(tray.config, "night_start_time", "20:00"),
         )
         return
+    on_ac = read_on_ac_power()
     _apply_time_scheduler_brightness(
         tray,
-        state.applied_base_brightness,
+        _active_power_source_base_brightness(state, on_ac=on_ac),
         state.active_reactive_brightness,
     )
 
@@ -115,27 +139,30 @@ def _scheduler_loop(
                 power_management_enabled=bool(getattr(tray.config, "power_management_enabled", True)),
             )
             if state.enabled and state.times_valid:
+                on_ac = read_on_ac_power()
+                base_brightness = _active_power_source_base_brightness(state, on_ac=on_ac)
                 apply_key = (
-                    f"{state.in_night}:{state.active_base_brightness}:{state.active_reactive_brightness}:"
-                    f"{state.defer_base_to_power_policy}"
+                    f"{state.in_night}:{base_brightness}:{state.active_reactive_brightness}:"
+                    f"{state.defer_base_to_power_policy}:{on_ac}"
                 )
 
                 if apply_key != last_applied_key:
                     _apply_time_scheduler_brightness(
                         tray,
-                        state.applied_base_brightness,
+                        base_brightness,
                         state.active_reactive_brightness,
                     )
+                    base_deferred = state.defer_base_to_power_policy and base_brightness is None
                     try_log_event(
                         tray,
                         "time_scheduler",
                         (
                             "night_reactive_applied_base_deferred_to_power_policy"
-                            if state.in_night and state.defer_base_to_power_policy
+                            if state.in_night and base_deferred
                             else "night_applied"
                             if state.in_night
                             else "day_reactive_applied_base_deferred_to_power_policy"
-                            if state.defer_base_to_power_policy
+                            if base_deferred
                             else "day_applied"
                         ),
                     )

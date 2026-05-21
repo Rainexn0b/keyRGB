@@ -193,6 +193,31 @@ class TestPowerManagerEventHandlers:
 
         mock_kb.restore.assert_called_once()
 
+    @patch("src.core.power.management.manager.PowerEventPolicy")
+    def test_lid_handlers_track_lid_closed_state(self, mock_policy_cls):
+        from src.core.power.management.manager import PowerManager, RestoreFromEvent, TurnOffFromEvent
+
+        mock_kb = MagicMock()
+        mock_kb.is_off = False
+        mock_kb.turn_off = MagicMock()
+        mock_kb.restore = MagicMock()
+
+        mock_policy_instance = MagicMock()
+        mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
+        mock_policy_instance.handle_power_restore_event.return_value = MagicMock(actions=[RestoreFromEvent()])
+        mock_policy_cls.return_value = mock_policy_instance
+
+        pm = PowerManager(mock_kb)
+        pm._config.management_enabled = True
+        pm._config.power_off_on_lid_close = True
+        pm._config.power_restore_on_lid_open = True
+
+        pm._on_lid_close()
+        assert pm._lid_closed is True
+
+        pm._on_lid_open()
+        assert pm._lid_closed is False
+
     def test_handle_power_event_catches_exceptions_in_kb_methods(self):
         """If kb.turn_off/restore raises, _handle_power_event should not crash."""
         from src.core.power.management.manager import PowerManager, TurnOffFromEvent

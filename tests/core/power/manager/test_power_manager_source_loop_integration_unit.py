@@ -243,6 +243,49 @@ def test_pipeline_emits_power_mode_activation_for_configured_ac_mode() -> None:
     assert ActivatePowerMode(PowerMode.BALANCED) in result.actions
 
 
+def test_pipeline_emits_battery_power_mode_when_battery_lighting_is_disabled() -> None:
+    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from src.core.power.policies.power_source_loop_policy import ActivatePowerMode, PowerSourceLoopPolicy, TurnOffKeyboard
+
+    class _BatteryPowerModeConfig(_FakeConfig):
+        ac_power_mode = PowerMode.PERFORMANCE.value
+        battery_power_mode = PowerMode.EXTREME_SAVER.value
+        battery_lighting_enabled = False
+
+    values = {"brightness": 40, "battery_saver_brightness": 25}
+    kb = MagicMock()
+    kb.is_off = False
+
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+    ac_inputs = build_power_source_loop_inputs(
+        _BatteryPowerModeConfig(),
+        kb_controller=kb,
+        on_ac=True,
+        now_mono=1000.0,
+        get_power_mode_status_fn=lambda: MagicMock(supported=True, mode=PowerMode.PERFORMANCE),
+        get_active_perkey_profile_fn=lambda: "default",
+        safe_int_attr_fn=lambda obj, name, default=0: values.get(name, default),
+    )
+    battery_inputs = build_power_source_loop_inputs(
+        _BatteryPowerModeConfig(),
+        kb_controller=kb,
+        on_ac=False,
+        now_mono=1010.0,
+        get_power_mode_status_fn=lambda: MagicMock(supported=True, mode=PowerMode.PERFORMANCE),
+        get_active_perkey_profile_fn=lambda: "default",
+        safe_int_attr_fn=lambda obj, name, default=0: values.get(name, default),
+    )
+
+    assert ac_inputs is not None
+    assert battery_inputs is not None
+
+    _ = policy.update(ac_inputs)
+    result = policy.update(battery_inputs)
+
+    assert TurnOffKeyboard() in result.actions
+    assert ActivatePowerMode(PowerMode.EXTREME_SAVER) in result.actions
+
+
 def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: pytest.MonkeyPatch) -> None:
     from src.core.power.management._manager_helpers import build_power_source_loop_inputs
     from src.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
@@ -287,7 +330,7 @@ def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: py
     assert result.actions == (ApplyBrightness(20),)
 
 
-def test_pipeline_on_ac_by_day_composes_scheduler_base_with_power_source_brightness(
+def test_pipeline_on_ac_by_day_keeps_power_source_brightness_primary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from src.core.power.management._manager_helpers import build_power_source_loop_inputs
@@ -308,7 +351,7 @@ def test_pipeline_on_ac_by_day_composes_scheduler_base_with_power_source_brightn
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 
     values = {
-        "brightness": 45,
+        "brightness": 30,
         "battery_saver_brightness": 25,
         "day_base_brightness": 30,
     }
@@ -318,6 +361,53 @@ def test_pipeline_on_ac_by_day_composes_scheduler_base_with_power_source_brightn
 
     inputs = build_power_source_loop_inputs(
         _DayConfig(),
+        kb_controller=kb,
+        on_ac=True,
+        now_mono=1000.0,
+        get_power_mode_status_fn=lambda: MagicMock(supported=True, mode=PowerMode.BALANCED),
+        get_active_perkey_profile_fn=lambda: "default",
+        safe_int_attr_fn=lambda obj, name, default=0: values.get(name, default),
+    )
+
+    assert inputs is not None
+
+    result = PowerSourceLoopPolicy().update(inputs)
+
+    assert result.actions == (ApplyBrightness(45),)
+
+
+def test_pipeline_on_ac_by_day_uses_scheduler_brightness_when_active_power_source_brightness_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from src.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
+
+    class _DayFallbackConfig(_FakeConfig):
+        time_scheduler_enabled = True
+        day_start_time = "08:00"
+        night_start_time = "20:00"
+        day_base_brightness = 30
+        ac_lighting_brightness = None
+        battery_lighting_brightness = 15
+
+    class FakeDateTime:
+        @staticmethod
+        def now() -> _datetime:
+            return _datetime(2024, 1, 1, 12, 0)
+
+    monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
+
+    values = {
+        "brightness": 45,
+        "battery_saver_brightness": 25,
+        "day_base_brightness": 30,
+    }
+
+    kb = MagicMock()
+    kb.is_off = False
+
+    inputs = build_power_source_loop_inputs(
+        _DayFallbackConfig(),
         kb_controller=kb,
         on_ac=True,
         now_mono=1000.0,

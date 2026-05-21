@@ -487,6 +487,19 @@ def test_apply_settings_values_materializes_active_night_reactive_brightness(mon
     assert cfg.reactive_brightness == 17
 
 
+def test_apply_settings_values_uses_canonical_night_start_default_when_blank() -> None:
+    cfg = SimpleNamespace()
+
+    apply_settings_values_to_config(
+        config=cfg,
+        values=_settings_values(
+            night_start_time="",
+        ),
+    )
+
+    assert cfg.night_start_time == "20:00"
+
+
 def test_apply_settings_values_leaves_reactive_brightness_when_scheduler_disabled() -> None:
     cfg = SimpleNamespace(reactive_brightness=50)
 

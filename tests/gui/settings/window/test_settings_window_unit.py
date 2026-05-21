@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from dataclasses import replace
 from types import ModuleType, SimpleNamespace
 
 import pytest
@@ -202,7 +203,7 @@ def test_init_sets_up_root_and_calls_init_steps(monkeypatch: pytest.MonkeyPatch)
     assert gui.root is root
     assert gui.config == "config-obj"
     assert root.title_calls == ["KeyRGB - Settings"]
-    assert root.minsize_calls == [(760, 560)]
+    assert root.minsize_calls == [(1000, 620)]
     assert root.resizable_calls == [(True, True)]
     assert calls == [
         ("icon", (root,), {}),
@@ -285,6 +286,7 @@ def test_init_layout_builds_frames_bottom_bar_and_scroll(monkeypatch: pytest.Mon
     assert gui.scroll.padding == 10
     assert labels[0].kwargs["text"] == "Settings"
     assert gui._left.parent is frames[2]
+    assert gui._middle.parent is frames[2]
     assert gui._right.parent is frames[2]
 
 
@@ -370,6 +372,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     gui.root = _FakeRoot()
     gui._left = object()
+    gui._middle = object()
     gui._right = object()
     gui.status = _FakeWidget()
     gui.var_enabled = _FakeVar(True)
@@ -403,6 +406,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui._init_panels()
 
     assert created["management"].args == (gui._left,)
+    assert created["power_source"].args == (gui._middle,)
     assert created["power_source"].kwargs["var_ac_brightness"] is gui.var_ac_brightness
     assert created["power_source"].kwargs["var_ac_power_mode"] is gui.var_ac_power_mode
     assert created["power_source"].kwargs["var_battery_power_mode"] is gui.var_battery_power_mode
@@ -412,10 +416,30 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
         "Balanced",
         "Performance",
     )
+    assert created["time_scheduler"].args == (gui._middle,)
     assert created["time_scheduler"].kwargs["var_enabled"] is gui.var_scheduler_enabled
     assert created["version"].kwargs["root"] is gui.root
     assert created["version"].kwargs["get_status_label"]() is gui.status
-    assert len(separators) == 6
+    assert len(separators) == 5
+
+
+def test_init_vars_uses_canonical_night_start_fallback_when_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    string_vars: list[_FakeVar] = []
+    bool_vars: list[_FakeVar] = []
+    double_vars: list[_FakeVar] = []
+    int_vars: list[_FakeVar] = []
+
+    monkeypatch.setattr(settings_window.tk, "StringVar", lambda value=None: string_vars.append(_FakeVar(value)) or string_vars[-1])
+    monkeypatch.setattr(settings_window.tk, "BooleanVar", lambda value=None: bool_vars.append(_FakeVar(value)) or bool_vars[-1])
+    monkeypatch.setattr(settings_window.tk, "DoubleVar", lambda value=None: double_vars.append(_FakeVar(value)) or double_vars[-1])
+    monkeypatch.setattr(settings_window.tk, "IntVar", lambda value=None: int_vars.append(_FakeVar(value)) or int_vars[-1])
+
+    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
+    values = replace(_values(), night_start_time="")
+
+    gui._init_vars(values)
+
+    assert gui.var_night_start.get() == "20:00"
 
 
 def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -477,8 +501,8 @@ def test_apply_geometry_uses_centered_geometry_helper(monkeypatch: pytest.Monkey
             "content_width_px": 900,
             "footer_height_px": 44,
             "chrome_padding_px": 40,
-            "default_w": 1100,
-            "default_h": 900,
+            "default_w": 1320,
+            "default_h": 860,
             "screen_ratio_cap": 0.95,
         }
     ]

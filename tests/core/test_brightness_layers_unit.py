@@ -87,12 +87,49 @@ def test_resolve_scheduler_brightness_state_ignores_unconfigured_mock_overrides(
     assert state.applied_base_brightness == 30
 
 
-def test_compose_power_source_brightness_overrides_limits_explicit_values_to_scheduler_base() -> None:
+def test_compose_power_source_brightness_overrides_uses_power_source_values_during_day() -> None:
     ac_override, battery_override = compose_power_source_brightness_overrides(
         ac_brightness_override=40,
         battery_brightness_override=15,
         scheduler_base_brightness=25,
+        scheduler_in_night=False,
+    )
+
+    assert ac_override == 40
+    assert battery_override == 15
+
+
+def test_compose_power_source_brightness_overrides_uses_scheduler_as_day_fallback() -> None:
+    ac_override, battery_override = compose_power_source_brightness_overrides(
+        ac_brightness_override=None,
+        battery_brightness_override=15,
+        scheduler_base_brightness=25,
+        scheduler_in_night=False,
     )
 
     assert ac_override == 25
     assert battery_override == 15
+
+
+def test_compose_power_source_brightness_overrides_caps_values_at_night() -> None:
+    ac_override, battery_override = compose_power_source_brightness_overrides(
+        ac_brightness_override=40,
+        battery_brightness_override=15,
+        scheduler_base_brightness=25,
+        scheduler_in_night=True,
+    )
+
+    assert ac_override == 25
+    assert battery_override == 15
+
+
+def test_compose_power_source_brightness_overrides_uses_scheduler_as_night_fallback() -> None:
+    ac_override, battery_override = compose_power_source_brightness_overrides(
+        ac_brightness_override=None,
+        battery_brightness_override=None,
+        scheduler_base_brightness=25,
+        scheduler_in_night=True,
+    )
+
+    assert ac_override == 25
+    assert battery_override == 25

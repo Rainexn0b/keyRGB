@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.25.3 (2026-05-21)
+
+- Tray/Power: Apply configured AC/battery system power modes even when the matching lighting state disables keyboard LEDs, preserve a manual tray power-mode override until the next AC/DC transition, and retry unsatisfied automatic power-mode changes without interactive prompts.
+- Tray/Power: Pause power-source lighting actions while the lid-close power-off policy is active, and keep lid-open/lid-close state coordinated with the power-source polling loop.
+- Scheduler/Brightness: Clarify and enforce the time-of-day scheduler interaction with AC/battery brightness: power-source brightness wins during the day when configured, while night mode caps to the lower active value.
+- Power/System: Improve power-mode detection and application on EPP-based systems, including performance inference when boost state is unavailable and verification that direct/helper writes actually activated the requested mode.
+- Settings/UI: Rework Settings into a wider three-column layout, tighten panel wrapping, use the canonical 20:00 night default consistently, and refresh the Settings screenshot.
+- Docs/Support: Expand contributor guidance, add support and security routing docs, add a pull request template, and link the new support paths from the README.
+
 ## 0.25.2 (2026-05-19)
 
 - Effects/Reactive: Add a persisted reactive visual-mode setting (`Subtle` vs `Vivid`), lower the default wave thickness for new/unset configs to `40`, soften mid-range reactive pulse intensity, and reduce auto-generated ripple saturation so reactive typing feels clearer without being as harsh by default.

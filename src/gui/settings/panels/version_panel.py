@@ -48,7 +48,7 @@ class VersionPanel:
             ),
             font=("Sans", 9),
             justify="left",
-            wraplength=520,
+            wraplength=400,
         )
         desc.pack(anchor="w", fill="x", pady=(0, 8))
         self._wrap_labels.append(desc)
@@ -89,7 +89,7 @@ class VersionPanel:
         self.lbl_latest_prerelease_version = ttk.Label(grid, text="Checking…", font=("Sans", 9))
         self.lbl_latest_prerelease_version.grid(row=2, column=1, sticky="w", padx=(10, 0), pady=(4, 0))
 
-        self.lbl_update_status = ttk.Label(parent, text="", font=("Sans", 9), justify="left", wraplength=520)
+        self.lbl_update_status = ttk.Label(parent, text="", font=("Sans", 9), justify="left", wraplength=400)
         self.lbl_update_status.pack(anchor="w", fill="x", pady=(0, 8))
         self._wrap_labels.append(self.lbl_update_status)
 

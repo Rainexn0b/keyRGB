@@ -127,6 +127,59 @@ class TestPowerManagerBatterySaverLoop:
             call.execute(plan, poll_interval_s=2.0),
         ]
 
+    def test_run_battery_saver_iteration_pauses_source_actions_while_lid_closed(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+
+        cfg = MagicMock()
+        cfg.reload = MagicMock()
+        cfg.power_off_on_lid_close = True
+        pm = PowerManager(MagicMock(), config=cfg)
+        pm._lid_closed = True
+        pm._classify_battery_saver_iteration = MagicMock()
+        pm._execute_battery_saver_iteration_plan = MagicMock()
+
+        with patch.object(manager_module.time, "sleep") as sleep:
+            result = pm._run_battery_saver_iteration(MagicMock(), poll_interval_s=2.0)
+
+        assert result is True
+        sleep.assert_called_once_with(2.0)
+        pm._classify_battery_saver_iteration.assert_not_called()
+        pm._execute_battery_saver_iteration_plan.assert_not_called()
+
+    def test_run_battery_saver_iteration_keeps_source_actions_when_lid_close_off_is_disabled(self):
+        from src.core.power.management.manager import PowerManager
+
+        cfg = MagicMock()
+        cfg.reload = MagicMock()
+        cfg.power_off_on_lid_close = False
+        pm = PowerManager(MagicMock(), config=cfg)
+        pm._lid_closed = True
+        fake_policy = MagicMock()
+        plan = object()
+        pm._classify_battery_saver_iteration = MagicMock(return_value=plan)
+        pm._execute_battery_saver_iteration_plan = MagicMock(return_value=False)
+
+        result = pm._run_battery_saver_iteration(fake_policy, poll_interval_s=2.0)
+
+        assert result is False
+        pm._classify_battery_saver_iteration.assert_called_once_with(fake_policy)
+        pm._execute_battery_saver_iteration_plan.assert_called_once_with(plan, poll_interval_s=2.0)
+
+    def test_activate_power_source_mode_uses_noninteractive_auth(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+        from src.core.power.system import PowerMode
+
+        mock_kb = MagicMock()
+        pm = PowerManager(mock_kb, config=MagicMock())
+
+        with patch.object(manager_module, "set_system_power_mode", return_value=True) as set_mode:
+            pm._activate_power_source_mode(PowerMode.EXTREME_SAVER)
+
+        set_mode.assert_called_once_with(PowerMode.EXTREME_SAVER, allow_interactive=False)
+        mock_kb._update_menu.assert_called_once()
+
     def test_battery_saver_loop_covers_common_branches_and_actions(self):
         from src.core.power.management.manager import PowerManager
         from src.core.power.policies.power_source_loop_policy import (

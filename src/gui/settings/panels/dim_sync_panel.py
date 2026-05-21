@@ -40,7 +40,7 @@ class DimSyncPanel:
             ),
             font=("Sans", 9),
             justify="left",
-            wraplength=520,
+            wraplength=400,
         )
         dim_desc.pack(anchor="w", fill="x", pady=(0, 8))
 

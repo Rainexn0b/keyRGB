@@ -88,6 +88,7 @@ class PowerManager:
         self._event_policy = PowerEventPolicy()
         self._stable_on_ac: bool | None = None
         self._pending_on_ac: bool | None = None
+        self._lid_closed = False
 
     def _reload_config(self, *, context: str) -> bool:
         return reload_power_management_config(self._config, context=context, logger=logger)
@@ -135,6 +136,10 @@ class PowerManager:
         *,
         poll_interval_s: float,
     ) -> bool:
+        if self._lid_closed and self._flag("power_off_on_lid_close", True):
+            time.sleep(poll_interval_s)
+            return True
+
         plan = self._classify_battery_saver_iteration(policy)
         return self._execute_battery_saver_iteration_plan(plan, poll_interval_s=poll_interval_s)
 
@@ -239,7 +244,9 @@ class PowerManager:
 
     def _activate_power_source_mode(self, mode) -> None:
         try:
-            set_system_power_mode(mode)
+            applied = set_system_power_mode(mode, allow_interactive=False)
+            if not bool(applied):
+                logger.warning("Power-source mode activation did not apply for %s", getattr(mode, "value", mode))
         finally:
             update_menu = getattr(self.kb_controller, "_update_menu", None)
             if callable(update_menu):
@@ -394,6 +401,7 @@ class PowerManager:
 
     def _on_lid_close(self):
         """Called when lid is closed."""
+        self._lid_closed = True
         self._dispatch_power_event_route(
             flag_name="power_off_on_lid_close",
             log_message="Lid closed - turning off keyboard backlight",
@@ -404,6 +412,7 @@ class PowerManager:
 
     def _on_lid_open(self):
         """Called when lid is opened."""
+        self._lid_closed = False
         self._dispatch_power_event_route(
             flag_name="power_restore_on_lid_open",
             log_message="Lid opened - restoring keyboard backlight",

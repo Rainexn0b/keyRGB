@@ -28,7 +28,7 @@ class PowerManagementPanel:
             text="Control whether KeyRGB turns keyboard LEDs off or on for lid and suspend events.",
             font=("Sans", 9),
             justify="left",
-            wraplength=520,
+            wraplength=400,
         )
         desc.pack(anchor="w", fill="x", pady=(0, 10))
 

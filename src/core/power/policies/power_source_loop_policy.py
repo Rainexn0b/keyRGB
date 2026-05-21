@@ -88,15 +88,20 @@ class PowerSourceLoopPolicy:
         self,
         *,
         debounce_seconds: float = 3.0,
+        power_mode_retry_seconds: float = 30.0,
         battery_saver_policy: BatterySaverPolicy | None = None,
     ) -> None:
         self._debounce_seconds = float(debounce_seconds)
+        self._power_mode_retry_seconds = float(power_mode_retry_seconds)
         self._last_on_ac: Optional[bool] = None
         self._last_change_ts: float = 0.0
 
         self._last_desired_enabled: Optional[bool] = None
         self._last_desired_brightness: Optional[int] = None
         self._last_desired_power_mode: Optional[str] = None
+        self._last_power_mode_attempt_value: Optional[str] = None
+        self._last_power_mode_attempt_ts: float = 0.0
+        self._power_mode_satisfied_for_desired: bool = False
         self._last_desired_perkey_profile: Optional[str] = None
 
         self._battery_saver_policy = battery_saver_policy or BatterySaverPolicy()
@@ -104,6 +109,7 @@ class PowerSourceLoopPolicy:
     def update(self, inputs: PowerSourceLoopInputs) -> PowerSourceLoopResult:
         on_ac = bool(inputs.on_ac)
         now = float(inputs.now)
+        power_source_changed = False
         try:
             current_brightness = int(inputs.current_brightness)
         except (TypeError, ValueError):
@@ -116,6 +122,7 @@ class PowerSourceLoopPolicy:
                 return PowerSourceLoopResult(skip=True, actions=())
             self._last_on_ac = on_ac
             self._last_change_ts = now
+            power_source_changed = True
         elif self._last_on_ac is None:
             self._last_on_ac = on_ac
             self._last_change_ts = now
@@ -154,21 +161,43 @@ class PowerSourceLoopPolicy:
 
         self._last_desired_enabled = bool(desired_enabled)
 
-        # If disabled in this power state, do not apply brightness policies.
-        if not bool(desired_enabled):
-            self._last_desired_power_mode = desired_power_mode.value if desired_power_mode is not None else None
-            self._last_desired_perkey_profile = desired_perkey_profile_name
-            return PowerSourceLoopResult(skip=False, actions=tuple(actions))
-
         should_apply_power_mode = False
         if desired_power_mode is not None:
-            if self._last_desired_power_mode is None:
-                should_apply_power_mode = desired_power_mode != current_power_mode
-            else:
-                should_apply_power_mode = desired_power_mode.value != self._last_desired_power_mode
+            desired_mode_value = desired_power_mode.value
+            desired_changed = desired_mode_value != self._last_desired_power_mode
+            power_mode_cycle_changed = self._last_desired_power_mode is None or desired_changed or power_source_changed
+            if power_mode_cycle_changed:
+                self._power_mode_satisfied_for_desired = False
+                self._last_power_mode_attempt_value = None
+                self._last_power_mode_attempt_ts = 0.0
+
+            active_matches = desired_power_mode == current_power_mode
+            if active_matches:
+                self._power_mode_satisfied_for_desired = True
+
+            retry_due = self._last_power_mode_attempt_value != desired_mode_value or now - float(
+                self._last_power_mode_attempt_ts
+            ) >= float(self._power_mode_retry_seconds)
+            should_apply_power_mode = (not active_matches) and (
+                power_mode_cycle_changed or (not self._power_mode_satisfied_for_desired and retry_due)
+            )
         if should_apply_power_mode and desired_power_mode is not None:
             actions.append(ActivatePowerMode(desired_power_mode))
-        self._last_desired_power_mode = desired_power_mode.value if desired_power_mode is not None else None
+            self._last_power_mode_attempt_value = desired_power_mode.value
+            self._last_power_mode_attempt_ts = now
+        elif desired_power_mode is None:
+            self._last_desired_power_mode = None
+            self._last_power_mode_attempt_value = None
+            self._last_power_mode_attempt_ts = 0.0
+            self._power_mode_satisfied_for_desired = False
+        if desired_power_mode is not None:
+            self._last_desired_power_mode = desired_power_mode.value
+
+        # If disabled in this power state, do not apply brightness policies.
+        if not bool(desired_enabled):
+            self._last_desired_brightness = None
+            self._last_desired_perkey_profile = desired_perkey_profile_name
+            return PowerSourceLoopResult(skip=False, actions=tuple(actions))
 
         should_apply_perkey_profile = False
         if desired_perkey_profile_name is not None:
@@ -195,6 +224,8 @@ class PowerSourceLoopPolicy:
             elif self._last_desired_brightness is None:
                 self._last_desired_brightness = int(desired_brightness)
             return PowerSourceLoopResult(skip=False, actions=tuple(actions))
+
+        self._last_desired_brightness = None
 
         # Battery saver policy (dim on AC unplug, restore on replug)
         # when no explicit battery brightness override is configured.

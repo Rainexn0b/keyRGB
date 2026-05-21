@@ -92,6 +92,7 @@ def build_power_source_loop_inputs(
         ac_brightness_override=scheduler_state.ac_brightness_override,
         battery_brightness_override=scheduler_state.battery_brightness_override,
         scheduler_base_brightness=scheduler_state.active_base_brightness,
+        scheduler_in_night=scheduler_state.in_night,
     )
 
     return PowerSourceLoopInputs(

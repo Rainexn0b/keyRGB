@@ -34,7 +34,7 @@ class PowerSourcePanel:
             text="Choose whether keyboard lighting stays on, and what brightness to use on AC and on battery.",
             font=("Sans", 9),
             justify="left",
-            wraplength=520,
+            wraplength=400,
         )
         ps_desc.pack(anchor="w", fill="x", pady=(0, 8))
 

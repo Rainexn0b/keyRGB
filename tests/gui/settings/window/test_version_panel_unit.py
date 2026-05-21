@@ -154,10 +154,10 @@ def test_version_panel_init_wires_widgets_and_starts_check(monkeypatch: pytest.M
     assert panel.lbl_latest_prerelease_version.options["text"] == "Checking…"
     assert panel.lbl_update_status.options["text"] == ""
     assert desc.options["justify"] == "left"
-    assert desc.options["wraplength"] == 520
+    assert desc.options["wraplength"] == 400
     assert desc.pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 8)}]
     assert panel.lbl_update_status.options["justify"] == "left"
-    assert panel.lbl_update_status.options["wraplength"] == 520
+    assert panel.lbl_update_status.options["wraplength"] == 400
     assert panel.lbl_update_status.pack_calls == [{"anchor": "w", "fill": "x", "pady": (0, 8)}]
     assert parent.bind_calls[0][0] == "<Configure>"
     assert parent.after_calls[0][0] == 0

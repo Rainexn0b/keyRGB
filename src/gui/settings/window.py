@@ -67,6 +67,11 @@ _POWER_MODE_LABEL_TO_VALUE = {
     "Performance": PowerMode.PERFORMANCE.value,
 }
 _POWER_MODE_VALUE_TO_LABEL = {value: label for label, value in _POWER_MODE_LABEL_TO_VALUE.items()}
+_SETTINGS_MIN_WIDTH = 1000
+_SETTINGS_MIN_HEIGHT = 620
+_SETTINGS_DEFAULT_WIDTH = 1320
+_SETTINGS_DEFAULT_HEIGHT = 860
+_SETTINGS_COLUMN_GAP = 22
 
 
 class PowerSettingsGUI:
@@ -74,7 +79,7 @@ class PowerSettingsGUI:
         self.root = tk.Tk()
         self.root.title("KeyRGB - Settings")
         apply_keyrgb_window_icon(self.root)
-        self.root.minsize(760, 560)
+        self.root.minsize(_SETTINGS_MIN_WIDTH, _SETTINGS_MIN_HEIGHT)
         self.root.resizable(True, True)
 
         bg_color, fg_color = apply_clam_theme(
@@ -144,8 +149,11 @@ class PowerSettingsGUI:
         self._left = ttk.Frame(cols)
         self._left.pack(side="left", fill="both", expand=True)
 
+        self._middle = ttk.Frame(cols)
+        self._middle.pack(side="left", fill="both", expand=True, padx=(_SETTINGS_COLUMN_GAP, 0))
+
         self._right = ttk.Frame(cols)
-        self._right.pack(side="left", fill="both", expand=True, padx=(18, 0))
+        self._right.pack(side="left", fill="both", expand=True, padx=(_SETTINGS_COLUMN_GAP, 0))
 
     def _init_vars(self, values: SettingsValues) -> None:
         self.var_enabled = tk.BooleanVar(value=bool(values.power_management_enabled))
@@ -172,7 +180,7 @@ class PowerSettingsGUI:
 
         self.var_scheduler_enabled = tk.BooleanVar(value=bool(values.time_scheduler_enabled))
         self.var_day_start = tk.StringVar(value=str(values.day_start_time or "08:00"))
-        self.var_night_start = tk.StringVar(value=str(values.night_start_time or "22:00"))
+        self.var_night_start = tk.StringVar(value=str(values.night_start_time or "20:00"))
         self.var_day_base = tk.DoubleVar(value=float(values.day_base_brightness))
         self.var_day_reactive = tk.DoubleVar(value=float(values.day_reactive_brightness))
         self.var_night_base = tk.DoubleVar(value=float(values.night_base_brightness))
@@ -180,6 +188,7 @@ class PowerSettingsGUI:
 
     def _init_panels(self) -> None:
         left = self._left
+        middle = self._middle
         right = self._right
 
         self.management_panel = PowerManagementPanel(
@@ -204,10 +213,8 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(left).pack(fill="x", pady=(8, 6))
-
         self.power_source_panel = PowerSourcePanel(
-            left,
+            middle,
             var_ac_enabled=self.var_ac_enabled,
             var_battery_enabled=self.var_battery_enabled,
             var_ac_brightness=self.var_ac_brightness,
@@ -218,10 +225,10 @@ class PowerSettingsGUI:
             on_toggle=self._on_toggle,
         )
 
-        ttk.Separator(left).pack(fill="x", pady=(8, 6))
+        ttk.Separator(middle).pack(fill="x", pady=(8, 6))
 
         self.time_scheduler_panel = TimeSchedulerPanel(
-            left,
+            middle,
             var_enabled=self.var_scheduler_enabled,
             var_day_start=self.var_day_start,
             var_night_start=self.var_night_start,
@@ -285,8 +292,8 @@ class PowerSettingsGUI:
             content_width_px=int(self.scroll.frame.winfo_reqwidth()),
             footer_height_px=int(self.bottom_bar.winfo_reqheight()),
             chrome_padding_px=40,
-            default_w=1100,
-            default_h=900,
+            default_w=_SETTINGS_DEFAULT_WIDTH,
+            default_h=_SETTINGS_DEFAULT_HEIGHT,
             screen_ratio_cap=0.95,
         )
         self.root.geometry(geometry)
@@ -322,7 +329,7 @@ class PowerSettingsGUI:
                 idle_dim_debounce_exit_polls=int(self.var_debounce_exit.get()),
                 time_scheduler_enabled=bool(self.var_scheduler_enabled.get()),
                 day_start_time=str(self.var_day_start.get() or "08:00"),
-                night_start_time=str(self.var_night_start.get() or "22:00"),
+                night_start_time=str(self.var_night_start.get() or "20:00"),
                 day_base_brightness=int(float(self.var_day_base.get())),
                 day_reactive_brightness=int(float(self.var_day_reactive.get())),
                 night_base_brightness=int(float(self.var_night_base.get())),

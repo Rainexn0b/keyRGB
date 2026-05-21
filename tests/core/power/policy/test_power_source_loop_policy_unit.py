@@ -121,6 +121,30 @@ def test_power_source_loop_policy_skips_noop_initial_override_apply() -> None:
     assert not any(isinstance(a, ApplyBrightness) for a in res.actions)
 
 
+def test_power_source_loop_policy_reapplies_same_override_after_no_override_state() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    first = policy.update(_inputs(ac_brightness_override=20, current_brightness=50))
+    no_override = policy.update(_inputs(now=1.0, ac_brightness_override=None, current_brightness=35))
+    reapplied = policy.update(_inputs(now=2.0, ac_brightness_override=20, current_brightness=35))
+
+    assert ApplyBrightness(20) in first.actions
+    assert not any(isinstance(a, ApplyBrightness) for a in no_override.actions)
+    assert ApplyBrightness(20) in reapplied.actions
+
+
+def test_power_source_loop_policy_reapplies_same_override_after_disabled_state() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    first = policy.update(_inputs(ac_brightness_override=20, current_brightness=50))
+    disabled = policy.update(_inputs(now=1.0, ac_enabled=False, ac_brightness_override=20, current_brightness=20))
+    restored = policy.update(_inputs(now=2.0, ac_brightness_override=20, current_brightness=35))
+
+    assert ApplyBrightness(20) in first.actions
+    assert any(isinstance(a, TurnOffKeyboard) for a in disabled.actions)
+    assert ApplyBrightness(20) in restored.actions
+
+
 def test_power_source_loop_policy_legacy_battery_saver_dim_action() -> None:
     policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
 
@@ -161,6 +185,34 @@ def test_power_source_loop_policy_does_not_reapply_same_power_mode_without_power
     assert second.actions == ()
 
 
+def test_power_source_loop_policy_retries_power_mode_when_active_mode_stays_wrong() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0, power_mode_retry_seconds=10.0)
+
+    first = policy.update(_inputs(active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+    too_soon = policy.update(_inputs(now=5.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+    retried = policy.update(_inputs(now=11.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in first.actions
+    assert not any(isinstance(action, ActivatePowerMode) for action in too_soon.actions)
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in retried.actions
+
+
+def test_power_source_loop_policy_preserves_manual_power_mode_after_desired_mode_was_observed() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0, power_mode_retry_seconds=10.0)
+
+    first = policy.update(_inputs(active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+    observed = policy.update(
+        _inputs(now=1.0, active_power_mode=PowerMode.PERFORMANCE, ac_power_mode=PowerMode.PERFORMANCE)
+    )
+    manual_override = policy.update(
+        _inputs(now=30.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE)
+    )
+
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in first.actions
+    assert not any(isinstance(action, ActivatePowerMode) for action in observed.actions)
+    assert not any(isinstance(action, ActivatePowerMode) for action in manual_override.actions)
+
+
 def test_power_source_loop_policy_switches_to_battery_power_mode_on_transition() -> None:
     policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
 
@@ -176,6 +228,52 @@ def test_power_source_loop_policy_switches_to_battery_power_mode_on_transition()
     )
 
     assert ActivatePowerMode(PowerMode.EXTREME_SAVER) in res.actions
+
+
+def test_power_source_loop_policy_applies_power_mode_when_lighting_disabled_for_power_source() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    _ = policy.update(_inputs(on_ac=True, active_power_mode=PowerMode.PERFORMANCE, ac_power_mode=PowerMode.PERFORMANCE))
+    res = policy.update(
+        _inputs(
+            on_ac=False,
+            now=10.0,
+            active_power_mode=PowerMode.PERFORMANCE,
+            battery_enabled=False,
+            ac_power_mode=PowerMode.PERFORMANCE,
+            battery_power_mode=PowerMode.EXTREME_SAVER,
+        )
+    )
+
+    assert TurnOffKeyboard() in res.actions
+    assert ActivatePowerMode(PowerMode.EXTREME_SAVER) in res.actions
+
+
+def test_power_source_loop_policy_power_source_transition_reapplies_same_configured_power_mode() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    _ = policy.update(_inputs(on_ac=True, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.BALANCED))
+    manual_override = policy.update(
+        _inputs(
+            on_ac=True,
+            now=5.0,
+            active_power_mode=PowerMode.PERFORMANCE,
+            ac_power_mode=PowerMode.BALANCED,
+            battery_power_mode=PowerMode.BALANCED,
+        )
+    )
+    battery_transition = policy.update(
+        _inputs(
+            on_ac=False,
+            now=10.0,
+            active_power_mode=PowerMode.PERFORMANCE,
+            ac_power_mode=PowerMode.BALANCED,
+            battery_power_mode=PowerMode.BALANCED,
+        )
+    )
+
+    assert not any(isinstance(action, ActivatePowerMode) for action in manual_override.actions)
+    assert ActivatePowerMode(PowerMode.BALANCED) in battery_transition.actions
 
 
 def test_power_source_loop_policy_activates_selected_perkey_profile_on_first_tick_when_needed() -> None:

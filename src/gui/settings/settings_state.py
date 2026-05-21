@@ -544,7 +544,7 @@ def apply_settings_values_to_config(*, config: _SettingsConfigLike, values: Sett
 
     config.time_scheduler_enabled = bool(values.time_scheduler_enabled)
     config.day_start_time = str(values.day_start_time or "08:00")
-    config.night_start_time = str(values.night_start_time or "22:00")
+    config.night_start_time = str(values.night_start_time or "20:00")
     config.day_base_brightness = max(0, min(50, int(values.day_base_brightness)))
     config.day_reactive_brightness = max(0, min(50, int(values.day_reactive_brightness)))
     config.night_base_brightness = max(0, min(50, int(values.night_base_brightness)))
