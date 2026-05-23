@@ -112,7 +112,7 @@ configure_optional_components() {
       echo "Optional components:"
       echo "Power Mode toggle:"
       echo "  - Adds 'Extreme Saver/Balanced/Performance' tray menu"
-      echo "  - Installs a helper + polkit rule for passwordless switching"
+      echo "  - Installs a helper + polkit rule/action for passwordless switching"
       install_power_helper="$(ask_yes_no "Install lightweight Power Mode helper?" "y")"
     else
       install_power_helper="y"

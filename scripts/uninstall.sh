@@ -127,6 +127,8 @@ POWER_HELPER_DST="/usr/local/bin/keyrgb-power-helper"
 POWER_HELPER_SRC="$REPO_DIR/system/bin/keyrgb-power-helper"
 POWER_POLKIT_DST="/etc/polkit-1/rules.d/90-keyrgb-power-helper.rules"
 POWER_POLKIT_SRC="$REPO_DIR/system/polkit/90-keyrgb-power-helper.rules"
+POWER_POLKIT_ACTION_DST="/usr/share/polkit-1/actions/org.keyrgb.power-helper.policy"
+POWER_POLKIT_ACTION_SRC="$REPO_DIR/system/polkit/org.keyrgb.power-helper.policy"
 
 if [ -f "$UDEV_DST" ]; then
   udev_matches_repo=0
@@ -262,6 +264,31 @@ remove_helper_and_rule_if_match() {
 }
 
 remove_helper_and_rule_if_match "$POWER_HELPER_DST" "$POWER_HELPER_SRC" "$POWER_POLKIT_DST" "$POWER_POLKIT_SRC" "Power Mode"
+
+if [ -f "$POWER_POLKIT_ACTION_DST" ]; then
+  action_matches_repo=0
+  if [ -f "$POWER_POLKIT_ACTION_SRC" ] && cmp -s "$POWER_POLKIT_ACTION_SRC" "$POWER_POLKIT_ACTION_DST"; then
+    action_matches_repo=1
+  fi
+  action_looks_like_keyrgb=0
+  if file_has_marker "$POWER_POLKIT_ACTION_DST" "org.keyrgb.power-helper.apply"; then
+    action_looks_like_keyrgb=1
+  fi
+
+  if [ "$action_matches_repo" -eq 1 ] || [ "$action_looks_like_keyrgb" -eq 1 ]; then
+    if [ "$action_matches_repo" -ne 1 ]; then
+      log_warn "Power Mode polkit action does not match this repo version, but appears KeyRGB-managed: $POWER_POLKIT_ACTION_DST"
+    fi
+    if confirm "Remove Power Mode polkit action (requires sudo)?"; then
+      sudo rm -f "$POWER_POLKIT_ACTION_DST" || true
+      log_ok "Removed Power Mode polkit action"
+    else
+      log_info "Skipped removing Power Mode polkit action"
+    fi
+  else
+    log_warn "Power Mode polkit action exists but does not look KeyRGB-managed; not removing: $POWER_POLKIT_ACTION_DST"
+  fi
+fi
 
 # Kernel drivers marker: prompt per entry.
 if [ -f "$KERNEL_DRIVERS_MARKER" ]; then

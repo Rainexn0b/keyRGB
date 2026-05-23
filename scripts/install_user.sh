@@ -246,7 +246,9 @@ if [ "$UPDATE_ONLY" -ne 1 ]; then
     local_ok=1
 
     if is_truthy "${KEYRGB_INSTALL_POWER_HELPER:-y}"; then
-      if ! [ -f "$REPO_DIR_LOCAL/system/bin/keyrgb-power-helper" ] || ! [ -f "$REPO_DIR_LOCAL/system/polkit/90-keyrgb-power-helper.rules" ]; then
+      if ! [ -f "$REPO_DIR_LOCAL/system/bin/keyrgb-power-helper" ] \
+        || ! [ -f "$REPO_DIR_LOCAL/system/polkit/90-keyrgb-power-helper.rules" ] \
+        || ! [ -f "$REPO_DIR_LOCAL/system/polkit/org.keyrgb.power-helper.policy" ]; then
         local_ok=0
       fi
     fi
@@ -273,6 +275,8 @@ if [ "$UPDATE_ONLY" -ne 1 ]; then
     fi
     log_ok "Reactive Typing input udev rule installed (best-effort)"
   fi
+else
+  log_info "Skipping privileged helper installation (update-only). Re-run without --update-only to refresh power-mode polkit integration."
 fi
 
 # Desktop exec should be absolute path.

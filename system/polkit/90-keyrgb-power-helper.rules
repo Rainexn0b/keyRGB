@@ -2,11 +2,21 @@
 //
 // This grants permission for locally-active users to run the KeyRGB helper
 // via pkexec. The helper performs narrowly-scoped sysfs writes.
+// The paired org.keyrgb.power-helper.policy action lets KeyRGB preflight
+// noninteractive source-driven changes without asking for org.freedesktop
+// pkexec program details, which polkit rejects from untrusted callers.
 //
 // Installed by KeyRGB's install.sh to: /etc/polkit-1/rules.d/90-keyrgb-power-helper.rules
 
 polkit.addRule(function(action, subject) {
     try {
+        if (action.id === "org.keyrgb.power-helper.apply") {
+            if (subject && subject.active && subject.local) {
+                return polkit.Result.YES;
+            }
+            return null;
+        }
+
         if (action.id !== "org.freedesktop.policykit.exec") {
             return null;
         }

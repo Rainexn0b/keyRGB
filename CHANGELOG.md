@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.25.5 (2026-05-23)
+
+- Power/System: Restore automatic AC/battery CPU power-mode switching by replacing the rejected `org.freedesktop.policykit.exec` detail preflight with a KeyRGB-owned `org.keyrgb.power-helper.apply` polkit action.
+- Tray/Power: Stop automatic AC/DC power-source transitions from rebuilding the live tray menu, avoiding KDE/AppIndicator host crashes when the menu is open during plug/unplug events.
+- Installer/System: Install and uninstall the full power-helper integration set — helper binary, pkexec rule, and KeyRGB polkit action — for both local-checkout and ref-based installs.
+
 ## 0.25.4 (2026-05-23)
 
 - Power/System: Prevent automatic wake and AC/DC-triggered power-mode changes from opening an interactive sudo/polkit prompt; noninteractive transitions now preflight existing polkit authorization before attempting the helper and fall back to noninteractive `sudo` only.

@@ -109,6 +109,7 @@ def activate_perkey_profile_runtime(
     load_per_key_colors_fn: Callable[[str | None], Mapping[PerKeyCoord, PerKeyColor]],
     apply_profile_to_config_fn: Callable[[object, PerKeyColorMap], None],
     mark_power_source_transition: bool = False,
+    refresh_menu: bool = True,
     monotonic_fn: Callable[[], float] = time.monotonic,
 ) -> str:
     activation_tray = cast(_RuntimeProfileActivationTrayProtocol, tray)
@@ -129,5 +130,6 @@ def activate_perkey_profile_runtime(
             activation_tray._start_current_effect()
 
     activation_tray._update_icon()
-    activation_tray._update_menu()
+    if bool(refresh_menu):
+        activation_tray._update_menu()
     return name

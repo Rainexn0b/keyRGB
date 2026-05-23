@@ -59,6 +59,7 @@ def activate_perkey_profile(tray: object, profile_name: str) -> None:
         load_per_key_colors_fn=perkey_profiles.load_per_key_colors,
         apply_profile_to_config_fn=perkey_profiles.apply_profile_to_config,
         mark_power_source_transition=True,
+        refresh_menu=False,
         monotonic_fn=time.monotonic,
     )
 
@@ -254,14 +255,9 @@ class PowerManager:
         return sync_config_brightness(self._config, brightness, logger=logger)
 
     def _activate_power_source_mode(self, mode) -> None:
-        try:
-            applied = set_system_power_mode(mode, allow_interactive=False)
-            if not bool(applied):
-                logger.warning("Power-source mode activation did not apply for %s", getattr(mode, "value", mode))
-        finally:
-            update_menu = getattr(self.kb_controller, "_update_menu", None)
-            if callable(update_menu):
-                update_menu()
+        applied = set_system_power_mode(mode, allow_interactive=False)
+        if not bool(applied):
+            logger.warning("Power-source mode activation did not apply for %s", getattr(mode, "value", mode))
 
     def _activate_power_source_perkey_profile(self, profile_name: str) -> None:
         available_profiles = {str(name) for name in list_perkey_profiles()}

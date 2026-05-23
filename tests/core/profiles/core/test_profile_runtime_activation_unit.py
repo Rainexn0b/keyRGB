@@ -73,6 +73,24 @@ def test_activate_perkey_profile_runtime_marks_power_source_transition_and_resta
     assert tray.config.per_key_colors == {(0, 0): (9, 9, 9)}
 
 
+def test_activate_perkey_profile_runtime_can_skip_menu_refresh() -> None:
+    from src.core.profile.runtime_activation import activate_perkey_profile_runtime
+
+    tray = _make_tray(transition_result=True)
+
+    activate_perkey_profile_runtime(
+        tray,
+        "battery",
+        set_active_profile_fn=lambda name: name,
+        load_per_key_colors_fn=lambda _name: {(0, 0): (9, 9, 9)},
+        apply_profile_to_config_fn=lambda config, colors: setattr(config, "per_key_colors", colors),
+        refresh_menu=False,
+    )
+
+    tray._update_icon.assert_called_once_with()
+    tray._update_menu.assert_not_called()
+
+
 def test_activate_perkey_profile_runtime_skips_runtime_apply_while_power_forced_off() -> None:
     from src.core.profile.runtime_activation import activate_perkey_profile_runtime
     from src.tray.protocols import TrayIdlePowerState

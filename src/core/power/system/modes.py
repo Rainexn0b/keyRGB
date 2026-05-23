@@ -14,6 +14,7 @@ DEFAULT_EXTREME_SAVER_CAP_KHZ = 800_000
 MIN_EXTREME_SAVER_CAP_KHZ = 400_000
 MAX_EXTREME_SAVER_CAP_KHZ = 5_000_000
 _EXTREME_SAVER_DETECTION_MARGIN_KHZ = 100_000
+_POWER_HELPER_ACTION_ID = "org.keyrgb.power-helper.apply"
 
 
 class PowerMode(str, Enum):
@@ -442,18 +443,15 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> N
     _write_mode_epp_preferences(mode, policies=policies)
 
 
-def _pkexec_noninteractive_authorized(pkcheck: str, *, helper: str) -> bool:
+def _pkexec_noninteractive_authorized(pkcheck: str) -> bool:
     try:
         cp = subprocess.run(
             [
                 pkcheck,
                 "--action-id",
-                "org.freedesktop.policykit.exec",
+                _POWER_HELPER_ACTION_ID,
                 "--process",
                 str(os.getpid()),
-                "--detail",
-                "program",
-                str(helper),
             ],
             check=False,
             capture_output=True,
@@ -485,7 +483,7 @@ def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_inter
             return cp.returncode == 0
 
         pkcheck = shutil.which("pkcheck")
-        if pkcheck and _pkexec_noninteractive_authorized(pkcheck, helper=helper):
+        if pkcheck and _pkexec_noninteractive_authorized(pkcheck):
             cp = subprocess.run(
                 [pkexec, "--disable-internal-agent", *argv],
                 check=False,

@@ -230,6 +230,30 @@ def test_power_source_loop_policy_switches_to_battery_power_mode_on_transition()
     assert ActivatePowerMode(PowerMode.EXTREME_SAVER) in res.actions
 
 
+def test_power_source_loop_policy_switches_to_ac_power_mode_on_transition() -> None:
+    policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
+
+    _ = policy.update(
+        _inputs(
+            on_ac=False,
+            active_power_mode=PowerMode.EXTREME_SAVER,
+            ac_power_mode=PowerMode.PERFORMANCE,
+            battery_power_mode=PowerMode.EXTREME_SAVER,
+        )
+    )
+    res = policy.update(
+        _inputs(
+            on_ac=True,
+            now=10.0,
+            active_power_mode=PowerMode.EXTREME_SAVER,
+            ac_power_mode=PowerMode.PERFORMANCE,
+            battery_power_mode=PowerMode.EXTREME_SAVER,
+        )
+    )
+
+    assert ActivatePowerMode(PowerMode.PERFORMANCE) in res.actions
+
+
 def test_power_source_loop_policy_applies_power_mode_when_lighting_disabled_for_power_source() -> None:
     policy = PowerSourceLoopPolicy(debounce_seconds=0.0)
 

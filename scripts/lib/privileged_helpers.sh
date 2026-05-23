@@ -17,8 +17,14 @@ install_privileged_helpers_local() {
   fi
 
   local polkit_dir="/etc/polkit-1/rules.d"
+  local polkit_action_dir="/usr/share/polkit-1/actions"
   if [ ! -d "$polkit_dir" ]; then
     log_warn "polkit rules directory not found: $polkit_dir"
+    log_warn "Skipping privileged helper install."
+    return 0
+  fi
+  if [ ! -d "$polkit_action_dir" ]; then
+    log_warn "polkit action directory not found: $polkit_action_dir"
     log_warn "Skipping privileged helper install."
     return 0
   fi
@@ -26,13 +32,16 @@ install_privileged_helpers_local() {
   local did_any=0
 
   if should_install_power_helper; then
-    if [ -f "$repo_dir/system/bin/keyrgb-power-helper" ] && [ -f "$repo_dir/system/polkit/90-keyrgb-power-helper.rules" ]; then
+    if [ -f "$repo_dir/system/bin/keyrgb-power-helper" ] \
+      && [ -f "$repo_dir/system/polkit/90-keyrgb-power-helper.rules" ] \
+      && [ -f "$repo_dir/system/polkit/org.keyrgb.power-helper.policy" ]; then
       log_info "Installing Power Mode helper from local repo (requires sudo)..."
       sudo install -D -m 0755 "$repo_dir/system/bin/keyrgb-power-helper" /usr/local/bin/keyrgb-power-helper
       sudo install -D -m 0644 "$repo_dir/system/polkit/90-keyrgb-power-helper.rules" "$polkit_dir/90-keyrgb-power-helper.rules"
+      sudo install -D -m 0644 "$repo_dir/system/polkit/org.keyrgb.power-helper.policy" "$polkit_action_dir/org.keyrgb.power-helper.policy"
       did_any=1
     else
-      log_warn "Local Power Mode helper/rule not found; skipping local install."
+      log_warn "Local Power Mode helper/rule/action not found; skipping local install."
     fi
   fi
 
@@ -50,8 +59,14 @@ install_privileged_helpers_from_ref() {
   fi
 
   local polkit_dir="/etc/polkit-1/rules.d"
+  local polkit_action_dir="/usr/share/polkit-1/actions"
   if [ ! -d "$polkit_dir" ]; then
     log_warn "polkit rules directory not found: $polkit_dir"
+    log_warn "Skipping privileged helper install."
+    return 0
+  fi
+  if [ ! -d "$polkit_action_dir" ]; then
+    log_warn "polkit action directory not found: $polkit_action_dir"
     log_warn "Skipping privileged helper install."
     return 0
   fi
@@ -62,7 +77,7 @@ install_privileged_helpers_from_ref() {
 
   local entries=()
   if should_install_power_helper; then
-    entries+=("keyrgb-power-helper|90-keyrgb-power-helper.rules")
+    entries+=("keyrgb-power-helper|90-keyrgb-power-helper.rules|org.keyrgb.power-helper.policy")
   fi
 
   if [ ${#entries[@]} -eq 0 ]; then
@@ -71,14 +86,16 @@ install_privileged_helpers_from_ref() {
   fi
 
   for ent in "${entries[@]}"; do
-    local helper_name rule_name
-    IFS='|' read -r helper_name rule_name <<<"$ent"
+    local helper_name rule_name action_name
+    IFS='|' read -r helper_name rule_name action_name <<<"$ent"
 
     local helper_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/system/bin/${helper_name}"
     local rule_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/system/polkit/${rule_name}"
+    local action_url="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/${raw_ref}/system/polkit/${action_name}"
 
     local helper_tmp="$tmp/$helper_name"
     local rule_tmp="$tmp/$rule_name"
+    local action_tmp="$tmp/$action_name"
 
     log_info "Downloading privileged helper: $helper_url"
       if ! download_url_quiet "$helper_url" "$helper_tmp"; then
@@ -104,11 +121,26 @@ install_privileged_helpers_from_ref() {
       fi
     fi
 
+    log_info "Downloading polkit action: $action_url"
+      if ! download_url_quiet "$action_url" "$action_tmp"; then
+      if [ "$raw_ref" != "main" ]; then
+        local action_url_fallback="https://raw.githubusercontent.com/${KEYRGB_REPO_OWNER}/${KEYRGB_REPO_NAME}/main/system/polkit/${action_name}"
+        log_warn "Failed to download polkit action from ref '$raw_ref'; trying main: $action_url_fallback"
+          download_url_quiet "$action_url_fallback" "$action_tmp" || { log_warn "Failed to download polkit action"; continue; }
+      else
+        log_warn "Failed to download polkit action: $action_url"
+        continue
+      fi
+    fi
+
     log_info "Installing helper (requires sudo): /usr/local/bin/${helper_name}"
     sudo install -D -m 0755 "$helper_tmp" "/usr/local/bin/${helper_name}"
 
     log_info "Installing polkit rule (requires sudo): ${polkit_dir}/${rule_name}"
     sudo install -D -m 0644 "$rule_tmp" "${polkit_dir}/${rule_name}"
+
+    log_info "Installing polkit action (requires sudo): ${polkit_action_dir}/${action_name}"
+    sudo install -D -m 0644 "$action_tmp" "${polkit_action_dir}/${action_name}"
   done
 
   log_ok "Privileged helpers installed (best-effort)"

@@ -440,12 +440,9 @@ def test_run_privileged_helper_uses_pkexec_disable_internal_agent_when_nonintera
         [
             "/usr/bin/pkcheck",
             "--action-id",
-            "org.freedesktop.policykit.exec",
+            "org.keyrgb.power-helper.apply",
             "--process",
             "12345",
-            "--detail",
-            "program",
-            "/usr/local/bin/keyrgb-power-helper",
         ],
         [
             "/usr/bin/pkexec",
@@ -459,7 +456,7 @@ def test_run_privileged_helper_uses_pkexec_disable_internal_agent_when_nonintera
     ]
 
 
-def test_run_privileged_helper_skips_pkexec_when_noninteractive_pkcheck_rejects(
+def test_run_privileged_helper_skips_pkexec_when_noninteractive_keyrgb_action_rejects(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run_calls: list[list[str]] = []
@@ -490,12 +487,9 @@ def test_run_privileged_helper_skips_pkexec_when_noninteractive_pkcheck_rejects(
         [
             "/usr/bin/pkcheck",
             "--action-id",
-            "org.freedesktop.policykit.exec",
+            "org.keyrgb.power-helper.apply",
             "--process",
             "12345",
-            "--detail",
-            "program",
-            "/usr/local/bin/keyrgb-power-helper",
         ],
         [
             "/usr/bin/sudo",
@@ -542,12 +536,9 @@ def test_run_privileged_helper_falls_back_to_sudo_n_when_noninteractive_pkexec_f
         [
             "/usr/bin/pkcheck",
             "--action-id",
-            "org.freedesktop.policykit.exec",
+            "org.keyrgb.power-helper.apply",
             "--process",
             "12345",
-            "--detail",
-            "program",
-            "/usr/local/bin/keyrgb-power-helper",
         ],
         [
             "/usr/bin/pkexec",

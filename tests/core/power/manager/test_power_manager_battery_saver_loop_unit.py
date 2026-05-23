@@ -217,7 +217,7 @@ class TestPowerManagerBatterySaverLoop:
             pm._activate_power_source_mode(PowerMode.EXTREME_SAVER)
 
         set_mode.assert_called_once_with(PowerMode.EXTREME_SAVER, allow_interactive=False)
-        mock_kb._update_menu.assert_called_once()
+        mock_kb._update_menu.assert_not_called()
 
     def test_battery_saver_loop_covers_common_branches_and_actions(self):
         from src.core.power.management.manager import PowerManager
@@ -453,7 +453,7 @@ class TestPowerManagerBatterySaverLoop:
         assert mock_kb._last_power_source_transition_at == 123.0
         assert mock_kb._last_power_source_transition_profile_name == "battery"
         mock_kb._update_icon.assert_called_once()
-        mock_kb._update_menu.assert_called_once()
+        mock_kb._update_menu.assert_not_called()
 
     def test_activate_power_source_perkey_profile_restarts_when_tray_transition_declines(self):
         from src.core.power.management import manager as manager_module
@@ -480,4 +480,4 @@ class TestPowerManagerBatterySaverLoop:
         assert mock_kb._last_power_source_transition_at == 123.0
         assert mock_kb._last_power_source_transition_profile_name == "battery"
         mock_kb._update_icon.assert_called_once()
-        mock_kb._update_menu.assert_called_once()
+        mock_kb._update_menu.assert_not_called()

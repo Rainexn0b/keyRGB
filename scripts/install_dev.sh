@@ -18,7 +18,7 @@ Usage:
 Behavior:
   - Installs build tools (gcc, pkg-config) and common libs (libusb) best-effort.
   - Performs pip editable install of this repo (or cloned repo).
-  - Installs the power-mode helper + polkit rule best-effort unless system
+  - Installs the power-mode helper + polkit rule/action best-effort unless system
     dependency changes are skipped.
 
 Options:
