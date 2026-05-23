@@ -147,6 +147,45 @@ class TestPowerManagerBatterySaverLoop:
         pm._classify_battery_saver_iteration.assert_not_called()
         pm._execute_battery_saver_iteration_plan.assert_not_called()
 
+    def test_run_battery_saver_iteration_pauses_source_actions_while_power_event_forced_off(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        mock_kb._power_forced_off = True
+        cfg = MagicMock()
+        cfg.reload = MagicMock()
+        pm = PowerManager(mock_kb, config=cfg)
+        pm._classify_battery_saver_iteration = MagicMock()
+        pm._execute_battery_saver_iteration_plan = MagicMock()
+
+        with patch.object(manager_module.time, "sleep") as sleep:
+            result = pm._run_battery_saver_iteration(MagicMock(), poll_interval_s=2.0)
+
+        assert result is True
+        sleep.assert_called_once_with(2.0)
+        pm._classify_battery_saver_iteration.assert_not_called()
+        pm._execute_battery_saver_iteration_plan.assert_not_called()
+
+    def test_run_battery_saver_iteration_pauses_source_actions_for_bridge_power_forced_off_state(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        mock_kb._power_forced_off = False
+        mock_kb.tray_idle_power_state.power_forced_off = True
+        pm = PowerManager(mock_kb, config=MagicMock())
+        pm._classify_battery_saver_iteration = MagicMock()
+        pm._execute_battery_saver_iteration_plan = MagicMock()
+
+        with patch.object(manager_module.time, "sleep") as sleep:
+            result = pm._run_battery_saver_iteration(MagicMock(), poll_interval_s=2.0)
+
+        assert result is True
+        sleep.assert_called_once_with(2.0)
+        pm._classify_battery_saver_iteration.assert_not_called()
+        pm._execute_battery_saver_iteration_plan.assert_not_called()
+
     def test_run_battery_saver_iteration_keeps_source_actions_when_lid_close_off_is_disabled(self):
         from src.core.power.management.manager import PowerManager
 

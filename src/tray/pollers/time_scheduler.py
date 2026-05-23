@@ -52,26 +52,26 @@ def _apply_time_scheduler_brightness(
     tray: LightingTrayProtocol,
     base_brightness: int | None,
     reactive_brightness: int | None,
-) -> None:
+) -> bool:
     try:
         base_brightness_int = None if base_brightness is None else int(base_brightness)
         reactive_brightness_int = None if reactive_brightness is None else int(reactive_brightness)
     except _BRIGHTNESS_COERCION_EXCEPTIONS:
-        return
+        return False
 
     if base_brightness_int is None and reactive_brightness_int is None:
-        return
+        return False
 
     if base_brightness_int is not None and base_brightness_int < 0:
-        return
+        return False
     if reactive_brightness_int is not None and reactive_brightness_int < 0:
-        return
+        return False
 
     if tray._user_forced_off:
-        return
+        return False
 
     if tray._power_forced_off or tray._idle_forced_off:
-        return
+        return False
 
     try:
         apply_layered_brightness_update(
@@ -84,7 +84,9 @@ def _apply_time_scheduler_brightness(
         )
     except _SCHEDULER_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: time-scheduler brightness application crosses config setters, backend runtime calls, and UI callbacks; must remain non-fatal
         _log_tray_exception(tray, "Failed to apply time-scheduler brightness: %s", exc)
-        return
+        return False
+
+    return True
 
 
 def _parse_time(time_str: str) -> tuple[int, int] | None:
@@ -147,26 +149,27 @@ def _scheduler_loop(
                 )
 
                 if apply_key != last_applied_key:
-                    _apply_time_scheduler_brightness(
+                    applied = _apply_time_scheduler_brightness(
                         tray,
                         base_brightness,
                         state.active_reactive_brightness,
                     )
-                    base_deferred = state.defer_base_to_power_policy and base_brightness is None
-                    try_log_event(
-                        tray,
-                        "time_scheduler",
-                        (
-                            "night_reactive_applied_base_deferred_to_power_policy"
-                            if state.in_night and base_deferred
-                            else "night_applied"
-                            if state.in_night
-                            else "day_reactive_applied_base_deferred_to_power_policy"
-                            if base_deferred
-                            else "day_applied"
-                        ),
-                    )
-                    last_applied_key = apply_key
+                    if applied:
+                        base_deferred = state.defer_base_to_power_policy and base_brightness is None
+                        try_log_event(
+                            tray,
+                            "time_scheduler",
+                            (
+                                "night_reactive_applied_base_deferred_to_power_policy"
+                                if state.in_night and base_deferred
+                                else "night_applied"
+                                if state.in_night
+                                else "day_reactive_applied_base_deferred_to_power_policy"
+                                if base_deferred
+                                else "day_applied"
+                            ),
+                        )
+                        last_applied_key = apply_key
         except _SCHEDULER_RUNTIME_EXCEPTIONS as exc:
             logger.error("Time-scheduler iteration error: %s", exc, exc_info=True)
 

@@ -419,11 +419,12 @@ def test_run_privileged_helper_uses_pkexec_disable_internal_agent_when_nonintera
         return type("Completed", (), {"returncode": 0})()
 
     def fake_which(name: str) -> str | None:
-        if name == "pkexec":
-            return "/usr/bin/pkexec"
+        if name in {"pkcheck", "pkexec"}:
+            return f"/usr/bin/{name}"
         return None
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
     monkeypatch.setattr(system_modes.shutil, "which", fake_which)
     monkeypatch.setattr(system_modes.subprocess, "run", fake_run)
 
@@ -437,6 +438,16 @@ def test_run_privileged_helper_uses_pkexec_disable_internal_agent_when_nonintera
     )
     assert run_calls == [
         [
+            "/usr/bin/pkcheck",
+            "--action-id",
+            "org.freedesktop.policykit.exec",
+            "--process",
+            "12345",
+            "--detail",
+            "program",
+            "/usr/local/bin/keyrgb-power-helper",
+        ],
+        [
             "/usr/bin/pkexec",
             "--disable-internal-agent",
             "/usr/local/bin/keyrgb-power-helper",
@@ -448,7 +459,7 @@ def test_run_privileged_helper_uses_pkexec_disable_internal_agent_when_nonintera
     ]
 
 
-def test_run_privileged_helper_falls_back_to_sudo_n_when_noninteractive_pkexec_fails(
+def test_run_privileged_helper_skips_pkexec_when_noninteractive_pkcheck_rejects(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     run_calls: list[list[str]] = []
@@ -458,11 +469,12 @@ def test_run_privileged_helper_falls_back_to_sudo_n_when_noninteractive_pkexec_f
         return type("Completed", (), {"returncode": 0 if argv[0] == "/usr/bin/sudo" else 1})()
 
     def fake_which(name: str) -> str | None:
-        if name in {"pkexec", "sudo"}:
+        if name in {"pkcheck", "pkexec", "sudo"}:
             return f"/usr/bin/{name}"
         return None
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
     monkeypatch.setattr(system_modes.shutil, "which", fake_which)
     monkeypatch.setattr(system_modes.subprocess, "run", fake_run)
 
@@ -475,6 +487,68 @@ def test_run_privileged_helper_falls_back_to_sudo_n_when_noninteractive_pkexec_f
         is True
     )
     assert run_calls == [
+        [
+            "/usr/bin/pkcheck",
+            "--action-id",
+            "org.freedesktop.policykit.exec",
+            "--process",
+            "12345",
+            "--detail",
+            "program",
+            "/usr/local/bin/keyrgb-power-helper",
+        ],
+        [
+            "/usr/bin/sudo",
+            "-n",
+            "/usr/local/bin/keyrgb-power-helper",
+            "apply",
+            "extreme-saver",
+            "--extreme-cap-khz",
+            "1400000",
+        ],
+    ]
+
+
+def test_run_privileged_helper_falls_back_to_sudo_n_when_noninteractive_pkexec_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_calls: list[list[str]] = []
+
+    def fake_run(argv, **_kwargs):
+        run_calls.append(list(argv))
+        if argv[0] == "/usr/bin/pkcheck":
+            return type("Completed", (), {"returncode": 0})()
+        return type("Completed", (), {"returncode": 0 if argv[0] == "/usr/bin/sudo" else 1})()
+
+    def fake_which(name: str) -> str | None:
+        if name in {"pkcheck", "pkexec", "sudo"}:
+            return f"/usr/bin/{name}"
+        return None
+
+    monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
+    monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
+    monkeypatch.setattr(system_modes.shutil, "which", fake_which)
+    monkeypatch.setattr(system_modes.subprocess, "run", fake_run)
+
+    assert (
+        system_modes._run_privileged_helper(
+            PowerMode.EXTREME_SAVER,
+            extreme_cap_khz=1_400_000,
+            allow_interactive=False,
+        )
+        is True
+    )
+    assert run_calls == [
+        [
+            "/usr/bin/pkcheck",
+            "--action-id",
+            "org.freedesktop.policykit.exec",
+            "--process",
+            "12345",
+            "--detail",
+            "program",
+            "/usr/local/bin/keyrgb-power-helper",
+        ],
         [
             "/usr/bin/pkexec",
             "--disable-internal-agent",

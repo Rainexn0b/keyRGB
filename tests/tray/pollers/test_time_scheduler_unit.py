@@ -4,8 +4,10 @@ from datetime import datetime
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import pytest
+
 from src.tray.pollers.time_scheduler import _active_power_source_base_brightness, _is_night, _parse_time
-from src.tray.pollers.time_scheduler import _run_scheduler_iteration
+from src.tray.pollers.time_scheduler import _run_scheduler_iteration, _scheduler_loop
 
 
 class TestParseTime:
@@ -237,3 +239,58 @@ def test_active_power_source_base_brightness_uses_lower_value_at_night() -> None
     assert _active_power_source_base_brightness(state, on_ac=None) is None
     assert _active_power_source_base_brightness(state, on_ac=True) == 20
     assert _active_power_source_base_brightness(state, on_ac=False) == 15
+
+
+def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
+    tray = MagicMock()
+    tray._user_forced_off = False
+    tray._power_forced_off = True
+    tray._idle_forced_off = False
+    tray.is_off = False
+    tray.config.time_scheduler_enabled = True
+    tray.config.day_start_time = "08:00"
+    tray.config.night_start_time = "20:00"
+    tray.config.day_base_brightness = 40
+    tray.config.day_reactive_brightness = 50
+    tray.config.night_base_brightness = 20
+    tray.config.night_reactive_brightness = 45
+    tray.config.power_management_enabled = True
+    tray.config.ac_lighting_brightness = 40
+    tray.config.battery_lighting_brightness = 20
+    tray.config.effect = "reactive_ripple"
+    tray.config.brightness = 40
+    tray.config.perkey_brightness = 40
+    tray.config.reactive_brightness = 50
+    tray.engine.reactive_brightness = 50
+
+    class StopLoop(Exception):
+        pass
+
+    sleep_calls = 0
+
+    def sleep_fn(_seconds: float) -> None:
+        nonlocal sleep_calls
+        sleep_calls += 1
+        if sleep_calls == 1:
+            tray._power_forced_off = False
+            return
+        raise StopLoop
+
+    with (
+        patch("src.tray.pollers.time_scheduler.read_on_ac_power", return_value=True),
+        pytest.raises(StopLoop),
+    ):
+        _scheduler_loop(
+            tray,
+            sleep_fn=sleep_fn,
+            now_fn=lambda: datetime(2024, 1, 1, 22, 0),
+        )
+
+    tray.engine.set_brightness.assert_called_once_with(
+        20,
+        apply_to_hardware=False,
+        fade=True,
+        fade_duration_s=0.25,
+    )
+    assert tray.config.brightness == 20
+    assert tray.config.reactive_brightness == 45

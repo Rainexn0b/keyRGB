@@ -140,8 +140,19 @@ class PowerManager:
             time.sleep(poll_interval_s)
             return True
 
+        if self._keyboard_is_power_event_forced_off():
+            time.sleep(poll_interval_s)
+            return True
+
         plan = self._classify_battery_saver_iteration(policy)
         return self._execute_battery_saver_iteration_plan(plan, poll_interval_s=poll_interval_s)
+
+    def _keyboard_is_power_event_forced_off(self) -> bool:
+        if getattr(self.kb_controller, "_power_forced_off", None) is True:
+            return True
+
+        idle_state = getattr(self.kb_controller, "tray_idle_power_state", None)
+        return getattr(idle_state, "power_forced_off", None) is True
 
     def _classify_battery_saver_iteration(
         self,

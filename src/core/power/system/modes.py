@@ -442,6 +442,28 @@ def _apply_mode_sysfs(mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> N
     _write_mode_epp_preferences(mode, policies=policies)
 
 
+def _pkexec_noninteractive_authorized(pkcheck: str, *, helper: str) -> bool:
+    try:
+        cp = subprocess.run(
+            [
+                pkcheck,
+                "--action-id",
+                "org.freedesktop.policykit.exec",
+                "--process",
+                str(os.getpid()),
+                "--detail",
+                "program",
+                str(helper),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return False
+    return cp.returncode == 0
+
+
 def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_interactive: bool = True) -> bool:
     helper = os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
     argv = [
@@ -458,12 +480,20 @@ def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_inter
 
     pkexec = shutil.which("pkexec")
     if pkexec:
-        pkexec_argv = [pkexec, *argv] if allow_interactive else [pkexec, "--disable-internal-agent", *argv]
-        cp = subprocess.run(pkexec_argv, check=False, capture_output=True, text=True)
-        if cp.returncode == 0:
-            return True
         if allow_interactive:
-            return False
+            cp = subprocess.run([pkexec, *argv], check=False, capture_output=True, text=True)
+            return cp.returncode == 0
+
+        pkcheck = shutil.which("pkcheck")
+        if pkcheck and _pkexec_noninteractive_authorized(pkcheck, helper=helper):
+            cp = subprocess.run(
+                [pkexec, "--disable-internal-agent", *argv],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if cp.returncode == 0:
+                return True
 
     sudo = shutil.which("sudo")
     if sudo:

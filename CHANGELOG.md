@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.25.4 (2026-05-23)
+
+- Power/System: Prevent automatic wake and AC/DC-triggered power-mode changes from opening an interactive sudo/polkit prompt; noninteractive transitions now preflight existing polkit authorization before attempting the helper and fall back to noninteractive `sudo` only.
+- Tray/Scheduler: Retry time-of-day brightness application after wake, lid-open, and other temporary power-off windows instead of caching skipped scheduler updates as already applied.
+- Tray/Power: Keep the AC/DC source loop paused while keyboard lighting is power-event-forced off, so unplugging after lid close or suspend no longer reactivates the battery lighting/profile inside a travel bag.
+
 ## 0.25.3 (2026-05-21)
 
 - Tray/Power: Apply configured AC/battery system power modes even when the matching lighting state disables keyboard LEDs, preserve a manual tray power-mode override until the next AC/DC transition, and retry unsatisfied automatic power-mode changes without interactive prompts.
