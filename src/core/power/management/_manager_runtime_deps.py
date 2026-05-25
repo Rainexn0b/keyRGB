@@ -15,6 +15,12 @@ def start_sysfs_lid_monitoring(*args, **kwargs):
     return _start_sysfs_lid_monitoring(*args, **kwargs)
 
 
+def read_lid_state(*args, **kwargs):
+    from src.core.power.monitoring.lid_monitoring import read_lid_state as _read_lid_state
+
+    return _read_lid_state(*args, **kwargs)
+
+
 def monitor_prepare_for_sleep(*args, **kwargs):
     from src.core.power.monitoring.login1_monitoring import monitor_prepare_for_sleep as _monitor_prepare_for_sleep
 

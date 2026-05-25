@@ -27,10 +27,29 @@ def test_parse_lid_state_handles_open_closed_and_unknown() -> None:
     assert lid_monitoring._parse_lid_state(None) is None
 
 
+def test_read_lid_state_returns_closed_when_any_lid_reports_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/A/state", "/fake/lid/B/state"])
+    monkeypatch.setattr(lid_monitoring, "_FALLBACK_LID_STATE_PATHS", ())
+
+    def _open(path, *args, **kwargs):
+        if path == "/fake/lid/A/state":
+            return io.StringIO("state: open\n")
+        if path == "/fake/lid/B/state":
+            return io.StringIO("state: closed\n")
+        raise FileNotFoundError(path)
+
+    monkeypatch.setattr(builtins, "open", _open)
+
+    assert lid_monitoring.read_lid_state() == "closed"
+
+
 def test_start_sysfs_lid_monitoring_warns_when_no_lid_files(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: [])
+    monkeypatch.setattr(lid_monitoring, "_FALLBACK_LID_STATE_PATHS", ())
 
     # The implementation always starts the thread; the thread should exit
     # immediately after noticing there are no lid state files.
@@ -55,6 +74,7 @@ def test_start_sysfs_lid_monitoring_emits_callbacks_on_state_change(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/state"])
+    monkeypatch.setattr(lid_monitoring, "_FALLBACK_LID_STATE_PATHS", ())
     monkeypatch.setattr(
         lid_monitoring.threading,
         "Thread",
@@ -105,6 +125,7 @@ def test_start_sysfs_lid_monitoring_logs_recoverable_runtime_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/state"])
+    monkeypatch.setattr(lid_monitoring, "_FALLBACK_LID_STATE_PATHS", ())
     monkeypatch.setattr(
         lid_monitoring.threading,
         "Thread",
@@ -131,6 +152,7 @@ def test_start_sysfs_lid_monitoring_propagates_unexpected_callback_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/state"])
+    monkeypatch.setattr(lid_monitoring, "_FALLBACK_LID_STATE_PATHS", ())
     monkeypatch.setattr(
         lid_monitoring.threading,
         "Thread",

@@ -117,6 +117,96 @@ def test_per_key_reactive_reassert_policy_reinitializes_each_frame() -> None:
     assert not [call for call in kb.calls if call[0] == "set_brightness"]
 
 
+def test_per_key_reactive_init_once_policy_skips_duplicate_idle_frame() -> None:
+    from src.core.effects.reactive.render import render
+
+    kb = _DummyKB(per_key_mode_policy="init_once")
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        brightness=15,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=15,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=0.0,
+        _last_rendered_brightness=15,
+        _last_hw_mode_brightness=15,
+        _last_reactive_per_key_frame_signature=None,
+    )
+
+    render(engine, color_map={(0, 0): (255, 255, 255)})
+    assert kb.calls == [
+        ("set_key_colors", 15),
+    ]
+
+    kb.calls.clear()
+    render(engine, color_map={(0, 0): (255, 255, 255)})
+
+    assert kb.calls == []
+
+
+def test_per_key_reactive_reassert_policy_reinitializes_duplicate_idle_frame() -> None:
+    from src.core.effects.reactive.render import render
+
+    kb = _DummyKB(per_key_mode_policy="reassert_every_frame")
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        brightness=15,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=15,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=0.0,
+        _last_rendered_brightness=15,
+        _last_hw_mode_brightness=15,
+        _last_reactive_per_key_frame_signature=None,
+    )
+
+    render(engine, color_map={(0, 0): (255, 255, 255)})
+    kb.calls.clear()
+
+    render(engine, color_map={(0, 0): (255, 255, 255)})
+
+    assert kb.calls == [
+        ("enable_user_mode", 15),
+        ("set_key_colors", 15),
+    ]
+
+
+def test_per_key_reactive_duplicate_frame_cache_keeps_animating_changed_frames() -> None:
+    from src.core.effects.reactive.render import render
+
+    kb = _DummyKB(per_key_mode_policy="reassert_every_frame")
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        brightness=15,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=15,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=1.0,
+        _last_rendered_brightness=15,
+        _last_hw_mode_brightness=15,
+        _last_reactive_per_key_frame_signature=None,
+    )
+
+    render(engine, color_map={(0, 0): (255, 0, 0)})
+    kb.calls.clear()
+
+    render(engine, color_map={(0, 0): (255, 1, 0)})
+
+    assert kb.calls == [
+        ("enable_user_mode", 15),
+        ("set_key_colors", 15),
+    ]
+
+
 def test_uniform_reactive_pulse_can_still_lift_hw_brightness() -> None:
     from src.core.effects.reactive.render import render
 

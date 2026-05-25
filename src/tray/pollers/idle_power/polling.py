@@ -125,6 +125,7 @@ def _compute_idle_action(
     last_idle_turn_off_at: float = 0.0,
     last_resume_at: float = 0.0,
     now: float = 0.0,
+    session_idle: Optional[bool] = None,
 ) -> IdleAction:
     from .policy import compute_idle_action
 
@@ -145,6 +146,7 @@ def _compute_idle_action(
         last_idle_turn_off_at=last_idle_turn_off_at,
         last_resume_at=last_resume_at,
         now=now,
+        session_idle=session_idle,
     )
 
 

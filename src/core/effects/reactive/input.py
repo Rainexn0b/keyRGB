@@ -48,6 +48,17 @@ EvdevKeyboardDevices: TypeAlias = list[EvdevKeyboardDeviceProtocol]
 logger = logging.getLogger(__name__)
 
 
+def _reactive_input_debug_enabled() -> bool:
+    return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1" or os.environ.get("KEYRGB_DEBUG_REACTIVE_INPUT") == "1"
+
+
+def _device_debug_name(dev: EvdevKeyboardDevice) -> str:
+    name = getattr(dev, "name", None)
+    if name is None:
+        return "<unknown>"
+    return str(name)
+
+
 def _log_reactive_input_exception(key: str, message: str, exc: BaseException) -> None:
     log_throttled(
         logger,
@@ -184,6 +195,13 @@ def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
 
         if keyboard_tag is True or _evdev_device_looks_like_keyboard(dev, evdev_module):
             out.append(dev)
+            if _reactive_input_debug_enabled():
+                logger.info(
+                    "reactive_input: opened path=%s name=%r keyboard_tag=%s",
+                    device_path,
+                    _device_debug_name(dev),
+                    keyboard_tag,
+                )
             continue
 
         _close_evdev_device(
@@ -289,6 +307,16 @@ def poll_keypress_slot_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[s
                     continue
                 name = evdev_module.ecodes.KEY.get(int(code))
                 slot_id = evdev_key_name_to_slot_id(str(name) if name else "")
+                if _reactive_input_debug_enabled():
+                    logger.info(
+                        "reactive_input: key_press path=%s device=%r code=%s key=%s slot=%s mapped=%s",
+                        getattr(dev, "path", "<unknown>"),
+                        _device_debug_name(dev),
+                        code,
+                        name,
+                        slot_id,
+                        bool(slot_id),
+                    )
                 if slot_id:
                     return slot_id
         except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:

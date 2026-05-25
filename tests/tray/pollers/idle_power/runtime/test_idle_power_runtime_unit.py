@@ -154,6 +154,44 @@ def test_run_idle_power_iteration_suppresses_dim_sync_during_power_source_change
     assert loop_state.screen_off_true_streak == 0
 
 
+def test_run_idle_power_iteration_passes_session_idle_for_restore_candidate() -> None:
+    captured: dict[str, object] = {}
+    tray = _make_tray(reload_fn=lambda: None, log_event_fn=lambda *_args, **_kwargs: None)
+    tray.is_off = True
+    tray._idle_forced_off = True
+
+    def compute_action(**kwargs):
+        captured.update(kwargs)
+        return None
+
+    _runtime.run_idle_power_iteration(
+        tray,
+        loop_state=_runtime.IdlePollLoopState(),
+        idle_timeout_s=60.0,
+        session_id="session-1",
+        now_monotonic_fn=lambda: 100.0,
+        ensure_idle_state_fn=lambda _tray: None,
+        read_dimmed_state_fn=lambda _state: False,
+        read_screen_off_state_drm_fn=lambda: False,
+        debounce_dim_and_screen_off_fn=lambda **kwargs: (
+            kwargs["dimmed_raw"],
+            kwargs["screen_off_raw"],
+            kwargs["dimmed_true_streak"],
+            kwargs["dimmed_false_streak"],
+            kwargs["screen_off_true_streak"],
+        ),
+        read_logind_idle_seconds_fn=lambda **_kwargs: 120.0,
+        effective_screen_dim_sync_enabled_fn=lambda _tray, requested_enabled: requested_enabled,
+        compute_idle_action_fn=compute_action,
+        build_idle_action_key_fn=lambda **kwargs: str(kwargs["action"]),
+        should_log_idle_action_fn=lambda **_kwargs: False,
+        apply_idle_action_fn=lambda *_args, **_kwargs: None,
+    )
+
+    assert captured["dimmed"] is False
+    assert captured["session_idle"] is True
+
+
 def test_run_idle_power_iteration_propagates_unexpected_config_reload_failure() -> None:
     def fail_reload() -> None:
         raise AssertionError("unexpected reload bug")

@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 Color = Tuple[int, int, int]
 Key = Tuple[int, int]
+FrameSignature = tuple[int, tuple[tuple[int, int, int, int, int], ...]]
 
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _REACTIVE_RENDER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -31,6 +32,20 @@ def _last_hw_mode_brightness_or_none(engine: "EffectsEngine") -> int | None:
         return engine._last_hw_mode_brightness
     except AttributeError:
         return None
+
+
+def _last_reactive_per_key_frame_signature_or_none(engine: "EffectsEngine") -> object | None:
+    try:
+        return engine._last_reactive_per_key_frame_signature
+    except AttributeError:
+        return None
+
+
+def _per_key_frame_signature(color_map: Mapping[Key, Color], *, brightness_hw: int) -> FrameSignature:
+    entries: list[tuple[int, int, int, int, int]] = []
+    for (row, col), (red, green, blue) in color_map.items():
+        entries.append((int(row), int(col), int(red), int(green), int(blue)))
+    return (int(brightness_hw), tuple(sorted(entries)))
 
 
 def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_reinit: bool = False) -> None:
@@ -90,7 +105,16 @@ def render_per_key_frame(
             engine._last_rendered_brightness = brightness_hw
 
             reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
-            need_mode_init = reassert_every_frame or _last_hw_mode_brightness_or_none(engine) is None
+            mode_uninitialized = _last_hw_mode_brightness_or_none(engine) is None
+            frame_signature = _per_key_frame_signature(rendered_color_map, brightness_hw=brightness_hw)
+            if (
+                not reassert_every_frame
+                and not mode_uninitialized
+                and frame_signature == _last_reactive_per_key_frame_signature_or_none(engine)
+            ):
+                return True
+
+            need_mode_init = reassert_every_frame or mode_uninitialized
             if need_mode_init:
                 apply_hw_brightness(engine, brightness_hw, force_reinit=reassert_every_frame)
 
@@ -114,6 +138,7 @@ def render_per_key_frame(
 
             if not need_mode_init:
                 apply_hw_brightness(engine, brightness_hw)
+            engine._last_reactive_per_key_frame_signature = frame_signature
         render_secondary_uniform_rgb(
             engine,
             rgb=average_color_map(rendered_color_map),

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.25.6 (2026-05-25)
+
+- Effects/Reactive: Suppress duplicate per-key idle frames on init-once backends while preserving every-frame reassertion for ITE controllers that require it, reducing subtle idle flashes without regressing animation stability.
+- Tray/Idle: Avoid restoring keyboard lighting while logind still reports the session idle, and recover stable zero-brightness hardware blanks without persisting brightness 0 or treating them as a user off state.
+- Power/Lid: Re-read lid state from ACPI lid files inside the AC/battery polling loop so closing the lid on AC still turns keyboard lighting off and suppresses plugged-in restores while closed.
+- Diagnostics/Reactive: Add opt-in reactive input debug logging for opened evdev devices and mapped keypresses to make future flicker reports easier to diagnose.
+
 ## 0.25.5 (2026-05-23)
 
 - Power/System: Restore automatic AC/battery CPU power-mode switching by replacing the rejected `org.freedesktop.policykit.exec` detail preflight with a KeyRGB-owned `org.keyrgb.power-helper.apply` polkit action.

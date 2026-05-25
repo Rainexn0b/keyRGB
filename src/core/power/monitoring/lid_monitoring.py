@@ -7,6 +7,12 @@ from collections.abc import Callable
 
 
 _LID_MONITOR_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_PROC_LID_STATE_GLOB = "/proc/acpi/button/lid/*/state"
+_FALLBACK_LID_STATE_PATHS = (
+    "/proc/acpi/button/lid/LID/state",
+    "/proc/acpi/button/lid/LID0/state",
+    "/proc/acpi/button/lid/LID1/state",
+)
 
 
 def _parse_lid_state(content: str | None) -> str | None:
@@ -18,6 +24,36 @@ def _parse_lid_state(content: str | None) -> str | None:
     if "closed" in s:
         return "closed"
     return None
+
+
+def _lid_state_paths() -> list[str]:
+    paths: list[str] = []
+    for path in glob.glob(_PROC_LID_STATE_GLOB):
+        if path not in paths:
+            paths.append(path)
+    for path in _FALLBACK_LID_STATE_PATHS:
+        if path not in paths:
+            paths.append(path)
+    return paths
+
+
+def read_lid_state() -> str | None:
+    """Return the current lid state from available ACPI lid state files."""
+
+    saw_open = False
+    for path in _lid_state_paths():
+        try:
+            with open(path) as f:
+                state = _parse_lid_state(f.read())
+        except OSError:
+            continue
+
+        if state == "closed":
+            return "closed"
+        if state == "open":
+            saw_open = True
+
+    return "open" if saw_open else None
 
 
 def _run_lid_monitor_action(*, action: Callable[[], None], logger) -> bool:
@@ -39,23 +75,20 @@ def start_sysfs_lid_monitoring(
     """Start a background thread to monitor lid state via /proc/acpi sysfs-style files."""
 
     def monitor_lid_sysfs():
-        lid_files = glob.glob("/proc/acpi/button/lid/*/state")
+        lid_files = [path for path in _lid_state_paths() if _path_exists(path)]
 
         if not lid_files:
             logger.warning("No lid state file found")
             return
 
-        lid_file = lid_files[0]
-        logger.info("Monitoring lid state from: %s", lid_file)
+        logger.info("Monitoring lid state from: %s", ", ".join(lid_files))
 
         last_state = None
         while is_running():
 
             def poll_once() -> None:
                 nonlocal last_state
-                with open(lid_file) as f:
-                    content = f.read()
-                    state = _parse_lid_state(content)
+                state = read_lid_state()
 
                 if state and state != last_state:
                     logger.info("Lid state changed: %s -> %s", last_state, state)
@@ -73,6 +106,16 @@ def start_sysfs_lid_monitoring(
     threading.Thread(target=monitor_lid_sysfs, daemon=True).start()
 
 
+def _path_exists(path: str) -> bool:
+    try:
+        with open(path):
+            return True
+    except OSError:
+        return False
+    except _LID_MONITOR_RUNTIME_ERRORS:
+        return True
+
+
 def poll_lid_state_paths(
     *,
     is_running: Callable[[], bool],
@@ -82,22 +125,7 @@ def poll_lid_state_paths(
 ) -> None:
     """Fallback: poll lid state from known /proc or /sys paths."""
 
-    lid_paths = [
-        "/proc/acpi/button/lid/LID/state",
-        "/proc/acpi/button/lid/LID0/state",
-        "/sys/class/power_supply/AC/online",
-    ]
-
-    lid_path = None
-    for path in lid_paths:
-        try:
-            with open(path):
-                lid_path = path
-                break
-        except OSError:
-            continue
-
-    if not lid_path:
+    if not any(_path_exists(path) for path in _lid_state_paths()):
         logger.warning("Could not find lid state file, power management disabled")
         return
 
@@ -106,17 +134,14 @@ def poll_lid_state_paths(
 
         def poll_once() -> None:
             nonlocal last_state
-            with open(lid_path) as f:
-                state = f.read()
+            parsed = read_lid_state()
 
-            parsed = _parse_lid_state(state)
-
-            if state != last_state:
+            if parsed and parsed != last_state:
                 if parsed == "closed":
                     on_lid_close()
                 elif parsed == "open":
                     on_lid_open()
-                last_state = state
+                last_state = parsed
 
         _run_lid_monitor_action(action=poll_once, logger=logger)
 

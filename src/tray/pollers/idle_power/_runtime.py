@@ -123,6 +123,20 @@ def _power_source_idle_guard_active(*, loop_state: IdlePollLoopState, now: float
     return (float(now) - changed_at) < POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 
 
+def _read_session_idle_state(
+    *,
+    session_id: str | None,
+    idle_timeout_s: float,
+    read_logind_idle_seconds_fn: Callable[..., Optional[float]],
+) -> Optional[bool]:
+    if not session_id:
+        return None
+    idle_s = read_logind_idle_seconds_fn(session_id=session_id)
+    if idle_s is None:
+        return None
+    return bool(float(idle_s) >= float(idle_timeout_s))
+
+
 def run_idle_power_iteration(
     tray: IdlePowerTrayProtocol,
     *,
@@ -177,10 +191,6 @@ def run_idle_power_iteration(
         debounce_polls_screen_off_true=4,
     )
 
-    if dimmed is None and session_id:
-        idle_s = read_logind_idle_seconds_fn(session_id=session_id)
-        dimmed = None if idle_s is None else (float(idle_s) >= float(idle_timeout_s))
-
     power_mgmt_enabled = safe_bool_attr(tray.config, "power_management_enabled", default=True)
     brightness = safe_int_attr(tray.config, "brightness", default=0)
 
@@ -188,6 +198,17 @@ def run_idle_power_iteration(
     dim_sync_enabled = effective_screen_dim_sync_enabled_fn(tray, bool(dim_sync_enabled_requested))
     dim_sync_mode = safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off"
     dim_temp_brightness = safe_int_attr(tray.config, "screen_dim_temp_brightness", default=5, min_v=1, max_v=50)
+    session_idle: Optional[bool] = None
+    restore_candidate = bool(dimmed is False and (bool(tray.is_off) or bool(tray._dim_temp_active)))
+    if dimmed is None or restore_candidate:
+        session_idle = _read_session_idle_state(
+            session_id=session_id,
+            idle_timeout_s=float(idle_timeout_s),
+            read_logind_idle_seconds_fn=read_logind_idle_seconds_fn,
+        )
+
+    if dimmed is None and session_idle is not None:
+        dimmed = bool(session_idle)
 
     action = compute_idle_action_fn(
         dimmed=dimmed,
@@ -211,6 +232,7 @@ def run_idle_power_iteration(
         ),
         last_resume_at=float(tray._last_resume_at),
         now=now,
+        session_idle=session_idle,
     )
     if _power_source_idle_guard_active(loop_state=loop_state, now=now):
         action = None

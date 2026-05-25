@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sys
 from types import SimpleNamespace
 
@@ -199,6 +200,30 @@ def test_poll_keypress_slot_id_logs_and_drops_devices_on_read_failure(monkeypatc
     args, kwargs = logs[0]
     assert args[1] == "effects.reactive.evdev.read_failed"
     assert kwargs["exc"].args == ("read failed",)
+
+
+def test_poll_keypress_slot_id_debug_logs_mapped_input(monkeypatch, caplog) -> None:
+    class _InputDevice(_FakeDevice):
+        path = "/dev/input/event3"
+        name = "AT Translated Set 2 keyboard"
+
+        def read(self):
+            return [SimpleNamespace(type=1, value=1, code=30)]
+
+    fake_evdev = SimpleNamespace(ecodes=SimpleNamespace(EV_KEY=1, KEY={30: "KEY_A"}))
+    fake_select = SimpleNamespace(select=lambda readers, _writers, _errors, _timeout: (list(readers), [], []))
+
+    monkeypatch.setenv("KEYRGB_DEBUG_REACTIVE_INPUT", "1")
+    monkeypatch.setitem(sys.modules, "evdev", fake_evdev)
+    monkeypatch.setitem(sys.modules, "select", fake_select)
+
+    with caplog.at_level(logging.INFO, logger=reactive_input.__name__):
+        assert reactive_input.poll_keypress_slot_id([_InputDevice()]) == str(slot_id_for_key_id("auto", "a") or "a")
+
+    assert "reactive_input: key_press" in caplog.text
+    assert "path=/dev/input/event3" in caplog.text
+    assert "key=KEY_A" in caplog.text
+    assert "mapped=True" in caplog.text
 
 
 def test_reactive_input_module_exposes_only_slot_first_loader_and_poller_names() -> None:

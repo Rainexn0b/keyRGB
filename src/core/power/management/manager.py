@@ -42,6 +42,7 @@ orchestrate_power_event = _power_events.orchestrate_power_event
 get_system_power_status = _manager_runtime_deps.get_system_power_status
 monitor_acpi_events = _manager_runtime_deps.monitor_acpi_events
 monitor_prepare_for_sleep = _manager_runtime_deps.monitor_prepare_for_sleep
+read_lid_state = _manager_runtime_deps.read_lid_state
 read_on_ac_power = _manager_runtime_deps.read_on_ac_power
 safe_int_attr = _manager_runtime_deps.safe_int_attr
 set_system_power_mode = _manager_runtime_deps.set_system_power_mode
@@ -137,6 +138,8 @@ class PowerManager:
         *,
         poll_interval_s: float,
     ) -> bool:
+        self._sync_lid_state_from_system()
+
         if self._lid_closed and self._flag("power_off_on_lid_close", True):
             time.sleep(poll_interval_s)
             return True
@@ -147,6 +150,15 @@ class PowerManager:
 
         plan = self._classify_battery_saver_iteration(policy)
         return self._execute_battery_saver_iteration_plan(plan, poll_interval_s=poll_interval_s)
+
+    def _sync_lid_state_from_system(self) -> None:
+        state = read_lid_state()
+        if state == "closed" and not self._lid_closed:
+            logger.info("Power-source polling observed closed lid")
+            self._on_lid_close()
+        elif state == "open" and self._lid_closed:
+            logger.info("Power-source polling observed open lid")
+            self._on_lid_open()
 
     def _keyboard_is_power_event_forced_off(self) -> bool:
         if getattr(self.kb_controller, "_power_forced_off", None) is True:

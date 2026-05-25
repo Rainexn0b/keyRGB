@@ -119,6 +119,7 @@ class _EngineCore:
         self._dim_temp_active: bool = False
         self._last_rendered_brightness: int | None = None
         self._last_hw_mode_brightness: int | None = None
+        self._last_reactive_per_key_frame_signature: object | None = None
         self._reactive_state = ReactiveRenderState()
 
         self._brightness_fade_token: int = 0
@@ -166,6 +167,7 @@ class _EngineCore:
             self.kb = NullKeyboard()
 
         # Best-effort close of the old device.
+        self._last_reactive_per_key_frame_signature = None
         close_fn = getattr(old_kb, "close", None)
         if callable(close_fn):
             try:
@@ -201,6 +203,7 @@ class _EngineCore:
 
         self._last_rendered_brightness = None
         self._last_hw_mode_brightness = None
+        self._last_reactive_per_key_frame_signature = None
         self._reactive_state = ReactiveRenderState()
 
         if not self.running and not self.thread:

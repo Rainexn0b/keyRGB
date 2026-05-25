@@ -30,6 +30,7 @@ def compute_idle_action(
     last_idle_turn_off_at: float = 0.0,
     last_resume_at: float = 0.0,
     now: float = 0.0,
+    session_idle: Optional[bool] = None,
 ) -> IdleAction:
     if now > 0 and last_resume_at > 0:
         if (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S:
@@ -80,9 +81,13 @@ def compute_idle_action(
 
     if dimmed_effective is False:
         if dim_temp_active:
+            if session_idle is True:
+                return None
             return "restore_brightness"
 
         if is_off:
+            if idle_forced_off and session_idle is True:
+                return None
             if (not bool(screen_off)) and now > 0 and last_idle_turn_off_at > 0:
                 if (now - last_idle_turn_off_at) < POST_TURN_OFF_RESTORE_SUPPRESSION_S:
                     return None
