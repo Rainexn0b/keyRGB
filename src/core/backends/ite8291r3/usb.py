@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, SupportsIndex, SupportsInt, cast
@@ -15,6 +17,7 @@ _USB_GET_REPORT = 0x001
 _USB_FEATURE_VALUE = 0x300
 
 IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
+_SLOW_TRANSFER_THRESHOLD_S = 0.02
 
 
 class _UsbEndpointProtocol(Protocol):
@@ -91,6 +94,44 @@ def _coerce_optional_int(value: object) -> int | None:
         return _coerce_int(value)
     except (TypeError, ValueError, OverflowError):
         return None
+
+
+def _brightness_debug_enabled() -> bool:
+    value = os.environ.get("KEYRGB_DEBUG_BRIGHTNESS", "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _payload_head(payload: bytes, *, limit: int = 8) -> tuple[int, ...]:
+    return tuple(int(value) for value in bytes(payload)[:limit])
+
+
+def _log_slow_transfer_if_needed(*, kind: str, direction: str, payload: bytes, result: object, elapsed_s: float) -> None:
+    if not _brightness_debug_enabled() or float(elapsed_s) < _SLOW_TRANSFER_THRESHOLD_S:
+        return
+
+    _logger.info(
+        "EVENT ite8291r3:usb_transfer_slow direction=%s kind=%s elapsed_ms=%.3f bytes=%s result=%s head=%s",
+        str(direction),
+        str(kind),
+        float(elapsed_s) * 1000.0,
+        len(bytes(payload)),
+        result,
+        _payload_head(payload),
+    )
+
+
+def _log_length_mismatch_if_needed(*, kind: str, direction: str, expected: int, actual: int, payload: bytes) -> None:
+    if not _brightness_debug_enabled() or int(expected) == int(actual):
+        return
+
+    _logger.info(
+        "EVENT ite8291r3:usb_transfer_length_mismatch direction=%s kind=%s expected=%s actual=%s head=%s",
+        str(direction),
+        str(kind),
+        int(expected),
+        int(actual),
+        _payload_head(payload),
+    )
 
 
 @dataclass(frozen=True)
@@ -263,7 +304,8 @@ class PyUsbTransport:
         if self._closed or self._device is None:
             raise OSError("PyUsbTransport is closed")
         payload = bytes(report)
-        return _coerce_int(
+        started = time.monotonic()
+        result = _coerce_int(
             self._device.ctrl_transfer(
                 self._usb_util.build_request_type(
                     self._usb_util.CTRL_OUT,
@@ -276,10 +318,27 @@ class PyUsbTransport:
                 payload,
             )
         )
+        elapsed_s = time.monotonic() - started
+        _log_slow_transfer_if_needed(
+            kind="control_write",
+            direction="out",
+            payload=payload,
+            result=result,
+            elapsed_s=elapsed_s,
+        )
+        _log_length_mismatch_if_needed(
+            kind="control_write",
+            direction="out",
+            expected=len(payload),
+            actual=int(result),
+            payload=payload,
+        )
+        return result
 
     def read_control_report(self, length: int) -> bytes:
         if self._closed or self._device is None:
             raise OSError("PyUsbTransport is closed")
+        started = time.monotonic()
         data = self._device.ctrl_transfer(
             self._usb_util.build_request_type(
                 self._usb_util.CTRL_IN,
@@ -291,12 +350,46 @@ class PyUsbTransport:
             self._interface_number,
             int(length),
         )
-        return bytes(cast(bytes | bytearray | list[int], data))
+        payload = bytes(cast(bytes | bytearray | list[int], data))
+        elapsed_s = time.monotonic() - started
+        _log_slow_transfer_if_needed(
+            kind="control_read",
+            direction="in",
+            payload=payload,
+            result=len(payload),
+            elapsed_s=elapsed_s,
+        )
+        _log_length_mismatch_if_needed(
+            kind="control_read",
+            direction="in",
+            expected=int(length),
+            actual=len(payload),
+            payload=payload,
+        )
+        return payload
 
     def write_data(self, payload: bytes) -> int:
         if self._closed or self._device is None:
             raise OSError("PyUsbTransport is closed")
-        return int(self._device.write(self._out_endpoint_address, bytes(payload)))
+        data = bytes(payload)
+        started = time.monotonic()
+        result = int(self._device.write(self._out_endpoint_address, data))
+        elapsed_s = time.monotonic() - started
+        _log_slow_transfer_if_needed(
+            kind="data_write",
+            direction="out",
+            payload=data,
+            result=result,
+            elapsed_s=elapsed_s,
+        )
+        _log_length_mismatch_if_needed(
+            kind="data_write",
+            direction="out",
+            expected=len(data),
+            actual=int(result),
+            payload=data,
+        )
+        return result
 
 
 def open_matching_transport(

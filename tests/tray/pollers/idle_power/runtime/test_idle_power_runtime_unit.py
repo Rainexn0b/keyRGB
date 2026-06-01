@@ -192,6 +192,59 @@ def test_run_idle_power_iteration_passes_session_idle_for_restore_candidate() ->
     assert captured["session_idle"] is True
 
 
+def test_run_idle_power_iteration_logs_raw_dim_and_session_context_when_debug_enabled(monkeypatch) -> None:
+    logged: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+
+    tray = _make_tray(
+        reload_fn=lambda: None,
+        log_event_fn=lambda *args, **kwargs: logged.append((args, kwargs)),
+    )
+
+    _runtime.run_idle_power_iteration(
+        tray,
+        loop_state=_runtime.IdlePollLoopState(),
+        idle_timeout_s=60.0,
+        session_id="session-1",
+        now_monotonic_fn=lambda: 100.0,
+        ensure_idle_state_fn=lambda _tray: None,
+        read_dimmed_state_fn=lambda _state: True,
+        read_screen_off_state_drm_fn=lambda: False,
+        debounce_dim_and_screen_off_fn=lambda **kwargs: (
+            kwargs["dimmed_raw"],
+            kwargs["screen_off_raw"],
+            6,
+            0,
+            0,
+        ),
+        read_logind_idle_seconds_fn=lambda **_kwargs: 5.0,
+        effective_screen_dim_sync_enabled_fn=lambda _tray, requested_enabled: requested_enabled,
+        compute_idle_action_fn=lambda **_kwargs: "turn_off",
+        build_idle_action_key_fn=lambda **_kwargs: "turn_off",
+        should_log_idle_action_fn=lambda **_kwargs: True,
+        apply_idle_action_fn=lambda *_args, **_kwargs: None,
+    )
+
+    assert logged
+    args, kwargs = logged[0]
+    assert args[:2] == ("idle_power", "turn_off")
+    assert kwargs["dimmed"] is True
+    assert kwargs["dimmed_raw"] is True
+    assert kwargs["screen_off"] is False
+    assert kwargs["screen_off_raw"] is False
+    assert kwargs["screen_off_backlight_raw"] is False
+    assert kwargs["screen_off_drm_raw"] is False
+    assert kwargs["session_idle"] is None
+    assert kwargs["session_idle_evaluated"] is False
+    assert kwargs["session_idle_seconds"] == pytest.approx(5.0)
+    assert kwargs["idle_timeout_s"] == pytest.approx(60.0)
+    assert kwargs["dimmed_true_streak"] == 6
+    assert kwargs["dimmed_false_streak"] == 0
+    assert kwargs["screen_off_true_streak"] == 0
+    assert kwargs["power_source_guard_active"] is False
+
+
 def test_run_idle_power_iteration_propagates_unexpected_config_reload_failure() -> None:
     def fail_reload() -> None:
         raise AssertionError("unexpected reload bug")

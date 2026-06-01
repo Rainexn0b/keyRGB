@@ -45,6 +45,30 @@ def test_read_lid_state_returns_closed_when_any_lid_reports_closed(
     assert lid_monitoring.read_lid_state() == "closed"
 
 
+def test_read_lid_state_details_returns_aggregated_state_and_per_path_details(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/A/state", "/fake/lid/B/state"])
+    monkeypatch.setattr(lid_monitoring, "_FALLBACK_LID_STATE_PATHS", ())
+
+    def _open(path, *args, **kwargs):
+        if path == "/fake/lid/A/state":
+            return io.StringIO("state: open\n")
+        if path == "/fake/lid/B/state":
+            return io.StringIO("state: closed\n")
+        raise FileNotFoundError(path)
+
+    monkeypatch.setattr(builtins, "open", _open)
+
+    state, details = lid_monitoring.read_lid_state_details()
+
+    assert state == "closed"
+    assert details == (
+        ("/fake/lid/A/state", "open", "state: open"),
+        ("/fake/lid/B/state", "closed", "state: closed"),
+    )
+
+
 def test_start_sysfs_lid_monitoring_warns_when_no_lid_files(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -119,6 +143,57 @@ def test_start_sysfs_lid_monitoring_emits_callbacks_on_state_change(
 
     on_open.assert_called_once()
     on_close.assert_called_once()
+
+
+def test_start_sysfs_lid_monitoring_logs_transition_details_when_debug_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    monkeypatch.setattr(lid_monitoring.glob, "glob", lambda _: ["/fake/lid/state"])
+    monkeypatch.setattr(lid_monitoring, "_FALLBACK_LID_STATE_PATHS", ())
+    monkeypatch.setattr(
+        lid_monitoring.threading,
+        "Thread",
+        lambda *, target, daemon: _ImmediateThread(target=target, daemon=daemon),
+    )
+    monkeypatch.setattr(lid_monitoring.time, "sleep", lambda _: None)
+
+    reads = ["state: open\n", "state: open\n", "state: closed\n"]
+    calls = {"n": 0}
+
+    def _open(_path, *args, **kwargs):
+        idx = min(calls["n"], len(reads) - 1)
+        calls["n"] += 1
+        return io.StringIO(reads[idx])
+
+    monkeypatch.setattr(builtins, "open", _open)
+
+    remaining = {"n": 2}
+
+    def is_running() -> bool:
+        remaining["n"] -= 1
+        return remaining["n"] >= 0
+
+    messages: list[str] = []
+
+    class _Logger:
+        def info(self, msg, *args) -> None:
+            messages.append(msg % args)
+
+        def warning(self, msg, *args) -> None:
+            messages.append(msg % args)
+
+        def exception(self, msg, *args) -> None:
+            messages.append(msg % args)
+
+    lid_monitoring.start_sysfs_lid_monitoring(
+        is_running=is_running,
+        on_lid_close=MagicMock(),
+        on_lid_open=MagicMock(),
+        logger=_Logger(),
+    )
+
+    assert any("EVENT power:lid_state_transition source=sysfs_monitor previous=open current=closed" in message for message in messages)
 
 
 def test_start_sysfs_lid_monitoring_logs_recoverable_runtime_errors(

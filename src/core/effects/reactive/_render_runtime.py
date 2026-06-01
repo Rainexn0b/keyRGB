@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 Color = Tuple[int, int, int]
 Key = Tuple[int, int]
+FrameEntry = tuple[int, int, int, int, int]
 FrameSignature = tuple[int, tuple[tuple[int, int, int, int, int], ...]]
 
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
@@ -46,6 +47,104 @@ def _per_key_frame_signature(color_map: Mapping[Key, Color], *, brightness_hw: i
     for (row, col), (red, green, blue) in color_map.items():
         entries.append((int(row), int(col), int(red), int(green), int(blue)))
     return (int(brightness_hw), tuple(sorted(entries)))
+
+
+def _frame_signature_or_none(signature: object) -> FrameSignature | None:
+    if not isinstance(signature, tuple) or len(signature) != 2:
+        return None
+
+    brightness_hw, raw_entries = signature
+    if not isinstance(raw_entries, tuple):
+        return None
+
+    try:
+        normalized_entries = tuple(
+            (int(row), int(col), int(red), int(green), int(blue))
+            for row, col, red, green, blue in raw_entries
+        )
+    except (TypeError, ValueError):
+        return None
+
+    try:
+        normalized_brightness = int(brightness_hw)
+    except (TypeError, ValueError):
+        return None
+
+    return (normalized_brightness, normalized_entries)
+
+
+def _reactive_deck_change_threshold(total_keys: int) -> int:
+    return max(1, (int(total_keys) * 3) // 4)
+
+
+def _log_reactive_frame_deck_change_if_needed(
+    *,
+    logger: logging.Logger,
+    previous_signature: object | None,
+    frame_signature: FrameSignature,
+) -> None:
+    if not _brightness_support.debug_brightness_enabled():
+        return
+
+    previous = _frame_signature_or_none(previous_signature)
+    current = _frame_signature_or_none(frame_signature)
+    if previous is None or current is None:
+        return
+
+    previous_brightness_hw, previous_entries = previous
+    brightness_hw, current_entries = current
+    total_keys = len(current_entries)
+    if total_keys <= 0:
+        return
+
+    previous_by_key = {(row, col): (red, green, blue) for row, col, red, green, blue in previous_entries}
+
+    changed_keys = 0
+    lit_keys = 0
+    total_red = 0
+    total_green = 0
+    total_blue = 0
+    changed_samples: list[tuple[int, int, int, int, int, int, int, int]] = []
+    for row, col, red, green, blue in current_entries:
+        total_red += int(red)
+        total_green += int(green)
+        total_blue += int(blue)
+        if red or green or blue:
+            lit_keys += 1
+
+        previous_rgb = previous_by_key.get((row, col), (0, 0, 0))
+        current_rgb = (int(red), int(green), int(blue))
+        if previous_rgb != current_rgb:
+            changed_keys += 1
+            if len(changed_samples) < 4:
+                changed_samples.append(
+                    (
+                        int(row),
+                        int(col),
+                        int(previous_rgb[0]),
+                        int(previous_rgb[1]),
+                        int(previous_rgb[2]),
+                        int(current_rgb[0]),
+                        int(current_rgb[1]),
+                        int(current_rgb[2]),
+                    )
+                )
+
+    if changed_keys < _reactive_deck_change_threshold(total_keys):
+        return
+
+    logger.info(
+        "reactive_frame_deck_change changed_keys=%s total_keys=%s lit_keys=%s brightness_hw=%s previous_brightness_hw=%s avg_rgb=(%s,%s,%s) samples=%s",
+        int(changed_keys),
+        int(total_keys),
+        int(lit_keys),
+        int(brightness_hw),
+        int(previous_brightness_hw),
+        int(round(total_red / total_keys)),
+        int(round(total_green / total_keys)),
+        int(round(total_blue / total_keys)),
+        tuple(changed_samples),
+    )
 
 
 def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_reinit: bool = False) -> None:
@@ -107,10 +206,11 @@ def render_per_key_frame(
             reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
             mode_uninitialized = _last_hw_mode_brightness_or_none(engine) is None
             frame_signature = _per_key_frame_signature(rendered_color_map, brightness_hw=brightness_hw)
+            previous_signature = _last_reactive_per_key_frame_signature_or_none(engine)
             if (
                 not reassert_every_frame
                 and not mode_uninitialized
-                and frame_signature == _last_reactive_per_key_frame_signature_or_none(engine)
+                and frame_signature == previous_signature
             ):
                 return True
 
@@ -138,6 +238,11 @@ def render_per_key_frame(
 
             if not need_mode_init:
                 apply_hw_brightness(engine, brightness_hw)
+            _log_reactive_frame_deck_change_if_needed(
+                logger=logger,
+                previous_signature=previous_signature,
+                frame_signature=frame_signature,
+            )
             engine._last_reactive_per_key_frame_signature = frame_signature
         render_secondary_uniform_rgb(
             engine,

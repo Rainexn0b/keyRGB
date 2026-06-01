@@ -21,6 +21,12 @@ def read_lid_state(*args, **kwargs):
     return _read_lid_state(*args, **kwargs)
 
 
+def read_lid_state_details(*args, **kwargs):
+    from src.core.power.monitoring.lid_monitoring import read_lid_state_details as _read_lid_state_details
+
+    return _read_lid_state_details(*args, **kwargs)
+
+
 def monitor_prepare_for_sleep(*args, **kwargs):
     from src.core.power.monitoring.login1_monitoring import monitor_prepare_for_sleep as _monitor_prepare_for_sleep
 

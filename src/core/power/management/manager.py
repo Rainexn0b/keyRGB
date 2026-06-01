@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 import time
 from typing import TYPE_CHECKING, cast
@@ -43,6 +44,7 @@ get_system_power_status = _manager_runtime_deps.get_system_power_status
 monitor_acpi_events = _manager_runtime_deps.monitor_acpi_events
 monitor_prepare_for_sleep = _manager_runtime_deps.monitor_prepare_for_sleep
 read_lid_state = _manager_runtime_deps.read_lid_state
+read_lid_state_details = _manager_runtime_deps.read_lid_state_details
 read_on_ac_power = _manager_runtime_deps.read_on_ac_power
 safe_int_attr = _manager_runtime_deps.safe_int_attr
 set_system_power_mode = _manager_runtime_deps.set_system_power_mode
@@ -67,6 +69,11 @@ def activate_perkey_profile(tray: object, profile_name: str) -> None:
 
 _POWER_MANAGER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _POWER_MANAGER_MONITOR_ERRORS = _POWER_MANAGER_RUNTIME_ERRORS + (ImportError,)
+
+
+def _brightness_debug_enabled() -> bool:
+    value = os.environ.get("KEYRGB_DEBUG_BRIGHTNESS", "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class PowerManager:
@@ -152,11 +159,25 @@ class PowerManager:
         return self._execute_battery_saver_iteration_plan(plan, poll_interval_s=poll_interval_s)
 
     def _sync_lid_state_from_system(self) -> None:
-        state = read_lid_state()
+        state, details = read_lid_state_details()
         if state == "closed" and not self._lid_closed:
+            if _brightness_debug_enabled():
+                logger.info(
+                    "EVENT power:lid_state_poll previous=%s current=%s details=%s",
+                    "open",
+                    state,
+                    details,
+                )
             logger.info("Power-source polling observed closed lid")
             self._on_lid_close()
         elif state == "open" and self._lid_closed:
+            if _brightness_debug_enabled():
+                logger.info(
+                    "EVENT power:lid_state_poll previous=%s current=%s details=%s",
+                    "closed",
+                    state,
+                    details,
+                )
             logger.info("Power-source polling observed open lid")
             self._on_lid_open()
 

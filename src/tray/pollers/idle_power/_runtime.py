@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import os
 from typing import Callable, Optional
 
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
@@ -13,6 +14,14 @@ from .sensors import BacklightState
 
 _IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _IDLE_POWER_IMPORT_EXCEPTIONS = (ImportError,) + _IDLE_POWER_RUNTIME_EXCEPTIONS
+
+
+def _env_flag_enabled(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _idle_power_debug_logging_enabled() -> bool:
+    return _env_flag_enabled("KEYRGB_DEBUG") or _env_flag_enabled("KEYRGB_DEBUG_BRIGHTNESS")
 
 
 @dataclass
@@ -39,18 +48,34 @@ def _log_idle_action_best_effort(
     *,
     action: IdleAction,
     dimmed: Optional[bool],
+    dimmed_raw: Optional[bool] = None,
     screen_off: bool,
+    screen_off_raw: bool = False,
+    screen_off_backlight_raw: bool = False,
+    screen_off_drm_raw: bool = False,
     brightness: int,
     dim_sync_enabled: bool,
     dim_sync_mode: str,
     dim_temp_brightness: int,
+    session_idle: Optional[bool] = None,
+    session_idle_evaluated: bool = False,
+    session_idle_seconds: Optional[float] = None,
+    idle_timeout_s: float = 0.0,
+    dimmed_true_streak: int = 0,
+    dimmed_false_streak: int = 0,
+    screen_off_true_streak: int = 0,
+    power_source_guard_active: bool = False,
 ) -> None:
     def _log_event() -> None:
         tray._log_event(
             "idle_power",
             str(action),
             dimmed=dimmed,
+            dimmed_raw=dimmed_raw,
             screen_off=bool(screen_off),
+            screen_off_raw=bool(screen_off_raw),
+            screen_off_backlight_raw=bool(screen_off_backlight_raw),
+            screen_off_drm_raw=bool(screen_off_drm_raw),
             config_brightness=int(brightness),
             dim_sync_enabled=bool(dim_sync_enabled),
             dim_sync_mode=str(dim_sync_mode),
@@ -60,6 +85,14 @@ def _log_idle_action_best_effort(
             power_forced_off=bool(tray._power_forced_off),
             idle_forced_off=bool(tray._idle_forced_off),
             dim_temp_active=bool(tray._dim_temp_active),
+            session_idle=session_idle,
+            session_idle_evaluated=bool(session_idle_evaluated),
+            session_idle_seconds=session_idle_seconds,
+            idle_timeout_s=float(idle_timeout_s),
+            dimmed_true_streak=int(dimmed_true_streak),
+            dimmed_false_streak=int(dimmed_false_streak),
+            screen_off_true_streak=int(screen_off_true_streak),
+            power_source_guard_active=bool(power_source_guard_active),
         )
 
     _run_idle_power_runtime_boundary_best_effort(_log_event)
@@ -91,6 +124,7 @@ def _reset_power_source_sensitive_idle_state(loop_state: IdlePollLoopState) -> N
     loop_state.screen_off_true_streak = 0
     loop_state.backlight_state.baselines.clear()
     loop_state.backlight_state.dimmed.clear()
+    loop_state.backlight_state.last_brightness.clear()
     loop_state.backlight_state.screen_off = False
 
 
@@ -123,18 +157,19 @@ def _power_source_idle_guard_active(*, loop_state: IdlePollLoopState, now: float
     return (float(now) - changed_at) < POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 
 
-def _read_session_idle_state(
+def _read_session_idle_details(
     *,
     session_id: str | None,
     idle_timeout_s: float,
     read_logind_idle_seconds_fn: Callable[..., Optional[float]],
-) -> Optional[bool]:
+) -> tuple[Optional[bool], Optional[float]]:
     if not session_id:
-        return None
+        return None, None
     idle_s = read_logind_idle_seconds_fn(session_id=session_id)
     if idle_s is None:
-        return None
-    return bool(float(idle_s) >= float(idle_timeout_s))
+        return None, None
+    idle_seconds = float(idle_s)
+    return bool(idle_seconds >= float(idle_timeout_s)), idle_seconds
 
 
 def run_idle_power_iteration(
@@ -168,7 +203,11 @@ def run_idle_power_iteration(
     )
 
     dimmed = read_dimmed_state_fn(loop_state.backlight_state)
-    screen_off = bool(loop_state.backlight_state.screen_off) or bool(read_screen_off_state_drm_fn())
+    dimmed_raw = dimmed
+    screen_off_backlight_raw = bool(loop_state.backlight_state.screen_off)
+    screen_off_drm_raw = bool(read_screen_off_state_drm_fn())
+    screen_off = bool(screen_off_backlight_raw or screen_off_drm_raw)
+    screen_off_raw = bool(screen_off)
 
     (
         dimmed,
@@ -199,9 +238,10 @@ def run_idle_power_iteration(
     dim_sync_mode = safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off"
     dim_temp_brightness = safe_int_attr(tray.config, "screen_dim_temp_brightness", default=5, min_v=1, max_v=50)
     session_idle: Optional[bool] = None
+    session_idle_seconds: Optional[float] = None
     restore_candidate = bool(dimmed is False and (bool(tray.is_off) or bool(tray._dim_temp_active)))
     if dimmed is None or restore_candidate:
-        session_idle = _read_session_idle_state(
+        session_idle, session_idle_seconds = _read_session_idle_details(
             session_id=session_id,
             idle_timeout_s=float(idle_timeout_s),
             read_logind_idle_seconds_fn=read_logind_idle_seconds_fn,
@@ -234,7 +274,8 @@ def run_idle_power_iteration(
         now=now,
         session_idle=session_idle,
     )
-    if _power_source_idle_guard_active(loop_state=loop_state, now=now):
+    power_source_guard_active = _power_source_idle_guard_active(loop_state=loop_state, now=now)
+    if power_source_guard_active:
         action = None
 
     action_key = build_idle_action_key_fn(
@@ -252,15 +293,33 @@ def run_idle_power_iteration(
         last_action_key=loop_state.last_action_key,
     ):
         loop_state.last_action_key = action_key
+        if _idle_power_debug_logging_enabled() and session_id and session_idle_seconds is None:
+            _session_idle_unused, session_idle_seconds = _read_session_idle_details(
+                session_id=session_id,
+                idle_timeout_s=float(idle_timeout_s),
+                read_logind_idle_seconds_fn=read_logind_idle_seconds_fn,
+            )
         _log_idle_action_best_effort(
             tray,
             action=action,
             dimmed=dimmed,
+            dimmed_raw=dimmed_raw,
             screen_off=bool(screen_off),
+            screen_off_raw=bool(screen_off_raw),
+            screen_off_backlight_raw=bool(screen_off_backlight_raw),
+            screen_off_drm_raw=bool(screen_off_drm_raw),
             brightness=int(brightness),
             dim_sync_enabled=bool(dim_sync_enabled),
             dim_sync_mode=str(dim_sync_mode),
             dim_temp_brightness=int(dim_temp_brightness),
+            session_idle=session_idle,
+            session_idle_evaluated=bool(session_idle is not None),
+            session_idle_seconds=session_idle_seconds,
+            idle_timeout_s=float(idle_timeout_s),
+            dimmed_true_streak=int(loop_state.dimmed_true_streak),
+            dimmed_false_streak=int(loop_state.dimmed_false_streak),
+            screen_off_true_streak=int(loop_state.screen_off_true_streak),
+            power_source_guard_active=bool(power_source_guard_active),
         )
 
     apply_idle_action_fn(tray, action=action, dim_temp_brightness=int(dim_temp_brightness))

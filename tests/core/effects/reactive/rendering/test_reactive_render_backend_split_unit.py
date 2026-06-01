@@ -207,6 +207,50 @@ def test_per_key_reactive_duplicate_frame_cache_keeps_animating_changed_frames()
     ]
 
 
+def test_per_key_reactive_logs_deck_scale_frame_changes_when_debug_enabled(monkeypatch) -> None:
+    import src.core.effects.reactive.render as reactive_render
+    from src.core.effects.reactive.render import render
+
+    kb = _DummyKB(per_key_mode_policy="init_once")
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        brightness=15,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 0, 0), (0, 1): (255, 0, 0), (0, 2): (255, 0, 0), (0, 3): (255, 0, 0)},
+        per_key_brightness=15,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=1.0,
+        _last_rendered_brightness=15,
+        _last_hw_mode_brightness=15,
+        _last_reactive_per_key_frame_signature=None,
+    )
+
+    logged: list[str] = []
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    monkeypatch.setattr(reactive_render.logger, "info", lambda message, *args: logged.append(message % args))
+
+    first_frame = {(0, 0): (255, 0, 0), (0, 1): (255, 0, 0), (0, 2): (255, 0, 0), (0, 3): (255, 0, 0)}
+    second_frame = {(0, 0): (0, 255, 0), (0, 1): (0, 255, 0), (0, 2): (0, 255, 0), (0, 3): (0, 255, 0)}
+
+    render(engine, color_map=first_frame)
+    logged.clear()
+
+    render(engine, color_map=second_frame)
+
+    assert any(
+        "reactive_frame_deck_change" in entry
+        and "changed_keys=4" in entry
+        and "total_keys=4" in entry
+        and "lit_keys=4" in entry
+        and "brightness_hw=15" in entry
+        and "previous_brightness_hw=15" in entry
+        and "avg_rgb=(0,255,0)" in entry
+        for entry in logged
+    )
+
+
 def test_uniform_reactive_pulse_can_still_lift_hw_brightness() -> None:
     from src.core.effects.reactive.render import render
 

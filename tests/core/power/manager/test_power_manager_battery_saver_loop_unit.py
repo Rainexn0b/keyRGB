@@ -140,7 +140,11 @@ class TestPowerManagerBatterySaverLoop:
         pm._execute_battery_saver_iteration_plan = MagicMock()
 
         with (
-            patch.object(manager_module, "read_lid_state", return_value="closed"),
+            patch.object(
+                manager_module,
+                "read_lid_state_details",
+                return_value=("closed", (("/fake/lid/state", "closed", "state: closed"),)),
+            ),
             patch.object(manager_module.time, "sleep") as sleep,
         ):
             result = pm._run_battery_saver_iteration(MagicMock(), poll_interval_s=2.0)
@@ -166,7 +170,11 @@ class TestPowerManagerBatterySaverLoop:
         pm._execute_battery_saver_iteration_plan = MagicMock()
 
         with (
-            patch.object(manager_module, "read_lid_state", return_value="closed"),
+            patch.object(
+                manager_module,
+                "read_lid_state_details",
+                return_value=("closed", (("/fake/lid/state", "closed", "state: closed"),)),
+            ),
             patch.object(manager_module.time, "sleep") as sleep,
         ):
             result = pm._run_battery_saver_iteration(MagicMock(), poll_interval_s=2.0)
@@ -177,6 +185,40 @@ class TestPowerManagerBatterySaverLoop:
         sleep.assert_called_once_with(2.0)
         pm._classify_battery_saver_iteration.assert_not_called()
         pm._execute_battery_saver_iteration_plan.assert_not_called()
+
+    def test_run_battery_saver_iteration_logs_lid_poll_details_when_debug_enabled(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+
+        mock_kb = MagicMock()
+        mock_kb._power_forced_off = False
+        cfg = MagicMock()
+        cfg.reload = MagicMock()
+        cfg.power_management_enabled = True
+        cfg.power_off_on_lid_close = True
+        pm = PowerManager(mock_kb, config=cfg)
+        pm._classify_battery_saver_iteration = MagicMock()
+        pm._execute_battery_saver_iteration_plan = MagicMock()
+
+        with (
+            patch.dict(manager_module.os.environ, {"KEYRGB_DEBUG_BRIGHTNESS": "1"}, clear=False),
+            patch.object(
+                manager_module,
+                "read_lid_state_details",
+                return_value=("closed", (("/fake/lid/state", "closed", "state: closed"),)),
+            ),
+            patch.object(manager_module.time, "sleep") as sleep,
+            patch.object(manager_module.logger, "info") as info,
+        ):
+            result = pm._run_battery_saver_iteration(MagicMock(), poll_interval_s=2.0)
+
+        assert result is True
+        sleep.assert_called_once_with(2.0)
+        assert any(
+            call.args[0] == "EVENT power:lid_state_poll previous=%s current=%s details=%s"
+            and call.args[1:] == ("open", "closed", (("/fake/lid/state", "closed", "state: closed"),))
+            for call in info.call_args_list
+        )
 
     def test_run_battery_saver_iteration_pauses_source_actions_while_power_event_forced_off(self):
         from src.core.power.management import manager as manager_module
@@ -231,7 +273,11 @@ class TestPowerManagerBatterySaverLoop:
         pm._classify_battery_saver_iteration = MagicMock(return_value=plan)
         pm._execute_battery_saver_iteration_plan = MagicMock(return_value=False)
 
-        with patch.object(manager_module, "read_lid_state", return_value="closed"):
+        with patch.object(
+            manager_module,
+            "read_lid_state_details",
+            return_value=("closed", (("/fake/lid/state", "closed", "state: closed"),)),
+        ):
             result = pm._run_battery_saver_iteration(fake_policy, poll_interval_s=2.0)
 
         assert result is False

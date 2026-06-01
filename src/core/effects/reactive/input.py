@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 
 
 def _reactive_input_debug_enabled() -> bool:
-    return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1" or os.environ.get("KEYRGB_DEBUG_REACTIVE_INPUT") == "1"
+    return os.environ.get("KEYRGB_DEBUG_REACTIVE_INPUT") == "1"
 
 
 def _device_debug_name(dev: EvdevKeyboardDevice) -> str:

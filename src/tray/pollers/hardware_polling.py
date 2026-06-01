@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import os
 import threading
 import time
 from typing import TypeVar
@@ -23,6 +24,14 @@ _STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S = 5.0
 _DEFAULT_HARDWARE_POLL_INTERVAL_S = 2.0
 _FAST_HARDWARE_POLL_INTERVAL_S = 0.25
 _T = TypeVar("_T")
+
+
+def _env_flag_enabled(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _hardware_debug_logging_enabled() -> bool:
+    return _env_flag_enabled("KEYRGB_DEBUG") or _env_flag_enabled("KEYRGB_DEBUG_BRIGHTNESS")
 
 
 def _coerce_poll_int(value: object, *, default: int) -> int:
@@ -149,6 +158,7 @@ def _recover_recent_power_source_blank_best_effort(
 
     apply_transition = _resolve_tray_callback(tray, "_apply_power_source_perkey_profile_transition")
     start_current_effect = _resolve_tray_callback(tray, "_start_current_effect")
+    method = "none"
 
     try:
         set_idle_power_state_field(
@@ -164,9 +174,12 @@ def _recover_recent_power_source_blank_best_effort(
             value=False,
         )
         handled = bool(apply_transition()) if callable(apply_transition) else False
+        if handled:
+            method = "in_place_transition"
         if not handled and callable(start_current_effect):
             start_current_effect()
             handled = True
+            method = "effect_restart"
     except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
         _log_hardware_polling_error_best_effort(tray, exc)
         return False
@@ -198,6 +211,7 @@ def _recover_recent_power_source_blank_best_effort(
         tray,
         "power_source_blank_recover",
         brightness=int(current_brightness),
+        method=str(method),
     )
     _refresh_ui_without_icon_animation(tray)
     return True
@@ -234,6 +248,7 @@ def _recover_stable_zero_brightness_best_effort(
 
     apply_transition = _resolve_tray_callback(tray, "_apply_power_source_perkey_profile_transition")
     start_current_effect = _resolve_tray_callback(tray, "_start_current_effect")
+    method = "none"
 
     try:
         set_idle_power_state_field(
@@ -249,9 +264,12 @@ def _recover_stable_zero_brightness_best_effort(
             value=False,
         )
         handled = bool(apply_transition()) if callable(apply_transition) else False
+        if handled:
+            method = "in_place_transition"
         if not handled and callable(start_current_effect):
             start_current_effect()
             handled = True
+            method = "effect_restart"
     except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
         _log_hardware_polling_error_best_effort(tray, exc)
         return False
@@ -283,6 +301,7 @@ def _recover_stable_zero_brightness_best_effort(
         tray,
         "stable_zero_brightness_recover",
         brightness=int(current_brightness),
+        method=str(method),
     )
     _refresh_ui_without_icon_animation(tray)
     return True
@@ -330,6 +349,18 @@ def _apply_polled_hardware_state(
         current_off = True
 
     if last_brightness is not None and current_brightness != last_brightness:
+        debug_fields: dict[str, object] = {}
+        if _hardware_debug_logging_enabled():
+            debug_fields = {
+                "config_brightness": int(_configured_brightness_intent(tray)),
+                "idle_forced_off": bool(tray_vars.get("_idle_forced_off", False)),
+                "power_forced_off": bool(tray_vars.get("_power_forced_off", False)),
+                "power_source_recovery_window": bool(
+                    _power_source_recovery_window_active(tray, now=time.monotonic())
+                ),
+                "user_forced_off": bool(tray_vars.get("_user_forced_off", False)),
+                "zero_without_off": bool(zero_brightness_without_off_state),
+            }
         _log_polled_hardware_event(
             tray,
             "brightness_change",
@@ -338,6 +369,7 @@ def _apply_polled_hardware_state(
             new=int(current_brightness),
             dim_temp_active=bool(dim_temp_active),
             dim_temp_target=dim_temp_target,
+            **debug_fields,
         )
 
         if dim_temp_active and dim_temp_target is not None:
@@ -378,11 +410,24 @@ def _apply_polled_hardware_state(
         return current_brightness, current_off
 
     if last_off_state is not None and current_off != last_off_state:
+        debug_fields: dict[str, object] = {}
+        if _hardware_debug_logging_enabled():
+            debug_fields = {
+                "config_brightness": int(_configured_brightness_intent(tray)),
+                "idle_forced_off": bool(tray_vars.get("_idle_forced_off", False)),
+                "power_forced_off": bool(tray_vars.get("_power_forced_off", False)),
+                "power_source_recovery_window": bool(
+                    _power_source_recovery_window_active(tray, now=time.monotonic())
+                ),
+                "user_forced_off": bool(tray_vars.get("_user_forced_off", False)),
+                "zero_without_off": bool(current_brightness == 0 and not bool(current_off)),
+            }
         _log_polled_hardware_event(
             tray,
             "off_state_change",
             old=bool(last_off_state),
             new=bool(current_off),
+            **debug_fields,
         )
 
         if bool(tray_vars.get("_power_forced_off", False)) and current_off:

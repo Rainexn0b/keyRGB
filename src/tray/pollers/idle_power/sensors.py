@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 from dataclasses import dataclass, field
@@ -11,11 +12,33 @@ _RECOVERABLE_SYSFS_READ_EXCEPTIONS = (OSError, UnicodeError, ValueError, Interru
 _RECOVERABLE_SUBPROCESS_EXCEPTIONS = (OSError, ValueError, subprocess.SubprocessError)
 
 
+logger = logging.getLogger(__name__)
+
+
 @dataclass
 class BacklightState:
     baselines: dict[str, int] = field(default_factory=dict)
     dimmed: dict[str, bool] = field(default_factory=dict)
+    last_brightness: dict[str, int] = field(default_factory=dict)
     screen_off: bool = False
+
+
+def _env_flag_enabled(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _idle_power_debug_logging_enabled() -> bool:
+    return _env_flag_enabled("KEYRGB_DEBUG") or _env_flag_enabled("KEYRGB_DEBUG_BRIGHTNESS")
+
+
+def _log_backlight_debug_event(action: str, **fields: object) -> None:
+    if not _idle_power_debug_logging_enabled():
+        return
+    field_text = " ".join(f"{name}={value}" for name, value in fields.items())
+    if field_text:
+        logger.info("EVENT idle_power:%s %s", action, field_text)
+        return
+    logger.info("EVENT idle_power:%s", action)
 
 
 def _read_int(path: Path) -> Optional[int]:
@@ -169,11 +192,20 @@ def read_dimmed_state(
         if baseline is None or baseline <= 0:
             state.baselines[key] = int(current)
             state.dimmed[key] = False
+            state.last_brightness[key] = int(current)
+            _log_backlight_debug_event(
+                "backlight_baseline_init",
+                device=child.name,
+                path=key,
+                current=int(current),
+                max_brightness=int(max_brightness),
+            )
             dimmed_any = False if dimmed_any is None else dimmed_any
             continue
 
         baseline_i = int(baseline)
         current_i = int(current)
+        previous_current = state.last_brightness.get(key)
 
         if current_i <= 0:
             screen_off_any = True
@@ -187,12 +219,50 @@ def read_dimmed_state(
         dimmed = (not exit_dim) if prev_dimmed else bool(enter_dim)
         state.dimmed[key] = bool(dimmed)
 
+        if previous_current is not None and int(previous_current) != current_i:
+            _log_backlight_debug_event(
+                "backlight_level_change",
+                device=child.name,
+                path=key,
+                previous_current=int(previous_current),
+                current=int(current_i),
+                baseline=int(baseline_i),
+                max_brightness=int(max_brightness),
+                previous_dimmed=bool(prev_dimmed),
+                dimmed=bool(dimmed),
+            )
+
+        if prev_dimmed != bool(dimmed):
+            _log_backlight_debug_event(
+                "backlight_dim_transition",
+                device=child.name,
+                path=key,
+                previous_dimmed=bool(prev_dimmed),
+                dimmed=bool(dimmed),
+                current=int(current_i),
+                baseline=int(baseline_i),
+                max_brightness=int(max_brightness),
+                enter_dim_threshold=int(enter_dim_threshold),
+                exit_dim_threshold=int(exit_dim_threshold),
+                screen_off=bool(current_i <= 0),
+            )
+
         if dimmed:
             dimmed_any = True
         else:
             dimmed_any = False if dimmed_any is None else dimmed_any
             if current_i > baseline_i:
                 state.baselines[key] = current_i
+                _log_backlight_debug_event(
+                    "backlight_baseline_raise",
+                    device=child.name,
+                    path=key,
+                    previous_baseline=int(baseline_i),
+                    new_baseline=int(current_i),
+                    max_brightness=int(max_brightness),
+                )
+
+        state.last_brightness[key] = int(current_i)
 
     if observed_any <= 0:
         return None

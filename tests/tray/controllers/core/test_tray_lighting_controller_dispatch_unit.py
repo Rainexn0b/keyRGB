@@ -355,6 +355,35 @@ class TestStartCurrentEffect:
         assert mock_tray.engine.reactive_brightness == 50
         assert mock_tray.engine.per_key_brightness == 50
 
+    def test_start_current_effect_logs_request_and_policy_when_debug_enabled(self, monkeypatch):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "rainbow_wave"
+        mock_tray.config.brightness = 50
+        mock_tray.config.perkey_brightness = 50
+        mock_tray.config.per_key_colors = {}
+        mock_tray.config.speed = 3
+        mock_tray.config.get_effect_speed.return_value = 3
+        mock_tray.config.color = (0, 255, 0)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
+        mock_tray.config.reactive_visual_mode = "subtle"
+
+        start_current_effect(mock_tray, brightness_override=10, fade_in=True, fade_in_duration_s=0.42)
+
+        assert mock_tray._log_event.call_count >= 2
+        assert mock_tray._log_event.call_args_list[0].args[:2] == ("lighting", "start_effect_request")
+        assert mock_tray._log_event.call_args_list[0].kwargs["configured_effect"] == "rainbow_wave"
+        assert mock_tray._log_event.call_args_list[0].kwargs["brightness_override"] == 10
+        assert mock_tray._log_event.call_args_list[1].args[:2] == ("lighting", "start_effect_policy")
+        assert mock_tray._log_event.call_args_list[1].kwargs["effect"] == "rainbow_wave"
+        assert mock_tray._log_event.call_args_list[1].kwargs["is_loop_effect"] is True
+        assert mock_tray._log_event.call_args_list[1].kwargs["start_brightness"] == 10
+        assert mock_tray._log_event.call_args_list[1].kwargs["target_brightness"] == 50
+
     def test_start_current_effect_idle_restore_loop_effect_uses_legacy_non_hardware_fade_without_follow_global(self):
         from src.tray.controllers.lighting_controller import start_current_effect
         from src.tray.protocols import set_idle_power_state_field

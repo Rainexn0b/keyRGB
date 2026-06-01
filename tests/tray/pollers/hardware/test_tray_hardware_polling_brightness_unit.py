@@ -169,6 +169,7 @@ def test_hardware_polling_recovers_recent_power_source_blank_without_marking_off
     tray = _DummyTray(brightness=25, is_off=False)
     tray._last_power_source_transition_at = 100.0
     tray._apply_power_source_perkey_profile_transition = MagicMock(return_value=True)
+    tray._log_event = MagicMock()
 
     monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
 
@@ -189,11 +190,14 @@ def test_hardware_polling_recovers_recent_power_source_blank_without_marking_off
     assert tray.tray_idle_power_state.hidden_perkey_restore_brightness_hint is None
     assert tray.tray_idle_power_state.hidden_perkey_restore_device_off_hint is None
     assert tray.tray_idle_power_state.last_power_source_blank_recovery_at == 101.0
+    assert tray._log_event.call_args.args[:2] == ("hardware", "power_source_blank_recover")
+    assert tray._log_event.call_args.kwargs["method"] == "in_place_transition"
 
 
 def test_hardware_polling_recovers_stable_zero_without_off_state(monkeypatch) -> None:
     tray = _DummyTray(brightness=25, is_off=False)
     tray._start_current_effect = MagicMock()
+    tray._log_event = MagicMock()
 
     monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 200.0)
 
@@ -214,6 +218,8 @@ def test_hardware_polling_recovers_stable_zero_without_off_state(monkeypatch) ->
     assert tray.tray_idle_power_state.hidden_perkey_restore_brightness_hint is None
     assert tray.tray_idle_power_state.hidden_perkey_restore_device_off_hint is None
     assert tray.tray_idle_power_state.last_hardware_blank_recovery_at == 200.0
+    assert tray._log_event.call_args.args[:2] == ("hardware", "stable_zero_brightness_recover")
+    assert tray._log_event.call_args.kwargs["method"] == "effect_restart"
 
 
 def test_hardware_polling_does_not_recover_stable_zero_when_forced_off(monkeypatch) -> None:

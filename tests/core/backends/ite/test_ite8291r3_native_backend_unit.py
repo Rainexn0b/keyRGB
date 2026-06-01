@@ -91,6 +91,61 @@ def test_device_get_effect_reads_back_payload() -> None:
     assert effect == [0x03, 0x04, 0x19, 0x01, 0x00, 0x00]
 
 
+def test_device_get_effect_logs_state_transitions_when_debug_enabled(monkeypatch, caplog) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    controls: list[bytes] = []
+    initial_payload = [protocol.USER_MODE_EFFECT, 0x00, 25, 0x00, 0x00, 0x00]
+    changed_payload = [0x03, 0x04, 25, 0x01, 0x00, 0x00]
+    responses = iter(
+        (
+            bytes((protocol.Commands.GET_EFFECT, 0x02, *initial_payload)),
+            bytes((protocol.Commands.GET_EFFECT, 0x02, *initial_payload)),
+            bytes((protocol.Commands.GET_EFFECT, 0x02, *changed_payload)),
+        )
+    )
+
+    def read_control(_length: int) -> bytes:
+        return next(responses)
+
+    device = Ite8291r3KeyboardDevice(lambda report: controls.append(report) or len(report), read_control, lambda payload: len(payload))
+
+    with caplog.at_level(logging.INFO):
+        assert device.get_effect() == initial_payload
+        assert device.get_effect() == initial_payload
+        assert device.get_effect() == changed_payload
+
+    messages = [record.message for record in caplog.records if "EVENT ite8291r3:effect_state" in record.message]
+    assert len(messages) == 2
+    assert "previous=None" in messages[0]
+    assert f"current={tuple(changed_payload)}" in messages[1]
+
+
+def test_device_logs_control_write_mismatch_when_debug_enabled(monkeypatch, caplog) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    device = Ite8291r3KeyboardDevice(lambda report: len(report) - 1, lambda _length: bytes(8), lambda payload: len(payload))
+
+    with caplog.at_level(logging.INFO):
+        device.set_brightness(25)
+
+    assert any("EVENT ite8291r3:control_write_mismatch" in record.message for record in caplog.records)
+
+
+def test_device_logs_row_write_mismatch_when_debug_enabled(monkeypatch, caplog) -> None:
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    row_calls = {"count": 0}
+
+    def write_row(payload: bytes) -> int:
+        row_calls["count"] += 1
+        return len(payload) - 1 if row_calls["count"] == 1 else len(payload)
+
+    device = Ite8291r3KeyboardDevice(lambda report: len(report), lambda _length: bytes(8), write_row)
+
+    with caplog.at_level(logging.INFO):
+        device.set_color((0x12, 0x34, 0x56), brightness=25)
+
+    assert any("EVENT ite8291r3:row_write_mismatch row=0" in record.message for record in caplog.records)
+
+
 def test_backend_effects_and_colors_are_native_protocol_maps() -> None:
     backend = Ite8291r3Backend()
     effects = backend.effects()

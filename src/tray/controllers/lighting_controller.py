@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
 from src.core.effects import catalog as effects_catalog
@@ -24,6 +25,14 @@ logger = logging.getLogger(__name__)
 
 _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _TRAY_LOGGER_CALLBACK_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
+def _env_flag_enabled(name: str) -> bool:
+    return str(os.environ.get(name, "")).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _start_effect_debug_logging_enabled() -> bool:
+    return _env_flag_enabled("KEYRGB_DEBUG") or _env_flag_enabled("KEYRGB_DEBUG_BRIGHTNESS")
 
 
 def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:
@@ -155,6 +164,19 @@ def start_current_effect(
     """
 
     try:
+        debug_logging_enabled = _start_effect_debug_logging_enabled()
+        if debug_logging_enabled:
+            lighting_controller_helpers.try_log_event(
+                tray,
+                "lighting",
+                "start_effect_request",
+                brightness_override=brightness_override,
+                configured_effect=safe_attrs.safe_str_attr(tray.config, "effect", default="none") or "none",
+                fade_in=bool(fade_in),
+                fade_in_duration_s=float(fade_in_duration_s),
+                is_off=bool(getattr(tray, "is_off", False)),
+            )
+
         lighting_controller_helpers.ensure_device_best_effort(tray)
         try:
             raw_reactive_visual_mode = getattr(tray.config, "reactive_visual_mode", "subtle")
@@ -169,6 +191,23 @@ def start_current_effect(
         start_plan = policy.start_plan
         target_brightness = policy.target_brightness
         start_brightness = policy.start_brightness
+
+        if debug_logging_enabled:
+            lighting_controller_helpers.try_log_event(
+                tray,
+                "lighting",
+                "start_effect_policy",
+                brightness_override=brightness_override,
+                effect=effect,
+                fade_in=bool(fade_in),
+                is_loop_effect=bool(start_plan.is_loop_effect),
+                is_none_mode=bool(start_plan.is_none_mode),
+                is_perkey_mode=bool(start_plan.is_perkey_mode),
+                persist_effect=policy.persist_effect,
+                restore_secondary_targets=bool(start_plan.restore_secondary_targets),
+                start_brightness=int(start_brightness),
+                target_brightness=int(target_brightness),
+            )
 
         if policy.persist_effect is not None:
             tray.config.effect = policy.persist_effect

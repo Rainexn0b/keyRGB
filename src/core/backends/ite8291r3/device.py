@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
@@ -15,6 +16,11 @@ ControlWriter = Callable[[bytes], int | None]
 ControlReader = Callable[[int], bytes | bytearray | list[int]]
 RowWriter = Callable[[bytes], int | None]
 IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
+
+
+def _brightness_debug_enabled() -> bool:
+    value = os.environ.get("KEYRGB_DEBUG_BRIGHTNESS", "")
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _coerce_int(value: object) -> int:
@@ -114,9 +120,45 @@ class Ite8291r3KeyboardDevice:
         self._read_control_report = read_control_report
         self._write_row_data = write_row_data
         self._transport = transport
+        self._last_effect_payload: tuple[int, ...] | None = None
+        self._last_row_index: int | None = None
+
+    def _log_control_write_mismatch_if_needed(self, report: bytes, result: int | None) -> None:
+        if not _brightness_debug_enabled() or result is None:
+            return
+
+        expected = len(report)
+        actual = int(result)
+        if expected <= 0 or actual == expected:
+            return
+
+        _logger.info(
+            "EVENT ite8291r3:control_write_mismatch actual=%s expected=%s report=%s",
+            actual,
+            expected,
+            tuple(int(value) for value in report),
+        )
+
+    def _log_row_write_mismatch_if_needed(self, row_data: bytes, result: int | None) -> None:
+        if not _brightness_debug_enabled() or result is None:
+            return
+
+        expected = len(row_data)
+        actual = int(result)
+        if expected <= 0 or actual == expected:
+            return
+
+        _logger.info(
+            "EVENT ite8291r3:row_write_mismatch row=%s actual=%s expected=%s head=%s",
+            self._last_row_index,
+            actual,
+            expected,
+            tuple(int(value) for value in row_data[:8]),
+        )
 
     def _send_control(self, report: bytes) -> None:
         result = self._send_control_report(bytes(report))
+        self._log_control_write_mismatch_if_needed(report, result)
         if int(result or 0) < 0:
             raise OSError("Could not send ITE 8291r3 control report")
 
@@ -126,6 +168,7 @@ class Ite8291r3KeyboardDevice:
 
     def _write_row(self, row_data: bytes) -> None:
         result = self._write_row_data(bytes(row_data))
+        self._log_row_write_mismatch_if_needed(row_data, result)
         if int(result or 0) < 0:
             raise OSError("Could not send ITE 8291r3 row data")
 
@@ -136,9 +179,18 @@ class Ite8291r3KeyboardDevice:
 
     def get_effect(self) -> list[int]:
         self._send_control(protocol.build_get_effect_report())
-        return [int(value) for value in self._read_control(8)[2:]]
+        payload = tuple(int(value) for value in self._read_control(8)[2:])
+        if _brightness_debug_enabled() and payload != self._last_effect_payload:
+            _logger.info(
+                "EVENT ite8291r3:effect_state current=%s previous=%s",
+                payload,
+                self._last_effect_payload,
+            )
+        self._last_effect_payload = payload
+        return list(payload)
 
     def _set_row_index(self, row_idx: int) -> None:
+        self._last_row_index = int(row_idx)
         self._send_control(protocol.build_set_row_index_report(row_idx))
 
     def _set_effect_impl(

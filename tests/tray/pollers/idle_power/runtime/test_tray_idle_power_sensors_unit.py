@@ -24,6 +24,7 @@ def test_read_dimmed_state_sets_baseline_first_observation(tmp_path):
     assert dimmed is False
     assert state.screen_off is False
     assert state.baselines[str(backlight)] == 100
+    assert state.last_brightness[str(backlight)] == 100
 
 
 def test_read_dimmed_state_detects_significant_drop(tmp_path):
@@ -37,6 +38,67 @@ def test_read_dimmed_state_detects_significant_drop(tmp_path):
 
     _write_text(dev / "brightness", "80\n")
     assert sensors.read_dimmed_state(state, backlight_base=base) is True
+
+
+def test_read_dimmed_state_logs_transition_context_when_debug_enabled(tmp_path, monkeypatch):
+    base = tmp_path / "sys" / "class" / "backlight"
+    dev = base / "intel_backlight"
+    _write_text(dev / "max_brightness", "200\n")
+
+    logged: list[str] = []
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    monkeypatch.setattr(sensors.logger, "info", lambda message, *args: logged.append(message % args))
+
+    state = sensors.BacklightState()
+    _write_text(dev / "brightness", "100\n")
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
+
+    logged.clear()
+    _write_text(dev / "brightness", "80\n")
+    assert sensors.read_dimmed_state(state, backlight_base=base) is True
+
+    assert any(
+        "EVENT idle_power:backlight_dim_transition" in entry
+        and f"device={dev.name}" in entry
+        and f"path={dev}" in entry
+        and "previous_dimmed=False" in entry
+        and "dimmed=True" in entry
+        and "current=80" in entry
+        and "baseline=100" in entry
+        and "enter_dim_threshold=90" in entry
+        and "exit_dim_threshold=98" in entry
+        for entry in logged
+    )
+
+
+def test_read_dimmed_state_logs_level_change_when_debug_enabled(tmp_path, monkeypatch):
+    base = tmp_path / "sys" / "class" / "backlight"
+    dev = base / "intel_backlight"
+    _write_text(dev / "max_brightness", "200\n")
+
+    logged: list[str] = []
+    monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
+    monkeypatch.setattr(sensors.logger, "info", lambda message, *args: logged.append(message % args))
+
+    state = sensors.BacklightState()
+    _write_text(dev / "brightness", "100\n")
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
+
+    logged.clear()
+    _write_text(dev / "brightness", "95\n")
+    assert sensors.read_dimmed_state(state, backlight_base=base) is False
+
+    assert any(
+        "EVENT idle_power:backlight_level_change" in entry
+        and f"device={dev.name}" in entry
+        and f"path={dev}" in entry
+        and "previous_current=100" in entry
+        and "current=95" in entry
+        and "baseline=100" in entry
+        and "previous_dimmed=False" in entry
+        and "dimmed=False" in entry
+        for entry in logged
+    )
 
 
 def test_read_dimmed_state_tracks_manual_changes_when_not_dimmed(tmp_path):
