@@ -41,6 +41,7 @@ class _DeviceContextMenuTrayProtocol(Protocol):
     _on_selected_device_color_clicked: _MenuAction
     _on_selected_device_brightness_clicked: _MenuAction
     _on_selected_device_turn_off_clicked: _MenuAction
+    _on_selected_device_turn_on_clicked: _MenuAction
     _on_support_debug_clicked: _MenuAction
     _on_power_settings_clicked: _MenuAction
     _on_quit_clicked: _MenuAction

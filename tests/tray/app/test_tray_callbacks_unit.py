@@ -448,6 +448,23 @@ def test_on_selected_device_turn_off_clicked_delegates_to_secondary_controller()
     turn_off_secondary.assert_called_once_with(tray)
 
 
+def test_on_selected_device_turn_on_clicked_delegates_to_secondary_controller() -> None:
+    from src.tray.app.callbacks import on_selected_device_turn_on_clicked
+
+    tray = MagicMock()
+
+    with (
+        patch(
+            "src.tray.app.callbacks.selected_device_context_entry",
+            return_value={"key": "lightbar:048d:7001", "device_type": "lightbar"},
+        ),
+        patch("src.tray.app.callbacks.turn_on_selected_secondary_device") as turn_on_secondary,
+    ):
+        on_selected_device_turn_on_clicked(tray)
+
+    turn_on_secondary.assert_called_once_with(tray)
+
+
 def test_support_window_callbacks_launch_with_expected_focus() -> None:
     from src.tray.app.callbacks import on_backend_discovery_clicked, on_support_debug_clicked
 

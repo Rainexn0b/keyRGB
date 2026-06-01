@@ -76,6 +76,67 @@ def test_turn_off_selected_secondary_device_turns_off_lightbar(monkeypatch) -> N
     tray._update_menu.assert_called_once()
 
 
+def test_turn_on_selected_secondary_device_restores_last_nonzero_brightness(monkeypatch) -> None:
+    from src.tray.controllers.secondary_device_controller import (
+        turn_off_selected_secondary_device,
+        turn_on_selected_secondary_device,
+    )
+
+    tray = _make_tray()
+    tray.config.lightbar_brightness = 10
+    seen: list[int | str] = []
+
+    class DummyDevice:
+        def turn_off(self) -> None:
+            seen.append("off")
+
+        def set_brightness(self, brightness: int) -> None:
+            seen.append(int(brightness))
+
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
+    )
+
+    assert turn_off_selected_secondary_device(tray) is True
+    assert tray.config.lightbar_brightness == 0
+
+    assert turn_on_selected_secondary_device(tray) is True
+    assert tray.config.lightbar_brightness == 10
+    assert seen == ["off", 10]
+    assert tray._update_menu.call_count == 2
+
+
+def test_turn_on_selected_secondary_device_defaults_to_25_without_saved_brightness(monkeypatch) -> None:
+    from src.tray.controllers.secondary_device_controller import turn_on_selected_secondary_device
+
+    tray = _make_tray()
+    tray.config.lightbar_brightness = 0
+    seen: list[int] = []
+
+    class DummyDevice:
+        def set_brightness(self, brightness: int) -> None:
+            seen.append(int(brightness))
+
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
+    )
+
+    assert turn_on_selected_secondary_device(tray) is True
+    assert tray.config.lightbar_brightness == 25
+    assert seen == [25]
+    tray._update_menu.assert_called_once()
+
+
 def test_apply_selected_secondary_brightness_notifies_permission_errors(monkeypatch) -> None:
     from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 

@@ -88,6 +88,9 @@ class DummyTray:
     def _on_selected_device_turn_off_clicked(self, *_a, **_k):
         return
 
+    def _on_selected_device_turn_on_clicked(self, *_a, **_k):
+        return
+
     def _on_software_effect_target_clicked(self, *_a, **_k):
         return
 

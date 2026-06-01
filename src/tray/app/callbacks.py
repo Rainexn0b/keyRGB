@@ -25,6 +25,7 @@ turn_off = lighting_controller.turn_off
 turn_on = lighting_controller.turn_on
 apply_selected_secondary_brightness = secondary_device_controller.apply_selected_secondary_brightness
 selected_secondary_backend_name = secondary_device_controller.selected_secondary_backend_name
+turn_on_selected_secondary_device = secondary_device_controller.turn_on_selected_secondary_device
 turn_off_selected_secondary_device = secondary_device_controller.turn_off_selected_secondary_device
 apply_software_effect_target_selection = software_target_controller.apply_software_effect_target_selection
 launch_perkey_gui = gui_launch.launch_perkey_gui
@@ -267,6 +268,15 @@ def on_selected_device_turn_off_clicked(tray: LightingTrayProtocol) -> None:
         turn_off(tray)
         return
     turn_off_selected_secondary_device(tray)
+
+
+def on_selected_device_turn_on_clicked(tray: LightingTrayProtocol) -> None:
+    entry = selected_device_context_entry(tray)
+    device_type = str(entry.get("device_type") or "keyboard").strip().lower()
+    if device_type == "keyboard":
+        turn_on(tray)
+        return
+    turn_on_selected_secondary_device(tray)
 
 
 def on_power_settings_clicked() -> None:

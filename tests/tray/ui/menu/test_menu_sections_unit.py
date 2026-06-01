@@ -39,6 +39,7 @@ def test_build_device_context_menu_items_shows_uniform_controls_for_mouse_route(
         _on_selected_device_color_clicked=lambda *_args, **_kwargs: None,
         _on_selected_device_brightness_clicked=lambda *_args, **_kwargs: None,
         _on_selected_device_turn_off_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_turn_on_clicked=lambda *_args, **_kwargs: None,
         _on_support_debug_clicked=lambda *_args, **_kwargs: None,
         _on_power_settings_clicked=lambda *_args, **_kwargs: None,
         _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
@@ -57,6 +58,37 @@ def test_build_device_context_menu_items_shows_uniform_controls_for_mouse_route(
     assert items[0].text == "Color…"
     assert items[1].text == "Brightness"
     assert items[3].text == "Turn Off"
+
+
+def test_build_device_context_menu_items_shows_turn_on_when_secondary_route_is_off() -> None:
+    turn_on_action = lambda *_args, **_kwargs: None
+    turn_off_action = lambda *_args, **_kwargs: None
+    tray = SimpleNamespace(
+        config=SimpleNamespace(
+            get_secondary_device_brightness=lambda state_key, *, fallback_keys=(), default=0: 0,
+        ),
+        _on_selected_device_color_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_brightness_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_turn_off_clicked=turn_off_action,
+        _on_selected_device_turn_on_clicked=turn_on_action,
+        _on_support_debug_clicked=lambda *_args, **_kwargs: None,
+        _on_power_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_quit_clicked=lambda *_args, **_kwargs: None,
+    )
+    context_entry = {
+        "key": "lightbar:048d:7001",
+        "device_type": "lightbar",
+        "backend_name": "ite8233",
+        "status": "supported",
+        "text": "Lightbar",
+    }
+
+    items = menu_sections.build_device_context_menu_items(tray, pystray=_Pystray(), item=_item, context_entry=context_entry)
+
+    assert items[3].text == "Turn On"
+    assert items[3].action is turn_on_action
+
 
 def test_build_device_context_menu_items_shows_unsupported_generic_device_with_footer() -> None:
     tray = SimpleNamespace(
@@ -117,6 +149,7 @@ def test_build_device_context_menu_items_uses_facade_collaborators_for_fallback_
         _on_selected_device_color_clicked=lambda *_args, **_kwargs: None,
         _on_selected_device_brightness_clicked=lambda *_args, **_kwargs: None,
         _on_selected_device_turn_off_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_turn_on_clicked=lambda *_args, **_kwargs: None,
         _on_support_debug_clicked=lambda *_args, **_kwargs: None,
         _on_power_settings_clicked=lambda *_args, **_kwargs: None,
         _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
@@ -135,9 +168,9 @@ def test_build_device_context_menu_items_uses_facade_collaborators_for_fallback_
 
     assert checked_entry.kwargs["checked"](checked_entry) is True
     assert collaborator_calls == [("route", "lightbar"), ("controls", "lightbar")]
-    assert len(safe_int_calls) == 1
-    assert safe_int_calls[0][1] == "lightbar_brightness"
-    assert safe_int_calls[0][2] == 0
+    assert len(safe_int_calls) == 2
+    assert all(call[1] == "lightbar_brightness" for call in safe_int_calls)
+    assert all(call[2] == 0 for call in safe_int_calls)
 
 
 def test_sw_effects_menu_first_item_is_reactive_typing_settings() -> None:

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.25.7 (2026-06-01)
+
+- Tray/Lightbar: Fix the secondary-device context menu so `Turn Off` switches back to `Turn On`, and restore the lightbar's own last nonzero brightness instead of jumping to a fallback value. Thanks to @BoneLiu for identifying the broken lightbar toggle path in PR #8.
+- Tray/Secondary Devices: Refactor secondary-device brightness and power-state handling behind a shared helper so the controller and menu use the same current-brightness, off-state, and restore-target logic.
+- Tests/Docs: Add focused regression coverage for secondary-device turn-off/turn-on restore behavior and document the runtime-only restore-brightness decision for future cleanup work.
+
 ## 0.25.6 (2026-05-25)
 
 - Effects/Reactive: Suppress duplicate per-key idle frames on init-once backends while preserving every-frame reassertion for ITE controllers that require it, reducing subtle idle flashes without regressing animation stability.

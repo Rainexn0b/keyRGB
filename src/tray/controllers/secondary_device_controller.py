@@ -4,6 +4,7 @@ import logging
 from typing import Callable, Protocol
 
 from src.core.utils.exceptions import is_permission_denied
+from src.tray import secondary_device_power
 from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.tray.protocols import LightingTrayProtocol
 from src.tray.ui.menu_status import DeviceContextEntry, selected_device_context_entry
@@ -20,6 +21,18 @@ class _LightbarDeviceProtocol(Protocol):
     def set_brightness(self, brightness: int) -> None: ...
 
     def turn_off(self) -> None: ...
+
+
+def _secondary_current_brightness(tray: LightingTrayProtocol, route: SecondaryDeviceRoute) -> int:
+    return secondary_device_power.current_brightness(getattr(tray, "config", None), route)
+
+
+def _secondary_restore_brightness(tray: LightingTrayProtocol, route: SecondaryDeviceRoute) -> int:
+    return secondary_device_power.restore_brightness(
+        tray,
+        route,
+        current_brightness_fn=lambda: _secondary_current_brightness(tray, route),
+    )
 
 
 def selected_secondary_context_entry(tray: LightingTrayProtocol) -> DeviceContextEntry | None:
@@ -61,6 +74,7 @@ def apply_selected_secondary_brightness(tray: LightingTrayProtocol, item: object
         return False
 
     brightness_hw = int(level) * 5
+    secondary_device_power.cache_restore_brightness(tray, route, brightness_hw)
     _set_secondary_brightness_best_effort(
         tray,
         route,
@@ -92,6 +106,7 @@ def turn_off_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
     if resolved is None:
         return False
     _entry, route = resolved
+    secondary_device_power.cache_restore_brightness(tray, route, _secondary_current_brightness(tray, route))
 
     _set_secondary_brightness_best_effort(
         tray,
@@ -107,6 +122,34 @@ def turn_off_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
         route,
         lambda device: device.turn_off(),
         error_msg=f"Error turning off {route.display_name.lower()}: %s",
+    )
+    if ok:
+        _refresh_menu_best_effort(tray)
+    return ok
+
+
+def turn_on_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
+    resolved = _selected_secondary_route(tray)
+    if resolved is None:
+        return False
+    _entry, route = resolved
+
+    restore_brightness = _secondary_restore_brightness(tray, route)
+    secondary_device_power.cache_restore_brightness(tray, route, restore_brightness)
+    _set_secondary_brightness_best_effort(
+        tray,
+        route,
+        restore_brightness,
+        error_msg=f"Failed to store {route.display_name.lower()} restore brightness: %s",
+    )
+
+    try_log_event(tray, "menu", f"turn_on_{route.device_type}")
+
+    ok = _with_secondary_device(
+        tray,
+        route,
+        lambda device: device.set_brightness(int(restore_brightness)),
+        error_msg=f"Error turning on {route.display_name.lower()}: %s",
     )
     if ok:
         _refresh_menu_best_effort(tray)
@@ -169,7 +212,9 @@ def _set_secondary_brightness_best_effort(
     try:
         setter = getattr(config, "set_secondary_device_brightness", None)
         if callable(setter):
-            setter(str(route.state_key), int(brightness), compatibility_key=route.config_brightness_attr)
+            setter(
+                secondary_device_power.state_key(route), int(brightness), compatibility_key=route.config_brightness_attr
+            )
             return
 
         attr_name = str(route.config_brightness_attr or "").strip()
@@ -223,5 +268,6 @@ __all__ = [
     "apply_selected_secondary_brightness",
     "selected_secondary_backend_name",
     "selected_secondary_context_entry",
+    "turn_on_selected_secondary_device",
     "turn_off_selected_secondary_device",
 ]

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Protocol, SupportsInt, runtime_checkable
+from typing import Protocol
 
+from src.tray import secondary_device_power
 from src.tray.secondary_device_routes import SecondaryDeviceRoute
 
 from .menu_status import DeviceContextEntry
@@ -14,7 +15,7 @@ ControlsAvailableResolver = Callable[[object, DeviceContextEntry], bool]
 RouteResolver = Callable[[Mapping[str, object] | None], SecondaryDeviceRoute | None]
 
 
-class SafeIntAttrResolver(Protocol):
+class SafeIntAttrResolver(secondary_device_power.SafeIntAttrReader, Protocol):
     def __call__(
         self,
         obj: object,
@@ -37,17 +38,7 @@ class _DeviceContextTrayProtocol(_DeviceContextFooterTrayProtocol, Protocol):
     _on_selected_device_color_clicked: MenuAction
     _on_selected_device_brightness_clicked: MenuAction
     _on_selected_device_turn_off_clicked: MenuAction
-
-
-@runtime_checkable
-class _SecondaryBrightnessConfigProtocol(Protocol):
-    def get_secondary_device_brightness(
-        self,
-        state_key: str,
-        *,
-        fallback_keys: tuple[str, ...] = (),
-        default: int = 0,
-    ) -> SupportsInt | str | None: ...
+    _on_selected_device_turn_on_clicked: MenuAction
 
 
 class _MenuFactoryProtocol(Protocol):
@@ -109,23 +100,9 @@ def _secondary_brightness_matches(
     expected_level: int,
     safe_int_attr: SafeIntAttrResolver,
 ) -> bool:
-    config = tray.config
-    if config is None or route is None:
-        return False
-
-    fallback_keys = (route.config_brightness_attr,) if route.config_brightness_attr else ()
-    if isinstance(config, _SecondaryBrightnessConfigProtocol):
-        current = config.get_secondary_device_brightness(
-            str(route.state_key),
-            fallback_keys=fallback_keys,
-            default=0,
-        )
-        return int(current or 0) == expected_level * 5
-
-    attr_name = str(route.config_brightness_attr or "").strip()
-    if not attr_name:
-        return False
-    return safe_int_attr(config, attr_name, default=0) == expected_level * 5
+    return (
+        secondary_device_power.current_brightness(tray.config, route, safe_int_attr=safe_int_attr) == expected_level * 5
+    )
 
 
 def _build_uniform_secondary_context_menu_items(
@@ -174,8 +151,14 @@ def _build_uniform_secondary_context_menu_items(
             [
                 item("Brightness", brightness_menu),
                 pystray.Menu.SEPARATOR,
-                item("Turn Off", tray._on_selected_device_turn_off_clicked),
             ]
+        )
+        is_off = secondary_device_power.is_off(tray.config, route, safe_int_attr=safe_int_attr)
+        body.append(
+            item(
+                "Turn On" if is_off else "Turn Off",
+                tray._on_selected_device_turn_on_clicked if is_off else tray._on_selected_device_turn_off_clicked,
+            )
         )
     else:
         body = [

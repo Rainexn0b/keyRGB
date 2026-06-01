@@ -630,6 +630,7 @@ def test_effect_and_power_wrappers_delegate(monkeypatch):
         ("_on_selected_device_color_clicked", "on_selected_device_color_clicked", (None, None)),
         ("_on_selected_device_brightness_clicked", "on_selected_device_brightness_clicked", (None, "ITEM")),
         ("_on_selected_device_turn_off_clicked", "on_selected_device_turn_off_clicked", (None, None)),
+        ("_on_selected_device_turn_on_clicked", "on_selected_device_turn_on_clicked", (None, None)),
         ("_on_off_clicked", "on_off_clicked", (None, None)),
         ("_on_turn_on_clicked", "on_turn_on_clicked", (None, None)),
         ("_on_hardware_static_mode_clicked", "on_hardware_static_mode_clicked", (None, None)),

@@ -63,6 +63,9 @@ class KeyRGBTrayDelegateMixin:
     def _on_selected_device_turn_off_clicked(self, _icon, _item):
         _application_module().callbacks.on_selected_device_turn_off_clicked(self)
 
+    def _on_selected_device_turn_on_clicked(self, _icon, _item):
+        _application_module().callbacks.on_selected_device_turn_on_clicked(self)
+
     def _on_software_effect_target_clicked(self, target_key: str) -> None:
         _application_module().callbacks.on_software_effect_target_clicked(self, target_key)
 
