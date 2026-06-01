@@ -14,6 +14,7 @@ ITE_VENDOR_ID = 0x048D
 
 DEVICE_TYPES_BY_USB_KEY: dict[tuple[int, int], str] = {
     (0x048D, 0xC195): "keyboard",
+    (0x048D, 0xC197): "keyboard",
     (0x048D, 0xC963): "keyboard",
     (0x048D, 0xC966): "keyboard",
     (0x048D, 0x600B): "keyboard",
@@ -46,14 +47,30 @@ def parse_usb_id_entry(value: object) -> tuple[int, int] | None:
         return None
 
 
-def candidate_status(probes: list[dict[str, Any]], *, vendor_id: int) -> tuple[str, str]:
+def _known_dormant_action(*, probes: list[dict[str, Any]], usb_key: tuple[int, int] | None) -> str:
+    probe_names = {str(probe.get("name") or "").strip().lower() for probe in probes if isinstance(probe, dict)}
+    if usb_key == (0x048D, 0xC197) or "ite8258-chassis" in probe_names:
+        return (
+            "Known backend scaffold exists for the Lenovo Gen10 composite ITE 8258 path. "
+            "Current builds are expected to surface `0x048d:0xc197` through the opt-in experimental `ite8258-chassis` backend, "
+            "so a dormant result usually means the reporter is on an older build or the probe snapshot is stale."
+        )
+    return "Known backend scaffold exists, but it is intentionally dormant until protocol evidence is confirmed."
+
+
+def candidate_status(
+    probes: list[dict[str, Any]],
+    *,
+    vendor_id: int,
+    usb_key: tuple[int, int] | None = None,
+) -> tuple[str, str]:
     if any(bool(p.get("available")) for p in probes):
         return "supported", "Handled by an available backend."
 
     if any(str(p.get("stability") or "") == "dormant" for p in probes):
         return (
             "known_dormant",
-            "Known backend scaffold exists, but it is intentionally dormant until protocol evidence is confirmed.",
+            _known_dormant_action(probes=probes, usb_key=usb_key),
         )
 
     if any(
@@ -98,7 +115,7 @@ def selected_probe(backends: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def primary_candidate(candidates: list[dict[str, Any]]) -> dict[str, Any] | None:
-    for preferred_status in ("unrecognized_ite", "known_dormant", "known_unavailable", "experimental_disabled"):
+    for preferred_status in ("known_dormant", "experimental_disabled", "unrecognized_ite", "known_unavailable"):
         for candidate in candidates:
             if str(candidate.get("status") or "") == preferred_status:
                 return candidate
@@ -149,6 +166,26 @@ def support_actions(backends: dict[str, Any], candidates: list[dict[str, Any]]) 
             "Run diagnostics and discovery from the tray, then attach the saved support bundle to a hardware-support issue.",
             "Include KEYRGB_DEBUG=1 logs if the tray starts but the keyboard does not respond.",
         ]
+        lead_usb_vid = (
+            str(lead_candidate.get("usb_vid") or "").strip().lower() if isinstance(lead_candidate, dict) else ""
+        )
+        lead_usb_pid = (
+            str(lead_candidate.get("usb_pid") or "").strip().lower() if isinstance(lead_candidate, dict) else ""
+        )
+        if lead_usb_vid == "0x048d" and lead_usb_pid == "0xc197":
+            next_steps.append(
+                "Treat `0x048d:0xc197` as the primary KeyRGB target for this Lenovo Gen10 path; `ite8258-chassis` is now an opt-in experimental backend, so enable Experimental backends before collecting runtime results."
+            )
+            has_c193_companion = any(
+                str(entry.get("usb_vid") or "").strip().lower() == "0x048d"
+                and str(entry.get("usb_pid") or "").strip().lower() == "0xc193"
+                for entry in attention_candidates
+                if isinstance(entry, dict)
+            )
+            if has_c193_companion:
+                next_steps.append(
+                    "Keep the companion `0x048d:0xc193` device listed in the report; it remains unmanaged and should be treated as separate evidence until its role is confirmed."
+                )
         if isinstance(lead_candidate, dict) and lead_candidate.get("hidraw_nodes"):
             descriptor_sizes = lead_candidate.get("hidraw_descriptor_sizes")
             if not isinstance(descriptor_sizes, list) or not descriptor_sizes:

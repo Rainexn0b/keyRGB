@@ -332,3 +332,109 @@ def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monk
     assert payload["candidates"][0]["status"] == "experimental_disabled"
     assert payload["candidates"][0]["device_type"] == "keyboard"
     assert payload["candidates"][0]["probe_names"] == ["ite8295-zones"]
+
+
+def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimental_disabled(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        lambda: {
+            "selected": None,
+            "probes": [
+                {
+                    "name": "ite8258-chassis",
+                    "available": False,
+                    "stability": "experimental",
+                    "selection_enabled": False,
+                    "selection_reason": "experimental backend disabled",
+                    "identifiers": {"usb_vid": "0x048d", "usb_pid": "0xc197"},
+                }
+            ],
+        },
+    )
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.usb_ids_snapshot",
+        lambda *, include_usb: ["048d:c193", "048d:c197"],
+    )
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        lambda targets: [
+            {
+                "idVendor": "0x048d",
+                "idProduct": "0xc193",
+                "product": "Lenovo Lighting",
+                "manufacturer": "ITE Tech. Inc.",
+            },
+            {
+                "idVendor": "0x048d",
+                "idProduct": "0xc197",
+                "product": "ITE Device(8258)",
+                "manufacturer": "ITE Tech. Inc.",
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        "src.core.diagnostics.device_discovery.hidraw_devices_snapshot",
+        lambda: [{"vendor_id": "0x048d", "product_id": "0xc197", "devnode": "/dev/hidraw11"}],
+    )
+
+    payload = collect_device_discovery(include_usb=True)
+
+    assert payload["summary"]["candidate_count"] == 2
+    assert payload["candidates"][0]["usb_pid"] == "0xc197"
+    assert payload["candidates"][0]["status"] == "experimental_disabled"
+    assert payload["candidates"][0]["device_type"] == "keyboard"
+    assert "experimental backend exists" in payload["candidates"][0]["recommended_action"].lower()
+    assert payload["candidates"][0]["probe_names"] == ["ite8258-chassis"]
+    assert payload["candidates"][0]["hidraw_nodes"] == ["/dev/hidraw11"]
+    assert payload["candidates"][1]["usb_pid"] == "0xc193"
+    assert payload["candidates"][1]["status"] == "unrecognized_ite"
+    assert payload["support_actions"]["recommended_issue_template"] == "hardware-support"
+    assert any("0x048d:0xc197" in step for step in payload["support_actions"]["next_steps"])
+    assert any("0x048d:0xc193" in step for step in payload["support_actions"]["next_steps"])
+
+
+def test_format_device_discovery_text_includes_ite8258_chassis_experimental_guidance() -> None:
+    text = format_device_discovery_text(
+        {
+            "selected_backend": None,
+            "usb_ids": ["048d:c193", "048d:c197"],
+            "summary": {"candidate_count": 2, "supported_count": 0, "attention_count": 2},
+            "support_actions": {
+                "recommended_issue_template": "hardware-support",
+                "recommended_issue_url": "https://example.invalid/hardware-support",
+                "next_steps": [
+                    "Treat `0x048d:0xc197` as the primary KeyRGB target for this Lenovo Gen10 path; `ite8258-chassis` is now an opt-in experimental backend, so enable Experimental backends before collecting runtime results.",
+                    "Keep the companion `0x048d:0xc193` device listed in the report; it remains unmanaged and should be treated as separate evidence until its role is confirmed.",
+                ],
+                "optional_capture_commands": ["lsusb -v -d 048d:c197"],
+            },
+            "candidates": [
+                {
+                    "usb_vid": "0x048d",
+                    "usb_pid": "0xc197",
+                    "product": "ITE Device(8258)",
+                    "device_type": "keyboard",
+                    "status": "experimental_disabled",
+                    "recommended_action": "Experimental backend exists, but experimental backends are currently disabled.",
+                    "probe_names": ["ite8258-chassis"],
+                    "hidraw_nodes": ["/dev/hidraw11"],
+                },
+                {
+                    "usb_vid": "0x048d",
+                    "usb_pid": "0xc193",
+                    "product": "Lenovo Lighting",
+                    "device_type": "unknown",
+                    "status": "unrecognized_ite",
+                    "recommended_action": "Unrecognized ITE-class device. Capture a safe dump and open a support issue.",
+                    "probe_names": [],
+                    "hidraw_nodes": [],
+                },
+            ],
+        }
+    )
+
+    assert "0x048d:0xc197 ITE Device(8258) type=keyboard status=experimental_disabled" in text
+    assert "Experimental backend exists, but experimental backends are currently disabled." in text
+    assert "0x048d:0xc193 Lenovo Lighting type=unknown status=unrecognized_ite" in text
+    assert "Treat `0x048d:0xc197` as the primary KeyRGB target" in text
+    assert "Keep the companion `0x048d:0xc193` device listed in the report" in text

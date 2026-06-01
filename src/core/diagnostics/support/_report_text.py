@@ -44,7 +44,7 @@ def primary_candidate(discovery: dict[str, Any] | None) -> dict[str, Any] | None
     candidates = discovery.get("candidates")
     if not isinstance(candidates, list):
         return None
-    for preferred_status in ("unrecognized_ite", "known_dormant", "known_unavailable", "experimental_disabled"):
+    for preferred_status in ("known_dormant", "experimental_disabled", "unrecognized_ite", "known_unavailable"):
         for candidate in candidates:
             if isinstance(candidate, dict) and str(candidate.get("status") or "") == preferred_status:
                 return candidate

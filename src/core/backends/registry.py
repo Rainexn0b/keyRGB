@@ -43,6 +43,7 @@ def _default_specs() -> list[BackendSpec]:
     # Keep this list small and lazy-importing.
     from .asusctl import AsusctlAuraBackend
     from .ite8258 import Ite8258Backend
+    from .ite8258_chassis import Ite8258ChassisBackend
     from .ite8291 import Ite8291Backend
     from .ite8291_zones import Ite8291ZonesBackend
     from .ite8295_zones import Ite8295ZonesBackend
@@ -72,6 +73,11 @@ def _default_specs() -> list[BackendSpec]:
             name=Ite8258Backend().name,
             priority=Ite8258Backend().priority,
             factory=Ite8258Backend,
+        ),
+        BackendSpec(
+            name=Ite8258ChassisBackend().name,
+            priority=Ite8258ChassisBackend().priority,
+            factory=Ite8258ChassisBackend,
         ),
         BackendSpec(
             name=Ite8295ZonesBackend().name,

@@ -5,6 +5,7 @@ from .ite8291 import Ite8291Backend
 from .ite8291_zones import Ite8291ZonesBackend
 from .ite8295_zones import Ite8295ZonesBackend
 from .ite8258 import Ite8258Backend
+from .ite8258_chassis import Ite8258ChassisBackend
 from .ite8910 import Ite8910Backend
 from .ite8291r3 import Ite8291r3Backend
 from .registry import select_backend
@@ -24,6 +25,7 @@ __all__ = [
     "KeyboardDevice",
     "Ite8295ZonesBackend",
     "Ite8258Backend",
+    "Ite8258ChassisBackend",
     "Ite8291Backend",
     "Ite8291ZonesBackend",
     "Ite8910Backend",

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+
+## 0.25.8 (2026-06-01)
+
+- Backends/ITE8258-Chassis: Add an OpenRGB-backed opt-in experimental `ite8258-chassis` backend for Lenovo Gen10 `0x048d:0xc197`, with keyboard-first support for off, brightness, uniform static color, per-key keyboard updates, and the confirmed Lenovo Gen10 firmware effects while neon/logo/vent UI remains deferred.
+- Diagnostics/Support: Prioritize `ite8258-chassis` `0x048d:0xc197` reports ahead of the unmanaged `0x048d:0xc193` companion device in discovery and support flows, and guide reporters to enable Experimental backends before collecting runtime results from the new keyboard-first path.
+- Docs/Backends: Formalize controller-first backend naming with semantic qualifiers, document `ite8258-chassis` as the `0x048d:0xc197` composite Lenovo Gen10 path, and add an external tester checklist for issue-driven hardware validation.
+
 ## 0.25.7 (2026-06-01)
 
 - Tray/Lightbar: Fix the secondary-device context menu so `Turn Off` switches back to `Turn On`, and restore the lightbar's own last nonzero brightness instead of jumping to a fallback value. Thanks to @BoneLiu for identifying the broken lightbar toggle path in PR #8.

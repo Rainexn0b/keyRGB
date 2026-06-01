@@ -7,10 +7,29 @@ from ..io import parse_hex_int
 from .classification import (
     candidate_device_type,
     candidate_status,
+    primary_candidate,
     parse_probe_usb_key,
     parse_usb_id_entry,
     support_actions,
 )
+
+
+def _candidate_sort_key(entry: dict[str, Any]) -> tuple[int, object, object]:
+    lead = primary_candidate([entry])
+    status = str(lead.get("status") or "") if isinstance(lead, dict) else str(entry.get("status") or "")
+    if status == "known_dormant":
+        rank = 0
+    elif status == "experimental_disabled":
+        rank = 1
+    elif status == "unrecognized_ite":
+        rank = 2
+    elif status == "known_unavailable":
+        rank = 3
+    elif status == "supported":
+        rank = 4
+    else:
+        rank = 5
+    return (rank, entry.get("usb_vid"), entry.get("usb_pid"))
 
 
 def build_device_discovery_payload(
@@ -54,7 +73,7 @@ def build_device_discovery_payload(
         key = (vid, pid)
         detailed_usb_keys.add(key)
         matching_probes = known_by_key.get(key, [])
-        status, action = candidate_status(matching_probes, vendor_id=vid)
+        status, action = candidate_status(matching_probes, vendor_id=vid, usb_key=key)
         device_type = candidate_device_type(usb_key=key, probes=matching_probes)
 
         if status == "observed" and vid != 0x048D:
@@ -79,7 +98,7 @@ def build_device_discovery_payload(
             continue
         vid, pid = key
         matching_probes = known_by_key.get(key, [])
-        status, action = candidate_status(matching_probes, vendor_id=vid)
+        status, action = candidate_status(matching_probes, vendor_id=vid, usb_key=key)
         device_type = candidate_device_type(usb_key=key, probes=matching_probes)
         if status == "observed" and vid != 0x048D:
             continue
@@ -135,7 +154,7 @@ def build_device_discovery_payload(
             }
         )
 
-    candidates.sort(key=lambda entry: (entry.get("status") != "supported", entry.get("usb_vid"), entry.get("usb_pid")))
+    candidates.sort(key=_candidate_sort_key)
 
     return {
         "selected_backend": backends.get("selected") if isinstance(backends, dict) else None,

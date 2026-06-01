@@ -231,6 +231,8 @@ Current backend plan:
   - `0x048d:0x8297` — 64-byte hidraw feature-report path, uniform color only
 - `ite8258`: `experimental` + `reverse_engineered`
 	- `0x048d:0xc195` — Lenovo Legion 5 / Pro 5 Gen 10 24-zone ITE 8258 hidraw keyboard path (4×6 logical zone matrix, static color, brightness, and firmware effects)
+- `ite8258-chassis`: `experimental` + `reverse_engineered`
+  - `0x048d:0xc197` — Lenovo Gen10 composite ITE 8258 path with keyboard-plus-chassis lighting; currently shipped as a keyboard-first experimental backend with ANSI matrix mapping, per-key/static keyboard color, brightness, and the confirmed Lenovo Gen10 firmware effects while neon/logo/vent surfaces remain deferred
 - `ite8295-zones`: `experimental` + `reverse_engineered`
 	- `0x048d:0xc963` — Lenovo 4-zone ITE 8295 hidraw keyboard path used by IdeaPad Gaming 3-class systems, with static color, 4-zone updates, brightness, and the confirmed default firmware effects (`breathing`, `wave`, `spectrum_cycle`)
 	- `0x048d:0xc966` — companion ITE 8176 endpoint reported on the same laptops; still treated as a separate unsupported protocol family until direct RGB evidence exists
@@ -245,6 +247,8 @@ Current backend plan:
   - `0x048d:0xce00` (bcdDevice ≠ `0x0002`) — per-key path; `bcdDevice 0x0002` is routed to `ite8291-zones` instead
 - `ite8291-zones`: `experimental` + `reverse_engineered`
   - `0x048d:0xce00` bcdDevice `0x0002` — 4-zone uniform-color firmware split
+
+Naming note: backend identifiers follow the controller or protocol family first, and only add a semantic qualifier when the same family splits into incompatible runtime shapes. Laptop and SKU names stay in the support notes instead of becoming the primary backend identifier.
 
 When a compatible auxiliary device is present, the tray exposes a `Software Targets` submenu so looped software effects can stay on the keyboard or mirror their uniformized output to all compatible secondary devices.
 
