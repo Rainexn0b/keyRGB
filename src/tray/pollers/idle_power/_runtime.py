@@ -34,6 +34,8 @@ class IdlePollLoopState:
     last_on_ac_power: Optional[bool] = None
     last_power_source_change_at: float = 0.0
     backlight_state: BacklightState = field(default_factory=BacklightState)
+    last_turn_off_at: float = 0.0
+    last_restore_at: float = 0.0
 
 
 def _run_idle_power_runtime_boundary_best_effort(operation: Callable[[], None]) -> None:
@@ -323,3 +325,20 @@ def run_idle_power_iteration(
         )
 
     apply_idle_action_fn(tray, action=action, dim_temp_brightness=int(dim_temp_brightness))
+
+    if action == "turn_off":
+        loop_state.last_turn_off_at = float(now)
+        since_restore = float(now) - loop_state.last_restore_at
+        if loop_state.last_restore_at > 0.0 and since_restore < 3.0:
+            logger.info(
+                "EVENT idle_power:rapid_oscillation detected turn_off %.2f s after restore",
+                since_restore,
+            )
+    elif action == "restore":
+        loop_state.last_restore_at = float(now)
+        since_turn_off = float(now) - loop_state.last_turn_off_at
+        if loop_state.last_turn_off_at > 0.0 and since_turn_off < 3.0:
+            logger.info(
+                "EVENT idle_power:rapid_oscillation detected restore %.2f s after turn_off",
+                since_turn_off,
+            )

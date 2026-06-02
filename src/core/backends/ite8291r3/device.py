@@ -242,6 +242,14 @@ class Ite8291r3KeyboardDevice:
         self.set_effect(effect)
 
     def turn_off(self) -> None:
+        if _brightness_debug_enabled() and self._last_effect_payload is not None:
+            _logger.info(
+                "EVENT ite8291r3:turn_off_pre_state effect=%s brightness=%s",
+                self._last_effect_payload,
+                int(self._last_effect_payload[protocol.EffectAttrs.BRIGHTNESS])
+                if len(self._last_effect_payload) > protocol.EffectAttrs.BRIGHTNESS
+                else None,
+            )
         self._set_effect_impl(control=0x01)
 
     def is_off(self) -> bool:

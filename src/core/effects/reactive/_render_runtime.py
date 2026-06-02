@@ -152,6 +152,13 @@ def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_re
 
     prev = _last_hw_mode_brightness_or_none(engine)
     if force_reinit or prev is None:
+        if _brightness_support.debug_brightness_enabled():
+            logger.info(
+                "apply_hw_brightness: force_reinit=%s prev=%s brightness_hw=%s",
+                force_reinit,
+                prev,
+                brightness_hw,
+            )
         enable_user_mode_once(
             kb=engine.kb,
             kb_lock=engine.kb_lock,
@@ -164,6 +171,12 @@ def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_re
     if int(prev) == int(brightness_hw):
         return
 
+    if _brightness_support.debug_brightness_enabled():
+        logger.info(
+            "apply_hw_brightness: set_brightness prev=%s brightness_hw=%s",
+            prev,
+            brightness_hw,
+        )
     try:
         engine.kb.set_brightness(int(brightness_hw))
     except _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS as exc:
