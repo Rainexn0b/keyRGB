@@ -159,17 +159,6 @@ def _write_epp(policy: Path, value: str) -> None:
     _write_text(_epp_path(policy), f"{value}\n")
 
 
-def _write_mode_epp_preferences(mode: PowerMode, *, policies: list[Path]) -> None:
-    for pol in policies:
-        epp_choice = _pick_epp_value(mode, available=_available_epp_preferences(pol))
-        if epp_choice is None or not _has_epp(pol):
-            continue
-        try:
-            _write_epp(pol, epp_choice)
-        except OSError:
-            pass
-
-
 def _boost_paths() -> list[Path]:
     # Different drivers expose boost/turbo differently.
     return [
@@ -244,53 +233,6 @@ def is_supported() -> bool:
     return any((p / "scaling_max_freq").exists() for p in policies)
 
 
-def _infer_mode(*, policies: list[Path], extreme_cap_khz: int) -> PowerMode:
-    # Infer from a couple of strong signals.
-    max_freqs: list[int] = []
-    max_possible: list[int] = []
-    governors: list[str] = []
-    epp_values: list[str] = []
-
-    for pol in policies:
-        m = _read_int(pol / "scaling_max_freq")
-        if m is not None:
-            max_freqs.append(m)
-        cm = _read_int(pol / "cpuinfo_max_freq")
-        if cm is not None:
-            max_possible.append(cm)
-        g = _read_text(pol / "scaling_governor")
-        if g:
-            governors.append(g.strip().lower())
-        epp = _read_epp(pol)
-        if epp:
-            epp_values.append(epp)
-
-    boost = _read_boost_enabled()
-
-    # If boost state is unavailable, explicit performance governor/EPP is still
-    # the strongest signal. Only reject performance when boost is explicitly off.
-    boost_allows_performance = boost is not False
-
-    if governors and all(g == "performance" for g in governors) and boost_allows_performance:
-        return PowerMode.PERFORMANCE
-
-    # EPP-driven policies (for example amd-pstate-epp) often keep the governor
-    # at powersave and express the effective mode via the EPP preference.
-    if epp_values and all(value == "performance" for value in epp_values) and boost_allows_performance:
-        return PowerMode.PERFORMANCE
-
-    # Extreme saver: capped hard and boost off.
-    if max_freqs:
-        cap = min(max_freqs)
-        threshold = int(extreme_cap_khz) + _EXTREME_SAVER_DETECTION_MARGIN_KHZ
-        epp_extreme = not epp_values or all(value in {"power", "balance_power"} for value in epp_values)
-        if cap <= threshold and (boost is False or boost is None) and epp_extreme:
-            return PowerMode.EXTREME_SAVER
-
-    # Balanced by default when supported.
-    return PowerMode.BALANCED
-
-
 def get_current_freq_stats_khz() -> tuple[int | None, int | None]:
     root = _cpufreq_root()
     policies = _policy_dirs(root)
@@ -320,194 +262,46 @@ def get_max_current_freq_khz() -> int | None:
     return max_khz
 
 
-def get_status() -> PowerModeStatus:
-    root = _cpufreq_root()
-    policies = _policy_dirs(root)
-    if not policies:
-        return PowerModeStatus(
-            supported=False,
-            mode=PowerMode.UNKNOWN,
-            reason="cpufreq policies not found",
-            identifiers={"cpufreq_root": str(root)},
-        )
+# ---------------------------------------------------------------------------
+# Observation layer (reads sysfs, best-effort mode inference)
+# ---------------------------------------------------------------------------
 
-    if not any((p / "scaling_max_freq").exists() for p in policies):
-        return PowerModeStatus(
-            supported=False,
-            mode=PowerMode.UNKNOWN,
-            reason="cpufreq scaling_max_freq not available",
-            identifiers={"cpufreq_root": str(root)},
-        )
+from ._observe import get_status as _get_status_obs  # noqa: E402
 
-    extreme_cap_khz = configured_extreme_saver_cap_khz()
-    mode = _infer_mode(policies=policies, extreme_cap_khz=extreme_cap_khz)
-    ids: dict[str, str] = {
-        "cpufreq_root": str(root),
-        "policies": str(len(policies)),
-        "configured_extreme_cap_khz": str(extreme_cap_khz),
-    }
-    driver_name = _driver_name(policies[0])
-    if driver_name:
-        ids["driver"] = driver_name
-    epp = _read_epp(policies[0])
-    if epp:
-        ids["epp"] = epp
-
-    # Can we likely apply changes without prompting every time?
-    helper = os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
-    helper_present = Path(helper).exists()
-    writable = any(os.access(p / "scaling_max_freq", os.W_OK) for p in policies)
-    ids["helper_present"] = str(bool(helper_present)).lower()
-    ids["sysfs_writable"] = str(bool(writable)).lower()
-    ids["can_apply"] = str(bool(helper_present or writable)).lower()
-
-    boost = _read_boost_enabled()
-    if boost is not None:
-        ids["boost_enabled"] = str(bool(boost)).lower()
-
-    return PowerModeStatus(supported=True, mode=mode, reason="ok", identifiers=ids)
-
-
-def _apply_mode_sysfs(mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> None:
-    policies = _policy_dirs(root)
-    if not policies:
-        raise FileNotFoundError(f"No cpufreq policies under {root}")
-
-    target_extreme_cap_khz = normalize_extreme_saver_cap_khz(extreme_cap_khz)
-
-    if mode in (PowerMode.BALANCED, PowerMode.PERFORMANCE):
-        try:
-            _set_boost_enabled(True)
-        except OSError:
-            pass
-
-    for pol in policies:
-        max_path = pol / "scaling_max_freq"
-        if not max_path.exists():
-            continue
-
-        min_khz = _read_int(pol / "cpuinfo_min_freq") or 0
-        max_khz = _read_int(pol / "cpuinfo_max_freq")
-        available_governors = _available_governors(pol)
-
-        if mode == PowerMode.EXTREME_SAVER:
-            target = target_extreme_cap_khz
-            if min_khz:
-                target = max(target, min_khz)
-            if max_khz:
-                target = min(target, max_khz)
-            _write_scaling_freq_range(pol, min_khz=int(target), max_khz=int(target))
-
-            gov = pol / "scaling_governor"
-            if gov.exists() and "powersave" in available_governors:
-                # Best-effort; may not be supported.
-                try:
-                    _write_text(gov, "powersave\n")
-                except OSError:
-                    pass
-
-        elif mode in (PowerMode.BALANCED, PowerMode.PERFORMANCE):
-            restore_min_khz = int(min_khz) if min_khz else None
-            restore_max_khz = int(max_khz) if max_khz else None
-            _write_scaling_freq_range(pol, min_khz=restore_min_khz, max_khz=restore_max_khz)
-
-            gov = pol / "scaling_governor"
-            if gov.exists():
-                try:
-                    governor_value: str | None = None
-                    if mode == PowerMode.PERFORMANCE:
-                        if "performance" in available_governors:
-                            governor_value = "performance\n"
-                        elif "powersave" in available_governors:
-                            governor_value = "powersave\n"
-                    else:
-                        if _has_epp(pol) and "powersave" in available_governors:
-                            governor_value = "powersave\n"
-                        elif "schedutil" in available_governors:
-                            governor_value = "schedutil\n"
-                    if governor_value is not None:
-                        _write_text(gov, governor_value)
-                except OSError:
-                    pass
-
-    # Boost handling is global-ish.
-    if mode == PowerMode.EXTREME_SAVER:
-        try:
-            _set_boost_enabled(False)
-        except OSError:
-            pass
-
-    # Some drivers expose mode-dependent EPP choices. amd-pstate-epp, for
-    # example, can show only "performance" while the governor is performance.
-    # Re-read and write EPP after governor/boost changes settle.
-    _write_mode_epp_preferences(mode, policies=policies)
-
-
-def _pkexec_noninteractive_authorized(pkcheck: str) -> bool:
-    try:
-        cp = subprocess.run(
-            [
-                pkcheck,
-                "--action-id",
-                _POWER_HELPER_ACTION_ID,
-                "--process",
-                str(os.getpid()),
-            ],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-    except OSError:
-        return False
-    return cp.returncode == 0
-
-
-def _run_privileged_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_interactive: bool = True) -> bool:
-    helper = os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
-    argv = [
-        helper,
-        "apply",
-        str(mode.value),
-        "--extreme-cap-khz",
-        str(normalize_extreme_saver_cap_khz(extreme_cap_khz)),
-    ]
-
-    if os.geteuid() == 0:
-        cp = subprocess.run(argv, check=False, capture_output=True, text=True)
-        return cp.returncode == 0
-
-    pkexec = shutil.which("pkexec")
-    if pkexec:
-        if allow_interactive:
-            cp = subprocess.run([pkexec, *argv], check=False, capture_output=True, text=True)
-            return cp.returncode == 0
-
-        pkcheck = shutil.which("pkcheck")
-        if pkcheck and _pkexec_noninteractive_authorized(pkcheck):
-            cp = subprocess.run(
-                [pkexec, "--disable-internal-agent", *argv],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            if cp.returncode == 0:
-                return True
-
-    sudo = shutil.which("sudo")
-    if sudo:
-        sudo_argv = [sudo, *argv] if allow_interactive else [sudo, "-n", *argv]
-        cp = subprocess.run(sudo_argv, check=False, capture_output=True, text=True)
-        return cp.returncode == 0
-
-    return False
+# Re-export for the public facade and for test monkeypatching.
+get_status = _get_status_obs
 
 
 def _mode_is_active(mode: PowerMode) -> bool:
+    """Best-effort check whether the requested mode appears to be active.
+
+    This is intentionally heuristic: it reads sysfs and infers the current
+    mode, which may disagree with the last-applied mode for legitimate
+    driver-specific reasons. Callers should not treat a False result as a
+    failure to apply."""
     status = get_status()
     return bool(status.supported and status.mode == mode)
 
 
+# ---------------------------------------------------------------------------
+# Apply layer (writes sysfs, invokes helper)
+# ---------------------------------------------------------------------------
+
+from ._apply import (  # noqa: E402
+    _apply_mode_sysfs,
+    _pkexec_noninteractive_authorized,
+    _run_privileged_helper,
+    apply_mode as _apply_mode_impl,
+)
+
+
 def set_mode(mode: PowerMode, *, allow_interactive: bool = True) -> bool:
+    """Apply a power mode. Returns True if sysfs/helper writes succeeded.
+
+    Success is based on whether the writes completed, not on a heuristic
+    readback of the system state. The observation layer (get_status) may
+    report a different mode for driver-specific reasons; that is expected
+    and does not indicate an application failure."""
     if not isinstance(mode, PowerMode):
         try:
             mode = PowerMode(str(mode))
@@ -520,22 +314,9 @@ def set_mode(mode: PowerMode, *, allow_interactive: bool = True) -> bool:
     root = _cpufreq_root()
     extreme_cap_khz = configured_extreme_saver_cap_khz()
 
-    # First try direct writes (works if user already has permissions).
-    try:
-        _apply_mode_sysfs(mode, root=root, extreme_cap_khz=extreme_cap_khz)
-        if _mode_is_active(mode):
-            return True
-    except PermissionError:
-        pass
-    except OSError:
-        # If direct write fails for other reasons, still allow helper.
-        pass
-
-    helper_applied = _run_privileged_helper(
+    return _apply_mode_impl(
         mode,
+        root=root,
         extreme_cap_khz=extreme_cap_khz,
         allow_interactive=allow_interactive,
     )
-    if not helper_applied:
-        return False
-    return _mode_is_active(mode)

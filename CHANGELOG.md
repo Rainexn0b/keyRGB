@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Power/System: Fix recurring bug where configured power mode (Performance/Extreme Saver) was ignored and tray showed Balanced instead. `set_mode` now trusts sysfs/helper write success instead of gating on a heuristic readback that could be wrong for legitimate driver-specific reasons (e.g. `balance_performance` EPP fallback, mixed EPP across heterogeneous CPU policies, or boost-unavailable systems).
+- Power/System: Split monolithic `modes.py` into apply (`_apply.py`) and observation (`_observe.py`) layers. `_infer_mode` heuristics are relaxed to recognize `balance_performance` EPP and mixed-policy states as consistent with `PERFORMANCE`.
 
 ## 0.25.8 (2026-06-01)
 

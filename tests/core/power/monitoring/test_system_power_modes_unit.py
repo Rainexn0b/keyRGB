@@ -141,6 +141,43 @@ def test_get_status_reports_performance_for_governor_when_boost_state_unknown(
     assert get_status().mode == PowerMode.PERFORMANCE
 
 
+def test_get_status_reports_performance_for_balance_performance_epp(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """EPP 'balance_performance' should be recognized as PERFORMANCE because
+    _pick_epp_value legitimately falls back to it when 'performance' EPP is
+    not available."""
+    root = tmp_path / "cpufreq"
+    policy = _make_policy(root, "policy0", max_khz=3000000)
+    _add_epp_files(policy, current_pref="balance_performance")
+    (policy / "scaling_governor").write_text("powersave\n", encoding="utf-8")
+
+    monkeypatch.setenv("KEYRGB_CPUFREQ_ROOT", str(root))
+    monkeypatch.setattr(system_modes, "_read_boost_enabled", lambda: True)
+
+    assert get_status().mode == PowerMode.PERFORMANCE
+
+
+def test_get_status_reports_performance_for_mixed_epp_policies(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """On heterogeneous CPUs different policies may have different EPP values
+    after PERFORMANCE application (e.g. 'performance' on P-cores,
+    'balance_performance' on E-cores)."""
+    root = tmp_path / "cpufreq"
+    policy0 = _make_policy(root, "policy0", max_khz=3000000)
+    policy1 = _make_policy(root, "policy1", max_khz=3000000)
+    _add_epp_files(policy0, current_pref="performance")
+    _add_epp_files(policy1, current_pref="balance_performance")
+    (policy0 / "scaling_governor").write_text("powersave\n", encoding="utf-8")
+    (policy1 / "scaling_governor").write_text("powersave\n", encoding="utf-8")
+
+    monkeypatch.setenv("KEYRGB_CPUFREQ_ROOT", str(root))
+    monkeypatch.setattr(system_modes, "_read_boost_enabled", lambda: True)
+
+    assert get_status().mode == PowerMode.PERFORMANCE
+
+
 def test_get_status_does_not_report_performance_when_boost_is_disabled(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -353,41 +390,38 @@ def test_set_mode_falls_back_to_helper_on_sysfs_oserror(monkeypatch: pytest.Monk
     assert helper_calls == [(PowerMode.BALANCED, 1_250_000, True)]
 
 
-def test_set_mode_falls_back_to_helper_when_direct_apply_does_not_change_mode(
+def test_set_mode_returns_true_when_direct_writes_succeed_regardless_of_observed_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """set_mode no longer gates success on _mode_is_active heuristic."""
     helper_calls: list[tuple[PowerMode, int, bool]] = []
-    observed_modes = [PowerMode.BALANCED, PowerMode.PERFORMANCE]
 
     monkeypatch.setattr(system_modes, "configured_extreme_saver_cap_khz", lambda: 1_250_000)
     monkeypatch.setattr(system_modes, "_apply_mode_sysfs", lambda *_args, **_kwargs: None)
-
-    def fake_status() -> system_modes.PowerModeStatus:
-        return system_modes.PowerModeStatus(
-            supported=True,
-            mode=observed_modes.pop(0),
-            reason="ok",
-            identifiers={},
-        )
 
     def fake_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_interactive: bool = True) -> bool:
         helper_calls.append((mode, extreme_cap_khz, allow_interactive))
         return True
 
-    monkeypatch.setattr(system_modes, "get_status", fake_status)
     monkeypatch.setattr(system_modes, "_run_privileged_helper", fake_helper)
 
     assert set_mode(PowerMode.PERFORMANCE, allow_interactive=False) is True
-    assert helper_calls == [(PowerMode.PERFORMANCE, 1_250_000, False)]
+    # Direct writes succeeded, so helper should not have been called.
+    assert helper_calls == []
 
 
-def test_set_mode_returns_false_when_helper_succeeds_but_mode_stays_wrong(
+def test_set_mode_returns_true_when_helper_succeeds_regardless_of_observed_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """set_mode trusts helper success, not heuristic readback."""
     helper_calls: list[tuple[PowerMode, int, bool]] = []
 
     monkeypatch.setattr(system_modes, "configured_extreme_saver_cap_khz", lambda: 1_250_000)
-    monkeypatch.setattr(system_modes, "_apply_mode_sysfs", lambda *_args, **_kwargs: None)
+
+    def raise_permission_error(_mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> None:
+        raise PermissionError("sysfs write denied")
+
+    monkeypatch.setattr(system_modes, "_apply_mode_sysfs", raise_permission_error)
     monkeypatch.setattr(
         system_modes,
         "get_status",
@@ -405,7 +439,7 @@ def test_set_mode_returns_false_when_helper_succeeds_but_mode_stays_wrong(
 
     monkeypatch.setattr(system_modes, "_run_privileged_helper", fake_helper)
 
-    assert set_mode(PowerMode.PERFORMANCE, allow_interactive=False) is False
+    assert set_mode(PowerMode.PERFORMANCE, allow_interactive=False) is True
     assert helper_calls == [(PowerMode.PERFORMANCE, 1_250_000, False)]
 
 
