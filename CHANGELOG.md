@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.25.10 (2026-06-03)
+
+- System/Udev: Add `0x048d:0xc197` (Lenovo Legion Pro 7 Gen10 `ite8258-chassis`) and its companion `0x048d:0xc193` to `99-ite8291-wootbook.rules`, fixing `PermissionError` on `/dev/hidraw3` when the experimental backend is enabled. Also updates tray permission hints and installer device-detection warnings to cover the `ite8258` family.
+
 ## 0.25.9 (2026-06-03)
 
 - Power/System: Fix recurring bug where configured power mode (Performance/Extreme Saver) was ignored and tray showed Balanced instead. `set_mode` now trusts sysfs/helper write success instead of gating on a heuristic readback that could be wrong for legitimate driver-specific reasons (e.g. `balance_performance` EPP fallback, mixed EPP across heterogeneous CPU policies, or boost-unavailable systems).

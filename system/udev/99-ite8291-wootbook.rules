@@ -1,5 +1,6 @@
 # Allow user access to supported ITE / Lenovo USB / hidraw devices.
-#
+# Name is based on the ITE8291 Wootbook, but the rules apply to all supported devices (historical artifact)
+
 # Use seat-based ACLs (uaccess) instead of making the device world-writable.
 # Some setups only apply the ACL reliably when explicitly invoking the uaccess
 # builtin.
@@ -9,6 +10,10 @@ SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idPro
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="600a", TAG+="uaccess", RUN{builtin}+="uaccess"
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="600b", TAG+="uaccess", RUN{builtin}+="uaccess"
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="ce00", TAG+="uaccess", RUN{builtin}+="uaccess"
+# Lenovo Gen10 composite (keyboard + chassis lighting)
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="c193", TAG+="uaccess", RUN{builtin}+="uaccess"
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="c197", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="8910", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c963", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c195", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c197", TAG+="uaccess", RUN{builtin}+="uaccess"

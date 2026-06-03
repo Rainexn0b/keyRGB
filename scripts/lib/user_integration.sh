@@ -426,10 +426,10 @@ warn_if_no_usb_device_best_effort() {
     fi
   fi
 
-  # Common supported ITE 8291r3 IDs.
-  if ! lsusb | grep -Eqi "048d:(6004|6006|6008|600b|ce00)"; then
-    log_warn "Supported ITE 8291 USB device not detected (best-effort check)."
-    log_warn "Expected one of: 048d:6004, 048d:6006, 048d:6008, 048d:600b, 048d:ce00"
+  # Common supported ITE USB IDs (8291r3, 8258, and related families).
+  if ! lsusb | grep -Eqi "048d:(6004|6006|6008|600b|ce00|c195|c197)"; then
+    log_warn "Supported ITE USB device not detected (best-effort check)."
+    log_warn "Expected one of: 048d:6004, 048d:6006, 048d:6008, 048d:600b, 048d:ce00, 048d:c195, 048d:c197"
   fi
 }
 

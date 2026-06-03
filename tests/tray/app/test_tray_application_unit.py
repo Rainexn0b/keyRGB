@@ -515,12 +515,13 @@ def test_notify_falls_back_to_notify_send_when_icon_notify_fails(monkeypatch):
     ]
 
 
-def test_notify_permission_issue_reports_once_and_includes_backend_hint(monkeypatch):
+@pytest.mark.parametrize("backend_name", ["ite8291r3", "ite8258", "ite8258-chassis"])
+def test_notify_permission_issue_reports_once_and_includes_backend_hint(monkeypatch, backend_name):
     warnings = []
     notifications = []
     tray = SimpleNamespace(
         _permission_notice_sent=False,
-        backend=SimpleNamespace(name="ite8291r3"),
+        backend=SimpleNamespace(name=backend_name),
         _notify=lambda title, message: notifications.append((title, message)),
     )
     err = PermissionError("denied")

@@ -39,9 +39,10 @@
 - **Brands:** XMG, Schenker, Tuxedo, PC Specialist, Eluktronics, Maingear, Monster Notebook, Aftershock, Mechrevo, **Wootbook**
 - **USB / controller IDs:** `048d:ce00` (ITE), ITE8291, ITE8297; Wootbook often uses **product ID `0x600B`**
 
-## Wootbook note
+## Wootbook / Lenovo Gen10 note
 
 - Wootbook models are treated as Tongfang rebrands and often require `system/udev/99-ite8291-wootbook.rules` for permissions.
+- Lenovo Legion Gen10 (`0x048d:0xc195`, `0x048d:0xc197`) also uses this rules file for hidraw/USB access.
 
 ## What to tell users (fast checklist)
 
