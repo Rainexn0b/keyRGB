@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-import shutil
-import subprocess
+import shutil  # noqa: F401  — re-exported for test monkeypatching
+import subprocess  # noqa: F401  — re-exported for test monkeypatching
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -288,9 +288,9 @@ def _mode_is_active(mode: PowerMode) -> bool:
 # ---------------------------------------------------------------------------
 
 from ._apply import (  # noqa: E402
-    _apply_mode_sysfs,
-    _pkexec_noninteractive_authorized,
-    _run_privileged_helper,
+    _apply_mode_sysfs,  # noqa: F401  — re-exported for test monkeypatching
+    _pkexec_noninteractive_authorized,  # noqa: F401  — re-exported for test monkeypatching
+    _run_privileged_helper,  # noqa: F401  — re-exported for test monkeypatching
     apply_mode as _apply_mode_impl,
 )
 

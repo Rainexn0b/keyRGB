@@ -46,18 +46,18 @@ def _infer_mode(*, policies: list[Path], extreme_cap_khz: int) -> PowerMode:
     # We accept "performance" or "balance_performance" because _pick_epp_value
     # legitimately falls back to "balance_performance" when "performance" is
     # not available on a given policy (common on heterogeneous CPUs).
-    if epp_values and all(
-        value in {"performance", "balance_performance"} for value in epp_values
-    ) and boost_allows_performance:
+    if (
+        epp_values
+        and all(value in {"performance", "balance_performance"} for value in epp_values)
+        and boost_allows_performance
+    ):
         return _modes.PowerMode.PERFORMANCE
 
     # Extreme saver: capped hard and boost off.
     if max_freqs:
         cap = min(max_freqs)
         threshold = int(extreme_cap_khz) + _modes._EXTREME_SAVER_DETECTION_MARGIN_KHZ
-        epp_extreme = not epp_values or all(
-            value in {"power", "balance_power"} for value in epp_values
-        )
+        epp_extreme = not epp_values or all(value in {"power", "balance_power"} for value in epp_values)
         if cap <= threshold and (boost is False or boost is None) and epp_extreme:
             return _modes.PowerMode.EXTREME_SAVER
 
