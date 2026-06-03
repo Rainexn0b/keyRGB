@@ -38,6 +38,14 @@ COMMAND_FAMILY: tuple[int, ...] = (
     GET_DIRECT_MODE_PROFILE,
 )
 
+# Dormant protocol operations — not yet wired into the device facade
+# (discovered in the independent 83F5 working implementation)
+GET_KEY_COUNT = 0xC4
+GET_KEY_PAGE = 0xC5
+RESET_PROFILE = 0xC9
+GET_LOGO_STATUS = 0xA5
+SET_LOGO_STATUS = 0xA6
+
 DEFAULT_PROFILE_ID = 0x01
 
 NUM_ROWS = 7
@@ -296,28 +304,39 @@ NUM_KEYS = len(KEYBOARD_LED_IDS)
 KEYBOARD_NUM_ROWS = NUM_ROWS
 KEYBOARD_NUM_COLS = NUM_COLS
 
-LOGO_LED_IDS: tuple[int, ...] = (0xDD,)
+LOGO_LED_IDS: tuple[int, ...] = (0x05DD,)
 VENT_LED_IDS: tuple[int, ...] = (
-    0xE9,
-    0xEA,
-    0xEB,
-    0xEC,
-    0xED,
-    0xEE,
-    0xEF,
-    0xF0,
-    0xF1,
-    0xF2,
-    0xF3,
-    0xF4,
-    0xF5,
-    0xF6,
-    0xF7,
-    0xF8,
-    0xF9,
-    0xFA,
+    0x03E9,
+    0x03EA,
+    0x03EB,
+    0x03EC,
+    0x03ED,
+    0x03EE,
+    0x03EF,
+    0x03F0,
+    0x03F1,
+    0x03F2,
+    0x03F3,
+    0x03F4,
+    0x03F5,
+    0x03F6,
+    0x03F7,
+    0x03F8,
+    0x03F9,
+    0x03FA,
 )
-NEON_LED_IDS: tuple[int, ...] = (0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE)
+NEON_LED_IDS: tuple[int, ...] = (
+    0x01F5,
+    0x01F6,
+    0x01F7,
+    0x01F8,
+    0x01F9,
+    0x01FA,
+    0x01FB,
+    0x01FC,
+    0x01FD,
+    0x01FE,
+)
 
 UI_BRIGHTNESS_MAX = 50
 RAW_BRIGHTNESS_MAX = 9

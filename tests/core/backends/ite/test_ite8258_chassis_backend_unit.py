@@ -50,6 +50,37 @@ def test_direction_code_matches_83f5_implementation() -> None:
     assert protocol._direction_code("") == protocol.DIRECTION_RIGHT == 0x03
 
 
+def test_chassis_zone_led_ids_use_16_bit_codes_from_83f5_implementation() -> None:
+    # Low-byte constants were truncated; corrected to full 16-bit codes per research.
+    assert protocol.LOGO_LED_IDS == (0x05DD,)
+    assert protocol.NEON_LED_IDS == (
+        0x01F5, 0x01F6, 0x01F7, 0x01F8, 0x01F9, 0x01FA,
+        0x01FB, 0x01FC, 0x01FD, 0x01FE,
+    )
+    assert protocol.VENT_LED_IDS == (
+        0x03E9, 0x03EA, 0x03EB, 0x03EC, 0x03ED, 0x03EE, 0x03EF,
+        0x03F0, 0x03F1, 0x03F2, 0x03F3, 0x03F4, 0x03F5, 0x03F6,
+        0x03F7, 0x03F8, 0x03F9, 0x03FA,
+    )
+
+
+def test_build_direct_color_emits_correct_16_bit_led_ids_for_chassis_zones() -> None:
+    # Logo 0x05DD → little-endian bytes DD 05
+    logo_report = protocol.build_direct_color_report(((0x05DD, (255, 0, 0)),))
+    assert logo_report[4:6].hex() == "dd05"
+    assert logo_report[6:9].hex() == "ff0000"
+
+    # Neon 0x01F5 → little-endian bytes F5 01
+    neon_report = protocol.build_direct_color_report(((0x01F5, (0, 255, 0)),))
+    assert neon_report[4:6].hex() == "f501"
+    assert neon_report[6:9].hex() == "00ff00"
+
+    # Vent 0x03E9 → little-endian bytes E9 03
+    vent_report = protocol.build_direct_color_report(((0x03E9, (0, 0, 255)),))
+    assert vent_report[4:6].hex() == "e903"
+    assert vent_report[6:9].hex() == "0000ff"
+
+
 def test_led_id_from_row_col_matches_openrgb_legion7_gen10_matrix() -> None:
     assert protocol.led_id_from_row_col(0, 0) == 0x01
     assert protocol.led_id_from_row_col(0, 19) == 0x14
