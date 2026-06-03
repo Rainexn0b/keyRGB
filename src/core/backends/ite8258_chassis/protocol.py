@@ -349,8 +349,8 @@ SPIN_LEFT = 0x02
 
 DIRECTION_UP = 0x01
 DIRECTION_DOWN = 0x02
-DIRECTION_LEFT = 0x03
-DIRECTION_RIGHT = 0x04
+DIRECTION_LEFT = 0x04
+DIRECTION_RIGHT = 0x03
 
 Color = tuple[int, int, int]
 IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
@@ -464,8 +464,9 @@ def _packet(command: int, payload_length: int) -> bytearray:
     packet = bytearray(PACKET_SIZE)
     packet[0] = REPORT_ID
     packet[1] = int(command) & 0xFF
-    packet[2] = int(payload_length) & 0xFF
-    packet[3] = (int(payload_length) >> 8) & 0xFF
+    # Fixed report size in header, matching the proven 83F5 implementation
+    packet[2] = PACKET_SIZE & 0xFF
+    packet[3] = (PACKET_SIZE >> 8) & 0xFF
     return packet
 
 
@@ -576,9 +577,6 @@ def build_save_profile_reports(profile_id: int, groups: Sequence[Ite8258ChassisG
         if not wrote_group:
             raise ValueError("group payload exceeds Lenovo Gen10 packet size")
 
-        payload_length = offset - 4
-        packet[2] = payload_length & 0xFF
-        packet[3] = (payload_length >> 8) & 0xFF
         reports.append(bytes(packet))
 
     return tuple(reports)

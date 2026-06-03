@@ -19,7 +19,7 @@ def test_protocol_builds_turn_off_report() -> None:
     report = protocol.build_turn_off_report()
 
     assert len(report) == protocol.PACKET_SIZE
-    assert report[:7].hex() == "07cb0300010101"
+    assert report[:7].hex() == "07cbc003010101"
     assert report[7:] == bytes(protocol.PACKET_SIZE - 7)
 
 
@@ -27,7 +27,7 @@ def test_protocol_builds_brightness_report() -> None:
     report = protocol.build_set_brightness_report(5)
 
     assert len(report) == protocol.PACKET_SIZE
-    assert report[:5].hex() == "07ce010005"
+    assert report[:5].hex() == "07cec00305"
     assert report[5:] == bytes(protocol.PACKET_SIZE - 5)
 
 
@@ -36,9 +36,18 @@ def test_protocol_builds_direct_mode_and_direct_color_reports() -> None:
     direct_off = protocol.build_set_direct_mode_report(enabled=False)
     direct_colors = protocol.build_direct_color_report(((0x0001, (0x12, 0x34, 0x56)), (0x00A1, (0xAB, 0xCD, 0xEF))))
 
-    assert direct_on[:6].hex() == "07d002000101"
-    assert direct_off[:6].hex() == "07d002000201"
-    assert direct_colors[:14].hex() == "07a10a000100123456a100abcdef"
+    assert direct_on[:6].hex() == "07d0c0030101"
+    assert direct_off[:6].hex() == "07d0c0030201"
+    assert direct_colors[:14].hex() == "07a1c0030100123456a100abcdef"
+
+
+def test_direction_code_matches_83f5_implementation() -> None:
+    # Left/right were swapped in the original translation; corrected per research.
+    assert protocol._direction_code("left") == protocol.DIRECTION_LEFT == 0x04
+    assert protocol._direction_code("right") == protocol.DIRECTION_RIGHT == 0x03
+    assert protocol._direction_code("up") == protocol.DIRECTION_UP == 0x01
+    assert protocol._direction_code("down") == protocol.DIRECTION_DOWN == 0x02
+    assert protocol._direction_code("") == protocol.DIRECTION_RIGHT == 0x03
 
 
 def test_led_id_from_row_col_matches_openrgb_legion7_gen10_matrix() -> None:
@@ -56,7 +65,7 @@ def test_protocol_builds_uniform_static_group_report() -> None:
     report = protocol.build_save_profile_reports(1, protocol.build_uniform_static_groups((0x12, 0x34, 0x56)))[0]
 
     assert len(report) == protocol.PACKET_SIZE
-    assert report[:34].hex() == "07cbe0000101010106010b0202030004000502060001123456650100020003000400"
+    assert report[:34].hex() == "07cbc0030101010106010b0202030004000502060001123456650100020003000400"
 
 
 def test_device_set_color_sends_profile_switch_direct_off_group_report_then_brightness() -> None:
@@ -65,10 +74,10 @@ def test_device_set_color_sends_profile_switch_direct_off_group_report_then_brig
 
     device.set_color((0x12, 0x34, 0x56), brightness=25)
 
-    assert sent[0][:5].hex() == "07c8010001"
-    assert sent[1][:6].hex() == "07d002000201"
-    assert sent[2][:34].hex() == "07cbe0000101010106010b0202030004000502060001123456650100020003000400"
-    assert sent[3][:5].hex() == "07ce010004"
+    assert sent[0][:5].hex() == "07c8c00301"
+    assert sent[1][:6].hex() == "07d0c0030201"
+    assert sent[2][:34].hex() == "07cbc0030101010106010b0202030004000502060001123456650100020003000400"
+    assert sent[3][:5].hex() == "07cec00304"
 
 
 def test_device_set_key_colors_maps_tuple_keys_to_keyboard_led_ids() -> None:
@@ -82,7 +91,7 @@ def test_device_set_key_colors_maps_tuple_keys_to_keyboard_led_ids() -> None:
     assert report[1] == protocol.SAVE_PROFILE
     assert b"\x01\x00" in report
     assert b"\xA1\x00" in report
-    assert sent[-1][:5].hex() == "07ce010009"
+    assert sent[-1][:5].hex() == "07cec00309"
 
 
 def test_backend_reports_research_backed_experimental_metadata() -> None:
@@ -251,10 +260,10 @@ def test_backend_get_device_returns_keyboard_device_when_transport_opens(monkeyp
 
     assert isinstance(device, Ite8258ChassisKeyboardDevice)
     device.set_effect({"name": "color_wave", "color": (0x12, 0x34, 0x56), "direction": "left", "brightness": 50})
-    assert sent[0][:5].hex() == "07c8010001"
-    assert sent[1][:6].hex() == "07d002000201"
+    assert sent[0][:5].hex() == "07c8c00301"
+    assert sent[1][:6].hex() == "07d0c0030201"
     assert sent[2][1] == protocol.SAVE_PROFILE
-    assert sent[3][:5].hex() == "07ce010009"
+    assert sent[3][:5].hex() == "07cec00309"
 
 
 def test_backend_is_available_reflects_probe_result(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.25.11 (2026-06-03)
+
+- Backends/ITE8258-Chassis: Fix two protocol discrepancies found against the independent 83F5 working implementation. Direction encoding is corrected (`left=0x04`, `right=0x03` — was swapped). Header framing now uses fixed report size (`960` / `0x03C0` in bytes 2–3) instead of dynamic payload length, matching the proven hardware behavior.
+
 ## 0.25.10 (2026-06-03)
 
 - System/Udev: Add `0x048d:0xc197` (Lenovo Legion Pro 7 Gen10 `ite8258-chassis`) and its companion `0x048d:0xc193` to `99-ite8291-wootbook.rules`, fixing `PermissionError` on `/dev/hidraw3` when the experimental backend is enabled. Also updates tray permission hints and installer device-detection warnings to cover the `ite8258` family.

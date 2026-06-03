@@ -10,7 +10,7 @@ set -euo pipefail
 
 KEYRGB_REPO_OWNER="${KEYRGB_REPO_OWNER:-Rainexn0b}"
 KEYRGB_REPO_NAME="${KEYRGB_REPO_NAME:-keyRGB}"
-KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.25.10}"
+KEYRGB_BOOTSTRAP_REF="${KEYRGB_BOOTSTRAP_REF:-v0.25.11}"
 
 usage() {
   cat <<'EOF'
@@ -18,7 +18,7 @@ Usage:
   uninstall.sh [--ref <git-ref>] [--help] [...uninstall args]
 
 Bootstrap (curl installs):
-  --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.25.10)
+  --ref <git-ref>    Git ref for downloading scripts/ from GitHub raw (default: v0.25.11)
   KEYRGB_BOOTSTRAP_REF can also be used.
 
 Example:
