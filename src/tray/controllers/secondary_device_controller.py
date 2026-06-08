@@ -164,7 +164,16 @@ def _with_secondary_device(
     error_msg: str,
 ) -> bool:
     def _apply_to_selected_device() -> None:
-        operation(route.get_device())
+        device = route.get_device()
+        try:
+            operation(device)
+        finally:
+            close_fn = getattr(device, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    logger.debug("Error closing secondary device after one-shot action", exc_info=True)
 
     def _handle_recoverable_device_failure(exc: Exception) -> None:
         if is_permission_denied(exc):

@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from types import SimpleNamespace
 
 from src.tray.ui import menu, menu_sections
 
@@ -61,8 +60,10 @@ def test_build_device_context_menu_items_shows_uniform_controls_for_mouse_route(
 
 
 def test_build_device_context_menu_items_shows_turn_on_when_secondary_route_is_off() -> None:
-    turn_on_action = lambda *_args, **_kwargs: None
-    turn_off_action = lambda *_args, **_kwargs: None
+    def turn_on_action(*_args, **_kwargs):
+        return None
+    def turn_off_action(*_args, **_kwargs):
+        return None
     tray = SimpleNamespace(
         config=SimpleNamespace(
             get_secondary_device_brightness=lambda state_key, *, fallback_keys=(), default=0: 0,
@@ -335,3 +336,71 @@ def test_perkey_profile_callback_propagates_unexpected_errors(monkeypatch: pytes
     assert isinstance(menu_items, list)
     with pytest.raises(AssertionError, match="unexpected perkey bug"):
         menu_items[2].action(None, None)
+
+
+def test_build_device_context_menu_items_falls_back_to_uniform_builder_for_unknown_device_type(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Virtual zone routes (logo/neon/vent) should render uniform controls without needing a dedicated builder."""
+    route = SimpleNamespace(
+        display_name="Logo",
+        supports_uniform_color=True,
+        state_key="ite8258_chassis_logo",
+        config_brightness_attr="ite8258_chassis_logo_brightness",
+    )
+
+    monkeypatch.setattr(
+        menu_sections,
+        "route_for_context_entry",
+        lambda _context_entry: route,
+    )
+
+    tray = SimpleNamespace(
+        config=SimpleNamespace(
+            get_secondary_device_brightness=lambda state_key, *, fallback_keys=(), default=0: 25,
+        ),
+        _on_selected_device_color_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_brightness_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_turn_off_clicked=lambda *_args, **_kwargs: None,
+        _on_selected_device_turn_on_clicked=lambda *_args, **_kwargs: None,
+        _on_support_debug_clicked=lambda *_args, **_kwargs: None,
+        _on_power_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_quit_clicked=lambda *_args, **_kwargs: None,
+    )
+    context_entry = {
+        "key": "ite8258-chassis-logo",
+        "device_type": "logo",
+        "backend_name": "ite8258-chassis-logo",
+        "status": "supported",
+        "text": "Logo",
+    }
+
+    items = menu_sections.build_device_context_menu_items(tray, pystray=_Pystray(), item=_item, context_entry=context_entry)
+
+    assert items[0].text == "Color…"
+    assert items[1].text == "Brightness"
+    assert items[3].text == "Turn Off"
+
+
+def test_build_device_context_menu_items_still_shows_generic_for_unsupported_unknown_device_type() -> None:
+    tray = SimpleNamespace(
+        _on_support_debug_clicked=lambda *_args, **_kwargs: None,
+        _on_power_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
+        _on_quit_clicked=lambda *_args, **_kwargs: None,
+    )
+    context_entry = {
+        "device_type": "fan_controller",
+        "status": "known_unavailable",
+    }
+
+    items = menu_sections.build_device_context_menu_items(tray, pystray=_Pystray(), item=_item, context_entry=context_entry)
+    texts = [entry.text for entry in items if hasattr(entry, "text")]
+
+    assert texts == [
+        "Fan Controller was identified, but it is not currently available for control",
+        "Support Tools…",
+        "Settings",
+        "Quit",
+    ]

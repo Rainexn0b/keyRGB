@@ -8,6 +8,11 @@ from ._device_status import (
     backend_status_suffix,
     format_hex_id,
 )
+from src.tray.secondary_device_routes import (
+    SecondaryDeviceRoute,
+    iter_virtual_routes,
+)
+
 from ._menu_status_secondary_devices import (
     DeviceContextEntry,
     secondary_device_context_entry,
@@ -188,6 +193,24 @@ def keyboard_status_text(
     return f"Keyboard: {display_name}{status_suffix}"
 
 
+def _virtual_device_context_entry(route: SecondaryDeviceRoute) -> DeviceContextEntry:
+    return {
+        "key": route.backend_name,
+        "device_type": route.device_type,
+        "backend_name": route.backend_name,
+        "status": "supported",
+        "text": route.display_name,
+    }
+
+
+def _parent_backend_is_available(route: SecondaryDeviceRoute) -> bool:
+    try:
+        backend = route.get_backend()
+        return bool(getattr(backend, "is_available", lambda: False)())
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        return False
+
+
 def device_context_entries(
     tray: object,
     *,
@@ -211,6 +234,10 @@ def device_context_entries(
         entry = secondary_device_context_entry(candidate)
         if entry is not None:
             entries.append(entry)
+
+    for route in iter_virtual_routes():
+        if _parent_backend_is_available(route):
+            entries.append(_virtual_device_context_entry(route))
 
     return entries
 

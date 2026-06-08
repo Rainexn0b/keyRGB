@@ -326,6 +326,10 @@ Select **Hardware support / diagnostics** and paste the JSON output from step 1.
 
 `keyrgb-diagnostics` attempts to sanitize output, but please review the JSON before posting to ensure no personal paths/names are included.
 
+## Acknowledgements
+
+KeyRGB is an independent platform with its own backend abstraction, power-management engine, and udev system. Some backend implementations were informed by device-support research from the Linux RGB community, including OpenRGB. Where OpenRGB data informed an implementation, the backend was independently reimplemented in Python for KeyRGB's custom layer. KeyRGB does not vendor, wrap, or directly reuse OpenRGB source code.
+
 ## License
 
 GPL-2.0-or-later.

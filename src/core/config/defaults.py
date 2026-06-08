@@ -21,6 +21,14 @@ DEFAULTS: dict = {
     # future mouse sysfs backends. Kept alongside the legacy lightbar fields so
     # older config consumers continue to work.
     "secondary_device_state": {},
+    # Lenovo Gen10 ITE 8258 chassis zone device defaults. These are virtual
+    # routes sharing the 0x048d:0xc197 composite controller with the keyboard.
+    "ite8258_chassis_logo_brightness": 25,
+    "ite8258_chassis_logo_color": [255, 0, 0],
+    "ite8258_chassis_neon_brightness": 25,
+    "ite8258_chassis_neon_color": [0, 255, 0],
+    "ite8258_chassis_vent_brightness": 25,
+    "ite8258_chassis_vent_color": [0, 0, 255],
     # Direction for directional effects (wave, snake). None = default direction.
     "direction": None,
     # Manual highlight color for reactive typing effects.

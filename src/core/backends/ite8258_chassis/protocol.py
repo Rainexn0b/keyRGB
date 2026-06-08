@@ -304,6 +304,11 @@ NUM_KEYS = len(KEYBOARD_LED_IDS)
 KEYBOARD_NUM_ROWS = NUM_ROWS
 KEYBOARD_NUM_COLS = NUM_COLS
 
+# WARNING: The zone LED IDs below are specific to the Lenovo Legion Pro 7 Gen10
+# (0x048d:0xc197).  A different laptop using the ITE 8258 chip may use entirely
+# different LED IDs for its logo, neon strip, and vent zones.  These constants
+# should be treated as product-variant data, not universal ITE 8258 constants.
+
 LOGO_LED_IDS: tuple[int, ...] = (0x05DD,)
 VENT_LED_IDS: tuple[int, ...] = (
     0x03E9,
@@ -602,7 +607,16 @@ def build_save_profile_reports(profile_id: int, groups: Sequence[Ite8258ChassisG
 
 
 def build_uniform_static_groups(color: object) -> tuple[Ite8258ChassisGroup, ...]:
+    return build_uniform_static_groups_for_leds(KEYBOARD_LED_IDS, color)
+
+
+def build_uniform_static_groups_for_leds(
+    led_ids: tuple[int, ...],
+    color: object,
+) -> tuple[Ite8258ChassisGroup, ...]:
     rgb = _coerce_rgb(color)
+    if not led_ids:
+        return ()
     return (
         Ite8258ChassisGroup(
             mode=MODE_STATIC,
@@ -611,7 +625,7 @@ def build_uniform_static_groups(color: object) -> tuple[Ite8258ChassisGroup, ...
             direction=0x00,
             color_mode=COLOR_MODE_CUSTOM,
             colors=(rgb,),
-            leds=KEYBOARD_LED_IDS,
+            leds=tuple(int(led_id) & 0xFFFF for led_id in led_ids),
         ),
     )
 

@@ -53,7 +53,15 @@ class _CachedSecondarySoftwareTarget:
         self._with_device(lambda device: device.turn_off())
 
     def _invalidate_cached_device(self) -> None:
+        device = self._device
         self._device = None
+        if device is not None:
+            close_fn = getattr(device, "close", None)
+            if callable(close_fn):
+                try:
+                    close_fn()
+                except (OSError, RuntimeError, ValueError):
+                    pass
 
     def _with_device(self, operation: Callable[[_LightbarDeviceProtocol], None]) -> None:
         with self._lock:

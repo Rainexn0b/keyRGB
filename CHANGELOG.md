@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.26.0 (2026-06-08)
+
+- Architecture/Shared Transport: Introduce `SharedHidrawTransportManager` to provide reference-counted, thread-safe shared hidraw access with per-backend write locking. Keyboard and chassis zone devices now open a single transport per backend and vend lightweight proxies, eliminating redundant `open/close` cycles and preventing cross-device write collisions on composite controllers.
+- Backends/ITE8258-Chassis: Extend `ite8258-chassis` with zone-scoped device facades (`logo`, `neon`, `vent`) using the shared transport manager. Zone `turn_off()` writes black static groups scoped to the zone's LED subset only, and zone `close()` releases the transport proxy back to the shared manager.
+- Backends/ITE8258-Chassis: Add `build_uniform_static_groups_for_leds()` helper for arbitrary LED subsets, and update chassis zone constants to confirmed 16-bit LED IDs for the Legion Pro 7 Gen10 (`0x048d:0xc197`). Add clarifying comments that these IDs are product-specific and future variants will need a `ChassisVariant` registry.
+- Tray/Secondary Devices: Extend `SecondaryDeviceRoute` with `parent_backend_name`, `zone_key`, `supports_independent_brightness`, and `shares_primary_brightness`. Register static virtual routes for `ite8258-chassis` zones so the tray recognizes them as controllable secondary devices.
+- Tray/Secondary Devices: Refactor one-shot device acquisition (`_with_secondary_device`) to wrap `route.get_device()` in `try/finally` with `device.close()`, preventing transport leaks when zone facades are used.
+- Tray/Software Target: Integrate virtual zone routes into the software-effect fan-out path. Cached secondary software targets now call `close()` on the old device during invalidation, ensuring shared transport proxies are released promptly.
+- Tray/Menu: Generalize the secondary-device context menu so any route advertising `supports_uniform_color=True` receives the uniform-color builder, replacing the previous lightbar-only hardcoding.
+- Diagnostics/Hardware Validation: Add `scripts/debug/ite8258-chassis-zone-test.py` for standalone hardware validation of composite zone control on `0x048d:0xc197`. Documented as experimental/unvalidated pending external tester confirmation.
+- Tests: Add unit coverage for `ite8258_chassis` zone device static groups, zone turn-off scoped behavior, backend `get_zone_device` routing, and tray menu section changes for generic uniform-color builders.
+
+
 ## 0.25.11 (2026-06-03)
 
 - Backends/ITE8258-Chassis: Fix two protocol discrepancies found against the independent 83F5 working implementation. Direction encoding is corrected (`left=0x04`, `right=0x03` — was swapped). Header framing now uses fixed report size (`960` / `0x03C0` in bytes 2–3) instead of dynamic payload length, matching the proven hardware behavior.

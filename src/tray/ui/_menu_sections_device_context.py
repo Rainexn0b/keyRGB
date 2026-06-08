@@ -245,7 +245,15 @@ def build_device_context_menu_items(
     """Build a selected device-context surface for non-keyboard devices."""
 
     device_type = str(context_entry.get("device_type") or "").strip().lower()
-    builder = _DEVICE_CONTEXT_MENU_BUILDERS.get(device_type, _build_generic_device_context_menu_items)
+    builder = _DEVICE_CONTEXT_MENU_BUILDERS.get(device_type)
+
+    if builder is None:
+        route = route_for_context_entry(context_entry)
+        if route is not None and bool(route.supports_uniform_color):
+            builder = _build_uniform_secondary_context_menu_items
+        else:
+            builder = _build_generic_device_context_menu_items
+
     return builder(
         tray,
         pystray=pystray,
