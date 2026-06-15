@@ -20,6 +20,7 @@ from ._runtime import run_idle_power_iteration
 if TYPE_CHECKING:
     from src.tray.protocols import IdlePowerTrayProtocol
 
+    from ._input_idle import InputIdleTracker
     from ._runtime import IdlePollLoopState
     from .policy import IdleAction
     from .sensors import BacklightState
@@ -188,6 +189,36 @@ def _read_logind_idle_seconds(*, session_id: str) -> Optional[float]:
     )
 
 
+def _read_desktop_dim_timeout(on_ac_power: Optional[bool]) -> Optional[float]:
+    from ._desktop_timeout import read_kde_dim_timeout
+
+    return read_kde_dim_timeout(on_ac_power)
+
+
+def _create_input_idle_tracker() -> "InputIdleTracker":
+    from ._input_idle import InputIdleTracker
+
+    return InputIdleTracker()
+
+
+def _read_input_idle_seconds(tracker: "InputIdleTracker") -> Optional[float]:
+    return tracker.seconds_since_activity()
+
+
+def _create_wayland_idle_tracker(timeout_ms: int) -> Optional[object]:
+    from ._wayland_idle import create_wayland_idle_tracker
+
+    return create_wayland_idle_tracker(timeout_ms=timeout_ms)
+
+
+def _read_wayland_idle(tracker: object) -> Optional[bool]:
+    from ._wayland_idle import WaylandIdleTracker
+
+    if not isinstance(tracker, WaylandIdleTracker):
+        return None
+    return tracker.is_idle()
+
+
 def _restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     from ._actions import restore_from_idle
 
@@ -302,6 +333,11 @@ def start_idle_power_polling(
             read_screen_off_state_drm_fn=_read_screen_off_state_drm,
             debounce_dim_and_screen_off_fn=_debounce_dim_and_screen_off,
             read_logind_idle_seconds_fn=_read_logind_idle_seconds,
+            read_desktop_dim_timeout_fn=_read_desktop_dim_timeout,
+            create_wayland_idle_tracker_fn=_create_wayland_idle_tracker,
+            read_wayland_idle_fn=_read_wayland_idle,
+            create_input_idle_tracker_fn=_create_input_idle_tracker,
+            read_input_idle_seconds_fn=_read_input_idle_seconds,
             effective_screen_dim_sync_enabled_fn=_effective_screen_dim_sync_enabled,
             compute_idle_action_fn=_compute_idle_action,
             build_idle_action_key_fn=_build_idle_action_key,

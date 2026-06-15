@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import os
-from typing import TYPE_CHECKING, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from src.tray.protocols import sync_idle_power_state_field
 from src.core.utils.safe_attrs import safe_str_attr
@@ -11,10 +11,12 @@ from src.core.utils.safe_attrs import safe_str_attr
 if TYPE_CHECKING:
     from src.tray.protocols import IdlePowerTrayProtocol
 
+    from ._input_idle import InputIdleTracker
     from ._runtime import IdlePollLoopState
     from .sensors import BacklightState
 else:
     IdlePowerTrayProtocol = object
+    InputIdleTracker = object
 
 
 _IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -141,6 +143,11 @@ def poll_idle_power_loop(
     read_screen_off_state_drm_fn: Callable[[], Optional[bool]],
     debounce_dim_and_screen_off_fn: Callable[..., tuple[Optional[bool], bool, int, int, int]],
     read_logind_idle_seconds_fn: Callable[..., Optional[float]],
+    read_desktop_dim_timeout_fn: Callable[[Optional[bool]], Optional[float]],
+    create_wayland_idle_tracker_fn: Callable[[int], Optional[Any]],
+    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
+    create_input_idle_tracker_fn: Callable[[], InputIdleTracker],
+    read_input_idle_seconds_fn: Callable[[InputIdleTracker], Optional[float]],
     effective_screen_dim_sync_enabled_fn: Callable[[IdlePowerTrayProtocol, bool], bool],
     compute_idle_action_fn: Callable[..., object],
     build_idle_action_key_fn: Callable[..., str],
@@ -165,6 +172,11 @@ def poll_idle_power_loop(
             read_screen_off_state_drm_fn=read_screen_off_state_drm_fn,
             debounce_dim_and_screen_off_fn=debounce_dim_and_screen_off_fn,
             read_logind_idle_seconds_fn=read_logind_idle_seconds_fn,
+            read_desktop_dim_timeout_fn=read_desktop_dim_timeout_fn,
+            create_wayland_idle_tracker_fn=create_wayland_idle_tracker_fn,
+            read_wayland_idle_fn=read_wayland_idle_fn,
+            create_input_idle_tracker_fn=create_input_idle_tracker_fn,
+            read_input_idle_seconds_fn=read_input_idle_seconds_fn,
             effective_screen_dim_sync_enabled_fn=effective_screen_dim_sync_enabled_fn,
             compute_idle_action_fn=compute_idle_action_fn,
             build_idle_action_key_fn=build_idle_action_key_fn,

@@ -18,6 +18,8 @@ from tkinter import ttk
 
 from . import hardware_hint, os_autostart, panels, scrollable_area, settings_state
 
+import importlib
+
 from src.core import config as core_config
 from src.core.power.system import PowerMode
 from src.gui import theme as gui_theme
@@ -46,6 +48,20 @@ apply_keyrgb_window_icon = window_icon.apply_keyrgb_window_icon
 load_settings_values = settings_state.load_settings_values
 SettingsValues = settings_state.SettingsValues
 compute_centered_window_geometry = window_geometry.compute_centered_window_geometry
+
+
+def _detect_idle_power_source() -> str:
+    """Best-effort probe for the idle source the tray would use.
+
+    Uses a dynamic import so the settings GUI does not take a static
+    dependency on tray runtime modules.
+    """
+    try:
+        module = importlib.import_module("src.tray.pollers.idle_power._source_probe")
+        fn = getattr(module, "detect_idle_power_source")
+        return str(fn())
+    except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
+        return "Unknown"
 
 
 _FOOTER_HARDWARE_PROBE_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
@@ -211,6 +227,7 @@ class PowerSettingsGUI:
             var_debounce_enter=self.var_debounce_enter,
             var_debounce_exit=self.var_debounce_exit,
             on_toggle=self._on_toggle,
+            idle_source_label=_detect_idle_power_source(),
         )
 
         self.power_source_panel = PowerSourcePanel(

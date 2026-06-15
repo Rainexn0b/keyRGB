@@ -66,7 +66,7 @@ def test_backlight_state_baselines_persist_across_ensure_idle_state(tmp_path) ->
     """
     import src.tray.pollers.idle_power.polling as ipp
     from src.tray.pollers.idle_power._runtime import IdlePollLoopState, run_idle_power_iteration
-    from src.tray.pollers.idle_power.sensors import BacklightState, read_dimmed_state
+    from src.tray.pollers.idle_power.sensors import read_dimmed_state
 
     backlight = tmp_path / "sys" / "class" / "backlight" / "intel_backlight"
     backlight.mkdir(parents=True, exist_ok=True)
@@ -115,6 +115,11 @@ def test_backlight_state_baselines_persist_across_ensure_idle_state(tmp_path) ->
             kwargs["screen_off_true_streak"],
         ),
         read_logind_idle_seconds_fn=lambda **_kwargs: None,
+        read_desktop_dim_timeout_fn=lambda _on_ac: None,
+        create_wayland_idle_tracker_fn=lambda _timeout_ms: None,
+        read_wayland_idle_fn=lambda _tracker: None,
+        create_input_idle_tracker_fn=lambda: None,
+        read_input_idle_seconds_fn=lambda _tracker: None,
         effective_screen_dim_sync_enabled_fn=lambda _tray, requested_enabled: requested_enabled,
         compute_idle_action_fn=lambda **_kwargs: None,
         build_idle_action_key_fn=lambda **_kwargs: "none",
@@ -143,6 +148,11 @@ def test_backlight_state_baselines_persist_across_ensure_idle_state(tmp_path) ->
             kwargs["screen_off_true_streak"],
         ),
         read_logind_idle_seconds_fn=lambda **_kwargs: None,
+        read_desktop_dim_timeout_fn=lambda _on_ac: None,
+        create_wayland_idle_tracker_fn=lambda _timeout_ms: None,
+        read_wayland_idle_fn=lambda _tracker: None,
+        create_input_idle_tracker_fn=lambda: None,
+        read_input_idle_seconds_fn=lambda _tracker: None,
         effective_screen_dim_sync_enabled_fn=lambda _tray, requested_enabled: requested_enabled,
         compute_idle_action_fn=lambda **_kwargs: None,
         build_idle_action_key_fn=lambda **_kwargs: "none",
@@ -562,6 +572,9 @@ def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -
 
     monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
 
+    # Avoid connecting to the real Wayland compositor during unit tests.
+    monkeypatch.setattr(ipp, "_create_wayland_idle_tracker", lambda _timeout_ms: None)
+
     # Force dimmed True and screen_off False.
     monkeypatch.setattr(ipp, "_read_dimmed_state", lambda _tray: True)
     monkeypatch.setattr(ipp, "_read_screen_off_state_drm", lambda: False)
@@ -628,6 +641,9 @@ def test_start_idle_power_polling_suppresses_dim_sync_for_asusctl_backend(monkey
 
     monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
 
+    # Avoid connecting to the real Wayland compositor during unit tests.
+    monkeypatch.setattr(ipp, "_create_wayland_idle_tracker", lambda _timeout_ms: None)
+
     monkeypatch.setattr(ipp, "_read_dimmed_state", lambda _tray: True)
     monkeypatch.setattr(ipp, "_read_screen_off_state_drm", lambda: False)
     monkeypatch.setattr(ipp, "_get_session_id", lambda: None)
@@ -683,6 +699,9 @@ def test_start_idle_power_polling_allows_dim_sync_for_asusctl_with_env_override(
         return t
 
     monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
+
+    # Avoid connecting to the real Wayland compositor during unit tests.
+    monkeypatch.setattr(ipp, "_create_wayland_idle_tracker", lambda _timeout_ms: None)
 
     monkeypatch.setattr(ipp, "_read_dimmed_state", lambda _tray: True)
     monkeypatch.setattr(ipp, "_read_screen_off_state_drm", lambda: False)

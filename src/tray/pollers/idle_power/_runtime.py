@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
 from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_float_field
 
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
+from ._input_idle import InputIdleTracker
 from .policy import IdleAction
 from .sensors import BacklightState
 
@@ -25,6 +26,8 @@ class IdlePollLoopState:
     last_on_ac_power: Optional[bool] = None
     last_power_source_change_at: float = 0.0
     backlight_state: BacklightState = field(default_factory=BacklightState)
+    input_idle_tracker: InputIdleTracker | None = None
+    wayland_idle_tracker: object | None = None
 
 
 def _run_idle_power_runtime_boundary_best_effort(operation: Callable[[], None]) -> None:
@@ -137,6 +140,86 @@ def _read_session_idle_state(
     return bool(float(idle_s) >= float(idle_timeout_s))
 
 
+def _read_wayland_dimmed_state(
+    *,
+    loop_state: IdlePollLoopState,
+    timeout_s: float,
+    create_wayland_idle_tracker_fn: Callable[[int], Optional[Any]],
+    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
+) -> Optional[bool]:
+    timeout_ms = int(float(timeout_s) * 1000)
+    if timeout_ms <= 0:
+        return None
+
+    if loop_state.wayland_idle_tracker is None:
+        try:
+            loop_state.wayland_idle_tracker = create_wayland_idle_tracker_fn(timeout_ms)
+        except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+            loop_state.wayland_idle_tracker = None
+            return None
+
+    tracker = loop_state.wayland_idle_tracker
+    if tracker is None:
+        return None
+
+    try:
+        set_timeout_ms = getattr(tracker, "set_timeout_ms", None)
+        if callable(set_timeout_ms):
+            set_timeout_ms(timeout_ms)
+    except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+        pass
+
+    return read_wayland_idle_fn(tracker)
+
+
+def _read_desktop_dimmed_state(
+    *,
+    loop_state: IdlePollLoopState,
+    on_ac_power: Optional[bool],
+    read_desktop_dim_timeout_fn: Callable[[Optional[bool]], Optional[float]],
+    create_wayland_idle_tracker_fn: Callable[[int], Optional[Any]],
+    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
+    create_input_idle_tracker_fn: Callable[[], InputIdleTracker],
+    read_input_idle_seconds_fn: Callable[[InputIdleTracker], Optional[float]],
+) -> tuple[Optional[bool], Optional[bool]]:
+    """Use KDE/system dim timeout + session idle as the primary dim signal.
+
+    Prefers the Wayland idle notifier when available (it sees touchpad and
+    other input devices that raw evdev cannot).  Falls back to evdev input
+    idle on X11 or when the compositor does not expose the protocol.
+
+    Returns (dimmed, session_idle).  If either the timeout or the idle
+    source is unavailable, returns (None, None) so the caller can fall back.
+    """
+
+    timeout_s = read_desktop_dim_timeout_fn(on_ac_power)
+    if timeout_s is None:
+        return None, None
+
+    wayland_idle = _read_wayland_dimmed_state(
+        loop_state=loop_state,
+        timeout_s=timeout_s,
+        create_wayland_idle_tracker_fn=create_wayland_idle_tracker_fn,
+        read_wayland_idle_fn=read_wayland_idle_fn,
+    )
+    if wayland_idle is not None:
+        dimmed = bool(wayland_idle)
+        return dimmed, dimmed
+
+    if loop_state.input_idle_tracker is None:
+        try:
+            loop_state.input_idle_tracker = create_input_idle_tracker_fn()
+        except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+            return None, None
+
+    input_idle_s = read_input_idle_seconds_fn(loop_state.input_idle_tracker)
+    if input_idle_s is None:
+        return None, None
+
+    dimmed = bool(float(input_idle_s) >= float(timeout_s))
+    return dimmed, dimmed
+
+
 def run_idle_power_iteration(
     tray: IdlePowerTrayProtocol,
     *,
@@ -149,6 +232,11 @@ def run_idle_power_iteration(
     read_screen_off_state_drm_fn: Callable[[], Optional[bool]],
     debounce_dim_and_screen_off_fn: Callable[..., tuple[Optional[bool], bool, int, int, int]],
     read_logind_idle_seconds_fn: Callable[..., Optional[float]],
+    read_desktop_dim_timeout_fn: Callable[[Optional[bool]], Optional[float]],
+    create_wayland_idle_tracker_fn: Callable[[int], Optional[object]],
+    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
+    create_input_idle_tracker_fn: Callable[[], InputIdleTracker],
+    read_input_idle_seconds_fn: Callable[[InputIdleTracker], Optional[float]],
     effective_screen_dim_sync_enabled_fn: Callable[[IdlePowerTrayProtocol, bool], bool],
     compute_idle_action_fn: Callable[..., IdleAction],
     build_idle_action_key_fn: Callable[..., str],
@@ -167,7 +255,25 @@ def run_idle_power_iteration(
         now=now,
     )
 
-    dimmed = read_dimmed_state_fn(loop_state.backlight_state)
+    # Primary dim signal: system dim timeout + session idle.  On Wayland the
+    # compositor's idle notifier is preferred because it sees touchpads and
+    # other devices that raw evdev cannot; otherwise we fall back to evdev.
+    on_ac_power = read_on_ac()
+    dimmed, session_idle = _read_desktop_dimmed_state(
+        loop_state=loop_state,
+        on_ac_power=on_ac_power,
+        read_desktop_dim_timeout_fn=read_desktop_dim_timeout_fn,
+        create_wayland_idle_tracker_fn=create_wayland_idle_tracker_fn,
+        read_wayland_idle_fn=read_wayland_idle_fn,
+        create_input_idle_tracker_fn=create_input_idle_tracker_fn,
+        read_input_idle_seconds_fn=read_input_idle_seconds_fn,
+    )
+
+    # Fallback dim signal: relative backlight brightness drop.  Used when the
+    # desktop timeout or evdev input idle is unavailable.
+    if dimmed is None:
+        dimmed = read_dimmed_state_fn(loop_state.backlight_state)
+
     screen_off = bool(loop_state.backlight_state.screen_off) or bool(read_screen_off_state_drm_fn())
 
     (
@@ -198,14 +304,17 @@ def run_idle_power_iteration(
     dim_sync_enabled = effective_screen_dim_sync_enabled_fn(tray, bool(dim_sync_enabled_requested))
     dim_sync_mode = safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off"
     dim_temp_brightness = safe_int_attr(tray.config, "screen_dim_temp_brightness", default=5, min_v=1, max_v=50)
-    session_idle: Optional[bool] = None
-    restore_candidate = bool(dimmed is False and (bool(tray.is_off) or bool(tray._dim_temp_active)))
-    if dimmed is None or restore_candidate:
-        session_idle = _read_session_idle_state(
-            session_id=session_id,
-            idle_timeout_s=float(idle_timeout_s),
-            read_logind_idle_seconds_fn=read_logind_idle_seconds_fn,
-        )
+
+    # Tertiary fallback: logind session idle (used when neither the desktop
+    # timeout/input-idle path nor the brightness heuristic could determine state).
+    if session_idle is None:
+        restore_candidate = bool(dimmed is False and (bool(tray.is_off) or bool(tray._dim_temp_active)))
+        if dimmed is None or restore_candidate:
+            session_idle = _read_session_idle_state(
+                session_id=session_id,
+                idle_timeout_s=float(idle_timeout_s),
+                read_logind_idle_seconds_fn=read_logind_idle_seconds_fn,
+            )
 
     if dimmed is None and session_idle is not None:
         dimmed = bool(session_idle)

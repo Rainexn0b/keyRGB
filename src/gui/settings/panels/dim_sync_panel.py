@@ -21,6 +21,7 @@ class DimSyncPanel:
         var_debounce_enter: tk.IntVar,
         var_debounce_exit: tk.IntVar,
         on_toggle: Callable[[], None],
+        idle_source_label: str = "Unknown",
     ) -> None:
         self.var_dim_sync_enabled = var_dim_sync_enabled
         self.var_dim_sync_mode = var_dim_sync_mode
@@ -28,14 +29,15 @@ class DimSyncPanel:
         self.var_debounce_enter = var_debounce_enter
         self.var_debounce_exit = var_debounce_exit
         self._on_toggle = on_toggle
+        self._idle_source_label = str(idle_source_label)
 
-        dim_title = ttk.Label(parent, text="Screen dim/brightness sync", font=("Sans", 11, "bold"))
+        dim_title = ttk.Label(parent, text="Screen idle/blanking sync", font=("Sans", 11, "bold"))
         dim_title.pack(anchor="w", pady=(0, 6))
 
         dim_desc = ttk.Label(
             parent,
             text=(
-                "React to screen dimming or brightness changes by turning keyboard LEDs off "
+                "React to screen blanking or session idle by turning keyboard LEDs off "
                 "or dropping them to a temporary brightness."
             ),
             font=("Sans", 9),
@@ -44,9 +46,16 @@ class DimSyncPanel:
         )
         dim_desc.pack(anchor="w", fill="x", pady=(0, 8))
 
+        self.lbl_idle_source = ttk.Label(
+            parent,
+            text=f"Idle source: {self._idle_source_label}",
+            font=("Sans", 8),
+        )
+        self.lbl_idle_source.pack(anchor="w", pady=(0, 8))
+
         self.chk_dim_sync = ttk.Checkbutton(
             parent,
-            text="Sync keyboard lighting with screen dimming/brightness",
+            text="Sync keyboard lighting with screen idle/blanking",
             variable=self.var_dim_sync_enabled,
             command=self._on_toggle,
         )
@@ -99,7 +108,7 @@ class DimSyncPanel:
         debounce_frame.pack(fill="x", pady=(10, 0))
         debounce_desc = ttk.Label(
             debounce_frame,
-            text="Delay before reacting to screen dimming/brightening (polls x 0.5s each).",
+            text="Delay before reacting to screen idle/blanking (polls x 0.5s each).",
             font=("Sans", 8),
         )
         debounce_desc.pack(anchor="w", pady=(0, 4))
@@ -145,6 +154,9 @@ class DimSyncPanel:
             self.spn_exit,
         ):
             w.configure(state=state)
+
+        if self.lbl_idle_source is not None:
+            self.lbl_idle_source.configure(state=state)
 
         if (
             power_management_enabled

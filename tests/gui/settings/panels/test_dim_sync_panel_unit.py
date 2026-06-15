@@ -76,9 +76,10 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
         on_toggle=lambda: toggle_calls.append("toggle"),
     )
 
-    assert labels[0].kwargs["text"] == "Screen dim/brightness sync"
-    assert labels[1].kwargs["text"].startswith("React to screen dimming or brightness changes")
-    assert checks[0].kwargs["text"] == "Sync keyboard lighting with screen dimming/brightness"
+    assert labels[0].kwargs["text"] == "Screen idle/blanking sync"
+    assert labels[1].kwargs["text"].startswith("React to screen blanking or session idle")
+    assert labels[2].kwargs["text"] == "Idle source: Unknown"
+    assert checks[0].kwargs["text"] == "Sync keyboard lighting with screen idle/blanking"
     assert radios[0].kwargs["value"] == "off"
     assert radios[1].kwargs["value"] == "temp"
     assert panel.lbl_dim_temp_val.kwargs["text"] == "17"
@@ -114,6 +115,7 @@ def _make_panel(*, dim_sync_enabled: bool, dim_sync_mode: str) -> dim_sync_panel
     panel.scale_dim_temp = _FakeWidget()
     panel.spn_enter = _FakeWidget()
     panel.spn_exit = _FakeWidget()
+    panel.lbl_idle_source = _FakeWidget()
     return panel
 
 
@@ -128,6 +130,7 @@ def test_apply_enabled_state_disables_all_controls_when_power_management_disable
     assert panel.scale_dim_temp.options["state"] == "disabled"
     assert panel.spn_enter.options["state"] == "disabled"
     assert panel.spn_exit.options["state"] == "disabled"
+    assert panel.lbl_idle_source.options["state"] == "disabled"
 
 
 def test_apply_enabled_state_disables_temp_scale_when_dim_sync_is_disabled() -> None:
@@ -141,6 +144,7 @@ def test_apply_enabled_state_disables_temp_scale_when_dim_sync_is_disabled() -> 
     assert panel.scale_dim_temp.options["state"] == "disabled"
     assert panel.spn_enter.options["state"] == "normal"
     assert panel.spn_exit.options["state"] == "normal"
+    assert panel.lbl_idle_source.options["state"] == "normal"
 
 
 def test_apply_enabled_state_enables_temp_scale_for_temp_mode() -> None:
@@ -167,6 +171,36 @@ def test_apply_enabled_state_disables_temp_scale_for_off_mode() -> None:
     assert panel.scale_dim_temp.options["state"] == "disabled"
     assert panel.spn_enter.options["state"] == "normal"
     assert panel.spn_exit.options["state"] == "normal"
+    assert panel.lbl_idle_source.options["state"] == "normal"
+
+
+def test_init_uses_idle_source_label_when_provided(monkeypatch) -> None:
+    labels: list[_FakeWidget] = []
+    monkeypatch.setattr(
+        dim_sync_panel,
+        "ttk",
+        SimpleNamespace(
+            Label=lambda parent=None, **kwargs: labels.append(_FakeWidget(parent, **kwargs)) or labels[-1],
+            Checkbutton=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+            Radiobutton=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+            Frame=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+            Scale=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+            Spinbox=lambda parent=None, **kwargs: _FakeWidget(parent, **kwargs),
+        ),
+    )
+
+    dim_sync_panel.DimSyncPanel(
+        object(),
+        var_dim_sync_enabled=_FakeVar(True),
+        var_dim_sync_mode=_FakeVar("off"),
+        var_dim_temp_brightness=_FakeVar(10.0),
+        var_debounce_enter=_FakeVar(1),
+        var_debounce_exit=_FakeVar(1),
+        on_toggle=lambda: None,
+        idle_source_label="Wayland compositor idle",
+    )
+
+    assert labels[2].kwargs["text"] == "Idle source: Wayland compositor idle"
 
 
 def test_set_label_int_updates_label_with_integer_text() -> None:

@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.27.0 (2026-06-15)
+
+- Tray/Idle: Add Wayland `ext-idle-notify-v1` idle tracker as the primary idle source on Wayland compositors. This fixes touchpad motion not waking the keyboard after dimming on KDE Plasma Wayland, where KWin/libinput holds an exclusive evdev grab that hides the touchpad from raw evdev readers.
+- Tray/Idle: Keep evdev input-idle, brightness heuristic, and logind fallbacks so the same install works on X11, SSH sessions, and compositors without `ext-idle-notify-v1`.
+- Settings/UI: Display the active idle-power source (e.g., "Wayland compositor idle", "evdev input devices") in the Screen idle/blanking sync panel when power management is enabled, to simplify future support diagnosis.
+- Settings/UI: Use a dynamic import for the idle-source probe so the settings window does not take a static dependency on tray runtime modules.
+- Tray/Idle: Add a `__del__` fallback to `WaylandIdleTracker` to ensure libwayland proxies are torn down in the correct order if a tracker is garbage collected without an explicit `close()`.
+- Tests: Stop three idle-power polling unit tests from connecting to the real Wayland compositor during test runs.
+- Dependencies: Add `pywayland>=0.4.18` to runtime requirements.
+
 ## 0.26.0 (2026-06-08)
 
 - Architecture/Shared Transport: Introduce `SharedHidrawTransportManager` to provide reference-counted, thread-safe shared hidraw access with per-backend write locking. Keyboard and chassis zone devices now open a single transport per backend and vend lightweight proxies, eliminating redundant `open/close` cycles and preventing cross-device write collisions on composite controllers.

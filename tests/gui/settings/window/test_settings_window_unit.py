@@ -364,6 +364,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
 
     monkeypatch.setattr(settings_window, "PowerManagementPanel", make_panel("management"))
     monkeypatch.setattr(settings_window, "DimSyncPanel", make_panel("dim_sync"))
+    monkeypatch.setattr(settings_window, "_detect_idle_power_source", lambda: "Wayland compositor idle")
     monkeypatch.setattr(settings_window, "PowerSourcePanel", make_panel("power_source"))
     monkeypatch.setattr(settings_window, "TimeSchedulerPanel", make_panel("time_scheduler"))
     monkeypatch.setattr(settings_window, "VersionPanel", make_panel("version"))
@@ -418,6 +419,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     )
     assert created["time_scheduler"].args == (gui._middle,)
     assert created["time_scheduler"].kwargs["var_enabled"] is gui.var_scheduler_enabled
+    assert created["dim_sync"].kwargs["idle_source_label"] == "Wayland compositor idle"
     assert created["version"].kwargs["root"] is gui.root
     assert created["version"].kwargs["get_status_label"]() is gui.status
     assert len(separators) == 5
