@@ -36,6 +36,18 @@ def _coerce_led_id(key_id: object) -> int:
     return _coerce_int(key_id) & 0xFFFF
 
 
+def _coerce_led_id_or_none(key_id: object) -> int | None:
+    if isinstance(key_id, tuple):
+        if len(key_id) != 2:
+            raise ValueError("tuple key ids must be (row, col)")
+        row, col = key_id
+        try:
+            return protocol.led_id_from_row_col(int(row), int(col))
+        except ValueError:
+            return None
+    return _coerce_led_id(key_id)
+
+
 def _normalize_effect_name(effect_data: object) -> str:
     if isinstance(effect_data, dict):
         effect_value = effect_data.get("name", effect_data.get("effect", ""))
@@ -131,7 +143,10 @@ class Ite8258ChassisKeyboardDevice:
 
         led_colors: dict[int, tuple[int, int, int]] = {}
         for key_id, color in color_map.items():
-            led_colors[_coerce_led_id(key_id)] = _coerce_rgb(color)
+            led_id = _coerce_led_id_or_none(key_id)
+            if led_id is None:
+                continue
+            led_colors[led_id] = _coerce_rgb(color)
 
         key_colors = protocol.build_static_led_map(led_colors)
         if all(color == (0, 0, 0) for color in key_colors):

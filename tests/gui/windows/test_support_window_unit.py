@@ -550,6 +550,37 @@ def test_save_support_bundle_writes_combined_json(monkeypatch: pytest.MonkeyPatc
     assert window.status_label.options["text"] == "Saved support bundle"
 
 
+def test_save_support_bundle_autocollects_missing_discovery_snapshot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    window = _make_window(diagnostics_json='{"diag": 1}')
+    out_path = tmp_path / "bundle.json"
+    monkeypatch.setattr(support_window.filedialog, "asksaveasfilename", lambda **kwargs: str(out_path))
+    monkeypatch.setattr(
+        support_window,
+        "collect_device_discovery",
+        lambda *, include_usb: {"selected_backend": "ite8258-chassis", "include_usb": include_usb},
+    )
+    monkeypatch.setattr(
+        support_window,
+        "build_support_bundle_payload",
+        lambda *, diagnostics, discovery, supplemental_evidence=None: {
+            "diagnostics": diagnostics,
+            "device_discovery": discovery,
+            "supplemental_evidence": supplemental_evidence,
+            "issue_report": {"template": "experimental-backend-confirmation"},
+        },
+    )
+
+    window.save_support_bundle()
+
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["diagnostics"] == {"diag": 1}
+    assert payload["device_discovery"] == {"selected_backend": "ite8258-chassis", "include_usb": True}
+    assert json.loads(window._discovery_json)["selected_backend"] == "ite8258-chassis"
+    assert window.status_label.options["text"] == "Saved support bundle"
+
+
 def test_save_support_bundle_logs_unexpected_builder_errors(
     monkeypatch: pytest.MonkeyPatch, tmp_path, caplog: pytest.LogCaptureFixture
 ) -> None:
@@ -1154,6 +1185,8 @@ def test_save_support_bundle_builds_job_inputs_without_changing_signature(monkey
     assert seen["asksaveasfilename"] is support_window.filedialog.asksaveasfilename
     assert seen["build_support_bundle_payload"] is support_window.build_support_bundle_payload
     assert seen["logger"] is support_window.logger
+    assert seen["collect_diagnostics_text"] is support_window.collect_diagnostics_text
+    assert seen["collect_device_discovery"] is support_window.collect_device_discovery
 
 
 def test_open_issue_form_builds_job_inputs_without_changing_signature(monkeypatch: pytest.MonkeyPatch) -> None:

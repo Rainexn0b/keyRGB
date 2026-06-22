@@ -261,6 +261,8 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
             asksaveasfilename=filedialog.asksaveasfilename,
             build_support_bundle_payload=build_support_bundle_payload,
             logger=logger,
+            collect_diagnostics_text=collect_diagnostics_text,
+            collect_device_discovery=collect_device_discovery,
         )
 
     def open_issue_form(self) -> None:

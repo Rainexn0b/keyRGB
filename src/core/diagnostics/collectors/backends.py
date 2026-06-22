@@ -61,6 +61,49 @@ def _provider_for_backend_name(name: str) -> str | None:
     return None
 
 
+def _capabilities_for_backend(backend: object) -> dict[str, bool] | None:
+    capabilities_fn = getattr(backend, "capabilities", None)
+    if not callable(capabilities_fn):
+        return None
+    try:
+        capabilities = capabilities_fn()
+    except _BACKEND_METADATA_ERRORS as exc:
+        _log_snapshot_boundary("Failed to collect backend capabilities during diagnostics collection", exc)
+        return None
+
+    out: dict[str, bool] = {}
+    for name in ("per_key", "color", "hardware_effects", "palette"):
+        try:
+            out[name] = bool(getattr(capabilities, name))
+        except _BACKEND_METADATA_ERRORS:
+            continue
+    return out or None
+
+
+def _dimensions_for_backend(backend: object) -> dict[str, int] | None:
+    dimensions_fn = getattr(backend, "dimensions", None)
+    if not callable(dimensions_fn):
+        return None
+    try:
+        rows, cols = dimensions_fn()
+    except _BACKEND_METADATA_ERRORS as exc:
+        _log_snapshot_boundary("Failed to collect backend dimensions during diagnostics collection", exc)
+        return None
+    return {"rows": int(rows), "cols": int(cols)}
+
+
+def _diagnostics_for_backend(backend: object) -> dict[str, Any] | None:
+    diagnostics_fn = getattr(backend, "diagnostics", None)
+    if not callable(diagnostics_fn):
+        return None
+    try:
+        payload = diagnostics_fn()
+    except _BACKEND_METADATA_ERRORS as exc:
+        _log_snapshot_boundary("Failed to collect backend-specific diagnostics", exc)
+        return None
+    return dict(payload) if isinstance(payload, dict) and payload else None
+
+
 @contextmanager
 def _disable_usb_scan_under_pytest_if_needed() -> Iterator[None]:
     did_override_usb_scan = False
@@ -142,6 +185,18 @@ def _probe_backend(backend: object) -> dict[str, Any]:
     if provider is not None:
         entry["provider"] = provider
 
+    capabilities = _capabilities_for_backend(backend)
+    if capabilities is not None:
+        entry["capabilities"] = capabilities
+
+    dimensions = _dimensions_for_backend(backend)
+    if dimensions is not None:
+        entry["dimensions"] = dimensions
+
+    backend_diagnostics = _diagnostics_for_backend(backend)
+    if backend_diagnostics is not None:
+        entry["diagnostics"] = backend_diagnostics
+
     if identifiers:
         try:
             entry["identifiers"] = dict(identifiers)
@@ -176,6 +231,9 @@ def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str
                 "experimental_evidence": probe.get("experimental_evidence"),
                 "reason": probe.get("reason"),
                 "identifiers": probe.get("identifiers"),
+                "capabilities": probe.get("capabilities"),
+                "dimensions": probe.get("dimensions"),
+                "diagnostics": probe.get("diagnostics"),
             }
         )
 

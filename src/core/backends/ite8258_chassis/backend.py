@@ -214,6 +214,29 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
     def dimensions(self) -> tuple[int, int]:
         return (protocol.NUM_ROWS, protocol.NUM_COLS)
 
+    def diagnostics(self) -> dict[str, Any]:
+        matrix_cells = int(protocol.NUM_ROWS * protocol.NUM_COLS)
+        mapped_leds = sum(1 for item in protocol.KEYBOARD_MATRIX_MAP if item is not None)
+        return {
+            "keyboard_matrix": {
+                "rows": int(protocol.NUM_ROWS),
+                "cols": int(protocol.NUM_COLS),
+                "matrix_cells": matrix_cells,
+                "mapped_leds": mapped_leds,
+                "keyboard_led_ids": len(protocol.KEYBOARD_LED_IDS),
+                "sparse": mapped_leds < matrix_cells,
+                "sparse_holes": matrix_cells - mapped_leds,
+                "row_mapped_counts": [
+                    sum(
+                        1
+                        for col in range(protocol.NUM_COLS)
+                        if protocol.KEYBOARD_MATRIX_MAP[(row * protocol.NUM_COLS) + col] is not None
+                    )
+                    for row in range(protocol.NUM_ROWS)
+                ],
+            }
+        }
+
     def effects(self) -> dict[str, Any]:
         return {
             "rainbow": _effect_builder("screw_rainbow", extra=("direction",)),

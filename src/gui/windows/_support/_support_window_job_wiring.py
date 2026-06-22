@@ -38,12 +38,19 @@ def build_save_support_bundle_job_kwargs(
     asksaveasfilename: Callable[..., str],
     build_support_bundle_payload: Callable[..., dict[str, object]],
     logger: object,
+    collect_diagnostics_text: Callable[..., str] | None = None,
+    collect_device_discovery: Callable[..., dict[str, object]] | None = None,
 ) -> dict[str, object]:
-    return {
+    kwargs: dict[str, object] = {
         "asksaveasfilename": asksaveasfilename,
         "build_support_bundle_payload": build_support_bundle_payload,
         "logger": logger,
     }
+    if collect_diagnostics_text is not None:
+        kwargs["collect_diagnostics_text"] = collect_diagnostics_text
+    if collect_device_discovery is not None:
+        kwargs["collect_device_discovery"] = collect_device_discovery
+    return kwargs
 
 
 def build_open_issue_form_job_kwargs(
@@ -68,6 +75,8 @@ def dispatch_save_support_bundle_job(
     asksaveasfilename: Callable[..., str],
     build_support_bundle_payload: Callable[..., dict[str, object]],
     logger: object,
+    collect_diagnostics_text: Callable[..., str] | None = None,
+    collect_device_discovery: Callable[..., dict[str, object]] | None = None,
 ) -> None:
     support_jobs.save_support_bundle(
         window,
@@ -75,6 +84,8 @@ def dispatch_save_support_bundle_job(
             asksaveasfilename=asksaveasfilename,
             build_support_bundle_payload=build_support_bundle_payload,
             logger=logger,
+            collect_diagnostics_text=collect_diagnostics_text,
+            collect_device_discovery=collect_device_discovery,
         ),
     )
 

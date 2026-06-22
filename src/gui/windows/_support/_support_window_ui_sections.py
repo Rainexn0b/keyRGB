@@ -238,8 +238,9 @@ def build_bundle_section(
     desc_label = ttk.Label(
         parent,
         text=(
-            "Save a single JSON bundle containing the current diagnostics report, device discovery snapshot, "
-            "supplemental evidence such as backend probe observations, and the generated issue draft."
+            "Save a single JSON bundle containing diagnostics, device discovery, supplemental evidence such as "
+            "backend probe observations, and the generated issue draft. Missing diagnostics or discovery snapshots "
+            "are filled with safe read-only collectors before saving."
         ),
         font=("Sans", 9),
         justify="left",

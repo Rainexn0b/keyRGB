@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.27.1 (2026-06-22)
+
+- Backends/ITE8258-Chassis: Skip sparse and out-of-range tuple keymap gaps when per-key profiles or software effects render generic grids, preventing one unmapped coordinate from aborting the whole Lenovo Gen10 `0x048d:0xc197` keyboard frame.
+- Diagnostics/Support: Include backend capabilities, matrix dimensions, and sparse keyboard metadata in diagnostics and support bundles, including mapped LED counts, sparse-hole counts, and per-row mapping totals.
+- Support Tools/UI: Auto-fill missing diagnostics or device-discovery snapshots before saving a support bundle so exported bundles include hidraw/device-discovery evidence even when the user saves directly.
+
 ## 0.27.0 (2026-06-15)
 
 - Tray/Idle: Add Wayland `ext-idle-notify-v1` idle tracker as the primary idle source on Wayland compositors. This fixes touchpad motion not waking the keyboard after dimming on KDE Plasma Wayland, where KWin/libinput holds an exclusive evdev grab that hides the touchpad from raw evdev readers.

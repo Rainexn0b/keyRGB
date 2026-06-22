@@ -129,6 +129,27 @@ def test_device_set_key_colors_maps_tuple_keys_to_keyboard_led_ids() -> None:
     assert sent[-1][:5].hex() == "07cec00309"
 
 
+def test_device_set_key_colors_skips_sparse_and_generic_grid_gaps() -> None:
+    sent: list[bytes] = []
+    device = Ite8258ChassisKeyboardDevice(sent.append)
+
+    device.set_key_colors(
+        {
+            (0, 0): (0x12, 0x34, 0x56),
+            (1, 10): (0xAA, 0xBB, 0xCC),
+            (0, 20): (0xDD, 0xEE, 0xFF),
+        },
+        brightness=50,
+    )
+
+    report = sent[2]
+    assert b"\x01\x00" in report
+    assert b"\x12\x34\x56" in report
+    assert b"\xAA\xBB\xCC" not in report
+    assert b"\xDD\xEE\xFF" not in report
+    assert sent[-1][:5].hex() == "07cec00309"
+
+
 def test_backend_reports_research_backed_experimental_metadata() -> None:
     backend = Ite8258ChassisBackend()
 
@@ -139,6 +160,16 @@ def test_backend_reports_research_backed_experimental_metadata() -> None:
     assert caps.per_key is True
     assert caps.hardware_effects is True
     assert backend.dimensions() == (protocol.KEYBOARD_NUM_ROWS, protocol.KEYBOARD_NUM_COLS)
+    assert backend.diagnostics()["keyboard_matrix"] == {
+        "rows": 7,
+        "cols": 20,
+        "matrix_cells": 140,
+        "mapped_leds": 101,
+        "keyboard_led_ids": 101,
+        "sparse": True,
+        "sparse_holes": 39,
+        "row_mapped_counts": [20, 18, 17, 17, 15, 11, 3],
+    }
     assert set(backend.effects()) == {
         "rainbow",
         "rainbow_wave",

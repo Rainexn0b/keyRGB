@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import subprocess
-import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -123,6 +122,59 @@ def test_format_diagnostics_text_includes_guided_speed_probe_section() -> None:
     assert "guided_speed_probes:" in text
     assert "sample: ui=1 payload=1 raw=0x01" in text
     assert "Higher UI speed values should look faster on ite8910." in text
+
+
+def test_format_diagnostics_text_includes_backend_capabilities_dimensions_and_matrix() -> None:
+    diag = Diagnostics(
+        dmi={},
+        leds=[],
+        sysfs_leds=[],
+        usb_ids=[],
+        env={},
+        virt={},
+        system={},
+        hints={},
+        app={},
+        power_supply={},
+        backends={
+            "selected": "ite8258-chassis",
+            "requested": "auto",
+            "probes": [
+                {
+                    "name": "ite8258-chassis",
+                    "available": True,
+                    "stability": "experimental",
+                    "experimental_evidence": "reverse_engineered",
+                    "confidence": 83,
+                    "reason": "hidraw device present (/dev/hidraw3)",
+                    "capabilities": {
+                        "per_key": True,
+                        "color": True,
+                        "hardware_effects": True,
+                        "palette": False,
+                    },
+                    "dimensions": {"rows": 7, "cols": 20},
+                    "diagnostics": {
+                        "keyboard_matrix": {
+                            "matrix_cells": 140,
+                            "mapped_leds": 101,
+                            "sparse_holes": 39,
+                            "row_mapped_counts": [20, 18, 17, 17, 15, 11, 3],
+                        }
+                    },
+                }
+            ],
+        },
+        usb_devices=[],
+        config={},
+        process={},
+    )
+
+    text = format_diagnostics_text(diag)
+
+    assert "capabilities: per_key=True color=True hardware_effects=True palette=False" in text
+    assert "dimensions: rows=7 cols=20" in text
+    assert "keyboard_matrix: cells=140 mapped_leds=101 sparse_holes=39" in text
 
 
 def test_diagnostics_typed_config_snapshot_serializes_without_shape_changes() -> None:

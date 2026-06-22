@@ -85,6 +85,30 @@ def _append_backends(lines: list[str], backends: object) -> None:
             if isinstance(ids, Mapping) and ids:
                 for k in sorted(ids.keys()):
                     lines.append(f"      {k}: {ids[k]}")
+            caps = p.get("capabilities")
+            if isinstance(caps, Mapping) and caps:
+                lines.append(
+                    "      capabilities: per_key={per_key} color={color} hardware_effects={hardware_effects} palette={palette}".format(
+                        per_key=caps.get("per_key"),
+                        color=caps.get("color"),
+                        hardware_effects=caps.get("hardware_effects"),
+                        palette=caps.get("palette"),
+                    )
+                )
+            dims = p.get("dimensions")
+            if isinstance(dims, Mapping) and dims:
+                lines.append(f"      dimensions: rows={dims.get('rows')} cols={dims.get('cols')}")
+            diagnostics = p.get("diagnostics")
+            keyboard_matrix = diagnostics.get("keyboard_matrix") if isinstance(diagnostics, Mapping) else None
+            if isinstance(keyboard_matrix, Mapping) and keyboard_matrix:
+                lines.append(
+                    "      keyboard_matrix: cells={cells} mapped_leds={mapped_leds} sparse_holes={sparse_holes} row_mapped_counts={row_mapped_counts}".format(
+                        cells=keyboard_matrix.get("matrix_cells"),
+                        mapped_leds=keyboard_matrix.get("mapped_leds"),
+                        sparse_holes=keyboard_matrix.get("sparse_holes"),
+                        row_mapped_counts=keyboard_matrix.get("row_mapped_counts"),
+                    )
+                )
 
     guided_speed_probes = backends.get("guided_speed_probes")
     if isinstance(guided_speed_probes, Sequence) and not isinstance(guided_speed_probes, str) and guided_speed_probes:
