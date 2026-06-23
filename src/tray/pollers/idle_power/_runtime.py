@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
@@ -11,6 +12,8 @@ from ._input_idle import InputIdleTracker
 from .policy import IdleAction
 from .sensors import BacklightState
 
+
+logger = logging.getLogger(__name__)
 
 _IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _IDLE_POWER_IMPORT_EXCEPTIONS = (ImportError,) + _IDLE_POWER_RUNTIME_EXCEPTIONS
@@ -169,7 +172,22 @@ def _read_wayland_dimmed_state(
     except _IDLE_POWER_RUNTIME_EXCEPTIONS:
         pass
 
-    return read_wayland_idle_fn(tracker)
+    result = read_wayland_idle_fn(tracker)
+    if result is None:
+        # The tracker's Wayland connection is broken (is_idle returned
+        # None after a dispatch/read/flush failure).  Close and drop the
+        # cached tracker so the next poll recreates a fresh connection
+        # instead of reusing a dead proxy for the entire session — which
+        # would silently fall back to the brightness heuristic.
+        try:
+            close = getattr(tracker, "close", None)
+            if callable(close):
+                close()
+        except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+            pass
+        loop_state.wayland_idle_tracker = None
+
+    return result
 
 
 def _read_desktop_dimmed_state(
@@ -181,6 +199,7 @@ def _read_desktop_dimmed_state(
     read_wayland_idle_fn: Callable[[Any], Optional[bool]],
     create_input_idle_tracker_fn: Callable[[], InputIdleTracker],
     read_input_idle_seconds_fn: Callable[[InputIdleTracker], Optional[float]],
+    fallback_timeout_s: float,
 ) -> tuple[Optional[bool], Optional[bool]]:
     """Use KDE/system dim timeout + session idle as the primary dim signal.
 
@@ -188,11 +207,20 @@ def _read_desktop_dimmed_state(
     other input devices that raw evdev cannot).  Falls back to evdev input
     idle on X11 or when the compositor does not expose the protocol.
 
-    Returns (dimmed, session_idle).  If either the timeout or the idle
-    source is unavailable, returns (None, None) so the caller can fall back.
+    When the desktop dim timeout is not configured (e.g. KDE's
+    ``DimDisplayIdleTimeoutSec`` is absent for the active power profile),
+    the ``fallback_timeout_s`` (the general idle timeout) is used instead so
+    that the Wayland tracker / evdev path is still consulted.  This prevents
+    the brightness heuristic from firing on manual screen-brightness changes
+    when a real idle source is available but the desktop dim policy is off.
+
+    Returns (dimmed, session_idle).  If no timeout or idle source is
+    available, returns (None, None) so the caller can fall back.
     """
 
     timeout_s = read_desktop_dim_timeout_fn(on_ac_power)
+    if timeout_s is None:
+        timeout_s = float(fallback_timeout_s) if float(fallback_timeout_s) > 0 else None
     if timeout_s is None:
         return None, None
 
@@ -267,12 +295,17 @@ def run_idle_power_iteration(
         read_wayland_idle_fn=read_wayland_idle_fn,
         create_input_idle_tracker_fn=create_input_idle_tracker_fn,
         read_input_idle_seconds_fn=read_input_idle_seconds_fn,
+        fallback_timeout_s=float(idle_timeout_s),
     )
+
+    dimmed_source = "wayland_or_evdev" if dimmed is not None else "none"
 
     # Fallback dim signal: relative backlight brightness drop.  Used when the
     # desktop timeout or evdev input idle is unavailable.
     if dimmed is None:
         dimmed = read_dimmed_state_fn(loop_state.backlight_state)
+        if dimmed is not None:
+            dimmed_source = "brightness_heuristic"
 
     screen_off = bool(loop_state.backlight_state.screen_off) or bool(read_screen_off_state_drm_fn())
 
@@ -318,6 +351,18 @@ def run_idle_power_iteration(
 
     if dimmed is None and session_idle is not None:
         dimmed = bool(session_idle)
+        dimmed_source = "logind"
+
+    if dimmed is None:
+        dimmed_source = "none"
+
+    logger.debug(
+        "idle_power:dimmed_source source=%s dimmed=%s session_idle=%s screen_off=%s",
+        dimmed_source,
+        dimmed,
+        session_idle,
+        bool(screen_off),
+    )
 
     action = compute_idle_action_fn(
         dimmed=dimmed,

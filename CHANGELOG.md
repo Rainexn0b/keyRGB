@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.27.2 (2026-06-23)
+
+- Tray/Idle: Fix manual screen-brightness changes turning the keyboard off on KDE Plasma Wayland when the KDE dim timeout (`DimDisplayIdleTimeoutSec`) is not configured for the active power profile. Previously, when the dim timeout was absent (e.g. "Dim screen" disabled on battery), the Wayland `ext-idle-notify-v1` tracker was never created and the brightness heuristic took over, interpreting manual brightness slider changes as idle-dim. The Wayland tracker (and evdev fallback) now use the general idle timeout as a fallback when the desktop dim timeout is unavailable, keeping the brightness heuristic as a last resort only.
+- Tray/Idle: Recreate a broken Wayland idle tracker on the next poll instead of caching a dead connection for the entire session. When `is_idle()` returned `None` after a transient dispatch/read/flush failure, the tracker was never replaced, silently falling back to the brightness heuristic for the rest of the session.
+- Tray/Idle: Add `dimmed_source` debug log line (source=wayland_or_evdev|brightness_heuristic|logind|none) per idle-power poll so future logs definitively show which idle source produced the dimmed state.
+
 ## 0.27.1 (2026-06-22)
 
 - Backends/ITE8258-Chassis: Skip sparse and out-of-range tuple keymap gaps when per-key profiles or software effects render generic grids, preventing one unmapped coordinate from aborting the whole Lenovo Gen10 `0x048d:0xc197` keyboard frame.
