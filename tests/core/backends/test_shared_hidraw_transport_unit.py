@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 from collections.abc import Callable, Sequence
+from pathlib import Path
 
 import pytest
 
@@ -87,10 +88,7 @@ def test_multiple_acquires_share_transport_and_close_after_last_release() -> Non
 def test_release_order_does_not_matter() -> None:
     manager, mock, _calls, opener = _make_manager_with_mock()
 
-    proxies: list[HidrawTransportProxy] = [
-        manager.acquire("ite8258-chassis", opener)
-        for _ in range(5)
-    ]
+    proxies: list[HidrawTransportProxy] = [manager.acquire("ite8258-chassis", opener) for _ in range(5)]
 
     for proxy in reversed(proxies):
         proxy.close()
@@ -165,6 +163,33 @@ def test_send_and_write_are_routed_through_underlying_transport() -> None:
 
     assert mock.send_log == [b"feature"]
     assert mock.write_log == [b"output"]
+
+
+def test_shared_proxy_uses_transport_level_pacing_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.core.backends.ite8291.hidraw import HidrawFeatureOutputTransport
+
+    sleeps: list[float] = []
+    ioctl_payloads: list[bytes] = []
+    monkeypatch.setenv("KEYRGB_ITE8258_CHASSIS_REPORT_DELAY_MS", "2")
+    monkeypatch.setattr("src.core.backends._report_pacing.time.sleep", sleeps.append)
+
+    def fake_ioctl(fd: int, request: int, payload: bytearray, mutate_flag: bool) -> None:
+        _ = fd, request, mutate_flag
+        ioctl_payloads.append(bytes(payload))
+
+    monkeypatch.setattr("src.core.backends.ite8291.hidraw.fcntl.ioctl", fake_ioctl)
+
+    transport = HidrawFeatureOutputTransport.__new__(HidrawFeatureOutputTransport)
+    transport.devnode = Path("/dev/hidraw-test")
+    transport._backend_name = "ite8258-chassis"
+    transport._fd = -1
+
+    manager = SharedHidrawTransportManager()
+    proxy = manager.acquire("ite8258-chassis", lambda: transport)
+
+    assert proxy.send_feature_report(b"\x08\x02") == 2
+    assert ioctl_payloads == [b"\x08\x02"]
+    assert sleeps == [0.002]
 
 
 def test_write_output_report_returns_none_when_transport_lacks_method() -> None:

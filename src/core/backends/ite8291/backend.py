@@ -24,7 +24,7 @@ def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
 def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
     from .hidraw import open_matching_hidraw_transport
 
-    return open_matching_hidraw_transport()
+    return open_matching_hidraw_transport(backend_name="ite8291")
 
 
 def _identifiers_for_match(match: HidrawDeviceInfo) -> dict[str, str]:

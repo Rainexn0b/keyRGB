@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.27.3 (2026-07-02)
+
+- Backends/HID: Add shared HID report pacing with a 1 ms default delay and global/per-backend overrides (`KEYRGB_HID_REPORT_DELAY_MS`, `KEYRGB_<BACKEND>_REPORT_DELAY_MS`) to prevent ITE USB controllers from blanking, flickering, or resetting under back-to-back report bursts.
+- Backends/HID: Apply pacing across the ITE USB/hidraw paths, including `ite8291r3`, `ite8291`, zone variants, `ite8910`, `ite8233`, `ite8297`, `ite8258`, and `ite8258-chassis`, while keeping shared hidraw proxies to a single transport-level delay per physical report.
+- Effects/Reactive: Skip duplicate rendered per-key frames for backends that require user-mode reassertion every changed frame, reducing idle/report traffic without dropping changed reactive frames.
+- Diagnostics/Docs: Capture HID pacing env overrides in diagnostics and document the new delay knobs and validation notes.
+
 ## 0.27.2 (2026-06-23)
 
 - Tray/Idle: Fix manual screen-brightness changes turning the keyboard off on KDE Plasma Wayland when the KDE dim timeout (`DimDisplayIdleTimeoutSec`) is not configured for the active power profile. Previously, when the dim timeout was absent (e.g. "Dim screen" disabled on battery), the Wayland `ext-idle-notify-v1` tracker was never created and the brightness heuristic took over, interpreting manual brightness slider changes as idle-dim. The Wayland tracker (and evdev fallback) now use the general idle timeout as a fallback when the desktop dim timeout is unavailable, keeping the brightness heuristic as a last resort only.

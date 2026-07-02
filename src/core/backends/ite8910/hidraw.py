@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.core.backends._report_pacing import sleep_after_hid_report
+
 HIDRAW_PATH_ENV = "KEYRGB_ITE8910_HIDRAW_PATH"
 
 _IOC_NRBITS = 8
@@ -134,9 +136,10 @@ def _os_cloexec_flag_or_zero() -> int:
 
 
 class HidrawFeatureTransport:
-    def __init__(self, devnode: Path) -> None:
+    def __init__(self, devnode: Path, *, backend_name: str | None = None) -> None:
         flags = int(os.O_RDWR) | _os_cloexec_flag_or_zero()
         self.devnode = Path(devnode)
+        self._backend_name = backend_name
         self._fd: int | None = os.open(os.fspath(self.devnode), flags)
 
     def close(self) -> None:
@@ -161,6 +164,7 @@ class HidrawFeatureTransport:
             raise RuntimeError("hidraw transport is closed")
 
         fcntl.ioctl(int(fd), hidiocsfeature(len(payload)), payload, True)
+        sleep_after_hid_report(backend_name=self._backend_name)
         return len(payload)
 
     def __del__(self) -> None:
@@ -176,8 +180,9 @@ def open_matching_hidraw_transport(
     *,
     root: Path | None = None,
     dev_root: Path | None = None,
+    backend_name: str | None = None,
 ) -> tuple[HidrawFeatureTransport, HidrawDeviceInfo]:
     info = find_matching_hidraw_device(vendor_id, product_id, root=root, dev_root=dev_root)
     if info is None:
         raise FileNotFoundError(f"No hidraw device found for 0x{int(vendor_id):04x}:0x{int(product_id):04x}")
-    return HidrawFeatureTransport(info.devnode), info
+    return HidrawFeatureTransport(info.devnode, backend_name=backend_name), info

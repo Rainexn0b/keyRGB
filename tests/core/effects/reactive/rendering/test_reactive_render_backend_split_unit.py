@@ -147,7 +147,7 @@ def test_per_key_reactive_init_once_policy_skips_duplicate_idle_frame() -> None:
     assert kb.calls == []
 
 
-def test_per_key_reactive_reassert_policy_reinitializes_duplicate_idle_frame() -> None:
+def test_per_key_reactive_reassert_policy_skips_duplicate_idle_frame() -> None:
     from src.core.effects.reactive.render import render
 
     kb = _DummyKB(per_key_mode_policy="reassert_every_frame")
@@ -171,10 +171,7 @@ def test_per_key_reactive_reassert_policy_reinitializes_duplicate_idle_frame() -
 
     render(engine, color_map={(0, 0): (255, 255, 255)})
 
-    assert kb.calls == [
-        ("enable_user_mode", 15),
-        ("set_key_colors", 15),
-    ]
+    assert kb.calls == []
 
 
 def test_per_key_reactive_duplicate_frame_cache_keeps_animating_changed_frames() -> None:

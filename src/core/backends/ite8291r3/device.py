@@ -4,12 +4,15 @@ import logging
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
+from src.core.backends._report_pacing import DEFAULT_HID_REPORT_DELAY_S, sleep_after_hid_report
+
 from . import protocol
 
 if TYPE_CHECKING:
     from .usb import PyUsbTransport
 
 _logger = logging.getLogger(__name__)
+
 
 ControlWriter = Callable[[bytes], int | None]
 ControlReader = Callable[[int], bytes | bytearray | list[int]]
@@ -102,6 +105,7 @@ class Ite8291r3KeyboardDevice:
         write_row_data: RowWriter,
         *,
         transport: PyUsbTransport | None = None,
+        report_delay_s: float = DEFAULT_HID_REPORT_DELAY_S,
     ) -> None:
         if not callable(send_control_report):
             raise TypeError("send_control_report must be callable")
@@ -114,11 +118,13 @@ class Ite8291r3KeyboardDevice:
         self._read_control_report = read_control_report
         self._write_row_data = write_row_data
         self._transport = transport
+        self._report_delay_s = max(0.0, float(report_delay_s))
 
     def _send_control(self, report: bytes) -> None:
         result = self._send_control_report(bytes(report))
         if int(result or 0) < 0:
             raise OSError("Could not send ITE 8291r3 control report")
+        sleep_after_hid_report(delay_s=self._report_delay_s)
 
     def _read_control(self, length: int) -> bytes:
         data = self._read_control_report(int(length))
@@ -128,6 +134,7 @@ class Ite8291r3KeyboardDevice:
         result = self._write_row_data(bytes(row_data))
         if int(result or 0) < 0:
             raise OSError("Could not send ITE 8291r3 row data")
+        sleep_after_hid_report(delay_s=self._report_delay_s)
 
     def get_fw_version(self) -> tuple[int, int, int, int]:
         self._send_control(protocol.build_get_fw_version_report())

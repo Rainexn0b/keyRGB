@@ -41,6 +41,7 @@ def open_matching_hidraw_transport(
     *,
     product_ids: tuple[int, ...] | None = None,
     forced_path_env: str | None = None,
+    backend_name: str | None = None,
 ) -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
     supported_product_ids = tuple(int(product_id) for product_id in (product_ids or protocol.SUPPORTED_PRODUCT_IDS))
     info = find_matching_hidraw_device(
@@ -55,7 +56,7 @@ def open_matching_hidraw_transport(
 
     from ..ite8291.hidraw import HidrawFeatureOutputTransport
 
-    return HidrawFeatureOutputTransport(info.devnode), info
+    return HidrawFeatureOutputTransport(info.devnode, backend_name=backend_name), info
 
 
 def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
@@ -69,6 +70,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
     return open_matching_hidraw_transport(
         product_ids=protocol.SUPPORTED_PRODUCT_IDS,
         forced_path_env=protocol.HIDRAW_PATH_ENV,
+        backend_name="ite8295-zones",
     )
 
 

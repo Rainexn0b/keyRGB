@@ -14,6 +14,7 @@ from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is
 
 from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 from . import protocol
+from .._report_pacing import hid_report_delay_s_from_env
 from .device import Ite8291r3KeyboardDevice
 from .usb import device_bcd_device_or_none, open_matching_transport
 
@@ -80,6 +81,17 @@ def _unexpected_revision_reason(*, bcd_device: int | None) -> str | None:
     if int(bcd_device) != int(protocol.REV_NUMBER):
         return f"unexpected firmware revision 0x{int(bcd_device):04x}"
     return None
+
+
+def _report_delay_s_from_env() -> float:
+    """Return the optional user-tunable report delay for the r3 USB path.
+
+    The default is intentionally small (1 ms).  On affected TongFang devices,
+    back-to-back HID reports without any bus quiet time can cause the
+    controller to lock up or reset.  Users who still see instability can raise
+    this; users on well-behaved hardware can set it to 0 to disable the pacing.
+    """
+    return hid_report_delay_s_from_env(backend_name="ite8291r3")
 
 
 @dataclass
@@ -214,6 +226,7 @@ class Ite8291r3Backend(KeyboardBackend):
                 transport.read_control_report,
                 transport.write_data,
                 transport=transport,
+                report_delay_s=_report_delay_s_from_env(),
             )
         except (
             ImportError,

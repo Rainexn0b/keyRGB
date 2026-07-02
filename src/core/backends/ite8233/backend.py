@@ -87,7 +87,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo
             "No hidraw device found for supported ITE 8233 lightbar IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
         )
-    return hidraw.HidrawFeatureTransport(info.devnode), info
+    return hidraw.HidrawFeatureTransport(info.devnode, backend_name="ite8233"), info
 
 
 @dataclass

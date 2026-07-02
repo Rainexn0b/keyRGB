@@ -99,3 +99,52 @@ def test_backend_effects_and_colors_are_native_protocol_maps() -> None:
     assert set(effects) >= {"breathing", "wave", "random", "rainbow"}
     assert colors["red"] == 1
     assert colors["random"] == 8
+
+
+def test_report_delay_env_helper_defaults_to_one_ms(monkeypatch) -> None:
+    from src.core.backends.ite8291r3.backend import _report_delay_s_from_env
+
+    monkeypatch.delenv("KEYRGB_ITE8291R3_REPORT_DELAY_MS", raising=False)
+    assert _report_delay_s_from_env() == 0.001
+
+
+def test_report_delay_env_helper_parses_ms(monkeypatch) -> None:
+    from src.core.backends.ite8291r3.backend import _report_delay_s_from_env
+
+    monkeypatch.setenv("KEYRGB_ITE8291R3_REPORT_DELAY_MS", "2.5")
+    assert _report_delay_s_from_env() == 0.0025
+
+
+def test_report_delay_env_helper_allows_zero_to_disable(monkeypatch) -> None:
+    from src.core.backends.ite8291r3.backend import _report_delay_s_from_env
+
+    monkeypatch.setenv("KEYRGB_ITE8291R3_REPORT_DELAY_MS", "0")
+    assert _report_delay_s_from_env() == 0.0
+
+
+def test_report_delay_env_helper_falls_back_to_global(monkeypatch) -> None:
+    from src.core.backends.ite8291r3.backend import _report_delay_s_from_env
+
+    monkeypatch.delenv("KEYRGB_ITE8291R3_REPORT_DELAY_MS", raising=False)
+    monkeypatch.setenv("KEYRGB_HID_REPORT_DELAY_MS", "4")
+    assert _report_delay_s_from_env() == 0.004
+
+
+def test_device_applies_report_delay_between_reports(monkeypatch) -> None:
+    sleeps: list[float] = []
+    monkeypatch.setattr("src.core.backends._report_pacing.time.sleep", sleeps.append)
+
+    controls: list[bytes] = []
+    rows: list[bytes] = []
+    device = Ite8291r3KeyboardDevice(
+        controls.append,
+        lambda _length: bytes(8),
+        rows.append,
+        report_delay_s=0.005,
+    )
+
+    device.set_color((0, 0, 0), brightness=25)
+
+    # enable_user_mode (1) + set_row_index per row (6) + write_row per row (6)
+    assert len(sleeps) == 13
+    assert all(abs(s - 0.005) < 1e-9 for s in sleeps)

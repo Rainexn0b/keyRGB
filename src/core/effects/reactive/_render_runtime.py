@@ -107,11 +107,7 @@ def render_per_key_frame(
             reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
             mode_uninitialized = _last_hw_mode_brightness_or_none(engine) is None
             frame_signature = _per_key_frame_signature(rendered_color_map, brightness_hw=brightness_hw)
-            if (
-                not reassert_every_frame
-                and not mode_uninitialized
-                and frame_signature == _last_reactive_per_key_frame_signature_or_none(engine)
-            ):
+            if not mode_uninitialized and frame_signature == _last_reactive_per_key_frame_signature_or_none(engine):
                 return True
 
             need_mode_init = reassert_every_frame or mode_uninitialized

@@ -73,7 +73,7 @@ def _open_matching_transport() -> tuple[hidraw.HidrawFeatureOutputTransport, hid
             "No hidraw device found for supported ITE 8258 chassis IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
         )
-    return hidraw.HidrawFeatureOutputTransport(info.devnode), info
+    return hidraw.HidrawFeatureOutputTransport(info.devnode, backend_name="ite8258-chassis"), info
 
 
 def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):

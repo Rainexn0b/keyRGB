@@ -41,12 +41,14 @@ def open_matching_hidraw_transport(
     *,
     product_ids: tuple[int, ...],
     forced_path_env: str,
+    backend_name: str | None = None,
 ) -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
     from ..ite8291.hidraw import open_matching_hidraw_transport as _open_matching_hidraw_transport
 
     return _open_matching_hidraw_transport(
         product_ids=product_ids,
         forced_path_env=forced_path_env,
+        backend_name=backend_name,
     )
 
 
@@ -128,6 +130,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
     transport, info = open_matching_hidraw_transport(
         product_ids=(protocol.PRODUCT_ID,),
         forced_path_env=protocol.HIDRAW_PATH_ENV,
+        backend_name="ite8291-zones",
     )
     if int(info.bcd_device or 0) != int(protocol.REQUIRED_BCD_DEVICE):
         transport.close()

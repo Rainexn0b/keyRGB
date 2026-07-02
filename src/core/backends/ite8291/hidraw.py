@@ -6,6 +6,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from src.core.backends._report_pacing import sleep_after_hid_report
+
 from . import protocol
 
 _IOC_NRBITS = 8
@@ -169,9 +171,10 @@ def _os_cloexec_flag_or_zero() -> int:
 
 
 class HidrawFeatureOutputTransport:
-    def __init__(self, devnode: Path) -> None:
+    def __init__(self, devnode: Path, *, backend_name: str | None = None) -> None:
         flags = int(os.O_RDWR) | _os_cloexec_flag_or_zero()
         self.devnode = Path(devnode)
+        self._backend_name = backend_name
         self._fd: int | None = os.open(os.fspath(self.devnode), flags)
 
     def close(self) -> None:
@@ -193,6 +196,7 @@ class HidrawFeatureOutputTransport:
             raise RuntimeError("hidraw transport is closed")
 
         fcntl.ioctl(int(fd), hidiocsfeature(len(payload)), payload, True)
+        sleep_after_hid_report(backend_name=self._backend_name)
         return len(payload)
 
     def write_output_report(self, report: bytes) -> int:
@@ -204,7 +208,9 @@ class HidrawFeatureOutputTransport:
         if fd is None:
             raise RuntimeError("hidraw transport is closed")
 
-        return int(os.write(int(fd), payload))
+        result = int(os.write(int(fd), payload))
+        sleep_after_hid_report(backend_name=self._backend_name)
+        return result
 
     def __del__(self) -> None:
         try:
@@ -217,6 +223,7 @@ def open_matching_hidraw_transport(
     *,
     product_ids: tuple[int, ...] | None = None,
     forced_path_env: str | None = None,
+    backend_name: str | None = None,
 ) -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
     supported_product_ids = tuple(int(pid) for pid in (product_ids or protocol.SUPPORTED_PRODUCT_IDS))
     info = find_matching_hidraw_device(product_ids=supported_product_ids, forced_path_env=forced_path_env)
@@ -225,4 +232,4 @@ def open_matching_hidraw_transport(
             "No hidraw device found for supported ITE 8291 IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in supported_product_ids)
         )
-    return HidrawFeatureOutputTransport(info.devnode), info
+    return HidrawFeatureOutputTransport(info.devnode, backend_name=backend_name), info
