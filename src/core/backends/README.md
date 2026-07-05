@@ -106,7 +106,7 @@ HID-reported name is concrete evidence. If future hardware diagnostics prove
 the chip is actually an ITE 8291 variant, this should be renamed to
 `ite8291_lightbar` or `ite8291_lb`.
 
-See `docs/audit/10-ite8233.md` for the full audit.
+See `docs/B-backend-audits/10-ite8233.md` for the full audit.
 
 ### ite8233_lightbar — usage page discrepancy
 

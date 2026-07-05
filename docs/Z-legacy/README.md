@@ -5,8 +5,10 @@ context; active work should reference the lanes in `docs/README.md` instead.
 
 ## Documents
 
-- `2026-04-21-improvement-roadmap.md` — superseded improvement roadmap. Active
-  coordination moved to chunked specs under `docs/developement/`.
+- `2026-04-21-improvement-roadmap.md` — superseded improvement roadmap. The
+  original chunk specs are archived along with this file.
+- `branches/archived/` — branch/release reference docs for old versions.
+- `tech-debt/archived/` — archived tech-debt ledgers and quality campaigns.
 
 ## Disposition rules
 

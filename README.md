@@ -10,7 +10,7 @@ A lightweight Linux tray app and per-key editor for laptop keyboard lighting, wi
 - [Hardware support issue chooser](https://github.com/Rainexn0b/keyRGB/issues/new/choose)
 - [Contributing guide](CONTRIBUTING.md)
 - [Support guide](SUPPORT.md)
-- [Architecture notes](docs/architecture/src/00-index.md)
+- [Architecture notes](docs/1-src/00-index.md)
 - [Changelog](CHANGELOG.md)
 - [Security policy](SECURITY.md)
 
@@ -211,7 +211,7 @@ Uses a priority-based backend system plus a backend-stability policy to select t
 
 2.  **USB / HID Direct**: Uses an implemented userspace backend such as `ite8291r3` or `ite8910`.
     *   **TongFang**: Supports per-key RGB on devices without kernel drivers (XMG, Wootbook, Eluktronics, older Tuxedo models) if the hardware supports it.
-    *   **Known limitation**: some `ite8291r3` laptops briefly blank the keyboard on AC unplug/replug before KeyRGB can repaint it; see [docs/usage/05-backend-limitations.md](docs/usage/05-backend-limitations.md).
+    *   **Known limitation**: some `ite8291r3` laptops briefly blank the keyboard on AC unplug/replug before KeyRGB can repaint it; see [docs/usage/05-backend-limitations.md](docs/B-backend-guides/backend-limitations.md).
 
 3.  **ASUS Aura**: Uses the `asusctl-aura` backend when the ASUS userspace stack is available.
 	*   **ASUS**: Best for laptops that already expose lighting control through `asusctl` / `rog-control-center`.

@@ -1,9 +1,7 @@
 # KeyRGB Documentation
 
 This directory contains canonical project documentation. The docs are organized
-into **lanes**: stable, prefixed buckets and hyphenated sub-lanes. The scheme is
-a lightweight adaptation of the doc-lanes pattern; we keep fewer buckets than a
-large monorepo because the project surface is smaller.
+into **lanes**: stable, prefixed buckets and hyphenated sub-lanes.
 
 ## Lane ID grammar
 
@@ -23,54 +21,84 @@ Z-legacy/         → terminal bucket for obsolete docs and disbanded lanes
 
 ### `0` — Project meta
 
-| Lane | Purpose | Current source (if migrating) |
-|---|---|---|
-| `0-usage` | User-facing usage, setup, and troubleshooting guides | `docs/usage/` |
-| `0-project` | Release/commit procedure, repo shape, contribution guidelines | `docs/usage/02-commit_procedure.md`, `docs/usage/03-release_procedure.md`, `CONTRIBUTING.md` |
+| Lane | Purpose |
+|---|---|
+| `0-governance` | Documentation governance and lane registry |
 
-### `A` — Architecture
+### `1` — Architecture & technical reference
 
-| Lane | Purpose | Current source |
-|---|---|---|
-| `A-architecture` | System architecture, module inventory, build-system design | `docs/architecture/` |
+| Lane | Purpose |
+|---|---|
+| `1-buildpython` | Build system (`buildpython`) design and operation |
+| `1-repo` | Repository layout and conventions |
+| `1-src` | Source-code architecture (backends, tray, diagnostics, etc.) |
 
-### `B` — Backends & hardware
+### `2` — Usage & operations
 
-| Lane | Purpose | Current source |
-|---|---|---|
-| `B-backend-audits` | Backend audit reports and reference comparisons | `docs/audit/` |
-| `B-hardware-research` | Hardware expansion research and device-support investigations | `docs/genAI/research-device-support/` |
-| `B-backend-guides` | Backend-specific implementation plans and protocol notes | `docs/developement/backends/` |
+| Lane | Purpose |
+|---|---|
+| `2-usage` | User-facing usage, setup, troubleshooting, release/commit procedures |
 
-### `D` — Development
+### `9` — Legal / project policy
 
-| Lane | Purpose | Current source |
-|---|---|---|
-| `D-development` | Active development plans, refactor campaigns, and architecture specs | `docs/developement/` (note: directory name retains historical spelling) |
-| `D-bug-reports` | Bug investigations and retest records | `docs/developement/bug-reports/`, `docs/developement/bug-ongoing/` |
+| Lane | Purpose |
+|---|---|
+| `9-Legal` | Code of conduct and legal/project-policy docs |
 
-### `O` — Operations
+### `B` — Backends & hardware research
 
-| Lane | Purpose | Current source |
-|---|---|---|
-| `O-debugging` | Debugging notes, incident records, and runbooks | `docs/debugging/` |
+| Lane | Purpose |
+|---|---|
+| `B-backend-audits` | Backend audit reports and reference comparisons |
+| `B-backend-guides` | Backend implementation plans, protocol notes, and naming policy |
+| `B-Research` | Hardware expansion research and device-support investigations |
 
-### `Q` — Quality
+### `D` — Development & debugging
 
-| Lane | Purpose | Current source |
-|---|---|---|
-| `Q-tech-debt` | Tech-debt ledgers, quality campaigns, and test strategy | `docs/tech-debt/` |
+| Lane | Purpose |
+|---|---|
+| `D-bug-reports` | Bug investigations and retest records |
+| `D-debugging` | Debugging notes, incident records, and runbooks |
+
+### `I` — Implementation plans
+
+| Lane | Purpose |
+|---|---|
+| `I-implementation-plans` | Bounded implementation and refactor campaign plans |
+
+### `O` — Optimisations
+
+| Lane | Purpose |
+|---|---|
+| `O-optimisations` | Performance, stability, and footprint improvement plans |
+
+### `P` — Power management
+
+| Lane | Purpose |
+|---|---|
+| `P-power-management` | Power-mode, battery-saver, and idle-power specs |
+
+### `R` — Feature removals
+
+| Lane | Purpose |
+|---|---|
+| `R-feature-removals` | Pruning and deprecation plans |
+
+### `U` — GUI / UX
+
+| Lane | Purpose |
+|---|---|
+| `U-gui` | GUI and user-experience work |
 
 ### `Z` — Legacy
 
 | Lane | Purpose |
 |---|---|
-| `Z-legacy` | Obsolete docs, disbanded lanes, and superseded records |
+| `Z-legacy` | Obsolete docs, disbanded lanes, superseded records |
 
 ## Reserved buckets
 
-Buckets `1–9` (except `0`), `C`, `E–G`, `I–N`, `P–T`, `V–Y` are reserved for
-future use.
+Buckets `3–8`, `C–H`, `J–N`, `Q`, `S–T`, `V–Y` are reserved for future use.
 
 ## Adding a new lane
 

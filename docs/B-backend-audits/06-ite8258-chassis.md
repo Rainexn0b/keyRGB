@@ -21,7 +21,7 @@
 3. **LenovoLegionToolkit**
    - `LenovoLegionToolkit.Lib/Native.cs`
 4. **Internal correction plan**
-   - `docs/developement/backends/ite8258/ite8258-chassis-correction-plan.md`
+   - `../../I-implementation-plans/2026-04-19/ite8258-chassis-correction-plan.md`
 
 ## Summary
 

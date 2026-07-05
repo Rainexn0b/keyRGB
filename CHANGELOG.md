@@ -393,7 +393,7 @@
 - GUI/Calibrator/Profiles: Use backend-provided matrix dimensions in the calibrator and per-key editor paths, and sanitize out-of-range keymap/per-key color cells on load so older 6x21 profile state cannot bleed into the 6x20 `ite8910` path.
 - GUI/ISO: Extend the built-in reference keyboard overlay with the ISO-only key beside left shift and map `KEY_102ND` into the reactive/keymap identifier model so ISO users can calibrate and use the extra key.
 - Backends/Shared Defaults: Replace scattered hardcoded fallback matrix sizes and string-based hardware-speed detection with shared reference-matrix defaults and explicit backend/device speed-policy metadata.
-- Tests/Docs: Add focused regression coverage for `ite8910` translation and speed-policy metadata, profile sanitization, calibrator dimension wiring, reference defaults/layout invariants, and document the issue #4 investigation in `docs/bug-reports/issue-4.md`.
+- Tests/Docs: Add focused regression coverage for `ite8910` translation and speed-policy metadata, profile sanitization, calibrator dimension wiring, reference defaults/layout invariants, and document the issue #4 investigation in `docs/D-bug-reports/issue-4/issue-4.md`.
 
 ## 0.18.3 (2026-03-29)
 

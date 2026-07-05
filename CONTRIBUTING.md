@@ -174,8 +174,8 @@ If you use numeric step selectors, list steps first. Step numbers can move as th
 ## Useful references
 
 - `README.md`
-- `docs/usage/01-build_runner.md`
-- `docs/usage/04-hardware_tests.md`
+- `docs/2-usage/01-build_runner.md`
+- `docs/2-usage/04-hardware_tests.md`
 - `docs/developement/backends/`
 - `tests/conftest.py` for hardware-safety assumptions in normal test runs
 

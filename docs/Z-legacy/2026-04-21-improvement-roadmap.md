@@ -1,6 +1,6 @@
 # Agent Improvement Roadmap
 
-> Archived snapshot from `2026-04-21`. The active coordination docs now live in `docs/developement/improvement-roadmap.md` and the three chunk specs under `docs/developement/chunk-*.md`.
+> Archived snapshot from `2026-04-21`. The three chunk specs were archived along with this roadmap; see the Current Chunk Execution Plan section below for the original scope.
 
 ## Purpose
 
@@ -305,21 +305,23 @@ The scanner-visible queue is clear and several roadmap hotspots are already comp
 
 ## Current Chunk Execution Plan
 
-The roadmap is now executed through three bounded chunk documents under `docs/developement/`.
+The roadmap is now executed through three bounded chunk documents. Those chunk
+specs were archived along with this roadmap; see the archived sub-sections
+below for the original scope.
 
 ### Chunk A (P0): Tray policy and classification seams
 
-- spec: `docs/developement/chunk-a-tray-policy-seams.md`
+- spec: `docs/Z-legacy/2026-04-21-improvement-roadmap.md`
 - focus: tray config-polling state seams and controller boundary auditing
 
 ### Chunk B (P1): GUI window cleanup
 
-- spec: `docs/developement/chunk-b-gui-window-cleanup.md`
+- spec: `docs/Z-legacy/2026-04-21-improvement-roadmap.md`
 - focus: support-window boundary cleanup and perkey entry-module seam survey
 
 ### Chunk C (P1/P2): Typed config boundaries and bootstrap cleanup
 
-- spec: `docs/developement/chunk-c-config-typed-boundaries.md`
+- spec: `docs/Z-legacy/2026-04-21-improvement-roadmap.md`
 - focus: typed config/snapshot shaping and import-bootstrap normalization
 
 Execution order:
@@ -346,8 +348,8 @@ This roadmap is succeeding when most of the following become true:
 
 See these archived notes for prior reasoning and earlier campaign history:
 
-- `docs/developement/archived/2026-04-19/architecture-and-maintainability-improvement-plan.md`
-- `docs/developement/archived/2026-04-19/package-and-gui-boundary-refactor-anchor-plan.md`
-- `docs/developement/archived/2026-04-19/refactor-campaign-progress.md`
+- `docs/I-implementation-plans/2026-04-19/architecture-and-maintainability-improvement-plan.md`
+- `docs/I-implementation-plans/2026-04-19/package-and-gui-boundary-refactor-anchor-plan.md`
+- `docs/I-implementation-plans/2026-04-19/refactor-campaign-progress.md`
 
 If this roadmap and the archived notes diverge, prefer this file for upcoming delegation rounds.

@@ -12,20 +12,26 @@ top-level `docs/README.md`.
 
 ## Registry
 
-| Lane | Purpose | Status | Current source |
-|---|---|---|---|
-| `0-usage` | User-facing usage, setup, and troubleshooting guides | active | `docs/usage/` |
-| `0-project` | Release/commit procedure, repo shape, contribution guidelines | planned | `docs/usage/02-commit_procedure.md`, `docs/usage/03-release_procedure.md` |
-| `A-architecture` | System architecture, module inventory, build-system design | active | `docs/architecture/` |
-| `B-backend-audits` | Backend audit reports and reference comparisons | active | `docs/B-backend-audits/` |
-| `B-hardware-research` | Hardware expansion research and device-support investigations | active | `docs/genAI/research-device-support/` |
-| `B-backend-guides` | Backend-specific implementation plans and protocol notes | active | `docs/developement/backends/` |
-| `D-development` | Active development plans, refactor campaigns, and architecture specs | active | `docs/developement/` |
-| `D-bug-reports` | Bug investigations and retest records | active | `docs/developement/bug-reports/`, `docs/developement/bug-ongoing/` |
-| `O-debugging` | Debugging notes, incident records, and runbooks | active | `docs/debugging/` |
-| `Q-tech-debt` | Tech-debt ledgers, quality campaigns, and test strategy | active | `docs/tech-debt/` |
-| `Z-legacy` | Obsolete docs, disbanded lanes, superseded records | legacy | `docs/Z-legacy/` |
+| Lane | Purpose | Status |
+|---|---|---|
+| `0-governance` | Documentation governance, lane registry | active |
+| `1-buildpython` | Build system (`buildpython`) design and operation | active |
+| `1-repo` | Repository layout and conventions | active |
+| `1-src` | Source-code architecture | active |
+| `2-usage` | User-facing usage, setup, troubleshooting, release/commit procedures | active |
+| `9-Legal` | Code of conduct and legal/project-policy docs | active |
+| `B-backend-audits` | Backend audit reports and reference comparisons | active |
+| `B-backend-guides` | Backend implementation plans, protocol notes, and naming policy | active |
+| `B-Research` | Hardware expansion research and device-support investigations | active |
+| `D-bug-reports` | Bug investigations and retest records | active |
+| `D-debugging` | Debugging notes, incident records, and runbooks | active |
+| `I-implementation-plans` | Bounded implementation and refactor campaign plans | active |
+| `O-optimisations` | Performance, stability, and footprint improvement plans | active |
+| `P-power-management` | Power-mode, battery-saver, and idle-power specs | active |
+| `R-feature-removals` | Pruning and deprecation plans | active |
+| `U-gui` | GUI and user-experience work | active |
+| `Z-legacy` | Obsolete docs, disbanded lanes, superseded records | legacy |
 
 ## Reserved buckets
 
-`1–9` (except `0`), `C`, `E–G`, `I–N`, `P–T`, `V–Y` are reserved.
+`3–8`, `C–H`, `J–N`, `Q`, `S–T`, `V–Y` are reserved.
