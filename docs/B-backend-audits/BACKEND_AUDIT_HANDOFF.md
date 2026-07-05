@@ -72,8 +72,8 @@ Secondary device route identifiers (e.g., `ite8258-chassis-logo`) and the
 - `tests/core/backends/test_report_pacing_unit.py` — updated env key expectations
 - `tests/core/backends/ite/test_ite8291r3_native_backend_unit.py` — updated env key
 - `tests/core/backends/general/test_backend_registry_unit.py` — alias-resolution coverage
-- `docs/audit/00-index.md` — canonical names in audit index
-- `docs/audit/BACKEND_AUDIT_HANDOFF.md` — this file
+- `docs/B-backend-audits/00-index.md` — canonical names in audit index
+- `docs/B-backend-audits/BACKEND_AUDIT_HANDOFF.md` — this file
 
 ---
 
@@ -137,10 +137,10 @@ Secondary device route identifiers (e.g., `ite8258-chassis-logo`) and the
 ## 6. References
 
 - `src/core/backends/README.md` — finalized naming policy and backend inventory
-- `docs/audit/00-index.md` — full audit plan and status
-- `docs/audit/09-ite8295-zones.md` — ITE8295_zones audit
-- `docs/audit/10-ite8233.md` — ITE8233 lightbar audit
-- `docs/audit/12-asusctl.md` — ASUS Aura CLI audit
+- `docs/B-backend-audits/00-index.md` — full audit plan and status
+- `docs/B-backend-audits/09-ite8295-zones.md` — ITE8295_zones audit
+- `docs/B-backend-audits/10-ite8233.md` — ITE8233 lightbar audit
+- `docs/B-backend-audits/12-asusctl.md` — ASUS Aura CLI audit
 - `src/core/backends/registry.py` — alias resolution
 - `system/udev/99-ite8291-wootbook.rules`
 

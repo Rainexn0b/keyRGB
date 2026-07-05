@@ -1,36 +1,58 @@
 # Backend naming
 
-KeyRGB backend names should stay stable across laptop rebrands, vendor SKUs, and support reports.
-
-Use these rules when adding or splitting a backend.
+KeyRGB backend names should stay stable across laptop rebrands, vendor SKUs, and
+support reports. Use these rules when adding or splitting a backend.
 
 ## Primary rule
 
-Name the backend after the controller family or protocol family that defines the runtime contract.
+Name the backend after the controller family **and** the lighting capability it
+exposes. This keeps the backend identity attached to the packet and capability
+model rather than a laptop marketing name.
+
+```text
+ITE<chip>_<capability>[_<capability>...][_<oem>]
+```
+
+Capabilities are ordered **`chassis` > `zones` > `perkey`**.
 
 Examples already in tree:
 
-- `ite8258`
-- `ite8291`
-- `ite8291r3`
-- `ite8910`
+- `ite8291r3_perkey`
+- `ite8291_perkey`
+- `ite8291_zones`
+- `ite8295_zones`
+- `ite8258_zones`
+- `ite8258_chassis`
+- `ite8233_lightbar`
+- `ite8297_uniform`
+- `ite8910_perkey`
 
-This keeps the backend identity attached to the packet and capability model rather than a laptop marketing name.
+## Capability suffixes
+
+| Suffix | Meaning |
+|--------|---------|
+| `_perkey` | Every key is individually addressable |
+| `_zones` | Keyboard deck has 2+ controllable zones, but not per-key |
+| `_uniform` | Entire keyboard is one single color |
+| `_chassis` | Non-keyboard lighting (logo, vents, neon strips) |
+| `_lightbar` | A separate lightbar strip device |
+
+All ITE backend names use **underscores** exclusively. Non-ITE backends
+(`sysfs-leds`, `sysfs-mouse`, `asusctl-aura`) retain hyphens because they do
+not follow the `ITE<chip>` convention.
 
 ## When to add a qualifier
 
-Add a qualifier only when one controller family splits into incompatible runtime shapes that need separate backend ownership.
-
-Prefer semantic qualifiers that explain the split:
-
-- topology or surface split: `-zones`, `-lightbar`, `-chassis`
-- protocol or hardware revision split: `r3`
+Add a capability suffix when one controller family splits into incompatible
+runtime shapes that need separate backend ownership.
 
 Current examples:
 
-- `ite8291` vs `ite8291-zones`
-- `ite8295-zones`
-- `ite8291r3`
+- `ite8291_perkey` vs `ite8291_zones`
+- `ite8258_zones` vs `ite8258_chassis`
+
+These are split because they use different protocols, different HID interfaces,
+or different probe behavior.
 
 ## What not to use as the primary name
 
@@ -43,24 +65,35 @@ Keep those in:
 - diagnostics wording
 - tests and evidence bundles
 
-Also avoid raw numbered variants such as `var1`, `var01`, or `v01` as public backend names when the split is already understood.
-
-Numbered variants are acceptable only as temporary research or catalogue labels while evidence is still incomplete. Replace them with a semantic qualifier before exposing the backend publicly.
+Also avoid raw numbered variants such as `var1`, `var01`, or `v01` as public
+backend names when the split is already understood. Numbered variants are
+acceptable only as temporary research or catalogue labels while evidence is still
+incomplete. Replace them with a semantic qualifier before exposing the backend
+publicly.
 
 ## Python package vs public backend name
 
-Python package directories should stay import-safe and use underscores when needed.
+Python package directories use underscores and match the public backend name.
 
 Examples:
 
-- package: `ite8291_zones` -> backend name: `ite8291-zones`
-- package: `ite8295_zones` -> backend name: `ite8295-zones`
+- package: `ite8291_zones` → backend name: `ite8291_zones`
+- package: `ite8295_zones` → backend name: `ite8295_zones`
+- package: `ite8291r3_perkey` → backend name: `ite8291r3_perkey`
 
-Follow the same pattern for future splits.
+## Deprecated aliases
+
+Renamed backends keep backward-compatible aliases so existing user config
+(`KEYRGB_BACKEND`, saved profiles) continues to work. Aliases are resolved in
+`src/core/backends/registry.py::_BACKEND_NAME_ALIASES`.
+
+See `src/core/backends/README.md` for the full alias table and policy.
 
 ## Current `ite8258` direction
 
-- keep `ite8258` for the existing keyboard-only `0x048d:0xc195` 24-zone path
-- use `ite8258-chassis` for the `0x048d:0xc197` composite keyboard-plus-chassis-lighting path
+- `ite8258_zones` for the keyboard-only `0x048d:0xc195` 24-zone path
+- `ite8258_chassis` for the `0x048d:0xc197` composite chassis-lighting path
 
-If a future `ite8258` split appears before its semantics are fully understood, a numbered research label can exist in notes temporarily, but the public backend name should still be renamed to a semantic form before release.
+If a future `ite8258` split appears before its semantics are fully understood, a
+numbered research label can exist in notes temporarily, but the public backend
+name should still be renamed to a semantic form before release.
