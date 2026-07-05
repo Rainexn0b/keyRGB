@@ -281,7 +281,7 @@ def test_legacy_support_state_bridge_creates_session_when_init_is_bypassed() -> 
     window._supplemental_evidence = {"captures": {"lsusb_verbose": {"ok": True}}}
     window._issue_report = {"markdown": "issue draft"}
     window._capture_prompt_key = "048d:ce00:lsusb_verbose"
-    window._backend_probe_prompt_key = "ite8291r3_speed:ite8291r3"
+    window._backend_probe_prompt_key = "ite8291r3_speed:ite8291r3_perkey"
 
     assert isinstance(window._support_session, support_window.support_window_state.SupportSessionState)
     assert window._diagnostics_json == '{"ok": true}'
@@ -289,7 +289,7 @@ def test_legacy_support_state_bridge_creates_session_when_init_is_bypassed() -> 
     assert window._supplemental_evidence == {"captures": {"lsusb_verbose": {"ok": True}}}
     assert window._issue_report == {"markdown": "issue draft"}
     assert window._capture_prompt_key == "048d:ce00:lsusb_verbose"
-    assert window._backend_probe_prompt_key == "ite8291r3_speed:ite8291r3"
+    assert window._backend_probe_prompt_key == "ite8291r3_speed:ite8291r3_perkey"
 
 
 def test_apply_geometry_uses_requested_content_size(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -455,7 +455,7 @@ def test_support_probe_dialog_button_row_uses_single_column_for_one_action() -> 
 
 def test_sync_button_state_tracks_copy_and_save_actions() -> None:
     window = _make_window(
-        diagnostics_json='{"backends": {"guided_speed_probes": [{"backend": "ite8910"}]}}',
+        diagnostics_json='{"backends": {"guided_speed_probes": [{"backend": "ite8910_perkey"}]}}',
         discovery_json='{"candidate": 1}',
     )
     window._can_run_backend_speed_probe = lambda: True
@@ -476,7 +476,7 @@ def test_sync_button_state_tracks_copy_and_save_actions() -> None:
 
 
 def test_sync_button_state_enables_backend_speed_probe_for_selected_ite8291r3() -> None:
-    window = _make_window(diagnostics_json='{"backends": {"selected": "ite8291r3"}}')
+    window = _make_window(diagnostics_json='{"backends": {"selected": "ite8291r3_perkey"}}')
     window._can_run_backend_speed_probe = lambda: True
 
     window._sync_button_state()
@@ -485,7 +485,7 @@ def test_sync_button_state_enables_backend_speed_probe_for_selected_ite8291r3() 
 
 
 def test_sync_button_state_enables_backend_speed_probe_from_discovery_backend() -> None:
-    window = _make_window(discovery_json='{"selected_backend": "ite8291r3"}')
+    window = _make_window(discovery_json='{"selected_backend": "ite8291r3_perkey"}')
     window._can_run_backend_speed_probe = lambda: True
 
     window._sync_button_state()
@@ -494,7 +494,7 @@ def test_sync_button_state_enables_backend_speed_probe_from_discovery_backend() 
 
 
 def test_sync_button_state_disables_backend_speed_probe_without_tray() -> None:
-    window = _make_window(diagnostics_json='{"backends": {"selected": "ite8291r3"}}')
+    window = _make_window(diagnostics_json='{"backends": {"selected": "ite8291r3_perkey"}}')
     window._can_run_backend_speed_probe = lambda: False
 
     window._sync_button_state()
@@ -559,7 +559,7 @@ def test_save_support_bundle_autocollects_missing_discovery_snapshot(
     monkeypatch.setattr(
         support_window,
         "collect_device_discovery",
-        lambda *, include_usb: {"selected_backend": "ite8258-chassis", "include_usb": include_usb},
+        lambda *, include_usb: {"selected_backend": "ite8258_chassis", "include_usb": include_usb},
     )
     monkeypatch.setattr(
         support_window,
@@ -576,8 +576,8 @@ def test_save_support_bundle_autocollects_missing_discovery_snapshot(
 
     payload = json.loads(out_path.read_text(encoding="utf-8"))
     assert payload["diagnostics"] == {"diag": 1}
-    assert payload["device_discovery"] == {"selected_backend": "ite8258-chassis", "include_usb": True}
-    assert json.loads(window._discovery_json)["selected_backend"] == "ite8258-chassis"
+    assert payload["device_discovery"] == {"selected_backend": "ite8258_chassis", "include_usb": True}
+    assert json.loads(window._discovery_json)["selected_backend"] == "ite8258_chassis"
     assert window.status_label.options["text"] == "Saved support bundle"
 
 
@@ -699,7 +699,7 @@ def test_run_discovery_updates_text_and_enables_buttons(monkeypatch: pytest.Monk
         support_window,
         "collect_device_discovery",
         lambda *, include_usb: {
-            "selected_backend": "ite8291r3",
+            "selected_backend": "ite8291r3_perkey",
             "summary": {"candidate_count": 1, "supported_count": 0, "attention_count": 1},
             "usb_ids": [],
             "candidates": [],
@@ -726,7 +726,7 @@ def test_run_discovery_updates_text_and_enables_buttons(monkeypatch: pytest.Monk
 
     window.run_discovery()
 
-    assert json.loads(window._discovery_json)["selected_backend"] == "ite8291r3"
+    assert json.loads(window._discovery_json)["selected_backend"] == "ite8291r3_perkey"
     assert window.txt_discovery.contents == "formatted discovery"
     assert window.btn_run_discovery.options["state"] == "normal"
     assert window.btn_copy_discovery.options["state"] == "normal"
@@ -963,7 +963,7 @@ def test_restore_probe_config_accepts_legacy_snapshot_dict_and_clears_empty_effe
 
 def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyPatch) -> None:
     window = _make_window(
-        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8910_speed", "backend": "ite8910", "effect_name": "spectrum_cycle", "selection_effect_name": "hw:spectrum_cycle", "selection_menu_path": "Hardware Effects -> Spectrum Cycle", "requested_ui_speeds": [1, 3], "samples": [{"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"}] , "instructions": ["Do the thing"], "observation_prompt": "Notes?"}]}}'
+        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8910_speed", "backend": "ite8910_perkey", "effect_name": "spectrum_cycle", "selection_effect_name": "hw:spectrum_cycle", "selection_menu_path": "Hardware Effects -> Spectrum Cycle", "requested_ui_speeds": [1, 3], "samples": [{"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"}] , "instructions": ["Do the thing"], "observation_prompt": "Notes?"}]}}'
     )
     responses = iter([True, False])
     showinfo_calls: list[str] = []
@@ -1030,7 +1030,7 @@ def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyP
     backend_probes = window._supplemental_evidence.get("backend_probes")
     assert isinstance(backend_probes, dict)
     probe = backend_probes["ite8910_speed"]
-    assert probe["backend"] == "ite8910"
+    assert probe["backend"] == "ite8910_perkey"
     assert probe["selection_effect_name"] == "hw:spectrum_cycle"
     assert probe["execution_mode"] == "auto"
     assert probe["automation"]["step_duration_s"] == 2.5
@@ -1045,7 +1045,7 @@ def test_run_backend_speed_probe_records_observation(monkeypatch: pytest.MonkeyP
 
 def test_run_backend_speed_probe_can_auto_run_via_tray_config(monkeypatch: pytest.MonkeyPatch) -> None:
     window = _make_window(
-        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8291r3_speed", "backend": "ite8291r3", "effect_name": "wave", "selection_effect_name": "wave", "selection_menu_path": "Hardware Effects -> Wave", "requested_ui_speeds": [1, 3], "samples": [{"ui_speed": 1, "payload_speed": 10, "raw_speed_hex": "0x0a"}] , "instructions": ["Do the thing"], "observation_prompt": "Notes?"}]}}'
+        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8291r3_speed", "backend": "ite8291r3_perkey", "effect_name": "wave", "selection_effect_name": "wave", "selection_menu_path": "Hardware Effects -> Wave", "requested_ui_speeds": [1, 3], "samples": [{"ui_speed": 1, "payload_speed": 10, "raw_speed_hex": "0x0a"}] , "instructions": ["Do the thing"], "observation_prompt": "Notes?"}]}}'
     )
     responses = iter([True, True])
     showinfo_calls: list[str] = []
@@ -1213,7 +1213,7 @@ def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.Monk
     window._supplemental_evidence = {
         "backend_probes": {
             "ite8910_speed": {
-                "backend": "ite8910",
+                "backend": "ite8910_perkey",
                 "effect_name": "spectrum_cycle",
             }
         },
@@ -1223,7 +1223,7 @@ def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.Monk
     monkeypatch.setattr(
         support_window,
         "collect_device_discovery",
-        lambda *, include_usb: {"selected_backend": "ite8910", "summary": {"candidate_count": 1}},
+        lambda *, include_usb: {"selected_backend": "ite8910_perkey", "summary": {"candidate_count": 1}},
     )
     monkeypatch.setattr(support_window, "format_device_discovery_text", lambda payload: "formatted discovery")
     monkeypatch.setattr(
@@ -1245,7 +1245,7 @@ def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.Monk
     assert window._supplemental_evidence == {
         "backend_probes": {
             "ite8910_speed": {
-                "backend": "ite8910",
+                "backend": "ite8910_perkey",
                 "effect_name": "spectrum_cycle",
             }
         }
@@ -1254,7 +1254,7 @@ def test_run_discovery_preserves_recorded_backend_probe(monkeypatch: pytest.Monk
 
 def test_run_backend_speed_probe_requires_running_tray(monkeypatch: pytest.MonkeyPatch) -> None:
     window = _make_window(
-        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8291r3_speed", "backend": "ite8291r3", "effect_name": "wave"}]}}'
+        diagnostics_json='{"backends": {"guided_speed_probes": [{"key": "ite8291r3_speed", "backend": "ite8291r3_perkey", "effect_name": "wave"}]}}'
     )
 
     monkeypatch.setattr(support_window.support_jobs, "_tray_process_alive", lambda _tray_pid: False)

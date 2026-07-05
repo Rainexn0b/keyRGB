@@ -105,7 +105,7 @@ def build_permission_denied_message(backend_name: str) -> str:
         "  • Reload udev rules: sudo udevadm control --reload-rules && sudo udevadm trigger",
         "  • Replug the device or reboot",
     ]
-    if backend_name in ("ite8291r3", "ite8258", "ite8258-chassis"):
+    if backend_name in ("ite8291r3_perkey", "ite8258_zones", "ite8258_chassis"):
         msg_lines.append("  • ITE USB devices usually need /etc/udev/rules.d/99-ite8291-wootbook.rules")
     elif backend_name == "sysfs-leds":
         msg_lines.append(

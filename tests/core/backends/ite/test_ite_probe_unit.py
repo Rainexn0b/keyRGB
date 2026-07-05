@@ -6,7 +6,7 @@ import types
 import pytest
 
 from src.core.backends.exceptions import BackendIOError
-from src.core.backends.ite8291r3 import Ite8291r3Backend
+from src.core.backends.ite8291r3_perkey import Ite8291r3Backend
 
 
 def test_ite_probe_uses_declared_product_ids(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -171,7 +171,7 @@ def test_ite_probe_rejects_unexpected_non_r3_firmware_revision(
 
 
 def test_ite_probe_denylists_known_other_protocol_families() -> None:
-    from src.core.backends.ite8291r3 import backend as ite_backend
+    from src.core.backends.ite8291r3_perkey import backend as ite_backend
 
     deny = list(getattr(ite_backend, "_KNOWN_UNSUPPORTED_USB_IDS", []) or [])
     assert (0x048D, 0x8297) in deny
@@ -180,13 +180,13 @@ def test_ite_probe_denylists_known_other_protocol_families() -> None:
 
 
 def test_ite_probe_supported_usb_ids_cover_known_r3_devices() -> None:
-    """Lock in KeyRGB's native ite8291r3 USB ID set."""
+    """Lock in KeyRGB's native ite8291r3_perkey USB ID set."""
 
-    from src.core.backends.ite8291r3 import backend as ite_backend
+    from src.core.backends.ite8291r3_perkey import backend as ite_backend
 
     allow = set(getattr(ite_backend, "_SUPPORTED_USB_IDS", []) or [])
 
-    # Native ite8291r3 uses the rev-0.03 vendor-confirmed PID set.
+    # Native ite8291r3_perkey uses the rev-0.03 vendor-confirmed PID set.
     assert (0x048D, 0x6004) in allow
     assert (0x048D, 0x6006) in allow
     assert (0x048D, 0x600B) in allow

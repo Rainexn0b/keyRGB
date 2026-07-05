@@ -18,6 +18,10 @@ RAW_SPEED_MAX = 10
 
 # Descriptor-level facts taken from issue #5. Command bytes beyond these values
 # are intentionally left undefined until traffic captures confirm them.
+# NOTE: The usage page below is used only in probe identifiers. OpenRGB's
+# detector for PID 0x7001 registers usage page 0xFF03 / usage 0x02, while
+# KeyRGB documents 0xFF89. This discrepancy does not affect hidraw matching
+# (which is VID/PID-only) but should be verified against real descriptors.
 FEATURE_REPORT_ID = 0x5A
 FEATURE_REPORT_SIZE = 16
 VENDOR_USAGE_PAGE = 0xFF89
@@ -39,6 +43,12 @@ MODE_BREATHING = _protocol_support.MODE_BREATHING
 MODE_WAVE = _protocol_support.MODE_WAVE
 MODE_BOUNCE = _protocol_support.MODE_BOUNCE
 MODE_MARQUEE = _protocol_support.MODE_MARQUEE
+
+# MODE_SCAN (0x06) is defined because OpenRGB exposes it, but KeyRGB does not
+# implement a scan effect yet. The base mode packet would be:
+#   [0] COMMAND_SET_MODE, [1] _MODE_VARIANT[pid], [2] MODE_SCAN,
+#   [3] speed, [4] brightness, [5] apply_byte, [6] 0x00, [7] 0x00
+# but the 7-slot color behavior for KeyRGB's multi-slot protocol is unconfirmed.
 MODE_SCAN = _protocol_support.MODE_SCAN
 MODE_FLASH = _protocol_support.MODE_FLASH
 COLOR_SLOT_COUNT = _protocol_support.COLOR_SLOT_COUNT

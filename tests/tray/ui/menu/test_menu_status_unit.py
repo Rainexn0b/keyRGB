@@ -192,7 +192,7 @@ def test_keyboard_status_text_uses_ite8291r3_backend_display_name(monkeypatch) -
     monkeypatch.setattr(menu_status, "probe_device_available", lambda tray: True)
 
     tray = SimpleNamespace(
-        backend=SimpleNamespace(name="ite8291r3"),
+        backend=SimpleNamespace(name="ite8291r3_perkey"),
         backend_probe=SimpleNamespace(identifiers={"usb_vid": "0x048d", "usb_pid": "0x600b"}),
     )
 
@@ -211,7 +211,7 @@ def test_device_context_entries_threads_backend_name_from_candidate_probe_names(
                     "usb_vid": "0x048d",
                     "usb_pid": "0x7001",
                     "status": "supported",
-                    "probe_names": ["ite8233"],
+                    "probe_names": ["ite8233_lightbar"],
                 }
             ]
         },
@@ -220,7 +220,7 @@ def test_device_context_entries_threads_backend_name_from_candidate_probe_names(
     entries = menu_status.device_context_entries(tray)
 
     assert entries[1]["device_type"] == "lightbar"
-    assert entries[1]["backend_name"] == "ite8233"
+    assert entries[1]["backend_name"] == "ite8233_lightbar"
 
 
 def test_device_context_entries_use_sysfs_mouse_context_key_and_backend_name() -> None:

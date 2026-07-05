@@ -9,7 +9,7 @@ import src.core.backends.exceptions as backend_exceptions
 import src.core.utils.exceptions as device_error_checks
 
 from .. import base, policy
-from ..ite8910 import hidraw as ite8910_hidraw
+from ..ite8910_perkey import hidraw as ite8910_hidraw
 from . import device, protocol
 
 
@@ -48,7 +48,7 @@ def _open_matching_transport() -> tuple[
             "No hidraw device found for supported ITE 8297 controller IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
         )
-    return ite8910_hidraw.HidrawFeatureTransport(info.devnode, backend_name="ite8297"), info
+    return ite8910_hidraw.HidrawFeatureTransport(info.devnode, backend_name="ite8297_uniform"), info
 
 
 @dataclass
@@ -60,7 +60,7 @@ class Ite8297Backend(base.KeyboardBackend):
     control or firmware effects.
     """
 
-    name: str = "ite8297"
+    name: str = "ite8297_uniform"
     priority: int = 95
     stability: base.BackendStability = base.BackendStability.EXPERIMENTAL
     experimental_evidence: base.ExperimentalEvidence = base.ExperimentalEvidence.REVERSE_ENGINEERED
@@ -72,7 +72,7 @@ class Ite8297Backend(base.KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return base.ProbeResult(
                 available=False,
-                reason="ite8297 hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8297_uniform hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
             )
 

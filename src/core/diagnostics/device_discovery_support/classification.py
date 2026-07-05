@@ -49,10 +49,10 @@ def parse_usb_id_entry(value: object) -> tuple[int, int] | None:
 
 def _known_dormant_action(*, probes: list[dict[str, Any]], usb_key: tuple[int, int] | None) -> str:
     probe_names = {str(probe.get("name") or "").strip().lower() for probe in probes if isinstance(probe, dict)}
-    if usb_key == (0x048D, 0xC197) or "ite8258-chassis" in probe_names:
+    if usb_key == (0x048D, 0xC197) or "ite8258_chassis" in probe_names:
         return (
             "Known backend scaffold exists for the Lenovo Gen10 composite ITE 8258 path. "
-            "Current builds are expected to surface `0x048d:0xc197` through the opt-in experimental `ite8258-chassis` backend, "
+            "Current builds are expected to surface `0x048d:0xc197` through the opt-in experimental `ite8258_chassis` backend, "
             "so a dormant result usually means the reporter is on an older build or the probe snapshot is stale."
         )
     return "Known backend scaffold exists, but it is intentionally dormant until protocol evidence is confirmed."
@@ -96,7 +96,7 @@ def candidate_device_type(*, usb_key: tuple[int, int], probes: list[dict[str, An
         return explicit_type
 
     probe_names = {str(probe.get("name") or "").strip().lower() for probe in probes if isinstance(probe, dict)}
-    if any("lightbar" in name or name == "ite8233" for name in probe_names):
+    if any("lightbar" in name or name == "ite8233_lightbar" for name in probe_names):
         return "lightbar"
     if probe_names:
         return "keyboard"
@@ -174,7 +174,7 @@ def support_actions(backends: dict[str, Any], candidates: list[dict[str, Any]]) 
         )
         if lead_usb_vid == "0x048d" and lead_usb_pid == "0xc197":
             next_steps.append(
-                "Treat `0x048d:0xc197` as the primary KeyRGB target for this Lenovo Gen10 path; `ite8258-chassis` is now an opt-in experimental backend, so enable Experimental backends before collecting runtime results."
+                "Treat `0x048d:0xc197` as the primary KeyRGB target for this Lenovo Gen10 path; `ite8258_chassis` is now an opt-in experimental backend, so enable Experimental backends before collecting runtime results."
             )
             has_c193_companion = any(
                 str(entry.get("usb_vid") or "").strip().lower() == "0x048d"

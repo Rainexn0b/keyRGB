@@ -47,7 +47,7 @@ def extract_unsupported_rgb_controllers_hint(backends_snapshot: dict) -> str:
 
         key = f"{vid}:{pid}".lower()
 
-        if "unsupported by ite8291r3 backend" in reason.lower() and key not in family_ids_with_experimental_path:
+        if "unsupported by ite8291r3_perkey backend" in reason.lower() and key not in family_ids_with_experimental_path:
             unsupported.append(f"{vid}:{pid}")
         if "experimental backend disabled" in reason.lower():
             experimental_disabled.append(f"{vid}:{pid}")

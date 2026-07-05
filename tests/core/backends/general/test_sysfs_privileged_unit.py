@@ -16,7 +16,10 @@ def test_helper_can_apply_led_matches_helper_contract() -> None:
     assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight") is True
     assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight", color_kind="multi_intensity") is True
     assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight", color_kind="color") is True
-    assert sysfs_privileged.helper_can_apply_led("ite_8297:1") is False
+    assert sysfs_privileged.helper_can_apply_led("ite_8297:1") is True
+    assert sysfs_privileged.helper_can_apply_led("ite_8297:2") is True
+    assert sysfs_privileged.helper_can_apply_led("ite_8297:3") is True
+    assert sysfs_privileged.helper_can_apply_led("ite_8297:4") is False  # only channels 1-3
     assert sysfs_privileged.helper_can_apply_led("rgb:kbd_backlight", color_kind="rgb") is False
     assert sysfs_privileged.helper_can_apply_led("system76::kbd_backlight", color_kind="file") is False
 

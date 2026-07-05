@@ -14,6 +14,17 @@ SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idPro
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="c193", TAG+="uaccess", RUN{builtin}+="uaccess"
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="c197", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="8910", TAG+="uaccess", RUN{builtin}+="uaccess"
+# Lenovo 4-zone ITE 8295 family (same protocol, multiple PIDs)
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c955", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c963", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c965", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c973", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c975", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c984", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c985", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c195", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c197", TAG+="uaccess", RUN{builtin}+="uaccess"
+# ITE 8233 / 8291 rev 0.03 lightbar family (Clevo/Tongfang lightbars)
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="6010", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="7000", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="7001", TAG+="uaccess", RUN{builtin}+="uaccess"

@@ -7,7 +7,17 @@ from typing import SupportsIndex, SupportsInt, cast
 HIDRAW_PATH_ENV = "KEYRGB_ITE8295_ZONES_HIDRAW_PATH"
 
 VENDOR_ID = 0x048D
-SUPPORTED_PRODUCT_IDS: tuple[int, ...] = (0xC963,)
+# Lenovo Legion/IdeaPad 4-zone keyboard family. Same VID/usage-page/usage/33-byte
+# protocol across all listed PIDs (confirmed by OpenRGB and L5P-Keyboard-RGB).
+SUPPORTED_PRODUCT_IDS: tuple[int, ...] = (
+    0xC955,
+    0xC963,
+    0xC965,
+    0xC973,
+    0xC975,
+    0xC984,
+    0xC985,
+)
 
 USAGE_PAGE = 0xFF89
 USAGE = 0x00CC

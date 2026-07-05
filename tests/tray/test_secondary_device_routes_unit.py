@@ -19,7 +19,7 @@ def test_all_virtual_routes_belong_to_ite8258_chassis_parent() -> None:
 
     assert len(virtual) == 3
     for route in virtual:
-        assert route.parent_backend_name == "ite8258-chassis"
+        assert route.parent_backend_name == "ite8258_chassis"
         assert route.zone_key in _VIRTUAL_DEVICE_TYPES
         assert route.device_type in _VIRTUAL_DEVICE_TYPES
         assert route.supports_uniform_color is True
@@ -27,7 +27,7 @@ def test_all_virtual_routes_belong_to_ite8258_chassis_parent() -> None:
 
 
 def test_iter_parent_backend_names_returns_ite8258_chassis() -> None:
-    assert iter_parent_backend_names() == {"ite8258-chassis"}
+    assert iter_parent_backend_names() == {"ite8258_chassis"}
 
 
 def test_virtual_routes_have_distinct_backend_names_and_state_keys() -> None:
@@ -83,7 +83,7 @@ def test_virtual_routes_carry_config_attr_names() -> None:
 
 
 def test_legacy_routes_have_no_parent_backend_or_zone_key() -> None:
-    lightbar = route_for_backend_name("ite8233")
+    lightbar = route_for_backend_name("ite8233_lightbar")
     mouse = route_for_backend_name("sysfs-mouse")
 
     assert lightbar is not None
@@ -95,7 +95,7 @@ def test_legacy_routes_have_no_parent_backend_or_zone_key() -> None:
 
 
 def test_secondary_device_route_is_frozen() -> None:
-    route = route_for_backend_name("ite8233")
+    route = route_for_backend_name("ite8233_lightbar")
     assert route is not None
 
     with pytest.raises(AttributeError):

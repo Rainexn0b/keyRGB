@@ -4,8 +4,8 @@ from collections.abc import Iterable
 from threading import RLock
 from typing import Any
 
-from src.core.backends.ite8910 import protocol as ite8910_protocol
-from src.core.backends.ite8910.backend import Ite8910Backend
+from src.core.backends.ite8910_perkey import protocol as ite8910_protocol
+from src.core.backends.ite8910_perkey.backend import Ite8910Backend
 from src.core.effects.catalog import hardware_effect_selection_key
 from src.core.effects.hw_payloads import build_hw_effect_payload
 
@@ -37,8 +37,8 @@ def _normalize_ui_speeds(values: Iterable[int]) -> tuple[int, ...]:
 
 def build_backend_speed_probe_plan(backend_name: object) -> dict[str, Any] | None:
     name = str(backend_name or "").strip().lower()
-    if name != "ite8910":
-        if name != "ite8291r3":
+    if name != "ite8910_perkey":
+        if name != "ite8291r3_perkey":
             return None
         return _build_ite8291r3_speed_probe_plan()
     return _build_ite8910_speed_probe_plan()
@@ -109,13 +109,13 @@ def _build_ite8910_speed_probe_plan() -> dict[str, Any]:
     return {
         "key": ITE8910_SPEED_PROBE_KEY,
         "label": "ITE8910 hardware speed probe",
-        "backend": "ite8910",
+        "backend": "ite8910_perkey",
         "effect_name": effect_name,
         "selection_effect_name": selection_effect_name,
         "selection_menu_path": f"Hardware Effects -> {effect_name.replace('_', ' ').title()}",
         "requested_ui_speeds": [int(value) for value in ui_speeds],
         "samples": samples,
-        "expectation": "Higher UI speed values should look faster on ite8910.",
+        "expectation": "Higher UI speed values should look faster on ite8910_perkey.",
         "instructions": [
             "Switch the keyboard to the hardware effect entry, not the software effect with the same title.",
             f"In the tray, use {effect_name.replace('_', ' ').title()} from Hardware Effects; the forced selection key is {selection_effect_name}.",
@@ -171,14 +171,14 @@ def _build_ite8291r3_speed_probe_plan() -> dict[str, Any]:
     return {
         "key": ITE8291R3_SPEED_PROBE_KEY,
         "label": "ITE8291R3 hardware speed probe",
-        "backend": "ite8291r3",
+        "backend": "ite8291r3_perkey",
         "effect_name": effect_name,
         "selection_effect_name": selection_effect_name,
         "selection_menu_path": f"Hardware Effects -> {effect_name.replace('_', ' ').title()}",
         "requested_ui_speeds": [int(value) for value in ui_speeds],
         "samples": samples,
         "expectation": (
-            "Higher UI speed values should look faster on ite8291r3, even though the programmed raw speed values "
+            "Higher UI speed values should look faster on ite8291r3_perkey, even though the programmed raw speed values "
             "drop as motion gets faster."
         ),
         "instructions": [

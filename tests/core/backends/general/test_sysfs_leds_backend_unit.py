@@ -351,6 +351,32 @@ def test_sysfs_device_set_color_multi_intensity(monkeypatch: pytest.MonkeyPatch,
     assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "50"
 
 
+def test_sysfs_device_set_color_multi_intensity_uses_multi_index_order(tmp_path: Path) -> None:
+    led_dir = _make_led(tmp_path, "rgb:kbd_backlight", brightness=0, max_brightness=100)
+    multi = led_dir / "multi_intensity"
+    multi.write_text("0 0 0\n", encoding="utf-8")
+    (led_dir / "multi_index").write_text("blue green red\n", encoding="utf-8")
+
+    dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
+    dev.set_color((1, 2, 3), brightness=25)
+
+    assert multi.read_text(encoding="utf-8") == "3 2 1\n"
+    assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "50"
+
+
+def test_sysfs_device_set_color_multi_intensity_falls_back_for_unknown_multi_index(tmp_path: Path) -> None:
+    led_dir = _make_led(tmp_path, "rgb:kbd_backlight", brightness=0, max_brightness=100)
+    multi = led_dir / "multi_intensity"
+    multi.write_text("0 0 0\n", encoding="utf-8")
+    (led_dir / "multi_index").write_text("amber red blue\n", encoding="utf-8")
+
+    dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
+    dev.set_color((1, 2, 3), brightness=25)
+
+    assert multi.read_text(encoding="utf-8") == "1 2 3\n"
+    assert (led_dir / "brightness").read_text(encoding="utf-8").strip() == "50"
+
+
 def test_sysfs_device_set_color_color_attr(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     led_dir = _make_led(tmp_path, "ite::kbd_backlight", brightness=0, max_brightness=100)
     color = led_dir / "color"
@@ -724,9 +750,10 @@ def test_sysfs_backend_probe_allows_helper_when_not_writable(monkeypatch: pytest
     assert probe.confidence >= 60
 
 
-def test_sysfs_backend_probe_rejects_helper_incompatible_root_only_led(
+def test_sysfs_backend_probe_accepts_ite8297_via_helper(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    """ITE 8297 channel LEDs are now accepted by the privileged helper."""
     _make_led(tmp_path, "ite_8297:1", brightness=1, max_brightness=255)
     monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
 
@@ -746,10 +773,9 @@ def test_sysfs_backend_probe_rejects_helper_incompatible_root_only_led(
     backend = SysfsLedsBackend()
     probe = backend.probe()
 
-    assert probe.available is False
-    assert probe.identifiers["helper_led_supported"] == "false"
-    assert "not writable" in (probe.reason or "")
-    assert "helper" in (probe.reason or "").lower()
+    assert probe.available is True
+    assert probe.identifiers["helper_led_supported"] == "true"
+    assert "using helper" in (probe.reason or "").lower()
 
 
 def test_sysfs_backend_probe_treats_access_oserror_as_unavailable(

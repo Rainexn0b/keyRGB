@@ -13,7 +13,6 @@ from src.core.backends.base import (
     ProbeResult,
 )
 from src.core.backends.sysfs import privileged
-from src.core.utils.safe_attrs import safe_int_attr
 
 from . import common
 from .device import SysfsMouseDevice
@@ -164,7 +163,10 @@ class SysfsMouseBackend(KeyboardBackend):
         return SysfsMouseDevice(primary_led_dir=found[0], all_led_dirs=found)
 
     def dimensions(self) -> tuple[int, int]:
-        return (1, max(1, safe_int_attr(self, "_zone_count_hint", default=1)))
+        # Mice are exposed as a single uniform-capable auxiliary zone, even when
+        # the underlying sysfs LED driver exposes multiple zones. Per-key mapping
+        # is intentionally not advertised for this backend.
+        return (1, 1)
 
     def effects(self) -> dict[str, object]:
         return {}

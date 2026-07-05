@@ -18,13 +18,19 @@ def _power_helper() -> str:
     return os.environ.get("KEYRGB_POWER_HELPER", "/usr/local/bin/keyrgb-power-helper")
 
 
+def _is_ite8297_channel(name: str) -> bool:
+    return bool(re.match(r"^ite_8297:[123]$", name, re.IGNORECASE))
+
+
 def helper_can_apply_led(led: str, *, color_kind: str = "brightness") -> bool:
     name = (led or "").strip()
     if not name or "/" in name or "\\" in name:
         return False
     if not _LED_NAME_RE.fullmatch(name):
         return False
-    if "kbd_backlight" not in name.lower():
+
+    # Only allow known keyboard-backlight LED name patterns.
+    if "kbd_backlight" not in name.lower() and not _is_ite8297_channel(name):
         return False
 
     kind = (color_kind or "brightness").strip().lower()

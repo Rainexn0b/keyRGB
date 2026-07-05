@@ -95,20 +95,20 @@ def test_format_diagnostics_text_includes_guided_speed_probe_section() -> None:
         app={},
         power_supply={},
         backends={
-            "selected": "ite8910",
+            "selected": "ite8910_perkey",
             "requested": "auto",
             "probes": [],
             "guided_speed_probes": [
                 {
                     "key": ITE8910_SPEED_PROBE_KEY,
-                    "backend": "ite8910",
+                    "backend": "ite8910_perkey",
                     "effect_name": "spectrum_cycle",
                     "requested_ui_speeds": [1, 3, 5, 7, 10],
                     "samples": [
                         {"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"},
                         {"ui_speed": 10, "payload_speed": 10, "raw_speed_hex": "0x0a"},
                     ],
-                    "expectation": "Higher UI speed values should look faster on ite8910.",
+                    "expectation": "Higher UI speed values should look faster on ite8910_perkey.",
                 }
             ],
         },
@@ -121,7 +121,7 @@ def test_format_diagnostics_text_includes_guided_speed_probe_section() -> None:
 
     assert "guided_speed_probes:" in text
     assert "sample: ui=1 payload=1 raw=0x01" in text
-    assert "Higher UI speed values should look faster on ite8910." in text
+    assert "Higher UI speed values should look faster on ite8910_perkey." in text
 
 
 def test_format_diagnostics_text_includes_backend_capabilities_dimensions_and_matrix() -> None:
@@ -137,11 +137,11 @@ def test_format_diagnostics_text_includes_backend_capabilities_dimensions_and_ma
         app={},
         power_supply={},
         backends={
-            "selected": "ite8258-chassis",
+            "selected": "ite8258_chassis",
             "requested": "auto",
             "probes": [
                 {
-                    "name": "ite8258-chassis",
+                    "name": "ite8258_chassis",
                     "available": True,
                     "stability": "experimental",
                     "experimental_evidence": "reverse_engineered",
@@ -250,10 +250,10 @@ def test_diagnostics_mapping_config_is_readonly_but_keeps_caller_mapping_values(
     )
 
     with pytest.raises(TypeError):
-        diag.config["backend"] = "ite8291r3"  # type: ignore[index]
+        diag.config["backend"] = "ite8291r3_perkey"  # type: ignore[index]
 
-    config_mapping["backend"] = "ite8291r3"
-    assert diag.to_dict()["config"] == {"backend": "ite8291r3"}
+    config_mapping["backend"] = "ite8291r3_perkey"
+    assert diag.to_dict()["config"] == {"backend": "ite8291r3_perkey"}
 
 
 def test_format_empty_diagnostics() -> None:
@@ -279,10 +279,10 @@ def test_format_support_hints_for_unsupported_usb_device() -> None:
             "selected": None,
             "probes": [
                 {
-                    "name": "ite8291r3",
+                    "name": "ite8291r3_perkey",
                     "available": False,
                     "confidence": 0,
-                    "reason": "usb device present but unsupported by ite8291r3 backend (0x048d:0xc966)",
+                    "reason": "usb device present but unsupported by ite8291r3_perkey backend (0x048d:0xc966)",
                     "identifiers": {"usb_vid": "0x048d", "usb_pid": "0xc966"},
                 }
             ],
@@ -314,7 +314,7 @@ def test_format_support_hints_for_tuxedo_ite829x_path() -> None:
             "selected": None,
             "probes": [
                 {
-                    "name": "ite8291r3",
+                    "name": "ite8291r3_perkey",
                     "available": False,
                     "confidence": 0,
                     "reason": "no matching usb device",

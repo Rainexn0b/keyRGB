@@ -18,6 +18,7 @@ _SYSFS_STATE_ERRORS = (OSError, ValueError)
 _CHANNEL_GROUP_STATE_ERRORS = (OSError, RuntimeError, ValueError)
 _CAPABILITY_PROBE_ERRORS = (OSError, RuntimeError)
 _DEBUG_LOGGING_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_MULTI_INDEX_READ_ERRORS = (OSError, UnicodeError)
 
 
 @dataclass
@@ -66,6 +67,32 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         brightness = int(round(level * 50))
         return (red, green, blue), max(0, min(50, brightness))
 
+    def _read_multi_index(self, led_dir: Path) -> tuple[str, ...] | None:
+        """Return kernel multicolor channel order when the LED exposes it.
+
+        The multicolor LED class documents `multi_index` as the authoritative
+        channel ordering for the sibling `multi_intensity` array. Known keyboard
+        drivers use `red green blue`, but the kernel ABI does not require that
+        order, so cache the index during zone discovery when it is available.
+        """
+        multi_index_path = led_dir / "multi_index"
+        if not multi_index_path.exists():
+            return None
+
+        try:
+            names = tuple(part.strip().lower() for part in multi_index_path.read_text(encoding="utf-8").split())
+        except _MULTI_INDEX_READ_ERRORS:
+            return None
+
+        return names or None
+
+    def _make_dir_zone(self, led_dir: Path) -> dict:
+        zone = {"type": "dir", "path": led_dir, "led_dir": led_dir}
+        multi_index = self._read_multi_index(led_dir)
+        if multi_index is not None:
+            zone["multi_index"] = multi_index
+        return zone
+
     def __post_init__(self):
         if not self.all_led_dirs:
             self.all_led_dirs = [self.primary_led_dir]
@@ -103,13 +130,13 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
                 for p in s76_paths:
                     self._zones.append({"type": "file", "path": p, "led_dir": self.all_led_dirs[0]})
             else:
-                self._zones.append({"type": "dir", "path": self.all_led_dirs[0], "led_dir": self.all_led_dirs[0]})
+                self._zones.append(self._make_dir_zone(self.all_led_dirs[0]))
         else:
             # Case 2: Multiple directories (e.g. kbd_backlight_1, _2).
             # We assume the list passed in is already sorted intelligently by the backend
             # (usually by name, so _1 (left) comes before _2 (center)).
             for d in self.all_led_dirs:
-                self._zones.append({"type": "dir", "path": d, "led_dir": d})
+                self._zones.append(self._make_dir_zone(d))
 
         # Pre-calculate key mapping if we have multiple zones
         if len(self._zones) > 1:

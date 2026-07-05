@@ -386,12 +386,12 @@ def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_ligh
             "src.tray.app.callbacks.selected_device_context_entry",
             return_value={"key": "lightbar:048d:7001", "device_type": "lightbar"},
         ),
-        patch("src.tray.app.callbacks.selected_secondary_backend_name", return_value="ite8233"),
+        patch("src.tray.app.callbacks.selected_secondary_backend_name", return_value="ite8233_lightbar"),
         patch("src.tray.app.callbacks.launch_uniform_gui") as launch,
     ):
         on_selected_device_color_clicked(tray)
 
-    launch.assert_called_once_with(target_context="lightbar:048d:7001", backend_name="ite8233")
+    launch.assert_called_once_with(target_context="lightbar:048d:7001", backend_name="ite8233_lightbar")
 
 
 def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_mouse() -> None:

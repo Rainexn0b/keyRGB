@@ -57,7 +57,7 @@ def test_build_issue_report_prefers_hardware_support_for_attention_candidates() 
             },
             "backend_probes": {
                 "ite8910_speed": {
-                    "backend": "ite8910",
+                    "backend": "ite8910_perkey",
                     "effect_name": "spectrum_cycle",
                     "selection_effect_name": "hw:spectrum_cycle",
                     "samples": [{"ui_speed": 1, "payload_speed": 1, "raw_speed_hex": "0x01"}],
@@ -86,16 +86,16 @@ def test_build_issue_report_uses_experimental_confirmation_for_selected_experime
     diagnostics = {
         "app": {"version": "0.19.1", "version_source": "pyproject"},
         "backends": {
-            "selected": "ite8297",
+            "selected": "ite8297_uniform",
             "selection": {"experimental_backends_enabled": True},
-            "probes": [{"name": "ite8297", "stability": "experimental"}],
+            "probes": [{"name": "ite8297_uniform", "stability": "experimental"}],
         },
         "system": {"kernel_release": "6.9.0", "os_release": {"PRETTY_NAME": "Nobara 41"}},
         "env": {"DESKTOP_SESSION": "plasma"},
         "dmi": {"sys_vendor": "Tongfang", "product_name": "GM7PX0N"},
     }
     discovery = {
-        "selected_backend": "ite8297",
+        "selected_backend": "ite8297_uniform",
         "summary": {"candidate_count": 1, "supported_count": 1, "attention_count": 0},
         "support_actions": {"recommended_issue_template": "experimental-backend-confirmation"},
         "candidates": [
@@ -112,9 +112,9 @@ def test_build_issue_report_uses_experimental_confirmation_for_selected_experime
     report = build_issue_report_with_evidence(diagnostics=diagnostics, discovery=discovery, supplemental_evidence=None)
 
     assert report["template"] == "experimental-backend-confirmation"
-    assert report["fields"]["backend"] == "ite8297"
+    assert report["fields"]["backend"] == "ite8297_uniform"
     assert report["fields"]["usb_id"] == "0x048d:0x8297"
-    assert "Selected backend shown by KeyRGB: ite8297" in report["fields"]["confirmation"]
+    assert "Selected backend shown by KeyRGB: ite8297_uniform" in report["fields"]["confirmation"]
 
 
 def test_build_support_bundle_payload_embeds_issue_report() -> None:

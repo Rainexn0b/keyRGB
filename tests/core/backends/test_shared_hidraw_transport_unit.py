@@ -56,7 +56,7 @@ def _make_manager_with_mock(
 def test_acquire_opens_transport_and_release_closes_it() -> None:
     manager, mock, calls, opener = _make_manager_with_mock()
 
-    proxy = manager.acquire("ite8258-chassis", opener)
+    proxy = manager.acquire("ite8258_chassis", opener)
     assert proxy.is_alive is True
     assert mock.closed is False
     assert len(calls) == 1
@@ -69,9 +69,9 @@ def test_acquire_opens_transport_and_release_closes_it() -> None:
 def test_multiple_acquires_share_transport_and_close_after_last_release() -> None:
     manager, mock, _calls, opener = _make_manager_with_mock()
 
-    proxy_a = manager.acquire("ite8258-chassis", opener)
-    proxy_b = manager.acquire("ite8258-chassis", opener)
-    proxy_c = manager.acquire("ite8258-chassis", opener)
+    proxy_a = manager.acquire("ite8258_chassis", opener)
+    proxy_b = manager.acquire("ite8258_chassis", opener)
+    proxy_c = manager.acquire("ite8258_chassis", opener)
 
     assert mock.closed is False
 
@@ -88,7 +88,7 @@ def test_multiple_acquires_share_transport_and_close_after_last_release() -> Non
 def test_release_order_does_not_matter() -> None:
     manager, mock, _calls, opener = _make_manager_with_mock()
 
-    proxies: list[HidrawTransportProxy] = [manager.acquire("ite8258-chassis", opener) for _ in range(5)]
+    proxies: list[HidrawTransportProxy] = [manager.acquire("ite8258_chassis", opener) for _ in range(5)]
 
     for proxy in reversed(proxies):
         proxy.close()
@@ -99,7 +99,7 @@ def test_release_order_does_not_matter() -> None:
 def test_double_release_is_idempotent() -> None:
     manager, mock, _calls, opener = _make_manager_with_mock()
 
-    proxy = manager.acquire("ite8258-chassis", opener)
+    proxy = manager.acquire("ite8258_chassis", opener)
     proxy.close()
     proxy.close()  # should not raise or double-close
 
@@ -109,10 +109,10 @@ def test_double_release_is_idempotent() -> None:
 def test_invalidation_closes_transport_and_marks_proxies_dead() -> None:
     manager, mock, _calls, opener = _make_manager_with_mock()
 
-    proxy_a = manager.acquire("ite8258-chassis", opener)
-    proxy_b = manager.acquire("ite8258-chassis", opener)
+    proxy_a = manager.acquire("ite8258_chassis", opener)
+    proxy_b = manager.acquire("ite8258_chassis", opener)
 
-    manager.invalidate("ite8258-chassis")
+    manager.invalidate("ite8258_chassis")
 
     assert mock.closed is True
     assert proxy_a.is_alive is False
@@ -125,7 +125,7 @@ def test_invalidation_closes_transport_and_marks_proxies_dead() -> None:
 def test_operations_after_release_raise() -> None:
     manager, mock, _calls, opener = _make_manager_with_mock()
 
-    proxy = manager.acquire("ite8258-chassis", opener)
+    proxy = manager.acquire("ite8258_chassis", opener)
     proxy.close()
 
     with pytest.raises(RuntimeError, match="no longer valid"):
@@ -141,11 +141,11 @@ def test_acquire_after_invalidation_opens_fresh_transport() -> None:
         mocks.append(mock)
         return mock
 
-    proxy1 = manager.acquire("ite8258-chassis", _opener)
+    proxy1 = manager.acquire("ite8258_chassis", _opener)
     proxy1.send_feature_report(b"hello")
-    manager.invalidate("ite8258-chassis")
+    manager.invalidate("ite8258_chassis")
 
-    proxy2 = manager.acquire("ite8258-chassis", _opener)
+    proxy2 = manager.acquire("ite8258_chassis", _opener)
     proxy2.send_feature_report(b"world")
 
     assert len(mocks) == 2
@@ -157,7 +157,7 @@ def test_acquire_after_invalidation_opens_fresh_transport() -> None:
 def test_send_and_write_are_routed_through_underlying_transport() -> None:
     manager, mock, _calls, opener = _make_manager_with_mock()
 
-    proxy = manager.acquire("ite8258-chassis", opener)
+    proxy = manager.acquire("ite8258_chassis", opener)
     proxy.send_feature_report(b"feature")
     proxy.write_output_report(b"output")
 
@@ -166,7 +166,7 @@ def test_send_and_write_are_routed_through_underlying_transport() -> None:
 
 
 def test_shared_proxy_uses_transport_level_pacing_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.backends.ite8291.hidraw import HidrawFeatureOutputTransport
+    from src.core.backends.ite8291_perkey.hidraw import HidrawFeatureOutputTransport
 
     sleeps: list[float] = []
     ioctl_payloads: list[bytes] = []
@@ -177,15 +177,15 @@ def test_shared_proxy_uses_transport_level_pacing_once(monkeypatch: pytest.Monke
         _ = fd, request, mutate_flag
         ioctl_payloads.append(bytes(payload))
 
-    monkeypatch.setattr("src.core.backends.ite8291.hidraw.fcntl.ioctl", fake_ioctl)
+    monkeypatch.setattr("src.core.backends.ite8291_perkey.hidraw.fcntl.ioctl", fake_ioctl)
 
     transport = HidrawFeatureOutputTransport.__new__(HidrawFeatureOutputTransport)
     transport.devnode = Path("/dev/hidraw-test")
-    transport._backend_name = "ite8258-chassis"
+    transport._backend_name = "ite8258_chassis"
     transport._fd = -1
 
     manager = SharedHidrawTransportManager()
-    proxy = manager.acquire("ite8258-chassis", lambda: transport)
+    proxy = manager.acquire("ite8258_chassis", lambda: transport)
 
     assert proxy.send_feature_report(b"\x08\x02") == 2
     assert ioctl_payloads == [b"\x08\x02"]
@@ -205,7 +205,7 @@ def test_write_output_report_returns_none_when_transport_lacks_method() -> None:
     manager = SharedHidrawTransportManager()
     mock = _NoWriteTransport()
 
-    proxy = manager.acquire("ite8258-chassis", lambda: mock)
+    proxy = manager.acquire("ite8258_chassis", lambda: mock)
     assert proxy.write_output_report(b"output") is None
 
 
@@ -245,7 +245,7 @@ def test_send_failure_invalidates_transport_and_re_raises() -> None:
     err = OSError(19, "No such device")
     mock = _MockTransport(fail_send=err)
 
-    proxy = manager.acquire("ite8258-chassis", lambda: mock)
+    proxy = manager.acquire("ite8258_chassis", lambda: mock)
 
     with pytest.raises(OSError, match="No such device"):
         proxy.send_feature_report(b"x")
@@ -259,7 +259,7 @@ def test_write_failure_invalidates_transport_and_re_raises() -> None:
     err = OSError(5, "Input/output error")
     mock = _MockTransport(fail_write=err)
 
-    proxy = manager.acquire("ite8258-chassis", lambda: mock)
+    proxy = manager.acquire("ite8258_chassis", lambda: mock)
 
     with pytest.raises(OSError, match="Input/output error"):
         proxy.write_output_report(b"x")
@@ -290,7 +290,7 @@ def test_concurrent_writes_are_serialized() -> None:
             self._fd = None
 
     mock = _SlowTransport()
-    proxies = [manager.acquire("ite8258-chassis", lambda: mock) for _ in range(4)]
+    proxies = [manager.acquire("ite8258_chassis", lambda: mock) for _ in range(4)]
 
     threads: list[threading.Thread] = []
     for i, proxy in enumerate(proxies):
@@ -317,7 +317,7 @@ def test_concurrent_writes_are_serialized() -> None:
 def test_proxy_close_after_manager_destroyed_does_not_raise() -> None:
     manager = SharedHidrawTransportManager()
     mock = _MockTransport()
-    proxy = manager.acquire("ite8258-chassis", lambda: mock)
+    proxy = manager.acquire("ite8258_chassis", lambda: mock)
 
     del manager
 

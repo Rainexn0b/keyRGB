@@ -12,6 +12,20 @@ def to_sysfs_brightness_method(self, brightness: int) -> int:
     return int(round((level / 50) * max_value))
 
 
+def _multi_intensity_content(zone: dict, color) -> str:
+    r, g, b = color
+    rgb_by_name = {"red": int(r), "green": int(g), "blue": int(b)}
+    default_values = [rgb_by_name["red"], rgb_by_name["green"], rgb_by_name["blue"]]
+    names = tuple(str(name).strip().lower() for name in zone.get("multi_index", ()))
+
+    if names and all(name in rgb_by_name for name in names):
+        values = [rgb_by_name[name] for name in names]
+    else:
+        values = default_values
+
+    return " ".join(str(value) for value in values) + "\n"
+
+
 def set_zone_color_method(self, zone: dict, color, brightness: int):
     r, g, b = color
     led_dir: Path = zone["led_dir"]
@@ -55,7 +69,7 @@ def set_zone_color_method(self, zone: dict, color, brightness: int):
     if self._supports_multicolor(led_dir):
         multi_intensity_path = led_dir / "multi_intensity"
         try:
-            common._safe_write_text(multi_intensity_path, f"{r} {g} {b}\n")
+            common._safe_write_text(multi_intensity_path, _multi_intensity_content(zone, color))
             self._set_zone_brightness(led_dir, self._to_sysfs_brightness(brightness))
             return
         except PermissionError as exc:

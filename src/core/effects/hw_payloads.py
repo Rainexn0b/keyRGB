@@ -98,8 +98,8 @@ def build_hw_effect_payload(
     """
 
     # Hardware speed policy is backend-specific.
-    # - ite8910: firmware uses 0..10 with larger values = faster
-    # - ite8291r3: native backend preserves the legacy 0 = fastest, 10 = slowest firmware scale
+    # - ite8910_perkey: firmware uses 0..10 with larger values = faster
+    # - ite8291r3_perkey: native backend preserves the legacy 0 = fastest, 10 = slowest firmware scale
     # Unknown backends default to the UI scale directly so new hardware-effect
     # paths do not inherit the old inverted behavior by accident.
     hw_speed = _hw_speed_from_ui_speed(ui_speed, kb=kb)
@@ -114,7 +114,7 @@ def build_hw_effect_payload(
     normalized_effect_name = str(effect_name or "").strip().lower()
     supports_color = "color" in allowed or normalized_effect_name in _KNOWN_COLOR_HW_EFFECTS
 
-    # Palette-based backends (for example ite8291r3) expose a firmware color
+    # Palette-based backends (for example ite8291r3_perkey) expose a firmware color
     # slot table. Any hardware effect that accepts a `color` parameter expects
     # that palette slot index, not a raw RGB tuple.
     if hw_colors and supports_color:
@@ -139,7 +139,7 @@ def build_hw_effect_payload(
             hw_kwargs["color"] = palette_slot
 
     # Direct-RGB color pass-through for backends that accept color as an RGB
-    # tuple (for example ite8910). Only set if not already populated by the
+    # tuple (for example ite8910_perkey). Only set if not already populated by the
     # palette path above.
     if "color" not in hw_kwargs and supports_color:
         hw_kwargs["color"] = tuple(current_color)

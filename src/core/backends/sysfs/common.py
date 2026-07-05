@@ -101,8 +101,6 @@ def _score_led_dir(led_dir: Path) -> int:
         score += 45
     if (led_dir / "color_center").exists() or (led_dir / "color_left").exists():
         score += 45
-    if name.startswith("ite_8297:"):
-        score += 35
 
     # De-prioritize "noise" LEDs that frequently contain kbd substrings.
     for noisy in ("capslock", "numlock", "scrolllock", "micmute", "mute"):

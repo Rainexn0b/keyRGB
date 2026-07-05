@@ -26,7 +26,7 @@ def _sample_diagnostics() -> Diagnostics:
         hints={},
         app={"version": "test"},
         power_supply={},
-        backends={"selected": "ite8291r3", "probes": []},
+        backends={"selected": "ite8291r3_perkey", "probes": []},
         usb_devices=[],
         config={"backend": "auto"},
         process={"pid": 1234},
@@ -55,7 +55,7 @@ def test_collect_diagnostics_filters_usb_targets_and_tolerates_power_mode_failur
         diagnostics_mod,
         "_backend_probe_snapshot",
         lambda: {
-            "selected": "ite8291r3",
+            "selected": "ite8291r3_perkey",
             "probes": [
                 {"identifiers": {"usb_vid": "0x048d", "usb_pid": "0xce00"}},
                 {"identifiers": {"usb_vid": "0xzzzz", "usb_pid": "0xce00"}},
@@ -101,7 +101,7 @@ def test_collect_diagnostics_propagates_programming_errors_from_power_mode_snaps
     monkeypatch.setattr(diagnostics_mod, "_list_module_hints", lambda: [])
     monkeypatch.setattr(diagnostics_mod, "_app_snapshot", lambda: {"version": "test"})
     monkeypatch.setattr(diagnostics_mod, "_power_supply_snapshot", lambda: {"ac_online": True})
-    monkeypatch.setattr(diagnostics_mod, "_backend_probe_snapshot", lambda: {"selected": "ite8291r3", "probes": []})
+    monkeypatch.setattr(diagnostics_mod, "_backend_probe_snapshot", lambda: {"selected": "ite8291r3_perkey", "probes": []})
     monkeypatch.setattr(diagnostics_mod, "_usb_devices_snapshot", lambda targets: [])
     monkeypatch.setattr(diagnostics_mod, "_config_snapshot", lambda: {"backend": "auto"})
     monkeypatch.setattr(diagnostics_mod, "_process_snapshot", lambda: {"pid": 55})
@@ -141,7 +141,7 @@ def test_diagnostics_main_prints_json_by_default(
 
     payload = json.loads(capsys.readouterr().out)
     assert payload["app"]["version"] == "test"
-    assert payload["backends"]["selected"] == "ite8291r3"
+    assert payload["backends"]["selected"] == "ite8291r3_perkey"
 
 
 def test_diagnostics_module_trampoline_invokes_package_main(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -17,11 +17,11 @@ def format_hex_id(val: str) -> str:
 def backend_display_name(backend_name: str) -> str:
     if backend_name == "sysfs-leds":
         return "Kernel Driver"
-    if backend_name == "ite8291r3":
+    if backend_name == "ite8291r3_perkey":
         return "ITE 8291r3 (USB)"
-    if backend_name == "ite8910":
+    if backend_name == "ite8910_perkey":
         return "ITE 8910 (USB)"
-    if backend_name == "ite8297":
+    if backend_name == "ite8297_uniform":
         return "ITE 8297 (USB)"
     return backend_name
 

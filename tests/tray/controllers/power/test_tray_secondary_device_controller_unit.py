@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, call
 def _make_lightbar_route(*, device_factory):
     return SimpleNamespace(
         device_type="lightbar",
-        backend_name="ite8233",
+        backend_name="ite8233_lightbar",
         display_name="Lightbar",
         get_device=device_factory,
         config_brightness_attr="lightbar_brightness",

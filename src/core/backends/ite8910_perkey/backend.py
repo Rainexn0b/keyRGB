@@ -44,7 +44,7 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> EffectB
 class Ite8910Backend(KeyboardBackend):
     """Backend for the ITE 8910 HID protocol (reverse-engineered, hardware-validated)."""
 
-    name: str = "ite8910"
+    name: str = "ite8910_perkey"
     priority: int = 94
     stability: BackendStability = BackendStability.VALIDATED
     experimental_evidence: None = None
@@ -56,7 +56,7 @@ class Ite8910Backend(KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=False,
-                reason="ite8910 hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8910_perkey hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
             )
 

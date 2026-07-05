@@ -20,7 +20,7 @@ def test_diagnostics_dict_fields_are_readonly_through_snapshot() -> None:
         hints={"test": "value"},
         app={"version": "1.0"},
         power_supply={},
-        backends={"selected": "ite8291r3"},
+        backends={"selected": "ite8291r3_perkey"},
         usb_devices=[],
         config={},
         process={"pid": 123},
@@ -143,11 +143,11 @@ def test_diagnostics_mapping_config_is_readonly_but_keeps_caller_mapping_values(
 
     # Cannot mutate through the snapshot (wrapped in MappingProxyType).
     with pytest.raises(TypeError):
-        diag.config["backend"] = "ite8291r3"  # type: ignore[index]
+        diag.config["backend"] = "ite8291r3_perkey"  # type: ignore[index]
 
     # But if caller still has the original reference and mutates it, snapshot reflects the change.
-    config_mapping["backend"] = "ite8291r3"
-    assert diag.to_dict()["config"] == {"backend": "ite8291r3", "effect": "wave"}
+    config_mapping["backend"] = "ite8291r3_perkey"
+    assert diag.to_dict()["config"] == {"backend": "ite8291r3_perkey", "effect": "wave"}
 
 
 def test_diagnostics_config_snapshot_is_immutable() -> None:

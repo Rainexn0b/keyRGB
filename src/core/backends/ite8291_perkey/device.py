@@ -123,6 +123,8 @@ class Ite8291KeyboardDevice:
         rgb = _coerce_rgb(color)
         self._current_matrix = [[rgb for _ in range(protocol.NUM_COLS)] for _ in range(protocol.NUM_ROWS)]
         self.enable_user_mode(brightness=brightness, save=False)
+        if self._is_off:
+            return
         self._write_matrix_rows()
 
     def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
@@ -144,6 +146,9 @@ class Ite8291KeyboardDevice:
                 return
             self._current_brightness = level
             self._is_off = False
+
+        if self._is_off:
+            return
 
         self._write_matrix_rows()
 

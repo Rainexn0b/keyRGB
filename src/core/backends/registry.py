@@ -13,6 +13,21 @@ logger = logging.getLogger(__name__)
 _BACKEND_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _T = TypeVar("_T")
 
+# Map deprecated backend names to their canonical replacement. Users who set
+# KEYRGB_BACKEND=<old_name> will transparently resolve to the canonical backend.
+# See src/core/backends/README.md for the naming convention.
+_BACKEND_NAME_ALIASES: dict[str, str] = {
+    "ite8291r3": "ite8291r3_perkey",
+    "ite8910": "ite8910_perkey",
+    "ite8291": "ite8291_perkey",
+    "ite8291-zones": "ite8291_zones",
+    "ite8258": "ite8258_zones",
+    "ite8258-chassis": "ite8258_chassis",
+    "ite8295-zones": "ite8295_zones",
+    "ite8233": "ite8233_lightbar",
+    "ite8297": "ite8297_uniform",
+}
+
 
 @dataclass(frozen=True)
 class BackendSpec:
@@ -42,15 +57,15 @@ def _unavailable_probe_result(boundary: str, exc: Exception) -> ProbeResult:
 def _default_specs() -> list[BackendSpec]:
     # Keep this list small and lazy-importing.
     from .asusctl import AsusctlAuraBackend
-    from .ite8258 import Ite8258Backend
+    from .ite8258_zones import Ite8258Backend
     from .ite8258_chassis import Ite8258ChassisBackend
-    from .ite8291 import Ite8291Backend
+    from .ite8291_perkey import Ite8291Backend
     from .ite8291_zones import Ite8291ZonesBackend
     from .ite8295_zones import Ite8295ZonesBackend
-    from .ite8233 import Ite8233Backend
-    from .ite8910 import Ite8910Backend
-    from .ite8291r3 import Ite8291r3Backend
-    from .ite8297 import Ite8297Backend
+    from .ite8233_lightbar import Ite8233Backend
+    from .ite8910_perkey import Ite8910Backend
+    from .ite8291r3_perkey import Ite8291r3Backend
+    from .ite8297_uniform import Ite8297Backend
     from .sysfs import SysfsLedsBackend
 
     return [
@@ -166,7 +181,7 @@ def select_backend(
     - env `KEYRGB_BACKEND`
     - auto selection (highest confidence, then priority)
 
-    Allowed values: backend name, or `auto`.
+    Allowed values: backend name, alias, or `auto`.
     Returns None if nothing is available.
     """
 
@@ -182,8 +197,9 @@ def select_backend(
     backends = iter_backends(specs=specs)
 
     if req != "auto":
+        resolved_req = _BACKEND_NAME_ALIASES.get(req, req)
         for backend in backends:
-            if backend.name.lower() == req:
+            if backend.name.lower() == resolved_req:
                 selectable, selection_reason = selection_allowed_for_backend(backend)
                 if not selectable:
                     logger.debug(

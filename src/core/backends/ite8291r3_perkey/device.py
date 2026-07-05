@@ -137,6 +137,12 @@ class Ite8291r3KeyboardDevice:
         sleep_after_hid_report(delay_s=self._report_delay_s)
 
     def get_fw_version(self) -> tuple[int, int, int, int]:
+        """Return the firmware version as ``(major, minor, test, customer)``.
+
+        Byte layout of the 8-byte response::
+
+            [cmd, major, minor, test, customer, 0, 0, 0]
+        """
         self._send_control(protocol.build_get_fw_version_report())
         buf = self._read_control(8)
         return (int(buf[1]), int(buf[2]), int(buf[3]), int(buf[4]))

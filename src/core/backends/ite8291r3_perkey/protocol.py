@@ -108,6 +108,18 @@ def build_set_effect_report(
     direction_or_reactive: int = 0,
     save: int = 0,
 ) -> bytes:
+    """Build an 8-byte set-effect control report.
+
+    Byte layout::
+
+        [0x08, control, effect, speed, brightness, color, direction_or_reactive, save]
+
+    ``control``: ``0x01`` to turn off or ``0x02`` to set a mode.
+    ``effect``: mode ID from the ``effects`` dict (e.g. ``0x33`` for per-key user mode).
+    ``color``: palette index (0-8) used by hardware effects; 8 = random.
+    ``direction_or_reactive``: wave direction (1-4) or reactive flag for applicable effects.
+    ``save``: ``0x01`` to persist across power cycles, ``0x00`` for transient.
+    """
     return build_control_report(
         Commands.SET_EFFECT,
         control,
@@ -152,6 +164,15 @@ def build_get_effect_report() -> bytes:
 
 
 def build_row_data_report(colors_for_row: Sequence[object]) -> bytes:
+    """Build a 65-byte row data output report for all 21 columns in one row.
+
+    Byte layout (65 bytes total)::
+
+        [pad, pad, B0..B20, G0..G20, R0..R20]
+
+    The row index must be set separately via ``build_set_row_index_report()``
+    before sending the row data for that row.
+    """
     if len(colors_for_row) != NUM_COLS:
         raise ValueError(f"row must contain exactly {NUM_COLS} colors")
 

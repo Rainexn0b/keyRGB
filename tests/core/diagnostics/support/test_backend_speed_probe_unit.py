@@ -14,11 +14,11 @@ from src.core.diagnostics.support import (
 
 
 def test_build_backend_speed_probe_plan_for_ite8910() -> None:
-    plan = build_backend_speed_probe_plan("ite8910")
+    plan = build_backend_speed_probe_plan("ite8910_perkey")
 
     assert isinstance(plan, dict)
     assert plan["key"] == ITE8910_SPEED_PROBE_KEY
-    assert plan["backend"] == "ite8910"
+    assert plan["backend"] == "ite8910_perkey"
     assert plan["effect_name"] == "spectrum_cycle"
     assert plan["selection_effect_name"] == "hw:spectrum_cycle"
     assert plan["selection_menu_path"] == "Hardware Effects -> Spectrum Cycle"
@@ -30,24 +30,24 @@ def test_build_backend_speed_probe_plan_for_ite8910() -> None:
 def test_build_backend_speed_probe_plans_filters_to_supported_backends() -> None:
     plans = build_backend_speed_probe_plans(
         backends_snapshot={
-            "selected": "ite8910",
+            "selected": "ite8910_perkey",
             "probes": [
-                {"name": "ite8910", "available": True},
+                {"name": "ite8910_perkey", "available": True},
                 {"name": "sysfs-leds", "available": True},
             ],
         }
     )
 
     assert len(plans) == 1
-    assert plans[0]["backend"] == "ite8910"
+    assert plans[0]["backend"] == "ite8910_perkey"
 
 
 def test_build_backend_speed_probe_plan_for_ite8291r3() -> None:
-    plan = build_backend_speed_probe_plan("ite8291r3")
+    plan = build_backend_speed_probe_plan("ite8291r3_perkey")
 
     assert isinstance(plan, dict)
     assert plan["key"] == ITE8291R3_SPEED_PROBE_KEY
-    assert plan["backend"] == "ite8291r3"
+    assert plan["backend"] == "ite8291r3_perkey"
     assert plan["effect_name"] == "wave"
     assert plan["selection_effect_name"] == "wave"
     assert plan["selection_menu_path"] == "Hardware Effects -> Wave"
@@ -59,13 +59,13 @@ def test_build_backend_speed_probe_plan_for_ite8291r3() -> None:
 def test_build_backend_speed_probe_plans_includes_ite8291r3_when_selected() -> None:
     plans = build_backend_speed_probe_plans(
         backends_snapshot={
-            "selected": "ite8291r3",
+            "selected": "ite8291r3_perkey",
             "probes": [
-                {"name": "ite8291r3", "available": True},
+                {"name": "ite8291r3_perkey", "available": True},
                 {"name": "sysfs-leds", "available": True},
             ],
         }
     )
 
     assert len(plans) == 1
-    assert plans[0]["backend"] == "ite8291r3"
+    assert plans[0]["backend"] == "ite8291r3_perkey"

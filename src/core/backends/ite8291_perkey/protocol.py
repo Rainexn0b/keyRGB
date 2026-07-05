@@ -6,6 +6,13 @@ from typing import SupportsIndex, SupportsInt, cast
 HIDRAW_PATH_ENV = "KEYRGB_ITE8291_HIDRAW_PATH"
 
 VENDOR_ID = 0x048D
+
+# Reference PID coverage is intentionally documented because public sources do
+# not all agree.  OpenRGB registers 0x600B only; pobrn's rev-0.03 USB driver
+# covers 0x6004/0x6006/0x600B/0xCE00 with bcdDevice 0x0003; tuxedo-drivers'
+# hid driver covers 0x6004/0x600A/0x600B/0xCE00.  The experimental 0x6008
+# entry is carried from KeyRGB's local hardware-expansion notes and should stay
+# treated as unvalidated until diagnostics from real hardware confirm it.
 SUPPORTED_PRODUCT_IDS: tuple[int, ...] = (0x6004, 0x6008, 0x600B, 0xCE00)
 
 NUM_ROWS = 6
@@ -82,6 +89,14 @@ def build_row_announce_report(row: int) -> bytes:
 
 
 def build_row_data_report(colors: Sequence[object]) -> bytes:
+    """Build a hidraw/hidapi row output report.
+
+    hidraw/hidapi output reports include a leading report-ID byte.  The ITE
+    row payload then has one additional zero byte before the B/G/R planes, so
+    OpenRGB and tuxedo-drivers use offsets 2/23/44.  The older pyusb reference
+    writes endpoint data with B at offset 1, which appears to be an API/report-ID
+    convention difference rather than a different color plane order.
+    """
     if len(colors) != NUM_COLS:
         raise ValueError(f"row must contain exactly {NUM_COLS} colors")
 

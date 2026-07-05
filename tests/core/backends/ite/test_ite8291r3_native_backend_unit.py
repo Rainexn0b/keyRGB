@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 from threading import RLock
 
-from src.core.backends.ite8291r3 import protocol
-from src.core.backends.ite8291r3.device import Ite8291r3KeyboardDevice
-from src.core.backends.ite8291r3.backend import Ite8291r3Backend
+from src.core.backends.ite8291r3_perkey import protocol
+from src.core.backends.ite8291r3_perkey.device import Ite8291r3KeyboardDevice
+from src.core.backends.ite8291r3_perkey.backend import Ite8291r3Backend
 from src.core.effects.hw_payloads import allowed_hw_effect_keys, build_hw_effect_payload
 
 
@@ -102,30 +102,30 @@ def test_backend_effects_and_colors_are_native_protocol_maps() -> None:
 
 
 def test_report_delay_env_helper_defaults_to_one_ms(monkeypatch) -> None:
-    from src.core.backends.ite8291r3.backend import _report_delay_s_from_env
+    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
-    monkeypatch.delenv("KEYRGB_ITE8291R3_REPORT_DELAY_MS", raising=False)
+    monkeypatch.delenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", raising=False)
     assert _report_delay_s_from_env() == 0.001
 
 
 def test_report_delay_env_helper_parses_ms(monkeypatch) -> None:
-    from src.core.backends.ite8291r3.backend import _report_delay_s_from_env
+    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
-    monkeypatch.setenv("KEYRGB_ITE8291R3_REPORT_DELAY_MS", "2.5")
+    monkeypatch.setenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", "2.5")
     assert _report_delay_s_from_env() == 0.0025
 
 
 def test_report_delay_env_helper_allows_zero_to_disable(monkeypatch) -> None:
-    from src.core.backends.ite8291r3.backend import _report_delay_s_from_env
+    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
-    monkeypatch.setenv("KEYRGB_ITE8291R3_REPORT_DELAY_MS", "0")
+    monkeypatch.setenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", "0")
     assert _report_delay_s_from_env() == 0.0
 
 
 def test_report_delay_env_helper_falls_back_to_global(monkeypatch) -> None:
-    from src.core.backends.ite8291r3.backend import _report_delay_s_from_env
+    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
-    monkeypatch.delenv("KEYRGB_ITE8291R3_REPORT_DELAY_MS", raising=False)
+    monkeypatch.delenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", raising=False)
     monkeypatch.setenv("KEYRGB_HID_REPORT_DELAY_MS", "4")
     assert _report_delay_s_from_env() == 0.004
 

@@ -24,7 +24,7 @@ def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
 def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
     from .hidraw import open_matching_hidraw_transport
 
-    return open_matching_hidraw_transport(backend_name="ite8291")
+    return open_matching_hidraw_transport(backend_name="ite8291_perkey")
 
 
 def _identifiers_for_match(match: HidrawDeviceInfo) -> dict[str, str]:
@@ -44,7 +44,7 @@ def _identifiers_for_match(match: HidrawDeviceInfo) -> dict[str, str]:
 class Ite8291Backend(_backend_base.KeyboardBackend):
     """Experimental native HID backend for the ITE 8291 6x21 row protocol."""
 
-    name: str = "ite8291"
+    name: str = "ite8291_perkey"
     priority: int = 97
     stability: _backend_base.BackendStability = _backend_base.BackendStability.EXPERIMENTAL
     experimental_evidence: _backend_base.ExperimentalEvidence = _backend_base.ExperimentalEvidence.REVERSE_ENGINEERED
@@ -61,7 +61,7 @@ class Ite8291Backend(_backend_base.KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return _backend_base.ProbeResult(
                 available=False,
-                reason="ite8291 hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8291_perkey hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )

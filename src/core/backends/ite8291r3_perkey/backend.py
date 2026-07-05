@@ -91,12 +91,12 @@ def _report_delay_s_from_env() -> float:
     controller to lock up or reset.  Users who still see instability can raise
     this; users on well-behaved hardware can set it to 0 to disable the pacing.
     """
-    return hid_report_delay_s_from_env(backend_name="ite8291r3")
+    return hid_report_delay_s_from_env(backend_name="ite8291r3_perkey")
 
 
 @dataclass
 class Ite8291r3Backend(KeyboardBackend):
-    name: str = "ite8291r3"
+    name: str = "ite8291r3_perkey"
     priority: int = 100
     stability: BackendStability = BackendStability.VALIDATED
     experimental_evidence: None = None
@@ -137,7 +137,7 @@ class Ite8291r3Backend(KeyboardBackend):
                     return ProbeResult(
                         available=False,
                         reason=(
-                            "usb device present but unsupported by ite8291r3 backend "
+                            "usb device present but unsupported by ite8291r3_perkey backend "
                             f"(0x{vendor_id:04x}:0x{int(pid):04x})"
                         ),
                         confidence=0,
@@ -163,7 +163,7 @@ class Ite8291r3Backend(KeyboardBackend):
                     return ProbeResult(
                         available=False,
                         reason=(
-                            "usb device present but unsupported by ite8291r3 backend "
+                            "usb device present but unsupported by ite8291r3_perkey backend "
                             f"(0x{vendor_id:04x}:0x{int(pid):04x}; {unsupported_variant})"
                         ),
                         confidence=0,
@@ -179,7 +179,7 @@ class Ite8291r3Backend(KeyboardBackend):
                     return ProbeResult(
                         available=False,
                         reason=(
-                            "usb device present but unsupported by ite8291r3 backend "
+                            "usb device present but unsupported by ite8291r3_perkey backend "
                             f"(0x{vendor_id:04x}:0x{int(pid):04x}; {unexpected_revision})"
                         ),
                         confidence=0,
@@ -246,7 +246,7 @@ class Ite8291r3Backend(KeyboardBackend):
             if is_device_busy(exc):
                 raise BackendBusyError("ITE 8291 device is busy; another process may own it") from exc
             if os.environ.get("KEYRGB_DEBUG"):
-                logger.exception("Failed to open native ite8291r3 device")
+                logger.exception("Failed to open native ite8291r3_perkey device")
             raise BackendIOError(f"ITE 8291 USB device open failed: {exc}") from exc
 
         _set_best_effort_device_attr(device, "keyrgb_hw_speed_policy", "inverted")

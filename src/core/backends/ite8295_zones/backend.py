@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from ..base import KeyboardDevice
-    from ..ite8291.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
+    from ..ite8291_perkey.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
 
 
 def find_matching_hidraw_device(
@@ -29,7 +29,7 @@ def find_matching_hidraw_device(
     product_ids: tuple[int, ...] | None = None,
     forced_path_env: str | None = None,
 ) -> HidrawDeviceInfo | None:
-    from ..ite8291.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
+    from ..ite8291_perkey.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
 
     return _find_matching_hidraw_device(
         product_ids=tuple(int(product_id) for product_id in (product_ids or protocol.SUPPORTED_PRODUCT_IDS)),
@@ -50,11 +50,11 @@ def open_matching_hidraw_transport(
     )
     if info is None:
         raise FileNotFoundError(
-            "No hidraw device found for supported ITE 8291 IDs: "
+            "No hidraw device found for supported ITE 8295 4-zone IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{product_id:04x}" for product_id in supported_product_ids)
         )
 
-    from ..ite8291.hidraw import HidrawFeatureOutputTransport
+    from ..ite8291_perkey.hidraw import HidrawFeatureOutputTransport
 
     return HidrawFeatureOutputTransport(info.devnode, backend_name=backend_name), info
 
@@ -70,7 +70,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
     return open_matching_hidraw_transport(
         product_ids=protocol.SUPPORTED_PRODUCT_IDS,
         forced_path_env=protocol.HIDRAW_PATH_ENV,
-        backend_name="ite8295-zones",
+        backend_name="ite8295_zones",
     )
 
 
@@ -93,9 +93,14 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> Callabl
 
 @dataclass
 class Ite8295ZonesBackend(KeyboardBackend):
-    """Experimental Lenovo 4-zone ITE 8295 hidraw backend for 0x048d:0xc963."""
+    """Experimental Lenovo 4-zone ITE 8295 hidraw backend.
 
-    name: str = "ite8295-zones"
+    Covers the Lenovo Legion/IdeaPad 4-zone keyboard family (VID 0x048d,
+    PIDs 0xc955/0xc963/0xc965/0xc973/0xc975/0xc984/0xc985). These devices
+    share the same usage page, usage, and 33-byte feature-report protocol.
+    """
+
+    name: str = "ite8295_zones"
     priority: int = 97
     stability: BackendStability = BackendStability.EXPERIMENTAL
     experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
@@ -115,7 +120,7 @@ class Ite8295ZonesBackend(KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=False,
-                reason="ite8295-zones hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8295_zones hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )

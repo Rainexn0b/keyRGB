@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.backends.ite8910 import Ite8910Backend, Ite8910KeyboardDevice
+from src.core.backends.ite8910_perkey import Ite8910Backend, Ite8910KeyboardDevice
 from src.core.backends.base import BackendStability
-from src.core.backends.ite8910.protocol import (
+from src.core.backends.ite8910_perkey.protocol import (
     Ite8910Effect,
     Ite8910ProtocolState,
     KNOWN_LED_IDS,
@@ -304,7 +304,7 @@ def test_backend_get_device_returns_keyboard(
 
     transport = FakeTransport()
     monkeypatch.setattr(
-        "src.core.backends.ite8910.backend.open_matching_hidraw_transport",
+        "src.core.backends.ite8910_perkey.backend.open_matching_hidraw_transport",
         lambda *_a, **_k: (transport, SimpleNamespace(devnode="/dev/hidraw7")),
     )
 
@@ -319,7 +319,7 @@ def test_backend_get_device_returns_keyboard(
 def test_backend_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPatch) -> None:
     err = PermissionError("permission denied")
     monkeypatch.setattr(
-        "src.core.backends.ite8910.backend.open_matching_hidraw_transport",
+        "src.core.backends.ite8910_perkey.backend.open_matching_hidraw_transport",
         lambda *_a, **_k: (_ for _ in ()).throw(err),
     )
 
@@ -329,7 +329,7 @@ def test_backend_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPat
 
 def test_backend_get_device_propagates_unexpected_open_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "src.core.backends.ite8910.backend.open_matching_hidraw_transport",
+        "src.core.backends.ite8910_perkey.backend.open_matching_hidraw_transport",
         lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("unexpected transport bug")),
     )
 
@@ -340,7 +340,7 @@ def test_backend_get_device_propagates_unexpected_open_errors(monkeypatch: pytes
 def test_backend_probe_reports_available_when_device_present(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setattr(
-        "src.core.backends.ite8910.backend.find_matching_hidraw_device",
+        "src.core.backends.ite8910_perkey.backend.find_matching_hidraw_device",
         lambda *_a, **_k: SimpleNamespace(
             vendor_id=0x048D,
             product_id=0x8910,

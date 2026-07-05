@@ -107,7 +107,7 @@ class TestBuildHwEffectPayload:
         assert result == "payload"
 
     def test_ite8291r3_inverts_speed_scale(self):
-        """Vendored ite8291r3 uses 0 = fastest, 10 = slowest."""
+        """Vendored ite8291r3_perkey uses 0 = fastest, 10 = slowest."""
         from src.core.effects.hw_payloads import build_hw_effect_payload
 
         class FakeIte8291r3Keyboard:
@@ -138,7 +138,7 @@ class TestBuildHwEffectPayload:
         assert result == "payload"
 
     def test_ite8291r3_slowest_speed_conversion(self):
-        """Lowest UI speed should stay slowest on the ite8291r3 backend."""
+        """Lowest UI speed should stay slowest on the ite8291r3_perkey backend."""
         from src.core.effects.hw_payloads import build_hw_effect_payload
 
         class FakeIte8291r3Keyboard:
@@ -442,7 +442,7 @@ class TestBuildHwEffectPayload:
             )
 
     def test_ite8291r3_clamps_speed_to_valid_range(self):
-        """ite8291r3 speed inversion should still clamp to [0, 10]."""
+        """ite8291r3_perkey speed inversion should still clamp to [0, 10]."""
         from src.core.effects.hw_payloads import build_hw_effect_payload
 
         class FakeIte8291r3Keyboard:
@@ -455,7 +455,7 @@ class TestBuildHwEffectPayload:
             return "payload"
 
         # Test upper bound: values above the UI range first clamp to 10, then
-        # the ite8291r3 inversion maps that to the fastest supported hardware
+        # the ite8291r3_perkey inversion maps that to the fastest supported hardware
         # value.
         build_hw_effect_payload(
             effect_name="test",

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.backends.ite8910.hidraw import HidrawFeatureTransport, _parse_hid_id, find_matching_hidraw_device
+from src.core.backends.ite8910_perkey.hidraw import HidrawFeatureTransport, _parse_hid_id, find_matching_hidraw_device
 
 
 def test_find_matching_hidraw_device_matches_vid_pid(tmp_path: Path) -> None:

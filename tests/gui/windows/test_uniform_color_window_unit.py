@@ -106,8 +106,8 @@ def test_resolve_secondary_route_prefers_requested_backend_route() -> None:
 
     result = uniform_color_bootstrap.resolve_secondary_route(
         target_context="mouse:external",
-        requested_backend="ite8291r3",
-        route_for_backend_name_fn=lambda name: sentinel if name == "ite8291r3" else None,
+        requested_backend="ite8291r3_perkey",
+        route_for_backend_name_fn=lambda name: sentinel if name == "ite8291r3_perkey" else None,
         route_for_device_type_fn=lambda _name: (_ for _ in ()).throw(AssertionError("unexpected device type")),
     )
 

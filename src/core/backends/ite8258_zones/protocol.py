@@ -8,6 +8,11 @@ from typing import SupportsIndex, SupportsInt, cast
 HIDRAW_PATH_ENV = "KEYRGB_ITE8258_HIDRAW_PATH"
 
 VENDOR_ID = 0x048D
+
+# Lenovo Gen10 keeps 0xC195 and 0xC197 in the same 960-byte packet family, but
+# OpenRGB treats 0xC195 as the keyboard-only 4x6/24-zone device and 0xC197 as a
+# larger composite keyboard/chassis controller.  Keep this backend scoped to the
+# 24-zone keyboard-only path; the composite path lives in `ite8258_chassis`.
 SUPPORTED_PRODUCT_IDS: tuple[int, ...] = (0xC195,)
 
 USAGE_PAGE = 0xFF89
@@ -17,6 +22,7 @@ PACKET_SIZE = 960
 REPORT_ID = 0x07
 
 SAVE_PROFILE = 0xCB
+SWITCH_PROFILE = 0xC8
 SET_BRIGHTNESS = 0xCE
 
 DEFAULT_PROFILE_ID = 0x01
@@ -163,6 +169,12 @@ def _packet(command: int, payload_length: int) -> bytearray:
 def build_set_brightness_report(brightness_raw: int) -> bytes:
     packet = _packet(SET_BRIGHTNESS, 1)
     packet[4] = max(0, min(RAW_BRIGHTNESS_MAX, int(brightness_raw)))
+    return bytes(packet)
+
+
+def build_switch_profile_report(profile_id: int = DEFAULT_PROFILE_ID) -> bytes:
+    packet = _packet(SWITCH_PROFILE, 1)
+    packet[4] = int(profile_id) & 0xFF
     return bytes(packet)
 
 

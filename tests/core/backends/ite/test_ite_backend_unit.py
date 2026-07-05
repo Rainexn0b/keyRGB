@@ -35,7 +35,7 @@ def test_ite_backend_smoke() -> None:
 
     # This test is intended for ITE-based devices. If you run it on other
     # hardware/backends, adapt as needed.
-    assert getattr(backend, "name", None) == "ite8291r3", f"Unexpected backend: {getattr(backend, 'name', None)}"
+    assert getattr(backend, "name", None) == "ite8291r3_perkey", f"Unexpected backend: {getattr(backend, 'name', None)}"
 
     kb = backend.get_device()
 

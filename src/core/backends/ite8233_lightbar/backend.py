@@ -17,7 +17,7 @@ from ..policy import experimental_backends_enabled
 from . import protocol
 
 if TYPE_CHECKING:
-    from ..ite8910.hidraw import HidrawDeviceInfo, HidrawFeatureTransport
+    from ..ite8910_perkey.hidraw import HidrawDeviceInfo, HidrawFeatureTransport
 
 
 class _HidrawModule(Protocol):
@@ -36,7 +36,7 @@ class _HidrawModule(Protocol):
 
 def _hidraw_module() -> _HidrawModule:
     # Keep hidraw dependency lazy to avoid pulling USB internals during backend discovery import.
-    from ..ite8910 import hidraw
+    from ..ite8910_perkey import hidraw
 
     return hidraw
 
@@ -87,14 +87,14 @@ def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo
             "No hidraw device found for supported ITE 8233 lightbar IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
         )
-    return hidraw.HidrawFeatureTransport(info.devnode, backend_name="ite8233"), info
+    return hidraw.HidrawFeatureTransport(info.devnode, backend_name="ite8233_lightbar"), info
 
 
 @dataclass
 class Ite8233Backend(KeyboardBackend):
     """Experimental ITE lightbar backend for the vendor-backed 0x7000/0x7001 HID path."""
 
-    name: str = "ite8233"
+    name: str = "ite8233_lightbar"
     priority: int = 96
     stability: BackendStability = BackendStability.EXPERIMENTAL
     experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
@@ -114,7 +114,7 @@ class Ite8233Backend(KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=False,
-                reason="ite8233 hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8233_lightbar hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )

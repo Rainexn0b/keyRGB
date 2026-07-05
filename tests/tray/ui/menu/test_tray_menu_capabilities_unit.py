@@ -209,7 +209,7 @@ def test_menu_includes_keyboard_status_header(monkeypatch: pytest.MonkeyPatch) -
 
 def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) -> None:
     class DummyBackend:
-        name = "ite8291r3"
+        name = "ite8291r3_perkey"
 
     class DummyProbe:
         identifiers = {"usb_vid": "0x048d", "usb_pid": "0x600b"}
@@ -351,7 +351,7 @@ def test_menu_resets_invalid_selected_context_to_keyboard(monkeypatch: pytest.Mo
 
 def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch: pytest.MonkeyPatch) -> None:
     class DummyBackend:
-        name = "ite8910"
+        name = "ite8910_perkey"
         stability = "experimental"
         experimental_evidence = "reverse_engineered"
 

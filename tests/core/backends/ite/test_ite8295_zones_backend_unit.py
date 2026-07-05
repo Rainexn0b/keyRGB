@@ -134,6 +134,11 @@ def test_backend_reports_research_backed_experimental_metadata() -> None:
     assert caps.hardware_effects is True
 
 
+def test_supported_product_ids_cover_lenovo_4zone_family() -> None:
+    expected = {0xC955, 0xC963, 0xC965, 0xC973, 0xC975, 0xC984, 0xC985}
+    assert set(protocol.SUPPORTED_PRODUCT_IDS) == expected
+
+
 def test_find_matching_supported_hidraw_device_uses_forced_existing_path(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

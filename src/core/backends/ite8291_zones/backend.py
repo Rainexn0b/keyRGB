@@ -15,7 +15,7 @@ from ..base import (
 from . import protocol
 
 if TYPE_CHECKING:
-    from ..ite8291.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
+    from ..ite8291_perkey.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
 
 
 def experimental_backends_enabled() -> bool:
@@ -29,7 +29,7 @@ def find_matching_hidraw_device(
     product_ids: tuple[int, ...],
     forced_path_env: str,
 ) -> HidrawDeviceInfo | None:
-    from ..ite8291.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
+    from ..ite8291_perkey.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
 
     return _find_matching_hidraw_device(
         product_ids=product_ids,
@@ -43,7 +43,7 @@ def open_matching_hidraw_transport(
     forced_path_env: str,
     backend_name: str | None = None,
 ) -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
-    from ..ite8291.hidraw import open_matching_hidraw_transport as _open_matching_hidraw_transport
+    from ..ite8291_perkey.hidraw import open_matching_hidraw_transport as _open_matching_hidraw_transport
 
     return _open_matching_hidraw_transport(
         product_ids=product_ids,
@@ -53,7 +53,7 @@ def open_matching_hidraw_transport(
 
 
 def _clone_match_with_required_bcd_device(match: HidrawDeviceInfo) -> HidrawDeviceInfo:
-    from ..ite8291.hidraw import HidrawDeviceInfo as _HidrawDeviceInfo
+    from ..ite8291_perkey.hidraw import HidrawDeviceInfo as _HidrawDeviceInfo
 
     return _HidrawDeviceInfo(
         hidraw_name=match.hidraw_name,
@@ -87,7 +87,7 @@ def is_permission_denied(exc: BaseException) -> bool:
 
 def __getattr__(name: str) -> object:
     if name in {"HidrawDeviceInfo", "HidrawFeatureOutputTransport"}:
-        from ..ite8291 import hidraw as hidraw_module
+        from ..ite8291_perkey import hidraw as hidraw_module
 
         return getattr(hidraw_module, name)
 
@@ -130,7 +130,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
     transport, info = open_matching_hidraw_transport(
         product_ids=(protocol.PRODUCT_ID,),
         forced_path_env=protocol.HIDRAW_PATH_ENV,
-        backend_name="ite8291-zones",
+        backend_name="ite8291_zones",
     )
     if int(info.bcd_device or 0) != int(protocol.REQUIRED_BCD_DEVICE):
         transport.close()
@@ -144,7 +144,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
 class Ite8291ZonesBackend(KeyboardBackend):
     """Experimental 4-zone backend for the legacy ITE 8291 ce00 firmware split."""
 
-    name: str = "ite8291-zones"
+    name: str = "ite8291_zones"
     priority: int = 96
     stability: BackendStability = BackendStability.EXPERIMENTAL
     experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
@@ -162,7 +162,7 @@ class Ite8291ZonesBackend(KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=False,
-                reason="ite8291-zones hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8291_zones hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )

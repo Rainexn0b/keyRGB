@@ -153,7 +153,7 @@ def test_device_set_key_colors_skips_sparse_and_generic_grid_gaps() -> None:
 def test_backend_reports_research_backed_experimental_metadata() -> None:
     backend = Ite8258ChassisBackend()
 
-    assert backend.name == "ite8258-chassis"
+    assert backend.name == "ite8258_chassis"
     assert backend.stability == BackendStability.EXPERIMENTAL
     assert backend.experimental_evidence == ExperimentalEvidence.REVERSE_ENGINEERED
     caps = backend.capabilities()

@@ -515,7 +515,7 @@ def test_notify_falls_back_to_notify_send_when_icon_notify_fails(monkeypatch):
     ]
 
 
-@pytest.mark.parametrize("backend_name", ["ite8291r3", "ite8258", "ite8258-chassis"])
+@pytest.mark.parametrize("backend_name", ["ite8291r3_perkey", "ite8258_zones", "ite8258_chassis"])
 def test_notify_permission_issue_reports_once_and_includes_backend_hint(monkeypatch, backend_name):
     warnings = []
     notifications = []

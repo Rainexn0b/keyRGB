@@ -13,11 +13,11 @@ from ..policy import experimental_backends_enabled
 from . import protocol
 
 if TYPE_CHECKING:
-    from ..ite8291 import hidraw
+    from ..ite8291_perkey import hidraw
 
 
 def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
-    from ..ite8291 import hidraw
+    from ..ite8291_perkey import hidraw
 
     forced_path = os.environ.get(protocol.HIDRAW_PATH_ENV)
     if forced_path:
@@ -40,7 +40,7 @@ def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
 
 
 def _open_matching_transport() -> tuple[hidraw.HidrawFeatureOutputTransport, hidraw.HidrawDeviceInfo]:
-    from ..ite8291 import hidraw
+    from ..ite8291_perkey import hidraw
 
     info = _find_matching_supported_hidraw_device()
     if info is None:
@@ -48,7 +48,7 @@ def _open_matching_transport() -> tuple[hidraw.HidrawFeatureOutputTransport, hid
             "No hidraw device found for supported ITE 8258 IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
         )
-    return hidraw.HidrawFeatureOutputTransport(info.devnode, backend_name="ite8258"), info
+    return hidraw.HidrawFeatureOutputTransport(info.devnode, backend_name="ite8258_zones"), info
 
 
 def _identifiers_for_match(match: hidraw.HidrawDeviceInfo) -> dict[str, str]:
@@ -83,7 +83,7 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):
 class Ite8258Backend(base.KeyboardBackend):
     """Experimental 24-zone ITE 8258 hidraw backend."""
 
-    name: str = "ite8258"
+    name: str = "ite8258_zones"
     priority: int = 98
     stability: base.BackendStability = base.BackendStability.EXPERIMENTAL
     experimental_evidence: base.ExperimentalEvidence = base.ExperimentalEvidence.REVERSE_ENGINEERED
@@ -95,12 +95,15 @@ class Ite8258Backend(base.KeyboardBackend):
         identifiers = {
             "usb_vid": f"0x{protocol.VENDOR_ID:04x}",
             "usb_pid": "/".join(f"0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS),
+            "usage_page": f"0x{protocol.USAGE_PAGE:04x}",
+            "usage": f"0x{protocol.USAGE:04x}",
+            "feature_report_size": str(protocol.PACKET_SIZE),
         }
 
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return base.ProbeResult(
                 available=False,
-                reason="ite8258 hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8258_zones hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )
@@ -115,6 +118,13 @@ class Ite8258Backend(base.KeyboardBackend):
             )
 
         identifiers = _identifiers_for_match(match)
+        identifiers.update(
+            {
+                "usage_page": f"0x{protocol.USAGE_PAGE:04x}",
+                "usage": f"0x{protocol.USAGE:04x}",
+                "feature_report_size": str(protocol.PACKET_SIZE),
+            }
+        )
 
         if not experimental_backends_enabled():
             return base.ProbeResult(

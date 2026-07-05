@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from src.core.backends.ite8258_chassis.backend import Ite8258ChassisBackend
 
-from src.core.backends.ite8233.backend import Ite8233Backend
+from src.core.backends.ite8233_lightbar.backend import Ite8233Backend
 from src.core.backends.sysfs_mouse.backend import SysfsMouseBackend
 
 
@@ -63,7 +63,7 @@ def _acquire_ite8258_chassis_zone(zone_key: str) -> Callable[[], object]:
 _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
     SecondaryDeviceRoute(
         device_type="lightbar",
-        backend_name="ite8233",
+        backend_name="ite8233_lightbar",
         display_name="Lightbar",
         state_key="lightbar",
         get_backend=_get_ite8233_lightbar_backend,
@@ -97,7 +97,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         config_color_attr="ite8258_chassis_logo_color",
         supports_uniform_color=True,
         supports_software_target=True,
-        parent_backend_name="ite8258-chassis",
+        parent_backend_name="ite8258_chassis",
         zone_key="logo",
     ),
     SecondaryDeviceRoute(
@@ -111,7 +111,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         config_color_attr="ite8258_chassis_neon_color",
         supports_uniform_color=True,
         supports_software_target=True,
-        parent_backend_name="ite8258-chassis",
+        parent_backend_name="ite8258_chassis",
         zone_key="neon",
     ),
     SecondaryDeviceRoute(
@@ -125,7 +125,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         config_color_attr="ite8258_chassis_vent_color",
         supports_uniform_color=True,
         supports_software_target=True,
-        parent_backend_name="ite8258-chassis",
+        parent_backend_name="ite8258_chassis",
         zone_key="vent",
     ),
 )

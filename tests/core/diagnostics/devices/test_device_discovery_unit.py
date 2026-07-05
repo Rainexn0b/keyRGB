@@ -12,10 +12,10 @@ def test_collect_device_discovery_marks_experimental_disabled_candidate(monkeypa
     monkeypatch.setattr(
         "src.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
-            "selected": "ite8291r3",
+            "selected": "ite8291r3_perkey",
             "probes": [
                 {
-                    "name": "ite8233",
+                    "name": "ite8233_lightbar",
                     "available": False,
                     "stability": "experimental",
                     "selection_enabled": False,
@@ -47,7 +47,7 @@ def test_collect_device_discovery_marks_experimental_disabled_candidate(monkeypa
     assert payload["summary"]["candidate_count"] == 1
     assert payload["candidates"][0]["status"] == "experimental_disabled"
     assert payload["candidates"][0]["device_type"] == "lightbar"
-    assert payload["candidates"][0]["probe_names"] == ["ite8233"]
+    assert payload["candidates"][0]["probe_names"] == ["ite8233_lightbar"]
     assert payload["candidates"][0]["hidraw_nodes"] == ["/dev/hidraw1"]
     assert payload["support_actions"]["recommended_issue_template"] == "hardware-support"
     assert payload["support_actions"]["optional_capture_commands"] == [
@@ -85,7 +85,7 @@ def test_collect_device_discovery_flags_unrecognized_ite_device(monkeypatch) -> 
 def test_format_device_discovery_text_includes_candidates() -> None:
     text = format_device_discovery_text(
         {
-            "selected_backend": "ite8291r3",
+            "selected_backend": "ite8291r3_perkey",
             "usb_ids": ["048d:600b", "048d:7001"],
             "summary": {"candidate_count": 1, "supported_count": 0, "attention_count": 1},
             "support_actions": {
@@ -102,7 +102,7 @@ def test_format_device_discovery_text_includes_candidates() -> None:
                     "device_type": "lightbar",
                     "status": "experimental_disabled",
                     "recommended_action": "Enable experimental backends and retry.",
-                    "probe_names": ["ite8233"],
+                    "probe_names": ["ite8233_lightbar"],
                     "hidraw_nodes": ["/dev/hidraw1"],
                 }
             ],
@@ -151,10 +151,10 @@ def test_collect_device_discovery_marks_supported_experimental_candidate(monkeyp
     monkeypatch.setattr(
         "src.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
-            "selected": "ite8233",
+            "selected": "ite8233_lightbar",
             "probes": [
                 {
-                    "name": "ite8233",
+                    "name": "ite8233_lightbar",
                     "available": True,
                     "stability": "experimental",
                     "selection_enabled": True,
@@ -259,7 +259,7 @@ def test_collect_device_discovery_marks_ite8258_candidate_as_keyboard(monkeypatc
             "selected": None,
             "probes": [
                 {
-                    "name": "ite8258",
+                    "name": "ite8258_zones",
                     "available": False,
                     "stability": "experimental",
                     "selection_enabled": False,
@@ -290,7 +290,7 @@ def test_collect_device_discovery_marks_ite8258_candidate_as_keyboard(monkeypatc
 
     assert payload["candidates"][0]["status"] == "experimental_disabled"
     assert payload["candidates"][0]["device_type"] == "keyboard"
-    assert payload["candidates"][0]["probe_names"] == ["ite8258"]
+    assert payload["candidates"][0]["probe_names"] == ["ite8258_zones"]
 
 
 def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monkeypatch) -> None:
@@ -300,7 +300,7 @@ def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monk
             "selected": None,
             "probes": [
                 {
-                    "name": "ite8295-zones",
+                    "name": "ite8295_zones",
                     "available": False,
                     "stability": "experimental",
                     "selection_enabled": False,
@@ -331,7 +331,7 @@ def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monk
 
     assert payload["candidates"][0]["status"] == "experimental_disabled"
     assert payload["candidates"][0]["device_type"] == "keyboard"
-    assert payload["candidates"][0]["probe_names"] == ["ite8295-zones"]
+    assert payload["candidates"][0]["probe_names"] == ["ite8295_zones"]
 
 
 def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimental_disabled(monkeypatch) -> None:
@@ -341,7 +341,7 @@ def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimenta
             "selected": None,
             "probes": [
                 {
-                    "name": "ite8258-chassis",
+                    "name": "ite8258_chassis",
                     "available": False,
                     "stability": "experimental",
                     "selection_enabled": False,
@@ -384,7 +384,7 @@ def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimenta
     assert payload["candidates"][0]["status"] == "experimental_disabled"
     assert payload["candidates"][0]["device_type"] == "keyboard"
     assert "experimental backend exists" in payload["candidates"][0]["recommended_action"].lower()
-    assert payload["candidates"][0]["probe_names"] == ["ite8258-chassis"]
+    assert payload["candidates"][0]["probe_names"] == ["ite8258_chassis"]
     assert payload["candidates"][0]["hidraw_nodes"] == ["/dev/hidraw11"]
     assert payload["candidates"][1]["usb_pid"] == "0xc193"
     assert payload["candidates"][1]["status"] == "unrecognized_ite"
@@ -403,7 +403,7 @@ def test_format_device_discovery_text_includes_ite8258_chassis_experimental_guid
                 "recommended_issue_template": "hardware-support",
                 "recommended_issue_url": "https://example.invalid/hardware-support",
                 "next_steps": [
-                    "Treat `0x048d:0xc197` as the primary KeyRGB target for this Lenovo Gen10 path; `ite8258-chassis` is now an opt-in experimental backend, so enable Experimental backends before collecting runtime results.",
+                    "Treat `0x048d:0xc197` as the primary KeyRGB target for this Lenovo Gen10 path; `ite8258_chassis` is now an opt-in experimental backend, so enable Experimental backends before collecting runtime results.",
                     "Keep the companion `0x048d:0xc193` device listed in the report; it remains unmanaged and should be treated as separate evidence until its role is confirmed.",
                 ],
                 "optional_capture_commands": ["lsusb -v -d 048d:c197"],
@@ -416,7 +416,7 @@ def test_format_device_discovery_text_includes_ite8258_chassis_experimental_guid
                     "device_type": "keyboard",
                     "status": "experimental_disabled",
                     "recommended_action": "Experimental backend exists, but experimental backends are currently disabled.",
-                    "probe_names": ["ite8258-chassis"],
+                    "probe_names": ["ite8258_chassis"],
                     "hidraw_nodes": ["/dev/hidraw11"],
                 },
                 {

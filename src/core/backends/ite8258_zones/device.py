@@ -78,18 +78,23 @@ class Ite8258KeyboardDevice:
         for report in reports:
             self._send(report)
 
+    def _switch_profile(self) -> None:
+        self._send(protocol.build_switch_profile_report(self._profile_id))
+
     def _apply_groups(self, groups: Sequence[protocol.Ite8258Group], *, brightness: int) -> None:
         level = protocol.clamp_ui_brightness(brightness)
         if level <= 0:
             self.turn_off()
             return
 
+        self._switch_profile()
         self._write_reports(protocol.build_save_profile_reports(self._profile_id, groups))
         self._send(protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(level)))
         self._current_brightness = level
         self._is_off = False
 
     def turn_off(self) -> None:
+        self._switch_profile()
         self._send(protocol.build_turn_off_report(profile_id=self._profile_id))
         self._current_brightness = 0
         self._is_off = True
@@ -106,6 +111,7 @@ class Ite8258KeyboardDevice:
             self.turn_off()
             return
 
+        self._switch_profile()
         self._send(protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(level)))
         self._current_brightness = level
         self._is_off = False
