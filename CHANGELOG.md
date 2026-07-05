@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.28.0 (2026-07-05)
+
+- Backends/Naming: Apply the `ITE<chip>_<capability>` naming convention across all ITE backends. Canonical names are now `ite8291r3_perkey`, `ite8291_perkey`, `ite8910_perkey`, `ite8258_zones`, `ite8258_chassis`, `ite8291_zones`, `ite8295_zones`, `ite8233_lightbar`, and `ite8297_uniform`.
+- Backends/Compatibility: Keep all previous backend names working via aliases in `src/core/backends/registry.py`, so existing `KEYRGB_BACKEND` values and saved profiles continue to work.
+- Backends/ITE8295-Zones: Expand supported product IDs to the OpenRGB-confirmed Lenovo 4-zone family (`0xC955`, `0xC963`, `0xC965`, `0xC973`, `0xC975`, `0xC984`, `0xC985`) and add hidraw uaccess rules for them.
+- Backends/ITE8233-Lightbar: Add hidraw uaccess rules for the Clevo/Tongfang lightbar PIDs (`0x6010`, `0x7000`, `0x7001`) and document remaining usage-page and scan-mode discrepancies against OpenRGB.
+- Backends/Sysfs-Mouse: Expand test coverage and clarify `dimensions()` behavior.
+- Docs: Complete doc-lanes reorganization. All docs now live in numbered/lettered lanes (`1-src/`, `2-usage/`, `3-contributing/`, `B-backend-audits/`, `B-backend-guides/`, `I-implementation-plans/`, `Z-legacy/`, etc.) with a single registry in `docs/0-governance/lane-registry.md`.
+- Docs: Add backend audit reports under `docs/B-backend-audits/` and a backend naming policy reference in `docs/B-backend-guides/backend-naming.md`.
+
 ## 0.27.3 (2026-07-02)
 
 - Backends/HID: Add shared HID report pacing with a 1 ms default delay and global/per-backend overrides (`KEYRGB_HID_REPORT_DELAY_MS`, `KEYRGB_<BACKEND>_REPORT_DELAY_MS`) to prevent ITE USB controllers from blanking, flickering, or resetting under back-to-back report bursts.
