@@ -203,5 +203,5 @@ The goal is to make failure observable and attributable:
 
 ## Related docs
 
-- `docs/Z-legacy/tech-debt/archived/2026-03-31/exception-handling-debt.md`
-- `docs/Z-legacy/tech-debt/archived/2026-03-31/buildpython-debt-automation.md`
+- `docs/Z-legacy/tech-debt/2026-03-31/exception-handling-debt.md`
+- `docs/Z-legacy/tech-debt/2026-03-31/buildpython-debt-automation.md`

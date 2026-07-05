@@ -263,7 +263,7 @@ All fixes are backend-internal (no UI changes), so they can land incrementally:
 | `src/core/backends/ite8258_chassis/protocol.py` | Swap direction constants; fix header framing; update chassis zone LED IDs; add dormant op constants |
 | `tests/core/backends/ite/test_ite8258_chassis_backend_unit.py` | Update expected packet bytes for new header; add chassis-zone packet tests; update direction tests |
 | `src/core/backends/ite8258_chassis/device.py` | No changes in Sprint 1–2 (device facade stays keyboard-only until protocol is validated) |
-| `docs/I-implementation-plans/ite8258-chassis-backend-plan.md` | Mark stages complete, add validation notes |
+| `docs/B-backend-guides/ite8258/ite8258-chassis-backend-plan.md` | Mark stages complete, add validation notes |
 | `AGENTS.md` | Update supported-hardware notes if chassis zones are validated |
 | `README.md` | Update backend table if chassis zones are validated |
 

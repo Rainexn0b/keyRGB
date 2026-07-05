@@ -311,17 +311,17 @@ below for the original scope.
 
 ### Chunk A (P0): Tray policy and classification seams
 
-- spec: `docs/Z-legacy/2026-04-21-improvement-roadmap.md`
+- spec: `docs/Z-legacy/improvement-roadmaps/2026-04-21/improvement-roadmap.md`
 - focus: tray config-polling state seams and controller boundary auditing
 
 ### Chunk B (P1): GUI window cleanup
 
-- spec: `docs/Z-legacy/2026-04-21-improvement-roadmap.md`
+- spec: `docs/Z-legacy/improvement-roadmaps/2026-04-21/improvement-roadmap.md`
 - focus: support-window boundary cleanup and perkey entry-module seam survey
 
 ### Chunk C (P1/P2): Typed config boundaries and bootstrap cleanup
 
-- spec: `docs/Z-legacy/2026-04-21-improvement-roadmap.md`
+- spec: `docs/Z-legacy/improvement-roadmaps/2026-04-21/improvement-roadmap.md`
 - focus: typed config/snapshot shaping and import-bootstrap normalization
 
 Execution order:

@@ -17,13 +17,13 @@ The relevant two-device model is:
 - Confirmed keyboard controller: `0x048d:0x600b` (`ite8291r3`, already supported)
 - Auxiliary controller: `0x048d:0x7001` (`ITE Device(8233)`, likely front lightbar or auxiliary RGB zones)
 
-The goal is to keep the research, implementation plan, scaffold design, UX direction, and promotion criteria in one backend-focused location under `docs/developement/backends/`.
+The goal is to keep the research, implementation plan, scaffold design, UX direction, and promotion criteria in one backend-focused location under `docs/B-Research/`.
 
 ## Source Inputs
 
 This summary is based on:
 
-- `docs/genAI/Lightbar Backend Research for keyRGB.md`
+- `Lightbar Backend Research for keyRGB.md`
 - GitHub issue `#5` (`Hardware support: Support for secondary ITE USB device (048d:7001) – likely lightbar / auxiliary RGB zones`)
 - The current backend architecture in `src/core/backends/`
 - Upstream OpenRGB `ClevoLightbarController` for `0x048d:0x7001`
