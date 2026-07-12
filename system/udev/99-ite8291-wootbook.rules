@@ -14,6 +14,17 @@ SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idPro
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="c193", TAG+="uaccess", RUN{builtin}+="uaccess"
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="048d", ATTR{idProduct}=="c197", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="8910", TAG+="uaccess", RUN{builtin}+="uaccess"
+# ITE 8291 family native-hidraw backends (ite8291_perkey, ite8291_zones_clevo).
+# These share PIDs with the USB control-transfer ite8291r3 backend above, but open
+# /dev/hidraw* directly, so they need their own hidraw uaccess rules (a SUBSYSTEM=="usb"
+# rule does not grant access to the /dev/hidraw* node).
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="6004", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="6008", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="600b", TAG+="uaccess", RUN{builtin}+="uaccess"
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="ce00", TAG+="uaccess", RUN{builtin}+="uaccess"
+# ITE 8297 uniform hidraw path (ite8297_uniform). The kernel ite_8297 sysfs path is
+# covered separately by 99-keyrgb-sysfs-leds.rules.
+KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="8297", TAG+="uaccess", RUN{builtin}+="uaccess"
 # Lenovo 4-zone ITE 8295 family (same protocol, multiple PIDs)
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c955", TAG+="uaccess", RUN{builtin}+="uaccess"
 KERNEL=="hidraw*", ATTRS{idVendor}=="048d", ATTRS{idProduct}=="c963", TAG+="uaccess", RUN{builtin}+="uaccess"

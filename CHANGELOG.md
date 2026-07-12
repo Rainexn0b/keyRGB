@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.28.2 (2026-07-12)
+
+- Installer/Permissions: Add missing hidraw uaccess rules to `system/udev/99-ite8291-wootbook.rules` for the ITE 8291 native-hidraw backends (`ite8291_perkey`, `ite8291_zones_clevo`: PIDs `0x6004`, `0x6008`, `0x600B`, `0xCE00`) and the `ite8297_uniform` hidraw path (`0x8297`). These backends open `/dev/hidraw*` directly but previously only had the `SUBSYSTEM=="usb"` rule used by the `ite8291r3` control-transfer backend, which does not grant access to the hidraw node — so they failed with permission-denied on supported hardware.
+- Build/CI: Bound the mypy dev dependency to `>=1.20.0,<3.0` and align the local venv with CI (mypy 2.x), so a green local release gate predicts a green CI gate. mypy 2.x typeshed changes had previously broken the release workflow while the stale local cache masked it.
+
 ## 0.28.1 (2026-07-11)
 
 - Backends/Naming: Rename the five chassis/OEM-specific ITE backends to the expanded self-describing convention (all-underscore, empty segments omitted): `ite8258_chassis` → `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`, `ite8258_zones` → `ite8258_zones_lenovo_legion`, `ite8291_zones` → `ite8291_zones_clevo`, `ite8295_zones` → `ite8295_zones_lenovo_ideapad`, and `ite8233_lightbar` → `ite8233_none_chassis_lightbar_clevo`. The matching package directories under `src/core/backends/` were renamed to match.
