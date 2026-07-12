@@ -23,7 +23,7 @@ The goal is to add support for the `0xc197` path under a dedicated `ite8258-chas
 
 ## Current repo status
 
-The repo now contains an experimental keyboard-first `ite8258-chassis` backend under `src/core/backends/ite8258_chassis/`.
+The repo now contains an experimental keyboard-first `ite8258-chassis` backend under `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/`.
 
 Current implemented scope:
 
@@ -199,10 +199,10 @@ That is the bar set by `ite8291r3` and `ite8910`.
 
 Recommended package shape:
 
-- `src/core/backends/ite8258_chassis/__init__.py`
-- `src/core/backends/ite8258_chassis/backend.py`
-- `src/core/backends/ite8258_chassis/protocol.py`
-- `src/core/backends/ite8258_chassis/device.py`
+- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/__init__.py`
+- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/backend.py`
+- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/protocol.py`
+- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/device.py`
 - either:
   - reuse the current shared hidraw-matching pattern from `ite8910` / `ite8291`, or
   - add a small backend-local hidraw helper if the match rules need to differ

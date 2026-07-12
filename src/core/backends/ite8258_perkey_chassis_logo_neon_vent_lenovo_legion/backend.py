@@ -6,6 +6,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from src.core.backends import exceptions as backend_exceptions
+from src.core.backends.shared_hidraw_transport import (
+    HidrawTransportProxy,
+    SharedHidrawTransportManager,
+)
 from src.core.utils import exceptions as device_exception_utils
 
 from .. import base
@@ -14,6 +18,16 @@ from . import protocol
 
 if TYPE_CHECKING:
     from ..ite8291_perkey import hidraw
+
+
+_transport_manager: SharedHidrawTransportManager | None = None
+
+
+def _get_transport_manager() -> SharedHidrawTransportManager:
+    global _transport_manager
+    if _transport_manager is None:
+        _transport_manager = SharedHidrawTransportManager()
+    return _transport_manager
 
 
 def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
@@ -30,25 +44,13 @@ def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
                 vendor_id=protocol.VENDOR_ID,
                 product_id=protocol.SUPPORTED_PRODUCT_IDS[0],
                 hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.SUPPORTED_PRODUCT_IDS[0]:04x}",
-                hid_name="ITE 8258 (forced)",
+                hid_name="ITE 8258 chassis (forced)",
             )
 
     return hidraw.find_matching_hidraw_device(
         product_ids=protocol.SUPPORTED_PRODUCT_IDS,
         forced_path_env=protocol.HIDRAW_PATH_ENV,
     )
-
-
-def _open_matching_transport() -> tuple[hidraw.HidrawFeatureOutputTransport, hidraw.HidrawDeviceInfo]:
-    from ..ite8291_perkey import hidraw
-
-    info = _find_matching_supported_hidraw_device()
-    if info is None:
-        raise FileNotFoundError(
-            "No hidraw device found for supported ITE 8258 IDs: "
-            + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
-        )
-    return hidraw.HidrawFeatureOutputTransport(info.devnode, backend_name="ite8258_zones"), info
 
 
 def _identifiers_for_match(match: hidraw.HidrawDeviceInfo) -> dict[str, str]:
@@ -60,6 +62,20 @@ def _identifiers_for_match(match: hidraw.HidrawDeviceInfo) -> dict[str, str]:
     if match.hid_name:
         identifiers["hid_name"] = str(match.hid_name)
     return identifiers
+
+
+def _open_matching_transport() -> tuple[hidraw.HidrawFeatureOutputTransport, hidraw.HidrawDeviceInfo]:
+    from ..ite8291_perkey import hidraw
+
+    info = _find_matching_supported_hidraw_device()
+    if info is None:
+        raise FileNotFoundError(
+            "No hidraw device found for supported ITE 8258 chassis IDs: "
+            + ", ".join(f"0x{protocol.VENDOR_ID:04x}:{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
+        )
+    return hidraw.HidrawFeatureOutputTransport(
+        info.devnode, backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"
+    ), info
 
 
 def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):
@@ -80,11 +96,11 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):
 
 
 @dataclass
-class Ite8258Backend(base.KeyboardBackend):
-    """Experimental 24-zone ITE 8258 hidraw backend."""
+class Ite8258ChassisBackend(base.KeyboardBackend):
+    """Experimental keyboard-first Lenovo Gen10 composite ITE 8258 backend."""
 
-    name: str = "ite8258_zones"
-    priority: int = 98
+    name: str = "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"
+    priority: int = 97
     stability: base.BackendStability = base.BackendStability.EXPERIMENTAL
     experimental_evidence: base.ExperimentalEvidence = base.ExperimentalEvidence.REVERSE_ENGINEERED
 
@@ -103,7 +119,7 @@ class Ite8258Backend(base.KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return base.ProbeResult(
                 available=False,
-                reason="ite8258_zones hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )
@@ -148,38 +164,90 @@ class Ite8258Backend(base.KeyboardBackend):
     def capabilities(self) -> base.BackendCapabilities:
         return base.BackendCapabilities(per_key=True, color=True, hardware_effects=True, palette=False)
 
-    def get_device(self) -> base.KeyboardDevice:
+    def _require_experimental(self) -> None:
         if not experimental_backends_enabled():
             raise RuntimeError(
-                "ITE 8258 support is classified as experimental. Enable Experimental backends in Settings "
+                "ITE 8258 chassis support is classified as experimental. Enable Experimental backends in Settings "
                 "or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 before using it."
             )
 
+    def _acquire_transport_proxy(self) -> HidrawTransportProxy:
+        self._require_experimental()
         try:
-            transport, _info = _open_matching_transport()
-            from .device import Ite8258KeyboardDevice
-
-            return Ite8258KeyboardDevice(transport.send_feature_report, transport=transport)
+            return _get_transport_manager().acquire(
+                self.name,
+                opener=lambda: _open_matching_transport()[0],
+            )
         except backend_exceptions.BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
             if device_exception_utils.is_permission_denied(exc):
                 raise backend_exceptions.BackendPermissionError(
-                    "Permission denied opening the ITE 8258 hidraw device. Install the KeyRGB udev rules, "
+                    "Permission denied opening the ITE 8258 chassis hidraw device. Install the KeyRGB udev rules, "
                     "then reload udev or reboot/log out and back in."
                 ) from exc
             if device_exception_utils.is_device_disconnected(exc):
                 raise backend_exceptions.BackendDisconnectedError(
-                    "ITE 8258 device disconnected during initialization"
+                    "ITE 8258 chassis device disconnected during initialization"
                 ) from exc
             if device_exception_utils.is_device_busy(exc):
                 raise backend_exceptions.BackendBusyError(
-                    "ITE 8258 device is busy; another process may own it"
+                    "ITE 8258 chassis device is busy; another process may own it"
                 ) from exc
             if isinstance(exc, RuntimeError):
                 raise
-            raise backend_exceptions.BackendIOError(f"ITE 8258 HID transport failed: {exc}") from exc
+            raise backend_exceptions.BackendIOError(f"ITE 8258 chassis HID transport failed: {exc}") from exc
+
+    def get_device(self) -> base.KeyboardDevice:
+        proxy = self._acquire_transport_proxy()
+        from .device import Ite8258ChassisKeyboardDevice
+
+        return Ite8258ChassisKeyboardDevice(proxy.send_feature_report, transport=proxy)
+
+    def get_zone_device(self, zone_key: str) -> object:
+        proxy = self._acquire_transport_proxy()
+        from .device import Ite8258ChassisZoneDevice
+
+        if zone_key == "logo":
+            led_ids = protocol.LOGO_LED_IDS
+        elif zone_key == "neon":
+            led_ids = protocol.NEON_LED_IDS
+        elif zone_key == "vent":
+            led_ids = protocol.VENT_LED_IDS
+        else:
+            proxy.close()
+            raise ValueError(f"Unknown ITE 8258 chassis zone: {zone_key}")
+
+        return Ite8258ChassisZoneDevice(
+            proxy.send_feature_report,
+            zone_name=zone_key,
+            led_ids=led_ids,
+            transport=proxy,
+        )
 
     def dimensions(self) -> tuple[int, int]:
         return (protocol.NUM_ROWS, protocol.NUM_COLS)
+
+    def diagnostics(self) -> dict[str, Any]:
+        matrix_cells = int(protocol.NUM_ROWS * protocol.NUM_COLS)
+        mapped_leds = sum(1 for item in protocol.KEYBOARD_MATRIX_MAP if item is not None)
+        return {
+            "keyboard_matrix": {
+                "rows": int(protocol.NUM_ROWS),
+                "cols": int(protocol.NUM_COLS),
+                "matrix_cells": matrix_cells,
+                "mapped_leds": mapped_leds,
+                "keyboard_led_ids": len(protocol.KEYBOARD_LED_IDS),
+                "sparse": mapped_leds < matrix_cells,
+                "sparse_holes": matrix_cells - mapped_leds,
+                "row_mapped_counts": [
+                    sum(
+                        1
+                        for col in range(protocol.NUM_COLS)
+                        if protocol.KEYBOARD_MATRIX_MAP[(row * protocol.NUM_COLS) + col] is not None
+                    )
+                    for row in range(protocol.NUM_ROWS)
+                ],
+            }
+        }
 
     def effects(self) -> dict[str, Any]:
         return {
@@ -189,7 +257,21 @@ class Ite8258Backend(base.KeyboardBackend):
             "color_pulse": _effect_builder("color_pulse", extra=("color",)),
             "color_wave": _effect_builder("color_wave", extra=("direction", "color")),
             "smooth": _effect_builder("smooth", extra=("color",)),
+            "rain": _effect_builder("rain", extra=("color",)),
+            "ripple": _effect_builder("ripple", extra=("color",)),
+            "audio_bounce": _effect_builder("audio_bounce"),
+            "audio_ripple": _effect_builder("audio_ripple"),
+            "type": _effect_builder("type", extra=("color",)),
         }
 
     def colors(self) -> dict[str, Any]:
         return {}
+
+
+# Backend naming clarification:
+# "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion" currently means "Lenovo Legion Pro 7 Gen10 (0x048d:0xc197)".
+# The ITE 8258 chip may appear in other laptops with different PIDs and different
+# zone configurations.  If a new PID is discovered, do not assume these LED IDs
+# and zone layouts apply.  A future refactor should introduce a ChassisVariant
+# registry that maps PID -> zone config, and virtual routes should be generated
+# dynamically from the probe result instead of hardcoded in secondary_device_routes.py.

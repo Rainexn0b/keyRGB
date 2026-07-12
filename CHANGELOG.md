@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.28.1 (2026-07-11)
+
+- Backends/Naming: Rename the five chassis/OEM-specific ITE backends to the expanded self-describing convention (all-underscore, empty segments omitted): `ite8258_chassis` → `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`, `ite8258_zones` → `ite8258_zones_lenovo_legion`, `ite8291_zones` → `ite8291_zones_clevo`, `ite8295_zones` → `ite8295_zones_lenovo_ideapad`, and `ite8233_lightbar` → `ite8233_none_chassis_lightbar_clevo`. The matching package directories under `src/core/backends/` were renamed to match.
+- Backends/Compatibility: All previous names (short aliases and the pre-rename canonical names) keep working via `_BACKEND_NAME_ALIASES` in `src/core/backends/registry.py`, so existing `KEYRGB_BACKEND` values, saved profiles, and persisted tray device-context selections continue to resolve. Per-backend HID pacing overrides now derive from the new names (e.g. `KEYRGB_ITE8258_PERKEY_CHASSIS_LOGO_NEON_VENT_LENOVO_LEGION_REPORT_DELAY_MS`).
+- Backends/Compatibility: Persisted per-zone state keys (`ite8258_chassis_{logo,neon,vent}_{brightness,color}`) and virtual zone route identifiers (`ite8258-chassis-{logo,neon,vent}`) are intentionally unchanged so saved per-zone colors/brightness survive the rename.
+- Docs: Align `src/core/backends/README.md` with the implemented convention (all-underscore, empty segments omitted) and record the new deprecated aliases.
+- Diagnostics/Support Tools: Add a `secondary_devices` section to device-discovery payloads and support bundles (new `src/core/diagnostics/secondary_devices.py`). It reports experimental-backend enablement, the virtual chassis-zone routes (logo/neon/vent) with parent-backend availability, auxiliary device candidates, expected tray device contexts, the software effect target, and persisted per-zone brightness/color — making multi-device / aux-lighting support cases (e.g. issue #7) self-describing from a support bundle.
+
 ## 0.28.0 (2026-07-05)
 
 - Backends/Naming: Apply the `ITE<chip>_<capability>` naming convention across all ITE backends. Canonical names are now `ite8291r3_perkey`, `ite8291_perkey`, `ite8910_perkey`, `ite8258_zones`, `ite8258_chassis`, `ite8291_zones`, `ite8295_zones`, `ite8233_lightbar`, and `ite8297_uniform`.

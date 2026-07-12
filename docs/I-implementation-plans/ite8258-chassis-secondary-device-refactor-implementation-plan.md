@@ -196,7 +196,7 @@ Implementation notes:
 
 ### 2. Arbitrary LED-subset static-group helper
 
-**File:** `src/core/backends/ite8258_chassis/protocol.py`
+**File:** `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/protocol.py`
 
 Add a helper that builds static groups for an arbitrary LED subset, not just the keyboard matrix:
 
@@ -222,7 +222,7 @@ Do not use `build_turn_off_report()` for zones. That command is global and would
 
 ### 3. `Ite8258ChassisZoneDevice`
 
-**File:** `src/core/backends/ite8258_chassis/device.py`
+**File:** `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/device.py`
 
 Add a lightweight uniform-color facade:
 
@@ -432,7 +432,7 @@ Preferred UX:
 
 ### 11. Backend integration
 
-**File:** `src/core/backends/ite8258_chassis/backend.py`
+**File:** `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/backend.py`
 
 Add:
 

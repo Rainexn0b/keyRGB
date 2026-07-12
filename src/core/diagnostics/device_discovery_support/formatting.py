@@ -68,6 +68,57 @@ def format_device_discovery_text(payload: dict[str, Any]) -> str:
             elif isinstance(hidraw_nodes, list) and hidraw_nodes:
                 lines.append("      hidraw_descriptor_sizes: unavailable (check permissions and rerun if needed)")
 
+    secondary = payload.get("secondary_devices")
+    if isinstance(secondary, dict):
+        lines.append("Secondary devices:")
+        lines.append(f"  experimental_backends_enabled: {secondary.get('experimental_backends_enabled')}")
+        lines.append(f"  selected_device_context: {secondary.get('selected_device_context')}")
+        software_target = secondary.get("software_effect_target")
+        if isinstance(software_target, dict):
+            lines.append(
+                "  software_effect_target: "
+                f"{software_target.get('current')} "
+                f"(all_compatible_devices_enabled={software_target.get('all_compatible_devices_enabled')})"
+            )
+        virtual_routes = secondary.get("virtual_routes")
+        if isinstance(virtual_routes, list) and virtual_routes:
+            lines.append("  virtual zone routes:")
+            for route in virtual_routes:
+                if not isinstance(route, dict):
+                    continue
+                available = route.get("parent_available")
+                reason = str(route.get("parent_reason") or "").strip()
+                suffix = f" ({reason})" if reason and not available else ""
+                lines.append(
+                    f"    - {route.get('display_name')} [{route.get('backend_name')}] "
+                    f"parent={route.get('parent_backend')} available={available}{suffix}"
+                )
+        aux_candidates = secondary.get("auxiliary_candidates")
+        if isinstance(aux_candidates, list) and aux_candidates:
+            lines.append("  auxiliary candidates:")
+            for candidate in aux_candidates:
+                if not isinstance(candidate, dict):
+                    continue
+                vid = str(candidate.get("usb_vid") or "").strip()
+                pid = str(candidate.get("usb_pid") or "").strip()
+                usb_id = f" {vid}:{pid}" if vid and pid else ""
+                product = str(candidate.get("product") or "").strip()
+                label = f" {product}" if product else ""
+                lines.append(
+                    f"    -{usb_id}{label} type={candidate.get('device_type')} "
+                    f"status={candidate.get('status')} controls_available={candidate.get('controls_available')}"
+                )
+        expected = secondary.get("expected_tray_contexts")
+        if isinstance(expected, list) and expected:
+            lines.append("  expected tray device-context rows:")
+            for context in expected:
+                if not isinstance(context, dict):
+                    continue
+                lines.append(
+                    f"    - {context.get('key')} type={context.get('device_type')} "
+                    f"source={context.get('source')} controls_available={context.get('controls_available')}"
+                )
+
     if not lines:
         return "(no discovery data available)"
     return "\n".join(lines)

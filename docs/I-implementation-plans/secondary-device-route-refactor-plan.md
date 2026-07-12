@@ -205,7 +205,7 @@ The dispatcher falls back to `"_uniform"` when `route.supports_uniform_color` is
 ### Phase 2: Backend zone-device factory + protocol variants
 
 **Scope:**
-- Add `Ite8258ChassisZoneDevice` to `src/core/backends/ite8258_chassis/device.py`
+- Add `Ite8258ChassisZoneDevice` to `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/device.py`
 - Add `get_zone_device()` to `Ite8258ChassisBackend`
 - Extend protocol builders to accept arbitrary `led_ids` instead of hardcoding `KEYBOARD_LED_IDS`:
   - `build_uniform_static_groups_for_leds(led_ids, color)`
@@ -267,9 +267,9 @@ The dispatcher falls back to `"_uniform"` when `route.supports_uniform_color` is
 - `tests/core/backends/test_shared_hidraw_transport_unit.py` **(new)**
 
 ### Phase 2
-- `src/core/backends/ite8258_chassis/device.py`
-- `src/core/backends/ite8258_chassis/backend.py`
-- `src/core/backends/ite8258_chassis/protocol.py`
+- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/device.py`
+- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/backend.py`
+- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/protocol.py`
 - `tests/core/backends/ite/test_ite8258_chassis_backend_unit.py`
 
 ### Phase 3

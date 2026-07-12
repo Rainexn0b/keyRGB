@@ -6,14 +6,14 @@ import pytest
 
 from src.core.backends.base import BackendStability, ExperimentalEvidence
 from src.core.backends.exceptions import BackendIOError
-from src.core.backends.ite8258_chassis import backend as _ite8258_chassis_backend_module
-from src.core.backends.ite8258_chassis import protocol
-from src.core.backends.ite8258_chassis.backend import (
+from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion import backend as _ite8258_chassis_backend_module
+from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion import protocol
+from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend import (
     Ite8258ChassisBackend,
     _find_matching_supported_hidraw_device,
     _open_matching_transport,
 )
-from src.core.backends.ite8258_chassis.device import (
+from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.device import (
     Ite8258ChassisKeyboardDevice,
     Ite8258ChassisZoneDevice,
 )
@@ -153,7 +153,7 @@ def test_device_set_key_colors_skips_sparse_and_generic_grid_gaps() -> None:
 def test_backend_reports_research_backed_experimental_metadata() -> None:
     backend = Ite8258ChassisBackend()
 
-    assert backend.name == "ite8258_chassis"
+    assert backend.name == "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"
     assert backend.stability == BackendStability.EXPERIMENTAL
     assert backend.experimental_evidence == ExperimentalEvidence.REVERSE_ENGINEERED
     caps = backend.capabilities()
@@ -214,7 +214,7 @@ def test_backend_probe_reports_unavailable_when_scan_disabled(monkeypatch: pytes
 def test_backend_probe_reports_unavailable_when_no_matching_device(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._find_matching_supported_hidraw_device", lambda: None
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._find_matching_supported_hidraw_device", lambda: None
     )
 
     result = Ite8258ChassisBackend().probe()
@@ -233,7 +233,7 @@ def test_backend_probe_reports_detected_but_disabled_until_opted_in(monkeypatch:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._find_matching_supported_hidraw_device",
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._find_matching_supported_hidraw_device",
         lambda: DummyMatch(),
     )
 
@@ -255,7 +255,7 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._find_matching_supported_hidraw_device",
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._find_matching_supported_hidraw_device",
         lambda: DummyMatch(),
     )
 
@@ -267,7 +267,7 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
 
 
 def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.core.backends.ite8258_chassis.backend._find_matching_supported_hidraw_device", lambda: None)
+    monkeypatch.setattr("src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._find_matching_supported_hidraw_device", lambda: None)
 
     with pytest.raises(FileNotFoundError, match="No hidraw device found"):
         _open_matching_transport()
@@ -284,7 +284,7 @@ def test_backend_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     err = PermissionError("permission denied")
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._open_matching_transport",
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._open_matching_transport",
         lambda: (_ for _ in ()).throw(err),
     )
 
@@ -296,7 +296,7 @@ def test_backend_get_device_reraises_non_permission_errors(monkeypatch: pytest.M
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     err = OSError("transport failed")
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._open_matching_transport",
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._open_matching_transport",
         lambda: (_ for _ in ()).throw(err),
     )
 
@@ -318,7 +318,7 @@ def test_backend_get_device_returns_keyboard_device_when_transport_opens(monkeyp
         devnode = Path("/dev/hidraw11")
 
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._open_matching_transport",
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._open_matching_transport",
         lambda: (DummyTransport(), DummyInfo()),
     )
 
@@ -416,7 +416,7 @@ def test_backend_get_zone_device_rejects_unknown_zone(monkeypatch: pytest.Monkey
         devnode = Path("/dev/hidraw11")
 
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._open_matching_transport",
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._open_matching_transport",
         lambda: (DummyTransport(), DummyInfo()),
     )
 
@@ -442,7 +442,7 @@ def test_backend_get_zone_device_returns_zone_device_for_logo(monkeypatch: pytes
         devnode = Path("/dev/hidraw11")
 
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._open_matching_transport",
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._open_matching_transport",
         lambda: (DummyTransport(), DummyInfo()),
     )
 
@@ -478,7 +478,7 @@ def test_backend_keyboard_and_zone_devices_share_one_transport(monkeypatch: pyte
         return DummyTransport(), DummyInfo()
 
     monkeypatch.setattr(
-        "src.core.backends.ite8258_chassis.backend._open_matching_transport",
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._open_matching_transport",
         _opener,
     )
 

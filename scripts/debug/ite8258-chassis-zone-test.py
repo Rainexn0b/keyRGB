@@ -29,8 +29,8 @@ def _main() -> int:
 
     os.environ.setdefault("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 
-    from src.core.backends.ite8258_chassis.backend import Ite8258ChassisBackend
-    from src.core.backends.ite8258_chassis.device import Ite8258ChassisZoneDevice
+    from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend import Ite8258ChassisBackend
+    from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.device import Ite8258ChassisZoneDevice
 
     backend = Ite8258ChassisBackend()
     if not backend.is_available():

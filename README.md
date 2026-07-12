@@ -158,6 +158,13 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | `keyrgb-settings`       | Open the settings GUI.                                    |
 | `keyrgb-diagnostics`    | Print hardware diagnostics JSON.                          |
 
+**Switching between devices:** when a supported auxiliary lighting device (or a
+composite controller's extra surfaces, such as the Legion Gen10 **Logo / Neon
+Strip / Vents**) is present, each surface appears as a selectable row at the top
+of the tray menu. Click a row to swap the menu into that device's own controls
+(uniform color, brightness, and on/off). Click the **Keyboard** row to return to
+the main keyboard controls.
+
 ### Environment variables
 
 | Variable                                | Usage                                                                                                                                                                                             |
@@ -168,7 +175,7 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | `KEYRGB_ITE8297_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8297` backend (mainly for diagnostics / testing).                                                                              |
 | `KEYRGB_ITE8233_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the experimental `ite8233` lightbar backend (mainly for diagnostics / testing).                                                                     |
 | `KEYRGB_HID_REPORT_DELAY_MS`            | Milliseconds to sleep between USB HID reports on all HID backends (default `1`). This is the global override used when a backend-specific variable is not set. Increase if the controller resets or locks up under heavy reactive/software frames; set to `0` to disable pacing. |
-| `KEYRGB_<BACKEND>_REPORT_DELAY_MS`      | Per-backend override for HID pacing, with backend punctuation normalized to underscores (for example `KEYRGB_ITE8291R3_REPORT_DELAY_MS` or `KEYRGB_ITE8258_CHASSIS_REPORT_DELAY_MS`). If unset, falls back to `KEYRGB_HID_REPORT_DELAY_MS`. |
+| `KEYRGB_<BACKEND>_REPORT_DELAY_MS`      | Per-backend override for HID pacing, with backend punctuation normalized to underscores (for example `KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS` or `KEYRGB_ITE8258_PERKEY_CHASSIS_LOGO_NEON_VENT_LENOVO_LEGION_REPORT_DELAY_MS`). If unset, falls back to `KEYRGB_HID_REPORT_DELAY_MS`. |
 | `KEYRGB_DEBUG=1`                        | Enable verbose debug logging.                                                                                                                                                                     |
 | `KEYRGB_TK_SCALING`                     | Float override for UI scaling (High-DPI / fractional scaling).                                                                                                                                    |
 | `KEYRGB_ITE8910_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the `ite8910` backend (mainly for diagnostics / testing).                                                                                           |
@@ -234,7 +241,7 @@ Current backend plan:
 - `ite8258`: `experimental` + `reverse_engineered`
 	- `0x048d:0xc195` — Lenovo Legion 5 / Pro 5 Gen 10 24-zone ITE 8258 hidraw keyboard path (4×6 logical zone matrix, static color, brightness, and firmware effects)
 - `ite8258-chassis`: `experimental` + `reverse_engineered`
-  - `0x048d:0xc197` — Lenovo Gen10 composite ITE 8258 path with keyboard-plus-chassis lighting; currently shipped as a keyboard-first experimental backend with ANSI matrix mapping, per-key/static keyboard color, brightness, and the confirmed Lenovo Gen10 firmware effects while neon/logo/vent surfaces remain deferred
+  - `0x048d:0xc197` — Lenovo Gen10 composite ITE 8258 path with keyboard-plus-chassis lighting; shipped as an experimental backend with ANSI matrix mapping, per-key/static keyboard color, brightness, and the confirmed Lenovo Gen10 firmware effects. The chassis lighting surfaces (rear lid logo, front neon strip, and rear vent lens) are exposed as live, selectable secondary-device contexts (**Logo / Neon Strip / Vents**) in the tray, each with uniform color, brightness, and on/off, plus software-effect mirroring via **Software Targets**.
 - `ite8295-zones`: `experimental` + `reverse_engineered`
 	- `0x048d:0xc963` — Lenovo 4-zone ITE 8295 hidraw keyboard path used by IdeaPad Gaming 3-class systems, with static color, 4-zone updates, brightness, and the confirmed default firmware effects (`breathing`, `wave`, `spectrum_cycle`)
 	- `0x048d:0xc966` — companion ITE 8176 endpoint reported on the same laptops; still treated as a separate unsupported protocol family until direct RGB evidence exists

@@ -80,7 +80,7 @@ def test_build_device_context_menu_items_shows_turn_on_when_secondary_route_is_o
     context_entry = {
         "key": "lightbar:048d:7001",
         "device_type": "lightbar",
-        "backend_name": "ite8233_lightbar",
+        "backend_name": "ite8233_none_chassis_lightbar_clevo",
         "status": "supported",
         "text": "Lightbar",
     }

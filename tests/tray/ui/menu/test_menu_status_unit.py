@@ -211,7 +211,7 @@ def test_device_context_entries_threads_backend_name_from_candidate_probe_names(
                     "usb_vid": "0x048d",
                     "usb_pid": "0x7001",
                     "status": "supported",
-                    "probe_names": ["ite8233_lightbar"],
+                    "probe_names": ["ite8233_none_chassis_lightbar_clevo"],
                 }
             ]
         },
@@ -220,7 +220,7 @@ def test_device_context_entries_threads_backend_name_from_candidate_probe_names(
     entries = menu_status.device_context_entries(tray)
 
     assert entries[1]["device_type"] == "lightbar"
-    assert entries[1]["backend_name"] == "ite8233_lightbar"
+    assert entries[1]["backend_name"] == "ite8233_none_chassis_lightbar_clevo"
 
 
 def test_device_context_entries_use_sysfs_mouse_context_key_and_backend_name() -> None:

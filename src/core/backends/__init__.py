@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from .base import BackendCapabilities, KeyboardBackend, KeyboardDevice
 from .ite8291_perkey import Ite8291Backend
-from .ite8291_zones import Ite8291ZonesBackend
-from .ite8295_zones import Ite8295ZonesBackend
-from .ite8258_zones import Ite8258Backend
-from .ite8258_chassis import Ite8258ChassisBackend
+from .ite8291_zones_clevo import Ite8291ZonesBackend
+from .ite8295_zones_lenovo_ideapad import Ite8295ZonesBackend
+from .ite8258_zones_lenovo_legion import Ite8258Backend
+from .ite8258_perkey_chassis_logo_neon_vent_lenovo_legion import Ite8258ChassisBackend
 from .ite8910_perkey import Ite8910Backend
 from .ite8291r3_perkey import Ite8291r3Backend
 from .registry import select_backend

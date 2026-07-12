@@ -16,6 +16,7 @@ right evidence without needing maintainer-only knowledge first.
 - `src/gui/windows/support.py`
 - `src/tray/ui/menu.py`
 - `src/core/diagnostics/device_discovery.py`
+- `src/core/diagnostics/secondary_devices.py`
 - `src/core/diagnostics/backend_speed_probe.py`
 - `src/core/diagnostics/support_reports.py`
 - `src/core/diagnostics/additional_evidence.py`
@@ -49,10 +50,21 @@ maintainer round-trip carries enough evidence to act on.
 Targeted flows such as the `ite8910` speed probe should live in Support Tools,
 not in hidden debug-only code paths.
 
+5. Secondary-device state must be self-describing.
+
+The discovery payload carries a `secondary_devices` section (see
+`src/core/diagnostics/secondary_devices.py`) that reports, read-only, whether
+auxiliary lighting devices and composite chassis zones (e.g. Legion Gen10
+logo/neon/vent) are detected, whether their parent backend probe is available
+(and the reason when it is not), which tray device-context rows would render,
+the software-target state, and persisted per-zone brightness/color. This lets a
+single support bundle confirm whether secondary-device controls are expected to
+appear and work.
+
 ## Outputs
 
 - diagnostics JSON
-- discovery JSON
+- discovery JSON (includes the `secondary_devices` section above)
 - combined support bundle
 - generated issue draft and recommended template link
 - optional deeper-evidence attachments when needed

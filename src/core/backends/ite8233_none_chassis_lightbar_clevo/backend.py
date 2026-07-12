@@ -87,14 +87,14 @@ def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo
             "No hidraw device found for supported ITE 8233 lightbar IDs: "
             + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
         )
-    return hidraw.HidrawFeatureTransport(info.devnode, backend_name="ite8233_lightbar"), info
+    return hidraw.HidrawFeatureTransport(info.devnode, backend_name="ite8233_none_chassis_lightbar_clevo"), info
 
 
 @dataclass
 class Ite8233Backend(KeyboardBackend):
     """Experimental ITE lightbar backend for the vendor-backed 0x7000/0x7001 HID path."""
 
-    name: str = "ite8233_lightbar"
+    name: str = "ite8233_none_chassis_lightbar_clevo"
     priority: int = 96
     stability: BackendStability = BackendStability.EXPERIMENTAL
     experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
@@ -114,7 +114,7 @@ class Ite8233Backend(KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=False,
-                reason="ite8233_lightbar hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8233_none_chassis_lightbar_clevo hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )

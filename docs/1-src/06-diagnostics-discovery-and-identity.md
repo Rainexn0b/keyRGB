@@ -32,6 +32,9 @@ These strings are often useful for heuristics, support triage, and quirk rules.
 - hidraw device nodes and report-descriptor availability
 - backend probe outcomes and reasons
 - detected auxiliary devices such as a lightbar path
+- secondary-device state: chassis-zone detection, parent-backend availability,
+  expected tray device-context rows, software-target state (see
+  `src/core/diagnostics/secondary_devices.py`)
 
 ### Environment / conflicts
 

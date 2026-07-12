@@ -221,17 +221,17 @@ def test_select_backend_resolves_deprecated_alias_to_canonical_name(
 ) -> None:
     specs = [
         BackendSpec(
-            name="ite8258_zones",
+            name="ite8258_zones_lenovo_legion",
             priority=1,
-            factory=lambda: DummyBackend("ite8258_zones", 1, True, confidence=50),
+            factory=lambda: DummyBackend("ite8258_zones_lenovo_legion", 1, True, confidence=50),
         ),
     ]
 
-    # Old alias "ite8258" should resolve to canonical "ite8258_zones"
+    # Old alias "ite8258" should resolve to canonical "ite8258_zones_lenovo_legion"
     monkeypatch.setenv("KEYRGB_BACKEND", "ite8258")
     backend = select_backend(specs=specs)
     assert backend is not None
-    assert backend.name == "ite8258_zones"
+    assert backend.name == "ite8258_zones_lenovo_legion"
 
 
 @pytest.mark.parametrize(
@@ -240,10 +240,10 @@ def test_select_backend_resolves_deprecated_alias_to_canonical_name(
         ("ite8291r3", "ite8291r3_perkey"),
         ("ite8910", "ite8910_perkey"),
         ("ite8291", "ite8291_perkey"),
-        ("ite8291-zones", "ite8291_zones"),
-        ("ite8258-chassis", "ite8258_chassis"),
-        ("ite8295-zones", "ite8295_zones"),
-        ("ite8233", "ite8233_lightbar"),
+        ("ite8291-zones", "ite8291_zones_clevo"),
+        ("ite8258-chassis", "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"),
+        ("ite8295-zones", "ite8295_zones_lenovo_ideapad"),
+        ("ite8233", "ite8233_none_chassis_lightbar_clevo"),
         ("ite8297", "ite8297_uniform"),
     ],
 )

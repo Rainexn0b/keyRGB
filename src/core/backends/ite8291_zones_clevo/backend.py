@@ -130,7 +130,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
     transport, info = open_matching_hidraw_transport(
         product_ids=(protocol.PRODUCT_ID,),
         forced_path_env=protocol.HIDRAW_PATH_ENV,
-        backend_name="ite8291_zones",
+        backend_name="ite8291_zones_clevo",
     )
     if int(info.bcd_device or 0) != int(protocol.REQUIRED_BCD_DEVICE):
         transport.close()
@@ -144,7 +144,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
 class Ite8291ZonesBackend(KeyboardBackend):
     """Experimental 4-zone backend for the legacy ITE 8291 ce00 firmware split."""
 
-    name: str = "ite8291_zones"
+    name: str = "ite8291_zones_clevo"
     priority: int = 96
     stability: BackendStability = BackendStability.EXPERIMENTAL
     experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
@@ -162,7 +162,7 @@ class Ite8291ZonesBackend(KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=False,
-                reason="ite8291_zones hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8291_zones_clevo hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )

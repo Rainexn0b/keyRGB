@@ -19,11 +19,11 @@ Examples already in tree:
 
 - `ite8291r3_perkey`
 - `ite8291_perkey`
-- `ite8291_zones`
-- `ite8295_zones`
-- `ite8258_zones`
-- `ite8258_chassis`
-- `ite8233_lightbar`
+- `ite8291_zones_clevo`
+- `ite8295_zones_lenovo_ideapad`
+- `ite8258_zones_lenovo_legion`
+- `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`
+- `ite8233_none_chassis_lightbar_clevo`
 - `ite8297_uniform`
 - `ite8910_perkey`
 
@@ -48,8 +48,8 @@ runtime shapes that need separate backend ownership.
 
 Current examples:
 
-- `ite8291_perkey` vs `ite8291_zones`
-- `ite8258_zones` vs `ite8258_chassis`
+- `ite8291_perkey` vs `ite8291_zones_clevo`
+- `ite8258_zones_lenovo_legion` vs `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`
 
 These are split because they use different protocols, different HID interfaces,
 or different probe behavior.
@@ -77,8 +77,8 @@ Python package directories use underscores and match the public backend name.
 
 Examples:
 
-- package: `ite8291_zones` → backend name: `ite8291_zones`
-- package: `ite8295_zones` → backend name: `ite8295_zones`
+- package: `ite8291_zones_clevo` → backend name: `ite8291_zones_clevo`
+- package: `ite8295_zones_lenovo_ideapad` → backend name: `ite8295_zones_lenovo_ideapad`
 - package: `ite8291r3_perkey` → backend name: `ite8291r3_perkey`
 
 ## Deprecated aliases
@@ -91,8 +91,8 @@ See `src/core/backends/README.md` for the full alias table and policy.
 
 ## Current `ite8258` direction
 
-- `ite8258_zones` for the keyboard-only `0x048d:0xc195` 24-zone path
-- `ite8258_chassis` for the `0x048d:0xc197` composite chassis-lighting path
+- `ite8258_zones_lenovo_legion` for the keyboard-only `0x048d:0xc195` 24-zone path
+- `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` for the `0x048d:0xc197` composite chassis-lighting path
 
 If a future `ite8258` split appears before its semantics are fully understood, a
 numbered research label can exist in notes temporarily, but the public backend

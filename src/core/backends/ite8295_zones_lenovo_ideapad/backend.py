@@ -70,7 +70,7 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
     return open_matching_hidraw_transport(
         product_ids=protocol.SUPPORTED_PRODUCT_IDS,
         forced_path_env=protocol.HIDRAW_PATH_ENV,
-        backend_name="ite8295_zones",
+        backend_name="ite8295_zones_lenovo_ideapad",
     )
 
 
@@ -100,7 +100,7 @@ class Ite8295ZonesBackend(KeyboardBackend):
     share the same usage page, usage, and 33-byte feature-report protocol.
     """
 
-    name: str = "ite8295_zones"
+    name: str = "ite8295_zones_lenovo_ideapad"
     priority: int = 97
     stability: BackendStability = BackendStability.EXPERIMENTAL
     experimental_evidence: ExperimentalEvidence = ExperimentalEvidence.REVERSE_ENGINEERED
@@ -120,7 +120,7 @@ class Ite8295ZonesBackend(KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return ProbeResult(
                 available=False,
-                reason="ite8295_zones hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8295_zones_lenovo_ideapad hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )
