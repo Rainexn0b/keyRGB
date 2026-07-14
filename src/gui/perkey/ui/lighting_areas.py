@@ -157,13 +157,37 @@ class LightingAreasPanel:
             text=_rgb_text(area.color),
         )
         color_label.grid(row=0, column=4, sticky="e")
+        brightness_variable: object | None = None
+        trailing_column = 5
+        if area.brightness is not None:
+            brightness_variable = self._tk.StringVar(value=str(area.brightness))
+            self._ttk.Label(frame, text="Brightness").grid(row=0, column=5, sticky="e", padx=(12, 4))
+            brightness_control = self._ttk.Combobox(
+                frame,
+                textvariable=brightness_variable,
+                values=tuple(str(value) for value in range(0, 51, 5)),
+                state="readonly",
+                width=4,
+            )
+            brightness_control.grid(row=0, column=6, sticky="e")
+            brightness_control.bind(
+                "<<ComboboxSelected>>",
+                lambda _event, key=area.state_key, var=brightness_variable: self._brightness_changed(key, var),
+            )
+            trailing_column = 7
         if area.simulated:
-            self._ttk.Label(frame, text="simulated").grid(row=0, column=5, sticky="e", padx=(8, 0))
+            self._ttk.Label(frame, text="simulated").grid(
+                row=0,
+                column=trailing_column,
+                sticky="e",
+                padx=(8, 0),
+            )
         self._rows[area.state_key] = {
             "frame": frame,
             "enabled": enabled,
             "preview": preview,
             "color_label": color_label,
+            "brightness": brightness_variable,
         }
 
     def _enabled_changed(self, state_key: str, variable: object) -> None:
@@ -174,6 +198,14 @@ class LightingAreasPanel:
             set_status(self.editor, f"{state_key} {'enabled' if value else 'disabled'}")
         except _UI_ERRORS as exc:
             set_status(self.editor, f"Failed to update {state_key}: {exc}")
+
+    def _brightness_changed(self, state_key: str, variable: object) -> None:
+        try:
+            value = self.draft.set_brightness(state_key, variable.get())  # type: ignore[attr-defined]
+            self._set_draft(self.draft)
+            set_status(self.editor, f"{state_key} brightness set to {value}")
+        except _UI_ERRORS as exc:
+            set_status(self.editor, f"Failed to update {state_key} brightness: {exc}")
 
     def _select_area(self, state_key: str) -> None:
         area = next((item for item in self.draft.areas() if item.state_key == state_key), None)

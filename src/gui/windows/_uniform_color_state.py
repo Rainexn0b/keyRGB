@@ -152,10 +152,18 @@ def store_brightness(gui: _UniformTargetState, brightness: int) -> None:
             int(brightness),
             compatibility_key=gui._secondary_route.config_brightness_attr,
         )
-        return
-
-    if gui._secondary_route.config_brightness_attr:
+    elif gui._secondary_route.config_brightness_attr:
         setattr(gui.config, gui._secondary_route.config_brightness_attr, int(brightness))
+
+    updates: dict[str, object] = {"enabled": int(brightness) > 0}
+    if int(brightness) > 0:
+        # A zero value is a live off action. Keep the active profile's last
+        # non-zero brightness so a later Turn On can restore it.
+        updates["brightness"] = int(brightness)
+    try:
+        profiles.update_secondary_lighting_area(gui._secondary_route.state_key, updates)
+    except _PROFILE_WRITE_ERRORS:
+        logger.warning("Failed to persist secondary brightness in the active lighting profile", exc_info=True)
 
 
 def current_secondary_color(gui: _UniformTargetState) -> Color:

@@ -79,12 +79,12 @@ def apply_secondary_static_scene(
         if not effective.available or not route.supports_profile_state:
             continue
         entry = secondary_lighting_state.area_entry(profile, route.state_key)
-        if entry is None:
-            continue
         device: object | None = None
         try:
             device = acquire_device_fn(route)
-            if secondary_lighting_state.entry_enabled(entry):
+            # A present secondary profile component is authoritative. Missing
+            # registered routes are disabled, not inherited from the last scene.
+            if entry is not None and secondary_lighting_state.entry_enabled(entry):
                 setter = getattr(device, "set_color")
                 config = getattr(tray, "config", None)
                 setter(
@@ -121,12 +121,10 @@ def apply_secondary_static_route(
     if profile is None:
         profile = secondary_lighting_state.payload_from_config(getattr(tray, "config", None), (route,))
     entry = secondary_lighting_state.area_entry(profile, route.state_key)
-    if entry is None:
-        return False
     device: object | None = None
     try:
         device = acquire_device_fn(route)
-        if secondary_lighting_state.entry_enabled(entry):
+        if entry is not None and secondary_lighting_state.entry_enabled(entry):
             config = getattr(tray, "config", None)
             getattr(device, "set_color")(
                 secondary_lighting_state.route_color(config, route, entry),
@@ -161,11 +159,7 @@ def turn_off_secondary_profile_areas(
         return
     for effective in effective_routes_fn():
         route = effective.route
-        if (
-            not effective.available
-            or not route.supports_profile_state
-            or secondary_lighting_state.area_entry(profile, route.state_key) is None
-        ):
+        if not effective.available or not route.supports_profile_state:
             continue
         device: object | None = None
         try:

@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 0.29.1 (2026-07-14)
+
+- Secondary Lighting/Profiles: Treat explicitly saved empty or partial secondary
+  scenes as authoritative, turning omitted known routes off instead of retaining
+  the previously active profile while preserving unknown future route metadata.
+- Secondary Lighting/UI: Expose independent-route brightness in the Lighting Areas
+  editor and persist standalone secondary-window brightness changes into the active
+  profile; shared-brightness chassis zones remain tied to keyboard brightness.
+- Tray/UX: Restore the v0.28.2-style inline `Hardware Static Mode` toggle and its
+  contextual uniform-colour/effects rows while retaining the v0.29.0 device routing,
+  profile, and Software Effects organization.
+
 ## 0.29.0 (2026-07-14)
 
 - Secondary Lighting/Profiles: Make lighting areas part of the whole-scene Lighting Profile Editor, with per-row selection through the shared colour wheel, enabled/color persistence, independent brightness where supported, and access from uniform or zoned keyboards whenever secondary routes are available.

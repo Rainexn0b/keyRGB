@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core.secondary_device_routes import SecondaryDeviceRoute
+from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT, SecondaryDeviceRoute
 from src.core.secondary_device_runtime import EffectiveSecondaryRoute
 from src.gui.perkey.secondary_lighting import SecondaryLightingDraft
 from src.gui.perkey.editor import PerKeyEditor
@@ -18,6 +18,7 @@ def _draft() -> SecondaryLightingDraft:
         get_backend=lambda: object(),
         get_device=lambda: object(),
         supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
     )
     effective = EffectiveSecondaryRoute(
         route=route,
@@ -69,6 +70,19 @@ def test_shared_wheel_falls_through_to_keyboard_when_no_area_is_selected() -> No
 
 def test_lighting_area_rgb_text_matches_keyboard_decimal_format() -> None:
     assert lighting_areas._rgb_text((12, 34, 56)) == "RGB: 12, 34, 56"
+
+
+def test_independent_lighting_area_brightness_updates_editor_draft(monkeypatch) -> None:
+    statuses: list[str] = []
+    panel = lighting_areas.LightingAreasPanel.__new__(lighting_areas.LightingAreasPanel)
+    panel.editor = SimpleNamespace(secondary_lighting=None)
+    panel._draft = _draft()
+    monkeypatch.setattr(lighting_areas, "set_status", lambda _editor, message: statuses.append(message))
+
+    panel._brightness_changed("logo", _Variable("35"))
+
+    assert panel.editor.secondary_lighting["areas"]["logo"]["brightness"] == 35
+    assert statuses == ["logo brightness set to 35"]
 
 
 def test_keyboard_selector_restores_selected_keyboard_target(monkeypatch) -> None:

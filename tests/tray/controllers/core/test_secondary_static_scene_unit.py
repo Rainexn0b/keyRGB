@@ -85,6 +85,44 @@ def test_static_scene_applies_enabled_and_disabled_profile_areas_and_closes_devi
     assert calls.count(("logo", "close", None)) == 1
 
 
+def test_explicit_empty_static_scene_turns_off_all_available_profile_routes() -> None:
+    calls: list[tuple[str, str, object]] = []
+    mouse = _route("mouse")
+    logo = _route("logo")
+    tray = SimpleNamespace(config=SimpleNamespace(), _active_secondary_lighting={"version": 1, "areas": {}})
+
+    assert (
+        apply_secondary_static_scene(
+            tray,
+            effective_routes_fn=lambda: (_effective(mouse), _effective(logo)),
+            acquire_device_fn=lambda route: _Device(route.state_key, calls),
+        )
+        is True
+    )
+
+    assert ("mouse", "turn_off", None) in calls
+    assert ("logo", "turn_off", None) in calls
+
+
+def test_partial_static_scene_turns_off_omitted_available_profile_route() -> None:
+    calls: list[tuple[str, str, object]] = []
+    mouse = _route("mouse")
+    logo = _route("logo")
+    tray = SimpleNamespace(
+        config=SimpleNamespace(),
+        _active_secondary_lighting={"areas": {"mouse": {"enabled": True, "color": [7, 8, 9]}}},
+    )
+
+    apply_secondary_static_scene(
+        tray,
+        effective_routes_fn=lambda: (_effective(mouse), _effective(logo)),
+        acquire_device_fn=lambda route: _Device(route.state_key, calls),
+    )
+
+    assert ("mouse", "set_color", ((7, 8, 9), 25)) in calls
+    assert ("logo", "turn_off", None) in calls
+
+
 def test_issue7_legacy_profile_static_scene_falls_back_to_saved_config_state() -> None:
     calls: list[tuple[str, str, object]] = []
     colors = {

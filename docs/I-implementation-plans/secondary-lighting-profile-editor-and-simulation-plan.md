@@ -2,8 +2,11 @@
 
 ## Status
 
-Implementation complete through Phase 7 validation as of 2026-07-14; real-hardware
-validation remains explicitly pending.
+Code implementation and automated Phase 7 validation completed for v0.29.0 on
+2026-07-14. Follow-up review fixes cover authoritative empty/partial scenes,
+independent-route editor/profile brightness, and the inline tray hardware-mode
+presentation. Issue #7 reporter hardware validation remains explicitly pending;
+this status does not claim hardware verification.
 
 Primary support case: [GitHub issue #7](https://github.com/Rainexn0b/keyRGB/issues/7),
 Lenovo Legion Pro 7 16IAX10H (`0x048d:0xc197`).
@@ -162,7 +165,8 @@ Lighting Profile Editor
 ```
 
 - Each row has an explicit selector, display label, enabled checkbox, colour value,
-  and preview swatch.
+  and preview swatch. Routes with independent brightness also expose a 0–50
+  brightness selector; shared-brightness chassis zones do not.
 - A Keyboard selector above the rows explicitly returns the shared wheel to per-key
   editing, and area values use the same decimal `RGB: r, g, b` format as the wheel.
 - The selected row reuses the editor's colour wheel. The selector makes the current
@@ -820,9 +824,13 @@ The implementation is complete only when all of these are true:
 - [x] No production consumer bypasses the runtime provider for route acquisition.
 - [x] Lighting profiles persist enabled/colour and optional independent-brightness
   state without destructive migration.
+- [x] Explicit-empty and partial secondary components turn omitted known routes off
+  while preserving unknown future route state.
 - [x] Unknown and unavailable route state survives Save.
 - [x] Lighting areas are visible in the main editor, not mapped onto keyboard cells.
 - [x] Lighting-area rows explicitly select which area the shared colour wheel edits.
+- [x] Independent-route brightness is editable in Lighting areas and standalone
+  secondary colour actions persist it to the active profile.
 - [x] Static applies the whole profile regardless of animated Effect output.
 - [x] Animated fan-out includes enabled routes only.
 - [x] Stopping an animation restores the profile scene.

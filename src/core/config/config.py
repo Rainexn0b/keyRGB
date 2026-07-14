@@ -132,9 +132,28 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         if not isinstance(raw_areas, Mapping):
             return
 
+        # An existing secondary component is an authoritative scene snapshot.
+        # Omitted registered routes must therefore become disabled instead of
+        # inheriting the previous profile's enabled state.  Unknown/future route
+        # entries remain untouched for forward compatibility.
+        from src.core.secondary_device_routes import iter_secondary_routes
+
         raw_state = self._settings.get("secondary_device_state")
         state: dict[str, object] = raw_state if isinstance(raw_state, dict) else {}
         self._settings["secondary_device_state"] = state
+
+        supplied_keys = {
+            str(raw_key or "").strip().lower()
+            for raw_key, raw_entry in raw_areas.items()
+            if str(raw_key or "").strip() and isinstance(raw_entry, Mapping)
+        }
+        for route in iter_secondary_routes():
+            if not route.supports_profile_state or route.state_key in supplied_keys:
+                continue
+            existing = state.get(route.state_key)
+            disabled: dict[str, object] = dict(existing) if isinstance(existing, dict) else {}
+            disabled["enabled"] = False
+            state[route.state_key] = disabled
 
         for raw_key, raw_entry in raw_areas.items():
             key = str(raw_key or "").strip().lower()

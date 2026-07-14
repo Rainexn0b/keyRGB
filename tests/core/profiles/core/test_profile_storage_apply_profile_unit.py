@@ -97,7 +97,66 @@ class TestApplyProfileToConfig:
         assert snapshots[0]["secondary_device_state"] == {
             "logo": {"brightness": 35, "legacy": "preserve", "enabled": False, "color": [255, 0, 7], "future": True},
             "neon": {"enabled": True, "color": [1, 2, 3]},
+            "lightbar": {"enabled": False},
+            "mouse": {"enabled": False},
+            "ite8258_chassis_logo": {"enabled": False},
+            "ite8258_chassis_neon": {"enabled": False},
+            "ite8258_chassis_vent": {"enabled": False},
         }
+
+    def test_explicit_empty_secondary_profile_disables_known_routes_and_preserves_unknown_state(self, monkeypatch):
+        from src.core.config import Config
+        from src.core.profile.profiles import apply_profile_to_config
+
+        cfg = Config()
+        cfg._settings["secondary_device_state"] = {
+            "lightbar": {"enabled": True, "brightness": 35, "color": [1, 2, 3]},
+            "ite8258_chassis_logo": {"enabled": True, "color": [4, 5, 6]},
+            "future_route": {"enabled": True, "future": "preserve"},
+        }
+        monkeypatch.setattr(cfg, "_save", lambda: None)
+
+        apply_profile_to_config(
+            cfg,
+            {},
+            secondary_lighting={"version": 1, "areas": {}},
+        )
+
+        state = cfg._settings["secondary_device_state"]
+        assert state["lightbar"] == {
+            "enabled": False,
+            "brightness": 35,
+            "color": [1, 2, 3],
+        }
+        assert state["ite8258_chassis_logo"] == {
+            "enabled": False,
+            "color": [4, 5, 6],
+        }
+        assert state["future_route"] == {"enabled": True, "future": "preserve"}
+
+    def test_partial_secondary_profile_disables_only_omitted_known_routes(self, monkeypatch):
+        from src.core.config import Config
+        from src.core.profile.profiles import apply_profile_to_config
+
+        cfg = Config()
+        cfg._settings["secondary_device_state"] = {
+            "lightbar": {"enabled": True, "brightness": 25},
+            "mouse": {"enabled": True, "brightness": 20},
+        }
+        monkeypatch.setattr(cfg, "_save", lambda: None)
+
+        apply_profile_to_config(
+            cfg,
+            {},
+            secondary_lighting={
+                "version": 1,
+                "areas": {"lightbar": {"enabled": True, "brightness": 40}},
+            },
+        )
+
+        state = cfg._settings["secondary_device_state"]
+        assert state["lightbar"] == {"enabled": True, "brightness": 40}
+        assert state["mouse"] == {"enabled": False, "brightness": 20}
 
     def test_apply_light_profile_restores_built_in_baseline_brightness(self, monkeypatch):
         """The built-in light profile should restore the normal full baseline."""

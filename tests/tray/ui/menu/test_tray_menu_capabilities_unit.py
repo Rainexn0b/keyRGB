@@ -156,8 +156,7 @@ def test_menu_uses_detected_backend_hardware_effects_count(
     tray.backend = DummyBackend()
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
-    labels = [i["text"] for i in hardware_menu.items if isinstance(i, dict)]
+    labels = [i["text"] for i in items if isinstance(i, dict)]
 
     assert "Hardware Effects (3 modes)" in labels
 
@@ -203,11 +202,10 @@ def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
 ) -> None:
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False, color=False))
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
-    labels = [i["text"] for i in hardware_menu.items if isinstance(i, dict)]
+    labels = [i["text"] for i in items if isinstance(i, dict)]
 
-    assert "Static Mode" in labels
-    assert "Uniform Color…" not in labels
+    assert "Hardware Static Mode" in labels
+    assert "Hardware Uniform Color…" not in labels
     assert not any(label.startswith("Hardware Effects") for label in labels)
 
 
@@ -218,12 +216,11 @@ def test_menu_hides_hardware_color_and_effect_rows_in_software_mode(
     tray.config.effect = "reactive_ripple"
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
-    hardware_items = [i for i in hardware_menu.items if isinstance(i, dict)]
+    hardware_items = [i for i in items if isinstance(i, dict)]
 
-    assert next(i for i in hardware_items if i["text"] == "Static Mode")
-    assert next(i for i in hardware_items if i["text"] == "Uniform Color…")["enabled"] is False
-    assert next(i for i in hardware_items if i["text"].startswith("Hardware Effects"))["enabled"] is False
+    assert next(i for i in hardware_items if i["text"] == "Hardware Static Mode")
+    assert not any(i["text"] == "Hardware Uniform Color…" for i in hardware_items)
+    assert not any(i["text"].startswith("Hardware Effects") for i in hardware_items)
 
 
 def test_hardware_static_row_checked_state_represents_hardware_mode_not_only_static_effect() -> None:
@@ -303,7 +300,7 @@ def test_menu_uses_capability_filtered_body_when_lightbar_context_is_selected(mo
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     labels = [i["text"] for i in items if isinstance(i, dict)]
 
-    assert "Hardware Mode" in labels
+    assert "Static Color…" in labels
     assert "Software Effects" in labels
     assert "Lightbar backend is present but disabled by experimental-backend policy" not in labels
     assert "Support Tools…" in labels
@@ -331,10 +328,7 @@ def test_menu_exposes_lightbar_controls_alongside_profile_editor(
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     labels = [i["text"] for i in items if isinstance(i, dict)]
 
-    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
-    hardware_labels = [i["text"] for i in hardware_menu.items if isinstance(i, dict)]
-
-    assert "Static Color…" in hardware_labels
+    assert "Static Color…" in labels
     assert "Brightness Override" in labels
     assert "Lighting Profiles" in labels
     assert "Turn Off" in labels
@@ -351,7 +345,7 @@ def test_menu_groups_controls_in_the_agreed_order() -> None:
     expected = [
         "Brightness Override",
         "Lighting Profiles",
-        "Hardware Mode",
+        "Hardware Static Mode",
         "Software Effects",
         "Effect Speed",
         "Support Tools…",
@@ -421,8 +415,7 @@ def test_independent_secondary_context_off_state_offers_turn_on(monkeypatch) -> 
     monkeypatch.setattr(tray_menu.menu_status, "device_context_controls_available", lambda *_args: True)
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
-    hardware_labels = [i["text"] for i in hardware_menu.items if isinstance(i, dict)]
+    hardware_labels = [i["text"] for i in items if isinstance(i, dict)]
 
     assert "Turn On Lightbar" in hardware_labels
 

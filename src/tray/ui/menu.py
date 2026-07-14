@@ -271,25 +271,24 @@ def build_menu_items(
         selected_brightness_item = item("Brightness Override", brightness_menu)
         hardware_mode_items: list[object] = [
             item(
-                "Static Mode",
+                "Hardware Static Mode",
                 tray_state._on_hardware_static_mode_clicked,
                 checked=menu_callbacks.checked_hw_static(tray_state, hw_mode=hw_mode),
             )
         ]
-        if color_supported:
+        if color_supported and hw_mode:
             hardware_mode_items.append(
                 item(
-                    "Uniform Color…",
+                    "Hardware Uniform Color…",
                     tray_state._on_hardware_color_clicked,
-                    enabled=hw_mode,
                 )
             )
-        if hw_effects_supported:
+        if hw_effects_supported and hw_mode:
             hardware_mode_items.append(
                 item(
                     hw_effects_label,
                     hw_effects_menu,
-                    enabled=bool(hw_effect_names) and hw_mode,
+                    enabled=bool(hw_effect_names),
                 )
             )
     else:
@@ -337,15 +336,13 @@ def build_menu_items(
             ),
         ]
 
-    hardware_mode_menu = pystray.Menu(*hardware_mode_items)
-
     return [
         *header_items,
         pystray.Menu.SEPARATOR,
         selected_brightness_item,
         *([item("Lighting Profiles", perkey_menu)] if perkey_menu is not None else []),
         pystray.Menu.SEPARATOR,
-        item("Hardware Mode", hardware_mode_menu),
+        *hardware_mode_items,
         pystray.Menu.SEPARATOR,
         item("Software Effects", sw_effects_menu),
         item("Effect Speed", speed_menu),

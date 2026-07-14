@@ -306,6 +306,56 @@ def test_secondary_uniform_color_does_not_store_brightness_for_shared_zone() -> 
     assert writes == []
 
 
+def test_secondary_uniform_color_stores_independent_brightness_in_active_profile(monkeypatch) -> None:
+    from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
+
+    config_writes: list[tuple[str, int, str | None]] = []
+    profile_updates: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        "src.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
+        lambda state_key, updates: profile_updates.append((state_key, dict(updates))),
+    )
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    gui.config = SimpleNamespace(
+        set_secondary_device_brightness=lambda state_key, value, *, compatibility_key=None: config_writes.append(
+            (state_key, value, compatibility_key)
+        )
+    )
+    gui._target_is_secondary = True
+    gui._secondary_route = SimpleNamespace(
+        brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
+        state_key="lightbar",
+        config_brightness_attr="lightbar_brightness",
+    )
+
+    gui._store_brightness(35)
+
+    assert config_writes == [("lightbar", 35, "lightbar_brightness")]
+    assert profile_updates == [("lightbar", {"enabled": True, "brightness": 35})]
+
+
+def test_secondary_uniform_color_zero_brightness_preserves_profile_restore_value(monkeypatch) -> None:
+    from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
+
+    profile_updates: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        "src.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
+        lambda state_key, updates: profile_updates.append((state_key, dict(updates))),
+    )
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    gui.config = SimpleNamespace(set_secondary_device_brightness=lambda *_args, **_kwargs: None)
+    gui._target_is_secondary = True
+    gui._secondary_route = SimpleNamespace(
+        brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
+        state_key="lightbar",
+        config_brightness_attr="lightbar_brightness",
+    )
+
+    gui._store_brightness(0)
+
+    assert profile_updates == [("lightbar", {"enabled": False})]
+
+
 def test_constructor_uses_content_driven_geometry(monkeypatch) -> None:
     root = _FakeRoot()
     config = SimpleNamespace(color=(12, 34, 56), brightness=25, effect="none")
