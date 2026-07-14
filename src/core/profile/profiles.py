@@ -15,6 +15,7 @@ profile data by writing to config when you activate a profile.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from src.core.config import layout_slots as config_layout_slots
 from src.core.resources import defaults as resource_defaults
 from src.core.resources import layout_slots as resource_layout_slots
@@ -88,10 +89,12 @@ __all__ = [
     "load_layout_slots",
     "load_lightbar_overlay",
     "load_per_key_colors",
+    "load_secondary_lighting",
     "normalize_backdrop_mode",
     "normalize_keymap",
     "normalize_layout_per_key_tweaks",
     "normalize_layout_slot_overrides",
+    "normalize_secondary_lighting",
     "paths_for",
     "profiles_root",
     "safe_profile_name",
@@ -103,6 +106,8 @@ __all__ = [
     "save_layout_slots",
     "save_lightbar_overlay",
     "save_per_key_colors",
+    "save_secondary_lighting",
+    "update_secondary_lighting_area",
     "migrate_builtin_profile_brightness",
     "set_active_profile",
     "set_default_profile",
@@ -233,6 +238,48 @@ def load_lightbar_overlay(name: str | None = None) -> dict[str, bool | float]:
     )
 
 
+def normalize_secondary_lighting(raw: object) -> dict[str, object]:
+    return storage_ops.normalize_secondary_lighting(raw)
+
+
+def load_secondary_lighting(name: str | None = None) -> dict[str, object] | None:
+    return storage_ops.load_secondary_lighting(
+        name=name,
+        paths_for=paths_for,
+        read_json=read_json,
+        normalize_secondary_lighting_fn=normalize_secondary_lighting,
+    )
+
+
+def save_secondary_lighting(payload: dict[str, object], name: str | None = None) -> dict[str, object]:
+    return storage_ops.save_secondary_lighting(
+        payload=payload,
+        name=name,
+        paths_for=paths_for,
+        write_json_atomic=write_json_atomic,
+        normalize_secondary_lighting_fn=normalize_secondary_lighting,
+    )
+
+
+def update_secondary_lighting_area(
+    state_key: str,
+    updates: Mapping[str, object],
+    name: str | None = None,
+) -> dict[str, object]:
+    """Patch one area in a profile while preserving unknown route data."""
+
+    payload = load_secondary_lighting(name) or {"version": 1, "areas": {}}
+    raw_areas = payload.get("areas")
+    areas: dict[str, object] = dict(raw_areas) if isinstance(raw_areas, Mapping) else {}
+    key = str(state_key or "").strip().lower()
+    raw_entry = areas.get(key)
+    entry: dict[str, object] = dict(raw_entry) if isinstance(raw_entry, Mapping) else {}
+    entry.update(dict(updates))
+    areas[key] = entry
+    payload["areas"] = areas
+    return save_secondary_lighting(payload, name)
+
+
 def save_lightbar_overlay(
     overlay: dict[str, bool | float],
     name: str | None = None,
@@ -305,10 +352,16 @@ def migrate_builtin_profile_brightness(cfg) -> bool:
     )
 
 
-def apply_profile_to_config(cfg, colors: dict[tuple[int, int], tuple[int, int, int]]) -> None:
+def apply_profile_to_config(
+    cfg,
+    colors: dict[tuple[int, int], tuple[int, int, int]],
+    *,
+    secondary_lighting: Mapping[object, object] | None = None,
+) -> None:
     apply_ops.apply_profile_to_config(
         cfg,
         colors,
+        secondary_lighting=secondary_lighting,
         safe_profile_name=safe_profile_name,
         get_active_profile=get_active_profile,
         log_throttled=log_throttled,

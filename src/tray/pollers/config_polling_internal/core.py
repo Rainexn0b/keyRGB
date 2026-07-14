@@ -66,6 +66,7 @@ def state_for_log(state: ConfigApplyState | None):
             "color": tuple(state.color) if state.color is not None else None,
             "perkey_keys": perkey_keys,
             "software_effect_target": state.software_effect_target,
+            "secondary_sig": state.secondary_sig,
         }
     except _CONFIG_FALLBACK_EXCEPTIONS:
         return None

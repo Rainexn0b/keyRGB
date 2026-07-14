@@ -8,6 +8,7 @@ from src.core.config import Config
 
 from ..commit_pipeline import PerKeyCommitPipeline
 from ..profile_management import KeyCells, Keymap, PerKeyColors
+from . import dirty_state
 
 
 LayoutTweaks = dict[str, float]
@@ -30,6 +31,8 @@ class _TkRootProtocol(Protocol):
     def after(self, delay_ms: int, callback: Callable[..., object]) -> object: ...
 
     def bind(self, sequence: str, func: Callable[..., object]) -> object: ...
+
+    def protocol(self, name: str, func: Callable[..., object]) -> object: ...
 
 
 class _TkModuleProtocol(Protocol):
@@ -63,6 +66,8 @@ class _ProfilesProtocol(Protocol):
 
     def load_lightbar_overlay(self, name: str | None = None) -> LightbarOverlay: ...
 
+    def load_secondary_lighting(self, name: str | None = None) -> dict[str, object] | None: ...
+
 
 class _VisibleLayoutKeyProtocol(Protocol):
     key_id: str
@@ -89,6 +94,7 @@ class _PerKeyEditorBootstrapApp(Protocol):
     _layout_legend_pack: str
     has_lightbar_device: bool
     lightbar_overlay: LightbarOverlay
+    secondary_lighting: dict[str, object] | None
     _layout_var: _TkVarProtocol
     _legend_pack_var: _TkVarProtocol
     _backdrop_mode_var: _TkVarProtocol
@@ -116,6 +122,8 @@ class _PerKeyEditorBootstrapApp(Protocol):
     _commit_pipeline: PerKeyCommitPipeline
     kb: KeyboardDevice | None
     canvas: _CanvasProtocol
+
+    def _on_close(self) -> None: ...
 
     def _detect_lightbar_device(self) -> bool: ...
 
@@ -145,7 +153,7 @@ def initialize_editor(
     apply_perkey_editor_geometry: Callable[..., object],
     compute_perkey_editor_min_content_size: Callable[..., tuple[int, int]],
     fit_perkey_editor_geometry_to_content: Callable[..., object],
-    apply_clam_theme: Callable[[_TkRootProtocol], tuple[str, str]],
+    apply_clam_theme: Callable[..., tuple[str, str]],
     tk_call_errors: tuple[type[BaseException], ...],
     log_boundary_exception: Callable[[str, str, Exception], object],
     normalize_layout_legend_pack_fn: Callable[[str, str | None], str],
@@ -175,7 +183,7 @@ def initialize_editor(
     editor._resize_job = None
 
     editor.root = tk_module.Tk()
-    editor.root.title("KeyRGB - Per-key Colors")
+    editor.root.title("KeyRGB - Lighting Profile Editor")
     apply_keyrgb_window_icon(editor.root)
     editor.root.update_idletasks()
 
@@ -201,8 +209,15 @@ def initialize_editor(
     )
 
     style = ttk_module.Style()
-    editor.bg_color, editor.fg_color = apply_clam_theme(editor.root)
-    style.configure("TCheckbutton", background=editor.bg_color, foreground=editor.fg_color)
+    # The per-key editor uses ttk.Checkbutton widgets ("Apply to all keys",
+    # "Sample tool"). Enable checkbutton styling + state mapping so the dark
+    # theme keeps the hover ("active") background dark instead of falling back
+    # to clam's default light hover color, which obscured the light label text.
+    editor.bg_color, editor.fg_color = apply_clam_theme(
+        editor.root,
+        include_checkbuttons=True,
+        map_checkbutton_state=True,
+    )
     style.configure("TLabelframe", background=editor.bg_color, foreground=editor.fg_color)
     style.configure("TLabelframe.Label", background=editor.bg_color, foreground=editor.fg_color)
     style.configure("TRadiobutton", background=editor.bg_color, foreground=editor.fg_color)
@@ -232,6 +247,12 @@ def initialize_editor(
     )
     editor.has_lightbar_device = editor._detect_lightbar_device()
     editor.lightbar_overlay = profiles_api.load_lightbar_overlay(editor.profile_name)
+    load_secondary_lighting = getattr(profiles_api, "load_secondary_lighting", None)
+    editor.secondary_lighting = (
+        cast(Callable[[str], dict[str, object] | None], load_secondary_lighting)(editor.profile_name)
+        if callable(load_secondary_lighting)
+        else None
+    )
 
     editor._layout_var = tk_module.StringVar(value=editor._physical_layout)
     editor._legend_pack_var = tk_module.StringVar(value=editor._layout_legend_pack)
@@ -280,6 +301,10 @@ def initialize_editor(
     editor.kb = get_keyboard()
 
     build_ui_fn()
+    protocol = getattr(editor.root, "protocol", None)
+    if callable(protocol):
+        protocol("WM_DELETE_WINDOW", editor._on_close)
+    dirty_state.mark_saved(editor)
     fit_perkey_editor_geometry_to_content(
         editor.root,
         min_content_width_px=min_content_width,

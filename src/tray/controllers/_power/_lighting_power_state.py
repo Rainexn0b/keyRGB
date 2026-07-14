@@ -48,6 +48,7 @@ def turn_off_impl(
     try_log_event: Callable[..., None],
     software_effect_target_routes_aux_devices: Callable[[LightingTrayProtocol], bool],
     turn_off_secondary_software_targets: Callable[[LightingTrayProtocol], None],
+    turn_off_secondary_profile_areas: Callable[[LightingTrayProtocol], None] | None = None,
 ) -> None:
     try_log_event(tray, "menu", "turn_off")
     _set_user_forced_off(tray, True)
@@ -55,6 +56,8 @@ def turn_off_impl(
     tray.engine.turn_off()
     if software_effect_target_routes_aux_devices(tray):
         turn_off_secondary_software_targets(tray)
+    if turn_off_secondary_profile_areas is not None:
+        turn_off_secondary_profile_areas(tray)
     tray.is_off = True
     tray._refresh_ui()
 
@@ -89,6 +92,7 @@ def power_turn_off_impl(
     try_log_event: Callable[..., None],
     software_effect_target_routes_aux_devices: Callable[[LightingTrayProtocol], bool],
     turn_off_secondary_software_targets: Callable[[LightingTrayProtocol], None],
+    turn_off_secondary_profile_areas: Callable[[LightingTrayProtocol], None] | None = None,
 ) -> None:
     try_log_event(tray, "power", "turn_off")
     _set_power_forced_off(tray, True)
@@ -97,6 +101,8 @@ def power_turn_off_impl(
     tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
     if software_effect_target_routes_aux_devices(tray):
         turn_off_secondary_software_targets(tray)
+    if turn_off_secondary_profile_areas is not None:
+        turn_off_secondary_profile_areas(tray)
     tray._refresh_ui()
 
 

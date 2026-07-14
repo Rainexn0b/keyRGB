@@ -109,12 +109,18 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
         "load_per_key_colors",
         lambda _name: {(1, 1): (10, 20, 30), (1, 20): (99, 99, 99)},
     )
+    monkeypatch.setattr(
+        profile_management.profiles,
+        "load_secondary_lighting",
+        lambda _name: {"version": 1, "areas": {"logo": {"enabled": True, "color": [1, 2, 3]}}},
+    )
 
     applied = {}
 
-    def fake_apply_profile_to_config(config, colors) -> None:
+    def fake_apply_profile_to_config(config, colors, *, secondary_lighting=None) -> None:
         applied["config"] = config
         applied["colors"] = dict(colors)
+        applied["secondary_lighting"] = secondary_lighting
 
     monkeypatch.setattr(profile_management.profiles, "apply_profile_to_config", fake_apply_profile_to_config)
 
@@ -136,9 +142,14 @@ def test_activate_profile_sanitizes_loaded_state_and_applies_colors(monkeypatch)
     assert result.colors == {(1, 1): (10, 20, 30)}
     assert result.layout_slot_overrides == {str(slot_id_for_key_id("iso", "nonusbackslash")): {"visible": False}}
     assert result.lightbar_overlay == {"visible": True, "length": 0.7}
+    assert result.secondary_lighting == {
+        "version": 1,
+        "areas": {"logo": {"enabled": True, "color": [1, 2, 3]}},
+    }
     assert applied == {
         "config": cfg,
         "colors": {(1, 1): (10, 20, 30)},
+        "secondary_lighting": {"version": 1, "areas": {"logo": {"enabled": True, "color": [1, 2, 3]}}},
     }
 
 
@@ -169,7 +180,14 @@ def test_save_profile_persists_lightbar_overlay(monkeypatch) -> None:
         profile_management.profiles, "save_per_key_colors", lambda *args: calls.setdefault("colors", args)
     )
     monkeypatch.setattr(
-        profile_management.profiles, "apply_profile_to_config", lambda *args: calls.setdefault("apply", args)
+        profile_management.profiles,
+        "save_secondary_lighting",
+        lambda *args: calls.setdefault("secondary_lighting", args),
+    )
+    monkeypatch.setattr(
+        profile_management.profiles,
+        "apply_profile_to_config",
+        lambda *args, **kwargs: calls.setdefault("apply", (args, kwargs)),
     )
 
     cfg = SimpleNamespace()
@@ -183,10 +201,15 @@ def test_save_profile_persists_lightbar_overlay(monkeypatch) -> None:
         physical_layout="ansi",
         layout_slot_overrides={"k": {"visible": False}},
         colors={(0, 0): (1, 2, 3)},
+        secondary_lighting={"version": 1, "areas": {"logo": {"enabled": True, "color": [1, 2, 3]}}},
     )
 
     assert name == "safe-p1"
     assert calls["lightbar_overlay"] == ({"visible": True, "length": 0.9}, "safe-p1")
+    assert calls["secondary_lighting"] == (
+        {"version": 1, "areas": {"logo": {"enabled": True, "color": [1, 2, 3]}}},
+        "safe-p1",
+    )
 
 
 def test_primary_helpers_pick_first_or_colored_cell() -> None:

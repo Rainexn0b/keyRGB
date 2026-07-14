@@ -11,6 +11,7 @@ from src.tray.controllers import _lighting_effect_coordination as lighting_effec
 from src.tray.controllers import _lighting_menu_handlers as lighting_menu_handlers
 from src.tray.controllers import _lighting_start_effect_boundary as lighting_start_effect_boundary
 from src.tray.controllers import software_target_controller
+from src.tray.controllers import secondary_static_scene
 from src.tray.controllers._power import _lighting_power_policy as lighting_power_policy
 from src.tray.controllers._power import _lighting_power_state as lighting_power_state
 from src.tray.protocols import LightingTrayProtocol
@@ -112,7 +113,7 @@ def _run_static_effect_mode(
     restore_secondary_targets: bool,
 ) -> None:
     """Run a static effect mode (convenience wrapper)."""
-    return lighting_effect_coordination._run_static_effect_mode(
+    lighting_effect_coordination._run_static_effect_mode(
         tray,
         apply_mode=apply_mode,
         start_brightness=start_brightness,
@@ -122,6 +123,7 @@ def _run_static_effect_mode(
         restore_secondary_targets=restore_secondary_targets,
         restore_secondary_software_targets_fn=restore_secondary_software_targets,
     )
+    secondary_static_scene.apply_secondary_static_scene(tray)
 
 
 def _apply_effect_fade_ramp(
@@ -245,6 +247,10 @@ def start_current_effect(
 
         if not start_plan.is_loop_effect and start_plan.restore_secondary_targets:
             restore_secondary_software_targets(tray)
+        if start_plan.is_loop_effect and not start_plan.restore_secondary_targets:
+            secondary_static_scene.apply_secondary_static_scene(tray)
+        elif not start_plan.is_loop_effect:
+            secondary_static_scene.apply_secondary_static_scene(tray)
     except _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: lighting startup crosses device I/O, backend callbacks, tray actions; must not fail tray runtime for recoverable failures
         lighting_start_effect_boundary.handle_start_current_effect_exception(
             tray,
@@ -266,10 +272,13 @@ def apply_power_source_perkey_profile_transition(tray: LightingTrayProtocol) -> 
                 brightness_override=safe_attrs.safe_int_attr(tray.config, "brightness", default=0),
                 reassert_user_mode=False,
             )
+            secondary_static_scene.apply_secondary_static_scene(tray)
             return True
 
         if lighting_controller_helpers.is_software_effect(effect):
             lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect(tray)
+            if not software_target_controller.software_effect_target_routes_aux_devices(tray):
+                secondary_static_scene.apply_secondary_static_scene(tray)
             tray.is_off = False
             return True
 
@@ -302,6 +311,7 @@ def turn_off(tray: LightingTrayProtocol) -> None:
         try_log_event=lighting_controller_helpers.try_log_event,
         software_effect_target_routes_aux_devices=software_target_controller.software_effect_target_routes_aux_devices,
         turn_off_secondary_software_targets=software_target_controller.turn_off_secondary_software_targets,
+        turn_off_secondary_profile_areas=secondary_static_scene.turn_off_secondary_profile_areas,
     )
 
 
@@ -319,6 +329,7 @@ def power_turn_off(tray: LightingTrayProtocol) -> None:
         try_log_event=lighting_controller_helpers.try_log_event,
         software_effect_target_routes_aux_devices=software_target_controller.software_effect_target_routes_aux_devices,
         turn_off_secondary_software_targets=software_target_controller.turn_off_secondary_software_targets,
+        turn_off_secondary_profile_areas=secondary_static_scene.turn_off_secondary_profile_areas,
     )
 
 

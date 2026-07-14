@@ -5,7 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.secondary_device_routes import iter_virtual_routes
+from src.core.secondary_device_runtime import EffectiveSecondaryRoute
+from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED, iter_virtual_routes
 from src.tray.ui import _menu_status_devices
 
 
@@ -13,10 +14,12 @@ def _make_tray() -> SimpleNamespace:
     return SimpleNamespace(
         config=SimpleNamespace(
             software_effect_target="all_uniform_capable",
+            brightness=25,
             lightbar_brightness=25,
             lightbar_color=(9, 8, 7),
             get_secondary_device_brightness=lambda state_key, *, fallback_keys=(), default=0: 25,
             get_secondary_device_color=lambda state_key, *, fallback_keys=(), default=(255, 0, 0): (255, 0, 0),
+            get_secondary_device_enabled=lambda *_args, **_kwargs: True,
         ),
         engine=SimpleNamespace(
             software_effect_target="keyboard",
@@ -36,7 +39,23 @@ def _make_tray() -> SimpleNamespace:
 
 
 def _patch_parent_availability(monkeypatch: pytest.MonkeyPatch, available: bool) -> None:
-    monkeypatch.setattr(_menu_status_devices, "_parent_backend_is_available", lambda _route: available)
+    monkeypatch.setattr(
+        _menu_status_devices,
+        "iter_effective_secondary_routes",
+        lambda: (
+            tuple(
+                EffectiveSecondaryRoute(
+                    route=route,
+                    available=available,
+                    simulated=False,
+                    availability_source="test",
+                )
+                for route in iter_virtual_routes()
+            )
+            if available
+            else ()
+        ),
+    )
 
 
 def test_secondary_software_render_targets_include_virtual_routes_when_parent_available(
@@ -77,8 +96,8 @@ def test_software_effect_target_options_enable_all_mode_with_virtual_routes(
     options = software_effect_target_options(tray)
 
     assert options == [
-        {"key": "keyboard", "label": "Keyboard Only", "enabled": True},
-        {"key": "all_uniform_capable", "label": "All Compatible Devices", "enabled": True},
+        {"key": "keyboard", "label": "Keyboard only", "enabled": True},
+        {"key": "all_uniform_capable", "label": "Keyboard + enabled lighting areas", "enabled": True},
     ]
 
 
@@ -139,6 +158,8 @@ def test_restore_secondary_software_targets_applies_to_virtual_routes(monkeypatc
                 config_color_attr=f"ite8258_chassis_{device_type}_color",
                 supports_uniform_color=True,
                 supports_software_target=True,
+                supports_profile_state=True,
+                brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
                 get_device=lambda zone=device_type: DummyZoneDevice(zone),
             )
         return original_route_for_context_entry(context_entry)  # type: ignore[no-any-return]

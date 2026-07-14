@@ -24,6 +24,7 @@ from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.protocols import LightingTrayProtocol
 from src.tray.controllers.software_target_controller import restore_secondary_software_targets
 from src.tray.controllers.software_target_controller import software_effect_target_routes_aux_devices
+from src.tray.controllers.secondary_static_scene import apply_secondary_static_scene
 
 logger = logging.getLogger(__name__)
 
@@ -191,6 +192,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                 tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
             if software_effect_target_routes_aux_devices(tray):
                 restore_secondary_software_targets(tray)
+            apply_secondary_static_scene(tray)
             tray.is_off = False
             return
 
@@ -211,6 +213,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
                 if software_effect_target_routes_aux_devices(tray):
                     restore_secondary_software_targets(tray)
+                apply_secondary_static_scene(tray)
 
             tray.is_off = False
             return
@@ -225,6 +228,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
                 if software_effect_target_routes_aux_devices(tray):
                     restore_secondary_software_targets(tray)
+                apply_secondary_static_scene(tray)
                 tray.is_off = False
                 return
 
@@ -248,6 +252,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
                     tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
                 if software_effect_target_routes_aux_devices(tray):
                     restore_secondary_software_targets(tray)
+                apply_secondary_static_scene(tray)
                 tray.is_off = False
                 return
 
@@ -272,6 +277,7 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         tray.config.effect = "none"
         with tray.engine.kb_lock:
             tray.engine.kb.set_color(tray.config.color, brightness=tray.config.brightness)
+        apply_secondary_static_scene(tray)
         tray.is_off = False
     except _EFFECT_SELECTION_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: effect apply crosses device I/O and tray state; permission/disconnect are dispatched and remaining recoverable runtime errors are logged with traceback
         if is_permission_denied(exc):

@@ -71,9 +71,10 @@ def probe_color_support(backend, *, logger: logging.Logger) -> bool:
     return uniform_color_bootstrap.probe_color_support(backend, logger=logger)
 
 
-def acquire_device_best_effort(backend, *, is_device_busy_fn, logger: logging.Logger):
+def acquire_device_best_effort(backend, *, secondary_route=None, is_device_busy_fn, logger: logging.Logger):
     return uniform_color_bootstrap.acquire_device_best_effort(
         backend,
+        secondary_route=secondary_route,
         is_device_busy_fn=is_device_busy_fn,
         logger=logger,
     )
@@ -98,5 +99,10 @@ def initialize_device_bootstrap_state(
         logger=logger,
     )
     color_supported = probe_color_support(backend, logger=logger)
-    device = acquire_device_best_effort(backend, is_device_busy_fn=is_device_busy_fn, logger=logger)
+    device = acquire_device_best_effort(
+        backend,
+        secondary_route=secondary_route,
+        is_device_busy_fn=is_device_busy_fn,
+        logger=logger,
+    )
     return UniformInitState(backend=backend, color_supported=color_supported, device=device)

@@ -1,16 +1,21 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from typing import Protocol, TypeAlias, TypeVar, cast
 
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from src.core.effects.software_targets import normalize_software_effect_target
+from src.core import secondary_lighting_state
+from src.core.secondary_device_runtime import iter_effective_secondary_routes
+from src.core.secondary_device_runtime import secondary_device_simulation_enabled
 from src.core.utils.exceptions import is_permission_denied
 from src.tray.secondary_device_routes import route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry, device_context_controls_available, device_context_entries
 
 from . import _software_target_auxiliary as software_target_auxiliary
+from . import secondary_static_scene
+from ._lighting_controller_helpers import is_software_effect
 
 
 logger = logging.getLogger(__name__)
@@ -23,6 +28,13 @@ _SECONDARY_TARGET_RUNTIME_EXCEPTIONS = software_target_auxiliary._SECONDARY_TARG
 _ENGINE_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
 _CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
 _TRAY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
+def _software_effect_is_running(tray: object, current: object) -> bool:
+    return bool(
+        getattr(getattr(tray, "engine", None), "running", False)
+        and is_software_effect(str(getattr(current, "effect", "none")))
+    )
 
 
 class _SoftwareTargetTrayProtocol(Protocol):
@@ -142,6 +154,11 @@ def software_effect_target_has_auxiliary_devices(tray: object) -> bool:
     )
 
 
+def software_effect_target_has_compatible_devices(tray: object) -> bool:
+    """Return whether compatible secondary routes exist, enabled or disabled."""
+    return bool(_compatible_secondary_target_entries(tray))
+
+
 def software_effect_target_routes_aux_devices(tray: _SoftwareTargetTrayProtocol) -> bool:
     return software_target_auxiliary.software_effect_target_routes_aux_devices(
         tray,
@@ -166,6 +183,45 @@ def restore_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> Non
             _handle_secondary_target_error(tray, exc, action="restore_secondary_software_target")
 
 
+def reconcile_secondary_profile_state(
+    tray: _SoftwareTargetTrayProtocol,
+    payload: Mapping[str, object] | None,
+    *,
+    animated: bool,
+) -> None:
+    """Refresh profile-owned secondary state without restarting the keyboard effect."""
+    if payload is None:
+        if not animated:
+            secondary_static_scene.apply_secondary_static_scene(tray)
+        return
+
+    old_payload = vars(tray).get("_active_secondary_lighting")
+    new_enabled = secondary_lighting_state.enabled_state_keys(payload)
+    old_enabled = secondary_lighting_state.enabled_state_keys(old_payload)
+    cache = _proxy_cache(tray)
+    if not old_enabled:
+        old_enabled = {str(getattr(target, "state_key", "")).strip().lower() for target in cache.values()}
+    if animated and not any(
+        bool(getattr(tray, attr, False)) for attr in ("_user_forced_off", "_idle_forced_off", "_power_forced_off")
+    ):
+        for target in tuple(cache.values()):
+            state_key = str(getattr(target, "state_key", "")).strip().lower()
+            if state_key not in old_enabled or state_key in new_enabled:
+                continue
+            try:
+                target.turn_off()
+            except _SECONDARY_TARGET_RUNTIME_EXCEPTIONS as exc:
+                _handle_secondary_target_error(tray, exc, action="disable_secondary_software_target")
+
+    try:
+        vars(tray)["_active_secondary_lighting"] = payload
+    except (AttributeError, TypeError, RuntimeError):
+        pass
+
+    if not animated:
+        secondary_static_scene.apply_secondary_static_scene(tray, payload=payload)
+
+
 def turn_off_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> None:
     for _entry, target in _iter_secondary_targets(tray):
         try:
@@ -181,12 +237,53 @@ def software_effect_target_options(tray: object) -> list[dict[str, object]]:
     )
 
 
-def _secondary_target_entries(tray: object) -> list[DeviceContextEntry]:
+def _compatible_secondary_target_entries(tray: object) -> list[DeviceContextEntry]:
+    if secondary_device_simulation_enabled():
+        return [
+            {
+                "key": effective.backend_name,
+                "backend_name": effective.backend_name,
+                "device_type": effective.device_type,
+                "status": "supported",
+                "text": f"{effective.display_name} (simulated)",
+            }
+            for effective in iter_effective_secondary_routes()
+            if effective.available
+            and effective.route.supports_uniform_color
+            and effective.route.supports_software_target
+        ]
     return software_target_auxiliary._secondary_target_entries(
         tray,
         device_context_entries_fn=device_context_entries,
         device_context_controls_available_fn=device_context_controls_available,
     )
+
+
+def _secondary_target_entries(tray: object) -> list[DeviceContextEntry]:
+    entries = _compatible_secondary_target_entries(tray)
+    if "_active_secondary_lighting" not in vars(tray):
+        return entries
+    return [
+        entry
+        for entry in entries
+        if (
+            (route := route_for_context_entry(entry)) is None or _route_enabled_by_active_profile(tray, route.state_key)
+        )
+    ]
+
+
+def _route_enabled_by_active_profile(tray: object, state_key: str) -> bool:
+    """Gate animated fan-out on the active profile when activation supplied it."""
+    if "_active_secondary_lighting" not in vars(tray):
+        return True
+    missing = object()
+    payload = vars(tray).get("_active_secondary_lighting", missing)
+    if payload is missing:
+        return True
+    entry = secondary_lighting_state.area_entry(payload, state_key)
+    if entry is None:
+        return False
+    return secondary_lighting_state.entry_enabled(entry)
 
 
 def _proxy_cache(tray: _SoftwareTargetTrayProtocol) -> dict[str, _SecondarySoftwareTargetProtocol]:
@@ -198,6 +295,11 @@ def _proxy_cache(tray: _SoftwareTargetTrayProtocol) -> dict[str, _SecondarySoftw
             exc,
         ),
     )
+
+
+def close_secondary_software_target_cache(tray: _SoftwareTargetTrayProtocol) -> None:
+    """Close and clear all cached secondary target handles for the tray."""
+    software_target_auxiliary.close_secondary_software_target_cache(_proxy_cache(tray))
 
 
 def _iter_secondary_targets(
@@ -221,39 +323,19 @@ def _restore_target_from_config(
         return
 
     config = getattr(tray, "config", None)
-    if config is None:
+    payload = vars(tray).get("_active_secondary_lighting")
+    if payload is None:
+        payload = secondary_lighting_state.payload_from_config(config, (route,))
+    state = secondary_lighting_state.area_entry(payload, route.state_key)
+    if state is None:
         return
-
-    brightness_getter = getattr(config, "get_secondary_device_brightness", None)
-    color_getter = getattr(config, "get_secondary_device_color", None)
-    if callable(brightness_getter):
-        brightness = int(
-            brightness_getter(
-                str(route.state_key), fallback_keys=tuple(filter(None, (route.config_brightness_attr,))), default=0
-            )
-            or 0
-        )
-    else:
-        brightness_attr = str(route.config_brightness_attr or "").strip()
-        if not brightness_attr:
-            return
-        raw_brightness = getattr(config, brightness_attr, 0)
-        brightness = 0 if not raw_brightness else int(raw_brightness)
-    if brightness <= 0:
+    if not secondary_lighting_state.entry_enabled(state):
         target.turn_off()
         return
-
-    if callable(color_getter):
-        raw_color = color_getter(
-            str(route.state_key), fallback_keys=tuple(filter(None, (route.config_color_attr,))), default=(255, 0, 0)
-        )
-    else:
-        color_attr = str(route.config_color_attr or "").strip()
-        if not color_attr:
-            return
-        raw_color = getattr(config, color_attr, (255, 0, 0))
-    color = tuple(raw_color or (255, 0, 0))
-    target.set_color(color, brightness=brightness)
+    target.set_color(
+        secondary_lighting_state.route_color(config, route, state),
+        brightness=secondary_lighting_state.route_brightness(config, route, state),
+    )
 
 
 def _handle_secondary_target_error(tray: _SoftwareTargetTrayProtocol, exc: Exception, *, action: str) -> None:
@@ -319,10 +401,12 @@ def _log_boundary_exception(tray: _SoftwareTargetTrayProtocol, msg: str, exc: Ex
 
 __all__ = [
     "apply_software_effect_target_selection",
+    "close_secondary_software_target_cache",
     "configure_engine_software_targets",
     "restore_secondary_software_targets",
     "secondary_software_render_targets",
     "software_effect_target_has_auxiliary_devices",
+    "software_effect_target_has_compatible_devices",
     "software_effect_target_options",
     "software_effect_target_routes_aux_devices",
     "turn_off_secondary_software_targets",

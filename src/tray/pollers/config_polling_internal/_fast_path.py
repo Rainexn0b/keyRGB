@@ -12,7 +12,14 @@ from src.tray.protocols import ConfigPollingTrayProtocol
 from . import helpers
 
 
-FastPathChangeKind = Literal["none", "target_only", "reactive_only", "brightness_only", "base_only"]
+FastPathChangeKind = Literal[
+    "none",
+    "target_only",
+    "reactive_only",
+    "brightness_only",
+    "base_only",
+    "secondary_only",
+]
 ColorTuple = tuple[int, int, int]
 
 
@@ -31,6 +38,9 @@ class _FastPathComparableState(Protocol):
 
     @property
     def perkey_sig(self) -> tuple | None: ...
+
+    @property
+    def secondary_sig(self) -> tuple | None: ...
 
     @property
     def reactive_use_manual(self) -> bool: ...
@@ -103,6 +113,12 @@ def classify_fast_path_change(
     except _FAST_PATH_CLASSIFICATION_EXCEPTIONS:
         pass
 
+    try:
+        if _is_secondary_only_change(last_applied, current):
+            return "secondary_only"
+    except _FAST_PATH_CLASSIFICATION_EXCEPTIONS:
+        pass
+
     return "none"
 
 
@@ -113,6 +129,13 @@ def apply_fast_path_change(
     current: _FastPathComparableState,
     sw_effects_set: set[str] | frozenset[str],
 ) -> bool:
+    if change_kind == "secondary_only":
+        try:
+            helpers._apply_secondary_only(tray, current)
+        except _FAST_PATH_EXECUTION_EXCEPTIONS:
+            pass
+        return True
+
     if change_kind == "target_only":
         try:
             helpers._sync_software_target_policy(tray, current)
@@ -169,6 +192,7 @@ def _is_target_only_change(
         and last_applied.brightness == current.brightness
         and last_applied.color == current.color
         and last_applied.perkey_sig == current.perkey_sig
+        and last_applied.secondary_sig == current.secondary_sig
         and last_applied.reactive_use_manual == current.reactive_use_manual
         and last_applied.reactive_color == current.reactive_color
         and last_applied.reactive_brightness == current.reactive_brightness
@@ -187,6 +211,7 @@ def _is_reactive_only_change(
         and last_applied.brightness == current.brightness
         and last_applied.color == current.color
         and last_applied.perkey_sig == current.perkey_sig
+        and last_applied.secondary_sig == current.secondary_sig
         and last_applied.software_effect_target == current.software_effect_target
         and (
             last_applied.reactive_use_manual != current.reactive_use_manual
@@ -207,6 +232,7 @@ def _is_brightness_only_change(
         and last_applied.speed == current.speed
         and last_applied.color == current.color
         and last_applied.perkey_sig == current.perkey_sig
+        and last_applied.secondary_sig == current.secondary_sig
         and last_applied.software_effect_target == current.software_effect_target
         and last_applied.reactive_use_manual == current.reactive_use_manual
         and last_applied.reactive_color == current.reactive_color
@@ -226,10 +252,31 @@ def _is_base_only_change(
         and last_applied.brightness == current.brightness
         and last_applied.color == current.color
         and last_applied.software_effect_target == current.software_effect_target
+        and last_applied.secondary_sig == current.secondary_sig
         and last_applied.reactive_use_manual == current.reactive_use_manual
         and last_applied.reactive_color == current.reactive_color
         and last_applied.reactive_brightness == current.reactive_brightness
         and last_applied.reactive_trail_percent == current.reactive_trail_percent
         and last_applied.reactive_visual_mode == current.reactive_visual_mode
         and last_applied.perkey_sig != current.perkey_sig
+    )
+
+
+def _is_secondary_only_change(
+    last_applied: _FastPathComparableState,
+    current: _FastPathComparableState,
+) -> bool:
+    return (
+        last_applied.effect == current.effect
+        and last_applied.speed == current.speed
+        and last_applied.brightness == current.brightness
+        and last_applied.color == current.color
+        and last_applied.perkey_sig == current.perkey_sig
+        and last_applied.reactive_use_manual == current.reactive_use_manual
+        and last_applied.reactive_color == current.reactive_color
+        and last_applied.reactive_brightness == current.reactive_brightness
+        and last_applied.reactive_trail_percent == current.reactive_trail_percent
+        and last_applied.reactive_visual_mode == current.reactive_visual_mode
+        and last_applied.software_effect_target == current.software_effect_target
+        and last_applied.secondary_sig != current.secondary_sig
     )

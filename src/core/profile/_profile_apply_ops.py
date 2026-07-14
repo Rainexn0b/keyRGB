@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Dict, Tuple, cast
 
 
@@ -173,6 +173,7 @@ def apply_profile_to_config(
     cfg: object,
     colors: Dict[Tuple[int, int], Tuple[int, int, int]],
     *,
+    secondary_lighting: Mapping[object, object] | None = None,
     safe_profile_name: Callable[..., object],
     get_active_profile: Callable[..., object],
     log_throttled: Callable[..., object],
@@ -289,10 +290,12 @@ def apply_profile_to_config(
     if builtin_target is not None:
         set_profile_brightness(builtin_target)
     if use_atomic_profile_apply:
-        atomic_apply_profile_state(
-            colors,
-            effect_brightness=effect_brightness_update,
-            perkey_brightness=perkey_brightness_update,
-        )
+        atomic_kwargs: dict[str, object] = {
+            "effect_brightness": effect_brightness_update,
+            "perkey_brightness": perkey_brightness_update,
+        }
+        if secondary_lighting is not None:
+            atomic_kwargs["secondary_lighting"] = secondary_lighting
+        atomic_apply_profile_state(colors, **atomic_kwargs)
         return
     cfg.per_key_colors = colors  # type: ignore[attr-defined]

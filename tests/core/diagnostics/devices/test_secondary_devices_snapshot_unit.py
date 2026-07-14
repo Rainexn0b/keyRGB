@@ -14,12 +14,16 @@ class _StubConfig:
     def __init__(self) -> None:
         self.tray_device_context = "keyboard"
         self.software_effect_target = "keyboard"
+        self.brightness = 40
 
     def get_secondary_device_brightness(self, state_key, *, fallback_keys=(), default=0):
         return 40
 
     def get_secondary_device_color(self, state_key, *, fallback_keys=(), default=(255, 0, 0)):
         return (1, 2, 3)
+
+    def get_secondary_device_enabled(self, state_key, *, fallback_keys=(), default=False):
+        return True
 
 
 def _patch_config(monkeypatch, config) -> None:
@@ -47,19 +51,31 @@ def test_zones_available_when_parent_probe_succeeds(monkeypatch) -> None:
     assert [route["device_type"] for route in snap["virtual_routes"]] == ["logo", "neon", "vent"]
     assert all(route["parent_available"] for route in snap["virtual_routes"])
 
-    context_keys = [context["key"] for context in snap["expected_tray_contexts"]]
-    assert "ite8258-chassis-logo" in context_keys
-    assert "ite8258-chassis-neon" in context_keys
-    assert "ite8258-chassis-vent" in context_keys
+    assert [context["device_type"] for context in snap["expected_tray_contexts"]] == [
+        "keyboard",
+        "logo",
+        "neon",
+        "vent",
+    ]
+    editor_keys = [row["state_key"] for row in snap["expected_profile_editor_rows"]]
+    assert "ite8258_chassis_logo" in editor_keys
+    assert "ite8258_chassis_neon" in editor_keys
+    assert "ite8258_chassis_vent" in editor_keys
     assert snap["software_effect_target"]["all_compatible_devices_enabled"] is True
 
-    # Per-zone persisted state is reported for each registered zone.
+    # Persisted state is reported for every registered secondary route.
     assert set(snap["secondary_device_state"]) == {
+        "lightbar",
+        "mouse",
         "ite8258_chassis_logo",
         "ite8258_chassis_neon",
         "ite8258_chassis_vent",
     }
-    assert snap["secondary_device_state"]["ite8258_chassis_logo"] == {"brightness": 40, "color": [1, 2, 3]}
+    assert snap["secondary_device_state"]["ite8258_chassis_logo"] == {
+        "enabled": True,
+        "brightness": 40,
+        "color": [1, 2, 3],
+    }
 
 
 def test_zones_absent_when_parent_probe_fails(monkeypatch) -> None:
@@ -74,6 +90,34 @@ def test_zones_absent_when_parent_probe_fails(monkeypatch) -> None:
     # Only the keyboard context renders; software target stays keyboard-only.
     assert [context["device_type"] for context in snap["expected_tray_contexts"]] == ["keyboard"]
     assert snap["software_effect_target"]["all_compatible_devices_enabled"] is False
+
+
+def test_simulation_snapshot_reports_all_routes_without_hardware(monkeypatch) -> None:
+    _patch_config(monkeypatch, _StubConfig())
+    monkeypatch.setenv("KEYRGB_SIMULATE_SECONDARY_DEVICES", "1")
+
+    snap = secondary_devices.secondary_devices_snapshot([])
+
+    assert [route["device_type"] for route in snap["effective_routes"]] == [
+        "lightbar",
+        "mouse",
+        "logo",
+        "neon",
+        "vent",
+    ]
+    assert all(route["available"] for route in snap["effective_routes"])
+    assert all(route["simulated"] for route in snap["effective_routes"])
+    assert {route["availability_source"] for route in snap["effective_routes"]} == {"simulation"}
+    assert [context["device_type"] for context in snap["expected_tray_contexts"]] == [
+        "keyboard",
+        "lightbar",
+        "mouse",
+        "logo",
+        "neon",
+        "vent",
+    ]
+    assert len(snap["expected_profile_editor_rows"]) == 5
+    assert all(row["simulated"] for row in snap["expected_profile_editor_rows"])
 
 
 def test_auxiliary_candidate_controls_follow_status(monkeypatch) -> None:
@@ -107,9 +151,11 @@ def test_auxiliary_candidate_controls_follow_status(monkeypatch) -> None:
     assert aux["lightbar"]["controls_available"] is True
     assert aux["unknown"]["controls_available"] is False
 
-    context_keys = [context["key"] for context in snap["expected_tray_contexts"]]
-    assert "lightbar:0x048d:0x7001" in context_keys
-    assert "unknown:0x048d:0xc193" in context_keys
+    assert [context["device_type"] for context in snap["expected_tray_contexts"]] == [
+        "keyboard",
+        "lightbar",
+        "unknown",
+    ]
 
 
 def test_snapshot_tolerates_missing_config(monkeypatch) -> None:

@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import logging
 from typing import Callable
 from typing import Protocol, TypeAlias
 
+from src.core.profile import profiles
+from src.core.secondary_device_routes import (
+    BRIGHTNESS_POLICY_INDEPENDENT,
+    BRIGHTNESS_POLICY_PRIMARY_SHARED,
+)
 from src.core.secondary_device_routes import SecondaryDeviceRoute
 
 Color: TypeAlias = tuple[int, int, int]
+logger = logging.getLogger(__name__)
+_PROFILE_WRITE_ERRORS = (OSError, RuntimeError, TypeError, ValueError)
 
 
 class _UniformConfig(Protocol):
@@ -108,6 +116,9 @@ def current_brightness(gui: _UniformTargetState) -> int:
     if not gui._target_is_secondary:
         return int(gui.config.brightness)
 
+    if gui._secondary_route is not None and gui._secondary_route.brightness_policy == BRIGHTNESS_POLICY_PRIMARY_SHARED:
+        return int(gui.config.brightness)
+
     getter = getattr(gui.config, "get_secondary_device_brightness", None)
     if callable(getter) and gui._secondary_route is not None:
         return int(
@@ -129,6 +140,9 @@ def store_brightness(gui: _UniformTargetState, brightness: int) -> None:
         return
 
     if gui._secondary_route is None:
+        return
+
+    if gui._secondary_route.brightness_policy != BRIGHTNESS_POLICY_INDEPENDENT:
         return
 
     setter = getattr(gui.config, "set_secondary_device_brightness", None)
@@ -175,7 +189,19 @@ def store_secondary_color(gui: _UniformTargetState, color: Color) -> None:
             compatibility_key=gui._secondary_route.config_color_attr,
             default=(255, 0, 0),
         )
-        return
-
-    if gui._secondary_route.config_color_attr:
+    elif gui._secondary_route.config_color_attr:
         setattr(gui.config, gui._secondary_route.config_color_attr, color)
+
+    enabled_setter = getattr(gui.config, "set_secondary_device_enabled", None)
+    if callable(enabled_setter):
+        enabled_setter(gui._secondary_route.state_key, True)
+
+    try:
+        profiles.update_secondary_lighting_area(
+            gui._secondary_route.state_key,
+            {"enabled": True, "color": list(color)},
+        )
+    except _PROFILE_WRITE_ERRORS:
+        # The live/config color action remains useful even if profile storage is
+        # temporarily unavailable; retain evidence for diagnostics.
+        logger.warning("Failed to persist secondary color in the active lighting profile", exc_info=True)

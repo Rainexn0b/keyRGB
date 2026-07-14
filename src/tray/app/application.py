@@ -41,6 +41,7 @@ power_restore = app_runtime_deps.power_restore
 power_turn_off = app_runtime_deps.power_turn_off
 start_current_effect = app_runtime_deps.start_current_effect
 configure_engine_software_targets = app_runtime_deps.configure_engine_software_targets
+close_secondary_software_target_cache = app_runtime_deps.close_secondary_software_target_cache
 load_tray_dependencies = app_runtime_deps.load_tray_dependencies
 maybe_autostart_effect = app_runtime_deps.maybe_autostart_effect
 start_all_polling = app_runtime_deps.start_all_polling

@@ -243,11 +243,17 @@ def on_layout_legend_pack_changed(app: _LayoutEditorAppProtocol) -> None:
 def hide_setup_panel(app: _LayoutEditorAppProtocol) -> None:
     app._overlay_setup_panel.grid_remove()
     app._layout_setup_controls.grid_remove()
+    lighting_areas_panel = vars(app).get("_lighting_areas_panel")
+    if lighting_areas_panel is not None and bool(getattr(lighting_areas_panel, "should_show", True)):
+        lighting_areas_panel.grid()
     app._setup_panel_mode = None
 
 
 def show_setup_panel(app: _LayoutEditorAppProtocol, mode: str) -> None:
     app._hide_setup_panel()
+    lighting_areas_panel = vars(app).get("_lighting_areas_panel")
+    if lighting_areas_panel is not None:
+        lighting_areas_panel.grid_remove()
     if mode == "overlay":
         app._overlay_setup_panel.grid()
         app.overlay_controls.sync_vars_from_scope()

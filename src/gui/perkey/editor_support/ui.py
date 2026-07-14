@@ -12,6 +12,7 @@ from ..canvas import KeyboardCanvas
 from ..lightbar_controls import LightbarControls
 from ..overlay import OverlayControls
 from ..ui.layout_setup import LayoutSetupControls
+from ..ui.lighting_areas import LightingAreasPanel
 
 
 _BACKDROP_MODE_LABELS = {
@@ -352,6 +353,11 @@ def build_editor_ui(editor) -> None:
     if bool(getattr(editor, "has_lightbar_device", False)):
         editor.lightbar_controls = LightbarControls(editor._overlay_setup_panel, editor=editor)
         editor.lightbar_controls.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+
+    editor._lighting_areas_panel = LightingAreasPanel(extras_setup, editor=editor, tk_module=tk, ttk_module=ttk)
+    if editor._lighting_areas_panel.should_show:
+        editor._lighting_areas_panel.grid(row=0, column=0, sticky="nsew")
+        ttk.Button(btns, text="4. Lighting Areas", command=editor._hide_setup_panel).pack(fill="x", pady=(0, 6))
 
     editor.overlay_controls.sync_vars_from_scope()
     if editor.lightbar_controls is not None:

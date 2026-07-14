@@ -8,9 +8,12 @@ from ._device_status import (
     backend_status_suffix,
     format_hex_id,
 )
+from src.core.secondary_device_runtime import (
+    EffectiveSecondaryRoute,
+    iter_effective_secondary_routes,
+)
 from src.tray.secondary_device_routes import (
-    SecondaryDeviceRoute,
-    iter_virtual_routes,
+    route_for_context_entry,
 )
 
 from ._menu_status_secondary_devices import (
@@ -193,22 +196,39 @@ def keyboard_status_text(
     return f"Keyboard: {display_name}{status_suffix}"
 
 
-def _virtual_device_context_entry(route: SecondaryDeviceRoute) -> DeviceContextEntry:
+def _effective_device_context_entry(
+    effective: EffectiveSecondaryRoute,
+    *,
+    primary_identifiers: dict[str, object],
+) -> DeviceContextEntry:
+    label = effective.display_name
+    if effective.simulated:
+        label = f"{label} (simulated)"
+    elif effective.route.parent_backend_name is not None:
+        vid = format_hex_id(str(primary_identifiers.get("usb_vid") or ""))
+        pid = format_hex_id(str(primary_identifiers.get("usb_pid") or ""))
+        shared_id = f" {vid}:{pid}" if vid and pid else ""
+        label = f"{label} (shared controller{shared_id})"
     return {
-        "key": route.backend_name,
-        "device_type": route.device_type,
-        "backend_name": route.backend_name,
+        "key": effective.backend_name,
+        "device_type": effective.device_type,
+        "backend_name": effective.backend_name,
+        "connected": True,
+        "is_virtual_area": effective.route.parent_backend_name is not None,
+        "simulated": effective.simulated,
+        "source": "simulation" if effective.simulated else "effective_route",
         "status": "supported",
-        "text": route.display_name,
+        "text": label,
     }
 
 
-def _parent_backend_is_available(route: SecondaryDeviceRoute) -> bool:
-    try:
-        backend = route.get_backend()
-        return bool(getattr(backend, "is_available", lambda: False)())
-    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
-        return False
+def _candidate_state_keys(entries: list[DeviceContextEntry]) -> set[str]:
+    state_keys: set[str] = set()
+    for entry in entries:
+        route = route_for_context_entry(entry)
+        if route is not None:
+            state_keys.add(route.state_key)
+    return state_keys
 
 
 def device_context_entries(
@@ -224,7 +244,11 @@ def device_context_entries(
     entries: list[DeviceContextEntry] = [
         {
             "key": "keyboard",
+            "connected": bool(getattr(getattr(tray_state, "engine", None), "device_available", True)),
             "device_type": "keyboard",
+            "is_virtual_area": False,
+            "simulated": False,
+            "source": "primary",
             "status": "supported",
             "text": keyboard_status_text(tray),
         }
@@ -235,9 +259,17 @@ def device_context_entries(
         if entry is not None:
             entries.append(entry)
 
-    for route in iter_virtual_routes():
-        if _parent_backend_is_available(route):
-            entries.append(_virtual_device_context_entry(route))
+    seen_state_keys = _candidate_state_keys(entries)
+    for effective in iter_effective_secondary_routes():
+        if not effective.available or effective.state_key in seen_state_keys:
+            continue
+        entries.append(
+            _effective_device_context_entry(
+                effective,
+                primary_identifiers=_probe_identifiers(tray_state),
+            )
+        )
+        seen_state_keys.add(effective.state_key)
 
     return entries
 

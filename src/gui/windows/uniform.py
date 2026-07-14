@@ -142,6 +142,7 @@ class UniformColorGUI:
     def _acquire_device_best_effort(self, backend):
         return uniform_init_adapter.acquire_device_best_effort(
             backend,
+            secondary_route=vars(self).get("_secondary_route"),
             is_device_busy_fn=is_device_busy,
             logger=logger,
         )

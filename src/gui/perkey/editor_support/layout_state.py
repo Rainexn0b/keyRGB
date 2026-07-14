@@ -102,6 +102,7 @@ class _LayoutEditorAppProtocol(Protocol):
     _legend_pack_var: _StringVarProtocol
     _overlay_setup_panel: _GridPanelProtocol
     _layout_setup_controls: _GridPanelProtocol
+    _lighting_areas_panel: _GridPanelProtocol
     overlay_controls: _OverlayControlsProtocol
     canvas: _CanvasProtocol
 

@@ -155,6 +155,35 @@ def test_select_backend_best_effort_uses_secondary_route_backend(monkeypatch) ->
     assert gui._select_backend_best_effort() is sentinel
 
 
+def test_secondary_uniform_window_uses_runtime_backend_and_device_in_simulation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
+    from src.core.secondary_device_routes import route_for_device_type
+
+    monkeypatch.setenv(SIMULATION_ENVIRONMENT_VARIABLE, "1")
+    route = route_for_device_type("logo")
+    assert route is not None
+
+    backend = uniform_color_bootstrap.select_backend_best_effort(
+        route,
+        requested_backend="ignored-real-backend",
+        select_backend_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("real selector called")),
+        logger=uniform_color_bootstrap.logging.getLogger(__name__),
+    )
+    assert backend is not None
+    assert str(getattr(backend, "name", "")) == "simulated:ite8258-chassis-logo"
+
+    device = uniform_color_bootstrap.acquire_device_best_effort(
+        None,
+        secondary_route=route,
+        is_device_busy_fn=lambda _exc: False,
+        logger=uniform_color_bootstrap.logging.getLogger(__name__),
+    )
+    assert device is not None
+    assert device.device_type == "logo"
+
+
 def test_acquire_device_best_effort_returns_none_when_device_is_busy(monkeypatch) -> None:
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
     err = OSError("busy")
@@ -209,6 +238,12 @@ def test_apply_color_propagates_unexpected_write_failure() -> None:
 def test_commit_color_to_config_uses_secondary_route_state(monkeypatch) -> None:
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
     calls: list[tuple[str, tuple[int, int, int], str | None]] = []
+    enabled_calls: list[tuple[str, bool]] = []
+    profile_updates: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        "src.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
+        lambda state_key, updates: profile_updates.append((state_key, dict(updates))),
+    )
 
     class _Config:
         effect = "wave"
@@ -217,6 +252,9 @@ def test_commit_color_to_config_uses_secondary_route_state(monkeypatch) -> None:
             assert default == (255, 0, 0)
             calls.append((state_key, tuple(color), compatibility_key))
 
+        def set_secondary_device_enabled(self, state_key: str, enabled: bool):
+            enabled_calls.append((state_key, enabled))
+
     gui.config = _Config()
     gui._target_is_secondary = True
     gui._secondary_route = SimpleNamespace(state_key="mouse", config_color_attr=None)
@@ -224,7 +262,48 @@ def test_commit_color_to_config_uses_secondary_route_state(monkeypatch) -> None:
     gui._commit_color_to_config(4, 5, 6)
 
     assert calls == [("mouse", (4, 5, 6), None)]
+    assert enabled_calls == [("mouse", True)]
+    assert profile_updates == [("mouse", {"enabled": True, "color": [4, 5, 6]})]
     assert gui.config.effect == "wave"
+
+
+def test_secondary_uniform_color_uses_primary_brightness_for_shared_zone() -> None:
+    from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED
+
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    gui.config = SimpleNamespace(
+        brightness=40,
+        get_secondary_device_brightness=lambda *_args, **_kwargs: 10,
+    )
+    gui._target_is_secondary = True
+    gui._secondary_route = SimpleNamespace(
+        brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
+        state_key="logo",
+        config_brightness_attr=None,
+    )
+
+    assert gui._current_brightness() == 40
+
+
+def test_secondary_uniform_color_does_not_store_brightness_for_shared_zone() -> None:
+    from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED
+
+    writes: list[int] = []
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    gui.config = SimpleNamespace(
+        brightness=40,
+        set_secondary_device_brightness=lambda *_args, **_kwargs: writes.append(1),
+    )
+    gui._target_is_secondary = True
+    gui._secondary_route = SimpleNamespace(
+        brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
+        state_key="logo",
+        config_brightness_attr=None,
+    )
+
+    gui._store_brightness(25)
+
+    assert writes == []
 
 
 def test_constructor_uses_content_driven_geometry(monkeypatch) -> None:

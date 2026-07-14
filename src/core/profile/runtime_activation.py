@@ -108,6 +108,7 @@ def activate_perkey_profile_runtime(
     set_active_profile_fn: Callable[[str], str],
     load_per_key_colors_fn: Callable[[str | None], Mapping[PerKeyCoord, PerKeyColor]],
     apply_profile_to_config_fn: Callable[[object, PerKeyColorMap], None],
+    load_secondary_lighting_fn: Callable[[str | None], Mapping[str, object] | None] | None = None,
     mark_power_source_transition: bool = False,
     refresh_menu: bool = True,
     monotonic_fn: Callable[[], float] = time.monotonic,
@@ -115,7 +116,20 @@ def activate_perkey_profile_runtime(
     activation_tray = cast(_RuntimeProfileActivationTrayProtocol, tray)
     name = set_active_profile_fn(profile_name)
     colors = dict(load_per_key_colors_fn(name) or {})
-    apply_profile_to_config_fn(activation_tray.config, colors)
+    secondary_lighting = load_secondary_lighting_fn(name) if load_secondary_lighting_fn is not None else None
+    if secondary_lighting is not None:
+        try:
+            vars(activation_tray)["_active_secondary_lighting"] = secondary_lighting
+        except (AttributeError, TypeError):
+            pass
+    if secondary_lighting is None:
+        apply_profile_to_config_fn(activation_tray.config, colors)
+    else:
+        cast(Callable[..., object], apply_profile_to_config_fn)(
+            activation_tray.config,
+            colors,
+            secondary_lighting=secondary_lighting,
+        )
 
     if mark_power_source_transition:
         _mark_recent_power_source_transition(

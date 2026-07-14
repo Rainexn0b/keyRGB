@@ -16,6 +16,7 @@ from . import hardware
 from .editor_support import actions as editor_actions
 from .editor_support import backdrop as editor_backdrop
 from .editor_support import bootstrap as editor_bootstrap
+from .editor_support import dirty_state
 from .editor_support import layout as editor_layout
 from .editor_support import selection as editor_selection
 from .ui import sample_tool
@@ -52,12 +53,14 @@ def _last_non_black_color_or(editor: object, default: object) -> object:
 
 class PerKeyEditor:
     # Attributes initialized by editor_bootstrap.initialize_editor
+    root: object
     config: Config
     kb: KeyboardDevice | None
     colors: PerKeyColors
     _commit_pipeline: PerKeyCommitPipeline
     per_key_layout_tweaks: dict[str, dict[str, float]]
     lightbar_overlay: dict[str, bool | float]
+    secondary_lighting: dict[str, object] | None
     profile_name: str
     _physical_layout: str
 
@@ -130,6 +133,35 @@ class PerKeyEditor:
 
         editor_ui.build_editor_ui(self)
 
+    def _on_close(self) -> None:
+        def _save_current_profile() -> None:
+            profile_var = vars(self)["_profile_name_var"]
+            requested = profile_var.get()
+            if requested != self.profile_name:
+                profile_var.set(self.profile_name)
+            try:
+                self._save_profile()
+            finally:
+                if requested != self.profile_name:
+                    profile_var.set(requested)
+
+        try:
+            allowed = dirty_state.confirm_destructive_action(
+                self,
+                action="closing the editor",
+                save_fn=_save_current_profile,
+            )
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            return
+        if not allowed:
+            return
+        destroy = getattr(self.root, "destroy", None)
+        if callable(destroy):
+            destroy()
+
+    def _mark_saved_snapshot(self) -> None:
+        dirty_state.mark_saved(self)
+
     _normalize_layout_legend_pack = staticmethod(editor_layout.normalize_layout_legend_pack)
     _resolved_layout_legend_pack_id = editor_layout.resolved_layout_legend_pack_id
 
@@ -173,7 +205,11 @@ class PerKeyEditor:
     def _set_layout_slot_label(self, slot_id: str, label: str) -> None:
         editor_layout.set_layout_slot_label(self, slot_id, label)
 
-    select_slot_id = editor_selection.select_slot_id
+    def select_slot_id(self, slot_id: str) -> None:
+        lighting_areas_panel = vars(self).get("_lighting_areas_panel")
+        if lighting_areas_panel is not None:
+            lighting_areas_panel.select_keyboard()
+        editor_selection.select_slot_id(self, slot_id)
 
     def _on_sample_tool_toggled(self) -> None:
         on_sample_tool_toggled_ui(self)
@@ -203,9 +239,15 @@ class PerKeyEditor:
         editor_actions.commit(self, force=force, hardware=hardware, last_non_black_color_or=_last_non_black_color_or)
 
     def _on_color_change(self, r: int, g: int, b: int):
+        lighting_areas_panel = vars(self).get("_lighting_areas_panel")
+        if lighting_areas_panel is not None and lighting_areas_panel.apply_wheel_color((r, g, b), released=False):
+            return
         editor_actions.on_wheel_color_change(self, r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _on_color_release(self, r: int, g: int, b: int):
+        lighting_areas_panel = vars(self).get("_lighting_areas_panel")
+        if lighting_areas_panel is not None and lighting_areas_panel.apply_wheel_color((r, g, b), released=True):
+            return
         editor_actions.on_wheel_color_release(self, r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _set_backdrop(self):

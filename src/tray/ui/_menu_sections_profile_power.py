@@ -157,8 +157,9 @@ class ProfilePowerMenuBuilder:
         pystray: _PystrayProtocol,
         item: _ItemFactoryProtocol,
         per_key_supported: bool,
+        secondary_lighting_supported: bool = False,
     ) -> object | None:
-        if not per_key_supported:
+        if not per_key_supported and not secondary_lighting_supported:
             return None
 
         try:
@@ -176,7 +177,7 @@ class ProfilePowerMenuBuilder:
             ]
 
             return pystray.Menu(
-                item("Open Color Editor…", tray._on_perkey_clicked),
+                item("Lighting Profile Editor", tray._on_perkey_clicked),
                 pystray.Menu.SEPARATOR,
                 *profile_items,
             )
@@ -187,7 +188,7 @@ class ProfilePowerMenuBuilder:
                 exc,
                 interval_s=120,
             )
-            return pystray.Menu(item("Open Color Editor…", tray._on_perkey_clicked))
+            return pystray.Menu(item("Lighting Profile Editor", tray._on_perkey_clicked))
 
     def _system_power_callback(self, tray: object, mode: PowerMode) -> _MenuAction:
         def _cb(_icon: object, _item: object) -> None:

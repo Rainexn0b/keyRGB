@@ -19,6 +19,36 @@ def normalize_lightbar_overlay(
     )
 
 
+def normalize_secondary_lighting(raw: object) -> Dict[str, object]:
+    return storage_payloads.normalize_secondary_lighting(raw)
+
+
+def load_secondary_lighting(
+    *,
+    name: str | None,
+    paths_for: Callable[..., object],
+    read_json: Callable[..., object],
+    normalize_secondary_lighting_fn: Callable[..., object],
+) -> Dict[str, object] | None:
+    raw = read_json(paths_for(name).secondary_lighting)  # type: ignore[attr-defined]
+    if raw is None:
+        return None
+    return normalize_secondary_lighting_fn(raw)  # type: ignore[return-value]
+
+
+def save_secondary_lighting(
+    *,
+    payload: Dict[str, object],
+    name: str | None,
+    paths_for: Callable[..., object],
+    write_json_atomic: Callable[..., object],
+    normalize_secondary_lighting_fn: Callable[..., object],
+) -> Dict[str, object]:
+    normalized = normalize_secondary_lighting_fn(payload or {})
+    write_json_atomic(paths_for(name).secondary_lighting, normalized)  # type: ignore[attr-defined]
+    return cast(Dict[str, object], normalized)
+
+
 def parse_keymap_cell(raw: object) -> KeyCell | None:
     return storage_payloads.parse_keymap_cell(raw)
 

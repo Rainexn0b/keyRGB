@@ -1,4 +1,4 @@
-# Multi-device Routing and Software Targets
+# Multi-device Routing and Effect Output
 
 ## Goal
 
@@ -13,22 +13,58 @@ without destabilizing keyboard behavior.
 
 ## Current owner modules
 
+- `src/core/secondary_device_routes.py` — declarative route/capability registry
+- `src/core/secondary_device_runtime.py` — availability, acquisition, and simulation
+- `src/core/secondary_lighting_state.py` — shared profile/config state interpretation
+- `src/core/profile/` — persistent whole-scene profile component
 - `src/tray/ui/menu_status.py`
-- `src/tray/ui/menu_sections.py`
+- `src/tray/ui/menu.py`
 - `src/tray/controllers/secondary_device_controller.py`
+- `src/tray/controllers/secondary_static_scene.py`
 - `src/tray/controllers/software_target_controller.py`
-- `src/core/diagnostics/device_discovery.py`
+- `src/core/diagnostics/secondary_devices.py`
+- `src/gui/perkey/secondary_lighting.py`
 - `src/gui/windows/uniform.py`
+
+## Architecture flow
+
+```text
+route registry
+    -> effective runtime inventory (real or simulated)
+        -> tray selectors / editor rows / diagnostics
+
+profile storage <-> normalized config mirror
+        -> shared secondary state interpretation
+            -> static scene renderer
+            -> animated target filter and restore
+            -> per-device live controls
+```
+
+The route registry describes what a device can do; it never owns mutable state.
+The runtime inventory decides what is currently available; it never decides profile
+policy. Profiles own the persistent scene, while config is the cross-process mirror
+and backward-compatibility source. Static and animated renderers consume the same
+state interpretation but remain separate output paths.
 
 ## Current model
 
 1. Device discovery can surface auxiliary devices separately from the keyboard.
-2. Tray status rows act as selectable device contexts.
-3. Non-keyboard contexts render their own menu sections.
-4. Software effects can target either the keyboard only or all compatible
-   devices.
-5. Auxiliary per-profile state such as lightbar color and brightness stays
-   distinct from the keyboard's primary state.
+2. The rows at the top of the tray select a live-control device context. They are
+   not a second profile selector: profiles remain whole-scene state in the editor.
+3. The Lighting Profile Editor is the authoritative surface for profile-owned
+   secondary state. Each lighting-area row can explicitly take ownership of the
+   shared colour wheel; selecting a keyboard key returns it to per-key editing.
+   The editor remains available for uniform or zoned primary keyboards when an
+   available profile-compatible secondary route exists.
+4. The Software Effects menu has an **Include enabled lighting areas** toggle;
+   unchecked renders to the keyboard only, while checked also fans out to enabled areas.
+5. Static profile state remains distinct from animated output selection.
+6. Brightness routing is explicit: standalone devices may be independent, composite
+   chassis zones follow the keyboard/controller brightness, and software effect speed
+   remains one global render setting.
+7. `src/core/secondary_lighting_state.py` owns interpretation of profile/config area
+   state, including legacy brightness-to-enabled fallback. Runtime consumers must not
+   duplicate those coercion rules.
 
 ## Design rules
 
@@ -53,10 +89,10 @@ keyboard's per-key engine model.
 
 The lightbar path is the first auxiliary-device architecture consumer:
 
-- tray context selection
+- tray status and diagnostics inventory
 - independent lightbar brightness and color config
 - dedicated uniform-color target routing
-- per-key editor lightbar placement overlay
+- Lighting Profile Editor lightbar placement and Lighting areas state
 
 ## Testing
 

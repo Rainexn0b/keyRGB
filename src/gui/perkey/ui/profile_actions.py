@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 
 from src.core.profile import profiles
+from ..editor_support import dirty_state
 from ._profile_actions_support import (
     _PerKeyProfileEditorProtocol,
     _layout_labels,
@@ -113,6 +114,32 @@ def keymap_cells_for(*args, **kwargs):
     from ..profile_management import keymap_cells_for as _keymap_cells_for
 
     return _keymap_cells_for(*args, **kwargs)
+
+
+def _save_current_profile_for_guard(editor: _PerKeyProfileEditorProtocol) -> None:
+    requested = editor._profile_name_var.get()
+    if requested != editor.profile_name:
+        editor._profile_name_var.set(editor.profile_name)
+    try:
+        save_profile_ui(editor)
+    finally:
+        if requested != editor.profile_name:
+            editor._profile_name_var.set(requested)
+
+
+def _guard_destructive_profile_action(editor: _PerKeyProfileEditorProtocol, action: str) -> bool:
+    return dirty_state.confirm_destructive_action(
+        editor,
+        action=action,
+        save_fn=lambda: _save_current_profile_for_guard(editor),
+    )
+
+
+def _mark_saved_snapshot_if_supported(editor: _PerKeyProfileEditorProtocol) -> None:
+    try:
+        editor._mark_saved_snapshot()
+    except AttributeError:
+        return
 
 
 def primary_cell(*args, **kwargs):
@@ -298,8 +325,13 @@ def save_power_source_profile_policy_ui(editor: _PerKeyProfileEditorProtocol) ->
 
 
 def activate_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
+    requested_name = editor._profile_name_var.get()
+    if requested_name != editor.profile_name and not _guard_destructive_profile_action(
+        editor, "activating another profile"
+    ):
+        return
     result = activate_profile(
-        editor._profile_name_var.get(),
+        requested_name,
         config=editor.config,
         current_colors=dict(editor.colors or {}),
         num_rows=NUM_ROWS,
@@ -315,6 +347,7 @@ def activate_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     editor.colors = result.colors
     editor.layout_slot_overrides = dict(result.layout_slot_overrides)
     editor.lightbar_overlay = dict(result.lightbar_overlay)
+    editor.secondary_lighting = result.secondary_lighting
 
     _sync_backdrop_ui_after_activation(editor, editor.profile_name, logger=logger)
 
@@ -324,8 +357,12 @@ def activate_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     editor.overlay_controls.sync_vars_from_scope()
     if editor.lightbar_controls is not None:
         editor.lightbar_controls.sync_vars_from_editor()
+    lighting_areas_panel = vars(editor).get("_lighting_areas_panel")
+    if lighting_areas_panel is not None:
+        lighting_areas_panel.sync_from_editor()
     _refresh_layout_slot_controls_if_present(editor)
     editor.canvas.redraw()
+    _mark_saved_snapshot_if_supported(editor)
     set_status(editor, active_profile(editor.profile_name))
 
     selected_slot_id = editor.selected_slot_id
@@ -346,6 +383,7 @@ def save_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
         physical_layout=editor._physical_layout,
         layout_slot_overrides=editor.layout_slot_overrides,
         colors=editor.colors,
+        secondary_lighting=getattr(editor, "secondary_lighting", None),
     )
     editor.profile_name = name
     editor._profile_name_var.set(name)
@@ -353,12 +391,16 @@ def save_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
 
     ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
+    _mark_saved_snapshot_if_supported(editor)
     set_status(editor, saved_profile(editor.profile_name))
 
 
 def new_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     """Create a new profile with a default name."""
     from tkinter import simpledialog
+
+    if not _guard_destructive_profile_action(editor, "creating another profile"):
+        return
 
     existing_profiles = profiles.list_profiles()
     new_name = simpledialog.askstring(
@@ -390,6 +432,7 @@ def new_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
         physical_layout=editor._physical_layout,
         layout_slot_overrides=editor.layout_slot_overrides,
         colors=editor.colors,
+        secondary_lighting=getattr(editor, "secondary_lighting", None),
     )
     editor.profile_name = name
     editor._profile_name_var.set(name)
@@ -398,10 +441,13 @@ def new_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
 
     ensure_full_map_ui(editor, num_rows=NUM_ROWS, num_cols=NUM_COLS)
     editor._commit(force=True)
+    _mark_saved_snapshot_if_supported(editor)
     set_status(editor, f"Created lighting profile '{name}'")
 
 
 def delete_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
+    if not _guard_destructive_profile_action(editor, "deleting a profile"):
+        return
     result = delete_profile(editor._profile_name_var.get())
     if not result.deleted:
         if result.message:
@@ -412,6 +458,9 @@ def delete_profile_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     editor._profile_name_var.set(result.active_profile)
     editor._profiles_combo.configure(values=profiles.list_profiles())
     sync_power_source_profile_policy_controls(editor)
+    if callable(editor._activate_profile):
+        editor._activate_profile()
+    _mark_saved_snapshot_if_supported(editor)
     set_status(editor, result.message)
 
 

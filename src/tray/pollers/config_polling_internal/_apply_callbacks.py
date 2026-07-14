@@ -82,6 +82,8 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
     )
     if has_all_uniform_capable_target(current):
         _helpers.turn_off_secondary_software_targets(tray)
+    secondary_payload = _helpers._secondary_static_scene.payload_from_config(tray.config)
+    _helpers.turn_off_secondary_profile_areas(tray, payload=secondary_payload)
     tray.is_off = True
     _helpers._call_tray_callback(
         tray,
@@ -211,8 +213,7 @@ def _apply_perkey(
         )
     ):
         tray.is_off = False
-        if has_all_uniform_capable_target(current):
-            _helpers.restore_secondary_software_targets(tray)
+        _helpers._apply_secondary_static_from_config(tray)
         return
 
     if should_reassert_user_mode:
@@ -227,8 +228,7 @@ def _apply_perkey(
             enable_user_mode=should_reassert_user_mode,
         )
     tray.is_off = False
-    if has_all_uniform_capable_target(current):
-        _helpers.restore_secondary_software_targets(tray)
+    _helpers._apply_secondary_static_from_config(tray)
 
 
 def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> None:
@@ -244,8 +244,7 @@ def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> N
     with tray.engine.kb_lock:
         tray.engine.kb.set_color(current.color, brightness=current.brightness)
     tray.is_off = False
-    if has_all_uniform_capable_target(current):
-        _helpers.restore_secondary_software_targets(tray)
+    _helpers._apply_secondary_static_from_config(tray)
 
 
 def _apply_effect(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> None:

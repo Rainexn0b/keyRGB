@@ -50,11 +50,17 @@ class _SecondaryDeviceEntry:
     def color(self) -> object:
         return self.values.get("color", _MISSING)
 
+    def enabled(self) -> object:
+        return self.values.get("enabled", _MISSING)
+
     def set_brightness(self, value: int) -> None:
         self.values["brightness"] = value
 
     def set_color(self, value: list[int]) -> None:
         self.values["color"] = value
+
+    def set_enabled(self, value: bool) -> None:
+        self.values["enabled"] = bool(value)
 
 
 @dataclass
@@ -162,6 +168,73 @@ def get_secondary_device_brightness(
         getter=_SecondaryDeviceEntry.brightness,
     )
     return config._normalize_brightness_value(coerce_int_setting_fn(raw_value, default=default))
+
+
+def _normalize_secondary_enabled(value: object) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)) and value in (0, 1):
+        return bool(value)
+    return None
+
+
+def get_secondary_device_enabled(
+    config: SecondaryDeviceAccessorConfig,
+    state_key: str,
+    *,
+    fallback_keys: tuple[str, ...] = (),
+    default: bool = False,
+    default_setting_fn: DefaultSettingFn,
+    coerce_int_setting_fn: CoerceIntSettingFn,
+) -> bool:
+    normalized_key = normalize_secondary_state_key(state_key)
+    state = _SecondaryDeviceStateBoundary.from_config(config)
+    entry = state.existing_entry(normalized_key)
+    if entry is not None:
+        explicit = _normalize_secondary_enabled(entry.enabled())
+        if explicit is not None:
+            return explicit
+
+    fallback = _resolve_fallback_value(
+        config,
+        normalized_key,
+        fallback_keys=fallback_keys,
+        default=_MISSING,
+        default_setting_fn=default_setting_fn,
+    )
+    normalized_fallback = _normalize_secondary_enabled(fallback)
+    if normalized_fallback is not None:
+        return normalized_fallback
+
+    return (
+        get_secondary_device_brightness(
+            config,
+            normalized_key,
+            fallback_keys=fallback_keys,
+            default=1 if default else 0,
+            default_setting_fn=default_setting_fn,
+            coerce_int_setting_fn=coerce_int_setting_fn,
+        )
+        > 0
+    )
+
+
+def set_secondary_device_enabled(
+    config: SecondaryDeviceAccessorConfig,
+    state_key: str,
+    value: bool | int | float,
+    *,
+    compatibility_key: str | None = None,
+) -> None:
+    normalized_key = normalize_secondary_state_key(state_key)
+    explicit = _normalize_secondary_enabled(value)
+    enabled = bool(explicit) if explicit is not None else bool(value)
+    state = _SecondaryDeviceStateBoundary.from_config(config)
+    entry = state.entry(normalized_key)
+    entry.set_enabled(enabled)
+    if compatibility_key:
+        config._settings[str(compatibility_key)] = enabled
+    config._save()
 
 
 def set_secondary_device_brightness(

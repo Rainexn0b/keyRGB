@@ -162,8 +162,10 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 composite controller's extra surfaces, such as the Legion Gen10 **Logo / Neon
 Strip / Vents**) is present, each surface appears as a selectable row at the top
 of the tray menu. Click a row to swap the menu into that device's own controls
-(uniform color, brightness, and on/off). Click the **Keyboard** row to return to
-the main keyboard controls.
+(uniform color, capability-aware brightness, and on/off). Shared controller zones
+explicitly follow the Keyboard brightness, while independent devices get their own
+slider. Click the **Keyboard** row to return to the main keyboard controls. These rows
+select live controls; **Lighting Profiles** remains the persistent whole-scene editor.
 
 ### Environment variables
 
@@ -241,7 +243,7 @@ Current backend plan:
 - `ite8258`: `experimental` + `reverse_engineered`
 	- `0x048d:0xc195` — Lenovo Legion 5 / Pro 5 Gen 10 24-zone ITE 8258 hidraw keyboard path (4×6 logical zone matrix, static color, brightness, and firmware effects)
 - `ite8258-chassis`: `experimental` + `reverse_engineered`
-  - `0x048d:0xc197` — Lenovo Gen10 composite ITE 8258 path with keyboard-plus-chassis lighting; shipped as an experimental backend with ANSI matrix mapping, per-key/static keyboard color, brightness, and the confirmed Lenovo Gen10 firmware effects. The chassis lighting surfaces (rear lid logo, front neon strip, and rear vent lens) are exposed as live, selectable secondary-device contexts (**Logo / Neon Strip / Vents**) in the tray, each with uniform color, brightness, and on/off, plus software-effect mirroring via **Software Targets**.
+  - `0x048d:0xc197` — Lenovo Gen10 composite ITE 8258 path with keyboard-plus-chassis lighting; shipped as an experimental backend with ANSI matrix mapping, per-key/static keyboard color, brightness, and the confirmed Lenovo Gen10 firmware effects. The chassis lighting surfaces (rear lid logo, front neon strip, and rear vent lens) are profile-owned **Lighting areas** in the Lighting Profile Editor, with static colours and enabled state plus animated Effect output support.
 - `ite8295-zones`: `experimental` + `reverse_engineered`
 	- `0x048d:0xc963` — Lenovo 4-zone ITE 8295 hidraw keyboard path used by IdeaPad Gaming 3-class systems, with static color, 4-zone updates, brightness, and the confirmed default firmware effects (`breathing`, `wave`, `spectrum_cycle`)
 	- `0x048d:0xc966` — companion ITE 8176 endpoint reported on the same laptops; still treated as a separate unsupported protocol family until direct RGB evidence exists
@@ -259,7 +261,7 @@ Current backend plan:
 
 Naming note: backend identifiers follow the controller or protocol family first, and only add a semantic qualifier when the same family splits into incompatible runtime shapes. Laptop and SKU names stay in the support notes instead of becoming the primary backend identifier.
 
-When a compatible auxiliary device is present, the tray exposes a `Software Targets` submenu so looped software effects can stay on the keyboard or mirror their uniformized output to all compatible secondary devices.
+When compatible auxiliary devices are present, **Software Effects** includes an `Include enabled lighting areas` toggle. It controls animated fan-out only; Static output always follows the active profile.
 
 Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental and dormant paths are additionally policy-gated, so detection alone does not guarantee automatic selection.
 
@@ -284,7 +286,10 @@ Profiles are stored in:
 
 `~/.config/keyrgb/profiles/`
 
-Each profile contains the keymap (calibration), global overlay tweaks, and per-key color data. Manage these via the Per-Key Editor.
+Each profile contains the keymap (calibration), global overlay tweaks, keyboard color
+data, and enabled/color state for secondary lighting areas. Independently dimmable
+secondary devices also store brightness. Manage the complete scene through the
+Lighting Profile Editor.
 
 ### Per-key calibration
 

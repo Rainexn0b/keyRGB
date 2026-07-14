@@ -4,19 +4,31 @@ import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call
 
+from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
+
 
 def _make_lightbar_route(*, device_factory):
     return SimpleNamespace(
         device_type="lightbar",
         backend_name="ite8233_none_chassis_lightbar_clevo",
         display_name="Lightbar",
+        state_key="lightbar",
         get_device=device_factory,
         config_brightness_attr="lightbar_brightness",
+        brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
+    )
+
+
+@pytest.fixture(autouse=True)
+def _stub_profile_brightness_persistence(monkeypatch):
+    monkeypatch.setattr(
+        "src.tray.controllers.secondary_device_controller.profiles.update_secondary_lighting_area",
+        lambda state_key, updates: {"version": 1, "areas": {state_key: dict(updates)}},
     )
 
 
 def _make_tray() -> SimpleNamespace:
-    return SimpleNamespace(
+    tray = SimpleNamespace(
         selected_device_context="lightbar:048d:7001",
         config=SimpleNamespace(lightbar_brightness=25),
         _update_menu=MagicMock(),
@@ -24,6 +36,8 @@ def _make_tray() -> SimpleNamespace:
         _notify_permission_issue=MagicMock(),
         _log_event=MagicMock(),
     )
+    tray.config.set_secondary_device_enabled = MagicMock()
+    return tray
 
 
 def test_apply_selected_secondary_brightness_updates_lightbar_device(monkeypatch) -> None:
@@ -47,6 +61,8 @@ def test_apply_selected_secondary_brightness_updates_lightbar_device(monkeypatch
 
     assert apply_selected_secondary_brightness(tray, "6") is True
     assert tray.config.lightbar_brightness == 30
+    tray.config.set_secondary_device_enabled.assert_called_once_with("lightbar", True)
+    assert tray._active_secondary_lighting["areas"]["lightbar"] == {"brightness": 30, "enabled": True}
     assert seen == [30]
     tray._update_menu.assert_called_once()
 
@@ -72,6 +88,8 @@ def test_turn_off_selected_secondary_device_turns_off_lightbar(monkeypatch) -> N
 
     assert turn_off_selected_secondary_device(tray) is True
     assert tray.config.lightbar_brightness == 0
+    tray.config.set_secondary_device_enabled.assert_called_once_with("lightbar", False)
+    assert tray._active_secondary_lighting["areas"]["lightbar"] == {"enabled": False}
     assert calls == {"off": 1}
     tray._update_menu.assert_called_once()
 
@@ -107,6 +125,8 @@ def test_turn_on_selected_secondary_device_restores_last_nonzero_brightness(monk
 
     assert turn_on_selected_secondary_device(tray) is True
     assert tray.config.lightbar_brightness == 10
+    assert tray.config.set_secondary_device_enabled.call_args_list[-1].args == ("lightbar", True)
+    assert tray._active_secondary_lighting["areas"]["lightbar"] == {"brightness": 10, "enabled": True}
     assert seen == ["off", 10]
     assert tray._update_menu.call_count == 2
 

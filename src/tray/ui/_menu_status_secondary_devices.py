@@ -8,8 +8,12 @@ from ._device_status import format_hex_id, secondary_status_suffix
 
 class DeviceContextEntry(TypedDict, total=False):
     backend_name: str
+    connected: bool
     device_type: str
+    is_virtual_area: bool
     key: str
+    simulated: bool
+    source: str
     status: str
     text: str
 
@@ -25,6 +29,10 @@ def secondary_device_context_entry(candidate: Mapping[str, object]) -> DeviceCon
         "key": _secondary_context_key(candidate, device_type=device_type, usb_vid=usb_vid, usb_pid=usb_pid),
         "device_type": device_type,
         "backend_name": _secondary_backend_name(candidate),
+        "connected": True,
+        "is_virtual_area": False,
+        "simulated": False,
+        "source": "discovery",
         "status": status,
         "text": _secondary_device_text(
             device_type=device_type,

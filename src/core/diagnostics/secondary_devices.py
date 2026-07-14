@@ -3,10 +3,10 @@ from __future__ import annotations
 from typing import Any
 
 from src.core.backends.policy import experimental_backends_enabled
-from src.core.secondary_device_routes import (
-    SecondaryDeviceRoute,
-    iter_virtual_routes,
-)
+from src.core import secondary_lighting_state
+from src.core.secondary_device_runtime import EffectiveSecondaryRoute
+from src.core.secondary_device_runtime import iter_effective_secondary_routes
+from src.core.secondary_device_routes import iter_secondary_routes
 
 
 _READ_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -30,43 +30,24 @@ def _config_value(config: object | None, attr: str, default: object = None) -> o
         return default
 
 
-def _parent_probe(route: SecondaryDeviceRoute) -> tuple[bool, str]:
-    """Read-only availability probe of a virtual route's parent backend.
-
-    Uses the backend ``probe()`` (hidraw scan + policy gate) rather than opening
-    the device, so discovery stays read-only.
-    """
-    try:
-        backend = route.get_backend()
-    except _READ_ERRORS as exc:
-        return False, f"parent backend unavailable ({exc})"
-
-    probe = getattr(backend, "probe", None)
-    if not callable(probe):
-        return False, "parent backend has no probe()"
-
-    try:
-        result = probe()
-    except _READ_ERRORS as exc:
-        return False, f"parent probe failed ({exc})"
-
-    available = bool(getattr(result, "available", False))
-    reason = str(getattr(result, "reason", "") or "")
-    return available, reason
-
-
-def _virtual_route_entry(route: SecondaryDeviceRoute) -> dict[str, Any]:
-    available, reason = _parent_probe(route)
+def _effective_route_entry(effective: EffectiveSecondaryRoute) -> dict[str, Any]:
+    route = effective.route
     return {
         "backend_name": route.backend_name,
         "device_type": route.device_type,
         "display_name": route.display_name,
         "parent_backend": route.parent_backend_name,
         "zone_key": route.zone_key,
-        "parent_available": available,
-        "parent_reason": reason,
+        "state_key": route.state_key,
+        "available": effective.available,
+        "parent_available": effective.available,
+        "parent_reason": effective.availability_reason,
+        "availability_source": effective.availability_source,
+        "simulated": effective.simulated,
         "supports_uniform_color": bool(route.supports_uniform_color),
         "supports_software_target": bool(route.supports_software_target),
+        "supports_profile_state": bool(route.supports_profile_state),
+        "brightness_policy": route.brightness_policy,
     }
 
 
@@ -98,73 +79,70 @@ def _auxiliary_candidates(candidates: list[dict[str, Any]]) -> list[dict[str, An
 
 def _expected_tray_contexts(
     aux_candidates: list[dict[str, Any]],
-    virtual_routes: list[dict[str, Any]],
+    effective_routes: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Summarize the device-context rows the tray header would render.
-
-    This mirrors the gating in ``src/tray/ui/_menu_status_devices.py``:
-    a keyboard row, one row per non-keyboard discovery candidate, and one row
-    per virtual zone route whose parent backend is currently available.
-    """
+    """Summarize the selectable live-control contexts the tray should render."""
     contexts: list[dict[str, Any]] = [
         {"key": "keyboard", "device_type": "keyboard", "source": "primary", "controls_available": True}
     ]
+    seen_device_types: set[str] = set()
     for candidate in aux_candidates:
-        key = str(candidate.get("context_key") or "").strip() or str(candidate.get("device_type") or "")
+        device_type = str(candidate.get("device_type") or "").strip().lower()
+        if not device_type or device_type in seen_device_types:
+            continue
         contexts.append(
             {
-                "key": key,
-                "device_type": candidate.get("device_type"),
+                "key": str(candidate.get("context_key") or device_type),
+                "device_type": device_type,
                 "source": "discovery",
                 "controls_available": bool(candidate.get("controls_available")),
             }
         )
-    for route in virtual_routes:
-        if not route.get("parent_available"):
+        seen_device_types.add(device_type)
+
+    for route in effective_routes:
+        device_type = str(route.get("device_type") or "").strip().lower()
+        if not bool(route.get("available")) or not device_type or device_type in seen_device_types:
             continue
         contexts.append(
             {
-                "key": route.get("backend_name"),
-                "device_type": route.get("device_type"),
-                "source": "virtual_route",
+                "key": str(route.get("backend_name") or device_type),
+                "device_type": device_type,
+                "source": "simulation" if bool(route.get("simulated")) else "effective_route",
                 "controls_available": True,
             }
         )
+        seen_device_types.add(device_type)
     return contexts
 
 
+def _expected_profile_editor_rows(effective_routes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Report the secondary rows the Lighting Profile Editor should render."""
+    return [
+        {
+            "state_key": route.get("state_key"),
+            "device_type": route.get("device_type"),
+            "display_name": route.get("display_name"),
+            "simulated": bool(route.get("simulated")),
+            "availability_source": route.get("availability_source"),
+        }
+        for route in effective_routes
+        if route.get("available") and route.get("supports_profile_state")
+    ]
+
+
 def _secondary_device_state(config: object | None) -> dict[str, Any]:
-    """Report persisted brightness/color for each registered secondary route."""
+    """Report persisted enabled/brightness/color for each registered route."""
     state: dict[str, Any] = {}
     if config is None:
         return state
-    get_brightness = getattr(config, "get_secondary_device_brightness", None)
-    get_color = getattr(config, "get_secondary_device_color", None)
-
-    routes = list(iter_virtual_routes())
+    routes = list(iter_secondary_routes())
     for route in routes:
-        brightness: object = None
-        color: object = None
-        if callable(get_brightness):
-            try:
-                brightness = get_brightness(
-                    route.state_key,
-                    fallback_keys=(route.config_brightness_attr,) if route.config_brightness_attr else (),
-                    default=0,
-                )
-            except _READ_ERRORS:
-                brightness = None
-        if callable(get_color):
-            try:
-                color_value = get_color(
-                    route.state_key,
-                    fallback_keys=(route.config_color_attr,) if route.config_color_attr else (),
-                )
-                if isinstance(color_value, (list, tuple)):
-                    color = [int(channel) for channel in color_value]
-            except _READ_ERRORS:
-                color = None
-        state[route.state_key] = {"brightness": brightness, "color": color}
+        state[route.state_key] = {
+            "enabled": secondary_lighting_state.config_enabled(config, route),
+            "brightness": secondary_lighting_state.config_brightness(config, route, default=0),
+            "color": list(secondary_lighting_state.config_color(config, route)),
+        }
     return state
 
 
@@ -178,13 +156,15 @@ def secondary_devices_snapshot(candidates: list[dict[str, Any]] | None) -> dict[
     """
     config = _load_config()
 
-    virtual_routes = [_virtual_route_entry(route) for route in iter_virtual_routes()]
+    effective = list(iter_effective_secondary_routes(include_unavailable=True))
+    effective_routes = [_effective_route_entry(entry) for entry in effective]
+    virtual_routes = [entry for entry in effective_routes if entry.get("parent_backend")]
     aux_candidates = _auxiliary_candidates(candidates or [])
-    expected_contexts = _expected_tray_contexts(aux_candidates, virtual_routes)
+    expected_contexts = _expected_tray_contexts(aux_candidates, effective_routes)
+    expected_editor_rows = _expected_profile_editor_rows(effective_routes)
 
     all_compatible_enabled = any(
-        bool(context.get("controls_available")) and context.get("device_type") != "keyboard"
-        for context in expected_contexts
+        bool(route.get("available")) and bool(route.get("supports_software_target")) for route in effective_routes
     )
 
     return {
@@ -195,8 +175,10 @@ def secondary_devices_snapshot(candidates: list[dict[str, Any]] | None) -> dict[
             "all_compatible_devices_enabled": all_compatible_enabled,
         },
         "virtual_routes": virtual_routes,
+        "effective_routes": effective_routes,
         "auxiliary_candidates": aux_candidates,
         "expected_tray_contexts": expected_contexts,
+        "expected_profile_editor_rows": expected_editor_rows,
         "secondary_device_state": _secondary_device_state(config),
     }
 

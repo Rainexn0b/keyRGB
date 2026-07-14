@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import importlib
 
+from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+from src.core.effects.software_targets import normalize_software_effect_target
 from src.tray.controllers import software_target_controller as _software_target_controller
+from src.tray.controllers import secondary_static_scene as _secondary_static_scene
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from . import _boundaries
@@ -16,6 +19,22 @@ _CONFIG_PERSIST_SYNC_EXCEPTIONS = _boundaries._CONFIG_PERSIST_SYNC_EXCEPTIONS
 configure_engine_software_targets = _software_target_controller.configure_engine_software_targets
 restore_secondary_software_targets = _software_target_controller.restore_secondary_software_targets
 turn_off_secondary_software_targets = _software_target_controller.turn_off_secondary_software_targets
+turn_off_secondary_profile_areas = _secondary_static_scene.turn_off_secondary_profile_areas
+
+
+def _apply_secondary_static_from_config(tray: ConfigPollingTrayProtocol) -> None:
+    payload = _secondary_static_scene.payload_from_config(tray.config)
+    _software_target_controller.reconcile_secondary_profile_state(tray, payload, animated=False)
+
+
+def _apply_secondary_only(tray: ConfigPollingTrayProtocol, current) -> None:
+    payload = _secondary_static_scene.payload_from_config(tray.config)
+    animated = bool(
+        normalize_software_effect_target(getattr(current, "software_effect_target", "keyboard"))
+        == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+        and _software_target_controller._software_effect_is_running(tray, current)
+    )
+    _software_target_controller.reconcile_secondary_profile_state(tray, payload, animated=animated)
 
 
 def _log_module_exception(msg: str, exc: Exception) -> None:

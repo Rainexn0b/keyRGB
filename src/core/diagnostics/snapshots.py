@@ -121,6 +121,7 @@ def env_snapshot() -> dict[str, str]:
         "KEYRGB_BACKEND",
         "KEYRGB_USE_INSTALLED_ITE",
         "KEYRGB_DISABLE_USB_SCAN",
+        "KEYRGB_SIMULATE_SECONDARY_DEVICES",
         "KEYRGB_ALLOW_HARDWARE",
         "KEYRGB_HW_TESTS",
         "KEYRGB_DEBUG",

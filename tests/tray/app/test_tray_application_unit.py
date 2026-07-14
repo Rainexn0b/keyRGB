@@ -557,18 +557,23 @@ def test_notify_permission_issue_ignores_non_permission_errors(monkeypatch):
     assert notifications == []
 
 
-def test_on_quit_clicked_stops_power_engine_and_icon():
-    calls = {"pm": 0, "engine": 0, "icon": 0}
+def test_on_quit_clicked_closes_secondary_cache_stops_power_engine_and_icon(monkeypatch):
+    calls = {"pm": 0, "cache": 0, "engine": 0, "icon": 0}
 
     tray = SimpleNamespace(
         power_manager=SimpleNamespace(stop_monitoring=lambda: calls.__setitem__("pm", calls["pm"] + 1)),
         engine=SimpleNamespace(stop=lambda: calls.__setitem__("engine", calls["engine"] + 1)),
     )
     icon = SimpleNamespace(stop=lambda: calls.__setitem__("icon", calls["icon"] + 1))
+    monkeypatch.setattr(
+        app,
+        "close_secondary_software_target_cache",
+        lambda _tray: calls.__setitem__("cache", calls["cache"] + 1),
+    )
 
     app.KeyRGBTray._on_quit_clicked(tray, icon, None)
 
-    assert calls == {"pm": 1, "engine": 1, "icon": 1}
+    assert calls == {"pm": 1, "cache": 1, "engine": 1, "icon": 1}
 
 
 def test_update_icon_and_menu_delegate_to_refresh_helpers(monkeypatch):

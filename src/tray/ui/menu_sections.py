@@ -5,17 +5,10 @@ import logging
 from typing import Protocol
 
 from src.core.utils.logging_utils import log_throttled
-from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers import menu_adapters as profile_power_menu_actions
-from src.tray.secondary_device_routes import route_for_context_entry
 
 from src.core.power.system import get_status, set_mode
-from ._menu_sections_device_context import (
-    DeviceContextEntry,
-    build_device_context_menu_items as _build_device_context_menu_items,
-)
 from ._menu_sections_profile_power import ProfilePowerMenuBuilder
-from .menu_status import device_context_controls_available
 
 
 _MenuAction = Callable[[object, object], None]
@@ -36,17 +29,6 @@ class _ItemFactoryProtocol(Protocol):
     def __call__(self, text: str, action: object | None = None, **kwargs: object) -> object: ...
 
 
-class _DeviceContextMenuTrayProtocol(Protocol):
-    config: object | None
-    _on_selected_device_color_clicked: _MenuAction
-    _on_selected_device_brightness_clicked: _MenuAction
-    _on_selected_device_turn_off_clicked: _MenuAction
-    _on_selected_device_turn_on_clicked: _MenuAction
-    _on_support_debug_clicked: _MenuAction
-    _on_power_settings_clicked: _MenuAction
-    _on_quit_clicked: _MenuAction
-
-
 class _SystemPowerMenuTrayProtocol(Protocol):
     _on_power_mode_settings_clicked: _MenuAction
 
@@ -59,41 +41,6 @@ logger = logging.getLogger(__name__)
 
 _MENU_BUILD_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
 _PROFILE_CALLBACK_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-
-
-def _device_context_controls_available_typed(tray: object, context_entry: DeviceContextEntry) -> bool:
-    return device_context_controls_available(tray, context_entry)
-
-
-def _safe_int_attr_typed(
-    obj: object,
-    attr_name: str,
-    *,
-    default: int = 0,
-    min_v: int | None = None,
-    max_v: int | None = None,
-) -> int:
-    return safe_int_attr(obj, attr_name, default=default, min_v=min_v, max_v=max_v)
-
-
-def build_device_context_menu_items(
-    tray: _DeviceContextMenuTrayProtocol,
-    *,
-    pystray: _PystrayProtocol,
-    item: _ItemFactoryProtocol,
-    context_entry: DeviceContextEntry,
-) -> list[object]:
-    """Build a selected device-context surface for non-keyboard devices."""
-
-    return _build_device_context_menu_items(
-        tray,
-        pystray=pystray,
-        item=item,
-        context_entry=context_entry,
-        route_for_context_entry=route_for_context_entry,
-        device_context_controls_available=_device_context_controls_available_typed,
-        safe_int_attr=_safe_int_attr_typed,
-    )
 
 
 def _log_menu_debug(key: str, msg: str, exc: Exception, *, interval_s: float = 60) -> None:
@@ -164,14 +111,16 @@ def build_perkey_profiles_menu(
     pystray: _PystrayProtocol,
     item: _ItemFactoryProtocol,
     per_key_supported: bool,
+    secondary_lighting_supported: bool = False,
 ) -> object | None:
-    """Build the per-key profiles submenu.
+    """Build the whole-scene lighting profiles submenu.
 
-    Returns None when per-key is not supported.
+    Returns None when neither per-key nor secondary lighting is supported.
     """
     return _profile_power_menu_builder().build_perkey_profiles_menu(
         tray,
         pystray=pystray,
         item=item,
         per_key_supported=per_key_supported,
+        secondary_lighting_supported=secondary_lighting_supported,
     )

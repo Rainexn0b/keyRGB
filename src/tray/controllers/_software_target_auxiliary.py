@@ -7,6 +7,7 @@ from typing import Protocol, TypeVar, cast
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 from src.core.effects.software_targets import normalize_software_effect_target
+from src.core.secondary_device_runtime import acquire_secondary_device
 from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry
 
@@ -35,6 +36,7 @@ class _CachedSecondarySoftwareTarget:
     def __init__(self, *, key: str, route: SecondaryDeviceRoute) -> None:
         self.key = str(key or "lightbar")
         self.device_type = str(route.device_type)
+        self.state_key = str(getattr(route, "state_key", route.device_type))
         self._route = route
         self._lock = RLock()
         self._device: _LightbarDeviceProtocol | None = None
@@ -52,6 +54,11 @@ class _CachedSecondarySoftwareTarget:
     def turn_off(self) -> None:
         self._with_device(lambda device: device.turn_off())
 
+    def close(self) -> None:
+        """Close the cached device handle, if one exists."""
+        with self._lock:
+            self._invalidate_cached_device()
+
     def _invalidate_cached_device(self) -> None:
         device = self._device
         self._device = None
@@ -67,7 +74,9 @@ class _CachedSecondarySoftwareTarget:
         with self._lock:
             device = self._device
             if device is None:
-                device = self._route.get_device()
+                # Keep all secondary acquisition behind the central runtime
+                # seam so simulation can never fall through to hardware.
+                device = cast(_LightbarDeviceProtocol, acquire_secondary_device(self._route))
                 self._device = device
             try:
                 operation(device)
@@ -112,6 +121,38 @@ def _proxy_cache(
     return cache
 
 
+def _close_target_best_effort(target: object) -> None:
+    close_fn = getattr(target, "close", None)
+    if not callable(close_fn):
+        return
+    try:
+        close_fn()
+    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+        return
+
+
+def prune_secondary_software_target_cache(
+    cache: dict[str, _SecondarySoftwareTargetProtocol],
+    *,
+    active_keys: set[str],
+) -> None:
+    """Close and remove cached targets absent from the current active set."""
+    for key in tuple(cache):
+        if key in active_keys:
+            continue
+        target = cache.pop(key, None)
+        if target is not None:
+            _close_target_best_effort(target)
+
+
+def close_secondary_software_target_cache(cache: dict[str, _SecondarySoftwareTargetProtocol]) -> None:
+    """Close and clear every cached secondary software target."""
+    targets = tuple(cache.values())
+    cache.clear()
+    for target in targets:
+        _close_target_best_effort(target)
+
+
 def _iter_secondary_targets(
     tray: _TrayT,
     *,
@@ -135,8 +176,17 @@ def secondary_software_render_targets(
     cached_secondary_target_cls: type[_CachedSecondarySoftwareTarget],
 ) -> list[_SecondarySoftwareTargetProtocol]:
     cache = proxy_cache_fn(tray)
+    entries = secondary_target_entries_fn(tray)
+    active_keys: set[str] = set()
+    for entry in entries:
+        route = route_for_context_entry(entry)
+        if route is None or not bool(route.supports_uniform_color) or not bool(route.supports_software_target):
+            continue
+        active_keys.add(str(entry.get("key") or route.device_type))
+    prune_secondary_software_target_cache(cache, active_keys=active_keys)
+
     targets: list[_SecondarySoftwareTargetProtocol] = []
-    for entry in secondary_target_entries_fn(tray):
+    for entry in entries:
         route = route_for_context_entry(entry)
         if route is None or not bool(route.supports_uniform_color) or not bool(route.supports_software_target):
             continue
@@ -166,12 +216,12 @@ def software_effect_target_options(
     return [
         {
             "key": SOFTWARE_EFFECT_TARGET_KEYBOARD,
-            "label": "Keyboard Only",
+            "label": "Keyboard only",
             "enabled": True,
         },
         {
             "key": SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
-            "label": "All Compatible Devices",
+            "label": "Keyboard + enabled lighting areas",
             "enabled": aux_available,
         },
     ]

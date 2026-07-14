@@ -265,8 +265,9 @@ def profile_paths_factory():
         layout_slots: Path | None = None,
         lightbar_overlay: Path | None = None,
         per_key_colors: Path | None = None,
-        backdrop_image: Path | None = None,
-        backdrop_settings: Path | None = None,
+         backdrop_image: Path | None = None,
+         backdrop_settings: Path | None = None,
+         secondary_lighting: Path | None = None,
     ):
         from src.core.profile.paths import ProfilePaths
 
@@ -278,9 +279,10 @@ def profile_paths_factory():
             layout_slots=layout_slots or (root / "layout_slots.json"),
             lightbar_overlay=lightbar_overlay or (root / "lightbar_overlay.json"),
             per_key_colors=per_key_colors or (root / "colors.json"),
-            backdrop_image=backdrop_image or (root / "backdrop.png"),
-            backdrop_settings=backdrop_settings or (root / "backdrop_settings.json"),
-        )
+             backdrop_image=backdrop_image or (root / "backdrop.png"),
+             backdrop_settings=backdrop_settings or (root / "backdrop_settings.json"),
+             secondary_lighting=secondary_lighting or (root / "secondary_lighting.json"),
+         )
 
     return _make
 

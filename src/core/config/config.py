@@ -114,15 +114,50 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         *,
         effect_brightness: int | None = None,
         perkey_brightness: int | None = None,
+        secondary_lighting: Mapping[object, object] | None = None,
     ) -> None:
-        """Persist a complete per-key base-profile switch in one config snapshot."""
+        """Persist keyboard and optional secondary profile state atomically."""
 
         if effect_brightness is not None:
             self._settings["brightness"] = self._normalize_brightness_value(effect_brightness)
         if perkey_brightness is not None:
             self._settings["perkey_brightness"] = self._normalize_brightness_value(perkey_brightness)
         self._settings["per_key_colors"] = self._serialize_per_key_colors(dict(colors or {}))
+        if secondary_lighting is not None:
+            self._merge_secondary_profile_state(secondary_lighting)
         self._save()
+
+    def _merge_secondary_profile_state(self, payload: Mapping[object, object]) -> None:
+        raw_areas = payload.get("areas")
+        if not isinstance(raw_areas, Mapping):
+            return
+
+        raw_state = self._settings.get("secondary_device_state")
+        state: dict[str, object] = raw_state if isinstance(raw_state, dict) else {}
+        self._settings["secondary_device_state"] = state
+
+        for raw_key, raw_entry in raw_areas.items():
+            key = str(raw_key or "").strip().lower()
+            if not key or not isinstance(raw_entry, Mapping):
+                continue
+            existing = state.get(key)
+            merged: dict[str, object] = dict(existing) if isinstance(existing, dict) else {}
+            for field, value in raw_entry.items():
+                if field == "enabled":
+                    if isinstance(value, bool):
+                        merged[field] = value
+                    elif isinstance(value, (int, float)) and value in (0, 1):
+                        merged[field] = bool(value)
+                elif field == "color":
+                    if isinstance(value, (list, tuple)) and len(value) == 3:
+                        if all(isinstance(channel, (int, float)) for channel in value):
+                            merged[field] = [max(0, min(255, int(channel))) for channel in value]
+                elif field == "brightness":
+                    if isinstance(value, (int, float)):
+                        merged[field] = max(0, min(100, int(value)))
+                else:
+                    merged[str(field)] = value
+            state[key] = merged
 
     @staticmethod
     def _normalize_brightness_value(value: int) -> int:

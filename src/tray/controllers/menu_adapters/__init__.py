@@ -60,4 +60,5 @@ def activate_perkey_profile(tray: object, profile_name: str) -> None:
         set_active_profile_fn=core_profiles.set_active_profile,
         load_per_key_colors_fn=core_profiles.load_per_key_colors,
         apply_profile_to_config_fn=core_profiles.apply_profile_to_config,
+        load_secondary_lighting_fn=core_profiles.load_secondary_lighting,
     )

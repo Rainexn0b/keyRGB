@@ -5,16 +5,21 @@ import os
 from src.core.runtime.imports import launch_module_subprocess
 
 
+def _inherited_gui_environment() -> dict[str, str]:
+    """Return the parent environment for GUI subprocesses."""
+    return dict(os.environ)
+
+
 def launch_perkey_gui() -> None:
     """Launch the per-key editor GUI as a subprocess."""
 
-    launch_module_subprocess("src.gui.perkey", anchor=__file__)
+    launch_module_subprocess("src.gui.perkey", anchor=__file__, env=_inherited_gui_environment())
 
 
 def launch_uniform_gui(*, target_context: str = "keyboard", backend_name: str | None = None) -> None:
     """Launch the uniform color GUI as a subprocess."""
 
-    env = dict(os.environ)
+    env = _inherited_gui_environment()
     env["KEYRGB_UNIFORM_TARGET_CONTEXT"] = str(target_context or "keyboard").strip().lower() or "keyboard"
     if backend_name:
         env["KEYRGB_UNIFORM_BACKEND"] = str(backend_name).strip().lower()

@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Protocol, TypeAlias, cast
 
 from src.core.backends.registry import select_backend
+from src.core.secondary_device_runtime import acquire_secondary_device, backend_for_secondary_route
 from src.core.secondary_device_routes import SecondaryDeviceRoute, route_for_backend_name, route_for_device_type
 
 
@@ -67,7 +68,7 @@ def select_backend_best_effort(
 ) -> _UniformColorBackendProtocol | None:
     try:
         if secondary_route is not None:
-            return cast(_UniformColorBackendProtocol, secondary_route.get_backend())
+            return cast(_UniformColorBackendProtocol, backend_for_secondary_route(secondary_route))
         return select_backend_fn(requested=requested_backend)
     except _BACKEND_SELECTION_ERRORS:
         logger.debug(
@@ -99,13 +100,17 @@ def probe_color_support(backend: _UniformColorBackendProtocol | None, *, logger:
 def acquire_device_best_effort(
     backend: _UniformColorBackendProtocol | None,
     *,
+    secondary_route: SecondaryDeviceRoute | None = None,
     is_device_busy_fn: IsDeviceBusyFn,
     logger: logging.Logger,
 ) -> _UniformColorDeviceProtocol | None:
-    if backend is None:
+    if backend is None and secondary_route is None:
         return None
 
     try:
+        if secondary_route is not None:
+            return cast(_UniformColorDeviceProtocol, acquire_secondary_device(secondary_route))
+        assert backend is not None
         return backend.get_device()
     except OSError as exc:
         if is_device_busy_fn(exc):

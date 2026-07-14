@@ -66,6 +66,35 @@ def test_per_key_reactive_pulse_keeps_hw_at_profile_brightness() -> None:
     assert not [call for call in kb.calls if call[0] == "set_brightness"]
 
 
+def test_per_key_reactive_frame_fans_out_average_color_to_enabled_secondaries(monkeypatch) -> None:
+    from src.core.effects.reactive import _render_runtime
+    from src.core.effects.reactive.render import render
+
+    secondary_frames: list[tuple[tuple[int, int, int], int]] = []
+    monkeypatch.setattr(
+        _render_runtime,
+        "render_secondary_uniform_rgb",
+        lambda _engine, *, rgb, brightness_hw, **_kwargs: secondary_frames.append((rgb, brightness_hw)),
+    )
+    engine = SimpleNamespace(
+        kb=_DummyKB(),
+        kb_lock=_DummyLock(),
+        brightness=15,
+        reactive_brightness=50,
+        per_key_colors={(0, 0): (255, 0, 0), (0, 1): (0, 0, 255)},
+        per_key_brightness=15,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _reactive_active_pulse_mix=1.0,
+        _last_rendered_brightness=15,
+        _last_hw_mode_brightness=15,
+    )
+
+    render(engine, color_map={(0, 0): (255, 0, 0), (0, 1): (0, 0, 255)})
+
+    assert secondary_frames == [((127, 0, 127), 15)]
+
+
 def test_per_key_reactive_pulse_first_frame_initializes_mode_at_profile_brightness() -> None:
     from src.core.effects.reactive.render import render
 

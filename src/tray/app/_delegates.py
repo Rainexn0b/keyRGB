@@ -104,6 +104,7 @@ class KeyRGBTrayDelegateMixin:
 
     def _on_quit_clicked(self, icon, _item):
         self.power_manager.stop_monitoring()
+        _application_module().close_secondary_software_target_cache(self)
         self.engine.stop()
         engine_close = getattr(self.engine, "close", None)
         if callable(engine_close):

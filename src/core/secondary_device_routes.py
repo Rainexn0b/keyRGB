@@ -11,6 +11,28 @@ from src.core.backends.ite8233_none_chassis_lightbar_clevo.backend import Ite823
 from src.core.backends.sysfs_mouse.backend import SysfsMouseBackend
 
 
+# Brightness policies for secondary routes.
+#
+# ``independent``     the route owns its own brightness (e.g. a separate USB
+#                     controller or sysfs LED with its own brightness file);
+# ``primary_shared``  the route shares the primary keyboard/controller brightness
+#                     (composite-controller zones such as Logo/Neon/Vents);
+# ``unsupported``     the route has no brightness control at all (on/off + colour).
+#
+# See docs/I-implementation-plans/secondary-lighting-profile-editor-and-simulation-plan.md
+# (Phase 1, "Route description" / "Brightness policy").
+BRIGHTNESS_POLICY_INDEPENDENT = "independent"
+BRIGHTNESS_POLICY_PRIMARY_SHARED = "primary_shared"
+BRIGHTNESS_POLICY_UNSUPPORTED = "unsupported"
+BRIGHTNESS_POLICIES = frozenset(
+    {
+        BRIGHTNESS_POLICY_INDEPENDENT,
+        BRIGHTNESS_POLICY_PRIMARY_SHARED,
+        BRIGHTNESS_POLICY_UNSUPPORTED,
+    }
+)
+
+
 @dataclass(frozen=True)
 class SecondaryDeviceRoute:
     device_type: str
@@ -23,6 +45,13 @@ class SecondaryDeviceRoute:
     config_color_attr: str | None = None
     supports_uniform_color: bool = False
     supports_software_target: bool = False
+    # Whether this route's enabled + static-colour state is part of a lighting
+    # profile (``secondary_lighting.json``). All uniform-capable routes are
+    # profile-compatible by default; the Lighting areas editor and profile/static
+    # scene application gate on this.
+    supports_profile_state: bool = False
+    # Runtime brightness behaviour. See the ``BRIGHTNESS_POLICY_*`` constants.
+    brightness_policy: str = BRIGHTNESS_POLICY_UNSUPPORTED
     # Virtual zone routes share a parent backend's transport (e.g., logo/neon/vent
     # on a single composite controller). ``parent_backend_name`` names the parent
     # backend; ``zone_key`` is the sub-device identifier passed to the parent's
@@ -72,6 +101,8 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         config_color_attr="lightbar_color",
         supports_uniform_color=True,
         supports_software_target=True,
+        supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
     ),
     SecondaryDeviceRoute(
         device_type="mouse",
@@ -82,6 +113,8 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         get_device=_acquire_sysfs_mouse,
         supports_uniform_color=True,
         supports_software_target=True,
+        supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
     ),
     # Virtual zone routes for the Lenovo Gen10 composite ITE 8258 chassis
     # controller (0x048d:0xc197). These share the keyboard's hidraw transport
@@ -97,6 +130,8 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         config_color_attr="ite8258_chassis_logo_color",
         supports_uniform_color=True,
         supports_software_target=True,
+        supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
         parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
         zone_key="logo",
     ),
@@ -111,6 +146,8 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         config_color_attr="ite8258_chassis_neon_color",
         supports_uniform_color=True,
         supports_software_target=True,
+        supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
         parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
         zone_key="neon",
     ),
@@ -125,6 +162,8 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         config_color_attr="ite8258_chassis_vent_color",
         supports_uniform_color=True,
         supports_software_target=True,
+        supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
         parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
         zone_key="vent",
     ),
@@ -163,14 +202,30 @@ def iter_virtual_routes() -> tuple[SecondaryDeviceRoute, ...]:
     return tuple(route for route in _ROUTES if route.parent_backend_name is not None)
 
 
+def iter_secondary_routes() -> tuple[SecondaryDeviceRoute, ...]:
+    """Return every registered secondary route, not only virtual-zone routes.
+
+    Consumers that need the full effective-route catalogue (the central
+    secondary-device runtime/provider, simulation, diagnostics, and the Lighting
+    areas editor) must use this rather than ``iter_virtual_routes()`` so that
+    standalone routes such as the Lightbar and Mouse are not silently dropped.
+    """
+    return _ROUTES
+
+
 def iter_parent_backend_names() -> frozenset[str]:
     """Return the set of parent backend names that have virtual zone routes."""
     return frozenset(route.parent_backend_name for route in _ROUTES if route.parent_backend_name is not None)
 
 
 __all__ = [
+    "BRIGHTNESS_POLICIES",
+    "BRIGHTNESS_POLICY_INDEPENDENT",
+    "BRIGHTNESS_POLICY_PRIMARY_SHARED",
+    "BRIGHTNESS_POLICY_UNSUPPORTED",
     "SecondaryDeviceRoute",
     "iter_parent_backend_names",
+    "iter_secondary_routes",
     "iter_virtual_routes",
     "route_for_backend_name",
     "route_for_context_entry",

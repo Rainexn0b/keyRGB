@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import cast
 
@@ -61,6 +61,32 @@ def _safe_perkey_signature(config: object) -> tuple | None:
         return None
 
 
+def _freeze_secondary_value(value: object) -> object:
+    if isinstance(value, Mapping):
+        pairs = [(str(key), _freeze_secondary_value(item)) for key, item in value.items()]
+        return tuple(sorted(pairs, key=lambda pair: pair[0]))
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_secondary_value(item) for item in value)
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _safe_secondary_signature(config: object) -> tuple | None:
+    """Return an ordering-independent immutable snapshot of secondary state."""
+    try:
+        settings = vars(config).get("_settings")
+        raw_state = settings.get("secondary_device_state") if isinstance(settings, Mapping) else None
+    except _CONFIG_FALLBACK_EXCEPTIONS:
+        return None
+    if raw_state is None:
+        return None
+    if not isinstance(raw_state, Mapping):
+        return ()
+    frozen = _freeze_secondary_value(raw_state)
+    return cast(tuple, frozen)
+
+
 @dataclass(frozen=True)
 class ConfigApplyState:
     effect: str
@@ -75,6 +101,7 @@ class ConfigApplyState:
     reactive_trail_percent: int = 40
     reactive_visual_mode: str = "subtle"
     software_effect_target: str = "keyboard"
+    secondary_sig: tuple | None = None
 
     def __post_init__(self) -> None:
         if self.selected_effect is None:
@@ -92,6 +119,7 @@ def build_config_apply_state(
     read_perkey_signature: PerkeySignatureReader,
     normalize_software_effect_target_fn: SoftwareEffectTargetNormalizer,
     reactive_effects_set: set[str] | frozenset[str],
+    read_secondary_signature: Callable[[object], tuple | None] = _safe_secondary_signature,
 ) -> ConfigApplyState:
     def _normalize_reactive_visual_mode(value: object, *, default: str = "subtle") -> str:
         try:
@@ -106,6 +134,7 @@ def build_config_apply_state(
         selected_effect = "none"
 
     perkey_sig = read_perkey_signature(config)
+    secondary_sig = read_secondary_signature(config)
     effect = render_effect_from_selected_effect(
         selected_effect=str(selected_effect),
         per_key_colors=perkey_sig,
@@ -143,4 +172,5 @@ def build_config_apply_state(
         reactive_brightness=int(reactive_brightness),
         reactive_trail_percent=int(reactive_trail_percent),
         reactive_visual_mode=str(reactive_visual_mode),
+        secondary_sig=secondary_sig,
     )

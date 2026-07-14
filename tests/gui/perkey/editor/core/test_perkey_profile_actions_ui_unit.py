@@ -99,6 +99,7 @@ class DummyEditor:
     _battery_power_source_profile_var: DummyVar | None = None
     _ac_power_source_profile_combo: DummyCombo | None = None
     _battery_power_source_profile_combo: DummyCombo | None = None
+    _activate_profile: object = None
     selected_cells: tuple[tuple[int, int], ...] = ()
     commit_calls: int = 0
     select_calls: list[str] = None  # type: ignore[assignment]
@@ -443,6 +444,44 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
     assert ed._profile_name_var.get() == "default"
     assert ed._profiles_combo.values == ["default", "p3"]
     assert ed.status_label.text == "Deleted lighting profile: p2"
+
+
+def test_delete_profile_ui_activates_fallback_scene_when_editor_supports_it(monkeypatch) -> None:
+    fallback_calls: list[bool] = []
+    monkeypatch.setattr(
+        actions,
+        "delete_profile",
+        lambda _name: DeleteProfileResult(deleted=True, active_profile="default", message="deleted"),
+    )
+    monkeypatch.setattr(actions.profiles, "list_profiles", lambda: ["default"])  # type: ignore[attr-defined]
+    ed = DummyEditor(
+        _profile_name_var=DummyVar("p2"),
+        config=object(),
+        colors={},
+        keymap={},
+        _physical_layout="ansi",
+        layout_tweaks={},
+        per_key_layout_tweaks={},
+        layout_slot_overrides={},
+        profile_name="p2",
+        selected_key_id=None,
+        selected_slot_id=None,
+        overlay_controls=DummyOverlayControls(),
+        lightbar_controls=None,
+        lightbar_overlay={},
+        canvas=DummyCanvas(),
+        status_label=DummyLabel(),
+        _profiles_combo=DummyCombo(),
+        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_combo=DummyCombo(),
+        _battery_power_source_profile_combo=DummyCombo(),
+        _activate_profile=lambda: fallback_calls.append(True),
+    )
+
+    actions.delete_profile_ui(ed)
+
+    assert fallback_calls == [True]
 
 
 def test_save_power_source_profile_policy_ui_persists_selection_and_refreshes_options(monkeypatch) -> None:

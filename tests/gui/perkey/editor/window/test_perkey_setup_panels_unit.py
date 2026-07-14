@@ -41,6 +41,7 @@ def _editor() -> SimpleNamespace:
         lightbar_controls=DummyLightbarPanel(),
         _overlay_setup_panel=DummyPanel(),
         _layout_setup_controls=DummyPanel(),
+        _lighting_areas_panel=DummyPanel(),
         _setup_panel_mode=None,
         _refresh_count=0,
     )
@@ -87,3 +88,13 @@ def test_toggle_methods_hide_when_same_mode_selected() -> None:
 
     PerKeyEditor._toggle_overlay(editor)
     assert editor._setup_panel_mode is None
+
+
+def test_hide_setup_panel_reopens_lighting_areas() -> None:
+    editor = _editor()
+    editor._setup_panel_mode = "overlay"
+
+    PerKeyEditor._hide_setup_panel(editor)
+
+    assert editor._setup_panel_mode is None
+    assert editor._lighting_areas_panel.grid_calls == 1

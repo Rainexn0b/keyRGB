@@ -67,6 +67,64 @@ def test_secondary_software_render_targets_reuses_cached_proxy_instances() -> No
     assert first[0] is second[0]
 
 
+def test_secondary_software_render_targets_use_all_simulated_routes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
+    from src.tray.controllers.software_target_controller import secondary_software_render_targets
+
+    monkeypatch.setenv(SIMULATION_ENVIRONMENT_VARIABLE, "1")
+    tray = _make_tray()
+    tray.device_discovery = {"candidates": []}
+    tray.secondary_device_controls = {}
+
+    targets = secondary_software_render_targets(tray)
+
+    assert [target.key for target in targets] == [
+        "ite8233_none_chassis_lightbar_clevo",
+        "sysfs-mouse",
+        "ite8258-chassis-logo",
+        "ite8258-chassis-neon",
+        "ite8258-chassis-vent",
+    ]
+    # The runtime inventory, rather than discovery candidates, drives the
+    # simulated target path and exposes all five registered routes.
+    assert all(target.device_type != "keyboard" for target in targets)
+
+
+def test_cached_secondary_target_acquires_through_runtime_seam(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.tray.controllers import _software_target_auxiliary
+    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+
+    calls: list[object] = []
+
+    class Device:
+        def set_color(self, _color, *, brightness: int) -> None:
+            calls.append(("set_color", brightness))
+
+        def turn_off(self) -> None:
+            calls.append(("turn_off",))
+
+    route = SimpleNamespace(
+        device_type="lightbar",
+        get_device=lambda: (_ for _ in ()).throw(AssertionError("route.get_device bypassed runtime")),
+    )
+
+    def _acquire(runtime_route: object) -> Device:
+        calls.append(runtime_route)
+        return Device()
+
+    monkeypatch.setattr(_software_target_auxiliary, "acquire_secondary_device", _acquire)
+    target = _CachedSecondarySoftwareTarget(key="lightbar", route=route)
+
+    target.set_color((1, 2, 3), brightness=10)
+
+    assert calls[0] is route
+    assert calls[1] == ("set_color", 10)
+
+
 def test_cached_secondary_target_invalidates_cache_on_recoverable_device_error() -> None:
     from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
 
@@ -95,6 +153,75 @@ def test_cached_secondary_target_invalidates_cache_on_recoverable_device_error()
         target.set_color((4, 5, 6), brightness=20)
 
     assert calls["get_device"] == 2
+
+
+def test_cached_secondary_target_close_releases_handle_idempotently(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.tray.controllers import _software_target_auxiliary
+    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+
+    close_calls: list[bool] = []
+
+    class Device:
+        def set_color(self, _color, *, brightness: int) -> None:
+            assert brightness == 10
+
+        def turn_off(self) -> None:
+            return None
+
+        def close(self) -> None:
+            close_calls.append(True)
+
+    monkeypatch.setattr(_software_target_auxiliary, "acquire_secondary_device", lambda _route: Device())
+    route = SimpleNamespace(device_type="lightbar")
+    target = _CachedSecondarySoftwareTarget(key="lightbar", route=route)
+
+    target.set_color((1, 2, 3), brightness=10)
+    target.close()
+    target.close()
+
+    assert close_calls == [True]
+
+
+def test_secondary_target_cache_prunes_removed_targets() -> None:
+    from src.tray.controllers import _software_target_auxiliary
+
+    closed: list[str] = []
+
+    class Target:
+        def __init__(self, key: str) -> None:
+            self.key = key
+
+        def close(self) -> None:
+            closed.append(self.key)
+
+    kept = Target("kept")
+    removed = Target("removed")
+    cache = {"kept": kept, "removed": removed}
+
+    _software_target_auxiliary.prune_secondary_software_target_cache(cache, active_keys={"kept"})
+
+    assert cache == {"kept": kept}
+    assert closed == ["removed"]
+
+
+def test_secondary_target_cache_close_clears_all_targets() -> None:
+    from src.tray.controllers import _software_target_auxiliary
+
+    closed: list[str] = []
+
+    class Target:
+        def __init__(self, key: str) -> None:
+            self.key = key
+
+        def close(self) -> None:
+            closed.append(self.key)
+
+    cache = {key: Target(key) for key in ("logo", "neon", "vent")}
+
+    _software_target_auxiliary.close_secondary_software_target_cache(cache)
+
+    assert cache == {}
+    assert set(closed) == {"logo", "neon", "vent"}
 
 
 def test_cached_secondary_target_propagates_unexpected_device_error_without_invalidating_cache() -> None:
@@ -135,8 +262,8 @@ def test_software_effect_target_options_enable_all_mode_when_auxiliary_device_ex
     options = software_effect_target_options(tray)
 
     assert options == [
-        {"key": "keyboard", "label": "Keyboard Only", "enabled": True},
-        {"key": "all_uniform_capable", "label": "All Compatible Devices", "enabled": True},
+        {"key": "keyboard", "label": "Keyboard only", "enabled": True},
+        {"key": "all_uniform_capable", "label": "Keyboard + enabled lighting areas", "enabled": True},
     ]
 
 

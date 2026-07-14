@@ -76,6 +76,36 @@ class LightingSecondaryDeviceFacade:
             compatibility_key=compatibility_key,
         )
 
+    def get_secondary_device_enabled(
+        self,
+        state_key: str,
+        *,
+        fallback_keys: tuple[str, ...] = (),
+        default: bool = False,
+    ) -> bool:
+        return secondary_device_accessors.get_secondary_device_enabled(
+            self,
+            state_key,
+            fallback_keys=fallback_keys,
+            default=default,
+            default_setting_fn=self._default_setting_adapter,
+            coerce_int_setting_fn=_coerce_int_setting,
+        )
+
+    def set_secondary_device_enabled(
+        self,
+        state_key: str,
+        value: bool | int | float,
+        *,
+        compatibility_key: str | None = None,
+    ) -> None:
+        secondary_device_accessors.set_secondary_device_enabled(
+            self,
+            state_key,
+            value,
+            compatibility_key=compatibility_key,
+        )
+
     def get_secondary_device_color(
         self,
         state_key: str,

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Protocol
+from typing import Callable, Protocol, cast
 
+from src.core.profile import profiles
+from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
+from src.core.secondary_device_runtime import acquire_secondary_device
 from src.core.utils.exceptions import is_permission_denied
 from src.tray import secondary_device_power
 from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
@@ -10,6 +13,7 @@ from src.tray.protocols import LightingTrayProtocol
 from src.tray.ui.menu_status import DeviceContextEntry, selected_device_context_entry
 
 from ._lighting_controller_helpers import parse_menu_int, try_log_event
+from .secondary_static_scene import apply_secondary_static_route
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +37,32 @@ def _secondary_restore_brightness(tray: LightingTrayProtocol, route: SecondaryDe
         route,
         current_brightness_fn=lambda: _secondary_current_brightness(tray, route),
     )
+
+
+def _persist_secondary_state_to_active_profile(
+    tray: LightingTrayProtocol,
+    route: SecondaryDeviceRoute,
+    *,
+    brightness: int | None = None,
+    enabled: bool | None = None,
+) -> None:
+    if not bool(getattr(route, "supports_profile_state", True)):
+        return
+    updates: dict[str, object] = {}
+    if brightness is not None and getattr(route, "brightness_policy", None) == BRIGHTNESS_POLICY_INDEPENDENT:
+        updates["brightness"] = max(0, min(100, int(brightness)))
+    if enabled is not None:
+        updates["enabled"] = bool(enabled)
+    if not updates:
+        return
+    try:
+        payload = profiles.update_secondary_lighting_area(
+            route.state_key,
+            updates,
+        )
+        vars(tray)["_active_secondary_lighting"] = payload
+    except _RECOVERABLE_RUNTIME_BOUNDARY_EXCEPTIONS as exc:
+        _log_boundary_exception(tray, f"Failed to persist {route.display_name.lower()} profile state: %s", exc)
 
 
 def selected_secondary_context_entry(tray: LightingTrayProtocol) -> DeviceContextEntry | None:
@@ -67,7 +97,10 @@ def apply_selected_secondary_brightness(tray: LightingTrayProtocol, item: object
     resolved = _selected_secondary_route(tray)
     if resolved is None:
         return False
-    entry, route = resolved
+    _entry, route = resolved
+
+    if getattr(route, "brightness_policy", None) != BRIGHTNESS_POLICY_INDEPENDENT:
+        return False
 
     level = parse_menu_int(item)
     if level is None:
@@ -81,6 +114,23 @@ def apply_selected_secondary_brightness(tray: LightingTrayProtocol, item: object
         brightness_hw if brightness_hw > 0 else 0,
         error_msg=f"Failed to store {route.display_name.lower()} brightness: %s",
     )
+    _set_secondary_enabled_best_effort(
+        tray,
+        route,
+        brightness_hw > 0,
+        error_msg=f"Failed to store {route.display_name.lower()} enabled state: %s",
+    )
+    if brightness_hw > 0:
+        _persist_secondary_state_to_active_profile(
+            tray,
+            route,
+            brightness=brightness_hw,
+            enabled=True,
+        )
+    else:
+        # Zero is a live off action. Preserve the profile's last non-zero
+        # brightness so a later Turn On (including after restart) can restore it.
+        _persist_secondary_state_to_active_profile(tray, route, enabled=False)
 
     try_log_event(tray, "menu", f"set_{route.device_type}_brightness", new=int(brightness_hw))
 
@@ -114,6 +164,13 @@ def turn_off_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
         0,
         error_msg=f"Failed to store {route.display_name.lower()} brightness: %s",
     )
+    _set_secondary_enabled_best_effort(
+        tray,
+        route,
+        False,
+        error_msg=f"Failed to store {route.display_name.lower()} disabled state: %s",
+    )
+    _persist_secondary_state_to_active_profile(tray, route, enabled=False)
 
     try_log_event(tray, "menu", f"turn_off_{route.device_type}")
 
@@ -142,15 +199,33 @@ def turn_on_selected_secondary_device(tray: LightingTrayProtocol) -> bool:
         restore_brightness,
         error_msg=f"Failed to store {route.display_name.lower()} restore brightness: %s",
     )
+    _set_secondary_enabled_best_effort(
+        tray,
+        route,
+        True,
+        error_msg=f"Failed to store {route.display_name.lower()} enabled state: %s",
+    )
+    _persist_secondary_state_to_active_profile(
+        tray,
+        route,
+        brightness=restore_brightness,
+        enabled=True,
+    )
 
     try_log_event(tray, "menu", f"turn_on_{route.device_type}")
 
-    ok = _with_secondary_device(
-        tray,
-        route,
-        lambda device: device.set_brightness(int(restore_brightness)),
-        error_msg=f"Error turning on {route.display_name.lower()}: %s",
-    )
+    if getattr(route, "brightness_policy", None) == BRIGHTNESS_POLICY_INDEPENDENT:
+        ok = _with_secondary_device(
+            tray,
+            route,
+            lambda device: device.set_brightness(int(restore_brightness)),
+            error_msg=f"Error turning on {route.display_name.lower()}: %s",
+        )
+    else:
+        # Shared zones resume by reapplying their profile colour at the primary
+        # keyboard brightness. Sending set_brightness directly would change the
+        # shared controller brightness for every surface.
+        ok = apply_secondary_static_route(tray, route)
     if ok:
         _refresh_menu_best_effort(tray)
     return ok
@@ -164,7 +239,7 @@ def _with_secondary_device(
     error_msg: str,
 ) -> bool:
     def _apply_to_selected_device() -> None:
-        device = route.get_device()
+        device = cast(_LightbarDeviceProtocol, acquire_secondary_device(route))
         try:
             operation(device)
         finally:
@@ -230,6 +305,26 @@ def _set_secondary_brightness_best_effort(
         if not attr_name:
             return
         setattr(config, attr_name, int(brightness))
+    except AttributeError:
+        return
+    except _RECOVERABLE_CONFIG_ATTR_WRITE_EXCEPTIONS as exc:
+        _log_boundary_exception(tray, error_msg, exc)
+
+
+def _set_secondary_enabled_best_effort(
+    tray: LightingTrayProtocol,
+    route: SecondaryDeviceRoute,
+    enabled: bool,
+    *,
+    error_msg: str,
+) -> None:
+    config = getattr(tray, "config", None)
+    if config is None:
+        return
+    try:
+        setter = getattr(config, "set_secondary_device_enabled", None)
+        if callable(setter):
+            setter(secondary_device_power.state_key(route), bool(enabled))
     except AttributeError:
         return
     except _RECOVERABLE_CONFIG_ATTR_WRITE_EXCEPTIONS as exc:

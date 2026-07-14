@@ -112,3 +112,85 @@ def test_get_secondary_device_brightness_falls_back_to_compatibility_key_then_no
     )
 
     assert brightness == 25
+
+
+def test_get_secondary_device_enabled_prefers_explicit_state_over_legacy_brightness() -> None:
+    cfg = _FakeConfig(
+        _settings={
+            "secondary_device_state": {
+                "logo": {
+                    "enabled": False,
+                    "brightness": 40,
+                    "color": [1, 2, 3],
+                }
+            }
+        }
+    )
+
+    enabled = accessors.get_secondary_device_enabled(
+        cfg,
+        "logo",
+        default_setting_fn=_default_setting,
+        coerce_int_setting_fn=_coerce_int,
+    )
+
+    assert enabled is False
+
+
+def test_get_secondary_device_enabled_uses_brightness_as_legacy_fallback() -> None:
+    cfg = _FakeConfig(
+        _settings={
+            "secondary_device_state": {"logo": {"brightness": 25}},
+        }
+    )
+
+    assert accessors.get_secondary_device_enabled(
+        cfg,
+        "logo",
+        default_setting_fn=_default_setting,
+        coerce_int_setting_fn=_coerce_int,
+    ) is True
+
+    cfg._settings["secondary_device_state"]["logo"]["brightness"] = 0  # type: ignore[index]
+    assert accessors.get_secondary_device_enabled(
+        cfg,
+        "logo",
+        default_setting_fn=_default_setting,
+        coerce_int_setting_fn=_coerce_int,
+    ) is False
+
+
+def test_get_secondary_device_enabled_uses_compatibility_brightness_as_legacy_fallback() -> None:
+    cfg = _FakeConfig(_settings={"legacy_logo_brightness": 25})
+
+    assert accessors.get_secondary_device_enabled(
+        cfg,
+        "logo",
+        fallback_keys=("legacy_logo_brightness",),
+        default_setting_fn=_default_setting,
+        coerce_int_setting_fn=_coerce_int,
+    ) is True
+
+
+def test_set_secondary_device_enabled_preserves_brightness_and_color() -> None:
+    cfg = _FakeConfig(
+        _settings={
+            "secondary_device_state": {
+                "logo": {
+                    "brightness": 35,
+                    "color": [9, 8, 7],
+                }
+            }
+        }
+    )
+
+    accessors.set_secondary_device_enabled(cfg, "logo", False)
+
+    assert cfg._settings["secondary_device_state"] == {
+        "logo": {
+            "brightness": 35,
+            "color": [9, 8, 7],
+            "enabled": False,
+        }
+    }
+    assert cfg.save_calls == 1

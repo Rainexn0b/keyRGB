@@ -193,6 +193,8 @@ class ActivatedProfile:
     colors: PerKeyColors
     layout_slot_overrides: Dict[str, Dict[str, object]] = field(default_factory=dict)
     lightbar_overlay: Dict[str, bool | float] = field(default_factory=dict)
+    # ``None`` means the legacy profile has no secondary_lighting component.
+    secondary_lighting: Dict[str, object] | None = None
 
 
 def activate_profile(
@@ -221,6 +223,7 @@ def activate_profile(
         physical_layout=physical_layout,
     )
     lightbar_overlay = profiles.load_lightbar_overlay(name)
+    secondary_lighting = profiles.load_secondary_lighting(name)
 
     colors = load_profile_colors(
         name=name,
@@ -229,7 +232,10 @@ def activate_profile(
         num_rows=num_rows,
         num_cols=num_cols,
     )
-    profiles.apply_profile_to_config(config, colors)
+    if secondary_lighting is None:
+        profiles.apply_profile_to_config(config, colors)
+    else:
+        profiles.apply_profile_to_config(config, colors, secondary_lighting=secondary_lighting)
 
     return ActivatedProfile(
         name=name,
@@ -239,6 +245,7 @@ def activate_profile(
         colors=colors,
         layout_slot_overrides=layout_slot_overrides,
         lightbar_overlay=lightbar_overlay,
+        secondary_lighting=secondary_lighting,
     )
 
 
@@ -253,6 +260,7 @@ def save_profile(
     physical_layout: str,
     layout_slot_overrides: Dict[str, Dict[str, object]] | None = None,
     colors: PerKeyColors,
+    secondary_lighting: Dict[str, object] | None = None,
 ) -> str:
     name = profiles.set_active_profile(requested_name)
 
@@ -269,7 +277,12 @@ def save_profile(
         physical_layout=physical_layout,
     )
     profiles.save_per_key_colors(colors, name)
-    profiles.apply_profile_to_config(config, colors)
+    if secondary_lighting is not None:
+        profiles.save_secondary_lighting(dict(secondary_lighting), name)
+    if secondary_lighting is None:
+        profiles.apply_profile_to_config(config, colors)
+    else:
+        profiles.apply_profile_to_config(config, colors, secondary_lighting=secondary_lighting)
 
     return name
 

@@ -91,6 +91,49 @@ def test_activate_perkey_profile_runtime_can_skip_menu_refresh() -> None:
     tray._update_menu.assert_not_called()
 
 
+def test_activate_perkey_profile_runtime_passes_secondary_payload_when_present() -> None:
+    from src.core.profile.runtime_activation import activate_perkey_profile_runtime
+
+    tray = _make_tray(transition_result=True)
+    apply_profile_to_config = MagicMock()
+    secondary = {"version": 1, "areas": {"logo": {"enabled": True, "color": [1, 2, 3]}}}
+
+    activate_perkey_profile_runtime(
+        tray,
+        "profile-with-areas",
+        set_active_profile_fn=lambda name: name,
+        load_per_key_colors_fn=lambda _name: {(0, 0): (9, 9, 9)},
+        apply_profile_to_config_fn=apply_profile_to_config,
+        load_secondary_lighting_fn=lambda _name: secondary,
+    )
+
+    apply_profile_to_config.assert_called_once_with(
+        tray.config,
+        {(0, 0): (9, 9, 9)},
+        secondary_lighting=secondary,
+    )
+    assert tray._active_secondary_lighting is secondary
+
+
+def test_activate_legacy_profile_preserves_current_secondary_scene() -> None:
+    from src.core.profile.runtime_activation import activate_perkey_profile_runtime
+
+    tray = _make_tray(transition_result=True)
+    existing = {"version": 1, "areas": {"logo": {"enabled": True, "color": [1, 2, 3]}}}
+    tray._active_secondary_lighting = existing
+
+    activate_perkey_profile_runtime(
+        tray,
+        "legacy-profile",
+        set_active_profile_fn=lambda name: name,
+        load_per_key_colors_fn=lambda _name: {(0, 0): (9, 9, 9)},
+        apply_profile_to_config_fn=MagicMock(),
+        load_secondary_lighting_fn=lambda _name: None,
+    )
+
+    assert tray._active_secondary_lighting is existing
+
+
 def test_activate_perkey_profile_runtime_skips_runtime_apply_while_power_forced_off() -> None:
     from src.core.profile.runtime_activation import activate_perkey_profile_runtime
     from src.tray.protocols import TrayIdlePowerState

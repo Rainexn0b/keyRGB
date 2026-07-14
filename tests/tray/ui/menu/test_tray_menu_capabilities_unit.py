@@ -10,6 +10,11 @@ from tests._paths import ensure_repo_root_on_sys_path
 ensure_repo_root_on_sys_path()
 
 from src.tray.ui import menu as tray_menu
+from src.core.secondary_device_routes import (
+    BRIGHTNESS_POLICY_INDEPENDENT,
+    BRIGHTNESS_POLICY_PRIMARY_SHARED,
+    SecondaryDeviceRoute,
+)
 
 
 class FakeMenu:
@@ -24,7 +29,13 @@ class FakePystray:
 
 
 def fake_item(text, _action, **kwargs):
-    return {"text": str(text), "enabled": kwargs.get("enabled", True), "action": _action}
+    return {
+        "text": str(text),
+        "enabled": kwargs.get("enabled", True),
+        "action": _action,
+        "checked": kwargs.get("checked"),
+        "default": kwargs.get("default", False),
+    }
 
 
 @dataclass
@@ -145,7 +156,8 @@ def test_menu_uses_detected_backend_hardware_effects_count(
     tray.backend = DummyBackend()
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    labels = [i["text"] for i in items if isinstance(i, dict)]
+    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
+    labels = [i["text"] for i in hardware_menu.items if isinstance(i, dict)]
 
     assert "Hardware Effects (3 modes)" in labels
 
@@ -166,16 +178,37 @@ def test_menu_hides_items_when_capabilities_disabled(
     assert "Open Backend Discovery…" not in labels
 
 
+def test_menu_keeps_lighting_editor_for_uniform_keyboard_with_secondary_device(monkeypatch) -> None:
+    monkeypatch.setattr(tray_menu, "has_available_secondary_profile_routes", lambda: True)
+    tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+    tray.device_discovery = {
+        "candidates": [
+            {
+                "device_type": "lightbar",
+                "usb_vid": "0x048d",
+                "usb_pid": "0x7001",
+                "status": "supported",
+                "probe_names": ["ite8233_none_chassis_lightbar_clevo"],
+            }
+        ]
+    }
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [item["text"] for item in items if isinstance(item, dict)]
+
+    assert "Lighting Profiles" in labels
+
+
 def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False, color=False))
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    labels = [i["text"] for i in items if isinstance(i, dict)]
+    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
+    labels = [i["text"] for i in hardware_menu.items if isinstance(i, dict)]
 
-    assert "Hardware Static Mode" in labels
-    assert "Hardware Uniform Color…" not in labels
-    assert "Hardware Effects" not in labels
+    assert "Static Mode" in labels
+    assert "Uniform Color…" not in labels
+    assert not any(label.startswith("Hardware Effects") for label in labels)
 
 
 def test_menu_hides_hardware_color_and_effect_rows_in_software_mode(
@@ -185,15 +218,18 @@ def test_menu_hides_hardware_color_and_effect_rows_in_software_mode(
     tray.config.effect = "reactive_ripple"
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    labels = [i["text"] for i in items if isinstance(i, dict)]
+    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
+    hardware_items = [i for i in hardware_menu.items if isinstance(i, dict)]
 
-    assert "Hardware Static Mode" in labels
-    assert "Hardware Uniform Color…" not in labels
-    assert "Hardware Effects" not in labels
+    assert next(i for i in hardware_items if i["text"] == "Static Mode")
+    assert next(i for i in hardware_items if i["text"] == "Uniform Color…")["enabled"] is False
+    assert next(i for i in hardware_items if i["text"].startswith("Hardware Effects"))["enabled"] is False
 
 
 def test_hardware_static_row_checked_state_represents_hardware_mode_not_only_static_effect() -> None:
-    checked = tray_menu.menu_callbacks.checked_hw_static(type("Tray", (), {"is_off": False, "config": DummyConfig()})(), hw_mode=True)
+    checked = tray_menu.menu_callbacks.checked_hw_static(
+        type("Tray", (), {"is_off": False, "config": DummyConfig()})(), hw_mode=True
+    )
 
     assert checked(object()) is True
 
@@ -202,9 +238,11 @@ def test_menu_includes_keyboard_status_header(monkeypatch: pytest.MonkeyPatch) -
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
 
-    # First entry should be the keyboard device selector.
+    # The first entry selects the keyboard live-control context.
     assert isinstance(items[0], dict)
     assert "Keyboard" in items[0]["text"]
+    assert items[0]["enabled"] is True
+    assert items[0]["checked"](object()) is True
 
 
 def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -222,8 +260,9 @@ def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) ->
     assert "048d:600b" in items[0]["text"].lower()
 
 
-def test_menu_includes_lightbar_status_header_when_discovered(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_menu_shows_secondary_status_as_context_selector(monkeypatch: pytest.MonkeyPatch) -> None:
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+    tray._on_device_context_clicked = lambda context_key: setattr(tray, "selected_device_context", context_key)
     tray.device_discovery = {
         "candidates": [
             {
@@ -238,10 +277,15 @@ def test_menu_includes_lightbar_status_header_when_discovered(monkeypatch: pytes
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
 
-    assert items[1]["text"] == "Lightbar: ITE Device(8233) (048d:7001) [experimental disabled]"
+    assert "Keyboard" in items[0]["text"]
+    assert "Connected:" not in [item["text"] for item in items if isinstance(item, dict)]
+    assert "048d:7001" in items[1]["text"].lower()
+    assert items[1]["enabled"] is True
+    items[1]["action"](object(), object())
+    assert tray.selected_device_context == "lightbar:048d:7001"
 
 
-def test_menu_switches_body_when_lightbar_context_is_selected(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_menu_uses_capability_filtered_body_when_lightbar_context_is_selected(monkeypatch: pytest.MonkeyPatch) -> None:
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
     tray.device_discovery = {
         "candidates": [
@@ -259,14 +303,16 @@ def test_menu_switches_body_when_lightbar_context_is_selected(monkeypatch: pytes
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     labels = [i["text"] for i in items if isinstance(i, dict)]
 
-    assert "Hardware Static Mode" not in labels
-    assert "Software Effects" not in labels
-    assert "Lightbar backend is present but disabled by experimental-backend policy" in labels
+    assert "Hardware Mode" in labels
+    assert "Software Effects" in labels
+    assert "Lightbar backend is present but disabled by experimental-backend policy" not in labels
     assert "Support Tools…" in labels
     assert "Quit" in labels
 
 
-def test_menu_uses_lightbar_context_builder_when_controls_are_available(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_menu_exposes_lightbar_controls_alongside_profile_editor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
     tray.device_discovery = {
         "candidates": [
@@ -285,14 +331,103 @@ def test_menu_uses_lightbar_context_builder_when_controls_are_available(monkeypa
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
     labels = [i["text"] for i in items if isinstance(i, dict)]
 
-    assert "Color…" in labels
-    assert "Brightness" in labels
+    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
+    hardware_labels = [i["text"] for i in hardware_menu.items if isinstance(i, dict)]
+
+    assert "Static Color…" in hardware_labels
+    assert "Brightness Override" in labels
+    assert "Lighting Profiles" in labels
     assert "Turn Off" in labels
     assert "Support Tools…" in labels
     assert "Quit" in labels
 
 
-def test_menu_includes_software_target_submenu_when_keyboard_context_is_selected(
+def test_menu_groups_controls_in_the_agreed_order() -> None:
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    labels = [entry["text"] for entry in items if isinstance(entry, dict)]
+
+    expected = [
+        "Brightness Override",
+        "Lighting Profiles",
+        "Hardware Mode",
+        "Software Effects",
+        "Effect Speed",
+        "Support Tools…",
+        "Settings",
+        "Turn Off",
+        "Quit",
+    ]
+    positions = [labels.index(label) for label in expected]
+    assert positions == sorted(positions)
+
+
+def test_shared_secondary_context_explains_that_brightness_follows_keyboard(monkeypatch) -> None:
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+    tray.selected_device_context = "logo:simulated"
+    entry = {
+        "key": "logo:simulated",
+        "device_type": "logo",
+        "text": "Logo (simulated)",
+    }
+    route = SecondaryDeviceRoute(
+        device_type="logo",
+        backend_name="ite8258-chassis-logo",
+        display_name="Logo",
+        state_key="logo",
+        get_backend=lambda: object(),
+        get_device=lambda: object(),
+        supports_uniform_color=True,
+        supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
+    )
+    monkeypatch.setattr(tray_menu.menu_status, "device_context_entries", lambda _tray: [entry])
+    monkeypatch.setattr(tray_menu, "route_for_context_entry", lambda _entry: route)
+    monkeypatch.setattr(tray_menu.menu_status, "device_context_controls_available", lambda *_args: True)
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    brightness = next(
+        item for item in items if isinstance(item, dict) and item["text"].startswith("Brightness Override")
+    )
+
+    assert brightness["text"] == "Brightness Override (follows Keyboard)"
+    assert brightness["enabled"] is False
+
+
+def test_independent_secondary_context_off_state_offers_turn_on(monkeypatch) -> None:
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+    tray.selected_device_context = "lightbar:simulated"
+    tray.config.lightbar_brightness = 0
+    entry = {
+        "key": "lightbar:simulated",
+        "device_type": "lightbar",
+        "text": "Lightbar (simulated)",
+    }
+    route = SecondaryDeviceRoute(
+        device_type="lightbar",
+        backend_name="ite8233_none_chassis_lightbar_clevo",
+        display_name="Lightbar",
+        state_key="lightbar",
+        get_backend=lambda: object(),
+        get_device=lambda: object(),
+        config_brightness_attr="lightbar_brightness",
+        supports_uniform_color=True,
+        supports_profile_state=True,
+        brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
+    )
+    monkeypatch.setattr(tray_menu.menu_status, "device_context_entries", lambda _tray: [entry])
+    monkeypatch.setattr(tray_menu, "route_for_context_entry", lambda _entry: route)
+    monkeypatch.setattr(tray_menu.menu_status, "device_context_controls_available", lambda *_args: True)
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    hardware_menu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Hardware Mode")
+    hardware_labels = [i["text"] for i in hardware_menu.items if isinstance(i, dict)]
+
+    assert "Turn On Lightbar" in hardware_labels
+
+
+def test_software_effects_include_enabled_lighting_areas_toggle(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
@@ -310,13 +445,43 @@ def test_menu_includes_software_target_submenu_when_keyboard_context_is_selected
     tray.secondary_device_controls = {"lightbar:048d:7001": True}
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    submenu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Software Targets")
+    submenu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Software Effects")
     labels = [i["text"] for i in submenu.items if isinstance(i, dict)]
+    toggle = next(i for i in submenu.items if isinstance(i, dict) and i["text"] == "Include enabled lighting areas")
 
-    assert labels == ["Keyboard Only", "All Compatible Devices"]
+    assert "Include enabled lighting areas" in labels
+    assert not any(i.get("text") == "Effect output" for i in items if isinstance(i, dict))
+    assert toggle["checked"](object()) is False
+    tray.config.software_effect_target = "all_uniform_capable"
+    assert toggle["checked"](object()) is True
 
 
-def test_software_target_submenu_actions_use_pystray_compatible_arity(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_software_effects_toggle_stays_visible_when_all_profile_areas_are_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
+    tray.device_discovery = {
+        "candidates": [
+            {
+                "device_type": "lightbar",
+                "usb_vid": "0x048d",
+                "usb_pid": "0x7001",
+                "status": "supported",
+            }
+        ]
+    }
+    tray.secondary_device_controls = {"lightbar:048d:7001": True}
+    tray._active_secondary_lighting = {"areas": {"lightbar": {"enabled": False}}}
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    submenu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Software Effects")
+
+    assert any(isinstance(i, dict) and i["text"] == "Include enabled lighting areas" for i in submenu.items)
+
+
+def test_software_target_toggle_uses_pystray_compatible_arity_and_flips_policy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tray = DummyTray(DummyCaps(per_key=True, hardware_effects=True))
     tray.device_discovery = {
         "candidates": [
@@ -331,11 +496,21 @@ def test_software_target_submenu_actions_use_pystray_compatible_arity(monkeypatc
     }
     tray.secondary_device_controls = {"lightbar:048d:7001": True}
 
+    selected: list[str] = []
+    tray._on_software_effect_target_clicked = selected.append
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
-    submenu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Software Targets")
-    first_action = next(i["action"] for i in submenu.items if isinstance(i, dict) and i["text"] == "Keyboard Only")
+    submenu = next(i["action"] for i in items if isinstance(i, dict) and i["text"] == "Software Effects")
+    toggle_action = next(
+        i["action"] for i in submenu.items if isinstance(i, dict) and i["text"] == "Include enabled lighting areas"
+    )
 
-    assert first_action.__code__.co_argcount == 2
+    assert toggle_action.__code__.co_argcount == 2
+    toggle_action(object(), object())
+    assert selected == ["all_uniform_capable"]
+
+    tray.config.software_effect_target = "all_uniform_capable"
+    toggle_action(object(), object())
+    assert selected == ["all_uniform_capable", "keyboard"]
 
 
 def test_menu_resets_invalid_selected_context_to_keyboard(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -504,4 +679,4 @@ def test_perkey_profiles_menu_falls_back_to_editor_when_profile_listing_raises_r
     )
 
     assert isinstance(menu, FakeMenu)
-    assert [entry["text"] for entry in menu.items if isinstance(entry, dict)] == ["Open Color Editor…"]
+    assert [entry["text"] for entry in menu.items if isinstance(entry, dict)] == ["Lighting Profile Editor"]

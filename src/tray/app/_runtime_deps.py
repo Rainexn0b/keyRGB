@@ -155,6 +155,10 @@ def configure_engine_software_targets(tray: object) -> None:
     _module("src.tray.controllers.software_target_controller").configure_engine_software_targets(tray)
 
 
+def close_secondary_software_target_cache(tray: object) -> None:
+    _module("src.tray.controllers.software_target_controller").close_secondary_software_target_cache(tray)
+
+
 def load_tray_dependencies():
     return _module("src.tray.integrations.dependencies").load_tray_dependencies()
 

@@ -17,6 +17,77 @@ _LAYOUT_TWEAK_DEFAULTS: Dict[str, float] = {
 }
 
 
+def _normalize_secondary_color(raw: object) -> list[int] | None:
+    if not isinstance(raw, (list, tuple)) or len(raw) != 3:
+        return None
+    if not all(isinstance(channel, (int, float)) for channel in raw):
+        return None
+    return [max(0, min(255, int(channel))) for channel in raw]
+
+
+def _normalize_secondary_enabled(raw: object) -> bool | None:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)) and raw in (0, 1):
+        return bool(raw)
+    return None
+
+
+def _normalize_secondary_brightness(raw: object) -> int | None:
+    if not isinstance(raw, (int, float)):
+        return None
+    return max(0, min(100, int(raw)))
+
+
+def normalize_secondary_lighting(raw: object) -> Dict[str, object]:
+    """Normalize a secondary-lighting payload without destructive migration.
+
+    Unknown top-level fields, route keys, and entry fields are retained. The
+    caller can distinguish a missing component because ``load_*`` returns
+    ``None`` before invoking this normalizer, while an explicit empty ``areas``
+    map remains present in the returned payload.
+    """
+    if not isinstance(raw, Mapping):
+        return {"version": 1, "areas": {}}
+
+    payload: Dict[str, object] = dict(raw)
+    payload["version"] = 1
+    raw_areas = raw.get("areas")
+    areas: Dict[str, object] = {}
+    if isinstance(raw_areas, Mapping):
+        for raw_key, raw_entry in raw_areas.items():
+            if not isinstance(raw_key, str) or not raw_key.strip():
+                continue
+            if not isinstance(raw_entry, Mapping):
+                # Preserve unknown route data rather than silently deleting it.
+                areas[raw_key] = raw_entry
+                continue
+
+            entry: Dict[str, object] = dict(raw_entry)
+            if "enabled" in entry:
+                enabled = _normalize_secondary_enabled(entry["enabled"])
+                if enabled is None:
+                    entry.pop("enabled", None)
+                else:
+                    entry["enabled"] = enabled
+            if "color" in entry:
+                color = _normalize_secondary_color(entry["color"])
+                if color is None:
+                    entry.pop("color", None)
+                else:
+                    entry["color"] = color
+            if "brightness" in entry:
+                brightness = _normalize_secondary_brightness(entry["brightness"])
+                if brightness is None:
+                    entry.pop("brightness", None)
+                else:
+                    entry["brightness"] = brightness
+            areas[raw_key] = entry
+
+    payload["areas"] = areas
+    return payload
+
+
 def _clamp(value: float, minimum: float, maximum: float) -> float:
     return max(minimum, min(maximum, float(value)))
 

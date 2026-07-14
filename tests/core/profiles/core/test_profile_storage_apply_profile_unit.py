@@ -65,6 +65,40 @@ class TestApplyProfileToConfig:
         assert cfg.effect == "none"
         assert cfg.per_key_colors == colors
 
+    def test_apply_profile_persists_secondary_state_in_same_snapshot(self, monkeypatch):
+        from src.core.config import Config
+        from src.core.profile.profiles import apply_profile_to_config
+
+        cfg = Config()
+        cfg._settings["effect"] = "none"
+        cfg._settings["brightness"] = 25
+        cfg._settings["perkey_brightness"] = 25
+        cfg._settings["secondary_device_state"] = {
+            "logo": {"brightness": 35, "legacy": "preserve"},
+        }
+
+        snapshots: list[dict] = []
+        monkeypatch.setattr(cfg, "_save", lambda: snapshots.append(deepcopy(cfg._settings)))
+
+        apply_profile_to_config(
+            cfg,
+            {(0, 0): (0, 0, 255)},
+            secondary_lighting={
+                "version": 1,
+                "areas": {
+                    "logo": {"enabled": False, "color": [300, -1, 7], "future": True},
+                    "neon": {"enabled": True, "color": [1, 2, 3]},
+                },
+            },
+        )
+
+        assert len(snapshots) == 1
+        assert snapshots[0]["per_key_colors"] == {"0,0": [0, 0, 255]}
+        assert snapshots[0]["secondary_device_state"] == {
+            "logo": {"brightness": 35, "legacy": "preserve", "enabled": False, "color": [255, 0, 7], "future": True},
+            "neon": {"enabled": True, "color": [1, 2, 3]},
+        }
+
     def test_apply_light_profile_restores_built_in_baseline_brightness(self, monkeypatch):
         """The built-in light profile should restore the normal full baseline."""
         from src.core.config import Config

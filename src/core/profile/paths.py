@@ -213,6 +213,7 @@ class ProfilePaths:
     per_key_colors: Path
     backdrop_image: Path
     backdrop_settings: Path
+    secondary_lighting: Path
 
 
 def paths_for(name: str | None = None) -> ProfilePaths:
@@ -251,4 +252,5 @@ def paths_for(name: str | None = None) -> ProfilePaths:
         per_key_colors=root / "per_key_colors.json",
         backdrop_image=backdrop_image,
         backdrop_settings=backdrop_settings,
+        secondary_lighting=root / "secondary_lighting.json",
     )

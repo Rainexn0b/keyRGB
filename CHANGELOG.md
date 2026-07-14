@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.29.0 (2026-07-14)
+
+- Secondary Lighting/Profiles: Make lighting areas part of the whole-scene Lighting Profile Editor, with per-row selection through the shared colour wheel, enabled/color persistence, independent brightness where supported, and access from uniform or zoned keyboards whenever secondary routes are available.
+- Secondary Lighting/Static: Render enabled secondary areas from the active profile in static software mode, including backward-compatible config fallback for profiles created before secondary state existed. This directly addresses issue #7's report that animated "all compatible devices" output worked while static output did not.
+- Tray/UX: Reorganize the tray around explicit device selectors and capability-aware controls; move `Include enabled lighting areas` into Software Effects, keep effect speed global, make shared chassis zones follow keyboard brightness, and retain independent brightness for standalone devices.
+- Diagnostics/Testing: Add `KEYRGB_SIMULATE_SECONDARY_DEVICES=1` for hardware-free UI validation, expose secondary route IDs and capabilities in diagnostics, add end-to-end issue #7 regressions, and verify every ITE backend product ID has the correct USB or hidraw udev rule.
+- Architecture: Centralize secondary route availability, mutable lighting-state interpretation, and static-scene rendering so the editor, tray, profiles, diagnostics, and simulated devices share one policy instead of duplicating fallback and routing rules.
+
 ## 0.28.2 (2026-07-12)
 
 - Installer/Permissions: Add missing hidraw uaccess rules to `system/udev/99-ite8291-wootbook.rules` for the ITE 8291 native-hidraw backends (`ite8291_perkey`, `ite8291_zones_clevo`: PIDs `0x6004`, `0x6008`, `0x600B`, `0xCE00`) and the `ite8297_uniform` hidraw path (`0x8297`). These backends open `/dev/hidraw*` directly but previously only had the `SUBSYSTEM=="usb"` rule used by the `ite8291r3` control-transfer backend, which does not grant access to the hidraw node — so they failed with permission-denied on supported hardware.

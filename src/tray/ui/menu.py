@@ -6,6 +6,16 @@ from collections.abc import Callable
 from typing import Protocol, cast
 
 import src.core.effects.catalog as effects_catalog
+from src.core import secondary_lighting_state
+from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+from src.core.secondary_device_routes import (
+    BRIGHTNESS_POLICY_INDEPENDENT,
+    BRIGHTNESS_POLICY_PRIMARY_SHARED,
+    SecondaryDeviceRoute,
+)
+from src.core.secondary_device_runtime import has_available_secondary_profile_routes
+from src.tray import secondary_device_power
+from src.tray.secondary_device_routes import route_for_context_entry
 
 from ..controllers import software_target_controller
 from . import _menu_callbacks as menu_callbacks
@@ -39,6 +49,10 @@ class _MenuTrayProtocol(Protocol):
     _on_brightness_clicked: _MenuAction
     _on_hardware_static_mode_clicked: _MenuAction
     _on_hardware_color_clicked: _MenuAction
+    _on_selected_device_color_clicked: _MenuAction
+    _on_selected_device_brightness_clicked: _MenuAction
+    _on_selected_device_turn_off_clicked: _MenuAction
+    _on_selected_device_turn_on_clicked: _MenuAction
     _on_support_debug_clicked: _MenuAction
     _on_power_settings_clicked: _MenuAction
     _on_power_mode_settings_clicked: _MenuAction
@@ -83,6 +97,14 @@ def normalize_effect_label(label: str) -> str:
     return effects_catalog.normalize_effect_name(s)
 
 
+def _selected_secondary_is_off(tray: object, route: SecondaryDeviceRoute | None) -> bool:
+    payload = vars(tray).get("_active_secondary_lighting")
+    entry = secondary_lighting_state.area_entry(payload, getattr(route, "state_key", ""))
+    if entry is not None and "enabled" in entry:
+        return not secondary_lighting_state.entry_enabled(entry)
+    return secondary_device_power.is_off(getattr(tray, "config", None), route)
+
+
 def build_menu_items(
     tray: object,
     *,
@@ -102,9 +124,21 @@ def build_menu_items(
     # Determine current mode for lockdown logic
     sw_mode = menu_status.is_software_mode(tray)
     hw_mode = menu_status.is_hardware_mode(tray)
+    secondary_lighting_supported = has_available_secondary_profile_routes()
+    secondary_effect_target_supported = software_target_controller.software_effect_target_has_compatible_devices(tray)
 
-    device_entries = menu_status.device_context_entries(tray)
-    selected_context = menu_status.selected_device_context_entry(tray)
+    all_device_entries = menu_status.device_context_entries(tray)
+    if not all_device_entries:
+        all_device_entries = [
+            {"key": "keyboard", "device_type": "keyboard", "text": menu_status.keyboard_status_text(tray)}
+        ]
+    selected_key = menu_status.selected_device_context_key(tray, entries=all_device_entries)
+    selected_context = next(
+        (entry for entry in all_device_entries if str(entry.get("key") or "") == selected_key),
+        all_device_entries[0],
+    )
+    selected_is_keyboard = str(selected_context.get("device_type") or "keyboard").strip().lower() == "keyboard"
+    selected_route = None if selected_is_keyboard else route_for_context_entry(selected_context)
 
     hw_effect_names = effects_catalog.detected_backend_hw_effect_names(getattr(tray_state, "backend", None))
     hw_effects_label = menu_status.hardware_effects_menu_text(tray)
@@ -166,6 +200,21 @@ def build_menu_items(
         ],
     ]
 
+    if secondary_effect_target_supported:
+        sw_items.extend(
+            [
+                pystray.Menu.SEPARATOR,
+                item(
+                    "Include enabled lighting areas",
+                    menu_callbacks.toggle_enabled_lighting_areas_callback(tray_state),
+                    checked=menu_callbacks.checked_software_target(
+                        tray_state,
+                        SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
+                    ),
+                ),
+            ]
+        )
+
     sw_effects_menu = pystray.Menu(*sw_items)
 
     speed_menu = pystray.Menu(
@@ -192,19 +241,6 @@ def build_menu_items(
         ]
     )
 
-    software_target_menu = pystray.Menu(
-        *[
-            item(
-                str(option.get("label") or "Keyboard Only"),
-                menu_callbacks.software_target_callback(tray_state, str(option.get("key") or "keyboard")),
-                checked=menu_callbacks.checked_software_target(tray_state, str(option.get("key") or "keyboard")),
-                enabled=bool(option.get("enabled", True)),
-                radio=True,
-            )
-            for option in software_target_controller.software_effect_target_options(tray)
-        ]
-    )
-
     # Lightweight system power mode toggle (cpufreq sysfs). If not available, hide.
     system_power_menu = menu_sections.build_system_power_mode_menu(
         cast(menu_sections._SystemPowerMenuTrayProtocol, tray),
@@ -217,6 +253,7 @@ def build_menu_items(
         pystray=pystray,
         item=item,
         per_key_supported=per_key_supported,
+        secondary_lighting_supported=secondary_lighting_supported,
     )
     power_menu = system_power_menu
 
@@ -227,62 +264,91 @@ def build_menu_items(
             checked=menu_callbacks.checked_device_context(selected_context, str(entry.get("key") or "keyboard")),
             radio=True,
         )
-        for entry in device_entries
+        for entry in all_device_entries
     ]
 
-    if str(selected_context.get("device_type") or "keyboard") != "keyboard":
-        return [
-            *header_items,
-            pystray.Menu.SEPARATOR,
-            *menu_sections.build_device_context_menu_items(
-                cast(menu_sections._DeviceContextMenuTrayProtocol, tray),
-                pystray=pystray,
-                item=item,
-                context_entry=selected_context,
+    if selected_is_keyboard:
+        selected_brightness_item = item("Brightness Override", brightness_menu)
+        hardware_mode_items: list[object] = [
+            item(
+                "Static Mode",
+                tray_state._on_hardware_static_mode_clicked,
+                checked=menu_callbacks.checked_hw_static(tray_state, hw_mode=hw_mode),
+            )
+        ]
+        if color_supported:
+            hardware_mode_items.append(
+                item(
+                    "Uniform Color…",
+                    tray_state._on_hardware_color_clicked,
+                    enabled=hw_mode,
+                )
+            )
+        if hw_effects_supported:
+            hardware_mode_items.append(
+                item(
+                    hw_effects_label,
+                    hw_effects_menu,
+                    enabled=bool(hw_effect_names) and hw_mode,
+                )
+            )
+    else:
+        controls_available = menu_status.device_context_controls_available(tray, selected_context)
+        if selected_route is not None and selected_route.brightness_policy == BRIGHTNESS_POLICY_INDEPENDENT:
+            selected_brightness_menu = pystray.Menu(
+                *[
+                    item(
+                        str(level),
+                        tray_state._on_selected_device_brightness_clicked,
+                        checked=lambda _i, current=level, route=selected_route: (
+                            secondary_device_power.current_brightness(tray_state.config, route) == current * 5
+                        ),
+                        radio=True,
+                        enabled=controls_available,
+                    )
+                    for level in range(0, 11)
+                ]
+            )
+            selected_brightness_item = item("Brightness Override", selected_brightness_menu)
+        elif selected_route is not None and selected_route.brightness_policy == BRIGHTNESS_POLICY_PRIMARY_SHARED:
+            selected_brightness_item = item("Brightness Override (follows Keyboard)", None, enabled=False)
+        else:
+            selected_brightness_item = item("Brightness Override (not supported)", None, enabled=False)
+
+        device_label = (
+            str(getattr(selected_route, "display_name", "") or "").strip()
+            or str(selected_context.get("device_type") or "device").replace("_", " ").title()
+        )
+        selected_device_is_off = _selected_secondary_is_off(tray, selected_route)
+        hardware_mode_items = [
+            item(
+                "Static Color…",
+                tray_state._on_selected_device_color_clicked,
+                enabled=bool(selected_route and selected_route.supports_uniform_color and controls_available),
+            ),
+            item(
+                f"Turn {'On' if selected_device_is_off else 'Off'} {device_label}",
+                (
+                    tray_state._on_selected_device_turn_on_clicked
+                    if selected_device_is_off
+                    else tray_state._on_selected_device_turn_off_clicked
+                ),
+                enabled=controls_available,
             ),
         ]
+
+    hardware_mode_menu = pystray.Menu(*hardware_mode_items)
 
     return [
         *header_items,
         pystray.Menu.SEPARATOR,
-        # === HARDWARE MODE ===
-        item(
-            "Hardware Static Mode",
-            tray_state._on_hardware_static_mode_clicked,
-            checked=menu_callbacks.checked_hw_static(tray_state, hw_mode=hw_mode),
-        ),
-        *(
-            [
-                item(
-                    "Hardware Uniform Color…",
-                    tray_state._on_hardware_color_clicked,
-                )
-            ]
-            if color_supported and hw_mode
-            else []
-        ),
-        *(
-            [
-                item(
-                    hw_effects_label,
-                    hw_effects_menu,
-                    enabled=bool(hw_effect_names),
-                    # Menu always enabled, individual animated effects locked when in SW mode
-                )
-            ]
-            if hw_effects_supported and hw_mode
-            else []
-        ),
+        selected_brightness_item,
+        *([item("Lighting Profiles", perkey_menu)] if perkey_menu is not None else []),
         pystray.Menu.SEPARATOR,
-        # === SOFTWARE MODE ===
-        # Per-key profiles + SW effects
-        *([item("Software Color Editor", perkey_menu)] if perkey_menu is not None else []),
+        item("Hardware Mode", hardware_mode_menu),
+        pystray.Menu.SEPARATOR,
         item("Software Effects", sw_effects_menu),
-        item("Software Targets", software_target_menu),
-        pystray.Menu.SEPARATOR,
-        # === COMMON CONTROLS ===
         item("Effect Speed", speed_menu),
-        item("Brightness Override", brightness_menu),
         pystray.Menu.SEPARATOR,
         # power mode / settings
         *([item("Power Mode", power_menu)] if power_menu is not None else []),

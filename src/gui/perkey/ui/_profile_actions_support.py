@@ -93,6 +93,7 @@ class _PerKeyProfileEditorProtocol(Protocol):
     overlay_controls: _OverlayControlsProtocol
     lightbar_controls: _LightbarControlsProtocol | None
     lightbar_overlay: LightbarOverlay
+    secondary_lighting: dict[str, object] | None
     canvas: _CanvasProtocol
     _profile_name_var: _ProfileNameVarProtocol
     _profiles_combo: _ProfilesComboProtocol
@@ -106,6 +107,10 @@ class _PerKeyProfileEditorProtocol(Protocol):
     def _key_id_for_slot_id(self, slot_id: str) -> str | None: ...
 
     def _commit(self, *, force: bool = False) -> None: ...
+
+    def _mark_saved_snapshot(self) -> None: ...
+
+    def _activate_profile(self) -> None: ...
 
 
 @lru_cache(maxsize=1)

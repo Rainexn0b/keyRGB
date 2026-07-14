@@ -59,6 +59,7 @@ def activate_perkey_profile(tray: object, profile_name: str) -> None:
         set_active_profile_fn=perkey_profiles.set_active_profile,
         load_per_key_colors_fn=perkey_profiles.load_per_key_colors,
         apply_profile_to_config_fn=perkey_profiles.apply_profile_to_config,
+        load_secondary_lighting_fn=perkey_profiles.load_secondary_lighting,
         mark_power_source_transition=True,
         refresh_menu=False,
         monotonic_fn=time.monotonic,

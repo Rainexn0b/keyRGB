@@ -206,6 +206,9 @@ class _FakeEditor:
     def _toggle_overlay(self) -> None:
         return None
 
+    def _hide_setup_panel(self) -> None:
+        return None
+
     def _run_calibrator(self) -> None:
         return None
 
@@ -243,6 +246,7 @@ def _install_fake_ui(
         "buttons": [],
         "scales": [],
         "checkbuttons": [],
+        "radiobuttons": [],
         "comboboxes": [],
         "separators": [],
         "labelframes": [],
@@ -287,6 +291,18 @@ def _install_fake_ui(
             super().__init__(parent, **kwargs)
             registry["checkbuttons"].append(self)
 
+    class FakeRadiobutton(_FakeWidget):
+        def __init__(self, parent=None, **kwargs):
+            super().__init__(parent, **kwargs)
+            registry["radiobuttons"].append(self)
+
+    class FakeCanvas(_FakeWidget):
+        def create_rectangle(self, *_args, **_kwargs):
+            return 1
+
+        def delete(self, *_args, **_kwargs) -> None:
+            return None
+
     class FakeCombobox(_FakeWidget):
         def __init__(self, parent=None, **kwargs):
             super().__init__(parent, **kwargs)
@@ -316,11 +332,21 @@ def _install_fake_ui(
             Button=FakeButton,
             Scale=FakeScale,
             Checkbutton=FakeCheckbutton,
+            Radiobutton=FakeRadiobutton,
             Combobox=FakeCombobox,
             Separator=FakeSeparator,
         ),
     )
-    monkeypatch.setattr(editor_ui, "tk", SimpleNamespace(LEFT="left"))
+    monkeypatch.setattr(
+        editor_ui,
+        "tk",
+        SimpleNamespace(
+            LEFT="left",
+            BooleanVar=_FakeVar,
+            StringVar=_FakeVar,
+            Canvas=FakeCanvas,
+        ),
+    )
 
     def fake_keyboard_canvas(parent=None, **kwargs):
         canvas = _FakeKeyboardCanvas(parent, **kwargs)
@@ -515,7 +541,6 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
         "2. Keymap Calibrator",
         "3. Overlay Alignment",
     ]
-
     label_texts = [label.options.get("text") for label in registry["labels"]]
     assert "Backdrop transparency" in label_texts
     assert "Config" in label_texts
@@ -524,7 +549,10 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert "Use on AC" in label_texts
     assert "Use on battery" in label_texts
     assert len(registry["separators"]) == 2
-    assert all(separator.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}] for separator in registry["separators"])
+    assert all(
+        separator.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
+        for separator in registry["separators"]
+    )
     assert len(registry["dropdowns"]) == 4
     assert editor._backdrop_mode_dropdown is registry["dropdowns"][0]
 
@@ -604,6 +632,17 @@ def test_build_editor_ui_builds_layout_and_wires_controls(monkeypatch: pytest.Mo
     assert overlay_panel.grid_remove_calls == 1
     assert overlay_controls.sync_calls == 1
     assert editor.lightbar_controls is None
+
+
+def test_build_editor_ui_shows_lighting_areas_button_only_with_secondaries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("KEYRGB_SIMULATE_SECONDARY_DEVICES", "1")
+
+    _editor, _root, registry = _build_ui(monkeypatch)
+
+    button_texts = [button.options["text"] for button in registry["buttons"]]
+    assert "4. Lighting Areas" in button_texts
 
 
 def test_build_editor_ui_adds_lightbar_controls_when_lightbar_is_detected(

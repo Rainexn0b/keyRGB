@@ -7,9 +7,15 @@ specs for larger changes.
 
 ### Active / current
 
+- `secondary-lighting-profile-editor-and-simulation-plan.md` — issue #7 static
+  scene/profile UX, tray target cleanup, and secondary-device simulation mode
+
+### Implemented dependencies / historical plans
+
 - `ite8258-chassis-secondary-device-refactor-implementation-plan.md` — secondary
-  device route refactor for ITE 8258 chassis
-- `secondary-device-route-refactor-plan.md` — secondary device route refactor
+  device route refactor implementation record for ITE 8258 chassis
+- `secondary-device-route-refactor-plan.md` — original virtual-route proposal;
+  retained for history, with remaining UI/profile work superseded by the active plan
 
 ### Archived campaign docs
 

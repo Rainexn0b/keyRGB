@@ -4,6 +4,11 @@ from collections.abc import Callable, Mapping
 from typing import Protocol
 
 from src.core.effects.catalog import normalize_effect_name
+from src.core.effects.software_targets import (
+    SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
+    SOFTWARE_EFFECT_TARGET_KEYBOARD,
+    normalize_software_effect_target,
+)
 from src.core.lighting_layers import render_effect_from_selected_effect
 
 from .menu_status import DeviceContextEntry
@@ -105,6 +110,23 @@ def checked_device_context(
 def software_target_callback(tray: _SoftwareTargetCallbackHost, target_key: str) -> _MenuAction:
     def _action(_icon: object, _item: object) -> None:
         tray._on_software_effect_target_clicked(target_key)
+
+    return _action
+
+
+def toggle_enabled_lighting_areas_callback(tray: _SoftwareTargetCallbackHost) -> _MenuAction:
+    """Toggle animated output between keyboard-only and enabled areas."""
+
+    def _action(_icon: object, _item: object) -> None:
+        current = normalize_software_effect_target(
+            getattr(getattr(tray, "config", None), "software_effect_target", SOFTWARE_EFFECT_TARGET_KEYBOARD)
+        )
+        target = (
+            SOFTWARE_EFFECT_TARGET_KEYBOARD
+            if current == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+            else SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+        )
+        tray._on_software_effect_target_clicked(target)
 
     return _action
 
