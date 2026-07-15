@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Mapping, Sequence
-from typing import SupportsIndex, SupportsInt, cast
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
 from . import protocol
+
+if TYPE_CHECKING:
+    from .profile_coordinator import Ite8258ChassisProfileCoordinator
 
 _logger = logging.getLogger(__name__)
 FeatureReportWriter = Callable[[bytes], int | None]
@@ -59,7 +63,11 @@ def _normalize_effect_name(effect_data: object) -> str:
 
 
 class Ite8258ChassisKeyboardDevice:
-    """Keyboard-first Lenovo Gen10 ITE 8258 runtime wrapper."""
+    """Keyboard-first Lenovo Gen10 ITE 8258 runtime wrapper.
+
+    ``is_off()`` / ``get_brightness()`` report accepted logical state for this
+    facade, not hardware readback of the composite controller.
+    """
 
     keyrgb_hw_speed_policy = "direct"
 
@@ -70,12 +78,14 @@ class Ite8258ChassisKeyboardDevice:
         profile_id: int = protocol.DEFAULT_PROFILE_ID,
         current_brightness: int = protocol.UI_BRIGHTNESS_MAX,
         transport: object | None = None,
+        profile_coordinator: Ite8258ChassisProfileCoordinator,
     ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
 
         self._send_feature_report = send_feature_report
         self._transport = transport
+        self._profile_coordinator = profile_coordinator
         self._profile_id = int(profile_id) & 0xFF
         self._current_brightness = protocol.clamp_ui_brightness(current_brightness)
         self._is_off = self._current_brightness <= 0
@@ -85,13 +95,11 @@ class Ite8258ChassisKeyboardDevice:
         if int(result or 0) < 0:
             raise OSError("Could not send ITE 8258 chassis feature report")
 
-    def _write_reports(self, reports: Sequence[bytes]) -> None:
-        for report in reports:
-            self._send(report)
-
-    def _prepare_profile_write(self) -> None:
-        self._send(protocol.build_switch_profile_report(self._profile_id))
-        self._send(protocol.build_set_direct_mode_report(enabled=False, profile_id=self._profile_id))
+    @contextmanager
+    def output_transaction(self) -> Iterator[None]:
+        """Batch primary and child facade writes into one full-scene commit."""
+        with self._profile_coordinator.output_transaction(self._send, profile_id=self._profile_id):
+            yield
 
     def _apply_groups(self, groups: Sequence[protocol.Ite8258ChassisGroup], *, brightness: int) -> None:
         level = protocol.clamp_ui_brightness(brightness)
@@ -99,22 +107,26 @@ class Ite8258ChassisKeyboardDevice:
             self.turn_off()
             return
 
-        self._prepare_profile_write()
-        self._write_reports(protocol.build_save_profile_reports(self._profile_id, groups))
-        self._send(protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(level)))
+        self._profile_coordinator.apply_primary(
+            self._send,
+            profile_id=self._profile_id,
+            groups=groups,
+            brightness=level,
+        )
         self._current_brightness = level
         self._is_off = False
 
     def turn_off(self) -> None:
-        self._prepare_profile_write()
-        self._send(protocol.build_turn_off_report(profile_id=self._profile_id))
+        self._profile_coordinator.turn_off_all(self._send, profile_id=self._profile_id)
         self._current_brightness = 0
         self._is_off = True
 
     def is_off(self) -> bool:
+        """Accepted logical off state for this facade (not hardware readback)."""
         return bool(self._is_off)
 
     def get_brightness(self) -> int:
+        """Accepted logical brightness for this facade (not hardware readback)."""
         return int(self._current_brightness)
 
     def set_brightness(self, brightness: int) -> None:
@@ -123,8 +135,11 @@ class Ite8258ChassisKeyboardDevice:
             self.turn_off()
             return
 
-        self._send(protocol.build_switch_profile_report(self._profile_id))
-        self._send(protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(level)))
+        self._profile_coordinator.set_primary_brightness(
+            self._send,
+            profile_id=self._profile_id,
+            brightness=level,
+        )
         self._current_brightness = level
         self._is_off = False
 
@@ -191,6 +206,10 @@ class Ite8258ChassisZoneDevice:
     Surfaces include the lid logo, the front neon strip, and the side/rear vent
     LED groups. Each zone device shares the parent keyboard's hidraw transport
     and operates on a fixed set of 16-bit LED IDs.
+
+    ``is_off()`` / ``get_brightness()`` report accepted logical state for this
+    facade (desired scene after the last call), not whether the composite
+    controller currently displays that scene on the wire.
     """
 
     keyrgb_hw_speed_policy = "direct"
@@ -204,12 +223,14 @@ class Ite8258ChassisZoneDevice:
         profile_id: int = protocol.DEFAULT_PROFILE_ID,
         current_brightness: int = protocol.UI_BRIGHTNESS_MAX,
         transport: object | None = None,
+        profile_coordinator: Ite8258ChassisProfileCoordinator,
     ) -> None:
         if not callable(send_feature_report):
             raise TypeError("send_feature_report must be callable")
 
         self._send_feature_report = send_feature_report
         self._transport = transport
+        self._profile_coordinator = profile_coordinator
         self._zone_name = str(zone_name)
         self._led_ids = tuple(int(led_id) & 0xFFFF for led_id in led_ids)
         self._profile_id = int(profile_id) & 0xFF
@@ -221,45 +242,49 @@ class Ite8258ChassisZoneDevice:
         if int(result or 0) < 0:
             raise OSError(f"Could not send ITE 8258 chassis {self._zone_name} feature report")
 
-    def _write_reports(self, reports: Sequence[bytes]) -> None:
-        for report in reports:
-            self._send(report)
-
-    def _prepare_profile_write(self) -> None:
-        self._send(protocol.build_switch_profile_report(self._profile_id))
-        self._send(protocol.build_set_direct_mode_report(enabled=False, profile_id=self._profile_id))
-
     def _apply_groups(self, groups: Sequence[protocol.Ite8258ChassisGroup], *, brightness: int) -> None:
         level = protocol.clamp_ui_brightness(brightness)
         if level <= 0:
             self.turn_off()
             return
 
-        self._prepare_profile_write()
-        self._write_reports(protocol.build_save_profile_reports(self._profile_id, groups))
-        self._send(protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(level)))
+        self._profile_coordinator.apply_zone(
+            self._send,
+            zone_name=self._zone_name,
+            profile_id=self._profile_id,
+            groups=groups,
+        )
+        # Logical accepted state: the desired scene was updated even when the
+        # coordinator stages without a wire write (no primary / suspended /
+        # batched transaction).
         self._current_brightness = level
         self._is_off = False
 
     def turn_off(self) -> None:
+        """Disable this zone in the desired scene (black groups).
+
+        While controller output is suspended this retains black for the zone
+        without a wire write.  Global power-off paths should skip calling this
+        on parent-shared routes after the primary has already powered off.
+        """
         if not self._led_ids:
             self._is_off = True
             return
 
-        self._prepare_profile_write()
-        self._write_reports(
-            protocol.build_save_profile_reports(
-                self._profile_id,
-                protocol.build_uniform_static_groups_for_leds(self._led_ids, (0, 0, 0)),
-            )
+        self._profile_coordinator.turn_off_zone(
+            self._send,
+            zone_name=self._zone_name,
+            profile_id=self._profile_id,
         )
         self._current_brightness = 0
         self._is_off = True
 
     def is_off(self) -> bool:
+        """Accepted logical off state for this facade (not hardware readback)."""
         return bool(self._is_off)
 
     def get_brightness(self) -> int:
+        """Accepted logical brightness for this facade (not hardware readback)."""
         return int(self._current_brightness)
 
     def set_brightness(self, brightness: int) -> None:
@@ -267,11 +292,10 @@ class Ite8258ChassisZoneDevice:
         if level <= 0:
             self.turn_off()
             return
-
-        self._send(protocol.build_switch_profile_report(self._profile_id))
-        self._send(protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(level)))
-        self._current_brightness = level
-        self._is_off = False
+        raise RuntimeError(
+            f"ITE 8258 chassis {self._zone_name} shares controller brightness; "
+            "set brightness on the primary keyboard device"
+        )
 
     def set_color(self, color, *, brightness: int):
         rgb = _coerce_rgb(color)

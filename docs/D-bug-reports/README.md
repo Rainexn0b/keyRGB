@@ -31,7 +31,7 @@ reporter feedback and maintainer follow-up.
 
 Example:
 
-- `docs/bug-reports/issue-4/`
+- `docs/D-bug-reports/issue-4/`
 
 This style is best when:
 
@@ -43,11 +43,11 @@ This style is best when:
 
 For an ongoing multi-session issue, prefer:
 
-- `docs/bug-reports/issue-<n>/issue-<n>.md`
+- `docs/D-bug-reports/issue-<n>/issue-<n>.md`
   - a short folder index explaining the contained docs
-- `docs/bug-reports/issue-<n>/01-<phase>.md`
-- `docs/bug-reports/issue-<n>/02-<phase>.md`
-- `docs/bug-reports/issue-<n>/03-<phase>.md`
+- `docs/D-bug-reports/issue-<n>/01-<phase>.md`
+- `docs/D-bug-reports/issue-<n>/02-<phase>.md`
+- `docs/D-bug-reports/issue-<n>/03-<phase>.md`
 - etc.
 
 The top-level issue index should not be a long monolithic note. It should

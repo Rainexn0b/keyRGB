@@ -7,6 +7,7 @@ from operator import attrgetter
 from typing import TYPE_CHECKING, Dict, SupportsIndex, SupportsInt, Tuple, cast
 
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from src.core.effects.device import optional_output_transaction
 from src.core.effects.software_targets import average_color_map, render_secondary_uniform_rgb
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
@@ -77,6 +78,22 @@ def _last_hw_mode_brightness_or_none(engine: "EffectsEngine") -> int | None:
         return int(cast(IntCoercible, raw))
     except (TypeError, ValueError, OverflowError):
         return None
+
+
+def _mark_disconnected_device_unavailable(engine: "EffectsEngine") -> None:
+    """Invalidate a disconnected primary without allowing unsafe fallback I/O."""
+
+    try:
+        engine.mark_device_unavailable()
+    except _SOFTWARE_RENDER_CLEANUP_ERRORS as mark_exc:  # @quality-exception exception-transparency: disconnect cleanup must stay best-effort for recoverable invalidation failures while unexpected cleanup bugs still surface
+        log_throttled(
+            logger,
+            "effects.render.mark_device_unavailable_failed",
+            interval_s=120,
+            level=logging.DEBUG,
+            msg="Failed to mark disconnected device unavailable",
+            exc=mark_exc,
+        )
 
 
 def clamp01(x: float) -> float:
@@ -204,65 +221,66 @@ def render(engine: "EffectsEngine", *, color_map: Mapping[Key, Color]) -> None:
     if has_per_key(engine):
         try:
             with engine.kb_lock:
-                brightness_hw = int(engine.brightness)
-                reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
-                last_hw_brightness = _last_hw_mode_brightness_or_none(engine)
-                need_mode_init = reassert_every_frame or last_hw_brightness is None
+                with optional_output_transaction(engine.kb):
+                    brightness_hw = int(engine.brightness)
+                    reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
+                    last_hw_brightness = _last_hw_mode_brightness_or_none(engine)
+                    need_mode_init = reassert_every_frame or last_hw_brightness is None
 
-                if need_mode_init:
-                    enable_user_mode_once(
-                        kb=engine.kb,
-                        kb_lock=engine.kb_lock,
-                        brightness=brightness_hw,
-                        save=last_hw_brightness is None,
-                    )
-                    engine._last_hw_mode_brightness = brightness_hw
-
-                try:
-                    engine.kb.set_key_colors(
-                        color_map,
-                        brightness=brightness_hw,
-                        enable_user_mode=False,
-                    )
-                except _SOFTWARE_RENDER_RUNTIME_ERRORS as exc:
-                    # On USB disconnect, attempting a fallback uniform write can trigger
-                    # a libusb crash on some systems. Mark the device unavailable and
-                    # stop issuing I/O until the engine re-acquires it.
-                    if is_device_disconnected(exc):
-                        try:
-                            engine.mark_device_unavailable()
-                        except _SOFTWARE_RENDER_CLEANUP_ERRORS as mark_exc:  # @quality-exception exception-transparency: disconnect cleanup must stay best-effort for recoverable invalidation failures while unexpected cleanup bugs still surface
-                            log_throttled(
-                                logger,
-                                "effects.render.mark_device_unavailable_failed",
-                                interval_s=120,
-                                level=logging.DEBUG,
-                                msg="Failed to mark disconnected device unavailable",
-                                exc=mark_exc,
-                            )
-                        return
-                    raise
-
-                if not need_mode_init and last_hw_brightness is not None and int(last_hw_brightness) != brightness_hw:
-                    try:
-                        engine.kb.set_brightness(int(brightness_hw))
-                    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                    if need_mode_init:
                         enable_user_mode_once(
                             kb=engine.kb,
                             kb_lock=engine.kb_lock,
                             brightness=brightness_hw,
+                            save=last_hw_brightness is None,
                         )
-                    engine._last_hw_mode_brightness = brightness_hw
+                        engine._last_hw_mode_brightness = brightness_hw
 
-                render_secondary_uniform_rgb(
-                    engine,
-                    rgb=average_color_map(color_map),
-                    brightness_hw=brightness_hw,
-                    logger=logger,
-                    log_key="effects.render.secondary",
-                )
-                return
+                    try:
+                        engine.kb.set_key_colors(
+                            color_map,
+                            brightness=brightness_hw,
+                            enable_user_mode=False,
+                        )
+                    except _SOFTWARE_RENDER_RUNTIME_ERRORS as exc:
+                        # On USB disconnect, attempting a fallback uniform write can trigger
+                        # a libusb crash on some systems. Mark the device unavailable and
+                        # stop issuing I/O until the engine re-acquires it.
+                        if is_device_disconnected(exc):
+                            _mark_disconnected_device_unavailable(engine)
+                            return
+                        raise
+
+                    if (
+                        not need_mode_init
+                        and last_hw_brightness is not None
+                        and int(last_hw_brightness) != brightness_hw
+                    ):
+                        try:
+                            engine.kb.set_brightness(int(brightness_hw))
+                        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                            enable_user_mode_once(
+                                kb=engine.kb,
+                                kb_lock=engine.kb_lock,
+                                brightness=brightness_hw,
+                            )
+                        engine._last_hw_mode_brightness = brightness_hw
+
+                    render_secondary_uniform_rgb(
+                        engine,
+                        rgb=average_color_map(color_map),
+                        brightness_hw=brightness_hw,
+                        logger=logger,
+                        log_key="effects.render.secondary",
+                    )
+                    return
         except _SOFTWARE_RENDER_RUNTIME_ERRORS as exc:
+            # Composite devices defer physical I/O until output_transaction()
+            # exits, so disconnects can surface here rather than inside
+            # set_key_colors(). Preserve the no-fallback safety contract.
+            if is_device_disconnected(exc):
+                _mark_disconnected_device_unavailable(engine)
+                return
             log_throttled(
                 logger,
                 "effects.render.per_key_failed",
@@ -279,12 +297,13 @@ def render(engine: "EffectsEngine", *, color_map: Mapping[Key, Color]) -> None:
 
     r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(engine.brightness))
     with engine.kb_lock:
-        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
-        engine.kb.set_color((r, g, b), brightness=int(engine.brightness))
-    render_secondary_uniform_rgb(
-        engine,
-        rgb=(r, g, b),
-        brightness_hw=int(engine.brightness),
-        logger=logger,
-        log_key="effects.render.secondary",
-    )
+        with optional_output_transaction(engine.kb):
+            enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
+            engine.kb.set_color((r, g, b), brightness=int(engine.brightness))
+            render_secondary_uniform_rgb(
+                engine,
+                rgb=(r, g, b),
+                brightness_hw=int(engine.brightness),
+                logger=logger,
+                log_key="effects.render.secondary",
+            )

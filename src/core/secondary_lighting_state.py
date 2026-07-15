@@ -140,14 +140,15 @@ def route_brightness(config: object | None, route: SecondaryDeviceRoute, entry: 
     return config_brightness(config, route)
 
 
-def payload_from_config(
+def legacy_snapshot_from_config(
     config: object | None,
     routes: Iterable[SecondaryDeviceRoute],
 ) -> dict[str, object]:
     """Build a non-persistent profile-shaped snapshot for legacy profiles.
 
     This lets upgraded installations receive static secondary output immediately
-    without silently materializing or rewriting their profile on read.
+    without silently materializing or rewriting their profile on read.  Reading
+    legacy state never creates or rewrites profile files.
     """
 
     route_areas: dict[str, object] = {}
@@ -174,10 +175,10 @@ __all__ = [
     "config_enabled",
     "enabled_state_keys",
     "entry_enabled",
+    "legacy_snapshot_from_config",
     "normalize_brightness",
     "normalize_color",
     "normalize_enabled",
-    "payload_from_config",
     "route_brightness",
     "route_color",
 ]

@@ -5,6 +5,11 @@
 Implemented on main as of 2026-06-07. All unit tests pass (2831 passed, 1 skipped).
 Hardware validation with `scripts/debug/ite8258-chassis-zone-test.py` is the next step.
 
+This is a historical implementation record. The v0.29.1 Issue #7 transaction
+regression and residual hardening are tracked in
+`issue-7-composite-profile-hardening-and-validation-plan.md`; current architecture
+is documented in `../1-src/12-composite-profile-coordination.md`.
+
 ### Implemented (matches plan)
 
 - `SharedHidrawTransportManager` with ref-counted proxies and per-backend write locking
@@ -39,7 +44,7 @@ Hardware validation with `scripts/debug/ite8258-chassis-zone-test.py` is the nex
 
 ## Purpose
 
-This document is the implementation plan for exposing chassis-zone secondary devices from the `ite8258-chassis` backend. It follows `2026-04-19/ite8258-chassis-correction-plan.md` and must land only after the protocol corrections in that document are complete and hardware-smoke tested.
+This document is the implementation plan for exposing chassis-zone secondary devices from the `ite8258-chassis` backend. It follows `../B-backend-guides/ite8258/ite8258-chassis-correction-plan.md` and must land only after the protocol corrections in that document are complete and hardware-smoke tested.
 
 ## Scope
 

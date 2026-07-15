@@ -18,16 +18,31 @@ from . import protocol
 
 if TYPE_CHECKING:
     from ..ite8291_perkey import hidraw
+    from .profile_coordinator import Ite8258ChassisProfileCoordinator
 
 
 _transport_manager: SharedHidrawTransportManager | None = None
+_profile_coordinator: Ite8258ChassisProfileCoordinator | None = None
 
 
 def _get_transport_manager() -> SharedHidrawTransportManager:
-    global _transport_manager
+    global _profile_coordinator, _transport_manager
     if _transport_manager is None:
+        from .profile_coordinator import Ite8258ChassisProfileCoordinator
+
         _transport_manager = SharedHidrawTransportManager()
+        _profile_coordinator = Ite8258ChassisProfileCoordinator()
     return _transport_manager
+
+
+def _get_profile_coordinator() -> Ite8258ChassisProfileCoordinator:
+    global _profile_coordinator
+    _get_transport_manager()
+    if _profile_coordinator is None:
+        from .profile_coordinator import Ite8258ChassisProfileCoordinator
+
+        _profile_coordinator = Ite8258ChassisProfileCoordinator()
+    return _profile_coordinator
 
 
 def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
@@ -200,7 +215,11 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
         proxy = self._acquire_transport_proxy()
         from .device import Ite8258ChassisKeyboardDevice
 
-        return Ite8258ChassisKeyboardDevice(proxy.send_feature_report, transport=proxy)
+        return Ite8258ChassisKeyboardDevice(
+            proxy.send_feature_report,
+            transport=proxy,
+            profile_coordinator=_get_profile_coordinator(),
+        )
 
     def get_zone_device(self, zone_key: str) -> object:
         proxy = self._acquire_transport_proxy()
@@ -221,6 +240,7 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
             zone_name=zone_key,
             led_ids=led_ids,
             transport=proxy,
+            profile_coordinator=_get_profile_coordinator(),
         )
 
     def dimensions(self) -> tuple[int, int]:

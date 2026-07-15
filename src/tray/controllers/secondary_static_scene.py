@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping
 from typing import cast
 
 from src.core import secondary_lighting_state
-from src.core.secondary_device_routes import SecondaryDeviceRoute
+from src.core.secondary_device_routes import SecondaryDeviceRoute, iter_secondary_routes
 from src.core.secondary_device_runtime import (
     EffectiveSecondaryRoute,
     acquire_secondary_device,
@@ -29,8 +29,44 @@ def _profile_payload(tray: object) -> Mapping[str, object] | None:
     return cast(Mapping[str, object], payload) if isinstance(payload, Mapping) else None
 
 
-def payload_from_config(config: object) -> dict[str, object] | None:
-    """Build the poller's profile-state payload from the mirrored config state."""
+def registered_profile_state_keys() -> frozenset[str]:
+    """Return every registered profile-capable route key (catalog, not inventory).
+
+    Authority for config mirrors uses this catalog.  Device availability must
+    not change whether a mirror is complete or authoritative.
+    """
+
+    return frozenset(route.state_key for route in iter_secondary_routes() if route.supports_profile_state)
+
+
+def is_authoritative_secondary_state(state: object) -> bool:
+    """True when a config-mirror mapping is a complete, explicit profile scene.
+
+    A mirror is authoritative only when every registered profile-capable route
+    is present as a mapping with an explicit ``enabled`` field.  Empty, partial,
+    or pre-enabled v0.28.x maps are compatibility sources, not all-off scenes.
+    Unknown route keys may be present and are ignored for completeness.
+    """
+
+    if not isinstance(state, Mapping) or not state:
+        return False
+    known_state_keys = registered_profile_state_keys()
+    if not known_state_keys.issubset(state):
+        return False
+    for state_key in known_state_keys:
+        entry = state[state_key]
+        if not isinstance(entry, Mapping) or "enabled" not in entry:
+            return False
+    return True
+
+
+def authoritative_payload_from_config(config: object) -> dict[str, object] | None:
+    """Return an authoritative profile payload from the config mirror, or None.
+
+    None means the poller should build a non-persistent legacy snapshot via
+    ``secondary_lighting_state.legacy_snapshot_from_config``.
+    """
+
     getter = vars(config).get("_secondary_device_state")
     if callable(getter):
         try:
@@ -40,9 +76,10 @@ def payload_from_config(config: object) -> dict[str, object] | None:
     else:
         settings = vars(config).get("_settings")
         state = settings.get("secondary_device_state") if isinstance(settings, Mapping) else None
-    if not isinstance(state, Mapping):
+    if not is_authoritative_secondary_state(state):
         return None
-    return {"version": 1, "areas": dict(state)}
+    areas = dict(cast(Mapping[object, object], state))
+    return {"version": 1, "areas": areas}
 
 
 def _forced_off(tray: object) -> bool:
@@ -69,7 +106,7 @@ def apply_secondary_static_scene(
     effective_routes = tuple(effective_routes_fn())
     profile = _profile_payload(tray) if payload is None else payload
     if profile is None:
-        profile = secondary_lighting_state.payload_from_config(
+        profile = secondary_lighting_state.legacy_snapshot_from_config(
             getattr(tray, "config", None),
             (effective.route for effective in effective_routes if effective.available),
         )
@@ -119,7 +156,7 @@ def apply_secondary_static_route(
         return False
     profile = _profile_payload(tray) if payload is None else payload
     if profile is None:
-        profile = secondary_lighting_state.payload_from_config(getattr(tray, "config", None), (route,))
+        profile = secondary_lighting_state.legacy_snapshot_from_config(getattr(tray, "config", None), (route,))
     entry = secondary_lighting_state.area_entry(profile, route.state_key)
     device: object | None = None
     try:
@@ -148,18 +185,21 @@ def apply_secondary_static_route(
 def turn_off_secondary_profile_areas(
     tray: object,
     *,
-    payload: Mapping[str, object] | None = None,
     effective_routes_fn: Callable[..., tuple[EffectiveSecondaryRoute, ...]] = iter_effective_secondary_routes,
     acquire_device_fn: Callable[[SecondaryDeviceRoute], object] = acquire_secondary_device,
 ) -> None:
-    """Turn off profile-owned routes for global power-off, independent of effect output."""
+    """Turn off independent profile-owned routes for global power-off.
 
-    profile = _profile_payload(tray) if payload is None else payload
-    if profile is None:
-        return
+    Composite virtual zones whose primary owns global output are skipped: the
+    keyboard path already suspended the shared controller, and child turn_off
+    would be misinterpreted as a desired-scene edit if applied after that.
+    """
+
     for effective in effective_routes_fn():
         route = effective.route
         if not effective.available or not route.supports_profile_state:
+            continue
+        if bool(getattr(route, "primary_owns_global_off", False)):
             continue
         device: object | None = None
         try:
@@ -179,6 +219,8 @@ def turn_off_secondary_profile_areas(
 __all__ = [
     "apply_secondary_static_route",
     "apply_secondary_static_scene",
-    "payload_from_config",
+    "authoritative_payload_from_config",
+    "is_authoritative_secondary_state",
+    "registered_profile_state_keys",
     "turn_off_secondary_profile_areas",
 ]

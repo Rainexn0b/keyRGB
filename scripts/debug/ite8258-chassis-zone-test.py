@@ -6,8 +6,10 @@ Run from a repo checkout with the experimental backend enabled:
     KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 \
         scripts/debug/ite8258-chassis-zone-test.py
 
-The script exercises each zone independently and prompts for visual
-confirmation. Collect the output and any failures when reporting results.
+The script first establishes a white keyboard baseline, then exercises each
+zone and prompts for visual confirmation. The c197 surfaces share one hardware
+profile, so a child-only write is intentionally never sent. Collect the output
+and any failures when reporting results.
 """
 
 from __future__ import annotations
@@ -22,6 +24,16 @@ def _repo_root() -> str:
     return os.path.dirname(os.path.dirname(os.path.dirname(this_file)))
 
 
+def _close_surface(label: str, device: object) -> None:
+    close_fn = getattr(device, "close", None)
+    if not callable(close_fn):
+        return
+    try:
+        close_fn()
+    except (OSError, RuntimeError, ValueError) as exc:
+        print(f"cleanup warning: failed to close {label}: {exc}", file=sys.stderr)
+
+
 def _main() -> int:
     repo_root = _repo_root()
     if repo_root not in sys.path:
@@ -30,7 +42,10 @@ def _main() -> int:
     os.environ.setdefault("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 
     from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend import Ite8258ChassisBackend
-    from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.device import Ite8258ChassisZoneDevice
+    from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.device import (
+        Ite8258ChassisKeyboardDevice,
+        Ite8258ChassisZoneDevice,
+    )
 
     backend = Ite8258ChassisBackend()
     if not backend.is_available():
@@ -47,12 +62,18 @@ def _main() -> int:
     print("ITE 8258 chassis zone validation")
     print("=" * 40)
 
-    devices: list[Ite8258ChassisZoneDevice] = []
+    keyboard: Ite8258ChassisKeyboardDevice | None = None
+    devices: list[tuple[str, Ite8258ChassisZoneDevice]] = []
     try:
+        print("\nEstablishing a white keyboard baseline for the shared profile...")
+        keyboard = backend.get_device()
+        keyboard.set_color((255, 255, 255), brightness=25)
+        time.sleep(0.5)
+
         for zone_name, color in zones:
             print(f"\nAcquiring {zone_name} zone device...")
             device = backend.get_zone_device(zone_name)
-            devices.append(device)
+            devices.append((zone_name, device))
 
             print(f"Setting {zone_name} to RGB{color}...")
             device.set_color(color, brightness=25)
@@ -76,11 +97,10 @@ def _main() -> int:
         print("\nInterrupted by user.")
         return 130
     finally:
-        for device in devices:
-            try:
-                device.close()
-            except Exception:
-                pass
+        for zone_name, device in devices:
+            _close_surface(zone_name, device)
+        if keyboard is not None:
+            _close_surface("keyboard", keyboard)
 
 
 if __name__ == "__main__":

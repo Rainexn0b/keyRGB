@@ -82,8 +82,7 @@ def _apply_turn_off(tray: ConfigPollingTrayProtocol, current, cause: str, monoto
     )
     if has_all_uniform_capable_target(current):
         _helpers.turn_off_secondary_software_targets(tray)
-    secondary_payload = _helpers._secondary_static_scene.payload_from_config(tray.config)
-    _helpers.turn_off_secondary_profile_areas(tray, payload=secondary_payload)
+    _helpers.turn_off_secondary_profile_areas(tray)
     tray.is_off = True
     _helpers._call_tray_callback(
         tray,
@@ -219,16 +218,19 @@ def _apply_perkey(
     if should_reassert_user_mode:
         tray.engine.stop()
 
+    from src.core.effects.device import optional_output_transaction
+
     with tray.engine.kb_lock:
-        if should_pre_enable_user_mode:
-            _helpers._enable_user_mode_best_effort(tray, brightness=int(current.brightness))
-        tray.engine.kb.set_key_colors(
-            color_map,
-            brightness=current.brightness,
-            enable_user_mode=should_reassert_user_mode,
-        )
-    tray.is_off = False
-    _helpers._apply_secondary_static_from_config(tray)
+        with optional_output_transaction(tray.engine.kb):
+            if should_pre_enable_user_mode:
+                _helpers._enable_user_mode_best_effort(tray, brightness=int(current.brightness))
+            tray.engine.kb.set_key_colors(
+                color_map,
+                brightness=current.brightness,
+                enable_user_mode=should_reassert_user_mode,
+            )
+            tray.is_off = False
+            _helpers._apply_secondary_static_from_config(tray)
 
 
 def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> None:
@@ -241,10 +243,13 @@ def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> N
         color=tuple(current.color),
     )
     tray.engine.stop()
+    from src.core.effects.device import optional_output_transaction
+
     with tray.engine.kb_lock:
-        tray.engine.kb.set_color(current.color, brightness=current.brightness)
-    tray.is_off = False
-    _helpers._apply_secondary_static_from_config(tray)
+        with optional_output_transaction(tray.engine.kb):
+            tray.engine.kb.set_color(current.color, brightness=current.brightness)
+            tray.is_off = False
+            _helpers._apply_secondary_static_from_config(tray)
 
 
 def _apply_effect(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> None:

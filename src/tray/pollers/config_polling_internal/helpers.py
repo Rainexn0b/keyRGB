@@ -23,12 +23,12 @@ turn_off_secondary_profile_areas = _secondary_static_scene.turn_off_secondary_pr
 
 
 def _apply_secondary_static_from_config(tray: ConfigPollingTrayProtocol) -> None:
-    payload = _secondary_static_scene.payload_from_config(tray.config)
+    payload = _secondary_static_scene.authoritative_payload_from_config(tray.config)
     _software_target_controller.reconcile_secondary_profile_state(tray, payload, animated=False)
 
 
 def _apply_secondary_only(tray: ConfigPollingTrayProtocol, current) -> None:
-    payload = _secondary_static_scene.payload_from_config(tray.config)
+    payload = _secondary_static_scene.authoritative_payload_from_config(tray.config)
     animated = bool(
         normalize_software_effect_target(getattr(current, "software_effect_target", "keyboard"))
         == SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE

@@ -3,10 +3,15 @@
 ## Status
 
 Code implementation and automated Phase 7 validation completed for v0.29.0 on
-2026-07-14. Follow-up review fixes cover authoritative empty/partial scenes,
-independent-route editor/profile brightness, and the inline tray hardware-mode
-presentation. Issue #7 reporter hardware validation remains explicitly pending;
-this status does not claim hardware verification.
+2026-07-14. The Issue #7 reporter subsequently found a v0.29.1 regression where
+mode changes briefly lit the keyboard and then turned the controller dark. The
+2026-07-15 follow-up traced that to two coupled seams: legacy empty or partial
+config mirrors were interpreted as authoritative scenes, and virtual-zone
+`SAVE_PROFILE` writes were treated as independent even though the c197 hardware
+uses one shared group namespace. The follow-up fix restores legacy fallback and
+coordinates every production write as a complete keyboard-plus-chassis profile.
+Automated regression coverage is complete; reporter hardware validation remains
+explicitly pending, so this status does not claim hardware verification.
 
 Primary support case: [GitHub issue #7](https://github.com/Rainexn0b/keyRGB/issues/7),
 Lenovo Legion Pro 7 16IAX10H (`0x048d:0xc197`).

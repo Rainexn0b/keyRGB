@@ -5,6 +5,13 @@ specs for larger changes.
 
 ## Documents
 
+### Active follow-up plans
+
+- `issue-7-composite-profile-hardening-and-validation-plan.md` — live-code-verified
+  disposition of the v0.29.1 regression review, including desired/off semantics,
+  composite output batching, the missing cross-layer regression, descriptor
+  filtering, and reporter hardware gates
+
 ### Implemented dependencies / historical plans
 
 - `secondary-lighting-profile-editor-and-simulation-plan.md` — implemented issue #7
@@ -20,7 +27,7 @@ specs for larger changes.
 - `2026-04-19/architecture-and-maintainability-improvement-plan.md`
 - `2026-04-19/package-and-gui-boundary-refactor-anchor-plan.md`
 - `2026-04-19/refactor-campaign-progress.md`
-- `2026-04-19/ite8258-chassis-correction-plan.md`
+- `../B-backend-guides/ite8258/ite8258-chassis-correction-plan.md`
 - `2026-04-01/diagnostics-discovery-roadmap.md`
 - `2026-03-29/V1_RELEASE_SPRINT.md`
 

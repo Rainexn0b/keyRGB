@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
 from src.core.backends.base import BackendStability, ExperimentalEvidence
 from src.core.backends.exceptions import BackendIOError
-from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion import backend as _ite8258_chassis_backend_module
+from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion import (
+    backend as _ite8258_chassis_backend_module,
+)
 from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion import protocol
 from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend import (
     Ite8258ChassisBackend,
@@ -17,6 +20,17 @@ from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.devic
     Ite8258ChassisKeyboardDevice,
     Ite8258ChassisZoneDevice,
 )
+from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.profile_coordinator import (
+    Ite8258ChassisProfileCoordinator,
+    ProfileCommitDisposition,
+)
+
+
+def _coordinator_with_primary_scene() -> Ite8258ChassisProfileCoordinator:
+    coordinator = Ite8258ChassisProfileCoordinator()
+    keyboard = Ite8258ChassisKeyboardDevice(lambda _report: None, profile_coordinator=coordinator)
+    keyboard.set_color((255, 255, 255), brightness=25)
+    return coordinator
 
 
 def test_protocol_builds_turn_off_report() -> None:
@@ -58,13 +72,36 @@ def test_chassis_zone_led_ids_use_16_bit_codes_from_83f5_implementation() -> Non
     # Low-byte constants were truncated; corrected to full 16-bit codes per research.
     assert protocol.LOGO_LED_IDS == (0x05DD,)
     assert protocol.NEON_LED_IDS == (
-        0x01F5, 0x01F6, 0x01F7, 0x01F8, 0x01F9, 0x01FA,
-        0x01FB, 0x01FC, 0x01FD, 0x01FE,
+        0x01F5,
+        0x01F6,
+        0x01F7,
+        0x01F8,
+        0x01F9,
+        0x01FA,
+        0x01FB,
+        0x01FC,
+        0x01FD,
+        0x01FE,
     )
     assert protocol.VENT_LED_IDS == (
-        0x03E9, 0x03EA, 0x03EB, 0x03EC, 0x03ED, 0x03EE, 0x03EF,
-        0x03F0, 0x03F1, 0x03F2, 0x03F3, 0x03F4, 0x03F5, 0x03F6,
-        0x03F7, 0x03F8, 0x03F9, 0x03FA,
+        0x03E9,
+        0x03EA,
+        0x03EB,
+        0x03EC,
+        0x03ED,
+        0x03EE,
+        0x03EF,
+        0x03F0,
+        0x03F1,
+        0x03F2,
+        0x03F3,
+        0x03F4,
+        0x03F5,
+        0x03F6,
+        0x03F7,
+        0x03F8,
+        0x03F9,
+        0x03FA,
     )
 
 
@@ -105,7 +142,10 @@ def test_protocol_builds_uniform_static_group_report() -> None:
 
 def test_device_set_color_sends_profile_switch_direct_off_group_report_then_brightness() -> None:
     sent: list[bytes] = []
-    device = Ite8258ChassisKeyboardDevice(sent.append)
+    device = Ite8258ChassisKeyboardDevice(
+        sent.append,
+        profile_coordinator=Ite8258ChassisProfileCoordinator(),
+    )
 
     device.set_color((0x12, 0x34, 0x56), brightness=25)
 
@@ -117,7 +157,10 @@ def test_device_set_color_sends_profile_switch_direct_off_group_report_then_brig
 
 def test_device_set_key_colors_maps_tuple_keys_to_keyboard_led_ids() -> None:
     sent: list[bytes] = []
-    device = Ite8258ChassisKeyboardDevice(sent.append)
+    device = Ite8258ChassisKeyboardDevice(
+        sent.append,
+        profile_coordinator=Ite8258ChassisProfileCoordinator(),
+    )
 
     device.set_key_colors({(0, 0): (255, 0, 0), (6, 15): (0, 255, 0)}, brightness=50)
 
@@ -125,13 +168,16 @@ def test_device_set_key_colors_maps_tuple_keys_to_keyboard_led_ids() -> None:
     assert report[0] == protocol.REPORT_ID
     assert report[1] == protocol.SAVE_PROFILE
     assert b"\x01\x00" in report
-    assert b"\xA1\x00" in report
+    assert b"\xa1\x00" in report
     assert sent[-1][:5].hex() == "07cec00309"
 
 
 def test_device_set_key_colors_skips_sparse_and_generic_grid_gaps() -> None:
     sent: list[bytes] = []
-    device = Ite8258ChassisKeyboardDevice(sent.append)
+    device = Ite8258ChassisKeyboardDevice(
+        sent.append,
+        profile_coordinator=Ite8258ChassisProfileCoordinator(),
+    )
 
     device.set_key_colors(
         {
@@ -145,8 +191,8 @@ def test_device_set_key_colors_skips_sparse_and_generic_grid_gaps() -> None:
     report = sent[2]
     assert b"\x01\x00" in report
     assert b"\x12\x34\x56" in report
-    assert b"\xAA\xBB\xCC" not in report
-    assert b"\xDD\xEE\xFF" not in report
+    assert b"\xaa\xbb\xcc" not in report
+    assert b"\xdd\xee\xff" not in report
     assert sent[-1][:5].hex() == "07cec00309"
 
 
@@ -214,7 +260,8 @@ def test_backend_probe_reports_unavailable_when_scan_disabled(monkeypatch: pytes
 def test_backend_probe_reports_unavailable_when_no_matching_device(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._find_matching_supported_hidraw_device", lambda: None
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._find_matching_supported_hidraw_device",
+        lambda: None,
     )
 
     result = Ite8258ChassisBackend().probe()
@@ -267,7 +314,10 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
 
 
 def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._find_matching_supported_hidraw_device", lambda: None)
+    monkeypatch.setattr(
+        "src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend._find_matching_supported_hidraw_device",
+        lambda: None,
+    )
 
     with pytest.raises(FileNotFoundError, match="No hidraw device found"):
         _open_matching_transport()
@@ -337,6 +387,7 @@ def test_backend_is_available_reflects_probe_result(monkeypatch: pytest.MonkeyPa
 
     assert Ite8258ChassisBackend().is_available() is True
 
+
 def test_protocol_builds_uniform_static_groups_for_leds() -> None:
     groups = protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (255, 0, 0))
     assert len(groups) == 1
@@ -349,12 +400,13 @@ def test_protocol_returns_empty_groups_for_empty_led_ids() -> None:
     assert protocol.build_uniform_static_groups_for_leds((), (255, 0, 0)) == ()
 
 
-def test_zone_device_set_color_sends_profile_switch_direct_off_group_report_then_brightness() -> None:
+def test_zone_device_set_color_sends_complete_profile_without_global_brightness() -> None:
     sent: list[bytes] = []
     device = Ite8258ChassisZoneDevice(
         sent.append,
         zone_name="logo",
         led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=_coordinator_with_primary_scene(),
     )
 
     device.set_color((0x12, 0x34, 0x56), brightness=25)
@@ -363,7 +415,7 @@ def test_zone_device_set_color_sends_profile_switch_direct_off_group_report_then
     assert sent[1][:6].hex() == "07d0c0030201"
     # The save-profile report should contain the logo LED ID 0x05DD (little-endian DD 05)
     assert b"\xdd\x05" in sent[2]
-    assert sent[3][:5].hex() == "07cec00304"
+    assert len(sent) == 3
 
 
 def test_zone_device_uses_correct_led_ids_for_each_zone() -> None:
@@ -379,6 +431,7 @@ def test_zone_device_uses_correct_led_ids_for_each_zone() -> None:
             sent.append,
             zone_name=zone_name,
             led_ids=expected_leds,
+            profile_coordinator=_coordinator_with_primary_scene(),
         )
         device.set_color((255, 255, 255), brightness=25)
 
@@ -389,6 +442,18 @@ def test_zone_device_uses_correct_led_ids_for_each_zone() -> None:
         for i, led_id in enumerate(expected_leds):
             assert report[offset + i * 2] == (led_id & 0xFF)
             assert report[offset + i * 2 + 1] == ((led_id >> 8) & 0xFF)
+
+
+def test_zone_device_rejects_independent_positive_brightness() -> None:
+    device = Ite8258ChassisZoneDevice(
+        lambda _report: None,
+        zone_name="logo",
+        led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=_coordinator_with_primary_scene(),
+    )
+
+    with pytest.raises(RuntimeError, match="primary keyboard"):
+        device.set_brightness(25)
 
 
 def test_backend_get_zone_device_requires_experimental_opt_in(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -424,7 +489,7 @@ def test_backend_get_zone_device_rejects_unknown_zone(monkeypatch: pytest.Monkey
         Ite8258ChassisBackend().get_zone_device("unknown")
 
 
-def test_backend_get_zone_device_returns_zone_device_for_logo(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_backend_zone_first_stages_until_keyboard_profile_exists(monkeypatch: pytest.MonkeyPatch) -> None:
     _ite8258_chassis_backend_module._transport_manager = None
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 
@@ -446,11 +511,20 @@ def test_backend_get_zone_device_returns_zone_device_for_logo(monkeypatch: pytes
         lambda: (DummyTransport(), DummyInfo()),
     )
 
-    device = Ite8258ChassisBackend().get_zone_device("logo")
+    backend = Ite8258ChassisBackend()
+    device = backend.get_zone_device("logo")
 
     assert isinstance(device, Ite8258ChassisZoneDevice)
     device.set_color((0xAB, 0xCD, 0xEF), brightness=25)
+    assert sent == []
+
+    keyboard = backend.get_device()
+    keyboard.set_color((0x12, 0x34, 0x56), brightness=25)
+
+    assert sent[0] == protocol.build_switch_profile_report()
+    assert sent[1] == protocol.build_set_direct_mode_report(enabled=False)
     assert b"\xdd\x05" in sent[2]
+    assert b"\xab\xcd\xef" in sent[2]
 
 
 def test_backend_keyboard_and_zone_devices_share_one_transport(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -499,17 +573,18 @@ def test_backend_keyboard_and_zone_devices_share_one_transport(monkeypatch: pyte
     assert open_count[0] == 1  # opener still only called once
 
 
-def test_zone_device_turn_off_sends_zone_scoped_black_static_groups() -> None:
+def test_zone_device_turn_off_sends_complete_profile_with_black_zone() -> None:
     sent: list[bytes] = []
     device = Ite8258ChassisZoneDevice(
         sent.append,
         zone_name="logo",
         led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=_coordinator_with_primary_scene(),
     )
 
     device.turn_off()
 
-    # Should send switch profile + direct off + save-profile with black group
+    # Should send switch profile + direct off + the complete scene with a black logo group.
     assert sent[0][:5].hex() == "07c8c00301"
     assert sent[1][:6].hex() == "07d0c0030201"
     # The save-profile report should contain the logo LED ID 0x05DD, not the global turn-off bytes 01 01
@@ -524,3 +599,460 @@ def test_zone_device_turn_off_sends_zone_scoped_black_static_groups() -> None:
     assert report[dd_offset - 4 : dd_offset - 1].hex() == "000000"  # black color immediately before LED id
     # Should NOT send a global brightness command after turn_off
     assert len(sent) == 3
+
+
+def test_composite_profile_zone_update_preserves_keyboard_and_sibling_groups() -> None:
+    sent: list[bytes] = []
+    coordinator = Ite8258ChassisProfileCoordinator()
+    keyboard = Ite8258ChassisKeyboardDevice(sent.append, profile_coordinator=coordinator)
+    logo = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="logo",
+        led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+    neon = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="neon",
+        led_ids=protocol.NEON_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+
+    keyboard.set_color((0x12, 0x34, 0x56), brightness=25)
+    logo.set_color((0xAB, 0xCD, 0xEF), brightness=25)
+    neon.set_color((0x10, 0x20, 0x30), brightness=25)
+    sent.clear()
+
+    logo.turn_off()
+
+    expected_groups = (
+        *protocol.build_uniform_static_groups((0x12, 0x34, 0x56)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (0, 0, 0)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.NEON_LED_IDS, (0x10, 0x20, 0x30)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.VENT_LED_IDS, (0, 0, 0)),
+    )
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_direct_mode_report(enabled=False),
+        *protocol.build_save_profile_reports(protocol.DEFAULT_PROFILE_ID, expected_groups),
+    ]
+
+
+def test_composite_profile_global_off_preserves_desired_children_until_explicit_edit() -> None:
+    sent: list[bytes] = []
+    coordinator = Ite8258ChassisProfileCoordinator()
+    keyboard = Ite8258ChassisKeyboardDevice(sent.append, profile_coordinator=coordinator)
+    logo = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="logo",
+        led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+
+    keyboard.set_color((0x12, 0x34, 0x56), brightness=25)
+    logo.set_color((0xAB, 0xCD, 0xEF), brightness=25)
+    sent.clear()
+
+    keyboard.turn_off()
+    # Transient global-off cleanup must not write; desired logo colour is retained.
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_direct_mode_report(enabled=False),
+        protocol.build_turn_off_report(),
+    ]
+    assert coordinator.output_suspended is True
+
+    sent.clear()
+    keyboard.set_color((0x01, 0x02, 0x03), brightness=25)
+
+    restored_groups = (
+        *protocol.build_uniform_static_groups((0x01, 0x02, 0x03)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (0xAB, 0xCD, 0xEF)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.NEON_LED_IDS, (0, 0, 0)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.VENT_LED_IDS, (0, 0, 0)),
+    )
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_direct_mode_report(enabled=False),
+        *protocol.build_save_profile_reports(protocol.DEFAULT_PROFILE_ID, restored_groups),
+        protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(25)),
+    ]
+
+
+def test_composite_profile_child_edits_while_suspended_update_desired_scene() -> None:
+    sent: list[bytes] = []
+    coordinator = Ite8258ChassisProfileCoordinator()
+    keyboard = Ite8258ChassisKeyboardDevice(sent.append, profile_coordinator=coordinator)
+    logo = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="logo",
+        led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+    neon = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="neon",
+        led_ids=protocol.NEON_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+
+    keyboard.set_color((0x12, 0x34, 0x56), brightness=25)
+    logo.set_color((0xAB, 0xCD, 0xEF), brightness=25)
+    neon.set_color((0x10, 0x20, 0x30), brightness=25)
+    sent.clear()
+
+    keyboard.turn_off()
+    after_off = len(sent)
+    logo.turn_off()  # desired-off while suspended
+    neon.set_color((0xAA, 0xBB, 0xCC), brightness=25)  # desired-on while suspended
+    assert len(sent) == after_off
+
+    sent.clear()
+    keyboard.set_color((0x01, 0x02, 0x03), brightness=25)
+    expected_groups = (
+        *protocol.build_uniform_static_groups((0x01, 0x02, 0x03)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (0, 0, 0)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.NEON_LED_IDS, (0xAA, 0xBB, 0xCC)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.VENT_LED_IDS, (0, 0, 0)),
+    )
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_direct_mode_report(enabled=False),
+        *protocol.build_save_profile_reports(protocol.DEFAULT_PROFILE_ID, expected_groups),
+        protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(25)),
+    ]
+
+
+def test_output_transaction_batches_keyboard_and_zones_into_one_commit() -> None:
+    sent: list[bytes] = []
+    coordinator = Ite8258ChassisProfileCoordinator()
+    keyboard = Ite8258ChassisKeyboardDevice(sent.append, profile_coordinator=coordinator)
+    logo = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="logo",
+        led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+    neon = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="neon",
+        led_ids=protocol.NEON_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+    vent = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="vent",
+        led_ids=protocol.VENT_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+
+    with keyboard.output_transaction():
+        keyboard.set_color((0x11, 0x22, 0x33), brightness=25)
+        logo.set_color((0xAB, 0xCD, 0xEF), brightness=25)
+        neon.set_color((0x10, 0x20, 0x30), brightness=25)
+        vent.set_color((0x40, 0x50, 0x60), brightness=25)
+        assert sent == []
+
+    expected_groups = (
+        *protocol.build_uniform_static_groups((0x11, 0x22, 0x33)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (0xAB, 0xCD, 0xEF)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.NEON_LED_IDS, (0x10, 0x20, 0x30)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.VENT_LED_IDS, (0x40, 0x50, 0x60)),
+    )
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_direct_mode_report(enabled=False),
+        *protocol.build_save_profile_reports(protocol.DEFAULT_PROFILE_ID, expected_groups),
+        protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(25)),
+    ]
+
+
+def test_nested_output_transactions_commit_once_at_outer_exit() -> None:
+    sent: list[bytes] = []
+    coordinator = Ite8258ChassisProfileCoordinator()
+    keyboard = Ite8258ChassisKeyboardDevice(sent.append, profile_coordinator=coordinator)
+
+    with keyboard.output_transaction():
+        with keyboard.output_transaction():
+            keyboard.set_color((0x11, 0x22, 0x33), brightness=25)
+        assert sent == []
+
+    expected_groups = (
+        *protocol.build_uniform_static_groups((0x11, 0x22, 0x33)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (0, 0, 0)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.NEON_LED_IDS, (0, 0, 0)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.VENT_LED_IDS, (0, 0, 0)),
+    )
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_direct_mode_report(enabled=False),
+        *protocol.build_save_profile_reports(protocol.DEFAULT_PROFILE_ID, expected_groups),
+        protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(25)),
+    ]
+
+
+def test_profile_commit_dispositions_describe_wire_outcome() -> None:
+    sent: list[bytes] = []
+    coordinator = Ite8258ChassisProfileCoordinator()
+    logo_groups = protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (0xAA, 0xBB, 0xCC))
+
+    assert (
+        coordinator.apply_zone(
+            sent.append,
+            zone_name="logo",
+            profile_id=protocol.DEFAULT_PROFILE_ID,
+            groups=logo_groups,
+        )
+        is ProfileCommitDisposition.STAGED_NO_PRIMARY
+    )
+    assert sent == []
+
+    assert (
+        coordinator.apply_primary(
+            sent.append,
+            profile_id=protocol.DEFAULT_PROFILE_ID,
+            groups=protocol.build_uniform_static_groups((0x11, 0x22, 0x33)),
+            brightness=25,
+        )
+        is ProfileCommitDisposition.COMMITTED
+    )
+    sent.clear()
+
+    coordinator.turn_off_all(sent.append, profile_id=protocol.DEFAULT_PROFILE_ID)
+    sent.clear()
+    assert (
+        coordinator.turn_off_zone(
+            sent.append,
+            zone_name="logo",
+            profile_id=protocol.DEFAULT_PROFILE_ID,
+        )
+        is ProfileCommitDisposition.STAGED_SUSPENDED
+    )
+    assert sent == []
+
+    with coordinator.output_transaction(sent.append, profile_id=protocol.DEFAULT_PROFILE_ID):
+        assert (
+            coordinator.apply_zone(
+                sent.append,
+                zone_name="logo",
+                profile_id=protocol.DEFAULT_PROFILE_ID,
+                groups=logo_groups,
+            )
+            is ProfileCommitDisposition.STAGED_IN_TRANSACTION
+        )
+    assert sent == []
+
+
+def test_output_transaction_staging_exception_restores_previous_desired_scene() -> None:
+    sent: list[bytes] = []
+    coordinator = Ite8258ChassisProfileCoordinator()
+    keyboard = Ite8258ChassisKeyboardDevice(sent.append, profile_coordinator=coordinator)
+    logo = Ite8258ChassisZoneDevice(
+        sent.append,
+        zone_name="logo",
+        led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+
+    keyboard.set_color((0x12, 0x34, 0x56), brightness=25)
+    logo.set_color((0xAB, 0xCD, 0xEF), brightness=25)
+    sent.clear()
+
+    try:
+        with keyboard.output_transaction():
+            keyboard.set_color((0x01, 0x02, 0x03), brightness=25)
+            logo.set_color((0x99, 0x88, 0x77), brightness=25)
+            raise RuntimeError("abort frame")
+    except RuntimeError:
+        pass
+
+    assert sent == []
+    keyboard.set_color((0x12, 0x34, 0x56), brightness=25)
+    expected_groups = (
+        *protocol.build_uniform_static_groups((0x12, 0x34, 0x56)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (0xAB, 0xCD, 0xEF)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.NEON_LED_IDS, (0, 0, 0)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.VENT_LED_IDS, (0, 0, 0)),
+    )
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_direct_mode_report(enabled=False),
+        *protocol.build_save_profile_reports(protocol.DEFAULT_PROFILE_ID, expected_groups),
+        protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(25)),
+    ]
+
+
+def test_mid_commit_io_error_leaves_desired_scene_dirty_and_retryable() -> None:
+    coordinator = Ite8258ChassisProfileCoordinator()
+    bootstrap: list[bytes] = []
+    keyboard = Ite8258ChassisKeyboardDevice(bootstrap.append, profile_coordinator=coordinator)
+    logo = Ite8258ChassisZoneDevice(
+        bootstrap.append,
+        zone_name="logo",
+        led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+    keyboard.set_color((0x12, 0x34, 0x56), brightness=25)
+    logo.set_color((0xAB, 0xCD, 0xEF), brightness=25)
+
+    writes = 0
+
+    def flaky_writer(report: bytes) -> None:
+        nonlocal writes
+        writes += 1
+        if writes == 3:
+            raise OSError("injected mid-commit failure")
+
+    flaky_keyboard = Ite8258ChassisKeyboardDevice(flaky_writer, profile_coordinator=coordinator)
+    try:
+        flaky_keyboard.set_color((0x01, 0x02, 0x03), brightness=25)
+    except OSError:
+        pass
+
+    assert coordinator.desired_dirty is True
+
+    sent: list[bytes] = []
+    keyboard_retry = Ite8258ChassisKeyboardDevice(sent.append, profile_coordinator=coordinator)
+    keyboard_retry.set_color((0x01, 0x02, 0x03), brightness=25)
+    expected_groups = (
+        *protocol.build_uniform_static_groups((0x01, 0x02, 0x03)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.LOGO_LED_IDS, (0xAB, 0xCD, 0xEF)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.NEON_LED_IDS, (0, 0, 0)),
+        *protocol.build_uniform_static_groups_for_leds(protocol.VENT_LED_IDS, (0, 0, 0)),
+    )
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_direct_mode_report(enabled=False),
+        *protocol.build_save_profile_reports(protocol.DEFAULT_PROFILE_ID, expected_groups),
+        protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(25)),
+    ]
+    assert coordinator.desired_dirty is False
+
+
+def test_cold_positive_brightness_emits_switch_profile_then_brightness_only() -> None:
+    sent: list[bytes] = []
+    keyboard = Ite8258ChassisKeyboardDevice(
+        sent.append,
+        profile_coordinator=Ite8258ChassisProfileCoordinator(),
+    )
+
+    keyboard.set_brightness(25)
+
+    assert sent == [
+        protocol.build_switch_profile_report(),
+        protocol.build_set_brightness_report(protocol.raw_brightness_from_ui(25)),
+    ]
+
+
+def test_composite_profile_transactions_do_not_interleave_between_surfaces() -> None:
+    import threading
+    import time
+
+    coordinator = Ite8258ChassisProfileCoordinator()
+    Ite8258ChassisKeyboardDevice(lambda _report: None, profile_coordinator=coordinator).set_color(
+        (0x12, 0x34, 0x56),
+        brightness=25,
+    )
+
+    writes: list[tuple[str, int]] = []
+    errors: list[Exception] = []
+    start = threading.Barrier(3)
+
+    def writer(label: str) -> Callable[[bytes], None]:
+        def _write(report: bytes) -> None:
+            writes.append((label, report[1]))
+            time.sleep(0.001)
+
+        return _write
+
+    keyboard = Ite8258ChassisKeyboardDevice(writer("keyboard"), profile_coordinator=coordinator)
+    logo = Ite8258ChassisZoneDevice(
+        writer("logo"),
+        zone_name="logo",
+        led_ids=protocol.LOGO_LED_IDS,
+        profile_coordinator=coordinator,
+    )
+
+    def apply(action: Callable[[], None]) -> None:
+        try:
+            start.wait()
+            action()
+        except Exception as exc:  # pragma: no cover - surfaced by assertion
+            errors.append(exc)
+
+    keyboard_thread = threading.Thread(
+        target=apply,
+        args=(lambda: keyboard.set_color((0x01, 0x02, 0x03), brightness=25),),
+    )
+    logo_thread = threading.Thread(
+        target=apply,
+        args=(lambda: logo.set_color((0xAB, 0xCD, 0xEF), brightness=25),),
+    )
+    keyboard_thread.start()
+    logo_thread.start()
+    start.wait()
+    keyboard_thread.join(timeout=2)
+    logo_thread.join(timeout=2)
+
+    assert not keyboard_thread.is_alive()
+    assert not logo_thread.is_alive()
+    assert errors == []
+    labels = [label for label, _command in writes]
+    assert labels in (
+        ["keyboard"] * 4 + ["logo"] * 3,
+        ["logo"] * 3 + ["keyboard"] * 4,
+    )
+
+
+def test_concurrent_output_transactions_are_serialized_not_coalesced() -> None:
+    import threading
+
+    coordinator = Ite8258ChassisProfileCoordinator()
+    writes: list[tuple[str, int]] = []
+    first_inside = threading.Event()
+    second_attempting = threading.Event()
+    release_first = threading.Event()
+    errors: list[Exception] = []
+
+    def run_first() -> None:
+        keyboard = Ite8258ChassisKeyboardDevice(
+            lambda report: writes.append(("first", report[1])),
+            profile_coordinator=coordinator,
+        )
+        try:
+            with keyboard.output_transaction():
+                first_inside.set()
+                if not release_first.wait(timeout=2):
+                    raise TimeoutError("timed out waiting to release first transaction")
+                keyboard.set_color((0x01, 0x02, 0x03), brightness=25)
+        except Exception as exc:  # pragma: no cover - surfaced by assertion
+            errors.append(exc)
+
+    def run_second() -> None:
+        if not first_inside.wait(timeout=2):
+            errors.append(TimeoutError("first transaction did not start"))
+            return
+        keyboard = Ite8258ChassisKeyboardDevice(
+            lambda report: writes.append(("second", report[1])),
+            profile_coordinator=coordinator,
+        )
+        second_attempting.set()
+        try:
+            with keyboard.output_transaction():
+                keyboard.set_color((0x04, 0x05, 0x06), brightness=25)
+        except Exception as exc:  # pragma: no cover - surfaced by assertion
+            errors.append(exc)
+
+    first_thread = threading.Thread(target=run_first)
+    second_thread = threading.Thread(target=run_second)
+    first_thread.start()
+    second_thread.start()
+    assert second_attempting.wait(timeout=2)
+    release_first.set()
+    first_thread.join(timeout=2)
+    second_thread.join(timeout=2)
+
+    assert not first_thread.is_alive()
+    assert not second_thread.is_alive()
+    assert errors == []
+    assert [label for label, _command in writes] == ["first"] * 4 + ["second"] * 4

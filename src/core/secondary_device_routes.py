@@ -58,6 +58,11 @@ class SecondaryDeviceRoute:
     # zone-device factory.
     parent_backend_name: str | None = None
     zone_key: str | None = None
+    # When True, global power-off is owned by the primary keyboard path for this
+    # composite controller.  Secondary global-off cleanup skips these routes so
+    # child turn_off is not misused as transient shutdown after the primary has
+    # already suspended output.
+    primary_owns_global_off: bool = False
 
 
 def _acquire_ite8233_lightbar() -> object:
@@ -134,6 +139,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
         parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
         zone_key="logo",
+        primary_owns_global_off=True,
     ),
     SecondaryDeviceRoute(
         device_type="neon",
@@ -150,6 +156,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
         parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
         zone_key="neon",
+        primary_owns_global_off=True,
     ),
     SecondaryDeviceRoute(
         device_type="vent",
@@ -166,6 +173,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
         parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
         zone_key="vent",
+        primary_owns_global_off=True,
     ),
 )
 

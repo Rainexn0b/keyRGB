@@ -17,3 +17,5 @@ management, and support tools.
 - `09-physical-layout-and-slot-ids.md` — physical layout and slot IDs
 - `10-support-tools-and-discovery.md` — support tools and discovery
 - `11-multi-device-routing-and-targets.md` — multi-device routing and targets
+- `12-composite-profile-coordination.md` — reference architecture for logical
+  routes that must commit one complete physical-controller profile

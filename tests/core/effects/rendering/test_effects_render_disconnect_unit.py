@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from threading import RLock
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -37,6 +38,23 @@ def _mk_engine(*, key_colors_exc: Exception):
 
 def test_sw_render_disconnect_marks_unavailable_and_skips_uniform_fallback() -> None:
     engine = _mk_engine(key_colors_exc=Errno19())
+
+    sw_base.render(engine, color_map={(0, 0): (255, 0, 0)})
+
+    engine.mark_device_unavailable.assert_called_once()
+    assert engine.kb.set_color.call_count == 0
+
+
+def test_sw_render_deferred_transaction_disconnect_skips_uniform_fallback() -> None:
+    engine = _mk_engine(key_colors_exc=RuntimeError("unused"))
+    engine.kb.set_key_colors.side_effect = None
+
+    @contextmanager
+    def output_transaction():
+        yield
+        raise Errno19()
+
+    engine.kb.output_transaction = output_transaction
 
     sw_base.render(engine, color_map={(0, 0): (255, 0, 0)})
 

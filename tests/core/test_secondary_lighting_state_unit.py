@@ -53,7 +53,7 @@ def test_config_fallback_payload_persists_brightness_only_for_independent_routes
         get_secondary_device_brightness=lambda *_args, **_kwargs: 30,
     )
 
-    assert secondary_lighting_state.payload_from_config(config, (lightbar, logo)) == {
+    assert secondary_lighting_state.legacy_snapshot_from_config(config, (lightbar, logo)) == {
         "version": 1,
         "areas": {
             "lightbar": {"enabled": True, "color": [1, 2, 3], "brightness": 30},

@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 import os
 import time
-from collections.abc import Iterable, Mapping, Sized
+from collections.abc import Iterable, Iterator, Mapping, Sized
+from contextlib import contextmanager
 from threading import RLock
 from typing import Protocol, cast
 
@@ -133,6 +134,26 @@ def get(*, backend: KeyboardBackendProtocol | None = None) -> KeyboardDeviceProt
     """Compatibility alias for legacy callers and tests."""
 
     return get_keyboard_device(backend=backend)
+
+
+@contextmanager
+def optional_output_transaction(device: object | None) -> Iterator[None]:
+    """Enter a device-owned output batch when the primary supports it.
+
+    Composite controllers (e.g. c197) implement ``output_transaction()`` so one
+    logical frame can stage keyboard + child mutations and emit a single full
+    profile. Ordinary backends have no such method and this is a no-op.
+    """
+
+    if device is None:
+        yield
+        return
+    factory = getattr(device, "output_transaction", None)
+    if not callable(factory):
+        yield
+        return
+    with factory():
+        yield
 
 
 def _rgb_for_debug_log(color: object) -> tuple[object, object, object]:

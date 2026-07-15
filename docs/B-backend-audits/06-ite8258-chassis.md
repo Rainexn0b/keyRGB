@@ -1,11 +1,11 @@
 # Audit: `ite8258-chassis` — Lenovo Legion Pro 7 Gen10 composite ITE 8258 backend
 
-**Audit date:** 2026-07-04  
-**Backend source:** `src/core/backends/ite8258_chassis/`  
-**Test file:** `tests/core/backends/ite/test_ite8258_chassis_backend_unit.py` (32 tests)  
-**Stability:** `EXPERIMENTAL`  
-**Evidence level:** `REVERSE_ENGINEERED`  
-**Priority:** 97
+- **Audit date:** 2026-07-04 (Issue #7 regression addendum: 2026-07-15)
+- **Backend source:** `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/`
+- **Test file:** `tests/core/backends/ite/test_ite8258_chassis_backend_unit.py` (+ Issue #7 integration test)
+- **Stability:** `EXPERIMENTAL`
+- **Evidence level:** `REVERSE_ENGINEERED`
+- **Priority:** 97
 
 ## References
 
@@ -21,7 +21,10 @@
 3. **LenovoLegionToolkit**
    - `LenovoLegionToolkit.Lib/Native.cs`
 4. **Internal correction plan**
-   - `../../I-implementation-plans/2026-04-19/ite8258-chassis-correction-plan.md`
+   - `../B-backend-guides/ite8258/ite8258-chassis-correction-plan.md`
+5. **Composite coordination reference and current hardening plan**
+   - `../1-src/12-composite-profile-coordination.md`
+   - `../I-implementation-plans/issue-7-composite-profile-hardening-and-validation-plan.md`
 
 ## Summary
 
@@ -35,9 +38,20 @@ resolved** in the current code:
 3. **Header framing** — `_packet()` writes the fixed report size (`PACKET_SIZE`) in bytes 2–3,
    matching the 83F5 implementation, not a dynamic payload length.
 
-The audit found no additional protocol bugs. One small diagnostics improvement was applied:
-probe identifiers now include the OpenRGB-backed HID usage page/usage and feature-report size,
-matching the sibling `ite8258` backend.
+The original audit found no additional packet-format bugs. The 2026-07-15 Issue #7
+follow-up did find a transaction-model bug: keyboard and virtual-zone calls each
+started their own `SAVE_PROFILE` payload at group 1, although the controller expects
+one full effect description for the shared keyboard/chassis profile. Production
+devices now share a coordinator that retains all surfaces, serializes the complete
+multi-report transaction, and prevents child cleanup after global off from replaying
+the keyboard scene. Probe identifiers also include the OpenRGB-backed HID usage
+page/usage and feature-report size, matching the sibling `ite8258` backend.
+
+The coordinator is the project's backend-local reference implementation for
+composite controllers. It is not yet a generic shared API. A maintainer follow-up
+also confirmed that all-compatible software rendering can request up to four
+complete c197 commits per frame; the hardening plan tracks a backend-owned output
+transaction without changing the independent logical-route model.
 
 ## Detailed Comparison
 
@@ -155,8 +169,11 @@ audio_ripple, and type — effects that the 24-zone `0xC195` device does not sup
 ### 8. Shared hidraw transport
 
 The chassis backend uses `SharedHidrawTransportManager` so the keyboard device and zone
-devices (logo/neon/vent) share a single hidraw file descriptor. This is correct for a
-composite controller where all surfaces are driven through one USB HID interface.
+devices (logo/neon/vent) share a single hidraw file descriptor. A shared
+`Ite8258ChassisProfileCoordinator` now also retains the complete desired group scene and
+holds one lock across profile switch, direct-mode disable, every save-profile packet,
+and controller brightness. Sharing only the transport was insufficient because its
+write lock covers one report, not a complete multi-report profile transaction.
 
 **Finding:** Correct architecture.
 
@@ -165,8 +182,12 @@ composite controller where all surfaces are driven through one USB HID interface
 ### 9. Zone device contract
 
 `Ite8258ChassisZoneDevice` correctly:
-- Sends profile-switch + direct-off + black-static-groups for `turn_off()` (not a global
-  turn-off, which would black out the keyboard too)
+- Stages a zone-first write until a primary keyboard scene exists, so it never emits an
+  incomplete zones-only profile.
+- Rebuilds the complete keyboard/logo/neon/vent group list for zone colour or off changes,
+  with a black static group representing an off zone.
+- Suppresses child off replay while controller-wide off is latched, preserving the desired
+  scene for resume without relighting the keyboard during shutdown.
 - Raises `RuntimeError` for `set_key_colors` and `set_effect` (zones are uniform-color only)
 - Shares the parent transport proxy
 
@@ -187,7 +208,7 @@ zone surfaces are exposed through the secondary-device route system.
 
 ## Test Coverage
 
-Focused tests (32) cover:
+Focused tests (36) cover:
 
 - turn-off, brightness, switch-profile, direct-mode, direct-color report bytes
 - direction code corrections (left/right swap resolved)
@@ -198,6 +219,8 @@ Focused tests (32) cover:
 - keyboard `set_color` send order (switch-profile → direct-off → save-profile → brightness)
 - sparse/gap key mapping
 - zone device `set_color`, `turn_off`, and per-zone LED IDs
+- zone-first staging, full-scene sibling preservation, global-off/resume latching,
+  and non-interleaving concurrent profile transactions
 - experimental opt-in probe behavior
 - transport-open error wrapping
 - shared transport (keyboard + zones open hidraw once)
@@ -213,8 +236,10 @@ Focused tests (32) cover:
 | 4 | Include usage page/usage/report size in probe identifiers | Diagnostics | Low | ✅ Done |
 | 5 | Add shared hidraw usage/report-descriptor filtering | Code | Medium | ⏳ Follow-up (shared with `ite8258`) |
 | 6 | Add product-variant registry if a non-83F5 `0xC197` laptop appears | Architecture | Low | ⏳ Follow-up |
+| 7 | Coordinate keyboard and virtual zones as one full hardware profile | Code | High | ✅ Done for Issue #7 follow-up |
 
-**Overall: VALIDATED AS EXPERIMENTAL** — all previously identified protocol discrepancies are
-resolved; packet format, mode IDs, chassis-zone LED IDs, direction/spin constants, and
-header framing match public references and the 83F5 working implementation. Remaining
+**Overall: AUTOMATED VALIDATION COMPLETE; HARDWARE REVALIDATION PENDING** — packet format,
+mode IDs, chassis-zone LED IDs, direction/spin constants, header framing, and full-scene
+transaction composition match public references and focused tests. The Issue #7 reporter
+still needs to verify the corrected transition on the 83F5 hardware. The remaining
 promotion blocker is shared hidraw usage filtering, tracked jointly with `ite8258`.

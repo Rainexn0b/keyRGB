@@ -30,6 +30,7 @@ boundaries.
 9. Physical layouts and canonical slot IDs: [09-physical-layout-and-slot-ids.md](09-physical-layout-and-slot-ids.md)
 10. Support Tools and backend discovery: [10-support-tools-and-discovery.md](10-support-tools-and-discovery.md)
 11. Multi-device routing and software targets: [11-multi-device-routing-and-targets.md](11-multi-device-routing-and-targets.md)
+12. Composite controller profile coordination: [12-composite-profile-coordination.md](12-composite-profile-coordination.md)
 
 ## Current baseline (already implemented)
 
@@ -49,6 +50,8 @@ boundaries.
 2. Keep the support and discovery docs aligned with the tray-first support flow.
 3. Keep the layout docs aligned with the slot-ID based editor and calibrator model.
 4. Keep multi-device routing docs aligned with auxiliary-device work such as the lightbar path.
+5. Keep composite-controller coordination docs aligned with backends where several
+   logical routes share one destructive hardware profile namespace.
 
 ## Notes
 

@@ -325,7 +325,7 @@ def _restore_target_from_config(
     config = getattr(tray, "config", None)
     payload = vars(tray).get("_active_secondary_lighting")
     if payload is None:
-        payload = secondary_lighting_state.payload_from_config(config, (route,))
+        payload = secondary_lighting_state.legacy_snapshot_from_config(config, (route,))
     state = secondary_lighting_state.area_entry(payload, route.state_key)
     if state is None:
         return

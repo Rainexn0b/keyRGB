@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.29.2 (2026-07-15)
+
+- ITE8258-Chassis/Issue #7: Preserve one complete keyboard, logo, neon, and
+  vent profile when any surface changes. Per-zone writes no longer restart at
+  hardware group 1 and replace the keyboard scene; global off also latches so
+  later virtual-zone cleanup cannot relight the shared controller.
+- Secondary Lighting/Compatibility: Treat legacy empty or partial
+  `secondary_device_state` config mirrors as compatibility state instead of an
+  explicitly saved profile scene, preventing v0.29.1 mode changes from following
+  a valid keyboard write with automatic secondary-area off writes.
+- ITE8258-Chassis/Issue #7 hardening: Separate desired-scene edits from output
+  suspension (child on/off while suspended is retained for resume); batch one
+  logical software/static frame into a single full-profile commit via optional
+  `output_transaction`; skip composite zones on secondary global-off when the
+  primary owns controller power; rename authority helpers to
+  `authoritative_payload_from_config` / `legacy_snapshot_from_config`; serialize
+  concurrent composite transactions and preserve safe device invalidation when
+  a deferred commit detects a disconnect.
+- Documentation: Add the composite profile coordinator reference, Issue #7
+  hardening plan, route-authority guidance, and focused integration coverage.
+
 ## 0.29.1 (2026-07-14)
 
 - Secondary Lighting/Profiles: Treat explicitly saved empty or partial secondary
