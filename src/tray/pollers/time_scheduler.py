@@ -16,6 +16,7 @@ from src.core.power.monitoring.power_supply_sysfs import read_on_ac_power
 from src.tray.controllers._brightness_layer import apply_layered_brightness_update
 from src.tray.controllers._lighting_controller_helpers import _log_tray_exception, try_log_event
 from src.tray.controllers.lighting_controller import start_current_effect
+from src.tray.idle_power_state import is_system_forced_off, is_user_forced_off
 
 
 if TYPE_CHECKING:
@@ -67,10 +68,10 @@ def _apply_time_scheduler_brightness(
     if reactive_brightness_int is not None and reactive_brightness_int < 0:
         return False
 
-    if tray._user_forced_off:
+    if is_user_forced_off(tray):
         return False
 
-    if tray._power_forced_off or tray._idle_forced_off:
+    if is_system_forced_off(tray):
         return False
 
     try:

@@ -34,7 +34,8 @@ launch_power_mode_settings_gui = gui_launch.launch_power_mode_settings_gui
 launch_reactive_color_gui = gui_launch.launch_reactive_color_gui
 launch_support_gui = gui_launch.launch_support_gui
 launch_uniform_gui = gui_launch.launch_uniform_gui
-_RECOVERABLE_UI_CALLBACK_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Best-effort tray UI refresh/menu callbacks (no map LookupError expected).
+_RECOVERABLE_UI_CALLBACK_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _run_ui_callback_best_effort(action: Callable[[], None]) -> None:

@@ -5,10 +5,12 @@ from unittest.mock import MagicMock
 
 
 def _make_tray(*, power_forced_off: bool = False, transition_result: bool | None = None):
-    tray = SimpleNamespace(
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
         config=SimpleNamespace(),
         is_off=True,
-        _power_forced_off=power_forced_off,
+        power_forced_off=power_forced_off,
         _start_current_effect=MagicMock(),
         _update_icon=MagicMock(),
         _update_menu=MagicMock(),
@@ -139,7 +141,6 @@ def test_activate_perkey_profile_runtime_skips_runtime_apply_while_power_forced_
     from src.tray.protocols import TrayIdlePowerState
 
     tray = _make_tray(power_forced_off=True, transition_result=True)
-    tray.tray_idle_power_state = TrayIdlePowerState()
     apply_profile_to_config = MagicMock()
 
     activate_perkey_profile_runtime(

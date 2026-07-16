@@ -29,9 +29,8 @@ class _TrayIconColorConfig(Protocol):
 
 _DEFAULT_COLOR: RGBColor = (255, 0, 128)
 _OFF_COLOR: RGBColor = (64, 64, 64)
+# getattr/property boundary for icon color config; AttributeError handled above.
 _RECOVERABLE_CONFIG_READ_ERRORS: tuple[type[Exception], ...] = (
-    LookupError,
-    OSError,
     RuntimeError,
     TypeError,
     ValueError,

@@ -43,6 +43,11 @@ class LightingSecondaryDeviceFacade:
     def _secondary_device_state(self) -> dict[str, Any]:
         return secondary_device_accessors.secondary_device_state(self)
 
+    def secondary_device_state_snapshot(self) -> dict[str, Any]:
+        """Return secondary state for readers without mutating config defaults."""
+
+        return secondary_device_accessors.secondary_device_state_snapshot(self)
+
     def _normalize_secondary_state_key(self, value: object, *, default: str = "device") -> str:
         return secondary_device_accessors.normalize_secondary_state_key(value, default=default)
 

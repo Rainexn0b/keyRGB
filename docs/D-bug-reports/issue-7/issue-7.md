@@ -23,14 +23,35 @@ for the composite ITE 8258 chassis path (keyboard + logo + neon + vent).
 - **Maintainer review of residual findings:** classified in the hardening plan;
   generic coordinator extraction and product variants remain evidence-triggered.
 
+## Status update (2026-07-16)
+
+- **Reporter confirmation (v0.29.2):** the reporter confirmed "0.29.2 is working
+  well" and closed the GitHub issue. This closes the **primary regression** —
+  the v0.29.1 mode-change → flash → all-dark defect is resolved on the affected
+  83F5 hardware. It is a regression-closure signal, not a structured per-surface
+  validation.
+- **Backend tier:** remains `EXPERIMENTAL`. The confirmation does not meet the
+  promotion bar; the missing gate is the structured Phase 8 reporter checklist
+  (per-surface pass/fail), not generic "hardware validation."
+- **Phase 6 reframing:** the v0.28.2 support bundle shows the c197 controller
+  exposes **exactly one** hidraw node (`hidraw3`); the two other `048d` nodes
+  are the companion `c193` device. The multi-interface selection ambiguity that
+  Phase 6 guards against does not exist on this hardware, so Phase 6 is
+  **lower urgency than the hardening plan implied.** Additionally, the support
+  bundle's descriptor read for `hidraw3` failed with
+  `report_descriptor_error: [Errno 22] Invalid argument`, so a plain bundle
+  re-capture will not produce the descriptor; the read path needs a look first
+  (or a `usbhid-dump` capture instead). The c195 descriptor half of Phase 6
+  cannot come from this reporter (different device family they do not own).
+
 ## Workstream and closure gates
 
 | Workstream | Current state | Closure evidence |
 |---|---|---|
 | Detection, permissions, sparse keymap | Implemented in earlier releases | Existing issue retests and support bundles |
-| Static/profile regression dual-seam fix | Implemented in working tree | Focused + CI validation; reporter c197 retest pending |
+| Static/profile regression dual-seam fix | Implemented in working tree | Focused + CI validation; **reporter confirmed v0.29.2 working (2026-07-16), regression closed** |
 | Residual coordinator hardening (P1–5) | Implemented in working tree | Unit + cross-layer integration tests green |
-| Shared hidraw interface filtering | Open promotion blocker | Real c195/c197 descriptors plus selector tests |
+| Shared hidraw interface filtering | **Demoted:** no selection ambiguity on real c197 hardware (single hidraw node) | Revisit only if a multi-interface c197 unit appears, or bundle with c195 when a c195 reporter surfaces |
 | Stable Issue #7 closure | Open | Exact artifact, reporter checklist, logs/support bundle for any failure |
 
 ## Documents in this folder

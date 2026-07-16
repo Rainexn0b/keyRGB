@@ -60,9 +60,9 @@ scope** for the 2026-07-15 dual-seam patch, except as residual product status:
 
 ### Code
 
-- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/profile_coordinator.py` (**new**)
-- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/backend.py`
-- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/device.py`
+- `src/core/backends/ite8258_perkey_chassis/profile_coordinator.py` (**new**)
+- `src/core/backends/ite8258_perkey_chassis/backend.py`
+- `src/core/backends/ite8258_perkey_chassis/device.py`
 - `src/tray/controllers/secondary_static_scene.py`
 - `scripts/debug/ite8258-chassis-zone-test.py`
 
@@ -106,7 +106,7 @@ Two independent seams combined into the flash-then-dark failure:
 ### Seam B — Independent virtual-zone `SAVE_PROFILE` on a shared group namespace
 
 **Location:** keyboard + zone devices under
-`ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`
+`ite8258_perkey_chassis`
 
 **Failure mode:**
 

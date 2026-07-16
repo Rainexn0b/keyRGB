@@ -18,7 +18,8 @@ from src.core.diagnostics.device_discovery import collect_device_discovery
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 
-_TRAY_BACKEND_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Backend selection/probe boundary; keep OSError, drop map LookupError.
+_TRAY_BACKEND_RUNTIME_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_debug_boundary(*, logger: logging.Logger, message: str) -> Callable[[Exception], None]:

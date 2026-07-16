@@ -6,41 +6,66 @@ a quick reference for what each backend does and why it is named the way it is.
 ## Naming convention
 
 ```
-ITE<chip>_<keyboard-capability>[_<chassis-lighting>][_<oem-exclusivity>]
+ITE<chip>_<keyboard-capability>[_<chassis-or-aux>][_<oem-exclusivity>]
 ```
 
-A backend name must be **self-describing**: two backends that share a chip but
-differ in keyboard capability, chassis lighting, or OEM wiring must never
-collide on the same name. Names use **underscores only** (never hyphens), so a
-name can always be split on `_` unambiguously. The two optional segments are
-**omitted when empty** rather than padded with a placeholder:
+### Hard rules (required for new backends)
 
-- `<chassis-lighting>` is omitted when the backend drives no extra chassis
+1. **Max four post-chip appendages.** Split the name on `_` after the chip token
+   (`ite8258`, `ite8291r3`, …). At most **four** remaining tokens are allowed.
+   Count every underscore-separated piece, including multi-word OEM tokens
+   (`lenovo` + `legion` count as two).
+
+   | Name | Post-chip tokens | OK? |
+   |---|---|:---:|
+   | `ite8258_perkey_chassis` | `perkey`, `chassis` (2) | yes |
+   | `ite8258_zones_lenovo_legion` | `zones`, `lenovo`, `legion` (3) | yes |
+   | `ite8233_none_chassis_lightbar_clevo` | `none`, `chassis`, `lightbar`, `clevo` (4) | yes (at limit) |
+   | `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` | 8 tokens | **no** |
+
+2. **Coarse chassis tokens only.** Use `chassis` / `lightbar` / `ports`. Do **not**
+   enumerate surfaces (`logo`, `neon`, `vent`) in the backend id; put those on
+   secondary routes and in docs.
+
+3. **Underscores only** for ITE backends (never hyphens). Non-ITE names may keep
+   hyphens (`sysfs-leds`, `asusctl-aura`).
+
+4. **Omit empty optional segments** rather than padding with placeholders.
+
+5. **Package directory == public backend `name`.** Aliases for renames live only
+   in `registry.py::_BACKEND_NAME_ALIASES`.
+
+If a draft name would break rule 1, fold detail into secondary routes, probe
+identifiers, support docs, or OEM notes instead of lengthening the id.
+
+A backend name must still be **self-describing** enough to avoid collisions:
+
+- `<chassis-or-aux>` is omitted when the backend drives no extra non-keyboard
   lighting.
-- `<oem-exclusivity>` is omitted when the chip+wiring is multi-OEM / generic.
+- `<oem-exclusivity>` is omitted when the chip+wiring is multi-OEM / generic, or
+  when keyboard capability + chassis already uniquely identify the path.
 
 | Segment | Answers | Token vocabulary | Examples |
 |---------|---------|------------------|----------|
 | `ITE<chip>` | Which silicon/controller drives the LEDs? | `ite8291`, `ite8258`, `ite8295`, `ite8233`, `ite8910`, `ite8297`, `ite8291r3` | `ite8258` |
 | `<keyboard-capability>` | How is the **keyboard deck** driven? | `perkey`, `zones`, `uniform`, `none` (backend drives no keyboard, e.g. a lightbar-only device) | `perkey` |
-| `<chassis-lighting>` *(optional)* | Does it also drive **extra chassis lighting**? If so, which surfaces? | `chassis_<surface>[_<surface>...]` where surface ∈ `logo`, `neon`, `vent`, `lightbar`, `ports` | `chassis_logo_neon_vent` |
+| `<chassis-or-aux>` *(optional)* | Does it also drive **extra non-keyboard lighting**? | `chassis`, `lightbar`, `ports` (surface lists belong in docs/routes, not the backend id) | `chassis` |
 | `<oem-exclusivity>` *(optional)* | Is this chip+wiring **exclusive to an OEM / model family**? If so, which? | `<oem>_<family>` | `lenovo_legion`, `lenovo_ideapad`, `clevo`, `tongfang` |
 
 Worked example — the Lenovo Legion Pro 7 Gen10 (`0x048d:0xc197`) composite
 controller:
 
 ```
-ite8258_perkey_chassis_logo_neon_vent_lenovo_legion
-  ^^^^^^  ^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^
-  chip    per-key  logo + neon + vent       exclusive to Lenovo
-          keyboard chassis surfaces         Legion Gen10
+ite8258_perkey_chassis
+  ^^^^^^  ^^^^^^  ^^^^^^^
+  chip    per-key  composite chassis lighting
+          keyboard (surfaces live on secondary routes)
 ```
 
 Compare with the same chip on the Legion 5 / Pro 5 Gen10 (`0x048d:0xc195`),
 which is a keyboard-only 24-zone part with no chassis lighting:
-`ite8258_zones_lenovo_legion` (the empty chassis segment is omitted). Under the
-old two-part scheme both collapsed to ambiguous `ite8258_*` names; the expanded
-form keeps them distinct.
+`ite8258_zones_lenovo_legion`. The two products stay distinct without listing
+every chassis surface in the composite backend id.
 
 ### Segment definitions
 
@@ -53,19 +78,16 @@ Keyboard capability:
 | `uniform` | Entire keyboard is one single color |
 | `none` | Backend drives no keyboard (auxiliary-only device such as a lightbar) |
 
-Chassis lighting (non-keyboard surfaces driven through the same backend). The
-whole segment is omitted when there is no extra chassis lighting:
+Chassis / auxiliary lighting (non-keyboard surfaces driven through the same
+backend). The whole segment is omitted when there is no extra chassis lighting.
+Do **not** append individual surface names to the backend id; expose surfaces as
+secondary routes or document them in support notes.
 
 | Token | Meaning |
 |-------|---------|
-| `chassis_logo` | Lid/logo lighting |
-| `chassis_neon` | Neon/accent strip |
-| `chassis_vent` | Vent/rear-edge lighting |
-| `chassis_lightbar` | A separate lightbar strip |
-| `chassis_ports` | I/O-port accent lighting |
-
-Combine multiple surfaces in one token, ordered `logo` > `neon` > `vent` >
-`lightbar` > `ports`, e.g. `chassis_logo_neon_vent`.
+| `chassis` | One or more non-keyboard chassis surfaces (logo, neon, vent, etc.) |
+| `lightbar` | A separate lightbar strip device |
+| `ports` | I/O-port accent lighting only |
 
 OEM exclusivity:
 
@@ -76,10 +98,9 @@ OEM exclusivity:
 
 ### Separator policy
 
-- **Underscores only.** All segments and all multi-word tokens inside a segment
-  use underscores (e.g. `chassis_logo_neon_vent`, `lenovo_legion`). ITE backend
-  names never contain hyphens, so a name can always be split on `_` without
-  ambiguity.
+- See **Hard rules** above for the max-four-appendages limit and underscore policy.
+- Multi-word OEM tokens still use underscores (`lenovo_legion`) and each word
+  counts toward the four-appendage budget.
 - Non-ITE backends (`sysfs-leds`, `sysfs-mouse`, `asusctl-aura`) keep their
   descriptive hyphenated names; they do not follow the `ITE<chip>` convention.
 
@@ -113,7 +134,7 @@ valid via aliases (see *Deprecated aliases*).
 | `ite8291_perkey` | `ite8291_perkey/` | EXPERIMENTAL | Native HID feature-report variant. |
 | `ite8291_zones_clevo` | `ite8291_zones_clevo/` | EXPERIMENTAL | 4-zone variant via tuxedo-drivers protocol (Clevo/Tuxedo). |
 | `ite8258_zones_lenovo_legion` | `ite8258_zones_lenovo_legion/` | EXPERIMENTAL | 24-zone keyboard controller, Lenovo Legion 5 / Pro 5 Gen10 (`0x048d:0xc195`). |
-| `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` | `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/` | EXPERIMENTAL | Composite keyboard + chassis lighting (Lenovo Legion Pro 7 Gen10, `0x048d:0xc197`). Exposes logo/neon/vent zones. |
+| `ite8258_perkey_chassis` | `ite8258_perkey_chassis/` | EXPERIMENTAL | Composite keyboard + chassis lighting (Lenovo Legion Pro 7 Gen10, `0x048d:0xc197`). Exposes logo/neon/vent zones. |
 | `ite8295_zones_lenovo_ideapad` | `ite8295_zones_lenovo_ideapad/` | EXPERIMENTAL | Lenovo IdeaPad/Legion 4-zone family. Covers PIDs `0xC955/0xC963/0xC965/0xC973/0xC975/0xC984/0xC985`. |
 | `ite8233_none_chassis_lightbar_clevo` | `ite8233_none_chassis_lightbar_clevo/` | EXPERIMENTAL | Clevo lightbar (no keyboard). OpenRGB calls this "ITE 8291 rev 0.03" but the device's own HID descriptor reports "ITE Device(8233)". |
 | `ite8297_uniform` | `ite8297_uniform/` | EXPERIMENTAL | Uniform-color sysfs/hidraw backend. |
@@ -132,13 +153,14 @@ existing user config (`KEYRGB_BACKEND`, saved profiles) continues to work.
 | `ite8291` | `ite8291_perkey` |
 | `ite8291-zones` | `ite8291_zones_clevo` |
 | `ite8258` | `ite8258_zones_lenovo_legion` |
-| `ite8258-chassis` | `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` |
+| `ite8258-chassis` | `ite8258_perkey_chassis` |
 | `ite8295-zones` | `ite8295_zones_lenovo_ideapad` |
 | `ite8233` | `ite8233_none_chassis_lightbar_clevo` |
 | `ite8297` | `ite8297_uniform` |
 | `ite8291_zones` | `ite8291_zones_clevo` |
 | `ite8258_zones` | `ite8258_zones_lenovo_legion` |
-| `ite8258_chassis` | `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` |
+| `ite8258_chassis` | `ite8258_perkey_chassis` |
+| `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` | `ite8258_perkey_chassis` |
 | `ite8295_zones` | `ite8295_zones_lenovo_ideapad` |
 | `ite8233_lightbar` | `ite8233_none_chassis_lightbar_clevo` |
 
@@ -189,7 +211,7 @@ Both target ITE 8291-family devices but use different transports:
 These are kept as separate backends because the probe logic and packet
 format differ.
 
-### ite8258_zones_lenovo_legion vs. ite8258_perkey_chassis_logo_neon_vent_lenovo_legion — same chip, different products
+### ite8258_zones_lenovo_legion vs. ite8258_perkey_chassis — same chip, different products
 
 The ITE 8258 chip ships in two different Lenovo Legion Gen10 products with
 different keyboard capabilities, chassis lighting, and USB IDs — which is
@@ -198,11 +220,11 @@ exactly why the convention keeps their names distinct:
 - **Legion 5 / Pro 5 Gen10** (`0x048d:0xc195`) — keyboard-only, 24 zones, no
   chassis lighting → `ite8258_zones_lenovo_legion`.
 - **Legion Pro 7 Gen10** (`0x048d:0xc197`) — per-key keyboard *plus* chassis
-  lighting (logo / neon / vent) → `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`.
+  lighting (logo / neon / vent) → `ite8258_perkey_chassis`.
 
 These are separate backends because they are different products (different
 PIDs, protocols, and probe logic), not two views of one laptop. The
-`ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` backend is keyboard-first and additionally exposes secondary
+`ite8258_perkey_chassis` backend is keyboard-first and additionally exposes secondary
 device routes for its individual chassis zones:
 - `ite8258-chassis-logo`
 - `ite8258-chassis-neon`
@@ -224,8 +246,13 @@ backend is more of a "sysfs LED aggregator" than a single-chip driver.
 ### Shared hidraw modules
 
 Several backends depend on hidraw transport modules from other backends:
-- `ite8291_perkey/hidraw.py` — used by `ite8291_zones_clevo`, `ite8295_zones_lenovo_ideapad`, `ite8258_zones_lenovo_legion`, `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`.
+- `ite8291_perkey/hidraw.py` — used by `ite8291_zones_clevo`, `ite8295_zones_lenovo_ideapad`, `ite8258_zones_lenovo_legion`, `ite8258_perkey_chassis`.
 - `ite8910_perkey/hidraw.py` — used by `ite8233_none_chassis_lightbar_clevo`, `ite8297_uniform`.
+- `shared_hidraw_probe.py` — common find/open/identifier glue for ite8291-style
+  and ite8910-style scanners (prefer this over copying forced-path + product-id
+  open loops).
+- `shared_hidraw_transport.py` — shared multi-zone transport manager for
+  composite controllers.
 
 These cross-dependencies exist because the hidraw transport logic is
 transport-specific (not chip-specific) and was originally implemented in

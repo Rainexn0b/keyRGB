@@ -261,6 +261,11 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         self._save()
 
     def _get_effect_speeds(self) -> dict[str, Any] | None:
+        return self.effect_speed_snapshot()
+
+    def effect_speed_snapshot(self) -> dict[str, Any] | None:
+        """Return detached per-effect speed overrides for read-only consumers."""
+
         return _effect_speed_boundary.EffectSpeedOverrides.copied_from_settings(
             self._get_optional_scalar("effect_speeds")
         )

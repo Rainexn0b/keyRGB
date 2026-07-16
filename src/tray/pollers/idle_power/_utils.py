@@ -3,7 +3,8 @@ from __future__ import annotations
 from typing import Optional
 
 
-_IDLE_ACTION_KEY_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Diagnostic-only key formatting: int()/str() failures only (no OS/I-O here).
+_IDLE_ACTION_KEY_RUNTIME_EXCEPTIONS = (RuntimeError, TypeError, ValueError, OverflowError)
 
 
 def debounce_dim_and_screen_off(

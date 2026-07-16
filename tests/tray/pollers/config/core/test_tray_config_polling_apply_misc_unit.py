@@ -13,12 +13,14 @@ from src.tray.pollers.config_polling_internal import core as config_polling_core
 
 
 def _mk_tray_base(*, effect: str, brightness: int) -> MagicMock:
-    tray = MagicMock()
-    tray.is_off = False
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-    tray._idle_forced_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
 
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        idle_forced_off=False,
+    )
     tray.config = SimpleNamespace(
         CONFIG_FILE="/tmp/keyrgb-test-config.json",
         effect=effect,
@@ -29,18 +31,9 @@ def _mk_tray_base(*, effect: str, brightness: int) -> MagicMock:
         reactive_use_manual_color=False,
         reactive_color=(10, 20, 30),
     )
-
-    tray.engine = MagicMock()
     tray.engine.running = True
     tray.engine.kb = MagicMock()
     tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *args: None)
-
-    tray._log_event = MagicMock()
-    tray._log_exception = MagicMock()
-    tray._refresh_ui = MagicMock()
-    tray._update_menu = MagicMock()
-    tray._start_current_effect = MagicMock()
-
     return tray
 
 
@@ -232,6 +225,7 @@ def test_apply_from_config_once_sets_last_brightness_when_positive() -> None:
     )
 
     assert tray._last_brightness == 12
+    assert tray.tray_idle_power_state.last_brightness == 12
 
 
 def test_apply_from_config_once_perkey_enable_user_mode_typeerror_fallback() -> None:

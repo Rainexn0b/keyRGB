@@ -37,6 +37,22 @@ KeyRGB has several hardware backends with similar responsibilities, especially a
 2. Keep protocol encoding and hardware write semantics backend-local.
 3. Add contract tests around the shared layer before migrating the backends to it.
 
+## Progress (2026-07-15)
+
+- Added `src/core/backends/shared_hidraw_probe.py` for ite8291-style find/open/
+  identifier glue (not full USB common yet).
+- Migrated onto shared helpers:
+  - `ite8258_zones_lenovo_legion`
+  - `ite8258_perkey_chassis`
+  - `ite8295_zones_lenovo_ideapad`
+  - `ite8291_perkey`
+  - `ite8291_zones_clevo` (bcdDevice filter remains backend-local)
+- Unit tests: `tests/core/backends/test_shared_hidraw_probe_unit.py` + backend suites.
+- Also migrated ite8910-style find glue for `ite8297_uniform` and
+  `ite8233_none_chassis_lightbar_clevo` via injectable scanner callbacks.
+- Remaining optional: shared probe-result construction helpers (experimental
+  gate + confidence templates).
+
 ## Buildpython hooks
 
 - Existing signals:

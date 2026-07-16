@@ -102,8 +102,10 @@ def test_read_desktop_dimmed_state_falls_back_to_input_idle_when_wayland_returns
 
 
 def test_run_idle_power_iteration_uses_wayland_idle_as_primary() -> None:
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
     captured: dict[str, object] = {}
-    tray = SimpleNamespace(
+    tray = make_owner_backed_simple_tray(
         config=SimpleNamespace(
             reload=lambda: None,
             power_management_enabled=True,
@@ -115,13 +117,13 @@ def test_run_idle_power_iteration_uses_wayland_idle_as_primary() -> None:
         engine=SimpleNamespace(),
         backend=None,
         is_off=False,
-        _idle_forced_off=False,
-        _user_forced_off=False,
-        _power_forced_off=False,
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        last_resume_at=0.0,
         _dim_sync_suppressed_logged=False,
-        _last_resume_at=0.0,
         _log_event=lambda *_args, **_kwargs: None,
     )
 
@@ -251,8 +253,10 @@ def test_run_idle_power_iteration_uses_wayland_via_fallback_when_kde_dim_timeout
     """Integration: when KDE dim timeout is None but Wayland is available,
     the iteration should use the Wayland tracker with the general idle
     timeout and NOT fall back to the brightness heuristic."""
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
     captured: dict[str, object] = {}
-    tray = SimpleNamespace(
+    tray = make_owner_backed_simple_tray(
         config=SimpleNamespace(
             reload=lambda: None,
             power_management_enabled=True,
@@ -264,13 +268,13 @@ def test_run_idle_power_iteration_uses_wayland_via_fallback_when_kde_dim_timeout
         engine=SimpleNamespace(),
         backend=None,
         is_off=False,
-        _idle_forced_off=False,
-        _user_forced_off=False,
-        _power_forced_off=False,
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        last_resume_at=0.0,
         _dim_sync_suppressed_logged=False,
-        _last_resume_at=0.0,
         _log_event=lambda *_args, **_kwargs: None,
     )
 

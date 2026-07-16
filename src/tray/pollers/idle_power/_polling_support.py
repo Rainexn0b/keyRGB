@@ -19,7 +19,8 @@ else:
     InputIdleTracker = object
 
 
-_IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Idle-power diagnostic/log boundary (not the full poll loop); drop map LookupError.
+_IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def tray_log_exception_or_none(tray: object) -> Callable[..., object] | None:
@@ -84,6 +85,7 @@ def ensure_idle_state(tray: IdlePowerTrayProtocol) -> None:
         ("_dim_temp_target_brightness", "dim_temp_target_brightness"),
         ("_last_idle_turn_off_at", "last_idle_turn_off_at"),
         ("_last_resume_at", "last_resume_at"),
+        ("_last_brightness", "last_brightness"),
         ("_dim_sync_suppressed_logged", "dim_sync_suppressed_logged"),
     )
 

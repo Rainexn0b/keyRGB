@@ -747,7 +747,6 @@ class TestStartCurrentEffect:
 
         assert _TRAY_LOGGER_CALLBACK_EXCEPTIONS == (
             AttributeError,
-            LookupError,
             OSError,
             RuntimeError,
             TypeError,

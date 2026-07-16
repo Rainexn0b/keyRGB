@@ -13,12 +13,19 @@ class _DummyConfig:
 
 class _DummyTray:
     def __init__(self, *, brightness: int, is_off: bool, power_forced_off: bool = False):
+        from tests.tray.fakes import attach_idle_power_owner, make_idle_power_owner
+
         self.config = _DummyConfig(brightness=brightness)
         self.is_off = is_off
-        self._power_forced_off = power_forced_off
-        self._last_brightness = brightness
         self.refresh_count = 0
         self.last_animate_icon = None
+        attach_idle_power_owner(
+            self,
+            make_idle_power_owner(
+                power_forced_off=power_forced_off,
+                last_brightness=brightness if brightness > 0 else 25,
+            ),
+        )
 
     def _refresh_ui(self, *, animate_icon: bool = True) -> None:
         self.refresh_count += 1

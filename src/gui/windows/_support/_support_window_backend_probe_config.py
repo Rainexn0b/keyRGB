@@ -23,6 +23,8 @@ class _ProbeConfigLike(Protocol):
 
     def set_effect_speed(self, effect_name: str, speed: int) -> None: ...
 
+    def effect_speed_snapshot(self) -> dict[str, object] | None: ...
+
 
 def _copy_effect_speeds(raw: object) -> dict[str, object] | None:
     return EffectSpeedOverrides.copied_from_settings(raw)
@@ -37,9 +39,13 @@ class ProbeConfigSnapshot:
     @classmethod
     def capture(cls, config: _ProbeConfigLike) -> ProbeConfigSnapshot:
         effect_speeds = None
-        settings = config._settings
-        if isinstance(settings, dict):
-            effect_speeds = _copy_effect_speeds(settings.get("effect_speeds"))
+        snapshot_fn = getattr(config, "effect_speed_snapshot", None)
+        if callable(snapshot_fn):
+            effect_speeds = _copy_effect_speeds(snapshot_fn())
+        else:
+            settings = config._settings
+            if isinstance(settings, dict):
+                effect_speeds = _copy_effect_speeds(settings.get("effect_speeds"))
 
         try:
             speed = int(getattr(config, "speed", 0))

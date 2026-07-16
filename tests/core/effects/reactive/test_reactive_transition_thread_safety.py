@@ -3,9 +3,6 @@
 See improvement plan Item 1 — thread safety for ReactiveRenderState transitions.
 """
 import threading
-import time
-
-import pytest
 
 from src.core.effects.reactive._render_brightness_support import (
     ReactiveRenderState,
@@ -55,7 +52,6 @@ class TestTransitionAtomicOperations:
         belongs to a different seed."""
         state = ReactiveRenderState()
         lock = threading.Lock()
-        errors = []
         ITERATIONS = 500
 
         def seeder():

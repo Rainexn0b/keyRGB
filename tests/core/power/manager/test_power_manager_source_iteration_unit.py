@@ -6,7 +6,32 @@ from unittest.mock import MagicMock
 from src.core.power.management._manager_source_iteration import (
     IterationDisposition,
     classify_power_source_iteration,
+    stabilize_power_source_state,
 )
+
+
+def test_stabilize_power_source_state_requires_two_changed_samples() -> None:
+    state = stabilize_power_source_state(raw_on_ac=True, stable_on_ac=None, pending_on_ac=None)
+    assert state.stable_on_ac is True
+    assert state.pending_on_ac is None
+
+    state = stabilize_power_source_state(raw_on_ac=False, stable_on_ac=True, pending_on_ac=None)
+    assert state.stable_on_ac is True
+    assert state.pending_on_ac is False
+
+    state = stabilize_power_source_state(raw_on_ac=False, stable_on_ac=True, pending_on_ac=False)
+    assert state.stable_on_ac is False
+    assert state.pending_on_ac is None
+
+
+def test_stabilize_power_source_state_clears_pending_when_sample_returns_to_stable() -> None:
+    state = stabilize_power_source_state(raw_on_ac=True, stable_on_ac=False, pending_on_ac=True)
+    assert state.stable_on_ac is True
+    assert state.pending_on_ac is None
+
+    state = stabilize_power_source_state(raw_on_ac=None, stable_on_ac=True, pending_on_ac=False)
+    assert state.stable_on_ac is True
+    assert state.pending_on_ac is None
 
 
 def test_classify_power_source_iteration_sleeps_when_power_source_unknown() -> None:

@@ -22,14 +22,15 @@ _BACKEND_NAME_ALIASES: dict[str, str] = {
     "ite8291": "ite8291_perkey",
     "ite8291-zones": "ite8291_zones_clevo",
     "ite8258": "ite8258_zones_lenovo_legion",
-    "ite8258-chassis": "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+    "ite8258-chassis": "ite8258_perkey_chassis",
     "ite8295-zones": "ite8295_zones_lenovo_ideapad",
     "ite8233": "ite8233_none_chassis_lightbar_clevo",
     "ite8297": "ite8297_uniform",
     # Pre-rename canonical names (persisted in user configs / KEYRGB_BACKEND).
     "ite8291_zones": "ite8291_zones_clevo",
     "ite8258_zones": "ite8258_zones_lenovo_legion",
-    "ite8258_chassis": "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+    "ite8258_chassis": "ite8258_perkey_chassis",
+    "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion": "ite8258_perkey_chassis",
     "ite8295_zones": "ite8295_zones_lenovo_ideapad",
     "ite8233_lightbar": "ite8233_none_chassis_lightbar_clevo",
 }
@@ -64,7 +65,7 @@ def _default_specs() -> list[BackendSpec]:
     # Keep this list small and lazy-importing.
     from .asusctl import AsusctlAuraBackend
     from .ite8258_zones_lenovo_legion import Ite8258Backend
-    from .ite8258_perkey_chassis_logo_neon_vent_lenovo_legion import Ite8258ChassisBackend
+    from .ite8258_perkey_chassis import Ite8258ChassisBackend
     from .ite8291_perkey import Ite8291Backend
     from .ite8291_zones_clevo import Ite8291ZonesBackend
     from .ite8295_zones_lenovo_ideapad import Ite8295ZonesBackend

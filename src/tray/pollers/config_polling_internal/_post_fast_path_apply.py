@@ -3,7 +3,10 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, TypeAlias, TypeVar
 
+from src.tray.idle_power_state import set_last_brightness
 from src.tray.protocols import ConfigPollingTrayProtocol
+
+from ._apply_plan import classify_apply_mode
 
 
 _LOG_WRITE_EXCEPTIONS = (OSError, RuntimeError, ValueError)
@@ -157,13 +160,13 @@ def apply_post_fast_path_execution(
 ) -> float:
     brightness = current.brightness
     if brightness > 0:
-        tray._last_brightness = brightness
+        set_last_brightness(tray, brightness)
 
     sync_reactive_fn(tray, current)
 
     def _apply_current() -> None:
-        effect = current.effect
-        if effect == "perkey":
+        apply_mode = classify_apply_mode(current.effect)
+        if apply_mode == "perkey":
             reassert_user_mode = True
             try:
                 already_perkey = getattr(last_applied, "effect", None) == "perkey"
@@ -179,7 +182,7 @@ def apply_post_fast_path_execution(
                 cause=cause,
                 reassert_user_mode=bool(reassert_user_mode),
             )
-        elif effect == "none":
+        elif apply_mode == "uniform":
             apply_uniform_fn(tray, current, cause=cause)
         else:
             apply_effect_fn(tray, current, cause=cause)

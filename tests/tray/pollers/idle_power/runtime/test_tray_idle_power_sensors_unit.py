@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import subprocess
-from types import SimpleNamespace
 
 
 import src.tray.pollers.idle_power.sensors as sensors

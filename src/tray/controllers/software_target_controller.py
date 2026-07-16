@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import logging
-from collections.abc import Callable, Iterator, Mapping
-from typing import Protocol, TypeAlias, TypeVar, cast
+from collections.abc import Iterator, Mapping
+from typing import TypeAlias
 
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from src.core.effects.software_targets import normalize_software_effect_target
@@ -14,20 +13,47 @@ from src.tray.secondary_device_routes import route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry, device_context_controls_available, device_context_entries
 
 from . import _software_target_auxiliary as software_target_auxiliary
-from . import secondary_static_scene
+from . import _software_target_boundaries as boundaries
+from . import _software_target_profile as software_target_profile
 from ._lighting_controller_helpers import is_software_effect
 
-
-logger = logging.getLogger(__name__)
-_ResultT = TypeVar("_ResultT")
+# Public re-exports for tests and monkeypatch seams.
+_SoftwareTargetTrayProtocol = boundaries._SoftwareTargetTrayProtocol
+_PermissionIssueTrayProtocol = boundaries._PermissionIssueTrayProtocol
+_run_recoverable_boundary = boundaries.run_recoverable_boundary
+_try_log_event = boundaries.try_log_event
+_call_tray_callback_best_effort = boundaries.call_tray_callback_best_effort
+_notify_permission_issue_or_none = boundaries.notify_permission_issue_or_none
+_set_engine_attr_best_effort = boundaries.set_engine_attr_best_effort
+_set_config_attr_best_effort = boundaries.set_config_attr_best_effort
+_log_boundary_exception = boundaries.log_boundary_exception
+_restore_target_from_config = software_target_profile.restore_target_from_config
+logger = boundaries.logger
 
 _SecondarySoftwareTargetProtocol: TypeAlias = software_target_auxiliary._SecondarySoftwareTargetProtocol
 _CachedSecondarySoftwareTarget = software_target_auxiliary._CachedSecondarySoftwareTarget
 _SECONDARY_TARGET_RUNTIME_EXCEPTIONS = software_target_auxiliary._SECONDARY_TARGET_RUNTIME_EXCEPTIONS
 
-_ENGINE_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
-_CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
-_TRAY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+def _handle_secondary_target_error(tray: _SoftwareTargetTrayProtocol, exc: Exception, *, action: str) -> None:
+    # Keep permission classification on this module so tests can patch
+    # ``is_permission_denied`` / logger seams on the public controller path.
+    if is_permission_denied(exc):
+        notify_permission_issue = _notify_permission_issue_or_none(tray)
+        if notify_permission_issue is None:
+            _log_boundary_exception(tray, f"Error during {action}: %s", exc)
+            return
+        if _call_tray_callback_best_effort(
+            lambda: notify_permission_issue(exc),
+            on_recoverable=lambda notify_exc: _log_boundary_exception(
+                tray,
+                "Failed to notify permission issue for secondary software target: %s",
+                notify_exc,
+            ),
+        ):
+            return
+
+    _log_boundary_exception(tray, f"Error during {action}: %s", exc)
 
 
 def _software_effect_is_running(tray: object, current: object) -> bool:
@@ -35,76 +61,6 @@ def _software_effect_is_running(tray: object, current: object) -> bool:
         getattr(getattr(tray, "engine", None), "running", False)
         and is_software_effect(str(getattr(current, "effect", "none")))
     )
-
-
-class _SoftwareTargetTrayProtocol(Protocol):
-    @property
-    def config(self) -> object: ...
-
-    @property
-    def engine(self) -> object: ...
-
-    @property
-    def is_off(self) -> bool: ...
-
-    def _log_exception(self, msg: str, exc: Exception) -> None: ...
-
-    def _log_event(self, source: str, action: str, **fields: object) -> None: ...
-
-
-class _PermissionIssueTrayProtocol(Protocol):
-    def _notify_permission_issue(self, exc: Exception) -> None: ...
-
-
-def _run_recoverable_boundary(
-    action: Callable[[], _ResultT],
-    *,
-    runtime_exceptions: tuple[type[Exception], ...],
-    on_recoverable: Callable[[Exception], None],
-    fallback: _ResultT,
-    reraise_recoverable: bool = False,
-) -> _ResultT:
-    try:
-        return action()
-    except runtime_exceptions as exc:  # @quality-exception exception-transparency: shared secondary-target device and tray callback runtime seams must either invalidate cached state or degrade to fallback logging while unexpected defects still propagate
-        on_recoverable(exc)
-        if reraise_recoverable:
-            raise
-        return fallback
-
-
-def _try_log_event(tray: _SoftwareTargetTrayProtocol, source: str, action: str, **fields: object) -> None:
-    _call_tray_callback_best_effort(
-        lambda: tray._log_event(source, action, **fields),
-        on_recoverable=lambda exc: logger.exception("Tray event logging failed: %s", exc),
-    )
-
-
-def _call_tray_callback_best_effort(
-    action: Callable[[], None],
-    *,
-    on_recoverable: Callable[[Exception], None],
-) -> bool:
-    def _call_action() -> bool:
-        action()
-        return True
-
-    return _run_recoverable_boundary(
-        _call_action,
-        runtime_exceptions=_TRAY_CALLBACK_RUNTIME_EXCEPTIONS,
-        on_recoverable=on_recoverable,
-        fallback=False,
-    )
-
-
-def _notify_permission_issue_or_none(tray: _SoftwareTargetTrayProtocol) -> Callable[[Exception], None] | None:
-    try:
-        notify_permission_issue = cast(_PermissionIssueTrayProtocol, tray)._notify_permission_issue
-    except AttributeError:
-        return None
-    if not callable(notify_permission_issue):
-        return None
-    return notify_permission_issue
 
 
 def configure_engine_software_targets(tray: _SoftwareTargetTrayProtocol) -> None:
@@ -176,6 +132,8 @@ def secondary_software_render_targets(tray: _SoftwareTargetTrayProtocol) -> list
 
 
 def restore_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> None:
+    # Keep the loop here so tests can monkeypatch `_iter_secondary_targets` /
+    # `_restore_target_from_config` on this module.
     for entry, target in _iter_secondary_targets(tray):
         try:
             _restore_target_from_config(tray, entry=entry, target=target)
@@ -185,41 +143,22 @@ def restore_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> Non
 
 def reconcile_secondary_profile_state(
     tray: _SoftwareTargetTrayProtocol,
-    payload: Mapping[str, object] | None,
+    payload: object,
     *,
     animated: bool,
 ) -> None:
-    """Refresh profile-owned secondary state without restarting the keyboard effect."""
-    if payload is None:
-        if not animated:
-            secondary_static_scene.apply_secondary_static_scene(tray)
-        return
-
-    old_payload = vars(tray).get("_active_secondary_lighting")
-    new_enabled = secondary_lighting_state.enabled_state_keys(payload)
-    old_enabled = secondary_lighting_state.enabled_state_keys(old_payload)
-    cache = _proxy_cache(tray)
-    if not old_enabled:
-        old_enabled = {str(getattr(target, "state_key", "")).strip().lower() for target in cache.values()}
-    if animated and not any(
-        bool(getattr(tray, attr, False)) for attr in ("_user_forced_off", "_idle_forced_off", "_power_forced_off")
-    ):
-        for target in tuple(cache.values()):
-            state_key = str(getattr(target, "state_key", "")).strip().lower()
-            if state_key not in old_enabled or state_key in new_enabled:
-                continue
-            try:
-                target.turn_off()
-            except _SECONDARY_TARGET_RUNTIME_EXCEPTIONS as exc:
-                _handle_secondary_target_error(tray, exc, action="disable_secondary_software_target")
-
-    try:
-        vars(tray)["_active_secondary_lighting"] = payload
-    except (AttributeError, TypeError, RuntimeError):
-        pass
-
-    if not animated:
-        secondary_static_scene.apply_secondary_static_scene(tray, payload=payload)
+    mapping_payload: Mapping[str, object] | None
+    if payload is None or isinstance(payload, Mapping):
+        mapping_payload = payload  # type: ignore[assignment]
+    else:
+        mapping_payload = None
+    software_target_profile.reconcile_secondary_profile_state(
+        tray,
+        mapping_payload,
+        animated=animated,
+        proxy_cache_fn=_proxy_cache,
+        handle_secondary_target_error_fn=_handle_secondary_target_error,
+    )
 
 
 def turn_off_secondary_software_targets(tray: _SoftwareTargetTrayProtocol) -> None:
@@ -312,97 +251,11 @@ def _iter_secondary_targets(
     )
 
 
-def _restore_target_from_config(
-    tray: _SoftwareTargetTrayProtocol,
-    *,
-    entry: DeviceContextEntry,
-    target: _SecondarySoftwareTargetProtocol,
-) -> None:
-    route = route_for_context_entry(entry)
-    if route is None:
-        return
-
-    config = getattr(tray, "config", None)
-    payload = vars(tray).get("_active_secondary_lighting")
-    if payload is None:
-        payload = secondary_lighting_state.legacy_snapshot_from_config(config, (route,))
-    state = secondary_lighting_state.area_entry(payload, route.state_key)
-    if state is None:
-        return
-    if not secondary_lighting_state.entry_enabled(state):
-        target.turn_off()
-        return
-    target.set_color(
-        secondary_lighting_state.route_color(config, route, state),
-        brightness=secondary_lighting_state.route_brightness(config, route, state),
-    )
-
-
-def _handle_secondary_target_error(tray: _SoftwareTargetTrayProtocol, exc: Exception, *, action: str) -> None:
-    if is_permission_denied(exc):
-        notify_permission_issue = _notify_permission_issue_or_none(tray)
-        if notify_permission_issue is None:
-            _log_boundary_exception(tray, f"Error during {action}: %s", exc)
-            return
-        if _call_tray_callback_best_effort(
-            lambda: notify_permission_issue(exc),
-            on_recoverable=lambda notify_exc: _log_boundary_exception(
-                tray,
-                "Failed to notify permission issue for secondary software target: %s",
-                notify_exc,
-            ),
-        ):
-            return
-
-    _log_boundary_exception(tray, f"Error during {action}: %s", exc)
-
-
-def _set_engine_attr_best_effort(
-    tray: _SoftwareTargetTrayProtocol, attr: str, value: object, *, error_msg: str
-) -> None:
-    engine = getattr(tray, "engine", None)
-    if engine is None:
-        return
-
-    try:
-        setattr(engine, attr, value)
-    except AttributeError:
-        return
-    except _ENGINE_ATTR_WRITE_EXCEPTIONS as exc:
-        _log_boundary_exception(tray, error_msg, exc)
-
-
-def _set_config_attr_best_effort(
-    tray: _SoftwareTargetTrayProtocol, attr: str, value: object, *, error_msg: str
-) -> None:
-    config = getattr(tray, "config", None)
-    if config is None:
-        return
-
-    try:
-        setattr(config, attr, value)
-    except AttributeError:
-        return
-    except _CONFIG_ATTR_WRITE_EXCEPTIONS as exc:
-        _log_boundary_exception(tray, error_msg, exc)
-
-
-def _log_boundary_exception(tray: _SoftwareTargetTrayProtocol, msg: str, exc: Exception) -> None:
-    if _call_tray_callback_best_effort(
-        lambda: tray._log_exception(msg, exc),
-        on_recoverable=lambda log_exc: logger.exception(
-            "Tray exception logger failed while logging boundary: %s", log_exc
-        ),
-    ):
-        return
-
-    logger.error(msg, exc, exc_info=(type(exc), exc, exc.__traceback__))
-
-
 __all__ = [
     "apply_software_effect_target_selection",
     "close_secondary_software_target_cache",
     "configure_engine_software_targets",
+    "reconcile_secondary_profile_state",
     "restore_secondary_software_targets",
     "secondary_software_render_targets",
     "software_effect_target_has_auxiliary_devices",

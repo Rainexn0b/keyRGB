@@ -31,6 +31,7 @@ boundaries.
 10. Support Tools and backend discovery: [10-support-tools-and-discovery.md](10-support-tools-and-discovery.md)
 11. Multi-device routing and software targets: [11-multi-device-routing-and-targets.md](11-multi-device-routing-and-targets.md)
 12. Composite controller profile coordination: [12-composite-profile-coordination.md](12-composite-profile-coordination.md)
+13. Tray runtime state ownership: [13-tray-runtime-state-ownership.md](13-tray-runtime-state-ownership.md)
 
 ## Current baseline (already implemented)
 

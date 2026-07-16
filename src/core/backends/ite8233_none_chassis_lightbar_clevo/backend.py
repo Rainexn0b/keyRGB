@@ -52,31 +52,18 @@ def find_matching_hidraw_device(
     return hidraw.find_matching_hidraw_device(vendor_id, product_id, root=root, dev_root=dev_root)
 
 
-def _forced_hidraw_device_info(devnode: Path) -> HidrawDeviceInfo:
-    hidraw = _hidraw_module()
-    return hidraw.HidrawDeviceInfo(
-        hidraw_name=devnode.name,
-        devnode=devnode,
-        sysfs_dir=Path(),
-        vendor_id=protocol.VENDOR_ID,
-        product_id=protocol.DEFAULT_PRODUCT_ID,
-        hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.DEFAULT_PRODUCT_ID:04x}",
-    )
-
-
 def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
-    forced_path = os.environ.get(protocol.HIDRAW_PATH_ENV)
-    if forced_path:
-        devnode = Path(forced_path)
-        if devnode.exists():
-            return _forced_hidraw_device_info(devnode)
+    from ..shared_hidraw_probe import find_matching_ite8910_style_hidraw_device
 
-    for product_id in protocol.SUPPORTED_PRODUCT_IDS:
-        match = find_matching_hidraw_device(protocol.VENDOR_ID, product_id)
-        if match is not None:
-            return match
-
-    return None
+    hidraw = _hidraw_module()
+    return find_matching_ite8910_style_hidraw_device(
+        vendor_id=protocol.VENDOR_ID,
+        product_ids=protocol.SUPPORTED_PRODUCT_IDS,
+        forced_path_env=protocol.HIDRAW_PATH_ENV,
+        forced_product_id=protocol.DEFAULT_PRODUCT_ID,
+        find_matching_fn=find_matching_hidraw_device,
+        device_info_factory=hidraw.HidrawDeviceInfo,
+    )
 
 
 def _open_matching_transport() -> tuple[HidrawFeatureTransport, HidrawDeviceInfo]:

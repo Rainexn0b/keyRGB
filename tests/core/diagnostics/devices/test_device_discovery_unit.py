@@ -341,7 +341,7 @@ def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimenta
             "selected": None,
             "probes": [
                 {
-                    "name": "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+                    "name": "ite8258_perkey_chassis",
                     "available": False,
                     "stability": "experimental",
                     "selection_enabled": False,
@@ -384,7 +384,7 @@ def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimenta
     assert payload["candidates"][0]["status"] == "experimental_disabled"
     assert payload["candidates"][0]["device_type"] == "keyboard"
     assert "experimental backend exists" in payload["candidates"][0]["recommended_action"].lower()
-    assert payload["candidates"][0]["probe_names"] == ["ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"]
+    assert payload["candidates"][0]["probe_names"] == ["ite8258_perkey_chassis"]
     assert payload["candidates"][0]["hidraw_nodes"] == ["/dev/hidraw11"]
     assert payload["candidates"][1]["usb_pid"] == "0xc193"
     assert payload["candidates"][1]["status"] == "unrecognized_ite"
@@ -403,7 +403,7 @@ def test_format_device_discovery_text_includes_ite8258_chassis_experimental_guid
                 "recommended_issue_template": "hardware-support",
                 "recommended_issue_url": "https://example.invalid/hardware-support",
                 "next_steps": [
-                    "Treat `0x048d:0xc197` as the primary KeyRGB target for this Lenovo Gen10 path; `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` is now an opt-in experimental backend, so enable Experimental backends before collecting runtime results.",
+                    "Treat `0x048d:0xc197` as the primary KeyRGB target for this Lenovo Gen10 path; `ite8258_perkey_chassis` is now an opt-in experimental backend, so enable Experimental backends before collecting runtime results.",
                     "Keep the companion `0x048d:0xc193` device listed in the report; it remains unmanaged and should be treated as separate evidence until its role is confirmed.",
                 ],
                 "optional_capture_commands": ["lsusb -v -d 048d:c197"],
@@ -416,7 +416,7 @@ def test_format_device_discovery_text_includes_ite8258_chassis_experimental_guid
                     "device_type": "keyboard",
                     "status": "experimental_disabled",
                     "recommended_action": "Experimental backend exists, but experimental backends are currently disabled.",
-                    "probe_names": ["ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"],
+                    "probe_names": ["ite8258_perkey_chassis"],
                     "hidraw_nodes": ["/dev/hidraw11"],
                 },
                 {

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from src.core.utils.safe_attrs import safe_int_attr
+from src.tray.idle_power_state import set_last_brightness
 from src.tray.protocols import LightingTrayProtocol
 
 from ._lighting_controller_helpers import (
@@ -15,7 +16,8 @@ from ._lighting_controller_helpers import (
 )
 
 
-_BRIGHTNESS_LAYER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Layered brightness apply crosses config/engine/UI; no map LookupError expected.
+_BRIGHTNESS_LAYER_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def apply_layered_brightness_update(
@@ -31,7 +33,7 @@ def apply_layered_brightness_update(
         return
 
     if base_brightness is not None and int(base_brightness) > 0:
-        tray._last_brightness = int(base_brightness)
+        set_last_brightness(tray, int(base_brightness))
 
     try_log_event(
         tray,

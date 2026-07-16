@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend import Ite8258ChassisBackend
+    from src.core.backends.ite8258_perkey_chassis.backend import Ite8258ChassisBackend
 
 from src.core.backends.ite8233_none_chassis_lightbar_clevo.backend import Ite8233Backend
 from src.core.backends.sysfs_mouse.backend import SysfsMouseBackend
@@ -82,7 +82,7 @@ def _get_sysfs_mouse_backend() -> object:
 
 
 def _get_ite8258_chassis_backend() -> Ite8258ChassisBackend:
-    from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend import Ite8258ChassisBackend
+    from src.core.backends.ite8258_perkey_chassis.backend import Ite8258ChassisBackend
 
     return Ite8258ChassisBackend()
 
@@ -137,7 +137,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         supports_software_target=True,
         supports_profile_state=True,
         brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
-        parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+        parent_backend_name="ite8258_perkey_chassis",
         zone_key="logo",
         primary_owns_global_off=True,
     ),
@@ -154,7 +154,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         supports_software_target=True,
         supports_profile_state=True,
         brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
-        parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+        parent_backend_name="ite8258_perkey_chassis",
         zone_key="neon",
         primary_owns_global_off=True,
     ),
@@ -171,7 +171,7 @@ _ROUTES: tuple[SecondaryDeviceRoute, ...] = (
         supports_software_target=True,
         supports_profile_state=True,
         brightness_policy=BRIGHTNESS_POLICY_PRIMARY_SHARED,
-        parent_backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+        parent_backend_name="ite8258_perkey_chassis",
         zone_key="vent",
         primary_owns_global_off=True,
     ),

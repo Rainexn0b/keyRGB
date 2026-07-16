@@ -280,6 +280,24 @@ def test_is_intentionally_off_requires_literal_true_for_controller_flags() -> No
     )
 
 
+def test_is_power_event_forced_off_checks_legacy_then_typed_owner() -> None:
+    from src.core.power.management._manager_helpers import is_power_event_forced_off
+
+    assert is_power_event_forced_off(MagicMock(_power_forced_off=True)) is True
+    assert (
+        is_power_event_forced_off(
+            MagicMock(_power_forced_off=False, tray_idle_power_state=MagicMock(power_forced_off=True))
+        )
+        is True
+    )
+    assert (
+        is_power_event_forced_off(
+            MagicMock(_power_forced_off=False, tray_idle_power_state=MagicMock(power_forced_off=False))
+        )
+        is False
+    )
+
+
 def test_is_intentionally_off_returns_false_when_safe_int_reader_raises() -> None:
     from src.core.power.management._manager_helpers import is_intentionally_off
 

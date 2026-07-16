@@ -2,38 +2,24 @@
 
 ## Unreleased
 
+## 0.30.0 (2026-07-16)
+
+- License: Ship the GPL-2 text in `LICENSE` to match the declared `GPL-2.0-or-later` SPDX/license in `pyproject.toml` and README (the root file previously contained a GPL-3 preamble block).
+- Backends/Naming: Rename the composite Lenovo Gen10 chassis backend from `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` to `ite8258_perkey_chassis` (package directory matches). Keep previous long and short names as aliases so `KEYRGB_BACKEND`, saved selections, and HID pacing overrides resolve. Secondary zone route ids (`ite8258-chassis-{logo,neon,vent}`) and persisted per-zone keys are unchanged.
+- Maintainability: Add the 2026-07-15 debt paydown plan under `docs/I-implementation-plans/2026-07-15/`; extract shared ite8291- and ite8910-style hidraw probe helpers (ITE 8258/8295/8291/8297/8233); extend `ConfigApplyPlan` with pure `apply_mode` and power-source skip gates; extract pure AC/battery debounce and power-forced-off detection from `PowerManager`; document tray runtime state ownership; add forced-off/dim-temp/`last_brightness` helpers on `TrayIdlePowerState` and migrate controllers, pollers, and profile activation off private forced-off/last-brightness access; expose typed readonly secondary/effect-speed config snapshots; add composite forced-off config-apply integration coverage; store KeyRGBTray idle/power flags on the typed owner via compatibility properties; skip dual-write on property-backed trays in set helpers; split software-target boundary/profile helpers; split settings_state into reader/values/scheduler modules; add owner-backed tray test fakes and migrate poller/controller/idle-restore/power-manager/config-apply suites onto them; narrow diagnostic exception tuples across tray callback/formatting seams (menu-int, idle action-key, icon config/poll, backend select, tray logging/notify/UI/secondary/per-key status, event-log, engine-attr-sync, brightness-layer, notification backend, idle-power diagnostics, profile menu callbacks, enable_user_mode save, config persist sync).
+
 ## 0.29.2 (2026-07-15)
 
-- ITE8258-Chassis/Issue #7: Preserve one complete keyboard, logo, neon, and
-  vent profile when any surface changes. Per-zone writes no longer restart at
-  hardware group 1 and replace the keyboard scene; global off also latches so
-  later virtual-zone cleanup cannot relight the shared controller.
-- Secondary Lighting/Compatibility: Treat legacy empty or partial
-  `secondary_device_state` config mirrors as compatibility state instead of an
-  explicitly saved profile scene, preventing v0.29.1 mode changes from following
-  a valid keyboard write with automatic secondary-area off writes.
-- ITE8258-Chassis/Issue #7 hardening: Separate desired-scene edits from output
-  suspension (child on/off while suspended is retained for resume); batch one
-  logical software/static frame into a single full-profile commit via optional
-  `output_transaction`; skip composite zones on secondary global-off when the
-  primary owns controller power; rename authority helpers to
-  `authoritative_payload_from_config` / `legacy_snapshot_from_config`; serialize
-  concurrent composite transactions and preserve safe device invalidation when
-  a deferred commit detects a disconnect.
-- Documentation: Add the composite profile coordinator reference, Issue #7
-  hardening plan, route-authority guidance, and focused integration coverage.
+- ITE8258-Chassis/Issue #7: Preserve one complete keyboard, logo, neon, and vent profile when any surface changes. Per-zone writes no longer restart at hardware group 1 and replace the keyboard scene; global off also latches so later virtual-zone cleanup cannot relight the shared controller.
+- Secondary Lighting/Compatibility: Treat legacy empty or partial `secondary_device_state` config mirrors as compatibility state instead of an explicitly saved profile scene, preventing v0.29.1 mode changes from following a valid keyboard write with automatic secondary-area off writes.
+- ITE8258-Chassis/Issue #7 hardening: Separate desired-scene edits from output suspension (child on/off while suspended is retained for resume); batch one logical software/static frame into a single full-profile commit via optional `output_transaction`; skip composite zones on secondary global-off when the primary owns controller power; rename authority helpers to `authoritative_payload_from_config` / `legacy_snapshot_from_config`; serialize concurrent composite transactions and preserve safe device invalidation when a deferred commit detects a disconnect.
+- Documentation: Add the composite profile coordinator reference, Issue #7 hardening plan, route-authority guidance, and focused integration coverage.
 
 ## 0.29.1 (2026-07-14)
 
-- Secondary Lighting/Profiles: Treat explicitly saved empty or partial secondary
-  scenes as authoritative, turning omitted known routes off instead of retaining
-  the previously active profile while preserving unknown future route metadata.
-- Secondary Lighting/UI: Expose independent-route brightness in the Lighting Areas
-  editor and persist standalone secondary-window brightness changes into the active
-  profile; shared-brightness chassis zones remain tied to keyboard brightness.
-- Tray/UX: Restore the v0.28.2-style inline `Hardware Static Mode` toggle and its
-  contextual uniform-colour/effects rows while retaining the v0.29.0 device routing,
-  profile, and Software Effects organization.
+- Secondary Lighting/Profiles: Treat explicitly saved empty or partial secondary scenes as authoritative, turning omitted known routes off instead of retaining the previously active profile while preserving unknown future route metadata.
+- Secondary Lighting/UI: Expose independent-route brightness in the Lighting Areas editor and persist standalone secondary-window brightness changes into the active profile; shared-brightness chassis zones remain tied to keyboard brightness.
+- Tray/UX: Restore the v0.28.2-style inline `Hardware Static Mode` toggle and its contextual uniform-colour/effects rows while retaining the v0.29.0 device routing, profile, and Software Effects organization.
 
 ## 0.29.0 (2026-07-14)
 
@@ -50,8 +36,8 @@
 
 ## 0.28.1 (2026-07-11)
 
-- Backends/Naming: Rename the five chassis/OEM-specific ITE backends to the expanded self-describing convention (all-underscore, empty segments omitted): `ite8258_chassis` → `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`, `ite8258_zones` → `ite8258_zones_lenovo_legion`, `ite8291_zones` → `ite8291_zones_clevo`, `ite8295_zones` → `ite8295_zones_lenovo_ideapad`, and `ite8233_lightbar` → `ite8233_none_chassis_lightbar_clevo`. The matching package directories under `src/core/backends/` were renamed to match.
-- Backends/Compatibility: All previous names (short aliases and the pre-rename canonical names) keep working via `_BACKEND_NAME_ALIASES` in `src/core/backends/registry.py`, so existing `KEYRGB_BACKEND` values, saved profiles, and persisted tray device-context selections continue to resolve. Per-backend HID pacing overrides now derive from the new names (e.g. `KEYRGB_ITE8258_PERKEY_CHASSIS_LOGO_NEON_VENT_LENOVO_LEGION_REPORT_DELAY_MS`).
+- Backends/Naming: Rename the five chassis/OEM-specific ITE backends to the expanded self-describing convention (all-underscore, empty segments omitted): `ite8258_chassis` → `ite8258_perkey_chassis`, `ite8258_zones` → `ite8258_zones_lenovo_legion`, `ite8291_zones` → `ite8291_zones_clevo`, `ite8295_zones` → `ite8295_zones_lenovo_ideapad`, and `ite8233_lightbar` → `ite8233_none_chassis_lightbar_clevo`. The matching package directories under `src/core/backends/` were renamed to match.
+- Backends/Compatibility: All previous names (short aliases and the pre-rename canonical names) keep working via `_BACKEND_NAME_ALIASES` in `src/core/backends/registry.py`, so existing `KEYRGB_BACKEND` values, saved profiles, and persisted tray device-context selections continue to resolve. Per-backend HID pacing overrides now derive from the new names (e.g. `KEYRGB_ITE8258_PERKEY_CHASSIS_REPORT_DELAY_MS`).
 - Backends/Compatibility: Persisted per-zone state keys (`ite8258_chassis_{logo,neon,vent}_{brightness,color}`) and virtual zone route identifiers (`ite8258-chassis-{logo,neon,vent}`) are intentionally unchanged so saved per-zone colors/brightness survive the rename.
 - Docs: Align `src/core/backends/README.md` with the implemented convention (all-underscore, empty segments omitted) and record the new deprecated aliases.
 - Diagnostics/Support Tools: Add a `secondary_devices` section to device-discovery payloads and support bundles (new `src/core/diagnostics/secondary_devices.py`). It reports experimental-backend enablement, the virtual chassis-zone routes (logo/neon/vent) with parent-backend availability, auxiliary device candidates, expected tray device contexts, the software effect target, and persisted per-zone brightness/color — making multi-device / aux-lighting support cases (e.g. issue #7) self-describing from a support bundle.
@@ -379,7 +365,7 @@
 ## 0.20.0 (2026-04-02)
 
 - Build/Logging: Scope throttled log suppression by logger identity as well as throttle key, so the breathing-effect palette-failure traceback log is not incorrectly suppressed by unrelated earlier suite activity during release validation.
-- GUI/Layout Architecture: Move the per-key editor, calibrator, canvas, saved keymaps, optional-slot overrides, and react- Build/Quality: Expand `buildpython` file-size reporting to bucket large Python files into `350-399`, `400-499`, `500-599`, and `600+` ranges, and add import-block and flat-directory hotspot scans to the same debt report family.
+- GUI/Layout Architecture: Move the per-key editor, calibrator, canvas, saved keymaps, optional-slot overrides, and reactive typing flows to canonical physical slot IDs while keeping legacy `key_id` data readable during the migration.
 - GUI/Keyboard Setup: Persist legend-pack selection with layout-aware fallback, add slot-based legend-pack resources for future locale variants, and make optional-key labels inherit the active legend pack before per-slot overrides.
 - GUI/Per-key Editor: Add profile-backed backdrop modes (`No backdrop`, `Built-in seed`, `Custom image`) and allow logical keys to map to multiple matrix cells so split legends can drive every assigned LED.
 - Effects/Reactive Input: Finish the slot-first internal API transition for reactive typing and remove most lower-level key-id compatibility aliases from the runtime-facing surface.

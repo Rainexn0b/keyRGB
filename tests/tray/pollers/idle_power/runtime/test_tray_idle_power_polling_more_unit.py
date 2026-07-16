@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
+
+from tests.tray.fakes import make_owner_backed_simple_tray
 
 
 class _FakeThread:
@@ -12,6 +15,22 @@ class _FakeThread:
 
     def start(self):
         return None
+
+
+def _idle_tray(**fields: Any) -> SimpleNamespace:
+    """Owner-backed idle-power tray with common restore defaults."""
+    defaults: dict[str, Any] = {
+        "is_off": True,
+        "idle_forced_off": True,
+        "last_brightness": 33,
+        "config": SimpleNamespace(brightness=0),
+        "engine": SimpleNamespace(current_color=(12, 34, 56)),
+        "_log_exception": lambda *_a, **_kw: None,
+        "_start_current_effect": lambda **_kwargs: None,
+        "_refresh_ui": lambda: None,
+    }
+    defaults.update(fields)
+    return make_owner_backed_simple_tray(**defaults)
 
 
 def test_ensure_idle_state_sets_defaults() -> None:
@@ -73,7 +92,7 @@ def test_backlight_state_baselines_persist_across_ensure_idle_state(tmp_path) ->
     (backlight / "max_brightness").write_text("200\n", encoding="utf-8")
     (backlight / "brightness").write_text("100\n", encoding="utf-8")
 
-    tray = SimpleNamespace(
+    tray = make_owner_backed_simple_tray(
         config=SimpleNamespace(
             reload=lambda: None,
             power_management_enabled=True,
@@ -83,13 +102,13 @@ def test_backlight_state_baselines_persist_across_ensure_idle_state(tmp_path) ->
             screen_dim_temp_brightness=5,
         ),
         is_off=False,
-        _idle_forced_off=False,
-        _user_forced_off=False,
-        _power_forced_off=False,
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        last_resume_at=0.0,
         _dim_sync_suppressed_logged=False,
-        _last_resume_at=0.0,
         _log_event=lambda *_a, **_kw: None,
         engine=SimpleNamespace(),
     )
@@ -211,12 +230,7 @@ def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
 
     calls = {"start": 0, "refresh": 0, "log": 0}
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        config=SimpleNamespace(brightness=0),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
+    tray = _idle_tray(
         _log_exception=None,
         _start_current_effect=None,
         _refresh_ui=None,
@@ -239,6 +253,7 @@ def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
 
     assert tray.is_off is False
     assert tray._idle_forced_off is False
+    assert tray.tray_idle_power_state.idle_forced_off is False
     assert tray.config.brightness == 33
     assert calls["start"] == 1
     assert calls["log"] == 1
@@ -251,42 +266,21 @@ def test_restore_from_idle_records_resume_timestamp(monkeypatch) -> None:
 
     monkeypatch.setattr(actions_module.time, "monotonic", lambda: 123.0)
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        _last_resume_at=0.0,
-        config=SimpleNamespace(brightness=0),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
-        _log_exception=lambda *_a, **_kw: None,
-        _start_current_effect=lambda **_kwargs: None,
-        _refresh_ui=lambda: None,
-    )
+    tray = _idle_tray(last_resume_at=0.0)
 
     ipp._restore_from_idle(tray)
 
     assert tray._last_resume_at == pytest.approx(123.0)
+    assert tray.tray_idle_power_state.last_resume_at == pytest.approx(123.0)
 
 
 def test_restore_from_idle_syncs_owner_state_fields(monkeypatch) -> None:
     import src.tray.pollers.idle_power._actions as actions_module
     import src.tray.pollers.idle_power.polling as ipp
-    from src.tray.protocols import TrayIdlePowerState
 
     monkeypatch.setattr(actions_module.time, "monotonic", lambda: 456.0)
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        _last_resume_at=0.0,
-        tray_idle_power_state=TrayIdlePowerState(idle_forced_off=True, last_resume_at=0.0),
-        config=SimpleNamespace(brightness=0),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
-        _log_exception=lambda *_a, **_kw: None,
-        _start_current_effect=lambda **_kwargs: None,
-        _refresh_ui=lambda: None,
-    )
+    tray = _idle_tray(last_resume_at=0.0)
 
     ipp._restore_from_idle(tray)
 
@@ -304,15 +298,9 @@ def test_restore_from_idle_refreshes_icon_without_animation_when_supported() -> 
     def capture_refresh(*, animate_icon=True):
         calls["animate_icon"] = animate_icon
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        _last_resume_at=0.0,
+    tray = _idle_tray(
+        last_resume_at=0.0,
         config=SimpleNamespace(brightness=33, effect="reactive_ripple"),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
-        _log_exception=lambda *_a, **_kw: None,
-        _start_current_effect=lambda **_kwargs: None,
         _refresh_ui=capture_refresh,
     )
 
@@ -330,16 +318,10 @@ def test_restore_from_idle_loop_effect_uses_soft_on_start() -> None:
     def capture_start(**kwargs):
         received.update(kwargs)
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        _last_resume_at=0.0,
+    tray = _idle_tray(
+        last_resume_at=0.0,
         config=SimpleNamespace(brightness=33, effect="reactive_ripple"),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
-        _log_exception=lambda *_a, **_kw: None,
         _start_current_effect=capture_start,
-        _refresh_ui=lambda: None,
     )
 
     ipp._restore_from_idle(tray)
@@ -357,11 +339,8 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
 
     monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        _last_resume_at=0.0,
+    tray = _idle_tray(
+        last_resume_at=0.0,
         config=SimpleNamespace(brightness=33, effect="reactive_ripple"),
         engine=SimpleNamespace(
             current_color=(12, 34, 56),
@@ -369,9 +348,6 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
             _reactive_restore_damp_until=None,
             _reactive_restore_phase=reactive_support.ReactiveRestorePhase.NORMAL,
         ),
-        _log_exception=lambda *_a, **_kw: None,
-        _start_current_effect=lambda **_kwargs: None,
-        _refresh_ui=lambda: None,
     )
 
     ipp._restore_from_idle(tray)
@@ -396,16 +372,10 @@ def test_restore_from_idle_non_loop_effect_uses_soft_on_start() -> None:
     def capture_start(**kwargs):
         received.update(kwargs)
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        _last_resume_at=0.0,
+    tray = _idle_tray(
+        last_resume_at=0.0,
         config=SimpleNamespace(brightness=33, effect="static"),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
-        _log_exception=lambda *_a, **_kw: None,
         _start_current_effect=capture_start,
-        _refresh_ui=lambda: None,
     )
 
     ipp._restore_from_idle(tray)
@@ -424,14 +394,8 @@ def test_restore_from_idle_logs_tray_logger_failure_with_fallback(monkeypatch) -
         logs.append((key, msg, exc))
         return True
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        config=SimpleNamespace(brightness=0),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
+    tray = _idle_tray(
         _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("restore failed")),
-        _refresh_ui=lambda: None,
     )
 
     def broken_log_exception(*_args, **_kwargs):
@@ -455,14 +419,8 @@ def test_restore_from_idle_logs_tray_logger_failure_with_fallback(monkeypatch) -
 def test_restore_from_idle_propagates_unexpected_tray_logger_failure() -> None:
     import src.tray.pollers.idle_power.polling as ipp
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        config=SimpleNamespace(brightness=0),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
+    tray = _idle_tray(
         _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("restore failed")),
-        _refresh_ui=lambda: None,
         _log_exception=lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
     )
 
@@ -473,15 +431,8 @@ def test_restore_from_idle_propagates_unexpected_tray_logger_failure() -> None:
 def test_restore_from_idle_propagates_unexpected_restore_errors() -> None:
     import src.tray.pollers.idle_power.polling as ipp
 
-    tray = SimpleNamespace(
-        is_off=True,
-        _idle_forced_off=True,
-        _last_brightness=33,
-        config=SimpleNamespace(brightness=0),
-        engine=SimpleNamespace(current_color=(12, 34, 56)),
+    tray = _idle_tray(
         _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected restore bug")),
-        _refresh_ui=lambda: None,
-        _log_exception=lambda *_a, **_kw: None,
     )
 
     with pytest.raises(AssertionError, match="unexpected restore bug"):
@@ -499,8 +450,10 @@ def test_apply_idle_action_dim_to_temp_respects_is_off_and_sw_effect(
         engine_calls["n"] += 1
         engine_calls["apply_to_hardware"] = apply_to_hardware
 
-    tray = SimpleNamespace(
+    tray = make_owner_backed_simple_tray(
         is_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
         config=SimpleNamespace(effect="perkey"),
         engine=SimpleNamespace(set_brightness=set_brightness),
     )
@@ -509,27 +462,28 @@ def test_apply_idle_action_dim_to_temp_respects_is_off_and_sw_effect(
 
     assert tray._dim_temp_active is True
     assert tray._dim_temp_target_brightness == 5
+    assert tray.tray_idle_power_state.dim_temp_active is True
     assert engine_calls["n"] == 1
     # perkey is a hardware per-key apply path -> DO apply to hardware
     assert engine_calls["apply_to_hardware"] is True
 
-    tray_sw = SimpleNamespace(
+    tray_sw = make_owner_backed_simple_tray(
         is_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
         config=SimpleNamespace(effect="rainbow_wave"),
         engine=SimpleNamespace(set_brightness=set_brightness),
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
     )
     ipp._apply_idle_action(tray_sw, action="dim_to_temp", dim_temp_brightness=5)
     assert engine_calls["n"] == 2
     assert engine_calls["apply_to_hardware"] is False
 
-    tray2 = SimpleNamespace(
+    tray2 = make_owner_backed_simple_tray(
         is_off=True,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
         config=SimpleNamespace(effect="uniform"),
         engine=SimpleNamespace(set_brightness=set_brightness),
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
     )
 
     ipp._apply_idle_action(tray2, action="dim_to_temp", dim_temp_brightness=5)
@@ -547,15 +501,19 @@ def test_apply_idle_action_restore_branch_gated_by_forced_off(monkeypatch) -> No
         lambda _tray: called.__setitem__("n", called["n"] + 1),
     )
 
-    tray = SimpleNamespace(_user_forced_off=True, _power_forced_off=False)
+    tray = make_owner_backed_simple_tray(user_forced_off=True, power_forced_off=False)
     ipp._apply_idle_action(tray, action="restore", dim_temp_brightness=5)
     assert called["n"] == 0
 
-    tray2 = SimpleNamespace(_user_forced_off=False, _power_forced_off=True)
+    tray2 = make_owner_backed_simple_tray(user_forced_off=False, power_forced_off=True)
     ipp._apply_idle_action(tray2, action="restore", dim_temp_brightness=5)
     assert called["n"] == 0
 
-    tray3 = SimpleNamespace(_user_forced_off=False, _power_forced_off=False, config=SimpleNamespace())
+    tray3 = make_owner_backed_simple_tray(
+        user_forced_off=False,
+        power_forced_off=False,
+        config=SimpleNamespace(),
+    )
     ipp._apply_idle_action(tray3, action="restore", dim_temp_brightness=5)
     assert called["n"] == 1
 

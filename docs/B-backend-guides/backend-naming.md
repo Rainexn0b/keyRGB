@@ -13,6 +13,12 @@ model rather than a laptop marketing name.
 ITE<chip>_<capability>[_<capability>...][_<oem>]
 ```
 
+**Canonical rules (including the hard max-four post-chip appendages limit and
+coarse chassis tokens) live in**
+[`src/core/backends/README.md`](../../src/core/backends/README.md).
+Do not invent longer surface-inventory names; put logo/neon/vent detail on
+secondary routes and in support docs.
+
 Capabilities are ordered **`chassis` > `zones` > `perkey`**.
 
 Examples already in tree:
@@ -22,7 +28,7 @@ Examples already in tree:
 - `ite8291_zones_clevo`
 - `ite8295_zones_lenovo_ideapad`
 - `ite8258_zones_lenovo_legion`
-- `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`
+- `ite8258_perkey_chassis`
 - `ite8233_none_chassis_lightbar_clevo`
 - `ite8297_uniform`
 - `ite8910_perkey`
@@ -49,7 +55,7 @@ runtime shapes that need separate backend ownership.
 Current examples:
 
 - `ite8291_perkey` vs `ite8291_zones_clevo`
-- `ite8258_zones_lenovo_legion` vs `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`
+- `ite8258_zones_lenovo_legion` vs `ite8258_perkey_chassis`
 
 These are split because they use different protocols, different HID interfaces,
 or different probe behavior.
@@ -92,7 +98,7 @@ See `src/core/backends/README.md` for the full alias table and policy.
 ## Current `ite8258` direction
 
 - `ite8258_zones_lenovo_legion` for the keyboard-only `0x048d:0xc195` 24-zone path
-- `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` for the `0x048d:0xc197` composite chassis-lighting path
+- `ite8258_perkey_chassis` for the `0x048d:0xc197` composite chassis-lighting path
 
 If a future `ite8258` split appears before its semantics are fully understood, a
 numbered research label can exist in notes temporarily, but the public backend

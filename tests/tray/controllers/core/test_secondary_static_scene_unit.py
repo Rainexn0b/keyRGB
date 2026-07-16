@@ -61,6 +61,16 @@ def test_default_empty_secondary_config_mirror_is_not_an_explicit_off_scene() ->
     assert authoritative_payload_from_config(config) is None
 
 
+def test_authoritative_payload_uses_readonly_secondary_snapshot_api() -> None:
+    config = SimpleNamespace(
+        secondary_device_state_snapshot=lambda: {
+            "logo": {"enabled": True},
+        }
+    )
+
+    assert authoritative_payload_from_config(config) is None
+
+
 def test_partial_legacy_secondary_config_mirror_is_not_an_explicit_off_scene() -> None:
     config = SimpleNamespace(
         _settings={
@@ -315,11 +325,13 @@ def test_static_scene_uses_legacy_brightness_as_enabled_fallback() -> None:
 
 
 def test_static_scene_does_not_write_while_forced_off() -> None:
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
     calls: list[SecondaryDeviceRoute] = []
     route = _route("mouse")
-    tray = SimpleNamespace(
+    tray = make_owner_backed_simple_tray(
         config=SimpleNamespace(),
-        _user_forced_off=True,
+        user_forced_off=True,
         _active_secondary_lighting={"areas": {"mouse": {"enabled": True}}},
     )
 

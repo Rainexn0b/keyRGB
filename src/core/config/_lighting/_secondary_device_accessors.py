@@ -97,6 +97,15 @@ def secondary_device_state(config: SecondaryDeviceAccessorConfig) -> dict[str, o
     return _SecondaryDeviceStateBoundary.from_config(config).values
 
 
+def secondary_device_state_snapshot(config: SecondaryDeviceAccessorConfig) -> dict[str, object]:
+    """Return a detached readonly-oriented snapshot without creating state."""
+
+    raw = config._settings.get("secondary_device_state")
+    if not isinstance(raw, dict):
+        return {}
+    return dict(raw)
+
+
 def normalize_secondary_state_key(value: object, *, default: str = "device") -> str:
     normalized = str(value or default).strip().lower()
     return normalized or default

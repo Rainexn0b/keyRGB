@@ -11,6 +11,7 @@ from src.tray.protocols import (
 
 from . import _planning as _planning
 from . import _post_fast_path_apply as _post_fast_path_apply
+from ._apply_plan import should_skip_config_apply_for_power_source_transition
 from ._config_apply_state import _CONFIG_FALLBACK_EXCEPTIONS
 from ._config_apply_state import _safe_perkey_signature, _safe_tuple_attr
 from ._config_apply_state import ConfigApplyState, build_config_apply_state
@@ -145,7 +146,11 @@ def apply_from_config_once(
 
     if str(cause or "") == "mtime_change" and current.perkey_sig is not None:
         now = float(monotonic_fn())
-        if _recent_power_source_transition_active(tray, now=now):
+        if should_skip_config_apply_for_power_source_transition(
+            cause=str(cause or ""),
+            current=current,
+            recent_power_source_transition=_recent_power_source_transition_active(tray, now=now),
+        ):
             try:
                 tray._log_event(
                     "config",

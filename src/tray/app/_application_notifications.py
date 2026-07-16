@@ -7,9 +7,11 @@ from collections.abc import Callable, MutableMapping
 from typing import Protocol, TypeVar
 
 
-_NOTIFICATION_BACKEND_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Desktop notification backends (pystray/notify-send); keep OSError, drop map LookupError.
+_NOTIFICATION_BACKEND_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _NOTIFICATION_TWO_ARG_ERRORS = (AttributeError, OSError, RuntimeError)
-_EVENT_LOGGING_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Diagnostic event-log formatting/throttle (no map LookupError expected).
+_EVENT_LOGGING_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _ResultT = TypeVar("_ResultT")
 
 

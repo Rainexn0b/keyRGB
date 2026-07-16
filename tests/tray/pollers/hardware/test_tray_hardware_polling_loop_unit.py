@@ -26,19 +26,20 @@ def test_apply_polled_state_logs_brightness_change_but_swallows_log_errors(
 ) -> None:
     from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
-    tray = SimpleNamespace(
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
-        _power_forced_off=False,
-        _user_forced_off=False,
-        _idle_forced_off=False,
-        _refresh_ui=lambda: None,
-    )
+    from tests.tray.fakes import make_owner_backed_simple_tray
 
     def boom(*_a, **_kw):
         raise RuntimeError("boom")
 
-    tray._log_event = boom
+    tray = make_owner_backed_simple_tray(
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
+        _refresh_ui=lambda: None,
+        _log_event=boom,
+    )
 
     # last_brightness changes => tries to log; log throws; should still refresh and return.
     b, off = _apply_polled_hardware_state(
@@ -63,12 +64,14 @@ def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> N
     def boom(*_a, **_kw):
         raise RuntimeError("boom")
 
-    tray = SimpleNamespace(
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
-        _power_forced_off=False,
-        _user_forced_off=False,
-        _idle_forced_off=False,
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
         _refresh_ui=lambda *, animate_icon=True: (
             refreshed.__setitem__("n", refreshed["n"] + 1),
             animate_flags.append(bool(animate_icon)),
@@ -95,12 +98,14 @@ def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> N
 def test_apply_polled_state_propagates_unexpected_log_event_errors() -> None:
     from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
-    tray = SimpleNamespace(
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
-        _power_forced_off=False,
-        _user_forced_off=False,
-        _idle_forced_off=False,
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
         _refresh_ui=lambda: None,
         _log_event=lambda *_a, **_kw: (_ for _ in ()).throw(AssertionError("unexpected event bug")),
         is_off=False,
@@ -126,12 +131,14 @@ def test_apply_polled_state_dim_temp_target_bad_int_is_ignored(monkeypatch) -> N
 
     refreshed = {"n": 0}
 
-    tray = SimpleNamespace(
-        _dim_temp_active=True,
-        _dim_temp_target_brightness=BadInt(),
-        _power_forced_off=False,
-        _user_forced_off=False,
-        _idle_forced_off=False,
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
+        dim_temp_active=True,
+        dim_temp_target_brightness=BadInt(),
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
         _refresh_ui=lambda: refreshed.__setitem__("n", refreshed["n"] + 1),
         _log_event=None,
         is_off=False,
@@ -154,12 +161,14 @@ def test_apply_polled_state_off_state_change_branch_and_forced_off_gate() -> Non
 
     refreshed = {"n": 0}
 
-    tray = SimpleNamespace(
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
-        _power_forced_off=True,
-        _user_forced_off=False,
-        _idle_forced_off=False,
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        power_forced_off=True,
+        user_forced_off=False,
+        idle_forced_off=False,
         _refresh_ui=lambda: refreshed.__setitem__("n", refreshed["n"] + 1),
         _log_event=lambda *_a, **_kw: None,
         is_off=False,

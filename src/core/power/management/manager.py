@@ -13,8 +13,17 @@ from src.core.profile import runtime_activation as profile_runtime_activation
 from . import _manager_brightness_execution as _brightness_execution, _manager_power_events as _power_events
 from . import _manager_runtime_deps, _monitor_runner as power_monitor_runner
 from ._manager_config import read_power_management_config_bool, reload_power_management_config
-from ._manager_helpers import apply_power_source_actions, build_power_source_loop_inputs, is_intentionally_off
-from ._manager_source_iteration import PowerSourceIterationPlan, classify_power_source_iteration
+from ._manager_helpers import (
+    apply_power_source_actions,
+    build_power_source_loop_inputs,
+    is_intentionally_off,
+    is_power_event_forced_off,
+)
+from ._manager_source_iteration import (
+    PowerSourceIterationPlan,
+    classify_power_source_iteration,
+    stabilize_power_source_state,
+)
 from ..policies import power_event_policy as _power_event_policy
 from ..policies.power_source_loop_policy import PowerSourceLoopPolicy
 
@@ -162,11 +171,7 @@ class PowerManager:
             self._on_lid_open()
 
     def _keyboard_is_power_event_forced_off(self) -> bool:
-        if getattr(self.kb_controller, "_power_forced_off", None) is True:
-            return True
-
-        idle_state = getattr(self.kb_controller, "tray_idle_power_state", None)
-        return getattr(idle_state, "power_forced_off", None) is True
+        return is_power_event_forced_off(self.kb_controller)
 
     def _classify_battery_saver_iteration(
         self,
@@ -232,26 +237,13 @@ class PowerManager:
             time.sleep(poll_interval_s)
 
     def _stabilize_on_ac_state(self, raw_on_ac: bool | None) -> bool | None:
-        if raw_on_ac is None:
-            self._pending_on_ac = None
-            return self._stable_on_ac
-
-        current_raw = bool(raw_on_ac)
-        if self._stable_on_ac is None:
-            self._stable_on_ac = current_raw
-            self._pending_on_ac = None
-            return self._stable_on_ac
-
-        if current_raw == self._stable_on_ac:
-            self._pending_on_ac = None
-            return self._stable_on_ac
-
-        if self._pending_on_ac != current_raw:
-            self._pending_on_ac = current_raw
-            return self._stable_on_ac
-
-        self._stable_on_ac = current_raw
-        self._pending_on_ac = None
+        state = stabilize_power_source_state(
+            raw_on_ac=raw_on_ac,
+            stable_on_ac=self._stable_on_ac,
+            pending_on_ac=self._pending_on_ac,
+        )
+        self._stable_on_ac = state.stable_on_ac
+        self._pending_on_ac = state.pending_on_ac
         return self._stable_on_ac
 
     def _apply_brightness_policy(self, brightness: int) -> None:

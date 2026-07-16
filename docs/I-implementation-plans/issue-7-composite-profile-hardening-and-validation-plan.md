@@ -14,6 +14,15 @@
   filtering remain open.
 - **Release state:** reporter hardware revalidation remains the Issue #7 closure
   gate
+- **2026-07-16 update:** the reporter confirmed "v0.29.2 is working well" and
+  closed the GitHub issue — this closes the primary (v0.29.1 flash-then-dark)
+  regression but is **not** the structured Phase 8 per-surface checklist. Phase 6
+  is **demoted**: the reporter's v0.28.2 support bundle shows c197 exposes a
+  single hidraw node (`hidraw3`), so the multi-interface selection ambiguity
+  Phase 6 guards against does not exist on real c197 hardware; additionally the
+  bundle's descriptor read for `hidraw3` returned `EINVAL`, so the descriptor
+  capture path needs investigation before any re-capture. The backend stays
+  `EXPERIMENTAL`; promotion is gated on the Phase 8 checklist, not Phase 6.
 
 This plan treats the Grok review as a hypothesis set. Every concern below was
 checked against the current coordinator, device facades, routing table, config
@@ -183,8 +192,8 @@ retained but an explicit zone-off is discarded as cleanup.
 
 ### Files
 
-- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/profile_coordinator.py`
-- `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/device.py`
+- `src/core/backends/ite8258_perkey_chassis/profile_coordinator.py`
+- `src/core/backends/ite8258_perkey_chassis/device.py`
 - `src/core/secondary_device_routes.py`
 - `src/tray/controllers/secondary_static_scene.py`
 - `src/tray/controllers/_power/`

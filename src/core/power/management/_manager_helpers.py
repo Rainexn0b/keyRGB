@@ -40,6 +40,15 @@ def _flag_attr_is_true(obj: object, name: str) -> bool:
     return _safe_getattr_or_none(obj, name) is True
 
 
+def is_power_event_forced_off(kb_controller: object) -> bool:
+    """Return whether power policy currently owns the keyboard-off state."""
+
+    if _flag_attr_is_true(kb_controller, "_power_forced_off"):
+        return True
+    idle_state = _safe_getattr_or_none(kb_controller, "tray_idle_power_state")
+    return _flag_attr_is_true(idle_state, "power_forced_off")
+
+
 def _power_management_enabled(config: object) -> bool:
     return read_power_management_config_bool(
         config,

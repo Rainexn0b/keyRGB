@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import tkinter as tk
-
 import pytest
 
 import src.gui.settings.panels.time_scheduler_panel as time_scheduler_panel

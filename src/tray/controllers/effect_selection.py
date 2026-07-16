@@ -36,7 +36,8 @@ _PROFILE_LOAD_RECOVERABLE_EXCEPTIONS = (
     ValueError,
 )
 _EFFECT_SELECTION_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-_NOTIFY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Permission-notify tray callback boundary; no map/key LookupError expected.
+_NOTIFY_CALLBACK_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class _BackendCapsProtocol(Protocol):

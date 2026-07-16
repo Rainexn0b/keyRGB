@@ -8,7 +8,9 @@ from src.tray.pollers.idle_power import _runtime
 
 
 def _make_tray(*, reload_fn, log_event_fn):
-    return SimpleNamespace(
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    return make_owner_backed_simple_tray(
         config=SimpleNamespace(
             reload=reload_fn,
             power_management_enabled=True,
@@ -20,13 +22,13 @@ def _make_tray(*, reload_fn, log_event_fn):
         engine=SimpleNamespace(),
         backend=None,
         is_off=False,
-        _idle_forced_off=False,
-        _user_forced_off=False,
-        _power_forced_off=False,
-        _dim_temp_active=False,
-        _dim_temp_target_brightness=None,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        last_resume_at=0.0,
         _dim_sync_suppressed_logged=False,
-        _last_resume_at=0.0,
         _log_event=log_event_fn,
     )
 
@@ -165,10 +167,14 @@ def test_run_idle_power_iteration_suppresses_dim_sync_during_power_source_change
 
 
 def test_run_idle_power_iteration_passes_session_idle_for_restore_candidate() -> None:
+    from src.tray.idle_power_state import set_idle_power_state_field
+
     captured: dict[str, object] = {}
     tray = _make_tray(reload_fn=lambda: None, log_event_fn=lambda *_args, **_kwargs: None)
     tray.is_off = True
-    tray._idle_forced_off = True
+    set_idle_power_state_field(
+        tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=True
+    )
 
     def compute_action(**kwargs):
         captured.update(kwargs)

@@ -4,7 +4,7 @@
 
 - **Classification:** implemented backend-local reference implementation
 - **Canonical implementation:**
-  `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/profile_coordinator.py`
+  `src/core/backends/ite8258_perkey_chassis/profile_coordinator.py`
 - **First consumer:** Lenovo Legion Pro 7 Gen10 composite ITE 8258 controller
   (`0x048d:0xc197`)
 - **API status:** not a shared backend API and not ready to move unchanged into a

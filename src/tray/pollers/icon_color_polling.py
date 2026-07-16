@@ -22,7 +22,8 @@ _ANIMATED_ICON_EFFECTS = frozenset(
     }
 )
 
-_ICON_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Icon poll crosses tray callbacks/backend state; no map LookupError expected.
+_ICON_POLL_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _ICON_RESUME_HOLDOFF_S = 1.0
 
 

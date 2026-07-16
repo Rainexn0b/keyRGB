@@ -20,7 +20,7 @@ This document is the authoritative correction plan. All fixes described here mus
 
 **Severity:** Confirmed wrong. Affects user-visible effect behavior.
 
-**Current KeyRGB (`src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/protocol.py`):**
+**Current KeyRGB (`src/core/backends/ite8258_perkey_chassis/protocol.py`):**
 ```python
 DIRECTION_UP = 0x01
 DIRECTION_DOWN = 0x02
@@ -56,7 +56,7 @@ DIRECTION_RIGHT = 0x03
 
 **Severity:** Confirmed wrong. Would cause chassis-zone writes to address incorrect LEDs or be ignored entirely.
 
-**Current KeyRGB (`src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/protocol.py`):**
+**Current KeyRGB (`src/core/backends/ite8258_perkey_chassis/protocol.py`):**
 ```python
 LOGO_LED_IDS: tuple[int, ...] = (0xDD,)
 NEON_LED_IDS: tuple[int, ...] = (0xF5, 0xF6, 0xF7, 0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE)
@@ -112,7 +112,7 @@ So updating the constants is sufficient; no encoder change is required.
 
 **Severity:** Suspected discrepancy. Needs hardware validation.
 
-**Current KeyRGB (`src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/protocol.py`):**
+**Current KeyRGB (`src/core/backends/ite8258_perkey_chassis/protocol.py`):**
 ```python
 def _packet(command: int, payload_length: int) -> bytearray:
     packet = bytearray(PACKET_SIZE)
@@ -193,7 +193,7 @@ SET_LOGO_STATUS = 0xA6
 
 ### 5. Keyboard Layout — ANSI Matrix Map Only
 
-**Clarification:** KeyRGB has full UI-level layout support. The per-key editor supports ANSI, ISO, KS, ABNT, and JIS visual layouts, and the calibrator lets users manually remap any key to any matrix cell. However, the `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` **backend protocol constants** are currently ANSI-only.
+**Clarification:** KeyRGB has full UI-level layout support. The per-key editor supports ANSI, ISO, KS, ABNT, and JIS visual layouts, and the calibrator lets users manually remap any key to any matrix cell. However, the `ite8258_perkey_chassis` **backend protocol constants** are currently ANSI-only.
 
 **Current state:** `KEYBOARD_MATRIX_MAP` (140 slots mapping row/col to LED index) and `KEYBOARD_LED_IDS` are hardcoded for ANSI key positions. The `led_id_from_row_col()` function uses this map directly.
 
@@ -260,9 +260,9 @@ All fixes are backend-internal (no UI changes), so they can land incrementally:
 
 | File | Change |
 |------|--------|
-| `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/protocol.py` | Swap direction constants; fix header framing; update chassis zone LED IDs; add dormant op constants |
+| `src/core/backends/ite8258_perkey_chassis/protocol.py` | Swap direction constants; fix header framing; update chassis zone LED IDs; add dormant op constants |
 | `tests/core/backends/ite/test_ite8258_chassis_backend_unit.py` | Update expected packet bytes for new header; add chassis-zone packet tests; update direction tests |
-| `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/device.py` | No changes in Sprint 1–2 (device facade stays keyboard-only until protocol is validated) |
+| `src/core/backends/ite8258_perkey_chassis/device.py` | No changes in Sprint 1–2 (device facade stays keyboard-only until protocol is validated) |
 | `docs/B-backend-guides/ite8258/ite8258-chassis-backend-plan.md` | Mark stages complete, add validation notes |
 | `AGENTS.md` | Update supported-hardware notes if chassis zones are validated |
 | `README.md` | Update backend table if chassis zones are validated |

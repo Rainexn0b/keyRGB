@@ -31,7 +31,7 @@ def _patch_config(monkeypatch, config) -> None:
 
 
 def _patch_parent_probe(monkeypatch, *, available: bool, reason: str) -> None:
-    from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.backend import Ite8258ChassisBackend
+    from src.core.backends.ite8258_perkey_chassis.backend import Ite8258ChassisBackend
 
     monkeypatch.setattr(
         Ite8258ChassisBackend,

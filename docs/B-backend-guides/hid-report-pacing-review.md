@@ -39,7 +39,7 @@ Backends intentionally **not** changed:
 | Variable | Purpose |
 |----------|---------|
 | `KEYRGB_HID_REPORT_DELAY_MS` | Global override for all HID backends (default `1`) |
-| `KEYRGB_<BACKEND>_REPORT_DELAY_MS` | Per-backend override for HID pacing. Backend punctuation is normalized to underscores, so `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` uses `KEYRGB_ITE8258_PERKEY_CHASSIS_LOGO_NEON_VENT_LENOVO_LEGION_REPORT_DELAY_MS`. Falls back to the global value if unset. |
+| `KEYRGB_<BACKEND>_REPORT_DELAY_MS` | Per-backend override for HID pacing. Backend punctuation is normalized to underscores, so `ite8258_perkey_chassis` uses `KEYRGB_ITE8258_PERKEY_CHASSIS_REPORT_DELAY_MS`. Falls back to the global value if unset. |
 
 ## Reactive Typing Idle Traffic Reduction
 

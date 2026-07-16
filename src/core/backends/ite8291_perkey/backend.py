@@ -16,28 +16,30 @@ if TYPE_CHECKING:
 
 
 def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:
-    from .hidraw import find_matching_hidraw_device
+    from ..shared_hidraw_probe import find_matching_ite8291_style_hidraw_device
 
-    return find_matching_hidraw_device()
+    return find_matching_ite8291_style_hidraw_device(
+        product_ids=protocol.SUPPORTED_PRODUCT_IDS,
+        forced_path_env=protocol.HIDRAW_PATH_ENV,
+    )
 
 
 def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
-    from .hidraw import open_matching_hidraw_transport
+    from ..shared_hidraw_probe import open_matching_ite8291_style_hidraw_transport
 
-    return open_matching_hidraw_transport(backend_name="ite8291_perkey")
+    return open_matching_ite8291_style_hidraw_transport(
+        product_ids=protocol.SUPPORTED_PRODUCT_IDS,
+        forced_path_env=protocol.HIDRAW_PATH_ENV,
+        backend_name="ite8291_perkey",
+        vendor_id=protocol.VENDOR_ID,
+        missing_label="ITE 8291",
+    )
 
 
 def _identifiers_for_match(match: HidrawDeviceInfo) -> dict[str, str]:
-    identifiers = {
-        "usb_vid": f"0x{int(match.vendor_id):04x}",
-        "usb_pid": f"0x{int(match.product_id):04x}",
-        "hidraw": str(match.devnode),
-    }
-    if match.hid_name:
-        identifiers["hid_name"] = str(match.hid_name)
-    if match.bcd_device is not None:
-        identifiers["usb_bcd_device"] = f"0x{int(match.bcd_device):04x}"
-    return identifiers
+    from ..shared_hidraw_probe import identifiers_for_hidraw_match
+
+    return identifiers_for_hidraw_match(match, include_bcd_device=True)
 
 
 @dataclass

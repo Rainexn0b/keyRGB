@@ -66,10 +66,13 @@ class TestIsNight:
 
 
 def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_has_no_base_override() -> None:
-    tray = MagicMock()
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-    tray._idle_forced_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        user_forced_off=False,
+        power_forced_off=False,
+        idle_forced_off=False,
+    )
     tray.config.time_scheduler_enabled = True
     tray.config.day_start_time = "08:00"
     tray.config.night_start_time = "20:00"
@@ -105,10 +108,13 @@ def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_h
 
 
 def test_run_scheduler_iteration_uses_ac_brightness_as_day_primary_when_configured() -> None:
-    tray = MagicMock()
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-    tray._idle_forced_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        user_forced_off=False,
+        power_forced_off=False,
+        idle_forced_off=False,
+    )
     tray.config.time_scheduler_enabled = True
     tray.config.day_start_time = "08:00"
     tray.config.night_start_time = "20:00"
@@ -150,10 +156,13 @@ def test_run_scheduler_iteration_uses_ac_brightness_as_day_primary_when_configur
 
 
 def test_run_scheduler_iteration_applies_day_base_when_only_inactive_power_source_override_exists() -> None:
-    tray = MagicMock()
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-    tray._idle_forced_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        user_forced_off=False,
+        power_forced_off=False,
+        idle_forced_off=False,
+    )
     tray.config.time_scheduler_enabled = True
     tray.config.day_start_time = "08:00"
     tray.config.night_start_time = "20:00"
@@ -242,11 +251,15 @@ def test_active_power_source_base_brightness_uses_lower_value_at_night() -> None
 
 
 def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
-    tray = MagicMock()
-    tray._user_forced_off = False
-    tray._power_forced_off = True
-    tray._idle_forced_off = False
-    tray.is_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
+    from src.tray.idle_power_state import set_idle_power_state_field
+
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        user_forced_off=False,
+        power_forced_off=True,
+        idle_forced_off=False,
+    )
     tray.config.time_scheduler_enabled = True
     tray.config.day_start_time = "08:00"
     tray.config.night_start_time = "20:00"
@@ -272,7 +285,9 @@ def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
         nonlocal sleep_calls
         sleep_calls += 1
         if sleep_calls == 1:
-            tray._power_forced_off = False
+            set_idle_power_state_field(
+                tray, attr_name="_power_forced_off", state_name="power_forced_off", value=False
+            )
             return
         raise StopLoop
 

@@ -17,7 +17,8 @@ TupleAttrReader = Callable[..., ColorTuple]
 PerkeySignatureReader = Callable[[object], tuple | None]
 SoftwareEffectTargetNormalizer = Callable[[str], str]
 
-_CONFIG_FALLBACK_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
+# getattr/property + tuple coercion for config snapshots (no OS/I-O).
+_CONFIG_FALLBACK_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError, OverflowError)
 _REACTIVE_VISUAL_MODES = frozenset({"subtle", "vivid"})
 
 
@@ -75,8 +76,12 @@ def _freeze_secondary_value(value: object) -> object:
 def _safe_secondary_signature(config: object) -> tuple | None:
     """Return an ordering-independent immutable snapshot of secondary state."""
     try:
-        settings = vars(config).get("_settings")
-        raw_state = settings.get("secondary_device_state") if isinstance(settings, Mapping) else None
+        snapshot_fn = getattr(config, "secondary_device_state_snapshot", None)
+        if callable(snapshot_fn):
+            raw_state = snapshot_fn()
+        else:
+            settings = vars(config).get("_settings")
+            raw_state = settings.get("secondary_device_state") if isinstance(settings, Mapping) else None
     except _CONFIG_FALLBACK_EXCEPTIONS:
         return None
     if raw_state is None:

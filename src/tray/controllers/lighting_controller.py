@@ -24,7 +24,8 @@ logger = logging.getLogger(__name__)
 
 
 _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-_TRAY_LOGGER_CALLBACK_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Diagnostic-only tray logger callback; match helpers (no LookupError).
+_TRAY_LOGGER_CALLBACK_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_boundary_exception(tray: LightingTrayProtocol, msg: str, exc: Exception) -> None:

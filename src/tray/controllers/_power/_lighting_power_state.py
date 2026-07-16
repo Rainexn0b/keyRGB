@@ -8,6 +8,7 @@ from ._transition_constants import (
     SOFT_ON_FADE_DURATION_S,
     SOFT_ON_START_BRIGHTNESS,
 )
+from src.tray.idle_power_state import read_last_brightness
 from src.tray.protocols import (
     LightingTrayProtocol,
     normalize_lighting_power_restore_policy_state,
@@ -74,7 +75,7 @@ def turn_on_impl(
     tray.is_off = False
 
     if tray.config.brightness == 0:
-        tray.config.brightness = tray._last_brightness if tray._last_brightness > 0 else 25
+        tray.config.brightness = read_last_brightness(tray, default=25)
 
     start_current_effect(
         tray,

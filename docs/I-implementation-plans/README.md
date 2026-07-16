@@ -7,6 +7,8 @@ specs for larger changes.
 
 ### Active follow-up plans
 
+- `2026-07-15/maintainability-debt-paydown-plan.md` — active maintainability /
+  tech-debt inventory, phases, and near-term slices (start here for debt work)
 - `issue-7-composite-profile-hardening-and-validation-plan.md` — live-code-verified
   disposition of the v0.29.1 regression review, including desired/off semantics,
   composite output batching, the missing cross-layer regression, descriptor

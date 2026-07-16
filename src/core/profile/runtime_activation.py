@@ -22,10 +22,6 @@ class _RuntimeProfileActivationTrayProtocol(Protocol):
     def _update_menu(self) -> None: ...
 
 
-class _OptionalPowerForcedOffTrayProtocol(Protocol):
-    _power_forced_off: object
-
-
 def _resolve_tray_callback(tray: object, name: str):
     instance_callback = vars(tray).get(name)
     if callable(instance_callback):
@@ -39,10 +35,31 @@ def _resolve_tray_callback(tray: object, name: str):
 
 
 def _power_forced_off_or_false(tray: object) -> bool:
+    """Read power-forced-off without importing tray modules (core layer boundary).
+
+    Prefer a legacy *instance* attr when present (duck-typed fakes / dual-write
+    tests). ``KeyRGBTray`` stores truth on the typed owner via properties, so
+    the attr is absent from ``vars(tray)`` and the owner is used instead.
+    Owner reads use ``is True`` so MagicMock auto-attrs stay false.
+    """
+
     try:
-        return bool(cast(_OptionalPowerForcedOffTrayProtocol, tray)._power_forced_off)
-    except AttributeError:
-        return False
+        tray_vars = vars(tray)
+    except TypeError:
+        tray_vars = {}
+    if "_power_forced_off" in tray_vars:
+        try:
+            return bool(tray_vars["_power_forced_off"])
+        except _RUNTIME_ACTIVATION_STATE_EXCEPTIONS:
+            return False
+
+    owner = getattr(tray, "tray_idle_power_state", None)
+    if owner is not None:
+        try:
+            return getattr(owner, "power_forced_off", False) is True
+        except _RUNTIME_ACTIVATION_STATE_EXCEPTIONS:
+            return False
+    return False
 
 
 def _mirror_optional_idle_power_state_field(tray: object, *, state_name: str, value: object) -> None:

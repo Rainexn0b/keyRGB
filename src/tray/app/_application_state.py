@@ -54,14 +54,29 @@ class TrayPreBootstrapState:
         tray.is_off = self.is_off
         tray.tray_icon_state = self.tray_icon_state
         tray.tray_idle_power_state = self.tray_idle_power_state
-        tray._power_forced_off = self.power_forced_off
-        tray._user_forced_off = self.user_forced_off
-        tray._idle_forced_off = self.idle_forced_off
-        tray._dim_temp_active = self.dim_temp_active
-        tray._dim_temp_target_brightness = self.dim_temp_target_brightness
-        tray._dim_sync_suppressed_logged = self.dim_sync_suppressed_logged
-        tray._last_brightness = self.last_brightness
-        tray._last_resume_at = self.last_resume_at
+        owner = self.tray_idle_power_state
+        owner.power_forced_off = bool(self.power_forced_off)
+        owner.user_forced_off = bool(self.user_forced_off)
+        owner.idle_forced_off = bool(self.idle_forced_off)
+        owner.dim_temp_active = bool(self.dim_temp_active)
+        owner.dim_temp_target_brightness = self.dim_temp_target_brightness
+        owner.dim_sync_suppressed_logged = bool(self.dim_sync_suppressed_logged)
+        owner.last_resume_at = float(self.last_resume_at)
+        try:
+            brightness = int(self.last_brightness)
+        except (TypeError, ValueError, OverflowError):
+            brightness = 25
+        if brightness > 0:
+            owner.last_brightness = brightness
+        # Compatibility surface (properties on KeyRGBTray, attrs on fakes).
+        tray._power_forced_off = owner.power_forced_off
+        tray._user_forced_off = owner.user_forced_off
+        tray._idle_forced_off = owner.idle_forced_off
+        tray._dim_temp_active = owner.dim_temp_active
+        tray._dim_temp_target_brightness = owner.dim_temp_target_brightness
+        tray._dim_sync_suppressed_logged = owner.dim_sync_suppressed_logged
+        tray._last_brightness = owner.last_brightness
+        tray._last_resume_at = owner.last_resume_at
         tray._event_last_at = self.event_last_at
         tray._permission_notice_sent = self.permission_notice_sent
         tray._pending_notifications = self.pending_notifications

@@ -8,12 +8,14 @@ from src.tray.pollers.config_polling import ConfigApplyState, _apply_from_config
 
 
 def _mk_tray_for_perkey(*, brightness: int, base_color=(9, 8, 7), per_key_colors=None) -> MagicMock:
-    tray = MagicMock()
-    tray.is_off = False
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-    tray._idle_forced_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
 
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        idle_forced_off=False,
+    )
     tray.config = SimpleNamespace(
         effect="perkey",
         speed=4,
@@ -23,19 +25,10 @@ def _mk_tray_for_perkey(*, brightness: int, base_color=(9, 8, 7), per_key_colors
         reactive_use_manual_color=False,
         reactive_color=(10, 20, 30),
     )
-
-    tray.engine = MagicMock()
     tray.engine.running = True
     tray.engine.kb = MagicMock()
-
     # Context-manager lock used by perkey apply.
     tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *args: None)
-
-    tray._log_event = MagicMock()
-    tray._refresh_ui = MagicMock()
-    tray._update_menu = MagicMock()
-    tray._start_current_effect = MagicMock()
-
     return tray
 
 

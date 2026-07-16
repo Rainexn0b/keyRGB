@@ -26,8 +26,11 @@ _RECOVERABLE_CONFIG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueEr
 _RECOVERABLE_ENGINE_ATTR_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
-_RECOVERABLE_TRAY_LOGGING_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
-_RECOVERABLE_STRINGIFICATION_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Best-effort tray logger callbacks; keep OSError (logger may hit broken streams).
+_RECOVERABLE_TRAY_LOGGING_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+# Diagnostic-only: menu item stringification. Keep RuntimeError (tested duck-typed
+# __str__ failures) but drop OS/I-O classes that str() conversion does not raise.
+_RECOVERABLE_STRINGIFICATION_EXCEPTIONS = (RuntimeError, TypeError, ValueError)
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 

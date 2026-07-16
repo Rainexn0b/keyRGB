@@ -21,9 +21,12 @@ class TestPowerManagerEventHandlers:
 
         from src.core.power.management.manager import PowerManager, TurnOffFromEvent
 
+        from src.tray.idle_power_state import TrayIdlePowerState
+
         mock_kb = MagicMock()
         mock_kb.is_off = True
         mock_kb._user_forced_off = False
+        mock_kb.tray_idle_power_state = TrayIdlePowerState(user_forced_off=False)
         mock_kb.turn_off = MagicMock()
 
         mock_policy_instance = MagicMock()
@@ -610,9 +613,12 @@ class TestPowerManagerHandlePowerEventBranches:
         )
         assert captured["inputs"].is_off is True
 
+        from src.tray.idle_power_state import TrayIdlePowerState
+
         kb3 = MagicMock()
         kb3.user_forced_off = False
         kb3._user_forced_off = False
+        kb3.tray_idle_power_state = TrayIdlePowerState(user_forced_off=False)
         pm3 = PowerManager(kb3)
         pm3._config.brightness = 0
         pm3._handle_power_event(

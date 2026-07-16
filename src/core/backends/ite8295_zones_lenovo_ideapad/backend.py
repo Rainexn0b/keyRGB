@@ -29,11 +29,11 @@ def find_matching_hidraw_device(
     product_ids: tuple[int, ...] | None = None,
     forced_path_env: str | None = None,
 ) -> HidrawDeviceInfo | None:
-    from ..ite8291_perkey.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
+    from ..shared_hidraw_probe import find_matching_ite8291_style_hidraw_device
 
-    return _find_matching_hidraw_device(
+    return find_matching_ite8291_style_hidraw_device(
         product_ids=tuple(int(product_id) for product_id in (product_ids or protocol.SUPPORTED_PRODUCT_IDS)),
-        forced_path_env=forced_path_env,
+        forced_path_env=forced_path_env or protocol.HIDRAW_PATH_ENV,
     )
 
 
@@ -43,20 +43,15 @@ def open_matching_hidraw_transport(
     forced_path_env: str | None = None,
     backend_name: str | None = None,
 ) -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
-    supported_product_ids = tuple(int(product_id) for product_id in (product_ids or protocol.SUPPORTED_PRODUCT_IDS))
-    info = find_matching_hidraw_device(
-        product_ids=supported_product_ids,
-        forced_path_env=forced_path_env,
+    from ..shared_hidraw_probe import open_matching_ite8291_style_hidraw_transport
+
+    return open_matching_ite8291_style_hidraw_transport(
+        product_ids=tuple(int(product_id) for product_id in (product_ids or protocol.SUPPORTED_PRODUCT_IDS)),
+        forced_path_env=forced_path_env or protocol.HIDRAW_PATH_ENV,
+        backend_name=backend_name or "ite8295_zones_lenovo_ideapad",
+        vendor_id=protocol.VENDOR_ID,
+        missing_label="ITE 8295 4-zone",
     )
-    if info is None:
-        raise FileNotFoundError(
-            "No hidraw device found for supported ITE 8295 4-zone IDs: "
-            + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{product_id:04x}" for product_id in supported_product_ids)
-        )
-
-    from ..ite8291_perkey.hidraw import HidrawFeatureOutputTransport
-
-    return HidrawFeatureOutputTransport(info.devnode, backend_name=backend_name), info
 
 
 def _find_matching_supported_hidraw_device() -> HidrawDeviceInfo | None:

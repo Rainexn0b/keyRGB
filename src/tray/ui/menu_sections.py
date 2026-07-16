@@ -40,7 +40,8 @@ class _PerkeyMenuTrayProtocol(Protocol):
 logger = logging.getLogger(__name__)
 
 _MENU_BUILD_EXCEPTIONS = (AttributeError, RuntimeError, TypeError, ValueError)
-_PROFILE_CALLBACK_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Profile menu activation callbacks (UI/persist/runtime); keep OSError, drop map LookupError.
+_PROFILE_CALLBACK_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_menu_debug(key: str, msg: str, exc: Exception, *, interval_s: float = 60) -> None:

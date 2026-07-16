@@ -18,6 +18,7 @@ from src.core.secondary_device_runtime import (
     acquire_secondary_device,
     iter_effective_secondary_routes,
 )
+from src.tray.idle_power_state import any_forced_off
 
 logger = logging.getLogger(__name__)
 
@@ -67,15 +68,22 @@ def authoritative_payload_from_config(config: object) -> dict[str, object] | Non
     ``secondary_lighting_state.legacy_snapshot_from_config``.
     """
 
-    getter = vars(config).get("_secondary_device_state")
+    getter = getattr(config, "secondary_device_state_snapshot", None)
     if callable(getter):
         try:
             state = getter()
         except _SCENE_RUNTIME_EXCEPTIONS:
             state = None
     else:
-        settings = vars(config).get("_settings")
-        state = settings.get("secondary_device_state") if isinstance(settings, Mapping) else None
+        getter = vars(config).get("_secondary_device_state")
+        if callable(getter):
+            try:
+                state = getter()
+            except _SCENE_RUNTIME_EXCEPTIONS:
+                state = None
+        else:
+            settings = vars(config).get("_settings")
+            state = settings.get("secondary_device_state") if isinstance(settings, Mapping) else None
     if not is_authoritative_secondary_state(state):
         return None
     areas = dict(cast(Mapping[object, object], state))
@@ -83,9 +91,7 @@ def authoritative_payload_from_config(config: object) -> dict[str, object] | Non
 
 
 def _forced_off(tray: object) -> bool:
-    return any(
-        bool(getattr(tray, attr, False)) for attr in ("_user_forced_off", "_idle_forced_off", "_power_forced_off")
-    )
+    return any_forced_off(tray)
 
 
 def _log_route_failure(tray: object, route: SecondaryDeviceRoute, exc: Exception) -> None:

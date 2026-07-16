@@ -12,7 +12,7 @@ VENDOR_ID = 0x048D
 # Lenovo Gen10 keeps 0xC195 and 0xC197 in the same 960-byte packet family, but
 # OpenRGB treats 0xC195 as the keyboard-only 4x6/24-zone device and 0xC197 as a
 # larger composite keyboard/chassis controller.  Keep this backend scoped to the
-# 24-zone keyboard-only path; the composite path lives in `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`.
+# 24-zone keyboard-only path; the composite path lives in `ite8258_perkey_chassis`.
 SUPPORTED_PRODUCT_IDS: tuple[int, ...] = (0xC195,)
 
 USAGE_PAGE = 0xFF89

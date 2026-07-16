@@ -108,7 +108,7 @@ def build_permission_denied_message(backend_name: str) -> str:
     if backend_name in (
         "ite8291r3_perkey",
         "ite8258_zones_lenovo_legion",
-        "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+        "ite8258_perkey_chassis",
     ):
         msg_lines.append("  • ITE USB devices usually need /etc/udev/rules.d/99-ite8291-wootbook.rules")
     elif backend_name == "sysfs-leds":

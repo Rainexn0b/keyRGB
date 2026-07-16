@@ -14,12 +14,12 @@ from unittest.mock import patch
 # Tripwire: any accidental real USB/hidraw open should fail loudly in CI.
 os.environ.setdefault("KEYRGB_TEST_HARDWARE_TRIPWIRE", "1")
 
-from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion import protocol
-from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.device import (
+from src.core.backends.ite8258_perkey_chassis import protocol
+from src.core.backends.ite8258_perkey_chassis.device import (
     Ite8258ChassisKeyboardDevice,
     Ite8258ChassisZoneDevice,
 )
-from src.core.backends.ite8258_perkey_chassis_logo_neon_vent_lenovo_legion.profile_coordinator import (
+from src.core.backends.ite8258_perkey_chassis.profile_coordinator import (
     Ite8258ChassisProfileCoordinator,
 )
 from src.core.secondary_device_routes import SecondaryDeviceRoute, iter_secondary_routes

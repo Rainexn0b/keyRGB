@@ -4,8 +4,6 @@ See improvement plan Item 6 — integration tests for dim/undim and reactive typ
 These tests exercise the complete idle-power action path with real policy and
 action functions, verifying that brightness stays bounded during transitions.
 """
-import pytest
-
 from src.tray.pollers.idle_power.policy import compute_idle_action
 from src.tray.pollers.idle_power.sensors import BacklightState
 

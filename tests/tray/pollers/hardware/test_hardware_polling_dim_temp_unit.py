@@ -1,18 +1,19 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
-
 from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
 
 def test_hardware_polling_dim_temp_target_does_not_refresh_or_toggle_off() -> None:
-    tray = MagicMock()
-    tray._dim_temp_active = True
-    tray._dim_temp_target_brightness = 5
-    tray._power_forced_off = False
-    tray._user_forced_off = False
-    tray._idle_forced_off = False
-    tray.is_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        dim_temp_active=True,
+        dim_temp_target_brightness=5,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
+    )
 
     new_last_brightness, new_last_off = _apply_polled_hardware_state(
         tray,
@@ -30,13 +31,16 @@ def test_hardware_polling_dim_temp_target_does_not_refresh_or_toggle_off() -> No
 
 
 def test_hardware_polling_ignores_zero_transient_while_dim_temp_active() -> None:
-    tray = MagicMock()
-    tray._dim_temp_active = True
-    tray._dim_temp_target_brightness = 5
-    tray._power_forced_off = False
-    tray._user_forced_off = False
-    tray._idle_forced_off = False
-    tray.is_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        dim_temp_active=True,
+        dim_temp_target_brightness=5,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
+    )
 
     new_last_brightness, new_last_off = _apply_polled_hardware_state(
         tray,
@@ -54,13 +58,16 @@ def test_hardware_polling_ignores_zero_transient_while_dim_temp_active() -> None
 
 
 def test_hardware_polling_ignores_off_transient_while_dim_temp_active() -> None:
-    tray = MagicMock()
-    tray._dim_temp_active = True
-    tray._dim_temp_target_brightness = 5
-    tray._power_forced_off = False
-    tray._user_forced_off = False
-    tray._idle_forced_off = False
-    tray.is_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        dim_temp_active=True,
+        dim_temp_target_brightness=5,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
+    )
 
     new_last_brightness, new_last_off = _apply_polled_hardware_state(
         tray,
@@ -78,13 +85,16 @@ def test_hardware_polling_ignores_off_transient_while_dim_temp_active() -> None:
 
 
 def test_hardware_polling_never_clears_is_off_when_user_forced_off() -> None:
-    tray = MagicMock()
-    tray._dim_temp_active = False
-    tray._dim_temp_target_brightness = None
-    tray._power_forced_off = False
-    tray._user_forced_off = True
-    tray._idle_forced_off = False
-    tray.is_off = True
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        is_off=True,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        power_forced_off=False,
+        user_forced_off=True,
+        idle_forced_off=False,
+    )
 
     _apply_polled_hardware_state(
         tray,
@@ -99,13 +109,16 @@ def test_hardware_polling_never_clears_is_off_when_user_forced_off() -> None:
 
 
 def test_hardware_polling_can_clear_is_off_when_not_forced_off() -> None:
-    tray = MagicMock()
-    tray._dim_temp_active = False
-    tray._dim_temp_target_brightness = None
-    tray._power_forced_off = False
-    tray._user_forced_off = False
-    tray._idle_forced_off = False
-    tray.is_off = True
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        is_off=True,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
+    )
 
     _apply_polled_hardware_state(
         tray,

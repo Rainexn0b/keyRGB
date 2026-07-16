@@ -6,7 +6,7 @@ secondary-lighting-profile-editor-and-simulation-plan.md`` (Phase 0).
 
 Reporter state (Lenovo Legion Pro 7 16IAX10H, ``0x048d:0xc197``):
 
-- the ``ite8258_perkey_chassis_logo_neon_vent_lenovo_legion`` parent is available;
+- the ``ite8258_perkey_chassis`` parent is available;
 - Logo / Neon Strip / Vents virtual routes are available and uniform-capable;
 - per-route colour/brightness state exists in config;
 - the saved software-effect target is ``all_uniform_capable``;
@@ -162,7 +162,9 @@ def issue7_factory(monkeypatch: pytest.MonkeyPatch):
                     return color
             return default
 
-        tray = SimpleNamespace(
+        from tests.tray.fakes import make_owner_backed_simple_tray
+
+        tray = make_owner_backed_simple_tray(
             config=SimpleNamespace(
                 software_effect_target=normalized_target,
                 brightness=_SAVED_BRIGHTNESS,
@@ -185,7 +187,7 @@ def issue7_factory(monkeypatch: pytest.MonkeyPatch):
             device_discovery={"candidates": []},
             secondary_device_controls={},
             is_off=bool(is_off),
-            _last_brightness=0,
+            last_brightness=0,
             _log_event=MagicMock(),
             _log_exception=MagicMock(),
             _notify_permission_issue=MagicMock(),

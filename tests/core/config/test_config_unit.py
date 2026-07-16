@@ -504,6 +504,16 @@ def test_get_effect_speeds_returns_detached_copy(tmp_path, monkeypatch) -> None:
     assert copy_map is not cfg._settings["effect_speeds"]
 
 
+def test_effect_speed_snapshot_is_public_detached_copy(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+    cfg._settings["effect_speeds"] = {"wave": 6}
+
+    copy_map = cfg.effect_speed_snapshot()
+
+    assert copy_map == {"wave": 6}
+    assert copy_map is not cfg._settings["effect_speeds"]
+
+
 def test_set_effect_speed_persists_to_disk(tmp_path, monkeypatch) -> None:
     from src.core.config import Config
 

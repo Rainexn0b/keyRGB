@@ -22,6 +22,38 @@ class PowerSourceIterationPlan:
         return self.disposition is IterationDisposition.SLEEP
 
 
+@dataclass(frozen=True)
+class PowerSourceStabilityState:
+    """Pure state transition result for debouncing AC/battery observations."""
+
+    stable_on_ac: bool | None
+    pending_on_ac: bool | None
+
+
+def stabilize_power_source_state(
+    *,
+    raw_on_ac: bool | None,
+    stable_on_ac: bool | None,
+    pending_on_ac: bool | None,
+) -> PowerSourceStabilityState:
+    """Accept a power-source change after two consecutive observations."""
+
+    if raw_on_ac is None:
+        return PowerSourceStabilityState(stable_on_ac=stable_on_ac, pending_on_ac=None)
+
+    current_raw = bool(raw_on_ac)
+    if stable_on_ac is None:
+        return PowerSourceStabilityState(stable_on_ac=current_raw, pending_on_ac=None)
+
+    if current_raw == stable_on_ac:
+        return PowerSourceStabilityState(stable_on_ac=stable_on_ac, pending_on_ac=None)
+
+    if pending_on_ac != current_raw:
+        return PowerSourceStabilityState(stable_on_ac=stable_on_ac, pending_on_ac=current_raw)
+
+    return PowerSourceStabilityState(stable_on_ac=current_raw, pending_on_ac=None)
+
+
 class SupportsPowerSourceLoopPolicy(Protocol):
     def update(self, inputs: PowerSourceLoopInputs): ...
 

@@ -24,7 +24,7 @@ def test_all_virtual_routes_belong_to_ite8258_chassis_parent() -> None:
 
     assert len(virtual) == 3
     for route in virtual:
-        assert route.parent_backend_name == "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"
+        assert route.parent_backend_name == "ite8258_perkey_chassis"
         assert route.zone_key in _VIRTUAL_DEVICE_TYPES
         assert route.device_type in _VIRTUAL_DEVICE_TYPES
         assert route.supports_uniform_color is True
@@ -32,7 +32,7 @@ def test_all_virtual_routes_belong_to_ite8258_chassis_parent() -> None:
 
 
 def test_iter_parent_backend_names_returns_ite8258_chassis() -> None:
-    assert iter_parent_backend_names() == {"ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"}
+    assert iter_parent_backend_names() == {"ite8258_perkey_chassis"}
 
 
 def test_virtual_routes_have_distinct_backend_names_and_state_keys() -> None:
@@ -174,7 +174,7 @@ def test_brightness_policy_matches_route_topology() -> None:
         route = route_for_device_type(zone)
         assert route is not None
         assert route.brightness_policy == BRIGHTNESS_POLICY_PRIMARY_SHARED, zone
-        assert route.parent_backend_name == "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"
+        assert route.parent_backend_name == "ite8258_perkey_chassis"
 
 
 def test_brightness_policy_constants_are_distinct_and_covered() -> None:

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from src.core.backends import exceptions as backend_exceptions
@@ -14,6 +13,11 @@ from src.core.utils import exceptions as device_exception_utils
 
 from .. import base
 from ..policy import experimental_backends_enabled
+from ..shared_hidraw_probe import (
+    find_matching_ite8291_style_hidraw_device,
+    identifiers_for_hidraw_match,
+    open_matching_ite8291_style_hidraw_transport,
+)
 from . import protocol
 
 if TYPE_CHECKING:
@@ -46,51 +50,24 @@ def _get_profile_coordinator() -> Ite8258ChassisProfileCoordinator:
 
 
 def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
-    from ..ite8291_perkey import hidraw
-
-    forced_path = os.environ.get(protocol.HIDRAW_PATH_ENV)
-    if forced_path:
-        devnode = Path(forced_path)
-        if devnode.exists():
-            return hidraw.HidrawDeviceInfo(
-                hidraw_name=devnode.name,
-                devnode=devnode,
-                sysfs_dir=Path(),
-                vendor_id=protocol.VENDOR_ID,
-                product_id=protocol.SUPPORTED_PRODUCT_IDS[0],
-                hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.SUPPORTED_PRODUCT_IDS[0]:04x}",
-                hid_name="ITE 8258 chassis (forced)",
-            )
-
-    return hidraw.find_matching_hidraw_device(
+    return find_matching_ite8291_style_hidraw_device(
         product_ids=protocol.SUPPORTED_PRODUCT_IDS,
         forced_path_env=protocol.HIDRAW_PATH_ENV,
     )
 
 
 def _identifiers_for_match(match: hidraw.HidrawDeviceInfo) -> dict[str, str]:
-    identifiers = {
-        "usb_vid": f"0x{int(match.vendor_id):04x}",
-        "usb_pid": f"0x{int(match.product_id):04x}",
-        "hidraw": str(match.devnode),
-    }
-    if match.hid_name:
-        identifiers["hid_name"] = str(match.hid_name)
-    return identifiers
+    return identifiers_for_hidraw_match(match)
 
 
 def _open_matching_transport() -> tuple[hidraw.HidrawFeatureOutputTransport, hidraw.HidrawDeviceInfo]:
-    from ..ite8291_perkey import hidraw
-
-    info = _find_matching_supported_hidraw_device()
-    if info is None:
-        raise FileNotFoundError(
-            "No hidraw device found for supported ITE 8258 chassis IDs: "
-            + ", ".join(f"0x{protocol.VENDOR_ID:04x}:{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
-        )
-    return hidraw.HidrawFeatureOutputTransport(
-        info.devnode, backend_name="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"
-    ), info
+    return open_matching_ite8291_style_hidraw_transport(
+        product_ids=protocol.SUPPORTED_PRODUCT_IDS,
+        forced_path_env=protocol.HIDRAW_PATH_ENV,
+        backend_name="ite8258_perkey_chassis",
+        vendor_id=protocol.VENDOR_ID,
+        missing_label="ITE 8258 chassis",
+    )
 
 
 def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):
@@ -114,7 +91,7 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):
 class Ite8258ChassisBackend(base.KeyboardBackend):
     """Experimental keyboard-first Lenovo Gen10 composite ITE 8258 backend."""
 
-    name: str = "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"
+    name: str = "ite8258_perkey_chassis"
     priority: int = 97
     stability: base.BackendStability = base.BackendStability.EXPERIMENTAL
     experimental_evidence: base.ExperimentalEvidence = base.ExperimentalEvidence.REVERSE_ENGINEERED
@@ -134,7 +111,7 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
         if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
             return base.ProbeResult(
                 available=False,
-                reason="ite8258_perkey_chassis_logo_neon_vent_lenovo_legion hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
+                reason="ite8258_perkey_chassis hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
                 confidence=0,
                 identifiers=identifiers,
             )
@@ -289,7 +266,7 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
 
 
 # Backend naming clarification:
-# "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion" currently means "Lenovo Legion Pro 7 Gen10 (0x048d:0xc197)".
+# "ite8258_perkey_chassis" currently means "Lenovo Legion Pro 7 Gen10 (0x048d:0xc197)".
 # The ITE 8258 chip may appear in other laptops with different PIDs and different
 # zone configurations.  If a new PID is discovered, do not assume these LED IDs
 # and zone layouts apply.  A future refactor should introduce a ChassisVariant

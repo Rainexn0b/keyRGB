@@ -12,6 +12,7 @@ from typing import Optional, Protocol
 
 from src.tray.idle_power_state import (
     read_idle_power_state_bool_field,
+    read_last_brightness,
     set_idle_power_state_field,
 )
 
@@ -139,7 +140,7 @@ def normalize_lighting_power_restore_policy_state(
         )
 
         if safe_int_attr_fn(tray.config, "brightness", default=0) == 0:
-            setattr(tray.config, "brightness", tray._last_brightness if tray._last_brightness > 0 else 25)
+            setattr(tray.config, "brightness", read_last_brightness(tray, default=25))
 
     if safe_int_attr_fn(tray.config, "brightness", default=0) == 0:
         return LightingPowerRestorePolicyState(

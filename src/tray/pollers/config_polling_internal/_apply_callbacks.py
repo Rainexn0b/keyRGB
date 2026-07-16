@@ -9,6 +9,7 @@ from __future__ import annotations
 from src.core.effects.perkey_animation import per_key_mode_requires_frame_reassert
 from src.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+from src.tray.idle_power_state import any_forced_off, read_forced_off_flags
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from ._apply_support import build_perkey_color_map
@@ -34,9 +35,10 @@ def _handle_forced_off(tray: ConfigPollingTrayProtocol, last_applied, current, c
     if not tray.is_off:
         return False
 
-    if not (bool(tray._user_forced_off) or bool(tray._power_forced_off) or bool(tray._idle_forced_off)):
+    if not any_forced_off(tray):
         return False
 
+    user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
     _helpers._log_detected_change(tray, last_applied, current, cause, state_for_log_fn)
     _helpers._try_log_event(
         tray,
@@ -44,9 +46,9 @@ def _handle_forced_off(tray: ConfigPollingTrayProtocol, last_applied, current, c
         "skipped_forced_off",
         cause=str(cause or "unknown"),
         is_off=True,
-        user_forced_off=bool(tray._user_forced_off),
-        power_forced_off=bool(tray._power_forced_off),
-        idle_forced_off=bool(tray._idle_forced_off),
+        user_forced_off=user_forced_off,
+        power_forced_off=power_forced_off,
+        idle_forced_off=idle_forced_off,
     )
     _helpers._call_tray_callback(
         tray,

@@ -1,7 +1,7 @@
 # Audit: `ite8258-chassis` — Lenovo Legion Pro 7 Gen10 composite ITE 8258 backend
 
 - **Audit date:** 2026-07-04 (Issue #7 regression addendum: 2026-07-15)
-- **Backend source:** `src/core/backends/ite8258_perkey_chassis_logo_neon_vent_lenovo_legion/`
+- **Backend source:** `src/core/backends/ite8258_perkey_chassis/`
 - **Test file:** `tests/core/backends/ite/test_ite8258_chassis_backend_unit.py` (+ Issue #7 integration test)
 - **Stability:** `EXPERIMENTAL`
 - **Evidence level:** `REVERSE_ENGINEERED`
@@ -234,12 +234,15 @@ Focused tests (36) cover:
 | 2 | 16-bit chassis-zone LED IDs | Code | High | ✅ Already resolved |
 | 3 | Fixed header framing | Code | Medium | ✅ Already resolved |
 | 4 | Include usage page/usage/report size in probe identifiers | Diagnostics | Low | ✅ Done |
-| 5 | Add shared hidraw usage/report-descriptor filtering | Code | Medium | ⏳ Follow-up (shared with `ite8258`) |
+| 5 | Add shared hidraw usage/report-descriptor filtering | Code | Low (demoted) | ⏳ Lower urgency than the hardening plan implied: the 2026-07-16 review of the reporter's v0.28.2 support bundle shows the c197 controller exposes exactly one hidraw node (`hidraw3`); the two other `048d` nodes are the companion `c193` device. The multi-interface selection ambiguity this guards against does not exist on real c197 hardware. Revisit if a multi-interface c197 unit appears, or bundle with c195 when a c195 reporter surfaces. Note: the bundle's descriptor read for `hidraw3` returned `report_descriptor_error: [Errno 22] Invalid argument`, so the descriptor-capture path needs a look before any re-capture. |
 | 6 | Add product-variant registry if a non-83F5 `0xC197` laptop appears | Architecture | Low | ⏳ Follow-up |
 | 7 | Coordinate keyboard and virtual zones as one full hardware profile | Code | High | ✅ Done for Issue #7 follow-up |
 
-**Overall: AUTOMATED VALIDATION COMPLETE; HARDWARE REVALIDATION PENDING** — packet format,
+**Overall: AUTOMATED VALIDATION COMPLETE; REPORTER CONFIRMED v0.29.2 WORKING; STRUCTURED PER-SURFACE VALIDATION STILL PENDING** — packet format,
 mode IDs, chassis-zone LED IDs, direction/spin constants, header framing, and full-scene
-transaction composition match public references and focused tests. The Issue #7 reporter
-still needs to verify the corrected transition on the 83F5 hardware. The remaining
-promotion blocker is shared hidraw usage filtering, tracked jointly with `ite8258`.
+transaction composition match public references and focused tests. On 2026-07-16 the Issue #7
+reporter confirmed "0.29.2 is working well" and closed the ticket, closing the v0.29.1
+flash-then-dark regression on the 83F5 hardware. That is a regression-closure signal, not a
+structured per-surface validation (the Phase 8 reporter checklist was not run). The backend
+remains `EXPERIMENTAL`; promotion is gated on the Phase 8 per-surface checklist, not Phase 6
+(which is demoted because c197 exposes a single hidraw node).

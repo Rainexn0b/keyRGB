@@ -9,7 +9,7 @@ import logging
 import shutil
 import subprocess
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, SupportsFloat, SupportsIndex, SupportsInt, cast
 
 from . import _application_bindings as application_bindings
 from . import _application_notifications as application_notifications
@@ -19,8 +19,12 @@ from ._application_state import TrayBootstrapState
 from ._delegates import KeyRGBTrayDelegateMixin
 from src.core.backends import BackendError, format_backend_error
 from src.core.utils.safe_attrs import safe_str_attr
+from src.tray.idle_power_state import ensure_tray_idle_power_state
 from src.tray.protocols import TrayIconState
 
+
+_IntCoercible = str | bytes | bytearray | SupportsInt | SupportsIndex
+_FloatCoercible = str | bytes | bytearray | SupportsFloat | SupportsIndex
 
 if TYPE_CHECKING:
     from src.core.config import Config
@@ -101,14 +105,7 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
     device_discovery: object | None
     selected_device_context: str
     tray_icon_state: TrayIconState
-    _power_forced_off: bool
-    _user_forced_off: bool
-    _idle_forced_off: bool
-    _dim_temp_active: bool
-    _dim_temp_target_brightness: int | None
     _dim_sync_suppressed_logged: bool
-    _last_brightness: int
-    _last_resume_at: float
     _event_last_at: dict[str, float]
     _permission_notice_sent: bool
     _pending_notifications: list[tuple[str, str]]
@@ -132,6 +129,82 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
 
     def _apply_bootstrap_state(self, state: TrayBootstrapState) -> None:
         state.apply_to(self)
+
+    # Owner-backed compatibility surface for idle/power flags. Instance attrs on
+    # fakes/tests still work via the dual-write helpers; KeyRGBTray stores truth
+    # on tray_idle_power_state only.
+    @property
+    def _power_forced_off(self) -> bool:
+        return bool(ensure_tray_idle_power_state(self).power_forced_off)
+
+    @_power_forced_off.setter
+    def _power_forced_off(self, value: object) -> None:
+        ensure_tray_idle_power_state(self).power_forced_off = bool(value)
+
+    @property
+    def _user_forced_off(self) -> bool:
+        return bool(ensure_tray_idle_power_state(self).user_forced_off)
+
+    @_user_forced_off.setter
+    def _user_forced_off(self, value: object) -> None:
+        ensure_tray_idle_power_state(self).user_forced_off = bool(value)
+
+    @property
+    def _idle_forced_off(self) -> bool:
+        return bool(ensure_tray_idle_power_state(self).idle_forced_off)
+
+    @_idle_forced_off.setter
+    def _idle_forced_off(self, value: object) -> None:
+        ensure_tray_idle_power_state(self).idle_forced_off = bool(value)
+
+    @property
+    def _dim_temp_active(self) -> bool:
+        return bool(ensure_tray_idle_power_state(self).dim_temp_active)
+
+    @_dim_temp_active.setter
+    def _dim_temp_active(self, value: object) -> None:
+        ensure_tray_idle_power_state(self).dim_temp_active = bool(value)
+
+    @property
+    def _dim_temp_target_brightness(self) -> int | None:
+        return ensure_tray_idle_power_state(self).dim_temp_target_brightness
+
+    @_dim_temp_target_brightness.setter
+    def _dim_temp_target_brightness(self, value: object) -> None:
+        owner = ensure_tray_idle_power_state(self)
+        if value is None:
+            owner.dim_temp_target_brightness = None
+            return
+        try:
+            owner.dim_temp_target_brightness = int(cast(_IntCoercible, value))
+        except (TypeError, ValueError, OverflowError):
+            owner.dim_temp_target_brightness = None
+
+    @property
+    def _last_brightness(self) -> int:
+        return int(ensure_tray_idle_power_state(self).last_brightness)
+
+    @_last_brightness.setter
+    def _last_brightness(self, value: object) -> None:
+        owner = ensure_tray_idle_power_state(self)
+        try:
+            brightness = int(cast(_IntCoercible, value))
+        except (TypeError, ValueError, OverflowError):
+            return
+        if brightness > 0:
+            owner.last_brightness = brightness
+
+    @property
+    def _last_resume_at(self) -> float:
+        return float(ensure_tray_idle_power_state(self).last_resume_at)
+
+    @_last_resume_at.setter
+    def _last_resume_at(self, value: object) -> None:
+        owner = ensure_tray_idle_power_state(self)
+        try:
+            owner.last_resume_at = float(cast(_FloatCoercible, value))
+        except (TypeError, ValueError, OverflowError):
+            owner.last_resume_at = 0.0
 
     # ---- notifications
 

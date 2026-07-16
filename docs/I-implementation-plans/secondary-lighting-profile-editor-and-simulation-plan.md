@@ -49,7 +49,7 @@ The latest issue report says:
 
 The attached v0.28.2 support bundle confirms:
 
-- the `ite8258_perkey_chassis_logo_neon_vent_lenovo_legion` parent is available;
+- the `ite8258_perkey_chassis` parent is available;
 - Logo, Neon Strip, and Vents virtual routes are available;
 - all three routes support uniform colour and software targeting;
 - the saved software target is `all_uniform_capable`;

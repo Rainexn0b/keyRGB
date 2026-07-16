@@ -22,6 +22,7 @@ class TrayIdlePowerState:
     dim_sync_suppressed_logged: bool = False
     last_idle_turn_off_at: float = 0.0
     last_resume_at: float = 0.0
+    last_brightness: int = 25
     idle_restore_loop_effect_ramp: bool = False
     last_power_source_transition_at: float = 0.0
     last_power_source_transition_profile_name: Optional[str] = None
@@ -100,7 +101,10 @@ def sync_idle_power_state_field(
     """Synchronize one idle/power field and return the effective value.
 
     Compatibility rule:
-    - If legacy attr exists, it remains source-of-truth and owner mirrors it.
+    - Prefer the typed owner when present and the legacy attr is only a
+      property/proxy (not an instance dict entry).
+    - If a legacy *instance* attr exists (tests/fakes), it remains source-of-
+      truth and the owner mirrors it.
     - Otherwise, owner value seeds the legacy attr.
     """
 
@@ -331,7 +335,12 @@ def set_idle_power_state_field(
     value: object,
     **alias_kwargs: object,
 ) -> None:
-    """Set idle/power field on both legacy tray attrs and typed owner state."""
+    """Set idle/power field on typed owner and compatibility tray surface.
+
+    Always writes the typed owner. Dual-writes the legacy tray attr only when
+    that name is not already a property on the tray type (``KeyRGBTray`` stores
+    truth on the owner via properties; duck-typed fakes still dual-write).
+    """
 
     attr_name, state_name = _normalize_idle_power_field_names(
         attr_name=attr_name,
@@ -339,11 +348,13 @@ def set_idle_power_state_field(
         alias_kwargs=dict(alias_kwargs),
     )
 
+    setattr(ensure_tray_idle_power_state(tray), state_name, value)
+    if isinstance(getattr(type(tray), attr_name, None), property):
+        return
     try:
         setattr(tray, attr_name, value)
     except AttributeError:
         pass
-    setattr(ensure_tray_idle_power_state(tray), state_name, value)
 
 
 def clear_idle_power_state_field(
@@ -386,4 +397,101 @@ def reset_dim_state_on_tray(tray: object) -> None:
     set_idle_power_state_field(tray, attr_name="_dim_temp_active", state_name="dim_temp_active", value=False)
     set_idle_power_state_field(
         tray, attr_name="_dim_temp_target_brightness", state_name="dim_temp_target_brightness", value=None
+    )
+
+
+def read_forced_off_flags(tray: object) -> tuple[bool, bool, bool]:
+    """Return ``(user_forced_off, power_forced_off, idle_forced_off)``.
+
+    Reads through the legacy-attr / owner compatibility bridge so callers do
+    not need to touch private tray attributes directly.
+    """
+
+    user = read_idle_power_state_bool_field(
+        tray, attr_name="_user_forced_off", state_name="user_forced_off", default=False
+    )
+    power = read_idle_power_state_bool_field(
+        tray, attr_name="_power_forced_off", state_name="power_forced_off", default=False
+    )
+    idle = read_idle_power_state_bool_field(
+        tray, attr_name="_idle_forced_off", state_name="idle_forced_off", default=False
+    )
+    return user, power, idle
+
+
+def any_forced_off(tray: object) -> bool:
+    """True when user, power, or idle policy is holding the keyboard off."""
+
+    user, power, idle = read_forced_off_flags(tray)
+    return bool(user or power or idle)
+
+
+def is_user_forced_off(tray: object) -> bool:
+    return read_forced_off_flags(tray)[0]
+
+
+def is_system_forced_off(tray: object) -> bool:
+    """True when power or idle policy (not the user) is holding the keyboard off."""
+
+    _user, power, idle = read_forced_off_flags(tray)
+    return bool(power or idle)
+
+
+def is_dim_temp_active(tray: object) -> bool:
+    return read_idle_power_state_bool_field(
+        tray, attr_name="_dim_temp_active", state_name="dim_temp_active", default=False
+    )
+
+
+def dim_temp_target_brightness(tray: object) -> int | None:
+    return read_idle_power_state_optional_int_field(
+        tray,
+        attr_name="_dim_temp_target_brightness",
+        state_name="dim_temp_target_brightness",
+        default=None,
+    )
+
+
+def read_last_resume_at(tray: object) -> float:
+    return read_idle_power_state_float_field(
+        tray, attr_name="_last_resume_at", state_name="last_resume_at", default=0.0
+    )
+
+
+def read_last_brightness(tray: object, *, default: int = 25) -> int:
+    """Return the last non-zero brightness cache used for restore paths."""
+
+    value = _read_idle_power_state_field_converged(
+        tray,
+        attr_name="_last_brightness",
+        state_name="last_brightness",
+        default=int(default),
+        coerce=_coerce_idle_power_optional_int,
+    )
+    if value is None:
+        return int(default)
+    if isinstance(value, (int, float, str, bytes, bytearray)):
+        try:
+            brightness = int(value)
+        except (TypeError, ValueError, OverflowError):
+            return int(default)
+    else:
+        return int(default)
+    return brightness if brightness > 0 else int(default)
+
+
+def set_last_brightness(tray: object, value: int) -> None:
+    """Cache last brightness on legacy tray attr and typed owner."""
+
+    try:
+        brightness = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return
+    if brightness <= 0:
+        return
+    set_idle_power_state_field(
+        tray,
+        attr_name="_last_brightness",
+        state_name="last_brightness",
+        value=brightness,
     )

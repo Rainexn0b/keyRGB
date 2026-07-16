@@ -7,10 +7,12 @@ from unittest.mock import MagicMock, patch
 def test_activate_perkey_profile_uses_shared_in_place_transition_path() -> None:
     from src.tray.controllers import menu_adapters
 
-    tray = SimpleNamespace(
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
         config=SimpleNamespace(),
         is_off=True,
-        _power_forced_off=False,
+        power_forced_off=False,
         _apply_power_source_perkey_profile_transition=MagicMock(return_value=True),
         _start_current_effect=MagicMock(),
         _update_icon=MagicMock(),

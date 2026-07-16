@@ -17,7 +17,8 @@ from . import _menu_status_devices
 logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
 _RECOVERABLE_CONFIG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
-_RECOVERABLE_PER_KEY_STATUS_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Per-key status inspection (config/property); LookupError kept for sparse maps.
+_RECOVERABLE_PER_KEY_STATUS_EXCEPTIONS = (LookupError, RuntimeError, TypeError, ValueError)
 _RECOVERABLE_DEVICE_AVAILABILITY_EXCEPTIONS = (
     AttributeError,
     LookupError,

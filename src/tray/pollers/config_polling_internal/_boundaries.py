@@ -16,9 +16,12 @@ _T = TypeVar("_T")
 
 _CONFIG_POLLING_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _TRAY_LOG_WRITE_EXCEPTIONS = (OSError, RuntimeError, ValueError)
-_ENGINE_ATTR_SYNC_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
-_ENABLE_USER_MODE_SAVE_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, ValueError)
-_CONFIG_PERSIST_SYNC_EXCEPTIONS = (LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Engine attr setattr/sync (no map LookupError expected).
+_ENGINE_ATTR_SYNC_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
+# enable_user_mode / config save setattr path (no map LookupError expected).
+_ENABLE_USER_MODE_SAVE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, ValueError)
+# Config persist setattr/sync path (no map LookupError expected after typed snapshots).
+_CONFIG_PERSIST_SYNC_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_module_exception(msg: str, exc: Exception) -> None:

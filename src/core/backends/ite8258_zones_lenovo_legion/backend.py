@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from src.core.backends import exceptions as backend_exceptions
@@ -10,6 +9,11 @@ from src.core.utils import exceptions as device_exception_utils
 
 from .. import base
 from ..policy import experimental_backends_enabled
+from ..shared_hidraw_probe import (
+    find_matching_ite8291_style_hidraw_device,
+    identifiers_for_hidraw_match,
+    open_matching_ite8291_style_hidraw_transport,
+)
 from . import protocol
 
 if TYPE_CHECKING:
@@ -17,49 +21,24 @@ if TYPE_CHECKING:
 
 
 def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
-    from ..ite8291_perkey import hidraw
-
-    forced_path = os.environ.get(protocol.HIDRAW_PATH_ENV)
-    if forced_path:
-        devnode = Path(forced_path)
-        if devnode.exists():
-            return hidraw.HidrawDeviceInfo(
-                hidraw_name=devnode.name,
-                devnode=devnode,
-                sysfs_dir=Path(),
-                vendor_id=protocol.VENDOR_ID,
-                product_id=protocol.SUPPORTED_PRODUCT_IDS[0],
-                hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.SUPPORTED_PRODUCT_IDS[0]:04x}",
-                hid_name="ITE 8258 (forced)",
-            )
-
-    return hidraw.find_matching_hidraw_device(
+    return find_matching_ite8291_style_hidraw_device(
         product_ids=protocol.SUPPORTED_PRODUCT_IDS,
         forced_path_env=protocol.HIDRAW_PATH_ENV,
     )
 
 
 def _open_matching_transport() -> tuple[hidraw.HidrawFeatureOutputTransport, hidraw.HidrawDeviceInfo]:
-    from ..ite8291_perkey import hidraw
-
-    info = _find_matching_supported_hidraw_device()
-    if info is None:
-        raise FileNotFoundError(
-            "No hidraw device found for supported ITE 8258 IDs: "
-            + ", ".join(f"0x{protocol.VENDOR_ID:04x}:0x{pid:04x}" for pid in protocol.SUPPORTED_PRODUCT_IDS)
-        )
-    return hidraw.HidrawFeatureOutputTransport(info.devnode, backend_name="ite8258_zones_lenovo_legion"), info
+    return open_matching_ite8291_style_hidraw_transport(
+        product_ids=protocol.SUPPORTED_PRODUCT_IDS,
+        forced_path_env=protocol.HIDRAW_PATH_ENV,
+        backend_name="ite8258_zones_lenovo_legion",
+        vendor_id=protocol.VENDOR_ID,
+        missing_label="ITE 8258",
+    )
 
 
 def _identifiers_for_match(match: hidraw.HidrawDeviceInfo) -> dict[str, str]:
-    identifiers = {
-        "usb_vid": f"0x{int(match.vendor_id):04x}",
-        "usb_pid": f"0x{int(match.product_id):04x}",
-        "hidraw": str(match.devnode),
-    }
-    if match.hid_name:
-        identifiers["hid_name"] = str(match.hid_name)
-    return identifiers
+    return identifiers_for_hidraw_match(match)
 
 
 def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):

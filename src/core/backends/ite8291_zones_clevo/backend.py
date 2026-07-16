@@ -29,9 +29,9 @@ def find_matching_hidraw_device(
     product_ids: tuple[int, ...],
     forced_path_env: str,
 ) -> HidrawDeviceInfo | None:
-    from ..ite8291_perkey.hidraw import find_matching_hidraw_device as _find_matching_hidraw_device
+    from ..shared_hidraw_probe import find_matching_ite8291_style_hidraw_device
 
-    return _find_matching_hidraw_device(
+    return find_matching_ite8291_style_hidraw_device(
         product_ids=product_ids,
         forced_path_env=forced_path_env,
     )
@@ -43,12 +43,14 @@ def open_matching_hidraw_transport(
     forced_path_env: str,
     backend_name: str | None = None,
 ) -> tuple[HidrawFeatureOutputTransport, HidrawDeviceInfo]:
-    from ..ite8291_perkey.hidraw import open_matching_hidraw_transport as _open_matching_hidraw_transport
+    from ..shared_hidraw_probe import open_matching_ite8291_style_hidraw_transport
 
-    return _open_matching_hidraw_transport(
+    return open_matching_ite8291_style_hidraw_transport(
         product_ids=product_ids,
         forced_path_env=forced_path_env,
-        backend_name=backend_name,
+        backend_name=backend_name or "ite8291_zones_clevo",
+        vendor_id=protocol.VENDOR_ID,
+        missing_label="ITE 8291 zones",
     )
 
 

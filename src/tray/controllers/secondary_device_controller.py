@@ -18,7 +18,8 @@ from .secondary_static_scene import apply_secondary_static_route
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
-_RECOVERABLE_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Tray callback + secondary device seams; LookupError dropped (no map-key path).
+_RECOVERABLE_RUNTIME_BOUNDARY_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 class _LightbarDeviceProtocol(Protocol):

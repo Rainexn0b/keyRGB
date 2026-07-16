@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import os
-from types import SimpleNamespace
-
 import pytest
 
 from src.tray.pollers.idle_power import _source_probe

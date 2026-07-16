@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 import src.core.backends.exceptions as backend_exceptions
@@ -10,6 +8,11 @@ import src.core.utils.exceptions as device_error_checks
 
 from .. import base, policy
 from ..ite8910_perkey import hidraw as ite8910_hidraw
+from ..shared_hidraw_probe import (
+    find_matching_ite8910_style_hidraw_device,
+    identifiers_for_hidraw_match,
+    usb_scan_disabled,
+)
 from . import device, protocol
 
 
@@ -17,25 +20,14 @@ find_matching_hidraw_device = ite8910_hidraw.find_matching_hidraw_device
 
 
 def _find_matching_supported_hidraw_device() -> ite8910_hidraw.HidrawDeviceInfo | None:
-    forced_path = os.environ.get(protocol.HIDRAW_PATH_ENV)
-    if forced_path:
-        devnode = Path(forced_path)
-        if devnode.exists():
-            return ite8910_hidraw.HidrawDeviceInfo(
-                hidraw_name=devnode.name,
-                devnode=devnode,
-                sysfs_dir=Path(),
-                vendor_id=protocol.VENDOR_ID,
-                product_id=protocol.SUPPORTED_PRODUCT_IDS[0],
-                hid_id=f"forced:{protocol.VENDOR_ID:04x}:{protocol.SUPPORTED_PRODUCT_IDS[0]:04x}",
-            )
-
-    for product_id in protocol.SUPPORTED_PRODUCT_IDS:
-        match = find_matching_hidraw_device(protocol.VENDOR_ID, product_id)
-        if match is not None:
-            return match
-
-    return None
+    return find_matching_ite8910_style_hidraw_device(
+        vendor_id=protocol.VENDOR_ID,
+        product_ids=protocol.SUPPORTED_PRODUCT_IDS,
+        forced_path_env=protocol.HIDRAW_PATH_ENV,
+        forced_product_id=protocol.SUPPORTED_PRODUCT_IDS[0],
+        find_matching_fn=find_matching_hidraw_device,
+        device_info_factory=ite8910_hidraw.HidrawDeviceInfo,
+    )
 
 
 def _open_matching_transport() -> tuple[
@@ -69,7 +61,7 @@ class Ite8297Backend(base.KeyboardBackend):
         return self.probe().available
 
     def probe(self) -> base.ProbeResult:
-        if os.environ.get("KEYRGB_DISABLE_USB_SCAN") == "1":
+        if usb_scan_disabled():
             return base.ProbeResult(
                 available=False,
                 reason="ite8297_uniform hardware scan disabled by KEYRGB_DISABLE_USB_SCAN",
@@ -84,13 +76,7 @@ class Ite8297Backend(base.KeyboardBackend):
                 confidence=0,
             )
 
-        identifiers = {
-            "usb_vid": f"0x{int(match.vendor_id):04x}",
-            "usb_pid": f"0x{int(match.product_id):04x}",
-            "hidraw": str(match.devnode),
-        }
-        if match.hid_name:
-            identifiers["hid_name"] = str(match.hid_name)
+        identifiers = identifiers_for_hidraw_match(match)
 
         if not policy.experimental_backends_enabled():
             return base.ProbeResult(

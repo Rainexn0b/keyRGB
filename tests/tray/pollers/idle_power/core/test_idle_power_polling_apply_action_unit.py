@@ -11,21 +11,17 @@ from src.tray.pollers.idle_power.polling import _apply_idle_action
 
 
 def _mk_tray(*, effect: str = "rainbow_wave", brightness: int = 25) -> MagicMock:
-    tray = MagicMock()
-    tray.engine = MagicMock()
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+    )
     tray.config = SimpleNamespace(effect=effect, brightness=brightness)
-
-    tray.is_off = False
-    tray._idle_forced_off = False
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-
-    tray._dim_temp_active = False
-    tray._dim_temp_target_brightness = None
-
-    tray._refresh_ui = MagicMock()
-    tray._start_current_effect = MagicMock()
-
     return tray
 
 
@@ -336,9 +332,12 @@ def test_restore_does_not_restore_when_user_forced_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import src.tray.pollers.idle_power.polling as module
+    from src.tray.idle_power_state import set_idle_power_state_field
 
     tray = _mk_tray(effect="wave", brightness=25)
-    tray._user_forced_off = True
+    set_idle_power_state_field(
+        tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True
+    )
 
     restore = MagicMock()
     monkeypatch.setattr(module, "_restore_from_idle", restore)
@@ -461,17 +460,19 @@ class _StrictEngine:
 
 def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     from src.core.effects.reactive._render_brightness_support import ensure_reactive_state
+    from tests.tray.fakes import make_owner_backed_simple_tray
 
     engine = _StrictEngine()
-    tray = SimpleNamespace()
-    tray.engine = engine
-    tray.is_off = False
-    tray._idle_forced_off = False
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-    tray._dim_temp_active = False
-    tray._dim_temp_target_brightness = None
-    tray.config = SimpleNamespace(effect="reactive_ripple", brightness=5, perkey_brightness=5)
+    tray = make_owner_backed_simple_tray(
+        is_off=False,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        config=SimpleNamespace(effect="reactive_ripple", brightness=5, perkey_brightness=5),
+        engine=engine,
+    )
 
     # Dim to temp must be atomic + instant (no sleeping fade under lock), and
     # must not tamper with reactive_brightness.
@@ -561,22 +562,30 @@ class _OrderingEngine:
 
 
 def test_dim_sync_reactive_ordering_under_lock() -> None:
+    from src.tray.idle_power_state import set_idle_power_state_field
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
     engine = _OrderingEngine()
-    tray = SimpleNamespace()
-    tray.engine = engine
-    tray.is_off = False
-    tray._idle_forced_off = False
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-    tray._dim_temp_active = False
-    tray._dim_temp_target_brightness = None
-    tray.config = SimpleNamespace(effect="reactive_ripple", brightness=5, perkey_brightness=5)
+    tray = make_owner_backed_simple_tray(
+        is_off=False,
+        idle_forced_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        config=SimpleNamespace(effect="reactive_ripple", brightness=5, perkey_brightness=5),
+        engine=engine,
+    )
 
     _apply_idle_action(tray, action="dim_to_temp", dim_temp_brightness=3)
     assert engine.events == ["lock_enter", "set_per_key_brightness", "set_brightness", "lock_exit"]
 
     engine.events.clear()
-    tray._dim_temp_active = True
-    tray._dim_temp_target_brightness = 3
+    set_idle_power_state_field(
+        tray, attr_name="_dim_temp_active", state_name="dim_temp_active", value=True
+    )
+    set_idle_power_state_field(
+        tray, attr_name="_dim_temp_target_brightness", state_name="dim_temp_target_brightness", value=3
+    )
     _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=3)
     assert engine.events == ["lock_enter", "set_per_key_brightness", "set_brightness", "lock_exit"]

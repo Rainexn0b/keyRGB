@@ -229,24 +229,24 @@ class TestOnBrightnessClicked:
 
     def test_on_brightness_clicked_saves_nonzero_to_last_brightness(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
+        from tests.tray.fakes import make_owner_backed_mock_tray
 
-        mock_tray = MagicMock()
-        mock_tray.is_off = False
-        mock_tray._last_brightness = 50
+        mock_tray = make_owner_backed_mock_tray(is_off=False, last_brightness=50)
 
         with patch("src.tray.controllers.lighting_controller.start_current_effect"):
             on_brightness_clicked(mock_tray, "15")
 
         assert mock_tray._last_brightness == 75
+        assert mock_tray.tray_idle_power_state.last_brightness == 75
 
     def test_on_brightness_clicked_does_not_save_zero_to_last_brightness(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
+        from tests.tray.fakes import make_owner_backed_mock_tray
 
-        mock_tray = MagicMock()
-        mock_tray.is_off = False
-        mock_tray._last_brightness = 100
+        mock_tray = make_owner_backed_mock_tray(is_off=False, last_brightness=100)
 
         with patch("src.tray.controllers.lighting_controller.start_current_effect"):
             on_brightness_clicked(mock_tray, "0")
 
         assert mock_tray._last_brightness == 100
+        assert mock_tray.tray_idle_power_state.last_brightness == 100

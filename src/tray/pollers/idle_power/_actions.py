@@ -9,6 +9,7 @@ from typing import Optional, cast
 from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
+from src.tray.idle_power_state import read_last_brightness
 from src.tray.pollers.idle_power._restore_policy import classify_idle_restore_start
 from src.tray.protocols import (
     IdlePowerTrayProtocol,
@@ -277,7 +278,7 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
 
     try:
         if safe_int_attr(tray.config, "brightness", default=0) == 0:
-            tray.config.brightness = safe_int_attr(tray, "_last_brightness", default=25)
+            tray.config.brightness = read_last_brightness(tray, default=25)
     except (AttributeError, TypeError, ValueError):
         pass
 

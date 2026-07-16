@@ -7,7 +7,6 @@ core computations produce non-trivial overlays.
 
 from __future__ import annotations
 
-import logging
 from types import SimpleNamespace
 
 
@@ -125,7 +124,6 @@ def test_fade_loop_per_key_backdrop_applies_pulse_scale_to_mix_weight() -> None:
     """Fade loop per-key backdrop path: pulse_scale controls mix weight so the reactive
     brightness slider remains effective even when the boost color is black or white."""
     from src.core.effects.reactive._ripple_helpers import build_ripple_color_map_into
-    from src.core.effects.reactive._ripple_helpers import mix, scale
 
     # All-white backdrop: contrasting highlight is black; scale(black, x) == black.
     # Mix-weight path must still produce a visible gradient.

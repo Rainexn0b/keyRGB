@@ -559,7 +559,7 @@ def test_save_support_bundle_autocollects_missing_discovery_snapshot(
     monkeypatch.setattr(
         support_window,
         "collect_device_discovery",
-        lambda *, include_usb: {"selected_backend": "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion", "include_usb": include_usb},
+        lambda *, include_usb: {"selected_backend": "ite8258_perkey_chassis", "include_usb": include_usb},
     )
     monkeypatch.setattr(
         support_window,
@@ -576,8 +576,8 @@ def test_save_support_bundle_autocollects_missing_discovery_snapshot(
 
     payload = json.loads(out_path.read_text(encoding="utf-8"))
     assert payload["diagnostics"] == {"diag": 1}
-    assert payload["device_discovery"] == {"selected_backend": "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion", "include_usb": True}
-    assert json.loads(window._discovery_json)["selected_backend"] == "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion"
+    assert payload["device_discovery"] == {"selected_backend": "ite8258_perkey_chassis", "include_usb": True}
+    assert json.loads(window._discovery_json)["selected_backend"] == "ite8258_perkey_chassis"
     assert window.status_label.options["text"] == "Saved support bundle"
 
 

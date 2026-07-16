@@ -5,11 +5,9 @@ from unittest.mock import MagicMock, patch
 
 
 def _mk_tray(*, effect: str, brightness: int = 50) -> MagicMock:
-    tray = MagicMock()
-    tray.is_off = False
-    tray._user_forced_off = False
-    tray._idle_forced_off = False
-    tray._power_forced_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
+
+    tray = make_owner_backed_mock_tray(is_off=False)
     tray.config.effect = effect
     tray.config.brightness = brightness
     return tray

@@ -9,7 +9,6 @@ Focus: error recovery at runtime boundaries and full happy path.
 
 from __future__ import annotations
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -26,9 +25,12 @@ class TestPowerManagerEventIntegrationFullPath:
         """_handle_power_event orchestrates: policy eval → plan build → execute."""
         from src.core.power.management.manager import logger
 
+        from src.tray.idle_power_state import TrayIdlePowerState
+
         mock_kb = MagicMock()
         mock_kb.is_off = False
         mock_kb._user_forced_off = False
+        mock_kb.tray_idle_power_state = TrayIdlePowerState(user_forced_off=False)
         mock_kb.turn_off = MagicMock()
 
         # Create a real mock policy that returns turn-off action
@@ -110,9 +112,12 @@ class TestPowerManagerPolicyEvaluationBoundaryErrorRecovery:
         """RuntimeError during policy method should be caught, logged, not propagated."""
         from src.core.power.management.manager import logger
 
+        from src.tray.idle_power_state import TrayIdlePowerState
+
         mock_kb = MagicMock()
         mock_kb.is_off = False
         mock_kb._user_forced_off = False
+        mock_kb.tray_idle_power_state = TrayIdlePowerState(user_forced_off=False)
 
         mock_policy_instance = MagicMock()
         # Simulate policy method raising an error
@@ -171,9 +176,12 @@ class TestPowerManagerPolicyEvaluationBoundaryErrorRecovery:
         """LookupError during policy eval should also be caught and logged."""
         from src.core.power.management.manager import logger
 
+        from src.tray.idle_power_state import TrayIdlePowerState
+
         mock_kb = MagicMock()
         mock_kb.is_off = False
         mock_kb._user_forced_off = False
+        mock_kb.tray_idle_power_state = TrayIdlePowerState(user_forced_off=False)
 
         mock_policy_instance = MagicMock()
         mock_policy_instance.handle_power_off_event.side_effect = LookupError("not found")
@@ -558,9 +566,12 @@ class TestPowerManagerEventIntegrationEdgeCases:
     @patch("src.core.power.management.manager.PowerEventPolicy")
     def test_evaluate_policy_passes_correct_power_event_inputs(self, mock_policy_cls):
         """Policy receives PowerEventInputs with correct enabled/action_enabled/is_off."""
+        from src.tray.idle_power_state import TrayIdlePowerState
+
         mock_kb = MagicMock()
         mock_kb.is_off = True
         mock_kb._user_forced_off = True
+        mock_kb.tray_idle_power_state = TrayIdlePowerState(user_forced_off=True)
 
         mock_policy_instance = MagicMock()
         mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(actions=())

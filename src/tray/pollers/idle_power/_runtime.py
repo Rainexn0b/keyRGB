@@ -5,6 +5,11 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
 
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
+from src.tray.idle_power_state import (
+    is_dim_temp_active,
+    read_forced_off_flags,
+    read_last_resume_at,
+)
 from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_float_field
 
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
@@ -15,7 +20,8 @@ from .sensors import BacklightState
 
 logger = logging.getLogger(__name__)
 
-_IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+# Idle-power per-iteration diagnostic boundary; drop map LookupError.
+_IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _IDLE_POWER_IMPORT_EXCEPTIONS = (ImportError,) + _IDLE_POWER_RUNTIME_EXCEPTIONS
 
 
@@ -52,6 +58,7 @@ def _log_idle_action_best_effort(
     dim_temp_brightness: int,
 ) -> None:
     def _log_event() -> None:
+        user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
         tray._log_event(
             "idle_power",
             str(action),
@@ -62,10 +69,10 @@ def _log_idle_action_best_effort(
             dim_sync_mode=str(dim_sync_mode),
             dim_temp_brightness=int(dim_temp_brightness),
             is_off=bool(tray.is_off),
-            user_forced_off=bool(tray._user_forced_off),
-            power_forced_off=bool(tray._power_forced_off),
-            idle_forced_off=bool(tray._idle_forced_off),
-            dim_temp_active=bool(tray._dim_temp_active),
+            user_forced_off=user_forced_off,
+            power_forced_off=power_forced_off,
+            idle_forced_off=idle_forced_off,
+            dim_temp_active=is_dim_temp_active(tray),
         )
 
     _run_idle_power_runtime_boundary_best_effort(_log_event)
@@ -341,7 +348,7 @@ def run_idle_power_iteration(
     # Tertiary fallback: logind session idle (used when neither the desktop
     # timeout/input-idle path nor the brightness heuristic could determine state).
     if session_idle is None:
-        restore_candidate = bool(dimmed is False and (bool(tray.is_off) or bool(tray._dim_temp_active)))
+        restore_candidate = bool(dimmed is False and (bool(tray.is_off) or is_dim_temp_active(tray)))
         if dimmed is None or restore_candidate:
             session_idle = _read_session_idle_state(
                 session_id=session_id,
@@ -364,27 +371,28 @@ def run_idle_power_iteration(
         bool(screen_off),
     )
 
+    user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
     action = compute_idle_action_fn(
         dimmed=dimmed,
         screen_off=bool(screen_off),
         idle_timeout_s=float(idle_timeout_s),
         is_off=bool(tray.is_off),
-        idle_forced_off=bool(tray._idle_forced_off),
-        dim_temp_active=bool(tray._dim_temp_active),
+        idle_forced_off=idle_forced_off,
+        dim_temp_active=is_dim_temp_active(tray),
         power_management_enabled=bool(power_mgmt_enabled),
         screen_dim_sync_enabled=bool(dim_sync_enabled),
         screen_dim_sync_mode=str(dim_sync_mode),
         screen_dim_temp_brightness=int(dim_temp_brightness),
         brightness=int(brightness),
-        user_forced_off=bool(tray._user_forced_off),
-        power_forced_off=bool(tray._power_forced_off),
+        user_forced_off=user_forced_off,
+        power_forced_off=power_forced_off,
         last_idle_turn_off_at=read_idle_power_state_float_field(
             tray,
             attr_name="_last_idle_turn_off_at",
             state_name="last_idle_turn_off_at",
             default=0.0,
         ),
-        last_resume_at=float(tray._last_resume_at),
+        last_resume_at=read_last_resume_at(tray),
         now=now,
         session_idle=session_idle,
     )

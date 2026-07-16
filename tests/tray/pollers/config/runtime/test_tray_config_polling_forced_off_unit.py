@@ -9,15 +9,15 @@ from src.tray.pollers.config_polling import ConfigApplyState, _apply_from_config
 
 
 def _mk_tray(*, brightness: int, effect: str = "rainbow_wave") -> MagicMock:
-    tray = MagicMock()
-    tray.is_off = False
-    tray._user_forced_off = False
-    tray._power_forced_off = False
-    tray._idle_forced_off = False
+    from tests.tray.fakes import make_owner_backed_mock_tray
 
-    tray.engine = MagicMock()
+    tray = make_owner_backed_mock_tray(
+        is_off=False,
+        user_forced_off=False,
+        power_forced_off=False,
+        idle_forced_off=False,
+    )
     tray.engine.running = True
-
     tray.config = SimpleNamespace(
         effect=effect,
         speed=4,
@@ -27,20 +27,24 @@ def _mk_tray(*, brightness: int, effect: str = "rainbow_wave") -> MagicMock:
         reactive_use_manual_color=False,
         reactive_color=(10, 20, 30),
     )
-
-    tray._log_event = MagicMock()
-    tray._update_menu = MagicMock()
-    tray._refresh_ui = MagicMock()
-    tray._start_current_effect = MagicMock()
-
     return tray
 
 
-@pytest.mark.parametrize("flag_name", ["_user_forced_off", "_power_forced_off", "_idle_forced_off"])
+@pytest.mark.parametrize(
+    "flag_name",
+    ["user_forced_off", "power_forced_off", "idle_forced_off"],
+)
 def test_forced_off_skip_prevents_fastpath_brightness_update(flag_name: str) -> None:
+    from src.tray.idle_power_state import set_idle_power_state_field
+
     tray = _mk_tray(brightness=30, effect="rainbow_wave")
     tray.is_off = True
-    setattr(tray, flag_name, True)
+    set_idle_power_state_field(
+        tray,
+        attr_name=f"_{flag_name}",
+        state_name=flag_name,
+        value=True,
+    )
 
     last_applied = ConfigApplyState(
         effect="rainbow_wave",
@@ -85,9 +89,13 @@ def test_forced_off_skip_prevents_fastpath_brightness_update(flag_name: str) -> 
 
 
 def test_forced_off_skip_logs_update_menu_failure() -> None:
+    from src.tray.idle_power_state import set_idle_power_state_field
+
     tray = _mk_tray(brightness=30, effect="rainbow_wave")
     tray.is_off = True
-    tray._user_forced_off = True
+    set_idle_power_state_field(
+        tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True
+    )
     tray._update_menu.side_effect = RuntimeError("boom")
 
     new_last_applied, _ = _apply_from_config_once(

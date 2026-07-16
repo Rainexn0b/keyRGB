@@ -64,6 +64,21 @@ def test_set_secondary_device_brightness_preserves_existing_color_field() -> Non
     assert cfg.save_calls == 1
 
 
+def test_secondary_device_state_snapshot_is_detached_and_does_not_create_state() -> None:
+    cfg = _FakeConfig()
+
+    snapshot = accessors.secondary_device_state_snapshot(cfg)
+
+    assert snapshot == {}
+    assert "secondary_device_state" not in cfg._settings
+
+    cfg._settings["secondary_device_state"] = {"logo": {"enabled": True}}
+    snapshot = accessors.secondary_device_state_snapshot(cfg)
+    snapshot["extra"] = {"enabled": False}
+
+    assert "extra" not in cfg._settings["secondary_device_state"]  # type: ignore[index]
+
+
 def test_get_secondary_device_color_prefers_state_entry_over_compatibility_fallback() -> None:
     cfg = _FakeConfig(
         _settings={

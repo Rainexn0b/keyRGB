@@ -54,6 +54,15 @@ Examples of state that currently spans multiple concerns:
 3. Keep `KeyRGBTray` as wiring and lifecycle, not as the main decision engine.
 4. Remove remaining private-attribute compatibility shims once the typed state is in place.
 
+## Progress (2026-07-15)
+
+- Bootstrap bags exist: `TrayPreBootstrapState`, `TrayBootstrapState`.
+- Ownership inventory: `docs/1-src/13-tray-runtime-state-ownership.md`.
+- Forced-off / dim-temp **read** helpers on `idle_power_state`; hardware poller
+  and idle-power runtime no longer touch those private attrs directly for reads.
+- `_last_brightness` now owned on `TrayIdlePowerState` with read/set helpers.
+- Remaining: stop dual-write once all writers use set helpers only.
+
 ## Buildpython hooks
 
 - Existing signals:

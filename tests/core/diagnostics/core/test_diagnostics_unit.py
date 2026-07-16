@@ -137,11 +137,11 @@ def test_format_diagnostics_text_includes_backend_capabilities_dimensions_and_ma
         app={},
         power_supply={},
         backends={
-            "selected": "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+            "selected": "ite8258_perkey_chassis",
             "requested": "auto",
             "probes": [
                 {
-                    "name": "ite8258_perkey_chassis_logo_neon_vent_lenovo_legion",
+                    "name": "ite8258_perkey_chassis",
                     "available": True,
                     "stability": "experimental",
                     "experimental_evidence": "reverse_engineered",

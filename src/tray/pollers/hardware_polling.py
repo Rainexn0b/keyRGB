@@ -6,6 +6,12 @@ import time
 from typing import TypeVar
 
 from src.core.utils.exceptions import is_device_disconnected
+from src.tray.idle_power_state import (
+    any_forced_off,
+    dim_temp_target_brightness,
+    is_dim_temp_active,
+    read_forced_off_flags,
+)
 from src.tray.protocols import (
     IdlePowerTrayProtocol,
     clear_idle_power_state_field,
@@ -121,16 +127,11 @@ def _recover_recent_power_source_blank_best_effort(
     *,
     current_brightness: int,
 ) -> bool:
-    tray_vars = vars(tray)
     now = time.monotonic()
     if not _power_source_recovery_window_active(tray, now=now):
         return False
 
-    if bool(tray_vars.get("_user_forced_off", False)):
-        return False
-    if bool(tray_vars.get("_power_forced_off", False)):
-        return False
-    if bool(tray_vars.get("_idle_forced_off", False)):
+    if any_forced_off(tray):
         return False
     if _configured_brightness_intent(tray) <= 0:
         return False
@@ -208,16 +209,11 @@ def _recover_stable_zero_brightness_best_effort(
     *,
     current_brightness: int,
 ) -> bool:
-    tray_vars = vars(tray)
     if int(current_brightness) != 0:
         return False
-    if bool(tray_vars.get("_dim_temp_active", False)):
+    if is_dim_temp_active(tray):
         return False
-    if bool(tray_vars.get("_user_forced_off", False)):
-        return False
-    if bool(tray_vars.get("_power_forced_off", False)):
-        return False
-    if bool(tray_vars.get("_idle_forced_off", False)):
+    if any_forced_off(tray):
         return False
     if _configured_brightness_intent(tray) <= 0:
         return False
@@ -297,13 +293,12 @@ def _apply_polled_hardware_state(
     last_brightness,
     last_off_state,
 ):
-    tray_vars = vars(tray)
-
     # If we're temporarily forcing brightness due to screen dim sync, do not
     # persist that brightness back into config.json (it would become a user
     # setting). Still allow off/on transitions to be detected.
-    dim_temp_active = bool(tray_vars.get("_dim_temp_active", False))
-    dim_temp_target = tray_vars.get("_dim_temp_target_brightness")
+    dim_temp_active = is_dim_temp_active(tray)
+    dim_temp_target = dim_temp_target_brightness(tray)
+    user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
 
     if raw_brightness is None:
         raw_brightness = current_brightness
@@ -321,12 +316,7 @@ def _apply_polled_hardware_state(
             return current_brightness, False
 
     zero_brightness_without_off_state = current_brightness == 0 and not bool(current_off)
-    if current_brightness == 0 and (
-        bool(current_off)
-        or bool(tray_vars.get("_power_forced_off", False))
-        or bool(tray_vars.get("_user_forced_off", False))
-        or bool(tray_vars.get("_idle_forced_off", False))
-    ):
+    if current_brightness == 0 and (bool(current_off) or user_forced_off or power_forced_off or idle_forced_off):
         current_off = True
 
     if last_brightness is not None and current_brightness != last_brightness:
@@ -349,7 +339,7 @@ def _apply_polled_hardware_state(
             except _BRIGHTNESS_COERCION_ERRORS:
                 pass
 
-        if bool(tray_vars.get("_power_forced_off", False)) and current_brightness == 0:
+        if power_forced_off and current_brightness == 0:
             return current_brightness, current_off
 
         # Never persist brightness=0 from hardware polling. Some backends can
@@ -367,11 +357,7 @@ def _apply_polled_hardware_state(
             # overwrite the user's tray selection and leave no brightness radio
             # item selected after restart.
             if last_brightness == 0:
-                if (
-                    not bool(tray_vars.get("_user_forced_off", False))
-                    and not bool(tray_vars.get("_power_forced_off", False))
-                    and not bool(tray_vars.get("_idle_forced_off", False))
-                ):
+                if not (user_forced_off or power_forced_off or idle_forced_off):
                     tray.is_off = False
 
         _refresh_ui_without_icon_animation(tray)
@@ -385,7 +371,7 @@ def _apply_polled_hardware_state(
             new=bool(current_off),
         )
 
-        if bool(tray_vars.get("_power_forced_off", False)) and current_off:
+        if power_forced_off and current_off:
             return current_brightness, current_off
 
         if current_off:
@@ -396,11 +382,7 @@ def _apply_polled_hardware_state(
             tray.is_off = True
         else:
             # Avoid overriding explicit forced-off states.
-            if (
-                not bool(tray_vars.get("_user_forced_off", False))
-                and not bool(tray_vars.get("_power_forced_off", False))
-                and not bool(tray_vars.get("_idle_forced_off", False))
-            ):
+            if not (user_forced_off or power_forced_off or idle_forced_off):
                 tray.is_off = False
         _refresh_ui_without_icon_animation(tray)
         return current_brightness, current_off
