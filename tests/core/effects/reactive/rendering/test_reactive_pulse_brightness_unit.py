@@ -77,6 +77,128 @@ def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
         render_module.time.monotonic = original_monotonic
 
 
+def test_queued_restore_seed_survives_engine_state_reset() -> None:
+    """Pre-start queue must re-apply after stop()-style ReactiveRenderState()."""
+    from src.core.effects.reactive._render_brightness_support import (
+        ReactiveRenderState,
+        ReactiveRestorePhase,
+        apply_queued_reactive_restore_seed,
+        ensure_reactive_state,
+        seed_reactive_restore_windows,
+    )
+
+    eng = _DummyEngine(brightness=20, reactive_brightness=50)
+    assert seed_reactive_restore_windows(eng, fade_in_duration_s=0.42, now=100.0)
+    state = ensure_reactive_state(eng)
+    assert state._reactive_restore_phase is ReactiveRestorePhase.FIRST_PULSE_PENDING
+    assert state._reactive_restore_damp_until == pytest.approx(104.0)
+
+    # Simulate engine.stop() rebuild.
+    eng._reactive_state = ReactiveRenderState()
+    assert apply_queued_reactive_restore_seed(eng) is True
+    state = ensure_reactive_state(eng)
+    assert state._reactive_restore_phase is ReactiveRestorePhase.FIRST_PULSE_PENDING
+    assert state._reactive_restore_damp_until == pytest.approx(104.0)
+    assert state._reactive_disable_pulse_hw_lift_until == pytest.approx(102.0)
+    # Queue is single-shot.
+    eng._reactive_state = ReactiveRenderState()
+    assert apply_queued_reactive_restore_seed(eng) is False
+
+
+def test_post_restore_frame_scale_softens_soft_on_matrix_steps() -> None:
+    """Whole-frame scale during restore damp covers pulse_mix=0 soft-on pops."""
+    from src.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+    from src.core.effects.reactive.render import _post_restore_frame_scale, _resolve_transition_visual_scale
+
+    eng = _DummyEngine(brightness=20, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 20
+    state = ensure_reactive_state(eng)
+    state._reactive_restore_damp_until = 104.0
+    state._reactive_restore_phase = ReactiveRestorePhase.FIRST_PULSE_PENDING
+
+    import src.core.effects.reactive.render as render_module
+
+    original_monotonic = render_module.time.monotonic
+    render_module.time.monotonic = lambda: 100.0
+    try:
+        # At damp floor 0.35 → frame floor 0.62
+        assert _post_restore_frame_scale(eng) == pytest.approx(0.62)
+        assert _resolve_transition_visual_scale(eng) == pytest.approx(0.62)
+        # Outside restore window, full scale.
+        state._reactive_restore_phase = ReactiveRestorePhase.NORMAL
+        state._reactive_restore_damp_until = None
+        assert _post_restore_frame_scale(eng) == pytest.approx(1.0)
+        assert _resolve_transition_visual_scale(eng) == pytest.approx(1.0)
+    finally:
+        render_module.time.monotonic = original_monotonic
+
+
+def test_pulse_brightness_damps_normal_base_post_restore_bursts() -> None:
+    """Typing-wake flash regression: damp must apply at base>=10 (e.g. 20).
+
+    Previously post-restore damp was nested under very_dim_curve (visual_hw < 10),
+    so a normal base like 20 kept pulse_scale=1.0 on the first rapid burst after
+    long idle off — a brief deck-wide flash with reactive_ripple.
+    """
+    from src.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+
+    eng = _DummyEngine(brightness=20, reactive_brightness=50)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 20
+    state = ensure_reactive_state(eng)
+    state._reactive_restore_damp_until = 102.0
+    state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
+
+    import src.core.effects.reactive.render as render_module
+
+    original_monotonic = render_module.time.monotonic
+    render_module.time.monotonic = lambda: 100.0
+    try:
+        # baseline=20/50=0.4, pulse=1.0, damp@start=0.35
+        # final = 0.4 + (1.0 - 0.4) * 0.35 = 0.61
+        assert pulse_brightness_scale_factor(eng) == pytest.approx(0.61)
+        undamped = _DummyEngine(brightness=20, reactive_brightness=50)
+        undamped.per_key_colors = {(0, 0): (0, 0, 0)}
+        undamped.per_key_brightness = 20
+        assert pulse_brightness_scale_factor(undamped) == pytest.approx(1.0)
+    finally:
+        render_module.time.monotonic = original_monotonic
+
+
+def test_pulse_brightness_damps_eff_le_hw_path_during_restore() -> None:
+    """Restore damp also applies when reactive slider is not above backdrop hw."""
+    from src.core.effects.reactive._render_brightness_support import (
+        ReactiveRestorePhase,
+        ensure_reactive_state,
+    )
+
+    eng = _DummyEngine(brightness=20, reactive_brightness=20)
+    eng.per_key_colors = {(0, 0): (0, 0, 0)}
+    eng.per_key_brightness = 20
+    state = ensure_reactive_state(eng)
+    state._reactive_restore_damp_until = 102.0
+    state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
+
+    import src.core.effects.reactive.render as render_module
+
+    original_monotonic = render_module.time.monotonic
+    render_module.time.monotonic = lambda: 100.0
+    try:
+        undamped = pulse_brightness_scale_factor(_DummyEngine(brightness=20, reactive_brightness=20))
+        damped = pulse_brightness_scale_factor(eng)
+        assert undamped == pytest.approx(0.4)
+        assert damped == pytest.approx(undamped * 0.35)
+    finally:
+        render_module.time.monotonic = original_monotonic
+
+
 def test_pulse_brightness_reseeds_restore_damp_on_first_post_restore_pulse() -> None:
     from src.core.effects.reactive import effects
     from src.core.effects.reactive._render_brightness_support import (

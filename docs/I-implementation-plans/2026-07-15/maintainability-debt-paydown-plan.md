@@ -22,16 +22,16 @@ codebase review. Supersedes the prioritization narrative of older debt notes for
 | D2 | Coordinators | Fat orchestration (tray app, config apply, power, some GUI) | P0 | L | monitoring | Config-apply gate + pure power-source debounce; software-target boundaries/profile split; settings_state split into reader/values/scheduler modules |
 | D3 | Config/state | Dict-centric config; alias chains repeated | P1 | M | monitoring | Readonly secondary/effect-speed snapshot APIs; remaining raw readers are compatibility fallbacks |
 | D4 | Backends | Duplicated HID find/open/identifier glue | P1 | M | monitoring | ite8291-style + ite8910-style find helpers shared; probe-result builders optional later |
-| D5 | Polling | Config/hardware/idle pollers still tightly coupled | P1 | M | monitoring | `ConfigApplyPlan.apply_mode` + power-source skip pure gates |
+| D5 | Polling | Config/hardware/idle pollers still tightly coupled | P1 | M | monitoring | Config-apply pure gates + hardware `_decisions` pure recovery/interval/persist classifiers (0.30.1) |
 | D6 | Exceptions | Broad recoverable boundaries in hot paths (budgeted) | P1 | M | monitoring | Diagnostic/callback tuples narrowed; Step 19: 0 active broad-except, 54 annotated boundaries, 3 intentional waivers only |
-| D7 | Tests | Strong units; thinner multi-component runtime flows | P1 | M | monitoring | Composite forced-off clear→apply integration present; further multi-layer tests optional, not release-blocking |
+| D7 | Tests | Strong units; thinner multi-component runtime flows | P1 | M | monitoring | Composite forced-off + idle dim/restore secondary + uniform/effect plan integrations (0.30.1); more optional |
 | D8 | Packaging | `from src.*` import root | P2 | L | deferred | AppImage-first; no packaging pain observed; migrate only if reuse/install pain rises |
 | D9 | Naming | Hard max-4 post-chip appendages rule | P2 | S | done | Canonical in `src/core/backends/README.md` |
 | D10 | Docs | Large plan/legacy surface; onboarding cost | P2 | S | monitoring | This doc is the start-here index; 139 docs files are historical by design under lane registry |
 | D11 | UI stack | Tk/pystray Wayland/tray edge cases | P2 | L | deferred | Product risk, not pure maintainability debt |
 | D12 | Tooling | Keep buildpython debt baselines honest | P2 | S | monitoring | `--profile debt`; identification pass 2026-07-16 green |
-| D13 | Layering | tray→gui theme detect; private cross-package imports | P2 | S | deferred | One tray→gui import (`theme.detect`); 3 gui→core private imports; architecture validation 0 findings |
-| D14 | File size | Protocol/reactive/hardware-polling LOC buckets | P2 | M | deferred | Largest prod: chassis protocol 709 (device-local); test megasuites are coverage artifacts, not runtime debt |
+| D13 | Layering | tray→gui theme detect; private cross-package imports | P2 | S | done | Theme detect moved to `src/core/theme` (0.30.1); tray→gui imports 0 |
+| D14 | File size | Protocol/reactive/hardware-polling LOC buckets | P2 | M | monitoring | 0.30.1: reactive support debug split (~367); hardware poll ~446; chassis protocol 709 still device-local |
 | D15 | Legacy secondary | `legacy_snapshot_from_config` markers (hygiene cleanup_hotspot=6) | P2 | S | deferred | Intentional v0.28→v0.29 compatibility path for issue #7 installs; do not remove while profiles still migrate |
 
 ## Phase plan
@@ -77,6 +77,10 @@ codebase review. Supersedes the prioritization narrative of older debt notes for
 | S4 | D1 | Document remaining tray attribute ownership; extract one more typed bag if cheap |
 | S5 | D5 | Grow config-apply plan coverage (more branches pure) |
 | S6 | D7 | One composite secondary + config-apply integration test expansion |
+
+**Post-0.30.0 ordering:** residual work is tracked in
+`docs/I-implementation-plans/2026-07-16/0.30.1-maintainability-follow-up-plan.md`
+(W1 orchestration, W2 size hotspots, W3 multi-layer tests, CQ1 tray→gui theme).
 
 ## Related docs
 

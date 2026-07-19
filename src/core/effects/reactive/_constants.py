@@ -26,6 +26,12 @@ POST_RESTORE_PULSE_VISUAL_HOLDOFF_S: float = 2.0
 # Units: fraction of full pulse intensity (0.0..1.0).
 POST_RESTORE_PULSE_VISUAL_MIN_FACTOR: float = 0.35
 
+# Mild whole-frame scale floor while the restore damp window is active.
+# Soft-on matrix steps (brightness_guard 8→16→20) paint the full deck even
+# when pulse_mix=0; pulse-only damp cannot soften that residual pop after a
+# long idle black. Map pulse-damp progress onto [FRAME_MIN, 1.0].
+POST_RESTORE_FRAME_MIN_FACTOR: float = 0.62
+
 # --- Pulse mix rise/decay ---
 
 # Per-frame decay when all pulses have ended.

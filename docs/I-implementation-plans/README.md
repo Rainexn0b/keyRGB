@@ -7,8 +7,11 @@ specs for larger changes.
 
 ### Active follow-up plans
 
-- `2026-07-15/maintainability-debt-paydown-plan.md` — active maintainability /
-  tech-debt inventory, phases, and near-term slices (start here for debt work)
+- `2026-07-16/0.30.1-maintainability-follow-up-plan.md` — **0.30.1** patch plan:
+  top-3 residual weaknesses (orchestration purity, size hotspots, multi-layer
+  tests) + bounded code-quality slices after 0.30.0
+- `2026-07-15/maintainability-debt-paydown-plan.md` — full maintainability /
+  tech-debt inventory (D1–D15), phases, and progress log
 - `issue-7-composite-profile-hardening-and-validation-plan.md` — live-code-verified
   disposition of the v0.29.1 regression review, including desired/off semantics,
   composite output batching, the missing cross-layer regression, descriptor

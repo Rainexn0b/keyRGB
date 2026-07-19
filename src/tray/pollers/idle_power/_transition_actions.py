@@ -56,30 +56,14 @@ def _should_seed_reactive_restore_windows(tray: object, *, fade_in: bool) -> boo
 
 
 def _seed_reactive_restore_windows(engine: object, *, fade_in_duration_s: float) -> None:
+    """Queue + apply restore damp so first post-start frames are already protected."""
+
+    if engine is None:
+        return
     try:
-        now = float(time.monotonic())
-        hw_lift_holdoff_until = now + max(
-            2.0,
-            float(fade_in_duration_s) + 0.75,
-        )
-        visual_damp_until = now + max(
-            4.0,
-            float(fade_in_duration_s) + 2.75,
-        )
-        _reactive_support.set_engine_attr(
+        _reactive_support.seed_reactive_restore_windows(
             cast(object, engine),
-            "_reactive_disable_pulse_hw_lift_until",
-            hw_lift_holdoff_until,
-        )
-        _reactive_support.set_engine_attr(
-            cast(object, engine),
-            "_reactive_restore_damp_until",
-            visual_damp_until,
-        )
-        _reactive_support.set_engine_attr(
-            cast(object, engine),
-            "_reactive_restore_phase",
-            _reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING,
+            fade_in_duration_s=float(fade_in_duration_s),
         )
     except (AttributeError, TypeError, ValueError):
         return
@@ -105,6 +89,12 @@ def start_current_effect_for_idle_restore(
         except (AttributeError, TypeError):
             use_loop_effect_ramp = False
 
+    engine = getattr(tray, "engine", None)
+    # Seed before start so stop()->ReactiveRenderState() re-applies queued damp
+    # before the effect thread's first frames (closes long-idle residual flash).
+    if seed_reactive_restore_windows:
+        _seed_reactive_restore_windows(engine, fade_in_duration_s=fade_in_duration_s)
+
     start_fn = _start_current_effect_or_none(tray)
     try:
         if callable(start_fn):
@@ -117,7 +107,8 @@ def start_current_effect_for_idle_restore(
             except TypeError:
                 start_fn()
             if seed_reactive_restore_windows:
-                _seed_reactive_restore_windows(getattr(tray, "engine", None), fade_in_duration_s=fade_in_duration_s)
+                # Refresh timers after start (stop consumed the pre-start queue).
+                _seed_reactive_restore_windows(engine, fade_in_duration_s=fade_in_duration_s)
             return
 
         from src.tray.controllers.lighting_controller import start_current_effect
@@ -129,7 +120,7 @@ def start_current_effect_for_idle_restore(
             fade_in_duration_s=fade_in_duration_s,
         )
         if seed_reactive_restore_windows:
-            _seed_reactive_restore_windows(getattr(tray, "engine", None), fade_in_duration_s=fade_in_duration_s)
+            _seed_reactive_restore_windows(engine, fade_in_duration_s=fade_in_duration_s)
     finally:
         if use_loop_effect_ramp:
             try:

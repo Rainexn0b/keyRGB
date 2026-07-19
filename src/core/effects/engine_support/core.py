@@ -12,7 +12,7 @@ from ..device import (
     PerKeyColorMap,
     acquire_keyboard,
 )
-from ..reactive._render_brightness_support import ReactiveRenderState
+from ..reactive._render_brightness_support import ReactiveRenderState, apply_queued_reactive_restore_seed
 from ..software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 
 logger = logging.getLogger("src.core.effects.engine_core")
@@ -205,6 +205,9 @@ class _EngineCore:
         self._last_hw_mode_brightness = None
         self._last_reactive_per_key_frame_signature = None
         self._reactive_state = ReactiveRenderState()
+        # Idle-restore may queue damp timers before start_effect(); stop() would
+        # otherwise wipe them and race the first render frames after long idle.
+        apply_queued_reactive_restore_seed(self)
 
         if not self.running and not self.thread:
             self.current_effect = None

@@ -12,6 +12,19 @@ from src.tray.idle_power_state import (
     is_dim_temp_active,
     read_forced_off_flags,
 )
+from src.tray.pollers.hardware._decisions import (
+    DEFAULT_HARDWARE_POLL_INTERVAL_S as _DEFAULT_HARDWARE_POLL_INTERVAL_S,
+    FAST_HARDWARE_POLL_INTERVAL_S as _FAST_HARDWARE_POLL_INTERVAL_S,
+    POWER_SOURCE_RECOVERY_COOLDOWN_S as _POWER_SOURCE_RECOVERY_COOLDOWN_S,
+    POWER_SOURCE_RECOVERY_WINDOW_S as _POWER_SOURCE_RECOVERY_WINDOW_S,
+    STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S as _STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S,
+    coerce_poll_int as _coerce_poll_int,
+    hardware_poll_interval_s as _pure_hardware_poll_interval_s,
+    normalize_brightness_to_config_scale as _normalize_brightness_to_config_scale,
+    power_source_recovery_window_active as _pure_power_source_recovery_window_active,
+    should_attempt_power_source_blank_recovery as _should_attempt_power_source_blank_recovery,
+    should_attempt_stable_zero_brightness_recovery as _should_attempt_stable_zero_brightness_recovery,
+)
 from src.tray.protocols import (
     IdlePowerTrayProtocol,
     clear_idle_power_state_field,
@@ -23,19 +36,7 @@ from src.tray.protocols import (
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _HARDWARE_POLL_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _HARDWARE_POLL_RECOVERY_EXCEPTIONS = (OSError, RuntimeError, ValueError)
-_POWER_SOURCE_RECOVERY_WINDOW_S = 6.0
-_POWER_SOURCE_RECOVERY_COOLDOWN_S = 0.75
-_STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S = 5.0
-_DEFAULT_HARDWARE_POLL_INTERVAL_S = 2.0
-_FAST_HARDWARE_POLL_INTERVAL_S = 0.25
 _T = TypeVar("_T")
-
-
-def _coerce_poll_int(value: object, *, default: int) -> int:
-    try:
-        return int(value)  # type: ignore[call-overload]
-    except _BRIGHTNESS_COERCION_ERRORS:
-        return int(default)
 
 
 def _run_recoverable_hardware_poll_boundary(
@@ -61,22 +62,6 @@ def _log_polled_hardware_event(tray: IdlePowerTrayProtocol, action: str, **field
     )
 
 
-def _normalize_brightness_to_config_scale(brightness: int, *, expected: int | None = None) -> int:
-    """Clamp brightness into KeyRGB's expected 0..50 range.
-
-    Note: We intentionally do NOT attempt to infer or convert other brightness
-    scales (like 0..10 or 0..100) here. That heuristic caused unwanted
-    brightness changes.
-    """
-
-    try:
-        b = int(brightness)
-    except _BRIGHTNESS_COERCION_ERRORS:
-        return 0
-
-    return max(0, min(50, b))
-
-
 def _refresh_ui_without_icon_animation(tray: IdlePowerTrayProtocol) -> None:
     try:
         tray._refresh_ui(animate_icon=False)
@@ -96,23 +81,31 @@ def _resolve_tray_callback(tray: object, name: str):
     return lambda *args, **kwargs: class_callback(tray, *args, **kwargs)
 
 
-def _power_source_recovery_window_active(tray: IdlePowerTrayProtocol, *, now: float) -> bool:
-    changed_at = read_idle_power_state_float_field(
+def _power_source_transition_at(tray: IdlePowerTrayProtocol) -> float:
+    return read_idle_power_state_float_field(
         tray,
         attr_name="_last_power_source_transition_at",
         state_name="last_power_source_transition_at",
         default=0.0,
     )
-    if changed_at <= 0:
-        return False
 
-    return now - changed_at <= _POWER_SOURCE_RECOVERY_WINDOW_S
+
+def _power_source_recovery_window_active(tray: IdlePowerTrayProtocol, *, now: float) -> bool:
+    return _pure_power_source_recovery_window_active(
+        now=now,
+        last_power_source_transition_at=_power_source_transition_at(tray),
+        window_s=_POWER_SOURCE_RECOVERY_WINDOW_S,
+    )
 
 
 def _hardware_poll_interval_s(tray: IdlePowerTrayProtocol, *, now: float) -> float:
-    if _power_source_recovery_window_active(tray, now=now):
-        return _FAST_HARDWARE_POLL_INTERVAL_S
-    return _DEFAULT_HARDWARE_POLL_INTERVAL_S
+    return _pure_hardware_poll_interval_s(
+        now=now,
+        last_power_source_transition_at=_power_source_transition_at(tray),
+        window_s=_POWER_SOURCE_RECOVERY_WINDOW_S,
+        fast_s=_FAST_HARDWARE_POLL_INTERVAL_S,
+        default_s=_DEFAULT_HARDWARE_POLL_INTERVAL_S,
+    )
 
 
 def _configured_brightness_intent(tray: IdlePowerTrayProtocol) -> int:
@@ -122,20 +115,8 @@ def _configured_brightness_intent(tray: IdlePowerTrayProtocol) -> int:
         return 0
 
 
-def _recover_recent_power_source_blank_best_effort(
-    tray: IdlePowerTrayProtocol,
-    *,
-    current_brightness: int,
-) -> bool:
-    now = time.monotonic()
-    if not _power_source_recovery_window_active(tray, now=now):
-        return False
-
-    if any_forced_off(tray):
-        return False
-    if _configured_brightness_intent(tray) <= 0:
-        return False
-
+def _power_source_blank_recovery_eligible(tray: IdlePowerTrayProtocol, *, now: float | None = None) -> bool:
+    when = time.monotonic() if now is None else float(now)
     try:
         last_recovery_at = read_idle_power_state_float_field(
             tray,
@@ -145,9 +126,26 @@ def _recover_recent_power_source_blank_best_effort(
         )
     except _BRIGHTNESS_COERCION_ERRORS:
         last_recovery_at = 0.0
-    if now - last_recovery_at < _POWER_SOURCE_RECOVERY_COOLDOWN_S:
-        return False
+    return _should_attempt_power_source_blank_recovery(
+        now=when,
+        last_power_source_transition_at=_power_source_transition_at(tray),
+        last_recovery_at=float(last_recovery_at),
+        any_forced_off=any_forced_off(tray),
+        configured_brightness_intent=_configured_brightness_intent(tray),
+        window_s=_POWER_SOURCE_RECOVERY_WINDOW_S,
+        cooldown_s=_POWER_SOURCE_RECOVERY_COOLDOWN_S,
+    )
 
+
+def _execute_blank_recovery(
+    tray: IdlePowerTrayProtocol,
+    *,
+    current_brightness: int,
+    now: float,
+    recovery_stamp_attr: str,
+    recovery_stamp_state: str,
+    log_action: str,
+) -> bool:
     apply_transition = _resolve_tray_callback(tray, "_apply_power_source_perkey_profile_transition")
     start_current_effect = _resolve_tray_callback(tray, "_start_current_effect")
 
@@ -190,18 +188,36 @@ def _recover_recent_power_source_blank_best_effort(
 
     set_idle_power_state_field(
         tray,
-        attr_name="_last_power_source_blank_recovery_at",
-        state_name="last_power_source_blank_recovery_at",
+        attr_name=recovery_stamp_attr,
+        state_name=recovery_stamp_state,
         value=float(now),
     )
     tray.is_off = False
     _log_polled_hardware_event(
         tray,
-        "power_source_blank_recover",
+        log_action,
         brightness=int(current_brightness),
     )
     _refresh_ui_without_icon_animation(tray)
     return True
+
+
+def _recover_recent_power_source_blank_best_effort(
+    tray: IdlePowerTrayProtocol,
+    *,
+    current_brightness: int,
+) -> bool:
+    now = time.monotonic()
+    if not _power_source_blank_recovery_eligible(tray, now=now):
+        return False
+    return _execute_blank_recovery(
+        tray,
+        current_brightness=current_brightness,
+        now=now,
+        recovery_stamp_attr="_last_power_source_blank_recovery_at",
+        recovery_stamp_state="last_power_source_blank_recovery_at",
+        log_action="power_source_blank_recover",
+    )
 
 
 def _recover_stable_zero_brightness_best_effort(
@@ -209,15 +225,6 @@ def _recover_stable_zero_brightness_best_effort(
     *,
     current_brightness: int,
 ) -> bool:
-    if int(current_brightness) != 0:
-        return False
-    if is_dim_temp_active(tray):
-        return False
-    if any_forced_off(tray):
-        return False
-    if _configured_brightness_intent(tray) <= 0:
-        return False
-
     now = time.monotonic()
     last_recovery_at = read_idle_power_state_float_field(
         tray,
@@ -225,63 +232,24 @@ def _recover_stable_zero_brightness_best_effort(
         state_name="last_hardware_blank_recovery_at",
         default=0.0,
     )
-    if now - last_recovery_at < _STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S:
+    if not _should_attempt_stable_zero_brightness_recovery(
+        current_brightness=int(current_brightness),
+        dim_temp_active=is_dim_temp_active(tray),
+        any_forced_off=any_forced_off(tray),
+        configured_brightness_intent=_configured_brightness_intent(tray),
+        now=now,
+        last_recovery_at=float(last_recovery_at),
+        cooldown_s=_STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S,
+    ):
         return False
-
-    apply_transition = _resolve_tray_callback(tray, "_apply_power_source_perkey_profile_transition")
-    start_current_effect = _resolve_tray_callback(tray, "_start_current_effect")
-
-    try:
-        set_idle_power_state_field(
-            tray,
-            attr_name="_hidden_perkey_restore_brightness_hint",
-            state_name="hidden_perkey_restore_brightness_hint",
-            value=int(current_brightness),
-        )
-        set_idle_power_state_field(
-            tray,
-            attr_name="_hidden_perkey_restore_device_off_hint",
-            state_name="hidden_perkey_restore_device_off_hint",
-            value=False,
-        )
-        handled = bool(apply_transition()) if callable(apply_transition) else False
-        if not handled and callable(start_current_effect):
-            start_current_effect()
-            handled = True
-    except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
-        _log_hardware_polling_error_best_effort(tray, exc)
-        return False
-    finally:
-        clear_idle_power_state_field(
-            tray,
-            attr_name="_hidden_perkey_restore_brightness_hint",
-            state_name="hidden_perkey_restore_brightness_hint",
-            value=None,
-        )
-        clear_idle_power_state_field(
-            tray,
-            attr_name="_hidden_perkey_restore_device_off_hint",
-            state_name="hidden_perkey_restore_device_off_hint",
-            value=None,
-        )
-
-    if not handled:
-        return False
-
-    set_idle_power_state_field(
+    return _execute_blank_recovery(
         tray,
-        attr_name="_last_hardware_blank_recovery_at",
-        state_name="last_hardware_blank_recovery_at",
-        value=float(now),
+        current_brightness=current_brightness,
+        now=now,
+        recovery_stamp_attr="_last_hardware_blank_recovery_at",
+        recovery_stamp_state="last_hardware_blank_recovery_at",
+        log_action="stable_zero_brightness_recover",
     )
-    tray.is_off = False
-    _log_polled_hardware_event(
-        tray,
-        "stable_zero_brightness_recover",
-        brightness=int(current_brightness),
-    )
-    _refresh_ui_without_icon_animation(tray)
-    return True
 
 
 def _apply_polled_hardware_state(

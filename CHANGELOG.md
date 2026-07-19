@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.30.1 (2026-07-16)
+
+- Effects/Reactive: Apply post-restore pulse visual damp at any steady keyboard brightness, not only the very-dim curve (`visual_hw < 10`). Fixes a brief deck-wide flash when waking from a long idle off with rapid typing on normal bases (e.g. brightness 20 + reactive 50).
+- Effects/Reactive: Close the idle-restore seed race (`stop()` wiped damp before the first frames) by queuing restore timers across effect restart, and apply a mild whole-frame restore scale so soft-on matrix steps after long idle black do not pop when `pulse_mix=0`.
+- Maintainability/Layering: Move system theme detection to `src/core/theme` so the tray icon path no longer imports `src.gui` (D13/CQ1). GUI keeps a compatibility re-export at `src.gui.theme.detect`.
+- Maintainability/Polling: Extract pure hardware-poll decision helpers (`src/tray/pollers/hardware/_decisions.py`) for recovery windows, poll interval, blank/zero recovery eligibility, and brightness/off persist classification; wire hardware polling through them (W1/D5).
+- Maintainability/Reactive: Split reactive brightness debug log helpers into `_render_brightness_debug.py` so `_render_brightness_support.py` drops out of the severe LOC band (W2/D14).
+- Testing: Add pure hardware-decision unit coverage and multi-layer integrations for idle dim/restore + secondary static + config-apply plan, and forced-off skip/resume with uniform/effect plan classification (W3/D7); add pulse-brightness restore-damp coverage for normal-base typing-wake.
+
 ## 0.30.0 (2026-07-16)
 
 - License: Ship the GPL-2 text in `LICENSE` to match the declared `GPL-2.0-or-later` SPDX/license in `pyproject.toml` and README (the root file previously contained a GPL-3 preamble block).

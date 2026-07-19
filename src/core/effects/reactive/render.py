@@ -11,6 +11,7 @@ from src.core.effects.perkey_animation import build_full_color_grid
 from . import _render_brightness_support as _support
 from ._constants import (
     MAX_BRIGHTNESS_STEP_PER_FRAME,
+    POST_RESTORE_FRAME_MIN_FACTOR,
     POST_RESTORE_PULSE_VISUAL_HOLDOFF_S,
     POST_RESTORE_PULSE_VISUAL_MIN_FACTOR,
 )
@@ -104,20 +105,35 @@ def _resolve_brightness(engine: "EffectsEngine") -> Tuple[int, int, int]:
 
 
 def _resolve_transition_visual_scale(engine: "EffectsEngine") -> float:
-    return _resolve_reactive_transition_visual_scale_impl(engine, clamp01_fn=clamp01)
+    scale = _resolve_reactive_transition_visual_scale_impl(engine, clamp01_fn=clamp01)
+    # Soft-on full-matrix steps after long idle black are backdrop-only
+    # (pulse_mix=0). Pulse damp cannot soften them; fold a milder whole-frame
+    # ease while the restore damp window is active.
+    return clamp01(float(scale) * _post_restore_frame_scale(engine))
+
+
+def _post_restore_frame_scale(engine: "EffectsEngine") -> float:
+    """Whole-frame scale in [FRAME_MIN, 1] while restore damp remaining > 0."""
+
+    damp, remaining_s = _post_restore_visual_damp(engine)
+    if remaining_s <= 0.0 or float(damp) >= 0.999:
+        return 1.0
+    min_pulse = float(POST_RESTORE_PULSE_VISUAL_MIN_FACTOR)
+    min_frame = float(POST_RESTORE_FRAME_MIN_FACTOR)
+    # Map pulse damp [min_pulse, 1] → frame [min_frame, 1].
+    t = (float(damp) - min_pulse) / max(1e-6, 1.0 - min_pulse)
+    t = max(0.0, min(1.0, t))
+    return min_frame + ((1.0 - min_frame) * t)
 
 
 def _post_restore_visual_damp(engine: "EffectsEngine") -> tuple[float, float]:
-    """Compute the visual damp factor and remaining seconds for post-restore pulses.
+    """Compute the visual damp factor and remaining seconds for post-restore.
 
-    After an idle wake or temp-dim restore, the keyboard brightness is ramping
-    up from a low value. If reactive pulses fired at full intensity during this
-    ramp, they would appear as a bright flash. This function returns a damp
-    factor (0..1) that scales pulse intensity down during the restore window.
-
-    The damp window is approximately 2 seconds and starts from the first
-    post-restore keypress (FIRST_PULSE_PENDING → DAMPING transition). After
-    the window expires, the damp factor returns to 1.0 (no suppression).
+    After an idle wake or temp-dim restore, hardware brightness ramps up from a
+    low value. Full-intensity reactive pulses (and, via frame scale, soft-on
+    matrix steps) would flash. This returns a damp factor (0..1) for the active
+    restore window seeded at idle restore (FIRST_PULSE_PENDING), extended on the
+    first post-restore keypress (→ DAMPING). When inactive, damp is 1.0.
 
     Returns:
         (damp_factor, remaining_seconds) — damp_factor is 1.0 when no damp
@@ -199,8 +215,9 @@ def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
     backends keep hardware brightness fixed and rely on per-key color contrast.
     For per-key hardware the reactive slider should therefore control the pulse
     color intensity directly across the full 0..50 range. Any extra suppression
-    must stay scoped to explicit post-restore recovery windows so normal low-
-    brightness typing still uses the configured reactive level.
+    must stay scoped to explicit post-restore recovery windows (any steady
+    brightness) so normal typing outside those windows keeps the configured
+    reactive level.
     """
 
     base, eff, hw = _resolve_brightness(engine)
@@ -230,7 +247,15 @@ def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
                 post_restore_damp=1.0,
             )
             return 0.0
+
+        # Post-restore damp must apply at any steady brightness (not only the
+        # very-dim curve). Nesting damp under visual_hw < 10 left normal bases
+        # (e.g. 20) undamped on typing-wake after long idle off — deck-wide flash.
+        post_restore_damp, post_restore_holdoff_remaining_s = _post_restore_visual_damp(engine)
+        very_dim_curve = visual_hw < 10
+
         if eff <= visual_hw:
+            final_scale = float(pulse_scale) * float(post_restore_damp)
             _support.log_pulse_visual_scale_change(
                 engine,
                 logger=logger,
@@ -239,24 +264,23 @@ def pulse_brightness_scale_factor(engine: "EffectsEngine") -> float:
                 hw=hw,
                 target_hw=target_hw,
                 visual_hw=visual_hw,
-                pulse_scale=pulse_scale,
+                pulse_scale=final_scale,
                 contrast_ratio=1.0,
                 contrast_compression=1.0,
-                very_dim_curve=False,
-                post_restore_holdoff_remaining_s=0.0,
-                post_restore_damp=1.0,
+                very_dim_curve=very_dim_curve,
+                post_restore_holdoff_remaining_s=post_restore_holdoff_remaining_s,
+                post_restore_damp=post_restore_damp,
             )
-            return pulse_scale
+            return final_scale
+
         baseline_scale = float(visual_hw) / 50.0
         contrast_ratio = float(visual_hw) / float(eff)
         contrast_compression = 1.0
-        very_dim_curve = visual_hw < 10
-        final_scale = pulse_scale
-        post_restore_damp = 1.0
-        post_restore_holdoff_remaining_s = 0.0
-        if very_dim_curve and pulse_scale > baseline_scale:
-            post_restore_damp, post_restore_holdoff_remaining_s = _post_restore_visual_damp(engine)
-            final_scale = baseline_scale + ((pulse_scale - baseline_scale) * post_restore_damp)
+        # damp=1.0 outside restore windows => final_scale == pulse_scale.
+        if pulse_scale > baseline_scale:
+            final_scale = baseline_scale + ((pulse_scale - baseline_scale) * float(post_restore_damp))
+        else:
+            final_scale = float(pulse_scale) * float(post_restore_damp)
         _support.log_pulse_visual_scale_change(
             engine,
             logger=logger,
