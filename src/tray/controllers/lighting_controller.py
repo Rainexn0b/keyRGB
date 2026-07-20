@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: thin public lighting-controller facade; mode/helpers already extracted to sibling modules
+
 import logging
 from typing import Optional
 

@@ -7,7 +7,6 @@ from typing import Protocol, cast
 
 import src.core.effects.catalog as effects_catalog
 from src.core import secondary_lighting_state
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from src.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,
@@ -17,8 +16,8 @@ from src.core.secondary_device_runtime import has_available_secondary_profile_ro
 from src.tray import secondary_device_power
 from src.tray.secondary_device_routes import route_for_context_entry
 
-from ..controllers import software_target_controller
 from . import _menu_callbacks as menu_callbacks
+from . import _menu_sections_effects as menu_effects
 from . import menu_sections, menu_status
 
 
@@ -125,7 +124,6 @@ def build_menu_items(
     sw_mode = menu_status.is_software_mode(tray)
     hw_mode = menu_status.is_hardware_mode(tray)
     secondary_lighting_supported = has_available_secondary_profile_routes()
-    secondary_effect_target_supported = software_target_controller.software_effect_target_has_compatible_devices(tray)
 
     all_device_entries = menu_status.device_context_entries(tray)
     if not all_device_entries:
@@ -143,103 +141,22 @@ def build_menu_items(
     hw_effect_names = effects_catalog.detected_backend_hw_effect_names(getattr(tray_state, "backend", None))
     hw_effects_label = menu_status.hardware_effects_menu_text(tray)
 
-    # HW effects menu - animated effects lock when in SW mode.
-    # Switching back to static hardware mode is now a separate top-level action.
-    hw_effects_menu = pystray.Menu(
-        *[
-            item(
-                effects_catalog.title_for_effect(effect),
-                menu_callbacks.effect_key_callback(tray_state, effects_catalog.hardware_effect_selection_key(effect)),
-                checked=menu_callbacks.checked_hw_effect(
-                    tray_state,
-                    effects_catalog.hardware_effect_selection_key(effect),
-                    hw_mode=hw_mode,
-                ),
-                radio=True,
-                enabled=hw_mode,  # Grey out animated effects when in SW mode
-            )
-            for effect in hw_effect_names
-        ],
+    # HW effects lock when in SW mode; static hardware mode is a separate top-level action.
+    hw_effects_menu = menu_effects.build_hw_effects_menu(
+        tray_state,
+        pystray=pystray,
+        item=item,
+        hw_mode=hw_mode,
+        hw_effect_names=tuple(hw_effect_names),
     )
-
-    # SW effects work best with per-key colors loaded
-    # "None" here means static per-key display, other SW effects locked when in HW mode
-    sw_items = [
-        item(
-            "Reactive Typing Settings…",
-            tray_state._on_reactive_color_clicked,
-        ),
-        pystray.Menu.SEPARATOR,
-        item(
-            "None (static per-key)",
-            menu_callbacks.effect_key_callback(tray_state, "perkey"),
-            checked=menu_callbacks.checked_perkey(tray_state),
-            radio=True,
-        ),
-        pystray.Menu.SEPARATOR,
-        *[
-            item(
-                effects_catalog.title_for_effect(effect),
-                menu_callbacks.effect_key_callback(tray_state, effect),
-                checked=menu_callbacks.checked_sw_effect(tray_state, effect, sw_mode=sw_mode),
-                radio=True,
-                enabled=sw_mode,
-            )
-            for effect in effects_catalog.SOFTWARE_EFFECTS
-        ],
-        pystray.Menu.SEPARATOR,
-        *[
-            item(
-                effects_catalog.title_for_effect(effect),
-                menu_callbacks.effect_key_callback(tray_state, effect),
-                checked=menu_callbacks.checked_sw_effect(tray_state, effect, sw_mode=sw_mode),
-                radio=True,
-                enabled=sw_mode,
-            )
-            for effect in effects_catalog.REACTIVE_EFFECTS
-        ],
-    ]
-
-    if secondary_effect_target_supported:
-        sw_items.extend(
-            [
-                pystray.Menu.SEPARATOR,
-                item(
-                    "Include enabled lighting areas",
-                    menu_callbacks.toggle_enabled_lighting_areas_callback(tray_state),
-                    checked=menu_callbacks.checked_software_target(
-                        tray_state,
-                        SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
-                    ),
-                ),
-            ]
-        )
-
-    sw_effects_menu = pystray.Menu(*sw_items)
-
-    speed_menu = pystray.Menu(
-        *[
-            item(
-                str(speed),
-                tray_state._on_speed_clicked,
-                checked=menu_callbacks.checked_speed(tray_state, speed),
-                radio=True,
-            )
-            for speed in range(0, 11)
-        ]
+    sw_effects_menu = menu_effects.build_sw_effects_menu(
+        tray_state,
+        pystray=pystray,
+        item=item,
+        sw_mode=sw_mode,
     )
-
-    brightness_menu = pystray.Menu(
-        *[
-            item(
-                str(brightness),
-                tray_state._on_brightness_clicked,
-                checked=menu_callbacks.checked_brightness(tray_state, brightness * 5),
-                radio=True,
-            )
-            for brightness in range(0, 11)
-        ]
-    )
+    speed_menu = menu_effects.build_speed_menu(tray_state, pystray=pystray, item=item)
+    brightness_menu = menu_effects.build_brightness_menu(tray_state, pystray=pystray, item=item)
 
     # Lightweight system power mode toggle (cpufreq sysfs). If not available, hide.
     system_power_menu = menu_sections.build_system_power_mode_menu(

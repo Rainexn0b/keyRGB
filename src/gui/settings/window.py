@@ -13,17 +13,17 @@ Settings are persisted in the shared `~/.config/keyrgb/config.json` via
 
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: single Tk PowerSettingsGUI window class; panels already extracted to settings/panels/
+
 import tkinter as tk
 from tkinter import ttk
 
 from . import hardware_hint, os_autostart, panels, scrollable_area, settings_state
 
-import importlib
-
 from src.core import config as core_config
-from src.core.power.system import PowerMode
 from src.gui import theme as gui_theme
 from src.gui.utils import tk_async, window_geometry, window_icon
+from . import _settings_window_constants as _swc
 
 
 # Keep module-level dependency names explicit so tests can monkeypatch window.py
@@ -49,20 +49,16 @@ load_settings_values = settings_state.load_settings_values
 SettingsValues = settings_state.SettingsValues
 compute_centered_window_geometry = window_geometry.compute_centered_window_geometry
 
-
-def _detect_idle_power_source() -> str:
-    """Best-effort probe for the idle source the tray would use.
-
-    Uses a dynamic import so the settings GUI does not take a static
-    dependency on tray runtime modules.
-    """
-    try:
-        module = importlib.import_module("src.tray.pollers.idle_power._source_probe")
-        fn = getattr(module, "detect_idle_power_source")
-        return str(fn())
-    except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
-        return "Unknown"
-
+_detect_idle_power_source = _swc.detect_idle_power_source
+_KEEP_CURRENT_POWER_MODE_LABEL = _swc.KEEP_CURRENT_POWER_MODE_LABEL
+_POWER_MODE_OPTIONS = _swc.POWER_MODE_OPTIONS
+_POWER_MODE_LABEL_TO_VALUE = _swc.POWER_MODE_LABEL_TO_VALUE
+_POWER_MODE_VALUE_TO_LABEL = _swc.POWER_MODE_VALUE_TO_LABEL
+_SETTINGS_MIN_WIDTH = _swc.SETTINGS_MIN_WIDTH
+_SETTINGS_MIN_HEIGHT = _swc.SETTINGS_MIN_HEIGHT
+_SETTINGS_DEFAULT_WIDTH = _swc.SETTINGS_DEFAULT_WIDTH
+_SETTINGS_DEFAULT_HEIGHT = _swc.SETTINGS_DEFAULT_HEIGHT
+_SETTINGS_COLUMN_GAP = _swc.SETTINGS_COLUMN_GAP
 
 _FOOTER_HARDWARE_PROBE_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
 _FOOTER_HARDWARE_HINT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
@@ -70,24 +66,6 @@ _SCROLLREGION_CONFIGURE_ERRORS = (RuntimeError, tk.TclError)
 _SETTINGS_VALUE_READ_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 _SETTINGS_APPLY_ERRORS = (AttributeError, OSError, RecursionError, RuntimeError, TypeError, ValueError)
 _OS_AUTOSTART_WRITE_ERRORS = (OSError, RuntimeError)
-_KEEP_CURRENT_POWER_MODE_LABEL = "Keep current power mode"
-_POWER_MODE_OPTIONS = (
-    _KEEP_CURRENT_POWER_MODE_LABEL,
-    "Extreme Saver",
-    "Balanced",
-    "Performance",
-)
-_POWER_MODE_LABEL_TO_VALUE = {
-    "Extreme Saver": PowerMode.EXTREME_SAVER.value,
-    "Balanced": PowerMode.BALANCED.value,
-    "Performance": PowerMode.PERFORMANCE.value,
-}
-_POWER_MODE_VALUE_TO_LABEL = {value: label for label, value in _POWER_MODE_LABEL_TO_VALUE.items()}
-_SETTINGS_MIN_WIDTH = 1000
-_SETTINGS_MIN_HEIGHT = 620
-_SETTINGS_DEFAULT_WIDTH = 1320
-_SETTINGS_DEFAULT_HEIGHT = 860
-_SETTINGS_COLUMN_GAP = 22
 
 
 class PowerSettingsGUI:

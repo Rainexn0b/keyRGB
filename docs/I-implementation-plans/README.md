@@ -5,11 +5,18 @@ specs for larger changes.
 
 ## Documents
 
+### Active sprint
+
+- `2026-07-19/0.30.x-maintainability-sprint.md` — **0.30.x sprint umbrella**.
+  Refactor-only patch series. The planned 0.30.2 work is complete: WS1, WS3,
+  and WS4 are done, WS2 is monitoring after its highest-ROI slices, and WS5
+  (legacy shim removal) remains blocked on profile-migration telemetry.
+
 ### Active follow-up plans
 
-- `2026-07-16/0.30.1-maintainability-follow-up-plan.md` — **0.30.1** patch plan:
-  top-3 residual weaknesses (orchestration purity, size hotspots, multi-layer
-  tests) + bounded code-quality slices after 0.30.0
+- `2026-07-16/0.30.1-maintainability-follow-up-plan.md` — **0.30.1** patch plan
+  (done): top-3 residual weaknesses (orchestration purity, size hotspots,
+  multi-layer tests) + bounded code-quality slices after 0.30.0
 - `2026-07-15/maintainability-debt-paydown-plan.md` — full maintainability /
   tech-debt inventory (D1–D15), phases, and progress log
 - `issue-7-composite-profile-hardening-and-validation-plan.md` — live-code-verified

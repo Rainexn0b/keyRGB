@@ -1,13 +1,25 @@
 from __future__ import annotations
 
 import logging
-import math
 import time
-from typing import TYPE_CHECKING, Callable, Optional
+from typing import TYPE_CHECKING, Callable
 
 from ._constants import UNIFORM_PULSE_HW_LIFT_STREAK_MIN
 from ._render_brightness_guard import apply_brightness_step_guard
+from ._render_brightness_transition import (
+    _clear_transition_state,
+    resolve_reactive_transition_brightness,
+    resolve_reactive_transition_visual_scale,
+)
 from . import _render_brightness_support as _support
+
+# Public re-exports for callers that import transition helpers from this module.
+__all__ = [
+    "resolve_brightness",
+    "resolve_reactive_transition_brightness",
+    "resolve_reactive_transition_visual_scale",
+    "_clear_transition_state",
+]
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -15,8 +27,6 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 _MISSING = object()
-
-# see _constants.py
 
 
 def _can_lift_hw_brightness(
@@ -172,127 +182,6 @@ def _resolve_hw_brightness_with_pulse_mix(
     return hw, idle_hw, allow_pulse_hw_lift, per_key_hw
 
 
-def resolve_reactive_transition_brightness(
-    engine: "EffectsEngine",
-    *,
-    clamp01_fn: Callable[[float], float],
-) -> Optional[tuple[int, bool]]:
-    """Return the current transition brightness for reactive temp-dim flows."""
-
-    transition = _resolve_reactive_transition_progress(engine, clamp01_fn=clamp01_fn)
-    if transition is None:
-        return None
-
-    current_f, rising = transition
-    if rising:
-        return int(math.ceil(current_f)), True
-
-    return int(round(current_f)), False
-
-
-def resolve_reactive_transition_visual_scale(
-    engine: "EffectsEngine",
-    *,
-    clamp01_fn: Callable[[float], float],
-) -> float:
-    """Return a fractional scale for rising per-key transitions.
-
-    During low-brightness restore ramps the hardware brightness must stay
-    integer-valued, which can make `1 -> 5` restores visibly step.  We smooth
-    the written per-key frame by scaling it against the ceiled transition level
-    so the overall visible intensity can still move fractionally between those
-    hardware steps.
-    """
-
-    transition = _resolve_reactive_transition_progress(engine, clamp01_fn=clamp01_fn)
-    if transition is None:
-        return 1.0
-
-    current_f, rising = transition
-    if not rising:
-        return 1.0
-
-    quantized = int(math.ceil(current_f))
-    if quantized <= 0:
-        return 0.0
-
-    return clamp01_fn(float(current_f) / float(quantized))
-
-
-def _resolve_reactive_transition_progress(
-    engine: "EffectsEngine",
-    *,
-    clamp01_fn: Callable[[float], float],
-) -> Optional[tuple[float, bool]]:
-    """Return the in-flight reactive transition brightness as a float."""
-
-    state = _support.ensure_reactive_state(engine)
-    lock = getattr(engine, "reactive_lock", None)
-    start: object
-    end: object
-    started_at: object
-    duration_s: object
-    if lock is not None:
-        start, end, started_at, duration_s = _support.read_transition_atomic(state, lock)
-    else:
-        start = _support.read_engine_attr(
-            engine,
-            "_reactive_transition_from_brightness",
-            missing_default=None,
-            error_default=None,
-        )
-        end = _support.read_engine_attr(
-            engine,
-            "_reactive_transition_to_brightness",
-            missing_default=None,
-            error_default=None,
-        )
-        started_at = _support.read_engine_attr(
-            engine,
-            "_reactive_transition_started_at",
-            missing_default=None,
-            error_default=None,
-        )
-        duration_s = _support.read_engine_attr(
-            engine,
-            "_reactive_transition_duration_s",
-            missing_default=None,
-            error_default=None,
-        )
-
-    if start is None or end is None or started_at is None or duration_s is None:
-        return None
-
-    start_i = _support.coerce_brightness(start, default=None)
-    end_i = _support.coerce_brightness(end, default=None)
-    duration = _support.coerce_float(duration_s, default=None)
-    started = _support.coerce_float(started_at, default=None)
-    if start_i is None or end_i is None or duration is None or started is None:
-        return None
-
-    duration = max(0.0, duration)
-    rising = bool(end_i >= start_i)
-
-    if duration <= 0.0 or start_i == end_i:
-        if lock is not None:
-            _support.clear_transition_atomic(state, lock)
-        else:
-            _support.clear_transition_state(engine, logger=_LOGGER)
-        return float(end_i), rising
-
-    elapsed = max(0.0, float(time.monotonic()) - started)
-    if elapsed >= duration:
-        if lock is not None:
-            _support.clear_transition_atomic(state, lock)
-        else:
-            _support.clear_transition_state(engine, logger=_LOGGER)
-        return float(end_i), rising
-
-    t = clamp01_fn(elapsed / duration)
-    current = float(start_i) + (float(end_i - start_i) * t)
-    return current, rising
-
-
 def resolve_brightness(
     engine: "EffectsEngine",
     *,
@@ -413,12 +302,3 @@ def resolve_brightness(
     )
 
     return base, eff, hw
-
-
-def _clear_transition_state(engine: "EffectsEngine") -> None:
-    state = _support.ensure_reactive_state(engine)
-    lock = getattr(engine, "reactive_lock", None)
-    if lock is not None:
-        _support.clear_transition_atomic(state, lock)
-    else:
-        _support.clear_transition_state(engine, logger=_LOGGER)

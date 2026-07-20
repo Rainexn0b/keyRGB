@@ -14,6 +14,8 @@ profile data by writing to config when you activate a profile.
 
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: profile storage public API surface (load/save/normalize); ops already partially in _profile_* modules
+
 import logging
 from collections.abc import Mapping
 from src.core.config import layout_slots as config_layout_slots

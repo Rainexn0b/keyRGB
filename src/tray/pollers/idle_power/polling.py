@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: idle-power polling entry facade; sensors/runtime/actions already live in sibling modules
+
 from functools import lru_cache
 import logging
 import threading

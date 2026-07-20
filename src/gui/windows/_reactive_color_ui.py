@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: Protocol-heavy Tk typing surface for one reactive color window; size is type discipline not mixed logic
+
 from typing import Protocol, cast
 
 

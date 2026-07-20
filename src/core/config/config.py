@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: Config facade class; lighting accessors already live under config/_lighting/
+
 import logging
 from collections.abc import Mapping
 from copy import deepcopy

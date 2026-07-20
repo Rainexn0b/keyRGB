@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: build-time usage-graph scanner; cohesive tooling module not shipped runtime
+
 import ast
 from dataclasses import dataclass
 from pathlib import Path

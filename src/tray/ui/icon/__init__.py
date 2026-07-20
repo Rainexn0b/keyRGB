@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Literal, cast
+from typing import Literal, TypeAlias, cast
 
 from PIL import Image
 
@@ -27,7 +27,7 @@ create_icon_rainbow = _draw.create_icon_rainbow
 PerKeyColorMap = _color.PerKeyColorMap
 RGBColor = _color.RGBColor
 TrayIconConfig = _color._TrayIconColorConfig
-TrayIconImage = Image.Image
+TrayIconImage: TypeAlias = Image.Image
 ColorGrid = tuple[RGBColor, ...]
 _per_key_color_mapping = _color._per_key_color_mapping
 representative_color = _color.representative_color

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: single cohesive SysfsLedKeyboardDevice implementation for brightness/RGB sysfs nodes
+
 import logging
 import os
 from dataclasses import dataclass, field

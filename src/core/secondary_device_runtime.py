@@ -8,6 +8,8 @@ tests and manual UX validation.
 
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: secondary route availability + simulation runtime; cohesive subsystem for one ownership area
+
 import logging
 import os
 from collections.abc import Iterable

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: device-local ITE 8258 chassis packet builders and LED matrix tables; splitting would scatter product-variant protocol data
+
 from collections import OrderedDict
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass

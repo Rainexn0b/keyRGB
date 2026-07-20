@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: cohesive secondary-device tray controller (select/apply/on/off); further split would add indirection without ownership clarity
+
 import logging
 from typing import Callable, Protocol, cast
 

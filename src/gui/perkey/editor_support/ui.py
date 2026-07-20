@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: single build_editor_ui builder for the per-key editor chrome
+
 import tkinter as tk
 from tkinter import TclError, ttk
 

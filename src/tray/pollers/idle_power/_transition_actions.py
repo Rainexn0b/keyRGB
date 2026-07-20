@@ -145,8 +145,10 @@ def apply_dim_temp_brightness(
     set_reactive_transition: Callable[..., None],
     set_brightness_best_effort: Callable[..., None],
 ) -> None:
-    is_sw_effect = effect in sw_effects_set
-    if effect in reactive_effects_set:
+    from ._effect_route import EffectRoute, apply_to_hardware_for_non_reactive, classify_effect_route
+
+    route = classify_effect_route(effect, reactive_effects_set, sw_effects_set)
+    if route == EffectRoute.REACTIVE:
         with tray.engine.kb_lock:
             _reactive_support.set_engine_attr(
                 tray.engine,
@@ -172,7 +174,7 @@ def apply_dim_temp_brightness(
     set_brightness_best_effort(
         tray.engine,
         dim_temp_brightness,
-        apply_to_hardware=not is_sw_effect,
+        apply_to_hardware=apply_to_hardware_for_non_reactive(route),
         fade=True,
         fade_duration_s=0.25,
     )
@@ -191,8 +193,10 @@ def apply_restore_brightness(
     set_engine_hw_brightness_cap: Callable[..., None],
     set_brightness_best_effort: Callable[..., None],
 ) -> None:
-    is_sw_effect = effect in sw_effects_set
-    if effect in reactive_effects_set:
+    from ._effect_route import EffectRoute, apply_to_hardware_for_non_reactive, classify_effect_route
+
+    route = classify_effect_route(effect, reactive_effects_set, sw_effects_set)
+    if route == EffectRoute.REACTIVE:
         restore_target_hw = max(int(target), int(perkey_target))
         with tray.engine.kb_lock:
             _seed_reactive_restore_windows(
@@ -218,7 +222,7 @@ def apply_restore_brightness(
     set_brightness_best_effort(
         tray.engine,
         target,
-        apply_to_hardware=not is_sw_effect,
+        apply_to_hardware=apply_to_hardware_for_non_reactive(route),
         fade=True,
         fade_duration_s=0.25,
     )

@@ -1,160 +1,36 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Protocol, TypeVar, TypedDict
+from src.core.secondary_device_runtime import EffectiveSecondaryRoute, iter_effective_secondary_routes
+from src.tray.secondary_device_routes import route_for_context_entry
 
-from ._device_status import (
-    backend_display_name,
-    backend_status_suffix,
-    format_hex_id,
-)
-from src.core.secondary_device_runtime import (
-    EffectiveSecondaryRoute,
-    iter_effective_secondary_routes,
-)
-from src.tray.secondary_device_routes import (
-    route_for_context_entry,
-)
+from . import _device_status as _devstat
+from . import _menu_status_device_discovery as _discovery
+from . import _menu_status_secondary_devices as _secondary
 
-from ._menu_status_secondary_devices import (
-    DeviceContextEntry,
-    secondary_device_context_entry,
-    secondary_device_status_text,
-)
-
-
-_T = TypeVar("_T")
-
-
-class _DeviceCandidate(TypedDict, total=False):
-    context_key: str
-    device_type: str
-    probe_names: list[str]
-    product: str
-    status: str
-    usb_pid: str
-    usb_vid: str
-
-
-class _MenuStatusDevicesTrayProtocol(Protocol):
-    backend: object | None
-    backend_probe: object | None
-    config: object | None
-    device_discovery: object | None
-    engine: object | None
-    secondary_device_controls: object | None
-    selected_device_context: str
-
-
-class _MenuStatusTrayResolver(Protocol):
-    def __call__(self, tray: object) -> _MenuStatusDevicesTrayProtocol: ...
-
-
-class _ProbeDeviceAvailableResolver(Protocol):
-    def __call__(self, tray: object) -> bool: ...
-
-
-class _ProbeIdentifiersResolver(Protocol):
-    def __call__(self, tray: _MenuStatusDevicesTrayProtocol) -> dict[str, object]: ...
-
-
-class _DeviceDiscoveryCandidatesResolver(Protocol):
-    def __call__(self, tray: _MenuStatusDevicesTrayProtocol) -> list[_DeviceCandidate]: ...
-
-
-class _KeyboardStatusTextResolver(Protocol):
-    def __call__(self, tray: object) -> str: ...
-
-
-class _DeviceContextEntriesResolver(Protocol):
-    def __call__(self, tray: object) -> list[DeviceContextEntry]: ...
-
-
-class _SelectedDeviceContextKeyResolver(Protocol):
-    def __call__(
-        self,
-        tray: object,
-        *,
-        entries: list[DeviceContextEntry] | None = None,
-    ) -> str: ...
-
-
-class _RecoverMenuStatusValue(Protocol):
-    def __call__(
-        self,
-        action: Callable[[], _T],
-        *,
-        default: _T,
-        key: str,
-        msg: str,
-        recoverable: tuple[type[Exception], ...],
-    ) -> _T: ...
+# Local short names (typing + helpers) — avoids a 15-line multi-import block.
+_DeviceCandidate = _discovery.DeviceCandidate
+_DeviceContextEntriesResolver = _discovery.DeviceContextEntriesResolver
+_DeviceDiscoveryCandidatesResolver = _discovery.DeviceDiscoveryCandidatesResolver
+_KeyboardStatusTextResolver = _discovery.KeyboardStatusTextResolver
+_MenuStatusDevicesTrayProtocol = _discovery.MenuStatusDevicesTrayProtocol
+_MenuStatusTrayResolver = _discovery.MenuStatusTrayResolver
+_ProbeDeviceAvailableResolver = _discovery.ProbeDeviceAvailableResolver
+_ProbeIdentifiersResolver = _discovery.ProbeIdentifiersResolver
+_RecoverMenuStatusValue = _discovery.RecoverMenuStatusValue
+_SelectedDeviceContextKeyResolver = _discovery.SelectedDeviceContextKeyResolver
+DeviceContextEntry = _secondary.DeviceContextEntry
 
 
 def _probe_identifiers(tray: _MenuStatusDevicesTrayProtocol) -> dict[str, object]:
-    probe = getattr(tray, "backend_probe", None)
-    identifiers = getattr(probe, "identifiers", None) if probe is not None else None
-    return dict(identifiers or {})
+    return _discovery.probe_identifiers(tray)
 
 
 def _normalized_device_candidate(raw_candidate: object) -> _DeviceCandidate | None:
-    if not isinstance(raw_candidate, dict):
-        return None
-
-    candidate: _DeviceCandidate = {}
-
-    device_type = str(raw_candidate.get("device_type") or "").strip().lower()
-    if device_type:
-        candidate["device_type"] = device_type
-
-    product = str(raw_candidate.get("product") or "").strip()
-    if product:
-        candidate["product"] = product
-
-    status = str(raw_candidate.get("status") or "").strip()
-    if status:
-        candidate["status"] = status
-
-    usb_vid = str(raw_candidate.get("usb_vid") or "").strip()
-    if usb_vid:
-        candidate["usb_vid"] = usb_vid
-
-    usb_pid = str(raw_candidate.get("usb_pid") or "").strip()
-    if usb_pid:
-        candidate["usb_pid"] = usb_pid
-
-    context_key = str(raw_candidate.get("context_key") or "").strip().lower()
-    if context_key:
-        candidate["context_key"] = context_key
-
-    probe_names = raw_candidate.get("probe_names")
-    if isinstance(probe_names, list):
-        normalized_probe_names: list[str] = []
-        for probe_name in probe_names:
-            normalized_probe_name = str(probe_name or "").strip().lower()
-            if normalized_probe_name:
-                normalized_probe_names.append(normalized_probe_name)
-        if normalized_probe_names:
-            candidate["probe_names"] = normalized_probe_names
-
-    return candidate
+    return _discovery.normalized_device_candidate(raw_candidate)
 
 
 def _device_discovery_candidates(tray: _MenuStatusDevicesTrayProtocol) -> list[_DeviceCandidate]:
-    payload = getattr(tray, "device_discovery", None)
-    if not isinstance(payload, dict):
-        return []
-
-    raw_candidates = payload.get("candidates")
-    if not isinstance(raw_candidates, list):
-        return []
-
-    candidates: list[_DeviceCandidate] = []
-    for raw_candidate in raw_candidates:
-        candidate = _normalized_device_candidate(raw_candidate)
-        if candidate is not None:
-            candidates.append(candidate)
-    return candidates
+    return _discovery.device_discovery_candidates(tray)
 
 
 def keyboard_status_text(
@@ -172,16 +48,16 @@ def keyboard_status_text(
 
     backend = getattr(tray_state, "backend", None)
     backend_name = str(getattr(backend, "name", "unknown"))
-    display_name = backend_display_name(backend_name)
-    status_suffix = backend_status_suffix(backend)
+    display_name = _devstat.backend_display_name(backend_name)
+    status_suffix = _devstat.backend_status_suffix(backend)
 
     identifiers = probe_identifiers(tray_state)
 
     usb_vid = identifiers.get("usb_vid")
     usb_pid = identifiers.get("usb_pid")
     if usb_vid and usb_pid:
-        vid = format_hex_id(str(usb_vid))
-        pid = format_hex_id(str(usb_pid))
+        vid = _devstat.format_hex_id(str(usb_vid))
+        pid = _devstat.format_hex_id(str(usb_pid))
         if vid and pid:
             return f"Keyboard: {display_name} ({vid}:{pid}){status_suffix}"
 
@@ -205,8 +81,8 @@ def _effective_device_context_entry(
     if effective.simulated:
         label = f"{label} (simulated)"
     elif effective.route.parent_backend_name is not None:
-        vid = format_hex_id(str(primary_identifiers.get("usb_vid") or ""))
-        pid = format_hex_id(str(primary_identifiers.get("usb_pid") or ""))
+        vid = _devstat.format_hex_id(str(primary_identifiers.get("usb_vid") or ""))
+        pid = _devstat.format_hex_id(str(primary_identifiers.get("usb_pid") or ""))
         shared_id = f" {vid}:{pid}" if vid and pid else ""
         label = f"{label} (shared controller{shared_id})"
     return {
@@ -255,7 +131,7 @@ def device_context_entries(
     ]
 
     for candidate in device_discovery_candidates(tray_state):
-        entry = secondary_device_context_entry(candidate)
+        entry = _secondary.secondary_device_context_entry(candidate)
         if entry is not None:
             entries.append(entry)
 
@@ -342,7 +218,7 @@ def secondary_device_status_texts(
     tray_state = menu_status_tray(tray)
     lines: list[str] = []
     for candidate in device_discovery_candidates(tray_state):
-        text = secondary_device_status_text(candidate)
+        text = _secondary.secondary_device_status_text(candidate)
         if text is not None:
             lines.append(text)
 

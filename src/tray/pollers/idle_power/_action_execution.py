@@ -117,7 +117,13 @@ def _execute_turn_off(
         warning_level=logging.WARNING,
         recoverable_effect_name_exceptions=recoverable_effect_name_exceptions,
     )
-    use_soft_fade = not (effect in reactive_effects_set and _engine_supports_per_key_output(tray.engine))
+    from ._effect_route import classify_effect_route, should_soft_fade_for_turn_off
+
+    route = classify_effect_route(effect, reactive_effects_set, frozenset())
+    use_soft_fade = should_soft_fade_for_turn_off(
+        route=route,
+        engine_supports_perkey=_engine_supports_per_key_output(tray.engine),
+    )
 
     reset_dim_state_on_tray(tray)
     set_engine_hw_brightness_cap(tray.engine, None)

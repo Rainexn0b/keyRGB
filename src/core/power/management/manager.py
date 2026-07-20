@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: PowerManager public facade after battery-saver extract; remaining methods are thin event/monitor delegates
+
 import logging
 import threading
 import time
@@ -10,22 +12,18 @@ from typing import TYPE_CHECKING, cast
 from src.core.profile import profiles as perkey_profiles
 from src.core.profile import runtime_activation as profile_runtime_activation
 
+from . import _manager_battery_saver as _battery_saver
 from . import _manager_brightness_execution as _brightness_execution, _manager_power_events as _power_events
 from . import _manager_runtime_deps, _monitor_runner as power_monitor_runner
 from ._manager_config import read_power_management_config_bool, reload_power_management_config
-from ._manager_helpers import (
+from ._manager_helpers import (  # noqa: F401
     apply_power_source_actions,
     build_power_source_loop_inputs,
     is_intentionally_off,
-    is_power_event_forced_off,
 )
-from ._manager_source_iteration import (
-    PowerSourceIterationPlan,
-    classify_power_source_iteration,
-    stabilize_power_source_state,
-)
+from ._manager_source_iteration import classify_power_source_iteration  # noqa: F401
 from ..policies import power_event_policy as _power_event_policy
-from ..policies.power_source_loop_policy import PowerSourceLoopPolicy
+from ..policies.power_source_loop_policy import PowerSourceLoopPolicy  # noqa: F401
 
 if TYPE_CHECKING:
     from src.core.config import Config
@@ -36,7 +34,6 @@ PowerEventInputs = _power_event_policy.PowerEventInputs
 PowerEventPolicy = _power_event_policy.PowerEventPolicy
 RestoreFromEvent = _power_event_policy.RestoreKeyboard
 TurnOffFromEvent = _power_event_policy.TurnOffKeyboard
-_DEFAULT_POWER_SOURCE_POLL_INTERVAL_S = 0.5
 
 classify_brightness_execution = _brightness_execution.classify_brightness_execution
 execute_brightness_execution = _brightness_execution.execute_brightness_execution
@@ -59,6 +56,13 @@ start_sysfs_lid_monitoring = _manager_runtime_deps.start_sysfs_lid_monitoring
 
 get_active_perkey_profile = perkey_profiles.get_active_profile
 list_perkey_profiles = perkey_profiles.list_profiles
+
+# Re-export helpers/classifier for battery-saver monkeypatch seams.
+# (apply_power_source_actions / build_power_source_loop_inputs /
+# classify_power_source_iteration already imported above.)
+
+# Re-export battery-saver poll interval for tests/monkeypatches.
+_DEFAULT_POWER_SOURCE_POLL_INTERVAL_S = _battery_saver._DEFAULT_POWER_SOURCE_POLL_INTERVAL_S
 
 
 def activate_perkey_profile(tray: object, profile_name: str) -> None:
@@ -142,109 +146,52 @@ class PowerManager:
 
     # ---- battery saver (dim on AC unplug)
 
-    def _run_battery_saver_iteration(
-        self,
-        policy: PowerSourceLoopPolicy,
-        *,
-        poll_interval_s: float,
-    ) -> bool:
-        self._sync_lid_state_from_system()
-
-        if self._lid_closed and self._flag("power_off_on_lid_close", True):
-            time.sleep(poll_interval_s)
-            return True
-
-        if self._keyboard_is_power_event_forced_off():
-            time.sleep(poll_interval_s)
-            return True
-
-        plan = self._classify_battery_saver_iteration(policy)
-        return self._execute_battery_saver_iteration_plan(plan, poll_interval_s=poll_interval_s)
+    def _run_battery_saver_iteration(self, policy, *, poll_interval_s: float) -> bool:
+        return _battery_saver.run_battery_saver_iteration(
+            self,
+            policy,
+            poll_interval_s=poll_interval_s,
+            classify_fn=self._classify_battery_saver_iteration,
+            execute_plan_fn=self._execute_battery_saver_iteration_plan,
+            sync_lid_fn=self._sync_lid_state_from_system,
+            keyboard_is_power_event_forced_off_fn=self._keyboard_is_power_event_forced_off,
+        )
 
     def _sync_lid_state_from_system(self) -> None:
-        state = read_lid_state()
-        if state == "closed" and not self._lid_closed:
-            logger.info("Power-source polling observed closed lid")
-            self._on_lid_close()
-        elif state == "open" and self._lid_closed:
-            logger.info("Power-source polling observed open lid")
-            self._on_lid_open()
+        _battery_saver.sync_lid_state_from_system(self)
 
     def _keyboard_is_power_event_forced_off(self) -> bool:
-        return is_power_event_forced_off(self.kb_controller)
+        return _battery_saver.keyboard_is_power_event_forced_off(self)
 
-    def _classify_battery_saver_iteration(
-        self,
-        policy: PowerSourceLoopPolicy,
-    ) -> PowerSourceIterationPlan:
-        now_mono = float(time.monotonic())
-        raw_on_ac = read_on_ac_power()
-        stable_on_ac = self._stabilize_on_ac_state(raw_on_ac)
-        return classify_power_source_iteration(
-            raw_on_ac=stable_on_ac,
-            build_loop_inputs_fn=lambda on_ac: build_power_source_loop_inputs(
-                self._config,
-                self.kb_controller,
-                on_ac=on_ac,
-                now_mono=now_mono,
-                get_power_mode_status_fn=get_system_power_status,
-                get_active_perkey_profile_fn=get_active_perkey_profile,
-                safe_int_attr_fn=safe_int_attr,
-            ),
-            policy=policy,
+    def _classify_battery_saver_iteration(self, policy):
+        return _battery_saver.classify_battery_saver_iteration(
+            self,
+            policy,
+            stabilize_on_ac_fn=self._stabilize_on_ac_state,
+            get_active_perkey_profile_fn=get_active_perkey_profile,
         )
 
-    def _execute_battery_saver_iteration_plan(
-        self,
-        plan: PowerSourceIterationPlan,
-        *,
-        poll_interval_s: float,
-    ) -> bool:
-        if plan.should_sleep:
-            time.sleep(poll_interval_s)
-            return True
-
-        apply_power_source_actions(
-            kb_controller=self.kb_controller,
-            actions=plan.actions,
-            apply_brightness=self._apply_brightness_policy,
-            activate_power_mode=self._activate_power_source_mode,
-            activate_perkey_profile=self._activate_power_source_perkey_profile,
+    def _execute_battery_saver_iteration_plan(self, plan, *, poll_interval_s: float) -> bool:
+        return _battery_saver.execute_battery_saver_iteration_plan(
+            self,
+            plan,
+            poll_interval_s=poll_interval_s,
+            apply_brightness_fn=self._apply_brightness_policy,
+            activate_power_mode_fn=self._activate_power_source_mode,
+            activate_perkey_profile_fn=self._activate_power_source_perkey_profile,
         )
-        return False
 
     def _battery_saver_loop(self) -> None:
-        """Poll AC online state and apply a simple dim/restore policy.
+        """Poll AC online state and apply a simple dim/restore policy."""
 
-        Requirements:
-        - no root required
-        - debounce rapid toggling
-        - don't fight manual brightness changes while on battery
-        """
-
-        policy = PowerSourceLoopPolicy(debounce_seconds=3.0)
-
-        while self.monitoring:
-            poll_interval_s = _DEFAULT_POWER_SOURCE_POLL_INTERVAL_S
-            did_sleep = self._run_recoverable_runtime_boundary(
-                lambda: self._run_battery_saver_iteration(policy, poll_interval_s=poll_interval_s),
-                log_message="Battery saver monitoring iteration failed",
-                fallback=False,
-            )
-            if did_sleep:
-                continue
-
-            time.sleep(poll_interval_s)
+        _battery_saver.battery_saver_loop(
+            self,
+            run_recoverable_runtime_boundary_fn=self._run_recoverable_runtime_boundary,
+            run_iteration_fn=self._run_battery_saver_iteration,
+        )
 
     def _stabilize_on_ac_state(self, raw_on_ac: bool | None) -> bool | None:
-        state = stabilize_power_source_state(
-            raw_on_ac=raw_on_ac,
-            stable_on_ac=self._stable_on_ac,
-            pending_on_ac=self._pending_on_ac,
-        )
-        self._stable_on_ac = state.stable_on_ac
-        self._pending_on_ac = state.pending_on_ac
-        return self._stable_on_ac
+        return _battery_saver.stabilize_on_ac_state(self, raw_on_ac)
 
     def _apply_brightness_policy(self, brightness: int) -> None:
         """Best-effort brightness change driven by power policy."""
@@ -260,9 +207,7 @@ class PowerManager:
         return sync_config_brightness(self._config, brightness, logger=logger)
 
     def _activate_power_source_mode(self, mode) -> None:
-        applied = set_system_power_mode(mode, allow_interactive=False)
-        if not bool(applied):
-            logger.warning("Power-source mode activation did not apply for %s", getattr(mode, "value", mode))
+        _battery_saver.activate_power_source_mode(mode)
 
     def _activate_power_source_perkey_profile(self, profile_name: str) -> None:
         available_profiles = {str(name) for name in list_perkey_profiles()}
@@ -378,11 +323,9 @@ class PowerManager:
         kb_method_name: str,
         delay_s: float = 0.0,
     ) -> None:
-        enabled = self._is_enabled()
-        action_enabled = self._flag(flag_name, True)
         self._handle_power_event(
-            enabled=enabled,
-            action_enabled=action_enabled,
+            enabled=self._is_enabled(),
+            action_enabled=self._flag(flag_name, True),
             log_message=log_message,
             delay_s=delay_s,
             policy_method=policy_method,
@@ -390,7 +333,7 @@ class PowerManager:
             kb_method_name=kb_method_name,
         )
 
-    def _on_suspend(self):
+    def _on_suspend(self) -> None:
         """Called when system is about to suspend."""
         self._dispatch_power_event_route(
             flag_name="power_off_on_suspend",
@@ -400,7 +343,7 @@ class PowerManager:
             kb_method_name="turn_off",
         )
 
-    def _on_resume(self):
+    def _on_resume(self) -> None:
         """Called when system resumes from suspend."""
         self._dispatch_power_event_route(
             flag_name="power_restore_on_resume",
@@ -411,7 +354,7 @@ class PowerManager:
             kb_method_name="restore",
         )
 
-    def _on_lid_close(self):
+    def _on_lid_close(self) -> None:
         """Called when lid is closed."""
         self._lid_closed = True
         self._dispatch_power_event_route(
@@ -422,7 +365,7 @@ class PowerManager:
             kb_method_name="turn_off",
         )
 
-    def _on_lid_open(self):
+    def _on_lid_open(self) -> None:
         """Called when lid is opened."""
         self._lid_closed = False
         self._dispatch_power_event_route(

@@ -35,9 +35,14 @@ def test_sw_effects_menu_first_item_is_reactive_typing_settings() -> None:
     confirmed after the rename from 'Reactive Typing Color...'."""
     import inspect
 
-    src = inspect.getsource(menu)
+    from src.tray.ui import _menu_sections_effects as menu_effects
+
+    # Label lives in the extracted effects section builder (WS1 / A8).
+    src = inspect.getsource(menu_effects)
     assert "Reactive Typing Settings" in src
     assert "Reactive Typing Color" not in src
+    # Parent orchestrator must not reintroduce the old label.
+    assert "Reactive Typing Color" not in inspect.getsource(menu)
 
 
 def test_system_power_callback_uses_runtime_helper_collaborators(monkeypatch: pytest.MonkeyPatch) -> None:

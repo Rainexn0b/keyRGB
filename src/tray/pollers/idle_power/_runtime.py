@@ -14,6 +14,15 @@ from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_floa
 
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 from ._input_idle import InputIdleTracker
+from ._power_source_guard import (
+    plan_power_source_guard_update,
+    power_source_idle_guard_active as _pure_power_source_idle_guard_active,
+)
+from ._runtime_sensors import (  # noqa: F401
+    read_desktop_dimmed_state as _read_desktop_dimmed_state,
+    read_session_idle_state as _read_session_idle_state,
+    read_wayland_dimmed_state as _read_wayland_dimmed_state,
+)
 from .policy import IdleAction
 from .sensors import BacklightState
 
@@ -113,146 +122,26 @@ def _update_power_source_idle_guard(
     on_ac_power: Optional[bool],
     now: float,
 ) -> None:
-    if on_ac_power is None:
+    plan = plan_power_source_guard_update(
+        on_ac_power=on_ac_power,
+        last_on_ac_power=loop_state.last_on_ac_power,
+        last_power_source_change_at=float(loop_state.last_power_source_change_at or 0.0),
+        now=float(now),
+    )
+    if plan is None:
         return
-
-    on_ac = bool(on_ac_power)
-    if loop_state.last_on_ac_power is None:
-        loop_state.last_on_ac_power = on_ac
-        return
-
-    if on_ac == bool(loop_state.last_on_ac_power):
-        return
-
-    loop_state.last_on_ac_power = on_ac
-    loop_state.last_power_source_change_at = float(now)
-    _reset_power_source_sensitive_idle_state(loop_state)
+    loop_state.last_on_ac_power = plan.last_on_ac_power
+    loop_state.last_power_source_change_at = plan.last_power_source_change_at
+    if plan.reset_sensitive_idle_state:
+        _reset_power_source_sensitive_idle_state(loop_state)
 
 
 def _power_source_idle_guard_active(*, loop_state: IdlePollLoopState, now: float) -> bool:
-    changed_at = float(loop_state.last_power_source_change_at or 0.0)
-    if changed_at <= 0.0:
-        return False
-    return (float(now) - changed_at) < POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
-
-
-def _read_session_idle_state(
-    *,
-    session_id: str | None,
-    idle_timeout_s: float,
-    read_logind_idle_seconds_fn: Callable[..., Optional[float]],
-) -> Optional[bool]:
-    if not session_id:
-        return None
-    idle_s = read_logind_idle_seconds_fn(session_id=session_id)
-    if idle_s is None:
-        return None
-    return bool(float(idle_s) >= float(idle_timeout_s))
-
-
-def _read_wayland_dimmed_state(
-    *,
-    loop_state: IdlePollLoopState,
-    timeout_s: float,
-    create_wayland_idle_tracker_fn: Callable[[int], Optional[Any]],
-    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
-) -> Optional[bool]:
-    timeout_ms = int(float(timeout_s) * 1000)
-    if timeout_ms <= 0:
-        return None
-
-    if loop_state.wayland_idle_tracker is None:
-        try:
-            loop_state.wayland_idle_tracker = create_wayland_idle_tracker_fn(timeout_ms)
-        except _IDLE_POWER_RUNTIME_EXCEPTIONS:
-            loop_state.wayland_idle_tracker = None
-            return None
-
-    tracker = loop_state.wayland_idle_tracker
-    if tracker is None:
-        return None
-
-    try:
-        set_timeout_ms = getattr(tracker, "set_timeout_ms", None)
-        if callable(set_timeout_ms):
-            set_timeout_ms(timeout_ms)
-    except _IDLE_POWER_RUNTIME_EXCEPTIONS:
-        pass
-
-    result = read_wayland_idle_fn(tracker)
-    if result is None:
-        # The tracker's Wayland connection is broken (is_idle returned
-        # None after a dispatch/read/flush failure).  Close and drop the
-        # cached tracker so the next poll recreates a fresh connection
-        # instead of reusing a dead proxy for the entire session — which
-        # would silently fall back to the brightness heuristic.
-        try:
-            close = getattr(tracker, "close", None)
-            if callable(close):
-                close()
-        except _IDLE_POWER_RUNTIME_EXCEPTIONS:
-            pass
-        loop_state.wayland_idle_tracker = None
-
-    return result
-
-
-def _read_desktop_dimmed_state(
-    *,
-    loop_state: IdlePollLoopState,
-    on_ac_power: Optional[bool],
-    read_desktop_dim_timeout_fn: Callable[[Optional[bool]], Optional[float]],
-    create_wayland_idle_tracker_fn: Callable[[int], Optional[Any]],
-    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
-    create_input_idle_tracker_fn: Callable[[], InputIdleTracker],
-    read_input_idle_seconds_fn: Callable[[InputIdleTracker], Optional[float]],
-    fallback_timeout_s: float,
-) -> tuple[Optional[bool], Optional[bool]]:
-    """Use KDE/system dim timeout + session idle as the primary dim signal.
-
-    Prefers the Wayland idle notifier when available (it sees touchpad and
-    other input devices that raw evdev cannot).  Falls back to evdev input
-    idle on X11 or when the compositor does not expose the protocol.
-
-    When the desktop dim timeout is not configured (e.g. KDE's
-    ``DimDisplayIdleTimeoutSec`` is absent for the active power profile),
-    the ``fallback_timeout_s`` (the general idle timeout) is used instead so
-    that the Wayland tracker / evdev path is still consulted.  This prevents
-    the brightness heuristic from firing on manual screen-brightness changes
-    when a real idle source is available but the desktop dim policy is off.
-
-    Returns (dimmed, session_idle).  If no timeout or idle source is
-    available, returns (None, None) so the caller can fall back.
-    """
-
-    timeout_s = read_desktop_dim_timeout_fn(on_ac_power)
-    if timeout_s is None:
-        timeout_s = float(fallback_timeout_s) if float(fallback_timeout_s) > 0 else None
-    if timeout_s is None:
-        return None, None
-
-    wayland_idle = _read_wayland_dimmed_state(
-        loop_state=loop_state,
-        timeout_s=timeout_s,
-        create_wayland_idle_tracker_fn=create_wayland_idle_tracker_fn,
-        read_wayland_idle_fn=read_wayland_idle_fn,
+    return _pure_power_source_idle_guard_active(
+        now=float(now),
+        last_power_source_change_at=float(loop_state.last_power_source_change_at or 0.0),
+        suppression_s=POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S,
     )
-    if wayland_idle is not None:
-        dimmed = bool(wayland_idle)
-        return dimmed, dimmed
-
-    if loop_state.input_idle_tracker is None:
-        try:
-            loop_state.input_idle_tracker = create_input_idle_tracker_fn()
-        except _IDLE_POWER_RUNTIME_EXCEPTIONS:
-            return None, None
-
-    input_idle_s = read_input_idle_seconds_fn(loop_state.input_idle_tracker)
-    if input_idle_s is None:
-        return None, None
-
-    dimmed = bool(float(input_idle_s) >= float(timeout_s))
-    return dimmed, dimmed
 
 
 def run_idle_power_iteration(

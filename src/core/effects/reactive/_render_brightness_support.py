@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from enum import Enum
 import logging
 import os
-import threading
 import time
 from operator import attrgetter
 from typing import Callable
@@ -303,80 +302,6 @@ def increment_uniform_hw_streak(
     return new_value
 
 
-_PENDING_RESTORE_SEED_ATTR = "_pending_reactive_restore_seed"
-
-
-@dataclass(frozen=True, slots=True)
-class ReactiveRestoreSeed:
-    """Restore damp timers applied onto a fresh ReactiveRenderState after stop()."""
-
-    disable_pulse_hw_lift_until: float
-    restore_damp_until: float
-    restore_phase: ReactiveRestorePhase = ReactiveRestorePhase.FIRST_PULSE_PENDING
-
-
-def build_reactive_restore_seed(*, fade_in_duration_s: float, now: float | None = None) -> ReactiveRestoreSeed:
-    """Build restore damp timers for idle full-off → on wake."""
-
-    current = float(time.monotonic() if now is None else now)
-    fade_s = float(fade_in_duration_s)
-    return ReactiveRestoreSeed(
-        disable_pulse_hw_lift_until=current + max(2.0, fade_s + 0.75),
-        restore_damp_until=current + max(4.0, fade_s + 2.75),
-        restore_phase=ReactiveRestorePhase.FIRST_PULSE_PENDING,
-    )
-
-
-def queue_reactive_restore_seed(engine: object, seed: ReactiveRestoreSeed) -> None:
-    """Queue a seed so the next ``ReactiveRenderState()`` reset inherits it.
-
-    ``engine.stop()`` rebuilds reactive state and would otherwise clear restore
-    damp before the render thread's first frames, racing post-start seeding.
-    """
-
-    try:
-        setattr(engine, _PENDING_RESTORE_SEED_ATTR, seed)
-    except (AttributeError, TypeError):
-        return
-
-
-def apply_queued_reactive_restore_seed(engine: object) -> bool:
-    """Apply and clear a queued restore seed onto the current reactive state."""
-
-    try:
-        seed = getattr(engine, _PENDING_RESTORE_SEED_ATTR, None)
-    except (AttributeError, TypeError):
-        return False
-    if not isinstance(seed, ReactiveRestoreSeed):
-        return False
-    try:
-        setattr(engine, _PENDING_RESTORE_SEED_ATTR, None)
-    except (AttributeError, TypeError):
-        pass
-    return apply_reactive_restore_seed(engine, seed)
-
-
-def apply_reactive_restore_seed(engine: object, seed: ReactiveRestoreSeed) -> bool:
-    """Write restore damp timers onto the live reactive state."""
-
-    try:
-        state = ensure_reactive_state(engine)
-        state._reactive_disable_pulse_hw_lift_until = float(seed.disable_pulse_hw_lift_until)
-        state._reactive_restore_damp_until = float(seed.restore_damp_until)
-        state._reactive_restore_phase = seed.restore_phase
-        return True
-    except (AttributeError, TypeError, ValueError):
-        return False
-
-
-def seed_reactive_restore_windows(engine: object, *, fade_in_duration_s: float, now: float | None = None) -> bool:
-    """Queue + apply restore damp (call before and after effect start on idle wake)."""
-
-    seed = build_reactive_restore_seed(fade_in_duration_s=fade_in_duration_s, now=now)
-    queue_reactive_restore_seed(engine, seed)
-    return apply_reactive_restore_seed(engine, seed)
-
-
 def clear_transition_state(engine: object, *, logger: logging.Logger) -> None:
     for name in (
         "_reactive_transition_from_brightness",
@@ -393,45 +318,23 @@ def clear_transition_state(engine: object, *, logger: logging.Logger) -> None:
         )
 
 
-def seed_transition_atomic(
-    state: ReactiveRenderState,
-    lock: threading.Lock,
-    *,
-    from_brightness: int,
-    to_brightness: int,
-    started_at: float,
-    duration_s: float,
-) -> None:
-    with lock:
-        state._reactive_transition_from_brightness = from_brightness
-        state._reactive_transition_to_brightness = to_brightness
-        state._reactive_transition_started_at = started_at
-        state._reactive_transition_duration_s = duration_s
-
-
-def read_transition_atomic(
-    state: ReactiveRenderState,
-    lock: threading.Lock,
-) -> tuple[int | None, int | None, float | None, float | None]:
-    with lock:
-        return (
-            state._reactive_transition_from_brightness,
-            state._reactive_transition_to_brightness,
-            state._reactive_transition_started_at,
-            state._reactive_transition_duration_s,
-        )
-
-
-def clear_transition_atomic(
-    state: ReactiveRenderState,
-    lock: threading.Lock,
-) -> None:
-    with lock:
-        state._reactive_transition_from_brightness = None
-        state._reactive_transition_to_brightness = None
-        state._reactive_transition_started_at = None
-        state._reactive_transition_duration_s = None
-
+# Re-exports for stable import path. Extracted to sibling modules
+# (WS1 / A4 slice 1) for LOC discipline; kept re-exported here so existing
+# module-attribute access (``_support.seed_transition_atomic`` etc.) and
+# direct imports keep working without churn across callers.
+from ._reactive_restore_seed import (  # noqa: E402,F401
+    ReactiveRestoreSeed,
+    apply_queued_reactive_restore_seed,
+    apply_reactive_restore_seed,
+    build_reactive_restore_seed,
+    queue_reactive_restore_seed,
+    seed_reactive_restore_windows,
+)
+from ._reactive_transition_atomic import (  # noqa: E402,F401
+    clear_transition_atomic,
+    read_transition_atomic,
+    seed_transition_atomic,
+)
 
 # Re-export debug log helpers for stable import path (split for LOC / D14).
 from . import _render_brightness_debug as _debug  # noqa: E402
