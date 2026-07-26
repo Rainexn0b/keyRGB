@@ -255,7 +255,84 @@ Other validation completed during the overall line of work:
   - a restore-time hardware brightness jump
   - a software-side per-key pulse burst
   - a tray/UI refresh artifact
+  - a hardware-poll recovery restart loop (see addendum below)
   - or a different regression entirely
+
+## Addendum 2026-07: Hardware-poll stable-zero recovery restart loop
+
+### What was observed
+
+After the original campaign closed, the reporter re-encountered brightness
+flashes "when typing for the first time after the keyboard is idle" on v0.30.2
+with an ite8291r3 backend (PID `0x600b`, bcd `0x0003`). The capture command:
+
+```
+KEYRGB_DEBUG=1 KEYRGB_DEBUG_BRIGHTNESS=1 KEYRGB_DEBUG_REACTIVE_INPUT=1 ./keyrgb >> ~/keyrgb-brightness.log 2>&1
+```
+
+revealed a **different failure class** from the original campaign. The reactive
+render path itself was clean — `reactive_hw_lift: reason=per_key_hw` with
+`allow=True` count 0, correct damp seeding on idle wake. The flash source was
+the **hardware-poll stable-zero-brightness recovery** firing in a tight loop:
+
+```
+t=1060443.777  kb.get_brightness -> 0   kb.is_off -> False     ← transient firmware read
+t=1060445.788  stable_zero_brightness_recover                  ← recovery fires (1st)
+t=1060451.830  stable_zero_brightness_recover                  ← fires again (~6s later)
+t=1060457.871  stable_zero_brightness_recover                  ← fires again (~6s later)
+... 16+ fires total, every ~6s (5s cooldown + 2s poll interval)
+```
+
+### Why this caused flashes
+
+Each `stable_zero_brightness_recover` called `start_current_effect()` which
+runs `engine.stop()` → wipes `_reactive_state` (including restore damp) →
+restart. The first post-restart keystroke rendered at full pulse intensity
+with no damp protection → deck-wide flash. The ite8291r3 device's own
+`get_brightness()` docstring explicitly warns:
+
+> TongFang EC/firmware combinations briefly leave the normal user-mode
+> contract … may report transient brightness bytes such as 0 … Treat those
+> reads as controller state observations, not as proof that a prior KeyRGB
+> write requested an off transition.
+
+The recovery treated the transient 0 as a real blank and restarted the effect
+on every cooldown cycle (~6 s). The 5 s cooldown itself was functional (each
+fire was ~6 s apart, not on every poll), but without a circuit breaker the
+loop sustained indefinitely — each restart wiped the reactive restore damp
+and the next keystroke flashed.
+
+### What landed
+
+Three layered fixes in `src/tray/pollers/hardware/`:
+
+1. **Circuit breaker** (`_decisions.py` + `_recovery.py`): after
+   `STABLE_ZERO_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS` (2) consecutive
+   recoveries that fail to restore a non-zero read, switch to a
+   `STABLE_ZERO_BRIGHTNESS_BACKOFF_S` (60 s) cooldown. The counter
+   (`stable_zero_recovery_attempt_count` on `TrayIdlePowerState`) resets
+   automatically when a non-zero hardware read is observed.
+
+2. **Stamp-first ordering** (`_recovery.py:_execute_blank_recovery`): the
+   cooldown stamp is now written *before* any tray callbacks as a defensive
+   ordering guarantee. Log analysis confirmed the 5 s cooldown was functional
+   (fires were ~6 s apart), but stamp-first is more robust against future
+   state-owner changes and ensures the stamp persists even when a callback
+   raises.
+
+3. **Restore damp seeding** (`_recovery.py:_seed_reactive_restore_damp_best_effort`):
+   for reactive effects, `seed_reactive_restore_windows(engine,
+   fade_in_duration_s=0.0)` is called right before `start_current_effect()`
+   so the fresh `ReactiveRenderState` inherits the damp window. Mirrors
+   `_transition_actions.start_current_effect_for_idle_restore`.
+
+### Lesson preserved
+
+The original campaign's wake-path fixes were correct and remained intact. The
+new failure was a **separate control path** (hardware polling, not idle
+restore) that happened to trigger the same visual symptom. This confirms
+lesson #2 from the original campaign: multiple code paths can restart the
+reactive effect, and each must seed restore damp independently.
 
 ## Related references
 

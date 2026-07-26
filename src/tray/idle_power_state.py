@@ -38,6 +38,11 @@ class TrayIdlePowerState:
     hidden_perkey_restore_device_off_hint: Optional[bool] = None
     last_power_source_blank_recovery_at: float = 0.0
     last_hardware_blank_recovery_at: float = 0.0
+    # Consecutive stable-zero recovery attempts that did not restore a non-zero
+    # brightness read.  Drives the circuit breaker in
+    # ``should_attempt_stable_zero_brightness_recovery`` so ITE controllers
+    # that persistently report a transient 0 do not restart-spam the keyboard.
+    stable_zero_recovery_attempt_count: int = 0
     hardware_toggle_restore_effect: str = "none"
     hardware_toggle_restore_per_key_colors: dict[object, object] | None = None
     hardware_toggle_restore_software_target: str = "keyboard"

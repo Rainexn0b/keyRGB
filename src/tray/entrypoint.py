@@ -7,6 +7,7 @@ and then launches the `KeyRGBTray` application.
 from __future__ import annotations
 
 import logging
+import signal
 import sys
 
 from .app.application import KeyRGBTray
@@ -28,19 +29,69 @@ _TRAY_ENTRYPOINT_RUNTIME_ERRORS = (
     ValueError,
 )
 
+# Engine cleanup must catch the same recoverable boundary as the normal quit
+# path (``_on_quit_clicked`` in ``_delegates.py``).
+_ENGINE_CLOSE_RECOVERABLE_ERRORS = (AttributeError, OSError, RuntimeError, ValueError)
+
+
+def _shutdown_engine_best_effort(app: object | None) -> None:
+    """Stop the engine and release the USB device before process exit.
+
+    Without this, the reactive render thread races with libusb teardown on
+    Ctrl-C / SIGTERM, causing ``usbi_mutex_destroy`` / ``usbi_mutex_lock``
+    C-level assertion failures (core dump) because the device handle is closed
+    while an in-flight ``ctrl_transfer`` still holds the libusb mutex.
+
+    ``engine.close()`` calls ``stop()`` first (joins the render thread with a
+    2 s timeout), then atomically swaps the device to a ``NullKeyboard``
+    under ``kb_lock`` before closing the real device — so the render thread
+    can no longer touch USB after this returns.
+    """
+
+    if app is None:
+        return
+    engine = getattr(app, "engine", None)
+    if engine is None:
+        return
+    try:
+        engine_close = getattr(engine, "close", None)
+        if callable(engine_close):
+            engine_close()
+    except _ENGINE_CLOSE_RECOVERABLE_ERRORS:
+        logger.debug("Error during best-effort engine close on shutdown", exc_info=True)
+
 
 def main() -> None:
+    app: KeyRGBTray | None = None
     try:
         configure_logging()
         log_startup_diagnostics_if_debug()
         acquire_single_instance_or_exit()
 
         app = KeyRGBTray()
+
+        # Ensure the engine is stopped and the USB device is released on
+        # SIGTERM (desktop session logout / systemd stop) as well as Ctrl-C.
+        def _signal_shutdown(signum: int, *_args: object) -> None:
+            raise SystemExit(128 + signum)
+
+        signal.signal(signal.SIGTERM, _signal_shutdown)
+
         app.run()
 
     except KeyboardInterrupt:
-        logger.info("Shutting down...")
+        logger.info("Shutting down (Ctrl-C)...")
         sys.exit(0)
+    except SystemExit:
+        # SIGTERM handler raises SystemExit; let finally handle cleanup.
+        raise
     except _TRAY_ENTRYPOINT_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: outermost process boundary; recoverable startup/runtime failures are logged with traceback before clean exit
         logger.exception("Unhandled error: %s", exc)
         sys.exit(1)
+    finally:
+        # Always close the engine, even when pystray swallows KeyboardInterrupt
+        # internally and ``app.run()`` returns normally. Without this, the
+        # reactive render thread keeps doing USB writes during interpreter
+        # teardown, racing with libusb device-handle cleanup and triggering
+        # ``usbi_mutex_destroy`` / ``usbi_mutex_lock`` C-level assertions.
+        _shutdown_engine_best_effort(app)

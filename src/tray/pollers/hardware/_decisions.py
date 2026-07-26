@@ -14,6 +14,19 @@ POWER_SOURCE_RECOVERY_WINDOW_S = 6.0
 POWER_SOURCE_RECOVERY_COOLDOWN_S = 0.75
 STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S = 5.0
 
+# Circuit breaker: after this many consecutive stable-zero recoveries that fail
+# to restore a non-zero brightness read, switch to the long backoff below so the
+# keyboard is not restart-spammed every cooldown cycle.
+#
+# Some ITE controllers (notably ite8291r3 on Tongfang hardware) persistently
+# report brightness=0 with is_off=False as a documented firmware transient
+# (see device.py:get_brightness docstring).  Restarting the effect on every
+# poll cycle does not fix the transient and visibly flashes the keyboard.
+# The circuit breaker lets the first couple of genuine-recovery attempts
+# through, then backs off hard.
+STABLE_ZERO_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS: int = 2
+STABLE_ZERO_BRIGHTNESS_BACKOFF_S: float = 60.0
+
 
 BrightnessPersistKind = Literal[
     "ignore_dim_temp_transient",
@@ -133,7 +146,10 @@ def should_attempt_stable_zero_brightness_recovery(
     configured_brightness_intent: int,
     now: float,
     last_recovery_at: float,
+    consecutive_attempts: int = 0,
     cooldown_s: float = STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S,
+    max_consecutive_attempts: int = STABLE_ZERO_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS,
+    backoff_s: float = STABLE_ZERO_BRIGHTNESS_BACKOFF_S,
 ) -> bool:
     if int(current_brightness) != 0:
         return False
@@ -143,7 +159,12 @@ def should_attempt_stable_zero_brightness_recovery(
         return False
     if int(configured_brightness_intent) <= 0:
         return False
-    if now - float(last_recovery_at) < cooldown_s:
+    # Circuit breaker: once we have fired max_consecutive_attempts recoveries
+    # without the hardware brightness recovering, require the long backoff
+    # window before attempting again.  This prevents a tight restart loop on
+    # controllers that persistently report a transient 0 read.
+    effective_cooldown = backoff_s if int(consecutive_attempts) >= int(max_consecutive_attempts) else cooldown_s
+    if now - float(last_recovery_at) < effective_cooldown:
         return False
     return True
 

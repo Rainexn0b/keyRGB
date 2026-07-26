@@ -26,6 +26,7 @@ _power_source_recovery_window_active = _recovery._power_source_recovery_window_a
 _recover_recent_power_source_blank_best_effort = _recovery._recover_recent_power_source_blank_best_effort
 _recover_stable_zero_brightness_best_effort = _recovery._recover_stable_zero_brightness_best_effort
 _refresh_ui_without_icon_animation = _recovery._refresh_ui_without_icon_animation
+_reset_stable_zero_recovery_attempt_count = _recovery.reset_stable_zero_recovery_attempt_count
 _run_recoverable_hardware_poll_boundary = _recovery._run_recoverable_hardware_poll_boundary
 
 # Test/monkeypatch compatibility: private recovery helpers were historically
@@ -63,6 +64,13 @@ def _apply_polled_hardware_state(
         raw_brightness = current_brightness
 
     current_brightness = _normalize_brightness_to_config_scale(current_brightness)
+
+    # A non-zero hardware read means the ITE transient-0 window has cleared
+    # (see device.py:get_brightness docstring).  Reset the stable-zero
+    # recovery circuit-breaker counter so the next genuine stuck-zero gets a
+    # fresh quota of recovery attempts.
+    if current_brightness > 0:
+        _reset_stable_zero_recovery_attempt_count(tray)
 
     # Temp-dim is a "screen dimmed" brightness policy, not an off-state. Some
     # backends can briefly report 0 / off while dim-sync brightness is being

@@ -20,6 +20,7 @@ from typing import TypeVar
 
 from src.tray.idle_power_state import (
     any_forced_off,
+    ensure_tray_idle_power_state,
     is_dim_temp_active,
 )
 from src.tray.pollers.hardware._decisions import (
@@ -27,6 +28,8 @@ from src.tray.pollers.hardware._decisions import (
     FAST_HARDWARE_POLL_INTERVAL_S,
     POWER_SOURCE_RECOVERY_COOLDOWN_S,
     POWER_SOURCE_RECOVERY_WINDOW_S,
+    STABLE_ZERO_BRIGHTNESS_BACKOFF_S,
+    STABLE_ZERO_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS,
     STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S,
     hardware_poll_interval_s as _pure_hardware_poll_interval_s,
     power_source_recovery_window_active as _pure_power_source_recovery_window_active,
@@ -168,6 +171,49 @@ def _power_source_blank_recovery_eligible(tray: IdlePowerTrayProtocol, *, now: f
     )
 
 
+def _seed_reactive_restore_damp_best_effort(tray: IdlePowerTrayProtocol) -> None:
+    """Seed reactive restore damp before an effect restart (defense in depth).
+
+    ``_execute_blank_recovery`` may call ``start_current_effect()`` which runs
+    ``engine.stop()`` and wipes ``_reactive_state`` — including the post-restore
+    pulse damp that prevents a deck-wide flash on the first post-restart frame.
+    Mirroring the idle-wake path (``_transition_actions``) we queue+apply a
+    restore seed so the first keystroke after a hardware-poll-triggered restart
+    stays visually damped.
+
+    No-op for non-reactive effects and for trays without the expected engine
+    or config attributes.
+    """
+
+    try:
+        config = getattr(tray, "config", None)
+        effect = str(getattr(config, "effect", "none") or "none")
+    except _HARDWARE_POLL_RUNTIME_EXCEPTIONS:
+        return
+
+    # Late import to avoid pulling the effects catalog into the polling module
+    # graph on every interpreter start; only needed when a recovery fires.
+    try:
+        from src.core.effects.catalog import REACTIVE_EFFECTS
+        from src.core.effects.reactive._render_brightness_support import (
+            seed_reactive_restore_windows,
+        )
+    except ImportError:
+        return
+
+    if effect not in REACTIVE_EFFECTS:
+        return
+
+    engine = getattr(tray, "engine", None)
+    if engine is None:
+        return
+
+    try:
+        seed_reactive_restore_windows(engine, fade_in_duration_s=0.0)
+    except (AttributeError, TypeError, ValueError):
+        return
+
+
 def _execute_blank_recovery(
     tray: IdlePowerTrayProtocol,
     *,
@@ -179,6 +225,19 @@ def _execute_blank_recovery(
 ) -> bool:
     apply_transition = _resolve_tray_callback(tray, "_apply_power_source_perkey_profile_transition")
     start_current_effect = _resolve_tray_callback(tray, "_start_current_effect")
+
+    # Write the cooldown stamp BEFORE any tray callbacks.  This is defensive:
+    # the callbacks (``apply_transition`` / ``start_current_effect`` /
+    # ``_refresh_ui``) cross tray/engine/UI boundaries whose interaction with
+    # the idle-power state owner is hard to audit.  Writing the stamp first
+    # guarantees the cooldown window always applies, even if a callback raises
+    # or resets related state.
+    set_idle_power_state_field(
+        tray,
+        attr_name=recovery_stamp_attr,
+        state_name=recovery_stamp_state,
+        value=float(now),
+    )
 
     try:
         set_idle_power_state_field(
@@ -195,6 +254,10 @@ def _execute_blank_recovery(
         )
         handled = bool(apply_transition()) if callable(apply_transition) else False
         if not handled and callable(start_current_effect):
+            # Seed restore damp right before the restart so the fresh
+            # ``ReactiveRenderState`` inherits the damp window instead of
+            # flashing at full pulse intensity on the first post-restart frame.
+            _seed_reactive_restore_damp_best_effort(tray)
             start_current_effect()
             handled = True
     except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
@@ -217,12 +280,6 @@ def _execute_blank_recovery(
     if not handled:
         return False
 
-    set_idle_power_state_field(
-        tray,
-        attr_name=recovery_stamp_attr,
-        state_name=recovery_stamp_state,
-        value=float(now),
-    )
     tray.is_off = False
     _log_polled_hardware_event(
         tray,
@@ -251,6 +308,37 @@ def _recover_recent_power_source_blank_best_effort(
     )
 
 
+def _stable_zero_recovery_attempt_count(tray: IdlePowerTrayProtocol) -> int:
+    """Read the consecutive stable-zero recovery attempt counter."""
+
+    try:
+        owner = ensure_tray_idle_power_state(tray)
+        return int(getattr(owner, "stable_zero_recovery_attempt_count", 0))
+    except (AttributeError, TypeError, ValueError):
+        return 0
+
+
+def _set_stable_zero_recovery_attempt_count(tray: IdlePowerTrayProtocol, value: int) -> None:
+    """Write the consecutive stable-zero recovery attempt counter."""
+
+    try:
+        owner = ensure_tray_idle_power_state(tray)
+        owner.stable_zero_recovery_attempt_count = max(0, int(value))
+    except (AttributeError, TypeError, ValueError):
+        return
+
+
+def reset_stable_zero_recovery_attempt_count(tray: IdlePowerTrayProtocol) -> None:
+    """Reset the consecutive-attempt counter.
+
+    Called from the polling loop when a non-zero brightness read is observed,
+    indicating the transient has cleared and future stable-zero recovery
+    attempts should start from a clean slate.
+    """
+
+    _set_stable_zero_recovery_attempt_count(tray, 0)
+
+
 def _recover_stable_zero_brightness_best_effort(
     tray: IdlePowerTrayProtocol,
     *,
@@ -263,6 +351,7 @@ def _recover_stable_zero_brightness_best_effort(
         state_name="last_hardware_blank_recovery_at",
         default=0.0,
     )
+    consecutive_attempts = _stable_zero_recovery_attempt_count(tray)
     if not should_attempt_stable_zero_brightness_recovery(
         current_brightness=int(current_brightness),
         dim_temp_active=is_dim_temp_active(tray),
@@ -270,9 +359,16 @@ def _recover_stable_zero_brightness_best_effort(
         configured_brightness_intent=_configured_brightness_intent(tray),
         now=now,
         last_recovery_at=float(last_recovery_at),
+        consecutive_attempts=int(consecutive_attempts),
         cooldown_s=STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S,
+        max_consecutive_attempts=STABLE_ZERO_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS,
+        backoff_s=STABLE_ZERO_BRIGHTNESS_BACKOFF_S,
     ):
         return False
+    # Increment the counter BEFORE executing the recovery so that even if the
+    # recovery fails (exception / not handled) the circuit breaker still
+    # counts the attempt and backs off on the next cycle.
+    _set_stable_zero_recovery_attempt_count(tray, int(consecutive_attempts) + 1)
     return _execute_blank_recovery(
         tray,
         current_brightness=current_brightness,

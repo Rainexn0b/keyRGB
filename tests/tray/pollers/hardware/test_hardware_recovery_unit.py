@@ -21,8 +21,12 @@ from src.tray.pollers.hardware._recovery import (
     _power_source_blank_recovery_eligible,
     _recover_recent_power_source_blank_best_effort,
     _recover_stable_zero_brightness_best_effort,
+    reset_stable_zero_recovery_attempt_count,
 )
-from src.tray.protocols import read_idle_power_state_float_field
+from src.tray.protocols import (
+    ensure_tray_idle_power_state,
+    read_idle_power_state_float_field,
+)
 from tests.tray.fakes import make_owner_backed_simple_tray
 
 
@@ -547,3 +551,227 @@ def test_recover_stable_zero_respects_cooldown(monkeypatch) -> None:
     result = _recover_stable_zero_brightness_best_effort(tray, current_brightness=0)
 
     assert result is False
+
+
+# ---------------------------------------------------------------------------
+# Circuit breaker: consecutive-attempt tracking
+# ---------------------------------------------------------------------------
+
+
+def test_recover_stable_zero_increments_attempt_count(monkeypatch) -> None:
+    """A successful recovery increments the consecutive-attempt counter."""
+
+    monkeypatch.setattr(
+        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0
+    )
+
+    tray = _make_recovery_tray(is_off=False)
+    tray._last_power_source_transition_at = 0.0
+    tray._last_power_source_blank_recovery_at = 0.0
+    tray._last_hardware_blank_recovery_at = 0.0
+    tray._apply_power_source_perkey_profile_transition = lambda: True
+    tray._start_current_effect = lambda: True
+    tray._refresh_ui = lambda **_kw: None
+    tray._log_event = lambda *_a, **_kw: None
+
+    owner = ensure_tray_idle_power_state(tray)
+    assert owner.stable_zero_recovery_attempt_count == 0
+
+    result = _recover_stable_zero_brightness_best_effort(tray, current_brightness=0)
+
+    assert result is True
+    assert owner.stable_zero_recovery_attempt_count == 1
+
+
+def test_recover_stable_zero_circuit_breaker_enters_backoff(monkeypatch) -> None:
+    """After max consecutive attempts, the long backoff window blocks recovery."""
+
+    monkeypatch.setattr(
+        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 110.0
+    )
+
+    tray = _make_recovery_tray(is_off=False)
+    tray._last_power_source_transition_at = 0.0
+    tray._last_power_source_blank_recovery_at = 0.0
+    # last recovery was 6 s ago: outside the 5 s cooldown but inside the 60 s
+    # backoff that applies once the circuit breaker has tripped.
+    tray._last_hardware_blank_recovery_at = 104.0
+    tray._apply_power_source_perkey_profile_transition = lambda: True
+    tray._start_current_effect = lambda: True
+
+    owner = ensure_tray_idle_power_state(tray)
+    # Already at the circuit-breaker threshold
+    owner.stable_zero_recovery_attempt_count = 2
+
+    result = _recover_stable_zero_brightness_best_effort(tray, current_brightness=0)
+
+    assert result is False
+
+
+def test_reset_stable_zero_recovery_attempt_count(monkeypatch) -> None:
+    """The reset helper zeros the counter (used when brightness recovers)."""
+
+    tray = _make_recovery_tray()
+    owner = ensure_tray_idle_power_state(tray)
+    owner.stable_zero_recovery_attempt_count = 5
+
+    reset_stable_zero_recovery_attempt_count(tray)
+
+    assert owner.stable_zero_recovery_attempt_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Stamp-first ordering (cooldown persistence)
+# ---------------------------------------------------------------------------
+
+
+def test_execute_blank_recovery_writes_stamp_even_when_callback_raises(monkeypatch) -> None:
+    """The cooldown stamp is written BEFORE callbacks so it persists on failure.
+
+    This is the core fix for the cooldown bypass: if ``apply_transition`` or
+    ``start_current_effect`` triggers a state-resetting side effect, the stamp
+    must already be in place to block the next poll cycle.
+    """
+
+    monkeypatch.setattr(
+        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0
+    )
+
+    tray = _make_recovery_tray()
+    tray._last_power_source_transition_at = 0.0
+    tray._last_power_source_blank_recovery_at = 0.0
+    tray._last_hardware_blank_recovery_at = 0.0
+
+    def _raising_apply():
+        raise RuntimeError("boom")
+
+    tray._apply_power_source_perkey_profile_transition = _raising_apply
+    tray._start_current_effect = lambda: True
+    tray._log_exception = lambda *_a, **_kw: None
+
+    result = _execute_blank_recovery(
+        tray,
+        current_brightness=0,
+        now=200.0,
+        recovery_stamp_attr="_last_hardware_blank_recovery_at",
+        recovery_stamp_state="last_hardware_blank_recovery_at",
+        log_action="stable_zero_brightness_recover",
+    )
+
+    # Recovery failed because the callback raised…
+    assert result is False
+    # …but the stamp was still written, so the cooldown will block retries.
+    assert read_idle_power_state_float_field(
+        tray,
+        attr_name="_last_hardware_blank_recovery_at",
+        state_name="last_hardware_blank_recovery_at",
+        default=0.0,
+    ) == 200.0
+
+
+# ---------------------------------------------------------------------------
+# Reactive restore damp seeding (defense in depth)
+# ---------------------------------------------------------------------------
+
+
+def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None:
+    """For reactive effects, restore damp is seeded before start_current_effect.
+
+    Without this, the engine.stop() inside start_current_effect() would wipe
+    _reactive_state and the first post-restart keystroke would flash at full
+    pulse intensity.
+    """
+
+    monkeypatch.setattr(
+        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0
+    )
+
+    seeded: list[float] = []
+
+    def _fake_seed(engine, *, fade_in_duration_s):
+        seeded.append(float(fade_in_duration_s))
+
+    # Patch the late import target so the damp-seeding helper picks it up.
+    monkeypatch.setattr(
+        "src.core.effects.reactive._render_brightness_support.seed_reactive_restore_windows",
+        _fake_seed,
+    )
+
+    from types import SimpleNamespace
+
+    engine = SimpleNamespace()
+    config = SimpleNamespace(brightness=20, effect="reactive_ripple")
+    tray = make_owner_backed_simple_tray(
+        config=config,
+        engine=engine,
+    )
+    tray._last_power_source_transition_at = 0.0
+    tray._last_power_source_blank_recovery_at = 0.0
+    tray._last_hardware_blank_recovery_at = 0.0
+
+    start_calls: list[bool] = []
+    tray._apply_power_source_perkey_profile_transition = lambda: False  # not handled
+    tray._start_current_effect = lambda: start_calls.append(True)
+    tray._refresh_ui = lambda **_kw: None
+    tray._log_event = lambda *_a, **_kw: None
+
+    result = _execute_blank_recovery(
+        tray,
+        current_brightness=0,
+        now=300.0,
+        recovery_stamp_attr="_last_hardware_blank_recovery_at",
+        recovery_stamp_state="last_hardware_blank_recovery_at",
+        log_action="stable_zero_brightness_recover",
+    )
+
+    assert result is True
+    assert start_calls == [True]
+    # Damp was seeded right before the restart.
+    assert seeded == [0.0]
+
+
+def test_execute_blank_recovery_skips_damp_for_non_reactive_effects(monkeypatch) -> None:
+    """Non-reactive effects do not trigger damp seeding."""
+
+    monkeypatch.setattr(
+        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0
+    )
+
+    seeded: list[float] = []
+
+    def _fake_seed(engine, *, fade_in_duration_s):
+        seeded.append(float(fade_in_duration_s))
+
+    monkeypatch.setattr(
+        "src.core.effects.reactive._render_brightness_support.seed_reactive_restore_windows",
+        _fake_seed,
+    )
+
+    from types import SimpleNamespace
+
+    engine = SimpleNamespace()
+    config = SimpleNamespace(brightness=20, effect="wave")
+    tray = make_owner_backed_simple_tray(
+        config=config,
+        engine=engine,
+    )
+    tray._last_power_source_transition_at = 0.0
+    tray._last_power_source_blank_recovery_at = 0.0
+    tray._last_hardware_blank_recovery_at = 0.0
+
+    tray._apply_power_source_perkey_profile_transition = lambda: False
+    tray._start_current_effect = lambda: True
+    tray._refresh_ui = lambda **_kw: None
+    tray._log_event = lambda *_a, **_kw: None
+
+    result = _execute_blank_recovery(
+        tray,
+        current_brightness=0,
+        now=300.0,
+        recovery_stamp_attr="_last_hardware_blank_recovery_at",
+        recovery_stamp_state="last_hardware_blank_recovery_at",
+        log_action="stable_zero_brightness_recover",
+    )
+
+    assert result is True
+    assert seeded == []
