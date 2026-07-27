@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from src.core.resources.layouts import slot_id_for_key_id
 import src.gui.perkey.ui.profile_actions as actions
+import src.gui.perkey.ui._profile_actions_ui as actions_ui
 from src.gui.perkey.profile_management import ActivatedProfile, DeleteProfileResult, keymap_cells_for, primary_cell
 
 
@@ -192,8 +193,8 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
-        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
-        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
         _ac_power_source_profile_combo=DummyCombo(),
         _battery_power_source_profile_combo=DummyCombo(),
     )
@@ -201,7 +202,7 @@ def test_activate_profile_ui_updates_state_and_redraws(monkeypatch) -> None:
     ed.backdrop_transparency = DummyVar(0.0)
     ed._backdrop_mode_combo = DummySettable()
 
-    actions.activate_profile_ui(ed)
+    actions_ui.activate_profile_ui(ed)
 
     assert ed.profile_name == "p2"
     assert ed._profile_name_var.get() == "p2"
@@ -263,8 +264,8 @@ def test_activate_profile_ui_keeps_activation_on_optional_backdrop_reload_failur
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
-        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
-        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
         _ac_power_source_profile_combo=DummyCombo(),
         _battery_power_source_profile_combo=DummyCombo(),
     )
@@ -274,7 +275,7 @@ def test_activate_profile_ui_keeps_activation_on_optional_backdrop_reload_failur
 
     caplog.set_level(logging.WARNING, logger=actions.__name__)
 
-    actions.activate_profile_ui(ed)
+    actions_ui.activate_profile_ui(ed)
 
     assert ed.profile_name == "p2"
     assert ed._profile_name_var.get() == "p2"
@@ -326,15 +327,15 @@ def test_activate_profile_ui_propagates_unexpected_backdrop_reload_failures(monk
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
-        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
-        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
         _ac_power_source_profile_combo=DummyCombo(),
         _battery_power_source_profile_combo=DummyCombo(),
     )
     ed.canvas.reload_backdrop_error = AssertionError("broken reload")
 
     with pytest.raises(AssertionError):
-        actions.activate_profile_ui(ed)
+        actions_ui.activate_profile_ui(ed)
 
 
 def test_activate_profile_ui_handles_missing_optional_methods(monkeypatch) -> None:
@@ -385,8 +386,8 @@ def test_activate_profile_ui_handles_missing_optional_methods(monkeypatch) -> No
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
-        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
-        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
         _ac_power_source_profile_combo=DummyCombo(),
         _battery_power_source_profile_combo=DummyCombo(),
     )
@@ -394,7 +395,7 @@ def test_activate_profile_ui_handles_missing_optional_methods(monkeypatch) -> No
     ed.backdrop_transparency = DummyVar(0.0)
     ed._backdrop_mode_combo = DummySettable()
 
-    actions.activate_profile_ui(ed)
+    actions_ui.activate_profile_ui(ed)
 
     assert ed.profile_name == "p2"
     assert ed.commit_calls == 1
@@ -432,13 +433,13 @@ def test_delete_profile_ui_updates_combo(monkeypatch) -> None:
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
-        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
-        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
         _ac_power_source_profile_combo=DummyCombo(),
         _battery_power_source_profile_combo=DummyCombo(),
     )
 
-    actions.delete_profile_ui(ed)
+    actions_ui.delete_profile_ui(ed)
 
     assert ed.profile_name == "default"
     assert ed._profile_name_var.get() == "default"
@@ -472,14 +473,14 @@ def test_delete_profile_ui_activates_fallback_scene_when_editor_supports_it(monk
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
-        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
-        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
         _ac_power_source_profile_combo=DummyCombo(),
         _battery_power_source_profile_combo=DummyCombo(),
         _activate_profile=lambda: fallback_calls.append(True),
     )
 
-    actions.delete_profile_ui(ed)
+    actions_ui.delete_profile_ui(ed)
 
     assert fallback_calls == [True]
 
@@ -508,12 +509,12 @@ def test_save_power_source_profile_policy_ui_persists_selection_and_refreshes_op
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
         _ac_power_source_profile_var=DummyVar("gaming"),
-        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
         _ac_power_source_profile_combo=DummyCombo(),
         _battery_power_source_profile_combo=DummyCombo(),
     )
 
-    actions.save_power_source_profile_policy_ui(ed)
+    actions_ui.save_power_source_profile_policy_ui(ed)
 
     assert config.ac_perkey_profile_name == "gaming"
     assert config.battery_perkey_profile_name is None
@@ -540,7 +541,7 @@ def test_save_power_source_profile_policy_ui_activates_current_ac_profile_when_n
         activation_calls.append(editor._profile_name_var.get())
         editor.profile_name = editor._profile_name_var.get()
 
-    monkeypatch.setattr(actions, "activate_profile_ui", fake_activate_profile_ui)
+    monkeypatch.setattr(actions_ui, "activate_profile_ui", fake_activate_profile_ui)
 
     config = SimpleNamespace(ac_perkey_profile_name=None, battery_perkey_profile_name="Blue")
     ed = DummyEditor(
@@ -567,7 +568,7 @@ def test_save_power_source_profile_policy_ui_activates_current_ac_profile_when_n
         _battery_power_source_profile_combo=DummyCombo(),
     )
 
-    actions.save_power_source_profile_policy_ui(ed)
+    actions_ui.save_power_source_profile_policy_ui(ed)
 
     assert config.ac_perkey_profile_name == "Purple"
     assert config.battery_perkey_profile_name == "Blue"
@@ -599,16 +600,16 @@ def test_sync_power_source_profile_policy_controls_keeps_missing_configured_prof
         canvas=DummyCanvas(),
         status_label=DummyLabel(),
         _profiles_combo=DummyCombo(),
-        _ac_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
-        _battery_power_source_profile_var=DummyVar(actions.KEEP_CURRENT_PROFILE_LABEL),
+        _ac_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
+        _battery_power_source_profile_var=DummyVar(actions_ui.KEEP_CURRENT_PROFILE_LABEL),
         _ac_power_source_profile_combo=DummyCombo(),
         _battery_power_source_profile_combo=DummyCombo(),
     )
 
-    actions.sync_power_source_profile_policy_controls(ed)
+    actions_ui.sync_power_source_profile_policy_controls(ed)
 
     assert ed._ac_power_source_profile_var.get() == "movie"
-    assert ed._battery_power_source_profile_var.get() == actions.KEEP_CURRENT_PROFILE_LABEL
+    assert ed._battery_power_source_profile_var.get() == actions_ui.KEEP_CURRENT_PROFILE_LABEL
     assert ed._ac_power_source_profile_combo.values == [
         "Keep current profile",
         "default",

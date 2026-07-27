@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import TclError, ttk
 
 from src.core.profile import profiles
-from src.gui.perkey.ui import profile_actions as profile_action_ui
+from src.gui.perkey.ui import _profile_actions_ui as profile_action_ui
 from src.gui.widgets.color_wheel import ColorWheel
 from src.gui.widgets.dropdown import UpwardListboxDropdown
 

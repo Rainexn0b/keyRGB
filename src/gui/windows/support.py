@@ -5,6 +5,7 @@ import os
 
 from . import _support_window_runtime_deps
 from ._support import _support_window_geometry
+from ._support._support_window_text_io import copy_text, save_text_via_dialog, set_status, set_text
 
 tk = _support_window_runtime_deps.tk
 filedialog = _support_window_runtime_deps.filedialog
@@ -138,14 +139,14 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         support_actions.merge_supplemental_evidence(self, payload)
 
     def _set_status(self, text: str, *, ok: bool = True) -> None:
-        support_actions.set_status(self, text, ok=ok)
+        set_status(self, text, ok=ok)
 
     @staticmethod
     def _set_text(widget: scrolledtext.ScrolledText, text: str) -> None:
-        support_actions.set_text(widget, text)
+        set_text(widget, text)
 
     def _copy_text(self, text: str, *, empty_message: str, ok_message: str) -> None:
-        support_actions.copy_text(
+        copy_text(
             self,
             text,
             empty_message=empty_message,
@@ -154,7 +155,7 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         )
 
     def _save_text_via_dialog(self, text: str, *, title: str, initialfile: str, empty_message: str) -> None:
-        support_actions.save_text_via_dialog(
+        save_text_via_dialog(
             self,
             text,
             title=title,

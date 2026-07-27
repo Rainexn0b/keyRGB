@@ -2,7 +2,8 @@
 
 These functions keep `editor.py` focused on UI wiring by grouping cohesive
 profile-related behaviors. Heavier power-source / CRUD UI lives in
-``_profile_actions_ui`` (WS1 / B1) and is re-exported here for stable imports.
+``_profile_actions_ui`` (WS1 / B1); callers use that module directly for the
+extracted profile UI actions.
 """
 
 from __future__ import annotations
@@ -20,8 +21,6 @@ from ._profile_actions_support import (
 )
 
 logger = logging.getLogger(__name__)
-# Re-export constant used by UI wiring / tests.
-from ._profile_actions_ui import KEEP_CURRENT_PROFILE_LABEL  # noqa: F401
 
 
 # Keep module-backed seams patchable while deferring heavier imports until use.
@@ -116,6 +115,8 @@ def keymap_cells_for(*args, **kwargs):
 
 
 def _save_current_profile_for_guard(editor: _PerKeyProfileEditorProtocol) -> None:
+    from ._profile_actions_ui import save_profile_ui
+
     requested = editor._profile_name_var.get()
     if requested != editor.profile_name:
         editor._profile_name_var.set(editor.profile_name)
@@ -228,16 +229,3 @@ def reset_layout_defaults_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     editor.overlay_controls.sync_vars_from_scope()
     editor.canvas.redraw()
     set_status(editor, layout_defaults_reset(_layout_labels().get(resolved_layout, resolved_layout.upper())))
-
-
-# Re-export heavier UI actions (WS1 / B1).
-from ._profile_actions_ui import (  # noqa: F401
-    activate_profile_ui,
-    delete_profile_ui,
-    new_profile_ui,
-    power_source_profile_options,
-    save_power_source_profile_policy_ui,
-    save_profile_ui,
-    set_default_profile_ui,
-    sync_power_source_profile_policy_controls,
-)

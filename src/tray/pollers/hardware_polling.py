@@ -31,16 +31,6 @@ _refresh_ui_without_icon_animation = _recovery._refresh_ui_without_icon_animatio
 _reset_stable_zero_recovery_attempt_count = _recovery.reset_stable_zero_recovery_attempt_count
 _run_recoverable_hardware_poll_boundary = _recovery._run_recoverable_hardware_poll_boundary
 
-# Test/monkeypatch compatibility: private recovery helpers were historically
-# imported from this module. Prefer ``src.tray.pollers.hardware._recovery``.
-_HARDWARE_POLL_RUNTIME_EXCEPTIONS = _recovery._HARDWARE_POLL_RUNTIME_EXCEPTIONS
-_configured_brightness_intent = _recovery._configured_brightness_intent
-_execute_blank_recovery = _recovery._execute_blank_recovery
-_power_source_blank_recovery_eligible = _recovery._power_source_blank_recovery_eligible
-_power_source_transition_at = _recovery._power_source_transition_at
-_resolve_tray_callback = _recovery._resolve_tray_callback
-
-
 # ---------------------------------------------------------------------------
 # Polled-state application (brightness / off transitions)
 # ---------------------------------------------------------------------------

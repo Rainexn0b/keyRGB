@@ -164,10 +164,8 @@ def apply_mode(mode: PowerMode, *, root: Path, extreme_cap_khz: int, allow_inter
     Returns False if both direct writes and the helper failed.
     """
     # First try direct writes (works if user already has permissions).
-    # We look up _apply_mode_sysfs on _modes so test monkeypatching of
-    # the re-exported name continues to work.
     try:
-        _modes._apply_mode_sysfs(mode, root=root, extreme_cap_khz=extreme_cap_khz)
+        _apply_mode_sysfs(mode, root=root, extreme_cap_khz=extreme_cap_khz)
         return True
     except PermissionError:
         pass
@@ -175,7 +173,7 @@ def apply_mode(mode: PowerMode, *, root: Path, extreme_cap_khz: int, allow_inter
         # If direct write fails for other reasons, still allow helper.
         pass
 
-    return _modes._run_privileged_helper(
+    return _run_privileged_helper(
         mode,
         extreme_cap_khz=extreme_cap_khz,
         allow_interactive=allow_interactive,

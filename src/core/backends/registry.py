@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from .base import KeyboardBackend, ProbeResult
-from .exceptions import BackendError  # noqa: F401 – available for callers and future narrowing
 from .policy import experimental_backends_enabled, selection_allowed_for_backend, stability_for_backend
 
 logger = logging.getLogger(__name__)

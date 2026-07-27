@@ -87,8 +87,7 @@ def _maybe_activate_current_power_source_profile_ui(
         return None
 
     editor._profile_name_var.set(desired_profile_name)
-    # Go through the facade so tests can monkeypatch profile_actions.activate_profile_ui.
-    facade.activate_profile_ui(editor)
+    activate_profile_ui(editor)
     return source_label, desired_profile_name
 
 

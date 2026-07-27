@@ -112,39 +112,39 @@ def clear_all(editor: object, *, num_rows: int, num_cols: int) -> None:
 
 
 def new_profile(editor: object) -> None:
-    from ..ui import profile_actions
+    from ..ui import _profile_actions_ui as profile_actions_ui
 
-    profile_actions.new_profile_ui(editor)
+    profile_actions_ui.new_profile_ui(editor)
 
 
 def activate_profile(editor: object) -> None:
-    from ..ui import profile_actions
+    from ..ui import _profile_actions_ui as profile_actions_ui
 
-    profile_actions.activate_profile_ui(editor)
+    profile_actions_ui.activate_profile_ui(editor)
 
 
 def save_profile(editor: object) -> None:
-    from ..ui import profile_actions
+    from ..ui import _profile_actions_ui as profile_actions_ui
 
-    profile_actions.save_profile_ui(editor)
+    profile_actions_ui.save_profile_ui(editor)
 
 
 def delete_profile(editor: object) -> None:
-    from ..ui import profile_actions
+    from ..ui import _profile_actions_ui as profile_actions_ui
 
-    profile_actions.delete_profile_ui(editor)
+    profile_actions_ui.delete_profile_ui(editor)
 
 
 def set_default_profile(editor: object) -> None:
-    from ..ui import profile_actions
+    from ..ui import _profile_actions_ui as profile_actions_ui
 
-    profile_actions.set_default_profile_ui(editor)
+    profile_actions_ui.set_default_profile_ui(editor)
 
 
 def save_power_source_profile_policy(editor: object) -> None:
-    from ..ui import profile_actions
+    from ..ui import _profile_actions_ui as profile_actions_ui
 
-    profile_actions.save_power_source_profile_policy_ui(editor)
+    profile_actions_ui.save_power_source_profile_policy_ui(editor)
 
 
 def reset_layout_defaults(editor: object) -> None:

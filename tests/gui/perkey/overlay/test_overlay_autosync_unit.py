@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from src.core.resources.layout import KeyDef
-from src.gui.perkey.overlay.autosync import (
+from src.core.resources.layout_tweak_autosync import (
     _apply_global_factory,
     _apply_per_key,
     _build_items,
@@ -13,8 +13,8 @@ from src.gui.perkey.overlay.autosync import (
     _snap_cols,
     _snap_rows,
     _sync_similar_sizes,
-    auto_sync_per_key_overlays,
 )
+from src.gui.perkey.overlay.autosync import auto_sync_per_key_overlays
 
 
 def _key(key_id: str, rect: tuple[int, int, int, int]) -> KeyDef:

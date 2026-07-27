@@ -10,6 +10,15 @@ from src.tray.protocols import (
 )
 
 from . import _planning, _post_fast_path_apply
+from ._apply_callbacks import (
+    _apply_effect,
+    _apply_perkey,
+    _apply_turn_off,
+    _apply_uniform,
+    _handle_forced_off,
+    _sync_reactive,
+    _sync_software_target_policy,
+)
 from ._apply_plan import should_skip_config_apply_for_power_source_transition
 from ._config_apply_state import (
     _CONFIG_FALLBACK_EXCEPTIONS,
@@ -19,15 +28,6 @@ from ._config_apply_state import (
     build_config_apply_state,
 )
 from ._fast_path import apply_fast_path_change, classify_fast_path_change
-from .helpers import (
-    _apply_effect,
-    _apply_perkey,
-    _apply_turn_off,
-    _apply_uniform,
-    _handle_forced_off,
-    _sync_reactive,
-    _sync_software_target_policy,
-)
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 _FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)

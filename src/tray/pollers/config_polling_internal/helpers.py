@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import importlib
-
 from src.core.effects.software_targets import (
     SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
     normalize_software_effect_target,
@@ -169,16 +167,3 @@ def _log_detected_change(tray: ConfigPollingTrayProtocol, last_applied, current,
         old=old_state,
         new=new_state,
     )
-
-
-# Import and re-export callback implementations for test monkeypatch compatibility.
-# The actual implementation is in _apply_callbacks.py.
-_apply_callbacks = importlib.import_module(f"{__package__}._apply_callbacks")
-
-_handle_forced_off = _apply_callbacks._handle_forced_off
-_apply_turn_off = _apply_callbacks._apply_turn_off
-_sync_reactive = _apply_callbacks._sync_reactive
-_sync_software_target_policy = _apply_callbacks._sync_software_target_policy
-_apply_perkey = _apply_callbacks._apply_perkey
-_apply_uniform = _apply_callbacks._apply_uniform
-_apply_effect = _apply_callbacks._apply_effect

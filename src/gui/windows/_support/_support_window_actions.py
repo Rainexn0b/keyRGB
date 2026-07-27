@@ -8,10 +8,6 @@ from ._support_window_text_io import (
     _ConfigurableWidget,
     _SupportWindowOutputLike,
     _TextWidget,
-    copy_text,  # noqa: F401 - stable facade for SupportToolsGUI
-    save_text_via_dialog,  # noqa: F401 - stable facade for SupportToolsGUI
-    set_status,  # noqa: F401 - stable facade for SupportToolsGUI
-    set_text,  # noqa: F401 - stable facade for SupportToolsGUI
 )
 
 JsonDict: TypeAlias = dict[str, object]

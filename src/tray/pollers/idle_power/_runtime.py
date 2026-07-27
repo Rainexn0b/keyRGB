@@ -20,12 +20,7 @@ from ._power_source_guard import power_source_idle_guard_active as _pure_power_s
 from ._runtime_sensors import (
     read_desktop_dimmed_state as _read_desktop_dimmed_state,
 )
-from ._runtime_sensors import (
-    read_session_idle_state as _read_session_idle_state,
-)
-from ._runtime_sensors import (  # noqa: F401
-    read_wayland_dimmed_state as _read_wayland_dimmed_state,
-)
+from ._runtime_sensors import read_session_idle_state as _read_session_idle_state
 from .policy import IdleAction
 from .sensors import BacklightState
 

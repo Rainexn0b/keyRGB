@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from src.tray.pollers.config_polling import ConfigApplyState, _maybe_apply_fast_path
-from src.tray.pollers.config_polling_internal.helpers import _sync_software_target_policy
+from src.tray.pollers.config_polling_internal._apply_callbacks import _sync_software_target_policy
 
 
 def _mk_tray(*, engine_running: bool = True) -> MagicMock:
@@ -210,7 +209,9 @@ def test_fastpath_software_target_change_updates_policy_without_restart() -> Non
         software_effect_target="all_uniform_capable",
     )
 
-    with patch("src.tray.pollers.config_polling_internal.helpers._sync_software_target_policy") as sync_policy:
+    with patch(
+        "src.tray.pollers.config_polling_internal._fast_path.apply_callbacks._sync_software_target_policy"
+    ) as sync_policy:
         handled, new_last = _maybe_apply_fast_path(tray, last_applied=last, current=current)
 
     assert handled is True

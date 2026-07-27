@@ -287,10 +287,3 @@ def sync_reactive_effect_brightness_state(
             f"Failed to enter {source} reactive engine update boundary: %s",
             exc,
         )
-
-
-# Re-export mode apply helpers (WS1 / A6) for stable import path.
-from src.tray.controllers._lighting_mode_apply import (  # noqa: F401
-    apply_perkey_mode,
-    apply_uniform_none_mode,
-)

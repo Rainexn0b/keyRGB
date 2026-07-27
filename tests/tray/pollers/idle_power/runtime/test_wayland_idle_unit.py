@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from src.tray.pollers.idle_power import _runtime
+from src.tray.pollers.idle_power import _runtime, _runtime_sensors
 from src.tray.pollers.idle_power._wayland_idle import create_wayland_idle_tracker
 
 
@@ -37,7 +37,7 @@ def test_read_wayland_dimmed_state_creates_tracker_and_returns_idle() -> None:
         fake_tracker.timeout_ms = timeout_ms
         return fake_tracker
 
-    result = _runtime._read_wayland_dimmed_state(
+    result = _runtime_sensors.read_wayland_dimmed_state(
         loop_state=loop_state,
         timeout_s=7.5,
         create_wayland_idle_tracker_fn=create_tracker,
@@ -54,7 +54,7 @@ def test_read_wayland_dimmed_state_updates_existing_tracker_timeout() -> None:
     loop_state = _runtime.IdlePollLoopState()
     loop_state.wayland_idle_tracker = fake_tracker
 
-    result = _runtime._read_wayland_dimmed_state(
+    result = _runtime_sensors.read_wayland_dimmed_state(
         loop_state=loop_state,
         timeout_s=12.0,
         create_wayland_idle_tracker_fn=lambda _timeout_ms: pytest.fail("should reuse existing tracker"),  # type: ignore[return-value]
@@ -129,7 +129,6 @@ def test_run_idle_power_iteration_uses_wayland_idle_as_primary() -> None:
 
     def compute_action(**kwargs):
         captured.update(kwargs)
-        return None
 
     _runtime.run_idle_power_iteration(
         tray,
@@ -219,7 +218,7 @@ def test_read_wayland_dimmed_state_drops_broken_tracker_for_recovery() -> None:
         create_count += 1
         return _FakeWaylandIdleTracker(idle=False)
 
-    result = _runtime._read_wayland_dimmed_state(
+    result = _runtime_sensors.read_wayland_dimmed_state(
         loop_state=loop_state,
         timeout_s=10.0,
         create_wayland_idle_tracker_fn=create_tracker,
@@ -237,7 +236,7 @@ def test_read_wayland_dimmed_state_drops_broken_tracker_for_recovery() -> None:
     assert create_count == 0
 
     # On the next poll, a fresh tracker should be created.
-    result2 = _runtime._read_wayland_dimmed_state(
+    result2 = _runtime_sensors.read_wayland_dimmed_state(
         loop_state=loop_state,
         timeout_s=10.0,
         create_wayland_idle_tracker_fn=create_tracker,
@@ -280,7 +279,6 @@ def test_run_idle_power_iteration_uses_wayland_via_fallback_when_kde_dim_timeout
 
     def compute_action(**kwargs):
         captured.update(kwargs)
-        return None
 
     _runtime.run_idle_power_iteration(
         tray,
@@ -290,7 +288,9 @@ def test_run_idle_power_iteration_uses_wayland_via_fallback_when_kde_dim_timeout
         now_monotonic_fn=lambda: 100.0,
         ensure_idle_state_fn=lambda _tray: None,
         # The brightness heuristic should NOT be consulted.
-        read_dimmed_state_fn=lambda _state: pytest.fail("brightness heuristic should not fire when Wayland is available"),
+        read_dimmed_state_fn=lambda _state: pytest.fail(
+            "brightness heuristic should not fire when Wayland is available"
+        ),
         read_screen_off_state_drm_fn=lambda: False,
         debounce_dim_and_screen_off_fn=lambda **kwargs: (
             kwargs["dimmed_raw"],

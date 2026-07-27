@@ -9,6 +9,7 @@ from src.core.utils import safe_attrs
 from src.tray.controllers import _lighting_controller_helpers as lighting_controller_helpers
 from src.tray.controllers import _lighting_effect_coordination as lighting_effect_coordination
 from src.tray.controllers import _lighting_menu_handlers as lighting_menu_handlers
+from src.tray.controllers import _lighting_mode_apply as lighting_mode_apply
 from src.tray.controllers import _lighting_start_effect_boundary as lighting_start_effect_boundary
 from src.tray.controllers import secondary_static_scene, software_target_controller
 from src.tray.controllers._power import _lighting_power_policy as lighting_power_policy
@@ -177,7 +178,7 @@ def start_current_effect(
         if start_plan.is_perkey_mode:
             _run_static_effect_mode(
                 tray,
-                apply_mode=lighting_controller_helpers.apply_perkey_mode,
+                apply_mode=lighting_mode_apply.apply_perkey_mode,
                 start_brightness=start_brightness,
                 target_brightness=target_brightness,
                 fade_in=fade_in,
@@ -189,7 +190,7 @@ def start_current_effect(
         if start_plan.is_none_mode:
             _run_static_effect_mode(
                 tray,
-                apply_mode=lighting_controller_helpers.apply_uniform_none_mode,
+                apply_mode=lighting_mode_apply.apply_uniform_none_mode,
                 start_brightness=start_brightness,
                 target_brightness=target_brightness,
                 fade_in=fade_in,
@@ -264,7 +265,7 @@ def apply_power_source_perkey_profile_transition(tray: LightingTrayProtocol) -> 
     try:
         effect = lighting_controller_helpers.get_effect_name(tray)
         if effect == "perkey":
-            lighting_controller_helpers.apply_perkey_mode(
+            lighting_mode_apply.apply_perkey_mode(
                 tray,
                 brightness_override=safe_attrs.safe_int_attr(tray.config, "brightness", default=0),
                 reassert_user_mode=False,

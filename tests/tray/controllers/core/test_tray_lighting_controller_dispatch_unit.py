@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -108,9 +107,11 @@ class TestHelperBoundaries:
         tray = MagicMock()
         tray._log_exception = MagicMock(side_effect=RuntimeError("logger failed"))
 
-        with patch.object(helpers.logger, "exception") as log_exception:
-            with patch.object(helpers.logger, "error") as log_error:
-                helpers._log_tray_exception(tray, "Helper error: %s", original_exc)
+        with (
+            patch.object(helpers.logger, "exception") as log_exception,
+            patch.object(helpers.logger, "error") as log_error,
+        ):
+            helpers._log_tray_exception(tray, "Helper error: %s", original_exc)
 
         tray._log_exception.assert_called_once_with("Helper error: %s", original_exc)
         log_exception.assert_called_once()
@@ -452,7 +453,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_perkey_in_place_apply_skips_user_mode_reassertion(self):
-        from src.tray.controllers import _lighting_controller_helpers as helpers
+        from src.tray.controllers import _lighting_mode_apply as helpers
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 35
@@ -474,7 +475,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_perkey_in_place_apply_reasserts_when_backend_requires_it(self):
-        from src.tray.controllers import _lighting_controller_helpers as helpers
+        from src.tray.controllers import _lighting_mode_apply as helpers
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 35
@@ -497,7 +498,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_perkey_in_place_apply_reuses_hidden_blank_without_user_mode_reassert(self):
-        from src.tray.controllers import _lighting_controller_helpers as helpers
+        from src.tray.controllers import _lighting_mode_apply as helpers
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 35
@@ -522,7 +523,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_perkey_in_place_apply_uses_hardware_blank_hints_without_requery(self):
-        from src.tray.controllers import _lighting_controller_helpers as helpers
+        from src.tray.controllers import _lighting_mode_apply as helpers
         from src.tray.protocols import set_idle_power_state_field
 
         mock_tray = MagicMock()
@@ -691,9 +692,11 @@ class TestStartCurrentEffect:
         mock_tray.engine.start_effect = MagicMock(side_effect=original_exc)
         mock_tray._log_exception = MagicMock(side_effect=RuntimeError("logger failed"))
 
-        with patch("src.tray.controllers.lighting_controller.logger.exception") as log_exception:
-            with patch("src.tray.controllers.lighting_controller.logger.error") as log_error:
-                start_current_effect(mock_tray)
+        with (
+            patch("src.tray.controllers.lighting_controller.logger.exception") as log_exception,
+            patch("src.tray.controllers.lighting_controller.logger.error") as log_error,
+        ):
+            start_current_effect(mock_tray)
 
         mock_tray._log_exception.assert_called_once_with("Error starting effect: %s", original_exc)
         log_exception.assert_called_once()
@@ -764,9 +767,11 @@ class TestStartCurrentEffect:
             raise RuntimeError("hardware error")
         except RuntimeError as raised_exc:
             original_exc = raised_exc
-            with patch("src.tray.controllers.lighting_controller.logger.exception") as log_exception:
-                with patch("src.tray.controllers.lighting_controller.logger.error") as log_error:
-                    _log_boundary_exception(tray, "Error starting effect: %s", original_exc)
+            with (
+                patch("src.tray.controllers.lighting_controller.logger.exception") as log_exception,
+                patch("src.tray.controllers.lighting_controller.logger.error") as log_error,
+            ):
+                _log_boundary_exception(tray, "Error starting effect: %s", original_exc)
 
         assert original_exc is not None
         tray._log_exception.assert_called_once_with("Error starting effect: %s", original_exc)
@@ -859,7 +864,7 @@ class TestPowerSourcePerkeyProfileTransition:
                 "src.tray.controllers.lighting_controller.lighting_controller_helpers.get_effect_name",
                 return_value="perkey",
             ),
-            patch("src.tray.controllers.lighting_controller.lighting_controller_helpers.apply_perkey_mode") as apply_mode,
+            patch("src.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
         ):
             handled = apply_power_source_perkey_profile_transition(mock_tray)
 
@@ -900,7 +905,7 @@ class TestPowerSourcePerkeyProfileTransition:
         mock_tray.config.effect = "perkey"
 
         with (
-            patch("src.tray.controllers.lighting_controller.lighting_controller_helpers.apply_perkey_mode") as apply_mode,
+            patch("src.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
             patch(
                 "src.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
             ) as set_sw_state,
@@ -926,7 +931,7 @@ class TestPowerSourcePerkeyProfileTransition:
                 "src.tray.controllers.lighting_controller.lighting_controller_helpers.is_software_effect",
                 return_value=False,
             ),
-            patch("src.tray.controllers.lighting_controller.lighting_controller_helpers.apply_perkey_mode") as apply_mode,
+            patch("src.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
             patch(
                 "src.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
             ) as set_sw_state,

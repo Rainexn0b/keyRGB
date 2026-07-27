@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+import src.core.power.system._apply as system_apply
 import src.core.power.system.modes as system_modes
 from src.core.power.system import PowerMode, get_status, is_supported, set_mode
 
@@ -158,9 +159,7 @@ def test_get_status_reports_performance_for_balance_performance_epp(
     assert get_status().mode == PowerMode.PERFORMANCE
 
 
-def test_get_status_reports_performance_for_mixed_epp_policies(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_get_status_reports_performance_for_mixed_epp_policies(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """On heterogeneous CPUs different policies may have different EPP values
     after PERFORMANCE application (e.g. 'performance' on P-cores,
     'balance_performance' on E-cores)."""
@@ -226,7 +225,7 @@ def test_apply_mode_sysfs_uses_epp_preferences_for_amd_pstate(monkeypatch: pytes
 
     monkeypatch.setattr(system_modes, "_set_boost_enabled", lambda enabled: None)
 
-    system_modes._apply_mode_sysfs(
+    system_apply._apply_mode_sysfs(
         PowerMode.EXTREME_SAVER,
         root=root,
         extreme_cap_khz=1_004_000,
@@ -237,7 +236,7 @@ def test_apply_mode_sysfs_uses_epp_preferences_for_amd_pstate(monkeypatch: pytes
     assert int((policy / "scaling_min_freq").read_text(encoding="utf-8").strip()) == 1_004_000
     assert int((policy / "scaling_max_freq").read_text(encoding="utf-8").strip()) == 1_004_000
 
-    system_modes._apply_mode_sysfs(
+    system_apply._apply_mode_sysfs(
         PowerMode.BALANCED,
         root=root,
         extreme_cap_khz=1_004_000,
@@ -248,7 +247,7 @@ def test_apply_mode_sysfs_uses_epp_preferences_for_amd_pstate(monkeypatch: pytes
     assert int((policy / "scaling_min_freq").read_text(encoding="utf-8").strip()) == 600_000
     assert int((policy / "scaling_max_freq").read_text(encoding="utf-8").strip()) == 3_000_000
 
-    system_modes._apply_mode_sysfs(
+    system_apply._apply_mode_sysfs(
         PowerMode.PERFORMANCE,
         root=root,
         extreme_cap_khz=1_004_000,
@@ -260,9 +259,7 @@ def test_apply_mode_sysfs_uses_epp_preferences_for_amd_pstate(monkeypatch: pytes
     assert int((policy / "scaling_max_freq").read_text(encoding="utf-8").strip()) == 3_000_000
 
 
-def test_apply_mode_sysfs_rereads_epp_after_governor_change(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_apply_mode_sysfs_rereads_epp_after_governor_change(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     root = tmp_path / "cpufreq"
     policy = _make_policy(root, "policy0", max_khz=3000000, min_khz=600000)
     _add_epp_files(policy, current_pref="performance", available_prefs="performance")
@@ -277,7 +274,7 @@ def test_apply_mode_sysfs_rereads_epp_after_governor_change(
     monkeypatch.setattr(system_modes, "_available_epp_preferences", dynamic_epp_preferences)
     monkeypatch.setattr(system_modes, "_set_boost_enabled", lambda enabled: None)
 
-    system_modes._apply_mode_sysfs(
+    system_apply._apply_mode_sysfs(
         PowerMode.EXTREME_SAVER,
         root=root,
         extreme_cap_khz=1_004_000,
@@ -311,7 +308,7 @@ def test_apply_mode_sysfs_enables_boost_before_restoring_performance_cap(
     monkeypatch.setattr(system_modes, "_set_boost_enabled", fake_set_boost_enabled)
     monkeypatch.setattr(system_modes, "_write_text", fake_write_text)
 
-    system_modes._apply_mode_sysfs(
+    system_apply._apply_mode_sysfs(
         PowerMode.PERFORMANCE,
         root=root,
         extreme_cap_khz=1_004_000,
@@ -343,7 +340,7 @@ def test_apply_mode_sysfs_reorders_min_max_writes_for_extreme_target_changes(
     monkeypatch.setattr(system_modes, "_set_boost_enabled", lambda enabled: None)
     monkeypatch.setattr(system_modes, "_write_text", guarded_write_text)
 
-    system_modes._apply_mode_sysfs(
+    system_apply._apply_mode_sysfs(
         PowerMode.EXTREME_SAVER,
         root=root,
         extreme_cap_khz=1_004_000,
@@ -351,7 +348,7 @@ def test_apply_mode_sysfs_reorders_min_max_writes_for_extreme_target_changes(
     assert int((policy / "scaling_min_freq").read_text(encoding="utf-8").strip()) == 1_004_000
     assert int((policy / "scaling_max_freq").read_text(encoding="utf-8").strip()) == 1_004_000
 
-    system_modes._apply_mode_sysfs(
+    system_apply._apply_mode_sysfs(
         PowerMode.EXTREME_SAVER,
         root=root,
         extreme_cap_khz=1_709_000,
@@ -383,8 +380,8 @@ def test_set_mode_falls_back_to_helper_on_sysfs_oserror(monkeypatch: pytest.Monk
         helper_calls.append((mode, extreme_cap_khz, allow_interactive))
         return True
 
-    monkeypatch.setattr(system_modes, "_apply_mode_sysfs", raise_oserror)
-    monkeypatch.setattr(system_modes, "_run_privileged_helper", fake_helper)
+    monkeypatch.setattr(system_apply, "_apply_mode_sysfs", raise_oserror)
+    monkeypatch.setattr(system_apply, "_run_privileged_helper", fake_helper)
 
     assert set_mode(PowerMode.BALANCED) is True
     assert helper_calls == [(PowerMode.BALANCED, 1_250_000, True)]
@@ -397,13 +394,13 @@ def test_set_mode_returns_true_when_direct_writes_succeed_regardless_of_observed
     helper_calls: list[tuple[PowerMode, int, bool]] = []
 
     monkeypatch.setattr(system_modes, "configured_extreme_saver_cap_khz", lambda: 1_250_000)
-    monkeypatch.setattr(system_modes, "_apply_mode_sysfs", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(system_apply, "_apply_mode_sysfs", lambda *_args, **_kwargs: None)
 
     def fake_helper(mode: PowerMode, *, extreme_cap_khz: int, allow_interactive: bool = True) -> bool:
         helper_calls.append((mode, extreme_cap_khz, allow_interactive))
         return True
 
-    monkeypatch.setattr(system_modes, "_run_privileged_helper", fake_helper)
+    monkeypatch.setattr(system_apply, "_run_privileged_helper", fake_helper)
 
     assert set_mode(PowerMode.PERFORMANCE, allow_interactive=False) is True
     # Direct writes succeeded, so helper should not have been called.
@@ -421,7 +418,7 @@ def test_set_mode_returns_true_when_helper_succeeds_regardless_of_observed_mode(
     def raise_permission_error(_mode: PowerMode, *, root: Path, extreme_cap_khz: int) -> None:
         raise PermissionError("sysfs write denied")
 
-    monkeypatch.setattr(system_modes, "_apply_mode_sysfs", raise_permission_error)
+    monkeypatch.setattr(system_apply, "_apply_mode_sysfs", raise_permission_error)
     monkeypatch.setattr(
         system_modes,
         "get_status",
@@ -437,7 +434,7 @@ def test_set_mode_returns_true_when_helper_succeeds_regardless_of_observed_mode(
         helper_calls.append((mode, extreme_cap_khz, allow_interactive))
         return True
 
-    monkeypatch.setattr(system_modes, "_run_privileged_helper", fake_helper)
+    monkeypatch.setattr(system_apply, "_run_privileged_helper", fake_helper)
 
     assert set_mode(PowerMode.PERFORMANCE, allow_interactive=False) is True
     assert helper_calls == [(PowerMode.PERFORMANCE, 1_250_000, False)]
@@ -459,11 +456,11 @@ def test_run_privileged_helper_uses_pkexec_disable_internal_agent_when_nonintera
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
     monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
-    monkeypatch.setattr(system_modes.shutil, "which", fake_which)
-    monkeypatch.setattr(system_modes.subprocess, "run", fake_run)
+    monkeypatch.setattr(system_apply.shutil, "which", fake_which)
+    monkeypatch.setattr(system_apply.subprocess, "run", fake_run)
 
     assert (
-        system_modes._run_privileged_helper(
+        system_apply._run_privileged_helper(
             PowerMode.EXTREME_SAVER,
             extreme_cap_khz=1_400_000,
             allow_interactive=False,
@@ -486,7 +483,7 @@ def test_run_privileged_helper_uses_pkexec_disable_internal_agent_when_nonintera
             "extreme-saver",
             "--extreme-cap-khz",
             "1400000",
-        ]
+        ],
     ]
 
 
@@ -506,11 +503,11 @@ def test_run_privileged_helper_skips_pkexec_when_noninteractive_keyrgb_action_re
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
     monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
-    monkeypatch.setattr(system_modes.shutil, "which", fake_which)
-    monkeypatch.setattr(system_modes.subprocess, "run", fake_run)
+    monkeypatch.setattr(system_apply.shutil, "which", fake_which)
+    monkeypatch.setattr(system_apply.subprocess, "run", fake_run)
 
     assert (
-        system_modes._run_privileged_helper(
+        system_apply._run_privileged_helper(
             PowerMode.EXTREME_SAVER,
             extreme_cap_khz=1_400_000,
             allow_interactive=False,
@@ -555,11 +552,11 @@ def test_run_privileged_helper_falls_back_to_sudo_n_when_noninteractive_pkexec_f
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
     monkeypatch.setattr(system_modes.os, "getpid", lambda: 12345)
-    monkeypatch.setattr(system_modes.shutil, "which", fake_which)
-    monkeypatch.setattr(system_modes.subprocess, "run", fake_run)
+    monkeypatch.setattr(system_apply.shutil, "which", fake_which)
+    monkeypatch.setattr(system_apply.subprocess, "run", fake_run)
 
     assert (
-        system_modes._run_privileged_helper(
+        system_apply._run_privileged_helper(
             PowerMode.EXTREME_SAVER,
             extreme_cap_khz=1_400_000,
             allow_interactive=False,
@@ -610,11 +607,11 @@ def test_run_privileged_helper_uses_sudo_noninteractive_flag_when_needed(
         return None
 
     monkeypatch.setattr(system_modes.os, "geteuid", lambda: 1000)
-    monkeypatch.setattr(system_modes.shutil, "which", fake_which)
-    monkeypatch.setattr(system_modes.subprocess, "run", fake_run)
+    monkeypatch.setattr(system_apply.shutil, "which", fake_which)
+    monkeypatch.setattr(system_apply.subprocess, "run", fake_run)
 
     assert (
-        system_modes._run_privileged_helper(
+        system_apply._run_privileged_helper(
             PowerMode.BALANCED,
             extreme_cap_khz=1_400_000,
             allow_interactive=False,
@@ -645,8 +642,8 @@ def test_set_mode_propagates_unexpected_runtime_errors(monkeypatch: pytest.Monke
         helper_calls.append((mode, extreme_cap_khz, allow_interactive))
         return True
 
-    monkeypatch.setattr(system_modes, "_apply_mode_sysfs", raise_runtime_error)
-    monkeypatch.setattr(system_modes, "_run_privileged_helper", fake_helper)
+    monkeypatch.setattr(system_apply, "_apply_mode_sysfs", raise_runtime_error)
+    monkeypatch.setattr(system_apply, "_run_privileged_helper", fake_helper)
 
     with pytest.raises(RuntimeError, match="unexpected bug"):
         set_mode(PowerMode.BALANCED)

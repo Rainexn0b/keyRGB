@@ -8,6 +8,7 @@ from src.tray.controllers._lighting_controller_helpers import (
 )
 from src.tray.protocols import ConfigPollingTrayProtocol, LightingTrayProtocol
 
+from . import _apply_callbacks as apply_callbacks
 from . import helpers
 
 FastPathChangeKind = Literal[
@@ -136,7 +137,7 @@ def apply_fast_path_change(
 
     if change_kind == "target_only":
         try:
-            helpers._sync_software_target_policy(tray, current)
+            apply_callbacks._sync_software_target_policy(tray, current)
         except _FAST_PATH_EXECUTION_EXCEPTIONS:
             pass
         return True

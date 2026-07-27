@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import ClassVar
 from unittest.mock import MagicMock
 
 from src.tray.pollers.config_polling import (
@@ -9,7 +10,7 @@ from src.tray.pollers.config_polling import (
     _maybe_apply_fast_path,
     _state_for_log,
 )
-from src.tray.pollers.config_polling_internal.helpers import _sync_reactive
+from src.tray.pollers.config_polling_internal._apply_callbacks import _sync_reactive
 
 
 def test_compute_config_apply_state_perkey_sig_handles_unorderable_items() -> None:
@@ -34,7 +35,7 @@ def test_compute_config_apply_state_handles_property_exceptions() -> None:
         effect = "rainbow_wave"
         speed = 1
         brightness = 2
-        per_key_colors = {}
+        per_key_colors: ClassVar[dict[object, object]] = {}
 
         @property
         def reactive_use_manual_color(self):
