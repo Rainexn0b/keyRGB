@@ -79,12 +79,14 @@ def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
 
 def test_queued_restore_seed_survives_engine_state_reset() -> None:
     """Pre-start queue must re-apply after stop()-style ReactiveRenderState()."""
+    from src.core.effects.reactive._reactive_restore_seed import (
+        apply_queued_reactive_restore_seed,
+        seed_reactive_restore_windows,
+    )
     from src.core.effects.reactive._render_brightness_support import (
         ReactiveRenderState,
         ReactiveRestorePhase,
-        apply_queued_reactive_restore_seed,
         ensure_reactive_state,
-        seed_reactive_restore_windows,
     )
 
     eng = _DummyEngine(brightness=20, reactive_brightness=50)

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from . import _render_brightness_support as _support
 from ._constants import UNIFORM_PULSE_HW_LIFT_STREAK_MIN
+from ._render_brightness_debug import log_hw_lift_decision_change
 from ._render_brightness_guard import apply_brightness_step_guard
 from ._render_brightness_transition import (
     _clear_transition_state,
@@ -163,7 +164,7 @@ def _resolve_hw_brightness_with_pulse_mix(
         elif allow_pulse_hw_lift:
             reason = "allowed"
 
-    _support.log_hw_lift_decision_change(
+    log_hw_lift_decision_change(
         engine,
         logger=logger,
         reason=reason,

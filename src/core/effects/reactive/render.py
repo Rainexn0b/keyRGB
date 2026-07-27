@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import build_full_color_grid
 
-from . import _render_brightness_support as _support
 from ._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
 from ._render_brightness import (
     resolve_brightness as _resolve_brightness_impl,
@@ -19,6 +18,7 @@ from ._render_brightness import (
 from ._render_brightness import (
     resolve_reactive_transition_visual_scale as _resolve_reactive_transition_visual_scale_impl,
 )
+from ._render_brightness_debug import log_pulse_visual_scale_change
 from ._render_post_restore import (
     post_restore_frame_scale as _post_restore_frame_scale,
 )
@@ -167,7 +167,7 @@ def pulse_brightness_scale_factor(engine: EffectsEngine) -> float:
         target_hw = _steady_target_hw_brightness(engine, base=base)
         visual_hw = min(int(hw), int(target_hw))
         if visual_hw <= 0:
-            _support.log_pulse_visual_scale_change(
+            log_pulse_visual_scale_change(
                 engine,
                 logger=logger,
                 base=base,
@@ -192,7 +192,7 @@ def pulse_brightness_scale_factor(engine: EffectsEngine) -> float:
 
         if eff <= visual_hw:
             final_scale = float(pulse_scale) * float(post_restore_damp)
-            _support.log_pulse_visual_scale_change(
+            log_pulse_visual_scale_change(
                 engine,
                 logger=logger,
                 base=base,
@@ -217,7 +217,7 @@ def pulse_brightness_scale_factor(engine: EffectsEngine) -> float:
             final_scale = baseline_scale + ((pulse_scale - baseline_scale) * float(post_restore_damp))
         else:
             final_scale = float(pulse_scale) * float(post_restore_damp)
-        _support.log_pulse_visual_scale_change(
+        log_pulse_visual_scale_change(
             engine,
             logger=logger,
             base=base,

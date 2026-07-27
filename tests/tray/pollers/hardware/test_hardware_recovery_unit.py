@@ -693,7 +693,7 @@ def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None
 
     # Patch the late import target so the damp-seeding helper picks it up.
     monkeypatch.setattr(
-        "src.core.effects.reactive._render_brightness_support.seed_reactive_restore_windows",
+        "src.core.effects.reactive._reactive_restore_seed.seed_reactive_restore_windows",
         _fake_seed,
     )
 
@@ -743,7 +743,7 @@ def test_execute_blank_recovery_skips_damp_for_non_reactive_effects(monkeypatch)
         seeded.append(float(fade_in_duration_s))
 
     monkeypatch.setattr(
-        "src.core.effects.reactive._render_brightness_support.seed_reactive_restore_windows",
+        "src.core.effects.reactive._reactive_restore_seed.seed_reactive_restore_windows",
         _fake_seed,
     )
 

@@ -14,6 +14,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from . import _render_brightness_support as _support
+from ._reactive_transition_atomic import clear_transition_atomic, read_transition_atomic
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -83,7 +84,7 @@ def _resolve_reactive_transition_progress(
     started_at: object
     duration_s: object
     if lock is not None:
-        start, end, started_at, duration_s = _support.read_transition_atomic(state, lock)
+        start, end, started_at, duration_s = read_transition_atomic(state, lock)
     else:
         start = _support.read_engine_attr(
             engine,
@@ -125,7 +126,7 @@ def _resolve_reactive_transition_progress(
 
     if duration <= 0.0 or start_i == end_i:
         if lock is not None:
-            _support.clear_transition_atomic(state, lock)
+            clear_transition_atomic(state, lock)
         else:
             _support.clear_transition_state(engine, logger=_LOGGER)
         return float(end_i), rising
@@ -133,7 +134,7 @@ def _resolve_reactive_transition_progress(
     elapsed = max(0.0, float(time.monotonic()) - started)
     if elapsed >= duration:
         if lock is not None:
-            _support.clear_transition_atomic(state, lock)
+            clear_transition_atomic(state, lock)
         else:
             _support.clear_transition_state(engine, logger=_LOGGER)
         return float(end_i), rising
@@ -147,6 +148,6 @@ def _clear_transition_state(engine: EffectsEngine) -> None:
     state = _support.ensure_reactive_state(engine)
     lock = getattr(engine, "reactive_lock", None)
     if lock is not None:
-        _support.clear_transition_atomic(state, lock)
+        clear_transition_atomic(state, lock)
     else:
         _support.clear_transition_state(engine, logger=_LOGGER)

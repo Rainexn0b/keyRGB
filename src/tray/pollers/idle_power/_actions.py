@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from typing import cast
 
+from src.core.effects.reactive import _reactive_transition_atomic
 from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
@@ -180,7 +181,7 @@ def _set_reactive_transition(
         state = _reactive_support.ensure_reactive_state(engine)
         lock = getattr(engine, "reactive_lock", None)
         if lock is not None:
-            _reactive_support.seed_transition_atomic(
+            _reactive_transition_atomic.seed_transition_atomic(
                 state,
                 lock,
                 from_brightness=current_i,

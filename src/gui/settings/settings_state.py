@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from src.gui.settings import _settings_scheduler as settings_scheduler
 from src.gui.settings import _settings_values as settings_values
 
 # Keep a module-level datetime binding so tests can monkeypatch
@@ -30,20 +29,6 @@ def apply_settings_values_to_config(*, config, values: SettingsValues) -> None:
         config=config,
         values=values,
         now=datetime.now(),
-    )
-
-
-_normalize_optional_power_mode = settings_values.normalize_optional_power_mode
-_load_scheduler_brightness = settings_values.load_scheduler_brightness
-_parse_scheduler_time = settings_scheduler.parse_scheduler_time
-_is_scheduler_night = settings_scheduler.is_scheduler_night
-
-
-def _active_scheduler_reactive_brightness(values: SettingsValues, *, now: datetime) -> int | None:
-    return settings_scheduler.active_scheduler_reactive_brightness(
-        values,
-        now=now,
-        clamp_brightness=clamp_brightness,
     )
 
 

@@ -13,7 +13,8 @@ from ..device import (
     PerKeyColorMap,
     acquire_keyboard,
 )
-from ..reactive._render_brightness_support import ReactiveRenderState, apply_queued_reactive_restore_seed
+from ..reactive._reactive_restore_seed import apply_queued_reactive_restore_seed
+from ..reactive._render_brightness_support import ReactiveRenderState
 from ..software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
 
 logger = logging.getLogger("src.core.effects.engine_core")

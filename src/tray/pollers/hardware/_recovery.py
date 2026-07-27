@@ -198,7 +198,7 @@ def _seed_reactive_restore_damp_best_effort(tray: IdlePowerTrayProtocol) -> None
     # graph on every interpreter start; only needed when a recovery fires.
     try:
         from src.core.effects.catalog import REACTIVE_EFFECTS
-        from src.core.effects.reactive._render_brightness_support import (
+        from src.core.effects.reactive._reactive_restore_seed import (
             seed_reactive_restore_windows,
         )
     except ImportError:

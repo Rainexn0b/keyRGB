@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.30.4 (2026-07-27)
+
+- Build/Lint: Raise the Ruff development dependency floor to `>=0.16` and clear the expanded Ruff 0.16 diagnostics without adding global suppressions.
+- Maintainability: Remove stale compatibility re-exports and private aliases across reactive brightness, settings, power management, hardware recovery, and idle-power paths. Durable public, persisted-config, and test-seam compatibility facades remain intact.
+- Testing: Retarget reactive and recovery tests to their owning modules and preserve coverage for restore seeding and atomic transition state.
+- Assets: Refresh tray screenshots for the current capability-aware menu layout and hardware/effect controls.
+
 ## 0.30.3 (2026-07-26)
 
 - Tray/Hardware-Poll: Fix reactive typing brightness flashes on ite8291r3 by adding a consecutive-attempt circuit breaker to the stable-zero-brightness recovery path. Some ITE controllers (notably ite8291r3 on Tongfang hardware with PID `0x600b`) persistently report brightness=0 with `is_off=False` as a documented firmware transient. The old code attempted a full effect restart on every cooldown cycle (~6 s apart), wiping the reactive restore damp on each restart and causing a deck-wide flash on the first post-restart keystroke. The circuit breaker allows the first 2 genuine recovery attempts through, then switches to a 60 s backoff so the keyboard is no longer restart-spammed. The consecutive-attempt counter resets automatically when a non-zero hardware read is observed.

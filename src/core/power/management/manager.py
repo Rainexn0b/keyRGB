@@ -58,13 +58,6 @@ start_sysfs_lid_monitoring = _manager_runtime_deps.start_sysfs_lid_monitoring
 get_active_perkey_profile = perkey_profiles.get_active_profile
 list_perkey_profiles = perkey_profiles.list_profiles
 
-# Re-export helpers/classifier for battery-saver monkeypatch seams.
-# (apply_power_source_actions / build_power_source_loop_inputs /
-# classify_power_source_iteration already imported above.)
-
-# Re-export battery-saver poll interval for tests/monkeypatches.
-_DEFAULT_POWER_SOURCE_POLL_INTERVAL_S = _battery_saver._DEFAULT_POWER_SOURCE_POLL_INTERVAL_S
-
 
 def activate_perkey_profile(tray: object, profile_name: str) -> None:
     profile_runtime_activation.activate_perkey_profile_runtime(

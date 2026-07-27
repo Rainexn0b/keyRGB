@@ -7,9 +7,8 @@ This module owns the "seed" abstraction used to propagate restore damp
 timers across the ``ReactiveRenderState`` reset that ``engine.stop()``
 triggers. Without it, the render thread's first frames after a restart
 would race the post-start seeding and lose the damp window, causing a
-bright flash on idle wake. The parent module re-exports these names so
-existing import paths and module-attribute access
-(``_support.seed_reactive_restore_windows`` etc.) keep working.
+bright flash on idle wake. Callers import these helpers from this module
+directly.
 """
 
 from __future__ import annotations

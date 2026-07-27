@@ -11,7 +11,7 @@ from src.core.effects.transitions import avoid_full_black
 from src.core.utils.exceptions import is_device_disconnected
 from src.core.utils.logging_utils import log_throttled
 
-from . import _render_brightness_support as _brightness_support
+from ._render_brightness_debug import log_render_visual_scale_change
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -94,7 +94,7 @@ def render_per_key_frame(
         with engine.kb_lock:
             _, _, brightness_hw = resolve_brightness(engine)
             transition_visual_scale = resolve_transition_visual_scale(engine)
-            _brightness_support.log_render_visual_scale_change(
+            log_render_visual_scale_change(
                 engine,
                 logger=logger,
                 brightness_hw=brightness_hw,

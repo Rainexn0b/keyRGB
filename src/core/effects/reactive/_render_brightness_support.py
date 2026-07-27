@@ -316,28 +316,3 @@ def clear_transition_state(engine: object, *, logger: logging.Logger) -> None:
             logger=logger,
             message="Reactive brightness failed to clear engine attribute %s",
         )
-
-
-# Re-exports for stable import path. Extracted to sibling modules
-# (WS1 / A4 slice 1) for LOC discipline; kept re-exported here so existing
-# module-attribute access (``_support.seed_transition_atomic`` etc.) and
-# direct imports keep working without churn across callers.
-# Re-export debug log helpers for stable import path (split for LOC / D14).
-from . import _render_brightness_debug as _debug
-from ._reactive_restore_seed import (  # noqa: F401
-    ReactiveRestoreSeed,
-    apply_queued_reactive_restore_seed,
-    apply_reactive_restore_seed,
-    build_reactive_restore_seed,
-    queue_reactive_restore_seed,
-    seed_reactive_restore_windows,
-)
-from ._reactive_transition_atomic import (  # noqa: F401
-    clear_transition_atomic,
-    read_transition_atomic,
-    seed_transition_atomic,
-)
-
-log_hw_lift_decision_change = _debug.log_hw_lift_decision_change
-log_pulse_visual_scale_change = _debug.log_pulse_visual_scale_change
-log_render_visual_scale_change = _debug.log_render_visual_scale_change

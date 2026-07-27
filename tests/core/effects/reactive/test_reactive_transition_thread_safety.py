@@ -4,11 +4,11 @@ See improvement plan Item 1 — thread safety for ReactiveRenderState transition
 """
 import threading
 
-from src.core.effects.reactive._render_brightness_support import (
+from src.core.effects.reactive._reactive_transition_atomic import (
     ReactiveRenderState,
-    seed_transition_atomic,
-    read_transition_atomic,
     clear_transition_atomic,
+    read_transition_atomic,
+    seed_transition_atomic,
 )
 
 
@@ -66,7 +66,7 @@ class TestTransitionAtomicOperations:
 
         def reader():
             for _ in range(ITERATIONS * 10):
-                from_b, to_b, started, duration = read_transition_atomic(state, lock)
+                from_b, to_b, _started, _duration = read_transition_atomic(state, lock)
                 if from_b is not None and to_b is not None:
                     pass
 

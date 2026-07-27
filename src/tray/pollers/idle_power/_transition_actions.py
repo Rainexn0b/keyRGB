@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Protocol, cast
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET
+from src.core.effects.reactive import _reactive_restore_seed
 from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.protocols import (
@@ -60,7 +61,7 @@ def _seed_reactive_restore_windows(engine: object, *, fade_in_duration_s: float)
     if engine is None:
         return
     try:
-        _reactive_support.seed_reactive_restore_windows(
+        _reactive_restore_seed.seed_reactive_restore_windows(
             cast(object, engine),
             fade_in_duration_s=float(fade_in_duration_s),
         )
