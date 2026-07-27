@@ -3,10 +3,9 @@ from __future__ import annotations
 import array
 import fcntl
 import os
-from pathlib import Path
 import struct
+from pathlib import Path
 from typing import Any
-
 
 HID_MAX_DESCRIPTOR_SIZE = 4096
 
@@ -79,7 +78,7 @@ def read_hidraw_report_descriptor(devnode: Path) -> dict[str, Any] | None:
 
     flags = os.O_RDONLY
     if hasattr(os, "O_CLOEXEC"):
-        flags |= int(getattr(os, "O_CLOEXEC"))
+        flags |= int(os.O_CLOEXEC)
 
     fd: int | None = None
     try:

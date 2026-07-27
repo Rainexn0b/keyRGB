@@ -5,10 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
+
 from src.core import secondary_lighting_state
 from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT, SecondaryDeviceRoute
 from src.core.secondary_device_runtime import EffectiveSecondaryRoute, iter_effective_secondary_routes
-
 
 RGB = secondary_lighting_state.RGB
 

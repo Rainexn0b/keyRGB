@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 import os
 import time
+from collections.abc import Callable
 from threading import RLock
-from typing import Callable
 
 from ..device import KeyboardDeviceProtocol
 from ..transitions import choose_steps
@@ -20,14 +20,14 @@ def _debug_brightness_enabled() -> bool:
     return os.environ.get("KEYRGB_DEBUG_BRIGHTNESS") == "1"
 
 
-def _brightness_fade_token_or_default(engine: "_EngineBrightness", *, default: int) -> int:
+def _brightness_fade_token_or_default(engine: _EngineBrightness, *, default: int) -> int:
     try:
         return int(engine._brightness_fade_token)
     except AttributeError:
         return default
 
 
-def _device_available_or_default(engine: "_EngineBrightness", *, default: bool) -> bool:
+def _device_available_or_default(engine: _EngineBrightness, *, default: bool) -> bool:
     try:
         return bool(engine.device_available)
     except AttributeError:
@@ -107,7 +107,7 @@ class _EngineBrightness:
                     logger.exception("Failed to compare brightness fade token")
                     return
                 t = float(i) / float(steps)
-                val = int(round(s + (e - s) * t))
+                val = round(s + (e - s) * t)
                 if val == s:
                     continue
                 with self.kb_lock:
@@ -184,7 +184,7 @@ class _EngineBrightness:
             try:
                 prev = int(self.brightness)
             except _INT_ATTR_ERRORS:
-                prev = prev
+                pass  # keep fallback value from default arg
 
             self.brightness = int(target)
 

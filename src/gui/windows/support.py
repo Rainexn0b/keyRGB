@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
 import logging
 import os
+
 from . import _support_window_runtime_deps
 from ._support import _support_window_geometry
-
 
 tk = _support_window_runtime_deps.tk
 filedialog = _support_window_runtime_deps.filedialog

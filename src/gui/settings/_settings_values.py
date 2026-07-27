@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from src.core.power.system import PowerMode
 from src.core.resources.layouts.catalog import VALID_LAYOUT_IDS
@@ -244,7 +244,7 @@ def apply_settings_values_to_config(
     config.night_base_brightness = max(0, min(50, int(values.night_base_brightness)))
     config.night_reactive_brightness = max(0, min(50, int(values.night_reactive_brightness)))
 
-    clock = datetime.now() if now is None else now
+    clock = datetime.now(timezone.utc) if now is None else now
     active_reactive_brightness = settings_scheduler.active_scheduler_reactive_brightness(
         values,
         now=clock,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-
 _LAYER_STATE_EXCEPTIONS = (AttributeError, LookupError, RuntimeError, TypeError, ValueError)
 
 

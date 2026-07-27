@@ -17,7 +17,6 @@ from src.core.utils.safe_attrs import safe_int_attr
 from ..support import build_backend_speed_probe_plans
 from ._backends_sysfs import sysfs_led_candidates_snapshot, sysfs_mouse_candidates_snapshot
 
-
 logger = logging.getLogger(__name__)
 
 _BACKEND_METADATA_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
@@ -138,7 +137,7 @@ def _probe_backend(backend: object) -> dict[str, Any]:
             confidence = safe_int_attr(result, "confidence", default=0)
             identifiers = getattr(result, "identifiers", None)
         else:
-            available = bool(getattr(backend, "is_available")())
+            available = bool(getattr(backend, "is_available")())  # noqa: B009 - backend capability is duck-typed
             reason = "is_available"
             confidence = 50 if available else 0
             identifiers = None

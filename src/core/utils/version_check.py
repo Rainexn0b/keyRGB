@@ -3,7 +3,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 _VERSION_LIKE_RE = re.compile(r"v?\d+(?:\.\d+){1,3}(?:a\d+|b\d+|rc\d+)?", re.IGNORECASE)
 _PRE_RE = re.compile(r"^(?P<main>\d+(?:\.\d+)*)(?:(?P<pre>a|b|rc)(?P<pre_n>\d+))?$", re.IGNORECASE)
 

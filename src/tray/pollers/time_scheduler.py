@@ -7,17 +7,18 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from src.core.brightness_layers import SchedulerBrightnessState
-from src.core.brightness_layers import compose_power_source_brightness_overrides
-from src.core.brightness_layers import is_scheduler_night
-from src.core.brightness_layers import parse_scheduler_time
-from src.core.brightness_layers import resolve_scheduler_brightness_state
+from src.core.brightness_layers import (
+    SchedulerBrightnessState,
+    compose_power_source_brightness_overrides,
+    is_scheduler_night,
+    parse_scheduler_time,
+    resolve_scheduler_brightness_state,
+)
 from src.core.power.monitoring.power_supply_sysfs import read_on_ac_power
 from src.tray.controllers._brightness_layer import apply_layered_brightness_update
 from src.tray.controllers._lighting_controller_helpers import _log_tray_exception, try_log_event
 from src.tray.controllers.lighting_controller import start_current_effect
 from src.tray.idle_power_state import is_system_forced_off, is_user_forced_off
-
 
 if TYPE_CHECKING:
     from src.tray.protocols import LightingTrayProtocol
@@ -101,7 +102,7 @@ def _is_night(now: datetime, day_start: tuple[int, int], night_start: tuple[int,
 def _run_scheduler_iteration(tray: LightingTrayProtocol) -> None:
     state = resolve_scheduler_brightness_state(
         tray.config,
-        now=datetime.now(),
+        now=datetime.now(),  # noqa: DTZ005 – local time is intentional for day/night scheduling
         power_management_enabled=bool(getattr(tray.config, "power_management_enabled", True)),
     )
     if not state.enabled:
@@ -171,8 +172,8 @@ def _scheduler_loop(
                             ),
                         )
                         last_applied_key = apply_key
-        except _SCHEDULER_RUNTIME_EXCEPTIONS as exc:
-            logger.error("Time-scheduler iteration error: %s", exc, exc_info=True)
+        except _SCHEDULER_RUNTIME_EXCEPTIONS:
+            logger.exception("Time-scheduler iteration error")
 
         sleep_fn(60.0)
 

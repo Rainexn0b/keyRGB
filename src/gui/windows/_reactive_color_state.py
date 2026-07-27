@@ -33,7 +33,7 @@ def read_reactive_brightness_percent(config: object, *, logger: logging.Logger) 
             exc_info=True,
         )
         return None
-    return max(0, min(100, int(round(hw * 2))))
+    return max(0, min(100, round(hw * 2)))
 
 
 def sync_reactive_brightness_widgets(
@@ -82,16 +82,16 @@ def commit_color_to_config(
     logger: logging.Logger,
 ) -> None:
     try:
-        setattr(config, "reactive_use_manual_color", True)
+        config.reactive_use_manual_color = True
         use_manual_var.set(True)
-        setattr(config, "reactive_color", color)
+        config.reactive_color = color
     except (AttributeError, OSError, RuntimeError, TypeError, ValueError, tk_error):
         logger.debug("Failed to save reactive_color", exc_info=True)
 
 
 def commit_brightness_to_config(
     config: object,
-    brightness_percent: float | int | None,
+    brightness_percent: float | None,
     *,
     logger: logging.Logger,
 ) -> int | None:
@@ -103,9 +103,9 @@ def commit_brightness_to_config(
         return None
 
     pct = max(0.0, min(100.0, pct))
-    hw = int(round(pct / 2.0))
+    hw = round(pct / 2.0)
     try:
-        setattr(config, "reactive_brightness", hw)
+        config.reactive_brightness = hw
     except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
         logger.debug("Failed to save brightness", exc_info=True)
         return None
@@ -145,7 +145,7 @@ def sync_reactive_trail_widgets(
 
 def commit_trail_to_config(
     config: object,
-    trail_percent: float | int | None,
+    trail_percent: float | None,
     *,
     logger: logging.Logger,
 ) -> int | None:
@@ -157,9 +157,9 @@ def commit_trail_to_config(
         return None
 
     pct = max(1.0, min(100.0, pct))
-    hw = int(round(pct))
+    hw = round(pct)
     try:
-        setattr(config, "reactive_trail_percent", hw)
+        config.reactive_trail_percent = hw
     except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
         logger.debug("Failed to save reactive trail percent", exc_info=True)
         return None

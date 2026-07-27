@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import Enum
 import logging
 import os
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from enum import Enum
 from operator import attrgetter
-from typing import Callable
 
 _LOGGER = logging.getLogger(__name__)
 _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
@@ -106,7 +106,7 @@ def ensure_reactive_state(engine: object) -> ReactiveRenderState:
         _copy_reactive_state_attrs(state, hydrated)
     _copy_reactive_state_attrs(engine, hydrated)
     try:
-        setattr(engine, "_reactive_state", hydrated)
+        setattr(engine, "_reactive_state", hydrated)  # noqa: B010 - engine state is intentionally duck-typed
     except (AttributeError, TypeError, ValueError):
         pass
     return hydrated
@@ -216,7 +216,7 @@ def set_engine_attr(
 
 def keyboard_or_none(engine: object) -> object | None:
     try:
-        return getattr(engine, "kb")
+        return getattr(engine, "kb")  # noqa: B009 - engine is intentionally duck-typed
     except AttributeError:
         return None
 
@@ -322,7 +322,9 @@ def clear_transition_state(engine: object, *, logger: logging.Logger) -> None:
 # (WS1 / A4 slice 1) for LOC discipline; kept re-exported here so existing
 # module-attribute access (``_support.seed_transition_atomic`` etc.) and
 # direct imports keep working without churn across callers.
-from ._reactive_restore_seed import (  # noqa: E402,F401
+# Re-export debug log helpers for stable import path (split for LOC / D14).
+from . import _render_brightness_debug as _debug
+from ._reactive_restore_seed import (  # noqa: F401
     ReactiveRestoreSeed,
     apply_queued_reactive_restore_seed,
     apply_reactive_restore_seed,
@@ -330,14 +332,11 @@ from ._reactive_restore_seed import (  # noqa: E402,F401
     queue_reactive_restore_seed,
     seed_reactive_restore_windows,
 )
-from ._reactive_transition_atomic import (  # noqa: E402,F401
+from ._reactive_transition_atomic import (  # noqa: F401
     clear_transition_atomic,
     read_transition_atomic,
     seed_transition_atomic,
 )
-
-# Re-export debug log helpers for stable import path (split for LOC / D14).
-from . import _render_brightness_debug as _debug  # noqa: E402
 
 log_hw_lift_decision_change = _debug.log_hw_lift_decision_change
 log_pulse_visual_scale_change = _debug.log_pulse_visual_scale_change

@@ -16,8 +16,7 @@ def evdev_key_name_to_key_id(name: str) -> str | None:
     if not name:
         return None
     normalized_name = str(name).strip().upper()
-    if normalized_name.startswith("KEY_"):
-        normalized_name = normalized_name[4:]
+    normalized_name = normalized_name.removeprefix("KEY_")
 
     if normalized_name in SPECIAL_KEY_NAMES:
         return SPECIAL_KEY_NAMES[normalized_name]

@@ -29,7 +29,7 @@ def _monotonic() -> float:
     return float(render_module.time.monotonic())
 
 
-def post_restore_frame_scale(engine: "EffectsEngine") -> float:
+def post_restore_frame_scale(engine: EffectsEngine) -> float:
     """Whole-frame scale in [FRAME_MIN, 1] while restore damp remaining > 0."""
 
     damp, remaining_s = post_restore_visual_damp(engine)
@@ -43,7 +43,7 @@ def post_restore_frame_scale(engine: "EffectsEngine") -> float:
     return min_frame + ((1.0 - min_frame) * t)
 
 
-def post_restore_visual_damp(engine: "EffectsEngine") -> tuple[float, float]:
+def post_restore_visual_damp(engine: EffectsEngine) -> tuple[float, float]:
     """Compute the visual damp factor and remaining seconds for post-restore.
 
     After an idle wake or temp-dim restore, hardware brightness ramps up from a

@@ -14,17 +14,21 @@ from collections.abc import Mapping
 from typing import Protocol, cast
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
-from src.core.effects.catalog import is_backend_hardware_effect
-from src.core.effects.catalog import is_forced_hardware_effect
-from src.core.effects.catalog import normalize_effect_name
-from src.core.effects.catalog import strip_effect_namespace
+from src.core.effects.catalog import (
+    is_backend_hardware_effect,
+    is_forced_hardware_effect,
+    normalize_effect_name,
+    strip_effect_namespace,
+)
 from src.core.lighting_layers import has_nonempty_per_key_base
 from src.core.utils.exceptions import is_permission_denied
 from src.core.utils.safe_attrs import safe_int_attr
-from src.tray.protocols import LightingTrayProtocol
-from src.tray.controllers.software_target_controller import restore_secondary_software_targets
-from src.tray.controllers.software_target_controller import software_effect_target_routes_aux_devices
 from src.tray.controllers.secondary_static_scene import apply_secondary_static_scene
+from src.tray.controllers.software_target_controller import (
+    restore_secondary_software_targets,
+    software_effect_target_routes_aux_devices,
+)
+from src.tray.protocols import LightingTrayProtocol
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +66,7 @@ profiles: object | None
 
 try:
     # Module-level import so tests (and callers) can monkeypatch `profiles`.
-    from src.core.profile import profiles as profiles
+    from src.core.profile import profiles
 except ImportError:  # pragma: no cover
     profiles = None
 
@@ -79,7 +83,7 @@ def _notify_permission_issue_best_effort(tray: LightingTrayProtocol, exc: Except
     try:
         tray._notify_permission_issue(exc)
     except _NOTIFY_CALLBACK_RUNTIME_EXCEPTIONS as notify_exc:
-        logger.exception("Failed to notify permission issue during effect selection: %s", notify_exc)
+        logger.exception("Failed to notify permission issue during effect selection: %s", notify_exc)  # noqa: TRY401
 
 
 def _load_per_key_colors_from_profile(config) -> dict:
@@ -284,5 +288,5 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
         if is_permission_denied(exc):
             _notify_permission_issue_best_effort(tray, exc)
             return
-        logger.exception("Error applying effect selection: %s", exc)
+        logger.exception("Error applying effect selection: %s", exc)  # noqa: TRY401
         return

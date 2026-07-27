@@ -4,7 +4,7 @@ import logging
 import os
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import Optional, Protocol, TypeAlias, cast
+from typing import Protocol, TypeAlias, cast
 
 from src.core.effects.reactive._evdev_specs import keyboard_control_keys, keyboard_letter_keys
 from src.core.utils.logging_utils import log_throttled
@@ -116,7 +116,7 @@ def _read_udev_input_properties(device_path: str) -> dict[str, str]:
         return {}
 
 
-def _udev_device_is_keyboard(device_path: str) -> Optional[bool]:
+def _udev_device_is_keyboard(device_path: str) -> bool | None:
     props = _read_udev_input_properties(device_path)
     if not props:
         return None
@@ -136,7 +136,7 @@ def _evdev_device_looks_like_keyboard(dev: EvdevKeyboardDevice, evdev: _EvdevMod
     return len(key_codes & letter_keys) >= 8 and len(key_codes & control_keys) >= 3
 
 
-def evdev_key_name_to_key_id(name: str) -> Optional[str]:
+def evdev_key_name_to_key_id(name: str) -> str | None:
     """Translate evdev key names into legacy calibrated key_id strings.
 
     This remains as a thin compatibility helper for code paths that still need
@@ -146,7 +146,7 @@ def evdev_key_name_to_key_id(name: str) -> Optional[str]:
     return _input_mapping.evdev_key_name_to_key_id(name)
 
 
-def evdev_key_name_to_slot_id(name: str, *, physical_layout: str = "auto") -> Optional[str]:
+def evdev_key_name_to_slot_id(name: str, *, physical_layout: str = "auto") -> str | None:
     """Translate evdev key names into canonical physical slot ids when known."""
 
     key_id = evdev_key_name_to_key_id(name)
@@ -155,7 +155,7 @@ def evdev_key_name_to_slot_id(name: str, *, physical_layout: str = "auto") -> Op
     return _input_mapping.key_id_to_slot_id(key_id, physical_layout=physical_layout)
 
 
-def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
+def try_open_evdev_keyboards() -> EvdevKeyboardDevices | None:
     if str(os.environ.get("KEYRGB_DISABLE_EVDEV", "")).strip().lower() in {
         "1",
         "true",
@@ -215,7 +215,7 @@ def try_open_evdev_keyboards() -> Optional[EvdevKeyboardDevices]:
     return out or None
 
 
-def close_evdev_keyboards(devices: Optional[EvdevKeyboardDevices]) -> None:
+def close_evdev_keyboards(devices: EvdevKeyboardDevices | None) -> None:
     if not devices:
         return
 
@@ -268,7 +268,7 @@ def load_active_profile_slot_keymap() -> dict[str, KeyCells]:
         return {}
 
 
-def poll_keypress_slot_id(devices: Optional[EvdevKeyboardDevices]) -> Optional[str]:
+def poll_keypress_slot_id(devices: EvdevKeyboardDevices | None) -> str | None:
     if not devices:
         return None
 

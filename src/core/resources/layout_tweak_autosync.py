@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Iterable
+from collections.abc import Iterable
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 
@@ -14,7 +14,7 @@ def _median(values: list[float]) -> float:
     return float((s[mid - 1] + s[mid]) / 2.0)
 
 
-def _apply_global_factory(*, layout_tweaks: Dict[str, float], base_image_size: tuple[int, int]):
+def _apply_global_factory(*, layout_tweaks: dict[str, float], base_image_size: tuple[int, int]):
     iw, ih = base_image_size
     px = iw / 2.0
     py = ih / 2.0
@@ -39,7 +39,7 @@ def _apply_per_key(
     gy: float,
     gw: float,
     gh: float,
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
 ) -> tuple[float, float, float, float, float, float, dict[str, float]]:
     kt = dict(per_key_layout_tweaks.get(key_id, {}) or {})
     kdx = float(kt.get("dx", 0.0))
@@ -62,7 +62,7 @@ def _build_items(
     *,
     keys: Iterable[KeyDef],
     apply_global,
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
 ) -> list[dict]:
     items: list[dict] = []
     for kd in keys:
@@ -118,11 +118,11 @@ def _cluster_sorted(vals: list[dict], axis: str, thresh: float) -> list[list[dic
     return out
 
 
-def _sync_similar_sizes(items: list[dict], *, per_key_layout_tweaks: Dict[str, Dict[str, float]]) -> None:
+def _sync_similar_sizes(items: list[dict], *, per_key_layout_tweaks: dict[str, dict[str, float]]) -> None:
     size_bins: dict[tuple[int, int], list[dict]] = {}
     for it in items:
-        bw = int(round(float(it["w"]) / 6.0))
-        bh = int(round(float(it["h"]) / 6.0))
+        bw = round(float(it["w"]) / 6.0)
+        bh = round(float(it["h"]) / 6.0)
         size_bins.setdefault((bw, bh), []).append(it)
 
     for group in size_bins.values():
@@ -160,7 +160,7 @@ def _snap_rows(
     *,
     items2: list[dict],
     y_thresh: float,
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
 ) -> None:
     for row_group in _cluster_sorted(items2, "cy", y_thresh):
         if len(row_group) < 2:
@@ -181,7 +181,7 @@ def _snap_cols(
     *,
     items3: list[dict],
     x_thresh: float,
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
 ) -> None:
     for col_group in _cluster_sorted(items3, "cx", x_thresh):
         if len(col_group) < 2:
@@ -200,8 +200,8 @@ def _snap_cols(
 
 def auto_sync_per_key_overlays(
     *,
-    layout_tweaks: Dict[str, float],
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    layout_tweaks: dict[str, float],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
     keys: Iterable[KeyDef] = REFERENCE_DEVICE_KEYS,
     base_image_size: tuple[int, int] = BASE_IMAGE_SIZE,
 ) -> None:

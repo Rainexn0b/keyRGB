@@ -73,9 +73,8 @@ def sysfs_leds_snapshot() -> tuple[list[dict[str, str]], list[dict[str, str]]]:
                 if "kbd" in lower or "keyboard" in lower:
                     leds.append(entry)
     except OSError:
-        # Best-effort.
-        all_leds = all_leds
-        leds = leds
+        # Best-effort — keep whatever was collected before the error.
+        pass
 
     return all_leds, leds
 

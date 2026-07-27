@@ -3,4 +3,4 @@
 from .backend import SysfsLedsBackend
 from .device import SysfsLedKeyboardDevice
 
-__all__ = ["SysfsLedsBackend", "SysfsLedKeyboardDevice"]
+__all__ = ["SysfsLedKeyboardDevice", "SysfsLedsBackend"]

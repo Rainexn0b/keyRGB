@@ -10,7 +10,8 @@ from __future__ import annotations
 import logging
 import math
 import time
-from typing import TYPE_CHECKING, Callable, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 from . import _render_brightness_support as _support
 
@@ -22,10 +23,10 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def resolve_reactive_transition_brightness(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     clamp01_fn: Callable[[float], float],
-) -> Optional[tuple[int, bool]]:
+) -> tuple[int, bool] | None:
     """Return the current transition brightness for reactive temp-dim flows."""
 
     transition = _resolve_reactive_transition_progress(engine, clamp01_fn=clamp01_fn)
@@ -34,13 +35,13 @@ def resolve_reactive_transition_brightness(
 
     current_f, rising = transition
     if rising:
-        return int(math.ceil(current_f)), True
+        return math.ceil(current_f), True
 
-    return int(round(current_f)), False
+    return round(current_f), False
 
 
 def resolve_reactive_transition_visual_scale(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     clamp01_fn: Callable[[float], float],
 ) -> float:
@@ -61,7 +62,7 @@ def resolve_reactive_transition_visual_scale(
     if not rising:
         return 1.0
 
-    quantized = int(math.ceil(current_f))
+    quantized = math.ceil(current_f)
     if quantized <= 0:
         return 0.0
 
@@ -69,10 +70,10 @@ def resolve_reactive_transition_visual_scale(
 
 
 def _resolve_reactive_transition_progress(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     clamp01_fn: Callable[[float], float],
-) -> Optional[tuple[float, bool]]:
+) -> tuple[float, bool] | None:
     """Return the in-flight reactive transition brightness as a float."""
 
     state = _support.ensure_reactive_state(engine)
@@ -142,7 +143,7 @@ def _resolve_reactive_transition_progress(
     return current, rising
 
 
-def _clear_transition_state(engine: "EffectsEngine") -> None:
+def _clear_transition_state(engine: EffectsEngine) -> None:
     state = _support.ensure_reactive_state(engine)
     lock = getattr(engine, "reactive_lock", None)
     if lock is not None:

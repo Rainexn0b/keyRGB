@@ -6,7 +6,6 @@ from typing import Protocol
 
 from src.core.power.system import PowerMode
 
-
 _MenuAction = Callable[[object, object], None]
 _MenuChecked = Callable[[object], bool]
 _ProfileActivationAction = Callable[[], None]

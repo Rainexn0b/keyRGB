@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
+from . import _render_brightness_support as _support
 from ._constants import UNIFORM_PULSE_HW_LIFT_STREAK_MIN
 from ._render_brightness_guard import apply_brightness_step_guard
 from ._render_brightness_transition import (
@@ -11,14 +13,13 @@ from ._render_brightness_transition import (
     resolve_reactive_transition_brightness,
     resolve_reactive_transition_visual_scale,
 )
-from . import _render_brightness_support as _support
 
 # Public re-exports for callers that import transition helpers from this module.
 __all__ = [
+    "_clear_transition_state",
     "resolve_brightness",
     "resolve_reactive_transition_brightness",
     "resolve_reactive_transition_visual_scale",
-    "_clear_transition_state",
 ]
 
 if TYPE_CHECKING:
@@ -69,7 +70,7 @@ def _can_lift_hw_brightness(
 
 
 def _resolve_hw_brightness_with_pulse_mix(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     global_hw: int,
     base: int,
@@ -146,7 +147,7 @@ def _resolve_hw_brightness_with_pulse_mix(
             cooldown_active=cooldown_active,
         )
         if allow_pulse_hw_lift:
-            pulse_hw = int(round(float(hw) + (float(eff - hw) * pulse_mix)))
+            pulse_hw = round(float(hw) + (float(eff - hw) * pulse_mix))
             hw = max(hw, pulse_hw)
 
         if per_key_hw:
@@ -183,7 +184,7 @@ def _resolve_hw_brightness_with_pulse_mix(
 
 
 def resolve_brightness(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     max_step_per_frame: int,
     clamp01_fn: Callable[[float], float],

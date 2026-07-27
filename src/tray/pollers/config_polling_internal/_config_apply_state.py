@@ -6,7 +6,6 @@ from typing import cast
 
 from src.core.lighting_layers import render_effect_from_selected_effect
 
-
 ColorTuple = tuple[int, int, int]
 
 EffectNameResolver = Callable[[str], str]

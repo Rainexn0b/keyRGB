@@ -17,11 +17,7 @@ def detect_os_autostart_enabled() -> bool:
 def set_os_autostart(enabled: bool) -> None:
     desktop_path = autostart_desktop_path()
     if not enabled:
-        try:
-            desktop_path.unlink(missing_ok=True)
-        except OSError:
-            # If removal fails, surface as error.
-            raise
+        desktop_path.unlink(missing_ok=True)
         return
 
     desktop_path.parent.mkdir(parents=True, exist_ok=True)

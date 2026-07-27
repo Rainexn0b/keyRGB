@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Sequence, Tuple
+from collections.abc import Sequence
 
 from .color_map_ops import Color, ColorMap, fill_all
 
@@ -12,7 +12,7 @@ def apply_color_to_map(
     num_cols: int,
     color: Color,
     apply_all_keys: bool,
-    selected_cells: Optional[Sequence[Tuple[int, int]]],
+    selected_cells: Sequence[tuple[int, int]] | None,
 ) -> ColorMap:
     """Apply a color selection to the per-key color map.
 

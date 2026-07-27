@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 
 def coerce_rgb_triplet(value: object, *, default: tuple[int, int, int]) -> tuple[int, int, int]:

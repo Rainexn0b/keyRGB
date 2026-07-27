@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
-from typing import Callable, Iterable, Mapping, Protocol, TypeAlias
+from typing import Protocol, TypeAlias
 
 from PIL import Image
 
 from src.core.resources.layout import KeyDef
-
 
 KeyCell: TypeAlias = tuple[int, int]
 KeyCells: TypeAlias = tuple[KeyCell, ...]

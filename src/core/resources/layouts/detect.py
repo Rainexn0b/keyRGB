@@ -45,7 +45,7 @@ def _device_name_for_cap_path(cap_path: str) -> str:
 
 def _is_generic_at_keyboard(name: str) -> bool:
     lowered = str(name or "").strip().lower()
-    return lowered in {"at translated set 2 keyboard", "at translated set 2 keyboard"}
+    return lowered in {"at translated set 2 keyboard"}
 
 
 def detect_physical_layout() -> str:

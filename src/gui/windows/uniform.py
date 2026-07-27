@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Uniform Color GUI - Simple color wheel for selecting a single keyboard color."""
 
 from __future__ import annotations
@@ -6,16 +5,15 @@ from __future__ import annotations
 import logging
 import os
 import time
-from pathlib import Path
-
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk
 
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
 from src.core.utils.exceptions import is_device_busy
+from src.gui.theme import apply_clam_theme
 from src.gui.utils.window_geometry import compute_centered_window_geometry
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
-from src.gui.theme import apply_clam_theme
 
 logger = logging.getLogger(__name__)
 _DEVICE_APPLY_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
@@ -25,23 +23,23 @@ _GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, 
 _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 try:
-    from src.gui.widgets.color_wheel import ColorWheel
     from src.core.config import Config
+    from src.gui.widgets.color_wheel import ColorWheel
     from src.gui.windows import _uniform_color_bootstrap as uniform_color_bootstrap
     from src.gui.windows import _uniform_color_interactions as uniform_color_interactions
-    from src.gui.windows import _uniform_init_adapter as uniform_init_adapter
     from src.gui.windows import _uniform_color_state as uniform_color_state
     from src.gui.windows import _uniform_color_ui as uniform_color_ui
+    from src.gui.windows import _uniform_init_adapter as uniform_init_adapter
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/windows/uniform.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
-    from src.gui.widgets.color_wheel import ColorWheel
     from src.core.config import Config
+    from src.gui.widgets.color_wheel import ColorWheel
     from src.gui.windows import _uniform_color_bootstrap as uniform_color_bootstrap
     from src.gui.windows import _uniform_color_interactions as uniform_color_interactions
-    from src.gui.windows import _uniform_init_adapter as uniform_init_adapter
     from src.gui.windows import _uniform_color_state as uniform_color_state
     from src.gui.windows import _uniform_color_ui as uniform_color_ui
+    from src.gui.windows import _uniform_init_adapter as uniform_init_adapter
 
 
 SecondaryDeviceRoute = uniform_color_bootstrap.SecondaryDeviceRoute

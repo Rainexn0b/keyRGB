@@ -17,7 +17,6 @@ from src.core.secondary_device_routes import (
     SecondaryDeviceRoute,
 )
 
-
 RGB: TypeAlias = tuple[int, int, int]
 AreaEntry: TypeAlias = Mapping[object, object]
 _STATE_READ_ERRORS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
@@ -166,8 +165,8 @@ def legacy_snapshot_from_config(
 
 
 __all__ = [
-    "AreaEntry",
     "RGB",
+    "AreaEntry",
     "area_entry",
     "areas",
     "config_brightness",

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 from PIL import Image
 
@@ -11,7 +10,7 @@ from src.core.resources.layout import BASE_IMAGE_SIZE
 from src.gui.utils.backdrop_image_cache import backdrop_image_candidates, load_cached_backdrop_image
 
 
-def load_backdrop_image(profile_name: str, *, backdrop_mode: str | None = None) -> Optional[Image.Image]:
+def load_backdrop_image(profile_name: str, *, backdrop_mode: str | None = None) -> Image.Image | None:
     """Load backdrop image (RGBA) for a profile, or return None."""
 
     mode = normalize_backdrop_mode(

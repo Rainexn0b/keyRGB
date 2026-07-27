@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from PIL import Image
-
 
 PhotoT = TypeVar("PhotoT")
 
@@ -15,7 +15,7 @@ def _transparency_key(transparency_pct: float) -> int:
     except (TypeError, ValueError):
         value = 0.0
     value = max(0.0, min(100.0, value))
-    return int(round(value * 1000.0))
+    return round(value * 1000.0)
 
 
 def _apply_transparency(rendered: Image.Image, transparency_pct: float) -> Image.Image:

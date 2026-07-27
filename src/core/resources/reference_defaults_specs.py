@@ -11,7 +11,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
-
 _RESOURCES_DIR = Path(__file__).resolve().parent
 _SPECS_PATH = _RESOURCES_DIR / "reference_defaults_specs.json"
 

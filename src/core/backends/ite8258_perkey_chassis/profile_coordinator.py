@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: single cohesive chassis profile coordinator class; desired/output/commit paths belong together
-
 from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from enum import Enum
 from threading import RLock
+from typing import ClassVar
 
 from . import protocol
-
 
 ReportWriter = Callable[[bytes], None]
 
@@ -53,7 +52,7 @@ class Ite8258ChassisProfileCoordinator:
     """
 
     _ZONE_ORDER = ("logo", "neon", "vent")
-    _ZONE_LED_IDS = {
+    _ZONE_LED_IDS: ClassVar[dict[str, tuple[int, ...]]] = {
         "logo": protocol.LOGO_LED_IDS,
         "neon": protocol.NEON_LED_IDS,
         "vent": protocol.VENT_LED_IDS,

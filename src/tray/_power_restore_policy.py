@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Optional, Protocol
+from typing import Protocol
 
 from src.tray.idle_power_state import (
     read_idle_power_state_bool_field,
@@ -25,8 +25,8 @@ class LightingPowerRestoreGuardState:
     """
 
     user_forced_off: bool
-    idle_forced_off: Optional[bool]
-    power_forced_off: Optional[bool]
+    idle_forced_off: bool | None
+    power_forced_off: bool | None
 
 
 @dataclass(frozen=True)
@@ -140,7 +140,7 @@ def normalize_lighting_power_restore_policy_state(
         )
 
         if safe_int_attr_fn(tray.config, "brightness", default=0) == 0:
-            setattr(tray.config, "brightness", read_last_brightness(tray, default=25))
+            setattr(tray.config, "brightness", read_last_brightness(tray, default=25))  # noqa: B010 - config facade is duck-typed
 
     if safe_int_attr_fn(tray.config, "brightness", default=0) == 0:
         return LightingPowerRestorePolicyState(

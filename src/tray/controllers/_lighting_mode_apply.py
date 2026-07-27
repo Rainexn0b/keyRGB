@@ -7,8 +7,6 @@ re-exports these apply functions so existing call sites stay stable.
 
 from __future__ import annotations
 
-from typing import Optional
-
 from src.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.protocols import (
@@ -22,7 +20,7 @@ from src.tray.protocols import (
 def apply_perkey_mode(
     tray: LightingTrayProtocol,
     *,
-    brightness_override: Optional[int] = None,
+    brightness_override: int | None = None,
     reassert_user_mode: bool = True,
 ) -> None:
     # Local import avoids import cycle: helpers re-exports this module.
@@ -126,7 +124,7 @@ def apply_perkey_mode(
     tray.is_off = False
 
 
-def apply_uniform_none_mode(tray: LightingTrayProtocol, *, brightness_override: Optional[int] = None) -> None:
+def apply_uniform_none_mode(tray: LightingTrayProtocol, *, brightness_override: int | None = None) -> None:
     from src.tray.controllers import _lighting_controller_helpers as helpers
 
     tray.engine.stop()

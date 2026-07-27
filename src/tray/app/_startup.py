@@ -3,21 +3,20 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, TypeVar, cast, overload
 
-
 _STARTUP_MIGRATION_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _STARTUP_CALLBACK_INSTALL_ERRORS = (AttributeError, RuntimeError)
 _STARTUP_ENGINE_SET_BACKEND_ERRORS = (TypeError, RuntimeError, ValueError)
 _ResultT = TypeVar("_ResultT")
-_EngineT = TypeVar("_EngineT", covariant=True)
+_EngineT_co = TypeVar("_EngineT_co", covariant=True)
 _PermissionErrorCallback = Callable[[Exception | None], None]
 
 
-class _EffectsEngineFactory(Protocol[_EngineT]):
+class _EffectsEngineFactory(Protocol[_EngineT_co]):
     @overload
-    def __call__(self, *, backend: object) -> _EngineT: ...
+    def __call__(self, *, backend: object) -> _EngineT_co: ...
 
     @overload
-    def __call__(self) -> _EngineT: ...
+    def __call__(self) -> _EngineT_co: ...
 
 
 class _NotificationDrainTray(Protocol):
@@ -72,7 +71,7 @@ def _set_engine_backend_best_effort(engine: object, backend: object) -> None:
     )
 
 
-def create_effects_engine(EffectsEngine: _EffectsEngineFactory[_EngineT], *, backend: object) -> _EngineT:
+def create_effects_engine(EffectsEngine: _EffectsEngineFactory[_EngineT_co], *, backend: object) -> _EngineT_co:
     try:
         return EffectsEngine(backend=backend)
     except TypeError:

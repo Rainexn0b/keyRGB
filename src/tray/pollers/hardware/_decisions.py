@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 
 DEFAULT_HARDWARE_POLL_INTERVAL_S = 2.0
@@ -133,9 +132,7 @@ def should_attempt_power_source_blank_recovery(
         return False
     if int(configured_brightness_intent) <= 0:
         return False
-    if now - float(last_recovery_at) < cooldown_s:
-        return False
-    return True
+    return not now - float(last_recovery_at) < cooldown_s
 
 
 def should_attempt_stable_zero_brightness_recovery(
@@ -164,9 +161,7 @@ def should_attempt_stable_zero_brightness_recovery(
     # window before attempting again.  This prevents a tight restart loop on
     # controllers that persistently report a transient 0 read.
     effective_cooldown = backoff_s if int(consecutive_attempts) >= int(max_consecutive_attempts) else cooldown_s
-    if now - float(last_recovery_at) < effective_cooldown:
-        return False
-    return True
+    return not now - float(last_recovery_at) < effective_cooldown
 
 
 def classify_brightness_change_persist(
@@ -189,13 +184,12 @@ def classify_brightness_change_persist(
     brightness = normalize_brightness_to_config_scale(current_brightness)
     off = bool(current_off)
 
-    if dim_temp_active and dim_temp_target is not None:
-        if brightness == 0 or off:
-            return BrightnessPersistDecision(
-                kind="ignore_dim_temp_transient",
-                track_brightness=brightness,
-                track_off=False,
-            )
+    if dim_temp_active and dim_temp_target is not None and (brightness == 0 or off):
+        return BrightnessPersistDecision(
+            kind="ignore_dim_temp_transient",
+            track_brightness=brightness,
+            track_off=False,
+        )
 
     zero_brightness_without_off_state = brightness == 0 and not off
     if brightness == 0 and (off or user_forced_off or power_forced_off or idle_forced_off):

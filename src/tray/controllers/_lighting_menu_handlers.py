@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 from src.core.utils import safe_attrs
-from src.tray.controllers._brightness_layer import apply_layered_brightness_update
 from src.tray.controllers import _lighting_controller_helpers as lighting_controller_helpers
+from src.tray.controllers._brightness_layer import apply_layered_brightness_update
 from src.tray.protocols import LightingTrayProtocol
-
 
 _LOCAL_COMPATIBILITY_FALLBACK_EXCEPTIONS = (
     AttributeError,

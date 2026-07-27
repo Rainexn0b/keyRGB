@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
 """Secondary-device and lightbar config access helpers."""
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Protocol, cast
+from typing import Protocol, cast
 
 from ._coercion import normalize_rgb_triplet
-
 
 RgbTriplet = tuple[int, int, int]
 _MISSING = object()
@@ -231,7 +230,7 @@ def get_secondary_device_enabled(
 def set_secondary_device_enabled(
     config: SecondaryDeviceAccessorConfig,
     state_key: str,
-    value: bool | int | float,
+    value: bool | float,
     *,
     compatibility_key: str | None = None,
 ) -> None:

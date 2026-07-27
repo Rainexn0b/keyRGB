@@ -1,19 +1,14 @@
 from __future__ import annotations
 
 import atexit
-import os
-import sys
 import importlib
 import importlib.util
 import logging
-from dataclasses import dataclass
+import os
+import sys
 from contextlib import suppress
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
-
 
 _pystray_mod = None
 _pystray_item = None
@@ -305,7 +300,7 @@ def get_pystray():
                     "module is supported but running the tray is not."
                 ) from exc
 
-    _pystray_item = getattr(_pystray_mod, "MenuItem")
+    _pystray_item = _pystray_mod.MenuItem
     return _pystray_mod, _pystray_item
 
 
@@ -334,7 +329,7 @@ def acquire_single_instance_lock() -> bool:
     lock_path = lock_dir / "keyrgb.lock"
 
     try:
-        _instance_lock_fh = open(lock_path, "a+")
+        _instance_lock_fh = open(lock_path, "a+")  # noqa: SIM115 – singleton lock kept open for process lifetime
         fcntl.flock(_instance_lock_fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         atexit.register(_instance_lock_fh.close)
         _instance_lock_fh.seek(0)

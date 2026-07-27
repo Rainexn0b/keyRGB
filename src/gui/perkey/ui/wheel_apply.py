@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Mapping, Protocol, cast
+from collections.abc import Mapping
+from typing import Protocol, cast
 
 from ..ops.color_apply_ops import apply_color_to_map
 from ..ops.color_map_ops import Color, ColorMap

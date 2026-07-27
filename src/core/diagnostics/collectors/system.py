@@ -10,7 +10,6 @@ from src.core.runtime.imports import repo_root_from
 
 from ..io import read_kv_file, read_text
 
-
 logger = logging.getLogger(__name__)
 
 _FS_SNAPSHOT_ERRORS = (OSError,)

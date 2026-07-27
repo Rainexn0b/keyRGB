@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Dict, Tuple
+from typing import TYPE_CHECKING
 
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.utils.logging_utils import log_throttled
@@ -9,8 +9,8 @@ from src.core.utils.logging_utils import log_throttled
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
 
-Color = Tuple[int, int, int]
-Key = Tuple[int, int]
+Color = tuple[int, int, int]
+Key = tuple[int, int]
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ _PER_KEY_BACKDROP_ITERATION_ERRORS = (AttributeError, LookupError, OSError, Runt
 _ALL_KEYS: tuple[Key, ...] = tuple((r, c) for r in range(NUM_ROWS) for c in range(NUM_COLS))
 
 
-def get_engine_color_map_buffer(engine: "EffectsEngine", attr_name: str) -> Dict[Key, Color]:
+def get_engine_color_map_buffer(engine: EffectsEngine, attr_name: str) -> dict[Key, Color]:
     try:
         engine_state = object.__getattribute__(engine, "__dict__")
     except (AttributeError, TypeError):
@@ -32,11 +32,11 @@ def get_engine_color_map_buffer(engine: "EffectsEngine", attr_name: str) -> Dict
         if isinstance(existing, dict):
             return existing
 
-        created: Dict[Key, Color] = {}
+        created: dict[Key, Color] = {}
         engine_state[attr_name] = created
         return created
 
-    created: Dict[Key, Color] = {}  # type: ignore[no-redef]
+    created: dict[Key, Color] = {}  # type: ignore[no-redef]
     try:
         setattr(engine, attr_name, created)
     except (AttributeError, TypeError):
@@ -44,7 +44,7 @@ def get_engine_color_map_buffer(engine: "EffectsEngine", attr_name: str) -> Dict
     return created
 
 
-def fill_uniform_color_map(dest: Dict[Key, Color], *, color: Color) -> Dict[Key, Color]:
+def fill_uniform_color_map(dest: dict[Key, Color], *, color: Color) -> dict[Key, Color]:
     dest.clear()
     for key in _ALL_KEYS:
         dest[key] = color
@@ -52,11 +52,11 @@ def fill_uniform_color_map(dest: Dict[Key, Color], *, color: Color) -> Dict[Key,
 
 
 def fill_per_key_backdrop_map(
-    dest: Dict[Key, Color],
+    dest: dict[Key, Color],
     *,
     base_color: Color,
     per_key_colors: object,
-) -> Dict[Key, Color]:
+) -> dict[Key, Color]:
     fill_uniform_color_map(dest, color=base_color)
 
     items = getattr(per_key_colors, "items", None)
@@ -85,31 +85,31 @@ def fill_per_key_backdrop_map(
     return dest
 
 
-def scale_color_map_into(dest: Dict[Key, Color], *, source: Dict[Key, Color], factor: float) -> Dict[Key, Color]:
+def scale_color_map_into(dest: dict[Key, Color], *, source: dict[Key, Color], factor: float) -> dict[Key, Color]:
     f = float(factor)
     dest.clear()
 
     if f <= 0.0:
-        for key in source.keys():
+        for key in source:
             dest[key] = (0, 0, 0)
         return dest
 
     for key, rgb in source.items():
         dest[key] = (
-            int(round(rgb[0] * f)),
-            int(round(rgb[1] * f)),
-            int(round(rgb[2] * f)),
+            round(rgb[0] * f),
+            round(rgb[1] * f),
+            round(rgb[2] * f),
         )
     return dest
 
 
 def build_frame_base_maps(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     background_rgb: Color,
     effect_brightness_hw: int,
     backdrop_brightness_scale_factor_fn,
-) -> tuple[bool, Dict[Key, Color], Dict[Key, Color]]:
+) -> tuple[bool, dict[Key, Color], dict[Key, Color]]:
     base_unscaled = get_engine_color_map_buffer(engine, "_reactive_base_unscaled_map")
     per_key_backdrop_active = bool(getattr(engine, "per_key_colors", None) or None)
     if per_key_backdrop_active:

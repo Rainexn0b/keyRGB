@@ -1,22 +1,21 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: cohesive secondary-device tray controller (select/apply/on/off); further split would add indirection without ownership clarity
-
 import logging
-from typing import Callable, Protocol, cast
+from collections.abc import Callable
+from typing import Protocol, cast
 
 from src.core.profile import profiles
 from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
 from src.core.secondary_device_runtime import acquire_secondary_device
 from src.core.utils.exceptions import is_permission_denied
 from src.tray import secondary_device_power
-from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.tray.protocols import LightingTrayProtocol
+from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry, selected_device_context_entry
 
 from ._lighting_controller_helpers import parse_menu_int, try_log_event
 from .secondary_static_scene import apply_secondary_static_route
-
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_CONFIG_ATTR_WRITE_EXCEPTIONS = (OSError, OverflowError, RuntimeError, TypeError, ValueError)
@@ -114,7 +113,7 @@ def apply_selected_secondary_brightness(tray: LightingTrayProtocol, item: object
     _set_secondary_brightness_best_effort(
         tray,
         route,
-        brightness_hw if brightness_hw > 0 else 0,
+        max(0, brightness_hw),
         error_msg=f"Failed to store {route.display_name.lower()} brightness: %s",
     )
     _set_secondary_enabled_best_effort(
@@ -375,6 +374,6 @@ __all__ = [
     "apply_selected_secondary_brightness",
     "selected_secondary_backend_name",
     "selected_secondary_context_entry",
-    "turn_on_selected_secondary_device",
     "turn_off_selected_secondary_device",
+    "turn_on_selected_secondary_device",
 ]

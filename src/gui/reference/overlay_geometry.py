@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Dict, Iterable, Optional, Tuple
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 
@@ -15,7 +15,7 @@ class CanvasTransform:
     sx: float
     sy: float
 
-    def to_canvas(self, rect: Tuple[float, float, float, float]) -> Tuple[float, float, float, float]:
+    def to_canvas(self, rect: tuple[float, float, float, float]) -> tuple[float, float, float, float]:
         x, y, w, h = rect
         x1 = self.x0 + x * self.sx
         y1 = self.y0 + y * self.sy
@@ -84,10 +84,10 @@ def transform_from_drawn_bbox(
 
 def apply_global_tweak(
     *,
-    rect: Tuple[float, float, float, float],
-    layout_tweaks: Dict[str, float],
+    rect: tuple[float, float, float, float],
+    layout_tweaks: dict[str, float],
     image_size: tuple[int, int] = BASE_IMAGE_SIZE,
-) -> Tuple[float, float, float, float]:
+) -> tuple[float, float, float, float]:
     x, y, w, h = rect
     iw, ih = image_size
     px = iw / 2.0
@@ -107,10 +107,10 @@ def apply_per_key_tweak(
     *,
     key_id: str,
     slot_id: str | None = None,
-    rect: Tuple[float, float, float, float],
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    rect: tuple[float, float, float, float],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
     inset_default: float,
-) -> Tuple[float, float, float, float, float]:
+) -> tuple[float, float, float, float, float]:
     x, y, w, h = rect
     kt = (
         (per_key_layout_tweaks.get(str(slot_id or ""), {}) if slot_id else {})
@@ -137,10 +137,10 @@ def key_canvas_rect(
     *,
     transform: CanvasTransform,
     key: KeyDef,
-    layout_tweaks: Dict[str, float],
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    layout_tweaks: dict[str, float],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
     image_size: tuple[int, int] = BASE_IMAGE_SIZE,
-) -> Tuple[float, float, float, float, float]:
+) -> tuple[float, float, float, float, float]:
     """Return key rectangle in canvas coords (without applying inset).
 
     Returns (x1,y1,x2,y2,inset_value).
@@ -171,10 +171,10 @@ def key_canvas_hit_rects(
     *,
     transform: CanvasTransform,
     key: KeyDef,
-    layout_tweaks: Dict[str, float],
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    layout_tweaks: dict[str, float],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
     image_size: tuple[int, int] = BASE_IMAGE_SIZE,
-) -> Tuple[Tuple[float, float, float, float], ...]:
+) -> tuple[tuple[float, float, float, float], ...]:
     x1, y1, x2, y2, inset_value = key_canvas_rect(
         transform=transform,
         key=key,
@@ -187,7 +187,7 @@ def key_canvas_hit_rects(
     shape_segments = key.shape_segments or ((0.0, 0.0, 1.0, 1.0),)
     width = max(1.0, x2 - x1)
     height = max(1.0, y2 - y1)
-    out: list[Tuple[float, float, float, float]] = []
+    out: list[tuple[float, float, float, float]] = []
     for sx, sy, sw, sh in shape_segments:
         seg_x1 = x1 + float(sx) * width
         seg_y1 = y1 + float(sy) * height
@@ -204,7 +204,7 @@ def inset_bbox(
     x2: float,
     y2: float,
     inset_value: float,
-) -> Tuple[float, float, float, float]:
+) -> tuple[float, float, float, float]:
     """Inset a bbox by either fraction (<=0.5) or pixels (>0.5)."""
 
     w_px = max(0.0, x2 - x1)
@@ -226,11 +226,11 @@ def key_canvas_bbox_inset(
     *,
     transform: CanvasTransform,
     key: KeyDef,
-    layout_tweaks: Dict[str, float],
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    layout_tweaks: dict[str, float],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
     image_size: tuple[int, int] = BASE_IMAGE_SIZE,
-    inset_value_cap: Optional[float] = None,
-) -> Tuple[float, float, float, float]:
+    inset_value_cap: float | None = None,
+) -> tuple[float, float, float, float]:
     x1, y1, x2, y2, inset_value = key_canvas_rect(
         transform=transform,
         key=key,
@@ -250,12 +250,12 @@ def hit_test(
     transform: CanvasTransform,
     x: int,
     y: int,
-    layout_tweaks: Dict[str, float],
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
+    layout_tweaks: dict[str, float],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
     keys: Iterable[KeyDef] = REFERENCE_DEVICE_KEYS,
     image_size: tuple[int, int] = BASE_IMAGE_SIZE,
-    inset_value_cap: Optional[float] = None,
-) -> Optional[KeyDef]:
+    inset_value_cap: float | None = None,
+) -> KeyDef | None:
     for key in keys:
         x1, y1, x2, y2 = key_canvas_bbox_inset(
             transform=transform,

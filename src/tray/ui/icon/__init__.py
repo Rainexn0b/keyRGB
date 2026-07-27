@@ -6,15 +6,17 @@ from typing import Literal, TypeAlias, cast
 
 from PIL import Image
 
-from . import _color, _draw
 from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.core.effects.perkey_animation import build_full_color_grid
 from src.core.lighting_layers import resolve_render_effect
 from src.core.resources.defaults import (
     REFERENCE_MATRIX_COLS as NUM_COLS,
+)
+from src.core.resources.defaults import (
     REFERENCE_MATRIX_ROWS as NUM_ROWS,
 )
 
+from . import _color, _draw
 
 _ANIMATED_ICON_PHASE_RATE = 0.008
 _ANIMATED_ICON_SCALE_FLOOR = 0.85
@@ -49,7 +51,7 @@ class IconVisual:
 
 def _icon_scale_from_brightness(brightness: int) -> float:
     # Mirror representative_color's icon-visibility scaling.
-    icon_brightness = max(0, min(50, int(round(float(brightness) * 3.0))))
+    icon_brightness = max(0, min(50, round(float(brightness) * 3.0)))
     return max(0.25, min(1.0, icon_brightness / 50.0))
 
 
@@ -133,10 +135,7 @@ def _is_non_uniform_effect(config: TrayIconConfig, *, backend: object | None = N
 
     # Heuristic: effect names that imply cycling/multi-color.
     lowered = effect.lower()
-    if "rainbow" in lowered or "cycle" in lowered or "spectrum" in lowered or "aurora" in lowered:
-        return True
-
-    return False
+    return bool("rainbow" in lowered or "cycle" in lowered or "spectrum" in lowered or "aurora" in lowered)
 
 
 def _build_perkey_mosaic_visual(*, config: TrayIconConfig, brightness: int) -> IconVisual | None:
@@ -276,12 +275,12 @@ def icon_visual(
 
 
 __all__ = [
+    "IconVisual",
     "create_icon",
     "create_icon_for_state",
     "create_icon_mosaic",
     "create_icon_rainbow",
-    "representative_color",
-    "IconVisual",
     "icon_visual",
     "render_icon_visual",
+    "representative_color",
 ]

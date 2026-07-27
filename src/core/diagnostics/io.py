@@ -3,7 +3,6 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 _READ_TEXT_ERRORS = (OSError, UnicodeError)
 _RUN_COMMAND_ERRORS = (OSError, TypeError, ValueError, subprocess.SubprocessError)
@@ -11,14 +10,14 @@ _READ_KV_FILE_ERRORS = (OSError,)
 _PARSE_HEX_INT_ERRORS = (AttributeError, TypeError, ValueError)
 
 
-def read_text(path: Path) -> Optional[str]:
+def read_text(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8").strip()
     except _READ_TEXT_ERRORS:
         return None
 
 
-def run_command(argv: list[str], *, timeout_s: float = 1.5) -> Optional[str]:
+def run_command(argv: list[str], *, timeout_s: float = 1.5) -> str | None:
     """Run a small diagnostic command in a best-effort, read-only way."""
 
     if not argv:
@@ -32,8 +31,7 @@ def run_command(argv: list[str], *, timeout_s: float = 1.5) -> Optional[str]:
         proc = subprocess.run(
             argv,
             check=False,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             text=True,
             timeout=timeout_s,
         )
@@ -60,11 +58,10 @@ def read_kv_file(path: Path) -> dict[str, str]:
     return data
 
 
-def parse_hex_int(text: str) -> Optional[int]:
+def parse_hex_int(text: str) -> int | None:
     try:
         s = text.strip().lower()
-        if s.startswith("0x"):
-            s = s[2:]
+        s = s.removeprefix("0x")
         return int(s, 16)
     except _PARSE_HEX_INT_ERRORS:
         return None

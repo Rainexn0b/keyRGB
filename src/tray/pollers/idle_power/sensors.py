@@ -4,8 +4,6 @@ import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional
-
 
 _RECOVERABLE_SYSFS_READ_EXCEPTIONS = (OSError, UnicodeError, ValueError, InterruptedError, BlockingIOError)
 _RECOVERABLE_SUBPROCESS_EXCEPTIONS = (OSError, ValueError, subprocess.SubprocessError)
@@ -18,14 +16,14 @@ class BacklightState:
     screen_off: bool = False
 
 
-def _read_int(path: Path) -> Optional[int]:
+def _read_int(path: Path) -> int | None:
     try:
         return int(path.read_text(encoding="utf-8").strip())
     except _RECOVERABLE_SYSFS_READ_EXCEPTIONS:
         return None
 
 
-def _device_pci_path(device_dir: Path) -> Optional[str]:
+def _device_pci_path(device_dir: Path) -> str | None:
     """Return the canonical PCI device path for a sysfs object (e.g. backlight or DRM card)."""
     device_link = device_dir / "device"
     if not device_link.exists():
@@ -125,9 +123,7 @@ def _is_active_backlight(
         return True
     if pci_path in active_pci_paths:
         return True
-    if pci_path in inactive_pci_paths:
-        return False
-    return True
+    return pci_path not in inactive_pci_paths
 
 
 def read_dimmed_state(
@@ -135,7 +131,7 @@ def read_dimmed_state(
     *,
     backlight_base: Path | None = None,
     drm_base: Path | None = None,
-) -> Optional[bool]:
+) -> bool | None:
     """Best-effort: infer 'dimmed' from kernel backlight brightness drops."""
 
     base = backlight_base or Path("/sys/class/backlight")
@@ -146,7 +142,7 @@ def read_dimmed_state(
     all_pci_paths = _all_drm_pci_paths(drm_base=drm_base)
     inactive_pci_paths = all_pci_paths - active_pci_paths
 
-    dimmed_any: Optional[bool] = None
+    dimmed_any: bool | None = None
     screen_off_any = False
     observed_any = 0
 
@@ -201,7 +197,7 @@ def read_dimmed_state(
     return dimmed_any
 
 
-def read_screen_off_state_drm(*, drm_base: Path | None = None) -> Optional[bool]:
+def read_screen_off_state_drm(*, drm_base: Path | None = None) -> bool | None:
     """Best-effort: detect whether the active display is powered off via DPMS."""
 
     base = drm_base or Path("/sys/class/drm")
@@ -271,7 +267,7 @@ def read_screen_off_state_drm(*, drm_base: Path | None = None) -> Optional[bool]
     return bool(any_off)
 
 
-def run(argv: list[str], *, timeout_s: float = 1.0) -> Optional[str]:
+def run(argv: list[str], *, timeout_s: float = 1.0) -> str | None:
     try:
         cp = subprocess.run(argv, capture_output=True, text=True, timeout=timeout_s, check=False)
     except _RECOVERABLE_SUBPROCESS_EXCEPTIONS:
@@ -282,7 +278,7 @@ def run(argv: list[str], *, timeout_s: float = 1.0) -> Optional[str]:
     return out or None
 
 
-def get_session_id() -> Optional[str]:
+def get_session_id() -> str | None:
     sid = os.environ.get("XDG_SESSION_ID")
     if sid:
         return str(sid).strip() or None

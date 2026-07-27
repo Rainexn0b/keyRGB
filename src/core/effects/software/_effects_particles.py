@@ -9,11 +9,12 @@ from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.transitions import scaled_color_map_nonzero
 
-from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer
 from . import base as _base
+from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
+
     from .base import Color, Key
 
 
@@ -216,9 +217,9 @@ def run_rain(engine: EffectsEngine, *, render_fn=_base.render) -> None:
 
             progress = d.age_s / d.ttl_s
             row_f = (1.0 - progress) * float(NUM_ROWS - 1)
-            row = int(round(row_f))
+            row = round(row_f)
             if 0 <= row < NUM_ROWS:
-                for tail in range(0, 3):
+                for tail in range(3):
                     rr = row + tail
                     if rr >= NUM_ROWS:
                         break

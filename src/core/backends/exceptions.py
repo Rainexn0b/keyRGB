@@ -15,7 +15,6 @@ Inheritance is designed for backward compatibility:
 
 from __future__ import annotations
 
-
 BACKEND_OPEN_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 

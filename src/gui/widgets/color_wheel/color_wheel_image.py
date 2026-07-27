@@ -11,7 +11,6 @@ import math
 import os
 from pathlib import Path
 
-
 _TEMP_FILE_CLEANUP_ERRORS = (OSError,)
 
 

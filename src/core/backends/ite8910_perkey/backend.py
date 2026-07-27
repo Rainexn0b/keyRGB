@@ -1,23 +1,22 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 
-from src.core.utils.exceptions import is_permission_denied, is_device_disconnected, is_device_busy
 from src.core.backends.exceptions import (
     BACKEND_OPEN_RUNTIME_ERRORS,
-    BackendPermissionError,
-    BackendDisconnectedError,
     BackendBusyError,
+    BackendDisconnectedError,
     BackendIOError,
+    BackendPermissionError,
 )
+from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
 
 from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
+from . import protocol
 from .device import Ite8910KeyboardDevice
 from .hidraw import find_matching_hidraw_device, open_matching_hidraw_transport
-from . import protocol
-
 
 EffectPayload = dict[str, object]
 EffectBuilder = Callable[..., EffectPayload]

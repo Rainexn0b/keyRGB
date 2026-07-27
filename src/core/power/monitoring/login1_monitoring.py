@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import subprocess
 from collections.abc import Callable, Iterable, Iterator
-from typing import Optional
 
 _logger = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ def monitor_prepare_for_sleep(
     is_running: Callable[[], bool],
     on_suspend: Callable[[], None],
     on_resume: Callable[[], None],
-    on_started: Optional[Callable[[], None]] = None,
+    on_started: Callable[[], None] | None = None,
 ) -> None:
     """Run `dbus-monitor` for logind PrepareForSleep and invoke callbacks."""
 

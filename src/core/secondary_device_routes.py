@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 from src.core.backends.ite8233_none_chassis_lightbar_clevo.backend import Ite8233Backend
 from src.core.backends.sysfs_mouse.backend import SysfsMouseBackend
 
-
 # Brightness policies for secondary routes.
 #
 # ``independent``     the route owns its own brightness (e.g. a separate USB

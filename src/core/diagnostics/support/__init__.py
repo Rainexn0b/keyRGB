@@ -1,18 +1,7 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: intentionally broad diagnostics support export surface
-
 from .evidence import build_additional_evidence_plan, collect_additional_evidence
-from .speed_probe import (
-    ITE8291R3_SPEED_PROBE_EFFECT,
-    ITE8291R3_SPEED_PROBE_KEY,
-    ITE8291R3_SPEED_PROBE_UI_SPEEDS,
-    ITE8910_SPEED_PROBE_EFFECT,
-    ITE8910_SPEED_PROBE_KEY,
-    ITE8910_SPEED_PROBE_UI_SPEEDS,
-    build_backend_speed_probe_plan,
-    build_backend_speed_probe_plans,
-)
 from .reports import (
     BUG_REPORT_TEMPLATE,
     EXPERIMENTAL_CONFIRMATION_TEMPLATE,
@@ -23,6 +12,16 @@ from .reports import (
     build_support_bundle_payload,
     choose_issue_template,
     issue_url_for_template,
+)
+from .speed_probe import (
+    ITE8291R3_SPEED_PROBE_EFFECT,
+    ITE8291R3_SPEED_PROBE_KEY,
+    ITE8291R3_SPEED_PROBE_UI_SPEEDS,
+    ITE8910_SPEED_PROBE_EFFECT,
+    ITE8910_SPEED_PROBE_KEY,
+    ITE8910_SPEED_PROBE_UI_SPEEDS,
+    build_backend_speed_probe_plan,
+    build_backend_speed_probe_plans,
 )
 
 __all__ = [

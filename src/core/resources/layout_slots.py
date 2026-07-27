@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from functools import lru_cache
-from typing import TYPE_CHECKING, Iterable, cast
+from typing import TYPE_CHECKING, cast
 
 from .layout_legends import get_layout_legend_labels
-
 
 if TYPE_CHECKING:
     from src.core.resources.layout import KeyDef
@@ -130,7 +130,7 @@ def get_layout_slot_states(
     for slot_id, key_id in _optional_slot_defs(resolved_layout):
         default_label = str(default_labels.get(slot_id, key_id))
         override = overrides.get(slot_id, {})
-        visible = True if override.get("visible") is not False else False
+        visible = override.get("visible") is not False
         label_value = override.get("label")
         label = str(label_value).strip() if isinstance(label_value, str) and str(label_value).strip() else default_label
         states.append(
@@ -146,17 +146,17 @@ def get_layout_slot_states(
 
 
 def apply_layout_slot_overrides(
-    keys: Iterable["KeyDef"],
+    keys: Iterable[KeyDef],
     *,
     layout_id: str | None,
     legend_pack_id: str | None = None,
     slot_overrides: dict[str, dict[str, object]] | None = None,
-) -> list["KeyDef"]:
+) -> list[KeyDef]:
     states_by_id = {
         state.slot_id: state
         for state in get_layout_slot_states(layout_id, slot_overrides, legend_pack_id=legend_pack_id)
     }
-    out: list["KeyDef"] = []
+    out: list[KeyDef] = []
     for key in keys:
         state = states_by_id.get(str(getattr(key, "slot_id", None) or key.key_id))
         if state is not None and not state.visible:

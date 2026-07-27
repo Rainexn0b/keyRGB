@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
 import json
@@ -10,10 +8,10 @@ from ._support_window_text_io import (
     _ConfigurableWidget,
     _SupportWindowOutputLike,
     _TextWidget,
-    copy_text as copy_text,
-    save_text_via_dialog as save_text_via_dialog,
-    set_status as set_status,
-    set_text as set_text,
+    copy_text,  # noqa: F401 - stable facade for SupportToolsGUI
+    save_text_via_dialog,  # noqa: F401 - stable facade for SupportToolsGUI
+    set_status,  # noqa: F401 - stable facade for SupportToolsGUI
+    set_text,  # noqa: F401 - stable facade for SupportToolsGUI
 )
 
 JsonDict: TypeAlias = dict[str, object]

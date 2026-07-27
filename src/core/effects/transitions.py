@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Dict, Tuple
-
 
 def choose_steps(
     *,
@@ -25,7 +23,7 @@ def choose_steps(
     min_dt_s = max(0.001, float(min_dt_s))
 
     # Prefer ~target_fps updates, but don't exceed max_steps.
-    steps = int(round(float(duration_s) * target_fps))
+    steps = round(float(duration_s) * target_fps)
     steps = max(2, min(max_steps, steps))
 
     # Enforce a minimum dt to avoid tight loops.
@@ -39,10 +37,10 @@ def choose_steps(
 
 def avoid_full_black(
     *,
-    rgb: Tuple[int, int, int],
-    target_rgb: Tuple[int, int, int],
+    rgb: tuple[int, int, int],
+    target_rgb: tuple[int, int, int],
     brightness: int,
-) -> Tuple[int, int, int]:
+) -> tuple[int, int, int]:
     """Avoid writing a full-black frame during transitions.
 
     Some firmware/backends interpret (0,0,0) as "off" and will visually blink
@@ -68,15 +66,15 @@ def avoid_full_black(
 
 
 def scaled_color_map_nonzero(
-    full_colors: Dict[Tuple[int, int], Tuple[int, int, int]],
+    full_colors: dict[tuple[int, int], tuple[int, int, int]],
     *,
     scale: float,
     brightness: int,
-) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+) -> dict[tuple[int, int], tuple[int, int, int]]:
     """Scale per-key colors without collapsing non-black keys to full black."""
 
     s = float(scale)
-    out: Dict[Tuple[int, int], Tuple[int, int, int]] = {}
+    out: dict[tuple[int, int], tuple[int, int, int]] = {}
     for (row, col), (r0, g0, b0) in full_colors.items():
         r0, g0, b0 = int(r0), int(g0), int(b0)
         if (r0, g0, b0) == (0, 0, 0):

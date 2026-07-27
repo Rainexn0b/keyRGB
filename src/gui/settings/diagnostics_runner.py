@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-
 logger = logging.getLogger(__name__)
 
 _DIAGNOSTICS_WARNING_ERRORS = (AttributeError, OverflowError, RuntimeError, TypeError, ValueError)

@@ -15,7 +15,6 @@ from ..shared_hidraw_probe import (
 )
 from . import device, protocol
 
-
 find_matching_hidraw_device = ite8910_hidraw.find_matching_hidraw_device
 
 

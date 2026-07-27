@@ -5,8 +5,8 @@ import os
 import tkinter as tk
 from tkinter import ttk
 
-from ._color_wheel_ui import ColorWheelCallback, _ColorWheelUIMixin
 from ._color_wheel_runtime import load_wheel_photo_image, resolve_theme_bg_hex
+from ._color_wheel_ui import ColorWheelCallback, _ColorWheelUIMixin
 from .color_wheel_image import (
     build_wheel_ppm_bytes,
     wheel_cache_path,
@@ -250,7 +250,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
                 brightness_percent=float(pct),
             )
 
-    def set_brightness_percent(self, pct: float | int) -> None:
+    def set_brightness_percent(self, pct: float) -> None:
         """Set the brightness slider programmatically (0..100) without callbacks."""
 
         try:

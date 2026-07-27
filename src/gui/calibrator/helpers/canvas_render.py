@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import tkinter as tk
 from tkinter import font as tkfont
-from typing import Optional, TypeAlias
+from typing import TypeAlias
 
 from PIL import Image, ImageTk
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, get_layout_keys
+from src.gui.perkey.profile_management import keymap_cells_for
 from src.gui.reference.overlay_geometry import (
     CanvasTransform,
     calc_centered_drawn_bbox,
@@ -14,10 +15,8 @@ from src.gui.reference.overlay_geometry import (
 )
 from src.gui.utils.deck_render_cache import DeckRenderCache
 from src.gui.utils.key_draw_style import key_draw_style
-from src.gui.perkey.profile_management import keymap_cells_for
 
 from .geometry import key_canvas_bbox
-
 
 LayoutTweaks: TypeAlias = dict[str, float]
 PerKeyLayoutTweaks: TypeAlias = dict[str, dict[str, float]]
@@ -28,7 +27,7 @@ _LABEL_FIT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, Value
 def redraw_calibration_canvas(
     *,
     canvas: tk.Canvas,
-    deck_pil: Optional[Image.Image],
+    deck_pil: Image.Image | None,
     deck_render_cache: DeckRenderCache[ImageTk.PhotoImage],
     layout_tweaks: LayoutTweaks,
     per_key_layout_tweaks: PerKeyLayoutTweaks,
@@ -38,7 +37,7 @@ def redraw_calibration_canvas(
     physical_layout: str = "auto",
     legend_pack_id: str | None = None,
     slot_overrides: dict[str, dict[str, object]] | None = None,
-) -> tuple[CanvasTransform, Optional[ImageTk.PhotoImage]]:
+) -> tuple[CanvasTransform, ImageTk.PhotoImage | None]:
     canvas.delete("all")
 
     cw = max(1, int(canvas.winfo_width()))
@@ -46,7 +45,7 @@ def redraw_calibration_canvas(
     x0, y0, dw, dh, _scale = calc_centered_drawn_bbox(canvas_w=cw, canvas_h=ch, image_size=BASE_IMAGE_SIZE)
     transform = transform_from_drawn_bbox(x0=x0, y0=y0, draw_w=dw, draw_h=dh, image_size=BASE_IMAGE_SIZE)
 
-    deck_tk: Optional[ImageTk.PhotoImage] = None
+    deck_tk: ImageTk.PhotoImage | None = None
     if deck_pil is not None:
         deck_tk = deck_render_cache.get_or_create(
             deck_image=deck_pil,

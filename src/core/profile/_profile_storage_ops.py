@@ -1,25 +1,24 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Dict, Tuple, cast
+from typing import cast
 
 from . import _profile_storage_payloads as storage_payloads
 
-
-KeyCell = Tuple[int, int]
-KeyCells = Tuple[KeyCell, ...]
+KeyCell = tuple[int, int]
+KeyCells = tuple[KeyCell, ...]
 
 
 def normalize_lightbar_overlay(
     raw: object, *, get_default_lightbar_overlay: Callable[..., object]
-) -> Dict[str, bool | float]:
+) -> dict[str, bool | float]:
     return storage_payloads.normalize_lightbar_overlay(
         raw,
         get_default_lightbar_overlay=get_default_lightbar_overlay,
     )
 
 
-def normalize_secondary_lighting(raw: object) -> Dict[str, object]:
+def normalize_secondary_lighting(raw: object) -> dict[str, object]:
     return storage_payloads.normalize_secondary_lighting(raw)
 
 
@@ -29,7 +28,7 @@ def load_secondary_lighting(
     paths_for: Callable[..., object],
     read_json: Callable[..., object],
     normalize_secondary_lighting_fn: Callable[..., object],
-) -> Dict[str, object] | None:
+) -> dict[str, object] | None:
     raw = read_json(paths_for(name).secondary_lighting)  # type: ignore[attr-defined]
     if raw is None:
         return None
@@ -38,15 +37,15 @@ def load_secondary_lighting(
 
 def save_secondary_lighting(
     *,
-    payload: Dict[str, object],
+    payload: dict[str, object],
     name: str | None,
     paths_for: Callable[..., object],
     write_json_atomic: Callable[..., object],
     normalize_secondary_lighting_fn: Callable[..., object],
-) -> Dict[str, object]:
+) -> dict[str, object]:
     normalized = normalize_secondary_lighting_fn(payload or {})
     write_json_atomic(paths_for(name).secondary_lighting, normalized)  # type: ignore[attr-defined]
-    return cast(Dict[str, object], normalized)
+    return cast(dict[str, object], normalized)
 
 
 def parse_keymap_cell(raw: object) -> KeyCell | None:
@@ -83,8 +82,8 @@ def normalize_layout_per_key_tweaks(
     *,
     physical_layout: str | None,
     canonical_layout_identity_fn: Callable[..., object],
-) -> Dict[str, Dict[str, float]]:
-    out: Dict[str, Dict[str, float]] = {}
+) -> dict[str, dict[str, float]]:
+    out: dict[str, dict[str, float]] = {}
     if not isinstance(raw, dict):
         return out
 
@@ -98,7 +97,7 @@ def normalize_layout_per_key_tweaks(
         if not normalized_identity:
             continue
 
-        parsed: Dict[str, float] = {}
+        parsed: dict[str, float] = {}
         for key in ("dx", "dy", "sx", "sy", "inset"):
             value = tweaks.get(key)
             if isinstance(value, (int, float)):
@@ -119,7 +118,7 @@ def normalize_layout_per_key_tweaks(
 
 def normalize_layout_slot_overrides(
     raw: object, *, physical_layout: str | None, sanitize_layout_slot_overrides: Callable[..., object]
-) -> Dict[str, Dict[str, object]]:
+) -> dict[str, dict[str, object]]:
     return sanitize_layout_slot_overrides(raw, layout_id=physical_layout)  # type: ignore[return-value]
 
 
@@ -128,8 +127,8 @@ def normalize_keymap(
     *,
     physical_layout: str | None,
     canonical_layout_identity_fn: Callable[..., object],
-) -> Dict[str, KeyCells]:
-    out: Dict[str, KeyCells] = {}
+) -> dict[str, KeyCells]:
+    out: dict[str, KeyCells] = {}
     if not isinstance(raw, dict):
         return out
 
@@ -167,7 +166,7 @@ def load_keymap(
     read_json: Callable[..., object],
     get_default_keymap: Callable[..., object],
     normalize_keymap_fn: Callable[..., object],
-) -> Dict[str, KeyCells]:
+) -> dict[str, KeyCells]:
     raw = read_json(paths_for(name).keymap)  # type: ignore[attr-defined]
     if raw is None:
         raw = get_default_keymap(physical_layout)
@@ -176,7 +175,7 @@ def load_keymap(
 
 def save_keymap(
     *,
-    keymap: Dict[str, KeyCells],
+    keymap: dict[str, KeyCells],
     name: str | None,
     physical_layout: str | None,
     paths_for: Callable[..., object],
@@ -196,7 +195,7 @@ def load_layout_global(
     paths_for: Callable[..., object],
     read_json: Callable[..., object],
     get_default_layout_tweaks: Callable[..., object],
-) -> Dict[str, float]:
+) -> dict[str, float]:
     raw = read_json(paths_for(name).layout_global)  # type: ignore[attr-defined]
     if raw is None:
         raw = get_default_layout_tweaks(physical_layout)
@@ -205,7 +204,7 @@ def load_layout_global(
 
 def save_layout_global(
     *,
-    tweaks: Dict[str, float],
+    tweaks: dict[str, float],
     name: str | None,
     paths_for: Callable[..., object],
     write_json_atomic: Callable[..., object],
@@ -222,7 +221,7 @@ def load_layout_per_key(
     read_json: Callable[..., object],
     get_default_per_key_tweaks: Callable[..., object],
     normalize_layout_per_key_tweaks_fn: Callable[..., object],
-) -> Dict[str, Dict[str, float]]:
+) -> dict[str, dict[str, float]]:
     raw = read_json(paths_for(name).layout_per_key)  # type: ignore[attr-defined]
     if raw is None:
         raw = get_default_per_key_tweaks(physical_layout)
@@ -231,7 +230,7 @@ def load_layout_per_key(
 
 def save_layout_per_key(
     *,
-    per_key: Dict[str, Dict[str, float]],
+    per_key: dict[str, dict[str, float]],
     name: str | None,
     paths_for: Callable[..., object],
     write_json_atomic: Callable[..., object],
@@ -250,7 +249,7 @@ def load_lightbar_overlay(
     read_json: Callable[..., object],
     get_default_lightbar_overlay: Callable[..., object],
     normalize_lightbar_overlay_fn: Callable[..., object],
-) -> Dict[str, bool | float]:
+) -> dict[str, bool | float]:
     raw = read_json(paths_for(name).lightbar_overlay)  # type: ignore[attr-defined]
     if raw is None:
         raw = get_default_lightbar_overlay()
@@ -259,12 +258,12 @@ def load_lightbar_overlay(
 
 def save_lightbar_overlay(
     *,
-    overlay: Dict[str, bool | float],
+    overlay: dict[str, bool | float],
     name: str | None,
     paths_for: Callable[..., object],
     write_json_atomic: Callable[..., object],
     normalize_lightbar_overlay_fn: Callable[..., object],
-) -> Dict[str, bool | float]:
+) -> dict[str, bool | float]:
     payload = normalize_lightbar_overlay_fn(overlay)
     write_json_atomic(paths_for(name).lightbar_overlay, payload)  # type: ignore[attr-defined]
     return payload  # type: ignore[return-value]
@@ -276,7 +275,7 @@ def load_layout_slots(
     physical_layout: str | None,
     load_layout_slot_overrides: Callable[..., object],
     normalize_layout_slot_overrides_fn: Callable[..., object],
-) -> Dict[str, Dict[str, object]]:
+) -> dict[str, dict[str, object]]:
     return normalize_layout_slot_overrides_fn(  # type: ignore[return-value]
         load_layout_slot_overrides(physical_layout or "auto", prior_profile_name=name),
         physical_layout=physical_layout,
@@ -285,12 +284,12 @@ def load_layout_slots(
 
 def save_layout_slots(
     *,
-    layout_slots: Dict[str, Dict[str, object]],
+    layout_slots: dict[str, dict[str, object]],
     name: str | None,
     physical_layout: str | None,
     save_layout_slot_overrides: Callable[..., object],
     normalize_layout_slot_overrides_fn: Callable[..., object],
-) -> Dict[str, Dict[str, object]]:
+) -> dict[str, dict[str, object]]:
     return save_layout_slot_overrides(  # type: ignore[return-value]
         physical_layout or "auto",
         normalize_layout_slot_overrides_fn(layout_slots, physical_layout=physical_layout),
@@ -303,8 +302,8 @@ def load_per_key_colors(
     paths_for: Callable[..., object],
     read_json: Callable[..., object],
     safe_profile_name: Callable[..., object],
-    default_colors: Dict[Tuple[int, int], Tuple[int, int, int]],
-) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+    default_colors: dict[tuple[int, int], tuple[int, int, int]],
+) -> dict[tuple[int, int], tuple[int, int, int]]:
     raw = read_json(paths_for(name).per_key_colors)  # type: ignore[attr-defined]
     if raw is None:
         return default_colors.copy()
@@ -313,7 +312,7 @@ def load_per_key_colors(
 
 def save_per_key_colors(
     *,
-    colors: Dict[Tuple[int, int], Tuple[int, int, int]],
+    colors: dict[tuple[int, int], tuple[int, int, int]],
     name: str | None,
     paths_for: Callable[..., object],
     write_json_atomic: Callable[..., object],

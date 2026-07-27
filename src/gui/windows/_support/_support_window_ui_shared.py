@@ -1,12 +1,9 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
-from collections.abc import Callable
 import tkinter as tk
+from collections.abc import Callable
 from typing import Protocol, TypeAlias, cast
 from weakref import WeakKeyDictionary
-
 
 BindCallback: TypeAlias = Callable[[object | None], None]
 AfterCallback: TypeAlias = Callable[[], None]
@@ -72,7 +69,7 @@ class _TtkModuleProtocol(Protocol):
     Button: _WidgetFactoryProtocol
 
 
-class _ScrolledTextModuleProtocol(Protocol):
+class _ScrolledTextModuleProtocol(Protocol):  # noqa: PYI046 – re-exported in _support_window_ui_sections.py
     ScrolledText: _TextWidgetFactoryProtocol
 
 
@@ -143,7 +140,7 @@ class _SupportWindowProtocol(Protocol):
     def save_support_bundle(self) -> None: ...
 
 
-class _RegisterWrapTargetFn(Protocol):
+class _RegisterWrapTargetFn(Protocol):  # noqa: PYI046 – re-exported in _support_window_ui_sections.py
     def __call__(
         self,
         window: object,

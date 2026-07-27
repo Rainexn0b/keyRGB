@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from typing import SupportsIndex
-from typing import SupportsInt
-from typing import cast
+from typing import SupportsIndex, SupportsInt, cast
 
-from src.core.effects.device import Color
-from src.core.effects.device import PerKeyColorMap
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from src.core.effects.software_targets import normalize_software_effect_target
+from src.core.effects.device import Color, PerKeyColorMap
+from src.core.effects.software_targets import (
+    SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
+    normalize_software_effect_target,
+)
 from src.core.utils.safe_attrs import safe_int_attr
-
 
 _INT_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 

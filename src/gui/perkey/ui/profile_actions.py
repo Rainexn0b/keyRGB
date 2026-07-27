@@ -10,17 +10,18 @@ from __future__ import annotations
 import logging
 
 from src.core.profile import profiles
+
 from ..editor_support import dirty_state
 from ._profile_actions_support import (
-    _PerKeyProfileEditorProtocol,
     _layout_labels,
     _parse_default_keymap,
+    _PerKeyProfileEditorProtocol,
     _refresh_layout_slot_controls_if_present,
 )
 
 logger = logging.getLogger(__name__)
 # Re-export constant used by UI wiring / tests.
-from ._profile_actions_ui import KEEP_CURRENT_PROFILE_LABEL  # noqa: E402,F401
+from ._profile_actions_ui import KEEP_CURRENT_PROFILE_LABEL  # noqa: F401
 
 
 # Keep module-backed seams patchable while deferring heavier imports until use.
@@ -230,7 +231,7 @@ def reset_layout_defaults_ui(editor: _PerKeyProfileEditorProtocol) -> None:
 
 
 # Re-export heavier UI actions (WS1 / B1).
-from ._profile_actions_ui import (  # noqa: E402,F401
+from ._profile_actions_ui import (  # noqa: F401
     activate_profile_ui,
     delete_profile_ui,
     new_profile_ui,

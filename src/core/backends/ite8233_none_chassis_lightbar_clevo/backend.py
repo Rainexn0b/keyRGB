@@ -9,8 +9,8 @@ from ..base import (
     BackendCapabilities,
     BackendStability,
     ExperimentalEvidence,
-    KeyboardDevice,
     KeyboardBackend,
+    KeyboardDevice,
     ProbeResult,
 )
 from ..policy import experimental_backends_enabled

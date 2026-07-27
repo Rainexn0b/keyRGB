@@ -6,7 +6,6 @@ from ._report_helpers import (
     BUG_REPORT_TEMPLATE,
     EXPERIMENTAL_CONFIRMATION_TEMPLATE,
     HARDWARE_SUPPORT_TEMPLATE,
-    ISSUE_URL as _ISSUE_URL,
     ISSUE_TEMPLATE_LABELS,
     ISSUE_TEMPLATE_URLS,
     fields_for_template,
@@ -15,7 +14,9 @@ from ._report_helpers import (
     selected_backend_probe,
     title_for_template,
 )
-
+from ._report_helpers import (
+    ISSUE_URL as _ISSUE_URL,
+)
 
 ISSUE_URL = _ISSUE_URL
 

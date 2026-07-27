@@ -1,15 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 from typing import Protocol
 
+from src.core.power.system import get_status, set_mode
 from src.core.utils.logging_utils import log_throttled
 from src.tray.controllers import menu_adapters as profile_power_menu_actions
 
-from src.core.power.system import get_status, set_mode
 from ._menu_sections_profile_power import ProfilePowerMenuBuilder
-
 
 _MenuAction = Callable[[object, object], None]
 _ProfileActivationAction = Callable[[], None]

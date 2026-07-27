@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-from typing import Optional
-
-
 _BRIGHTNESS_PARSE_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 
 
@@ -11,9 +8,9 @@ def compute_power_source_policy(
     on_ac: bool,
     ac_enabled: bool,
     battery_enabled: bool,
-    ac_brightness_override: int | float | str | None,
-    battery_brightness_override: int | float | str | None,
-) -> tuple[bool, Optional[int]]:
+    ac_brightness_override: float | str | None,
+    battery_brightness_override: float | str | None,
+) -> tuple[bool, int | None]:
     """Compute desired on/off + optional brightness override for current power source.
 
     Returns:

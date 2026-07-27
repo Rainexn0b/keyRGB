@@ -8,7 +8,6 @@ from PIL import Image, ImageTk
 from . import _app_bootstrap, _app_logic
 from ._internal import _app_runtime_deps
 
-
 Config = _app_runtime_deps.Config
 profiles = _app_runtime_deps.profiles
 get_default_keymap = _app_runtime_deps.get_default_keymap

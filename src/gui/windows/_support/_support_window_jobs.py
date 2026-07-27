@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
 import time
 from collections.abc import Callable
 
-from . import _support_window_backend_probe_adapter as _backend_probe_adapter
 from . import _support_window_backend_probe as _backend_probe
+from . import _support_window_backend_probe_adapter as _backend_probe_adapter
 from . import _support_window_exports as _exports
 
 # Retained for external support window callers.

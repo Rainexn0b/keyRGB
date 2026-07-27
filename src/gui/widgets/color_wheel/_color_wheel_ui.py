@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """UI helpers for the ColorWheel widget.
 
 This module exists to keep src/gui/widgets/color_wheel.py smaller and easier
@@ -10,7 +9,6 @@ from __future__ import annotations
 import tkinter as tk
 from tkinter import ttk
 from typing import Protocol, TypeAlias
-
 
 ColorRGB: TypeAlias = tuple[int, int, int]
 
@@ -31,10 +29,6 @@ class _ConfigurableWidget(Protocol):
     def config(self, **kwargs: object) -> None: ...
 
     def configure(self, **kwargs: object) -> None: ...
-
-
-class _FrameWidget(_PackWidget, Protocol):
-    def columnconfigure(self, index: int, weight: int = 0, **kwargs: object) -> None: ...
 
 
 class _CanvasWidget(_PackWidget, _GridWidget, _BindableWidget, Protocol):

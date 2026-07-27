@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from operator import attrgetter
 
-
 _CONFIG_RELOAD_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _CONFIG_FLAG_READ_EXCEPTIONS = (OSError, RuntimeError, TypeError, ValueError)
 

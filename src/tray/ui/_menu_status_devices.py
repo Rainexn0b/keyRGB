@@ -169,7 +169,7 @@ def selected_device_context_key(
 
     fallback = str(available[0].get("key") or "keyboard") if available else "keyboard"
     try:
-        setattr(tray_state, "selected_device_context", fallback)
+        tray_state.selected_device_context = fallback
     except AttributeError:
         pass
     try:

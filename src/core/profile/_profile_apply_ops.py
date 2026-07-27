@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping
-from typing import Dict, Tuple, cast
+from typing import cast
 
-
-KeyCell = Tuple[int, int]
+KeyCell = tuple[int, int]
 _MISSING = object()
 _READ_FAILED = object()
 _PROFILE_APPLY_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -171,7 +170,7 @@ def migrate_builtin_profile_brightness(
 
 def apply_profile_to_config(
     cfg: object,
-    colors: Dict[Tuple[int, int], Tuple[int, int, int]],
+    colors: dict[tuple[int, int], tuple[int, int, int]],
     *,
     secondary_lighting: Mapping[object, object] | None = None,
     safe_profile_name: Callable[..., object],
@@ -207,7 +206,7 @@ def apply_profile_to_config(
     )
 
     try:
-        atomic_apply_profile_state = getattr(cfg, "apply_perkey_profile_state")
+        atomic_apply_profile_state = getattr(cfg, "apply_perkey_profile_state")  # noqa: B009 - config facade is duck-typed
     except AttributeError:
         atomic_apply_profile_state = None
     use_atomic_profile_apply = callable(atomic_apply_profile_state)

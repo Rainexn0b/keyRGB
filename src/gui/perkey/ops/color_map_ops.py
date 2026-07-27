@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from typing import Dict, Tuple
-
-Color = Tuple[int, int, int]
-Cell = Tuple[int, int]
-ColorMap = Dict[Cell, Color]
+Color = tuple[int, int, int]
+Cell = tuple[int, int]
+ColorMap = dict[Cell, Color]
 
 
 def fill_all(*, num_rows: int, num_cols: int, color: Color) -> ColorMap:

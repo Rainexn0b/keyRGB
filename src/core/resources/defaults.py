@@ -13,12 +13,11 @@ exposing layout-aware accessors for newer UI flows.
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import cache
 from typing import cast
 
 from src.core.resources.layouts import resolve_layout_id
 from src.core.resources.reference_defaults_specs import load_reference_defaults_spec
-
 
 _DEFAULT_LAYOUT_ID = "ansi"
 _SUPPORTED_LAYOUT_IDS = {"ansi", "iso", "ks", "abnt", "jis"}
@@ -37,7 +36,7 @@ def _normalize_layout_id(layout_id: str | None) -> str:
     return value if value in _SUPPORTED_LAYOUT_IDS else _DEFAULT_LAYOUT_ID
 
 
-@lru_cache(maxsize=None)
+@cache
 def _load_defaults(layout_id: str = _DEFAULT_LAYOUT_ID) -> dict[str, object]:
     resolved_layout = _normalize_layout_id(layout_id)
     spec_defaults = load_reference_defaults_spec(resolved_layout)
@@ -160,17 +159,17 @@ DEFAULT_COLORS = build_default_colors()
 
 
 __all__ = [
-    "DEFAULT_LAYOUT_TWEAKS",
-    "DEFAULT_KEYMAP",
-    "DEFAULT_PER_KEY_TWEAKS",
     "DEFAULT_COLORS",
+    "DEFAULT_KEYMAP",
+    "DEFAULT_LAYOUT_TWEAKS",
     "DEFAULT_LIGHTBAR_OVERLAY",
-    "REFERENCE_MATRIX_ROWS",
+    "DEFAULT_PER_KEY_TWEAKS",
     "REFERENCE_MATRIX_COLS",
+    "REFERENCE_MATRIX_ROWS",
     "build_default_colors",
-    "get_default_lightbar_overlay",
     "get_default_keymap",
     "get_default_layout_tweaks",
+    "get_default_lightbar_overlay",
     "get_default_per_key_tweaks",
     "get_reference_matrix_dimensions",
 ]

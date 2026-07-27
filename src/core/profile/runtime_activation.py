@@ -4,7 +4,6 @@ import time
 from collections.abc import Callable, Mapping
 from typing import Protocol, TypeAlias, cast
 
-
 _RUNTIME_ACTIVATION_STATE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 PerKeyCoord: TypeAlias = tuple[int, int]
 PerKeyColor: TypeAlias = tuple[int, int, int]
@@ -83,7 +82,7 @@ def _mark_recent_power_source_transition(
     except _RUNTIME_ACTIVATION_STATE_EXCEPTIONS:
         return
     try:
-        setattr(tray, "_last_power_source_transition_at", changed_at)
+        setattr(tray, "_last_power_source_transition_at", changed_at)  # noqa: B010 – object-typed arg; setattr bypasses mypy attr-defined
     except _RUNTIME_ACTIVATION_STATE_EXCEPTIONS:
         return
     _mirror_optional_idle_power_state_field(
@@ -97,7 +96,7 @@ def _mark_recent_power_source_transition(
 
     profile_name_text = str(profile_name)
     try:
-        setattr(tray, "_last_power_source_transition_profile_name", profile_name_text)
+        setattr(tray, "_last_power_source_transition_profile_name", profile_name_text)  # noqa: B010 – object-typed arg; setattr bypasses mypy attr-defined
     except _RUNTIME_ACTIVATION_STATE_EXCEPTIONS:
         return
     _mirror_optional_idle_power_state_field(

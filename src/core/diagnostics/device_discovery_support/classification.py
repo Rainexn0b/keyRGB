@@ -9,7 +9,6 @@ from ..support.reports import (
     issue_url_for_template,
 )
 
-
 ITE_VENDOR_ID = 0x048D
 
 DEVICE_TYPES_BY_USB_KEY: dict[tuple[int, int], str] = {

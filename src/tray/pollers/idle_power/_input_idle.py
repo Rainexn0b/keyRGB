@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import select
 import time
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable, Optional, Protocol, Sequence, TypeAlias, cast
+from typing import Protocol, TypeAlias, cast
 
 
 class _InputDeviceProtocol(Protocol):
@@ -12,11 +13,6 @@ class _InputDeviceProtocol(Protocol):
 
     def close(self) -> None: ...
     def read(self) -> Iterable[object]: ...
-
-
-class _EvdevModuleProtocol(Protocol):
-    def list_devices(self) -> Sequence[str]: ...
-    def InputDevice(self, path: str) -> _InputDeviceProtocol: ...
 
 
 _InputDevice: TypeAlias = _InputDeviceProtocol
@@ -124,7 +120,7 @@ class InputIdleTracker:
                 pass
         self.devices = None
 
-    def seconds_since_activity(self) -> Optional[float]:
+    def seconds_since_activity(self) -> float | None:
         """Return seconds since the last input event, or None if monitoring failed."""
 
         now = float(self.monotonic_fn())

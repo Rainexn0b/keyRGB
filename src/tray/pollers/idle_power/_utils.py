@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from typing import Optional
-
-
 # Diagnostic-only key formatting: int()/str() failures only (no OS/I-O here).
 _IDLE_ACTION_KEY_RUNTIME_EXCEPTIONS = (RuntimeError, TypeError, ValueError, OverflowError)
 
 
 def debounce_dim_and_screen_off(
     *,
-    dimmed_raw: Optional[bool],
+    dimmed_raw: bool | None,
     screen_off_raw: bool,
     dimmed_true_streak: int,
     dimmed_false_streak: int,
@@ -17,7 +14,7 @@ def debounce_dim_and_screen_off(
     debounce_polls_dimmed_true: int,
     debounce_polls_dimmed_false: int,
     debounce_polls_screen_off_true: int,
-) -> tuple[Optional[bool], bool, int, int, int]:
+) -> tuple[bool | None, bool, int, int, int]:
     """Debounce dimmed and screen-off signals."""
 
     if dimmed_raw is True:
@@ -54,8 +51,8 @@ def debounce_dim_and_screen_off(
 
 def build_idle_action_key(
     *,
-    action: Optional[str],
-    dimmed: Optional[bool],
+    action: str | None,
+    dimmed: bool | None,
     screen_off: bool,
     brightness: int,
     dim_sync_mode: str,
@@ -64,13 +61,13 @@ def build_idle_action_key(
     try:
         return (
             f"{action}|dimmed={dimmed}|screen_off={bool(screen_off)}|"
-            f"bri={int(brightness)}|dim_mode={str(dim_sync_mode)}|dim_tmp={int(dim_temp_brightness)}"
+            f"bri={int(brightness)}|dim_mode={dim_sync_mode!s}|dim_tmp={int(dim_temp_brightness)}"
         )
     except _IDLE_ACTION_KEY_RUNTIME_EXCEPTIONS:  # @quality-exception exception-transparency: idle action key formatting degrades to str(action) so the poller never crashes on non-int fields
         return str(action)
 
 
-def should_log_idle_action(*, action: Optional[str], action_key: str, last_action_key: Optional[str]) -> bool:
+def should_log_idle_action(*, action: str | None, action_key: str, last_action_key: str | None) -> bool:
     is_real_action = bool(action) and str(action) != "none"
     if not is_real_action:
         return False

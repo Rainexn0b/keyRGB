@@ -11,7 +11,6 @@ sibling modules and are re-exported so existing import paths stay stable:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -26,16 +25,16 @@ class TrayIdlePowerState:
     user_forced_off: bool = False
     power_forced_off: bool = False
     dim_temp_active: bool = False
-    dim_temp_target_brightness: Optional[int] = None
+    dim_temp_target_brightness: int | None = None
     dim_sync_suppressed_logged: bool = False
     last_idle_turn_off_at: float = 0.0
     last_resume_at: float = 0.0
     last_brightness: int = 25
     idle_restore_loop_effect_ramp: bool = False
     last_power_source_transition_at: float = 0.0
-    last_power_source_transition_profile_name: Optional[str] = None
-    hidden_perkey_restore_brightness_hint: Optional[int] = None
-    hidden_perkey_restore_device_off_hint: Optional[bool] = None
+    last_power_source_transition_profile_name: str | None = None
+    hidden_perkey_restore_brightness_hint: int | None = None
+    hidden_perkey_restore_device_off_hint: bool | None = None
     last_power_source_blank_recovery_at: float = 0.0
     last_hardware_blank_recovery_at: float = 0.0
     # Consecutive stable-zero recovery attempts that did not restore a non-zero
@@ -67,14 +66,14 @@ def ensure_tray_idle_power_state(tray: object) -> TrayIdlePowerState:
 
     st = TrayIdlePowerState()
     try:
-        setattr(tray, "tray_idle_power_state", st)
+        setattr(tray, "tray_idle_power_state", st)  # noqa: B010 – object-typed arg; setattr bypasses mypy attr-defined
     except AttributeError:
         pass
     return st
 
 
 # Re-exports (WS1 / A2): field bridge + convenience predicates.
-from src.tray._idle_power_fields import (  # noqa: E402,F401
+from src.tray._idle_power_fields import (  # noqa: F401
     clear_idle_power_state_field,
     read_idle_power_state_bool_field,
     read_idle_power_state_float_field,
@@ -83,7 +82,7 @@ from src.tray._idle_power_fields import (  # noqa: E402,F401
     set_idle_power_state_field,
     sync_idle_power_state_field,
 )
-from src.tray._idle_power_predicates import (  # noqa: E402,F401
+from src.tray._idle_power_predicates import (  # noqa: F401
     any_forced_off,
     dim_temp_target_brightness,
     is_dim_temp_active,

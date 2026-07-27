@@ -16,7 +16,7 @@ from src.gui.settings import _settings_values as settings_values
 
 # Keep a module-level datetime binding so tests can monkeypatch
 # ``settings_state.datetime`` and still affect apply paths.
-datetime = datetime
+datetime = datetime  # noqa: PLW0127 – module-level binding for test monkeypatch
 
 # Compatibility re-exports for tests and internal helpers.
 _SettingsConfigLike = settings_reader.SettingsConfigLike

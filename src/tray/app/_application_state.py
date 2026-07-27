@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Protocol
 
 from src.tray.protocols import TrayIconState
 
-
 if TYPE_CHECKING:
     from src.core.config import Config
     from src.tray.idle_power_state import TrayIdlePowerState

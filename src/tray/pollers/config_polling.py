@@ -7,6 +7,7 @@ from pathlib import Path
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.utils.exceptions import is_device_disconnected
+from src.tray.protocols import ConfigPollingTrayProtocol
 
 from .config_polling_internal.core import ConfigApplyState
 from .config_polling_internal.core import apply_from_config_once as _apply_from_config_once_impl
@@ -15,9 +16,6 @@ from .config_polling_internal.core import (
 )
 from .config_polling_internal.core import maybe_apply_fast_path as _maybe_apply_fast_path_impl
 from .config_polling_internal.core import state_for_log as _state_for_log_impl
-
-from src.tray.protocols import ConfigPollingTrayProtocol
-
 
 _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 

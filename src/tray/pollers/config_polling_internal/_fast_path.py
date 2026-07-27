@@ -6,11 +6,9 @@ from src.tray.controllers._lighting_controller_helpers import (
     is_reactive_effect,
     set_engine_perkey_from_config_for_sw_effect,
 )
-from src.tray.protocols import LightingTrayProtocol
-from src.tray.protocols import ConfigPollingTrayProtocol
+from src.tray.protocols import ConfigPollingTrayProtocol, LightingTrayProtocol
 
 from . import helpers
-
 
 FastPathChangeKind = Literal[
     "none",

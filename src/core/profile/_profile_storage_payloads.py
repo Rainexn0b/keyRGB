@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from typing import Dict, Tuple
 
-
-KeyCell = Tuple[int, int]
-KeyCells = Tuple[KeyCell, ...]
+KeyCell = tuple[int, int]
+KeyCells = tuple[KeyCell, ...]
 
 _LIGHTBAR_FLOAT_KEYS = ("length", "thickness", "dx", "dy", "inset")
-_LAYOUT_TWEAK_DEFAULTS: Dict[str, float] = {
+_LAYOUT_TWEAK_DEFAULTS: dict[str, float] = {
     "dx": 0.0,
     "dy": 0.0,
     "sx": 1.0,
@@ -39,7 +37,7 @@ def _normalize_secondary_brightness(raw: object) -> int | None:
     return max(0, min(100, int(raw)))
 
 
-def normalize_secondary_lighting(raw: object) -> Dict[str, object]:
+def normalize_secondary_lighting(raw: object) -> dict[str, object]:
     """Normalize a secondary-lighting payload without destructive migration.
 
     Unknown top-level fields, route keys, and entry fields are retained. The
@@ -50,10 +48,10 @@ def normalize_secondary_lighting(raw: object) -> Dict[str, object]:
     if not isinstance(raw, Mapping):
         return {"version": 1, "areas": {}}
 
-    payload: Dict[str, object] = dict(raw)
+    payload: dict[str, object] = dict(raw)
     payload["version"] = 1
     raw_areas = raw.get("areas")
-    areas: Dict[str, object] = {}
+    areas: dict[str, object] = {}
     if isinstance(raw_areas, Mapping):
         for raw_key, raw_entry in raw_areas.items():
             if not isinstance(raw_key, str) or not raw_key.strip():
@@ -63,7 +61,7 @@ def normalize_secondary_lighting(raw: object) -> Dict[str, object]:
                 areas[raw_key] = raw_entry
                 continue
 
-            entry: Dict[str, object] = dict(raw_entry)
+            entry: dict[str, object] = dict(raw_entry)
             if "enabled" in entry:
                 enabled = _normalize_secondary_enabled(entry["enabled"])
                 if enabled is None:
@@ -94,8 +92,8 @@ def _clamp(value: float, minimum: float, maximum: float) -> float:
 
 def normalize_lightbar_overlay(
     raw: object, *, get_default_lightbar_overlay: Callable[..., object]
-) -> Dict[str, bool | float]:
-    out: Dict[str, bool | float] = dict(get_default_lightbar_overlay())  # type: ignore[call-overload]
+) -> dict[str, bool | float]:
+    out: dict[str, bool | float] = dict(get_default_lightbar_overlay())  # type: ignore[call-overload]
     if isinstance(raw, dict):
         visible = raw.get("visible")
         if isinstance(visible, bool):
@@ -156,8 +154,8 @@ def parse_keymap_cells(raw: object) -> KeyCells:
     return tuple(out)
 
 
-def encode_keymap_payload(keymap: Mapping[str, KeyCells]) -> Dict[str, str | list[str]]:
-    payload: Dict[str, str | list[str]] = {}
+def encode_keymap_payload(keymap: Mapping[str, KeyCells]) -> dict[str, str | list[str]]:
+    payload: dict[str, str | list[str]] = {}
     for key_id, raw_cells in sorted(keymap.items()):
         cells = parse_keymap_cells(raw_cells)
         if not cells:
@@ -167,7 +165,7 @@ def encode_keymap_payload(keymap: Mapping[str, KeyCells]) -> Dict[str, str | lis
     return payload
 
 
-def normalize_layout_global(raw: object) -> Dict[str, float]:
+def normalize_layout_global(raw: object) -> dict[str, float]:
     out = dict(_LAYOUT_TWEAK_DEFAULTS)
     if isinstance(raw, dict):
         for key in _LAYOUT_TWEAK_DEFAULTS:
@@ -178,12 +176,12 @@ def normalize_layout_global(raw: object) -> Dict[str, float]:
     return out
 
 
-def encode_layout_global(tweaks: Mapping[str, float]) -> Dict[str, float]:
+def encode_layout_global(tweaks: Mapping[str, float]) -> dict[str, float]:
     return {key: float(tweaks.get(key, default)) for key, default in _LAYOUT_TWEAK_DEFAULTS.items()}
 
 
-def parse_per_key_colors(raw: object) -> Dict[KeyCell, Tuple[int, int, int]]:
-    out: Dict[KeyCell, Tuple[int, int, int]] = {}
+def parse_per_key_colors(raw: object) -> dict[KeyCell, tuple[int, int, int]]:
+    out: dict[KeyCell, tuple[int, int, int]] = {}
     if not isinstance(raw, dict):
         return out
 
@@ -199,8 +197,8 @@ def parse_per_key_colors(raw: object) -> Dict[KeyCell, Tuple[int, int, int]]:
     return out
 
 
-def encode_per_key_colors(colors: Mapping[KeyCell, Tuple[int, int, int]]) -> Dict[str, list[int]]:
-    payload: Dict[str, list[int]] = {}
+def encode_per_key_colors(colors: Mapping[KeyCell, tuple[int, int, int]]) -> dict[str, list[int]]:
+    payload: dict[str, list[int]] = {}
     for (row, col), rgb in colors.items():
         try:
             rr, gg, bb = rgb

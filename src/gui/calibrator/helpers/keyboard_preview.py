@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Dict, Tuple
-
 import logging
-
-from src.core.utils.logging_utils import log_throttled
+from dataclasses import dataclass
 
 from src.core.config import Config
-
+from src.core.utils.logging_utils import log_throttled
 
 logger = logging.getLogger(__name__)
 _PREVIEW_SNAPSHOT_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _PREVIEW_RESTORE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
-def _full_black_map(*, rows: int, cols: int) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+def _full_black_map(*, rows: int, cols: int) -> dict[tuple[int, int], tuple[int, int, int]]:
     return {(r, c): (0, 0, 0) for r in range(rows) for c in range(cols)}
 
 

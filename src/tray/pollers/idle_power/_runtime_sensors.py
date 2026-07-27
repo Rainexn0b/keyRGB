@@ -5,10 +5,10 @@ Extracted from ``_runtime.py`` (WS1 / A7 slice 1).
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from ._input_idle import InputIdleTracker
-
 
 _IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
@@ -17,8 +17,8 @@ def read_session_idle_state(
     *,
     session_id: str | None,
     idle_timeout_s: float,
-    read_logind_idle_seconds_fn: Callable[..., Optional[float]],
-) -> Optional[bool]:
+    read_logind_idle_seconds_fn: Callable[..., float | None],
+) -> bool | None:
     if not session_id:
         return None
     idle_s = read_logind_idle_seconds_fn(session_id=session_id)
@@ -31,9 +31,9 @@ def read_wayland_dimmed_state(
     *,
     loop_state: object,
     timeout_s: float,
-    create_wayland_idle_tracker_fn: Callable[[int], Optional[Any]],
-    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
-) -> Optional[bool]:
+    create_wayland_idle_tracker_fn: Callable[[int], Any | None],
+    read_wayland_idle_fn: Callable[[Any], bool | None],
+) -> bool | None:
     timeout_ms = int(float(timeout_s) * 1000)
     if timeout_ms <= 0:
         return None
@@ -42,9 +42,9 @@ def read_wayland_dimmed_state(
     if wayland_idle_tracker is None:
         try:
             wayland_idle_tracker = create_wayland_idle_tracker_fn(timeout_ms)
-            setattr(loop_state, "wayland_idle_tracker", wayland_idle_tracker)
+            setattr(loop_state, "wayland_idle_tracker", wayland_idle_tracker)  # noqa: B010 - loop state is duck-typed
         except _IDLE_POWER_RUNTIME_EXCEPTIONS:
-            setattr(loop_state, "wayland_idle_tracker", None)
+            setattr(loop_state, "wayland_idle_tracker", None)  # noqa: B010 - loop state is duck-typed
             return None
 
     tracker = wayland_idle_tracker
@@ -71,7 +71,7 @@ def read_wayland_dimmed_state(
                 close()
         except _IDLE_POWER_RUNTIME_EXCEPTIONS:
             pass
-        setattr(loop_state, "wayland_idle_tracker", None)
+        setattr(loop_state, "wayland_idle_tracker", None)  # noqa: B010 - loop state is duck-typed
 
     return result
 
@@ -79,14 +79,14 @@ def read_wayland_dimmed_state(
 def read_desktop_dimmed_state(
     *,
     loop_state: object,
-    on_ac_power: Optional[bool],
-    read_desktop_dim_timeout_fn: Callable[[Optional[bool]], Optional[float]],
-    create_wayland_idle_tracker_fn: Callable[[int], Optional[Any]],
-    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
+    on_ac_power: bool | None,
+    read_desktop_dim_timeout_fn: Callable[[bool | None], float | None],
+    create_wayland_idle_tracker_fn: Callable[[int], Any | None],
+    read_wayland_idle_fn: Callable[[Any], bool | None],
     create_input_idle_tracker_fn: Callable[[], InputIdleTracker],
-    read_input_idle_seconds_fn: Callable[[InputIdleTracker], Optional[float]],
+    read_input_idle_seconds_fn: Callable[[InputIdleTracker], float | None],
     fallback_timeout_s: float,
-) -> tuple[Optional[bool], Optional[bool]]:
+) -> tuple[bool | None, bool | None]:
     """Use KDE/system dim timeout + session idle as the primary dim signal.
 
     Prefers the Wayland idle notifier when available (it sees touchpad and
@@ -124,7 +124,7 @@ def read_desktop_dimmed_state(
     if input_idle_tracker is None:
         try:
             input_idle_tracker = create_input_idle_tracker_fn()
-            setattr(loop_state, "input_idle_tracker", input_idle_tracker)
+            setattr(loop_state, "input_idle_tracker", input_idle_tracker)  # noqa: B010 - loop state is duck-typed
         except _IDLE_POWER_RUNTIME_EXCEPTIONS:
             return None, None
 

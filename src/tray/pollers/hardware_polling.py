@@ -9,11 +9,13 @@ from src.tray.idle_power_state import (
     is_dim_temp_active,
     read_forced_off_flags,
 )
+from src.tray.pollers.hardware import _recovery
 from src.tray.pollers.hardware._decisions import (
     coerce_poll_int as _coerce_poll_int,
+)
+from src.tray.pollers.hardware._decisions import (
     normalize_brightness_to_config_scale as _normalize_brightness_to_config_scale,
 )
-from src.tray.pollers.hardware import _recovery as _recovery
 from src.tray.protocols import IdlePowerTrayProtocol
 
 # Bind recovery helpers used by this module (and keep short local names).
@@ -123,9 +125,8 @@ def _apply_polled_hardware_state(
             # Some backends report a different scale (e.g. 0..10), which would
             # overwrite the user's tray selection and leave no brightness radio
             # item selected after restart.
-            if last_brightness == 0:
-                if not (user_forced_off or power_forced_off or idle_forced_off):
-                    tray.is_off = False
+            if last_brightness == 0 and not (user_forced_off or power_forced_off or idle_forced_off):
+                tray.is_off = False
 
         _refresh_ui_without_icon_animation(tray)
         return current_brightness, current_off
@@ -228,10 +229,10 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
 
         while True:
             polled_state = _run_recoverable_hardware_poll_boundary(
-                lambda: _poll_hardware_once(
+                lambda lb=last_brightness, lo=last_off_state: _poll_hardware_once(
                     tray,
-                    last_brightness=last_brightness,
-                    last_off_state=last_off_state,
+                    last_brightness=lb,
+                    last_off_state=lo,
                 ),
                 on_recoverable=_recover_polling_error,
             )

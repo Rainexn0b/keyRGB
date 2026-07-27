@@ -92,7 +92,7 @@ class _ReactiveColorRuntime(Protocol):
     def commit_brightness_to_config(
         self,
         config: object,
-        brightness_percent: float | int | None,
+        brightness_percent: float | None,
         *,
         logger: logging.Logger,
     ) -> int | None: ...
@@ -100,7 +100,7 @@ class _ReactiveColorRuntime(Protocol):
     def commit_trail_to_config(
         self,
         config: object,
-        trail_percent: float | int | None,
+        trail_percent: float | None,
         *,
         logger: logging.Logger,
     ) -> int | None: ...
@@ -179,14 +179,14 @@ class ReactiveColorSettingsAdapter:
             logger=self._logger,
         )
 
-    def commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None:
+    def commit_brightness_to_config(self, brightness_percent: float | None) -> int | None:
         return self._runtime.commit_brightness_to_config(
             self._gui.config,
             brightness_percent,
             logger=self._logger,
         )
 
-    def commit_trail_to_config(self, trail_percent: float | int | None) -> int | None:
+    def commit_trail_to_config(self, trail_percent: float | None) -> int | None:
         return self._runtime.commit_trail_to_config(
             self._gui.config,
             trail_percent,

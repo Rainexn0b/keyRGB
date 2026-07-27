@@ -17,22 +17,22 @@ mapping even if the boxes are slightly off.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable, List, Tuple, cast
+from typing import cast
 
 from .layout_specs import load_layout_spec
 
-
-BASE_IMAGE_SIZE: Tuple[int, int] = (1008, 450)
+BASE_IMAGE_SIZE: tuple[int, int] = (1008, 450)
 
 
 @dataclass(frozen=True)
 class KeyDef:
     key_id: str
     label: str
-    rect: Tuple[int, int, int, int]  # x, y, w, h in BASE_IMAGE_SIZE coords
+    rect: tuple[int, int, int, int]  # x, y, w, h in BASE_IMAGE_SIZE coords
     slot_id: str | None = None
-    shape_segments: Tuple[Tuple[float, float, float, float], ...] | None = None
+    shape_segments: tuple[tuple[float, float, float, float], ...] | None = None
 
     def __post_init__(self) -> None:
         if not self.slot_id:
@@ -48,14 +48,14 @@ def _units_row(
     x0: int,
     unit: int,
     gap: int,
-    keys: Iterable[Tuple[str, str, float]],
+    keys: Iterable[tuple[str, str, float]],
     *,
     slot_prefix: str,
-) -> List[KeyDef]:
-    out: List[KeyDef] = []
+) -> list[KeyDef]:
+    out: list[KeyDef] = []
     x = x0
     for index, (key_id, label, w_units) in enumerate(keys):
-        w = int(round(w_units * unit + (w_units - 1) * 0))
+        w = round(w_units * unit + (w_units - 1) * 0)
         out.append(
             KeyDef(
                 key_id=key_id,
@@ -73,26 +73,26 @@ def _units_row_with_spacers(
     x0: int,
     unit: int,
     gap: int,
-    items: Iterable[Tuple[str, str, float, str | None] | Tuple[None, None, float, None]],
+    items: Iterable[tuple[str, str, float, str | None] | tuple[None, None, float, None]],
     *,
     slot_prefix: str,
-) -> List[KeyDef]:
+) -> list[KeyDef]:
     """Row helper that supports spacer runs.
 
     Use (None, None, width_units) to advance x without creating a key.
     """
 
-    out: List[KeyDef] = []
+    out: list[KeyDef] = []
     x = x0
     slot_index = 0
     for key_id, label, w_units, slot_id in items:
         if key_id is None:
-            x += int(round(w_units * unit))
+            x += round(w_units * unit)
             continue
 
         key_id_str = cast(str, key_id)
         label_str = cast(str, label)
-        w = int(round(w_units * unit))
+        w = round(w_units * unit)
         out.append(
             KeyDef(
                 key_id=key_id_str,
@@ -109,7 +109,7 @@ def _units_row_with_spacers(
 def _segmented_key(
     key_id: str,
     label: str,
-    segments: Iterable[Tuple[int, int, int, int]],
+    segments: Iterable[tuple[int, int, int, int]],
     *,
     slot_id: str | None = None,
 ) -> KeyDef:
@@ -153,14 +153,14 @@ def _normalize_layout_variant(variant: str | None) -> str:
     return normalized if normalized in LAYOUT_VARIANTS else "iso"
 
 
-def _end_x(keys: List[KeyDef]) -> int:
+def _end_x(keys: list[KeyDef]) -> int:
     if not keys:
         return 0
     last = keys[-1]
     return int(last.rect[0] + last.rect[2])
 
 
-def build_layout(*, variant: str | None = None, include_iso: bool | None = None) -> List[KeyDef]:
+def build_layout(*, variant: str | None = None, include_iso: bool | None = None) -> list[KeyDef]:
     """Return the built-in reference layout.
 
     ``variant`` selects a concrete physical keyboard family. Supported values
@@ -193,7 +193,7 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
     nav_x0 = 748
     nx0 = 806
 
-    keys: List[KeyDef] = []
+    keys: list[KeyDef] = []
 
     fy = r0 - 66
     row_tops = {
@@ -216,8 +216,8 @@ def build_layout(*, variant: str | None = None, include_iso: bool | None = None)
     return keys
 
 
-def _build_reference_device_keys() -> List[KeyDef]:
-    out: List[KeyDef] = []
+def _build_reference_device_keys() -> list[KeyDef]:
+    out: list[KeyDef] = []
     seen: set[str] = set()
     for variant_name in ("iso", "ansi", "ks", "abnt", "jis"):
         for key in build_layout(variant=variant_name):
@@ -229,7 +229,7 @@ def _build_reference_device_keys() -> List[KeyDef]:
 
 
 # Superset used by backends and overlay helpers that need a stable key-id index.
-REFERENCE_DEVICE_KEYS: List[KeyDef] = _build_reference_device_keys()
+REFERENCE_DEVICE_KEYS: list[KeyDef] = _build_reference_device_keys()
 
 
 def get_layout_keys(
@@ -237,7 +237,7 @@ def get_layout_keys(
     *,
     legend_pack_id: str | None = None,
     slot_overrides: dict[str, dict[str, object]] | None = None,
-) -> List[KeyDef]:
+) -> list[KeyDef]:
     """Return the reference layout key list for *physical_layout*.
 
     Delegates to :mod:`src.core.resources.layouts` for catalog resolution.

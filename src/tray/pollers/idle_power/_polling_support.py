@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 import os
-from typing import TYPE_CHECKING, Any, Optional, cast
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, cast
 
-from src.tray.protocols import sync_idle_power_state_field
 from src.core.utils.safe_attrs import safe_str_attr
-
+from src.tray.protocols import sync_idle_power_state_field
 
 if TYPE_CHECKING:
     from src.tray.protocols import IdlePowerTrayProtocol
@@ -136,20 +135,20 @@ def poll_idle_power_loop(
     *,
     idle_timeout_s: float,
     create_loop_state_fn: Callable[[], IdlePollLoopState],
-    get_session_id_fn: Callable[[], Optional[str]],
+    get_session_id_fn: Callable[[], str | None],
     run_idle_power_iteration_fn: Callable[..., None],
     now_monotonic_fn: Callable[[], float],
     sleep_fn: Callable[[float], None],
     ensure_idle_state_fn: Callable[[IdlePowerTrayProtocol], None],
-    read_dimmed_state_fn: Callable[[BacklightState], Optional[bool]],
-    read_screen_off_state_drm_fn: Callable[[], Optional[bool]],
-    debounce_dim_and_screen_off_fn: Callable[..., tuple[Optional[bool], bool, int, int, int]],
-    read_logind_idle_seconds_fn: Callable[..., Optional[float]],
-    read_desktop_dim_timeout_fn: Callable[[Optional[bool]], Optional[float]],
-    create_wayland_idle_tracker_fn: Callable[[int], Optional[Any]],
-    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
+    read_dimmed_state_fn: Callable[[BacklightState], bool | None],
+    read_screen_off_state_drm_fn: Callable[[], bool | None],
+    debounce_dim_and_screen_off_fn: Callable[..., tuple[bool | None, bool, int, int, int]],
+    read_logind_idle_seconds_fn: Callable[..., float | None],
+    read_desktop_dim_timeout_fn: Callable[[bool | None], float | None],
+    create_wayland_idle_tracker_fn: Callable[[int], Any | None],
+    read_wayland_idle_fn: Callable[[Any], bool | None],
     create_input_idle_tracker_fn: Callable[[], InputIdleTracker],
-    read_input_idle_seconds_fn: Callable[[InputIdleTracker], Optional[float]],
+    read_input_idle_seconds_fn: Callable[[InputIdleTracker], float | None],
     effective_screen_dim_sync_enabled_fn: Callable[[IdlePowerTrayProtocol, bool], bool],
     compute_idle_action_fn: Callable[..., object],
     build_idle_action_key_fn: Callable[..., str],

@@ -3,19 +3,20 @@ from __future__ import annotations
 import math
 import random
 import time
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING
 
 from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer, scale_color_map_into
-from .base import animation_step_s, Color, Key, base_color_map, frame_dt_s, mix, pace, render as base_render
+from .base import Color, Key, animation_step_s, base_color_map, frame_dt_s, mix, pace
+from .base import render as base_render
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
 
 
-def run_breathing(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_breathing(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Breathing (SW): smooth breathing that respects per-key when available."""
 
     base = base_color_map(engine)
@@ -37,7 +38,7 @@ def run_breathing(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         engine.stop_event.wait(nominal_dt)
 
 
-def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_fire(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Fire (SW): higher-FPS, smoother flames; overlays onto per-key base when present."""
 
     base = base_color_map(engine)
@@ -63,7 +64,7 @@ def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             for c in range(NUM_COLS):
                 heat[r][c] = max(0.0, heat[r][c] - cooling)
 
-        sparks = max(1, int(round((2 * p) * step_ratio)))
+        sparks = max(1, round((2 * p) * step_ratio))
         for _ in range(sparks):
             c = random.randrange(NUM_COLS)
             r = random.randrange(min(2, NUM_ROWS))
@@ -88,7 +89,7 @@ def run_fire(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         engine.stop_event.wait(nominal_dt)
 
 
-def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_random(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Random (SW): frequent, smooth cross-fades; per-key when available."""
 
     nominal_dt = frame_dt_s()
@@ -112,7 +113,7 @@ def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
             prev.clear()
             prev.update(target)
 
-            for k in target.keys():
+            for k in target:
                 rr = random.randint(0, 255)
                 gg = random.randint(0, 255)
                 bb = random.randint(0, 255)
@@ -126,14 +127,14 @@ def run_random(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
         t = min(1.0, t + step_s * (1.8 * p))
         color_map.clear()
-        for k in target.keys():
+        for k in target:
             color_map[k] = mix(prev[k], target[k], t)
         render_fn(engine, color_map=color_map)
 
         engine.stop_event.wait(nominal_dt)
 
 
-def run_rainbow_wave(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_rainbow_wave(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Rainbow Wave (SW): OpenRGB-style hue gradient wave across the key matrix."""
 
     nominal_dt = frame_dt_s()
@@ -141,7 +142,7 @@ def run_rainbow_wave(engine: "EffectsEngine", *, render_fn=base_render) -> None:
 
     col_den = float(max(1, NUM_COLS - 1))
     row_den = float(max(1, NUM_ROWS - 1))
-    pos: Dict[Key, float] = {}
+    pos: dict[Key, float] = {}
     for r in range(NUM_ROWS):
         for c in range(NUM_COLS):
             pos[(r, c)] = (float(c) / col_den) + (0.18 * (float(r) / row_den))
@@ -162,7 +163,7 @@ def run_rainbow_wave(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         engine.stop_event.wait(nominal_dt)
 
 
-def run_rainbow_swirl(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_rainbow_swirl(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Rainbow Swirl (SW): OpenRGB-style swirl around the keyboard center."""
 
     nominal_dt = frame_dt_s()
@@ -170,7 +171,7 @@ def run_rainbow_swirl(engine: "EffectsEngine", *, render_fn=base_render) -> None
 
     cr = (NUM_ROWS - 1) / 2.0
     cc = (NUM_COLS - 1) / 2.0
-    coords: Dict[Key, tuple[float, float]] = {}
+    coords: dict[Key, tuple[float, float]] = {}
     max_r = 0.0
     for r in range(NUM_ROWS):
         for c in range(NUM_COLS):
@@ -198,7 +199,7 @@ def run_rainbow_swirl(engine: "EffectsEngine", *, render_fn=base_render) -> None
         engine.stop_event.wait(nominal_dt)
 
 
-def run_spectrum_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_spectrum_cycle(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Spectrum Cycle (SW): OpenRGB-style uniform hue cycling."""
 
     nominal_dt = frame_dt_s()
@@ -216,7 +217,7 @@ def run_spectrum_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> Non
         engine.stop_event.wait(nominal_dt)
 
 
-def run_color_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
+def run_color_cycle(engine: EffectsEngine, *, render_fn=base_render) -> None:
     """Color Cycle (SW): smooth RGB cycling (OpenRGB-style)."""
 
     nominal_dt = frame_dt_s()
@@ -228,7 +229,7 @@ def run_color_cycle(engine: "EffectsEngine", *, render_fn=base_render) -> None:
         r = (math.sin(phase) + 1.0) / 2.0
         g = (math.sin(phase + (2.0 * math.pi / 3.0)) + 1.0) / 2.0
         b = (math.sin(phase + (4.0 * math.pi / 3.0)) + 1.0) / 2.0
-        rgb = (int(round(r * 255)), int(round(g * 255)), int(round(b * 255)))
+        rgb = (round(r * 255), round(g * 255), round(b * 255))
         fill_uniform_color_map(color_map, color=rgb)
         render_fn(engine, color_map=color_map)
 

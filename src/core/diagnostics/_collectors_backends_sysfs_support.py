@@ -5,7 +5,6 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-
 _EXPECTED_RUNTIME_ERRORS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
 _ACCESS_ERRORS = (NotImplementedError, OSError, TypeError, ValueError)
 

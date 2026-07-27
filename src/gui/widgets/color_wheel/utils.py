@@ -1,11 +1,10 @@
 import math
-from typing import Tuple
 
 from ._color_wheel_ui import ColorWheelCallback
 
 # Type aliases
 # RGB color is (0..255, 0..255, 0..255)
-ColorRGB = Tuple[int, int, int]
+ColorRGB = tuple[int, int, int]
 
 
 def hex_to_rgb(hex_color: str) -> ColorRGB:
@@ -13,8 +12,7 @@ def hex_to_rgb(hex_color: str) -> ColorRGB:
     s = str(hex_color or "").strip()
     if not s:
         return (0x2B, 0x2B, 0x2B)
-    if s.startswith("#"):
-        s = s[1:]
+    s = s.removeprefix("#")
     if len(s) == 3:
         s = "".join([c * 2 for c in s])
     if len(s) != 6:
@@ -85,7 +83,7 @@ def invoke_callback(
         cb(red, green, blue)
 
 
-def hsv_to_xy(hue: float, saturation: float, radius: float) -> Tuple[float, float]:
+def hsv_to_xy(hue: float, saturation: float, radius: float) -> tuple[float, float]:
     """Calculate X, Y coordinates on the wheel from Hue and Saturation.
 
     hue: 0..1

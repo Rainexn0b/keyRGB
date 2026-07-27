@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Callable, Mapping, Protocol
+from typing import Protocol
 
 from src.core.resources.layout import KeyDef
 
 from . import _app_profile_layout
-
 
 Keymap = _app_profile_layout.Keymap
 LayoutTweaks = _app_profile_layout.LayoutTweaks

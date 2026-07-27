@@ -1,12 +1,9 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from typing import Protocol, TypeAlias, TypeVar
 
 from . import _support_window_probe_dialog_layout as _dialog_layout
-
 
 _GridPadding: TypeAlias = tuple[int, int]
 _DialogAction: TypeAlias = Callable[[], None]

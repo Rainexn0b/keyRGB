@@ -101,7 +101,6 @@ class Ite8291ZonesKeyboardDevice:
 
     def set_effect(self, effect_data) -> None:
         del effect_data
-        return
 
     def close(self) -> None:
         """Release the HID transport if one was provided."""

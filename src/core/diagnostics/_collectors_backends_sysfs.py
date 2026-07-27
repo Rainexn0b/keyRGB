@@ -5,12 +5,14 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from ._collectors_backends_sysfs_support import _ACCESS_ERRORS
-from ._collectors_backends_sysfs_support import _EXPECTED_RUNTIME_ERRORS
-from ._collectors_backends_sysfs_support import _append_error
-from ._collectors_backends_sysfs_support import _build_led_entry
-from ._collectors_backends_sysfs_support import _exception_snapshot
-from ._collectors_backends_sysfs_support import _infer_zone_snapshot
+from ._collectors_backends_sysfs_support import (
+    _ACCESS_ERRORS,
+    _EXPECTED_RUNTIME_ERRORS,
+    _append_error,
+    _build_led_entry,
+    _exception_snapshot,
+    _infer_zone_snapshot,
+)
 
 
 def sysfs_led_candidates_snapshot() -> dict[str, Any]:

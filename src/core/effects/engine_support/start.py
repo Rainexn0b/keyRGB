@@ -113,7 +113,7 @@ class _EngineStart:
         force_hardware = is_forced_hardware_effect(requested_effect_name)
         effect_name = strip_effect_namespace(requested_effect_name)
         backend_effects = self.get_backend_effects()
-        available_hw_effects = frozenset(str(name or "").strip().lower() for name in backend_effects.keys())
+        available_hw_effects = frozenset(str(name or "").strip().lower() for name in backend_effects)
         known_effects = frozenset(self.SW_EFFECTS) | available_hw_effects
 
         if effect_name not in known_effects:

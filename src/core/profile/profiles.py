@@ -15,9 +15,9 @@ profile data by writing to config when you activate a profile.
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: profile storage public API surface (load/save/normalize); ops already partially in _profile_* modules
-
 import logging
 from collections.abc import Mapping
+
 from src.core.config import layout_slots as config_layout_slots
 from src.core.resources import defaults as resource_defaults
 from src.core.resources import layout_slots as resource_layout_slots
@@ -29,7 +29,6 @@ from . import _profile_apply_ops as apply_ops
 from . import _profile_storage_ops as storage_ops
 from . import json_storage
 from . import paths as profile_paths
-
 
 load_backdrop_mode = backdrop_ops.load_backdrop_mode
 load_backdrop_transparency = backdrop_ops.load_backdrop_transparency
@@ -77,11 +76,11 @@ KeyCells = tuple[KeyCell, ...]
 __all__ = [
     "DEFAULT_PROFILE_NAME",
     "_DEFAULT_PROFILE",
-    "default_profile_path",
     "apply_profile_to_config",
+    "default_profile_path",
     "delete_profile",
-    "get_default_profile",
     "get_active_profile",
+    "get_default_profile",
     "list_profiles",
     "load_backdrop_mode",
     "load_backdrop_transparency",
@@ -92,6 +91,7 @@ __all__ = [
     "load_lightbar_overlay",
     "load_per_key_colors",
     "load_secondary_lighting",
+    "migrate_builtin_profile_brightness",
     "normalize_backdrop_mode",
     "normalize_keymap",
     "normalize_layout_per_key_tweaks",
@@ -109,10 +109,9 @@ __all__ = [
     "save_lightbar_overlay",
     "save_per_key_colors",
     "save_secondary_lighting",
-    "update_secondary_lighting_area",
-    "migrate_builtin_profile_brightness",
     "set_active_profile",
     "set_default_profile",
+    "update_secondary_lighting_area",
 ]
 
 

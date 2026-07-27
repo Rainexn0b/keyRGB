@@ -138,8 +138,8 @@ def _build_ite8291r3_speed_probe_plan() -> dict[str, Any]:
     for ui_speed in ui_speeds:
         captured_kwargs: dict[str, object] = {}
 
-        def _capture_effect(**kwargs: object) -> dict[str, object]:
-            captured_kwargs.update(kwargs)
+        def _capture_effect(_ck=captured_kwargs, **kwargs: object) -> dict[str, object]:
+            _ck.update(kwargs)
             return dict(kwargs)
 
         payload = build_hw_effect_payload(

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 from typing import TypeVar
 
 from src.core.backends.base import KeyboardBackend, KeyboardDevice
-from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
-from src.gui._backend_runtime import select_backend
+from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 from src.core.utils.logging_utils import log_throttled
-
+from src.gui._backend_runtime import select_backend
 
 logger = logging.getLogger(__name__)
 _T = TypeVar("_T")

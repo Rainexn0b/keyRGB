@@ -5,6 +5,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
+from ..model import DiagnosticsConfigSnapshot
+from ..paths import config_file_path
 from .backends import backend_probe_snapshot
 from .system import (
     app_snapshot,
@@ -14,9 +16,6 @@ from .system import (
     system_power_mode_snapshot,
     system_snapshot,
 )
-from ..model import DiagnosticsConfigSnapshot
-from ..paths import config_file_path
-
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +116,6 @@ __all__ = [
     "list_module_hints",
     "list_platform_hints",
     "power_supply_snapshot",
-    "system_snapshot",
     "system_power_mode_snapshot",
+    "system_snapshot",
 ]

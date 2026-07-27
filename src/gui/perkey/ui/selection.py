@@ -79,7 +79,4 @@ def select_visible_identity(editor: object, *, slot_id: str | None = None, key_i
     if resolved_slot_id and _select_slot_id_if_present(editor, str(resolved_slot_id)):
         return True
 
-    if _select_key_id_if_present(editor, str(resolved_key_id)):
-        return True
-
-    return False
+    return bool(_select_key_id_if_present(editor, str(resolved_key_id)))

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Secondary-device lighting facade shared by Config lighting accessors."""
 
 from __future__ import annotations
@@ -100,7 +99,7 @@ class LightingSecondaryDeviceFacade:
     def set_secondary_device_enabled(
         self,
         state_key: str,
-        value: bool | int | float,
+        value: bool | float,
         *,
         compatibility_key: str | None = None,
     ) -> None:

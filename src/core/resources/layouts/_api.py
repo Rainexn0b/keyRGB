@@ -5,9 +5,10 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from .catalog import get_layout_def
 from src.core.resources.layout_legends import apply_layout_legend_pack, clear_layout_legend_cache
 from src.core.resources.layout_slots import apply_layout_slot_overrides, sanitize_layout_slot_overrides
+
+from .catalog import get_layout_def
 
 if TYPE_CHECKING:
     from src.core.resources.layout import KeyDef
@@ -48,7 +49,7 @@ def resolve_layout_id(layout_id: str) -> str:
 
 
 @lru_cache(maxsize=16)
-def _get_layout_keys_cached(layout_id: str) -> tuple["KeyDef", ...]:
+def _get_layout_keys_cached(layout_id: str) -> tuple[KeyDef, ...]:
     ld = get_layout_def(layout_id)
 
     # Import here to avoid a circular dependency (layout.py imports from
@@ -59,7 +60,7 @@ def _get_layout_keys_cached(layout_id: str) -> tuple["KeyDef", ...]:
 
 
 @lru_cache(maxsize=16)
-def _get_layout_lookup_cached(layout_id: str) -> tuple[dict[str, "KeyDef"], dict[str, "KeyDef"]]:
+def _get_layout_lookup_cached(layout_id: str) -> tuple[dict[str, KeyDef], dict[str, KeyDef]]:
     keys = _get_layout_keys_cached(layout_id)
     by_key_id = {str(key.key_id): key for key in keys}
     by_slot_id = {str(key.slot_id): key for key in keys}
@@ -71,7 +72,7 @@ def get_layout_keys(
     *,
     legend_pack_id: str | None = None,
     slot_overrides: dict[str, dict[str, object]] | None = None,
-) -> list["KeyDef"]:
+) -> list[KeyDef]:
     """Return the reference layout key list for *layout_id*.
 
     Resolves ``"auto"`` via sysfs detection, then delegates to

@@ -4,7 +4,6 @@ import os
 import tkinter as tk
 from tkinter import ttk
 
-
 _BG_COLOR = "#2b2b2b"
 _FG_COLOR = "#e0e0e0"
 

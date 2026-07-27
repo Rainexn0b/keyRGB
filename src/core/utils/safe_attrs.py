@@ -13,8 +13,7 @@ Migration:
 
 from __future__ import annotations
 
-from typing import Optional, overload
-
+from typing import overload
 
 _SAFE_ATTR_ACCESS_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _SAFE_NUMERIC_FALLBACK_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -32,10 +31,10 @@ def _coerce_int_like(raw: object, *, default: int) -> int: ...
 
 
 @overload
-def _coerce_int_like(raw: object, *, default: None) -> Optional[int]: ...
+def _coerce_int_like(raw: object, *, default: None) -> int | None: ...
 
 
-def _coerce_int_like(raw: object, *, default: Optional[int]) -> Optional[int]:
+def _coerce_int_like(raw: object, *, default: int | None) -> int | None:
     _raw = raw
     try:
         return int(_raw)  # type: ignore[call-overload]
@@ -49,7 +48,7 @@ def _coerce_int_like(raw: object, *, default: Optional[int]) -> Optional[int]:
 
 
 def safe_int_attr(
-    obj: object, name: str, *, default: int = 0, min_v: Optional[int] = None, max_v: Optional[int] = None
+    obj: object, name: str, *, default: int = 0, min_v: int | None = None, max_v: int | None = None
 ) -> int:
     """Safely get an integer attribute with explicit default.
 
@@ -104,7 +103,7 @@ def safe_bool_attr(obj: object, name: str, *, default: bool = False) -> bool:
 
 
 def safe_float_attr(
-    obj: object, name: str, *, default: float = 0.0, min_v: Optional[float] = None, max_v: Optional[float] = None
+    obj: object, name: str, *, default: float = 0.0, min_v: float | None = None, max_v: float | None = None
 ) -> float:
     """Safely get a float attribute with explicit default.
 
@@ -155,9 +154,7 @@ def safe_str_attr(obj: object, name: str, *, default: str = "") -> str:
     return str(raw)
 
 
-def safe_optional_int_attr(
-    obj: object, name: str, *, min_v: Optional[int] = None, max_v: Optional[int] = None
-) -> Optional[int]:
+def safe_optional_int_attr(obj: object, name: str, *, min_v: int | None = None, max_v: int | None = None) -> int | None:
     """Safely get an optional integer attribute (preserves None).
 
     Unlike safe_int_attr, this returns None when the attribute is None or missing,

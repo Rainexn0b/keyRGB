@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable, Literal, Protocol, TypeAlias, cast
+from collections.abc import Callable
+from typing import Literal, Protocol, TypeAlias, cast
 
 Color: TypeAlias = tuple[int, int, int]
 ColorApplyResult = bool | Literal["deferred"]

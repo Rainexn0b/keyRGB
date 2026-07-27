@@ -1,14 +1,12 @@
-#!/usr/bin/env python3
 """Boundary helpers for config polling - exception tuples, logging, recoverable runtime seams."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 from typing import TypeVar
 
 from src.tray.protocols import ConfigPollingTrayProtocol
-
 
 logger = logging.getLogger(__name__)
 

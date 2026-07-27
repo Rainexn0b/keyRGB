@@ -6,7 +6,6 @@ import os
 import subprocess
 from shutil import which
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -100,7 +99,7 @@ def _read_kde_colorscheme_from_ini(kdeglobals: str) -> str | None:
         with open(kdeglobals, "r", encoding="utf-8", errors="ignore") as f:
             for raw in f:
                 line = raw.strip()
-                if not line or line.startswith("#") or line.startswith(";"):
+                if not line or line.startswith(("#", ";")):
                     continue
                 if line.startswith("[") and line.endswith("]"):
                     in_general = line.lower() == "[general]"

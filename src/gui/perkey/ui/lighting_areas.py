@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import ttk
-from typing import TYPE_CHECKING, Callable, cast
+from typing import TYPE_CHECKING, cast
 
 from src.core.secondary_device_runtime import iter_effective_secondary_routes
 
@@ -20,7 +21,7 @@ _KEYBOARD_TARGET = "keyboard"
 
 
 def _hex_color(color: tuple[int, int, int]) -> str:
-    return "#%02x%02x%02x" % color
+    return "#{:02x}{:02x}{:02x}".format(*color)
 
 
 def _rgb_text(color: tuple[int, int, int]) -> str:

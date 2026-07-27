@@ -6,8 +6,7 @@ Extracted from ``_menu_status_devices.py`` (WS1 / B3 slice 1).
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Protocol, TypeVar, TypedDict
-
+from typing import Protocol, TypedDict, TypeVar
 
 _T = TypeVar("_T")
 

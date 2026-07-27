@@ -7,9 +7,9 @@ from ..io import parse_hex_int
 from .classification import (
     candidate_device_type,
     candidate_status,
-    primary_candidate,
     parse_probe_usb_key,
     parse_usb_id_entry,
+    primary_candidate,
     support_actions,
 )
 

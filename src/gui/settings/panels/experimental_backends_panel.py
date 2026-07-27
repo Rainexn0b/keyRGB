@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import ttk
-
 
 _WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 

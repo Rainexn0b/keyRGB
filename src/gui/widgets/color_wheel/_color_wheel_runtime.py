@@ -5,7 +5,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Protocol, TypeVar
 
-
 ColorRGB = tuple[int, int, int]
 _PhotoImageT = TypeVar("_PhotoImageT")
 

@@ -2,15 +2,19 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping
-from typing import Optional, TypeVar
+from typing import TypeVar
 
-from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET as SW_EFFECTS
-from src.core.effects.catalog import is_forced_hardware_effect, resolve_effect_name_for_backend, strip_effect_namespace
+from src.core.effects.catalog import (
+    REACTIVE_EFFECTS,
+    is_forced_hardware_effect,
+    resolve_effect_name_for_backend,
+    strip_effect_namespace,
+)
+from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.perkey_animation import per_key_mode_requires_frame_reassert
 from src.core.lighting_layers import resolve_render_effect
 from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
 from src.tray.protocols import LightingTrayProtocol
-
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 logger = logging.getLogger(__name__)
@@ -104,7 +108,7 @@ def _config_per_key_colors_ref(config: object) -> Mapping[object, object] | None
     return None
 
 
-def parse_menu_int(item: object) -> Optional[int]:
+def parse_menu_int(item: object) -> int | None:
     def _stringify_item() -> str | None:
         return str(item)
 
@@ -286,7 +290,7 @@ def sync_reactive_effect_brightness_state(
 
 
 # Re-export mode apply helpers (WS1 / A6) for stable import path.
-from src.tray.controllers._lighting_mode_apply import (  # noqa: E402,F401
+from src.tray.controllers._lighting_mode_apply import (  # noqa: F401
     apply_perkey_mode,
     apply_uniform_none_mode,
 )

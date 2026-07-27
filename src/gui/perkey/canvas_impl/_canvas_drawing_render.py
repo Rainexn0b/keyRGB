@@ -7,7 +7,6 @@ from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef
 
 from ._canvas_drawing_helpers import ShapeRect
 
-
 CanvasItemId: TypeAlias = int
 KeyCell: TypeAlias = tuple[int, int]
 RGBColor: TypeAlias = tuple[int, int, int]

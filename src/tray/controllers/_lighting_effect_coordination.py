@@ -7,11 +7,11 @@ start_current_effect() public facade.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
-from src.core.lighting_layers import resolve_render_effect
 from src.core.effects.reactive import _render_brightness_support as _reactive_support
+from src.core.lighting_layers import resolve_render_effect
 from src.tray.protocols import LightingTrayProtocol, read_idle_power_state_bool_field
 
 

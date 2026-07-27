@@ -19,7 +19,6 @@ from src.gui.utils.profile_backdrop_storage import load_backdrop_image
 from ..lightbar_layout import lightbar_rect_for_size
 from ..profile_management import keymap_cells_for, representative_cell
 
-
 KeyCell = tuple[int, int]
 KeyCells = tuple[KeyCell, ...]
 LayoutTweaks = dict[str, float]

@@ -3,13 +3,13 @@ from __future__ import annotations
 from ..profile_management import keymap_cells_for
 from . import _sample_tool_support as _support
 from .selection import select_visible_identity
-from .wheel_apply import on_wheel_color_release_ui
 from .status import (
     sample_tool_pick_a_key,
     sample_tool_sampled_color,
     sample_tool_unmapped_key,
     set_status,
 )
+from .wheel_apply import on_wheel_color_release_ui
 
 
 def on_sample_tool_toggled_ui(editor: _support._SampleToolToggleEditorProtocol) -> None:

@@ -5,7 +5,6 @@ from datetime import datetime
 
 from src.core.config.defaults import DEFAULTS
 
-
 _BRIGHTNESS_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 _DEFAULT_TIME_SCHEDULER_ENABLED = bool(DEFAULTS["time_scheduler_enabled"])
 _DEFAULT_POWER_MANAGEMENT_ENABLED = bool(DEFAULTS["power_management_enabled"])

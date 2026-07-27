@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import subprocess
 from collections.abc import Callable
-from typing import Optional
 
 from .lid_monitoring import poll_lid_state_paths
 
@@ -60,7 +59,7 @@ def monitor_acpi_events(
     If `acpi_listen` isn't available, falls back to polling lid state paths.
     """
 
-    process: Optional[subprocess.Popen] = None
+    process: subprocess.Popen | None = None
 
     try:
         process = subprocess.Popen(

@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Callable, Mapping, Protocol, TypeAlias
+from typing import Protocol, TypeAlias
 
 from PIL import Image
 
@@ -15,7 +16,6 @@ from ._internal._app_profile_layout import (
     _ProbeSelectedIdentityFn,
     _SanitizeKeymapCellsFn,
 )
-
 
 _CalibratorConfigLike = _app_profile_layout._CalibratorConfigLike
 keymap_path_for_active_profile = _app_profile_layout.keymap_path_for_active_profile
@@ -227,7 +227,7 @@ def save_current_keymap(
     physical_layout_id_fn: PhysicalLayoutIdFn,
 ) -> None:
     save_keymap_fn(app.keymap, physical_layout=physical_layout_id_fn(app))
-    app.lbl_status.configure(text=f"Saved to {str(keymap_path_fn())}")
+    app.lbl_status.configure(text=f"Saved to {keymap_path_fn()!s}")
 
 
 def save_and_close(app: _CalibratorAppLike) -> None:

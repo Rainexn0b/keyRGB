@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -15,26 +14,29 @@ class BatterySaverPolicy:
     target_brightness: int = 25
     debounce_seconds: float = 3.0
 
-    _last_state: Optional[bool] = None
+    _last_state: bool | None = None
     _last_change_ts: float = 0.0
-    _saved_ac_brightness: Optional[int] = None
-    _applied_battery_brightness: Optional[int] = None
+    _saved_ac_brightness: int | None = None
+    _applied_battery_brightness: int | None = None
     _manual_override_on_battery: bool = False
 
     def configure(self, *, enabled: bool, target_brightness: int) -> None:
         self.enabled = bool(enabled)
         self.target_brightness = int(target_brightness)
 
-    def update(self, *, on_ac: bool, current_brightness: int, is_off: bool, now: float) -> Optional[int]:
+    def update(self, *, on_ac: bool, current_brightness: int, is_off: bool, now: float) -> int | None:
         """Process current inputs and return a brightness to apply, if any."""
 
         on_ac = bool(on_ac)
         current_brightness = int(current_brightness)
 
         # Track manual overrides while on battery (user brightness differs from what we set).
-        if self._last_state is False and self._applied_battery_brightness is not None:
-            if current_brightness != int(self._applied_battery_brightness):
-                self._manual_override_on_battery = True
+        if (
+            self._last_state is False
+            and self._applied_battery_brightness is not None
+            and current_brightness != int(self._applied_battery_brightness)
+        ):
+            self._manual_override_on_battery = True
 
         if self._last_state is None:
             self._last_state = on_ac

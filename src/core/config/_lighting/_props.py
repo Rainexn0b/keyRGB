@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Iterable
-
+from collections.abc import Iterable
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_INT_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)

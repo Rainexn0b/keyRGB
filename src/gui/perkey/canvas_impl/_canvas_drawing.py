@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping, Sequence
-from tkinter import TclError, font as tkfont
+from tkinter import TclError
+from tkinter import font as tkfont
 from typing import TYPE_CHECKING, Protocol, TypeAlias
 
 from PIL import Image, ImageTk

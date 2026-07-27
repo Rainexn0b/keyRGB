@@ -8,11 +8,11 @@ identity separate from locale-facing legends.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import replace
 from functools import lru_cache
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable, cast
-
+from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from src.core.resources.layout import KeyDef
@@ -119,7 +119,7 @@ def resolve_layout_legend_pack_id(layout_id: str, legend_pack_id: str | None = N
             return requested
 
     fallback = f"{resolved_layout}-generic"
-    return fallback if load_layout_legend_pack(fallback) else fallback
+    return fallback
 
 
 @lru_cache(maxsize=64)
@@ -136,13 +136,13 @@ def get_layout_legend_labels(layout_id: str, legend_pack_id: str | None = None) 
 
 
 def apply_layout_legend_pack(
-    keys: Iterable["KeyDef"],
+    keys: Iterable[KeyDef],
     *,
     layout_id: str,
     legend_pack_id: str | None = None,
-) -> list["KeyDef"]:
+) -> list[KeyDef]:
     labels = get_layout_legend_labels(layout_id, legend_pack_id)
-    out: list["KeyDef"] = []
+    out: list[KeyDef] = []
     for key in keys:
         slot_id = str(getattr(key, "slot_id", None) or key.key_id)
         label = labels.get(slot_id)

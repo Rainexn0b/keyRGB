@@ -11,17 +11,17 @@ import subprocess
 import time
 from typing import TYPE_CHECKING, SupportsFloat, SupportsIndex, SupportsInt, cast
 
+from src.core.backends import BackendError, format_backend_error
+from src.core.utils.safe_attrs import safe_str_attr
+from src.tray.idle_power_state import ensure_tray_idle_power_state
+from src.tray.protocols import TrayIconState
+
 from . import _application_bindings as application_bindings
 from . import _application_notifications as application_notifications
 from . import _runtime_deps as app_runtime_deps
 from . import _startup as tray_startup
 from ._application_state import TrayBootstrapState
 from ._delegates import KeyRGBTrayDelegateMixin
-from src.core.backends import BackendError, format_backend_error
-from src.core.utils.safe_attrs import safe_str_attr
-from src.tray.idle_power_state import ensure_tray_idle_power_state
-from src.tray.protocols import TrayIconState
-
 
 _IntCoercible = str | bytes | bytearray | SupportsInt | SupportsIndex
 _FloatCoercible = str | bytes | bytearray | SupportsFloat | SupportsIndex

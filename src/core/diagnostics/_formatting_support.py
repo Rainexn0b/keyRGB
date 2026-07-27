@@ -107,7 +107,7 @@ def append_support_hints(
 
     ite829x_loaded = "ite_829x" in module_names
     tuxedo_keyboard_loaded = "tuxedo_keyboard" in module_names
-    clevo_platform_loaded = any(name in module_names for name in {"clevo_wmi", "clevo_acpi"})
+    clevo_platform_loaded = any(name in module_names for name in ("clevo_wmi", "clevo_acpi"))
     tuxedo_or_clevo_platform_loaded = tuxedo_keyboard_loaded or clevo_platform_loaded
 
     if (

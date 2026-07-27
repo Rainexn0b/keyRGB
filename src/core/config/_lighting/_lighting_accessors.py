@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Lighting-related config accessors shared by Config."""
 
 from __future__ import annotations

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import ttk
-
 
 _LABEL_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
 _LABEL_WIDGET_ERRORS = (RuntimeError, tk.TclError)

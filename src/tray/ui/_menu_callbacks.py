@@ -13,7 +13,6 @@ from src.core.lighting_layers import render_effect_from_selected_effect
 
 from .menu_status import DeviceContextEntry
 
-
 _MenuAction = Callable[[object, object], None]
 _MenuChecked = Callable[[object], bool]
 

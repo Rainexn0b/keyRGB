@@ -95,7 +95,7 @@ def _forced_off(tray: object) -> bool:
 
 
 def _log_route_failure(tray: object, route: SecondaryDeviceRoute, exc: Exception) -> None:
-    logger.warning("Failed to apply static secondary route %s: %s", route.state_key, exc, exc_info=True)
+    logger.warning("Failed to apply static secondary route %s: %s", route.state_key, exc)
 
 
 def apply_secondary_static_scene(
@@ -128,14 +128,14 @@ def apply_secondary_static_scene(
             # A present secondary profile component is authoritative. Missing
             # registered routes are disabled, not inherited from the last scene.
             if entry is not None and secondary_lighting_state.entry_enabled(entry):
-                setter = getattr(device, "set_color")
+                setter = getattr(device, "set_color")  # noqa: B009 - routed device is duck-typed
                 config = getattr(tray, "config", None)
                 setter(
                     secondary_lighting_state.route_color(config, route, entry),
                     brightness=secondary_lighting_state.route_brightness(config, route, entry),
                 )
             else:
-                getattr(device, "turn_off")()
+                getattr(device, "turn_off")()  # noqa: B009 - routed device is duck-typed
             applied = True
         except _SCENE_RUNTIME_EXCEPTIONS as exc:
             _log_route_failure(tray, route, exc)
@@ -169,12 +169,12 @@ def apply_secondary_static_route(
         device = acquire_device_fn(route)
         if entry is not None and secondary_lighting_state.entry_enabled(entry):
             config = getattr(tray, "config", None)
-            getattr(device, "set_color")(
+            getattr(device, "set_color")(  # noqa: B009 - routed device is duck-typed
                 secondary_lighting_state.route_color(config, route, entry),
                 brightness=secondary_lighting_state.route_brightness(config, route, entry),
             )
         else:
-            getattr(device, "turn_off")()
+            getattr(device, "turn_off")()  # noqa: B009 - routed device is duck-typed
         return True
     except _SCENE_RUNTIME_EXCEPTIONS as exc:
         _log_route_failure(tray, route, exc)
@@ -210,7 +210,7 @@ def turn_off_secondary_profile_areas(
         device: object | None = None
         try:
             device = acquire_device_fn(route)
-            getattr(device, "turn_off")()
+            getattr(device, "turn_off")()  # noqa: B009 - routed device is duck-typed
         except _SCENE_RUNTIME_EXCEPTIONS as exc:
             _log_route_failure(tray, route, exc)
         finally:

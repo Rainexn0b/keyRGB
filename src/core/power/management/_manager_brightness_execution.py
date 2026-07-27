@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Protocol
 
 from src.core.effects.catalog import REACTIVE_EFFECTS, normalize_effect_name, strip_effect_namespace
 from src.core.lighting_layers import render_effect_from_selected_effect
@@ -139,10 +140,10 @@ def sync_config_brightness(
     global_synced = False
 
     try:
-        setattr(config, "effect_brightness", requested)
+        config.effect_brightness = requested
         global_synced = True
         try:
-            effective = int(getattr(config, "effect_brightness"))
+            effective = int(config.effect_brightness)
         except _BRIGHTNESS_STATE_EXCEPTIONS:
             effective = requested
     except AttributeError:
@@ -155,7 +156,7 @@ def sync_config_brightness(
             config.brightness = requested
             global_synced = True
             try:
-                effective = int(getattr(config, "brightness"))
+                effective = int(config.brightness)
             except _BRIGHTNESS_STATE_EXCEPTIONS:
                 effective = requested
         if _should_sync_perkey_brightness(config):

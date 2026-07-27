@@ -4,11 +4,9 @@ import logging
 from collections.abc import Callable, Iterable
 from datetime import datetime
 
-from src.core.brightness_layers import compose_power_source_brightness_overrides
-from src.core.brightness_layers import resolve_scheduler_brightness_state
+from src.core.brightness_layers import compose_power_source_brightness_overrides, resolve_scheduler_brightness_state
 from src.core.utils.safe_attrs import _safe_getattr_or_none
 
-from ._manager_config import read_power_management_config_bool
 from ..policies.power_source_loop_policy import (
     ActivatePerkeyProfile,
     ActivatePowerMode,
@@ -18,7 +16,7 @@ from ..policies.power_source_loop_policy import (
     TurnOffKeyboard,
 )
 from ..system import PowerMode
-
+from ._manager_config import read_power_management_config_bool
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +92,7 @@ def build_power_source_loop_inputs(
     )
     scheduler_state = resolve_scheduler_brightness_state(
         config,
-        now=datetime.now(),
+        now=datetime.now(),  # noqa: DTZ005 – local time is intentional for day/night scheduling
         power_management_enabled=power_management_enabled,
     )
     ac_brightness_override, battery_brightness_override = compose_power_source_brightness_overrides(

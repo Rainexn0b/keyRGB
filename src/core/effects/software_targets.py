@@ -210,9 +210,9 @@ def _coerce_target(raw_target: object) -> SoftwareRenderTarget | None:
 
 
 __all__ = [
+    "SOFTWARE_EFFECT_TARGETS",
     "SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE",
     "SOFTWARE_EFFECT_TARGET_KEYBOARD",
-    "SOFTWARE_EFFECT_TARGETS",
     "SoftwareRenderTarget",
     "average_color_map",
     "normalize_software_effect_target",

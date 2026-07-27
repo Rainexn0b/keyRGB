@@ -1,16 +1,15 @@
 from __future__ import annotations
 
-import os
 import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
+from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
-from ..base import BackendCapabilities, BackendStability, KeyboardDevice, KeyboardBackend, ProbeResult
-from . import common
-from . import privileged
+from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
+from . import common, privileged
 from .device import SysfsLedKeyboardDevice
 
 logger = logging.getLogger(__name__)

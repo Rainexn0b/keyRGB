@@ -12,7 +12,6 @@ from src.tray.ui.icon._mask import candidate_tray_mask_paths as _candidate_tray_
 from src.tray.ui.icon._mask import render_cairosvg_mask_alpha_64 as _render_cairosvg_mask_alpha_64
 from src.tray.ui.icon._mask import render_simple_svg_mask_alpha_64 as _render_simple_svg_mask_alpha_64
 
-
 _ICON_SIZE = (64, 64)
 _TRAY_MASK_PATH_ERRORS = (OSError,)
 _TRAY_MASK_RASTER_ERRORS = (
@@ -133,7 +132,7 @@ def clear_cached_solid_icons() -> None:
 
 
 def _scale_cache_key(scale: float) -> int:
-    return int(round(float(max(0.0, min(1.0, scale))) * 1000.0))
+    return round(float(max(0.0, min(1.0, scale))) * 1000.0)
 
 
 def create_icon(color: tuple[int, int, int]) -> Image.Image:
@@ -217,7 +216,7 @@ def clear_cached_rainbow_icons() -> None:
 def create_icon_rainbow(*, scale: float = 1.0, phase: float = 0.0) -> Image.Image:
     """Create tray icon where the 'K' cutout is filled with a rainbow gradient."""
 
-    phase_q = int(round((float(phase) % 1.0) * 63.0))
+    phase_q = round((float(phase) % 1.0) * 63.0)
     return _create_cached_rainbow_icon(phase_q, _scale_cache_key(scale))
 
 
@@ -251,11 +250,11 @@ def create_icon_mosaic(
         cell_h = float(h) / float(r_n)
 
         for r in range(r_n):
-            y0 = int(round(r * cell_h))
-            y1 = int(round((r + 1) * cell_h))
+            y0 = round(r * cell_h)
+            y1 = round((r + 1) * cell_h)
             for c in range(c_n):
-                x0 = int(round(c * cell_w))
-                x1 = int(round((c + 1) * cell_w))
+                x0 = round(c * cell_w)
+                x1 = round((c + 1) * cell_w)
                 rr, gg, bb = colors_flat[(r * c_n) + c]
                 cr, cg, cb = _scale_rgb((int(rr), int(gg), int(bb)), scale)
                 draw.rectangle((x0, y0, max(x0, x1 - 1), max(y0, y1 - 1)), fill=(cr, cg, cb, 255))

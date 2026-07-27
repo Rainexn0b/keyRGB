@@ -7,9 +7,8 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.core.utils.logging_utils import log_throttled
 from src.core.config import Config
-
+from src.core.utils.logging_utils import log_throttled
 
 DEFAULT_PROFILE_NAME = "default"
 

@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
 """Standalone lightweight power mode settings window."""
 
 from __future__ import annotations
 
 import logging
 import os
-from pathlib import Path
-
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk
 
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
@@ -126,10 +124,10 @@ def _format_live_freq_text() -> str:
     if average_khz is None:
         return "Live CPU avg/max: unavailable"
 
-    average_mhz = int(round(average_khz / 1000))
+    average_mhz = round(average_khz / 1000)
     if max_khz is None:
         return f"Live CPU avg/max: {average_mhz} MHz / unavailable"
-    max_mhz = int(round(max_khz / 1000))
+    max_mhz = round(max_khz / 1000)
     return f"Live CPU avg/max: {average_mhz} / {max_mhz} MHz"
 
 
@@ -161,10 +159,10 @@ class PowerModeSettingsGUI:
         )
 
     def _configured_cap_mhz(self) -> int:
-        return int(round(self._configured_cap_khz() / 1000))
+        return round(self._configured_cap_khz() / 1000)
 
     def _selected_cap_khz(self) -> int:
-        return normalize_extreme_saver_cap_khz(int(round(float(self._cap_var.get()))) * 1000)
+        return normalize_extreme_saver_cap_khz(round(float(self._cap_var.get())) * 1000)
 
     def _apply_geometry(self) -> None:
         try:
@@ -185,7 +183,7 @@ class PowerModeSettingsGUI:
 
     def _sync_cap_label(self, raw_value: float | str) -> None:
         try:
-            khz = int(round(float(raw_value))) * 1000
+            khz = round(float(raw_value)) * 1000
         except _GUI_RUNTIME_ERRORS:
             khz = self._configured_cap_khz()
         self._cap_value_var.set(_format_cap_mhz_label(khz))

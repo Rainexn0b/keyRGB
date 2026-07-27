@@ -7,11 +7,11 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast, overload
 
-from ._application_state import TrayBootstrapState, TrayPreBootstrapState
-from .lifecycle import _AutostartEffectTray, _LifecyclePollingTray, _MonitoringPowerManager
 from src.tray.idle_power_state import ensure_tray_idle_power_state
 from src.tray.protocols import TrayIconState
 
+from ._application_state import TrayBootstrapState, TrayPreBootstrapState
+from .lifecycle import _AutostartEffectTray, _LifecyclePollingTray, _MonitoringPowerManager
 
 if TYPE_CHECKING:
     from src.core.config import Config

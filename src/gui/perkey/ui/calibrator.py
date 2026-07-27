@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 from src.gui.calibrator.launch import launch_keymap_calibrator
 

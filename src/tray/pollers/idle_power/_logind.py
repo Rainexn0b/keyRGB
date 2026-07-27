@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 
 def read_logind_idle_seconds(
     *,
     session_id: str,
-    run_fn: Callable[[list[str], float], Optional[str]],
+    run_fn: Callable[[list[str], float], str | None],
     monotonic_fn: Callable[[], float],
-) -> Optional[float]:
+) -> float | None:
     """Read idle time via logind IdleHint, best-effort."""
 
     out = run_fn(
@@ -26,8 +26,8 @@ def read_logind_idle_seconds(
     if out is None:
         return None
 
-    idle_hint_s: Optional[str] = None
-    idle_since_us_s: Optional[str] = None
+    idle_hint_s: str | None = None
+    idle_since_us_s: str | None = None
     for raw_line in out.splitlines():
         line = raw_line.strip()
         if not line or "=" not in line:

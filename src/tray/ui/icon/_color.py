@@ -14,7 +14,6 @@ from src.core.resources.defaults import REFERENCE_MATRIX_COLS as NUM_COLS
 from src.core.resources.defaults import REFERENCE_MATRIX_ROWS as NUM_ROWS
 from src.core.utils.logging_utils import log_throttled
 
-
 logger = logging.getLogger(__name__)
 
 RGBColor = tuple[int, int, int]
@@ -152,9 +151,9 @@ def _weighted_hsv_mean(colors: Iterable[RGBColor]) -> RGBColor:
     if total <= 1e-6 or (x == 0.0 and y == 0.0):
         if count == 0:
             return _DEFAULT_COLOR
-        r = int(round(r_sum / count))
-        g = int(round(g_sum / count))
-        b = int(round(b_sum / count))
+        r = round(r_sum / count)
+        g = round(g_sum / count)
+        b = round(b_sum / count)
         return (r, g, b)
 
     mean_h = (math.atan2(y, x) / (2.0 * math.pi)) % 1.0
@@ -271,7 +270,7 @@ def representative_color(
             rf = (math.sin(phase) + 1.0) / 2.0
             gf = (math.sin(phase + (2.0 * math.pi / 3.0)) + 1.0) / 2.0
             bf = (math.sin(phase + (4.0 * math.pi / 3.0)) + 1.0) / 2.0
-            base = (int(round(rf * 255)), int(round(gf * 255)), int(round(bf * 255)))
+            base = (round(rf * 255), round(gf * 255), round(bf * 255))
 
         else:  # spectrum_cycle
             hue = (now * (0.22 * p)) % 1.0
@@ -304,7 +303,7 @@ def representative_color(
     # tray icon stays readable in dark mode at low keyboard brightness.
     #
     # Ratio: approximately 1:3 (keyboard:icon), clamped to [0.25, 1.0].
-    icon_brightness = max(0, min(50, int(round(float(brightness) * 3.0))))
+    icon_brightness = max(0, min(50, round(float(brightness) * 3.0)))
     scale = max(0.25, min(1.0, icon_brightness / 50.0))
     return (
         int(max(0, min(255, base[0] * scale))),

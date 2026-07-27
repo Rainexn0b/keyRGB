@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import List
-
 from .layout import KeyDef, _end_x, _make_slot_id, _units_row, _units_row_with_spacers
 
 
@@ -53,16 +51,16 @@ def _shape_segments_from_spec(raw_segments: object) -> tuple[tuple[float, float,
 def _layout_special_keys(
     spec: dict[str, object],
     *,
-    row_lookup: dict[str, List[KeyDef]],
+    row_lookup: dict[str, list[KeyDef]],
     row_top_lookup: dict[str, int],
     unit: int,
     gap: int,
-) -> List[KeyDef]:
+) -> list[KeyDef]:
     raw_special_keys = spec.get("special_keys")
     if not isinstance(raw_special_keys, list):
         return []
 
-    out: List[KeyDef] = []
+    out: list[KeyDef] = []
     for index, raw_key in enumerate(raw_special_keys):
         if not isinstance(raw_key, dict):
             continue
@@ -94,9 +92,9 @@ def _layout_special_keys(
             continue
 
         rect = (
-            _end_x(anchor_row) + gap + int(round(float(dx))),
-            y_base + int(round(float(dy))),
-            int(round(float(width) * unit)),
+            _end_x(anchor_row) + gap + round(float(dx)),
+            y_base + round(float(dy)),
+            round(float(width) * unit),
             max(1, int(height_rows) * unit + (max(1, int(height_rows)) - 1) * gap),
         )
         out.append(
@@ -111,8 +109,8 @@ def _layout_special_keys(
     return out
 
 
-def build_function_rows(*, fy: int, x0: int, nav_x0: int, nx0: int) -> List[KeyDef]:
-    keys: List[KeyDef] = []
+def build_function_rows(*, fy: int, x0: int, nav_x0: int, nx0: int) -> list[KeyDef]:
+    keys: list[KeyDef] = []
     f_unit = 34
     f_gap = 6
     keys += _units_row_with_spacers(
@@ -162,8 +160,8 @@ def build_function_rows(*, fy: int, x0: int, nav_x0: int, nx0: int) -> List[KeyD
 
 def build_alpha_block(
     *, spec: dict[str, object], x0: int, unit: int, gap: int, row_tops: dict[str, int]
-) -> List[KeyDef]:
-    keys: List[KeyDef] = []
+) -> list[KeyDef]:
+    keys: list[KeyDef] = []
 
     number_row = _units_row_with_spacers(
         row_tops["number"], x0, unit, gap, _layout_row_items(spec, "number"), slot_prefix="number"
@@ -191,7 +189,7 @@ def build_alpha_block(
     return keys
 
 
-def build_arrow_cluster(*, ax0: int, ay0: int, arrow_unit: int) -> List[KeyDef]:
+def build_arrow_cluster(*, ax0: int, ay0: int, arrow_unit: int) -> list[KeyDef]:
     return [
         KeyDef(
             "up",
@@ -205,8 +203,8 @@ def build_arrow_cluster(*, ax0: int, ay0: int, arrow_unit: int) -> List[KeyDef]:
     ]
 
 
-def build_numpad(*, r0: int, r1: int, r2: int, r3: int, r4: int, nx0: int, unit: int, gap: int) -> List[KeyDef]:
-    keys: List[KeyDef] = []
+def build_numpad(*, r0: int, r1: int, r2: int, r3: int, r4: int, nx0: int, unit: int, gap: int) -> list[KeyDef]:
+    keys: list[KeyDef] = []
     keys += _units_row(
         r0,
         nx0,

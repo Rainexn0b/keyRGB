@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 
 from . import protocol
 
@@ -86,7 +86,6 @@ class Ite8297KeyboardDevice:
 
     def set_effect(self, effect_data: object) -> None:
         del effect_data
-        return
 
     def close(self) -> None:
         """Release the HID transport if one was provided."""

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """KeyRGB Per-Key Editor (Tkinter)"""
 
 from __future__ import annotations

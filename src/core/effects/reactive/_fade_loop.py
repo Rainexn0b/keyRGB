@@ -17,7 +17,7 @@ FadeOverlay = dict[Key, float]
 _INT_COERCION_ERRORS = (TypeError, ValueError)
 
 
-def _engine_int_attr_or_default(engine: "EffectsEngine", attr_name: str, *, missing_default: int) -> int:
+def _engine_int_attr_or_default(engine: EffectsEngine, attr_name: str, *, missing_default: int) -> int:
     try:
         raw_value = attrgetter(attr_name)(engine)
     except AttributeError:
@@ -26,7 +26,7 @@ def _engine_int_attr_or_default(engine: "EffectsEngine", attr_name: str, *, miss
 
 
 def _engine_int_attr_or_fallback(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     attr_name: str,
     *,
     missing_default: int,
@@ -38,7 +38,7 @@ def _engine_int_attr_or_fallback(
         return error_default
 
 
-def _has_per_key_writer(engine: "EffectsEngine") -> bool:
+def _has_per_key_writer(engine: EffectsEngine) -> bool:
     kb = engine.kb
     try:
         set_key_colors = attrgetter("set_key_colors")(kb)
@@ -82,7 +82,7 @@ class _RandomProtocol(Protocol):
 
 
 class _BackdropBrightnessScaleFactorProtocol(Protocol):
-    def __call__(self, engine: "EffectsEngine", *, effect_brightness_hw: int) -> float: ...
+    def __call__(self, engine: EffectsEngine, *, effect_brightness_hw: int) -> float: ...
 
 
 class _ReactiveFadeApiProtocol(Protocol):
@@ -96,7 +96,7 @@ class _ReactiveFadeApiProtocol(Protocol):
 
     def create_press_source(
         self,
-        engine: "EffectsEngine",
+        engine: EffectsEngine,
         *,
         press_source_cls: _PressSourceFactoryProtocol,
         open_keyboards: Callable[[], EvdevKeyboardDevices | None],
@@ -111,34 +111,34 @@ class _ReactiveFadeApiProtocol(Protocol):
 
     def load_active_profile_slot_keymap(self) -> SlotKeyMap: ...
 
-    def pace(self, engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float = 2.2) -> float: ...
+    def pace(self, engine: EffectsEngine, *, min_factor: float = 0.8, max_factor: float = 2.2) -> float: ...
 
-    def get_engine_reactive_color(self, engine: "EffectsEngine") -> Color: ...
+    def get_engine_reactive_color(self, engine: EffectsEngine) -> Color: ...
 
-    def get_engine_manual_reactive_color(self, engine: "EffectsEngine") -> Color | None: ...
+    def get_engine_manual_reactive_color(self, engine: EffectsEngine) -> Color | None: ...
 
     def mapped_slot_cells(self, slot_keymap: SlotKeyMap, pressed_slot_id: object) -> Sequence[Key]: ...
 
     def _age_pulses_in_place(self, pulses: list[_PulseProtocol], *, dt: float) -> list[_PulseProtocol]: ...
 
-    def get_engine_overlay_buffer(self, engine: "EffectsEngine", attr_name: str) -> FadeOverlay: ...
+    def get_engine_overlay_buffer(self, engine: EffectsEngine, attr_name: str) -> FadeOverlay: ...
 
     def build_fade_overlay_into(self, dest: FadeOverlay, pulses: Sequence[_PulseProtocol]) -> FadeOverlay: ...
 
-    def _set_reactive_active_pulse_mix(self, engine: "EffectsEngine", *, target: float) -> None: ...
+    def _set_reactive_active_pulse_mix(self, engine: EffectsEngine, *, target: float) -> None: ...
 
     def build_frame_base_maps(
         self,
-        engine: "EffectsEngine",
+        engine: EffectsEngine,
         *,
         background_rgb: Color,
         effect_brightness_hw: int,
         backdrop_brightness_scale_factor_fn: _BackdropBrightnessScaleFactorProtocol,
     ) -> tuple[bool, ColorMap, ColorMap]: ...
 
-    def backdrop_brightness_scale_factor(self, engine: "EffectsEngine", *, effect_brightness_hw: int) -> float: ...
+    def backdrop_brightness_scale_factor(self, engine: EffectsEngine, *, effect_brightness_hw: int) -> float: ...
 
-    def pulse_brightness_scale_factor(self, engine: "EffectsEngine") -> float: ...
+    def pulse_brightness_scale_factor(self, engine: EffectsEngine) -> float: ...
 
     def scale(self, rgb: Color, s: float) -> Color: ...
 
@@ -148,14 +148,14 @@ class _ReactiveFadeApiProtocol(Protocol):
 
     def mix(self, a: Color, b: Color, t: float) -> Color: ...
 
-    def _render_uniform_fallback(self, engine: "EffectsEngine", *, rgb: Color) -> None: ...
+    def _render_uniform_fallback(self, engine: EffectsEngine, *, rgb: Color) -> None: ...
 
-    def get_engine_color_map_buffer(self, engine: "EffectsEngine", attr_name: str) -> ColorMap: ...
+    def get_engine_color_map_buffer(self, engine: EffectsEngine, attr_name: str) -> ColorMap: ...
 
-    def render(self, engine: "EffectsEngine", *, color_map: ColorMap) -> None: ...
+    def render(self, engine: EffectsEngine, *, color_map: ColorMap) -> None: ...
 
 
-def run_reactive_fade_loop(engine: "EffectsEngine", *, api: _ReactiveFadeApiProtocol) -> None:
+def run_reactive_fade_loop(engine: EffectsEngine, *, api: _ReactiveFadeApiProtocol) -> None:
     dt = api.frame_dt_s()
 
     press = api.create_press_source(

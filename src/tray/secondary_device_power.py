@@ -76,7 +76,7 @@ def restore_hints(tray: object) -> dict[str, int]:
     if isinstance(hints, dict):
         return hints
     hints = {}
-    setattr(tray, "secondary_restore_brightness", hints)
+    setattr(tray, "secondary_restore_brightness", hints)  # noqa: B010 - tray compatibility surface is duck-typed
     return hints
 
 

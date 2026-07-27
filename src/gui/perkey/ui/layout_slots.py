@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable, Sequence
 from tkinter import ttk
-from typing import Callable, Protocol, Sequence, cast
+from typing import Protocol, cast
 
 from src.core.resources.layout_slots import get_layout_slot_states
 

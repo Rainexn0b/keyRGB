@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True)
 class IdleRestoreStartPolicy:
-    brightness_override: Optional[int]
+    brightness_override: int | None
     fade_in: bool
 
 

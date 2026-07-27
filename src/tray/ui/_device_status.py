@@ -9,8 +9,7 @@ from src.core.backends.policy import (
 
 def format_hex_id(val: str) -> str:
     s = str(val or "").strip().lower() if val is not None else ""
-    if s.startswith("0x"):
-        s = s[2:]
+    s = s.removeprefix("0x")
     return s
 
 

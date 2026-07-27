@@ -3,11 +3,6 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-from ._transition_constants import (
-    SOFT_OFF_FADE_DURATION_S,
-    SOFT_ON_FADE_DURATION_S,
-    SOFT_ON_START_BRIGHTNESS,
-)
 from src.tray.idle_power_state import read_last_brightness
 from src.tray.protocols import (
     LightingTrayProtocol,
@@ -15,6 +10,11 @@ from src.tray.protocols import (
     set_idle_power_state_field,
 )
 
+from ._transition_constants import (
+    SOFT_OFF_FADE_DURATION_S,
+    SOFT_ON_FADE_DURATION_S,
+    SOFT_ON_START_BRIGHTNESS,
+)
 
 # ---------------------------------------------------------------------------
 # Local wrapper helpers for idle power state field updates

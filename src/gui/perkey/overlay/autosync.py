@@ -12,7 +12,6 @@ from src.core.resources.layout_tweak_autosync import (
     auto_sync_per_key_overlays,
 )
 
-
 __all__ = [
     "_apply_global_factory",
     "_apply_per_key",

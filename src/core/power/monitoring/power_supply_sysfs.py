@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Optional
-
 
 _POWER_SUPPLY_ENUMERATION_EXCEPTIONS = (OSError,)
 _POWER_SUPPLY_TEXT_READ_EXCEPTIONS = (OSError, UnicodeError)
@@ -34,15 +32,14 @@ def iter_ac_online_files(power_supply_root: Path) -> list[Path]:
 
     # Fallback: common names like AC/ACAD/AC0
     try:
-        for online in sorted(power_supply_root.glob("AC*/online")):
-            files.append(online)
+        files.extend(sorted(power_supply_root.glob("AC*/online")))
     except _POWER_SUPPLY_ENUMERATION_EXCEPTIONS:
         pass
 
     return files
 
 
-def read_on_ac_power(*, power_supply_root: Optional[Path] = None) -> Optional[bool]:
+def read_on_ac_power(*, power_supply_root: Path | None = None) -> bool | None:
     if power_supply_root is None:
         power_supply_root = Path(os.environ.get("KEYRGB_SYSFS_POWER_SUPPLY_ROOT", "/sys/class/power_supply"))
 

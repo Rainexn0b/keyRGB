@@ -9,12 +9,15 @@ from src.tray.protocols import (
     read_idle_power_state_float_field,
 )
 
-from . import _planning as _planning
-from . import _post_fast_path_apply as _post_fast_path_apply
+from . import _planning, _post_fast_path_apply
 from ._apply_plan import should_skip_config_apply_for_power_source_transition
-from ._config_apply_state import _CONFIG_FALLBACK_EXCEPTIONS
-from ._config_apply_state import _safe_perkey_signature, _safe_tuple_attr
-from ._config_apply_state import ConfigApplyState, build_config_apply_state
+from ._config_apply_state import (
+    _CONFIG_FALLBACK_EXCEPTIONS,
+    ConfigApplyState,
+    _safe_perkey_signature,
+    _safe_tuple_attr,
+    build_config_apply_state,
+)
 from ._fast_path import apply_fast_path_change, classify_fast_path_change
 from .helpers import (
     _apply_effect,
@@ -25,7 +28,6 @@ from .helpers import (
     _sync_reactive,
     _sync_software_target_policy,
 )
-
 
 REACTIVE_EFFECTS_SET = frozenset(REACTIVE_EFFECTS)
 _FAST_PATH_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)

@@ -7,16 +7,15 @@ application constructor.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
-import logging
-
-from ._startup import _run_best_effort
 from src.core.backends.base import KeyboardBackend
 from src.core.backends.registry import select_backend
 from src.core.diagnostics.device_discovery import collect_device_discovery
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
+from ._startup import _run_best_effort
 
 # Backend selection/probe boundary; keep OSError, drop map LookupError.
 _TRAY_BACKEND_RUNTIME_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)

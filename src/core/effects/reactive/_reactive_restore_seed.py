@@ -14,14 +14,13 @@ existing import paths and module-attribute access
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import time
+from dataclasses import dataclass
 
 from ._render_brightness_support import (
     ReactiveRestorePhase,
     ensure_reactive_state,
 )
-
 
 _PENDING_RESTORE_SEED_ATTR = "_pending_reactive_restore_seed"
 

@@ -5,8 +5,8 @@ from collections.abc import Callable
 from typing import Protocol, TypeAlias, cast
 
 from src.core.backends.registry import select_backend
-from src.core.secondary_device_runtime import acquire_secondary_device, backend_for_secondary_route
 from src.core.secondary_device_routes import SecondaryDeviceRoute, route_for_backend_name, route_for_device_type
+from src.core.secondary_device_runtime import acquire_secondary_device, backend_for_secondary_route
 
 
 class _ColorCapabilitiesProtocol(Protocol):

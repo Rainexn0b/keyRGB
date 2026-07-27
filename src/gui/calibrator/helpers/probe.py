@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 
 def _step_cell(
     *,
-    current_cell: Tuple[int, int],
+    current_cell: tuple[int, int],
     delta: int,
     rows: int,
     cols: int,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     r, c = current_cell
     idx = (r * cols + c + delta) % (rows * cols)
     return idx // cols, idx % cols
@@ -20,11 +19,11 @@ def _step_cell(
 class CalibrationProbeState:
     rows: int
     cols: int
-    current_cell: Tuple[int, int] = (0, 0)
-    selected_key_id: Optional[str] = None
-    selected_slot_id: Optional[str] = None
+    current_cell: tuple[int, int] = (0, 0)
+    selected_key_id: str | None = None
+    selected_slot_id: str | None = None
 
-    def prev_cell(self) -> Tuple[int, int]:
+    def prev_cell(self) -> tuple[int, int]:
         self.current_cell = _step_cell(
             current_cell=self.current_cell,
             delta=-1,
@@ -33,7 +32,7 @@ class CalibrationProbeState:
         )
         return self.current_cell
 
-    def next_cell(self) -> Tuple[int, int]:
+    def next_cell(self) -> tuple[int, int]:
         self.current_cell = _step_cell(
             current_cell=self.current_cell,
             delta=1,

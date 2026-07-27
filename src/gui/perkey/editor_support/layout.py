@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable, cast
+from collections.abc import Callable
+from typing import cast
 
 from src.core.profile import profiles
 from src.core.resources.layout_legends import load_layout_legend_pack, resolve_layout_legend_pack_id
@@ -10,7 +11,6 @@ from ..profile_management import keymap_cells_for
 from ..ui.layout_slots import refresh_layout_slots_ui
 from ..ui.status import layout_slot_label_updated, layout_slot_visibility_updated, set_status
 from . import layout_state as _layout_state
-
 
 BoundaryLogger = _layout_state.BoundaryLogger
 LayoutSlotOverrides = _layout_state.LayoutSlotOverrides

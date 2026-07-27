@@ -6,8 +6,6 @@ import subprocess  # noqa: F401  — re-exported for test monkeypatching
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Optional
-
 
 _CPUFREQ_ROOT_DEFAULT = Path("/sys/devices/system/cpu/cpufreq")
 DEFAULT_EXTREME_SAVER_CAP_KHZ = 800_000
@@ -58,14 +56,14 @@ def _cpufreq_root() -> Path:
     return Path(root) if root else _CPUFREQ_ROOT_DEFAULT
 
 
-def _read_text(path: Path) -> Optional[str]:
+def _read_text(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8").strip()
     except (OSError, UnicodeDecodeError):
         return None
 
 
-def _read_int(path: Path) -> Optional[int]:
+def _read_int(path: Path) -> int | None:
     raw = _read_text(path)
     if raw is None:
         return None
@@ -167,7 +165,7 @@ def _boost_paths() -> list[Path]:
     ]
 
 
-def _read_boost_enabled() -> Optional[bool]:
+def _read_boost_enabled() -> bool | None:
     # intel_pstate/no_turbo: 1 => turbo disabled
     p = Path("/sys/devices/system/cpu/intel_pstate/no_turbo")
     if p.exists():
@@ -247,7 +245,7 @@ def get_current_freq_stats_khz() -> tuple[int | None, int | None]:
 
     if not current_freqs:
         return (None, None)
-    average_khz = int(round(sum(current_freqs) / len(current_freqs)))
+    average_khz = round(sum(current_freqs) / len(current_freqs))
     max_khz = max(current_freqs)
     return (average_khz, max_khz)
 
@@ -266,7 +264,7 @@ def get_max_current_freq_khz() -> int | None:
 # Observation layer (reads sysfs, best-effort mode inference)
 # ---------------------------------------------------------------------------
 
-from ._observe import get_status as _get_status_obs  # noqa: E402
+from ._observe import get_status as _get_status_obs
 
 # Re-export for the public facade and for test monkeypatching.
 get_status = _get_status_obs
@@ -287,10 +285,12 @@ def _mode_is_active(mode: PowerMode) -> bool:
 # Apply layer (writes sysfs, invokes helper)
 # ---------------------------------------------------------------------------
 
-from ._apply import (  # noqa: E402
+from ._apply import (
     _apply_mode_sysfs,  # noqa: F401  — re-exported for test monkeypatching
     _pkexec_noninteractive_authorized,  # noqa: F401  — re-exported for test monkeypatching
     _run_privileged_helper,  # noqa: F401  — re-exported for test monkeypatching
+)
+from ._apply import (
     apply_mode as _apply_mode_impl,
 )
 

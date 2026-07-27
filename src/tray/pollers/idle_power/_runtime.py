@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
 from src.tray.idle_power_state import (
@@ -14,18 +15,19 @@ from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_floa
 
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 from ._input_idle import InputIdleTracker
-from ._power_source_guard import (
-    plan_power_source_guard_update,
-    power_source_idle_guard_active as _pure_power_source_idle_guard_active,
+from ._power_source_guard import plan_power_source_guard_update
+from ._power_source_guard import power_source_idle_guard_active as _pure_power_source_idle_guard_active
+from ._runtime_sensors import (
+    read_desktop_dimmed_state as _read_desktop_dimmed_state,
+)
+from ._runtime_sensors import (
+    read_session_idle_state as _read_session_idle_state,
 )
 from ._runtime_sensors import (  # noqa: F401
-    read_desktop_dimmed_state as _read_desktop_dimmed_state,
-    read_session_idle_state as _read_session_idle_state,
     read_wayland_dimmed_state as _read_wayland_dimmed_state,
 )
 from .policy import IdleAction
 from .sensors import BacklightState
-
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,7 @@ class IdlePollLoopState:
     dimmed_true_streak: int = 0
     dimmed_false_streak: int = 0
     screen_off_true_streak: int = 0
-    last_on_ac_power: Optional[bool] = None
+    last_on_ac_power: bool | None = None
     last_power_source_change_at: float = 0.0
     backlight_state: BacklightState = field(default_factory=BacklightState)
     input_idle_tracker: InputIdleTracker | None = None
@@ -59,7 +61,7 @@ def _log_idle_action_best_effort(
     tray: IdlePowerTrayProtocol,
     *,
     action: IdleAction,
-    dimmed: Optional[bool],
+    dimmed: bool | None,
     screen_off: bool,
     brightness: int,
     dim_sync_enabled: bool,
@@ -95,7 +97,7 @@ def _reload_idle_power_config_best_effort(tray: IdlePowerTrayProtocol) -> None:
     _run_idle_power_runtime_boundary_best_effort(reload_config)
 
 
-def _read_on_ac_power_best_effort() -> Optional[bool]:
+def _read_on_ac_power_best_effort() -> bool | None:
     try:
         from src.core.power.monitoring.power_supply_sysfs import read_on_ac_power
     except _IDLE_POWER_IMPORT_EXCEPTIONS:
@@ -119,7 +121,7 @@ def _reset_power_source_sensitive_idle_state(loop_state: IdlePollLoopState) -> N
 def _update_power_source_idle_guard(
     *,
     loop_state: IdlePollLoopState,
-    on_ac_power: Optional[bool],
+    on_ac_power: bool | None,
     now: float,
 ) -> None:
     plan = plan_power_source_guard_update(
@@ -152,21 +154,21 @@ def run_idle_power_iteration(
     session_id: str | None,
     now_monotonic_fn: Callable[[], float],
     ensure_idle_state_fn: Callable[[IdlePowerTrayProtocol], None],
-    read_dimmed_state_fn: Callable[[BacklightState], Optional[bool]],
-    read_screen_off_state_drm_fn: Callable[[], Optional[bool]],
-    debounce_dim_and_screen_off_fn: Callable[..., tuple[Optional[bool], bool, int, int, int]],
-    read_logind_idle_seconds_fn: Callable[..., Optional[float]],
-    read_desktop_dim_timeout_fn: Callable[[Optional[bool]], Optional[float]],
-    create_wayland_idle_tracker_fn: Callable[[int], Optional[object]],
-    read_wayland_idle_fn: Callable[[Any], Optional[bool]],
+    read_dimmed_state_fn: Callable[[BacklightState], bool | None],
+    read_screen_off_state_drm_fn: Callable[[], bool | None],
+    debounce_dim_and_screen_off_fn: Callable[..., tuple[bool | None, bool, int, int, int]],
+    read_logind_idle_seconds_fn: Callable[..., float | None],
+    read_desktop_dim_timeout_fn: Callable[[bool | None], float | None],
+    create_wayland_idle_tracker_fn: Callable[[int], object | None],
+    read_wayland_idle_fn: Callable[[Any], bool | None],
     create_input_idle_tracker_fn: Callable[[], InputIdleTracker],
-    read_input_idle_seconds_fn: Callable[[InputIdleTracker], Optional[float]],
+    read_input_idle_seconds_fn: Callable[[InputIdleTracker], float | None],
     effective_screen_dim_sync_enabled_fn: Callable[[IdlePowerTrayProtocol, bool], bool],
     compute_idle_action_fn: Callable[..., IdleAction],
     build_idle_action_key_fn: Callable[..., str],
     should_log_idle_action_fn: Callable[..., bool],
     apply_idle_action_fn: Callable[..., None],
-    read_on_ac_power_fn: Callable[[], Optional[bool]] | None = None,
+    read_on_ac_power_fn: Callable[[], bool | None] | None = None,
 ) -> None:
     ensure_idle_state_fn(tray)
 

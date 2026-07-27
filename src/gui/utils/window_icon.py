@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from functools import lru_cache
-from io import BytesIO
 import importlib
 import logging
-from pathlib import Path
-
 import tkinter as tk
-
+from functools import lru_cache
+from io import BytesIO
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +22,7 @@ def _rasterize_svg_window_icon_with_cairosvg(path_str: str):
     from PIL import Image  # type: ignore
 
     cairosvg = importlib.import_module("cairosvg")
-    svg2png = getattr(cairosvg, "svg2png")
+    svg2png = cairosvg.svg2png
     png_bytes = svg2png(url=path_str, output_width=_WINDOW_ICON_SIZE[0], output_height=_WINDOW_ICON_SIZE[1])
     with Image.open(BytesIO(png_bytes)) as image:
         return image.convert("RGBA")
@@ -163,7 +161,7 @@ def apply_keyrgb_window_icon(window: tk.Misc) -> None:
                 photo = ImageTk.PhotoImage(img)
 
                 # Prevent garbage collection.
-                setattr(window, "keyrgb_icon_image", photo)
+                window.keyrgb_icon_image = photo
 
                 iconphoto = getattr(window, "iconphoto", None)
                 if callable(iconphoto):

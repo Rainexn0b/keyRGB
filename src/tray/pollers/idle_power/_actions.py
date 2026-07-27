@@ -4,7 +4,7 @@ import logging
 import os
 import time
 from collections.abc import Callable
-from typing import Optional, cast
+from typing import cast
 
 from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.core.utils.logging_utils import log_throttled
@@ -17,7 +17,6 @@ from src.tray.protocols import (
     read_idle_power_state_optional_int_field,
     set_idle_power_state_field,
 )
-
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
@@ -324,7 +323,7 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
 def apply_idle_action(
     tray: IdlePowerTrayProtocol,
     *,
-    action: Optional[str],
+    action: str | None,
     dim_temp_brightness: int,
     restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], None],
     reactive_effects_set: frozenset[str],

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef, get_layout_keys
 from src.gui.reference import overlay_geometry as _overlay_geometry
@@ -11,7 +11,6 @@ from .canvas_impl import _canvas_services
 from .canvas_impl import canvas_hit_testing as _canvas_hit_testing
 from .canvas_impl._canvas_drawing import _KeyboardCanvasDrawingMixin
 from .canvas_impl._canvas_events import _KeyboardCanvasEventMixin
-
 from .overlay import OverlayDragController
 
 if TYPE_CHECKING:
@@ -40,12 +39,12 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
     def __init__(self, parent, editor: PerKeyEditor, **kwargs):
         super().__init__(parent, **kwargs)
         self.editor = editor
-        self._deck_img: Optional[object] = None
-        self._deck_img_tk: Optional[object] = None
+        self._deck_img: object | None = None
+        self._deck_img_tk: object | None = None
         self._deck_render_cache: DeckRenderCache[object] = DeckRenderCache()
-        self._deck_drawn_bbox: Optional[tuple[int, int, int, int]] = None
+        self._deck_drawn_bbox: tuple[int, int, int, int] | None = None
         self._overlay_drag = OverlayDragController(self)
-        self._resize_job: Optional[str] = None
+        self._resize_job: str | None = None
 
         self.key_rects: dict[str, int] = {}
         self.key_texts: dict[str, int] = {}
@@ -61,7 +60,7 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
         self._load_deck_image()
 
     def _inset_pixels(self, w_px: float, h_px: float, inset_value: float) -> float:
-        x1, y1, x2, y2 = inset_bbox(
+        x1, _y1, _x2, _y2 = inset_bbox(
             x1=0.0,
             y1=0.0,
             x2=float(w_px),

@@ -8,7 +8,8 @@ from typing import Protocol, cast
 from ..integrations import runtime
 from ..protocols import ensure_tray_icon_state
 from . import icon as icon_mod
-from . import menu as menu_mod, menu_sections
+from . import menu as menu_mod
+from . import menu_sections
 
 
 class _ReloadableConfigProtocol(icon_mod.TrayIconConfig, Protocol):
@@ -30,18 +31,6 @@ class _TrayIconImageSurfaceProtocol(Protocol):
 
 class _TrayIconMenuSurfaceProtocol(Protocol):
     menu: object
-
-
-class _MenuFactoryProtocol(Protocol):
-    def __call__(self, *items: object) -> object: ...
-
-
-class _PystrayProtocol(Protocol):
-    Menu: _MenuFactoryProtocol
-
-
-class _MenuItemFactoryProtocol(Protocol):
-    def __call__(self, text: str, action: object | None = None, **kwargs: object) -> object: ...
 
 
 def _icon_refresh_tray(tray: object) -> _IconRefreshTrayProtocol:

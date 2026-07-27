@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import Protocol, cast
 
-
 Color = tuple[int, int, int]
 
 _UNSUPPORTED_BACKEND_TEXT = (

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Callable
 from tkinter import ttk
-from typing import Callable, Protocol, cast
+from typing import Protocol, cast
 
 from src.core.resources.layout_legends import get_layout_legend_pack_ids, load_layout_legend_pack
 from src.core.resources.layouts import LAYOUT_CATALOG

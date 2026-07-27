@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Callable, Protocol
+from collections.abc import Callable
+from typing import Protocol
 
 BoundaryLogger = Callable[[str, str, Exception], None]
 
@@ -55,7 +56,7 @@ def on_backdrop_transparency_changed(
     log_boundary_exception: BoundaryLogger,
 ) -> None:
     try:
-        transparency = int(round(float(value)))
+        transparency = round(float(value))
     except value_coercion_errors:
         transparency = 0
     transparency = max(0, min(100, transparency))
@@ -119,7 +120,7 @@ def persist_backdrop_transparency(
 ) -> None:
     app._backdrop_transparency_save_job = None
     try:
-        transparency = int(round(float(app.backdrop_transparency.get())))
+        transparency = round(float(app.backdrop_transparency.get()))
     except value_coercion_errors + tk_call_errors:
         return
 

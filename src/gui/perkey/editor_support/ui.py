@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: single build_editor_ui builder for the per-key editor chrome
-
 import tkinter as tk
 from tkinter import TclError, ttk
 
 from src.core.profile import profiles
+from src.gui.perkey.ui import profile_actions as profile_action_ui
 from src.gui.widgets.color_wheel import ColorWheel
 from src.gui.widgets.dropdown import UpwardListboxDropdown
-from src.gui.perkey.ui import profile_actions as profile_action_ui
 
 from ..canvas import KeyboardCanvas
 from ..lightbar_controls import LightbarControls
 from ..overlay import OverlayControls
 from ..ui.layout_setup import LayoutSetupControls
 from ..ui.lighting_areas import LightingAreasPanel
-
 
 _BACKDROP_MODE_LABELS = {
     "none": "No backdrop",

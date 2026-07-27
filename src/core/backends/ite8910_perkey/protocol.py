@@ -22,10 +22,10 @@ Command reference (from reverse-engineered .NET IL and native DLL):
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import IntEnum
 from math import ceil
-from typing import Iterable
 
 from src.core.backends.ite8910_perkey._protocol_effects import EffectDesc as _EffectDesc
 from src.core.backends.ite8910_perkey._protocol_effects import build_effect_reports_impl
@@ -208,7 +208,7 @@ def raw_brightness_from_ui(value: int) -> int:
     ui = _clamp(value, 0, UI_BRIGHTNESS_MAX)
     if ui == 0:
         return 0
-    return clamp_raw_brightness(int(ceil(ui * RAW_BRIGHTNESS_MAX / UI_BRIGHTNESS_MAX)))
+    return clamp_raw_brightness(ceil(ui * RAW_BRIGHTNESS_MAX / UI_BRIGHTNESS_MAX))
 
 
 def ui_brightness_from_raw(value: int) -> int:

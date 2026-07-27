@@ -29,7 +29,7 @@ class _PressSourceFactoryProtocol(Protocol):
 
 
 def create_press_source(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     press_source_cls: _PressSourceFactoryProtocol,
     open_keyboards: Callable[[], EvdevKeyboardDevices | None],

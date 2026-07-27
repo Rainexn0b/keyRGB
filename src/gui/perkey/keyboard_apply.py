@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Mapping, Protocol, Tuple, cast
+from collections.abc import Mapping
+from typing import Protocol, cast
 
 from src.core.backends.base import KeyboardDevice
 from src.core.utils.exceptions import is_device_busy, is_device_disconnected
-
 
 _RECOVERABLE_ENABLE_USER_MODE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _PERKEY_WRITE_RUNTIME_ERRORS = (AttributeError, LookupError, RuntimeError, TypeError, ValueError)
@@ -16,7 +16,7 @@ class _EnableUserModeKeyboard(Protocol):
 
 def push_per_key_colors(
     kb: KeyboardDevice | None,
-    colors: Mapping[Tuple[int, int], Tuple[int, int, int]],
+    colors: Mapping[tuple[int, int], tuple[int, int, int]],
     *,
     brightness: int,
     enable_user_mode: bool = True,

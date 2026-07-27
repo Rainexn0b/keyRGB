@@ -6,9 +6,8 @@ import logging
 import os
 import signal
 import time
-from pathlib import Path
-
 import tkinter as tk
+from pathlib import Path
 from tkinter import ttk
 
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
@@ -19,17 +18,17 @@ _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 
 try:
+    from src.gui.windows import _reactive_color_geometry as _geometry
     from src.gui.windows import _reactive_color_init_adapter as _init_adapter
     from src.gui.windows import _reactive_color_runtime as _runtime
-    from src.gui.windows import _reactive_color_geometry as _geometry
     from src.gui.windows import _reactive_color_settings_adapter as _settings_adapter
     from src.gui.windows import _reactive_color_wiring as _wiring
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/windows/reactive_color.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
+    from src.gui.windows import _reactive_color_geometry as _geometry
     from src.gui.windows import _reactive_color_init_adapter as _init_adapter
     from src.gui.windows import _reactive_color_runtime as _runtime
-    from src.gui.windows import _reactive_color_geometry as _geometry
     from src.gui.windows import _reactive_color_settings_adapter as _settings_adapter
     from src.gui.windows import _reactive_color_wiring as _wiring
 
@@ -147,11 +146,11 @@ class ReactiveColorGUI:
     def _commit_color_to_config(self, color: tuple[int, int, int]) -> None:
         self._get_settings_adapter().commit_color_to_config(color)
 
-    def _commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None:
+    def _commit_brightness_to_config(self, brightness_percent: float | None) -> int | None:
         """Persist reactive typing brightness (pulse/highlight intensity)."""
         return self._get_settings_adapter().commit_brightness_to_config(brightness_percent)
 
-    def _commit_trail_to_config(self, trail_percent: float | int | None) -> int | None:
+    def _commit_trail_to_config(self, trail_percent: float | None) -> int | None:
         """Persist reactive wave thickness."""
         return self._get_settings_adapter().commit_trail_to_config(trail_percent)
 

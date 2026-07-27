@@ -10,15 +10,21 @@ from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.widgets.color_wheel import ColorWheel
 from src.gui.windows import (
     _reactive_color_bootstrap as reactive_color_bootstrap,
+)
+from src.gui.windows import (
     _reactive_color_interactions as reactive_color_interactions,
-    _reactive_color_state as _reactive_color_state,
+)
+from src.gui.windows import (
+    _reactive_color_state,
+)
+from src.gui.windows import (
     _reactive_color_ui as reactive_color_ui,
 )
 
 
 def commit_brightness_to_config(
     config: object,
-    brightness_percent: float | int | None,
+    brightness_percent: float | None,
     *,
     logger: logging.Logger,
 ) -> int | None:
@@ -48,7 +54,7 @@ def commit_color_to_config(
 
 def commit_trail_to_config(
     config: object,
-    trail_percent: float | int | None,
+    trail_percent: float | None,
     *,
     logger: logging.Logger,
 ) -> int | None:

@@ -85,8 +85,8 @@ def main() -> None:
     except SystemExit:
         # SIGTERM handler raises SystemExit; let finally handle cleanup.
         raise
-    except _TRAY_ENTRYPOINT_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: outermost process boundary; recoverable startup/runtime failures are logged with traceback before clean exit
-        logger.exception("Unhandled error: %s", exc)
+    except _TRAY_ENTRYPOINT_RUNTIME_ERRORS:  # @quality-exception exception-transparency: outermost process boundary; recoverable startup/runtime failures are logged with traceback before clean exit
+        logger.exception("Unhandled error")
         sys.exit(1)
     finally:
         # Always close the engine, even when pystray swallows KeyboardInterrupt

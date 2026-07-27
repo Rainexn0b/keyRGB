@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import tkinter as tk
+from collections.abc import Sequence
 from tkinter import filedialog
-from typing import Protocol, Sequence, cast
+from typing import Protocol, cast
 
 from src.core.profile import profiles
 from src.gui.utils.profile_backdrop_storage import (
@@ -17,7 +18,6 @@ from .status import (
     backdrop_updated,
     set_status,
 )
-
 
 _BACKDROP_PERSISTENCE_ERRORS = (OSError, RuntimeError, ValueError)
 _BACKDROP_UI_ERRORS = (AttributeError, OSError, RuntimeError, ValueError, tk.TclError)

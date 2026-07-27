@@ -3,11 +3,12 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 from typing import TypeAlias
 
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from src.core.effects.software_targets import normalize_software_effect_target
 from src.core import secondary_lighting_state
-from src.core.secondary_device_runtime import iter_effective_secondary_routes
-from src.core.secondary_device_runtime import secondary_device_simulation_enabled
+from src.core.effects.software_targets import (
+    SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
+    normalize_software_effect_target,
+)
+from src.core.secondary_device_runtime import iter_effective_secondary_routes, secondary_device_simulation_enabled
 from src.core.utils.exceptions import is_permission_denied
 from src.tray.secondary_device_routes import route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry, device_context_controls_available, device_context_entries

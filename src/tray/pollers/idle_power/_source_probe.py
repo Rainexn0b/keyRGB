@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import os
-from typing import Optional
-
 
 _RECOVERABLE_PROBE_EXCEPTIONS = (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError)
 
@@ -62,7 +60,7 @@ def _evdev_input_idle_available() -> bool:
     return False
 
 
-def format_idle_power_source(source: Optional[str]) -> str:
+def format_idle_power_source(source: str | None) -> str:
     """Format an idle-source label for display, with a safe fallback."""
 
     if not source:

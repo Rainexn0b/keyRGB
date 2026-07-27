@@ -1,9 +1,6 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
 from . import _support_window_ui_shared as support_window_ui_shared
-
 
 CheckActionSpec = support_window_ui_shared.CheckActionSpec
 _ScrolledTextModuleProtocol = support_window_ui_shared._ScrolledTextModuleProtocol
@@ -53,8 +50,10 @@ def build_checks_section(
             "Run backend speed probe…",
             window.run_backend_speed_probe,
             "SupportChecks.Probe.TButton",
-            "Temporarily switch the tray to the guided probe effect, step through the test speeds, then "
-            "record your observation.",
+            (
+                "Temporarily switch the tray to the guided probe effect, step through the test speeds, then "
+                "record your observation."
+            ),
             "btn_run_speed_probe",
         ),
         (

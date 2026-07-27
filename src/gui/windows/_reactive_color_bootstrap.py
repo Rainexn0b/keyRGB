@@ -5,7 +5,6 @@ from collections.abc import Callable
 from types import TracebackType
 from typing import Protocol, TypeAlias, cast
 
-
 _BACKEND_CAPABILITY_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _DESCRIPTION_TEXT = (
     "Sets a manual highlight color used by Reactive Typing effects.\n"

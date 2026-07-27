@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from functools import lru_cache
 from pathlib import Path
-from typing import Iterable
 
 from PIL import Image
 
 from src.core.profile import profiles
 from src.core.runtime.imports import repo_root_from
-
 
 _BACKDROP_CANDIDATE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 

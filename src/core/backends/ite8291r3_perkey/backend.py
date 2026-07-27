@@ -12,9 +12,9 @@ from src.core.backends.exceptions import (
 )
 from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
 
+from .._report_pacing import hid_report_delay_s_from_env
 from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 from . import protocol
-from .._report_pacing import hid_report_delay_s_from_env
 from .device import Ite8291r3KeyboardDevice
 from .usb import device_bcd_device_or_none, open_matching_transport
 

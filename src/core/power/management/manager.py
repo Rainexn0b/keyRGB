@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: PowerManager public facade after battery-saver extract; remaining methods are thin event/monitor delegates
-
 import logging
 import threading
 import time
@@ -12,9 +11,13 @@ from typing import TYPE_CHECKING, cast
 from src.core.profile import profiles as perkey_profiles
 from src.core.profile import runtime_activation as profile_runtime_activation
 
+from ..policies import power_event_policy as _power_event_policy
+from ..policies.power_source_loop_policy import PowerSourceLoopPolicy  # noqa: F401
 from . import _manager_battery_saver as _battery_saver
-from . import _manager_brightness_execution as _brightness_execution, _manager_power_events as _power_events
-from . import _manager_runtime_deps, _monitor_runner as power_monitor_runner
+from . import _manager_brightness_execution as _brightness_execution
+from . import _manager_power_events as _power_events
+from . import _manager_runtime_deps
+from . import _monitor_runner as power_monitor_runner
 from ._manager_config import read_power_management_config_bool, reload_power_management_config
 from ._manager_helpers import (  # noqa: F401
     apply_power_source_actions,
@@ -22,8 +25,6 @@ from ._manager_helpers import (  # noqa: F401
     is_intentionally_off,
 )
 from ._manager_source_iteration import classify_power_source_iteration  # noqa: F401
-from ..policies import power_event_policy as _power_event_policy
-from ..policies.power_source_loop_policy import PowerSourceLoopPolicy  # noqa: F401
 
 if TYPE_CHECKING:
     from src.core.config import Config

@@ -3,9 +3,8 @@ from __future__ import annotations
 import logging
 import select
 import threading
-from collections.abc import Sequence
-from typing import Any, Callable, Optional
-
+from collections.abc import Callable, Sequence
+from typing import Any, Optional
 
 _SelectFn = Callable[..., tuple[Sequence[object], Sequence[object], Sequence[object]]]
 
@@ -37,10 +36,10 @@ class WaylandIdleTracker:
         self._idle = False
         self._available = False
 
-        self._display: Optional[Any] = None
-        self._idle_notifier: Optional[Any] = None
-        self._seat: Optional[Any] = None
-        self._notification: Optional[Any] = None
+        self._display: Optional[Any] = None  # noqa: UP045 - pywayland object has no usable static type
+        self._idle_notifier: Optional[Any] = None  # noqa: UP045 - pywayland object has no usable static type
+        self._seat: Optional[Any] = None  # noqa: UP045 - pywayland object has no usable static type
+        self._notification: Optional[Any] = None  # noqa: UP045 - pywayland object has no usable static type
 
         self._setup()
 
@@ -57,7 +56,7 @@ class WaylandIdleTracker:
 
         registry = display.get_registry()
 
-        found: dict[str, Optional[int]] = {"seat": None, "notifier": None}
+        found: dict[str, int | None] = {"seat": None, "notifier": None}
 
         def _on_global(registry_proxy: object, name: int, interface: str, version: int) -> None:
             if interface == WlSeat.name and found["seat"] is None:
@@ -148,7 +147,7 @@ class WaylandIdleTracker:
         except _RECOVERABLE_WAYLAND_EXCEPTIONS:
             return False
 
-    def is_idle(self) -> Optional[bool]:
+    def is_idle(self) -> bool | None:
         """Return current idle state, dispatching any pending Wayland events.
 
         Returns ``True`` if the session has been idle for at least the
@@ -207,7 +206,7 @@ class WaylandIdleTracker:
 def create_wayland_idle_tracker(
     timeout_ms: int = 10_000,
     display_name_or_fd: int | str | None = None,
-) -> Optional[WaylandIdleTracker]:
+) -> WaylandIdleTracker | None:
     try:
         return WaylandIdleTracker(timeout_ms=timeout_ms, display_name_or_fd=display_name_or_fd)
     except _RECOVERABLE_WAYLAND_EXCEPTIONS as exc:

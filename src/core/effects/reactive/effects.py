@@ -4,8 +4,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from . import _fade_loop
-from . import _ripple_loop
+from . import _fade_loop, _ripple_loop
 from . import _render_brightness_support as _support
 from ._constants import (
     FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S,
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 bind_reactive_effect_exports(globals())
 
 
-def _reactive_active_pulse_mix_or_default(engine: "EffectsEngine", *, default: float) -> float:
+def _reactive_active_pulse_mix_or_default(engine: EffectsEngine, *, default: float) -> float:
     raw_value = _support.read_engine_attr(
         engine,
         "_reactive_active_pulse_mix",
@@ -39,7 +38,7 @@ def _reactive_active_pulse_mix_or_default(engine: "EffectsEngine", *, default: f
     return default if value is None else value
 
 
-def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) -> None:
+def _set_reactive_active_pulse_mix(engine: EffectsEngine, *, target: float) -> None:
     """Update the live reactive pulse mix with a short tail decay.
 
     Ripple/fade overlays can disappear abruptly when the last pulse ages out,
@@ -112,7 +111,7 @@ def _set_reactive_active_pulse_mix(engine: "EffectsEngine", *, target: float) ->
     _support.set_engine_attr(engine, "_reactive_active_pulse_mix", float(next_mix), logger=logger)
 
 
-def _render_uniform_fallback(engine: "EffectsEngine", *, rgb: tuple[int, int, int]) -> None:
+def _render_uniform_fallback(engine: EffectsEngine, *, rgb: tuple[int, int, int]) -> None:
     api = reactive_fade_api_for(__name__)
     color_map = api.get_engine_color_map_buffer(engine, "_reactive_uniform_fallback_map")
     color_map.clear()
@@ -120,9 +119,9 @@ def _render_uniform_fallback(engine: "EffectsEngine", *, rgb: tuple[int, int, in
     api.render(engine, color_map=color_map)
 
 
-def run_reactive_fade(engine: "EffectsEngine") -> None:
+def run_reactive_fade(engine: EffectsEngine) -> None:
     _fade_loop.run_reactive_fade_loop(engine, api=reactive_fade_api_for(__name__))
 
 
-def run_reactive_ripple(engine: "EffectsEngine") -> None:
+def run_reactive_ripple(engine: EffectsEngine) -> None:
     _ripple_loop.run_reactive_ripple_loop(engine, api=reactive_ripple_api_for(__name__))

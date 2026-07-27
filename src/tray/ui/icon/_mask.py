@@ -8,7 +8,6 @@ from xml.etree import ElementTree as ET
 
 from PIL import Image, ImageDraw
 
-
 _ICON_SIZE = (64, 64)
 _ICON_INNER_SIZE = (48, 48)
 _SVG_PATH_TOKEN_RE = re.compile(r"[MLZmlz]|-?\d+(?:\.\d+)?")
@@ -59,8 +58,8 @@ def center_alpha_mask(alpha: Image.Image) -> Image.Image:
         float(_ICON_INNER_SIZE[0]) / float(src_w),
         float(_ICON_INNER_SIZE[1]) / float(src_h),
     )
-    dst_w = max(1, int(round(src_w * scale)))
-    dst_h = max(1, int(round(src_h * scale)))
+    dst_w = max(1, round(src_w * scale))
+    dst_h = max(1, round(src_h * scale))
     inner = cropped.resize((dst_w, dst_h), resampling_lanczos())  # type: ignore[arg-type]
 
     out = Image.new("L", _ICON_SIZE, color=0)
@@ -157,7 +156,7 @@ def render_simple_svg_mask_alpha_64(path: Path) -> Image.Image | None:
 
 def render_cairosvg_mask_alpha_64(path: Path) -> Image.Image:
     cairosvg = importlib.import_module("cairosvg")
-    svg2png = getattr(cairosvg, "svg2png")
+    svg2png = cairosvg.svg2png
     png_bytes = svg2png(url=str(path), output_width=_ICON_INNER_SIZE[0], output_height=_ICON_INNER_SIZE[1])
     img = Image.open(BytesIO(png_bytes)).convert("RGBA")
     return center_alpha_mask(img.getchannel("A"))

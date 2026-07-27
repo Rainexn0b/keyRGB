@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 import tkinter as _tk
+from collections.abc import Callable
 from typing import Protocol, TypeAlias, cast
 
 from src.gui.utils.window_geometry import compute_centered_window_geometry
-
 
 BindCallback: TypeAlias = Callable[[_tk.Event], None]
 AfterCallback: TypeAlias = Callable[[], None]

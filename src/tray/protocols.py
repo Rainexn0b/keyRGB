@@ -11,11 +11,10 @@ the tray codebase. Using Protocols instead of untyped parameters enables:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from src.tray import _power_restore_policy as _power_restore_policy
+from src.tray import _power_restore_policy
 from src.tray import idle_power_state as _idle_power_state
-
 
 if TYPE_CHECKING:
     from src.core.config import Config
@@ -47,7 +46,7 @@ normalize_lighting_power_restore_policy_state = _power_restore_policy.normalize_
 class TrayIconState:
     """Typed state for tray icon appearance tracking."""
 
-    visual: Optional["IconVisual"] = None
+    visual: IconVisual | None = None
     animating: bool = False
 
 
@@ -60,7 +59,7 @@ class TrayIconState:
 class HasConfig(Protocol):
     """Protocol for objects with a Config-like attribute."""
 
-    config: "Config"
+    config: Config
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +71,7 @@ class HasConfig(Protocol):
 class HasEngine(Protocol):
     """Protocol for objects with an EffectsEngine."""
 
-    engine: "EffectsEngine"
+    engine: EffectsEngine
 
 
 # ---------------------------------------------------------------------------
@@ -109,7 +108,7 @@ class _HasSelectedDeviceContext(Protocol):
 
 class _HasIdleDimState(Protocol):
     _dim_temp_active: bool
-    _dim_temp_target_brightness: Optional[int]
+    _dim_temp_target_brightness: int | None
     _dim_sync_suppressed_logged: bool
 
 

@@ -5,7 +5,6 @@ from collections.abc import Callable
 
 from src.tray.protocols import LightingTrayProtocol
 
-
 logger = logging.getLogger(__name__)
 
 _LOCAL_COMPATIBILITY_FALLBACK_EXCEPTIONS = (

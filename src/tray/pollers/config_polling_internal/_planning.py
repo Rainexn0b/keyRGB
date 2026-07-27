@@ -2,9 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._apply_plan import classify_config_apply_plan
-from ._apply_plan import ConfigApplyPlan
-
+from ._apply_plan import ConfigApplyPlan, classify_config_apply_plan
 
 if TYPE_CHECKING:
     from .core import ConfigApplyState

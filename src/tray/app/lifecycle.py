@@ -24,12 +24,12 @@ class _MonitoringPowerManager(Protocol):
     def start_monitoring(self) -> None: ...
 
 
-_PowerManagerT = TypeVar("_PowerManagerT", bound=_MonitoringPowerManager, covariant=True)
-_TrayT = TypeVar("_TrayT", contravariant=True)
+_PowerManagerT_co = TypeVar("_PowerManagerT_co", bound=_MonitoringPowerManager, covariant=True)
+_TrayT_contra = TypeVar("_TrayT_contra", contravariant=True)
 
 
-class _PowerManagerFactory(Protocol[_TrayT, _PowerManagerT]):
-    def __call__(self, tray: _TrayT, *, config: Config | None = None) -> _PowerManagerT: ...
+class _PowerManagerFactory(Protocol[_TrayT_contra, _PowerManagerT_co]):
+    def __call__(self, tray: _TrayT_contra, *, config: Config | None = None) -> _PowerManagerT_co: ...
 
 
 class _IconColorPollingTray(Protocol):
@@ -60,11 +60,11 @@ class _AutostartEffectTray(Protocol):
 
 
 def start_power_monitoring(
-    tray: _TrayT,
+    tray: _TrayT_contra,
     *,
-    power_manager_cls: _PowerManagerFactory[_TrayT, _PowerManagerT],
+    power_manager_cls: _PowerManagerFactory[_TrayT_contra, _PowerManagerT_co],
     config: Config | None,
-) -> _PowerManagerT:
+) -> _PowerManagerT_co:
     """Create and start the PowerManager monitoring loop.
 
     Returns the created PowerManager instance.

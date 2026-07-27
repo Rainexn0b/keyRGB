@@ -65,9 +65,9 @@ def fade_uniform_color(
 
     for i in range(1, steps + 1):
         t = float(i) / float(steps)
-        r = int(round(fr + (tr - fr) * t))
-        g = int(round(fg + (tg - fg) * t))
-        b = int(round(fb + (tb - fb) * t))
+        r = round(fr + (tr - fr) * t)
+        g = round(fg + (tg - fg) * t)
+        b = round(fb + (tb - fb) * t)
 
         try:
             r, g, b = avoid_full_black(

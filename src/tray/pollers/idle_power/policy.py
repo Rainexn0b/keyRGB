@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Literal
 
 from ._constants import (
     POST_RESUME_IDLE_ACTION_SUPPRESSION_S,
     POST_TURN_OFF_RESTORE_SUPPRESSION_S,
 )
 
-IdleAction = Optional[Literal["turn_off", "restore", "dim_to_temp", "restore_brightness"]]
+IdleAction = Literal["turn_off", "restore", "dim_to_temp", "restore_brightness"] | None
 
 # see _constants.py
 
 
 def compute_idle_action(
     *,
-    dimmed: Optional[bool],
+    dimmed: bool | None,
     screen_off: bool,
     is_off: bool,
     idle_forced_off: bool,
@@ -30,19 +30,17 @@ def compute_idle_action(
     last_idle_turn_off_at: float = 0.0,
     last_resume_at: float = 0.0,
     now: float = 0.0,
-    session_idle: Optional[bool] = None,
+    session_idle: bool | None = None,
 ) -> IdleAction:
-    if now > 0 and last_resume_at > 0:
-        if (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S:
-            return None
+    if now > 0 and last_resume_at > 0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S:
+        return None
 
     if not power_management_enabled:
         return None
 
     if not screen_dim_sync_enabled:
-        if dimmed is None:
-            if is_off and (not idle_forced_off):
-                return "restore"
+        if dimmed is None and is_off and (not idle_forced_off):
+            return "restore"
         return None
 
     if user_forced_off or power_forced_off:
@@ -51,7 +49,7 @@ def compute_idle_action(
     if int(brightness) <= 0:
         return None
 
-    dimmed_effective: Optional[bool] = True if bool(screen_off) else dimmed
+    dimmed_effective: bool | None = True if bool(screen_off) else dimmed
 
     if dimmed_effective is None:
         if dim_temp_active:
@@ -88,9 +86,13 @@ def compute_idle_action(
         if is_off:
             if idle_forced_off and session_idle is True:
                 return None
-            if (not bool(screen_off)) and now > 0 and last_idle_turn_off_at > 0:
-                if (now - last_idle_turn_off_at) < POST_TURN_OFF_RESTORE_SUPPRESSION_S:
-                    return None
+            if (
+                (not bool(screen_off))
+                and now > 0
+                and last_idle_turn_off_at > 0
+                and (now - last_idle_turn_off_at) < POST_TURN_OFF_RESTORE_SUPPRESSION_S
+            ):
+                return None
             return "restore"
         return None
 

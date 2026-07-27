@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Callable, Iterable, Optional, TypeVar
+from typing import TypeVar
 
 from .base import KeyboardBackend, ProbeResult
 from .exceptions import BackendError  # noqa: F401 – available for callers and future narrowing
@@ -64,15 +65,15 @@ def _unavailable_probe_result(boundary: str, exc: Exception) -> ProbeResult:
 def _default_specs() -> list[BackendSpec]:
     # Keep this list small and lazy-importing.
     from .asusctl import AsusctlAuraBackend
-    from .ite8258_zones_lenovo_legion import Ite8258Backend
+    from .ite8233_none_chassis_lightbar_clevo import Ite8233Backend
     from .ite8258_perkey_chassis import Ite8258ChassisBackend
+    from .ite8258_zones_lenovo_legion import Ite8258Backend
     from .ite8291_perkey import Ite8291Backend
     from .ite8291_zones_clevo import Ite8291ZonesBackend
-    from .ite8295_zones_lenovo_ideapad import Ite8295ZonesBackend
-    from .ite8233_none_chassis_lightbar_clevo import Ite8233Backend
-    from .ite8910_perkey import Ite8910Backend
     from .ite8291r3_perkey import Ite8291r3Backend
+    from .ite8295_zones_lenovo_ideapad import Ite8295ZonesBackend
     from .ite8297_uniform import Ite8297Backend
+    from .ite8910_perkey import Ite8910Backend
     from .sysfs import SysfsLedsBackend
 
     return [
@@ -134,7 +135,7 @@ def _default_specs() -> list[BackendSpec]:
     ]
 
 
-def iter_backends(*, specs: Optional[Iterable[BackendSpec]] = None) -> list[KeyboardBackend]:
+def iter_backends(*, specs: Iterable[BackendSpec] | None = None) -> list[KeyboardBackend]:
     out: list[KeyboardBackend] = []
     for spec in list(specs) if specs is not None else _default_specs():
         backend = _run_recoverable_backend_boundary(
@@ -179,8 +180,8 @@ def _probe_backend(backend: KeyboardBackend) -> ProbeResult:
 
 
 def select_backend(
-    *, requested: Optional[str] = None, specs: Optional[Iterable[BackendSpec]] = None
-) -> Optional[KeyboardBackend]:
+    *, requested: str | None = None, specs: Iterable[BackendSpec] | None = None
+) -> KeyboardBackend | None:
     """Select a backend.
 
     Order of precedence:

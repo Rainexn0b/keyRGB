@@ -4,19 +4,19 @@ import logging
 import time
 from collections.abc import Mapping
 from operator import attrgetter
-from typing import TYPE_CHECKING, Dict, SupportsIndex, SupportsInt, Tuple, cast
+from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.device import optional_output_transaction
-from src.core.effects.software_targets import average_color_map, render_secondary_uniform_rgb
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.perkey_animation import (
     build_full_color_grid,
     enable_user_mode_once,
     per_key_mode_requires_frame_reassert,
 )
+from src.core.effects.software_targets import average_color_map, render_secondary_uniform_rgb
 from src.core.effects.transitions import avoid_full_black
-from src.core.utils.logging_utils import log_throttled
 from src.core.utils.exceptions import is_device_disconnected
+from src.core.utils.logging_utils import log_throttled
 
 logger = logging.getLogger(__name__)
 _SOFTWARE_RENDER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -25,19 +25,19 @@ _SOFTWARE_RENDER_CLEANUP_ERRORS = (AttributeError, LookupError, OSError, Runtime
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
 
-Color = Tuple[int, int, int]
-Key = Tuple[int, int]
+Color = tuple[int, int, int]
+Key = tuple[int, int]
 IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
 
 
-def _engine_attr_or_none(engine: "EffectsEngine", attr_name: str) -> object | None:
+def _engine_attr_or_none(engine: EffectsEngine, attr_name: str) -> object | None:
     try:
         return attrgetter(attr_name)(engine)
     except AttributeError:
         return None
 
 
-def _keyboard_attr_or_none(engine: "EffectsEngine", attr_name: str) -> object | None:
+def _keyboard_attr_or_none(engine: EffectsEngine, attr_name: str) -> object | None:
     try:
         kb = engine.kb
     except AttributeError:
@@ -58,19 +58,19 @@ def _coerce_color_or_default(value: object, *, default: Color) -> Color:
         return default
 
 
-def _current_color_or_default(engine: "EffectsEngine", *, default: Color) -> Color:
+def _current_color_or_default(engine: EffectsEngine, *, default: Color) -> Color:
     raw = _engine_attr_or_none(engine, "current_color")
     return _coerce_color_or_default(raw, default=default)
 
 
-def _per_key_colors_or_none(engine: "EffectsEngine") -> Mapping[Key, Color] | None:
+def _per_key_colors_or_none(engine: EffectsEngine) -> Mapping[Key, Color] | None:
     raw = _engine_attr_or_none(engine, "per_key_colors")
     if not raw or not isinstance(raw, Mapping):
         return None
     return cast(Mapping[Key, Color], raw)
 
 
-def _last_hw_mode_brightness_or_none(engine: "EffectsEngine") -> int | None:
+def _last_hw_mode_brightness_or_none(engine: EffectsEngine) -> int | None:
     raw = _engine_attr_or_none(engine, "_last_hw_mode_brightness")
     if raw is None:
         return None
@@ -80,7 +80,7 @@ def _last_hw_mode_brightness_or_none(engine: "EffectsEngine") -> int | None:
         return None
 
 
-def _mark_disconnected_device_unavailable(engine: "EffectsEngine") -> None:
+def _mark_disconnected_device_unavailable(engine: EffectsEngine) -> None:
     """Invalidate a disconnected primary without allowing unsafe fallback I/O."""
 
     try:
@@ -97,10 +97,10 @@ def _mark_disconnected_device_unavailable(engine: "EffectsEngine") -> None:
 
 
 def clamp01(x: float) -> float:
-    return 0.0 if x <= 0.0 else (1.0 if x >= 1.0 else x)
+    return 0.0 if x <= 0.0 else (min(1.0, x))
 
 
-def pace(engine: "EffectsEngine", *, min_factor: float = 0.8, max_factor: float = 2.2) -> float:
+def pace(engine: EffectsEngine, *, min_factor: float = 0.8, max_factor: float = 2.2) -> float:
     """Map UI speed (0..10) to an effect pace multiplier.
 
     Uses a quadratic curve so the top end (speed=10) is significantly faster.
@@ -137,7 +137,7 @@ def frame_dt_s() -> float:
 
 
 def animation_step_s(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     attr_name: str,
     *,
     nominal_s: float | None = None,
@@ -172,11 +172,11 @@ def animation_step_s(
     return min(max_step_s, elapsed_s)
 
 
-def has_per_key(engine: "EffectsEngine") -> bool:
+def has_per_key(engine: EffectsEngine) -> bool:
     return bool(_keyboard_attr_or_none(engine, "set_key_colors"))
 
 
-def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
+def base_color_map(engine: EffectsEngine) -> dict[Key, Color]:
     base_color_src = _current_color_or_default(engine, default=(255, 0, 0))
     base_color = (
         int(base_color_src[0]),
@@ -195,7 +195,7 @@ def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
         num_cols=NUM_COLS,
     )
 
-    out: Dict[Key, Color] = {}
+    out: dict[Key, Color] = {}
     for (r, c), rgb in full.items():
         out[(r, c)] = (int(rgb[0]), int(rgb[1]), int(rgb[2]))
     return out
@@ -204,76 +204,71 @@ def base_color_map(engine: "EffectsEngine") -> Dict[Key, Color]:
 def mix(a: Color, b: Color, t: float) -> Color:
     tt = clamp01(t)
     return (
-        int(round(a[0] + (b[0] - a[0]) * tt)),
-        int(round(a[1] + (b[1] - a[1]) * tt)),
-        int(round(a[2] + (b[2] - a[2]) * tt)),
+        round(a[0] + (b[0] - a[0]) * tt),
+        round(a[1] + (b[1] - a[1]) * tt),
+        round(a[2] + (b[2] - a[2]) * tt),
     )
 
 
 def scale(rgb: Color, s: float) -> Color:
     ss = clamp01(s)
-    return (int(round(rgb[0] * ss)), int(round(rgb[1] * ss)), int(round(rgb[2] * ss)))
+    return (round(rgb[0] * ss), round(rgb[1] * ss), round(rgb[2] * ss))
 
 
-def render(engine: "EffectsEngine", *, color_map: Mapping[Key, Color]) -> None:
+def render(engine: EffectsEngine, *, color_map: Mapping[Key, Color]) -> None:
     """Render per-key when available, otherwise fall back to uniform."""
 
     if has_per_key(engine):
         try:
-            with engine.kb_lock:
-                with optional_output_transaction(engine.kb):
-                    brightness_hw = int(engine.brightness)
-                    reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
-                    last_hw_brightness = _last_hw_mode_brightness_or_none(engine)
-                    need_mode_init = reassert_every_frame or last_hw_brightness is None
+            with engine.kb_lock, optional_output_transaction(engine.kb):
+                brightness_hw = int(engine.brightness)
+                reassert_every_frame = per_key_mode_requires_frame_reassert(engine.kb)
+                last_hw_brightness = _last_hw_mode_brightness_or_none(engine)
+                need_mode_init = reassert_every_frame or last_hw_brightness is None
 
-                    if need_mode_init:
+                if need_mode_init:
+                    enable_user_mode_once(
+                        kb=engine.kb,
+                        kb_lock=engine.kb_lock,
+                        brightness=brightness_hw,
+                        save=last_hw_brightness is None,
+                    )
+                    engine._last_hw_mode_brightness = brightness_hw
+
+                try:
+                    engine.kb.set_key_colors(
+                        color_map,
+                        brightness=brightness_hw,
+                        enable_user_mode=False,
+                    )
+                except _SOFTWARE_RENDER_RUNTIME_ERRORS as exc:
+                    # On USB disconnect, attempting a fallback uniform write can trigger
+                    # a libusb crash on some systems. Mark the device unavailable and
+                    # stop issuing I/O until the engine re-acquires it.
+                    if is_device_disconnected(exc):
+                        _mark_disconnected_device_unavailable(engine)
+                        return
+                    raise
+
+                if not need_mode_init and last_hw_brightness is not None and int(last_hw_brightness) != brightness_hw:
+                    try:
+                        engine.kb.set_brightness(int(brightness_hw))
+                    except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
                         enable_user_mode_once(
                             kb=engine.kb,
                             kb_lock=engine.kb_lock,
                             brightness=brightness_hw,
-                            save=last_hw_brightness is None,
                         )
-                        engine._last_hw_mode_brightness = brightness_hw
+                    engine._last_hw_mode_brightness = brightness_hw
 
-                    try:
-                        engine.kb.set_key_colors(
-                            color_map,
-                            brightness=brightness_hw,
-                            enable_user_mode=False,
-                        )
-                    except _SOFTWARE_RENDER_RUNTIME_ERRORS as exc:
-                        # On USB disconnect, attempting a fallback uniform write can trigger
-                        # a libusb crash on some systems. Mark the device unavailable and
-                        # stop issuing I/O until the engine re-acquires it.
-                        if is_device_disconnected(exc):
-                            _mark_disconnected_device_unavailable(engine)
-                            return
-                        raise
-
-                    if (
-                        not need_mode_init
-                        and last_hw_brightness is not None
-                        and int(last_hw_brightness) != brightness_hw
-                    ):
-                        try:
-                            engine.kb.set_brightness(int(brightness_hw))
-                        except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
-                            enable_user_mode_once(
-                                kb=engine.kb,
-                                kb_lock=engine.kb_lock,
-                                brightness=brightness_hw,
-                            )
-                        engine._last_hw_mode_brightness = brightness_hw
-
-                    render_secondary_uniform_rgb(
-                        engine,
-                        rgb=average_color_map(color_map),
-                        brightness_hw=brightness_hw,
-                        logger=logger,
-                        log_key="effects.render.secondary",
-                    )
-                    return
+                render_secondary_uniform_rgb(
+                    engine,
+                    rgb=average_color_map(color_map),
+                    brightness_hw=brightness_hw,
+                    logger=logger,
+                    log_key="effects.render.secondary",
+                )
+                return
         except _SOFTWARE_RENDER_RUNTIME_ERRORS as exc:
             # Composite devices defer physical I/O until output_transaction()
             # exits, so disconnects can surface here rather than inside
@@ -296,14 +291,13 @@ def render(engine: "EffectsEngine", *, color_map: Mapping[Key, Color]) -> None:
         rgb = average_color_map(color_map)
 
     r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(engine.brightness))
-    with engine.kb_lock:
-        with optional_output_transaction(engine.kb):
-            enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
-            engine.kb.set_color((r, g, b), brightness=int(engine.brightness))
-            render_secondary_uniform_rgb(
-                engine,
-                rgb=(r, g, b),
-                brightness_hw=int(engine.brightness),
-                logger=logger,
-                log_key="effects.render.secondary",
-            )
+    with engine.kb_lock, optional_output_transaction(engine.kb):
+        enable_user_mode_once(kb=engine.kb, kb_lock=engine.kb_lock, brightness=int(engine.brightness))
+        engine.kb.set_color((r, g, b), brightness=int(engine.brightness))
+        render_secondary_uniform_rgb(
+            engine,
+            rgb=(r, g, b),
+            brightness_hw=int(engine.brightness),
+            logger=logger,
+            log_key="effects.render.secondary",
+        )

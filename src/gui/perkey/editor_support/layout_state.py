@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable, Mapping, Protocol, Sequence, cast
+from collections.abc import Callable, Mapping, Sequence
+from typing import Protocol, cast
 
 from src.core.profile import profiles
 from src.core.resources.layout_legends import load_layout_legend_pack, resolve_layout_legend_pack_id
@@ -8,7 +9,6 @@ from src.core.resources.layout_slots import LayoutSlotState, get_layout_slot_sta
 
 from ..profile_management import keymap_cells_for
 from ..ui.layout_slots import refresh_layout_slots_ui
-
 
 _LIGHTBAR_DISCOVERY_ERRORS = (
     AttributeError,
@@ -30,7 +30,7 @@ class _PathExistsProtocol(Protocol):
     def exists(self) -> bool: ...
 
 
-class _ProfilePathsProtocol(Protocol):
+class _ProfilePathsProtocol(Protocol):  # noqa: PYI046 – re-exported via layout.py for cross-module casts
     keymap: _PathExistsProtocol
     layout_global: _PathExistsProtocol
     layout_per_key: _PathExistsProtocol
@@ -57,7 +57,7 @@ class _OverlayControlsProtocol(Protocol):
     def sync_vars_from_scope(self) -> None: ...
 
 
-class _LightbarControlsProtocol(Protocol):
+class _LightbarControlsProtocol(Protocol):  # noqa: PYI046 – re-exported via layout.py for cross-module casts
     def sync_vars_from_editor(self) -> None: ...
 
 

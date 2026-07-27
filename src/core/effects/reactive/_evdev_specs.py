@@ -69,7 +69,7 @@ SPECIAL_KEY_NAMES: dict[str, str] = {
 
 
 def keyboard_letter_keys(evdev: object) -> set[int]:
-    ecodes = getattr(evdev, "ecodes")
+    ecodes = getattr(evdev, "ecodes")  # noqa: B009 – object-typed arg; getattr bypasses mypy attr-defined
     return {
         ecodes.KEY_A,
         ecodes.KEY_B,
@@ -101,7 +101,7 @@ def keyboard_letter_keys(evdev: object) -> set[int]:
 
 
 def keyboard_control_keys(evdev: object) -> set[int]:
-    ecodes = getattr(evdev, "ecodes")
+    ecodes = getattr(evdev, "ecodes")  # noqa: B009 – object-typed arg; getattr bypasses mypy attr-defined
     return {
         ecodes.KEY_SPACE,
         ecodes.KEY_ENTER,

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-# @quality-exception file-size-analysis: idle-power polling entry facade; sensors/runtime/actions already live in sibling modules
-
-from functools import lru_cache
 import logging
 import threading
 import time
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Optional
+
+# @quality-exception file-size-analysis: idle-power polling entry facade; sensors/runtime/actions already live in sibling modules
+from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from ._polling_support import call_best_effort as _call_best_effort_impl
 from ._polling_support import effective_screen_dim_sync_enabled as _effective_screen_dim_sync_enabled_impl
@@ -17,7 +17,6 @@ from ._polling_support import recover_idle_power_polling_error as _recover_idle_
 from ._polling_support import tray_log_event_or_none as _tray_log_event_or_none_impl
 from ._polling_support import tray_log_exception_or_none as _tray_log_exception_or_none_impl
 from ._runtime import run_idle_power_iteration
-
 
 if TYPE_CHECKING:
     from src.tray.protocols import IdlePowerTrayProtocol
@@ -112,7 +111,7 @@ def _effective_screen_dim_sync_enabled(tray: IdlePowerTrayProtocol, requested_en
 
 def _compute_idle_action(
     *,
-    dimmed: Optional[bool],
+    dimmed: bool | None,
     screen_off: bool,
     is_off: bool,
     idle_forced_off: bool,
@@ -128,7 +127,7 @@ def _compute_idle_action(
     last_idle_turn_off_at: float = 0.0,
     last_resume_at: float = 0.0,
     now: float = 0.0,
-    session_idle: Optional[bool] = None,
+    session_idle: bool | None = None,
 ) -> IdleAction:
     from .policy import compute_idle_action
 
@@ -157,31 +156,31 @@ def _ensure_idle_state(tray: IdlePowerTrayProtocol) -> None:
     _ensure_idle_state_impl(tray)
 
 
-def _read_dimmed_state(state: BacklightState) -> Optional[bool]:
+def _read_dimmed_state(state: BacklightState) -> bool | None:
     from .sensors import read_dimmed_state
 
     return read_dimmed_state(state)
 
 
-def _read_screen_off_state_drm() -> Optional[bool]:
+def _read_screen_off_state_drm() -> bool | None:
     from .sensors import read_screen_off_state_drm
 
     return read_screen_off_state_drm()
 
 
-def _run(argv: list[str], *, timeout_s: float = 1.0) -> Optional[str]:
+def _run(argv: list[str], *, timeout_s: float = 1.0) -> str | None:
     from .sensors import run
 
     return run(argv, timeout_s=timeout_s)
 
 
-def _get_session_id() -> Optional[str]:
+def _get_session_id() -> str | None:
     from .sensors import get_session_id
 
     return get_session_id()
 
 
-def _read_logind_idle_seconds(*, session_id: str) -> Optional[float]:
+def _read_logind_idle_seconds(*, session_id: str) -> float | None:
     from ._logind import read_logind_idle_seconds
 
     return read_logind_idle_seconds(
@@ -191,29 +190,29 @@ def _read_logind_idle_seconds(*, session_id: str) -> Optional[float]:
     )
 
 
-def _read_desktop_dim_timeout(on_ac_power: Optional[bool]) -> Optional[float]:
+def _read_desktop_dim_timeout(on_ac_power: bool | None) -> float | None:
     from ._desktop_timeout import read_kde_dim_timeout
 
     return read_kde_dim_timeout(on_ac_power)
 
 
-def _create_input_idle_tracker() -> "InputIdleTracker":
+def _create_input_idle_tracker() -> InputIdleTracker:
     from ._input_idle import InputIdleTracker
 
     return InputIdleTracker()
 
 
-def _read_input_idle_seconds(tracker: "InputIdleTracker") -> Optional[float]:
+def _read_input_idle_seconds(tracker: InputIdleTracker) -> float | None:
     return tracker.seconds_since_activity()
 
 
-def _create_wayland_idle_tracker(timeout_ms: int) -> Optional[object]:
+def _create_wayland_idle_tracker(timeout_ms: int) -> object | None:
     from ._wayland_idle import create_wayland_idle_tracker
 
     return create_wayland_idle_tracker(timeout_ms=timeout_ms)
 
 
-def _read_wayland_idle(tracker: object) -> Optional[bool]:
+def _read_wayland_idle(tracker: object) -> bool | None:
     from ._wayland_idle import WaylandIdleTracker
 
     if not isinstance(tracker, WaylandIdleTracker):
@@ -249,7 +248,7 @@ def _apply_idle_action(
 
 def _debounce_dim_and_screen_off(
     *,
-    dimmed_raw: Optional[bool],
+    dimmed_raw: bool | None,
     screen_off_raw: bool,
     dimmed_true_streak: int,
     dimmed_false_streak: int,
@@ -257,7 +256,7 @@ def _debounce_dim_and_screen_off(
     debounce_polls_dimmed_true: int,
     debounce_polls_dimmed_false: int,
     debounce_polls_screen_off_true: int,
-) -> tuple[Optional[bool], bool, int, int, int]:
+) -> tuple[bool | None, bool, int, int, int]:
     from ._utils import debounce_dim_and_screen_off
 
     return debounce_dim_and_screen_off(
@@ -275,7 +274,7 @@ def _debounce_dim_and_screen_off(
 def _build_idle_action_key(
     *,
     action: IdleAction,
-    dimmed: Optional[bool],
+    dimmed: bool | None,
     screen_off: bool,
     brightness: int,
     dim_sync_mode: str,
@@ -297,7 +296,7 @@ def _should_log_idle_action(
     *,
     action: IdleAction,
     action_key: str,
-    last_action_key: Optional[str],
+    last_action_key: str | None,
 ) -> bool:
     from ._utils import should_log_idle_action
 
@@ -353,6 +352,6 @@ def start_idle_power_polling(
 
 
 __all__ = [
-    "start_idle_power_polling",
     "_compute_idle_action",
+    "start_idle_power_polling",
 ]

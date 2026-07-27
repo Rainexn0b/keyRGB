@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Callable, SupportsIndex, SupportsInt, cast
+from collections.abc import Callable
+from typing import SupportsIndex, SupportsInt, cast
 
 from . import protocol
 

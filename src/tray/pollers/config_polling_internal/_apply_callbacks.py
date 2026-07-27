@@ -6,19 +6,19 @@ They rely on helpers.py scaffold for "how to apply safely" infrastructure.
 
 from __future__ import annotations
 
-from src.core.effects.perkey_animation import per_key_mode_requires_frame_reassert
-from src.core.effects.perkey_animation import restore_hidden_per_key_rows_once
+from src.core.effects.perkey_animation import per_key_mode_requires_frame_reassert, restore_hidden_per_key_rows_once
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from src.tray.idle_power_state import any_forced_off, read_forced_off_flags
 from src.tray.protocols import ConfigPollingTrayProtocol
 
-from ._apply_support import build_perkey_color_map
-from ._apply_support import current_software_effect_target
-from ._apply_support import has_all_uniform_capable_target
-from ._apply_support import reactive_sync_values
-from ._apply_support import reactive_visual_mode_value
 from . import helpers as _helpers
-
+from ._apply_support import (
+    build_perkey_color_map,
+    current_software_effect_target,
+    has_all_uniform_capable_target,
+    reactive_sync_values,
+    reactive_visual_mode_value,
+)
 
 _PERKEY_POLICY_READ_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
@@ -142,9 +142,8 @@ def _sync_software_target_policy(tray: ConfigPollingTrayProtocol, current) -> No
     except AttributeError:
         pass
     _helpers.configure_engine_software_targets(tray)
-    if target != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE:
-        if not bool(getattr(tray, "is_off", False)):
-            _helpers.restore_secondary_software_targets(tray)
+    if target != SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE and not bool(getattr(tray, "is_off", False)):
+        _helpers.restore_secondary_software_targets(tray)
 
 
 def _sync_perkey_brightness_state(
@@ -222,17 +221,16 @@ def _apply_perkey(
 
     from src.core.effects.device import optional_output_transaction
 
-    with tray.engine.kb_lock:
-        with optional_output_transaction(tray.engine.kb):
-            if should_pre_enable_user_mode:
-                _helpers._enable_user_mode_best_effort(tray, brightness=int(current.brightness))
-            tray.engine.kb.set_key_colors(
-                color_map,
-                brightness=current.brightness,
-                enable_user_mode=should_reassert_user_mode,
-            )
-            tray.is_off = False
-            _helpers._apply_secondary_static_from_config(tray)
+    with tray.engine.kb_lock, optional_output_transaction(tray.engine.kb):
+        if should_pre_enable_user_mode:
+            _helpers._enable_user_mode_best_effort(tray, brightness=int(current.brightness))
+        tray.engine.kb.set_key_colors(
+            color_map,
+            brightness=current.brightness,
+            enable_user_mode=should_reassert_user_mode,
+        )
+        tray.is_off = False
+        _helpers._apply_secondary_static_from_config(tray)
 
 
 def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> None:
@@ -247,11 +245,10 @@ def _apply_uniform(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> N
     tray.engine.stop()
     from src.core.effects.device import optional_output_transaction
 
-    with tray.engine.kb_lock:
-        with optional_output_transaction(tray.engine.kb):
-            tray.engine.kb.set_color(current.color, brightness=current.brightness)
-            tray.is_off = False
-            _helpers._apply_secondary_static_from_config(tray)
+    with tray.engine.kb_lock, optional_output_transaction(tray.engine.kb):
+        tray.engine.kb.set_color(current.color, brightness=current.brightness)
+        tray.is_off = False
+        _helpers._apply_secondary_static_from_config(tray)
 
 
 def _apply_effect(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> None:

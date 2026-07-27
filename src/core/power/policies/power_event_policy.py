@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Union
 
 
 @dataclass(frozen=True)
@@ -14,7 +13,7 @@ class RestoreKeyboard:
     pass
 
 
-PowerEventAction = Union[TurnOffKeyboard, RestoreKeyboard]
+PowerEventAction = TurnOffKeyboard | RestoreKeyboard
 
 
 @dataclass(frozen=True)
@@ -40,7 +39,7 @@ class PowerEventPolicy:
     """
 
     def __init__(self) -> None:
-        self._saved_was_off: Optional[bool] = None
+        self._saved_was_off: bool | None = None
 
     def handle_power_off_event(self, inputs: PowerEventInputs) -> PowerEventResult:
         # Even if the action is disabled ("don't turn off on suspend"), we still

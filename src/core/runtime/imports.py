@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-import sys
 import subprocess
-from collections.abc import Mapping
+import sys
+from collections.abc import Iterable, Mapping
 from pathlib import Path
-from typing import Iterable, Optional
 
 
 def repo_root_from(anchor: str | Path) -> Path:
@@ -127,7 +126,7 @@ def ensure_repo_root_on_sys_path_str(anchor: str | Path) -> str:
     return str(ensure_repo_root_on_sys_path(anchor))
 
 
-def add_first_existing_to_sys_path(paths: Iterable[Path]) -> Optional[Path]:
+def add_first_existing_to_sys_path(paths: Iterable[Path]) -> Path | None:
     """Insert the first existing path from *paths* to sys.path and return it."""
 
     for path in paths:

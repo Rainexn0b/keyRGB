@@ -3,7 +3,6 @@ from __future__ import annotations
 from .json_storage import read_json, write_json_atomic
 from .paths import paths_for
 
-
 BACKDROP_MODE_BUILTIN = "builtin"
 BACKDROP_MODE_CUSTOM = "custom"
 BACKDROP_MODE_NONE = "none"

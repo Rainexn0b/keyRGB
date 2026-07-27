@@ -12,6 +12,5 @@ from __future__ import annotations
 
 from typing import Final
 
-
 NUM_ROWS: Final[int] = 6
 NUM_COLS: Final[int] = 21

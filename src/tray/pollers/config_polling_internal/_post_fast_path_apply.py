@@ -8,7 +8,6 @@ from src.tray.protocols import ConfigPollingTrayProtocol
 
 from ._apply_plan import classify_apply_mode
 
-
 _LOG_WRITE_EXCEPTIONS = (OSError, RuntimeError, ValueError)
 _ResultT = TypeVar("_ResultT")
 MonotonicFn: TypeAlias = Callable[[], float]

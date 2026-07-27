@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """KeyRGB Effects Engine.
 
 This module intentionally stays small and composes the engine from mixins.
@@ -8,7 +7,11 @@ from __future__ import annotations
 
 from src.core.effects.catalog import (
     ALL_EFFECTS as _ALL_EFFECTS,
+)
+from src.core.effects.catalog import (
     HW_EFFECTS as _HW_EFFECTS,
+)
+from src.core.effects.catalog import (
     SW_EFFECTS as _SW_EFFECTS,
 )
 from src.core.effects.engine_support import _EngineBrightness, _EngineCore, _EngineStart

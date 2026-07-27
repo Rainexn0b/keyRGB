@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: single cohesive SysfsLedKeyboardDevice implementation for brightness/RGB sysfs nodes
-
 import logging
 import os
 from dataclasses import dataclass, field
@@ -9,10 +8,9 @@ from pathlib import Path
 
 from ...resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS
 from ..base import BackendCapabilities, KeyboardDevice
+from . import common, privileged
 from ._device_methods import set_zone_color_method as _set_zone_color_method
 from ._device_methods import to_sysfs_brightness_method as _to_sysfs_brightness_method
-from . import common
-from . import privileged
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +64,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
             green / max_values[1],
             blue / max_values[2],
         )
-        brightness = int(round(level * 50))
+        brightness = round(level * 50)
         return (red, green, blue), max(0, min(50, brightness))
 
     def _read_multi_index(self, led_dir: Path) -> tuple[str, ...] | None:
@@ -213,7 +211,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         # We read only from the primary zone.
         sysfs_value = self._read_sysfs_brightness()
         max_value = self._max()
-        return int(round((sysfs_value / max_value) * 50))
+        return round((sysfs_value / max_value) * 50)
 
     def set_brightness(self, brightness: int) -> None:
         if any(zone.get("type") == "ite8297_channels" for zone in self._zones):
@@ -228,7 +226,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
         # Map KeyRGB's 0..50 brightness scale into sysfs range.
         b = max(0, min(50, int(brightness)))
         max_value = self._max()
-        sysfs_value = int(round((b / 50) * max_value))
+        sysfs_value = round((b / 50) * max_value)
 
         # Debug logging (once). Logging is optional diagnostics, so a broken handler
         # should not block LED writes.

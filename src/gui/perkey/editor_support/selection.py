@@ -15,7 +15,6 @@ from ..profile_management import (
 )
 from ..ui.status import selected_mapped, selected_unmapped, set_status
 
-
 LayoutSlotOverrides: TypeAlias = dict[str, dict[str, object]]
 RgbColor: TypeAlias = tuple[int, int, int]
 

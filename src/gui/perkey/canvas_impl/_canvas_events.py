@@ -7,7 +7,6 @@ from typing import Protocol, SupportsFloat, cast
 
 from src.core.utils.logging_utils import log_throttled
 
-
 logger = logging.getLogger(__name__)
 
 _CANVAS_MOTION_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError, tk.TclError)

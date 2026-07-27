@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: thin public lighting-controller facade; mode/helpers already extracted to sibling modules
-
 import logging
-from typing import Optional
 
 from src.core.effects import catalog as effects_catalog
 from src.core.utils import exceptions as core_exceptions
@@ -12,12 +10,10 @@ from src.tray.controllers import _lighting_controller_helpers as lighting_contro
 from src.tray.controllers import _lighting_effect_coordination as lighting_effect_coordination
 from src.tray.controllers import _lighting_menu_handlers as lighting_menu_handlers
 from src.tray.controllers import _lighting_start_effect_boundary as lighting_start_effect_boundary
-from src.tray.controllers import software_target_controller
-from src.tray.controllers import secondary_static_scene
+from src.tray.controllers import secondary_static_scene, software_target_controller
 from src.tray.controllers._power import _lighting_power_policy as lighting_power_policy
 from src.tray.controllers._power import _lighting_power_state as lighting_power_state
 from src.tray.protocols import LightingTrayProtocol
-
 
 SW_EFFECTS = effects_catalog.SW_EFFECTS_SET
 restore_secondary_software_targets = software_target_controller.restore_secondary_software_targets
@@ -85,7 +81,7 @@ def _plan_effect_fade_ramp(
 def _resolve_start_current_effect_policy(
     tray: LightingTrayProtocol,
     *,
-    brightness_override: Optional[int],
+    brightness_override: int | None,
 ) -> lighting_effect_coordination._StartCurrentEffectPolicy:
     """Resolve start_current_effect policy before invoking engine side effects."""
     return lighting_effect_coordination._resolve_start_current_effect_policy(
@@ -150,7 +146,7 @@ def _apply_effect_fade_ramp(
 def start_current_effect(
     tray: LightingTrayProtocol,
     *,
-    brightness_override: Optional[int] = None,
+    brightness_override: int | None = None,
     fade_in: bool = False,
     fade_in_duration_s: float = 0.25,
 ) -> None:
@@ -250,9 +246,7 @@ def start_current_effect(
 
         if not start_plan.is_loop_effect and start_plan.restore_secondary_targets:
             restore_secondary_software_targets(tray)
-        if start_plan.is_loop_effect and not start_plan.restore_secondary_targets:
-            secondary_static_scene.apply_secondary_static_scene(tray)
-        elif not start_plan.is_loop_effect:
+        if start_plan.is_loop_effect and not start_plan.restore_secondary_targets or not start_plan.is_loop_effect:
             secondary_static_scene.apply_secondary_static_scene(tray)
     except _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: lighting startup crosses device I/O, backend callbacks, tray actions; must not fail tray runtime for recoverable failures
         lighting_start_effect_boundary.handle_start_current_effect_exception(

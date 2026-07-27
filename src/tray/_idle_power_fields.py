@@ -7,7 +7,7 @@ prefer the public re-exports on ``src.tray.idle_power_state`` (and
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from collections.abc import Callable
 
 from src.tray.idle_power_state import ensure_tray_idle_power_state
 
@@ -105,7 +105,7 @@ def _coerce_idle_power_bool(value: object) -> tuple[bool, bool]:
     return False, False
 
 
-def _coerce_idle_power_optional_int(value: object) -> tuple[Optional[int], bool]:
+def _coerce_idle_power_optional_int(value: object) -> tuple[int | None, bool]:
     if value is None:
         return None, True
 
@@ -121,7 +121,7 @@ def _coerce_idle_power_optional_int(value: object) -> tuple[Optional[int], bool]
     return None, False
 
 
-def _coerce_idle_power_optional_bool(value: object) -> tuple[Optional[bool], bool]:
+def _coerce_idle_power_optional_bool(value: object) -> tuple[bool | None, bool]:
     if value is None:
         return None, True
 
@@ -210,9 +210,9 @@ def read_idle_power_state_optional_int_field(
     *,
     attr_name: object = None,
     state_name: object = None,
-    default: Optional[int] = None,
+    default: int | None = None,
     **alias_kwargs: object,
-) -> Optional[int]:
+) -> int | None:
     """Read an optional-int idle/power field with safe owner fallback and convergence."""
 
     value = _read_idle_power_state_field_converged(
@@ -235,9 +235,9 @@ def read_idle_power_state_optional_bool_field(
     *,
     attr_name: object = None,
     state_name: object = None,
-    default: Optional[bool] = None,
+    default: bool | None = None,
     **alias_kwargs: object,
-) -> Optional[bool]:
+) -> bool | None:
     """Read an optional-bool idle/power field with safe owner fallback and convergence."""
 
     value = _read_idle_power_state_field_converged(

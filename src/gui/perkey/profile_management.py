@@ -1,17 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Dict, Mapping, Tuple
 
-from src.core.profile import profiles
 from src.core.config import Config
+from src.core.profile import profiles
 from src.core.resources.layouts import key_id_for_slot_id, slot_id_for_key_id
 
-
-PerKeyColors = Dict[Tuple[int, int], Tuple[int, int, int]]
-KeyCell = Tuple[int, int]
-KeyCells = Tuple[KeyCell, ...]
-Keymap = Dict[str, KeyCells]
+PerKeyColors = dict[tuple[int, int], tuple[int, int, int]]
+KeyCell = tuple[int, int]
+KeyCells = tuple[KeyCell, ...]
+Keymap = dict[str, KeyCells]
 
 
 def _candidate_keymap_identities(
@@ -39,7 +38,7 @@ def _candidate_keymap_identities(
     return tuple(out)
 
 
-def _is_valid_cell(cell: Tuple[int, int], *, num_rows: int, num_cols: int) -> bool:
+def _is_valid_cell(cell: tuple[int, int], *, num_rows: int, num_cols: int) -> bool:
     row, col = int(cell[0]), int(cell[1])
     return 0 <= row < int(num_rows) and 0 <= col < int(num_cols)
 
@@ -188,13 +187,13 @@ def load_profile_colors(
 class ActivatedProfile:
     name: str
     keymap: Keymap
-    layout_tweaks: Dict[str, float]
-    per_key_layout_tweaks: Dict[str, Dict[str, float]]
+    layout_tweaks: dict[str, float]
+    per_key_layout_tweaks: dict[str, dict[str, float]]
     colors: PerKeyColors
-    layout_slot_overrides: Dict[str, Dict[str, object]] = field(default_factory=dict)
-    lightbar_overlay: Dict[str, bool | float] = field(default_factory=dict)
+    layout_slot_overrides: dict[str, dict[str, object]] = field(default_factory=dict)
+    lightbar_overlay: dict[str, bool | float] = field(default_factory=dict)
     # ``None`` means the legacy profile has no secondary_lighting component.
-    secondary_lighting: Dict[str, object] | None = None
+    secondary_lighting: dict[str, object] | None = None
 
 
 def activate_profile(
@@ -254,13 +253,13 @@ def save_profile(
     *,
     config: Config,
     keymap: Keymap,
-    layout_tweaks: Dict[str, float],
-    per_key_layout_tweaks: Dict[str, Dict[str, float]],
-    lightbar_overlay: Dict[str, bool | float] | None = None,
+    layout_tweaks: dict[str, float],
+    per_key_layout_tweaks: dict[str, dict[str, float]],
+    lightbar_overlay: dict[str, bool | float] | None = None,
     physical_layout: str,
-    layout_slot_overrides: Dict[str, Dict[str, object]] | None = None,
+    layout_slot_overrides: dict[str, dict[str, object]] | None = None,
     colors: PerKeyColors,
-    secondary_lighting: Dict[str, object] | None = None,
+    secondary_lighting: dict[str, object] | None = None,
 ) -> str:
     name = profiles.set_active_profile(requested_name)
 

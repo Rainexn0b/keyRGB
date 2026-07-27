@@ -5,7 +5,6 @@ import threading
 import time
 from collections.abc import Callable
 
-
 _LID_MONITOR_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _PROC_LID_STATE_GLOB = "/proc/acpi/button/lid/*/state"
 _FALLBACK_LID_STATE_PATHS = (
@@ -59,8 +58,8 @@ def read_lid_state() -> str | None:
 def _run_lid_monitor_action(*, action: Callable[[], None], logger) -> bool:
     try:
         action()
-    except _LID_MONITOR_RUNTIME_ERRORS as e:  # @quality-exception exception-transparency: lid monitor polling crosses a runtime filesystem/hardware boundary; recoverable OS/device failures are logged with traceback while unexpected defects still propagate
-        logger.exception("Error reading lid state: %s", e)
+    except _LID_MONITOR_RUNTIME_ERRORS:  # @quality-exception exception-transparency: lid monitor polling crosses a runtime filesystem/hardware boundary; recoverable OS/device failures are logged with traceback while unexpected defects still propagate
+        logger.exception("Error reading lid state")
         return False
     return True
 

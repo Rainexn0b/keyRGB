@@ -84,7 +84,7 @@ def _permission_error_callback_or_none(engine: object) -> Callable[[Exception], 
 
 def _mark_device_unavailable_callback_or_none(engine: object) -> Callable[[], None] | None:
     try:
-        callback = getattr(engine, "mark_device_unavailable")
+        callback = getattr(engine, "mark_device_unavailable")  # noqa: B009 - engine is intentionally duck-typed
     except AttributeError:
         return None
     return cast(Callable[[], None] | None, callback if callable(callback) else None)

@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from typing import Callable, Mapping, Protocol, Tuple
+from typing import Protocol
 
 from src.core.backends.base import KeyboardDevice
 from src.core.utils.logging_utils import log_throttled
@@ -14,8 +15,8 @@ from .ops.color_map_ops import ensure_full_map
 logger = logging.getLogger(__name__)
 _CONFIG_WRITE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
-Color = Tuple[int, int, int]
-Cell = Tuple[int, int]
+Color = tuple[int, int, int]
+Cell = tuple[int, int]
 ColorMap = Mapping[Cell, Color]
 
 

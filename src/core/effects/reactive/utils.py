@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import colorsys
 from dataclasses import dataclass
-from typing import Any, List, Tuple
+from typing import Any
 
 from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.reactive.input import (
@@ -13,7 +13,7 @@ from src.core.effects.reactive.input import (
 )
 
 # Type alias
-Color = Tuple[int, int, int]
+Color = tuple[int, int, int]
 
 
 def _srgb_channel_to_linear(c: float) -> float:
@@ -48,7 +48,7 @@ def _pick_contrasting_highlight(*, base_rgb: Color, preferred_rgb: Color) -> Col
         return preferred_rgb
 
     inv = (255 - preferred_rgb[0], 255 - preferred_rgb[1], 255 - preferred_rgb[2])
-    candidates: List[Color] = [preferred_rgb, inv, (255, 255, 255), (0, 0, 0)]
+    candidates: list[Color] = [preferred_rgb, inv, (255, 255, 255), (0, 0, 0)]
 
     best = preferred_rgb
     best_ratio = 0.0
@@ -161,7 +161,7 @@ def _ripple_radius(*, age_s: float, ttl_s: float, min_radius: float = 0.0, max_r
     return float(min_radius + (max_radius - min_radius) * t)
 
 
-def _age_pulses_in_place(pulses: List[Any], *, dt: float) -> List[Any]:
+def _age_pulses_in_place(pulses: list[Any], *, dt: float) -> list[Any]:
     write_idx = 0
     for pulse in pulses:
         pulse.age_s += dt

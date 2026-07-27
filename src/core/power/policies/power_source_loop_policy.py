@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Union
 
+from ..system import PowerMode
 from .battery_saver_policy import BatterySaverPolicy
 from .power_source_policy import compute_power_source_policy
-from ..system import PowerMode
 
 
 @dataclass(frozen=True)
@@ -33,13 +32,7 @@ class ActivatePerkeyProfile:
     profile_name: str
 
 
-PowerAction = Union[
-    TurnOffKeyboard,
-    RestoreKeyboard,
-    ApplyBrightness,
-    ActivatePowerMode,
-    ActivatePerkeyProfile,
-]
+PowerAction = TurnOffKeyboard | RestoreKeyboard | ApplyBrightness | ActivatePowerMode | ActivatePerkeyProfile
 
 
 @dataclass(frozen=True)
@@ -93,16 +86,16 @@ class PowerSourceLoopPolicy:
     ) -> None:
         self._debounce_seconds = float(debounce_seconds)
         self._power_mode_retry_seconds = float(power_mode_retry_seconds)
-        self._last_on_ac: Optional[bool] = None
+        self._last_on_ac: bool | None = None
         self._last_change_ts: float = 0.0
 
-        self._last_desired_enabled: Optional[bool] = None
-        self._last_desired_brightness: Optional[int] = None
-        self._last_desired_power_mode: Optional[str] = None
-        self._last_power_mode_attempt_value: Optional[str] = None
+        self._last_desired_enabled: bool | None = None
+        self._last_desired_brightness: int | None = None
+        self._last_desired_power_mode: str | None = None
+        self._last_power_mode_attempt_value: str | None = None
         self._last_power_mode_attempt_ts: float = 0.0
         self._power_mode_satisfied_for_desired: bool = False
-        self._last_desired_perkey_profile: Optional[str] = None
+        self._last_desired_perkey_profile: str | None = None
 
         self._battery_saver_policy = battery_saver_policy or BatterySaverPolicy()
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Settings GUI.
 
 This is a small Tkinter window that controls how KeyRGB reacts to:
@@ -14,17 +13,15 @@ Settings are persisted in the shared `~/.config/keyrgb/config.json` via
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: single Tk PowerSettingsGUI window class; panels already extracted to settings/panels/
-
 import tkinter as tk
 from tkinter import ttk
-
-from . import hardware_hint, os_autostart, panels, scrollable_area, settings_state
 
 from src.core import config as core_config
 from src.gui import theme as gui_theme
 from src.gui.utils import tk_async, window_geometry, window_icon
-from . import _settings_window_constants as _swc
 
+from . import _settings_window_constants as _swc
+from . import hardware_hint, os_autostart, panels, scrollable_area, settings_state
 
 # Keep module-level dependency names explicit so tests can monkeypatch window.py
 # directly while the implementation still resolves through this module.
@@ -76,7 +73,7 @@ class PowerSettingsGUI:
         self.root.minsize(_SETTINGS_MIN_WIDTH, _SETTINGS_MIN_HEIGHT)
         self.root.resizable(True, True)
 
-        bg_color, fg_color = apply_clam_theme(
+        bg_color, _fg_color = apply_clam_theme(
             self.root,
             include_checkbuttons=True,
             map_checkbutton_state=True,

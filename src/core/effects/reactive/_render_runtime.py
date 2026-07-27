@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
-from typing import TYPE_CHECKING, Callable, Tuple
+from collections.abc import Callable, Mapping
+from typing import TYPE_CHECKING
 
 from src.core.effects.perkey_animation import enable_user_mode_once, per_key_mode_requires_frame_reassert
 from src.core.effects.software_targets import average_color_map as average_color_map_impl
@@ -18,8 +18,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-Color = Tuple[int, int, int]
-Key = Tuple[int, int]
+Color = tuple[int, int, int]
+Key = tuple[int, int]
 FrameSignature = tuple[int, tuple[tuple[int, int, int, int, int], ...]]
 
 _RECOVERABLE_BRIGHTNESS_WRITE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
@@ -27,14 +27,14 @@ _REACTIVE_RENDER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, Runtime
 _REACTIVE_RENDER_CLEANUP_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
-def _last_hw_mode_brightness_or_none(engine: "EffectsEngine") -> int | None:
+def _last_hw_mode_brightness_or_none(engine: EffectsEngine) -> int | None:
     try:
         return engine._last_hw_mode_brightness
     except AttributeError:
         return None
 
 
-def _last_reactive_per_key_frame_signature_or_none(engine: "EffectsEngine") -> object | None:
+def _last_reactive_per_key_frame_signature_or_none(engine: EffectsEngine) -> object | None:
     try:
         return engine._last_reactive_per_key_frame_signature
     except AttributeError:
@@ -48,7 +48,7 @@ def _per_key_frame_signature(color_map: Mapping[Key, Color], *, brightness_hw: i
     return (int(brightness_hw), tuple(sorted(entries)))
 
 
-def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_reinit: bool = False) -> None:
+def apply_hw_brightness(engine: EffectsEngine, brightness_hw: int, *, force_reinit: bool = False) -> None:
     """Set hardware brightness, avoiding a full mode reinit when possible."""
 
     prev = _last_hw_mode_brightness_or_none(engine)
@@ -81,11 +81,11 @@ def apply_hw_brightness(engine: "EffectsEngine", brightness_hw: int, *, force_re
 
 
 def render_per_key_frame(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     color_map: Mapping[Key, Color],
-    resolve_brightness: Callable[["EffectsEngine"], tuple[int, int, int]],
-    resolve_transition_visual_scale: Callable[["EffectsEngine"], float],
+    resolve_brightness: Callable[[EffectsEngine], tuple[int, int, int]],
+    resolve_transition_visual_scale: Callable[[EffectsEngine], float],
     logger: logging.Logger,
 ) -> bool:
     try:
@@ -156,10 +156,10 @@ def render_per_key_frame(
 
 
 def render_uniform_frame(
-    engine: "EffectsEngine",
+    engine: EffectsEngine,
     *,
     color_map: Mapping[Key, Color],
-    resolve_brightness: Callable[["EffectsEngine"], tuple[int, int, int]],
+    resolve_brightness: Callable[[EffectsEngine], tuple[int, int, int]],
 ) -> None:
     rgb = average_color_map(color_map)
     final_rgb = rgb
@@ -200,9 +200,9 @@ def _scale_color_map(color_map: Mapping[Key, Color], *, factor: float) -> Mappin
         return {key: (0, 0, 0) for key in color_map}
     return {
         key: (
-            int(round(rgb[0] * f)),
-            int(round(rgb[1] * f)),
-            int(round(rgb[2] * f)),
+            round(rgb[0] * f),
+            round(rgb[1] * f),
+            round(rgb[2] * f),
         )
         for key, rgb in color_map.items()
     }

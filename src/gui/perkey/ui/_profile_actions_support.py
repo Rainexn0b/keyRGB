@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from functools import lru_cache
 from logging import Logger
 from tkinter import TclError
-from typing import Callable, Protocol, Sequence, cast
+from typing import Protocol, cast
 
 from src.core.profile import profiles
 

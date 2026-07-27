@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Sequence, Tuple
+from collections.abc import Sequence
 
 from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 from src.core.effects.reactive.utils import (
+    _pick_contrasting_highlight,
     _Pulse,
     _RainbowPulse,
-    _pick_contrasting_highlight,
     _ripple_radius,
     _ripple_weight,
 )
@@ -39,7 +39,7 @@ def get_engine_overlay_buffer(engine: object, attr_name: str):
     return created
 
 
-def build_fade_overlay_into(dest: Dict[Key, float], pulses: Sequence[_Pulse]) -> Dict[Key, float]:
+def build_fade_overlay_into(dest: dict[Key, float], pulses: Sequence[_Pulse]) -> dict[Key, float]:
     dest.clear()
     for pulse in pulses:
         intensity = 1.0 - (pulse.age_s / pulse.ttl_s)
@@ -49,11 +49,11 @@ def build_fade_overlay_into(dest: Dict[Key, float], pulses: Sequence[_Pulse]) ->
 
 
 def build_ripple_overlay_into(
-    dest: Dict[Key, Tuple[float, float]],
-    pulses: List[_RainbowPulse],
+    dest: dict[Key, tuple[float, float]],
+    pulses: list[_RainbowPulse],
     *,
     band: float,
-) -> Dict[Key, Tuple[float, float]]:
+) -> dict[Key, tuple[float, float]]:
     dest.clear()
     max_radius = float((NUM_ROWS - 1) + (NUM_COLS - 1))
     for pulse in pulses:
@@ -64,7 +64,7 @@ def build_ripple_overlay_into(
             min_radius=0.0,
             max_radius=max_radius,
         )
-        radius_i = int(math.ceil(radius_f + band))
+        radius_i = math.ceil(radius_f + band)
 
         for dr in range(-radius_i, radius_i + 1):
             for dc in range(-radius_i, radius_i + 1):
@@ -88,21 +88,21 @@ def build_ripple_overlay_into(
     return dest
 
 
-def build_ripple_overlay(pulses: List[_RainbowPulse], *, band: float) -> Dict[Key, Tuple[float, float]]:
+def build_ripple_overlay(pulses: list[_RainbowPulse], *, band: float) -> dict[Key, tuple[float, float]]:
     return build_ripple_overlay_into({}, pulses, band=band)
 
 
 def build_ripple_color_map_into(
-    dest: Dict[Key, Color],
+    dest: dict[Key, Color],
     *,
-    base: Dict[Key, Color],
-    base_unscaled: Dict[Key, Color],
-    overlay: Dict[Key, Tuple[float, float]],
+    base: dict[Key, Color],
+    base_unscaled: dict[Key, Color],
+    overlay: dict[Key, tuple[float, float]],
     per_key_backdrop_active: bool,
     manual: Color | None,
     pulse_scale: float,
     auto_pulse_saturation: float = 1.0,
-) -> Dict[Key, Color]:
+) -> dict[Key, Color]:
     dest.clear()
     saturation = max(0.0, min(1.0, float(auto_pulse_saturation)))
     for key, base_rgb in base.items():
@@ -127,14 +127,14 @@ def build_ripple_color_map_into(
 
 def build_ripple_color_map(
     *,
-    base: Dict[Key, Color],
-    base_unscaled: Dict[Key, Color],
-    overlay: Dict[Key, Tuple[float, float]],
+    base: dict[Key, Color],
+    base_unscaled: dict[Key, Color],
+    overlay: dict[Key, tuple[float, float]],
     per_key_backdrop_active: bool,
     manual: Color | None,
     pulse_scale: float,
     auto_pulse_saturation: float = 1.0,
-) -> Dict[Key, Color]:
+) -> dict[Key, Color]:
     return build_ripple_color_map_into(
         {},
         base=base,

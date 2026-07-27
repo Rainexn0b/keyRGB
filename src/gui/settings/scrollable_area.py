@@ -6,7 +6,6 @@ from tkinter import ttk
 
 from src.core.utils.logging_utils import log_throttled
 
-
 logger = logging.getLogger(__name__)
 
 _TK_WIDGET_ERRORS = (RuntimeError, tk.TclError)

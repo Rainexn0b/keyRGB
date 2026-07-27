@@ -5,7 +5,6 @@ import shutil
 import subprocess
 from typing import Any
 
-
 _EVIDENCE_COMMAND_ERRORS = (OSError, RuntimeError, TypeError, ValueError, subprocess.SubprocessError)
 
 

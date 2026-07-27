@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from threading import Event, RLock, Thread
-from typing import Callable, Protocol, TypeVar, cast
+from typing import Protocol, TypeVar, cast
 
 from ..device import (
     Color,
@@ -60,7 +61,7 @@ def _backend_name(backend: object | None) -> str:
     return str(name)
 
 
-def _thread_generation_or_default(engine: "_EngineCore", *, default: int) -> int:
+def _thread_generation_or_default(engine: _EngineCore, *, default: int) -> int:
     try:
         return int(engine._thread_generation)
     except AttributeError:

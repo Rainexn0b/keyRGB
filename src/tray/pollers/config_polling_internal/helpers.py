@@ -2,14 +2,15 @@ from __future__ import annotations
 
 import importlib
 
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from src.core.effects.software_targets import normalize_software_effect_target
-from src.tray.controllers import software_target_controller as _software_target_controller
+from src.core.effects.software_targets import (
+    SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
+    normalize_software_effect_target,
+)
 from src.tray.controllers import secondary_static_scene as _secondary_static_scene
+from src.tray.controllers import software_target_controller as _software_target_controller
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from . import _boundaries
-
 
 _CONFIG_POLLING_RUNTIME_EXCEPTIONS = _boundaries._CONFIG_POLLING_RUNTIME_EXCEPTIONS
 _TRAY_LOG_WRITE_EXCEPTIONS = _boundaries._TRAY_LOG_WRITE_EXCEPTIONS

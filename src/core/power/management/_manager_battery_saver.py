@@ -153,7 +153,7 @@ def battery_saver_loop(
     while manager.monitoring:
         poll_interval_s = _DEFAULT_POWER_SOURCE_POLL_INTERVAL_S
         did_sleep = run_recoverable_runtime_boundary_fn(
-            lambda: run_iteration_fn(policy, poll_interval_s=poll_interval_s),
+            lambda pi=poll_interval_s: run_iteration_fn(policy, poll_interval_s=pi),
             log_message="Battery saver monitoring iteration failed",
             fallback=False,
         )

@@ -11,7 +11,6 @@ from typing import Protocol, cast
 from src.core.backends.registry import select_backend
 from src.core.utils.logging_utils import log_throttled
 
-
 _LOG_COLOR_SNAPSHOT_ERRORS = (
     AttributeError,
     IndexError,

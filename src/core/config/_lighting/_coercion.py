@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, MutableMapping
+from collections.abc import Callable, Iterable, MutableMapping
 from pathlib import Path
-from typing import Callable, SupportsIndex, SupportsInt, cast
-
+from typing import SupportsIndex, SupportsInt, cast
 
 _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 _RGB_TRIPLET_UNPACK_ERRORS = (TypeError, ValueError)
@@ -33,7 +32,7 @@ def normalize_brightness_value(value: object) -> int:
     if normalized == 0:
         return 0
 
-    snapped = int(round(normalized / 5.0)) * 5
+    snapped = round(normalized / 5.0) * 5
     snapped = max(0, min(50, snapped))
     if snapped == 0:
         snapped = 5

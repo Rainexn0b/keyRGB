@@ -10,7 +10,6 @@ from ..commit_pipeline import PerKeyCommitPipeline
 from ..profile_management import KeyCells, Keymap, PerKeyColors
 from . import dirty_state
 
-
 LayoutTweaks = dict[str, float]
 PerKeyLayoutTweaks = dict[str, dict[str, float]]
 LayoutSlotOverrides = dict[str, dict[str, object]]

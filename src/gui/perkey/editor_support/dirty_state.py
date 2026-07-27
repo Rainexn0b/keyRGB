@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from typing import Callable
+from collections.abc import Callable, Mapping
 
 
 def _freeze(value: object) -> object:

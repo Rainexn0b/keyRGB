@@ -18,7 +18,7 @@ def detect_idle_power_source() -> str:
     """
     try:
         module = importlib.import_module("src.tray.pollers.idle_power._source_probe")
-        fn = getattr(module, "detect_idle_power_source")
+        fn = module.detect_idle_power_source
         return str(fn())
     except (AttributeError, ImportError, OSError, RuntimeError, TypeError, ValueError):
         return "Unknown"

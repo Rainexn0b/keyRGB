@@ -4,7 +4,6 @@ import tkinter as tk
 
 from src.gui.utils.window_geometry import compute_centered_window_geometry
 
-
 _GEOMETRY_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 

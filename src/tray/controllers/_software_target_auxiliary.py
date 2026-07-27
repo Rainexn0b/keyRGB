@@ -4,13 +4,14 @@ from collections.abc import Callable, Iterator
 from threading import RLock
 from typing import Protocol, TypeVar, cast
 
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
-from src.core.effects.software_targets import normalize_software_effect_target
+from src.core.effects.software_targets import (
+    SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
+    SOFTWARE_EFFECT_TARGET_KEYBOARD,
+    normalize_software_effect_target,
+)
 from src.core.secondary_device_runtime import acquire_secondary_device
 from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry
-
 
 _TrayT = TypeVar("_TrayT")
 _SECONDARY_TARGET_RUNTIME_EXCEPTIONS = (AttributeError, OSError, OverflowError, RuntimeError, TypeError, ValueError)
@@ -42,7 +43,7 @@ class _CachedSecondarySoftwareTarget:
         self._device: _LightbarDeviceProtocol | None = None
 
     @property
-    def device(self) -> "_CachedSecondarySoftwareTarget":
+    def device(self) -> _CachedSecondarySoftwareTarget:
         return self
 
     def set_color(self, color: object, *, brightness: int) -> None:
@@ -112,7 +113,7 @@ def _proxy_cache(
 
     cache: dict[str, _SecondarySoftwareTargetProtocol] = {}
     try:
-        setattr(tray, "software_target_proxy_cache", cache)
+        setattr(tray, "software_target_proxy_cache", cache)  # noqa: B010 - tray compatibility surface is duck-typed
     except (AttributeError, TypeError):
         pass
     except RuntimeError as exc:

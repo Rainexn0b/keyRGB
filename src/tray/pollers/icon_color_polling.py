@@ -6,7 +6,6 @@ import time
 from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.tray.protocols import read_idle_power_state_float_field
 
-
 _ANIMATED_ICON_EFFECTS = frozenset(
     {
         "rainbow",

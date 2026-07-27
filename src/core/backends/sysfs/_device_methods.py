@@ -2,14 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import common
-from . import privileged
+from . import common, privileged
 
 
 def to_sysfs_brightness_method(self, brightness: int) -> int:
     level = max(0, min(50, int(brightness)))
     max_value = self._max()
-    return int(round((level / 50) * max_value))
+    return round((level / 50) * max_value)
 
 
 def _multi_intensity_content(zone: dict, color) -> str:
@@ -33,9 +32,9 @@ def set_zone_color_method(self, zone: dict, color, brightness: int):
     if zone["type"] == "ite8297_channels":
         level = max(0, min(50, int(brightness))) / 50 if int(brightness) > 0 else 0.0
         scaled = {
-            "red": int(round(int(r) * level)),
-            "green": int(round(int(g) * level)),
-            "blue": int(round(int(b) * level)),
+            "red": round(int(r) * level),
+            "green": round(int(g) * level),
+            "blue": round(int(b) * level),
         }
         for channel_name, value in scaled.items():
             channel_dir = zone["paths"][channel_name]

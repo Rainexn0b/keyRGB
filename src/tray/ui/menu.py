@@ -20,7 +20,6 @@ from . import _menu_callbacks as menu_callbacks
 from . import _menu_sections_effects as menu_effects
 from . import menu_sections, menu_status
 
-
 logger = logging.getLogger(__name__)
 
 _MenuAction = Callable[[object, object], None]
@@ -222,7 +221,7 @@ def build_menu_items(
                         radio=True,
                         enabled=controls_available,
                     )
-                    for level in range(0, 11)
+                    for level in range(11)
                 ]
             )
             selected_brightness_item = item("Brightness Override", selected_brightness_menu)

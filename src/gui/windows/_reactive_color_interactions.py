@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable, Mapping, Protocol, TypeAlias, cast
+from collections.abc import Callable, Mapping
+from typing import Protocol, TypeAlias, cast
 
 ReactiveColor: TypeAlias = tuple[int, int, int]
 InteractionMeta: TypeAlias = Mapping[str, object]
@@ -69,7 +70,7 @@ class _ReactiveBrightnessGui(Protocol):
     _last_drag_commit_ts: float
     _last_drag_committed_brightness: int | None
 
-    def _commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None: ...
+    def _commit_brightness_to_config(self, brightness_percent: float | None) -> int | None: ...
 
     def _set_status(self, msg: str, *, ok: bool) -> None: ...
 
@@ -78,7 +79,7 @@ class _ReactiveTrailGui(Protocol):
     _reactive_trail_label: _ConfigurableWidget
     _reactive_trail_var: _ReadableVariable
 
-    def _commit_trail_to_config(self, trail_percent: float | int | None) -> int | None: ...
+    def _commit_trail_to_config(self, trail_percent: float | None) -> int | None: ...
 
     def _set_status(self, msg: str, *, ok: bool) -> None: ...
 
@@ -177,7 +178,7 @@ def _on_reactive_brightness_change(
         sync_color_wheel_brightness_fn(
             gui.color_wheel,
             gui._use_manual_var,
-            percent=int(round(pct)),
+            percent=round(pct),
             tk_error=tk_error,
             logger=logger,
         )
@@ -191,7 +192,7 @@ def _on_reactive_brightness_change(
     hw = gui._commit_brightness_to_config(pct)
     if hw is not None:
         gui._last_drag_commit_ts = now
-        gui._last_drag_committed_brightness = int(round(hw * 2))
+        gui._last_drag_committed_brightness = round(hw * 2)
 
 
 def _on_reactive_brightness_release(
@@ -212,7 +213,7 @@ def _on_reactive_brightness_release(
         sync_color_wheel_brightness_fn(
             gui.color_wheel,
             gui._use_manual_var,
-            percent=int(round(pct)),
+            percent=round(pct),
             tk_error=tk_error,
             logger=logger,
         )
@@ -222,7 +223,7 @@ def _on_reactive_brightness_release(
         gui._set_status("✗ Failed to save reactive brightness", ok=False)
         return
 
-    pct_i = int(round(hw * 2))
+    pct_i = round(hw * 2)
     gui._last_drag_commit_ts = time_monotonic()
     gui._last_drag_committed_brightness = pct_i
     gui._set_status(f"✓ Saved reactive brightness {pct_i}%", ok=True)

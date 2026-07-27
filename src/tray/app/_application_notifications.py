@@ -6,7 +6,6 @@ import logging
 from collections.abc import Callable, MutableMapping
 from typing import Protocol, TypeVar
 
-
 # Desktop notification backends (pystray/notify-send); keep OSError, drop map LookupError.
 _NOTIFICATION_BACKEND_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _NOTIFICATION_TWO_ARG_ERRORS = (AttributeError, OSError, RuntimeError)
@@ -186,8 +185,8 @@ def log_event(
     for key in sorted(fields.keys()):
         value = fields.get(key)
 
-        def format_field() -> str:
-            return f"{key}={value}"
+        def format_field(k=key, v=value) -> str:
+            return f"{k}={v}"
 
         parts.append(
             _run_best_effort(

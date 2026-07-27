@@ -12,7 +12,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import cast
 
-
 _SPECS_PATH = Path(__file__).resolve().with_name("layout_specs.json")
 
 

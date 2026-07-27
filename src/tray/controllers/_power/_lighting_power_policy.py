@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from src.tray.idle_power_state import is_system_forced_off, is_user_forced_off
-from src.tray.protocols import LightingTrayProtocol
-
 from src.tray.controllers._brightness_layer import apply_layered_brightness_update
 from src.tray.controllers._lighting_controller_helpers import _log_tray_exception
-
+from src.tray.idle_power_state import is_system_forced_off, is_user_forced_off
+from src.tray.protocols import LightingTrayProtocol
 
 _BRIGHTNESS_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
 # Power-policy brightness apply (config/engine/UI); LookupError kept for tested UI callback failures.

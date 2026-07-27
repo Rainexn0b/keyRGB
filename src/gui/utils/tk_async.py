@@ -1,11 +1,9 @@
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable
 from threading import Thread
 from typing import TypeVar
-
-import tkinter as tk
-
 
 T = TypeVar("T")
 _TK_SCHEDULE_ERRORS = (RuntimeError, tk.TclError)

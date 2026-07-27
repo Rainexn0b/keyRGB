@@ -1,12 +1,10 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Callable, Protocol, cast
+from typing import Protocol, cast
 
 from . import _support_window_backend_probe_config as _probe_config
-
 
 _PROBE_AUTO_STEP_DURATION_S = _probe_config._PROBE_AUTO_STEP_DURATION_S
 _PROBE_AUTO_SETTLE_DURATION_S = _probe_config._PROBE_AUTO_SETTLE_DURATION_S

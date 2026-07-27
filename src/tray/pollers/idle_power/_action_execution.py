@@ -3,17 +3,16 @@ from __future__ import annotations
 import logging
 import time
 from collections.abc import Callable
-from typing import Optional
 
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers._power._transition_constants import SOFT_OFF_FADE_DURATION_S, SOFT_ON_FADE_DURATION_S
+from src.tray.idle_power_state import reset_dim_state_on_tray
 from src.tray.pollers.idle_power._transition_actions import (
     apply_dim_temp_brightness,
     apply_restore_brightness,
     read_effect_name,
     refresh_ui_best_effort,
 )
-from src.tray.idle_power_state import reset_dim_state_on_tray
 from src.tray.protocols import IdlePowerTrayProtocol, set_idle_power_state_field, sync_idle_power_state_field
 
 
@@ -34,7 +33,7 @@ def _sync_idle_state_field(tray: IdlePowerTrayProtocol, *, prior_name: str, stat
 def execute_idle_action(
     tray: IdlePowerTrayProtocol,
     *,
-    action: Optional[str],
+    action: str | None,
     dim_temp_brightness: int,
     restore_from_idle_fn: Callable[[IdlePowerTrayProtocol], None],
     reactive_effects_set: frozenset[str],

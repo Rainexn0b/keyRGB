@@ -7,7 +7,6 @@ from typing import Protocol, SupportsFloat, SupportsIndex, TypeAlias, cast
 
 from src.core.resources.layout import KeyDef
 
-
 ShapeRect: TypeAlias = tuple[float, float, float, float]
 FloatCoercible: TypeAlias = SupportsFloat | SupportsIndex | str | bytes | bytearray
 

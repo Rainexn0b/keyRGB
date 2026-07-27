@@ -183,7 +183,7 @@ def build_speed_menu(
                 checked=menu_callbacks.checked_speed(tray_state, speed),
                 radio=True,
             )
-            for speed in range(0, 11)
+            for speed in range(11)
         ]
     )
 
@@ -204,7 +204,7 @@ def build_brightness_menu(
                 checked=menu_callbacks.checked_brightness(tray_state, brightness * 5),
                 radio=True,
             )
-            for brightness in range(0, 11)
+            for brightness in range(11)
         ]
     )
 

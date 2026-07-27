@@ -1,10 +1,8 @@
-#!/usr/bin/env python3
 """KeyRGB Config implementation."""
 
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: Config facade class; lighting accessors already live under config/_lighting/
-
 import logging
 from collections.abc import Mapping
 from copy import deepcopy
@@ -16,11 +14,11 @@ from . import defaults as _defaults
 from . import file_storage as _file_storage
 from . import paths as _paths
 from . import perkey_colors as _perkey_colors
-from ._settings_view import ConfigSettingsView
 from ._lighting import _coercion as _lighting_coercion
-from ._lighting import _lighting_accessors as _lighting_accessors
 from ._lighting import _effect_speed_overrides as _effect_speed_boundary
+from ._lighting import _lighting_accessors
 from ._lighting import _props as _lighting_props
+from ._settings_view import ConfigSettingsView
 
 logger = logging.getLogger(__name__)
 
@@ -92,9 +90,12 @@ class Config(_lighting_accessors.LightingConfigAccessors):
 
         # If the config file hasn't changed since our last successful reload,
         # skip disk I/O and JSON parsing.
-        if mtime_ns is not None and self._last_reload_mtime_ns is not None:
-            if int(mtime_ns) == int(self._last_reload_mtime_ns):
-                return
+        if (
+            mtime_ns is not None
+            and self._last_reload_mtime_ns is not None
+            and int(mtime_ns) == int(self._last_reload_mtime_ns)
+        ):
+            return
 
         loaded = self._load()
         # If the file was transiently unreadable, keep the previous in-memory settings.
@@ -170,9 +171,12 @@ class Config(_lighting_accessors.LightingConfigAccessors):
                     elif isinstance(value, (int, float)) and value in (0, 1):
                         merged[field] = bool(value)
                 elif field == "color":
-                    if isinstance(value, (list, tuple)) and len(value) == 3:
-                        if all(isinstance(channel, (int, float)) for channel in value):
-                            merged[field] = [max(0, min(255, int(channel))) for channel in value]
+                    if (
+                        isinstance(value, (list, tuple))
+                        and len(value) == 3
+                        and all(isinstance(channel, (int, float)) for channel in value)
+                    ):
+                        merged[field] = [max(0, min(255, int(channel))) for channel in value]
                 elif field == "brightness":
                     if isinstance(value, (int, float)):
                         merged[field] = max(0, min(100, int(value)))

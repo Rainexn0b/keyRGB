@@ -256,7 +256,7 @@ class PyUsbTransport:
             _logger.warning("PyUsbTransport was not explicitly closed; releasing in __del__")
             try:
                 self.close()
-            except Exception:  # @quality-exception exception-transparency: __del__ must never propagate exceptions; any failure during finalizer cleanup is logged above and suppressed to prevent interpreter crash
+            except Exception:  # noqa: S110, BLE001  @quality-exception exception-transparency: __del__ must never propagate exceptions; any failure during finalizer cleanup is logged above and suppressed to prevent interpreter crash
                 pass
 
     def send_control_report(self, report: bytes) -> int:

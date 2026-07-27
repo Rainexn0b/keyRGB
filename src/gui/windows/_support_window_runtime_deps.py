@@ -13,13 +13,12 @@ from ._support import _support_window_session_bridge as support_session_bridge
 from ._support import _support_window_state as support_window_state
 from ._support import _support_window_ui as support_window_ui
 
-
 __all__ = (
-    "Config",
     "ISSUE_URL",
     "_BROWSER_OPEN_ERRORS",
     "_GEOMETRY_APPLY_ERRORS",
     "_TK_RUNTIME_ERRORS",
+    "Config",
     "apply_clam_theme",
     "apply_keyrgb_window_icon",
     "build_additional_evidence_plan",

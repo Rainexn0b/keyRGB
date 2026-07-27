@@ -1,11 +1,8 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
 import json
 from collections.abc import Callable
 from typing import Protocol, TypeAlias
-
 
 _JsonDict: TypeAlias = dict[str, object]
 

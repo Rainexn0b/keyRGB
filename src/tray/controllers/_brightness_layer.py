@@ -15,7 +15,6 @@ from ._lighting_controller_helpers import (
     try_log_event,
 )
 
-
 # Layered brightness apply crosses config/engine/UI; no map LookupError expected.
 _BRIGHTNESS_LAYER_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 

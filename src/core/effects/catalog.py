@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from typing import Final
 
-
 # Hardware effects (built into the keyboard/controller firmware)
 HW_EFFECTS: Final[list[str]] = [
     "rainbow",
@@ -132,7 +131,7 @@ def detected_backend_hw_effect_names(backend: object | None) -> tuple[str, ...]:
             raw_effects = effect_fn()
             if isinstance(raw_effects, dict):
                 seen: set[str] = set()
-                for key in raw_effects.keys():
+                for key in raw_effects:
                     normalized = strip_effect_namespace(normalize_effect_name(str(key or "")))
                     if normalized and normalized not in seen:
                         seen.add(normalized)

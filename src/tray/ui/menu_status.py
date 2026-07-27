@@ -5,14 +5,18 @@ from collections.abc import Callable
 from typing import Protocol, TypeVar, cast
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
-from src.core.effects.catalog import backend_hw_effect_names, detected_backend_hw_effect_names
-from src.core.effects.catalog import is_forced_hardware_effect, resolve_effect_name_for_backend, strip_effect_namespace
-from src.core.effects.catalog import title_for_effect
+from src.core.effects.catalog import (
+    backend_hw_effect_names,
+    detected_backend_hw_effect_names,
+    is_forced_hardware_effect,
+    resolve_effect_name_for_backend,
+    strip_effect_namespace,
+    title_for_effect,
+)
 from src.core.utils.logging_utils import log_throttled
 from src.tray.controllers.menu_adapters import get_active_perkey_profile_name
 
 from . import _menu_status_devices
-
 
 logger = logging.getLogger(__name__)
 _T = TypeVar("_T")
@@ -72,10 +76,7 @@ def is_software_mode(tray: object) -> bool:
     if effect_base == "perkey" or (effect_base in SW_EFFECTS and not is_forced_hardware_effect(effect)):
         return True
 
-    if _config_has_nonempty_per_key_colors(cfg):
-        return True
-
-    return False
+    return bool(_config_has_nonempty_per_key_colors(cfg))
 
 
 def is_hardware_mode(tray: object) -> bool:

@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
-from collections.abc import Mapping
-from typing import Dict, Tuple, TypeVar, cast
+from collections.abc import Callable, Mapping
+from typing import TypeVar, cast
 
 from src.core.utils.logging_utils import log_throttled
-
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +55,10 @@ def _run_with_recoverable_logging(
         return fallback
 
 
-def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+def load_per_key_colors_from_config() -> dict[tuple[int, int], tuple[int, int, int]]:
     """Best-effort load of per-key colors from the legacy config."""
 
-    def _load_colors() -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+    def _load_colors() -> dict[tuple[int, int], tuple[int, int, int]]:
         from src.core.config import Config
 
         cfg = Config()
@@ -77,19 +75,19 @@ def load_per_key_colors_from_config() -> Dict[Tuple[int, int], Tuple[int, int, i
 
 def build_full_color_grid(
     *,
-    base_color: Tuple[int, int, int],
-    per_key_colors: Mapping[Tuple[int, int], Tuple[int, int, int]] | None,
+    base_color: tuple[int, int, int],
+    per_key_colors: Mapping[tuple[int, int], tuple[int, int, int]] | None,
     num_rows: int,
     num_cols: int,
-) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+) -> dict[tuple[int, int], tuple[int, int, int]]:
     """Fill the full matrix with base_color, then overlay per-key values."""
 
-    base: Tuple[int, int, int] = (
+    base: tuple[int, int, int] = (
         int(base_color[0]),
         int(base_color[1]),
         int(base_color[2]),
     )
-    full: Dict[Tuple[int, int], Tuple[int, int, int]] = {
+    full: dict[tuple[int, int], tuple[int, int, int]] = {
         (r, c): base for r in range(int(num_rows)) for c in range(int(num_cols))
     }
 
@@ -104,14 +102,14 @@ def build_full_color_grid(
 
 
 def scaled_color_map(
-    full_colors: Dict[Tuple[int, int], Tuple[int, int, int]],
+    full_colors: dict[tuple[int, int], tuple[int, int, int]],
     *,
     scale: float,
-) -> Dict[Tuple[int, int], Tuple[int, int, int]]:
+) -> dict[tuple[int, int], tuple[int, int, int]]:
     """Return a new color map with each channel scaled by `scale`."""
 
     s = float(scale)
-    out: Dict[Tuple[int, int], Tuple[int, int, int]] = {}
+    out: dict[tuple[int, int], tuple[int, int, int]] = {}
     for (row, col), (r, g, b) in full_colors.items():
         out[(row, col)] = (
             max(0, min(255, int(r * s))),

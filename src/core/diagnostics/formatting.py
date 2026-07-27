@@ -3,8 +3,8 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import TYPE_CHECKING
 
-from .model import DiagnosticsConfigSnapshot
 from ._formatting_support import append_support_hints, append_sysfs_leds
+from .model import DiagnosticsConfigSnapshot
 
 if TYPE_CHECKING:
     from .model import Diagnostics
@@ -272,7 +272,7 @@ def _append_hints(lines: list[str], hints: object) -> None:
             lines.append(f"    - {name}")
 
 
-def format_diagnostics_text(diag: "Diagnostics") -> str:
+def format_diagnostics_text(diag: Diagnostics) -> str:
     """Format diagnostics for logs or copy/paste."""
 
     lines: list[str] = []

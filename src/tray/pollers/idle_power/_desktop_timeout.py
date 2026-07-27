@@ -1,19 +1,17 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
-
 
 _RECOVERABLE_READ_EXCEPTIONS = (OSError, UnicodeError)
 
 
-def _profile_name(on_ac_power: Optional[bool]) -> str:
+def _profile_name(on_ac_power: bool | None) -> str:
     if on_ac_power is False:
         return "Battery"
     return "AC"
 
 
-def _parse_powerdevilrc_dim_timeout(text: str, *, on_ac_power: Optional[bool]) -> Optional[float]:
+def _parse_powerdevilrc_dim_timeout(text: str, *, on_ac_power: bool | None) -> float | None:
     """Parse DimDisplayIdleTimeoutSec from KDE powerdevilrc for the active profile.
 
     powerdevilrc uses nested groups written as ``[Profile][Subgroup]``,
@@ -52,10 +50,10 @@ def _parse_powerdevilrc_dim_timeout(text: str, *, on_ac_power: Optional[bool]) -
 
 
 def read_kde_dim_timeout(
-    on_ac_power: Optional[bool],
+    on_ac_power: bool | None,
     *,
     config_home: Path | None = None,
-) -> Optional[float]:
+) -> float | None:
     """Best-effort KDE screen-dim timeout in seconds for the active power profile."""
 
     base = config_home or (Path.home() / ".config")

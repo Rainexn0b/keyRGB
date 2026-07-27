@@ -1,13 +1,11 @@
-#!/usr/bin/env python3
-
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable, Protocol
+from typing import Protocol
 
 from src.core.config._lighting._effect_speed_overrides import EffectSpeedOverrides
-
 
 _PROBE_AUTO_STEP_DURATION_S = 2.5
 _PROBE_AUTO_SETTLE_DURATION_S = 0.5

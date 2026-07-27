@@ -2,19 +2,17 @@ from __future__ import annotations
 
 import json
 import re
+import tkinter as tk
 import webbrowser
+from collections.abc import Callable
 from importlib import metadata
 from pathlib import Path
-from typing import Callable
-from urllib.request import Request, urlopen
-
-import tkinter as tk
 from tkinter import ttk
+from urllib.request import Request, urlopen
 
 from src.core.runtime.imports import repo_root_from
 from src.core.utils.version_check import compare_versions, normalize_version_text
 from src.gui.utils.tk_async import run_in_thread
-
 
 _METADATA_VERSION_LOOKUP_ERRORS = (metadata.PackageNotFoundError,)
 _REPO_ROOT_ERRORS = (OSError, RuntimeError)

@@ -13,7 +13,6 @@ from src.tray.protocols import (
     set_idle_power_state_field,
 )
 
-
 _LOOP_EFFECTS = frozenset(REACTIVE_EFFECTS) | frozenset(SW_EFFECTS_SET)
 
 

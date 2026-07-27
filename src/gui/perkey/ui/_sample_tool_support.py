@@ -7,7 +7,6 @@ from typing import Protocol, cast
 
 from ..profile_management import KeyCell, KeyCells, Keymap, PerKeyColors, keymap_cells_for, representative_cell
 
-
 _TK_WIDGET_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 _UI_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
 _OVERLAY_SYNC_ERRORS = _TK_WIDGET_ERRORS + _UI_VALUE_ERRORS
@@ -99,7 +98,7 @@ class _SampleToolEditorProtocol(_SampleToolToggleEditorProtocol, Protocol):
     color_wheel: _ColorWheelProtocol
 
 
-class _ApplyReleaseFn(Protocol):
+class _ApplyReleaseFn(Protocol):  # noqa: PYI046 – used via _support._ApplyReleaseFn in sample_tool.py
     def __call__(
         self,
         editor: _SampleToolEditorProtocol,

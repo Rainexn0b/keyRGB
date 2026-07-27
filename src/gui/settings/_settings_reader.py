@@ -120,7 +120,7 @@ def resolve_settings_source(config: SettingsSourceLike) -> ResolvedSettingsSourc
 def settings_view_from_config(config: SettingsConfigLike) -> ConfigSettingsView | None:
     if hasattr(config, "settings_view"):
         try:
-            view_getter = getattr(config, "settings_view")
+            view_getter = config.settings_view
             if callable(view_getter):
                 view = view_getter()
                 if isinstance(view, ConfigSettingsView):
@@ -130,7 +130,7 @@ def settings_view_from_config(config: SettingsConfigLike) -> ConfigSettingsView 
 
     if hasattr(config, "settings"):
         try:
-            raw_settings = getattr(config, "settings")
+            raw_settings = config.settings
         except _SETTINGS_ATTR_READ_ERRORS:
             logger.exception("Failed reading settings mapping from config")
             return None

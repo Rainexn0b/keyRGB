@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import tkinter as tk
-from typing import Callable, Iterable
+from collections.abc import Callable, Iterable
 
 from src.gui.theme import detect_system_prefers_dark
-
 
 _TK_RUNTIME_ERRORS = (tk.TclError, RuntimeError)
 _LISTBOX_SELECTION_ERRORS = _TK_RUNTIME_ERRORS + (IndexError,)

@@ -6,7 +6,6 @@ from importlib import import_module
 from types import ModuleType
 from typing import TYPE_CHECKING, Protocol, cast
 
-
 if TYPE_CHECKING:
     from src.core.config import Config
     from src.core.utils import exceptions as _exceptions

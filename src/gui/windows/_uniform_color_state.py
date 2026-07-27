@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import logging
-from typing import Callable
+from collections.abc import Callable
 from typing import Protocol, TypeAlias
 
 from src.core.profile import profiles
 from src.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,
+    SecondaryDeviceRoute,
 )
-from src.core.secondary_device_routes import SecondaryDeviceRoute
 
 Color: TypeAlias = tuple[int, int, int]
 logger = logging.getLogger(__name__)
@@ -79,9 +79,9 @@ def initialize_drag_state(gui: _UniformDragState, *, drag_commit_interval: float
 
 def log_color_apply_failure(exc: Exception, *, debug_enabled: bool, logger: object) -> None:
     if debug_enabled:
-        getattr(logger, "exception")("Error setting color")
+        logger.exception("Error setting color")
         return
-    getattr(logger, "error")("Error setting color: %s", exc)
+    logger.error("Error setting color: %s", exc)
 
 
 def set_status(gui: _UniformStatusGui, msg: str, *, ok: bool, clear_delay_ms: int = 2000) -> None:

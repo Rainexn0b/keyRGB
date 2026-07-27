@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 _SAFE_EXCEPTION_MESSAGE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
