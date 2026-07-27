@@ -9,7 +9,6 @@ from ..utils.import_probe import probe_module_import
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
-
 logger = logging.getLogger(__name__)
 
 

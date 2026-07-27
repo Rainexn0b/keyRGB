@@ -5,7 +5,6 @@ from pathlib import Path
 
 from .models import HygieneIssue
 
-
 _SOURCE_PARSE_ERRORS = (OSError, SyntaxError, ValueError)
 
 _RUNTIME_COPY_WATCH_PATHS = [

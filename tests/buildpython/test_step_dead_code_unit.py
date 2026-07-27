@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import json
 
+from buildpython.steps import step_dead_code
 from buildpython.utils.subproc import RunResult
-
-import buildpython.steps.step_dead_code as step_dead_code
 
 
 def test_parse_findings_extracts_confidence_and_scope() -> None:
-    stdout = "\n".join(
+    stdout = "\n".join(  # noqa: FLY002 - multi-line fixture payload is clearer as an explicit list
         [
             "src/core/example.py:10: unused variable 'x' (100% confidence)",
             "src/gui/example.py:12: unused import 'y' (90% confidence)",
@@ -27,7 +26,7 @@ def test_parse_findings_extracts_confidence_and_scope() -> None:
 
 
 def test_dead_code_runner_treats_vulture_findings_as_informational(monkeypatch, tmp_path) -> None:
-    fake_stdout = "\n".join(
+    fake_stdout = "\n".join(  # noqa: FLY002 - multi-line fixture payload is clearer as an explicit list
         [
             "src/tray/icon.py:7: unused variable 'outline' (100% confidence)",
             "buildpython/core/cli.py:8: unused import 'x' (80% confidence)",

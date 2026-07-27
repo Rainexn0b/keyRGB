@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import argparse
-from typing import Iterable
+from collections.abc import Iterable
 
+from ..steps.step_defs import steps as all_steps
 from .profiles import PROFILES
 from .runner import run
-from ..steps.step_defs import steps as all_steps
 
 
 def _parse_csv(raw: str | None) -> list[str] | None:

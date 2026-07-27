@@ -1,16 +1,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import textwrap
+from pathlib import Path
 
 import buildpython.steps.file_size_analysis.step as step_size
-from buildpython.steps.file_size_analysis.scanning import scan_middleman_candidate, scan_unreferenced_file_candidates
-from buildpython.steps.file_size_analysis.usage_graph import build_usage_graph
-
 from buildpython.core.debt_index import build_debt_index, write_debt_index
 from buildpython.core.summary import BuildSummary, write_summary
 from buildpython.core.summary_support.debt_terminal import build_terminal_filesize_highlight
+from buildpython.steps.file_size_analysis.scanning import scan_middleman_candidate, scan_unreferenced_file_candidates
+from buildpython.steps.file_size_analysis.usage_graph import build_usage_graph
 
 
 def _write_python_file(path: Path, content: str) -> None:
@@ -20,7 +19,7 @@ def _write_python_file(path: Path, content: str) -> None:
 
 def _write_minimal_pyproject(root: Path) -> None:
     (root / "pyproject.toml").write_text(
-        "\n".join(
+        "\n".join(  # noqa: FLY002 - explicit generated fixture lines are easier to review
             [
                 "[project]",
                 'name = "demo"',
@@ -69,42 +68,42 @@ def test_file_size_runner_reports_middlemen_and_unreferenced_candidates(tmp_path
     _write_minimal_pyproject(tmp_path)
     _write_python_file(
         tmp_path / "src" / "app.py",
-        '''
+        """
         from src.middleman import exported_name
         from src.used import helper
 
 
         def main() -> int:
             return helper() + exported_name()
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "used.py",
-        '''
+        """
         def helper() -> int:
             return 1
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "impl.py",
-        '''
+        """
         def exported_name() -> int:
             return 2
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "middleman.py",
-        '''
+        """
         from src.impl import exported_name
 
         __all__ = ["exported_name"]
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "dead.py",
-        '''
+        """
         VALUE = 5
-        ''',
+        """,
     )
 
     monkeypatch.setattr(step_size, "repo_root", lambda: tmp_path)
@@ -135,30 +134,30 @@ def test_unreferenced_scan_treats_reachable_python_m_launches_as_roots(tmp_path,
     _write_minimal_pyproject(tmp_path)
     _write_python_file(
         tmp_path / "src" / "app.py",
-        '''
+        """
         from src.launcher import launch_support
 
 
         def main() -> None:
             launch_support()
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "launcher.py",
-        '''
+        """
         import subprocess
         import sys
 
 
         def launch_support() -> None:
             subprocess.Popen([sys.executable, "-m", "src.support"])
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "support.py",
-        '''
+        """
         VALUE = 1
-        ''',
+        """,
     )
 
     monkeypatch.setattr(step_size, "repo_root", lambda: tmp_path)
@@ -175,42 +174,42 @@ def test_unreferenced_scan_treats_launch_module_subprocess_targets_as_roots(tmp_
     _write_minimal_pyproject(tmp_path)
     _write_python_file(
         tmp_path / "src" / "app.py",
-        '''
+        """
         from src.gui_launch import launch_support
 
 
         def main() -> None:
             launch_support()
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "gui_launch.py",
-        '''
+        """
         from src.core.runtime.imports import launch_module_subprocess
 
 
         def launch_support() -> None:
             launch_module_subprocess("src.support")
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "support.py",
-        '''
+        """
         from src.support_impl import VALUE
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "support_impl.py",
-        '''
+        """
         VALUE = 1
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "core" / "runtime" / "imports.py",
-        '''
+        """
         def launch_module_subprocess(module_name: str) -> None:
             pass
-        ''',
+        """,
     )
 
     rows = scan_unreferenced_file_candidates(tmp_path, roots=("src",))
@@ -222,13 +221,13 @@ def test_usage_graph_treats_package_relative_import_module_calls_as_roots(tmp_pa
     _write_minimal_pyproject(tmp_path)
     _write_python_file(
         tmp_path / "src" / "app.py",
-        '''
+        """
         from src.pkg.helpers import VALUE
 
 
         def main() -> int:
             return VALUE
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "pkg" / "__init__.py",
@@ -236,19 +235,19 @@ def test_usage_graph_treats_package_relative_import_module_calls_as_roots(tmp_pa
     )
     _write_python_file(
         tmp_path / "src" / "pkg" / "helpers.py",
-        '''
+        """
         import importlib
 
         _impl = importlib.import_module(f"{__package__}._impl")
         VALUE = _impl.VALUE
-        ''',
+        """,
     )
     impl_path = tmp_path / "src" / "pkg" / "_impl.py"
     _write_python_file(
         impl_path,
-        '''
+        """
         VALUE = 1
-        ''',
+        """,
     )
 
     graph = build_usage_graph(tmp_path, roots=("src",))
@@ -260,44 +259,44 @@ def test_file_size_runner_suppresses_middleman_and_unreferenced_for_waived_files
     _write_minimal_pyproject(tmp_path)
     _write_python_file(
         tmp_path / "src" / "app.py",
-        '''
+        """
         from src.impl import exported_name
         from src.used import helper
 
 
         def main() -> int:
             return helper() + exported_name()
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "used.py",
-        '''
+        """
         def helper() -> int:
             return 1
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "impl.py",
-        '''
+        """
         def exported_name() -> int:
             return 2
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "middleman.py",
-        '''
+        """
         # @quality-exception file-size-analysis: intentional export facade module
         from src.impl import exported_name
 
         __all__ = ["exported_name"]
-        ''',
+        """,
     )
     _write_python_file(
         tmp_path / "src" / "dead.py",
-        '''
+        """
         # @quality-exception file-size-analysis: temporary standalone migration helper
         VALUE = 5
-        ''',
+        """,
     )
 
     monkeypatch.setattr(step_size, "repo_root", lambda: tmp_path)

@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+from buildpython.utils import import_probe
 from buildpython.utils.import_probe import probe_module_import
 from buildpython.utils.subproc import RunResult
-
-import buildpython.utils.import_probe as import_probe
 
 
 def test_probe_module_import_returns_success_when_subprocess_succeeds(monkeypatch, tmp_path) -> None:

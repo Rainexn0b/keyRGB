@@ -3,7 +3,6 @@ from __future__ import annotations
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult, python_exe, run
 
-
 _GUI_PURE_MYPY_TARGETS = (
     "src/gui/perkey/ops/color_map_ops.py",
     "src/gui/perkey/ops/color_apply_ops.py",
@@ -39,6 +38,8 @@ def mypy_runner() -> RunResult:
             "src/core",
             "src/tray",
             "buildpython",
+            "scripts/release",
+            "tests/buildpython",
         ],
         cwd=str(root),
         env_overrides={"KEYRGB_HW_TESTS": "0"},

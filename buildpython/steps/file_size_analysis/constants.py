@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 REFACTOR_LINES = 350
 CRITICAL_LINES = 400
 SEVERE_LINES = 500

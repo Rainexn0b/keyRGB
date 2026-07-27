@@ -5,7 +5,6 @@ from pathlib import Path
 
 from .subproc import RunResult, python_exe, run
 
-
 _IMPORT_PROBE_PROGRAM = """from __future__ import annotations
 import importlib
 import sys

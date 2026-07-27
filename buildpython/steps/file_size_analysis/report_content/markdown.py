@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..constants import DIRECTORY_SCAN_ROOTS, DIRECT_PYTHON_FILE_THRESHOLD, SIZE_SCAN_ROOTS
+from ..constants import DIRECT_PYTHON_FILE_THRESHOLD, DIRECTORY_SCAN_ROOTS, SIZE_SCAN_ROOTS
 from ._shared import delegation_count, file_counts, import_counts, middleman_count, unreferenced_count
 
 
@@ -158,9 +158,7 @@ def build_markdown_lines(
             ]
         )
         for item in unreferenced_rows[:100]:
-            md_lines.append(
-                f"| {item['lines']} | {item['inbound_imports']} | {item['path']} | {item['reason']} |"
-            )
+            md_lines.append(f"| {item['lines']} | {item['inbound_imports']} | {item['path']} | {item['reason']} |")
         md_lines.append("")
     else:
         md_lines.extend(["## Unreferenced file candidates", "", "No unreferenced file candidates detected.", ""])

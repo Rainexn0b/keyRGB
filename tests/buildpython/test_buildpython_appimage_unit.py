@@ -55,10 +55,7 @@ def test_ldd_deps_propagates_unexpected_subprocess_bug(monkeypatch, tmp_path) ->
 def test_ldd_deps_parses_resolved_paths(monkeypatch, tmp_path) -> None:
     proc = SimpleNamespace(
         returncode=0,
-        stdout=(
-            "libXft.so.2 => /usr/lib/libXft.so.2 (0x0000)\n"
-            "/lib64/ld-linux-x86-64.so.2 (0x0000)\n"
-        ),
+        stdout=("libXft.so.2 => /usr/lib/libXft.so.2 (0x0000)\n/lib64/ld-linux-x86-64.so.2 (0x0000)\n"),
     )
     monkeypatch.setattr(tkinter_bundle.subprocess, "run", lambda *_args, **_kwargs: proc)
 

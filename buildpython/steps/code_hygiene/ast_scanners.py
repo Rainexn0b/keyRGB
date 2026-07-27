@@ -6,7 +6,6 @@ from typing import TypeGuard
 
 from .models import HygieneIssue
 
-
 _SOURCE_PARSE_ERRORS = (OSError, SyntaxError, ValueError)
 
 _FORBIDDEN_API_EXCLUDE_PATHS = ["src/tests/", "tests/"]
@@ -58,9 +57,13 @@ def _forbidden_api_message(call: ast.Call) -> str | None:
         if call.func.id == "exec":
             return "exec() is forbidden - never use exec in production code"
 
-    if isinstance(call.func, ast.Attribute):
-        if call.func.attr == "system" and isinstance(call.func.value, ast.Name) and call.func.value.id == "os":
-            return "os.system() is forbidden - use subprocess.run/check_call"
+    if (
+        isinstance(call.func, ast.Attribute)
+        and call.func.attr == "system"
+        and isinstance(call.func.value, ast.Name)
+        and call.func.value.id == "os"
+    ):
+        return "os.system() is forbidden - use subprocess.run/check_call"
 
     return None
 

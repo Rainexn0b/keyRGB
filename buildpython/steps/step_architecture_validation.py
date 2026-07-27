@@ -8,7 +8,6 @@ from ..utils.subproc import RunResult
 from .architecture_validation import load_architecture_rules, scan_architecture
 from .reports import write_csv, write_json, write_md
 
-
 _ARCHITECTURE_VALIDATION_RUNTIME_ERRORS = (OSError, ValueError, re.error)
 
 

@@ -1,21 +1,25 @@
 {
   "code_hygiene": {
     "counts": {
-      "defensive_conversion": 19,
-      "hasattr_coupling": 4,
+      "defensive_conversion": 1,
+      "hasattr_coupling": 3,
       "any_type_hint": 0,
       "runtime_copy_hotspot": 0,
       "test_naming": 0,
       "forbidden_getattr": 0,
       "forbidden_api": 0,
       "resource_leak": 0,
-      "cleanup_hotspot": 94,
+      "cleanup_hotspot": 6,
       "silent_broad_except": 0,
       "logged_broad_except": 0,
       "fallback_broad_except": 0
     },
     "gated_categories": [
+      "defensive_conversion",
+      "hasattr_coupling",
       "any_type_hint",
+      "runtime_copy_hotspot",
+      "test_naming",
       "forbidden_getattr",
       "forbidden_api",
       "resource_leak",
@@ -24,58 +28,56 @@
       "logged_broad_except",
       "fallback_broad_except"
     ],
-    "path_budgets": {
-      "silent_broad_except": {
-        "src/tray/pollers/idle_power/_actions.py": 17,
-        "src/tray/app/application.py": 12,
-        "src/tray/pollers/config_polling_internal/helpers.py": 12,
-        "src/tray/controllers/lighting_controller.py": 11,
-        "src/core/effects/engine_start.py": 10
-      },
-      "logged_broad_except": {
-        "src/tray/pollers/config_polling_internal/core.py": 5,
-        "src/gui/windows/reactive_color.py": 3,
-        "src/core/power/management/manager.py": 5
-      },
-      "fallback_broad_except": {
-        "src/tray/controllers/_lighting_controller_helpers.py": 9,
-        "src/core/effects/reactive/effects.py": 9,
-        "src/tray/pollers/config_polling_internal/core.py": 8,
-        "src/core/effects/reactive/input.py": 8,
-        "src/core/config/config.py": 7
-      }
-    }
+    "path_budgets": {}
   },
   "coverage": {
-    "minimum_total_percent": 5.0,
+    "minimum_total_percent": 89.5,
     "tracked_prefixes": {
-      "src/core/": 5.0,
-      "src/tray/": 5.0,
-      "src/gui/": 2.0
+      "src/core/": 89.5,
+      "src/tray/": 89.0,
+      "src/gui/": 90.0
     },
+    "minimum_watch_file_percent": 20.0,
     "watch_files": [
       "src/core/backends/sysfs/device.py",
       "src/core/backends/asusctl/backend.py",
       "src/core/backends/asusctl/device.py",
-      "src/core/backends/ite8297/backend.py",
+      "src/core/backends/ite8291r3_perkey/usb.py",
+      "src/core/backends/shared_hidraw_transport.py",
+      "src/core/effects/engine_support/core.py",
       "src/core/power/management/manager.py",
       "src/tray/app/application.py",
-      "src/core/config/config.py"
+      "src/core/config/config.py",
+      "src/core/runtime/hardware_ownership.py"
     ]
   },
   "exception_transparency": {
     "counts": {
       "naked_except": 0,
       "baseexception_catch": 0,
-      "broad_except_total": 638,
-      "broad_except_traceback_logged": 20,
-      "broad_except_logged_no_traceback": 13,
-      "broad_except_unlogged": 591
+      "broad_except_total": 0,
+      "broad_except_traceback_logged": 0,
+      "broad_except_logged_no_traceback": 0,
+      "broad_except_unlogged": 0
     },
     "gated_categories": [
       "naked_except",
-      "baseexception_catch"
+      "baseexception_catch",
+      "broad_except_total",
+      "broad_except_traceback_logged",
+      "broad_except_logged_no_traceback",
+      "broad_except_unlogged"
     ]
+  },
+  "file_size_analysis": {
+    "counts": {
+      "large_files": 0,
+      "long_import_blocks": 13,
+      "flat_directories": 0,
+      "delegation_candidates": 0,
+      "middleman_modules": 2,
+      "unreferenced_files": 0
+    }
   },
   "flat_directories": {
     "allowed": [
@@ -194,6 +196,14 @@
       {
         "path": "tests/tray/app",
         "reason": "intentionally flat tray-app test root; direct test modules are peer-level behavior slices (application, backend seam, callbacks, entrypoint, lifecycle, protocols, startup bootstrap) around one tray-app boundary"
+      },
+      {
+        "path": "src/tray",
+        "reason": "intentionally flat tray package root; direct modules are public entry/protocol/idle-power/secondary facades with subsystems already under app/, controllers/, integrations/, pollers/, startup/, ui/"
+      },
+      {
+        "path": "src/core/backends",
+        "reason": "intentionally flat backends package root; direct modules are shared contracts (base, exceptions, policy, registry, hidraw helpers) with device implementations already under per-backend subpackages"
       }
     ]
   },

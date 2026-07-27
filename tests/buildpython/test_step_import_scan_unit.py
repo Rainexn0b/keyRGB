@@ -4,9 +4,8 @@ import logging
 
 import pytest
 
+from buildpython.steps import step_import_scan
 from buildpython.utils.import_probe import ImportProbeResult
-
-import buildpython.steps.step_import_scan as step_import_scan
 
 
 def test_parse_imports_skips_unreadable_files(tmp_path) -> None:

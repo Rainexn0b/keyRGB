@@ -57,7 +57,7 @@ def appimage_smoke_runner() -> RunResult:
 
     image = os.environ.get("KEYRGB_APPIMAGE_SMOKE_IMAGE", "ubuntu:24.04")
 
-    script = "\n".join(
+    script = "\n".join(  # noqa: FLY002 - container smoke script lines are clearer as an explicit list
         [
             "set -euo pipefail",
             "export DEBIAN_FRONTEND=noninteractive",

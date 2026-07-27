@@ -3,9 +3,18 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 from pathlib import Path
+
 from .summary_support.coverage import build_terminal_build_overview, build_terminal_coverage_highlight
 from .summary_support.debt_markdown import append_debt_snapshot
 from .summary_support.models import BuildSummary, StepSummary
+
+__all__ = [
+    "BuildSummary",
+    "StepSummary",
+    "build_terminal_build_overview",
+    "build_terminal_coverage_highlight",
+    "write_summary",
+]
 
 
 def write_summary(buildlog_dir: Path, summary: BuildSummary) -> None:
@@ -24,7 +33,7 @@ def write_summary(buildlog_dir: Path, summary: BuildSummary) -> None:
     lines.append(f"- Duration: {summary.total_duration_s:.1f}s")
 
     bar_width = 20
-    filled = max(0, min(bar_width, int(round(summary.health_score / 100 * bar_width))))
+    filled = max(0, min(bar_width, round(summary.health_score / 100 * bar_width)))
     bar = "[" + ("#" * filled) + ("-" * (bar_width - filled)) + "]"
     lines.append(f"- Health bar: {bar}")
     lines.append("")

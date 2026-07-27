@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
-
 import ast
 import json
 from pathlib import Path
+from typing import Any
 
-from . import _ast_scan_helpers as _scan_helpers
-from . import constants as _constants
-from . import usage_graph as _usage_graph
 from ..quality_exceptions import explanation_for_quality_exception_step
+from . import _ast_scan_helpers as _scan_helpers, constants as _constants, usage_graph as _usage_graph
 
 delegation_candidate_metrics = _scan_helpers.delegation_candidate_metrics
 import_block_metrics = _scan_helpers.import_block_metrics

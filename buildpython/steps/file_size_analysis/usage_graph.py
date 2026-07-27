@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 # @quality-exception file-size-analysis: build-time usage-graph scanner; cohesive tooling module not shipped runtime
-
 import ast
 from dataclasses import dataclass
 from pathlib import Path
-
 
 _TOP_LEVEL_ROOT_FILES = ("keyrgb", "keyrgb-tuxedo")
 _EXTERNAL_ROOT_DIRS = ("scripts",)
@@ -33,7 +31,9 @@ def build_usage_graph(root: Path, *, roots: tuple[str, ...]) -> UsageGraph:
             reverse_adjacency.setdefault(dependency, set()).add(path)
 
     external_inbound_counts: dict[Path, int] = {}
-    root_paths = _collect_root_paths(root, module_index, external_inbound_counts, external_root_files=external_root_files)
+    root_paths = _collect_root_paths(
+        root, module_index, external_inbound_counts, external_root_files=external_root_files
+    )
     reachable = _reachable_paths(adjacency, root_paths) if root_paths else frozenset()
 
     launched_module_roots = _collect_launched_module_roots(

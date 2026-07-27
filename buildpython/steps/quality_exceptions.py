@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-
 QUALITY_EXCEPTION_MARKER = "@quality-exception"
 _QUALITY_EXCEPTION_TAG_RE = re.compile(
     r"@quality-exception\s+(?P<step>[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)(?P<explanation>\s*(?::|-)?\s*.*)$",

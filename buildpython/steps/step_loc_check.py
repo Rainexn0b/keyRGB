@@ -115,16 +115,16 @@ def _markdown_lines(*, thresholds: dict[str, str], rows: list[dict[str, Any]], c
         md_lines.append("No files exceed configured LOC thresholds.")
         return md_lines
 
-    md_lines.extend([
-        "## Largest files",
-        "",
-        "| Lines | Bucket | Scope | Path |",
-        "|---:|---|---|---|",
-    ])
+    md_lines.extend(
+        [
+            "## Largest files",
+            "",
+            "| Lines | Bucket | Scope | Path |",
+            "|---:|---|---|---|",
+        ]
+    )
     for item in rows[:200]:
-        md_lines.append(
-            f"| {int(item['lines'])} | {item['bucket']} | {item['scope']} | {item['path']} |"
-        )
+        md_lines.append(f"| {int(item['lines'])} | {item['bucket']} | {item['scope']} | {item['path']} |")
     return md_lines
 
 

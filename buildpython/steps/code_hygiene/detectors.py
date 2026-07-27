@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import ast_scanners as _ast_scanners
-from . import baseline as _baseline
-from . import models as _models
-from . import runtime_scanners as _runtime_scanners
-from . import text_scanners as _text_scanners
+from . import (
+    ast_scanners as _ast_scanners,
+    baseline as _baseline,
+    models as _models,
+    runtime_scanners as _runtime_scanners,
+    text_scanners as _text_scanners,
+)
 
 _baseline_delta = _baseline._baseline_delta
 _baseline_regressions = _baseline._baseline_regressions

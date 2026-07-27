@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-
 _LOC_BUCKET_KEYS = (
     ("monitor", "monitor"),
     ("refactor", "refactor"),
@@ -62,7 +61,9 @@ def file_size_structure_candidate_counts(payload: dict[str, Any]) -> tuple[int, 
 def loc_check_counts(payload: dict[str, Any]) -> tuple[dict[str, int], dict[str, int], dict[str, int]]:
     counts = _normalize_loc_counts(payload.get("counts", {}))
     counts_by_scope = payload.get("counts_by_scope", {})
-    default_counts = _normalize_loc_counts(counts_by_scope.get("default", {}) if isinstance(counts_by_scope, dict) else {})
+    default_counts = _normalize_loc_counts(
+        counts_by_scope.get("default", {}) if isinstance(counts_by_scope, dict) else {}
+    )
     test_counts = _normalize_loc_counts(counts_by_scope.get("tests", {}) if isinstance(counts_by_scope, dict) else {})
 
     count = payload.get("count")

@@ -7,7 +7,17 @@ from ..utils.subproc import RunResult, python_exe, run
 def ruff_format_check_runner() -> RunResult:
     root = repo_root()
     return run(
-        [python_exe(), "-m", "ruff", "format", "--check", "src"],
+        [
+            python_exe(),
+            "-m",
+            "ruff",
+            "format",
+            "--check",
+            "src",
+            "buildpython",
+            "scripts/release",
+            "tests",
+        ],
         cwd=str(root),
         env_overrides={"KEYRGB_HW_TESTS": "0"},
     )

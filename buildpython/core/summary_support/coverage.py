@@ -46,8 +46,7 @@ def build_terminal_coverage_highlight(buildlog_dir: Path) -> str | None:
             if not isinstance(prefix, str):
                 continue
             label = prefix.rstrip("/")
-            if label.startswith("src/"):
-                label = label[4:]
+            label = label.removeprefix("src/")
             if isinstance(percent, (int, float)):
                 prefix_parts.append(f"{label} {float(percent):.2f}%")
         if prefix_parts:
@@ -63,7 +62,7 @@ def build_terminal_build_overview(buildlog_dir: Path, summary: BuildSummary) -> 
     skipped = sum(1 for step in summary.steps if step.status == "skipped")
 
     bar_width = 20
-    filled = max(0, min(bar_width, int(round(summary.health_score / 100 * bar_width))))
+    filled = max(0, min(bar_width, round(summary.health_score / 100 * bar_width)))
     bar = "\u2588" * filled + "\u2591" * (bar_width - filled)  # █ and ░
 
     status_icon = "\u2705  " if summary.passed else "\u274c  "  # ✅ or ❌

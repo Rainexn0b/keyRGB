@@ -6,7 +6,6 @@ from pathlib import Path
 
 from .models import MarkerBaseline
 
-
 MARKERS = [
     "TODO",
     "FIXME",

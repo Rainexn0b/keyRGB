@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 import ast
+from dataclasses import dataclass
 from pathlib import Path
 
 ImportNode = ast.Import | ast.ImportFrom

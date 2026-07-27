@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from collections import Counter
 import json
+from collections import Counter
 from pathlib import Path
 
-import buildpython.steps.code_hygiene.step as step_code_hygiene
 import buildpython.steps.code_hygiene.baseline as step_code_hygiene_baseline
-import buildpython.steps.code_hygiene.text_scanners as text_scanners
+import buildpython.steps.code_hygiene.step as step_code_hygiene
 import buildpython.steps.file_size_analysis._ast_scan_helpers as file_size_ast_scan_helpers
-
 from buildpython.core.debt_index import build_debt_index, write_debt_index
 from buildpython.core.summary import (
     BuildSummary,
@@ -20,13 +18,17 @@ from buildpython.core.summary_support.debt_terminal import (
     build_terminal_loc_check_highlight,
     build_terminal_transparency_highlight,
 )
+from buildpython.steps.code_hygiene import detectors as code_hygiene_detectors, text_scanners
 from buildpython.steps.code_hygiene.baseline import _path_budget_regressions
 from buildpython.steps.code_hygiene.models import HygieneBaseline, HygieneIssue
+from buildpython.steps.coverage_step.step import CoverageBaseline, build_coverage_report
 from buildpython.steps.exception_transparency.models import ExceptionTransparencyAnnotationInventory
 from buildpython.steps.exception_transparency.reporting import build_stdout, write_reports
-from buildpython.steps.exception_transparency.scanner import collect_annotation_inventory, collect_findings
-from buildpython.steps.coverage_step.step import CoverageBaseline, build_coverage_report
-from buildpython.steps.exception_transparency.step import _scan_python_source
+from buildpython.steps.exception_transparency.scanner import (
+    collect_annotation_inventory,
+    collect_findings,
+    scan_python_source as _scan_python_source,
+)
 
 
 def test_exception_transparency_scan_suppresses_valid_quality_exception_waivers() -> None:
@@ -155,6 +157,45 @@ def example(logger):
     assert counts["broad_except_traceback_logged"] == 2
     assert counts["baseexception_catch"] == 1
     assert counts.get("naked_except", 0) == 0
+
+
+def test_exception_transparency_scan_resolves_local_exception_aliases() -> None:
+    findings = _scan_python_source(
+        """
+SPECIFIC_ERRORS = (OSError, RuntimeError)
+BROAD_ERRORS = SPECIFIC_ERRORS + (Exception,)
+
+def example():
+    try:
+        run_specific()
+    except SPECIFIC_ERRORS:
+        pass
+
+    try:
+        run_broad()
+    except BROAD_ERRORS:
+        pass
+""".strip(),
+        rel_path="src/example.py",
+    )
+
+    counts = Counter(finding.category for finding in findings)
+    assert counts == Counter({"broad_except_total": 1, "broad_except_unlogged": 1})
+
+
+def test_exception_transparency_waiver_cannot_hide_baseexception() -> None:
+    findings = _scan_python_source(
+        """
+def example():
+    try:
+        run_one()
+    except BaseException:  # @quality-exception exception-transparency: finalizer boundary
+        pass
+""".strip(),
+        rel_path="src/example.py",
+    )
+
+    assert [finding.category for finding in findings] == ["baseexception_catch"]
 
 
 def test_exception_transparency_scan_skips_unparseable_source() -> None:
@@ -351,7 +392,7 @@ def test_code_hygiene_runner_uses_cleanup_hotspot_threshold_from_baseline(tmp_pa
     assert report["active_counts"]["cleanup_hotspot"] == 95
 
 
-def test_code_hygiene_runner_keeps_non_cleanup_thresholds_unchanged(tmp_path, monkeypatch) -> None:
+def test_code_hygiene_runner_uses_gated_non_cleanup_baselines(tmp_path, monkeypatch) -> None:
     config_dir = tmp_path / "buildpython" / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "debt_baselines.json").write_text(
@@ -387,9 +428,9 @@ def test_code_hygiene_runner_keeps_non_cleanup_thresholds_unchanged(tmp_path, mo
     result = step_code_hygiene.code_hygiene_runner()
     report = json.loads((tmp_path / "buildlog" / "keyrgb" / "code-hygiene.json").read_text(encoding="utf-8"))
 
-    assert result.exit_code == 0
+    assert result.exit_code == 1
     assert report["thresholds"]["cleanup_hotspot"] == 94
-    assert report["thresholds"]["silent_broad_except"] == 4
+    assert report["thresholds"]["silent_broad_except"] == 0
 
 
 def test_hygiene_detectors_ignore_missing_or_unparseable_sources(tmp_path) -> None:
@@ -399,9 +440,9 @@ def test_hygiene_detectors_ignore_missing_or_unparseable_sources(tmp_path) -> No
     broken_file.parent.mkdir(parents=True)
     broken_file.write_text("def broken(:\n    pass\n", encoding="utf-8")
 
-    assert step_code_hygiene._detect_cleanup_hotspots(missing_file, root) == []
-    assert step_code_hygiene._detect_runtime_copy_hotspots(broken_file, root) == []
-    assert step_code_hygiene._detect_broad_exception_patterns(broken_file, root) == []
+    assert code_hygiene_detectors._detect_cleanup_hotspots(missing_file, root) == []
+    assert code_hygiene_detectors._detect_runtime_copy_hotspots(broken_file, root) == []
+    assert code_hygiene_detectors._detect_broad_exception_patterns(broken_file, root) == []
 
 
 def test_text_scanners_match_representative_cleanup_and_defensive_patterns(tmp_path) -> None:
@@ -467,24 +508,17 @@ def test_any_type_hint_scanner_covers_all_src_including_gui_paths(tmp_path) -> N
     helper_target.parent.mkdir(parents=True)
 
     gui_target.write_text(
-        "from typing import Any\n\n"
-        "def initialize_editor(editor: Any) -> Any:\n"
-        "    return editor\n",
+        "from typing import Any\n\ndef initialize_editor(editor: Any) -> Any:\n    return editor\n",
         encoding="utf-8",
     )
     helper_target.write_text(
-        "from typing import Any\n\n"
-        "def helper(value: Any) -> Any:\n"
-        "    return value\n",
+        "from typing import Any\n\ndef helper(value: Any) -> Any:\n    return value\n",
         encoding="utf-8",
     )
 
     issues = text_scanners._detect_any_type_hints(gui_target, root)
 
-    assert [
-        (issue.path, issue.line, issue.message)
-        for issue in issues
-    ] == [
+    assert [(issue.path, issue.line, issue.message) for issue in issues] == [
         (
             "src/gui/perkey/editor.py",
             3,
@@ -548,6 +582,36 @@ def test_build_coverage_report_tracks_prefixes_and_watch_files() -> None:
     watch = {item["path"]: item for item in report["watch_files"]}
     assert watch["src/core/backends/sysfs/device.py"]["percent"] == 0.0
     assert len(report["baseline"]["regressions"]) == 1
+
+
+def test_build_coverage_report_fails_missing_and_undercovered_watch_files() -> None:
+    payload = {
+        "files": {
+            "src/core/present.py": {
+                "summary": {
+                    "covered_lines": 1,
+                    "num_statements": 10,
+                }
+            },
+        },
+        "totals": {"covered_lines": 1, "num_statements": 10},
+    }
+    baseline = CoverageBaseline(
+        minimum_total_percent=None,
+        tracked_prefixes={},
+        watch_files=("src/core/present.py", "src/core/missing.py"),
+        minimum_watch_file_percent=20.0,
+    )
+
+    report = build_coverage_report(payload, baseline)
+
+    watch = {item["path"]: item for item in report["watch_files"]}
+    assert watch["src/core/present.py"]["status"] == "fail"
+    assert watch["src/core/missing.py"]["status"] == "missing"
+    assert {(item["kind"], item["target"]) for item in report["baseline"]["regressions"]} == {
+        ("watch_file", "src/core/present.py"),
+        ("watch_missing", "src/core/missing.py"),
+    }
 
 
 def test_write_debt_index_aggregates_reports(tmp_path) -> None:

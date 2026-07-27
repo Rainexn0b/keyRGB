@@ -2,18 +2,20 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
-from ._architecture_validation_helpers import _iter_rule_files
-from ._architecture_validation_helpers import _line_number
-from ._architecture_validation_helpers import _line_snippet
-from ._architecture_validation_helpers import _module_matches_import_rule
-from ._architecture_validation_helpers import _rel_path
-from ._architecture_validation_helpers import _ScannedAttribute
-from ._architecture_validation_helpers import _ScannedImport
-from ._architecture_validation_helpers import _scan_python_signals
+from ._architecture_validation_helpers import (
+    _iter_rule_files,
+    _line_number,
+    _line_snippet,
+    _module_matches_import_rule,
+    _rel_path,
+    _scan_python_signals,
+    _ScannedAttribute,
+    _ScannedImport,
+)
 
 
 @dataclass(frozen=True)

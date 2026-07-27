@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-
 LOC_SCAN_ROOTS = ("src", "buildpython", "tests")
 
 

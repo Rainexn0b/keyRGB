@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: cohesive AST scanner for one build gate; helpers form a single exception-transparency pipeline
 import ast
 from collections import Counter
 from pathlib import Path
@@ -7,7 +8,6 @@ from pathlib import Path
 from ..quality_exceptions import explanation_for_quality_exception_step
 from .baseline import iter_python_files
 from .models import ExceptionTransparencyAnnotationInventory, ExceptionTransparencyFinding
-
 
 MESSAGE_BY_CATEGORY = {
     "naked_except": "Naked except catches KeyboardInterrupt/SystemExit; replace it with a specific exception type.",
@@ -50,25 +50,45 @@ _PARSE_SKIP_EXCEPTIONS = (SyntaxError, ValueError)
 _SOURCE_READ_SKIP_EXCEPTIONS = (OSError,)
 
 
-def handler_type_names(node: ast.expr | None) -> set[str]:
+def handler_type_names(
+    node: ast.expr | None,
+    aliases: dict[str, ast.expr] | None = None,
+    seen: frozenset[str] = frozenset(),
+) -> set[str]:
     if node is None:
         return set()
     if isinstance(node, ast.Name):
+        if aliases is not None and node.id in aliases and node.id not in seen:
+            return handler_type_names(aliases[node.id], aliases, seen | {node.id})
         return {node.id}
     if isinstance(node, ast.Attribute):
         return {node.attr}
     if isinstance(node, ast.Tuple):
         names: set[str] = set()
         for element in node.elts:
-            names.update(handler_type_names(element))
+            names.update(handler_type_names(element, aliases, seen))
         return names
+    if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+        return handler_type_names(node.left, aliases, seen) | handler_type_names(node.right, aliases, seen)
     return set()
 
 
-def is_broad_handler(handler: ast.ExceptHandler) -> bool:
+def collect_exception_aliases(tree: ast.AST) -> dict[str, ast.expr]:
+    aliases: dict[str, ast.expr] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    aliases[target.id] = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name) and node.value is not None:
+            aliases[node.target.id] = node.value
+    return aliases
+
+
+def is_broad_handler(handler: ast.ExceptHandler, aliases: dict[str, ast.expr] | None = None) -> bool:
     if handler.type is None:
         return True
-    names = handler_type_names(handler.type)
+    names = handler_type_names(handler.type, aliases)
     return bool(names & {"Exception", "BaseException"})
 
 
@@ -247,6 +267,7 @@ def scan_python_source(source: str, *, rel_path: str) -> list[ExceptionTranspare
         return []
 
     lines = source.splitlines()
+    aliases = collect_exception_aliases(tree)
     findings: list[ExceptionTransparencyFinding] = []
     try_nodes: tuple[type[ast.AST], ...]
     try_star = getattr(ast, "TryStar", None)
@@ -260,19 +281,20 @@ def scan_python_source(source: str, *, rel_path: str) -> list[ExceptionTranspare
             continue
         handlers = getattr(node, "handlers", [])
         for handler in handlers:
-            if not isinstance(handler, ast.ExceptHandler) or not is_broad_handler(handler):
+            if not isinstance(handler, ast.ExceptHandler) or not is_broad_handler(handler, aliases):
                 continue
-            if has_quality_exception_waiver(lines, handler):
-                continue
-
-            findings.append(make_finding("broad_except_total", rel_path, handler, lines))
 
             if handler.type is None:
                 findings.append(make_finding("naked_except", rel_path, handler, lines))
             else:
-                type_names = handler_type_names(handler.type)
+                type_names = handler_type_names(handler.type, aliases)
                 if "BaseException" in type_names:
                     findings.append(make_finding("baseexception_catch", rel_path, handler, lines))
+
+            if has_quality_exception_waiver(lines, handler):
+                continue
+
+            findings.append(make_finding("broad_except_total", rel_path, handler, lines))
 
             if contains_reraise(handler.body):
                 continue
@@ -327,11 +349,15 @@ def count_broad_waivers(root: Path) -> int:
         except (*_PARSE_SKIP_EXCEPTIONS, *_SOURCE_READ_SKIP_EXCEPTIONS):
             continue
         lines = source.splitlines()
+        aliases = collect_exception_aliases(tree)
         for node in ast.walk(tree):
             if not isinstance(node, ast.Try):
                 continue
             for handler in getattr(node, "handlers", []):
-                if not isinstance(handler, ast.ExceptHandler) or not is_broad_handler(handler):
+                if not isinstance(handler, ast.ExceptHandler) or not is_broad_handler(handler, aliases):
+                    continue
+                names = handler_type_names(handler.type, aliases)
+                if handler.type is None or "BaseException" in names:
                     continue
                 if has_quality_exception_waiver(lines, handler):
                     total += 1

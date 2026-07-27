@@ -195,8 +195,7 @@ def build_terminal_filesize_highlight(buildlog_dir: Path) -> list[str]:
         )
     if isinstance(unreferenced_files, list) and unreferenced_files and isinstance(unreferenced_files[0], dict):
         lines.append(
-            f"{'Top dead-file:':<16}  {unreferenced_files[0].get('path')} "
-            f"({unreferenced_files[0].get('lines')} lines)"
+            f"{'Top dead-file:':<16}  {unreferenced_files[0].get('path')} ({unreferenced_files[0].get('lines')} lines)"
         )
 
     return lines

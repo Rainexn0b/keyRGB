@@ -5,16 +5,9 @@ from pathlib import Path
 
 from ...utils.paths import repo_root
 from ...utils.subproc import RunResult
-from .baseline import _load_hygiene_baseline
-from .detectors import (
-    HygieneIssue,
-    _collect_all_issues,
-    _detect_broad_exception_patterns,
-    _detect_cleanup_hotspots,
-    _detect_runtime_copy_hotspots,
-)
+from .baseline import _baseline_regressions, _load_hygiene_baseline, _path_budget_regressions
+from .detectors import _collect_all_issues
 from .reporting import _build_stdout, _write_reports
-
 
 CATEGORY_THRESHOLDS = {
     "defensive_conversion": 50,
@@ -28,16 +21,13 @@ CATEGORY_THRESHOLDS = {
     "logged_broad_except": 0,
     "fallback_broad_except": 0,
 }
-_BASELINE_THRESHOLD_CATEGORIES = frozenset({"cleanup_hotspot"})
 
 
 def _resolved_category_thresholds(root: Path) -> dict[str, int]:
     thresholds = dict(CATEGORY_THRESHOLDS)
     baseline = _load_hygiene_baseline(root)
 
-    for category in _BASELINE_THRESHOLD_CATEGORIES:
-        if category not in baseline.gated_categories:
-            continue
+    for category in baseline.gated_categories:
         baseline_count = baseline.counts.get(category)
         if isinstance(baseline_count, int):
             thresholds[category] = baseline_count
@@ -47,6 +37,7 @@ def _resolved_category_thresholds(root: Path) -> dict[str, int]:
 
 def code_hygiene_runner() -> RunResult:
     root = repo_root()
+    baseline = _load_hygiene_baseline(root)
     category_thresholds = _resolved_category_thresholds(root)
     issues = _collect_all_issues(root)
 
@@ -61,7 +52,20 @@ def code_hygiene_runner() -> RunResult:
     stdout_lines = _build_stdout(issues, active_counts, suppressed_counts, category_thresholds=category_thresholds)
     _write_reports(root, issues, active_counts, suppressed_counts, category_thresholds=category_thresholds)
 
-    should_fail = any(active_counts.get(category, 0) > threshold for category, threshold in category_thresholds.items())
+    count_regressions = _baseline_regressions(active_counts, baseline)
+    active_issues = [issue for issue in issues if not issue.suppressed]
+    path_regressions = _path_budget_regressions(active_issues, baseline)
+    if path_regressions:
+        stdout_lines.append("")
+        stdout_lines.append("Path-budget regressions:")
+        stdout_lines.extend(
+            f"  {category} {path}: current={current} baseline={expected}"
+            for category, path, current, expected in path_regressions
+        )
+
+    should_fail = bool(count_regressions or path_regressions) or any(
+        active_counts.get(category, 0) > threshold for category, threshold in category_thresholds.items()
+    )
 
     return RunResult(
         command_str="(internal) code hygiene check",

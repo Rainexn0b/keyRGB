@@ -6,7 +6,6 @@ from ..utils.import_probe import probe_module_import
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
-
 DEFAULT_IMPORTS = [
     "src.tray.entrypoint",
     # Tk-based GUIs are optional in CI environments where tkinter isn't present.

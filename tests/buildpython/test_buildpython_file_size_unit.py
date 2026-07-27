@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 
 import buildpython.steps.file_size_analysis.step as step_size
+from buildpython.core.debt_index import build_debt_index, write_debt_index
+from buildpython.core.summary_support.debt_terminal import build_terminal_filesize_highlight
 from buildpython.steps.file_size_analysis.scanning import (
     load_flat_directory_allowlist,
     scan_delegation_candidate,
@@ -11,8 +13,14 @@ from buildpython.steps.file_size_analysis.scanning import (
     scan_import_block,
 )
 
-from buildpython.core.debt_index import build_debt_index, write_debt_index
-from buildpython.core.summary_support.debt_terminal import build_terminal_filesize_highlight
+
+def test_structure_regressions_only_flag_increases() -> None:
+    regressions = step_size._structure_regressions(
+        {"large_files": 3, "flat_directories": 9, "middleman_modules": 1},
+        {"large_files": 3, "flat_directories": 8, "middleman_modules": 2},
+    )
+
+    assert regressions == [("flat_directories", 9, 8)]
 
 
 def _write_python_file(path: Path, *, total_lines: int, import_lines: int = 0) -> None:
@@ -32,7 +40,7 @@ def _write_small_python_file(path: Path) -> None:
 def _write_delegation_candidate(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
-        "\n".join(
+        "\n".join(  # noqa: FLY002 - explicit generated fixture lines are easier to review
             [
                 '"""Delegation candidate."""',
                 "from pkg import helper_01",

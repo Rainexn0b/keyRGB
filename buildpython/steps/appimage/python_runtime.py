@@ -7,7 +7,6 @@ from pathlib import Path
 
 from ...utils.paths import repo_root
 from ...utils.subproc import python_exe
-
 from .common import chmod_x
 
 
@@ -38,8 +37,8 @@ print(json.dumps(out))
         [python_exe(), "-c", code],
         cwd=str(repo_root()),
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
+        check=False,
     )
     if proc.returncode != 0:
         raise SystemExit(proc.returncode)

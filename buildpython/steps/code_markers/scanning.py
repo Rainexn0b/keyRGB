@@ -7,7 +7,6 @@ from pathlib import Path
 from ...utils.paths import repo_root
 from .baseline import MARKERS, REF_EXTS
 
-
 COMMENTED_CODE_RE = re.compile(
     r"^\s*#\s*(def |class |import |from |if |elif |else:|for |while |try:|except |with |return |raise )"
 )

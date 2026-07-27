@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-import buildpython.steps.step_imports as step_imports
+from buildpython.steps import step_imports
 from buildpython.utils.import_probe import ImportProbeResult
 
 

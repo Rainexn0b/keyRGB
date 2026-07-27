@@ -4,8 +4,8 @@ import os
 import shlex
 import subprocess
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,7 @@ def run(
         text=True,
         capture_output=True,
         env=env,
+        check=False,
     )
 
     return RunResult(

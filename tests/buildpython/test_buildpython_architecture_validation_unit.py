@@ -5,8 +5,7 @@ import re
 
 import pytest
 
-import buildpython.steps.step_architecture_validation as step_architecture_validation
-
+from buildpython.steps import step_architecture_validation
 from buildpython.steps.architecture_validation import load_architecture_rules, scan_architecture
 
 
@@ -295,7 +294,7 @@ def test_scan_architecture_reports_attribute_rule_matches(tmp_path) -> None:
                             {
                                 "name": "_system_power_last_ok",
                                 "message": "Tray UI should not mutate private tray runtime state directly",
-                            }
+                            },
                         ],
                     }
                 ]
@@ -354,9 +353,7 @@ def test_scan_architecture_attribute_rules_ignore_private_method_definitions(tmp
     assert result.findings == ()
 
 
-def test_architecture_validation_runner_returns_run_result_for_recoverable_rule_errors(
-    monkeypatch, tmp_path
-) -> None:
+def test_architecture_validation_runner_returns_run_result_for_recoverable_rule_errors(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
     monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
 

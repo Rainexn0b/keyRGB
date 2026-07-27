@@ -232,9 +232,7 @@ def append_debt_snapshot(lines: list[str], buildlog_dir: Path) -> None:
         if isinstance(files, list) and files:
             first = files[0]
             if isinstance(first, dict):
-                lines.append(
-                    f"- Largest file: {first.get('path')} ({first.get('lines')} lines, {first.get('bucket')})"
-                )
+                lines.append(f"- Largest file: {first.get('path')} ({first.get('lines')} lines, {first.get('bucket')})")
         lines.append(f"- Report: {buildlog_dir / 'loc-check.md'}")
         lines.append("")
 

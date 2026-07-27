@@ -8,10 +8,7 @@ from typing import Any
 from ..utils.paths import buildlog_dir, repo_root
 from ..utils.subproc import RunResult, python_exe, run
 
-
-_FINDING_RE = re.compile(
-    r"^(?P<path>.+?):(?P<line>\d+): (?P<message>.+) \((?P<confidence>\d+)% confidence\)$"
-)
+_FINDING_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): (?P<message>.+) \((?P<confidence>\d+)% confidence\)$")
 _SCAN_ROOTS = ("src", "buildpython", "tests")
 _MIN_CONFIDENCE = 80
 
@@ -101,9 +98,7 @@ def _write_reports(*, report_dir: Path, findings: list[dict[str, Any]], raw_outp
 
     md_lines.extend(["", "## Top findings", "", "| Confidence | Path | Line | Message |", "|---:|---|---:|---|"])
     for item in findings[:120]:
-        md_lines.append(
-            f"| {int(item['confidence'])}% | {item['path']} | {int(item['line'])} | {item['message']} |"
-        )
+        md_lines.append(f"| {int(item['confidence'])}% | {item['path']} | {int(item['line'])} | {item['message']} |")
 
     (report_dir / "dead-code-vulture.md").write_text("\n".join(md_lines) + "\n", encoding="utf-8")
 
@@ -150,9 +145,7 @@ def dead_code_runner() -> RunResult:
         stdout_lines.append("")
         stdout_lines.append("Top findings:")
         for item in findings[:80]:
-            stdout_lines.append(
-                f"  - {int(item['confidence'])}% {item['path']}:{int(item['line'])} {item['message']}"
-            )
+            stdout_lines.append(f"  - {int(item['confidence'])}% {item['path']}:{int(item['line'])} {item['message']}")
 
     return RunResult(
         command_str=result.command_str,

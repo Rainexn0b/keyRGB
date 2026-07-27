@@ -1,11 +1,8 @@
 from __future__ import annotations
 
-from collections import Counter
-from pathlib import Path
-
 from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
-from .code_markers.baseline import MarkerBaseline, load_marker_baseline as _load_marker_baseline, marker_regressions
+from .code_markers.baseline import load_marker_baseline as _load_marker_baseline, marker_regressions
 from .code_markers.reporting import build_stdout_lines, write_reports
 from .code_markers.scanning import (
     find_ref_files,

@@ -228,7 +228,9 @@ def write_debt_index(buildlog_dir: Path) -> None:
             lines.append(
                 f"- Delegation candidates: {len(delegation_candidates) if isinstance(delegation_candidates, list) else 0}"
             )
-            lines.append(f"- Middle-man modules: {len(middleman_modules) if isinstance(middleman_modules, list) else 0}")
+            lines.append(
+                f"- Middle-man modules: {len(middleman_modules) if isinstance(middleman_modules, list) else 0}"
+            )
             lines.append(
                 f"- Unreferenced file candidates: {len(unreferenced_files) if isinstance(unreferenced_files, list) else 0}"
             )
@@ -274,7 +276,9 @@ def write_debt_index(buildlog_dir: Path) -> None:
             if isinstance(files, list) and files:
                 first = files[0]
                 if isinstance(first, dict):
-                    lines.append(f"- Largest file: {first.get('path')} ({first.get('lines')} lines, {first.get('bucket')})")
+                    lines.append(
+                        f"- Largest file: {first.get('path')} ({first.get('lines')} lines, {first.get('bucket')})"
+                    )
             lines.append("")
 
         coverage = sections.get("coverage")

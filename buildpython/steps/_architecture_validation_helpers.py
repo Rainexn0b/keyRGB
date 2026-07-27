@@ -2,19 +2,16 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass
-from pathlib import Path
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Protocol
 
 
 class _ArchitectureRuleCorpus(Protocol):
     @property
-    def include_globs(self) -> tuple[str, ...]:
-        ...
+    def include_globs(self) -> tuple[str, ...]: ...
 
     @property
-    def exclude_globs(self) -> tuple[str, ...]:
-        ...
+    def exclude_globs(self) -> tuple[str, ...]: ...
 
 
 @dataclass(frozen=True)

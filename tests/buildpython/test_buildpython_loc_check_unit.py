@@ -3,10 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import buildpython.steps.step_loc_check as step_loc_check
-
 from buildpython.core.debt_index import build_debt_index
 from buildpython.core.summary_support.debt_terminal import build_terminal_loc_check_highlight
+from buildpython.steps import step_loc_check
 
 
 def _write_python_file(path: Path, *, total_lines: int) -> None:
@@ -160,5 +159,7 @@ def test_terminal_loc_check_highlight_summarizes_buckets_and_top_file(tmp_path) 
 
     lines = build_terminal_loc_check_highlight(buildlog_dir)
 
-    assert any("monitor 1" in line and "critical 1" in line and "severe 1" in line and "tests 1" in line for line in lines)
+    assert any(
+        "monitor 1" in line and "critical 1" in line and "severe 1" in line and "tests 1" in line for line in lines
+    )
     assert any("Top LOC" in line and "tests/test_big.py" in line and "SEVERE" in line for line in lines)

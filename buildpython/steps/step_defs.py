@@ -24,10 +24,18 @@ def steps() -> list[Step]:
     def pytest_runner():
         return pytest_runner_with_optional_coverage()
 
-    # Optional: ruff (only runs if installed)
     def ruff_runner():
         return run(
-            [python_exe(), "-m", "ruff", "check", "src"],
+            [
+                python_exe(),
+                "-m",
+                "ruff",
+                "check",
+                "src",
+                "buildpython",
+                "scripts/release",
+                "tests",
+            ],
             cwd=str(root),
             env_overrides={"KEYRGB_HW_TESTS": "0"},
         )

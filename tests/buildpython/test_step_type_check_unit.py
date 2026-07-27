@@ -16,7 +16,16 @@ def test_mypy_runner_checks_runtime_and_narrow_gui_baseline(monkeypatch) -> None
 
     result = step_type_check.mypy_runner()
 
-    assert calls[0] == ["python", "-m", "mypy", "src/core", "src/tray", "buildpython"]
+    assert calls[0] == [
+        "python",
+        "-m",
+        "mypy",
+        "src/core",
+        "src/tray",
+        "buildpython",
+        "scripts/release",
+        "tests/buildpython",
+    ]
     assert calls[1][:5] == ["python", "-m", "mypy", "--follow-imports=skip", "src/gui/perkey/ops/color_map_ops.py"]
     assert tuple(calls[1][4:]) == step_type_check._GUI_PURE_MYPY_TARGETS
     assert result.exit_code == 0

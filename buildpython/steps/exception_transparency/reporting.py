@@ -33,10 +33,7 @@ def build_stdout(
         lines.append(f"  {category:<32} {current:>4}")
 
     lines.append("")
-    lines.append(
-        "Valid @quality-exception exception-transparency annotations: "
-        f"{annotation_inventory.total}"
-    )
+    lines.append(f"Valid @quality-exception exception-transparency annotations: {annotation_inventory.total}")
     for subtree, count in annotation_inventory.by_subtree[:10]:
         lines.append(f"  {count:>3}  {subtree}")
 
@@ -86,8 +83,7 @@ def write_reports(
             "annotation_inventory": {
                 "total": annotation_inventory.total,
                 "by_subtree": [
-                    {"subtree": subtree, "count": count}
-                    for subtree, count in annotation_inventory.by_subtree
+                    {"subtree": subtree, "count": count} for subtree, count in annotation_inventory.by_subtree
                 ],
             },
             "top_files_by_category": {

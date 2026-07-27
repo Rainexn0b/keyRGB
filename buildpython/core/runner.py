@@ -5,13 +5,12 @@ import re
 import sys
 import time
 
+from ..utils.log_format import StepLogRecord, format_standard_log
+from ..utils.paths import buildlog_dir
 from . import summary as summary_module
 from .debt_index import write_debt_index
 from .model import Step, StepOutcome
 from .summary_support import debt_terminal
-from ..utils.log_format import StepLogRecord, format_standard_log
-from ..utils.paths import buildlog_dir
-
 
 _USE_COLOR = sys.stdout.isatty()
 _RESET = "\033[0m" if _USE_COLOR else ""
@@ -274,7 +273,7 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
         if not considered:
             return 100
         successes = sum(1 for s in considered if s.status == "success")
-        return int(round(100 * successes / len(considered)))
+        return round(100 * successes / len(considered))
 
     for index, step in enumerate(steps, start=1):
         outcome = run_step(

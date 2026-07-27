@@ -36,6 +36,7 @@ def run_checked(args: list[str], *, cwd: Path, env: dict[str, str] | None = None
         cwd=str(cwd),
         env={**os.environ, **(env or {})},
         text=True,
+        check=False,
     )
     if proc.returncode != 0:
         raise SystemExit(proc.returncode)

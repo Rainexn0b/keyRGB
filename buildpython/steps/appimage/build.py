@@ -17,7 +17,6 @@ from . import (
     write_text,
 )
 
-
 APPIMAGETOOL_URL = "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
 
 
@@ -114,7 +113,7 @@ def build_appimage() -> Path:
 
     write_text(
         appdir / "keyrgb.desktop",
-        "\n".join(
+        "\n".join(  # noqa: FLY002 - desktop entry lines are clearer as an explicit list
             [
                 "[Desktop Entry]",
                 "Type=Application",
@@ -130,7 +129,7 @@ def build_appimage() -> Path:
         ),
     )
 
-    apprun = "\n".join(
+    apprun = "\n".join(  # noqa: FLY002 - shell bootstrap lines are clearer as an explicit list
         [
             "#!/bin/sh",
             "set -eu",

@@ -5,7 +5,6 @@ from pathlib import Path
 
 from .models import HygieneIssue
 
-
 _TEXT_READ_ERRORS = (OSError,)
 
 

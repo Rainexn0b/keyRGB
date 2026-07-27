@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import buildpython.core.runner as runner
+from buildpython.core import runner
 
 
 def test_is_module_available_checks_module_spec(monkeypatch) -> None:

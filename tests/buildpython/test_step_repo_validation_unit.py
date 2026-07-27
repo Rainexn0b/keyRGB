@@ -1,15 +1,17 @@
 from __future__ import annotations
 
-import buildpython.steps.step_repo_validation as step_repo_validation
+from buildpython.steps import step_repo_validation
 
 
-def _write_required_repo_files(tmp_path, *, install_text: str, user_install_text: str = "", user_integration_text: str = "") -> None:
+def _write_required_repo_files(
+    tmp_path, *, install_text: str, user_install_text: str = "", user_integration_text: str = ""
+) -> None:
     (tmp_path / "README.md").write_text("# KeyRGB\n", encoding="utf-8")
     (tmp_path / "LICENSE").write_text("license\n", encoding="utf-8")
     (tmp_path / "requirements.txt").write_text("pytest\n", encoding="utf-8")
     (tmp_path / "install.sh").write_text(install_text, encoding="utf-8")
     (tmp_path / "pyproject.toml").write_text(
-        "[project]\nname = \"keyrgb\"\n\n[project.urls]\nHomepage = \"https://github.com/Rainexn0b/keyRGB\"\n",
+        '[project]\nname = "keyrgb"\n\n[project.urls]\nHomepage = "https://github.com/Rainexn0b/keyRGB"\n',
         encoding="utf-8",
     )
     (tmp_path / "scripts" / "lib").mkdir(parents=True, exist_ok=True)

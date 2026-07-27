@@ -4,7 +4,7 @@ from ...utils.paths import buildlog_dir, repo_root
 from ...utils.subproc import RunResult, python_exe, run
 from .constants import _RAW_JSON_NAME
 from .models import CoverageBaseline
-from .payload import build_coverage_report, _load_coverage_baseline, _load_json_file
+from .payload import _load_coverage_baseline, _load_json_file, build_coverage_report
 from .reporting import _build_stdout, _write_coverage_reports, _write_missing_capture_reports
 from .runtime import (
     _clear_coverage_report_artifacts,
@@ -13,6 +13,12 @@ from .runtime import (
     _has_fresh_pytest_coverage_data,
     pytest_runner_with_optional_coverage as _pytest_runner_with_optional_coverage,
 )
+
+__all__ = [
+    "CoverageBaseline",
+    "coverage_runner",
+    "pytest_runner_with_optional_coverage",
+]
 
 
 def pytest_runner_with_optional_coverage() -> RunResult:

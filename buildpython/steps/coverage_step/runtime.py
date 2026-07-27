@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ..reports import write_json
 from ...utils.paths import buildlog_dir
 from ...utils.subproc import RunResult, python_exe, run
+from ..reports import write_json
 from .constants import (
     _CAPTURE_MARKER_NAME,
     _DATA_FILE_NAME,

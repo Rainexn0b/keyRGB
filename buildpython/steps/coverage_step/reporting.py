@@ -49,10 +49,12 @@ def _build_stdout(report: dict[str, Any], *, reports_path: Path) -> list[str]:
             if not isinstance(path, str):
                 continue
             percent = item.get("percent")
+            expected = item.get("baseline", 0.0)
+            status = "FAIL" if item.get("status") in {"fail", "missing"} else "OK"
             if percent is None:
-                lines.append(f"  {path}: not present in coverage payload")
+                lines.append(f"  {path}: not present in coverage payload [{status}]")
                 continue
-            lines.append(f"  {path}: {float(percent):.2f}%")
+            lines.append(f"  {path}: {float(percent):.2f}% baseline={float(expected):.2f}% [{status}]")
 
     lowest = report.get("lowest_covered_files", [])
     if isinstance(lowest, list) and lowest:
