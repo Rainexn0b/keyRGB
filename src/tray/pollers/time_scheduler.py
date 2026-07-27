@@ -19,6 +19,7 @@ from src.tray.controllers._brightness_layer import apply_layered_brightness_upda
 from src.tray.controllers._lighting_controller_helpers import _log_tray_exception, try_log_event
 from src.tray.controllers.lighting_controller import start_current_effect
 from src.tray.idle_power_state import is_system_forced_off, is_user_forced_off
+from src.tray.pollers import _lifecycle as polling_lifecycle
 
 if TYPE_CHECKING:
     from src.tray.protocols import LightingTrayProtocol
@@ -125,8 +126,9 @@ def _run_scheduler_iteration(tray: LightingTrayProtocol) -> None:
 def _scheduler_loop(
     tray: LightingTrayProtocol,
     *,
-    sleep_fn: Callable[[float], None],
+    sleep_fn: Callable[[float], object],
     now_fn: Callable[[], datetime],
+    shutdown_requested_fn: Callable[[], bool] = lambda: False,
 ) -> None:
     """Main scheduler polling loop.
 
@@ -135,7 +137,7 @@ def _scheduler_loop(
     """
     last_applied_key: str | None = None
 
-    while True:
+    while not shutdown_requested_fn():
         try:
             state = resolve_scheduler_brightness_state(
                 tray.config,
@@ -178,10 +180,21 @@ def _scheduler_loop(
         sleep_fn(60.0)
 
 
-def start_time_scheduler_polling(tray: LightingTrayProtocol) -> None:
+def start_time_scheduler_polling(tray: LightingTrayProtocol) -> threading.Thread:
     """Start the time-of-day brightness scheduler in a daemon thread."""
 
     def run_scheduler() -> None:
-        _scheduler_loop(tray, sleep_fn=time.sleep, now_fn=datetime.now)
+        _scheduler_loop(
+            tray,
+            sleep_fn=lambda seconds: polling_lifecycle.wait_for_shutdown(
+                tray,
+                seconds,
+                sleep_fn=time.sleep,
+            ),
+            now_fn=datetime.now,
+            shutdown_requested_fn=lambda: polling_lifecycle.shutdown_requested(tray),
+        )
 
-    threading.Thread(target=run_scheduler, daemon=True).start()
+    thread = threading.Thread(target=run_scheduler, daemon=True)
+    thread.start()
+    return thread

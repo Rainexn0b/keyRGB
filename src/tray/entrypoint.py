@@ -11,6 +11,7 @@ import signal
 import sys
 
 from .app.application import KeyRGBTray
+from .app.lifecycle import shutdown_tray_runtime_best_effort
 from .startup import (
     acquire_single_instance_or_exit,
     configure_logging,
@@ -29,13 +30,9 @@ _TRAY_ENTRYPOINT_RUNTIME_ERRORS = (
     ValueError,
 )
 
-# Engine cleanup must catch the same recoverable boundary as the normal quit
-# path (``_on_quit_clicked`` in ``_delegates.py``).
-_ENGINE_CLOSE_RECOVERABLE_ERRORS = (AttributeError, OSError, RuntimeError, ValueError)
-
 
 def _shutdown_engine_best_effort(app: object | None) -> None:
-    """Stop the engine and release the USB device before process exit.
+    """Stop runtime producers and release USB devices before process exit.
 
     Without this, the reactive render thread races with libusb teardown on
     Ctrl-C / SIGTERM, causing ``usbi_mutex_destroy`` / ``usbi_mutex_lock``
@@ -50,15 +47,7 @@ def _shutdown_engine_best_effort(app: object | None) -> None:
 
     if app is None:
         return
-    engine = getattr(app, "engine", None)
-    if engine is None:
-        return
-    try:
-        engine_close = getattr(engine, "close", None)
-        if callable(engine_close):
-            engine_close()
-    except _ENGINE_CLOSE_RECOVERABLE_ERRORS:
-        logger.debug("Error during best-effort engine close on shutdown", exc_info=True)
+    shutdown_tray_runtime_best_effort(app)
 
 
 def main() -> None:
@@ -68,14 +57,14 @@ def main() -> None:
         log_startup_diagnostics_if_debug()
         acquire_single_instance_or_exit()
 
-        app = KeyRGBTray()
-
         # Ensure the engine is stopped and the USB device is released on
         # SIGTERM (desktop session logout / systemd stop) as well as Ctrl-C.
         def _signal_shutdown(signum: int, *_args: object) -> None:
             raise SystemExit(128 + signum)
 
         signal.signal(signal.SIGTERM, _signal_shutdown)
+
+        app = KeyRGBTray()
 
         app.run()
 

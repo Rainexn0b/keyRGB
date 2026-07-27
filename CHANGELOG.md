@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.30.5 (2026-07-27)
+
+- Tray/Shutdown: Add cooperative shutdown for all polling threads, joining them before power, secondary-device, and effects-engine teardown; roll back partially started power monitoring and clean up failed tray startup deterministically.
+- Tray/Idle: Close evdev and Wayland idle trackers when the idle-power loop exits, and suppress only evdev's known Python 3.13 `DeprecationWarning` during synchronous close so idle cleanup is warning-free without hiding unrelated warnings.
+- Effects/Reactive: Preserve the last rendered brightness atomically across config-apply restarts, keep NaN values from being promoted to full-scale output by clamp helpers, and report failed effect restarts accurately to hardware recovery.
+- Tray/Settings/Hardware: Evaluate scheduler defaults in local time, restore the established invalid-zone-payload `ValueError` contract, and include tracebacks in secondary-route failure logs.
+- Maintainability/Compatibility: Retain documented extraction facades and monkeypatch seams while expanding regression coverage for runtime lifecycle, compatibility aliases, brightness transitions, and idle-tracker cleanup.
+
 ## 0.30.4 (2026-07-27)
 
 - Build/Lint: Raise the Ruff development dependency floor to `>=0.16` and clear the expanded Ruff 0.16 diagnostics without adding global suppressions.

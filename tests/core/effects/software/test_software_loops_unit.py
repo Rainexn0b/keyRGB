@@ -13,6 +13,12 @@ from types import SimpleNamespace
 import pytest
 
 
+def test_software_clamp_preserves_nan_instead_of_promoting_to_full_scale() -> None:
+    from src.core.effects.software.base import clamp01
+
+    assert math.isnan(clamp01(float("nan")))
+
+
 def test_speed_mapping_has_strong_top_end() -> None:
     from src.core.effects.software.base import pace as _pace
 

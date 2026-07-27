@@ -6,6 +6,8 @@ import time
 from src.core.effects.catalog import resolve_effect_name_for_backend
 from src.tray.protocols import read_idle_power_state_float_field
 
+from . import _lifecycle as polling_lifecycle
+
 _ANIMATED_ICON_EFFECTS = frozenset(
     {
         "rainbow",
@@ -111,19 +113,20 @@ def _resume_icon_holdoff_active(tray, *, now_monotonic: float) -> bool:
     return 0.0 <= elapsed < _ICON_RESUME_HOLDOFF_S
 
 
-def start_icon_color_polling(tray) -> None:
+def start_icon_color_polling(tray) -> threading.Thread:
     """Update tray icon color periodically for dynamic effects."""
 
     def poll_icon_color():
         last_sig = None
         last_error_at = 0.0
-        while True:
+        while not polling_lifecycle.shutdown_requested(tray):
             try:
                 now = time.monotonic()
                 sig = _compute_icon_sig(tray)
                 if _resume_icon_holdoff_active(tray, now_monotonic=now):
                     last_sig = sig
-                    time.sleep(0.8)
+                    if polling_lifecycle.wait_for_shutdown(tray, 0.8, sleep_fn=time.sleep):
+                        return
                     continue
                 if _should_update_icon(sig, last_sig):
                     try:
@@ -140,6 +143,9 @@ def start_icon_color_polling(tray) -> None:
                     except (OSError, RuntimeError, ValueError):
                         return
 
-            time.sleep(0.8)
+            if polling_lifecycle.wait_for_shutdown(tray, 0.8, sleep_fn=time.sleep):
+                return
 
-    threading.Thread(target=poll_icon_color, daemon=True).start()
+    thread = threading.Thread(target=poll_icon_color, daemon=True)
+    thread.start()
+    return thread

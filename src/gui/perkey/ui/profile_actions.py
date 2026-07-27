@@ -115,8 +115,6 @@ def keymap_cells_for(*args, **kwargs):
 
 
 def _save_current_profile_for_guard(editor: _PerKeyProfileEditorProtocol) -> None:
-    from ._profile_actions_ui import save_profile_ui
-
     requested = editor._profile_name_var.get()
     if requested != editor.profile_name:
         editor._profile_name_var.set(editor.profile_name)
@@ -229,3 +227,17 @@ def reset_layout_defaults_ui(editor: _PerKeyProfileEditorProtocol) -> None:
     editor.overlay_controls.sync_vars_from_scope()
     editor.canvas.redraw()
     set_status(editor, layout_defaults_reset(_layout_labels().get(resolved_layout, resolved_layout.upper())))
+
+
+# Stable facade for the profile UI actions extracted in v0.30.2.
+from ._profile_actions_ui import (  # noqa: F401
+    KEEP_CURRENT_PROFILE_LABEL,
+    activate_profile_ui,
+    delete_profile_ui,
+    new_profile_ui,
+    power_source_profile_options,
+    save_power_source_profile_policy_ui,
+    save_profile_ui,
+    set_default_profile_ui,
+    sync_power_source_profile_policy_controls,
+)

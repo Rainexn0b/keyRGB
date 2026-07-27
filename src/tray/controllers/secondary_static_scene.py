@@ -95,7 +95,12 @@ def _forced_off(tray: object) -> bool:
 
 
 def _log_route_failure(tray: object, route: SecondaryDeviceRoute, exc: Exception) -> None:
-    logger.warning("Failed to apply static secondary route %s: %s", route.state_key, exc)
+    logger.warning(
+        "Failed to apply static secondary route %s: %s",
+        route.state_key,
+        exc,
+        exc_info=(type(exc), exc, exc.__traceback__),
+    )
 
 
 def apply_secondary_static_scene(

@@ -16,7 +16,7 @@ def apply_brightness_from_power_policy_impl(
     tray: LightingTrayProtocol,
     brightness: int,
     *,
-    start_current_effect: Callable[[LightingTrayProtocol], None],
+    start_current_effect: Callable[[LightingTrayProtocol], object],
 ) -> None:
     try:
         brightness_int = int(brightness)

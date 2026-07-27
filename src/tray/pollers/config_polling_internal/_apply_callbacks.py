@@ -262,18 +262,7 @@ def _apply_effect(tray: ConfigPollingTrayProtocol, current, *, cause: str) -> No
         brightness=int(current.brightness),
         color=tuple(current.color),
     )
-    # Preserve the last rendered brightness across the restart so the
-    # brightness_guard does not dip the keyboard from its current brightness
-    # down to 0 and back up.  ``engine.stop()`` clears
-    # ``_last_rendered_brightness`` (correct for idle-wake ramps where the
-    # keyboard was off), but on a config-apply restart the keyboard is already
-    # displaying at the target brightness — the guard's None→0 behaviour
-    # creates a visible flash-dip (40→8→16→24→32→40).
-    engine = getattr(tray, "engine", None)
-    saved_last_rendered = engine._last_rendered_brightness if engine is not None else None
-    tray._start_current_effect()
-    if engine is not None and saved_last_rendered is not None:
-        try:
-            engine._last_rendered_brightness = int(saved_last_rendered)
-        except (AttributeError, TypeError, ValueError):
-            pass
+    # Preserve the brightness baseline inside the engine restart, before the
+    # replacement render thread starts. Restoring it here after the callback
+    # returns races the first frame and can overwrite freshly rendered state.
+    tray._start_current_effect(preserve_last_rendered_brightness=True)

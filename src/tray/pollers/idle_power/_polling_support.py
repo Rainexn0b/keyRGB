@@ -138,7 +138,7 @@ def poll_idle_power_loop(
     get_session_id_fn: Callable[[], str | None],
     run_idle_power_iteration_fn: Callable[..., None],
     now_monotonic_fn: Callable[[], float],
-    sleep_fn: Callable[[float], None],
+    sleep_fn: Callable[[float], object],
     ensure_idle_state_fn: Callable[[IdlePowerTrayProtocol], None],
     read_dimmed_state_fn: Callable[[BacklightState], bool | None],
     read_screen_off_state_drm_fn: Callable[[], bool | None],
@@ -156,33 +156,44 @@ def poll_idle_power_loop(
     apply_idle_action_fn: Callable[..., None],
     call_best_effort_fn: Callable[..., bool],
     recover_idle_power_polling_error_fn: Callable[[IdlePowerTrayProtocol, IdlePollLoopState, Exception], None],
+    shutdown_requested_fn: Callable[[], bool] = lambda: False,
 ) -> None:
     loop_state = create_loop_state_fn()
     session_id = get_session_id_fn()
 
-    while True:
-        call_best_effort_fn(
-            run_idle_power_iteration_fn,
-            tray,
-            loop_state=loop_state,
-            idle_timeout_s=float(idle_timeout_s),
-            session_id=session_id,
-            now_monotonic_fn=now_monotonic_fn,
-            ensure_idle_state_fn=ensure_idle_state_fn,
-            read_dimmed_state_fn=read_dimmed_state_fn,
-            read_screen_off_state_drm_fn=read_screen_off_state_drm_fn,
-            debounce_dim_and_screen_off_fn=debounce_dim_and_screen_off_fn,
-            read_logind_idle_seconds_fn=read_logind_idle_seconds_fn,
-            read_desktop_dim_timeout_fn=read_desktop_dim_timeout_fn,
-            create_wayland_idle_tracker_fn=create_wayland_idle_tracker_fn,
-            read_wayland_idle_fn=read_wayland_idle_fn,
-            create_input_idle_tracker_fn=create_input_idle_tracker_fn,
-            read_input_idle_seconds_fn=read_input_idle_seconds_fn,
-            effective_screen_dim_sync_enabled_fn=effective_screen_dim_sync_enabled_fn,
-            compute_idle_action_fn=compute_idle_action_fn,
-            build_idle_action_key_fn=build_idle_action_key_fn,
-            should_log_idle_action_fn=should_log_idle_action_fn,
-            apply_idle_action_fn=apply_idle_action_fn,
-            on_recoverable=lambda exc: recover_idle_power_polling_error_fn(tray, loop_state, exc),
-        )
-        sleep_fn(0.5)
+    try:
+        while not shutdown_requested_fn():
+            call_best_effort_fn(
+                run_idle_power_iteration_fn,
+                tray,
+                loop_state=loop_state,
+                idle_timeout_s=float(idle_timeout_s),
+                session_id=session_id,
+                now_monotonic_fn=now_monotonic_fn,
+                ensure_idle_state_fn=ensure_idle_state_fn,
+                read_dimmed_state_fn=read_dimmed_state_fn,
+                read_screen_off_state_drm_fn=read_screen_off_state_drm_fn,
+                debounce_dim_and_screen_off_fn=debounce_dim_and_screen_off_fn,
+                read_logind_idle_seconds_fn=read_logind_idle_seconds_fn,
+                read_desktop_dim_timeout_fn=read_desktop_dim_timeout_fn,
+                create_wayland_idle_tracker_fn=create_wayland_idle_tracker_fn,
+                read_wayland_idle_fn=read_wayland_idle_fn,
+                create_input_idle_tracker_fn=create_input_idle_tracker_fn,
+                read_input_idle_seconds_fn=read_input_idle_seconds_fn,
+                effective_screen_dim_sync_enabled_fn=effective_screen_dim_sync_enabled_fn,
+                compute_idle_action_fn=compute_idle_action_fn,
+                build_idle_action_key_fn=build_idle_action_key_fn,
+                should_log_idle_action_fn=should_log_idle_action_fn,
+                apply_idle_action_fn=apply_idle_action_fn,
+                on_recoverable=lambda exc: recover_idle_power_polling_error_fn(tray, loop_state, exc),
+            )
+            sleep_fn(0.5)
+    finally:
+        for tracker in (loop_state.input_idle_tracker, loop_state.wayland_idle_tracker):
+            close = getattr(tracker, "close", None)
+            if not callable(close):
+                continue
+            try:
+                close()
+            except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+                pass

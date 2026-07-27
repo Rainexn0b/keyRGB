@@ -261,8 +261,7 @@ def _execute_blank_recovery(
             # ``ReactiveRenderState`` inherits the damp window instead of
             # flashing at full pulse intensity on the first post-restart frame.
             _seed_reactive_restore_damp_best_effort(tray)
-            start_current_effect()
-            handled = True
+            handled = bool(start_current_effect())
     except _HARDWARE_POLL_RUNTIME_EXCEPTIONS as exc:
         _log_hardware_polling_error_best_effort(tray, exc)
         return False

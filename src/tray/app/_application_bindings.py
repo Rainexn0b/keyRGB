@@ -226,6 +226,7 @@ def start_tray_runtime(
         power_manager_cls=cast(_PowerManagerFactory, state.power_manager_factory),
         config=state.config,
     )
+    runtime_tray.power_manager = power_manager
     bindings.start_all_polling(runtime_tray, ite_num_rows=state.ite_rows, ite_num_cols=state.ite_cols)
     bindings.maybe_autostart_effect(cast(_AutostartEffectTray, tray))
     return power_manager

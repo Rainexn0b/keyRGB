@@ -7,6 +7,7 @@ core computations produce non-trivial overlays.
 
 from __future__ import annotations
 
+import math
 from types import SimpleNamespace
 
 
@@ -22,6 +23,12 @@ class TestRippleWeight:
 
         w = _ripple_weight(d=3, radius=3.0, intensity=0.8, band=1.35)
         assert w > 0.0
+
+
+def test_reactive_clamp_preserves_nan_instead_of_promoting_to_full_scale() -> None:
+    from src.core.effects.reactive.render import clamp01
+
+    assert math.isnan(clamp01(float("nan")))
 
 
 class TestRippleRadius:

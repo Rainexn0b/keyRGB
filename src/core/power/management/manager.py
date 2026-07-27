@@ -58,6 +58,9 @@ start_sysfs_lid_monitoring = _manager_runtime_deps.start_sysfs_lid_monitoring
 get_active_perkey_profile = perkey_profiles.get_active_profile
 list_perkey_profiles = perkey_profiles.list_profiles
 
+# Stable test/monkeypatch seam retained from the battery-saver extraction.
+_DEFAULT_POWER_SOURCE_POLL_INTERVAL_S = _battery_saver._DEFAULT_POWER_SOURCE_POLL_INTERVAL_S
+
 
 def activate_perkey_profile(tray: object, profile_name: str) -> None:
     profile_runtime_activation.activate_perkey_profile_runtime(

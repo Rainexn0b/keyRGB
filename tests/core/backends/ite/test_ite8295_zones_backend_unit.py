@@ -51,6 +51,11 @@ def test_protocol_builds_expected_turn_off_report() -> None:
     assert report[20:] == bytes(protocol.PACKET_SIZE - 20)
 
 
+def test_protocol_invalid_zone_payload_preserves_value_error_contract() -> None:
+    with pytest.raises(ValueError, match="4-item sequence"):
+        protocol.normalize_zone_colors(object())
+
+
 def test_device_set_color_sends_single_static_report() -> None:
     sent: list[bytes] = []
     device = Ite8295ZonesKeyboardDevice(sent.append)

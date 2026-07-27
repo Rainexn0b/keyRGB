@@ -67,7 +67,7 @@ def turn_on_impl(
     tray: LightingTrayProtocol,
     *,
     try_log_event: Callable[..., None],
-    start_current_effect: Callable[..., None],
+    start_current_effect: Callable[..., object],
 ) -> None:
     try_log_event(tray, "menu", "turn_on")
     _set_user_forced_off(tray, False)
@@ -115,7 +115,7 @@ def power_restore_impl(
     safe_str_attr_fn: Callable[..., str],
     is_software_effect_fn: Callable[[str], bool],
     is_reactive_effect_fn: Callable[[str], bool],
-    start_current_effect: Callable[..., None],
+    start_current_effect: Callable[..., object],
 ) -> None:
     resume_at = time.monotonic()
     _set_last_resume_at(tray, resume_at)

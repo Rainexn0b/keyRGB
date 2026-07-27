@@ -26,7 +26,7 @@ def apply_layered_brightness_update(
     base_brightness: int | None,
     reactive_brightness: int | None,
     reactive_source_label: str | None = None,
-    start_current_effect: Callable[[LightingTrayProtocol], None],
+    start_current_effect: Callable[[LightingTrayProtocol], object],
 ) -> None:
     if base_brightness is None and reactive_brightness is None:
         return

@@ -20,6 +20,7 @@ from . import _application_bindings as application_bindings
 from . import _application_notifications as application_notifications
 from . import _runtime_deps as app_runtime_deps
 from . import _startup as tray_startup
+from . import lifecycle as app_lifecycle
 from ._application_state import TrayBootstrapState
 from ._delegates import KeyRGBTrayDelegateMixin
 
@@ -120,12 +121,19 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
         bindings = _init_bindings()
         bootstrap_state = application_bindings.build_tray_bootstrap_state(bindings=bindings)
         self._apply_bootstrap_state(bootstrap_state)
-        self.power_manager = application_bindings.start_tray_runtime(
-            self,
-            state=bootstrap_state,
-            bindings=bindings,
-            notify_permission_issue=self._notify_permission_issue,
-        )
+        self.power_manager = None
+        runtime_started = False
+        try:
+            self.power_manager = application_bindings.start_tray_runtime(
+                self,
+                state=bootstrap_state,
+                bindings=bindings,
+                notify_permission_issue=self._notify_permission_issue,
+            )
+            runtime_started = True
+        finally:
+            if not runtime_started:
+                app_lifecycle.shutdown_tray_runtime_best_effort(self)
 
     def _apply_bootstrap_state(self, state: TrayBootstrapState) -> None:
         state.apply_to(self)

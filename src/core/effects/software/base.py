@@ -97,7 +97,11 @@ def _mark_disconnected_device_unavailable(engine: EffectsEngine) -> None:
 
 
 def clamp01(x: float) -> float:
-    return 0.0 if x <= 0.0 else (min(1.0, x))
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    return x
 
 
 def pace(engine: EffectsEngine, *, min_factor: float = 0.8, max_factor: float = 2.2) -> float:

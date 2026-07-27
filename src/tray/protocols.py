@@ -121,7 +121,7 @@ class _RefreshTrayUi(_RefreshUi, Protocol):
 
 
 class _StartsCurrentEffect(Protocol):
-    def _start_current_effect(self, **kwargs: object) -> None: ...
+    def _start_current_effect(self, **kwargs: object) -> bool | None: ...
 
 
 class _TrayLogging(Protocol):

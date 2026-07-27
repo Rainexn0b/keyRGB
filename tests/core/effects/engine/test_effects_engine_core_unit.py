@@ -24,6 +24,25 @@ def test_stop_recovers_from_malformed_thread_generation_state() -> None:
     assert engine.stop_event.is_set() is False
 
 
+def test_start_effect_restores_config_restart_brightness_before_thread_setup(monkeypatch) -> None:
+    engine = EffectsEngine()
+    engine.current_effect = "reactive_fade"
+    engine._last_rendered_brightness = 40
+    observed: list[int | None] = []
+
+    monkeypatch.setattr(engine, "_ensure_device_available", lambda: True)
+    monkeypatch.setattr(engine, "get_backend_effects", lambda: {})
+    monkeypatch.setattr(
+        engine,
+        "_start_sw_effect",
+        lambda **_kwargs: observed.append(engine._last_rendered_brightness),
+    )
+
+    engine.start_effect("reactive_fade", preserve_last_rendered_brightness=True)
+
+    assert observed == [40]
+
+
 def test_get_backend_effects_returns_empty_dict_and_logs_backend_failures(caplog) -> None:
     class DummyBackend:
         def effects(self):

@@ -150,7 +150,8 @@ def start_current_effect(
     brightness_override: int | None = None,
     fade_in: bool = False,
     fade_in_duration_s: float = 0.25,
-) -> None:
+    preserve_last_rendered_brightness: bool = False,
+) -> bool:
     """Start the currently selected effect.
 
     This is best-effort and must never crash the tray.
@@ -185,7 +186,7 @@ def start_current_effect(
                 fade_in_duration_s=fade_in_duration_s,
                 restore_secondary_targets=start_plan.restore_secondary_targets,
             )
-            return
+            return True
 
         if start_plan.is_none_mode:
             _run_static_effect_mode(
@@ -197,7 +198,7 @@ def start_current_effect(
                 fade_in_duration_s=fade_in_duration_s,
                 restore_secondary_targets=start_plan.restore_secondary_targets,
             )
-            return
+            return True
 
         # Prepare per-key state in case the effect is a software effect that needs it.
         # This handles cases like 'reactive_ripple' running on startup where the menu logic hasn't run.
@@ -217,16 +218,29 @@ def start_current_effect(
             target_brightness=target_brightness,
         )
 
-        tray.engine.start_effect(
-            effect,
-            speed=tray.config.get_effect_speed(effect),
-            brightness=start_brightness,
-            color=tray.config.color,
-            reactive_color=getattr(tray.config, "reactive_color", None),
-            reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
-            reactive_visual_mode=reactive_visual_mode,
-            direction=getattr(tray.config, "direction", None),
-        )
+        if preserve_last_rendered_brightness:
+            tray.engine.start_effect(
+                effect,
+                speed=tray.config.get_effect_speed(effect),
+                brightness=start_brightness,
+                color=tray.config.color,
+                reactive_color=getattr(tray.config, "reactive_color", None),
+                reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
+                reactive_visual_mode=reactive_visual_mode,
+                direction=getattr(tray.config, "direction", None),
+                preserve_last_rendered_brightness=True,
+            )
+        else:
+            tray.engine.start_effect(
+                effect,
+                speed=tray.config.get_effect_speed(effect),
+                brightness=start_brightness,
+                color=tray.config.color,
+                reactive_color=getattr(tray.config, "reactive_color", None),
+                reactive_use_manual_color=bool(getattr(tray.config, "reactive_use_manual_color", False)),
+                reactive_visual_mode=reactive_visual_mode,
+                direction=getattr(tray.config, "direction", None),
+            )
         tray.is_off = False
 
         # Sync the global speed to the per-effect speed that was just started
@@ -249,6 +263,7 @@ def start_current_effect(
             restore_secondary_software_targets(tray)
         if start_plan.is_loop_effect and not start_plan.restore_secondary_targets or not start_plan.is_loop_effect:
             secondary_static_scene.apply_secondary_static_scene(tray)
+        return True
     except _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: lighting startup crosses device I/O, backend callbacks, tray actions; must not fail tray runtime for recoverable failures
         lighting_start_effect_boundary.handle_start_current_effect_exception(
             tray,
@@ -257,6 +272,7 @@ def start_current_effect(
             is_permission_denied_fn=core_exceptions.is_permission_denied,
             log_boundary_exception_fn=_log_boundary_exception,
         )
+        return False
 
 
 def apply_power_source_perkey_profile_transition(tray: LightingTrayProtocol) -> bool:

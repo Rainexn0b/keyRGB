@@ -356,6 +356,24 @@ class TestStartCurrentEffect:
         assert mock_tray.engine.reactive_brightness == 50
         assert mock_tray.engine.per_key_brightness == 50
 
+    def test_start_current_effect_forwards_config_restart_brightness_preservation(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "rainbow_wave"
+        mock_tray.config.brightness = 40
+        mock_tray.config.perkey_brightness = 40
+        mock_tray.config.per_key_colors = {}
+        mock_tray.config.get_effect_speed.return_value = 3
+        mock_tray.config.color = (0, 255, 0)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
+        mock_tray.config.reactive_visual_mode = "subtle"
+
+        start_current_effect(mock_tray, preserve_last_rendered_brightness=True)
+
+        assert mock_tray.engine.start_effect.call_args.kwargs["preserve_last_rendered_brightness"] is True
+
     def test_start_current_effect_idle_restore_loop_effect_uses_legacy_non_hardware_fade_without_follow_global(self):
         from src.tray.controllers.lighting_controller import start_current_effect
         from src.tray.protocols import set_idle_power_state_field
@@ -653,11 +671,25 @@ class TestStartCurrentEffect:
         mock_tray.config.effect = "wave"
         mock_tray.engine.start_effect = MagicMock(side_effect=RuntimeError("hardware error"))
 
-        start_current_effect(mock_tray)
+        result = start_current_effect(mock_tray)
 
+        assert result is False
         mock_tray._log_exception.assert_called_once()
         assert mock_tray._log_exception.call_args.args[0] == "Error starting effect: %s"
         assert str(mock_tray._log_exception.call_args.args[1]) == "hardware error"
+
+    def test_start_current_effect_reports_success(self):
+        from src.tray.controllers.lighting_controller import start_current_effect
+
+        mock_tray = MagicMock()
+        mock_tray.config.effect = "breathe"
+        mock_tray.config.brightness = 40
+        mock_tray.config.get_effect_speed.return_value = 3
+        mock_tray.config.color = (0, 255, 0)
+        mock_tray.config.reactive_color = None
+        mock_tray.config.reactive_use_manual_color = False
+
+        assert start_current_effect(mock_tray) is True
 
     def test_start_current_effect_propagates_unexpected_startup_errors(self):
         from src.tray.controllers.lighting_controller import start_current_effect

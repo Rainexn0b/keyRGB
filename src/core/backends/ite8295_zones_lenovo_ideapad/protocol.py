@@ -95,7 +95,9 @@ def normalize_zone_colors(colors: object, *, fallback: Color = (255, 255, 255)) 
     if isinstance(colors, tuple) and len(colors) == 3:
         return uniform_zone_colors(colors)
     if not isinstance(colors, (list, tuple)):
-        raise TypeError("zone colors must be a 4-item sequence or a single RGB tuple")
+        # Preserve the established protocol API: callers historically handled
+        # all invalid zone payloads through ValueError.
+        raise ValueError("zone colors must be a 4-item sequence or a single RGB tuple")  # noqa: TRY004
     if len(colors) != NUM_ZONES:
         raise ValueError(f"zone colors must contain exactly {NUM_ZONES} entries")
     return tuple(_coerce_rgb(color) for color in colors)

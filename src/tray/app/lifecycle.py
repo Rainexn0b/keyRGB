@@ -7,7 +7,9 @@ if optional features fail.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Protocol, TypeVar
+import logging
+import threading
+from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
 from ..pollers.config_polling import start_config_polling
 from ..pollers.hardware_polling import start_hardware_polling
@@ -16,12 +18,18 @@ from ..pollers.idle_power import start_idle_power_polling
 from ..pollers.time_scheduler import start_time_scheduler_polling
 from ..protocols import ConfigPollingTrayProtocol, IdlePowerTrayProtocol, LightingTrayProtocol
 
+logger = logging.getLogger(__name__)
+
+_SHUTDOWN_RECOVERABLE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
 if TYPE_CHECKING:
     from src.core.config import Config
 
 
 class _MonitoringPowerManager(Protocol):
     def start_monitoring(self) -> None: ...
+
+    def stop_monitoring(self) -> None: ...
 
 
 _PowerManagerT_co = TypeVar("_PowerManagerT_co", bound=_MonitoringPowerManager, covariant=True)
@@ -51,12 +59,14 @@ class _LifecyclePollingTray(
 ):
     """Combined tray surface required during lifecycle startup."""
 
+    power_manager: object | None
+
 
 class _AutostartEffectTray(Protocol):
     config: object
     is_off: bool
 
-    def _start_current_effect(self, **kwargs: object) -> None: ...
+    def _start_current_effect(self, **kwargs: object) -> bool | None: ...
 
 
 def start_power_monitoring(
@@ -71,18 +81,100 @@ def start_power_monitoring(
     """
 
     power_manager = power_manager_cls(tray, config=config)
-    power_manager.start_monitoring()
+    monitoring_started = False
+    try:
+        power_manager.start_monitoring()
+        monitoring_started = True
+    finally:
+        if not monitoring_started:
+            try:
+                power_manager.stop_monitoring()
+            except _SHUTDOWN_RECOVERABLE_ERRORS:
+                logger.debug("Failed to roll back partial power monitoring startup", exc_info=True)
     return power_manager
+
+
+def _record_polling_thread(tray: object, thread: object | None) -> None:
+    if thread is None:
+        return
+    threads = vars(tray).get("_polling_threads")
+    if not isinstance(threads, list):
+        threads = []
+        vars(tray)["_polling_threads"] = threads
+    threads.append(thread)
 
 
 def start_all_polling(tray: _LifecyclePollingTray, *, ite_num_rows: int, ite_num_cols: int) -> None:
     """Start all pollers used by the tray UI."""
 
-    start_hardware_polling(tray)
-    start_config_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols)
-    start_icon_color_polling(tray)
-    start_idle_power_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols)
-    start_time_scheduler_polling(tray)
+    shutdown_event = threading.Event()
+    vars(tray)["_polling_shutdown_event"] = shutdown_event
+    vars(tray)["_polling_threads"] = []
+
+    _record_polling_thread(tray, start_hardware_polling(tray))
+    _record_polling_thread(tray, start_config_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols))
+    _record_polling_thread(tray, start_icon_color_polling(tray))
+    _record_polling_thread(
+        tray,
+        start_idle_power_polling(tray, ite_num_rows=ite_num_rows, ite_num_cols=ite_num_cols),
+    )
+    _record_polling_thread(tray, start_time_scheduler_polling(tray))
+
+
+def stop_all_polling(tray: object, *, join_timeout_s: float = 2.0) -> None:
+    """Signal and join every poller before device teardown begins."""
+
+    event = vars(tray).get("_polling_shutdown_event")
+    set_event = getattr(event, "set", None)
+    if callable(set_event):
+        set_event()
+
+    threads = vars(tray).get("_polling_threads")
+    if not isinstance(threads, list):
+        return
+    for thread in tuple(threads):
+        join = getattr(thread, "join", None)
+        if not callable(join):
+            continue
+        try:
+            join(timeout=max(0.0, float(join_timeout_s)))
+        except (RuntimeError, TypeError):
+            logger.debug("Failed to join tray polling thread during shutdown", exc_info=True)
+    threads.clear()
+
+
+def shutdown_tray_runtime_best_effort(tray: object) -> None:
+    """Quiesce runtime producers and release devices in safe order."""
+
+    try:
+        stop_all_polling(tray)
+    except _SHUTDOWN_RECOVERABLE_ERRORS:
+        logger.debug("Failed to stop tray pollers during shutdown", exc_info=True)
+
+    power_manager = getattr(tray, "power_manager", None)
+    stop_monitoring = getattr(power_manager, "stop_monitoring", None)
+    if callable(stop_monitoring):
+        try:
+            stop_monitoring()
+        except _SHUTDOWN_RECOVERABLE_ERRORS:
+            logger.debug("Failed to stop power monitoring during shutdown", exc_info=True)
+
+    try:
+        from src.tray.controllers.software_target_controller import close_secondary_software_target_cache
+
+        close_secondary_software_target_cache(cast(Any, tray))
+    except _SHUTDOWN_RECOVERABLE_ERRORS:
+        logger.debug("Failed to close secondary target cache during shutdown", exc_info=True)
+
+    engine = getattr(tray, "engine", None)
+    engine_close = getattr(engine, "close", None)
+    if not callable(engine_close):
+        engine_close = getattr(engine, "stop", None)
+    if callable(engine_close):
+        try:
+            engine_close()
+        except _SHUTDOWN_RECOVERABLE_ERRORS:
+            logger.debug("Failed to close effects engine during shutdown", exc_info=True)
 
 
 def maybe_autostart_effect(tray: _AutostartEffectTray) -> None:

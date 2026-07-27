@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from types import SimpleNamespace
 
 from src.core.secondary_device_routes import (
@@ -191,6 +192,32 @@ def test_static_scene_applies_enabled_and_disabled_profile_areas_and_closes_devi
     assert ("logo", "turn_off", None) in calls
     assert calls.count(("mouse", "close", None)) == 1
     assert calls.count(("logo", "close", None)) == 1
+
+
+def test_static_scene_route_failure_logs_traceback(caplog) -> None:
+    route = _route("mouse")
+    tray = SimpleNamespace(config=SimpleNamespace(), _active_secondary_lighting={"areas": {}})
+
+    class FailingDevice:
+        def turn_off(self) -> None:
+            raise RuntimeError("route failure")
+
+        def close(self) -> None:
+            return None
+
+    with caplog.at_level(logging.WARNING, logger="src.tray.controllers.secondary_static_scene"):
+        assert (
+            apply_secondary_static_scene(
+                tray,
+                effective_routes_fn=lambda: (_effective(route),),
+                acquire_device_fn=lambda _route: FailingDevice(),
+            )
+            is False
+        )
+
+    record = caplog.records[-1]
+    assert record.exc_info is not None
+    assert isinstance(record.exc_info[1], RuntimeError)
 
 
 def test_explicit_empty_static_scene_turns_off_all_available_profile_routes() -> None:

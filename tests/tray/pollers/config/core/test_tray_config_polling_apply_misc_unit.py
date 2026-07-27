@@ -308,22 +308,13 @@ def test_apply_from_config_once_other_effect_starts_current_effect() -> None:
     tray._start_current_effect.assert_called_once()
 
 
-def test_apply_effect_preserves_last_rendered_brightness_across_restart() -> None:
+def test_apply_effect_requests_atomic_brightness_preservation() -> None:
     """The brightness_guard dips the keyboard (40→8→16→24→32→40) if
     ``_last_rendered_brightness`` is cleared to None by ``engine.stop()``
     during a config-apply restart.  This test verifies the value is preserved.
     """
 
     tray = _mk_tray_base(effect="wave", brightness=40)
-    tray.engine._last_rendered_brightness = 40
-
-    # Simulate engine.stop() clearing _last_rendered_brightness inside
-    # _start_current_effect (as the real engine does on stop).
-    def _simulate_restart_clearing_state() -> None:
-        tray.engine._last_rendered_brightness = None
-
-    tray._start_current_effect.side_effect = _simulate_restart_clearing_state
-
     _apply_from_config_once(
         tray,
         ite_num_rows=6,
@@ -333,9 +324,7 @@ def test_apply_effect_preserves_last_rendered_brightness_across_restart() -> Non
         last_apply_warn_at=0.0,
     )
 
-    tray._start_current_effect.assert_called_once()
-    # The value must be restored so the brightness_guard doesn't ramp from 0.
-    assert tray.engine._last_rendered_brightness == 40
+    tray._start_current_effect.assert_called_once_with(preserve_last_rendered_brightness=True)
 
 
 def test_apply_from_config_once_logs_recoverable_apply_error() -> None:

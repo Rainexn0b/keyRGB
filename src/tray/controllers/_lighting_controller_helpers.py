@@ -287,3 +287,11 @@ def sync_reactive_effect_brightness_state(
             f"Failed to enter {source} reactive engine update boundary: %s",
             exc,
         )
+
+
+# Compatibility facade retained for callers and monkeypatch seams documented
+# when these implementations moved to ``_lighting_mode_apply``.
+from src.tray.controllers._lighting_mode_apply import (  # noqa: F401
+    apply_perkey_mode,
+    apply_uniform_none_mode,
+)

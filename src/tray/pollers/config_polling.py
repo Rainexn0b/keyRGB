@@ -9,6 +9,7 @@ from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.utils.exceptions import is_device_disconnected
 from src.tray.protocols import ConfigPollingTrayProtocol
 
+from . import _lifecycle as polling_lifecycle
 from .config_polling_internal.core import ConfigApplyState
 from .config_polling_internal.core import apply_from_config_once as _apply_from_config_once_impl
 from .config_polling_internal.core import (
@@ -66,7 +67,12 @@ def _apply_from_config_once(
     )
 
 
-def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, ite_num_cols: int) -> None:
+def start_config_polling(
+    tray: ConfigPollingTrayProtocol,
+    *,
+    ite_num_rows: int,
+    ite_num_cols: int,
+) -> threading.Thread:
     """Poll config file for external changes and apply them."""
 
     config_path = Path(tray.config.CONFIG_FILE)
@@ -143,7 +149,7 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
             throttle_s=30.0,
         )
 
-        while True:
+        while not polling_lifecycle.shutdown_requested(tray):
             try:
                 mtime = config_path.stat().st_mtime
             except FileNotFoundError:
@@ -155,6 +161,8 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
                 # without any content change (e.g., redundant saves).
                 digest = _file_digest(config_path) if mtime is not None else None
                 if digest is not None and digest == last_digest:
+                    if polling_lifecycle.wait_for_shutdown(tray, 0.1, sleep_fn=time.sleep):
+                        return
                     continue
                 last_digest = digest
                 reload_and_apply_config(
@@ -162,6 +170,9 @@ def start_config_polling(tray: ConfigPollingTrayProtocol, *, ite_num_rows: int, 
                     error_message="Error reloading config: %s",
                 )
 
-            time.sleep(0.1)
+            if polling_lifecycle.wait_for_shutdown(tray, 0.1, sleep_fn=time.sleep):
+                return
 
-    threading.Thread(target=poll_config, daemon=True).start()
+    thread = threading.Thread(target=poll_config, daemon=True)
+    thread.start()
+    return thread

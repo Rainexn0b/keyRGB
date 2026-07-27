@@ -53,7 +53,7 @@ class _EffectSelectionTrayProtocol(LightingTrayProtocol, Protocol):
     backend: object | None
     backend_caps: _BackendCapsProtocol | None
 
-    def _start_current_effect(self, **kwargs: object) -> None: ...
+    def _start_current_effect(self, **kwargs: object) -> bool | None: ...
 
 
 class _ProfilesApi(Protocol):

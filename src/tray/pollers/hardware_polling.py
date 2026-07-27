@@ -18,6 +18,8 @@ from src.tray.pollers.hardware._decisions import (
 )
 from src.tray.protocols import IdlePowerTrayProtocol
 
+from . import _lifecycle as polling_lifecycle
+
 # Bind recovery helpers used by this module (and keep short local names).
 _BRIGHTNESS_COERCION_ERRORS = _recovery._BRIGHTNESS_COERCION_ERRORS
 _HARDWARE_POLL_RECOVERY_EXCEPTIONS = _recovery._HARDWARE_POLL_RECOVERY_EXCEPTIONS
@@ -30,6 +32,15 @@ _recover_stable_zero_brightness_best_effort = _recovery._recover_stable_zero_bri
 _refresh_ui_without_icon_animation = _recovery._refresh_ui_without_icon_animation
 _reset_stable_zero_recovery_attempt_count = _recovery.reset_stable_zero_recovery_attempt_count
 _run_recoverable_hardware_poll_boundary = _recovery._run_recoverable_hardware_poll_boundary
+
+# Compatibility facade for the pre-extraction recovery import and monkeypatch
+# paths documented in v0.30.2.
+_HARDWARE_POLL_RUNTIME_EXCEPTIONS = _recovery._HARDWARE_POLL_RUNTIME_EXCEPTIONS
+_configured_brightness_intent = _recovery._configured_brightness_intent
+_execute_blank_recovery = _recovery._execute_blank_recovery
+_power_source_blank_recovery_eligible = _recovery._power_source_blank_recovery_eligible
+_power_source_transition_at = _recovery._power_source_transition_at
+_resolve_tray_callback = _recovery._resolve_tray_callback
 
 # ---------------------------------------------------------------------------
 # Polled-state application (brightness / off transitions)
@@ -201,7 +212,7 @@ def _handle_hardware_polling_exception(tray: IdlePowerTrayProtocol, exc: Excepti
     return float(last_error_at)
 
 
-def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
+def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
     """Poll keyboard hardware state to detect physical button changes."""
 
     def poll_hardware():
@@ -217,7 +228,7 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
                 last_error_at=last_error_at,
             )
 
-        while True:
+        while not polling_lifecycle.shutdown_requested(tray):
             polled_state = _run_recoverable_hardware_poll_boundary(
                 lambda lb=last_brightness, lo=last_off_state: _poll_hardware_once(
                     tray,
@@ -229,6 +240,13 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> None:
             if polled_state is not None:
                 last_brightness, last_off_state = polled_state
 
-            time.sleep(_hardware_poll_interval_s(tray, now=time.monotonic()))
+            if polling_lifecycle.wait_for_shutdown(
+                tray,
+                _hardware_poll_interval_s(tray, now=time.monotonic()),
+                sleep_fn=time.sleep,
+            ):
+                return
 
-    threading.Thread(target=poll_hardware, daemon=True).start()
+    thread = threading.Thread(target=poll_hardware, daemon=True)
+    thread.start()
+    return thread

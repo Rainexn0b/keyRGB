@@ -235,6 +235,26 @@ def test_execute_blank_recovery_returns_false_when_no_callback_handles() -> None
     assert tray.is_off is True
 
 
+def test_execute_blank_recovery_does_not_treat_void_restart_as_success() -> None:
+    tray = _make_recovery_tray(is_off=True)
+    tray._apply_power_source_perkey_profile_transition = lambda: False
+    tray._start_current_effect = lambda: None
+    tray._refresh_ui = lambda **_kw: None
+    tray._log_event = lambda *_a, **_kw: None
+
+    result = _execute_blank_recovery(
+        tray,
+        current_brightness=25,
+        now=101.0,
+        recovery_stamp_attr="_last_power_source_blank_recovery_at",
+        recovery_stamp_state="last_power_source_blank_recovery_at",
+        log_action="power_source_blank_recover",
+    )
+
+    assert result is False
+    assert tray.is_off is True
+
+
 def test_execute_blank_recovery_swallows_recoverable_exception_and_returns_false() -> None:
     """An OSError during apply_transition is logged best-effort and recovery aborts."""
 
@@ -711,7 +731,7 @@ def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None
 
     start_calls: list[bool] = []
     tray._apply_power_source_perkey_profile_transition = lambda: False  # not handled
-    tray._start_current_effect = lambda: start_calls.append(True)
+    tray._start_current_effect = lambda: (start_calls.append(True), True)[1]
     tray._refresh_ui = lambda **_kw: None
     tray._log_event = lambda *_a, **_kw: None
 

@@ -33,8 +33,8 @@ class KeyRGBTrayDelegateMixin:
             self._update_icon()
         self._update_menu()
 
-    def _start_current_effect(self, **kwargs):
-        _application_module().start_current_effect(self, **kwargs)
+    def _start_current_effect(self, **kwargs) -> bool:
+        return bool(_application_module().start_current_effect(self, **kwargs))
 
     def _apply_power_source_perkey_profile_transition(self) -> bool:
         return bool(_application_module().apply_power_source_perkey_profile_transition(self))
@@ -103,15 +103,9 @@ class KeyRGBTrayDelegateMixin:
         _application_module().callbacks.on_backend_discovery_clicked()
 
     def _on_quit_clicked(self, icon, _item):
-        self.power_manager.stop_monitoring()
-        _application_module().close_secondary_software_target_cache(self)
-        self.engine.stop()
-        engine_close = getattr(self.engine, "close", None)
-        if callable(engine_close):
-            try:
-                engine_close()
-            except (AttributeError, OSError, RuntimeError, ValueError):
-                pass
+        from .lifecycle import shutdown_tray_runtime_best_effort
+
+        shutdown_tray_runtime_best_effort(self)
         icon.stop()
 
     def turn_off(self):

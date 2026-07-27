@@ -171,6 +171,41 @@ def test_init_handles_profile_migration_engine_fallback_and_permission_cb_failur
     assert calls == {"set_backend": 1, "start_power": 1, "start_polling": 1, "autostart": 1}
 
 
+def test_init_failure_cleans_partially_started_runtime(monkeypatch):
+    calls: list[object] = []
+
+    class FakeConfig:
+        tray_device_context = "keyboard"
+
+    class FakeEngine:
+        pass
+
+    class FakePowerManager:
+        pass
+
+    fake_pm = SimpleNamespace()
+
+    monkeypatch.setattr(app, "load_tray_dependencies", lambda: (FakeEngine, FakeConfig, FakePowerManager))
+    monkeypatch.setattr(app, "select_backend_with_introspection", lambda: (None, None, None))
+    monkeypatch.setattr(app, "select_device_discovery_snapshot", lambda: None)
+    monkeypatch.setattr(app, "load_ite_dimensions", lambda: (6, 21))
+    monkeypatch.setattr(app, "start_power_monitoring", lambda *_a, **_kw: fake_pm)
+    monkeypatch.setattr(app, "start_all_polling", lambda *_a, **_kw: (_ for _ in ()).throw(RuntimeError("polling")))
+    monkeypatch.setattr(
+        app.app_lifecycle,
+        "shutdown_tray_runtime_best_effort",
+        lambda tray: calls.append((tray.engine, tray.power_manager)),
+    )
+
+    with pytest.raises(RuntimeError, match="polling"):
+        app.KeyRGBTray()
+
+    assert len(calls) == 1
+    engine, power_manager = calls[0]
+    assert isinstance(engine, FakeEngine)
+    assert power_manager is fake_pm
+
+
 def test_refresh_ui_calls_instance_update_methods():
     calls = {"icon": 0, "menu": 0}
 
@@ -566,8 +601,7 @@ def test_on_quit_clicked_closes_secondary_cache_stops_power_engine_and_icon(monk
     )
     icon = SimpleNamespace(stop=lambda: calls.__setitem__("icon", calls["icon"] + 1))
     monkeypatch.setattr(
-        app,
-        "close_secondary_software_target_cache",
+        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
         lambda _tray: calls.__setitem__("cache", calls["cache"] + 1),
     )
 

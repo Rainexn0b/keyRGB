@@ -487,6 +487,41 @@ def test_apply_settings_values_materializes_active_night_reactive_brightness(mon
     assert cfg.reactive_brightness == 17
 
 
+def test_internal_settings_apply_converts_default_utc_clock_to_local_time(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from datetime import timezone
+
+    from src.gui.settings import _settings_values as settings_values
+
+    cfg = SimpleNamespace(reactive_brightness=50)
+
+    class FakeUtcNow:
+        def astimezone(self) -> _datetime:
+            return _datetime(2024, 1, 1, 22, 0)
+
+    class FakeDateTime:
+        @staticmethod
+        def now(tz) -> FakeUtcNow:
+            assert tz is timezone.utc
+            return FakeUtcNow()
+
+    monkeypatch.setattr(settings_values, "datetime", FakeDateTime)
+
+    settings_values.apply_settings_values_to_config(
+        config=cfg,
+        values=_settings_values(
+            time_scheduler_enabled=True,
+            day_start_time="08:00",
+            night_start_time="20:00",
+            day_reactive_brightness=42,
+            night_reactive_brightness=17,
+        ),
+    )
+
+    assert cfg.reactive_brightness == 17
+
+
 def test_apply_settings_values_uses_canonical_night_start_default_when_blank() -> None:
     cfg = SimpleNamespace()
 

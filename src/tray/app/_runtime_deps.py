@@ -142,8 +142,8 @@ def power_turn_off(tray: object) -> None:
     _module("src.tray.controllers.lighting_controller").power_turn_off(tray)
 
 
-def start_current_effect(tray: object, **kwargs: object) -> None:
-    _module("src.tray.controllers.lighting_controller").start_current_effect(tray, **kwargs)
+def start_current_effect(tray: object, **kwargs: object) -> bool:
+    return bool(_module("src.tray.controllers.lighting_controller").start_current_effect(tray, **kwargs))
 
 
 def apply_power_source_perkey_profile_transition(tray: object) -> bool:

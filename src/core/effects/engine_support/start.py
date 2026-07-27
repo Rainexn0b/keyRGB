@@ -100,13 +100,21 @@ class _EngineStart:
         reactive_use_manual_color: bool | None = None,
         reactive_visual_mode: str | None = None,
         direction: str | None = None,
+        *,
+        preserve_last_rendered_brightness: bool = False,
     ):
         """Start an effect (hardware or software)."""
 
         prev_color = self.current_color
         prev_effect_was_sw = self.current_effect in self.SW_EFFECTS
+        preserved_last_rendered = self._last_rendered_brightness if preserve_last_rendered_brightness else None
 
         self.stop()
+        if preserved_last_rendered is not None:
+            # Config-apply restarts happen while the keyboard is already lit.
+            # Restore this baseline before the replacement render thread is
+            # created so its first frame cannot observe the stop() sentinel.
+            self._last_rendered_brightness = preserved_last_rendered
         self._ensure_device_available()
 
         requested_effect_name = normalize_effect_name(effect_name)

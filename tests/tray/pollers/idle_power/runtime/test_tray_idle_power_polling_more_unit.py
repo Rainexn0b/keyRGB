@@ -334,8 +334,8 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
     monkeypatch,
 ) -> None:
     import src.tray.pollers.idle_power.polling as ipp
-    from src.tray.controllers._power._transition_constants import SOFT_ON_FADE_DURATION_S
     from src.core.effects.reactive import _render_brightness_support as reactive_support
+    from src.tray.controllers._power._transition_constants import SOFT_ON_FADE_DURATION_S
 
     monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
 
@@ -356,9 +356,7 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
     assert state._reactive_disable_pulse_hw_lift_until == pytest.approx(
         100.0 + max(2.0, float(SOFT_ON_FADE_DURATION_S) + 0.75)
     )
-    assert state._reactive_restore_damp_until == pytest.approx(
-        100.0 + max(4.0, float(SOFT_ON_FADE_DURATION_S) + 2.75)
-    )
+    assert state._reactive_restore_damp_until == pytest.approx(100.0 + max(4.0, float(SOFT_ON_FADE_DURATION_S) + 2.75))
     assert state._reactive_restore_damp_until > state._reactive_disable_pulse_hw_lift_until
     assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING
 
@@ -522,6 +520,9 @@ def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -
     import src.tray.pollers.idle_power.polling as ipp
 
     created = {}
+    input_tracker = SimpleNamespace(closed=False)
+    input_tracker.seconds_since_activity = lambda: None
+    input_tracker.close = lambda: setattr(input_tracker, "closed", True)
 
     def fake_thread(*, target, daemon: bool):
         t = _FakeThread(target=target, daemon=daemon)
@@ -532,6 +533,7 @@ def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -
 
     # Avoid connecting to the real Wayland compositor during unit tests.
     monkeypatch.setattr(ipp, "_create_wayland_idle_tracker", lambda _timeout_ms: None)
+    monkeypatch.setattr(ipp, "_create_input_idle_tracker", lambda: input_tracker)
 
     # Force dimmed True and screen_off False.
     monkeypatch.setattr(ipp, "_read_dimmed_state", lambda _tray: True)
@@ -585,6 +587,7 @@ def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -
     assert applied["n"] == 1
     assert events["n"] == 1
     assert sleep_calls == [0.5]
+    assert input_tracker.closed is True
 
 
 def test_start_idle_power_polling_suppresses_dim_sync_for_asusctl_backend(monkeypatch) -> None:
@@ -751,7 +754,6 @@ def test_start_idle_power_polling_logs_loop_errors_with_module_fallback(monkeypa
         run_calls["count"] += 1
         if run_calls["count"] == 1:
             raise RuntimeError("loop boom")
-        return None
 
     monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
     monkeypatch.setattr(ipp, "run_idle_power_iteration", fake_iteration)
@@ -803,7 +805,6 @@ def test_start_idle_power_polling_propagates_unexpected_logger_failures(monkeypa
         run_calls["count"] += 1
         if run_calls["count"] == 1:
             raise RuntimeError("loop boom")
-        return None
 
     monkeypatch.setattr(ipp.threading, "Thread", fake_thread)
     monkeypatch.setattr(ipp, "run_idle_power_iteration", fake_iteration)

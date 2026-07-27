@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import select
 import time
+import warnings
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -115,7 +116,18 @@ class InputIdleTracker:
             return
         for dev in list(self.devices):
             try:
-                dev.close()
+                # evdev 1.9.3 still calls asyncio.get_event_loop() from its
+                # synchronous close path, which is deprecated when no loop is
+                # installed on Python 3.13.  Keep the workaround scoped to the
+                # exact upstream warning while still closing the descriptor.
+                with warnings.catch_warnings():
+                    warnings.filterwarnings(
+                        "ignore",
+                        message="There is no current event loop",
+                        category=DeprecationWarning,
+                        module=r"evdev\.eventio_async",
+                    )
+                    dev.close()
             except _RECOVERABLE_DEVICE_EXCEPTIONS:
                 pass
         self.devices = None

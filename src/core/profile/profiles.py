@@ -65,6 +65,9 @@ slot_id_for_key_id = resource_layouts.slot_id_for_key_id
 sanitize_layout_slot_overrides = resource_layout_slots.sanitize_layout_slot_overrides
 log_throttled = logging_utils.log_throttled
 
+# Backwards-compatible profile-name constant. Keep this alias until a
+# documented deprecation window has elapsed.
+_DEFAULT_PROFILE = DEFAULT_PROFILE_NAME
 logger = logging.getLogger(__name__)
 
 KeyCell = tuple[int, int]
@@ -73,6 +76,7 @@ KeyCells = tuple[KeyCell, ...]
 
 __all__ = [
     "DEFAULT_PROFILE_NAME",
+    "_DEFAULT_PROFILE",
     "apply_profile_to_config",
     "default_profile_path",
     "delete_profile",

@@ -9,6 +9,7 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from .. import _lifecycle as polling_lifecycle
 from ._polling_support import call_best_effort as _call_best_effort_impl
 from ._polling_support import effective_screen_dim_sync_enabled as _effective_screen_dim_sync_enabled_impl
 from ._polling_support import ensure_idle_state as _ensure_idle_state_impl
@@ -313,7 +314,7 @@ def start_idle_power_polling(
     ite_num_rows: int,
     ite_num_cols: int,
     idle_timeout_s: float = 60.0,
-) -> None:
+) -> threading.Thread:
     """Power-management: sync keyboard lighting with display dimming."""
 
     _ensure_idle_state(tray)
@@ -328,7 +329,11 @@ def start_idle_power_polling(
             get_session_id_fn=_get_session_id,
             run_idle_power_iteration_fn=run_idle_power_iteration,
             now_monotonic_fn=time.monotonic,
-            sleep_fn=time.sleep,
+            sleep_fn=lambda seconds: polling_lifecycle.wait_for_shutdown(
+                tray,
+                seconds,
+                sleep_fn=time.sleep,
+            ),
             ensure_idle_state_fn=_ensure_idle_state,
             read_dimmed_state_fn=_read_dimmed_state,
             read_screen_off_state_drm_fn=_read_screen_off_state_drm,
@@ -346,9 +351,12 @@ def start_idle_power_polling(
             apply_idle_action_fn=_apply_idle_action,
             call_best_effort_fn=_call_best_effort,
             recover_idle_power_polling_error_fn=_recover_idle_power_polling_error,
+            shutdown_requested_fn=lambda: polling_lifecycle.shutdown_requested(tray),
         )
 
-    threading.Thread(target=poll_idle_power, daemon=True).start()
+    thread = threading.Thread(target=poll_idle_power, daemon=True)
+    thread.start()
+    return thread
 
 
 __all__ = [

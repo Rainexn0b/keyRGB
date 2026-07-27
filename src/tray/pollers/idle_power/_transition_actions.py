@@ -18,7 +18,7 @@ _LOOP_EFFECTS = frozenset(REACTIVE_EFFECTS) | frozenset(SW_EFFECTS_SET)
 
 
 class _IdleRestoreStartTray(Protocol):
-    def _start_current_effect(self, **kwargs: object) -> None: ...
+    def _start_current_effect(self, **kwargs: object) -> bool | None: ...
 
 
 def _start_current_effect_or_none(tray: object) -> Callable[..., object] | None:

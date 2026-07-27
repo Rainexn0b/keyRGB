@@ -244,7 +244,9 @@ def apply_settings_values_to_config(
     config.night_base_brightness = max(0, min(50, int(values.night_base_brightness)))
     config.night_reactive_brightness = max(0, min(50, int(values.night_reactive_brightness)))
 
-    clock = datetime.now(timezone.utc) if now is None else now
+    # Scheduler boundaries are local wall-clock values. Start from an aware UTC
+    # timestamp for lint/timezone safety, then convert to the local timezone.
+    clock = datetime.now(timezone.utc).astimezone() if now is None else now
     active_reactive_brightness = settings_scheduler.active_scheduler_reactive_brightness(
         values,
         now=clock,

@@ -19,6 +19,21 @@ def test_start_power_monitoring_constructs_and_starts() -> None:
     pm.start_monitoring.assert_called_once()
 
 
+def test_start_power_monitoring_failure_rolls_back_partial_manager() -> None:
+    import pytest
+
+    from src.tray.app.lifecycle import start_power_monitoring
+
+    pm = MagicMock()
+    pm.start_monitoring.side_effect = RuntimeError("monitor startup")
+    power_manager_cls = MagicMock(return_value=pm)
+
+    with pytest.raises(RuntimeError, match="monitor startup"):
+        start_power_monitoring(MagicMock(), power_manager_cls=power_manager_cls, config=MagicMock())
+
+    pm.stop_monitoring.assert_called_once()
+
+
 def test_start_all_polling_wires_pollers() -> None:
     from src.tray.app.lifecycle import start_all_polling
 
@@ -29,6 +44,7 @@ def test_start_all_polling_wires_pollers() -> None:
         patch("src.tray.app.lifecycle.start_config_polling") as cfg,
         patch("src.tray.app.lifecycle.start_icon_color_polling") as icon,
         patch("src.tray.app.lifecycle.start_idle_power_polling") as idle,
+        patch("src.tray.app.lifecycle.start_time_scheduler_polling") as scheduler,
     ):
         start_all_polling(tray, ite_num_rows=6, ite_num_cols=21)
 
@@ -36,6 +52,31 @@ def test_start_all_polling_wires_pollers() -> None:
     cfg.assert_called_once_with(tray, ite_num_rows=6, ite_num_cols=21)
     icon.assert_called_once_with(tray)
     idle.assert_called_once_with(tray, ite_num_rows=6, ite_num_cols=21)
+    scheduler.assert_called_once_with(tray)
+
+
+def test_shutdown_tray_runtime_stops_producers_before_engine_close(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from src.tray.app import lifecycle
+
+    calls: list[str] = []
+    thread = SimpleNamespace(join=lambda *, timeout: calls.append(f"join:{timeout}"))
+    event = SimpleNamespace(set=lambda: calls.append("pollers:set"))
+    tray = SimpleNamespace(
+        _polling_shutdown_event=event,
+        _polling_threads=[thread],
+        power_manager=SimpleNamespace(stop_monitoring=lambda: calls.append("power:stop")),
+        engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        lambda _tray: calls.append("secondary:close"),
+    )
+
+    lifecycle.shutdown_tray_runtime_best_effort(tray)
+
+    assert calls == ["pollers:set", "join:2.0", "power:stop", "secondary:close", "engine:close"]
 
 
 def test_maybe_autostart_effect_calls_start_when_enabled_and_not_off() -> None:

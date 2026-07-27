@@ -20,7 +20,7 @@ def on_speed_clicked_impl(
     tray: LightingTrayProtocol,
     item: object,
     *,
-    start_current_effect: Callable[[LightingTrayProtocol], None],
+    start_current_effect: Callable[[LightingTrayProtocol], object],
     log_boundary_exception: Callable[[LightingTrayProtocol, str, Exception], None],
 ) -> None:
     speed = lighting_controller_helpers.parse_menu_int(item)
@@ -62,7 +62,7 @@ def on_brightness_clicked_impl(
     tray: LightingTrayProtocol,
     item: object,
     *,
-    start_current_effect: Callable[[LightingTrayProtocol], None],
+    start_current_effect: Callable[[LightingTrayProtocol], object],
 ) -> None:
     brightness = lighting_controller_helpers.parse_menu_int(item)
     if brightness is None:
