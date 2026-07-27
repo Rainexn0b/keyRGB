@@ -6,7 +6,6 @@ import datetime as dt
 import re
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT = ROOT / "pyproject.toml"
 CHANGELOG = ROOT / "CHANGELOG.md"
@@ -56,8 +55,8 @@ def _update_dispatcher_refs(version: str) -> None:
     )
     install_updated = _replace_once(
         install_updated,
-        r'(--ref <git-ref>\s+Git ref for downloading scripts/ from GitHub raw \(default: )v\d+\.\d+\.\d+(\))',
-        rf'\g<1>{tag}\2',
+        r"(--ref <git-ref>\s+Git ref for downloading scripts/ from GitHub raw \(default: )v\d+\.\d+\.\d+(\))",
+        rf"\g<1>{tag}\2",
         file_label="install.sh",
     )
     install_updated = _replace_once(
@@ -79,8 +78,8 @@ def _update_dispatcher_refs(version: str) -> None:
     )
     uninstall_updated = _replace_once(
         uninstall_updated,
-        r'(--ref <git-ref>\s+Git ref for downloading scripts/ from GitHub raw \(default: )v\d+\.\d+\.\d+(\))',
-        rf'\g<1>{tag}\2',
+        r"(--ref <git-ref>\s+Git ref for downloading scripts/ from GitHub raw \(default: )v\d+\.\d+\.\d+(\))",
+        rf"\g<1>{tag}\2",
         file_label="uninstall.sh",
     )
     if uninstall_updated != uninstall_original:
@@ -105,13 +104,11 @@ def _update_changelog(version: str, date_str: str) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Bump KeyRGB version metadata and scaffold changelog release entry"
-    )
+    parser = argparse.ArgumentParser(description="Bump KeyRGB version metadata and scaffold changelog release entry")
     parser.add_argument("version", help="Version in X.Y.Z format")
     parser.add_argument(
         "--date",
-        default=dt.date.today().isoformat(),
+        default=dt.datetime.now(tz=dt.timezone.utc).date().isoformat(),
         help="Release date for changelog heading (default: today, YYYY-MM-DD)",
     )
     return parser.parse_args()

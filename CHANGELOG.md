@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.30.6 (2026-07-27)
+
+- Hardware/Runtime: Add process-wide ownership locking for direct keyboard control, prefer the kernel-backed sysfs backend during automatic selection, and make HID/USB cleanup safe across concurrent transport replacement and failure paths.
+- Tray/Power/Effects: Harden shutdown and restart coordination so power-monitor subprocesses, lid-monitor threads, and effect workers cannot outlive their owners or race with replacement hardware access.
+- GUI/Settings: Keep configuration writes transactional, report partial save failures accurately, and prevent tray-managed settings and editor windows from competing for hardware control.
+- Build/Quality: Strengthen coverage watch-file and maintainability baselines, include file-size analysis in CI and release profiles, improve AppImage subprocess handling, and expand build-runner regression checks.
+- Testing: Extend unit and integration coverage across hardware lifecycle, diagnostics, power monitoring, reactive effects, GUI state, tray routing, and the new hardware-ownership behavior.
+
 ## 0.30.5 (2026-07-27)
 
 - Tray/Shutdown: Add cooperative shutdown for all polling threads, joining them before power, secondary-device, and effects-engine teardown; roll back partially started power monitoring and clean up failed tray startup deterministically.
