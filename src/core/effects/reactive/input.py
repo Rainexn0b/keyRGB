@@ -164,7 +164,7 @@ def try_open_evdev_keyboards() -> EvdevKeyboardDevices | None:
         return None
 
     try:
-        import evdev  # type: ignore
+        import evdev
     except ImportError:
         return None
     evdev_module = cast(_EvdevModuleProtocol, evdev)
@@ -278,7 +278,7 @@ def poll_keypress_slot_id(devices: EvdevKeyboardDevices | None) -> str | None:
         return None
 
     try:
-        import evdev  # type: ignore
+        import evdev
     except ImportError:
         return None
     evdev_module = cast(_EvdevModuleProtocol, evdev)

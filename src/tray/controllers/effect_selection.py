@@ -13,8 +13,8 @@ import logging
 from collections.abc import Mapping
 from typing import Protocol, cast
 
-from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import (
+    SW_EFFECTS_SET as SW_EFFECTS,
     is_backend_hardware_effect,
     is_forced_hardware_effect,
     normalize_effect_name,
@@ -94,7 +94,7 @@ def _load_per_key_colors_from_profile(config) -> dict:
     prof = profiles
     if prof is None:
         try:
-            from src.core.profile import profiles as prof  # type: ignore[no-redef]
+            from src.core.profile import profiles as prof
         except ImportError:
             logger.debug("Profile API unavailable while loading per-key colors", exc_info=True)
             return {}

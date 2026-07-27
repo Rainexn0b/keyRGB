@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime as _datetime
+from datetime import datetime as _datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 import src.core.power.management._manager_helpers as manager_helpers
 from src.core.power.system import PowerMode
 
@@ -69,7 +70,9 @@ def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> Non
         now_mono=123.0,
         get_power_mode_status_fn=MagicMock(return_value=MagicMock(supported=True, mode=PowerMode.BALANCED)),
         get_active_perkey_profile_fn=MagicMock(return_value="gaming"),
-        safe_int_attr_fn=lambda obj, name, default=0: {"brightness": 35, "battery_saver_brightness": 20}.get(name, default),
+        safe_int_attr_fn=lambda obj, name, default=0: {"brightness": 35, "battery_saver_brightness": 20}.get(
+            name, default
+        ),
     )
 
     assert inputs is None
@@ -102,7 +105,7 @@ def test_build_power_source_loop_inputs_composes_night_scheduler_base_with_power
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 22, 24)
+            return _datetime(2024, 1, 1, 22, 24, tzinfo=timezone.utc)
 
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 
@@ -153,7 +156,7 @@ def test_build_power_source_loop_inputs_keeps_power_source_brightness_primary_by
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 12, 0)
+            return _datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 
@@ -212,15 +215,17 @@ def test_apply_power_source_actions_propagates_unexpected_controller_failures() 
         def turn_off(self) -> None:
             raise AssertionError("unexpected turn off bug")
 
-    with patch("src.core.power.management._manager_helpers.logger.exception") as exc:
-        with pytest.raises(AssertionError, match="unexpected turn off bug"):
-            apply_power_source_actions(
-                kb_controller=_Controller(),
-                actions=(TurnOffKeyboard(),),
-                apply_brightness=MagicMock(),
-                activate_power_mode=MagicMock(),
-                activate_perkey_profile=MagicMock(),
-            )
+    with (
+        patch("src.core.power.management._manager_helpers.logger.exception") as exc,
+        pytest.raises(AssertionError, match="unexpected turn off bug"),
+    ):
+        apply_power_source_actions(
+            kb_controller=_Controller(),
+            actions=(TurnOffKeyboard(),),
+            apply_brightness=MagicMock(),
+            activate_power_mode=MagicMock(),
+            activate_perkey_profile=MagicMock(),
+        )
 
     exc.assert_not_called()
 

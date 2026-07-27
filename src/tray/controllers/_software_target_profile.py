@@ -10,8 +10,7 @@ from src.tray.idle_power_state import any_forced_off
 from src.tray.secondary_device_routes import route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry
 
-from . import _software_target_auxiliary as software_target_auxiliary
-from . import secondary_static_scene
+from . import _software_target_auxiliary as software_target_auxiliary, secondary_static_scene
 
 _SecondarySoftwareTargetProtocol: TypeAlias = software_target_auxiliary._SecondarySoftwareTargetProtocol
 _SECONDARY_TARGET_RUNTIME_EXCEPTIONS = software_target_auxiliary._SECONDARY_TARGET_RUNTIME_EXCEPTIONS

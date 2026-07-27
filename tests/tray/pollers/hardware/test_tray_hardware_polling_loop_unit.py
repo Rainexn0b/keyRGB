@@ -25,7 +25,6 @@ def test_apply_polled_state_logs_brightness_change_but_swallows_log_errors(
     monkeypatch,
 ) -> None:
     from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
-
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     def boom(*_a, **_kw):
@@ -97,7 +96,6 @@ def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> N
 
 def test_apply_polled_state_propagates_unexpected_log_event_errors() -> None:
     from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
-
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     tray = make_owner_backed_simple_tray(

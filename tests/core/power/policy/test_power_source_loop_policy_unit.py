@@ -189,8 +189,12 @@ def test_power_source_loop_policy_retries_power_mode_when_active_mode_stays_wron
     policy = PowerSourceLoopPolicy(debounce_seconds=0.0, power_mode_retry_seconds=10.0)
 
     first = policy.update(_inputs(active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
-    too_soon = policy.update(_inputs(now=5.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
-    retried = policy.update(_inputs(now=11.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE))
+    too_soon = policy.update(
+        _inputs(now=5.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE)
+    )
+    retried = policy.update(
+        _inputs(now=11.0, active_power_mode=PowerMode.BALANCED, ac_power_mode=PowerMode.PERFORMANCE)
+    )
 
     assert ActivatePowerMode(PowerMode.PERFORMANCE) in first.actions
     assert not any(isinstance(action, ActivatePowerMode) for action in too_soon.actions)

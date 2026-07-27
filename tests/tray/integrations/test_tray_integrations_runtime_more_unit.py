@@ -1,12 +1,12 @@
 import importlib
 import os
 import sys
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-import src.tray.integrations.runtime as runtime
+from src.tray.integrations import runtime
 
 
 @pytest.fixture(autouse=True)
@@ -94,13 +94,16 @@ def test_install_gtk_scale_factor_log_filter_registers_once(monkeypatch):
     fake_glib = SimpleNamespace(
         LogLevelFlags=SimpleNamespace(LEVEL_CRITICAL=123),
         log_default_handler=lambda *_args: None,
-        log_set_handler=lambda domain, level, handler, user_data: calls.update(log_set_handler=calls["log_set_handler"] + 1)
-        or 99,
+        log_set_handler=lambda domain, level, handler, user_data: (
+            calls.update(log_set_handler=calls["log_set_handler"] + 1) or 99
+        ),
     )
 
     def _fake_import_module(name: str):
         if name == "gi":
-            return SimpleNamespace(require_version=lambda namespace, version: calls["require_version"].append((namespace, version)))
+            return SimpleNamespace(
+                require_version=lambda namespace, version: calls["require_version"].append((namespace, version))
+            )
         if name == "gi.repository.GLib":
             return fake_glib
         raise AssertionError(f"unexpected import: {name}")
@@ -121,13 +124,16 @@ def test_install_appindicator_deprecation_log_filter_registers_once(monkeypatch)
     fake_glib = SimpleNamespace(
         LogLevelFlags=SimpleNamespace(LEVEL_WARNING=16),
         log_default_handler=lambda *_args: None,
-        log_set_handler=lambda domain, level, handler, user_data: calls.update(log_set_handler=calls["log_set_handler"] + 1)
-        or 199,
+        log_set_handler=lambda domain, level, handler, user_data: (
+            calls.update(log_set_handler=calls["log_set_handler"] + 1) or 199
+        ),
     )
 
     def _fake_import_module(name: str):
         if name == "gi":
-            return SimpleNamespace(require_version=lambda namespace, version: calls["require_version"].append((namespace, version)))
+            return SimpleNamespace(
+                require_version=lambda namespace, version: calls["require_version"].append((namespace, version))
+            )
         if name == "gi.repository.GLib":
             return fake_glib
         raise AssertionError(f"unexpected import: {name}")
@@ -332,7 +338,7 @@ def test_get_pystray_explicit_backend_does_not_probe_gi(monkeypatch):
 
     mod, item = runtime.get_pystray()
     assert hasattr(mod, "MenuItem")
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
     assert calls["import"] == 1
     assert any("(explicit)" in m for (m, _a) in calls["log"])
 
@@ -375,7 +381,7 @@ def test_get_pystray_prefers_gtk_when_gi_works(monkeypatch):
     assert calls["import"] == 1
     assert ("pystray backend: %s", ("gtk (auto)",)) in calls["log"]
     assert install_calls == [True]
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
 
 
 def test_get_pystray_prefers_xorg_when_gi_is_unavailable(monkeypatch):
@@ -405,7 +411,7 @@ def test_get_pystray_prefers_xorg_when_gi_is_unavailable(monkeypatch):
     assert os.environ.get("PYSTRAY_BACKEND") == "xorg"
     assert calls["import"] == 1
     assert ("pystray backend: %s", ("xorg (auto)",)) in calls["log"]
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
 
 
 def test_get_pystray_falls_back_to_xorg_when_gtk_import_fails(monkeypatch):
@@ -437,7 +443,7 @@ def test_get_pystray_falls_back_to_xorg_when_gtk_import_fails(monkeypatch):
         mod, item = runtime.get_pystray()
         assert calls["import"] == 2
         assert os.environ.get("PYSTRAY_BACKEND") == "xorg"
-        assert item is getattr(mod, "MenuItem")
+        assert item is mod.MenuItem
         assert sys.modules.get("pystray") is not sentinel_partial
     finally:
         if previous is not None:
@@ -478,7 +484,7 @@ def test_get_pystray_falls_back_to_appindicator_when_gtk_and_xorg_import_fail(mo
         mod, item = runtime.get_pystray()
         assert calls["import"] == 3
         assert os.environ.get("PYSTRAY_BACKEND") == "appindicator"
-        assert item is getattr(mod, "MenuItem")
+        assert item is mod.MenuItem
         assert sys.modules.get("pystray") is not sentinel_partial
     finally:
         if previous is not None:
@@ -496,7 +502,7 @@ def test_get_pystray_explicit_gtk_installs_log_filter(monkeypatch):
     mod, item = runtime.get_pystray()
 
     assert install_calls == [True]
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
 
 
 def test_get_pystray_prefers_appindicator_on_kde_wayland(monkeypatch):
@@ -524,7 +530,7 @@ def test_get_pystray_prefers_appindicator_on_kde_wayland(monkeypatch):
     assert calls["import"] == 1
     assert ("pystray backend: %s", ("appindicator (auto-kde-wayland)",)) in calls["log"]
     assert install_calls == [True]
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
 
 
 def test_get_pystray_falls_back_to_gtk_when_appindicator_import_fails_on_kde_wayland(monkeypatch):
@@ -550,7 +556,7 @@ def test_get_pystray_falls_back_to_gtk_when_appindicator_import_fails_on_kde_way
     mod, item = runtime.get_pystray()
     assert calls["import"] == 2
     assert os.environ.get("PYSTRAY_BACKEND") == "gtk"
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
 
 
 def test_get_pystray_explicit_appindicator_installs_log_filter(monkeypatch):
@@ -562,7 +568,7 @@ def test_get_pystray_explicit_appindicator_installs_log_filter(monkeypatch):
     mod, item = runtime.get_pystray()
 
     assert install_calls == [True]
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
 
 
 def test_get_pystray_prefers_appindicator_on_gnome(monkeypatch):
@@ -591,7 +597,7 @@ def test_get_pystray_prefers_appindicator_on_gnome(monkeypatch):
     assert calls["import"] == 1
     assert ("pystray backend: %s", ("appindicator (auto-gnome)",)) in calls["log"]
     assert install_calls == [True]
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
 
 
 def test_get_pystray_falls_back_to_gtk_when_appindicator_import_fails_on_gnome(monkeypatch):
@@ -618,7 +624,7 @@ def test_get_pystray_falls_back_to_gtk_when_appindicator_import_fails_on_gnome(m
     mod, item = runtime.get_pystray()
     assert calls["import"] == 2
     assert os.environ.get("PYSTRAY_BACKEND") == "gtk"
-    assert item is getattr(mod, "MenuItem")
+    assert item is mod.MenuItem
 
 
 def test_acquire_single_instance_lock_uses_xdg_config_home(monkeypatch, tmp_path):

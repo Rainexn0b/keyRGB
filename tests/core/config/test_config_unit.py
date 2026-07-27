@@ -7,7 +7,6 @@ Focuses on small behaviors that should not depend on real user config.
 from __future__ import annotations
 
 import logging
-
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -342,11 +341,14 @@ def test_secondary_device_brightness_prefers_first_compatibility_key(tmp_path, m
     cfg._settings["legacy_primary"] = 42
     cfg._settings["legacy_secondary"] = 17
 
-    assert cfg.get_secondary_device_brightness(
-        "mouse",
-        fallback_keys=("legacy_primary", "legacy_secondary"),
-        default=0,
-    ) == 40
+    assert (
+        cfg.get_secondary_device_brightness(
+            "mouse",
+            fallback_keys=("legacy_primary", "legacy_secondary"),
+            default=0,
+        )
+        == 40
+    )
 
 
 def test_secondary_device_color_uses_default_fallback_keys_in_order(tmp_path, monkeypatch) -> None:
@@ -630,3 +632,61 @@ def test_lightbar_color_propagates_unexpected_defaults_lookup_failures(tmp_path,
 
     with pytest.raises(AssertionError, match="unexpected defaults bug"):
         _ = cfg.lightbar_color
+
+
+def test_stale_config_instances_merge_unrelated_updates(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config
+
+    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+    first = Config()
+    stale_second = Config()
+
+    first.brightness = 17
+    stale_second.effect = "rainbow_wave"
+
+    reloaded = Config()
+    assert reloaded.brightness == 15
+    assert reloaded.effect == "rainbow_wave"
+
+
+def test_batch_update_persists_once(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config, file_storage
+
+    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+    config = Config()
+    real_merge = file_storage.merge_config_settings_atomic
+    merge_calls: list[dict[str, object]] = []
+
+    def counting_merge(**kwargs):
+        merge_calls.append(dict(kwargs))
+        return real_merge(**kwargs)
+
+    monkeypatch.setattr(file_storage, "merge_config_settings_atomic", counting_merge)
+
+    with config.batch_update():
+        config.brightness = 21
+        config.effect = "rainbow_wave"
+        config.autostart = False
+
+    reloaded = Config()
+    assert len(merge_calls) == 1
+    assert reloaded.brightness == 20
+    assert reloaded.effect == "rainbow_wave"
+    assert reloaded.autostart is False
+
+
+def test_batch_update_rolls_back_when_persistence_fails(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config, ConfigPersistenceError, file_storage
+
+    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+    config = Config()
+    original_brightness = config.brightness
+    original_effect = config.effect
+    monkeypatch.setattr(file_storage, "merge_config_settings_atomic", lambda **_kwargs: None)
+
+    with pytest.raises(ConfigPersistenceError, match="Could not persist"), config.batch_update():
+        config.brightness = 3
+        config.effect = "rainbow_wave"
+
+    assert config.brightness == original_brightness
+    assert config.effect == original_effect

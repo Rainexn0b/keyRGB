@@ -21,8 +21,6 @@ if TYPE_CHECKING:
     from .ite8291_perkey.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
     from .ite8910_perkey.hidraw import (
         HidrawDeviceInfo as Ite8910HidrawDeviceInfo,
-    )
-    from .ite8910_perkey.hidraw import (
         HidrawFeatureTransport as Ite8910HidrawFeatureTransport,
     )
 

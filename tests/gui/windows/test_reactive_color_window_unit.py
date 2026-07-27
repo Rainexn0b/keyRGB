@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import src.gui.windows.reactive_color as reactive_color
+from src.gui.windows import reactive_color
 
 
 class _FakeVar:
@@ -185,11 +185,11 @@ class _RecordingSettingsAdapter:
     def commit_color_to_config(self, color: tuple[int, int, int]) -> None:
         self.calls.append(("commit_color_to_config", color))
 
-    def commit_brightness_to_config(self, brightness_percent: float | int | None) -> int | None:
+    def commit_brightness_to_config(self, brightness_percent: float | None) -> int | None:
         self.calls.append(("commit_brightness_to_config", brightness_percent))
         return 14
 
-    def commit_trail_to_config(self, trail_percent: float | int | None) -> int | None:
+    def commit_trail_to_config(self, trail_percent: float | None) -> int | None:
         self.calls.append(("commit_trail_to_config", trail_percent))
         return 55
 
@@ -532,7 +532,7 @@ def test_on_reactive_trail_release_saves_and_sets_status() -> None:
     status_calls: list[dict] = []
     gui._set_status = lambda msg, ok: status_calls.append({"msg": msg, "ok": ok})
     committed: list[float] = []
-    gui._commit_trail_to_config = lambda pct: committed.append(float(pct)) or int(round(float(pct)))
+    gui._commit_trail_to_config = lambda pct: committed.append(float(pct)) or round(float(pct))
 
     gui._on_reactive_trail_release()
 

@@ -9,18 +9,17 @@ import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
 import src.core.backends.sysfs.common as sysfs_common
 import src.core.diagnostics.collectors as diagnostics_collectors
 import src.core.diagnostics.collectors.backends as collectors_backends
 import src.core.diagnostics.io as diagnostics_io
+from src.core.config._settings_view import ConfigSettingsView
 from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
-from src.core.diagnostics.support import ITE8910_SPEED_PROBE_KEY
 from src.core.diagnostics.collectors._backends_sysfs import sysfs_led_candidates_snapshot
 from src.core.diagnostics.model import Diagnostics, DiagnosticsConfigSnapshot
-from src.core.config._settings_view import ConfigSettingsView
+from src.core.diagnostics.support import ITE8910_SPEED_PROBE_KEY
 
 
 def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -414,7 +413,9 @@ def test_sysfs_led_candidates_snapshot_records_scoring_failure(monkeypatch: pyte
     )
 
 
-def test_sysfs_mouse_candidates_snapshot_records_rejection_reason(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_sysfs_mouse_candidates_snapshot_records_rejection_reason(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     leds_root = tmp_path / "sys" / "class" / "leds"
     led_dir = leds_root / "steelseries::logo"
     led_dir.mkdir(parents=True)
@@ -557,9 +558,9 @@ def test_backend_probe_snapshot_logs_selection_boundary_failures(
 
     monkeypatch.setattr(collectors_backends, "_selection_is_blocked_under_pytest", lambda: (False, None))
     monkeypatch.setattr(collectors_backends, "build_backend_speed_probe_plans", lambda backends_snapshot: [])
-    monkeypatch.setattr(collectors_backends, "_iter_auxiliary_probe_backends", lambda: [])
-    monkeypatch.setattr(collectors_backends, "sysfs_led_candidates_snapshot", lambda: {})
-    monkeypatch.setattr(backend_registry, "iter_backends", lambda: [])
+    monkeypatch.setattr(collectors_backends, "_iter_auxiliary_probe_backends", list)
+    monkeypatch.setattr(collectors_backends, "sysfs_led_candidates_snapshot", dict)
+    monkeypatch.setattr(backend_registry, "iter_backends", list)
     monkeypatch.setattr(
         backend_registry,
         "select_backend",
@@ -588,9 +589,9 @@ def test_backend_probe_snapshot_propagates_unexpected_selection_boundary_failure
 
     monkeypatch.setattr(collectors_backends, "_selection_is_blocked_under_pytest", lambda: (False, None))
     monkeypatch.setattr(collectors_backends, "build_backend_speed_probe_plans", lambda backends_snapshot: [])
-    monkeypatch.setattr(collectors_backends, "_iter_auxiliary_probe_backends", lambda: [])
-    monkeypatch.setattr(collectors_backends, "sysfs_led_candidates_snapshot", lambda: {})
-    monkeypatch.setattr(backend_registry, "iter_backends", lambda: [])
+    monkeypatch.setattr(collectors_backends, "_iter_auxiliary_probe_backends", list)
+    monkeypatch.setattr(collectors_backends, "sysfs_led_candidates_snapshot", dict)
+    monkeypatch.setattr(backend_registry, "iter_backends", list)
     monkeypatch.setattr(
         backend_registry,
         "select_backend",
@@ -748,7 +749,9 @@ def test_config_snapshot_logs_unexpected_boundary_failures(
     assert records[-1].exc_info is not None
 
 
-def test_config_snapshot_propagates_unexpected_boundary_failures(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_config_snapshot_propagates_unexpected_boundary_failures(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     cfg_path = tmp_path / "config.json"
     cfg_path.write_text("{}", encoding="utf-8")
     monkeypatch.setattr(diagnostics_collectors, "config_file_path", lambda: cfg_path)

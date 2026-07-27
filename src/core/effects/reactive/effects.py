@@ -4,8 +4,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from . import _fade_loop, _ripple_loop
-from . import _render_brightness_support as _support
+from . import _fade_loop, _render_brightness_support as _support, _ripple_loop
 from ._constants import (
     FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S,
     FIRST_ACTIVITY_PULSE_LIFT_HOLDOFF_S,

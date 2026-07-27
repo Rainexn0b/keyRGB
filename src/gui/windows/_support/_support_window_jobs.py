@@ -3,14 +3,15 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-from . import _support_window_backend_probe as _backend_probe
-from . import _support_window_backend_probe_adapter as _backend_probe_adapter
-from . import _support_window_exports as _exports
-
 # Retained for external support window callers.
-from . import _support_window_job_wiring as _job_wiring
-from . import _support_window_probe_dialogs as _probe_dialogs
-from . import _support_window_tasks as _tasks
+from . import (
+    _support_window_backend_probe as _backend_probe,
+    _support_window_backend_probe_adapter as _backend_probe_adapter,
+    _support_window_exports as _exports,
+    _support_window_job_wiring as _job_wiring,
+    _support_window_probe_dialogs as _probe_dialogs,
+    _support_window_tasks as _tasks,
+)
 
 # Retained for external tests.
 _probe_dialog_dimensions = _probe_dialogs._probe_dialog_dimensions

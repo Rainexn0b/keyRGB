@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from io import BytesIO
 import os
+from io import BytesIO
 
-from PIL import Image
 import pytest
+from PIL import Image
 
 from src.gui.utils import window_icon
 

@@ -4,15 +4,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.backends.ite8910_perkey import Ite8910Backend, Ite8910KeyboardDevice
 from src.core.backends.base import BackendStability
+from src.core.backends.ite8910_perkey import Ite8910Backend, Ite8910KeyboardDevice
 from src.core.backends.ite8910_perkey.protocol import (
+    KNOWN_LED_IDS,
     Ite8910Effect,
     Ite8910ProtocolState,
-    KNOWN_LED_IDS,
-    build_effect_reports,
     build_brightness_speed_report_raw,
     build_effect_report,
+    build_effect_reports,
     build_led_color_report,
     build_reset_report,
     led_id_from_row_col,

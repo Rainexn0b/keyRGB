@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import os
-import sys
 import builtins
 import importlib.abc
-import traceback
+import os
+import sys
 import tempfile
+import traceback
 from pathlib import Path
 
 import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
-
 
 _TESTS_REPO_ROOT = ensure_repo_root_on_sys_path()
 
@@ -60,13 +59,13 @@ def _install_tripwire() -> None:
         def find_spec(self, fullname: str, path, target=None):  # type: ignore[override]
             # Allow tests that inject fakes via sys.modules.
             if fullname in sys.modules:
-                return None
+                return
             if any(fullname == prefix or fullname.startswith(f"{prefix}.") for prefix in blocked_prefixes):
                 raise RuntimeError(
                     "Tripwire: attempted to import a hardware/USB module during pytest: "
                     f"{fullname}\n\n" + "".join(traceback.format_stack(limit=50))
                 )
-            return None
+            return
 
     # Prepend so it wins.
     sys.meta_path.insert(0, _BlockImportsFinder())
@@ -81,7 +80,7 @@ def _install_tripwire() -> None:
     def _path_str(file) -> str:
         try:
             return os.fspath(file)
-        except Exception:
+        except TypeError:
             return str(file)
 
     def _tripwire_open(file, mode="r", *args, **kwargs):  # type: ignore[override]
@@ -123,7 +122,7 @@ _BASELINE_SYSFS_LEDS: dict[str, str] | None = None
 def _read_text_best_effort(path: Path) -> str | None:
     try:
         return path.read_text(encoding="utf-8").strip()
-    except Exception:
+    except OSError:
         return None
 
 
@@ -137,7 +136,7 @@ def _candidate_keyboard_led_dirs() -> list[Path]:
         for child in root.iterdir():
             if child.is_dir():
                 out.append(child)
-    except Exception:
+    except OSError:
         return []
 
     return sorted(out, key=lambda p: p.name)
@@ -195,8 +194,8 @@ def _read_led_snapshot() -> dict[str, str]:
                     "type",
                 ):
                     add_if_exists(bl_dir / rel)
-        except Exception:
-            pass
+        except OSError:
+            return snap
 
     return snap
 
@@ -217,7 +216,6 @@ def pytest_sessionstart(session: pytest.Session) -> None:  # pragma: no cover
 def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> None:  # pragma: no cover
     # If the physical keyboard backlight turns off during the suite, fail the
     # first test after which the observed sysfs brightness changed.
-    global _BASELINE_SYSFS_LEDS
     if not _tripwire_enabled():
         return
     if not _BASELINE_SYSFS_LEDS:
@@ -265,9 +263,9 @@ def profile_paths_factory():
         layout_slots: Path | None = None,
         lightbar_overlay: Path | None = None,
         per_key_colors: Path | None = None,
-         backdrop_image: Path | None = None,
-         backdrop_settings: Path | None = None,
-         secondary_lighting: Path | None = None,
+        backdrop_image: Path | None = None,
+        backdrop_settings: Path | None = None,
+        secondary_lighting: Path | None = None,
     ):
         from src.core.profile.paths import ProfilePaths
 
@@ -279,10 +277,10 @@ def profile_paths_factory():
             layout_slots=layout_slots or (root / "layout_slots.json"),
             lightbar_overlay=lightbar_overlay or (root / "lightbar_overlay.json"),
             per_key_colors=per_key_colors or (root / "colors.json"),
-             backdrop_image=backdrop_image or (root / "backdrop.png"),
-             backdrop_settings=backdrop_settings or (root / "backdrop_settings.json"),
-             secondary_lighting=secondary_lighting or (root / "secondary_lighting.json"),
-         )
+            backdrop_image=backdrop_image or (root / "backdrop.png"),
+            backdrop_settings=backdrop_settings or (root / "backdrop_settings.json"),
+            secondary_lighting=secondary_lighting or (root / "secondary_lighting.json"),
+        )
 
     return _make
 

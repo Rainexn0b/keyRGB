@@ -2,6 +2,7 @@
 
 See improvement plan Item 1 — thread safety for ReactiveRenderState transitions.
 """
+
 import threading
 
 from src.core.effects.reactive._reactive_transition_atomic import (
@@ -20,9 +21,12 @@ class TestTransitionAtomicOperations:
         lock = threading.Lock()
 
         seed_transition_atomic(
-            state, lock,
-            from_brightness=5, to_brightness=25,
-            started_at=100.0, duration_s=0.42,
+            state,
+            lock,
+            from_brightness=5,
+            to_brightness=25,
+            started_at=100.0,
+            duration_s=0.42,
         )
         from_b, to_b, started, duration = read_transition_atomic(state, lock)
         assert from_b == 5
@@ -35,9 +39,12 @@ class TestTransitionAtomicOperations:
         lock = threading.Lock()
 
         seed_transition_atomic(
-            state, lock,
-            from_brightness=5, to_brightness=25,
-            started_at=100.0, duration_s=0.42,
+            state,
+            lock,
+            from_brightness=5,
+            to_brightness=25,
+            started_at=100.0,
+            duration_s=0.42,
         )
         clear_transition_atomic(state, lock)
         from_b, to_b, started, duration = read_transition_atomic(state, lock)
@@ -57,7 +64,8 @@ class TestTransitionAtomicOperations:
         def seeder():
             for i in range(ITERATIONS):
                 seed_transition_atomic(
-                    state, lock,
+                    state,
+                    lock,
                     from_brightness=0,
                     to_brightness=i % 50,
                     started_at=float(i),

@@ -9,7 +9,7 @@ import pytest
 def test_acquire_single_instance_lock_returns_true_when_fcntl_missing(
     monkeypatch,
 ) -> None:
-    import src.tray.integrations.runtime as runtime
+    from src.tray.integrations import runtime
 
     orig_import = builtins.__import__
 
@@ -24,7 +24,7 @@ def test_acquire_single_instance_lock_returns_true_when_fcntl_missing(
 
 
 def test_acquire_single_instance_lock_creates_lock_file_and_writes_pid(monkeypatch, tmp_path) -> None:
-    import src.tray.integrations.runtime as runtime
+    from src.tray.integrations import runtime
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path))
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
@@ -41,7 +41,8 @@ def test_acquire_single_instance_lock_creates_lock_file_and_writes_pid(monkeypat
 
 def test_acquire_single_instance_lock_returns_false_if_already_locked(monkeypatch, tmp_path) -> None:
     import fcntl
-    import src.tray.integrations.runtime as runtime
+
+    from src.tray.integrations import runtime
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path))
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
@@ -63,7 +64,7 @@ def test_acquire_single_instance_lock_returns_false_if_already_locked(monkeypatc
 
 
 def test_acquire_single_instance_lock_propagates_unexpected_mkdir_bug(monkeypatch, tmp_path) -> None:
-    import src.tray.integrations.runtime as runtime
+    from src.tray.integrations import runtime
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)

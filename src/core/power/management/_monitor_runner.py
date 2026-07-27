@@ -21,6 +21,7 @@ class _PowerMonitorManagerProtocol(Protocol):
     monitoring: bool
     monitor_thread: _JoinableThreadProtocol | None
     _battery_thread: _JoinableThreadProtocol | None
+    _lid_thread: _JoinableThreadProtocol | None
 
     def _monitor_loop(self) -> None: ...
 
@@ -34,6 +35,12 @@ class _PowerMonitorManagerProtocol(Protocol):
 
     def _on_lid_open(self) -> None: ...
 
+    def _register_monitor_process(self, process: object) -> None: ...
+
+    def _unregister_monitor_process(self, process: object) -> None: ...
+
+    def _terminate_monitor_process(self) -> None: ...
+
 
 class _PrepareForSleepMonitorProtocol(Protocol):
     def __call__(
@@ -43,6 +50,8 @@ class _PrepareForSleepMonitorProtocol(Protocol):
         on_suspend: Callable[[], None],
         on_resume: Callable[[], None],
         on_started: Callable[[], None] | None = None,
+        on_process_started: Callable[[object], None] | None = None,
+        on_process_stopped: Callable[[object], None] | None = None,
     ) -> None: ...
 
 
@@ -54,6 +63,19 @@ class _LidEventMonitorProtocol(Protocol):
         on_lid_close: Callable[[], None],
         on_lid_open: Callable[[], None],
         logger: logging.Logger,
+    ) -> _JoinableThreadProtocol: ...
+
+
+class _AcpiEventMonitorProtocol(Protocol):
+    def __call__(
+        self,
+        *,
+        is_running: Callable[[], bool],
+        on_lid_close: Callable[[], None],
+        on_lid_open: Callable[[], None],
+        logger: logging.Logger,
+        on_process_started: Callable[[object], None] | None = None,
+        on_process_stopped: Callable[[object], None] | None = None,
     ) -> None: ...
 
 
@@ -75,8 +97,11 @@ def stop_monitoring(manager: _PowerMonitorManagerProtocol, *, join_timeout_s: in
     """Stop monitoring and join worker threads best-effort."""
 
     manager.monitoring = False
+    manager._terminate_monitor_process()
     if manager.monitor_thread:
         manager.monitor_thread.join(timeout=join_timeout_s)
+    if manager._lid_thread:
+        manager._lid_thread.join(timeout=join_timeout_s)
     if manager._battery_thread:
         manager._battery_thread.join(timeout=join_timeout_s)
 
@@ -100,6 +125,8 @@ def run_monitor_loop(
             on_started=start_lid_monitor_fn,
             on_suspend=manager._on_suspend,
             on_resume=manager._on_resume,
+            on_process_started=manager._register_monitor_process,
+            on_process_stopped=manager._unregister_monitor_process,
         )
 
     except FileNotFoundError:
@@ -117,7 +144,7 @@ def start_lid_monitoring(
 ) -> None:
     """Start sysfs lid monitoring with the manager callbacks."""
 
-    start_sysfs_lid_monitoring_fn(
+    manager._lid_thread = start_sysfs_lid_monitoring_fn(
         is_running=lambda: manager.monitoring,
         on_lid_close=manager._on_lid_close,
         on_lid_open=manager._on_lid_open,
@@ -129,7 +156,7 @@ def run_acpi_monitoring(
     manager: _PowerMonitorManagerProtocol,
     *,
     logger: logging.Logger,
-    monitor_acpi_events_fn: _LidEventMonitorProtocol,
+    monitor_acpi_events_fn: _AcpiEventMonitorProtocol,
 ) -> None:
     """Run ACPI lid monitoring with the manager callbacks."""
 
@@ -138,4 +165,6 @@ def run_acpi_monitoring(
         on_lid_close=manager._on_lid_close,
         on_lid_open=manager._on_lid_open,
         logger=logger,
+        on_process_started=manager._register_monitor_process,
+        on_process_stopped=manager._unregister_monitor_process,
     )

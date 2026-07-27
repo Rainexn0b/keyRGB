@@ -121,6 +121,7 @@ class SharedHidrawTransportManager:
             )
 
     def _release(self, backend_name: str, proxy_id: int) -> None:
+        entry_to_close: _TransportEntry | None = None
         with self._state_lock:
             entry = self._entries.get(backend_name)
             if entry is None:
@@ -132,15 +133,27 @@ class SharedHidrawTransportManager:
             entry.ref_count -= 1
 
             if entry.ref_count <= 0:
-                self._close_entry(entry)
                 self._entries.pop(backend_name, None)
+                entry_to_close = entry
+
+        if entry_to_close is not None:
+            self._close_entry(entry_to_close)
 
     def invalidate(self, backend_name: str) -> None:
         """Forcibly close the transport for *backend_name* and drop all proxies."""
         with self._state_lock:
             entry = self._entries.pop(backend_name, None)
-            if entry is not None:
-                self._close_entry(entry)
+        if entry is not None:
+            self._close_entry(entry)
+
+    def _invalidate_if_current(self, backend_name: str, expected_entry: _TransportEntry) -> None:
+        """Invalidate *expected_entry* without closing a newer replacement."""
+
+        with self._state_lock:
+            if self._entries.get(backend_name) is not expected_entry:
+                return
+            self._entries.pop(backend_name, None)
+        self._close_entry(expected_entry)
 
     def is_alive(self, backend_name: str) -> bool:
         with self._state_lock:
@@ -157,12 +170,12 @@ class SharedHidrawTransportManager:
             transport = entry.transport
             write_lock = entry.write_lock
 
-        with write_lock:
-            try:
+        try:
+            with write_lock:
                 return int(transport.send_feature_report(report))
-            except OSError:
-                self.invalidate(backend_name)
-                raise
+        except OSError:
+            self._invalidate_if_current(backend_name, entry)
+            raise
 
     def _write_output_report(self, backend_name: str, proxy_id: int, report: bytes) -> int | None:
         with self._state_lock:
@@ -175,21 +188,22 @@ class SharedHidrawTransportManager:
             if write_fn is None:
                 return None
 
-        with write_lock:
-            try:
+        try:
+            with write_lock:
                 return int(write_fn(report))
-            except OSError:
-                self.invalidate(backend_name)
-                raise
+        except OSError:
+            self._invalidate_if_current(backend_name, entry)
+            raise
 
     @staticmethod
     def _close_entry(entry: _TransportEntry) -> None:
-        try:
-            close_fn = getattr(entry.transport, "close", None)
-            if callable(close_fn):
-                close_fn()
-        except (OSError, RuntimeError, ValueError):
-            logger.debug("Error closing shared hidraw transport", exc_info=True)
+        with entry.write_lock:
+            try:
+                close_fn = getattr(entry.transport, "close", None)
+                if callable(close_fn):
+                    close_fn()
+            except (OSError, RuntimeError, ValueError):
+                logger.debug("Error closing shared hidraw transport", exc_info=True)
 
     def __del__(self) -> None:
         try:

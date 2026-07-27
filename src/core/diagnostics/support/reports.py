@@ -8,14 +8,12 @@ from ._report_helpers import (
     HARDWARE_SUPPORT_TEMPLATE,
     ISSUE_TEMPLATE_LABELS,
     ISSUE_TEMPLATE_URLS,
+    ISSUE_URL as _ISSUE_URL,
     fields_for_template,
     issue_url_for_template,
     render_issue_report_markdown,
     selected_backend_probe,
     title_for_template,
-)
-from ._report_helpers import (
-    ISSUE_URL as _ISSUE_URL,
 )
 
 ISSUE_URL = _ISSUE_URL

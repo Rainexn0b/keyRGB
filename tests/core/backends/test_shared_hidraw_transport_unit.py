@@ -123,7 +123,7 @@ def test_invalidation_closes_transport_and_marks_proxies_dead() -> None:
 
 
 def test_operations_after_release_raise() -> None:
-    manager, mock, _calls, opener = _make_manager_with_mock()
+    manager, _mock, _calls, opener = _make_manager_with_mock()
 
     proxy = manager.acquire("ite8258_perkey_chassis", opener)
     proxy.close()
@@ -312,6 +312,53 @@ def test_concurrent_writes_are_serialized() -> None:
     sorted_starts = sorted(starts)
     for i in range(1, len(sorted_starts)):
         assert sorted_starts[i] - sorted_starts[i - 1] >= 0.01
+
+
+@pytest.mark.parametrize("close_operation", ["release", "invalidate"])
+def test_close_waits_for_in_flight_write(close_operation: str) -> None:
+    manager = SharedHidrawTransportManager()
+    write_entered = threading.Event()
+    allow_write_to_finish = threading.Event()
+    events: list[str] = []
+
+    class _BlockingTransport:
+        _fd: int | None = 1
+
+        def send_feature_report(self, report: bytes) -> int:
+            events.append("write-start")
+            write_entered.set()
+            assert allow_write_to_finish.wait(timeout=1.0)
+            assert self._fd is not None
+            events.append("write-finish")
+            return len(report)
+
+        def close(self) -> None:
+            events.append("close")
+            self._fd = None
+
+    transport = _BlockingTransport()
+    proxy = manager.acquire("ite8258_perkey_chassis", lambda: transport)
+    write_thread = threading.Thread(target=proxy.send_feature_report, args=(b"x",))
+    write_thread.start()
+    assert write_entered.wait(timeout=1.0)
+
+    close_target = proxy.close if close_operation == "release" else lambda: manager.invalidate("ite8258_perkey_chassis")
+    close_thread = threading.Thread(target=close_target)
+    close_thread.start()
+    close_thread.join(timeout=0.05)
+
+    assert close_thread.is_alive()
+    assert transport._fd is not None
+    assert events == ["write-start"]
+
+    allow_write_to_finish.set()
+    write_thread.join(timeout=1.0)
+    close_thread.join(timeout=1.0)
+
+    assert not write_thread.is_alive()
+    assert not close_thread.is_alive()
+    assert events == ["write-start", "write-finish", "close"]
+    assert transport._fd is None
 
 
 def test_proxy_close_after_manager_destroyed_does_not_raise() -> None:

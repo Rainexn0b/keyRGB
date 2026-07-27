@@ -50,7 +50,7 @@ def _safe_perkey_signature(config: object) -> tuple | None:
     if per_key_colors is None:
         return None
     try:
-        if len(per_key_colors) <= 0:  # type: ignore[arg-type]
+        if len(per_key_colors) <= 0:
             return None
     except _CONFIG_FALLBACK_EXCEPTIONS:
         return None

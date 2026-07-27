@@ -5,10 +5,8 @@ from collections.abc import Iterable
 from src.core.resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS, KeyDef
 from src.gui.reference.overlay_geometry import (
     CanvasTransform,
-    key_canvas_bbox_inset,
-)
-from src.gui.reference.overlay_geometry import (
     hit_test as _hit_test,
+    key_canvas_bbox_inset,
 )
 
 

@@ -72,15 +72,15 @@ def _expected_sizes(
 def test_apply_perkey_editor_geometry_uses_keyboard_math_chrome_padding_and_scaling() -> None:
     root = _FakeRoot(screen_w=2000, screen_h=1600)
 
-    params = dict(
-        num_rows=12,
-        num_cols=16,
-        key_margin=12,
-        key_size=32,
-        key_gap=4,
-        right_panel_width=280,
-        wheel_size=60,
-    )
+    params = {
+        "num_rows": 12,
+        "num_cols": 16,
+        "key_margin": 12,
+        "key_size": 32,
+        "key_gap": 4,
+        "right_panel_width": 280,
+        "wheel_size": 60,
+    }
 
     apply_perkey_editor_geometry(root, **params)
 
@@ -93,14 +93,14 @@ def test_apply_perkey_editor_geometry_uses_keyboard_math_chrome_padding_and_scal
 
 
 def test_apply_perkey_editor_geometry_includes_right_panel_width_in_window_width() -> None:
-    base_params = dict(
-        num_rows=12,
-        num_cols=16,
-        key_margin=12,
-        key_size=32,
-        key_gap=4,
-        wheel_size=60,
-    )
+    base_params = {
+        "num_rows": 12,
+        "num_cols": 16,
+        "key_margin": 12,
+        "key_size": 32,
+        "key_gap": 4,
+        "wheel_size": 60,
+    }
 
     no_panel_root = _FakeRoot(screen_w=2000, screen_h=1600)
     with_panel_root = _FakeRoot(screen_w=2000, screen_h=1600)
@@ -119,15 +119,15 @@ def test_apply_perkey_editor_geometry_includes_right_panel_width_in_window_width
 def test_apply_perkey_editor_geometry_uses_wheel_height_minimum_when_taller() -> None:
     root = _FakeRoot(screen_w=2000, screen_h=1500)
 
-    params = dict(
-        num_rows=4,
-        num_cols=6,
-        key_margin=8,
-        key_size=24,
-        key_gap=3,
-        right_panel_width=180,
-        wheel_size=240,
-    )
+    params = {
+        "num_rows": 4,
+        "num_cols": 6,
+        "key_margin": 8,
+        "key_size": 24,
+        "key_gap": 3,
+        "right_panel_width": 180,
+        "wheel_size": 240,
+    }
 
     apply_perkey_editor_geometry(root, **params)
 
@@ -142,15 +142,15 @@ def test_apply_perkey_editor_geometry_uses_wheel_height_minimum_when_taller() ->
 def test_apply_perkey_editor_geometry_clamps_to_ninety_two_percent_of_screen() -> None:
     root = _FakeRoot(screen_w=1000, screen_h=900)
 
-    params = dict(
-        num_rows=20,
-        num_cols=30,
-        key_margin=20,
-        key_size=40,
-        key_gap=5,
-        right_panel_width=500,
-        wheel_size=200,
-    )
+    params = {
+        "num_rows": 20,
+        "num_cols": 30,
+        "key_margin": 20,
+        "key_size": 40,
+        "key_gap": 5,
+        "right_panel_width": 500,
+        "wheel_size": 200,
+    }
 
     apply_perkey_editor_geometry(root, **params)
 

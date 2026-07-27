@@ -7,9 +7,7 @@ from typing import Protocol, cast
 
 from ..integrations import runtime
 from ..protocols import ensure_tray_icon_state
-from . import icon as icon_mod
-from . import menu as menu_mod
-from . import menu_sections
+from . import icon as icon_mod, menu as menu_mod, menu_sections
 
 
 class _ReloadableConfigProtocol(icon_mod.TrayIconConfig, Protocol):

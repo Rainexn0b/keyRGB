@@ -13,8 +13,7 @@ from src.core.effects.catalog import is_backend_hardware_effect, normalize_effec
 from src.tray.protocols import LightingTrayProtocol, ensure_tray_idle_power_state
 
 from ..controllers import effect_selection, lighting_controller, secondary_device_controller, software_target_controller
-from ..ui import gui_launch
-from ..ui import menu as menu_mod
+from ..ui import gui_launch, menu as menu_mod
 from ..ui.menu_status import is_hardware_mode, selected_device_context_entry
 
 apply_effect_selection = effect_selection.apply_effect_selection

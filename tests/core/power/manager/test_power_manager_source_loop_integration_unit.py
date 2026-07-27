@@ -1,14 +1,15 @@
 """Integration seam tests for apply_power_source_actions and the
 full input→policy→action pipeline in _manager_helpers.py."""
+
 from __future__ import annotations
 
-from datetime import datetime as _datetime
+from datetime import datetime as _datetime, timezone
 from unittest.mock import MagicMock, patch
 
 import pytest
+
 import src.core.power.management._manager_helpers as manager_helpers
 from src.core.power.system import PowerMode
-
 
 # ---------------------------------------------------------------------------
 # apply_power_source_actions — single-action dispatch
@@ -245,7 +246,11 @@ def test_pipeline_emits_power_mode_activation_for_configured_ac_mode() -> None:
 
 def test_pipeline_emits_battery_power_mode_when_battery_lighting_is_disabled() -> None:
     from src.core.power.management._manager_helpers import build_power_source_loop_inputs
-    from src.core.power.policies.power_source_loop_policy import ActivatePowerMode, PowerSourceLoopPolicy, TurnOffKeyboard
+    from src.core.power.policies.power_source_loop_policy import (
+        ActivatePowerMode,
+        PowerSourceLoopPolicy,
+        TurnOffKeyboard,
+    )
 
     class _BatteryPowerModeConfig(_FakeConfig):
         ac_power_mode = PowerMode.PERFORMANCE.value
@@ -300,7 +305,7 @@ def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: py
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 22, 24)
+            return _datetime(2024, 1, 1, 22, 24, tzinfo=timezone.utc)
 
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 
@@ -346,7 +351,7 @@ def test_pipeline_on_ac_by_day_keeps_power_source_brightness_primary(
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 12, 0)
+            return _datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 
@@ -393,7 +398,7 @@ def test_pipeline_on_ac_by_day_uses_scheduler_brightness_when_active_power_sourc
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 12, 0)
+            return _datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     monkeypatch.setattr(manager_helpers, "datetime", FakeDateTime)
 

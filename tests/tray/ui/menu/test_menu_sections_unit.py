@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 import pytest
 
-
 from src.tray.ui import menu, menu_sections
 
 
@@ -84,7 +83,7 @@ def test_system_power_menu_includes_settings_entry() -> None:
         set_mode=lambda _mode: True,
         set_system_power_result=lambda *_args, **_kwargs: None,
         refresh_system_power_menu=lambda *_args, **_kwargs: None,
-        list_perkey_profiles=lambda: [],
+        list_perkey_profiles=list,
         get_active_perkey_profile=lambda: None,
         activate_perkey_profile=lambda *_args, **_kwargs: None,
     ).build_system_power_mode_menu(tray, pystray=_Pystray(), item=_item)

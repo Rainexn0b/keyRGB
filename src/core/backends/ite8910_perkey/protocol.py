@@ -27,8 +27,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from math import ceil
 
-from src.core.backends.ite8910_perkey._protocol_effects import EffectDesc as _EffectDesc
-from src.core.backends.ite8910_perkey._protocol_effects import build_effect_reports_impl
+from src.core.backends.ite8910_perkey._protocol_effects import EffectDesc as _EffectDesc, build_effect_reports_impl
 
 # --- Hardware constants ---
 

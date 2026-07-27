@@ -6,7 +6,6 @@ from unittest.mock import MagicMock, patch
 
 def test_activate_perkey_profile_uses_shared_in_place_transition_path() -> None:
     from src.tray.controllers import menu_adapters
-
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     tray = make_owner_backed_simple_tray(
@@ -21,7 +20,9 @@ def test_activate_perkey_profile_uses_shared_in_place_transition_path() -> None:
 
     with (
         patch.object(menu_adapters.core_profiles, "set_active_profile", return_value="gaming") as set_active,
-        patch.object(menu_adapters.core_profiles, "load_per_key_colors", return_value={(0, 0): (3, 4, 5)}) as load_colors,
+        patch.object(
+            menu_adapters.core_profiles, "load_per_key_colors", return_value={(0, 0): (3, 4, 5)}
+        ) as load_colors,
         patch.object(menu_adapters.core_profiles, "apply_profile_to_config") as apply_profile,
     ):
         menu_adapters.activate_perkey_profile(tray, "gaming")

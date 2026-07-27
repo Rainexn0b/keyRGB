@@ -123,15 +123,7 @@ def test_read_kde_colorscheme_from_kreadconfig_uses_available_tool_and_falls_bac
 def test_read_kde_colorscheme_from_ini_reads_general_section_only(tmp_path) -> None:
     kdeglobals = tmp_path / "kdeglobals"
     kdeglobals.write_text(
-        "\n".join(
-            [
-                "# comment",
-                "[Other]",
-                "ColorScheme=IgnoreMe",
-                "[General]",
-                "ColorScheme = BreezeDark",
-            ]
-        ),
+        "# comment\n[Other]\nColorScheme=IgnoreMe\n[General]\nColorScheme = BreezeDark",
         encoding="utf-8",
     )
 
@@ -218,11 +210,9 @@ def test_detect_system_prefers_dark_uses_first_non_none_provider(
 
     def override():
         calls.append("override")
-        return None
 
     def gtk_theme():
         calls.append("gtk")
-        return None
 
     def gsettings():
         calls.append("gsettings")
@@ -252,7 +242,6 @@ def test_detect_system_prefers_dark_logs_and_skips_unexpected_provider_errors(
 
     def gtk_theme():
         calls.append("gtk")
-        return None
 
     def gsettings():
         calls.append("gsettings")
@@ -329,14 +318,7 @@ def test_kde_colorscheme_background_luminance_reads_window_then_view(tmp_path, m
     scheme_dir.mkdir(parents=True)
     scheme_path = scheme_dir / "BreezeDark.colors"
     scheme_path.write_text(
-        "\n".join(
-            [
-                "[Colors:Window]",
-                "BackgroundNormal=0, 0, 0",
-                "[Colors:View]",
-                "BackgroundNormal=255, 255, 255",
-            ]
-        ),
+        "[Colors:Window]\nBackgroundNormal=0, 0, 0\n[Colors:View]\nBackgroundNormal=255, 255, 255",
         encoding="utf-8",
     )
 
@@ -344,14 +326,7 @@ def test_kde_colorscheme_background_luminance_reads_window_then_view(tmp_path, m
     assert detect._kde_colorscheme_background_luminance("BreezeDark") == pytest.approx(0.0)
 
     scheme_path.write_text(
-        "\n".join(
-            [
-                "[Colors:Window]",
-                "BackgroundNormal=not,rgb",
-                "[Colors:View]",
-                "BackgroundNormal=255, 255, 255",
-            ]
-        ),
+        "[Colors:Window]\nBackgroundNormal=not,rgb\n[Colors:View]\nBackgroundNormal=255, 255, 255",
         encoding="utf-8",
     )
 
@@ -370,14 +345,7 @@ def test_kde_colorscheme_background_luminance_returns_none_for_missing_invalid_o
 
     invalid = scheme_dir / "Invalid.colors"
     invalid.write_text(
-        "\n".join(
-            [
-                "[Colors:Window]",
-                "BackgroundNormal=1, 2",
-                "[Colors:View]",
-                "BackgroundNormal=hello",
-            ]
-        ),
+        "[Colors:Window]\nBackgroundNormal=1, 2\n[Colors:View]\nBackgroundNormal=hello",
         encoding="utf-8",
     )
     assert detect._kde_colorscheme_background_luminance("Invalid") is None

@@ -14,6 +14,7 @@ together keeps the import direction one-way (``hardware_polling`` →
 
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: cohesive hardware blank-recovery + shared poll helpers; intentionally extracted as one ownership unit from hardware_polling
 import time
 from collections.abc import Callable
 from typing import TypeVar
@@ -31,14 +32,10 @@ from src.tray.pollers.hardware._decisions import (
     STABLE_ZERO_BRIGHTNESS_BACKOFF_S,
     STABLE_ZERO_BRIGHTNESS_MAX_CONSECUTIVE_ATTEMPTS,
     STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S,
+    hardware_poll_interval_s as _pure_hardware_poll_interval_s,
+    power_source_recovery_window_active as _pure_power_source_recovery_window_active,
     should_attempt_power_source_blank_recovery,
     should_attempt_stable_zero_brightness_recovery,
-)
-from src.tray.pollers.hardware._decisions import (
-    hardware_poll_interval_s as _pure_hardware_poll_interval_s,
-)
-from src.tray.pollers.hardware._decisions import (
-    power_source_recovery_window_active as _pure_power_source_recovery_window_active,
 )
 from src.tray.protocols import (
     IdlePowerTrayProtocol,

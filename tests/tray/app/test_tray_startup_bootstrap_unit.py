@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-import src.tray.startup.bootstrap as bootstrap
+from src.tray.startup import bootstrap
 
 
 @pytest.fixture(autouse=True)

@@ -9,8 +9,10 @@ from pathlib import Path
 from ...resources.layout import BASE_IMAGE_SIZE, REFERENCE_DEVICE_KEYS
 from ..base import BackendCapabilities, KeyboardDevice
 from . import common, privileged
-from ._device_methods import set_zone_color_method as _set_zone_color_method
-from ._device_methods import to_sysfs_brightness_method as _to_sysfs_brightness_method
+from ._device_methods import (
+    set_zone_color_method as _set_zone_color_method,
+    to_sysfs_brightness_method as _to_sysfs_brightness_method,
+)
 
 logger = logging.getLogger(__name__)
 

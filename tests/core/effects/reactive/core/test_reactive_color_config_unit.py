@@ -4,7 +4,6 @@ import os
 
 from tests._paths import REPO_ROOT, ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
 

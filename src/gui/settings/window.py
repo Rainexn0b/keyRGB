@@ -14,14 +14,14 @@ from __future__ import annotations
 
 # @quality-exception file-size-analysis: single Tk PowerSettingsGUI window class; panels already extracted to settings/panels/
 import tkinter as tk
+from dataclasses import replace
 from tkinter import ttk
 
 from src.core import config as core_config
 from src.gui import theme as gui_theme
 from src.gui.utils import tk_async, window_geometry, window_icon
 
-from . import _settings_window_constants as _swc
-from . import hardware_hint, os_autostart, panels, scrollable_area, settings_state
+from . import _settings_window_constants as _swc, hardware_hint, os_autostart, panels, scrollable_area, settings_state
 
 # Keep module-level dependency names explicit so tests can monkeypatch window.py
 # directly while the implementation still resolves through this module.
@@ -332,23 +332,27 @@ class PowerSettingsGUI:
         except _SETTINGS_VALUE_READ_ERRORS:
             values = None
 
+        desired_os_autostart = bool(self.var_os_autostart.get())
+        os_autostart_saved = True
+        try:
+            set_os_autostart(desired_os_autostart)
+        except _OS_AUTOSTART_WRITE_ERRORS:
+            os_autostart_saved = False
+            actual_os_autostart = detect_os_autostart_enabled()
+            self.var_os_autostart.set(actual_os_autostart)
+            if values is not None:
+                values = replace(values, os_autostart_enabled=actual_os_autostart)
+
+        config_saved = values is not None
         if values is not None:
             try:
                 apply_settings_values_to_config(config=self.config, values=values)
             except _SETTINGS_APPLY_ERRORS:
-                # Keep settings persistence best-effort for GUI toggles.
-                pass
-
-        desired_os_autostart = bool(self.var_os_autostart.get())
-        try:
-            set_os_autostart(desired_os_autostart)
-            self.config.os_autostart = desired_os_autostart
-        except _OS_AUTOSTART_WRITE_ERRORS:
-            self.var_os_autostart.set(detect_os_autostart_enabled())
+                config_saved = False
 
         self._apply_enabled_state()
 
-        self.status.configure(text="✓ Saved")
+        self.status.configure(text="✓ Saved" if config_saved and os_autostart_saved else "⚠ Save failed")
         self.root.after(1500, lambda: self.status.configure(text=""))
 
     def _on_close(self) -> None:

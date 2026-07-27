@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime as _datetime
+from datetime import datetime as _datetime, timezone
 from types import SimpleNamespace
+from typing import ClassVar
 
 import pytest
-import src.gui.settings.settings_state as settings_state
 
+from src.core.config._settings_view import ConfigSettingsView
+from src.core.diagnostics.model import DiagnosticsConfigSnapshot
+from src.core.power.system import PowerMode
+from src.gui.settings import settings_state
 from src.gui.settings.settings_state import (
     SettingsValues,
     apply_settings_values_to_config,
@@ -14,9 +18,6 @@ from src.gui.settings.settings_state import (
     clamp_nonzero_brightness,
     load_settings_values,
 )
-from src.core.config._settings_view import ConfigSettingsView
-from src.core.diagnostics.model import DiagnosticsConfigSnapshot
-from src.core.power.system import PowerMode
 
 
 def _settings_values(**overrides) -> SettingsValues:
@@ -258,7 +259,7 @@ def test_load_settings_accepts_direct_config_settings_view() -> None:
 
 def test_load_settings_uses_settings_mapping_when_settings_view_method_is_absent() -> None:
     class Config:
-        settings = {
+        settings: ClassVar[dict] = {
             "brightness": 41,
             "battery_saver_enabled": True,
             "battery_saver_brightness": 13,
@@ -375,6 +376,7 @@ def test_apply_settings_values_to_config() -> None:
     assert cfg.power_restore_on_lid_open is True
 
     assert cfg.autostart is False
+    assert cfg.os_autostart is True
     assert cfg.experimental_backends_enabled is True
 
     assert cfg.ac_lighting_enabled is True
@@ -445,7 +447,7 @@ def test_apply_settings_values_materializes_active_day_reactive_brightness(monke
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 12, 0)
+            return _datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     monkeypatch.setattr(settings_state, "datetime", FakeDateTime)
 
@@ -469,7 +471,7 @@ def test_apply_settings_values_materializes_active_night_reactive_brightness(mon
     class FakeDateTime:
         @staticmethod
         def now() -> _datetime:
-            return _datetime(2024, 1, 1, 22, 0)
+            return _datetime(2024, 1, 1, 22, 0, tzinfo=timezone.utc)
 
     monkeypatch.setattr(settings_state, "datetime", FakeDateTime)
 
@@ -498,7 +500,7 @@ def test_internal_settings_apply_converts_default_utc_clock_to_local_time(
 
     class FakeUtcNow:
         def astimezone(self) -> _datetime:
-            return _datetime(2024, 1, 1, 22, 0)
+            return _datetime(2024, 1, 1, 22, 0, tzinfo=timezone.utc)
 
     class FakeDateTime:
         @staticmethod

@@ -16,9 +16,7 @@ from src.core.secondary_device_runtime import has_available_secondary_profile_ro
 from src.tray import secondary_device_power
 from src.tray.secondary_device_routes import route_for_context_entry
 
-from . import _menu_callbacks as menu_callbacks
-from . import _menu_sections_effects as menu_effects
-from . import menu_sections, menu_status
+from . import _menu_callbacks as menu_callbacks, _menu_sections_effects as menu_effects, menu_sections, menu_status
 
 logger = logging.getLogger(__name__)
 

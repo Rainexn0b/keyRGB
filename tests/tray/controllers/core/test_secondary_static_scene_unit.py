@@ -118,13 +118,12 @@ def test_simulated_new_registered_route_makes_old_mirror_non_authoritative(monke
 
     old_routes = routes_mod.iter_secondary_routes()
     areas = {
-        route.state_key: {"enabled": False, "color": [1, 2, 3]}
-        for route in old_routes
-        if route.supports_profile_state
+        route.state_key: {"enabled": False, "color": [1, 2, 3]} for route in old_routes if route.supports_profile_state
     }
-    assert scene.authoritative_payload_from_config(
-        SimpleNamespace(_settings={"secondary_device_state": areas})
-    ) is not None
+    assert (
+        scene.authoritative_payload_from_config(SimpleNamespace(_settings={"secondary_device_state": areas}))
+        is not None
+    )
 
     extra = SecondaryDeviceRoute(
         device_type="future",
@@ -137,9 +136,7 @@ def test_simulated_new_registered_route_makes_old_mirror_non_authoritative(monke
         brightness_policy=BRIGHTNESS_POLICY_INDEPENDENT,
     )
     monkeypatch.setattr(routes_mod, "_ROUTES", old_routes + (extra,))
-    assert scene.authoritative_payload_from_config(
-        SimpleNamespace(_settings={"secondary_device_state": areas})
-    ) is None
+    assert scene.authoritative_payload_from_config(SimpleNamespace(_settings={"secondary_device_state": areas})) is None
 
 
 def test_global_off_skips_primary_owned_composite_routes() -> None:

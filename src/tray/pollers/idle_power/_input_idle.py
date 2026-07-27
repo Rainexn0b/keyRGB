@@ -57,7 +57,7 @@ def _is_user_input_device(device_path: str) -> bool:
 
 def _default_list_devices() -> Sequence[str]:
     try:
-        import evdev  # type: ignore[import]
+        import evdev
     except ImportError:
         return []
     try:
@@ -67,7 +67,7 @@ def _default_list_devices() -> Sequence[str]:
 
 
 def _default_open_device(path: str) -> _InputDevice:
-    import evdev  # type: ignore[import]
+    import evdev
 
     return cast(_InputDevice, evdev.InputDevice(path))
 

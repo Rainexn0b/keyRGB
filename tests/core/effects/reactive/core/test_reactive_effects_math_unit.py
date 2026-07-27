@@ -166,6 +166,7 @@ def test_global_hue_formula_is_fixed_rate_not_pace_coupled() -> None:
     and that multiplying by p is NOT present in the ripple loop source."""
     import ast
     import inspect
+
     from src.core.effects.reactive import _ripple_loop
 
     source = inspect.getsource(_ripple_loop.run_reactive_ripple_loop)

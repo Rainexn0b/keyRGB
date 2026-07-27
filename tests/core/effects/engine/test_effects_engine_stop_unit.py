@@ -416,7 +416,9 @@ def test_permission_error_callback_propagates_unexpected_failures() -> None:
     from src.core.effects.engine_support.start import _notify_permission_error_callback_best_effort
 
     class _Engine:
-        _permission_error_cb = staticmethod(lambda _exc: (_ for _ in ()).throw(AssertionError("unexpected callback bug")))
+        _permission_error_cb = staticmethod(
+            lambda _exc: (_ for _ in ()).throw(AssertionError("unexpected callback bug"))
+        )
 
     with pytest.raises(AssertionError, match="unexpected callback bug"):
         _notify_permission_error_callback_best_effort(_Engine(), PermissionError("denied"))

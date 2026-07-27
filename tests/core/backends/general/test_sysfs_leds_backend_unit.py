@@ -7,13 +7,12 @@ import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
 from src.core.backends.sysfs import SysfsLedsBackend
-from src.core.backends.sysfs.device import SysfsLedKeyboardDevice
 from src.core.backends.sysfs.common import _is_real_sysfs_path, _leds_root, _safe_write_text, _write_int
-from src.core.resources.defaults import REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
+from src.core.backends.sysfs.device import SysfsLedKeyboardDevice
+from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 
 def _make_led(tmp_path: Path, name: str, *, brightness: int, max_brightness: int) -> Path:
@@ -568,9 +567,7 @@ def test_sysfs_device_set_color_file_zone_permission_error_raises_without_helper
         path.write_text("unexpected\n", encoding="utf-8")
 
     monkeypatch.setattr("src.core.backends.sysfs.device.common._safe_write_text", fake_safe_write)
-    monkeypatch.setattr(
-        "src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True
-    )
+    monkeypatch.setattr("src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
     monkeypatch.setattr(
         "src.core.backends.sysfs.device.privileged.run_led_apply",
         lambda *, led, brightness, rgb: helper_calls.append((led, brightness, rgb)) or True,
@@ -701,9 +698,7 @@ def test_sysfs_backend_probe_reports_permission_failures(monkeypatch: pytest.Mon
 
     def fake_access(path: str | os.PathLike[str], mode: int) -> bool:
         p = str(path)
-        if p.endswith(str(led / "brightness")) and mode == os.R_OK:
-            return False
-        return True
+        return not (p.endswith(str(led / "brightness")) and mode == os.R_OK)
 
     monkeypatch.setattr(os, "access", fake_access)
 
@@ -714,9 +709,7 @@ def test_sysfs_backend_probe_reports_permission_failures(monkeypatch: pytest.Mon
 
     def fake_access_w(path: str | os.PathLike[str], mode: int) -> bool:
         p = str(path)
-        if p.endswith(str(led / "brightness")) and mode == os.W_OK:
-            return False
-        return True
+        return not (p.endswith(str(led / "brightness")) and mode == os.W_OK)
 
     monkeypatch.setattr(os, "access", fake_access_w)
 
@@ -750,9 +743,7 @@ def test_sysfs_backend_probe_allows_helper_when_not_writable(monkeypatch: pytest
     assert probe.confidence >= 60
 
 
-def test_sysfs_backend_probe_accepts_ite8297_via_helper(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
+def test_sysfs_backend_probe_accepts_ite8297_via_helper(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """ITE 8297 channel LEDs are now accepted by the privileged helper."""
     _make_led(tmp_path, "ite_8297:1", brightness=1, max_brightness=255)
     monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))

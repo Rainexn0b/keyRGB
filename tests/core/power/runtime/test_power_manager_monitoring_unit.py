@@ -55,12 +55,27 @@ class TestPowerManagerMonitoringThreads:
         pm.monitoring = True
         pm.monitor_thread = MagicMock()
         pm._battery_thread = MagicMock()
+        pm._lid_thread = MagicMock()
+        process = MagicMock()
+        pm._monitor_process = process
 
         pm.stop_monitoring()
 
         assert pm.monitoring is False
+        process.terminate.assert_called_once()
         pm.monitor_thread.join.assert_called_once_with(timeout=2)
+        pm._lid_thread.join.assert_called_once_with(timeout=2)
         pm._battery_thread.join.assert_called_once_with(timeout=2)
+
+    def test_register_monitor_process_after_stop_terminates_it_immediately(self):
+        from src.core.power.management.manager import PowerManager
+
+        pm = PowerManager(MagicMock())
+        process = MagicMock()
+
+        pm._register_monitor_process(process)
+
+        process.terminate.assert_called_once()
 
 
 class TestPowerManagerMonitorLoopFallbacks:
@@ -80,6 +95,8 @@ class TestPowerManagerMonitorLoopFallbacks:
         assert callable(kwargs["on_started"])
         assert callable(kwargs["on_suspend"])
         assert callable(kwargs["on_resume"])
+        assert callable(kwargs["on_process_started"])
+        assert callable(kwargs["on_process_stopped"])
 
     def test_monitor_loop_falls_back_to_acpi_when_dbus_monitor_missing(self):
         from src.core.power.management.manager import PowerManager
@@ -126,12 +143,14 @@ class TestPowerManagerMonitorLoopFallbacks:
         pm = PowerManager(mock_kb)
         pm.monitoring = True
 
-        with patch(
-            "src.core.power.management.manager.monitor_prepare_for_sleep",
-            side_effect=AssertionError("unexpected monitor bug"),
+        with (
+            patch(
+                "src.core.power.management.manager.monitor_prepare_for_sleep",
+                side_effect=AssertionError("unexpected monitor bug"),
+            ),
+            pytest.raises(AssertionError, match="unexpected monitor bug"),
         ):
-            with pytest.raises(AssertionError, match="unexpected monitor bug"):
-                pm._monitor_loop()
+            pm._monitor_loop()
 
     def test_start_lid_monitor_wires_callbacks(self):
         from src.core.power.management.manager import PowerManager
@@ -141,6 +160,7 @@ class TestPowerManagerMonitorLoopFallbacks:
         pm.monitoring = True
 
         with patch("src.core.power.management.manager.start_sysfs_lid_monitoring") as start:
+            lid_thread = start.return_value
             pm._start_lid_monitor()
 
         start.assert_called_once()
@@ -149,6 +169,7 @@ class TestPowerManagerMonitorLoopFallbacks:
         assert callable(kwargs["on_lid_close"])
         assert callable(kwargs["on_lid_open"])
         assert kwargs["logger"] is not None
+        assert pm._lid_thread is lid_thread
 
     def test_monitor_acpi_events_wires_callbacks(self):
         from src.core.power.management.manager import PowerManager
@@ -166,3 +187,5 @@ class TestPowerManagerMonitorLoopFallbacks:
         assert callable(kwargs["on_lid_close"])
         assert callable(kwargs["on_lid_open"])
         assert kwargs["logger"] is not None
+        assert callable(kwargs["on_process_started"])
+        assert callable(kwargs["on_process_stopped"])

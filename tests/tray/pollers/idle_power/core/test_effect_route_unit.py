@@ -9,7 +9,6 @@ from src.tray.pollers.idle_power._effect_route import (
     should_soft_fade_for_turn_off,
 )
 
-
 _REACTIVE = frozenset({"reactive_fade", "reactive_ripple"})
 _SW = frozenset({"rainbow_wave", "color_cycle"})
 

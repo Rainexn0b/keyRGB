@@ -181,6 +181,10 @@ class _EngineCore:
         """Stop the current effect and release the keyboard device."""
 
         self.stop()
+        thread = self.thread
+        if thread is not None and thread.is_alive():
+            logger.warning("Deferring keyboard close while effect thread is still stopping")
+            return
 
         with self.kb_lock:
             old_kb = self.kb
@@ -220,12 +224,17 @@ class _EngineCore:
         self.stop_event.set()
 
         thread = self.thread
-        self.thread = None
         self.current_effect = None
 
         if thread:
             thread.join(timeout=2.0)
             if thread.is_alive():
                 logger.warning("Effect thread did not stop within timeout")
+                # Keep both the worker reference and its cancellation event
+                # published. Clearing either would allow this blocked worker
+                # to resume beside a replacement when hardware I/O unblocks.
+                return
 
+        if self.thread is thread:
+            self.thread = None
         self.stop_event.clear()

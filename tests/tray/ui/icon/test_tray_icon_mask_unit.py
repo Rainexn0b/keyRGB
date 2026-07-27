@@ -163,11 +163,7 @@ def test_render_simple_svg_mask_alpha_64_returns_none_when_no_path_nodes(tmp_pat
 def test_render_simple_svg_mask_alpha_64_returns_none_when_no_drawable_polygons(tmp_path) -> None:
     path = tmp_path / "mask.svg"
     path.write_text(
-        (
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
-            '<path d="M 0 0 L 1 1"/>'
-            "</svg>"
-        ),
+        ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M 0 0 L 1 1"/></svg>'),
         encoding="utf-8",
     )
 
@@ -177,11 +173,7 @@ def test_render_simple_svg_mask_alpha_64_returns_none_when_no_drawable_polygons(
 def test_render_simple_svg_mask_alpha_64_success_returns_centered_mask(tmp_path) -> None:
     path = tmp_path / "mask.svg"
     path.write_text(
-        (
-            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
-            '<path d="M 4 4 L 20 4 L 20 20 L 4 20 Z"/>'
-            "</svg>"
-        ),
+        ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M 4 4 L 20 4 L 20 20 L 4 20 Z"/></svg>'),
         encoding="utf-8",
     )
 
@@ -210,7 +202,11 @@ def test_render_cairosvg_mask_alpha_64_returns_centered_alpha_mask(monkeypatch, 
         calls["output_height"] = output_height
         return png_bytes
 
-    monkeypatch.setattr(icon_mask.importlib, "import_module", lambda name: SimpleNamespace(svg2png=_svg2png) if name == "cairosvg" else None)
+    monkeypatch.setattr(
+        icon_mask.importlib,
+        "import_module",
+        lambda name: SimpleNamespace(svg2png=_svg2png) if name == "cairosvg" else None,
+    )
 
     svg_path = tmp_path / "mask.svg"
     svg_path.write_text('<svg xmlns="http://www.w3.org/2000/svg"/>', encoding="utf-8")

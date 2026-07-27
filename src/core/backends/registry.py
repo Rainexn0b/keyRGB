@@ -11,6 +11,7 @@ from .policy import experimental_backends_enabled, selection_allowed_for_backend
 
 logger = logging.getLogger(__name__)
 _BACKEND_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+_KERNEL_PREFERRED_AUTO_BACKENDS = frozenset({"sysfs-leds"})
 _T = TypeVar("_T")
 
 # Map deprecated backend names to their canonical replacement. Users who set
@@ -178,6 +179,12 @@ def _probe_backend(backend: KeyboardBackend) -> ProbeResult:
     )
 
 
+def _auto_selection_safety_tier(backend: KeyboardBackend) -> int:
+    """Prefer usable kernel-backed control before direct userspace hardware I/O."""
+
+    return 1 if backend.name.strip().lower() in _KERNEL_PREFERRED_AUTO_BACKENDS else 0
+
+
 def select_backend(
     *, requested: str | None = None, specs: Iterable[BackendSpec] | None = None
 ) -> KeyboardBackend | None:
@@ -186,7 +193,7 @@ def select_backend(
     Order of precedence:
     - explicit `requested`
     - env `KEYRGB_BACKEND`
-    - auto selection (highest confidence, then priority)
+    - auto selection (kernel/sysfs safety tier, then confidence and priority)
 
     Allowed values: backend name, alias, or `auto`.
     Returns None if nothing is available.
@@ -254,9 +261,12 @@ def select_backend(
     if not candidates:
         return None
 
-    # Highest confidence wins; priority is a tiebreaker.
+    # A usable kernel-backed sysfs path is safer than direct userspace USB/HID
+    # access and must win before probe-confidence comparisons. Confidence and
+    # priority still rank candidates within the same safety tier.
     candidates.sort(
         key=lambda pair: (
+            _auto_selection_safety_tier(pair[1]),
             int(getattr(pair[0], "confidence", 0)),
             int(getattr(pair[1], "priority", 0)),
         ),

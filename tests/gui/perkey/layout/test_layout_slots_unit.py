@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.perkey.ui.layout_slots as layout_slots
+from src.gui.perkey.ui import layout_slots
 
 
 @dataclass(frozen=True)

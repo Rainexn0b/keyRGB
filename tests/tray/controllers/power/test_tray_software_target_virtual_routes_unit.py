@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
 from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED, iter_virtual_routes
+from src.core.secondary_device_runtime import EffectiveSecondaryRoute
 from src.tray.ui import _menu_status_devices
 
 

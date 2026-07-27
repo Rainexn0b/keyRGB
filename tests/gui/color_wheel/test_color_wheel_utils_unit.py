@@ -77,7 +77,7 @@ def test_hsv_and_xy_conversion_round_trip_is_reasonably_close(hue: float, satura
     radius = 100.0
 
     x, y = hsv_to_xy(hue, saturation, radius)
-    result = xy_to_hsv(int(round(x)), int(round(y)), radius)
+    result = xy_to_hsv(round(x), round(y), radius)
 
     assert result is not None
     round_trip_hue, round_trip_saturation = result

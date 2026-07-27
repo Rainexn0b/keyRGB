@@ -10,7 +10,10 @@ from src.core.backends._report_pacing import (
 def test_backend_report_delay_env_key_normalizes_backend_names() -> None:
     assert backend_report_delay_env_key("ite8291r3_perkey") == "KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS"
     assert backend_report_delay_env_key("ite8258_perkey_chassis") == "KEYRGB_ITE8258_PERKEY_CHASSIS_REPORT_DELAY_MS"
-    assert backend_report_delay_env_key("ite8295_zones_lenovo_ideapad") == "KEYRGB_ITE8295_ZONES_LENOVO_IDEAPAD_REPORT_DELAY_MS"
+    assert (
+        backend_report_delay_env_key("ite8295_zones_lenovo_ideapad")
+        == "KEYRGB_ITE8295_ZONES_LENOVO_IDEAPAD_REPORT_DELAY_MS"
+    )
 
 
 def test_backend_report_delay_env_key_ignores_empty_names() -> None:

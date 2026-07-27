@@ -5,8 +5,8 @@ import random
 import threading
 import time
 
-from src.core.effects.engine import EffectsEngine
 import src.core.effects.reactive.effects as reactive_effects
+from src.core.effects.engine import EffectsEngine
 from src.core.effects.reactive.effects import run_reactive_fade
 from src.core.effects.software.effects import run_chase
 from src.core.resources.layouts import slot_id_for_key_id
@@ -131,7 +131,7 @@ def test_reactive_fade_fans_out_one_keypress_to_all_mapped_cells(monkeypatch) ->
     engine.per_key_colors = None
 
     monkeypatch.setattr(reactive_effects, "frame_dt_s", lambda: 0.01)
-    monkeypatch.setattr(reactive_effects, "try_open_evdev_keyboards", lambda: [])
+    monkeypatch.setattr(reactive_effects, "try_open_evdev_keyboards", list)
     monkeypatch.setattr(reactive_effects, "_PressSource", _PressSource)
     monkeypatch.setattr(reactive_effects, "pace", lambda _engine: 1.0)
     monkeypatch.setattr(

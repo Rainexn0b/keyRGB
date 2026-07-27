@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import src.core.resources.defaults as defaults
-
+from src.core.resources import defaults
 from src.core.resources.defaults import (
     DEFAULT_COLORS,
     DEFAULT_KEYMAP,
@@ -250,4 +249,3 @@ def test_layout_defaults_cover_visible_layout_keys() -> None:
 
         assert visible_key_ids <= keymap_ids
         assert visible_key_ids <= tweak_ids
-

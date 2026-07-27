@@ -3,9 +3,11 @@ from __future__ import annotations
 from src.core.secondary_device_runtime import EffectiveSecondaryRoute, iter_effective_secondary_routes
 from src.tray.secondary_device_routes import route_for_context_entry
 
-from . import _device_status as _devstat
-from . import _menu_status_device_discovery as _discovery
-from . import _menu_status_secondary_devices as _secondary
+from . import (
+    _device_status as _devstat,
+    _menu_status_device_discovery as _discovery,
+    _menu_status_secondary_devices as _secondary,
+)
 
 # Local short names (typing + helpers) — avoids a 15-line multi-import block.
 _DeviceCandidate = _discovery.DeviceCandidate

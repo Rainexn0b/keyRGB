@@ -3,8 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Protocol, cast
 
-from src.core.profile import profiles as core_profiles
-from src.core.profile import runtime_activation as profile_runtime_activation
+from src.core.profile import profiles as core_profiles, runtime_activation as profile_runtime_activation
 
 __all__ = [
     "activate_perkey_profile",

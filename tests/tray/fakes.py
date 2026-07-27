@@ -41,7 +41,7 @@ def attach_idle_power_owner(tray: object, owner: TrayIdlePowerState | None = Non
 
     st = owner if isinstance(owner, TrayIdlePowerState) else make_idle_power_owner()
     try:
-        setattr(tray, "tray_idle_power_state", st)
+        tray.tray_idle_power_state = st
     except AttributeError:
         pass
     # Mirror for tests that still read legacy private attrs directly.

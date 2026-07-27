@@ -13,8 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from src.tray import _power_restore_policy
-from src.tray import idle_power_state as _idle_power_state
+from src.tray import _power_restore_policy, idle_power_state as _idle_power_state
 
 if TYPE_CHECKING:
     from src.core.config import Config

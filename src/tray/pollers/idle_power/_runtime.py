@@ -15,12 +15,14 @@ from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_floa
 
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 from ._input_idle import InputIdleTracker
-from ._power_source_guard import plan_power_source_guard_update
-from ._power_source_guard import power_source_idle_guard_active as _pure_power_source_idle_guard_active
+from ._power_source_guard import (
+    plan_power_source_guard_update,
+    power_source_idle_guard_active as _pure_power_source_idle_guard_active,
+)
 from ._runtime_sensors import (
     read_desktop_dimmed_state as _read_desktop_dimmed_state,
+    read_session_idle_state as _read_session_idle_state,
 )
-from ._runtime_sensors import read_session_idle_state as _read_session_idle_state
 from .policy import IdleAction
 from .sensors import BacklightState
 

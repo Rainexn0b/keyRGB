@@ -11,8 +11,7 @@ def test_profile_default_name_compatibility_alias() -> None:
 
 
 def test_lighting_mode_compatibility_facade() -> None:
-    from src.tray.controllers import _lighting_controller_helpers as facade
-    from src.tray.controllers import _lighting_mode_apply as owner
+    from src.tray.controllers import _lighting_controller_helpers as facade, _lighting_mode_apply as owner
 
     assert facade.apply_perkey_mode is owner.apply_perkey_mode
     assert facade.apply_uniform_none_mode is owner.apply_uniform_none_mode
@@ -28,9 +27,11 @@ def test_hardware_recovery_compatibility_facade() -> None:
 
 
 def test_reactive_brightness_compatibility_facade() -> None:
-    from src.core.effects.reactive import _reactive_restore_seed as restore_owner
-    from src.core.effects.reactive import _reactive_transition_atomic as atomic_owner
-    from src.core.effects.reactive import _render_brightness_support as facade
+    from src.core.effects.reactive import (
+        _reactive_restore_seed as restore_owner,
+        _reactive_transition_atomic as atomic_owner,
+        _render_brightness_support as facade,
+    )
 
     assert facade.seed_reactive_restore_windows is restore_owner.seed_reactive_restore_windows
     assert facade.seed_transition_atomic is atomic_owner.seed_transition_atomic
@@ -38,8 +39,7 @@ def test_reactive_brightness_compatibility_facade() -> None:
 
 
 def test_profile_action_compatibility_facade() -> None:
-    from src.gui.perkey.ui import _profile_actions_ui as owner
-    from src.gui.perkey.ui import profile_actions as facade
+    from src.gui.perkey.ui import _profile_actions_ui as owner, profile_actions as facade
 
     assert facade.activate_profile_ui is owner.activate_profile_ui
     assert facade.save_profile_ui is owner.save_profile_ui
@@ -47,7 +47,6 @@ def test_profile_action_compatibility_facade() -> None:
 
 
 def test_power_manager_poll_interval_monkeypatch_seam() -> None:
-    from src.core.power.management import _manager_battery_saver as owner
-    from src.core.power.management import manager as facade
+    from src.core.power.management import _manager_battery_saver as owner, manager as facade
 
     assert facade._DEFAULT_POWER_SOURCE_POLL_INTERVAL_S == owner._DEFAULT_POWER_SOURCE_POLL_INTERVAL_S

@@ -20,7 +20,6 @@ class TestPowerManagerEventHandlers:
         """
 
         from src.core.power.management.manager import PowerManager, TurnOffFromEvent
-
         from src.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
@@ -420,9 +419,9 @@ class TestPowerManagerEventPolicyEvaluationSeams:
                 side_effect=AssertionError("unexpected intent bug"),
             ),
             patch.object(logger, "exception") as log_exception,
+            pytest.raises(AssertionError, match="unexpected intent bug"),
         ):
-            with pytest.raises(AssertionError, match="unexpected intent bug"):
-                pm._get_keyboard_intent_state()
+            pm._get_keyboard_intent_state()
 
         log_exception.assert_not_called()
 

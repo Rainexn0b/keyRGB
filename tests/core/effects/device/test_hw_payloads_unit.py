@@ -367,10 +367,9 @@ class TestBuildHwEffectPayload:
         def failing_then_succeeding_func(**kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count == 1:
+            if call_count == 1 and "brightness" in kwargs:
                 # First call: reject 'brightness'
-                if "brightness" in kwargs:
-                    raise ValueError("'brightness' attr is not needed by effect")
+                raise ValueError("'brightness' attr is not needed by effect")
             return kwargs
 
         result = build_hw_effect_payload(

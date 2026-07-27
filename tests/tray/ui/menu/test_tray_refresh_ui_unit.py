@@ -9,7 +9,7 @@ def test_tray_refresh_ui_calls_icon_and_menu() -> None:
     calls: list[str] = []
 
     class DummyTray:
-        def _update_icon(self) -> None:  # noqa: D401
+        def _update_icon(self) -> None:
             calls.append("icon")
 
         def _update_menu(self) -> None:

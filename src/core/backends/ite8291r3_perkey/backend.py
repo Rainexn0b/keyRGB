@@ -38,7 +38,7 @@ _KNOWN_UNSUPPORTED_USB_BCD_VARIANTS: dict[tuple[int, int, int], str] = {
 
 
 def _load_usb_core():
-    import usb.core as usb_core  # type: ignore
+    import usb.core as usb_core
 
     return usb_core
 

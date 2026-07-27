@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -92,7 +93,7 @@ class TestPowerManagerApplyBrightnessExceptionPaths:
 
         class _ConfigRaisingOnSet:
             effect = "wave"
-            per_key_colors = {}
+            per_key_colors: ClassVar[dict] = {}
 
             def reload(self):
                 return None

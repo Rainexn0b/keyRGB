@@ -4,6 +4,7 @@ See improvement plan Item 6 — integration tests for dim/undim and reactive typ
 These tests exercise the complete idle-power action path with real policy and
 action functions, verifying that brightness stays bounded during transitions.
 """
+
 from src.tray.pollers.idle_power.policy import compute_idle_action
 from src.tray.pollers.idle_power.sensors import BacklightState
 
@@ -79,14 +80,21 @@ class TestDimTempRestorePolicyCycle:
 
     def test_full_cycle_dim_temp_then_restore(self):
         """Full cycle: normal → dim_to_temp → (already dim) → restore_brightness → normal."""
-        base = dict(
-            screen_off=False, is_off=False, idle_forced_off=False,
-            idle_timeout_s=60.0, power_management_enabled=True,
-            screen_dim_sync_enabled=True, screen_dim_sync_mode="temp",
-            screen_dim_temp_brightness=5, brightness=25,
-            user_forced_off=False, power_forced_off=False,
-            last_idle_turn_off_at=0.0, last_resume_at=0.0,
-        )
+        base = {
+            "screen_off": False,
+            "is_off": False,
+            "idle_forced_off": False,
+            "idle_timeout_s": 60.0,
+            "power_management_enabled": True,
+            "screen_dim_sync_enabled": True,
+            "screen_dim_sync_mode": "temp",
+            "screen_dim_temp_brightness": 5,
+            "brightness": 25,
+            "user_forced_off": False,
+            "power_forced_off": False,
+            "last_idle_turn_off_at": 0.0,
+            "last_resume_at": 0.0,
+        }
 
         action1 = compute_idle_action(dimmed=True, dim_temp_active=False, now=100.0, **base)
         assert action1 == "dim_to_temp"
@@ -95,12 +103,18 @@ class TestDimTempRestorePolicyCycle:
         assert action2 is None
 
         action3 = compute_idle_action(
-            dimmed=False, dim_temp_active=True, now=105.0, **base,
+            dimmed=False,
+            dim_temp_active=True,
+            now=105.0,
+            **base,
         )
         assert action3 == "restore_brightness"
 
         action4 = compute_idle_action(
-            dimmed=False, dim_temp_active=False, now=110.0, **base,
+            dimmed=False,
+            dim_temp_active=False,
+            now=110.0,
+            **base,
         )
         assert action4 is None
 

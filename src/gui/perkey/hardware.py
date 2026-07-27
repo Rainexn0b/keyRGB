@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Callable
 from typing import TypeVar
 
 from src.core.backends.base import KeyboardBackend, KeyboardDevice
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
+from src.core.runtime.hardware_ownership import acquire_hardware_control_lock, release_hardware_control_lock
 from src.core.utils.logging_utils import log_throttled
 from src.gui._backend_runtime import select_backend
 
@@ -62,19 +64,35 @@ def _backend_dimensions_or_reference(backend: object) -> tuple[int, int]:
     )
 
 
-_backend = _select_backend()
+_TRAY_MANAGED_GUI_ENV = "KEYRGB_TRAY_MANAGED_GUI"
+
+
+def _tray_managed_config_only() -> bool:
+    return os.environ.get(_TRAY_MANAGED_GUI_ENV, "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+_backend = None if _tray_managed_config_only() else _select_backend()
 NUM_ROWS, NUM_COLS = _backend_dimensions_or_reference(_backend)
 
 
 def get_keyboard() -> KeyboardDevice | None:
     """Return a keyboard instance if the backend is available."""
 
-    if _backend is None:
+    if _tray_managed_config_only() or _backend is None:
+        return None
+    if not acquire_hardware_control_lock():
         return None
 
-    return _recover_runtime_boundary(
+    keyboard = _recover_runtime_boundary(
         _backend.get_device,
         fallback=None,
         log_key="perkey.hardware.get_keyboard",
         log_msg="Failed to open keyboard device; perkey hardware unavailable",
     )
+    if keyboard is None:
+        release_hardware_control_lock()
+    return keyboard
+
+
+def release_hardware_control() -> None:
+    release_hardware_control_lock()

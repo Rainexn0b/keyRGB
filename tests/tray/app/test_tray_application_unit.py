@@ -101,6 +101,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
     assert tray.tray_idle_power_state.user_forced_off is False
     assert tray.tray_idle_power_state.power_forced_off is False
     from src.tray.protocols import TrayIconState
+
     assert isinstance(tray.tray_icon_state, TrayIconState)
     assert tray._idle_forced_off is False
     assert tray._user_forced_off is False
@@ -343,7 +344,9 @@ def test_log_event_propagates_unexpected_throttle_state_errors(monkeypatch):
 def test_log_event_propagates_unexpected_logger_failures(monkeypatch):
     tray = SimpleNamespace(_event_last_at={})
     monkeypatch.setattr(app.time, "monotonic", lambda: 123.0)
-    monkeypatch.setattr(app.logger, "info", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("unexpected logger bug")))
+    monkeypatch.setattr(
+        app.logger, "info", lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("unexpected logger bug"))
+    )
 
     with pytest.raises(AssertionError, match="unexpected logger bug"):
         app.KeyRGBTray._log_event(tray, "src", "act", a=1)

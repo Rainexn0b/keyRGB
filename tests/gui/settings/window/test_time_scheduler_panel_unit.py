@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.settings.panels.time_scheduler_panel as time_scheduler_panel
+from src.gui.settings.panels import time_scheduler_panel
 
 
 class _FakeWidget:
@@ -75,14 +75,18 @@ class _FakeLabelFrame(_FakeWidget):
 
 @pytest.fixture(autouse=True)
 def _patch_ttk(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(time_scheduler_panel, "ttk", SimpleNamespace(
-        Frame=_FakeFrame,
-        Label=_FakeLabel,
-        Checkbutton=_FakeCheckbutton,
-        Entry=_FakeEntry,
-        Scale=_FakeScale,
-        LabelFrame=_FakeLabelFrame,
-    ))
+    monkeypatch.setattr(
+        time_scheduler_panel,
+        "ttk",
+        SimpleNamespace(
+            Frame=_FakeFrame,
+            Label=_FakeLabel,
+            Checkbutton=_FakeCheckbutton,
+            Entry=_FakeEntry,
+            Scale=_FakeScale,
+            LabelFrame=_FakeLabelFrame,
+        ),
+    )
 
 
 def test_panel_creates_expected_widgets() -> None:

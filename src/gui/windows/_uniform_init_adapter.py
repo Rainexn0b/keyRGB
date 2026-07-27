@@ -4,8 +4,10 @@ import logging
 from dataclasses import dataclass
 from types import SimpleNamespace
 
-from src.gui.windows import _uniform_color_bootstrap as uniform_color_bootstrap
-from src.gui.windows import _uniform_color_state as uniform_color_state
+from src.gui.windows import (
+    _uniform_color_bootstrap as uniform_color_bootstrap,
+    _uniform_color_state as uniform_color_state,
+)
 
 
 @dataclass(frozen=True)
@@ -91,7 +93,11 @@ def initialize_device_bootstrap_state(
     select_backend_fn,
     is_device_busy_fn,
     logger: logging.Logger,
+    allow_hardware: bool = True,
 ) -> UniformInitState:
+    if not allow_hardware:
+        return UniformInitState(backend=None, color_supported=True, device=None)
+
     backend = select_backend_best_effort(
         secondary_route,
         requested_backend=requested_backend,

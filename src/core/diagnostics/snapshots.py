@@ -91,7 +91,7 @@ def usb_ids_snapshot(*, include_usb: bool) -> list[str]:
 
     usb_ids: list[str] = []
     try:
-        import usb.core as usb_core  # type: ignore
+        import usb.core as usb_core
     except ImportError:
         return []
 

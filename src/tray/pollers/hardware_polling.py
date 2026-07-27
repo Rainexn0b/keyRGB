@@ -12,8 +12,6 @@ from src.tray.idle_power_state import (
 from src.tray.pollers.hardware import _recovery
 from src.tray.pollers.hardware._decisions import (
     coerce_poll_int as _coerce_poll_int,
-)
-from src.tray.pollers.hardware._decisions import (
     normalize_brightness_to_config_scale as _normalize_brightness_to_config_scale,
 )
 from src.tray.protocols import IdlePowerTrayProtocol

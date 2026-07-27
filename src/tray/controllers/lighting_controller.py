@@ -4,16 +4,20 @@ from __future__ import annotations
 import logging
 
 from src.core.effects import catalog as effects_catalog
-from src.core.utils import exceptions as core_exceptions
-from src.core.utils import safe_attrs
-from src.tray.controllers import _lighting_controller_helpers as lighting_controller_helpers
-from src.tray.controllers import _lighting_effect_coordination as lighting_effect_coordination
-from src.tray.controllers import _lighting_menu_handlers as lighting_menu_handlers
-from src.tray.controllers import _lighting_mode_apply as lighting_mode_apply
-from src.tray.controllers import _lighting_start_effect_boundary as lighting_start_effect_boundary
-from src.tray.controllers import secondary_static_scene, software_target_controller
-from src.tray.controllers._power import _lighting_power_policy as lighting_power_policy
-from src.tray.controllers._power import _lighting_power_state as lighting_power_state
+from src.core.utils import exceptions as core_exceptions, safe_attrs
+from src.tray.controllers import (
+    _lighting_controller_helpers as lighting_controller_helpers,
+    _lighting_effect_coordination as lighting_effect_coordination,
+    _lighting_menu_handlers as lighting_menu_handlers,
+    _lighting_mode_apply as lighting_mode_apply,
+    _lighting_start_effect_boundary as lighting_start_effect_boundary,
+    secondary_static_scene,
+    software_target_controller,
+)
+from src.tray.controllers._power import (
+    _lighting_power_policy as lighting_power_policy,
+    _lighting_power_state as lighting_power_state,
+)
 from src.tray.protocols import LightingTrayProtocol
 
 SW_EFFECTS = effects_catalog.SW_EFFECTS_SET

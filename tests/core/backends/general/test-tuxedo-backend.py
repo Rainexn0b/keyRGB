@@ -7,7 +7,6 @@ import time
 
 from tests._paths import REPO_ROOT, ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
 sys.path.insert(0, os.path.join(REPO_ROOT, "tuxedo-src"))
@@ -105,7 +104,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\n⚠️  Test interrupted by user")
         sys.exit(0)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"\n\n❌ Error: {e}")
         import traceback
 

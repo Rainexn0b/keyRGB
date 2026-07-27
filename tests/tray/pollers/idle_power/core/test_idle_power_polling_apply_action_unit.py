@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from contextlib import AbstractContextManager
 from types import SimpleNamespace
 from unittest.mock import MagicMock
-from contextlib import AbstractContextManager
 
 import pytest
 
@@ -335,9 +335,7 @@ def test_restore_does_not_restore_when_user_forced_off(
     from src.tray.idle_power_state import set_idle_power_state_field
 
     tray = _mk_tray(effect="wave", brightness=25)
-    set_idle_power_state_field(
-        tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True
-    )
+    set_idle_power_state_field(tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True)
 
     restore = MagicMock()
     monkeypatch.setattr(module, "_restore_from_idle", restore)
@@ -429,11 +427,9 @@ class _CountingLock(AbstractContextManager[None]):
     def __enter__(self) -> None:
         self.enter_count += 1
         self.held = True
-        return None
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self.held = False
-        return None
 
 
 class _StrictEngine:
@@ -526,12 +522,10 @@ class _SequencingLock(AbstractContextManager[None]):
     def __enter__(self) -> None:
         self.held = True
         self._events.append("lock_enter")
-        return None
 
     def __exit__(self, exc_type, exc, tb) -> None:
         self._events.append("lock_exit")
         self.held = False
-        return None
 
 
 class _OrderingEngine:
@@ -581,9 +575,7 @@ def test_dim_sync_reactive_ordering_under_lock() -> None:
     assert engine.events == ["lock_enter", "set_per_key_brightness", "set_brightness", "lock_exit"]
 
     engine.events.clear()
-    set_idle_power_state_field(
-        tray, attr_name="_dim_temp_active", state_name="dim_temp_active", value=True
-    )
+    set_idle_power_state_field(tray, attr_name="_dim_temp_active", state_name="dim_temp_active", value=True)
     set_idle_power_state_field(
         tray, attr_name="_dim_temp_target_brightness", state_name="dim_temp_target_brightness", value=3
     )

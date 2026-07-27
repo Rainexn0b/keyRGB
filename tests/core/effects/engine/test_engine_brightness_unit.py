@@ -6,9 +6,9 @@ from threading import RLock
 import pytest
 
 from src.core.effects.engine_support.brightness import (
-    _EngineBrightness,
     _brightness_fade_token_or_default,
     _device_available_or_default,
+    _EngineBrightness,
 )
 
 

@@ -11,8 +11,6 @@ from src.core.effects.perkey_animation import build_full_color_grid
 from src.core.lighting_layers import resolve_render_effect
 from src.core.resources.defaults import (
     REFERENCE_MATRIX_COLS as NUM_COLS,
-)
-from src.core.resources.defaults import (
     REFERENCE_MATRIX_ROWS as NUM_ROWS,
 )
 

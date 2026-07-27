@@ -8,18 +8,21 @@ from src.core.power.monitoring import acpi_monitoring
 
 
 class _FakeStdout:
-    def __init__(self, lines: list[str]):
+    def __init__(self, lines: list[str], *, on_read=None):
         self._lines = list(lines)
+        self._on_read = on_read
 
     def readline(self) -> str:
+        if self._on_read is not None:
+            self._on_read()
         if not self._lines:
             return ""
         return self._lines.pop(0)
 
 
 class _FakeProcess:
-    def __init__(self, lines: list[str]):
-        self.stdout = _FakeStdout(lines)
+    def __init__(self, lines: list[str], *, on_read=None):
+        self.stdout = _FakeStdout(lines, on_read=on_read)
 
 
 def test_parse_acpi_lid_event_recognizes_open_close() -> None:
@@ -89,3 +92,30 @@ def test_monitor_acpi_events_falls_back_when_acpi_listen_missing(
     _, kwargs = poll.call_args
     assert kwargs["on_lid_close"] is on_close
     assert kwargs["on_lid_open"] is on_open
+
+
+def test_monitor_acpi_events_does_not_callback_after_shutdown_during_read(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    running = {"value": True}
+    fake = _FakeProcess(
+        ["button/lid LID close\n"],
+        on_read=lambda: running.__setitem__("value", False),
+    )
+    monkeypatch.setattr(acpi_monitoring.subprocess, "Popen", lambda *a, **k: fake)
+    on_close = MagicMock()
+    on_process_started = MagicMock()
+    on_process_stopped = MagicMock()
+
+    acpi_monitoring.monitor_acpi_events(
+        is_running=lambda: running["value"],
+        on_lid_close=on_close,
+        on_lid_open=MagicMock(),
+        logger=MagicMock(),
+        on_process_started=on_process_started,
+        on_process_stopped=on_process_stopped,
+    )
+
+    on_close.assert_not_called()
+    on_process_started.assert_called_once_with(fake)
+    on_process_stopped.assert_called_once_with(fake)

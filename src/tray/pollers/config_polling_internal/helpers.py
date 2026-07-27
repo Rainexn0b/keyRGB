@@ -4,8 +4,10 @@ from src.core.effects.software_targets import (
     SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
     normalize_software_effect_target,
 )
-from src.tray.controllers import secondary_static_scene as _secondary_static_scene
-from src.tray.controllers import software_target_controller as _software_target_controller
+from src.tray.controllers import (
+    secondary_static_scene as _secondary_static_scene,
+    software_target_controller as _software_target_controller,
+)
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from . import _boundaries

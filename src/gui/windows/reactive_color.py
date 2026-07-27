@@ -18,19 +18,23 @@ _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
 
 
 try:
-    from src.gui.windows import _reactive_color_geometry as _geometry
-    from src.gui.windows import _reactive_color_init_adapter as _init_adapter
-    from src.gui.windows import _reactive_color_runtime as _runtime
-    from src.gui.windows import _reactive_color_settings_adapter as _settings_adapter
-    from src.gui.windows import _reactive_color_wiring as _wiring
+    from src.gui.windows import (
+        _reactive_color_geometry as _geometry,
+        _reactive_color_init_adapter as _init_adapter,
+        _reactive_color_runtime as _runtime,
+        _reactive_color_settings_adapter as _settings_adapter,
+        _reactive_color_wiring as _wiring,
+    )
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/windows/reactive_color.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
-    from src.gui.windows import _reactive_color_geometry as _geometry
-    from src.gui.windows import _reactive_color_init_adapter as _init_adapter
-    from src.gui.windows import _reactive_color_runtime as _runtime
-    from src.gui.windows import _reactive_color_settings_adapter as _settings_adapter
-    from src.gui.windows import _reactive_color_wiring as _wiring
+    from src.gui.windows import (
+        _reactive_color_geometry as _geometry,
+        _reactive_color_init_adapter as _init_adapter,
+        _reactive_color_runtime as _runtime,
+        _reactive_color_settings_adapter as _settings_adapter,
+        _reactive_color_wiring as _wiring,
+    )
 
 
 Config = _runtime.Config

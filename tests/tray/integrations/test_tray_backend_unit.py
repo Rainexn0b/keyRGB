@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 from types import TracebackType
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
 
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
@@ -62,9 +62,11 @@ def test_load_ite_dimensions_falls_back_and_logs_traceback() -> None:
 def test_load_ite_dimensions_propagates_unexpected_errors() -> None:
     from src.tray.app.backend import load_ite_dimensions
 
-    with patch("src.tray.app.backend.select_backend", side_effect=AssertionError("unexpected backend bug")):
-        with pytest.raises(AssertionError, match="unexpected backend bug"):
-            load_ite_dimensions()
+    with (
+        patch("src.tray.app.backend.select_backend", side_effect=AssertionError("unexpected backend bug")),
+        pytest.raises(AssertionError, match="unexpected backend bug"),
+    ):
+        load_ite_dimensions()
 
 
 def test_select_backend_with_introspection_handles_probe_exception() -> None:
@@ -94,9 +96,11 @@ def test_select_backend_with_introspection_propagates_unexpected_probe_exception
     backend.probe.side_effect = AssertionError("unexpected probe bug")
     backend.capabilities.return_value = "caps"
 
-    with patch("src.tray.app.backend.select_backend", return_value=backend):
-        with pytest.raises(AssertionError, match="unexpected probe bug"):
-            select_backend_with_introspection()
+    with (
+        patch("src.tray.app.backend.select_backend", return_value=backend),
+        pytest.raises(AssertionError, match="unexpected probe bug"),
+    ):
+        select_backend_with_introspection()
 
 
 def test_select_backend_with_introspection_handles_caps_exception() -> None:
@@ -126,9 +130,11 @@ def test_select_backend_with_introspection_propagates_unexpected_caps_exception(
     backend.probe.return_value = "probe"
     backend.capabilities.side_effect = AssertionError("unexpected caps bug")
 
-    with patch("src.tray.app.backend.select_backend", return_value=backend):
-        with pytest.raises(AssertionError, match="unexpected caps bug"):
-            select_backend_with_introspection()
+    with (
+        patch("src.tray.app.backend.select_backend", return_value=backend),
+        pytest.raises(AssertionError, match="unexpected caps bug"),
+    ):
+        select_backend_with_introspection()
 
 
 def test_select_backend_with_introspection_handles_none_backend() -> None:
@@ -168,9 +174,11 @@ def test_select_device_discovery_snapshot_swallows_errors() -> None:
 def test_select_device_discovery_snapshot_propagates_unexpected_errors() -> None:
     from src.tray.app.backend import select_device_discovery_snapshot
 
-    with patch(
-        "src.tray.app.backend.collect_device_discovery",
-        side_effect=AssertionError("unexpected discovery bug"),
+    with (
+        patch(
+            "src.tray.app.backend.collect_device_discovery",
+            side_effect=AssertionError("unexpected discovery bug"),
+        ),
+        pytest.raises(AssertionError, match="unexpected discovery bug"),
     ):
-        with pytest.raises(AssertionError, match="unexpected discovery bug"):
-            select_device_discovery_snapshot()
+        select_device_discovery_snapshot()

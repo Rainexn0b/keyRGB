@@ -6,19 +6,20 @@ import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
 from src.core.backends.base import BackendStability, ExperimentalEvidence
-from src.core.backends.ite8233_none_chassis_lightbar_clevo import backend as ite8233_backend_module
+from src.core.backends.exceptions import BackendIOError
+from src.core.backends.ite8233_none_chassis_lightbar_clevo import (
+    backend as ite8233_backend_module,
+    protocol as ite8233_protocol,
+)
 from src.core.backends.ite8233_none_chassis_lightbar_clevo.backend import (
     Ite8233Backend,
     _find_matching_supported_hidraw_device,
     _open_matching_transport,
 )
-from src.core.backends.exceptions import BackendIOError
 from src.core.backends.ite8233_none_chassis_lightbar_clevo.device import Ite8233LightbarDevice
-from src.core.backends.ite8233_none_chassis_lightbar_clevo import protocol as ite8233_protocol
 
 
 def test_ite8233_backend_metadata_is_research_backed_experimental() -> None:
@@ -89,7 +90,8 @@ def test_ite8233_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
+        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
+        lambda: DummyMatch(),
     )
 
     result = Ite8233Backend().probe()
@@ -110,7 +112,8 @@ def test_ite8233_probe_reports_vendor_lightbar_7000_when_opted_in(monkeypatch: p
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
+        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
+        lambda: DummyMatch(),
     )
 
     result = Ite8233Backend().probe()
@@ -131,7 +134,8 @@ def test_ite8233_probe_reports_vendor_lightbar_6010_when_opted_in(monkeypatch: p
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
+        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
+        lambda: DummyMatch(),
     )
 
     result = Ite8233Backend().probe()
@@ -149,7 +153,10 @@ def test_ite8233_get_device_requires_experimental_opt_in(monkeypatch: pytest.Mon
 
 
 def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device", lambda: None)
+    monkeypatch.setattr(
+        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
+        lambda: None,
+    )
 
     with pytest.raises(FileNotFoundError, match="No hidraw device found"):
         _open_matching_transport()
@@ -160,7 +167,8 @@ def test_ite8233_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPat
 
     err = PermissionError("permission denied")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport", lambda: (_ for _ in ()).throw(err)
+        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
+        lambda: (_ for _ in ()).throw(err),
     )
 
     with pytest.raises(PermissionError, match="udev rules"):
@@ -172,7 +180,8 @@ def test_ite8233_get_device_reraises_non_permission_errors(monkeypatch: pytest.M
 
     err = RuntimeError("transport failed")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport", lambda: (_ for _ in ()).throw(err)
+        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
+        lambda: (_ for _ in ()).throw(err),
     )
 
     with pytest.raises(BackendIOError, match="transport failed"):
@@ -184,7 +193,8 @@ def test_ite8233_get_device_propagates_unexpected_open_errors(monkeypatch: pytes
 
     err = AssertionError("unexpected transport bug")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport", lambda: (_ for _ in ()).throw(err)
+        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
+        lambda: (_ for _ in ()).throw(err),
     )
 
     with pytest.raises(AssertionError, match="unexpected transport bug"):
@@ -255,7 +265,9 @@ def test_ite8233_protocol_builds_expected_color_slot_report_for_7000() -> None:
     assert report == bytes((0x14, 0x01, 0x03, 0x12, 0x34, 0x56, 0x00, 0x00))
 
 
-def test_ite8233_protocol_applies_vendor_color_scaling_quirk_for_6010(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
+def test_ite8233_protocol_applies_vendor_color_scaling_quirk_for_6010(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
     dmi_root = tmp_path / "dmi"
     dmi_root.mkdir()
     (dmi_root / "product_sku").write_text("STEPOL1XA04\n", encoding="utf-8")
@@ -549,9 +561,7 @@ def test_ite8233_protocol_builds_expected_flash_report_with_direction_for_6010()
 
 
 def test_ite8233_protocol_builds_expected_flash_sequence_for_6010() -> None:
-    reports = ite8233_protocol.build_flash_reports(
-        (0x12, 0x34, 0x56), brightness=37, speed=4, product_id=0x6010
-    )
+    reports = ite8233_protocol.build_flash_reports((0x12, 0x34, 0x56), brightness=37, speed=4, product_id=0x6010)
 
     assert len(reports) == ite8233_protocol.COLOR_SLOT_COUNT + 1
     assert reports[0] == bytes((0x14, 0x00, 0x01, 0x12, 0x34, 0x56, 0x00, 0x00))
@@ -562,7 +572,9 @@ def test_ite8233_device_supports_hidden_flash_effect_for_6010() -> None:
     seen: list[bytes] = []
     device = Ite8233LightbarDevice(lambda report: seen.append(bytes(report)) or len(report), product_id=0x6010)
 
-    device.set_effect({"name": "flash", "color": (0x12, 0x34, 0x56), "brightness": 25, "speed": 7, "direction": "right"})
+    device.set_effect(
+        {"name": "flash", "color": (0x12, 0x34, 0x56), "brightness": 25, "speed": 7, "direction": "right"}
+    )
 
     assert len(seen) == ite8233_protocol.COLOR_SLOT_COUNT + 1
     assert seen[0] == bytes((0x14, 0x00, 0x01, 0x12, 0x34, 0x56, 0x00, 0x00))

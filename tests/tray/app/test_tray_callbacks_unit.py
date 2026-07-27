@@ -313,7 +313,9 @@ def test_on_hardware_static_mode_clicked_restores_previous_hardware_effect_when_
     tray._refresh_ui.assert_called_once()
 
 
-def test_on_hardware_static_mode_clicked_switches_hardware_effect_to_hardware_static_without_restoring_software() -> None:
+def test_on_hardware_static_mode_clicked_switches_hardware_effect_to_hardware_static_without_restoring_software() -> (
+    None
+):
     from src.tray.app.callbacks import on_hardware_static_mode_clicked
     from src.tray.idle_power_state import TrayIdlePowerState
 
@@ -386,12 +388,16 @@ def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_ligh
             "src.tray.app.callbacks.selected_device_context_entry",
             return_value={"key": "lightbar:048d:7001", "device_type": "lightbar"},
         ),
-        patch("src.tray.app.callbacks.selected_secondary_backend_name", return_value="ite8233_none_chassis_lightbar_clevo"),
+        patch(
+            "src.tray.app.callbacks.selected_secondary_backend_name", return_value="ite8233_none_chassis_lightbar_clevo"
+        ),
         patch("src.tray.app.callbacks.launch_uniform_gui") as launch,
     ):
         on_selected_device_color_clicked(tray)
 
-    launch.assert_called_once_with(target_context="lightbar:048d:7001", backend_name="ite8233_none_chassis_lightbar_clevo")
+    launch.assert_called_once_with(
+        target_context="lightbar:048d:7001", backend_name="ite8233_none_chassis_lightbar_clevo"
+    )
 
 
 def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_mouse() -> None:

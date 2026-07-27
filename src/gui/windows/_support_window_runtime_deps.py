@@ -6,12 +6,14 @@ import tkinter as tk
 import webbrowser
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 
-from ._support import _support_window_actions as support_actions
-from ._support import _support_window_jobs as support_jobs
-from ._support import _support_window_runtime_services as support_runtime_services
-from ._support import _support_window_session_bridge as support_session_bridge
-from ._support import _support_window_state as support_window_state
-from ._support import _support_window_ui as support_window_ui
+from ._support import (
+    _support_window_actions as support_actions,
+    _support_window_jobs as support_jobs,
+    _support_window_runtime_services as support_runtime_services,
+    _support_window_session_bridge as support_session_bridge,
+    _support_window_state as support_window_state,
+    _support_window_ui as support_window_ui,
+)
 
 __all__ = (
     "ISSUE_URL",

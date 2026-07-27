@@ -104,9 +104,7 @@ def test_power_source_blank_recovery_not_eligible_within_cooldown() -> None:
 def test_power_source_blank_recovery_uses_monotonic_when_now_is_none(monkeypatch) -> None:
     """When now=None, the function falls back to time.monotonic()."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 101.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 101.0)
 
     tray = _make_recovery_tray()
     tray._last_power_source_transition_at = 100.0
@@ -167,12 +165,15 @@ def test_execute_blank_recovery_success_apply_transition_handled() -> None:
     # is_off was cleared
     assert tray.is_off is False
     # timestamp was written via typed owner (and converged to legacy attr)
-    assert read_idle_power_state_float_field(
-        tray,
-        attr_name="_last_power_source_blank_recovery_at",
-        state_name="last_power_source_blank_recovery_at",
-        default=0.0,
-    ) == 101.0
+    assert (
+        read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_power_source_blank_recovery_at",
+            state_name="last_power_source_blank_recovery_at",
+            default=0.0,
+        )
+        == 101.0
+    )
     # log event recorded with brightness
     assert len(log_events) == 1
     assert log_events[0]["args"][1] == "power_source_blank_recover"
@@ -405,9 +406,7 @@ def test_execute_blank_recovery_sets_hidden_hints_during_apply_call() -> None:
 def test_recover_recent_power_source_blank_returns_false_when_not_eligible(monkeypatch) -> None:
     """When the recovery window is not active, do not attempt recovery."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0)
 
     apply_calls: list[bool] = []
 
@@ -427,9 +426,7 @@ def test_recover_recent_power_source_blank_returns_false_when_not_eligible(monke
 def test_recover_recent_power_source_blank_writes_power_source_stamp(monkeypatch) -> None:
     """On success, the power_source_blank recovery timestamp is written."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 101.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 101.0)
 
     tray = _make_recovery_tray(is_off=True)
     tray._last_power_source_transition_at = 100.0
@@ -443,18 +440,24 @@ def test_recover_recent_power_source_blank_writes_power_source_stamp(monkeypatch
 
     assert result is True
     # The power_source_blank stamp was updated, NOT the hardware_blank stamp.
-    assert read_idle_power_state_float_field(
-        tray,
-        attr_name="_last_power_source_blank_recovery_at",
-        state_name="last_power_source_blank_recovery_at",
-        default=0.0,
-    ) == 101.0
-    assert read_idle_power_state_float_field(
-        tray,
-        attr_name="_last_hardware_blank_recovery_at",
-        state_name="last_hardware_blank_recovery_at",
-        default=0.0,
-    ) == 0.0
+    assert (
+        read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_power_source_blank_recovery_at",
+            state_name="last_power_source_blank_recovery_at",
+            default=0.0,
+        )
+        == 101.0
+    )
+    assert (
+        read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_hardware_blank_recovery_at",
+            state_name="last_hardware_blank_recovery_at",
+            default=0.0,
+        )
+        == 0.0
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -465,9 +468,7 @@ def test_recover_recent_power_source_blank_writes_power_source_stamp(monkeypatch
 def test_recover_stable_zero_returns_false_when_brightness_nonzero(monkeypatch) -> None:
     """Stable-zero recovery only fires when current_brightness is exactly 0."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray()
     tray._last_power_source_transition_at = 0.0
@@ -484,9 +485,7 @@ def test_recover_stable_zero_returns_false_when_brightness_nonzero(monkeypatch) 
 def test_recover_stable_zero_returns_false_when_dim_temp_active(monkeypatch) -> None:
     """Dim-temp state suppresses stable-zero recovery (treat as transient)."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray(dim_temp_active=True)
     tray._last_power_source_transition_at = 0.0
@@ -503,9 +502,7 @@ def test_recover_stable_zero_returns_false_when_dim_temp_active(monkeypatch) -> 
 def test_recover_stable_zero_returns_false_when_any_forced_off(monkeypatch) -> None:
     """Forced-off state suppresses stable-zero recovery (intentional off)."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray(user_forced_off=True)
     tray._last_power_source_transition_at = 0.0
@@ -522,9 +519,7 @@ def test_recover_stable_zero_returns_false_when_any_forced_off(monkeypatch) -> N
 def test_recover_stable_zero_writes_hardware_blank_stamp(monkeypatch) -> None:
     """On success, the hardware_blank recovery timestamp is written (not the power_source one)."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray(is_off=False)
     tray._last_power_source_transition_at = 0.0
@@ -538,26 +533,30 @@ def test_recover_stable_zero_writes_hardware_blank_stamp(monkeypatch) -> None:
     result = _recover_stable_zero_brightness_best_effort(tray, current_brightness=0)
 
     assert result is True
-    assert read_idle_power_state_float_field(
-        tray,
-        attr_name="_last_hardware_blank_recovery_at",
-        state_name="last_hardware_blank_recovery_at",
-        default=0.0,
-    ) == 100.0
-    assert read_idle_power_state_float_field(
-        tray,
-        attr_name="_last_power_source_blank_recovery_at",
-        state_name="last_power_source_blank_recovery_at",
-        default=0.0,
-    ) == 0.0
+    assert (
+        read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_hardware_blank_recovery_at",
+            state_name="last_hardware_blank_recovery_at",
+            default=0.0,
+        )
+        == 100.0
+    )
+    assert (
+        read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_power_source_blank_recovery_at",
+            state_name="last_power_source_blank_recovery_at",
+            default=0.0,
+        )
+        == 0.0
+    )
 
 
 def test_recover_stable_zero_respects_cooldown(monkeypatch) -> None:
     """A recovery within the cooldown window is rejected."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray()
     tray._last_power_source_transition_at = 0.0
@@ -581,9 +580,7 @@ def test_recover_stable_zero_respects_cooldown(monkeypatch) -> None:
 def test_recover_stable_zero_increments_attempt_count(monkeypatch) -> None:
     """A successful recovery increments the consecutive-attempt counter."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray(is_off=False)
     tray._last_power_source_transition_at = 0.0
@@ -606,9 +603,7 @@ def test_recover_stable_zero_increments_attempt_count(monkeypatch) -> None:
 def test_recover_stable_zero_circuit_breaker_enters_backoff(monkeypatch) -> None:
     """After max consecutive attempts, the long backoff window blocks recovery."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 110.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 110.0)
 
     tray = _make_recovery_tray(is_off=False)
     tray._last_power_source_transition_at = 0.0
@@ -653,9 +648,7 @@ def test_execute_blank_recovery_writes_stamp_even_when_callback_raises(monkeypat
     must already be in place to block the next poll cycle.
     """
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0)
 
     tray = _make_recovery_tray()
     tray._last_power_source_transition_at = 0.0
@@ -681,12 +674,15 @@ def test_execute_blank_recovery_writes_stamp_even_when_callback_raises(monkeypat
     # Recovery failed because the callback raised…
     assert result is False
     # …but the stamp was still written, so the cooldown will block retries.
-    assert read_idle_power_state_float_field(
-        tray,
-        attr_name="_last_hardware_blank_recovery_at",
-        state_name="last_hardware_blank_recovery_at",
-        default=0.0,
-    ) == 200.0
+    assert (
+        read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_hardware_blank_recovery_at",
+            state_name="last_hardware_blank_recovery_at",
+            default=0.0,
+        )
+        == 200.0
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -702,9 +698,7 @@ def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None
     pulse intensity.
     """
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0)
 
     seeded: list[float] = []
 
@@ -753,9 +747,7 @@ def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None
 def test_execute_blank_recovery_skips_damp_for_non_reactive_effects(monkeypatch) -> None:
     """Non-reactive effects do not trigger damp seeding."""
 
-    monkeypatch.setattr(
-        "src.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0
-    )
+    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0)
 
     seeded: list[float] = []
 

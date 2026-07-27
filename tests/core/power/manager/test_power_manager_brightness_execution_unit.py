@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import ClassVar
 from unittest.mock import MagicMock
 
 from src.core.power.management._manager_brightness_execution import (
@@ -110,7 +111,8 @@ class TestApplyBrightnessPolicySeam:
 
         run_boundary = MagicMock()
         apply_brightness_policy(
-            MagicMock(), -1,
+            MagicMock(),
+            -1,
             run_boundary_fn=run_boundary,
             config=MagicMock(),
             sync_config_fn=MagicMock(),
@@ -146,7 +148,8 @@ class TestApplyBrightnessPolicySeam:
             return action()
 
         apply_brightness_policy(
-            kb, 80,
+            kb,
+            80,
             run_boundary_fn=_boundary,
             config=MagicMock(),
             sync_config_fn=sync_config,
@@ -164,7 +167,7 @@ class TestSyncConfigBrightnessSeam:
                 self.effect = "wave"
                 self.brightness = 10
                 self.perkey_brightness = 20
-                self.per_key_colors = {}
+                self.per_key_colors: ClassVar[dict] = {}
 
             @property
             def effect_brightness(self):
@@ -219,7 +222,7 @@ class TestSyncConfigBrightnessSeam:
 
         class _BadConfig:
             effect = "wave"
-            per_key_colors = {}
+            per_key_colors: ClassVar[dict] = {}
 
             @property
             def effect_brightness(self):

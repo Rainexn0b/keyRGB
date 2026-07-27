@@ -7,7 +7,11 @@ from src.core.runtime.imports import launch_module_subprocess
 
 def _inherited_gui_environment() -> dict[str, str]:
     """Return the parent environment for GUI subprocesses."""
-    return dict(os.environ)
+
+    env = dict(os.environ)
+    env["KEYRGB_TRAY_MANAGED_GUI"] = "1"
+    env["KEYRGB_TRAY_PID"] = str(os.getpid())
+    return env
 
 
 def launch_perkey_gui() -> None:

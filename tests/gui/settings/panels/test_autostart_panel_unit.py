@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.settings.panels.autostart_panel as autostart_panel
+from src.gui.settings.panels import autostart_panel
 
 
 class _FakeWidget:

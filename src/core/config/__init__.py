@@ -9,13 +9,14 @@ Backward compatibility:
 
 from __future__ import annotations
 
-from .config import Config
+from .config import Config, ConfigPersistenceError
 from .file_storage import load_config_settings, save_config_settings_atomic
 from .paths import config_dir, config_file_path
 from .perkey_colors import deserialize_per_key_colors, serialize_per_key_colors
 
 __all__ = [
     "Config",
+    "ConfigPersistenceError",
     "config_dir",
     "config_file_path",
     "deserialize_per_key_colors",

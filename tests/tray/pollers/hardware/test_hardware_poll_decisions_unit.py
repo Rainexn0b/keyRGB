@@ -21,18 +21,10 @@ def test_normalize_brightness_clamps_to_0_50() -> None:
 
 
 def test_power_source_recovery_window_and_interval() -> None:
-    assert power_source_recovery_window_active(
-        now=10.0, last_power_source_transition_at=8.0, window_s=6.0
-    )
-    assert not power_source_recovery_window_active(
-        now=20.0, last_power_source_transition_at=8.0, window_s=6.0
-    )
-    assert hardware_poll_interval_s(
-        now=10.0, last_power_source_transition_at=8.0
-    ) == 0.25
-    assert hardware_poll_interval_s(
-        now=20.0, last_power_source_transition_at=8.0
-    ) == 2.0
+    assert power_source_recovery_window_active(now=10.0, last_power_source_transition_at=8.0, window_s=6.0)
+    assert not power_source_recovery_window_active(now=20.0, last_power_source_transition_at=8.0, window_s=6.0)
+    assert hardware_poll_interval_s(now=10.0, last_power_source_transition_at=8.0) == 0.25
+    assert hardware_poll_interval_s(now=20.0, last_power_source_transition_at=8.0) == 2.0
 
 
 def test_blank_recovery_eligibility_gates() -> None:
@@ -189,7 +181,7 @@ def test_stable_zero_recovery_circuit_breaker_uses_short_cooldown_within_quota()
         any_forced_off=False,
         configured_brightness_intent=20,
         now=100.0,
-        last_recovery_at=94.5,        # 5.5 s ago → outside 5 s cooldown
+        last_recovery_at=94.5,  # 5.5 s ago → outside 5 s cooldown
         consecutive_attempts=1,
         cooldown_s=5.0,
         max_consecutive_attempts=2,
@@ -206,7 +198,7 @@ def test_stable_zero_recovery_circuit_breaker_blocks_within_short_cooldown() -> 
         any_forced_off=False,
         configured_brightness_intent=20,
         now=100.0,
-        last_recovery_at=98.0,        # 2 s ago → inside 5 s cooldown
+        last_recovery_at=98.0,  # 2 s ago → inside 5 s cooldown
         consecutive_attempts=1,
         cooldown_s=5.0,
         max_consecutive_attempts=2,
@@ -239,7 +231,7 @@ def test_stable_zero_recovery_circuit_breaker_switches_to_backoff() -> None:
         any_forced_off=False,
         configured_brightness_intent=20,
         now=100.0,
-        last_recovery_at=39.0,        # 61 s ago → outside 60 s backoff
+        last_recovery_at=39.0,  # 61 s ago → outside 60 s backoff
         consecutive_attempts=2,
         cooldown_s=5.0,
         max_consecutive_attempts=2,
@@ -257,5 +249,5 @@ def test_stable_zero_recovery_circuit_breaker_defaults() -> None:
         any_forced_off=False,
         configured_brightness_intent=20,
         now=100.0,
-        last_recovery_at=94.0,        # 6 s ago → outside default 5 s cooldown
+        last_recovery_at=94.0,  # 6 s ago → outside default 5 s cooldown
     )

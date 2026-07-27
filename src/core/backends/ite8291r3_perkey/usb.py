@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: single cohesive PyUSB transport + protocol typing for ITE8291r3; size is device I/O and type surface, not mixed ownership
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -77,7 +78,7 @@ class _UsbUtilModuleProtocol(Protocol):
 
     def build_request_type(self, direction: int, request_type: int, recipient: int) -> int: ...
 
-    def dispose_devices(self, device: object) -> None: ...
+    def dispose_resources(self, device: object) -> None: ...
 
 
 def _coerce_int(value: object) -> int:
@@ -104,8 +105,8 @@ class UsbDeviceInfo:
 
 
 def _load_pyusb_modules() -> tuple[_UsbCoreModuleProtocol, _UsbUtilModuleProtocol]:
-    import usb.core as usb_core  # type: ignore[import-not-found]
-    import usb.util as usb_util  # type: ignore[import-not-found]
+    import usb.core as usb_core
+    import usb.util as usb_util
 
     return cast(_UsbCoreModuleProtocol, usb_core), cast(_UsbUtilModuleProtocol, usb_util)
 
@@ -168,13 +169,15 @@ def _check_kernel_driver_active(device: _UsbDeviceProtocol, *, interface_number:
         return False
 
 
-def _detach_kernel_driver_if_needed(device: _UsbDeviceProtocol, *, interface_number: int) -> None:
+def _detach_kernel_driver_if_needed(device: _UsbDeviceProtocol, *, interface_number: int) -> bool:
     if not _check_kernel_driver_active(device, interface_number=int(interface_number)):
-        return
+        return False
 
     detach = getattr(device, "detach_kernel_driver", None)
     if callable(detach):
         detach(int(interface_number))
+        return True
+    return False
 
 
 def _reattach_kernel_driver(device: _UsbDeviceProtocol, *, interface_number: int) -> None:
@@ -187,6 +190,15 @@ def _reattach_kernel_driver(device: _UsbDeviceProtocol, *, interface_number: int
     except (AttributeError, NotImplementedError, OSError, RuntimeError, ValueError):
         # Re-attach may fail if the driver was unloaded or the device is gone.
         _logger.debug("Could not re-attach kernel driver on interface %d", int(interface_number), exc_info=True)
+
+
+def _dispose_usb_resources(device: _UsbDeviceProtocol, usb_util: _UsbUtilModuleProtocol) -> None:
+    """Best-effort release of resources claimed by PyUSB for one device."""
+
+    try:
+        usb_util.dispose_resources(device)
+    except (AttributeError, OSError, RuntimeError, ValueError):
+        _logger.debug("Could not dispose USB device resources", exc_info=True)
 
 
 def _resolve_output_endpoint(
@@ -238,26 +250,25 @@ class PyUsbTransport:
         self._closed = True
 
         device = self._device
-        if device is not None and self._kernel_driver_detached:
-            _reattach_kernel_driver(device, interface_number=self._interface_number)
-
-        if device is not None:
+        usb_util = self._usb_util
+        try:
+            if device is not None and usb_util is not None:
+                _dispose_usb_resources(device, usb_util)
+        finally:
             try:
-                self._usb_util.dispose_devices(device)
-            except (AttributeError, OSError, RuntimeError, ValueError):
-                # dispose_devices may not exist or the device may already be gone.
-                _logger.debug("Could not dispose USB device handle", exc_info=True)
-
-        self._device = None  # type: ignore[assignment]
-        self._usb_util = None  # type: ignore[assignment]
+                if device is not None and self._kernel_driver_detached:
+                    _reattach_kernel_driver(device, interface_number=self._interface_number)
+            finally:
+                self._device = None  # type: ignore[assignment]
+                self._usb_util = None  # type: ignore[assignment]
 
     def __del__(self) -> None:
         if not self._closed:
             _logger.warning("PyUsbTransport was not explicitly closed; releasing in __del__")
             try:
                 self.close()
-            except Exception:  # noqa: S110, BLE001  @quality-exception exception-transparency: __del__ must never propagate exceptions; any failure during finalizer cleanup is logged above and suppressed to prevent interpreter crash
-                pass
+            except Exception:  # @quality-exception exception-transparency: __del__ must never propagate exceptions; cleanup failure is logged with traceback and suppressed to prevent interpreter crash
+                _logger.exception("Failed to release PyUsbTransport from finalizer")
 
     def send_control_report(self, report: bytes) -> int:
         if self._closed or self._device is None:
@@ -311,25 +322,31 @@ def open_matching_transport(
     if device is None:
         raise FileNotFoundError("no suitable device found")
 
-    kernel_driver_was_active = _check_kernel_driver_active(device, interface_number=int(interface_number))
-    if kernel_driver_was_active:
-        _detach_kernel_driver_if_needed(device, interface_number=int(interface_number))
-    out_endpoint = _resolve_output_endpoint(device, usb_core, usb_util, interface_number=int(interface_number))
-    info = UsbDeviceInfo(
-        vendor_id=_coerce_optional_int(device.idVendor) or int(protocol.VENDOR_ID),
-        product_id=_coerce_int(device.idProduct),
-        bcd_device=device_bcd_device_or_none(device),
-        bus=_coerce_optional_int(device.bus),
-        address=_coerce_optional_int(device.address),
-        out_endpoint_address=int(out_endpoint),
-    )
-    return (
-        PyUsbTransport(
+    kernel_driver_detached = False
+    transport: PyUsbTransport | None = None
+    try:
+        kernel_driver_detached = _detach_kernel_driver_if_needed(device, interface_number=int(interface_number))
+        out_endpoint = _resolve_output_endpoint(device, usb_core, usb_util, interface_number=int(interface_number))
+        info = UsbDeviceInfo(
+            vendor_id=_coerce_optional_int(device.idVendor) or int(protocol.VENDOR_ID),
+            product_id=_coerce_int(device.idProduct),
+            bcd_device=device_bcd_device_or_none(device),
+            bus=_coerce_optional_int(device.bus),
+            address=_coerce_optional_int(device.address),
+            out_endpoint_address=int(out_endpoint),
+        )
+        transport = PyUsbTransport(
             device=device,
             usb_util=usb_util,
             out_endpoint_address=int(out_endpoint),
             interface_number=int(interface_number),
-            kernel_driver_detached=kernel_driver_was_active,
-        ),
-        info,
-    )
+            kernel_driver_detached=kernel_driver_detached,
+        )
+        return transport, info
+    finally:
+        if transport is None:
+            try:
+                _dispose_usb_resources(device, usb_util)
+            finally:
+                if kernel_driver_detached:
+                    _reattach_kernel_driver(device, interface_number=int(interface_number))

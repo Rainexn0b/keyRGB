@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from src.core.runtime.imports import (
     ensure_repo_root_on_sys_path_str,
     launch_module_subprocess,
-    launcher_python_argv,
     launcher_cwd_from,
+    launcher_python_argv,
     repo_root_from,
 )
 
@@ -88,7 +88,6 @@ def test_launch_module_subprocess_uses_launcher_root_and_env(tmp_path: Path, mon
 
     def _fake_popen(args, **kwargs):
         calls.append({"args": list(args), **kwargs})
-        return None
 
     import src.core.runtime.imports as runtime_imports
 

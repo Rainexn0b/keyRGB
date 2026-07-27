@@ -60,7 +60,7 @@ def center_alpha_mask(alpha: Image.Image) -> Image.Image:
     )
     dst_w = max(1, round(src_w * scale))
     dst_h = max(1, round(src_h * scale))
-    inner = cropped.resize((dst_w, dst_h), resampling_lanczos())  # type: ignore[arg-type]
+    inner = cropped.resize((dst_w, dst_h), resampling_lanczos())
 
     out = Image.new("L", _ICON_SIZE, color=0)
     ox = (_ICON_SIZE[0] - dst_w) // 2

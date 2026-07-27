@@ -4,8 +4,8 @@ import logging
 from collections.abc import Callable
 from typing import Protocol, TypeVar, cast
 
-from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.effects.catalog import (
+    SW_EFFECTS_SET as SW_EFFECTS,
     backend_hw_effect_names,
     detected_backend_hw_effect_names,
     is_forced_hardware_effect,

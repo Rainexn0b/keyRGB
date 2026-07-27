@@ -153,7 +153,6 @@ class TestPowerManagerBatterySaverLoop:
     def test_run_battery_saver_iteration_detects_closed_lid_and_pauses_source_actions(self):
         from src.core.power.management import manager as manager_module
         from src.core.power.management.manager import PowerManager
-
         from src.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
@@ -378,12 +377,14 @@ class TestPowerManagerBatterySaverLoop:
         pm = PowerManager(mock_kb, config=cfg)
         pm.monitoring = True
 
-        with patch(
-            "src.core.power.management.manager.read_on_ac_power",
-            side_effect=AssertionError("unexpected battery loop bug"),
+        with (
+            patch(
+                "src.core.power.management.manager.read_on_ac_power",
+                side_effect=AssertionError("unexpected battery loop bug"),
+            ),
+            pytest.raises(AssertionError, match="unexpected battery loop bug"),
         ):
-            with pytest.raises(AssertionError, match="unexpected battery loop bug"):
-                pm._battery_saver_loop()
+            pm._battery_saver_loop()
 
     def test_battery_saver_loop_respects_ac_battery_overrides_for_light_profile(self):
         from src.core.power.management.manager import PowerManager
@@ -463,7 +464,6 @@ class TestPowerManagerBatterySaverLoop:
     def test_activate_power_source_perkey_profile_uses_tray_transition_when_available(self):
         from src.core.power.management import manager as manager_module
         from src.core.power.management.manager import PowerManager
-
         from src.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
@@ -500,7 +500,6 @@ class TestPowerManagerBatterySaverLoop:
     def test_activate_power_source_perkey_profile_restarts_when_tray_transition_declines(self):
         from src.core.power.management import manager as manager_module
         from src.core.power.management.manager import PowerManager
-
         from src.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()

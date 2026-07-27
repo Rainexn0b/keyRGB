@@ -76,8 +76,7 @@ class LightingConfigAccessors(LightingSecondaryDeviceFacade):
     DEFAULTS: object
 
     # Provided by the implementing class (Config).
-    def _save(self) -> None:  # type: ignore[empty-body]
-        ...
+    def _save(self) -> None: ...
 
     @staticmethod
     def _normalize_brightness_value(value: int) -> int:  # type: ignore[empty-body]

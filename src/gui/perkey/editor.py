@@ -12,12 +12,14 @@ from src.core.profile import profiles
 from src.core.utils.logging_utils import log_throttled
 
 from . import hardware
-from .editor_support import actions as editor_actions
-from .editor_support import backdrop as editor_backdrop
-from .editor_support import bootstrap as editor_bootstrap
-from .editor_support import dirty_state
-from .editor_support import layout as editor_layout
-from .editor_support import selection as editor_selection
+from .editor_support import (
+    actions as editor_actions,
+    backdrop as editor_backdrop,
+    bootstrap as editor_bootstrap,
+    dirty_state,
+    layout as editor_layout,
+    selection as editor_selection,
+)
 from .ui import sample_tool
 
 if TYPE_CHECKING:
@@ -37,6 +39,7 @@ on_slot_clicked_ui = sample_tool.on_slot_clicked_ui
 _TK_CALL_ERRORS = (RuntimeError, tk.TclError)
 _VALUE_COERCION_ERRORS = (TypeError, ValueError)
 _BACKDROP_PERSISTENCE_ERRORS = (AttributeError, OSError, TypeError, ValueError)
+_HARDWARE_CLOSE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
 def _log_boundary_exception(key: str, msg: str, exc: Exception) -> None:
@@ -154,6 +157,19 @@ class PerKeyEditor:
             return
         if not allowed:
             return
+        kb = getattr(self, "kb", None)
+        self.kb = None
+        close = getattr(kb, "close", None)
+        if callable(close):
+            try:
+                close()
+            except _HARDWARE_CLOSE_ERRORS as exc:
+                _log_boundary_exception(
+                    "perkey.editor.hardware_close",
+                    "Failed to close per-key editor hardware",
+                    exc,
+                )
+        hardware.release_hardware_control()
         destroy = getattr(self.root, "destroy", None)
         if callable(destroy):
             destroy()

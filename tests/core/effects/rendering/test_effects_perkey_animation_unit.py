@@ -5,9 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.effects.perkey_animation import load_per_key_colors_from_config
-from src.core.effects.perkey_animation import enable_user_mode_once
-from src.core.effects.perkey_animation import restore_hidden_per_key_rows_once
+from src.core.effects.perkey_animation import (
+    enable_user_mode_once,
+    load_per_key_colors_from_config,
+    restore_hidden_per_key_rows_once,
+)
 
 
 def test_load_per_key_colors_from_config_returns_mapping(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -48,7 +50,7 @@ def test_load_per_key_colors_from_config_propagates_unexpected_errors(
 
 
 def test_enable_user_mode_once_logs_recoverable_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.core.effects.perkey_animation as perkey_animation
+    from src.core.effects import perkey_animation
 
     seen: dict[str, object] = {}
 

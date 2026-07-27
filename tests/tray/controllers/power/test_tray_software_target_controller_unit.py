@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import pytest
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 def _make_tray() -> SimpleNamespace:
@@ -298,16 +298,18 @@ def test_restore_secondary_software_targets_bubbles_unhandled_exceptions() -> No
 
     tray = _make_tray()
 
-    with patch(
-        "src.tray.controllers.software_target_controller._iter_secondary_targets",
-        return_value=[({}, object())],
-    ):
-        with patch(
+    with (
+        patch(
+            "src.tray.controllers.software_target_controller._iter_secondary_targets",
+            return_value=[({}, object())],
+        ),
+        patch(
             "src.tray.controllers.software_target_controller._restore_target_from_config",
             side_effect=LookupError("unexpected bug"),
-        ):
-            with pytest.raises(LookupError, match="unexpected bug"):
-                restore_secondary_software_targets(tray)
+        ),
+        pytest.raises(LookupError, match="unexpected bug"),
+    ):
+        restore_secondary_software_targets(tray)
 
 
 def test_handle_secondary_target_error_falls_back_to_logger_when_tray_logging_raises() -> None:
@@ -317,9 +319,11 @@ def test_handle_secondary_target_error_falls_back_to_logger_when_tray_logging_ra
     tray = _make_tray()
     tray._log_exception.side_effect = RuntimeError("logger failed")
 
-    with patch("src.tray.controllers.software_target_controller.logger.exception") as log_exception:
-        with patch("src.tray.controllers.software_target_controller.logger.error") as log_error:
-            _handle_secondary_target_error(tray, original_exc, action="restore_secondary_software_target")
+    with (
+        patch("src.tray.controllers.software_target_controller.logger.exception") as log_exception,
+        patch("src.tray.controllers.software_target_controller.logger.error") as log_error,
+    ):
+        _handle_secondary_target_error(tray, original_exc, action="restore_secondary_software_target")
 
     tray._log_exception.assert_called_once_with("Error during restore_secondary_software_target: %s", original_exc)
     log_exception.assert_called_once()
@@ -369,9 +373,11 @@ def test_handle_secondary_target_error_propagates_unexpected_notify_callback_err
     tray = _make_tray()
     tray._notify_permission_issue.side_effect = AssertionError("unexpected notify bug")
 
-    with patch("src.tray.controllers.software_target_controller.is_permission_denied", return_value=True):
-        with pytest.raises(AssertionError, match="unexpected notify bug"):
-            _handle_secondary_target_error(tray, original_exc, action="restore_secondary_software_target")
+    with (
+        patch("src.tray.controllers.software_target_controller.is_permission_denied", return_value=True),
+        pytest.raises(AssertionError, match="unexpected notify bug"),
+    ):
+        _handle_secondary_target_error(tray, original_exc, action="restore_secondary_software_target")
 
 
 def test_log_boundary_exception_propagates_unexpected_logger_failures() -> None:

@@ -159,32 +159,41 @@ def test_get_secondary_device_enabled_uses_brightness_as_legacy_fallback() -> No
         }
     )
 
-    assert accessors.get_secondary_device_enabled(
-        cfg,
-        "logo",
-        default_setting_fn=_default_setting,
-        coerce_int_setting_fn=_coerce_int,
-    ) is True
+    assert (
+        accessors.get_secondary_device_enabled(
+            cfg,
+            "logo",
+            default_setting_fn=_default_setting,
+            coerce_int_setting_fn=_coerce_int,
+        )
+        is True
+    )
 
     cfg._settings["secondary_device_state"]["logo"]["brightness"] = 0  # type: ignore[index]
-    assert accessors.get_secondary_device_enabled(
-        cfg,
-        "logo",
-        default_setting_fn=_default_setting,
-        coerce_int_setting_fn=_coerce_int,
-    ) is False
+    assert (
+        accessors.get_secondary_device_enabled(
+            cfg,
+            "logo",
+            default_setting_fn=_default_setting,
+            coerce_int_setting_fn=_coerce_int,
+        )
+        is False
+    )
 
 
 def test_get_secondary_device_enabled_uses_compatibility_brightness_as_legacy_fallback() -> None:
     cfg = _FakeConfig(_settings={"legacy_logo_brightness": 25})
 
-    assert accessors.get_secondary_device_enabled(
-        cfg,
-        "logo",
-        fallback_keys=("legacy_logo_brightness",),
-        default_setting_fn=_default_setting,
-        coerce_int_setting_fn=_coerce_int,
-    ) is True
+    assert (
+        accessors.get_secondary_device_enabled(
+            cfg,
+            "logo",
+            fallback_keys=("legacy_logo_brightness",),
+            default_setting_fn=_default_setting,
+            coerce_int_setting_fn=_coerce_int,
+        )
+        is True
+    )
 
 
 def test_set_secondary_device_enabled_preserves_brightness_and_color() -> None:

@@ -9,16 +9,13 @@ from typing import TYPE_CHECKING, Protocol, cast
 if TYPE_CHECKING:
     from src.core.config import Config
     from src.core.utils import exceptions as _exceptions
-    from src.tray.app import backend as _backend
-    from src.tray.app import callbacks as _callbacks
-    from src.tray.app import lifecycle as _lifecycle
-    from src.tray.controllers import lighting_controller as _lighting_controller
-    from src.tray.controllers import software_target_controller as _software_target_controller
-    from src.tray.integrations import dependencies as _dependencies
-    from src.tray.integrations import runtime as _runtime
-    from src.tray.ui import icon as _icon
-    from src.tray.ui import menu as _menu
-    from src.tray.ui import refresh as _refresh
+    from src.tray.app import backend as _backend, callbacks as _callbacks, lifecycle as _lifecycle
+    from src.tray.controllers import (
+        lighting_controller as _lighting_controller,
+        software_target_controller as _software_target_controller,
+    )
+    from src.tray.integrations import dependencies as _dependencies, runtime as _runtime
+    from src.tray.ui import icon as _icon, menu as _menu, refresh as _refresh
 
     from ._application_bindings import _PowerManagerFactory
     from .lifecycle import _LifecyclePollingTray, _MonitoringPowerManager

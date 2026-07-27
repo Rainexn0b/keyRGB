@@ -8,12 +8,14 @@ from typing import cast
 from src.core.effects import colors, matrix_layout
 from src.core.effects.reactive import utils as reactive_utils
 
-from . import _base_maps as base_maps
-from . import _engine_color_state as engine_color_state
-from . import _ripple_helpers as ripple_helpers
-from . import _runtime_inputs as runtime_inputs
-from . import input as reactive_input
-from . import render as render_runtime
+from . import (
+    _base_maps as base_maps,
+    _engine_color_state as engine_color_state,
+    _ripple_helpers as ripple_helpers,
+    _runtime_inputs as runtime_inputs,
+    input as reactive_input,
+    render as render_runtime,
+)
 from ._fade_loop import _ReactiveFadeApiProtocol
 from ._ripple_loop import _ReactiveRippleApiProtocol
 

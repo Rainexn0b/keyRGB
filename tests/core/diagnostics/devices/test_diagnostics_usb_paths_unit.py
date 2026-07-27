@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+import src.core.diagnostics.paths as paths_mod
+import src.core.diagnostics.usb as usb_mod
 from src.core.diagnostics.paths import (
     config_file_path,
     sysfs_dmi_root,
@@ -12,8 +14,6 @@ from src.core.diagnostics.paths import (
     usb_devnode_root,
 )
 from src.core.diagnostics.usb import usb_devices_snapshot
-import src.core.diagnostics.paths as paths_mod
-import src.core.diagnostics.usb as usb_mod
 
 
 def test_diagnostics_paths_use_expected_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

@@ -9,8 +9,8 @@ from src.core.backends.base import BackendStability, ExperimentalEvidence
 from src.core.backends.exceptions import BackendIOError
 from src.core.backends.ite8258_perkey_chassis import (
     backend as _ite8258_chassis_backend_module,
+    protocol,
 )
-from src.core.backends.ite8258_perkey_chassis import protocol
 from src.core.backends.ite8258_perkey_chassis.backend import (
     Ite8258ChassisBackend,
     _find_matching_supported_hidraw_device,
@@ -977,7 +977,7 @@ def test_composite_profile_transactions_do_not_interleave_between_surfaces() -> 
         try:
             start.wait()
             action()
-        except Exception as exc:  # pragma: no cover - surfaced by assertion
+        except Exception as exc:  # noqa: BLE001 # pragma: no cover - surfaced by assertion
             errors.append(exc)
 
     keyboard_thread = threading.Thread(
@@ -1025,7 +1025,7 @@ def test_concurrent_output_transactions_are_serialized_not_coalesced() -> None:
                 if not release_first.wait(timeout=2):
                     raise TimeoutError("timed out waiting to release first transaction")
                 keyboard.set_color((0x01, 0x02, 0x03), brightness=25)
-        except Exception as exc:  # pragma: no cover - surfaced by assertion
+        except Exception as exc:  # noqa: BLE001 # pragma: no cover - surfaced by assertion
             errors.append(exc)
 
     def run_second() -> None:
@@ -1040,7 +1040,7 @@ def test_concurrent_output_transactions_are_serialized_not_coalesced() -> None:
         try:
             with keyboard.output_transaction():
                 keyboard.set_color((0x04, 0x05, 0x06), brightness=25)
-        except Exception as exc:  # pragma: no cover - surfaced by assertion
+        except Exception as exc:  # noqa: BLE001 # pragma: no cover - surfaced by assertion
             errors.append(exc)
 
     first_thread = threading.Thread(target=run_first)
@@ -1056,3 +1056,101 @@ def test_concurrent_output_transactions_are_serialized_not_coalesced() -> None:
     assert not second_thread.is_alive()
     assert errors == []
     assert [label for label, _command in writes] == ["first"] * 4 + ["second"] * 4
+
+
+def test_device_coerce_helpers_and_error_edges() -> None:
+    from src.core.backends.ite8258_perkey_chassis import device as device_mod
+
+    assert device_mod._coerce_int("12") == 12
+    with pytest.raises(ValueError, match="RGB"):
+        device_mod._coerce_rgb(object())
+    assert device_mod._coerce_rgb((300, -1, 10))  # clamped
+
+    with pytest.raises(ValueError, match="tuple key"):
+        device_mod._coerce_led_id((1, 2, 3))
+    assert isinstance(device_mod._coerce_led_id((0, 0)), int)
+    assert isinstance(device_mod._coerce_led_id(5), int)
+
+    with pytest.raises(ValueError, match="tuple key"):
+        device_mod._coerce_led_id_or_none((1,))
+    assert device_mod._coerce_led_id_or_none((99, 99)) is None  # out of range -> None via ValueError
+
+    assert device_mod._normalize_effect_name({"name": "Color Wave"}) == "color_wave"
+    assert device_mod._normalize_effect_name(["Static"]) == "static"
+    assert device_mod._normalize_effect_name("Rainbow") == "rainbow"
+    assert device_mod._normalize_effect_name(None) == ""
+
+    with pytest.raises(TypeError, match="callable"):
+        Ite8258ChassisKeyboardDevice(None, profile_coordinator=Ite8258ChassisProfileCoordinator())  # type: ignore[arg-type]
+
+    reports: list[bytes] = []
+
+    def send(report: bytes) -> int:
+        reports.append(report)
+        return -1
+
+    device = Ite8258ChassisKeyboardDevice(lambda r: 0, profile_coordinator=Ite8258ChassisProfileCoordinator())
+    device._send_feature_report = send  # type: ignore[method-assign]
+    with pytest.raises(OSError, match="feature report"):
+        device._send(b"\x00")
+
+    # black color / empty map / all black turns off
+    device = Ite8258ChassisKeyboardDevice(lambda r: 0, profile_coordinator=Ite8258ChassisProfileCoordinator())
+    device.set_color((0, 0, 0), brightness=50)
+    assert device.is_off() is True
+    device.set_color((1, 2, 3), brightness=0)
+    assert device.is_off() is True
+    device.set_key_colors({}, brightness=20)
+    assert device.is_off() is True
+    device.set_brightness(0)
+    assert device.is_off() is True
+    assert device.get_brightness() == 0
+
+    # close swallows transport errors
+    class _Bad:
+        def close(self) -> None:
+            raise OSError("gone")
+
+    device = Ite8258ChassisKeyboardDevice(
+        lambda r: 0,
+        profile_coordinator=Ite8258ChassisProfileCoordinator(),
+        transport=_Bad(),
+    )
+    device.close()
+    assert device._transport is None
+
+
+def test_zone_device_edges() -> None:
+    coordinator = Ite8258ChassisProfileCoordinator()
+    with pytest.raises(TypeError):
+        Ite8258ChassisZoneDevice(None, zone_name="logo", led_ids=(1,), profile_coordinator=coordinator)  # type: ignore[arg-type]
+
+    zone = Ite8258ChassisZoneDevice(
+        lambda r: -1,
+        zone_name="logo",
+        led_ids=(0x05DD,),
+        profile_coordinator=coordinator,
+    )
+    with pytest.raises(OSError, match="logo"):
+        zone._send(b"\x00")
+
+    empty = Ite8258ChassisZoneDevice(
+        lambda r: 0,
+        zone_name="logo",
+        led_ids=(),
+        profile_coordinator=coordinator,
+        current_brightness=10,
+    )
+    empty.turn_off()
+    assert empty.is_off() is True
+    # empty led_ids path only flips logical off without rewriting brightness
+
+    zone2 = Ite8258ChassisZoneDevice(
+        lambda r: 0,
+        zone_name="logo",
+        led_ids=(0x05DD,),
+        profile_coordinator=coordinator,
+        current_brightness=10,
+    )
+    zone2.set_brightness(0)
+    assert zone2.is_off() is True

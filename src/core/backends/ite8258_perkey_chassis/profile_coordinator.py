@@ -106,14 +106,16 @@ class Ite8258ChassisProfileCoordinator:
                 self._transaction_brightness = None
             self._transaction_depth += 1
 
+            completed = False
             try:
                 yield
-            except BaseException:  # @quality-exception exception-transparency: rollback must restore coordinator invariants even for cancellation and process-control exceptions
-                self._transaction_depth -= 1
-                if self._transaction_depth == 0:
-                    self._restore_snapshot(self._transaction_snapshot)
-                    self._clear_transaction_state()
-                raise
+                completed = True
+            finally:
+                if not completed:
+                    self._transaction_depth -= 1
+                    if self._transaction_depth == 0:
+                        self._restore_snapshot(self._transaction_snapshot)
+                        self._clear_transaction_state()
 
             self._transaction_depth -= 1
             if self._transaction_depth != 0:

@@ -7,11 +7,9 @@ from typing import Final, Literal, cast
 
 from src.core.utils import exceptions as core_exceptions
 
-from .. import catalog as effects_catalog
-from .. import hw_payloads as effects_hw_payloads
+from .. import catalog as effects_catalog, hw_payloads as effects_hw_payloads
 from ..device import Color, KeyboardDeviceProtocol, PerKeyColorMap
-from . import _start_support
-from . import methods as engine_methods
+from . import _start_support, methods as engine_methods
 
 _SW_EFFECTS = effects_catalog.SW_EFFECTS
 is_forced_hardware_effect = effects_catalog.is_forced_hardware_effect
@@ -110,6 +108,9 @@ class _EngineStart:
         preserved_last_rendered = self._last_rendered_brightness if preserve_last_rendered_brightness else None
 
         self.stop()
+        previous_thread = self.thread
+        if previous_thread is not None and previous_thread.is_alive():
+            raise RuntimeError("Previous effect thread is still stopping; replacement effect was not started")
         if preserved_last_rendered is not None:
             # Config-apply restarts happen while the keyboard is already lit.
             # Restore this baseline before the replacement render thread is

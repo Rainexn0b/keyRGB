@@ -5,7 +5,7 @@ from threading import RLock
 
 import pytest
 
-import src.core.effects.device as device
+from src.core.effects import device
 from src.core.effects.device import NullKeyboard, acquire_keyboard
 
 

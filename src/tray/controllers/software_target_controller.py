@@ -13,9 +13,11 @@ from src.core.utils.exceptions import is_permission_denied
 from src.tray.secondary_device_routes import route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry, device_context_controls_available, device_context_entries
 
-from . import _software_target_auxiliary as software_target_auxiliary
-from . import _software_target_boundaries as boundaries
-from . import _software_target_profile as software_target_profile
+from . import (
+    _software_target_auxiliary as software_target_auxiliary,
+    _software_target_boundaries as boundaries,
+    _software_target_profile as software_target_profile,
+)
 from ._lighting_controller_helpers import is_software_effect
 
 # Public re-exports for tests and monkeypatch seams.
@@ -150,7 +152,7 @@ def reconcile_secondary_profile_state(
 ) -> None:
     mapping_payload: Mapping[str, object] | None
     if payload is None or isinstance(payload, Mapping):
-        mapping_payload = payload  # type: ignore[assignment]
+        mapping_payload = payload
     else:
         mapping_payload = None
     software_target_profile.reconcile_secondary_profile_state(

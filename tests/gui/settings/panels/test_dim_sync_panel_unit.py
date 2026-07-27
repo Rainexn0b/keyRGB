@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import tkinter as tk
 from types import SimpleNamespace
 
-import tkinter as tk
-
-import src.gui.settings.panels.dim_sync_panel as dim_sync_panel
+from src.gui.settings.panels import dim_sync_panel
 
 
 class _FakeWidget:

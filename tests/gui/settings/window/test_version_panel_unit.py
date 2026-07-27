@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import json
+import webbrowser
 from pathlib import Path
 from types import SimpleNamespace
-import webbrowser
 
 import pytest
 
-import src.gui.settings.panels.version_panel as version_panel
+from src.gui.settings.panels import version_panel
 
 
 class _FakeWidget:
@@ -210,20 +210,7 @@ def test_repo_version_text_reads_project_section_and_ignores_other_sections(
 ) -> None:
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
-        "\n".join(
-            [
-                "[tool.poetry]",
-                'version = "9.9.9"',
-                "",
-                "# ignored comment",
-                "[project]",
-                'name = "keyrgb"',
-                'version = "1.4.2" # trailing comment',
-                "",
-                "[tool.ruff]",
-                'version = "0.0.1"',
-            ]
-        ),
+        '[tool.poetry]\nversion = "9.9.9"\n\n# ignored comment\n[project]\nname = "keyrgb"\nversion = "1.4.2" # trailing comment\n\n[tool.ruff]\nversion = "0.0.1"',
         encoding="utf-8",
     )
     monkeypatch.setattr(version_panel, "repo_root_from", lambda _path: tmp_path)

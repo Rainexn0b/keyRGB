@@ -6,7 +6,6 @@ import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
 from src.core.backends.base import (
@@ -16,8 +15,12 @@ from src.core.backends.base import (
     normalize_backend_stability,
     normalize_experimental_evidence,
 )
-from src.core.backends.registry import _probe_backend, BackendSpec, iter_backends, select_backend
-from src.core.backends.policy import experimental_backends_enabled, experimental_evidence_for_backend, experimental_evidence_label
+from src.core.backends.policy import (
+    experimental_backends_enabled,
+    experimental_evidence_for_backend,
+    experimental_evidence_label,
+)
+from src.core.backends.registry import BackendSpec, _probe_backend, iter_backends, select_backend
 
 
 @dataclass
@@ -142,6 +145,75 @@ def test_select_backend_auto_prefers_higher_confidence_over_priority(
     backend = select_backend(specs=specs)
     assert backend is not None
     assert backend.name == "conf"
+
+
+def test_select_backend_auto_prefers_usable_sysfs_over_higher_confidence_usb(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8291r3_perkey",
+            priority=100,
+            factory=lambda: DummyBackend("ite8291r3_perkey", 100, True, confidence=90),
+        ),
+        BackendSpec(
+            name="sysfs-leds",
+            priority=150,
+            factory=lambda: DummyBackend("sysfs-leds", 150, True, confidence=70),
+        ),
+    ]
+
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+
+    backend = select_backend(specs=specs)
+    assert backend is not None
+    assert backend.name == "sysfs-leds"
+
+
+def test_select_backend_auto_uses_usb_when_sysfs_is_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8291r3_perkey",
+            priority=100,
+            factory=lambda: DummyBackend("ite8291r3_perkey", 100, True, confidence=90),
+        ),
+        BackendSpec(
+            name="sysfs-leds",
+            priority=150,
+            factory=lambda: DummyBackend("sysfs-leds", 150, False, confidence=0),
+        ),
+    ]
+
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+
+    backend = select_backend(specs=specs)
+    assert backend is not None
+    assert backend.name == "ite8291r3_perkey"
+
+
+def test_select_backend_requested_usb_bypasses_sysfs_auto_preference(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    specs = [
+        BackendSpec(
+            name="ite8291r3_perkey",
+            priority=100,
+            factory=lambda: DummyBackend("ite8291r3_perkey", 100, True, confidence=90),
+        ),
+        BackendSpec(
+            name="sysfs-leds",
+            priority=150,
+            factory=lambda: DummyBackend("sysfs-leds", 150, True, confidence=85),
+        ),
+    ]
+
+    monkeypatch.setenv("KEYRGB_BACKEND", "ite8291r3_perkey")
+
+    backend = select_backend(specs=specs)
+    assert backend is not None
+    assert backend.name == "ite8291r3_perkey"
 
 
 def test_select_backend_env_override(monkeypatch: pytest.MonkeyPatch) -> None:

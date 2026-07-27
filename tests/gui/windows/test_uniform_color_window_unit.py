@@ -4,9 +4,11 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.windows._uniform_color_bootstrap as uniform_color_bootstrap
-import src.gui.windows._uniform_color_ui as uniform_color_ui
-import src.gui.windows.uniform as uniform
+from src.gui.windows import (
+    _uniform_color_bootstrap as uniform_color_bootstrap,
+    _uniform_color_ui as uniform_color_ui,
+    uniform,
+)
 
 
 class _FakeWidget:
@@ -56,6 +58,7 @@ class _FakeRoot:
         self.after_calls: list[tuple[int, object]] = []
         self.destroy_calls = 0
         self.update_idletasks_calls = 0
+        self.protocol_calls: list[tuple[str, object]] = []
 
     def title(self, text: str) -> None:
         self.title_calls.append(text)
@@ -83,6 +86,9 @@ class _FakeRoot:
 
     def destroy(self) -> None:
         self.destroy_calls += 1
+
+    def protocol(self, name: str, callback) -> None:
+        self.protocol_calls.append((name, callback))
 
 
 class _FakeColorWheel:
@@ -158,8 +164,8 @@ def test_select_backend_best_effort_uses_secondary_route_backend(monkeypatch) ->
 def test_secondary_uniform_window_uses_runtime_backend_and_device_in_simulation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
     from src.core.secondary_device_routes import route_for_device_type
+    from src.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
 
     monkeypatch.setenv(SIMULATION_ENVIRONMENT_VARIABLE, "1")
     route = route_for_device_type("logo")
@@ -206,6 +212,21 @@ def test_acquire_device_best_effort_propagates_unexpected_runtime_failure() -> N
 
     with pytest.raises(AssertionError):
         gui._acquire_device_best_effort(BrokenBackend())
+
+
+def test_device_bootstrap_stays_config_only_when_hardware_is_not_allowed() -> None:
+    state = uniform.uniform_init_adapter.initialize_device_bootstrap_state(
+        secondary_route=None,
+        requested_backend=None,
+        select_backend_fn=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected selection")),
+        is_device_busy_fn=lambda _exc: False,
+        logger=uniform.logger,
+        allow_hardware=False,
+    )
+
+    assert state.backend is None
+    assert state.color_supported is True
+    assert state.device is None
 
 
 def test_apply_color_returns_false_for_recoverable_runtime_failure() -> None:
@@ -388,6 +409,8 @@ def test_constructor_uses_content_driven_geometry(monkeypatch) -> None:
     monkeypatch.setattr(uniform, "apply_clam_theme", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(uniform, "apply_keyrgb_window_icon", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(uniform, "compute_centered_window_geometry", lambda *_args, **_kwargs: "520x570+10+20")
+    monkeypatch.setattr(uniform, "acquire_hardware_control_lock", lambda: True)
+    monkeypatch.setattr(uniform, "release_hardware_control_lock", lambda: None)
 
     gui = uniform.UniformColorGUI()
 
@@ -403,12 +426,14 @@ def test_constructor_uses_content_driven_geometry(monkeypatch) -> None:
     assert button_frame.columnconfigure_calls == [(0, 1), (1, 1)]
     assert apply_button.grid_calls == [{"row": 0, "column": 0, "sticky": "ew", "padx": (0, 8)}]
     assert close_button.grid_calls == [{"row": 0, "column": 1, "sticky": "ew", "padx": (8, 0)}]
+    assert [name for name, _callback in root.protocol_calls] == ["WM_DELETE_WINDOW"]
 
 
 def test_constructor_delegates_bootstrap_state_to_adapter(monkeypatch) -> None:
     root = _FakeRoot()
     config = SimpleNamespace(color=(12, 34, 56), brightness=25, effect="none")
     calls: list[dict[str, object]] = []
+    releases: list[bool] = []
 
     monkeypatch.setattr(uniform.tk, "Tk", lambda: root)
     monkeypatch.setattr(uniform, "Config", lambda: config)
@@ -416,6 +441,8 @@ def test_constructor_delegates_bootstrap_state_to_adapter(monkeypatch) -> None:
     monkeypatch.setattr(uniform, "apply_keyrgb_window_icon", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(uniform, "compute_centered_window_geometry", lambda *_args, **_kwargs: "520x570+10+20")
     monkeypatch.setattr(uniform_color_ui, "build_uniform_window_ui", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(uniform, "acquire_hardware_control_lock", lambda: True)
+    monkeypatch.setattr(uniform, "release_hardware_control_lock", lambda: releases.append(True))
 
     def _fake_init_adapter(**kwargs):
         calls.append(dict(kwargs))
@@ -434,9 +461,28 @@ def test_constructor_delegates_bootstrap_state_to_adapter(monkeypatch) -> None:
     assert calls[0]["requested_backend"] is None
     assert calls[0]["select_backend_fn"] is uniform.select_backend
     assert calls[0]["is_device_busy_fn"] is uniform.is_device_busy
+    assert calls[0]["allow_hardware"] is True
     assert gui._backend == "backend"
     assert gui._color_supported is False
     assert gui.kb == "device"
+
+    gui._on_close()
+    assert releases == [True]
+
+
+def test_on_close_releases_device_and_hardware_lock(monkeypatch) -> None:
+    calls: list[str] = []
+    gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
+    gui.kb = SimpleNamespace(close=lambda: calls.append("device:close"))
+    gui._owns_hardware_lock = True
+    gui.root = SimpleNamespace(destroy=lambda: calls.append("root:destroy"))
+    monkeypatch.setattr(uniform, "release_hardware_control_lock", lambda: calls.append("lock:release"))
+
+    gui._on_close()
+
+    assert calls == ["device:close", "lock:release", "root:destroy"]
+    assert gui.kb is None
+    assert gui._owns_hardware_lock is False
 
 
 def test_build_uniform_window_ui_disables_apply_and_syncs_wrap_for_added_labels() -> None:

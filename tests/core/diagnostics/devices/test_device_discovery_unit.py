@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
 from src.core.diagnostics.device_discovery import collect_device_discovery, format_device_discovery_text
@@ -73,7 +72,7 @@ def test_collect_device_discovery_flags_unrecognized_ite_device(monkeypatch) -> 
             }
         ],
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", lambda: [])
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
 
     payload = collect_device_discovery(include_usb=True)
 
@@ -175,7 +174,7 @@ def test_collect_device_discovery_marks_supported_experimental_candidate(monkeyp
             }
         ],
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", lambda: [])
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
 
     payload = collect_device_discovery(include_usb=True)
 
@@ -206,7 +205,7 @@ def test_collect_device_discovery_includes_sysfs_mouse_aux_candidate(monkeypatch
     )
     monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: [])
     monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_devices_snapshot", lambda targets: [])
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", lambda: [])
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
 
     payload = collect_device_discovery(include_usb=True)
 
@@ -244,7 +243,7 @@ def test_collect_device_discovery_recommends_bug_report_for_supported_validated_
             }
         ],
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", lambda: [])
+    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
 
     payload = collect_device_discovery(include_usb=True)
 

@@ -8,7 +8,7 @@ from src.core.effects.reactive._ripple_helpers import (
     build_ripple_overlay_into,
     get_engine_overlay_buffer,
 )
-from src.core.effects.reactive.utils import _Pulse, _RainbowPulse, _age_pulses_in_place
+from src.core.effects.reactive.utils import _age_pulses_in_place, _Pulse, _RainbowPulse
 
 
 def test_age_pulses_in_place_reuses_list_and_drops_expired() -> None:

@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping, Sequence
-from tkinter import TclError
-from tkinter import font as tkfont
+from tkinter import TclError, font as tkfont
 from typing import TYPE_CHECKING, Protocol, TypeAlias
 
 from PIL import Image, ImageTk
 
-from . import _canvas_drawing_helpers as drawing_helpers
-from . import _canvas_drawing_render as drawing_render
+from . import _canvas_drawing_helpers as drawing_helpers, _canvas_drawing_render as drawing_render
 from ._canvas_drawing_runtime import DEFAULT_CANVAS_DRAWING_RUNTIME
 
 if TYPE_CHECKING:

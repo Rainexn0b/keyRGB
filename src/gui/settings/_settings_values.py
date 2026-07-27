@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from src.core.power.system import PowerMode
 from src.core.resources.layouts.catalog import VALID_LAYOUT_IDS
-from src.gui.settings import _settings_reader as settings_reader
-from src.gui.settings import _settings_scheduler as settings_scheduler
+from src.gui.settings import _settings_reader as settings_reader, _settings_scheduler as settings_scheduler
 
 
 def clamp_brightness(value: int) -> int:
@@ -207,7 +207,20 @@ def apply_settings_values_to_config(
     values: SettingsValues,
     now: datetime | None = None,
 ) -> None:
-    """Apply GUI settings back onto a Config-like object."""
+    """Apply GUI settings in one transaction when the Config supports it."""
+
+    batch_update = getattr(config, "batch_update", None)
+    transaction = batch_update() if callable(batch_update) else nullcontext()
+    with transaction:
+        _apply_settings_values_to_config_unbatched(config=config, values=values, now=now)
+
+
+def _apply_settings_values_to_config_unbatched(
+    *,
+    config: settings_reader.SettingsConfigLike,
+    values: SettingsValues,
+    now: datetime | None,
+) -> None:
 
     config.power_management_enabled = bool(values.power_management_enabled)
     config.management_enabled = bool(values.power_management_enabled)
@@ -217,6 +230,7 @@ def apply_settings_values_to_config(
     config.power_restore_on_lid_open = bool(values.power_restore_on_lid_open)
 
     config.autostart = bool(values.autostart)
+    config.os_autostart = bool(values.os_autostart_enabled)
     config.experimental_backends_enabled = bool(values.experimental_backends_enabled)
 
     config.ac_lighting_enabled = bool(values.ac_lighting_enabled)

@@ -7,11 +7,11 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.utils.safe_attrs import (
-    safe_int_attr,
     safe_bool_attr,
     safe_float_attr,
-    safe_str_attr,
+    safe_int_attr,
     safe_optional_int_attr,
+    safe_str_attr,
 )
 
 

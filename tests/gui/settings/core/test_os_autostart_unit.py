@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import src.gui.settings.os_autostart as os_autostart
+from src.gui.settings import os_autostart
 
 
 def test_autostart_desktop_path_uses_home_config_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -86,13 +86,15 @@ def test_set_os_autostart_enables_and_writes_desktop_file(monkeypatch: pytest.Mo
     assert fake_path.parent.mkdir_calls == [(True, True)]
     assert fake_path.writes == [
         (
-            "[Desktop Entry]\n"
-            "Type=Application\n"
-            "Name=KeyRGB\n"
-            "Comment=Keyboard RGB tray\n"
-            "Exec=keyrgb\n"
-            "Terminal=false\n"
-            "X-GNOME-Autostart-enabled=true\n",
+            (
+                "[Desktop Entry]\n"
+                "Type=Application\n"
+                "Name=KeyRGB\n"
+                "Comment=Keyboard RGB tray\n"
+                "Exec=keyrgb\n"
+                "Terminal=false\n"
+                "X-GNOME-Autostart-enabled=true\n"
+            ),
             "utf-8",
         )
     ]

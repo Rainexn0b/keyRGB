@@ -8,10 +8,10 @@ from pathlib import Path as RealPath
 
 import pytest
 
+import src.core.diagnostics.proc as proc_mod
 from src.core import diagnostics as diagnostics_mod
 from src.core.diagnostics.model import Diagnostics
 from src.core.diagnostics.proc import proc_open_holders
-import src.core.diagnostics.proc as proc_mod
 
 
 def _sample_diagnostics() -> Diagnostics:
@@ -97,11 +97,13 @@ def test_collect_diagnostics_propagates_programming_errors_from_power_mode_snaps
         "_system_power_mode_snapshot",
         lambda: (_ for _ in ()).throw(AssertionError("bug")),
     )
-    monkeypatch.setattr(diagnostics_mod, "_list_platform_hints", lambda: [])
-    monkeypatch.setattr(diagnostics_mod, "_list_module_hints", lambda: [])
+    monkeypatch.setattr(diagnostics_mod, "_list_platform_hints", list)
+    monkeypatch.setattr(diagnostics_mod, "_list_module_hints", list)
     monkeypatch.setattr(diagnostics_mod, "_app_snapshot", lambda: {"version": "test"})
     monkeypatch.setattr(diagnostics_mod, "_power_supply_snapshot", lambda: {"ac_online": True})
-    monkeypatch.setattr(diagnostics_mod, "_backend_probe_snapshot", lambda: {"selected": "ite8291r3_perkey", "probes": []})
+    monkeypatch.setattr(
+        diagnostics_mod, "_backend_probe_snapshot", lambda: {"selected": "ite8291r3_perkey", "probes": []}
+    )
     monkeypatch.setattr(diagnostics_mod, "_usb_devices_snapshot", lambda targets: [])
     monkeypatch.setattr(diagnostics_mod, "_config_snapshot", lambda: {"backend": "auto"})
     monkeypatch.setattr(diagnostics_mod, "_process_snapshot", lambda: {"pid": 55})

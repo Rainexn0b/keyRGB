@@ -5,8 +5,8 @@ from threading import RLock
 import pytest
 
 from src.core.effects.device import NullKeyboard
-from src.core.effects.fades import fade_in_per_key
 from src.core.effects.engine import EffectsEngine
+from src.core.effects.fades import fade_in_per_key
 
 
 def test_perkey_fade_passes_brightness_kwarg() -> None:

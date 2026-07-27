@@ -97,7 +97,7 @@ def _build_led_entry(*, led_dir: Path, name: str, score: int, root_is_sys: bool)
     acl_present: bool | None = None
     if hasattr(os, "getxattr"):
         try:
-            os.getxattr(brightness_path, "system.posix_acl_access")  # type: ignore[arg-type]
+            os.getxattr(brightness_path, "system.posix_acl_access")
             acl_present = True
         except OSError:
             acl_present = False

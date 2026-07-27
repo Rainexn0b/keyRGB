@@ -4,23 +4,27 @@ from __future__ import annotations
 
 # @quality-exception file-size-analysis: Config facade class; lighting accessors already live under config/_lighting/
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, Literal, overload
 
 from src.core.effects import software_targets as _software_targets
 
-from . import defaults as _defaults
-from . import file_storage as _file_storage
-from . import paths as _paths
-from . import perkey_colors as _perkey_colors
-from ._lighting import _coercion as _lighting_coercion
-from ._lighting import _effect_speed_overrides as _effect_speed_boundary
-from ._lighting import _lighting_accessors
-from ._lighting import _props as _lighting_props
+from . import defaults as _defaults, file_storage as _file_storage, paths as _paths, perkey_colors as _perkey_colors
+from ._lighting import (
+    _coercion as _lighting_coercion,
+    _effect_speed_overrides as _effect_speed_boundary,
+    _lighting_accessors,
+    _props as _lighting_props,
+)
 from ._settings_view import ConfigSettingsView
 
 logger = logging.getLogger(__name__)
+
+
+class ConfigPersistenceError(OSError):
+    """Raised when an explicitly transactional configuration update cannot persist."""
 
 
 def _normalized_optional_string(value: object) -> str | None:
@@ -56,6 +60,9 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         loaded = self._load()
         self._settings: dict[str, Any] = loaded if loaded is not None else deepcopy(self.DEFAULTS)
+        self._persisted_settings: dict[str, Any] = deepcopy(self._settings)
+        self._save_defer_depth = 0
+        self._save_pending = False
         self._coerce_loaded_settings()
 
         # Cache mtime for reload() short-circuiting.
@@ -101,15 +108,69 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         # If the file was transiently unreadable, keep the previous in-memory settings.
         if loaded is not None:
             self._settings = loaded
+            self._persisted_settings = deepcopy(loaded)
             self._last_reload_mtime_ns = mtime_ns
 
     def _save(self) -> None:
-        _file_storage.save_config_settings_atomic(
+        self._persist_changes()
+
+    def _persist_changes(self) -> bool:
+        if self._save_defer_depth > 0:
+            self._save_pending = True
+            return True
+
+        updates = {
+            key: deepcopy(value)
+            for key, value in self._settings.items()
+            if key not in self._persisted_settings or self._persisted_settings[key] != value
+        }
+        removed_keys = set(self._persisted_settings) - set(self._settings)
+        if not updates and not removed_keys:
+            return True
+
+        merged = _file_storage.merge_config_settings_atomic(
             config_dir=self.CONFIG_DIR,
             config_file=self.CONFIG_FILE,
-            settings=self._settings,
+            defaults=_defaults.DEFAULTS,
+            updates=updates,
+            removed_keys=removed_keys,
             logger=logger,
         )
+        if merged is None:
+            return False
+
+        self._settings = merged
+        self._persisted_settings = deepcopy(merged)
+        try:
+            self._last_reload_mtime_ns = self.CONFIG_FILE.stat().st_mtime_ns
+        except OSError:
+            self._last_reload_mtime_ns = None
+        return True
+
+    @contextmanager
+    def batch_update(self) -> Iterator[Config]:
+        """Persist multiple property updates as one rollback-capable transaction."""
+
+        outermost = self._save_defer_depth == 0
+        snapshot = deepcopy(self._settings) if outermost else None
+        pending_before = self._save_pending
+        self._save_defer_depth += 1
+        completed = False
+        try:
+            yield self
+            completed = True
+        finally:
+            self._save_defer_depth -= 1
+            if outermost and not completed and snapshot is not None:
+                self._settings = snapshot
+                self._save_pending = pending_before
+            elif outermost:
+                should_save = self._save_pending
+                self._save_pending = pending_before
+                if should_save and not self._persist_changes():
+                    if snapshot is not None:
+                        self._settings = snapshot
+                    raise ConfigPersistenceError("Could not persist configuration transaction")
 
     def apply_perkey_profile_state(
         self,

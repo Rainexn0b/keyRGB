@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.core.power.management.manager import PowerManager, TurnOffFromEvent, RestoreFromEvent
+from src.core.power.management.manager import PowerManager, RestoreFromEvent, TurnOffFromEvent
 from src.core.power.policies.power_event_policy import PowerEventInputs, PowerEventResult
 
 
@@ -24,7 +24,6 @@ class TestPowerManagerEventIntegrationFullPath:
     def test_handle_power_event_full_path_with_turnoff_action(self, mock_policy_cls):
         """_handle_power_event orchestrates: policy eval → plan build → execute."""
         from src.core.power.management.manager import logger
-
         from src.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
@@ -44,17 +43,19 @@ class TestPowerManagerEventIntegrationFullPath:
         pm._config.management_enabled = True
         pm._config.power_off_on_suspend = True
 
-        with patch.object(logger, "info") as log_info_mock:
-            with patch("src.core.power.management.manager.time.sleep") as sleep_mock:
-                pm._handle_power_event(
-                    enabled=True,
-                    action_enabled=True,
-                    log_message="Test suspend event",
-                    delay_s=0.1,
-                    policy_method=mock_policy_instance.handle_power_off_event,
-                    expected_action_type=TurnOffFromEvent,
-                    kb_method_name="turn_off",
-                )
+        with (
+            patch.object(logger, "info") as log_info_mock,
+            patch("src.core.power.management.manager.time.sleep") as sleep_mock,
+        ):
+            pm._handle_power_event(
+                enabled=True,
+                action_enabled=True,
+                log_message="Test suspend event",
+                delay_s=0.1,
+                policy_method=mock_policy_instance.handle_power_off_event,
+                expected_action_type=TurnOffFromEvent,
+                kb_method_name="turn_off",
+            )
 
         # Verify full chain:
         # 1. Policy was called with correct inputs
@@ -79,9 +80,7 @@ class TestPowerManagerEventIntegrationFullPath:
         mock_kb.restore = MagicMock()
 
         mock_policy_instance = MagicMock()
-        mock_policy_instance.handle_power_restore_event.return_value = PowerEventResult(
-            actions=(RestoreFromEvent(),)
-        )
+        mock_policy_instance.handle_power_restore_event.return_value = PowerEventResult(actions=(RestoreFromEvent(),))
         mock_policy_cls.return_value = mock_policy_instance
 
         pm = PowerManager(mock_kb)
@@ -111,7 +110,6 @@ class TestPowerManagerPolicyEvaluationBoundaryErrorRecovery:
     def test_evaluate_policy_catches_attribute_error_and_logs(self, mock_policy_cls):
         """RuntimeError during policy method should be caught, logged, not propagated."""
         from src.core.power.management.manager import logger
-
         from src.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
@@ -165,7 +163,7 @@ class TestPowerManagerPolicyEvaluationBoundaryErrorRecovery:
                 expected_action_type=TurnOffFromEvent,
                 kb_method_name="turn_off",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - convert any unexpected raise into pytest.fail
             pytest.fail(f"_handle_power_event raised {type(e).__name__}: {e}")
 
         # Keyboard was NOT called (plan was None due to error)
@@ -175,7 +173,6 @@ class TestPowerManagerPolicyEvaluationBoundaryErrorRecovery:
     def test_evaluate_policy_catches_lookup_error(self, mock_policy_cls):
         """LookupError during policy eval should also be caught and logged."""
         from src.core.power.management.manager import logger
-
         from src.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
@@ -218,9 +215,7 @@ class TestPowerManagerKeyboardMethodInvocationBoundaryErrorRecovery:
 
         mock_policy_instance = MagicMock()
         # 2 turn-off actions in the plan
-        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(
-            actions=(TurnOffFromEvent(),) * 2
-        )
+        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(actions=(TurnOffFromEvent(),) * 2)
         mock_policy_cls.return_value = mock_policy_instance
 
         pm = PowerManager(mock_kb)
@@ -249,14 +244,10 @@ class TestPowerManagerKeyboardMethodInvocationBoundaryErrorRecovery:
         """Flow continues even when kb method raises (per action, not halt)."""
         mock_kb = MagicMock()
         # All 3 calls fail, but they should all be attempted
-        mock_kb.turn_off = MagicMock(
-            side_effect=[RuntimeError("fail1"), RuntimeError("fail2"), RuntimeError("fail3")]
-        )
+        mock_kb.turn_off = MagicMock(side_effect=[RuntimeError("fail1"), RuntimeError("fail2"), RuntimeError("fail3")])
 
         mock_policy_instance = MagicMock()
-        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(
-            actions=(TurnOffFromEvent(),) * 3
-        )
+        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(actions=(TurnOffFromEvent(),) * 3)
         mock_policy_cls.return_value = mock_policy_instance
 
         pm = PowerManager(mock_kb)
@@ -273,7 +264,7 @@ class TestPowerManagerKeyboardMethodInvocationBoundaryErrorRecovery:
                 expected_action_type=TurnOffFromEvent,
                 kb_method_name="turn_off",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - convert any unexpected raise into pytest.fail
             pytest.fail(f"_handle_power_event raised {type(e).__name__}: {e}")
 
         # All 3 invocations were attempted despite errors
@@ -288,9 +279,7 @@ class TestPowerManagerKeyboardMethodInvocationBoundaryErrorRecovery:
         mock_kb.turn_off = MagicMock(side_effect=TypeError("wrong arg type"))
 
         mock_policy_instance = MagicMock()
-        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(
-            actions=(TurnOffFromEvent(),)
-        )
+        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(actions=(TurnOffFromEvent(),))
         mock_policy_cls.return_value = mock_policy_instance
 
         pm = PowerManager(mock_kb)
@@ -416,17 +405,19 @@ class TestPowerManagerNoOpPlanExecution:
         pm._config.management_enabled = True
         pm._config.power_off_on_suspend = True
 
-        with patch.object(logger, "info") as log_info_mock:
-            with patch("src.core.power.management.manager.time.sleep") as sleep_mock:
-                pm._handle_power_event(
-                    enabled=True,
-                    action_enabled=True,
-                    log_message="Should not log",
-                    delay_s=0.5,
-                    policy_method=mock_policy_instance.handle_power_off_event,
-                    expected_action_type=TurnOffFromEvent,
-                    kb_method_name="turn_off",
-                )
+        with (
+            patch.object(logger, "info") as log_info_mock,
+            patch("src.core.power.management.manager.time.sleep") as sleep_mock,
+        ):
+            pm._handle_power_event(
+                enabled=True,
+                action_enabled=True,
+                log_message="Should not log",
+                delay_s=0.5,
+                policy_method=mock_policy_instance.handle_power_off_event,
+                expected_action_type=TurnOffFromEvent,
+                kb_method_name="turn_off",
+            )
 
         # No logging (empty plan, should_log=False)
         log_info_mock.assert_not_called()
@@ -459,7 +450,7 @@ class TestPowerManagerNoOpPlanExecution:
                 expected_action_type=TurnOffFromEvent,
                 kb_method_name="turn_off",
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 - convert any unexpected raise into pytest.fail
             pytest.fail(f"_handle_power_event raised {type(e).__name__}: {e}")
 
         # Verify no side effects
@@ -480,17 +471,19 @@ class TestPowerManagerNoOpPlanExecution:
         pm = PowerManager(mock_kb)
         pm._config.management_enabled = True
 
-        with patch.object(logger, "info") as log_info_mock:
-            with patch("src.core.power.management.manager.time.sleep") as sleep_mock:
-                pm._handle_power_event(
-                    enabled=True,
-                    action_enabled=True,
-                    log_message="Testing",
-                    delay_s=0.1,
-                    policy_method=mock_policy_instance.handle_power_off_event,
-                    expected_action_type=TurnOffFromEvent,
-                    kb_method_name="turn_off",
-                )
+        with (
+            patch.object(logger, "info") as log_info_mock,
+            patch("src.core.power.management.manager.time.sleep") as sleep_mock,
+        ):
+            pm._handle_power_event(
+                enabled=True,
+                action_enabled=True,
+                log_message="Testing",
+                delay_s=0.1,
+                policy_method=mock_policy_instance.handle_power_off_event,
+                expected_action_type=TurnOffFromEvent,
+                kb_method_name="turn_off",
+            )
 
         # No log, no sleep, no invocation (action_count=0 gates everything)
         log_info_mock.assert_not_called()
@@ -510,26 +503,23 @@ class TestPowerManagerEventIntegrationEdgeCases:
         mock_kb.turn_off = MagicMock()
 
         mock_policy_instance = MagicMock()
-        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(
-            actions=(TurnOffFromEvent(),)
-        )
+        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(actions=(TurnOffFromEvent(),))
         mock_policy_cls.return_value = mock_policy_instance
 
         pm = PowerManager(mock_kb)
         pm._config.management_enabled = True
         pm._config.power_off_on_suspend = True
 
-        with patch.object(logger, "info"):
-            with patch("src.core.power.management.manager.time.sleep") as sleep_mock:
-                pm._handle_power_event(
-                    enabled=True,
-                    action_enabled=True,
-                    log_message="Test",
-                    delay_s=0.0,
-                    policy_method=mock_policy_instance.handle_power_off_event,
-                    expected_action_type=TurnOffFromEvent,
-                    kb_method_name="turn_off",
-                )
+        with patch.object(logger, "info"), patch("src.core.power.management.manager.time.sleep") as sleep_mock:
+            pm._handle_power_event(
+                enabled=True,
+                action_enabled=True,
+                log_message="Test",
+                delay_s=0.0,
+                policy_method=mock_policy_instance.handle_power_off_event,
+                expected_action_type=TurnOffFromEvent,
+                kb_method_name="turn_off",
+            )
 
         # Sleep should NOT be called when delay is 0
         sleep_mock.assert_not_called()
@@ -542,9 +532,7 @@ class TestPowerManagerEventIntegrationEdgeCases:
 
         mock_policy_instance = MagicMock()
         # 5 turn-off actions
-        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(
-            actions=(TurnOffFromEvent(),) * 5
-        )
+        mock_policy_instance.handle_power_off_event.return_value = PowerEventResult(actions=(TurnOffFromEvent(),) * 5)
         mock_policy_cls.return_value = mock_policy_instance
 
         pm = PowerManager(mock_kb)

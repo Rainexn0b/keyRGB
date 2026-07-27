@@ -6,10 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.effects.reactive.render import (
+    _resolve_brightness,
     apply_backdrop_brightness_scale,
     backdrop_brightness_scale_factor,
     pulse_brightness_scale_factor,
-    _resolve_brightness,
 )
 
 

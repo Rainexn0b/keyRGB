@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 from src.core import config as core_config
-from src.core.diagnostics import device_discovery as diagnostics_device_discovery
-from src.core.diagnostics import support as diagnostics_support
+from src.core.diagnostics import device_discovery as diagnostics_device_discovery, support as diagnostics_support
 from src.gui import theme as gui_theme
 from src.gui.settings import diagnostics_runner
 from src.gui.utils import tk_async, window_centering, window_geometry, window_icon

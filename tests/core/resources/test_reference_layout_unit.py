@@ -1,17 +1,16 @@
 from __future__ import annotations
 
 import src.core.resources.layout as layout_mod
-
+import src.core.resources.layout_slots as layout_slots_mod
 from src.core.resources.layout import (
     ISO_ONLY_KEY_IDS,
+    KeyDef,
     build_layout,
     get_layout_keys,
     key_id_for_slot_id,
-    KeyDef,
     resolve_physical_layout,
     slot_id_for_key_id,
 )
-import src.core.resources.layout_slots as layout_slots_mod
 from src.core.resources.layout_slots import apply_layout_slot_overrides, clear_layout_slot_cache, get_layout_slot_states
 from src.core.resources.layout_specs import load_layout_spec
 
@@ -255,4 +254,3 @@ def test_abnt_layout_spec_inherits_iso_rows() -> None:
 
     assert "nonushash" in home_ids
     assert "abnt2slash" in shift_ids
-

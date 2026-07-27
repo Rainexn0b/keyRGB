@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from src.core.backends.base import BackendStability, ExperimentalEvidence
+from src.core.backends.exceptions import BackendIOError
 from src.core.backends.ite8297_uniform import protocol
 from src.core.backends.ite8297_uniform.backend import (
     Ite8297Backend,
@@ -11,8 +13,6 @@ from src.core.backends.ite8297_uniform.backend import (
     _open_matching_transport,
 )
 from src.core.backends.ite8297_uniform.device import Ite8297KeyboardDevice
-from src.core.backends.exceptions import BackendIOError
-from src.core.backends.base import BackendStability, ExperimentalEvidence
 
 
 def test_protocol_builds_64_byte_uniform_color_report() -> None:
@@ -86,7 +86,9 @@ def test_backend_probe_reports_unavailable_when_scan_disabled(monkeypatch: pytes
 
 def test_backend_probe_reports_unavailable_when_no_matching_device(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
-    monkeypatch.setattr("src.core.backends.ite8297_uniform.backend._find_matching_supported_hidraw_device", lambda: None)
+    monkeypatch.setattr(
+        "src.core.backends.ite8297_uniform.backend._find_matching_supported_hidraw_device", lambda: None
+    )
 
     result = Ite8297Backend().probe()
 
@@ -100,13 +102,17 @@ def test_find_matching_supported_hidraw_device_falls_back_to_scanned_match_when_
 ) -> None:
     dummy_match = object()
     monkeypatch.setenv(protocol.HIDRAW_PATH_ENV, "/tmp/does-not-exist")
-    monkeypatch.setattr("src.core.backends.ite8297_uniform.backend.find_matching_hidraw_device", lambda *_a, **_k: dummy_match)
+    monkeypatch.setattr(
+        "src.core.backends.ite8297_uniform.backend.find_matching_hidraw_device", lambda *_a, **_k: dummy_match
+    )
 
     assert _find_matching_supported_hidraw_device() is dummy_match
 
 
 def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.core.backends.ite8297_uniform.backend._find_matching_supported_hidraw_device", lambda: None)
+    monkeypatch.setattr(
+        "src.core.backends.ite8297_uniform.backend._find_matching_supported_hidraw_device", lambda: None
+    )
 
     with pytest.raises(FileNotFoundError, match="No hidraw device found"):
         _open_matching_transport()

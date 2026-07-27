@@ -93,9 +93,7 @@ def test_forced_off_skip_logs_update_menu_failure() -> None:
 
     tray = _mk_tray(brightness=30, effect="rainbow_wave")
     tray.is_off = True
-    set_idle_power_state_field(
-        tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True
-    )
+    set_idle_power_state_field(tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True)
     tray._update_menu.side_effect = RuntimeError("boom")
 
     new_last_applied, _ = _apply_from_config_once(

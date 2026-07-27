@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import ClassVar
 
 import pytest
 
@@ -396,7 +397,7 @@ def test_icon_visual_reactive_falls_back_to_base_brightness_when_perkey_brightne
         color = (10, 20, 30)
         reactive_color = (200, 100, 50)
         reactive_use_manual_color = False
-        per_key_colors = {(0, 0): (255, 0, 0)}
+        per_key_colors: ClassVar[dict] = {(0, 0): (255, 0, 0)}
 
         @property
         def perkey_brightness(self):
@@ -443,7 +444,7 @@ def test_icon_visual_perkey_falls_back_to_base_brightness_when_perkey_brightness
         effect = "perkey"
         brightness = 10
         color = (255, 255, 255)
-        per_key_colors = {(0, 0): (255, 0, 0)}
+        per_key_colors: ClassVar[dict] = {(0, 0): (255, 0, 0)}
 
         @property
         def perkey_brightness(self):

@@ -6,10 +6,9 @@ import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
-import src.core.diagnostics.support.evidence as evidence
+from src.core.diagnostics.support import evidence
 
 
 def test_build_additional_evidence_plan_for_attention_candidate() -> None:

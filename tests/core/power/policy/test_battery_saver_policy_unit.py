@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 from src.core.power.policies.battery_saver_policy import BatterySaverPolicy
 
 

@@ -53,6 +53,8 @@ def monitor_acpi_events(
     on_lid_close: Callable[[], None],
     on_lid_open: Callable[[], None],
     logger,
+    on_process_started: Callable[[object], None] | None = None,
+    on_process_stopped: Callable[[object], None] | None = None,
 ) -> None:
     """Fallback method using acpi_listen for lid events.
 
@@ -69,11 +71,15 @@ def monitor_acpi_events(
             universal_newlines=True,
             bufsize=1,
         )
+        if on_process_started is not None:
+            on_process_started(process)
 
         assert process.stdout is not None
 
         while is_running():
             line = process.stdout.readline()
+            if not is_running():
+                break
             if not line:
                 break
 
@@ -93,3 +99,5 @@ def monitor_acpi_events(
     finally:
         if process is not None:
             _terminate_process(process)
+            if on_process_stopped is not None:
+                on_process_stopped(process)

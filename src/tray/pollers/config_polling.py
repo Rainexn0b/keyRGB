@@ -10,13 +10,13 @@ from src.core.utils.exceptions import is_device_disconnected
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from . import _lifecycle as polling_lifecycle
-from .config_polling_internal.core import ConfigApplyState
-from .config_polling_internal.core import apply_from_config_once as _apply_from_config_once_impl
 from .config_polling_internal.core import (
+    ConfigApplyState,
+    apply_from_config_once as _apply_from_config_once_impl,
     compute_config_apply_state as _compute_config_apply_state_impl,
+    maybe_apply_fast_path as _maybe_apply_fast_path_impl,
+    state_for_log as _state_for_log_impl,
 )
-from .config_polling_internal.core import maybe_apply_fast_path as _maybe_apply_fast_path_impl
-from .config_polling_internal.core import state_for_log as _state_for_log_impl
 
 _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 

@@ -70,7 +70,7 @@ def start_sysfs_lid_monitoring(
     on_lid_close: Callable[[], None],
     on_lid_open: Callable[[], None],
     logger,
-) -> None:
+) -> threading.Thread:
     """Start a background thread to monitor lid state via /proc/acpi sysfs-style files."""
 
     def monitor_lid_sysfs():
@@ -88,6 +88,8 @@ def start_sysfs_lid_monitoring(
             def poll_once() -> None:
                 nonlocal last_state
                 state = read_lid_state()
+                if not is_running():
+                    return
 
                 if state and state != last_state:
                     logger.info("Lid state changed: %s -> %s", last_state, state)
@@ -102,7 +104,9 @@ def start_sysfs_lid_monitoring(
 
             time.sleep(0.5)
 
-    threading.Thread(target=monitor_lid_sysfs, daemon=True).start()
+    thread = threading.Thread(target=monitor_lid_sysfs, daemon=True)
+    thread.start()
+    return thread
 
 
 def _path_exists(path: str) -> bool:
@@ -134,6 +138,8 @@ def poll_lid_state_paths(
         def poll_once() -> None:
             nonlocal last_state
             parsed = read_lid_state()
+            if not is_running():
+                return
 
             if parsed and parsed != last_state:
                 if parsed == "closed":

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.widgets.dropdown as dropdown
+from src.gui.widgets import dropdown
 
 
 class _FakeRoot:

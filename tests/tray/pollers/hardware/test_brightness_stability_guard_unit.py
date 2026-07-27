@@ -8,7 +8,6 @@ caused by concurrent brightness writers racing.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Optional
 
 
 class _DummyLock:
@@ -43,9 +42,9 @@ def _mk_engine(
     brightness: int = 50,
     per_key_brightness: int = 50,
     reactive_brightness: int = 50,
-    hw_brightness_cap: Optional[int] = None,
+    hw_brightness_cap: int | None = None,
     dim_temp_active: bool = False,
-    last_rendered: Optional[int] = None,
+    last_rendered: int | None = None,
     has_per_key: bool = True,
 ) -> SimpleNamespace:
     kb = _RecordingKB()

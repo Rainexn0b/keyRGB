@@ -5,7 +5,6 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-
 # ── Utility: _engine_int_attr_or_default ──────────────────────────────────────
 
 
@@ -180,7 +179,9 @@ class _MockApi:
     def pace(self, engine, *, min_factor: float = 0.8, max_factor: float = 2.2) -> float:
         return 1.0
 
-    def build_frame_base_maps(self, engine, *, background_rgb, effect_brightness_hw, backdrop_brightness_scale_factor_fn):
+    def build_frame_base_maps(
+        self, engine, *, background_rgb, effect_brightness_hw, backdrop_brightness_scale_factor_fn
+    ):
         bm = dict(self._base_map)
         return (self._per_key_backdrop_active, bm, bm)
 

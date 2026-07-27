@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from . import _support_window_ui_sections as support_window_ui_sections
-from . import _support_window_ui_shared as support_window_ui_shared
+from . import (
+    _support_window_ui_sections as support_window_ui_sections,
+    _support_window_ui_shared as support_window_ui_shared,
+)
 
 BindCallback = support_window_ui_shared.BindCallback
 AfterCallback = support_window_ui_shared.AfterCallback

@@ -25,7 +25,7 @@ def test_ite_backend_smoke() -> None:
             import pytest
 
             pytest.skip("Hardware test skipped (set KEYRGB_HW_TESTS=1 to enable)")
-        except Exception:
+        except ImportError:
             return
 
     from src.core.backends.registry import select_backend

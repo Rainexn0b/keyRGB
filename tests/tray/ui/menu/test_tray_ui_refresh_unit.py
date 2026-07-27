@@ -11,7 +11,7 @@ def test_update_icon_noop_without_icon(monkeypatch) -> None:
 
 
 def test_update_icon_sets_icon_image(monkeypatch) -> None:
-    import src.tray.ui.refresh as refresh
+    from src.tray.ui import refresh
 
     calls = {"n": 0}
 
@@ -39,7 +39,7 @@ def test_update_menu_noop_without_icon(monkeypatch) -> None:
 
 
 def test_update_menu_reloads_and_builds_menu(monkeypatch) -> None:
-    import src.tray.ui.refresh as refresh
+    from src.tray.ui import refresh
 
     tray = SimpleNamespace(icon=SimpleNamespace(menu=None), config=SimpleNamespace(reload=lambda: None))
 
@@ -51,7 +51,7 @@ def test_update_menu_reloads_and_builds_menu(monkeypatch) -> None:
 
 
 def test_refresh_ui_calls_both(monkeypatch) -> None:
-    import src.tray.ui.refresh as refresh
+    from src.tray.ui import refresh
 
     calls = {"icon": 0, "menu": 0}
 

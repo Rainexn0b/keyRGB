@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 from types import SimpleNamespace
-import sys
 
 import pytest
 
@@ -77,16 +77,7 @@ def test_list_module_hints_filters_uniques_and_preserves_order(
 ) -> None:
     modules_path = tmp_path / "modules"
     modules_path.write_text(
-        "\n".join(
-            [
-                "snd_hda_intel 0 0 - Live 0x0000",
-                "tuxedo_keyboard 0 0 - Live 0x0001",
-                "hid_generic 0 0 - Live 0x0002",
-                "hid_generic 0 0 - Live 0x0003",
-                "hid_multitouch 0 0 - Live 0x0004",
-                "acpi_call 0 0 - Live 0x0005",
-            ]
-        ),
+        "snd_hda_intel 0 0 - Live 0x0000\ntuxedo_keyboard 0 0 - Live 0x0001\nhid_generic 0 0 - Live 0x0002\nhid_generic 0 0 - Live 0x0003\nhid_multitouch 0 0 - Live 0x0004\nacpi_call 0 0 - Live 0x0005",
         encoding="utf-8",
     )
 
@@ -179,19 +170,7 @@ def test_repo_version_text_reads_project_version_from_pyproject(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "pyproject.toml").write_text(
-        "\n".join(
-            [
-                "[tool.black]",
-                'version = "ignored"',
-                "",
-                "[project]",
-                'name = "keyrgb"',
-                'version = "1.2.3" # current release',
-                "",
-                "[tool.pytest.ini_options]",
-                'version = "ignored-again"',
-            ]
-        ),
+        '[tool.black]\nversion = "ignored"\n\n[project]\nname = "keyrgb"\nversion = "1.2.3" # current release\n\n[tool.pytest.ini_options]\nversion = "ignored-again"',
         encoding="utf-8",
     )
     monkeypatch.setattr(collectors_system, "repo_root_from", lambda _anchor: tmp_path)
@@ -215,13 +194,7 @@ def test_repo_version_text_returns_none_for_malformed_project_version(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "pyproject.toml").write_text(
-        "\n".join(
-            [
-                "[project]",
-                'name = "keyrgb"',
-                "version = 1.2.3",
-            ]
-        ),
+        '[project]\nname = "keyrgb"\nversion = 1.2.3',
         encoding="utf-8",
     )
     monkeypatch.setattr(collectors_system, "repo_root_from", lambda _anchor: tmp_path)

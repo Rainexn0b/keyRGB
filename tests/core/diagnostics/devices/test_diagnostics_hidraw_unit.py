@@ -4,10 +4,9 @@ from pathlib import Path
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
-import src.core.diagnostics.hidraw as hidraw
+from src.core.diagnostics import hidraw
 
 
 def test_read_hidraw_report_descriptor_reads_size_and_payload(monkeypatch) -> None:

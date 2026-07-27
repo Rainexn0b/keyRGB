@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-import src.gui.perkey.keyboard_apply as keyboard_apply
+from src.gui.perkey import keyboard_apply
 from src.gui.perkey.keyboard_apply import push_per_key_colors
 
 

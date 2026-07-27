@@ -238,7 +238,7 @@ def save_layout_per_key(
 ) -> None:
     write_json_atomic(
         paths_for(name).layout_per_key,  # type: ignore[attr-defined]
-        normalize_layout_per_key_tweaks_fn(per_key or {}, physical_layout=None),  # type: ignore[attr-defined]
+        normalize_layout_per_key_tweaks_fn(per_key or {}, physical_layout=None),
     )
 
 

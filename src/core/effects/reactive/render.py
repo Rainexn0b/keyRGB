@@ -11,18 +11,12 @@ from src.core.effects.perkey_animation import build_full_color_grid
 from ._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
 from ._render_brightness import (
     resolve_brightness as _resolve_brightness_impl,
-)
-from ._render_brightness import (
     resolve_reactive_transition_brightness as _resolve_reactive_transition_brightness_impl,
-)
-from ._render_brightness import (
     resolve_reactive_transition_visual_scale as _resolve_reactive_transition_visual_scale_impl,
 )
 from ._render_brightness_debug import log_pulse_visual_scale_change
 from ._render_post_restore import (
     post_restore_frame_scale as _post_restore_frame_scale,
-)
-from ._render_post_restore import (
     post_restore_visual_damp as _post_restore_visual_damp,
 )
 from ._render_runtime import render_per_key_frame, render_uniform_frame

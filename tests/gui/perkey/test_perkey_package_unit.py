@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import src.gui.perkey as perkey
+from src.gui import perkey
 from src.gui.perkey import launch as perkey_launch
 
 

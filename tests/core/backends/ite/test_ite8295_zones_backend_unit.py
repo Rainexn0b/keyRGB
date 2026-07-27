@@ -225,7 +225,9 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
 
 
 def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.core.backends.ite8295_zones_lenovo_ideapad.backend.find_matching_hidraw_device", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "src.core.backends.ite8295_zones_lenovo_ideapad.backend.find_matching_hidraw_device", lambda **kwargs: None
+    )
 
     with pytest.raises(FileNotFoundError, match="No hidraw device found"):
         _open_matching_transport()

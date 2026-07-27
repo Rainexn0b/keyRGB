@@ -4,8 +4,8 @@ import logging
 
 import pytest
 
-import src.gui.perkey.hardware as hardware
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
+from src.gui.perkey import hardware
 
 
 def test_select_backend_returns_none_on_recoverable_selection_failure(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -103,3 +103,41 @@ def test_get_keyboard_propagates_unexpected_open_failure(monkeypatch: pytest.Mon
 
     with pytest.raises(AssertionError, match="unexpected open bug"):
         hardware.get_keyboard()
+
+
+def test_get_keyboard_stays_config_only_when_launched_by_tray(monkeypatch: pytest.MonkeyPatch) -> None:
+    class UnexpectedBackend:
+        def get_device(self):
+            raise AssertionError("tray-managed editor must not open hardware")
+
+    monkeypatch.setenv("KEYRGB_TRAY_MANAGED_GUI", "1")
+    monkeypatch.setattr(hardware, "_backend", UnexpectedBackend())
+
+    assert hardware.get_keyboard() is None
+
+
+def test_get_keyboard_stays_config_only_when_hardware_lock_is_owned(monkeypatch: pytest.MonkeyPatch) -> None:
+    class UnexpectedBackend:
+        def get_device(self):
+            raise AssertionError("lock loser must not open hardware")
+
+    monkeypatch.delenv("KEYRGB_TRAY_MANAGED_GUI", raising=False)
+    monkeypatch.setattr(hardware, "_backend", UnexpectedBackend())
+    monkeypatch.setattr(hardware, "acquire_hardware_control_lock", lambda: False)
+
+    assert hardware.get_keyboard() is None
+
+
+def test_get_keyboard_releases_hardware_lock_when_open_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    class BrokenBackend:
+        def get_device(self):
+            raise RuntimeError("open failed")
+
+    releases: list[bool] = []
+    monkeypatch.delenv("KEYRGB_TRAY_MANAGED_GUI", raising=False)
+    monkeypatch.setattr(hardware, "_backend", BrokenBackend())
+    monkeypatch.setattr(hardware, "acquire_hardware_control_lock", lambda: True)
+    monkeypatch.setattr(hardware, "release_hardware_control_lock", lambda: releases.append(True))
+
+    assert hardware.get_keyboard() is None
+    assert releases == [True]

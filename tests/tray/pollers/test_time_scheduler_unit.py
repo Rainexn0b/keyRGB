@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from datetime import datetime
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.tray.pollers.time_scheduler import _active_power_source_base_brightness, _is_night, _parse_time
-from src.tray.pollers.time_scheduler import _run_scheduler_iteration, _scheduler_loop
+from src.tray.pollers.time_scheduler import (
+    _active_power_source_base_brightness,
+    _is_night,
+    _parse_time,
+    _run_scheduler_iteration,
+    _scheduler_loop,
+)
 
 
 class TestParseTime:
@@ -38,31 +42,31 @@ class TestIsNight:
         day_start = (8, 0)
         night_start = (20, 0)
 
-        assert _is_night(datetime(2024, 1, 1, 23, 0), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 3, 0), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 8, 0), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 12, 0), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 20, 0), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 23, 0, tzinfo=timezone.utc), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 3, 0, tzinfo=timezone.utc), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 8, 0, tzinfo=timezone.utc), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 20, 0, tzinfo=timezone.utc), day_start, night_start) is True
 
     def test_night_contiguous_during_day(self) -> None:
         # Night: 02:00 to 14:00
         day_start = (14, 0)
         night_start = (2, 0)
 
-        assert _is_night(datetime(2024, 1, 1, 2, 0), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 8, 0), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 13, 59), day_start, night_start) is True
-        assert _is_night(datetime(2024, 1, 1, 14, 0), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 1, 0), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 15, 0), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 2, 0, tzinfo=timezone.utc), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 8, 0, tzinfo=timezone.utc), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 13, 59, tzinfo=timezone.utc), day_start, night_start) is True
+        assert _is_night(datetime(2024, 1, 1, 14, 0, tzinfo=timezone.utc), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 1, 0, tzinfo=timezone.utc), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 15, 0, tzinfo=timezone.utc), day_start, night_start) is False
 
     def test_equal_times_means_always_day(self) -> None:
         day_start = (8, 0)
         night_start = (8, 0)
 
-        assert _is_night(datetime(2024, 1, 1, 0, 0), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 12, 0), day_start, night_start) is False
-        assert _is_night(datetime(2024, 1, 1, 23, 59), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 0, 0, tzinfo=timezone.utc), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc), day_start, night_start) is False
+        assert _is_night(datetime(2024, 1, 1, 23, 59, tzinfo=timezone.utc), day_start, night_start) is False
 
 
 def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_has_no_base_override() -> None:
@@ -90,7 +94,7 @@ def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_h
     class _FakeDateTime:
         @staticmethod
         def now() -> datetime:
-            return datetime(2024, 1, 1, 12, 0)
+            return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     with patch("src.tray.pollers.time_scheduler.datetime", _FakeDateTime):
         _run_scheduler_iteration(tray)
@@ -134,7 +138,7 @@ def test_run_scheduler_iteration_uses_ac_brightness_as_day_primary_when_configur
     class _FakeDateTime:
         @staticmethod
         def now() -> datetime:
-            return datetime(2024, 1, 1, 12, 0)
+            return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     with (
         patch("src.tray.pollers.time_scheduler.datetime", _FakeDateTime),
@@ -182,7 +186,7 @@ def test_run_scheduler_iteration_applies_day_base_when_only_inactive_power_sourc
     class _FakeDateTime:
         @staticmethod
         def now() -> datetime:
-            return datetime(2024, 1, 1, 12, 0)
+            return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     with (
         patch("src.tray.pollers.time_scheduler.datetime", _FakeDateTime),
@@ -216,7 +220,7 @@ def test_active_power_source_base_brightness_uses_day_policy() -> None:
 
     state = resolve_scheduler_brightness_state(
         config,
-        now=datetime(2024, 1, 1, 11, 10),
+        now=datetime(2024, 1, 1, 11, 10, tzinfo=timezone.utc),
         power_management_enabled=True,
     )
 
@@ -241,7 +245,7 @@ def test_active_power_source_base_brightness_uses_lower_value_at_night() -> None
 
     state = resolve_scheduler_brightness_state(
         config,
-        now=datetime(2024, 1, 1, 22, 10),
+        now=datetime(2024, 1, 1, 22, 10, tzinfo=timezone.utc),
         power_management_enabled=True,
     )
 
@@ -251,8 +255,8 @@ def test_active_power_source_base_brightness_uses_lower_value_at_night() -> None
 
 
 def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
-    from tests.tray.fakes import make_owner_backed_mock_tray
     from src.tray.idle_power_state import set_idle_power_state_field
+    from tests.tray.fakes import make_owner_backed_mock_tray
 
     tray = make_owner_backed_mock_tray(
         is_off=False,
@@ -285,9 +289,7 @@ def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
         nonlocal sleep_calls
         sleep_calls += 1
         if sleep_calls == 1:
-            set_idle_power_state_field(
-                tray, attr_name="_power_forced_off", state_name="power_forced_off", value=False
-            )
+            set_idle_power_state_field(tray, attr_name="_power_forced_off", state_name="power_forced_off", value=False)
             return
         raise StopLoop
 
@@ -298,7 +300,7 @@ def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
         _scheduler_loop(
             tray,
             sleep_fn=sleep_fn,
-            now_fn=lambda: datetime(2024, 1, 1, 22, 0),
+            now_fn=lambda: datetime(2024, 1, 1, 22, 0, tzinfo=timezone.utc),
         )
 
     tray.engine.set_brightness.assert_called_once_with(

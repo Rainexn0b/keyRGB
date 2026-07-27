@@ -16,11 +16,13 @@ from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.idle_power_state import ensure_tray_idle_power_state
 from src.tray.protocols import TrayIconState
 
-from . import _application_bindings as application_bindings
-from . import _application_notifications as application_notifications
-from . import _runtime_deps as app_runtime_deps
-from . import _startup as tray_startup
-from . import lifecycle as app_lifecycle
+from . import (
+    _application_bindings as application_bindings,
+    _application_notifications as application_notifications,
+    _runtime_deps as app_runtime_deps,
+    _startup as tray_startup,
+    lifecycle as app_lifecycle,
+)
 from ._application_state import TrayBootstrapState
 from ._delegates import KeyRGBTrayDelegateMixin
 

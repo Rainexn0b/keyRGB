@@ -8,8 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -250,6 +249,23 @@ class TestSaveConfigSettingsAtomic:
         assert exc_info[0] is OSError
         assert isinstance(exc_info[1], OSError)
         assert exc_info[2] is not None
+
+    def test_save_fails_without_writing_when_lock_cannot_be_acquired(self, temp_config_dir, monkeypatch):
+        from src.core.config import file_storage
+
+        config_file = temp_config_dir / "config.json"
+        config_file.write_text('{"effect": "none"}', encoding="utf-8")
+        monkeypatch.setattr(file_storage, "_acquire_lock", lambda *_args, **_kwargs: None)
+
+        saved = file_storage.save_config_settings_atomic(
+            config_dir=temp_config_dir,
+            config_file=config_file,
+            settings={"effect": "rainbow_wave"},
+            logger=MagicMock(),
+        )
+
+        assert saved is False
+        assert json.loads(config_file.read_text(encoding="utf-8")) == {"effect": "none"}
 
     def test_save_attempts_temp_cleanup_even_on_failure(self, temp_config_dir):
         """Even if os.replace fails, save should try to clean up temp file."""

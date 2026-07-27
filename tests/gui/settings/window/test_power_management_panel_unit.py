@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.settings.panels.power_management_panel as power_management_panel
+from src.gui.settings.panels import power_management_panel
 
 
 class _FakeWidget:

@@ -8,8 +8,7 @@ from src.tray.controllers._lighting_controller_helpers import (
 )
 from src.tray.protocols import ConfigPollingTrayProtocol, LightingTrayProtocol
 
-from . import _apply_callbacks as apply_callbacks
-from . import helpers
+from . import _apply_callbacks as apply_callbacks, helpers
 
 FastPathChangeKind = Literal[
     "none",

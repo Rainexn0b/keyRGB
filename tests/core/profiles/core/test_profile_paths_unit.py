@@ -21,11 +21,11 @@ def test_paths_for_renames_previous_light_dir_and_y15_pro_files(
     old_root.mkdir(parents=True)
 
     old_files = {
-        "keymap_y15_pro.json": "{\"esc\": \"0,0\"}",
-        "layout_tweaks_y15_pro.json": "{\"inset\": 0.1}",
-        "layout_tweaks_y15_pro_perkey.json": "{\"esc\": {\"x\": 1}}",
+        "keymap_y15_pro.json": '{"esc": "0,0"}',
+        "layout_tweaks_y15_pro.json": '{"inset": 0.1}',
+        "layout_tweaks_y15_pro_perkey.json": '{"esc": {"x": 1}}',
         "backdrop_y15_pro.png": "png-bytes",
-        "backdrop_settings_y15_pro.json": "{\"mode\": \"seed\"}",
+        "backdrop_settings_y15_pro.json": '{"mode": "seed"}',
     }
     for filename, content in old_files.items():
         (old_root / filename).write_text(content, encoding="utf-8")

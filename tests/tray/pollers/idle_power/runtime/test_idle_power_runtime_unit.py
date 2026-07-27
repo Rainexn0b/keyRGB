@@ -172,13 +172,10 @@ def test_run_idle_power_iteration_passes_session_idle_for_restore_candidate() ->
     captured: dict[str, object] = {}
     tray = _make_tray(reload_fn=lambda: None, log_event_fn=lambda *_args, **_kwargs: None)
     tray.is_off = True
-    set_idle_power_state_field(
-        tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=True
-    )
+    set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=True)
 
     def compute_action(**kwargs):
         captured.update(kwargs)
-        return None
 
     _runtime.run_idle_power_iteration(
         tray,
@@ -256,7 +253,6 @@ def test_run_idle_power_iteration_uses_desktop_timeout_and_input_idle_as_primary
 
     def compute_action(**kwargs):
         captured.update(kwargs)
-        return None
 
     _runtime.run_idle_power_iteration(
         tray,
@@ -297,7 +293,6 @@ def test_run_idle_power_iteration_falls_back_to_brightness_when_desktop_timeout_
 
     def compute_action(**kwargs):
         captured.update(kwargs)
-        return None
 
     _runtime.run_idle_power_iteration(
         tray,
@@ -337,7 +332,6 @@ def test_run_idle_power_iteration_falls_back_to_brightness_when_input_idle_missi
 
     def compute_action(**kwargs):
         captured.update(kwargs)
-        return None
 
     _runtime.run_idle_power_iteration(
         tray,

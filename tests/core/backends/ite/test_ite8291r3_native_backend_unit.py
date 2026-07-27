@@ -3,9 +3,11 @@ from __future__ import annotations
 import logging
 from threading import RLock
 
+import pytest
+
 from src.core.backends.ite8291r3_perkey import protocol
-from src.core.backends.ite8291r3_perkey.device import Ite8291r3KeyboardDevice
 from src.core.backends.ite8291r3_perkey.backend import Ite8291r3Backend
+from src.core.backends.ite8291r3_perkey.device import Ite8291r3KeyboardDevice
 from src.core.effects.hw_payloads import allowed_hw_effect_keys, build_hw_effect_payload
 
 
@@ -148,3 +150,175 @@ def test_device_applies_report_delay_between_reports(monkeypatch) -> None:
     # enable_user_mode (1) + set_row_index per row (6) + write_row per row (6)
     assert len(sleeps) == 13
     assert all(abs(s - 0.005) < 1e-9 for s in sleeps)
+
+
+def test_coerce_helpers_reject_invalid_inputs() -> None:
+    from src.core.backends.ite8291r3_perkey import device as device_mod
+
+    with pytest.raises(ValueError, match="RGB 3-tuple"):
+        device_mod._coerce_rgb(object())
+
+    with pytest.raises(ValueError, match="tuple key ids"):
+        device_mod._coerce_row_col((1, 2, 3))
+
+    assert device_mod._coerce_row_col("bad") is None
+    assert device_mod._coerce_row_col("x,y") is None
+    assert device_mod._coerce_row_col("99,0") is None
+    assert device_mod._coerce_row_col("0,99") is None
+    assert device_mod._coerce_row_col("1,2") == (1, 2)
+    assert device_mod._coerce_row_col((2, 3)) == (2, 3)
+
+
+def test_coerce_effect_payload_from_name_dict_and_list() -> None:
+    from src.core.backends.ite8291r3_perkey import device as device_mod
+
+    named = device_mod._coerce_effect_payload({"name": "wave", "speed": 3, "brightness": 20})
+    assert named[0] == protocol.effects["wave"](speed=3, brightness=20)[0]
+    assert named[1] == 3
+    assert named[2] == 20
+
+    indexed = device_mod._coerce_effect_payload({"effect": 4, "speed": 2, "brightness": 10, "color": 1})
+    assert indexed == (4, 2, 10, 1, 0, 0)
+
+    listed = device_mod._coerce_effect_payload([7, 1, 2])
+    assert listed == (7, 1, 2)
+
+    with pytest.raises(ValueError, match="at most 6"):
+        device_mod._coerce_effect_payload([1, 2, 3, 4, 5, 6, 7])
+
+    with pytest.raises(ValueError, match="must contain"):
+        device_mod._coerce_effect_payload({"speed": 1})
+
+    with pytest.raises(ValueError, match="dict, list, or tuple"):
+        device_mod._coerce_effect_payload("wave")
+
+
+def test_device_constructor_requires_callables() -> None:
+    with pytest.raises(TypeError, match="send_control_report"):
+        Ite8291r3KeyboardDevice(None, lambda _n: b"", lambda _b: 0)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="read_control_report"):
+        Ite8291r3KeyboardDevice(lambda _b: 0, None, lambda _b: 0)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="write_row_data"):
+        Ite8291r3KeyboardDevice(lambda _b: 0, lambda _n: b"", None)  # type: ignore[arg-type]
+
+
+def test_device_control_and_row_errors_and_fw_version() -> None:
+    def fail_send(_report: bytes) -> int:
+        return -1
+
+    device = Ite8291r3KeyboardDevice(fail_send, lambda _n: bytes(8), lambda _b: 0, report_delay_s=0.0)
+    with pytest.raises(OSError, match="control report"):
+        device.set_brightness(10)
+
+    def fail_row(_payload: bytes) -> int:
+        return -1
+
+    device = Ite8291r3KeyboardDevice(lambda _b: 0, lambda _n: bytes(8), fail_row, report_delay_s=0.0)
+    with pytest.raises(OSError, match="row data"):
+        device._write_row(b"\x00" * 8)
+
+    controls: list[bytes] = []
+
+    def read_fw(_length: int) -> bytes:
+        return bytes((0x80, 1, 2, 3, 4, 0, 0, 0))
+
+    device = Ite8291r3KeyboardDevice(controls.append, read_fw, lambda _b: 0, report_delay_s=0.0)
+    assert device.get_fw_version() == (1, 2, 3, 4)
+    assert controls == [protocol.build_get_fw_version_report()]
+
+
+def test_device_effect_brightness_off_and_freeze() -> None:
+    controls: list[bytes] = []
+    effect_bytes = bytes((0x88, 0x02, 0x03, 0x04, 0x19, 0x01, 0x00, 0x00))
+
+    def read_control(_length: int) -> bytes:
+        return effect_bytes
+
+    device = Ite8291r3KeyboardDevice(controls.append, read_control, lambda _b: 0, report_delay_s=0.0)
+
+    device.set_effect({"name": "wave", "speed": 4, "brightness": 20})
+    device.set_effect((1, 2, 3))
+    device.set_brightness(50)
+    device.turn_off()
+    assert device.is_off() is False
+    assert device.get_brightness() == 0x19
+
+    before = len(controls)
+    device.freeze()
+    # freeze reads effect then writes set_effect with speed=11
+    assert len(controls) > before
+
+
+def test_device_set_key_colors_and_test_pattern_and_palette_restore() -> None:
+    controls: list[bytes] = []
+    rows: list[bytes] = []
+    effect_bytes = bytes((0x88, 0x02, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00))
+    device = Ite8291r3KeyboardDevice(
+        controls.append,
+        lambda _n: effect_bytes,
+        rows.append,
+        report_delay_s=0.0,
+    )
+
+    device.set_key_colors(
+        {
+            (0, 0): (255, 0, 0),
+            "1,2": (0, 255, 0),
+            "bad": (1, 1, 1),
+            (99, 0): (2, 2, 2),
+        },
+        brightness=30,
+        save=False,
+    )
+    assert any(c == protocol.build_set_row_index_report(0) for c in controls)
+    assert rows  # at least one row write
+
+    rows.clear()
+    controls.clear()
+    device.test_pattern(shift=1, brightness=20, save=False)
+    assert len(rows) == protocol.NUM_ROWS
+
+    with pytest.raises(ValueError, match="palette color index"):
+        device.set_palette_color(0, (1, 2, 3))
+
+    controls.clear()
+    device.restore_default_palette()
+    assert len(controls) == len(protocol.DEFAULT_PALETTE)
+
+
+def test_device_close_releases_transport() -> None:
+    closed: list[str] = []
+
+    class _Transport:
+        def close(self) -> None:
+            closed.append("closed")
+
+    device = Ite8291r3KeyboardDevice(
+        lambda _b: 0,
+        lambda _n: bytes(8),
+        lambda _b: 0,
+        transport=_Transport(),  # type: ignore[arg-type]
+        report_delay_s=0.0,
+    )
+    device.close()
+    assert closed == ["closed"]
+    assert device._transport is None
+
+    # second close is a no-op
+    device.close()
+
+
+def test_device_close_swallows_transport_close_errors() -> None:
+    class _BadTransport:
+        def close(self) -> None:
+            raise OSError("gone")
+
+    device = Ite8291r3KeyboardDevice(
+        lambda _b: 0,
+        lambda _n: bytes(8),
+        lambda _b: 0,
+        transport=_BadTransport(),  # type: ignore[arg-type]
+        report_delay_s=0.0,
+    )
+    device.close()
+    assert device._transport is None

@@ -10,14 +10,8 @@ from src.gui.utils.window_icon import apply_keyrgb_window_icon
 from src.gui.widgets.color_wheel import ColorWheel
 from src.gui.windows import (
     _reactive_color_bootstrap as reactive_color_bootstrap,
-)
-from src.gui.windows import (
     _reactive_color_interactions as reactive_color_interactions,
-)
-from src.gui.windows import (
     _reactive_color_state,
-)
-from src.gui.windows import (
     _reactive_color_ui as reactive_color_ui,
 )
 

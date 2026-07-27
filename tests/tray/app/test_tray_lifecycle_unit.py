@@ -76,7 +76,31 @@ def test_shutdown_tray_runtime_stops_producers_before_engine_close(monkeypatch) 
 
     lifecycle.shutdown_tray_runtime_best_effort(tray)
 
-    assert calls == ["pollers:set", "join:2.0", "power:stop", "secondary:close", "engine:close"]
+    assert calls == ["pollers:set", "join:2.0", "power:stop", "engine:close", "secondary:close"]
+
+
+def test_shutdown_tray_runtime_keeps_secondary_targets_open_if_engine_worker_is_stuck(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from src.tray.app import lifecycle
+
+    calls: list[str] = []
+    tray = SimpleNamespace(
+        _polling_threads=[],
+        power_manager=None,
+        engine=SimpleNamespace(
+            close=lambda: calls.append("engine:close"),
+            thread=SimpleNamespace(is_alive=lambda: True),
+        ),
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        lambda _tray: calls.append("secondary:close"),
+    )
+
+    lifecycle.shutdown_tray_runtime_best_effort(tray)
+
+    assert calls == ["engine:close"]
 
 
 def test_maybe_autostart_effect_calls_start_when_enabled_and_not_off() -> None:

@@ -4,7 +4,6 @@ from types import SimpleNamespace
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
 from src.core.diagnostics import secondary_devices

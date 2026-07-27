@@ -7,6 +7,17 @@ import pytest
 from src.core.effects.engine import EffectsEngine
 
 
+class _StuckEffectThread:
+    def __init__(self) -> None:
+        self.join_timeouts: list[float | None] = []
+
+    def join(self, timeout: float | None = None) -> None:
+        self.join_timeouts.append(timeout)
+
+    def is_alive(self) -> bool:
+        return True
+
+
 def test_stop_recovers_from_malformed_thread_generation_state() -> None:
     engine = EffectsEngine()
     engine._thread_generation = "broken"  # type: ignore[assignment]
@@ -24,6 +35,63 @@ def test_stop_recovers_from_malformed_thread_generation_state() -> None:
     assert engine.stop_event.is_set() is False
 
 
+def test_stop_keeps_timed_out_worker_cancelled_and_published() -> None:
+    engine = EffectsEngine()
+    stuck_thread = _StuckEffectThread()
+    engine.running = True
+    engine.thread = stuck_thread  # type: ignore[assignment]
+    engine.current_effect = "rainbow_wave"
+
+    engine.stop()
+
+    assert engine.running is False
+    assert engine.thread is stuck_thread
+    assert engine.current_effect is None
+    assert engine.stop_event.is_set() is True
+    assert stuck_thread.join_timeouts == [2.0]
+
+
+def test_start_effect_refuses_replacement_while_previous_worker_is_alive() -> None:
+    engine = EffectsEngine()
+    stuck_thread = _StuckEffectThread()
+    engine.running = True
+    engine.thread = stuck_thread  # type: ignore[assignment]
+    engine.current_effect = "rainbow_wave"
+
+    with pytest.raises(RuntimeError, match="Previous effect thread is still stopping"):
+        engine.start_effect("spectrum_cycle")
+
+    assert engine.running is False
+    assert engine.thread is stuck_thread
+    assert engine.current_effect is None
+    assert engine.stop_event.is_set() is True
+    assert stuck_thread.join_timeouts == [2.0]
+
+
+def test_close_does_not_release_keyboard_while_timed_out_worker_is_alive() -> None:
+    class _ClosableKeyboard:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        def close(self) -> None:
+            self.close_calls += 1
+
+    engine = EffectsEngine()
+    keyboard = _ClosableKeyboard()
+    stuck_thread = _StuckEffectThread()
+    engine.kb = keyboard  # type: ignore[assignment]
+    engine.device_available = True
+    engine.running = True
+    engine.thread = stuck_thread  # type: ignore[assignment]
+
+    engine.close()
+
+    assert keyboard.close_calls == 0
+    assert engine.kb is keyboard
+    assert engine.device_available is True
+    assert engine.stop_event.is_set() is True
+
+
 def test_start_effect_restores_config_restart_brightness_before_thread_setup(monkeypatch) -> None:
     engine = EffectsEngine()
     engine.current_effect = "reactive_fade"
@@ -31,7 +99,7 @@ def test_start_effect_restores_config_restart_brightness_before_thread_setup(mon
     observed: list[int | None] = []
 
     monkeypatch.setattr(engine, "_ensure_device_available", lambda: True)
-    monkeypatch.setattr(engine, "get_backend_effects", lambda: {})
+    monkeypatch.setattr(engine, "get_backend_effects", dict)
     monkeypatch.setattr(
         engine,
         "_start_sw_effect",

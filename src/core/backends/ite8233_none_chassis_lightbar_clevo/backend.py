@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 class _HidrawModule(Protocol):
-    HidrawDeviceInfo: type[HidrawDeviceInfo]  # type: ignore[valid-type]
+    HidrawDeviceInfo: type[HidrawDeviceInfo]
     HidrawFeatureTransport: type[HidrawFeatureTransport]
 
     def find_matching_hidraw_device(

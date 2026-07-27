@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import pytest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call
+
+import pytest
 
 from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
 

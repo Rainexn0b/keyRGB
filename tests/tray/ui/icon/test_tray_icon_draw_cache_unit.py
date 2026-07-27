@@ -152,7 +152,11 @@ def test_create_icon_fallback_draws_placeholder_when_mask_missing(monkeypatch) -
 def test_create_icon_rainbow_uses_masked_gradient_path(monkeypatch) -> None:
     icon_draw.clear_cached_rainbow_icons()
     monkeypatch.setattr(icon_draw, "_tray_k_mask", lambda: icon_draw.Image.new("L", (64, 64), color=255))
-    monkeypatch.setattr(icon_draw, "_rainbow_gradient_64", lambda _phase_q: icon_draw.Image.new("RGBA", (64, 64), color=(10, 20, 30, 255)))
+    monkeypatch.setattr(
+        icon_draw,
+        "_rainbow_gradient_64",
+        lambda _phase_q: icon_draw.Image.new("RGBA", (64, 64), color=(10, 20, 30, 255)),
+    )
 
     def _unexpected_create_icon(_color):
         raise AssertionError("rainbow masked path should not call create_icon fallback")

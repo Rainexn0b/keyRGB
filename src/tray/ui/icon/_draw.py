@@ -8,9 +8,11 @@ from xml.etree import ElementTree as ET
 from PIL import Image, ImageDraw
 
 from src.core.theme.detect import detect_system_prefers_dark
-from src.tray.ui.icon._mask import candidate_tray_mask_paths as _candidate_tray_mask_paths
-from src.tray.ui.icon._mask import render_cairosvg_mask_alpha_64 as _render_cairosvg_mask_alpha_64
-from src.tray.ui.icon._mask import render_simple_svg_mask_alpha_64 as _render_simple_svg_mask_alpha_64
+from src.tray.ui.icon._mask import (
+    candidate_tray_mask_paths as _candidate_tray_mask_paths,
+    render_cairosvg_mask_alpha_64 as _render_cairosvg_mask_alpha_64,
+    render_simple_svg_mask_alpha_64 as _render_simple_svg_mask_alpha_64,
+)
 
 _ICON_SIZE = (64, 64)
 _TRAY_MASK_PATH_ERRORS = (OSError,)

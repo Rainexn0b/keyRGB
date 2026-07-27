@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-from src.core.brightness_layers import compose_power_source_brightness_overrides
-from src.core.brightness_layers import resolve_scheduler_brightness_state
+from src.core.brightness_layers import compose_power_source_brightness_overrides, resolve_scheduler_brightness_state
 
 
 def test_resolve_scheduler_brightness_state_applies_day_window_without_power_source_override() -> None:
@@ -21,7 +20,7 @@ def test_resolve_scheduler_brightness_state_applies_day_window_without_power_sou
 
     state = resolve_scheduler_brightness_state(
         config,
-        now=datetime(2024, 1, 1, 12, 0),
+        now=datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc),
         power_management_enabled=True,
     )
 
@@ -48,7 +47,7 @@ def test_resolve_scheduler_brightness_state_defers_base_when_power_source_overri
 
     state = resolve_scheduler_brightness_state(
         config,
-        now=datetime(2024, 1, 1, 12, 0),
+        now=datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc),
         power_management_enabled=True,
     )
 
@@ -77,7 +76,7 @@ def test_resolve_scheduler_brightness_state_ignores_unconfigured_mock_overrides(
 
     state = resolve_scheduler_brightness_state(
         config,
-        now=datetime(2024, 1, 1, 12, 0),
+        now=datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc),
         power_management_enabled=True,
     )
 

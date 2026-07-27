@@ -33,7 +33,7 @@ def test_debounce_dimmed_requires_two_true_polls():
 
 
 def test_debounce_dimmed_requires_two_false_polls():
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    dimmed, _screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=False,
         screen_off_raw=False,
         dimmed_true_streak=0,
@@ -45,7 +45,7 @@ def test_debounce_dimmed_requires_two_false_polls():
     )
     assert dimmed is None
 
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    dimmed, _screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=False,
         screen_off_raw=False,
         dimmed_true_streak=t,
@@ -59,7 +59,7 @@ def test_debounce_dimmed_requires_two_false_polls():
 
 
 def test_debounce_dimmed_unknown_resets_streaks():
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    dimmed, _screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=True,
         screen_off_raw=False,
         dimmed_true_streak=0,
@@ -71,7 +71,7 @@ def test_debounce_dimmed_unknown_resets_streaks():
     )
     assert (t, f) == (1, 0)
 
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    dimmed, _screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=None,
         screen_off_raw=False,
         dimmed_true_streak=t,
@@ -86,7 +86,7 @@ def test_debounce_dimmed_unknown_resets_streaks():
 
 
 def test_debounce_screen_off_requires_two_true_polls():
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    _dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=None,
         screen_off_raw=True,
         dimmed_true_streak=0,
@@ -99,7 +99,7 @@ def test_debounce_screen_off_requires_two_true_polls():
     assert screen_off is False
     assert so == 1
 
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    _dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=None,
         screen_off_raw=True,
         dimmed_true_streak=t,
@@ -113,7 +113,7 @@ def test_debounce_screen_off_requires_two_true_polls():
 
 
 def test_debounce_screen_off_false_resets_streak():
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    _dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=None,
         screen_off_raw=True,
         dimmed_true_streak=0,
@@ -125,7 +125,7 @@ def test_debounce_screen_off_false_resets_streak():
     )
     assert so == 2
 
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    _dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=None,
         screen_off_raw=False,
         dimmed_true_streak=t,
@@ -145,7 +145,7 @@ def test_debounce_dimmed_false_requires_longer_streak_by_default():
     # dim↔restore brightness writes.
     t = f = so = 0
 
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    dimmed, _screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=True,
         screen_off_raw=False,
         dimmed_true_streak=t,
@@ -157,7 +157,7 @@ def test_debounce_dimmed_false_requires_longer_streak_by_default():
     )
     assert dimmed is None
 
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    dimmed, _screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=True,
         screen_off_raw=False,
         dimmed_true_streak=t,
@@ -169,7 +169,7 @@ def test_debounce_dimmed_false_requires_longer_streak_by_default():
     )
     assert dimmed is True
 
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    dimmed, _screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=False,
         screen_off_raw=False,
         dimmed_true_streak=t,
@@ -181,7 +181,7 @@ def test_debounce_dimmed_false_requires_longer_streak_by_default():
     )
     assert dimmed is None
 
-    dimmed, screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
+    dimmed, _screen_off, t, f, so = ipp._debounce_dim_and_screen_off(
         dimmed_raw=False,
         screen_off_raw=False,
         dimmed_true_streak=t,

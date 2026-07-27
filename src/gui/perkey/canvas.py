@@ -7,8 +7,7 @@ from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef, get_layout_keys
 from src.gui.reference import overlay_geometry as _overlay_geometry
 from src.gui.utils.deck_render_cache import DeckRenderCache
 
-from .canvas_impl import _canvas_services
-from .canvas_impl import canvas_hit_testing as _canvas_hit_testing
+from .canvas_impl import _canvas_services, canvas_hit_testing as _canvas_hit_testing
 from .canvas_impl._canvas_drawing import _KeyboardCanvasDrawingMixin
 from .canvas_impl._canvas_events import _KeyboardCanvasEventMixin
 from .overlay import OverlayDragController

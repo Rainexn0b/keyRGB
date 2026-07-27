@@ -19,16 +19,20 @@ import logging
 from collections.abc import Mapping
 
 from src.core.config import layout_slots as config_layout_slots
-from src.core.resources import defaults as resource_defaults
-from src.core.resources import layout_slots as resource_layout_slots
-from src.core.resources import layouts as resource_layouts
+from src.core.resources import (
+    defaults as resource_defaults,
+    layout_slots as resource_layout_slots,
+    layouts as resource_layouts,
+)
 from src.core.utils import logging_utils
 
-from . import _backdrop as backdrop_ops
-from . import _profile_apply_ops as apply_ops
-from . import _profile_storage_ops as storage_ops
-from . import json_storage
-from . import paths as profile_paths
+from . import (
+    _backdrop as backdrop_ops,
+    _profile_apply_ops as apply_ops,
+    _profile_storage_ops as storage_ops,
+    json_storage,
+    paths as profile_paths,
+)
 
 load_backdrop_mode = backdrop_ops.load_backdrop_mode
 load_backdrop_transparency = backdrop_ops.load_backdrop_transparency

@@ -38,6 +38,8 @@ def monitor_prepare_for_sleep(
     on_suspend: Callable[[], None],
     on_resume: Callable[[], None],
     on_started: Callable[[], None] | None = None,
+    on_process_started: Callable[[object], None] | None = None,
+    on_process_stopped: Callable[[object], None] | None = None,
 ) -> None:
     """Run `dbus-monitor` for logind PrepareForSleep and invoke callbacks."""
 
@@ -55,16 +57,21 @@ def monitor_prepare_for_sleep(
         bufsize=1,
     )
 
-    # For type-checkers: stdout is only None if stdout=DEVNULL/None.
-    assert process.stdout is not None
-
     try:
+        if on_process_started is not None:
+            on_process_started(process)
+
+        # For type-checkers: stdout is only None if stdout=DEVNULL/None.
+        assert process.stdout is not None
+
         if on_started is not None:
             on_started()
 
         # Read incrementally to preserve the original behavior.
         while is_running():
             line = process.stdout.readline()
+            if not is_running():
+                break
             if not line:
                 break
 
@@ -72,12 +79,16 @@ def monitor_prepare_for_sleep(
                 continue
 
             next_line = process.stdout.readline()
+            if not is_running():
+                break
             if "boolean true" in next_line:
                 on_suspend()
             elif "boolean false" in next_line:
                 on_resume()
     finally:
         _terminate_process(process)
+        if on_process_stopped is not None:
+            on_process_stopped(process)
 
 
 def _terminate_process(process: subprocess.Popen) -> None:

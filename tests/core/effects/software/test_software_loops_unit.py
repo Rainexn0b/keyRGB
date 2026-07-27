@@ -177,7 +177,7 @@ class TestPulseCalculation:
         # Test at peak (phase where sin = 1)
         phase = math.pi / 2  # sin(π/2) = 1
         pulse = (math.sin(phase) + 1) / 2  # = 1.0
-        pulse_brightness = int(round(max_brightness * pulse))
+        pulse_brightness = round(max_brightness * pulse)
         pulse_brightness = max(1, min(max_brightness, pulse_brightness))
 
         assert pulse_brightness == max_brightness
@@ -189,7 +189,7 @@ class TestPulseCalculation:
         # Test at trough (phase where sin = -1)
         phase = 3 * math.pi / 2  # sin(3π/2) = -1
         pulse = (math.sin(phase) + 1) / 2  # = 0.0
-        pulse_brightness = int(round(max_brightness * pulse))
+        pulse_brightness = round(max_brightness * pulse)
         pulse_brightness = max(1, min(max_brightness, pulse_brightness))
 
         assert pulse_brightness == 1
@@ -199,7 +199,7 @@ class TestPulseCalculation:
         max_brightness = 100
         phase = 0.0  # sin(0) = 0
         pulse = (math.sin(phase) + 1) / 2  # = 0.5
-        pulse_brightness = int(round(max_brightness * pulse))
+        pulse_brightness = round(max_brightness * pulse)
         pulse_brightness = max(1, min(max_brightness, pulse_brightness))
 
         assert 45 <= pulse_brightness <= 55  # ~50 with rounding tolerance
@@ -216,9 +216,9 @@ class TestCrossFadeMath:
         pr, pg, pb = prev
         tr, tg, tb = target
 
-        r = int(round(pr + (tr - pr) * t))
-        g = int(round(pg + (tg - pg) * t))
-        b = int(round(pb + (tb - pb) * t))
+        r = round(pr + (tr - pr) * t)
+        g = round(pg + (tg - pg) * t)
+        b = round(pb + (tb - pb) * t)
 
         assert r == 150
         assert g == 50
@@ -348,6 +348,7 @@ def test_smooth_cycling_effects_use_constant_frame_step(effect_runner: str, modu
     back-to-back with no actual delay between them.
     """
     import importlib
+
     from src.core.effects.software import _effects_basic, _effects_particles  # noqa: F401
 
     mod = importlib.import_module(f"src.core.effects.software.{module}")
@@ -391,3 +392,95 @@ def test_smooth_cycling_effects_use_constant_frame_step(effect_runner: str, modu
     frame1 = rendered[1]
     # At speed=10 the per-frame delta is non-zero.
     assert frame0 != frame1, "effect did not advance between frames"
+
+
+def test_particle_effects_multiple_ticks_with_fast_pace(monkeypatch) -> None:
+    """Exercise spawn/age/overlay branches across a few wait cycles."""
+    from src.core.effects.software import _effects_particles as particles
+
+    class StopEvent:
+        def __init__(self, max_waits: int) -> None:
+            self.waits = 0
+            self.max_waits = max_waits
+
+        def is_set(self) -> bool:
+            return self.waits >= self.max_waits
+
+        def wait(self, _timeout: float) -> bool:
+            self.waits += 1
+            return True
+
+    monkeypatch.setattr(particles._base, "frame_dt_s", lambda: 0.05)
+    monkeypatch.setattr(particles._base, "pace", lambda _e: 8.0)
+    monkeypatch.setattr(particles._base, "animation_step_s", lambda *_a, **_k: 0.2)
+    monkeypatch.setattr(particles._base, "base_color_map", lambda _e: {(0, 0): (10, 10, 10), (0, 1): (0, 0, 0)})
+    monkeypatch.setattr(particles._base, "has_per_key", lambda _e: True)
+    monkeypatch.setattr(particles._base, "mix", lambda a, b, *, t: b if t > 0.5 else a)
+    monkeypatch.setattr(particles._base, "scale", lambda c, s: c)
+    monkeypatch.setattr(particles.random, "randrange", lambda n: 0)
+    monkeypatch.setattr(particles.random, "random", lambda: 0.25)
+
+    renders: list[int] = []
+
+    def render_fn(_engine, *, color_map):
+        renders.append(len(color_map))
+
+    for runner in (particles.run_twinkle, particles.run_strobe, particles.run_chase, particles.run_rain):
+        renders.clear()
+        engine = SimpleNamespace(
+            running=True,
+            stop_event=StopEvent(3),
+            speed=8,
+            brightness=25,
+            current_color=(0, 0, 0),  # chase black-highlight fallback
+            per_key_colors={(0, 0): (1, 1, 1)},
+            kb=SimpleNamespace(set_key_colors=lambda *_a, **_k: None),
+        )
+        # strobe black base fallback
+        if runner is particles.run_strobe:
+            monkeypatch.setattr(particles._base, "base_color_map", lambda _e: {(0, 0): (0, 0, 0)})
+        runner(engine, render_fn=render_fn)
+        assert len(renders) >= 2
+
+
+def test_strobe_invalid_brightness_and_chase_uniform(monkeypatch) -> None:
+    from src.core.effects.software import _effects_particles as particles
+
+    class StopEvent:
+        def __init__(self) -> None:
+            self.waits = 0
+
+        def is_set(self) -> bool:
+            return self.waits > 0
+
+        def wait(self, _timeout: float) -> bool:
+            self.waits += 1
+            return True
+
+    monkeypatch.setattr(particles._base, "frame_dt_s", lambda: 0.05)
+    monkeypatch.setattr(particles._base, "pace", lambda _e: 2.0)
+    monkeypatch.setattr(particles._base, "animation_step_s", lambda *_a, **_k: 0.5)
+    monkeypatch.setattr(particles._base, "base_color_map", lambda _e: {(0, 0): (1, 1, 1)})
+    monkeypatch.setattr(particles._base, "has_per_key", lambda _e: False)
+    monkeypatch.setattr(particles._base, "mix", lambda a, b, *, t: a)
+    monkeypatch.setattr(particles._base, "scale", lambda c, s: c)
+    monkeypatch.setattr(particles, "fill_uniform_color_map", lambda m, *, color: m.__setitem__((0, 0), color))
+    monkeypatch.setattr(particles, "scaled_color_map_nonzero", lambda base, *, scale, brightness: base)
+
+    engine = SimpleNamespace(
+        running=True,
+        stop_event=StopEvent(),
+        brightness="bad",
+        current_color=None,
+        kb=SimpleNamespace(),
+    )
+    particles.run_strobe(engine, render_fn=lambda *_a, **_k: None)
+
+    engine2 = SimpleNamespace(
+        running=True,
+        stop_event=StopEvent(),
+        brightness=25,
+        current_color=None,
+        kb=SimpleNamespace(),
+    )
+    particles.run_chase(engine2, render_fn=lambda *_a, **_k: None)

@@ -10,13 +10,15 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from .. import _lifecycle as polling_lifecycle
-from ._polling_support import call_best_effort as _call_best_effort_impl
-from ._polling_support import effective_screen_dim_sync_enabled as _effective_screen_dim_sync_enabled_impl
-from ._polling_support import ensure_idle_state as _ensure_idle_state_impl
-from ._polling_support import poll_idle_power_loop as _poll_idle_power_loop
-from ._polling_support import recover_idle_power_polling_error as _recover_idle_power_polling_error_impl
-from ._polling_support import tray_log_event_or_none as _tray_log_event_or_none_impl
-from ._polling_support import tray_log_exception_or_none as _tray_log_exception_or_none_impl
+from ._polling_support import (
+    call_best_effort as _call_best_effort_impl,
+    effective_screen_dim_sync_enabled as _effective_screen_dim_sync_enabled_impl,
+    ensure_idle_state as _ensure_idle_state_impl,
+    poll_idle_power_loop as _poll_idle_power_loop,
+    recover_idle_power_polling_error as _recover_idle_power_polling_error_impl,
+    tray_log_event_or_none as _tray_log_event_or_none_impl,
+    tray_log_exception_or_none as _tray_log_exception_or_none_impl,
+)
 from ._runtime import run_idle_power_iteration
 
 if TYPE_CHECKING:

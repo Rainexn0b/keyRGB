@@ -7,11 +7,13 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.effects.software import base as software_base
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
-from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_KEYBOARD
-from src.core.effects.software_targets import normalize_software_effect_target
-from src.core.effects.software_targets import render_secondary_uniform_rgb
-from src.core.effects.software_targets import software_render_targets
+from src.core.effects.software_targets import (
+    SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
+    SOFTWARE_EFFECT_TARGET_KEYBOARD,
+    normalize_software_effect_target,
+    render_secondary_uniform_rgb,
+    software_render_targets,
+)
 
 
 class _SpyKeyboard:

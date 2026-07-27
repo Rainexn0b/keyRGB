@@ -159,22 +159,37 @@ def shutdown_tray_runtime_best_effort(tray: object) -> None:
         except _SHUTDOWN_RECOVERABLE_ERRORS:
             logger.debug("Failed to stop power monitoring during shutdown", exc_info=True)
 
+    engine = getattr(tray, "engine", None)
+    engine_close = getattr(engine, "close", None)
+    if not callable(engine_close):
+        engine_close = getattr(engine, "stop", None)
+    engine_quiesced = True
+    if callable(engine_close):
+        try:
+            engine_close()
+        except _SHUTDOWN_RECOVERABLE_ERRORS:
+            engine_quiesced = False
+            logger.debug("Failed to close effects engine during shutdown", exc_info=True)
+
+    engine_thread = getattr(engine, "thread", None)
+    thread_is_alive = getattr(engine_thread, "is_alive", None)
+    if callable(thread_is_alive):
+        try:
+            engine_quiesced = engine_quiesced and not bool(thread_is_alive())
+        except _SHUTDOWN_RECOVERABLE_ERRORS:
+            engine_quiesced = False
+            logger.debug("Failed to verify effects engine shutdown", exc_info=True)
+
+    if not engine_quiesced:
+        logger.warning("Skipping secondary target close because the effects engine is still active")
+        return
+
     try:
         from src.tray.controllers.software_target_controller import close_secondary_software_target_cache
 
         close_secondary_software_target_cache(cast(Any, tray))
     except _SHUTDOWN_RECOVERABLE_ERRORS:
         logger.debug("Failed to close secondary target cache during shutdown", exc_info=True)
-
-    engine = getattr(tray, "engine", None)
-    engine_close = getattr(engine, "close", None)
-    if not callable(engine_close):
-        engine_close = getattr(engine, "stop", None)
-    if callable(engine_close):
-        try:
-            engine_close()
-        except _SHUTDOWN_RECOVERABLE_ERRORS:
-            logger.debug("Failed to close effects engine during shutdown", exc_info=True)
 
 
 def maybe_autostart_effect(tray: _AutostartEffectTray) -> None:

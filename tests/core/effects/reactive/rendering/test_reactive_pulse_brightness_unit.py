@@ -229,8 +229,7 @@ def test_pulse_brightness_reseeds_restore_damp_on_first_post_restore_pulse() -> 
 def test_wake_path_reseeds_restore_damp_after_initial_window_expires(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.effects.reactive import _render_brightness_support as reactive_support
-    from src.core.effects.reactive import effects
+    from src.core.effects.reactive import _render_brightness_support as reactive_support, effects
     from src.core.effects.reactive.render import _resolve_brightness
     from src.tray.pollers.idle_power._transition_actions import _seed_reactive_restore_windows
 

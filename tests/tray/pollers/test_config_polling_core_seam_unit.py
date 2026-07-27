@@ -4,9 +4,13 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
-from src.tray.pollers.config_polling_internal.core import ConfigApplyState, compute_config_apply_state, maybe_apply_fast_path
-import src.tray.pollers.config_polling_internal.core as core_module
 import src.tray.pollers.config_polling_internal._post_fast_path_apply as post_fast_path_module
+import src.tray.pollers.config_polling_internal.core as core_module
+from src.tray.pollers.config_polling_internal.core import (
+    ConfigApplyState,
+    compute_config_apply_state,
+    maybe_apply_fast_path,
+)
 
 
 class _FakeTray:

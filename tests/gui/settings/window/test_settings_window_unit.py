@@ -431,10 +431,18 @@ def test_init_vars_uses_canonical_night_start_fallback_when_empty(monkeypatch: p
     double_vars: list[_FakeVar] = []
     int_vars: list[_FakeVar] = []
 
-    monkeypatch.setattr(settings_window.tk, "StringVar", lambda value=None: string_vars.append(_FakeVar(value)) or string_vars[-1])
-    monkeypatch.setattr(settings_window.tk, "BooleanVar", lambda value=None: bool_vars.append(_FakeVar(value)) or bool_vars[-1])
-    monkeypatch.setattr(settings_window.tk, "DoubleVar", lambda value=None: double_vars.append(_FakeVar(value)) or double_vars[-1])
-    monkeypatch.setattr(settings_window.tk, "IntVar", lambda value=None: int_vars.append(_FakeVar(value)) or int_vars[-1])
+    monkeypatch.setattr(
+        settings_window.tk, "StringVar", lambda value=None: string_vars.append(_FakeVar(value)) or string_vars[-1]
+    )
+    monkeypatch.setattr(
+        settings_window.tk, "BooleanVar", lambda value=None: bool_vars.append(_FakeVar(value)) or bool_vars[-1]
+    )
+    monkeypatch.setattr(
+        settings_window.tk, "DoubleVar", lambda value=None: double_vars.append(_FakeVar(value)) or double_vars[-1]
+    )
+    monkeypatch.setattr(
+        settings_window.tk, "IntVar", lambda value=None: int_vars.append(_FakeVar(value)) or int_vars[-1]
+    )
 
     gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
     values = replace(_values(), night_start_time="")
@@ -547,6 +555,15 @@ def test_on_toggle_preserves_best_effort_status_when_settings_apply_fails(monkey
     gui.var_dim_sync_enabled = _FakeVar(True)
     gui.var_dim_sync_mode = _FakeVar("temp")
     gui.var_dim_temp_brightness = _FakeVar(4.4)
+    gui.var_debounce_enter = _FakeVar(6)
+    gui.var_debounce_exit = _FakeVar(10)
+    gui.var_scheduler_enabled = _FakeVar(False)
+    gui.var_day_start = _FakeVar("08:00")
+    gui.var_night_start = _FakeVar("20:00")
+    gui.var_day_base = _FakeVar(40.0)
+    gui.var_day_reactive = _FakeVar(50.0)
+    gui.var_night_base = _FakeVar(20.0)
+    gui.var_night_reactive = _FakeVar(50.0)
     gui.var_os_autostart = _FakeVar(True)
     monkeypatch.setattr(
         settings_window,
@@ -560,8 +577,7 @@ def test_on_toggle_preserves_best_effort_status_when_settings_apply_fails(monkey
     gui._on_toggle()
 
     assert enabled_calls == ["enabled"]
-    assert gui.config.os_autostart is True
-    assert gui.status.configure_calls[0] == {"text": "✓ Saved"}
+    assert gui.status.configure_calls[0] == {"text": "⚠ Save failed"}
 
 
 def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -610,7 +626,7 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
     assert apply_calls[0].ac_power_mode == PowerMode.BALANCED.value
     assert apply_calls[0].battery_power_mode is None
     assert apply_calls[0].physical_layout == "ansi"
-    assert gui.config.os_autostart is True
+    assert apply_calls[0].os_autostart_enabled is True
     assert enabled_calls == ["enabled"]
     assert gui.status.configure_calls[0] == {"text": "✓ Saved"}
     assert gui.root.after_calls[0][0] == 1500
@@ -639,8 +655,20 @@ def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.
     gui.var_dim_sync_enabled = _FakeVar(False)
     gui.var_dim_sync_mode = _FakeVar("off")
     gui.var_dim_temp_brightness = _FakeVar(5.0)
+    gui.var_debounce_enter = _FakeVar(6)
+    gui.var_debounce_exit = _FakeVar(10)
+    gui.var_scheduler_enabled = _FakeVar(False)
+    gui.var_day_start = _FakeVar("08:00")
+    gui.var_night_start = _FakeVar("20:00")
+    gui.var_day_base = _FakeVar(40.0)
+    gui.var_day_reactive = _FakeVar(50.0)
+    gui.var_night_base = _FakeVar(20.0)
+    gui.var_night_reactive = _FakeVar(50.0)
     gui.var_os_autostart = _FakeVar(True)
-    monkeypatch.setattr(settings_window, "apply_settings_values_to_config", lambda *, config, values: None)
+    apply_calls: list[SettingsValues] = []
+    monkeypatch.setattr(
+        settings_window, "apply_settings_values_to_config", lambda *, config, values: apply_calls.append(values)
+    )
     monkeypatch.setattr(
         settings_window, "set_os_autostart", lambda enabled: (_ for _ in ()).throw(RuntimeError("boom"))
     )
@@ -650,7 +678,8 @@ def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.
     gui._on_toggle()
 
     assert gui.var_os_autostart.set_calls == [False]
-    assert gui.status.configure_calls[0] == {"text": "✓ Saved"}
+    assert apply_calls[0].os_autostart_enabled is False
+    assert gui.status.configure_calls[0] == {"text": "⚠ Save failed"}
 
 
 def test_power_mode_selection_helpers_translate_between_labels_and_values() -> None:

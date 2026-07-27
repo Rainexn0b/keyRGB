@@ -142,7 +142,7 @@ def _load_config_inner(
     return None
 
 
-def save_config_settings_atomic(*, config_dir: Path, config_file: Path, settings: dict[str, Any], logger) -> None:
+def save_config_settings_atomic(*, config_dir: Path, config_file: Path, settings: dict[str, Any], logger) -> bool:
     """Save config JSON atomically with exclusive file lock.
 
     Acquires LOCK_EX on config_dir/config.lock, then writes to a temp file
@@ -152,14 +152,56 @@ def save_config_settings_atomic(*, config_dir: Path, config_file: Path, settings
     """
 
     lock_fd = _acquire_lock(config_dir, exclusive=True)
+    if lock_fd is None:
+        logger.warning("Failed to save config: could not acquire config lock")
+        return False
     try:
-        _save_config_inner(config_dir=config_dir, config_file=config_file, settings=settings, logger=logger)
+        return _save_config_inner(config_dir=config_dir, config_file=config_file, settings=settings, logger=logger)
     finally:
-        if lock_fd is not None:
-            _release_lock(lock_fd)
+        _release_lock(lock_fd)
 
 
-def _save_config_inner(*, config_dir: Path, config_file: Path, settings: dict[str, Any], logger) -> None:
+def merge_config_settings_atomic(
+    *,
+    config_dir: Path,
+    config_file: Path,
+    defaults: dict[str, Any],
+    updates: dict[str, Any],
+    removed_keys: set[str],
+    logger,
+) -> dict[str, Any] | None:
+    """Merge top-level changes into the latest on-disk snapshot under one lock."""
+
+    lock_fd = _acquire_lock(config_dir, exclusive=True)
+    if lock_fd is None:
+        logger.warning("Failed to save config: could not acquire config lock")
+        return None
+    try:
+        if config_file.exists():
+            latest = _load_config_inner(
+                config_file=config_file,
+                defaults=defaults,
+                retries=1,
+                retry_delay=0.0,
+                logger=logger,
+            )
+            if latest is None:
+                return None
+        else:
+            latest = deepcopy(defaults)
+
+        latest.update(deepcopy(updates))
+        for key in removed_keys:
+            latest.pop(key, None)
+
+        if not _save_config_inner(config_dir=config_dir, config_file=config_file, settings=latest, logger=logger):
+            return None
+        return latest
+    finally:
+        _release_lock(lock_fd)
+
+
+def _save_config_inner(*, config_dir: Path, config_file: Path, settings: dict[str, Any], logger) -> bool:
     """Inner save implementation, called under an exclusive lock."""
     try:
         config_dir.mkdir(parents=True, exist_ok=True)
@@ -177,6 +219,8 @@ def _save_config_inner(*, config_dir: Path, config_file: Path, settings: dict[st
                     os.unlink(tmp_path)
             except OSError as exc:
                 logger.debug("Failed to remove temp config file %s: %s", tmp_path, exc)
+        return True
 
     except _CONFIG_SAVE_ERRORS as e:
         _log_warning_with_traceback(logger, "Failed to save config: %s", e)
+        return False

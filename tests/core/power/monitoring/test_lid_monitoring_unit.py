@@ -193,7 +193,7 @@ def test_poll_lid_state_paths_picks_first_readable_path_and_emits_callbacks(
 
     monkeypatch.setattr(builtins, "open", _open)
 
-    remaining = {"n": 2}
+    remaining = {"n": 4}
 
     def is_running() -> bool:
         remaining["n"] -= 1
@@ -260,7 +260,7 @@ def test_poll_lid_state_paths_propagates_unexpected_callback_errors(monkeypatch:
 
     monkeypatch.setattr(builtins, "open", _open)
 
-    remaining = {"n": 1}
+    remaining = {"n": 2}
 
     def is_running() -> bool:
         remaining["n"] -= 1

@@ -9,12 +9,9 @@ from typing import cast
 
 from src.core.config import Config
 from src.core.profile import profiles
-from src.core.resources import layout as layout_resources
-from src.core.resources import layout_legends
-from src.core.resources import layouts as layout_catalog
+from src.core.resources import layout as layout_resources, layout_legends, layouts as layout_catalog
 from src.core.resources.defaults import get_default_keymap
-from src.gui.perkey import hardware as perkey_hardware
-from src.gui.perkey import profile_management
+from src.gui.perkey import hardware as perkey_hardware, profile_management
 from src.gui.reference import overlay_geometry
 from src.gui.theme import apply_clam_theme
 from src.gui.utils import deck_render_cache, profile_backdrop_storage

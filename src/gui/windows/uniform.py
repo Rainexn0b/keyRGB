@@ -9,6 +9,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
 
+from src.core.runtime.hardware_ownership import acquire_hardware_control_lock, release_hardware_control_lock
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
 from src.core.utils.exceptions import is_device_busy
 from src.gui.theme import apply_clam_theme
@@ -21,25 +22,30 @@ _UNIFORM_DEVICE_WRITE_ERRORS = (AttributeError, LookupError, RuntimeError, TypeE
 _TK_WIDGET_STATE_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 _GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
 _WRAP_SYNC_ERRORS = (RuntimeError, tk.TclError, TypeError, ValueError)
+_DEVICE_CLOSE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 try:
     from src.core.config import Config
     from src.gui.widgets.color_wheel import ColorWheel
-    from src.gui.windows import _uniform_color_bootstrap as uniform_color_bootstrap
-    from src.gui.windows import _uniform_color_interactions as uniform_color_interactions
-    from src.gui.windows import _uniform_color_state as uniform_color_state
-    from src.gui.windows import _uniform_color_ui as uniform_color_ui
-    from src.gui.windows import _uniform_init_adapter as uniform_init_adapter
+    from src.gui.windows import (
+        _uniform_color_bootstrap as uniform_color_bootstrap,
+        _uniform_color_interactions as uniform_color_interactions,
+        _uniform_color_state as uniform_color_state,
+        _uniform_color_ui as uniform_color_ui,
+        _uniform_init_adapter as uniform_init_adapter,
+    )
 except ImportError:
     # Fallback for direct execution (e.g. `python src/gui/windows/uniform.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
     from src.core.config import Config
     from src.gui.widgets.color_wheel import ColorWheel
-    from src.gui.windows import _uniform_color_bootstrap as uniform_color_bootstrap
-    from src.gui.windows import _uniform_color_interactions as uniform_color_interactions
-    from src.gui.windows import _uniform_color_state as uniform_color_state
-    from src.gui.windows import _uniform_color_ui as uniform_color_ui
-    from src.gui.windows import _uniform_init_adapter as uniform_init_adapter
+    from src.gui.windows import (
+        _uniform_color_bootstrap as uniform_color_bootstrap,
+        _uniform_color_interactions as uniform_color_interactions,
+        _uniform_color_state as uniform_color_state,
+        _uniform_color_ui as uniform_color_ui,
+        _uniform_init_adapter as uniform_init_adapter,
+    )
 
 
 SecondaryDeviceRoute = uniform_color_bootstrap.SecondaryDeviceRoute
@@ -77,16 +83,22 @@ class UniformColorGUI:
         self.config = Config()
 
         # Try to acquire device for standalone mode; if tray app owns it, we'll defer.
+        tray_managed = os.environ.get("KEYRGB_TRAY_MANAGED_GUI", "").strip().lower() in {"1", "true", "yes", "on"}
+        self._owns_hardware_lock = False if tray_managed else acquire_hardware_control_lock()
         init_state = uniform_init_adapter.initialize_device_bootstrap_state(
             secondary_route=self._secondary_route,
             requested_backend=getattr(self, "requested_backend", None),
             select_backend_fn=select_backend,
             is_device_busy_fn=is_device_busy,
             logger=logger,
+            allow_hardware=self._owns_hardware_lock,
         )
         self._backend = init_state.backend
         self._color_supported = init_state.color_supported
         self.kb = init_state.device
+        if self.kb is None and self._owns_hardware_lock:
+            release_hardware_control_lock()
+            self._owns_hardware_lock = False
 
         uniform_color_ui.build_uniform_window_ui(
             self,
@@ -100,6 +112,9 @@ class UniformColorGUI:
         self.root.after(50, self._apply_geometry)
 
         uniform_color_state.initialize_drag_state(self, drag_commit_interval=0.06)
+        protocol = getattr(self.root, "protocol", None)
+        if callable(protocol):
+            protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _apply_geometry(self) -> None:
         try:
@@ -212,6 +227,21 @@ class UniformColorGUI:
         )
 
     def _on_close(self):
+        device = getattr(self, "kb", None)
+        self.kb = None
+        close = getattr(device, "close", None)
+        if callable(close):
+            try:
+                close()
+            except _DEVICE_CLOSE_ERRORS:
+                logger.debug("Failed to close uniform color device", exc_info=True)
+        try:
+            owns_hardware_lock = bool(self._owns_hardware_lock)
+        except AttributeError:
+            owns_hardware_lock = False
+        if owns_hardware_lock:
+            release_hardware_control_lock()
+            self._owns_hardware_lock = False
         self.root.destroy()
 
     def run(self):

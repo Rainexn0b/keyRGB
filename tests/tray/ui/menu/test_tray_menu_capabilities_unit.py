@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import ClassVar
 
 import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
 
-
 ensure_repo_root_on_sys_path()
 
-from src.tray.ui import menu as tray_menu
 from src.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,
     SecondaryDeviceRoute,
 )
+from src.tray.ui import menu as tray_menu
 
 
 class FakeMenu:
@@ -247,7 +247,7 @@ def test_keyboard_status_formats_usb_vid_pid(monkeypatch: pytest.MonkeyPatch) ->
         name = "ite8291r3_perkey"
 
     class DummyProbe:
-        identifiers = {"usb_vid": "0x048d", "usb_pid": "0x600b"}
+        identifiers: ClassVar[dict[str, str]] = {"usb_vid": "0x048d", "usb_pid": "0x600b"}
 
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.backend = DummyBackend()
@@ -524,7 +524,7 @@ def test_keyboard_status_badges_research_backed_experimental_backend(monkeypatch
         experimental_evidence = "reverse_engineered"
 
     class DummyProbe:
-        identifiers = {"usb_vid": "0x048d", "usb_pid": "0x8910"}
+        identifiers: ClassVar[dict[str, str]] = {"usb_vid": "0x048d", "usb_pid": "0x8910"}
 
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.backend = DummyBackend()
@@ -657,8 +657,8 @@ def test_system_power_menu_contains_power_mode_settings_entry(monkeypatch: pytes
 def test_perkey_profiles_menu_falls_back_to_editor_when_profile_listing_raises_runtime_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.tray.ui import menu_sections
     from src.core.profile import profiles as core_profiles
+    from src.tray.ui import menu_sections
 
     monkeypatch.setattr(core_profiles, "list_profiles", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
 

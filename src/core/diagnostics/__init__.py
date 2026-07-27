@@ -4,12 +4,14 @@ import argparse
 import json
 from typing import Any
 
-from . import collectors as diagnostics_collectors
-from . import formatting as diagnostics_formatting
-from . import io as diagnostics_io
-from . import model as diagnostics_model
-from . import snapshots as diagnostics_snapshots
-from . import usb as diagnostics_usb
+from . import (
+    collectors as diagnostics_collectors,
+    formatting as diagnostics_formatting,
+    io as diagnostics_io,
+    model as diagnostics_model,
+    snapshots as diagnostics_snapshots,
+    usb as diagnostics_usb,
+)
 
 _app_snapshot = diagnostics_collectors.app_snapshot
 _backend_probe_snapshot = diagnostics_collectors.backend_probe_snapshot
