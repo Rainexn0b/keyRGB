@@ -34,6 +34,7 @@ _effect_twinkle_method = engine_methods.effect_twinkle_method
 _fade_in_per_key_method = engine_methods.fade_in_per_key_method
 _fade_uniform_color_method = engine_methods.fade_uniform_color_method
 _get_interval_method = engine_methods.get_interval_method
+_prime_per_key_frame_method = engine_methods.prime_per_key_frame_method
 
 logger = logging.getLogger("src.core.effects.engine_start")
 
@@ -184,9 +185,13 @@ class _EngineStart:
             pass
         elif int(self.brightness) > 1:
             if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
-                self._fade_in_per_key(duration_s=0.06)
-                self._last_hw_mode_brightness = int(self.brightness)
-                self._last_rendered_brightness = int(self.brightness)
+                if self._prime_per_key_frame():
+                    self._last_hw_mode_brightness = int(self.brightness)
+                    self._last_rendered_brightness = int(self.brightness)
+                else:
+                    self._fade_in_per_key(duration_s=0.06)
+                    self._last_hw_mode_brightness = int(self.brightness)
+                    self._last_rendered_brightness = int(self.brightness)
             else:
                 self._fade_uniform_color(
                     from_color=prev_color,
@@ -277,6 +282,7 @@ class _EngineStart:
     _clamped_interval = _clamped_interval_method
     _fade_uniform_color = _fade_uniform_color_method
     _fade_in_per_key = _fade_in_per_key_method
+    _prime_per_key_frame = _prime_per_key_frame_method
     _effect_rainbow_wave = _effect_rainbow_wave_method
     _effect_rainbow_swirl = _effect_rainbow_swirl_method
     _effect_spectrum_cycle = _effect_spectrum_cycle_method

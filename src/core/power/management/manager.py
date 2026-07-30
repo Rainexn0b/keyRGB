@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, cast
 from src.core.profile import profiles as perkey_profiles, runtime_activation as profile_runtime_activation
 
 from ..policies import power_event_policy as _power_event_policy
-from ..policies.power_source_loop_policy import PowerSourceLoopPolicy  # noqa: F401
+from ..policies.power_source_loop_policy import PowerSourceLoopPolicy
 from . import (
     _manager_battery_saver as _battery_saver,
     _manager_brightness_execution as _brightness_execution,
@@ -134,6 +134,22 @@ class PowerManager:
         except _POWER_MANAGER_RUNTIME_ERRORS:  # @quality-exception exception-transparency: shared power-manager policy/controller runtime seams must keep recoverable runtime failures logged and contained while unexpected defects still propagate
             logger.exception(log_message)
             return fallback
+
+    def prime_power_source_state(self) -> None:
+        """Apply the current power-source policy once before monitor threads start.
+
+        Tray autostart runs immediately after power monitoring starts.  Without
+        this synchronous first classification, the background battery thread can
+        race the initial effect prime and briefly expose the previous power
+        source's profile and brightness.
+        """
+
+        policy = PowerSourceLoopPolicy(debounce_seconds=3.0)
+        self._run_recoverable_runtime_boundary(
+            lambda: self._run_battery_saver_iteration(policy, poll_interval_s=0.0),
+            log_message="Initial power-source state application failed",
+            fallback=False,
+        )
 
     def start_monitoring(self):
         """Start monitoring power events in background thread."""

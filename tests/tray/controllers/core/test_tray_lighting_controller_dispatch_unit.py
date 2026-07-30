@@ -540,6 +540,44 @@ class TestStartCurrentEffect:
         mock_tray.engine.kb.set_brightness.assert_called_once_with(35)
         assert mock_tray.is_off is False
 
+    def test_reactive_blank_recovery_restores_hidden_rows_without_user_mode_or_restart(self):
+        from src.tray.controllers import _lighting_mode_apply as helpers
+        from src.tray.protocols import set_idle_power_state_field
+
+        mock_tray = MagicMock()
+        mock_tray.config.brightness = 10
+        mock_tray.config.per_key_colors = {(0, 0): (0, 255, 255)}
+        mock_tray.engine.kb.get_brightness = MagicMock(side_effect=AssertionError("should use hint"))
+        mock_tray.engine.kb.is_off = MagicMock(side_effect=AssertionError("should use hint"))
+        mock_tray.engine.kb.enable_user_mode = MagicMock(side_effect=AssertionError("must not reinitialize"))
+        mock_tray.engine.kb.set_brightness = MagicMock()
+        mock_tray.engine.kb.set_key_colors = MagicMock()
+        mock_tray.engine.kb_lock = _lock_mock()
+        set_idle_power_state_field(
+            mock_tray,
+            attr_name="_hidden_perkey_restore_brightness_hint",
+            state_name="hidden_perkey_restore_brightness_hint",
+            value=0,
+        )
+        set_idle_power_state_field(
+            mock_tray,
+            attr_name="_hidden_perkey_restore_device_off_hint",
+            state_name="hidden_perkey_restore_device_off_hint",
+            value=False,
+        )
+
+        restored = helpers.restore_hidden_perkey_rows_from_recovery_hint(mock_tray)
+
+        assert restored is True
+        mock_tray.engine.stop.assert_not_called()
+        mock_tray.engine.kb.enable_user_mode.assert_not_called()
+        mock_tray.engine.kb.set_key_colors.assert_called_once_with(
+            mock_tray.config.per_key_colors,
+            brightness=10,
+            enable_user_mode=False,
+        )
+        mock_tray.engine.kb.set_brightness.assert_called_once_with(10)
+
     def test_perkey_in_place_apply_uses_hardware_blank_hints_without_requery(self):
         from src.tray.controllers import _lighting_mode_apply as helpers
         from src.tray.protocols import set_idle_power_state_field
@@ -908,6 +946,7 @@ class TestPowerSourcePerkeyProfileTransition:
 
         mock_tray = MagicMock()
         mock_tray.is_off = True
+        mock_tray.config.brightness = 10
 
         with (
             patch(
@@ -921,12 +960,16 @@ class TestPowerSourcePerkeyProfileTransition:
             patch(
                 "src.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
             ) as set_sw_state,
+            patch(
+                "src.tray.controllers.lighting_controller.lighting_mode_apply.restore_hidden_perkey_rows_from_recovery_hint"
+            ) as hidden_restore,
         ):
             handled = apply_power_source_perkey_profile_transition(mock_tray)
 
         assert handled is True
         assert mock_tray.is_off is False
         set_sw_state.assert_called_once_with(mock_tray)
+        hidden_restore.assert_called_once_with(mock_tray, brightness_override=10)
 
     def test_apply_power_source_perkey_profile_transition_uses_live_engine_effect_before_config_perkey(self):
         from src.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition

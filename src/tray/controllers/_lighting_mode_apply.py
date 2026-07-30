@@ -124,6 +124,60 @@ def apply_perkey_mode(
     tray.is_off = False
 
 
+def restore_hidden_perkey_rows_from_recovery_hint(
+    tray: LightingTrayProtocol,
+    *,
+    brightness_override: int | None = None,
+) -> bool:
+    """Restore per-key rows during an explicit hidden-blank recovery hint.
+
+    The hardware poller supplies the brightness/off observations that made it
+    classify the controller as blank-but-not-off.  Avoid requerying the device
+    here: sleeping ITE controllers may wake into their saved startup effect if
+    polled unnecessarily.  Row data is written before brightness is raised and
+    no user-mode command or effect restart is issued.
+    """
+
+    from src.tray.controllers import _lighting_controller_helpers as helpers
+
+    known_brightness = read_idle_power_state_optional_int_field(
+        tray,
+        attr_name="_hidden_perkey_restore_brightness_hint",
+        state_name="hidden_perkey_restore_brightness_hint",
+        default=None,
+    )
+    known_is_off = read_idle_power_state_optional_bool_field(
+        tray,
+        attr_name="_hidden_perkey_restore_device_off_hint",
+        state_name="hidden_perkey_restore_device_off_hint",
+        default=None,
+    )
+    if known_brightness is None or known_is_off is None:
+        return False
+    if int(known_brightness) > 0 or bool(known_is_off):
+        return False
+
+    if brightness_override is not None:
+        effective_brightness = helpers._coerce_brightness_override(brightness_override)
+    else:
+        effective_brightness = safe_int_attr(tray.config, "brightness", default=0)
+    if int(effective_brightness) <= 0:
+        return False
+
+    color_map = helpers._config_per_key_colors_ref(tray.config)
+    if not color_map:
+        return False
+
+    return restore_hidden_per_key_rows_once(
+        kb=tray.engine.kb,
+        kb_lock=tray.engine.kb_lock,
+        color_map=color_map,
+        brightness=int(effective_brightness),
+        known_brightness=int(known_brightness),
+        known_is_off=bool(known_is_off),
+    )
+
+
 def apply_uniform_none_mode(tray: LightingTrayProtocol, *, brightness_override: int | None = None) -> None:
     from src.tray.controllers import _lighting_controller_helpers as helpers
 

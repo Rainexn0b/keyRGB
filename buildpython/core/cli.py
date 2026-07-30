@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from ..steps.step_defs import steps as all_steps
 from .profiles import PROFILES
 from .runner import run
+from .runtime_log import RUNTIME_LAUNCHERS, RUNTIME_LOG_MODES, capture_runtime_log
 
 
 def _parse_csv(raw: str | None) -> list[str] | None:
@@ -138,8 +139,44 @@ def main(argv: Iterable[str] | None = None) -> int:
         action="store_true",
         help="Also run black formatting check after the selected steps",
     )
+    parser.add_argument(
+        "--capture-runtime-log",
+        nargs="?",
+        const="full",
+        choices=RUNTIME_LOG_MODES,
+        metavar="MODE",
+        help="Capture KeyRGB runtime logs (debug, brightness, or full; default: full)",
+    )
+    parser.add_argument(
+        "--runtime-log-launcher",
+        choices=RUNTIME_LAUNCHERS,
+        default="installed",
+        help="Runtime used by --capture-runtime-log (default: installed)",
+    )
 
     args = parser.parse_args(list(argv) if argv is not None else None)
+
+    if args.capture_runtime_log is not None:
+        capture_conflicts = (
+            args.profile is not None
+            or args.list_profiles
+            or args.list_steps
+            or args.run_steps is not None
+            or args.skip_steps is not None
+            or args.verbose
+            or args.continue_on_error
+            or args.with_appimage
+            or args.with_black
+        )
+        if capture_conflicts:
+            parser.error("--capture-runtime-log cannot be combined with build step or profile options")
+        return capture_runtime_log(
+            mode=str(args.capture_runtime_log),
+            launcher=str(args.runtime_log_launcher),
+        )
+
+    if args.runtime_log_launcher != "installed":
+        parser.error("--runtime-log-launcher requires --capture-runtime-log")
 
     if args.list_profiles:
         _list_profiles()

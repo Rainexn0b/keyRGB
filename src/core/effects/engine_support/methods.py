@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from ..fades import fade_in_per_key, fade_uniform_color
+from ..fades import fade_in_per_key, fade_uniform_color, prime_per_key_frame
 from ..reactive.effects import run_reactive_fade, run_reactive_ripple
 from ..software.effects import (
     run_chase,
@@ -53,6 +53,16 @@ def fade_in_per_key_method(self, *, duration_s: float, steps: int = 12) -> None:
         brightness=int(self.brightness),
         duration_s=duration_s,
         steps=steps,
+    )
+
+
+def prime_per_key_frame_method(self) -> bool:
+    return prime_per_key_frame(
+        kb=self.kb,
+        kb_lock=self.kb_lock,
+        per_key_colors=self.per_key_colors,
+        current_color=self.current_color,
+        brightness=int(self.brightness),
     )
 
 

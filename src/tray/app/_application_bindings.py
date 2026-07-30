@@ -227,8 +227,11 @@ def start_tray_runtime(
         config=state.config,
     )
     runtime_tray.power_manager = power_manager
-    bindings.start_all_polling(runtime_tray, ite_num_rows=state.ite_rows, ite_num_cols=state.ite_cols)
+    # Start the configured effect before the config-poll thread can perform its
+    # startup apply. The previous order allowed both paths to enter
+    # start_effect() concurrently, leaving two reactive input listeners alive.
     bindings.maybe_autostart_effect(cast(_AutostartEffectTray, tray))
+    bindings.start_all_polling(runtime_tray, ite_num_rows=state.ite_rows, ite_num_cols=state.ite_cols)
     return power_manager
 
 

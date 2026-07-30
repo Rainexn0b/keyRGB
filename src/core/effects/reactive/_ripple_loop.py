@@ -188,6 +188,8 @@ class _ReactiveRippleApiProtocol(Protocol):
 
 def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiProtocol) -> None:
     dt = api.frame_dt_s()
+    if engine.stop_event.is_set():
+        return
 
     press = api.create_press_source(
         engine,
@@ -201,6 +203,8 @@ def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiPr
     global_hue = 0.0
 
     try:
+        if engine.stop_event.is_set():
+            return
         while engine.running and not engine.stop_event.is_set():
             p = api.pace(engine)
             press.spawn_interval_s = max(0.10, 0.45 / max(0.1, p))

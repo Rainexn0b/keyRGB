@@ -7,6 +7,40 @@ import pytest
 from src.core.effects.device import NullKeyboard
 from src.core.effects.engine import EffectsEngine
 from src.core.effects.fades import fade_in_per_key
+from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+
+
+def test_prime_per_key_frame_writes_rows_then_brightness_without_user_mode() -> None:
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.calls: list[tuple[str, int | bool]] = []
+
+        def enable_user_mode(self, *, brightness: int, save: bool = False):
+            del brightness, save
+            raise AssertionError("startup prime must not reinitialize user mode")
+
+        def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
+            assert len(color_map) == NUM_ROWS * NUM_COLS
+            assert enable_user_mode is False
+            self.calls.append(("set_key_colors", int(brightness)))
+
+        def set_brightness(self, brightness: int):
+            self.calls.append(("set_brightness", int(brightness)))
+
+    engine = EffectsEngine()
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.brightness = 10
+    engine.current_color = (0, 255, 255)
+    engine.per_key_colors = {(0, 0): (0, 255, 255)}
+
+    assert engine._prime_per_key_frame() is True
+    assert spy.calls == [
+        ("set_key_colors", 10),
+        ("set_brightness", 10),
+    ]
 
 
 def test_perkey_fade_passes_brightness_kwarg() -> None:

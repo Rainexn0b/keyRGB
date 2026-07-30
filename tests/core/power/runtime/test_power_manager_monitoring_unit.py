@@ -47,6 +47,19 @@ class TestPowerManagerMonitoringThreads:
             pm.start_monitoring()
         th.assert_not_called()
 
+    def test_prime_power_source_state_runs_one_iteration_without_sleep(self):
+        from src.core.power.management.manager import PowerManager, PowerSourceLoopPolicy
+
+        pm = PowerManager(MagicMock())
+        pm._run_battery_saver_iteration = MagicMock(return_value=False)
+
+        pm.prime_power_source_state()
+
+        pm._run_battery_saver_iteration.assert_called_once()
+        policy = pm._run_battery_saver_iteration.call_args.args[0]
+        assert isinstance(policy, PowerSourceLoopPolicy)
+        assert pm._run_battery_saver_iteration.call_args.kwargs == {"poll_interval_s": 0.0}
+
     def test_stop_monitoring_joins_threads_best_effort(self):
         from src.core.power.management.manager import PowerManager
 

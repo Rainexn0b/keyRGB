@@ -83,6 +83,52 @@ def fade_uniform_color(
             time.sleep(dt)
 
 
+def prime_per_key_frame(
+    *,
+    kb: KeyboardDeviceProtocol,
+    kb_lock: RLock,
+    per_key_colors: Mapping[Key, Color] | None,
+    current_color: Color,
+    brightness: int,
+) -> bool:
+    """Write the final per-key frame once without a startup fade or mode command.
+
+    Row data is programmed before brightness is raised.  This avoids the
+    controller-visible full-deck initialization flash that otherwise appears
+    when KeyRGB starts or reclaims an ITE controller after firmware sleep.
+    """
+
+    if not per_key_colors:
+        return False
+
+    try:
+        base_color_src = current_color or (255, 0, 0)
+        base_color = (
+            int(base_color_src[0]),
+            int(base_color_src[1]),
+            int(base_color_src[2]),
+        )
+        brightness_hw = int(brightness)
+        full_colors = build_full_color_grid(
+            base_color=base_color,
+            per_key_colors=per_key_colors,
+            num_rows=NUM_ROWS,
+            num_cols=NUM_COLS,
+        )
+    except _FADE_SETUP_ERRORS:
+        return False
+
+    try:
+        with kb_lock:
+            kb.set_key_colors(full_colors, brightness=brightness_hw, enable_user_mode=False)
+            set_brightness = getattr(kb, "set_brightness", None)
+            if callable(set_brightness):
+                set_brightness(brightness_hw)
+    except _FADE_RUNTIME_ERRORS:
+        return False
+    return True
+
+
 def fade_in_per_key(
     *,
     kb: KeyboardDeviceProtocol,

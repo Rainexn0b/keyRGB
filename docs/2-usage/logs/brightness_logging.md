@@ -2,17 +2,51 @@
 
 ## Full reactive typing investigation (recommended for flash/flicker reports)
 
+Quit any existing KeyRGB tray instance, then run this command from the project
+checkout. It launches the installed KeyRGB runtime by default, preserving its
+packaged GTK/AppIndicator integration, and writes a fresh `keyrgb-debug.log` in
+the current directory:
+
 ```bash
-KEYRGB_DEBUG=1 \
-KEYRGB_DEBUG_BRIGHTNESS=1 \
-KEYRGB_DEBUG_REACTIVE_INPUT=1 \
-./keyrgb >> ~/keyrgb-brightness.log 2>&1
+keyrgb --capture-runtime-log
 ```
 
 `KEYRGB_DEBUG_REACTIVE_INPUT=1` adds `reactive_input: key_press …` lines that
 pin each flash to an exact keystroke. Stop with Ctrl-C; a libusb assertion
 on shutdown (`usbi_mutex_destroy: Assertion … failed`) is a known harmless
 teardown race and does not invalidate the captured session.
+
+### Capture modes
+
+```bash
+# General runtime and startup diagnostics
+keyrgb --capture-runtime-log=debug
+
+# Runtime plus brightness decisions and hardware reads/writes
+keyrgb --capture-runtime-log=brightness
+
+# Everything above plus explicit reactive-input tracing (the default)
+keyrgb --capture-runtime-log=full
+```
+
+Use the source launcher when intentionally testing uninstalled code:
+
+```bash
+keyrgb --capture-runtime-log=full --runtime-log-launcher=source
+```
+
+The source launcher prefers an external installed KeyRGB runtime as its
+dependency host while keeping the checkout authoritative through its working
+directory and `PYTHONPATH`. This lets an installed AppImage provide its bundled
+PyGObject/Ayatana AppIndicator stack, so KDE Wayland source captures retain the
+normal shaped icon. If no external runtime is available, it falls back to the
+active Python; that environment must then provide the tray dependencies listed
+in `docs/2-usage/venv/setup.md`.
+
+The previous `buildpython --capture-runtime-log` interface remains as a
+compatibility wrapper for contributor workflows. Runtime capture itself is
+owned by `src/core/diagnostics/runtime_capture.py` and does not depend on
+`buildpython`.
 
 ### What to grep for at the flash timestamp
 
@@ -31,7 +65,7 @@ together. A flash with `allow=False`, stable `hw=`, and no
 ## Standard brightness logging
 
 ```bash
-KEYRGB_DEBUG=1 KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb >> ./keyrgb-brightness.log 2>&1
+keyrgb --capture-runtime-log=brightness
 ```
 
 ## Runtime debug

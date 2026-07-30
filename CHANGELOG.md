@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.30.7 (2026-07-30)
+
+- Tray/Startup: Apply the current power-source profile and brightness synchronously before starting monitor threads or autostarting the effect. This prevents the first frame from briefly using the previous power source's profile/brightness and then stepping through the reactive brightness guard.
+- Effects/Reactive: Remove the experimental changed-content idle keepalive after a full hardware trace proved the ite8291r3 sleep timer is keyed to physical keyboard input; the controller still slept 605 and 604 seconds after the last keypress despite 98 content-changing keepalive pairs. Duplicate idle-frame suppression is restored to avoid pointless USB traffic.
+- Tray/Hardware-Poll: Recover the ite8291r3 `brightness=0, is_off=False` controller-sleep state by writing the current per-key rows before raising brightness, without `enable_user_mode`, an effect restart, or the startup fade. This prevents the controller's saved startup state and KeyRGB's initialization path from appearing as a random deck-wide flash.
+- Effects/Startup: Prime per-key software effects with one hidden final frame (rows first, then brightness) instead of the previous saved-user-mode plus full-deck startup fade, eliminating the visible deck flicker when KeyRGB starts.
+- Tray/Startup: Start the configured effect before polling threads so config polling cannot race tray autostart into two simultaneous reactive workers. The initial config snapshot now recognizes an already-running identical loop effect instead of restarting it, and reactive loops honor an already-requested stop before opening evdev (closing immediately if the stop arrives during open), preventing replacement workers from briefly doubling physical key events.
+- Diagnostics/Runtime Capture: Add `keyrgb --capture-runtime-log[=debug|brightness|full]` (ownership in `src/core/diagnostics`); keep `buildpython --capture-runtime-log` as a thin delegate. Default to the installed runtime for AppIndicator support on KDE Wayland; source mode imports checkout code under that dependency host.
+- Docs/Development: Correct venv guidance for distro-managed PyGObject by requiring a system-Python-compatible venv instead of symlinking `gi` across potentially incompatible Python minor versions.
+
 ## 0.30.6 (2026-07-27)
 
 - Hardware/Runtime: Add process-wide ownership locking for direct keyboard control, prefer the kernel-backed sysfs backend during automatic selection, and make HID/USB cleanup safe across concurrent transport replacement and failure paths.

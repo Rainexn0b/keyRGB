@@ -325,6 +325,41 @@ def test_apply_effect_requests_atomic_brightness_preservation() -> None:
     tray._start_current_effect.assert_called_once_with(preserve_last_rendered_brightness=True)
 
 
+def test_startup_apply_skips_restart_when_autostarted_loop_effect_is_running() -> None:
+    tray = _mk_tray_base(effect="reactive_ripple", brightness=40)
+    tray.engine.current_effect = "reactive_ripple"
+
+    new_last, warn_at = _apply_from_config_once(
+        tray,
+        ite_num_rows=6,
+        ite_num_cols=21,
+        cause="startup",
+        last_applied=None,
+        last_apply_warn_at=0.0,
+    )
+
+    assert isinstance(new_last, ConfigApplyState)
+    assert new_last.effect == "reactive_ripple"
+    assert warn_at == 0.0
+    tray._start_current_effect.assert_not_called()
+
+
+def test_startup_apply_restarts_when_running_effect_differs_from_config() -> None:
+    tray = _mk_tray_base(effect="reactive_ripple", brightness=40)
+    tray.engine.current_effect = "rainbow_wave"
+
+    _apply_from_config_once(
+        tray,
+        ite_num_rows=6,
+        ite_num_cols=21,
+        cause="startup",
+        last_applied=None,
+        last_apply_warn_at=0.0,
+    )
+
+    tray._start_current_effect.assert_called_once_with(preserve_last_rendered_brightness=True)
+
+
 def test_apply_from_config_once_logs_recoverable_apply_error() -> None:
     tray = _mk_tray_base(effect="wave", brightness=10)
     tray._start_current_effect.side_effect = RuntimeError("apply boom")

@@ -157,6 +157,8 @@ class _ReactiveFadeApiProtocol(Protocol):
 
 def run_reactive_fade_loop(engine: EffectsEngine, *, api: _ReactiveFadeApiProtocol) -> None:
     dt = api.frame_dt_s()
+    if engine.stop_event.is_set():
+        return
 
     press = api.create_press_source(
         engine,
@@ -168,6 +170,8 @@ def run_reactive_fade_loop(engine: EffectsEngine, *, api: _ReactiveFadeApiProtoc
 
     pulses: list[_PulseProtocol] = []
     try:
+        if engine.stop_event.is_set():
+            return
         while engine.running and not engine.stop_event.is_set():
             p = api.pace(engine)
             press.spawn_interval_s = max(0.10, 0.45 / max(0.1, p))

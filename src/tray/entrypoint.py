@@ -9,6 +9,9 @@ from __future__ import annotations
 import logging
 import signal
 import sys
+from collections.abc import Sequence
+
+from src.core.diagnostics.runtime_capture import capture_runtime_log_from_cli
 
 from .app.application import KeyRGBTray
 from .app.lifecycle import shutdown_tray_runtime_best_effort
@@ -50,7 +53,16 @@ def _shutdown_engine_best_effort(app: object | None) -> None:
     shutdown_tray_runtime_best_effort(app)
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
+    capture_exit_code = capture_runtime_log_from_cli(
+        tuple(sys.argv[1:] if argv is None else argv),
+        prog="keyrgb",
+    )
+    if capture_exit_code is not None:
+        if capture_exit_code != 0:
+            raise SystemExit(capture_exit_code)
+        return
+
     app: KeyRGBTray | None = None
     try:
         configure_logging()

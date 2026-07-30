@@ -295,6 +295,10 @@ def apply_power_source_perkey_profile_transition(tray: LightingTrayProtocol) -> 
 
         if lighting_controller_helpers.is_software_effect(effect):
             lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect(tray)
+            lighting_mode_apply.restore_hidden_perkey_rows_from_recovery_hint(
+                tray,
+                brightness_override=safe_attrs.safe_int_attr(tray.config, "brightness", default=0),
+            )
             if not software_target_controller.software_effect_target_routes_aux_devices(tray):
                 secondary_static_scene.apply_secondary_static_scene(tray)
             tray.is_off = False

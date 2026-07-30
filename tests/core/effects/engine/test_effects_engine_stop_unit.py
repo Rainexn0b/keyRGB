@@ -329,6 +329,36 @@ def test_old_effect_thread_cannot_clear_new_thread_state() -> None:
     engine.stop()
 
 
+def test_initial_perkey_sw_start_primes_single_frame_without_startup_fade(monkeypatch) -> None:
+    """Initial SW startup writes one hidden frame instead of animating the deck."""
+
+    class PerKeyKeyboard(NullKeyboard):
+        def set_key_colors(self, _color_map, *, brightness: int, enable_user_mode: bool = False):
+            del brightness, enable_user_mode
+
+    engine = EffectsEngine()
+    engine.kb = PerKeyKeyboard()
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.per_key_colors = {(0, 0): (0, 255, 255)}
+    engine.brightness = 10
+
+    calls: list[str] = []
+    monkeypatch.setattr(engine, "_prime_per_key_frame", lambda: calls.append("prime") or True)
+    monkeypatch.setattr(engine, "_fade_in_per_key", lambda **_kwargs: calls.append("fade"))
+
+    engine._start_sw_effect(
+        target=lambda: None,
+        prev_color=(0, 0, 0),
+        fade_to_color=(0, 255, 255),
+    )
+
+    assert calls == ["prime"]
+    assert engine._last_hw_mode_brightness == 10
+    assert engine._last_rendered_brightness == 10
+    engine.stop()
+
+
 def test_sw_to_sw_transition_skips_fade_in() -> None:
     """SW→SW transitions must skip _fade_in_per_key to avoid a dark-dip flicker.
 

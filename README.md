@@ -150,6 +150,7 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | Command                 | Description                                               |
 | ----------------------- | --------------------------------------------------------- |
 | `keyrgb`                | Start the tray app (background).                          |
+| `keyrgb --capture-runtime-log` | Capture a full foreground runtime diagnostic log. |
 | `./keyrgb`              | Run attached to terminal (dev mode).                      |
 | `keyrgb-perkey`         | Open the per-key editor.                                  |
 | `keyrgb-uniform`        | Open the uniform-color GUI.                               |

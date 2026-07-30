@@ -83,6 +83,9 @@ def start_power_monitoring(
     power_manager = power_manager_cls(tray, config=config)
     monitoring_started = False
     try:
+        prime_power_source = getattr(power_manager, "prime_power_source_state", None)
+        if callable(prime_power_source):
+            prime_power_source()
         power_manager.start_monitoring()
         monitoring_started = True
     finally:

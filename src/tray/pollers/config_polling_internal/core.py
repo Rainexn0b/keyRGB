@@ -87,6 +87,28 @@ def _recent_power_source_transition_active(tray: object, *, now: float) -> bool:
     return now - changed_at <= _POWER_SOURCE_CONFIG_SUPPRESSION_WINDOW_S
 
 
+def _startup_loop_effect_already_running(tray: ConfigPollingTrayProtocol, current: ConfigApplyState) -> bool:
+    """Return true when autostart already started the same loop effect.
+
+    Startup config polling runs immediately after tray autostart. Treating the
+    initial ``None`` baseline as a change would stop and recreate that fresh
+    worker, briefly opening a second reactive input listener for no config
+    change. Static modes intentionally continue through the normal startup
+    apply path because they do not publish a running engine effect.
+    """
+
+    try:
+        engine = getattr(tray, "engine", None)
+        running = bool(getattr(engine, "running", False))
+        active_effect = str(getattr(engine, "current_effect", "") or "")
+    except _CONFIG_FALLBACK_EXCEPTIONS:
+        return False
+
+    if not running or not active_effect:
+        return False
+    return active_effect in {str(current.effect or ""), str(current.selected_effect or "")}
+
+
 def maybe_apply_fast_path(
     tray: ConfigPollingTrayProtocol,
     *,
@@ -145,6 +167,9 @@ def apply_from_config_once(
 
     if current == last_applied:
         return last_applied, last_apply_warn_at
+
+    if str(cause or "") == "startup" and last_applied is None and _startup_loop_effect_already_running(tray, current):
+        return current, last_apply_warn_at
 
     if str(cause or "") == "mtime_change" and current.perkey_sig is not None:
         now = float(monotonic_fn())

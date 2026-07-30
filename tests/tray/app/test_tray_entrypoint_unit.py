@@ -3,6 +3,29 @@ import pytest
 import src.tray.entrypoint as entry
 
 
+def test_main_runtime_capture_dispatches_before_tray_startup(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        entry,
+        "capture_runtime_log_from_cli",
+        lambda argv, *, prog: calls.append((argv, prog)) or 0,
+    )
+    monkeypatch.setattr(entry, "configure_logging", lambda: pytest.fail("tray startup called"))
+
+    entry.main(["--capture-runtime-log=full", "--runtime-log-launcher=source"])
+
+    assert calls == [(("--capture-runtime-log=full", "--runtime-log-launcher=source"), "keyrgb")]
+
+
+def test_main_runtime_capture_propagates_failure_status(monkeypatch):
+    monkeypatch.setattr(entry, "capture_runtime_log_from_cli", lambda _argv, *, prog: 2)
+
+    with pytest.raises(SystemExit) as exc_info:
+        entry.main(["--capture-runtime-log"])
+
+    assert exc_info.value.code == 2
+
+
 def test_main_happy_path_wires_startup_and_runs(monkeypatch):
     calls = {
         "logging": 0,

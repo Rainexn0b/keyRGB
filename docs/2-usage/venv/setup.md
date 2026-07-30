@@ -36,22 +36,27 @@ PyGObject should come from the system package manager, not from `pip`.
 
 ## Create the venv
 
-```bash
-python3 -m venv .venv
-```
-
-Expose system `gi` into the venv if you need the GTK or AppIndicator tray backends:
+Create the venv from the distro Python and expose distro-managed packages. This
+is important for PyGObject: its compiled `_gi` extension must match the Python
+minor version used by the venv.
 
 ```bash
-PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-SYS_SITE=$(python3 -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
-ln -s "${SYS_SITE}/gi" ".venv/lib/python${PY_VER}/site-packages/gi"
+python3 -m venv --system-site-packages .venv
 ```
+
+For `uv`, select the same distro Python explicitly:
+
+```bash
+uv venv --system-site-packages --python /usr/bin/python3 .venv
+```
+
+Do not symlink `gi` from a different Python minor version. For example, a
+Python 3.13 `uv` venv cannot load CachyOS/Arch's Python 3.14 `_gi` extension.
 
 Install the project in editable mode:
 
 ```bash
-.venv/bin/python -m pip install -e '.[qt,dev]'
+.venv/bin/python -m pip install -e '.[dev]'
 ```
 
 Fish users should prefer `.venv/bin/python ...` directly instead of sourcing the POSIX activation script.
@@ -76,9 +81,6 @@ Fish users should prefer `.venv/bin/python ...` directly instead of sourcing the
 
 ```bash
 rm -rf .venv
-python3 -m venv .venv
-PY_VER=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-SYS_SITE=$(python3 -c "import sysconfig; print(sysconfig.get_paths()['purelib'])")
-ln -s "${SYS_SITE}/gi" ".venv/lib/python${PY_VER}/site-packages/gi"
-.venv/bin/python -m pip install -e '.[qt,dev]'
+python3 -m venv --system-site-packages .venv
+.venv/bin/python -m pip install -e '.[dev]'
 ```

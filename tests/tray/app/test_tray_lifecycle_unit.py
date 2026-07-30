@@ -3,20 +3,25 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 
-def test_start_power_monitoring_constructs_and_starts() -> None:
+def test_start_power_monitoring_constructs_primes_and_starts() -> None:
     from src.tray.app.lifecycle import start_power_monitoring
 
     tray = MagicMock()
     config = MagicMock()
 
+    events: list[str] = []
     pm = MagicMock()
+    pm.prime_power_source_state.side_effect = lambda: events.append("prime")
+    pm.start_monitoring.side_effect = lambda: events.append("start")
     power_manager_cls = MagicMock(return_value=pm)
 
     got = start_power_monitoring(tray, power_manager_cls=power_manager_cls, config=config)
 
     assert got is pm
     power_manager_cls.assert_called_once_with(tray, config=config)
+    pm.prime_power_source_state.assert_called_once_with()
     pm.start_monitoring.assert_called_once()
+    assert events == ["prime", "start"]
 
 
 def test_start_power_monitoring_failure_rolls_back_partial_manager() -> None:

@@ -117,6 +117,59 @@ class _MockRandom:
         return 0
 
 
+class _AlreadySetEvent:
+    def is_set(self) -> bool:
+        return True
+
+    def wait(self, _dt: float) -> None:
+        return
+
+
+class _SetAfterFirstCheckEvent:
+    def __init__(self) -> None:
+        self.check_count = 0
+
+    def is_set(self) -> bool:
+        self.check_count += 1
+        return self.check_count > 1
+
+    def wait(self, _dt: float) -> None:
+        return
+
+
+class _TrackingStartupApi:
+    _PressSource = None
+
+    def __init__(self, press: _MockPressSource) -> None:
+        self.press = press
+        self.create_press_calls = 0
+        self.load_keymap_calls = 0
+        self.render_calls = 0
+
+    def frame_dt_s(self) -> float:
+        return 0.001
+
+    def try_open_evdev_keyboards(self):
+        return None
+
+    def reactive_synthetic_fallback_enabled(self) -> bool:
+        return False
+
+    def load_active_profile_slot_keymap(self):
+        return {}
+
+    def create_press_source(self, _engine, **_kwargs):
+        self.create_press_calls += 1
+        return self.press
+
+    def load_slot_keymap(self, **_kwargs):
+        self.load_keymap_calls += 1
+        return {}
+
+    def render(self, _engine, **_kwargs) -> None:
+        self.render_calls += 1
+
+
 class _MockApi:
     NUM_ROWS = 6
     NUM_COLS = 21
@@ -447,3 +500,59 @@ class TestRunReactiveRippleLoop:
 
         assert api.build_ripple_cm_calls > 0
         assert api.render_calls
+
+    def test_stopped_replacement_worker_does_not_open_input(self):
+        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+
+        engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
+        engine.stop_event = _AlreadySetEvent()
+        api = _TrackingStartupApi(_MockPressSource())
+
+        run_reactive_ripple_loop(engine, api=api)
+
+        assert api.create_press_calls == 0
+        assert api.load_keymap_calls == 0
+        assert api.render_calls == 0
+        assert not api.press.close_called
+
+    def test_worker_stopped_during_input_open_closes_without_rendering(self):
+        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+
+        engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
+        engine.stop_event = _SetAfterFirstCheckEvent()
+        api = _TrackingStartupApi(_MockPressSource())
+
+        run_reactive_ripple_loop(engine, api=api)
+
+        assert api.create_press_calls == 1
+        assert api.load_keymap_calls == 1
+        assert api.render_calls == 0
+        assert api.press.close_called
+
+    def test_stopped_fade_replacement_worker_does_not_open_input(self):
+        from src.core.effects.reactive._fade_loop import run_reactive_fade_loop
+
+        engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
+        engine.stop_event = _AlreadySetEvent()
+        api = _TrackingStartupApi(_MockPressSource())
+
+        run_reactive_fade_loop(engine, api=api)
+
+        assert api.create_press_calls == 0
+        assert api.load_keymap_calls == 0
+        assert api.render_calls == 0
+        assert not api.press.close_called
+
+    def test_fade_worker_stopped_during_input_open_closes_without_rendering(self):
+        from src.core.effects.reactive._fade_loop import run_reactive_fade_loop
+
+        engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
+        engine.stop_event = _SetAfterFirstCheckEvent()
+        api = _TrackingStartupApi(_MockPressSource())
+
+        run_reactive_fade_loop(engine, api=api)
+
+        assert api.create_press_calls == 1
+        assert api.load_keymap_calls == 1
+        assert api.render_calls == 0
+        assert api.press.close_called

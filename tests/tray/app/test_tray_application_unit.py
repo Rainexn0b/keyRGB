@@ -6,6 +6,7 @@ import src.tray.app.application as app
 
 
 def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
+    startup_order: list[str] = []
     calls = {
         "deps": 0,
         "select_backend": 0,
@@ -61,11 +62,13 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
         return fake_pm
 
     def _start_all_polling(self, *, ite_num_rows, ite_num_cols):
+        startup_order.append("polling")
         calls["start_polling"] += 1
         assert ite_num_rows == 6
         assert ite_num_cols == 21
 
     def _maybe_autostart_effect(self):
+        startup_order.append("autostart")
         calls["autostart"] += 1
 
     monkeypatch.setattr(app, "load_tray_dependencies", _load_tray_dependencies)
@@ -87,6 +90,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
         "start_polling": 1,
         "autostart": 1,
     }
+    assert startup_order == ["autostart", "polling"]
 
     assert isinstance(tray.config, FakeConfig)
     assert isinstance(tray.engine, FakeEngine)
