@@ -13,6 +13,28 @@ POWER_SOURCE_RECOVERY_WINDOW_S = 6.0
 POWER_SOURCE_RECOVERY_COOLDOWN_S = 0.75
 STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S = 5.0
 
+# Reactive-pulse poll deferral. The poller's two synchronous USB reads hold
+# kb_lock for ~10-15ms; when they land mid-frame on a reactive effect, the
+# render thread stalls and the ripple visibly jumps. While pulses are in
+# flight, defer the poll and retry on a short cadence — but never defer longer
+# than max_defer_s so disconnect/off-state detection cannot starve during
+# long typing sessions.
+REACTIVE_PULSE_POLL_DEFER_MAX_S = 5.0
+REACTIVE_PULSE_POLL_DEFER_RETRY_S = 0.5
+
+
+def should_defer_poll_for_reactive_pulses(
+    *,
+    reactive_pulse_mix: float,
+    now: float,
+    last_real_poll_at: float,
+    max_defer_s: float = REACTIVE_PULSE_POLL_DEFER_MAX_S,
+) -> bool:
+    """True when a hardware poll should wait for reactive pulses to drain."""
+    if float(reactive_pulse_mix) <= 0.0:
+        return False
+    return (float(now) - float(last_real_poll_at)) < float(max_defer_s)
+
 # Circuit breaker: after this many consecutive stable-zero recoveries that fail
 # to restore a non-zero brightness read, switch to the long backoff below so the
 # keyboard is not restart-spammed every cooldown cycle.

@@ -8,6 +8,8 @@ optimisation plans.
 - `0.19.0-footprint.md` — release footprint analysis
 - `stability-and-ram-audit.md` — stability and RAM audit
 - `reactive-typing-improvement-plan.md` — reactive typing improvement plan
+- `reactive-typing-smoothness-upgrades.md` — reactive ripple/fade smoothness
+  upgrades (real-dt timing, multi-press batching, ease-out decay, ripple cost)
 - `dim-undim-reactive-typing-review-improvement-plan.md` — dim/undim reactive
   typing review
 

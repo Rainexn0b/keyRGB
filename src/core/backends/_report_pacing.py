@@ -36,7 +36,7 @@ def _delay_s_from_env_key(env_key: str) -> float | None:
         return None
 
 
-def hid_report_delay_s_from_env(*, backend_name: str | None = None) -> float:
+def hid_report_delay_s_from_env(*, backend_name: str | None = None, default_s: float | None = None) -> float:
     """Return the configured HID report pacing delay in seconds.
 
     The global ``KEYRGB_HID_REPORT_DELAY_MS`` applies to all HID/USB backends
@@ -44,6 +44,10 @@ def hid_report_delay_s_from_env(*, backend_name: str | None = None) -> float:
     ``KEYRGB_<BACKEND_NAME>_REPORT_DELAY_MS`` can override the global value for
     that backend, with punctuation normalized to underscores.  Set the variable
     to ``0`` to disable pacing.
+
+    ``default_s`` lets a backend supply its own validated fallback delay when
+    no env var is set (e.g. after hardware validation at a lower value); when
+    omitted, the shared ``DEFAULT_HID_REPORT_DELAY_S`` (1 ms) applies.
     """
 
     if backend_name:
@@ -56,6 +60,9 @@ def hid_report_delay_s_from_env(*, backend_name: str | None = None) -> float:
     delay_s = _delay_s_from_env_key(GLOBAL_HID_REPORT_DELAY_ENV)
     if delay_s is not None:
         return delay_s
+
+    if default_s is not None:
+        return max(0.0, float(default_s))
 
     return DEFAULT_HID_REPORT_DELAY_S
 

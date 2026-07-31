@@ -268,19 +268,26 @@ def load_active_profile_slot_keymap() -> dict[str, KeyCells]:
         return {}
 
 
-def poll_keypress_slot_id(devices: EvdevKeyboardDevices | None) -> str | None:
+def poll_keypress_slot_ids(devices: EvdevKeyboardDevices | None) -> list[str]:
+    """Return every mapped slot id pressed since the last poll.
+
+    A single evdev batch can contain several keydown events (fast typing); the
+    singular wrapper historically returned only the first one and dropped the
+    rest. Collecting all of them lets the effect loops spawn one pulse per
+    physical press, which keeps burst typing visually responsive.
+    """
     if not devices:
-        return None
+        return []
 
     try:
         import select
     except ImportError:
-        return None
+        return []
 
     try:
         import evdev
     except ImportError:
-        return None
+        return []
     evdev_module = cast(_EvdevModuleProtocol, evdev)
 
     try:
@@ -292,11 +299,12 @@ def poll_keypress_slot_id(devices: EvdevKeyboardDevices | None) -> str | None:
             exc,
         )
         close_evdev_keyboards(devices)
-        return None
+        return []
 
     if not r:
-        return None
+        return []
 
+    slot_ids: list[str] = []
     for dev in list(r):
         try:
             for event in dev.read():
@@ -320,7 +328,7 @@ def poll_keypress_slot_id(devices: EvdevKeyboardDevices | None) -> str | None:
                         bool(slot_id),
                     )
                 if slot_id:
-                    return slot_id
+                    slot_ids.append(slot_id)
         except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
             dev_name = getattr(dev, "path", "<unknown>")
             _log_reactive_input_exception(
@@ -331,4 +339,9 @@ def poll_keypress_slot_id(devices: EvdevKeyboardDevices | None) -> str | None:
             _drop_evdev_device(devices, dev)
             continue
 
-    return None
+    return slot_ids
+
+
+def poll_keypress_slot_id(devices: EvdevKeyboardDevices | None) -> str | None:
+    slot_ids = poll_keypress_slot_ids(devices)
+    return slot_ids[0] if slot_ids else None

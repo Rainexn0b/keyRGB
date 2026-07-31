@@ -210,7 +210,7 @@ def test_ite_backend_get_device_tags_speed_policy(monkeypatch: pytest.MonkeyPatc
     kb = backend.get_device()
 
     assert kb.keyrgb_hw_speed_policy == "inverted"
-    assert kb.keyrgb_per_key_mode_policy == "reassert_every_frame"
+    assert kb.keyrgb_per_key_mode_policy == "init_once"
 
 
 def test_ite_backend_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPatch) -> None:

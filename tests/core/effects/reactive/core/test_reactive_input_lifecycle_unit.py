@@ -39,7 +39,7 @@ def test_reactive_synthetic_fallback_is_opt_in(monkeypatch) -> None:
 def test_press_source_retries_evdev_open_without_spawning_synthetic(monkeypatch) -> None:
     reopened = [_FakeDevice()]
 
-    monkeypatch.setattr("src.core.effects.reactive.utils.poll_keypress_slot_id", lambda _devices: None)
+    monkeypatch.setattr("src.core.effects.reactive.utils.poll_keypress_slot_ids", lambda _devices: [])
     monkeypatch.setattr("src.core.effects.reactive.utils.try_open_evdev_keyboards", lambda: reopened)
 
     press = _PressSource(

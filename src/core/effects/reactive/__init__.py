@@ -8,6 +8,7 @@ from .input import (
     evdev_key_name_to_slot_id,
     load_active_profile_slot_keymap,
     poll_keypress_slot_id,
+    poll_keypress_slot_ids,
     try_open_evdev_keyboards,
 )
 
@@ -16,6 +17,7 @@ __all__ = [
     "evdev_key_name_to_slot_id",
     "load_active_profile_slot_keymap",
     "poll_keypress_slot_id",
+    "poll_keypress_slot_ids",
     "run_reactive_fade",
     "run_reactive_ripple",
     "try_open_evdev_keyboards",

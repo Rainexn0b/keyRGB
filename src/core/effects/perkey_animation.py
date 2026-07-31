@@ -12,6 +12,15 @@ logger = logging.getLogger(__name__)
 PER_KEY_MODE_POLICY_INIT_ONCE = "init_once"
 PER_KEY_MODE_POLICY_REASSERT_EVERY_FRAME = "reassert_every_frame"
 RECOVERY_USER_MODE_SAVE_ENV = "KEYRGB_RECOVERY_USER_MODE_SAVE"
+
+# Diagnostic override for the per-key mode policy. Each backend declares the
+# policy its firmware needs (e.g. ITE8291R3 re-asserts user mode every frame,
+# costing ~2-4ms of USB traffic per frame). This env var lets hardware testing
+# A/B whether a specific device actually needs the reassert:
+#   KEYRGB_PER_KEY_MODE_POLICY=init_once
+# Failure mode when a device DOES need the reassert: the deck freezes, reverts
+# to a hardware effect, or goes dark mid-animation. Unset = backend default.
+PER_KEY_MODE_POLICY_ENV = "KEYRGB_PER_KEY_MODE_POLICY"
 _PERKEY_CONFIG_LOAD_ERRORS = (AttributeError, ImportError, LookupError, OSError, TypeError, ValueError)
 _ENABLE_USER_MODE_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _HIDDEN_PERKEY_RESTORE_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -26,6 +35,9 @@ def normalize_per_key_mode_policy(policy: object) -> str:
 
 
 def per_key_mode_policy(kb: object) -> str:
+    override = str(os.environ.get(PER_KEY_MODE_POLICY_ENV, "")).strip()
+    if override:
+        return normalize_per_key_mode_policy(override)
     return normalize_per_key_mode_policy(getattr(kb, "keyrgb_per_key_mode_policy", None))
 
 

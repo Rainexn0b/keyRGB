@@ -108,11 +108,11 @@ def test_reactive_fade_fans_out_one_keypress_to_all_mapped_cells(monkeypatch) ->
             self.synthetic = False
             self.spawn_interval_s = 0.1
 
-        def poll_slot_id(self, *, dt: float):
+        def poll_slot_ids(self, *, dt: float):
             if self._used:
-                return None
+                return []
             self._used = True
-            return str(slot_id_for_key_id("auto", "enter") or "enter")
+            return [str(slot_id_for_key_id("auto", "enter") or "enter")]
 
         def close(self) -> None:
             return None
@@ -133,7 +133,7 @@ def test_reactive_fade_fans_out_one_keypress_to_all_mapped_cells(monkeypatch) ->
     monkeypatch.setattr(reactive_effects, "frame_dt_s", lambda: 0.01)
     monkeypatch.setattr(reactive_effects, "try_open_evdev_keyboards", list)
     monkeypatch.setattr(reactive_effects, "_PressSource", _PressSource)
-    monkeypatch.setattr(reactive_effects, "pace", lambda _engine: 1.0)
+    monkeypatch.setattr(reactive_effects, "pace", lambda _engine, **_kwargs: 1.0)
     monkeypatch.setattr(
         reactive_effects,
         "load_active_profile_slot_keymap",

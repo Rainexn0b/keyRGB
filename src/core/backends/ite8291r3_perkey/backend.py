@@ -15,7 +15,7 @@ from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is
 from .._report_pacing import hid_report_delay_s_from_env
 from ..base import BackendCapabilities, BackendStability, KeyboardBackend, KeyboardDevice, ProbeResult
 from . import protocol
-from .device import Ite8291r3KeyboardDevice
+from .device import Ite8291r3KeyboardDevice, _skip_unchanged_rows_enabled
 from .usb import device_bcd_device_or_none, open_matching_transport
 
 logger = logging.getLogger(__name__)
@@ -83,15 +83,25 @@ def _unexpected_revision_reason(*, bcd_device: int | None) -> str | None:
     return None
 
 
+# Hardware-validated pacing default for the r3 USB path (see below).
+ITE8291R3_DEFAULT_REPORT_DELAY_S = 0.00025
+
+
 def _report_delay_s_from_env() -> float:
     """Return the optional user-tunable report delay for the r3 USB path.
 
-    The default is intentionally small (1 ms).  On affected TongFang devices,
-    back-to-back HID reports without any bus quiet time can cause the
-    controller to lock up or reset.  Users who still see instability can raise
-    this; users on well-behaved hardware can set it to 0 to disable the pacing.
+    The default is 0.25 ms, hardware-validated on Tongfang ITE8291R3
+    (2026-07-31 runtime-log analysis: ~28fps reactive frames with a tight
+    36ms p50 / 37ms p90 distribution and no dropped-report artifacts; the
+    previous 1 ms default cost ~12ms of every ~45ms frame).  Users who see
+    instability (controller lockups, stale rows, wrong colors) can raise it
+    via ``KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS`` or the global
+    ``KEYRGB_HID_REPORT_DELAY_MS``; set to 0 to disable pacing entirely.
     """
-    return hid_report_delay_s_from_env(backend_name="ite8291r3_perkey")
+    return hid_report_delay_s_from_env(
+        backend_name="ite8291r3_perkey",
+        default_s=ITE8291R3_DEFAULT_REPORT_DELAY_S,
+    )
 
 
 @dataclass
@@ -250,7 +260,16 @@ class Ite8291r3Backend(KeyboardBackend):
             raise BackendIOError(f"ITE 8291 USB device open failed: {exc}") from exc
 
         _set_best_effort_device_attr(device, "keyrgb_hw_speed_policy", "inverted")
-        _set_best_effort_device_attr(device, "keyrgb_per_key_mode_policy", "reassert_every_frame")
+        _set_best_effort_device_attr(device, "keyrgb_per_key_mode_policy", "init_once")
+        # Self-describing runtime captures: A/B lever comparisons are only
+        # interpretable if the log records which lever configuration produced it.
+        _policy_override = os.environ.get("KEYRGB_PER_KEY_MODE_POLICY", "").strip()
+        logger.info(
+            "ite8291r3_perkey device config: report_delay_ms=%.3f skip_unchanged_rows=%s per_key_mode_policy=%s",
+            _report_delay_s_from_env() * 1000.0,
+            _skip_unchanged_rows_enabled(),
+            _policy_override or "init_once (backend default)",
+        )
         return device
 
     def dimensions(self) -> tuple[int, int]:

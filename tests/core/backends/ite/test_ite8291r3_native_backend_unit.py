@@ -103,11 +103,12 @@ def test_backend_effects_and_colors_are_native_protocol_maps() -> None:
     assert colors["random"] == 8
 
 
-def test_report_delay_env_helper_defaults_to_one_ms(monkeypatch) -> None:
+def test_report_delay_env_helper_defaults_to_validated_025_ms(monkeypatch) -> None:
     from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
     monkeypatch.delenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", raising=False)
-    assert _report_delay_s_from_env() == 0.001
+    monkeypatch.delenv("KEYRGB_HID_REPORT_DELAY_MS", raising=False)
+    assert _report_delay_s_from_env() == 0.00025
 
 
 def test_report_delay_env_helper_parses_ms(monkeypatch) -> None:
@@ -322,3 +323,71 @@ def test_device_close_swallows_transport_close_errors() -> None:
     )
     device.close()
     assert device._transport is None
+
+
+def test_device_set_key_colors_rewrites_all_rows_when_diff_disabled(monkeypatch) -> None:
+    """Row diffing can be opted out via env; then every frame writes all rows."""
+    monkeypatch.setenv("KEYRGB_ITE8291R3_SKIP_UNCHANGED_ROWS", "0")
+    rows: list[bytes] = []
+    device = Ite8291r3KeyboardDevice(lambda _b: 0, lambda _n: bytes(8), rows.append, report_delay_s=0.0)
+
+    color_map = {(r, c): (r, c, 0) for r in range(protocol.NUM_ROWS) for c in range(protocol.NUM_COLS)}
+    device.set_key_colors(color_map, brightness=30, enable_user_mode=False)
+    device.set_key_colors(color_map, brightness=30, enable_user_mode=False)
+
+    assert len(rows) == 2 * protocol.NUM_ROWS
+
+
+def test_device_set_key_colors_skips_unchanged_rows_by_default(monkeypatch) -> None:
+    """Row diffing is default-on (hardware-validated); no env var needed."""
+    monkeypatch.delenv("KEYRGB_ITE8291R3_SKIP_UNCHANGED_ROWS", raising=False)
+    rows: list[bytes] = []
+    device = Ite8291r3KeyboardDevice(lambda _b: 0, lambda _n: bytes(8), rows.append, report_delay_s=0.0)
+
+    color_map = {(r, c): (r, c, 0) for r in range(protocol.NUM_ROWS) for c in range(protocol.NUM_COLS)}
+    device.set_key_colors(color_map, brightness=30, enable_user_mode=False)
+    assert len(rows) == protocol.NUM_ROWS
+
+    # Identical frame: nothing to write.
+    device.set_key_colors(color_map, brightness=30, enable_user_mode=False)
+    assert len(rows) == protocol.NUM_ROWS
+
+    # One changed key -> only that row is rewritten.
+    changed = dict(color_map)
+    changed[(2, 5)] = (255, 255, 255)
+    device.set_key_colors(changed, brightness=30, enable_user_mode=False)
+    assert len(rows) == protocol.NUM_ROWS + 1
+
+
+def test_device_set_color_invalidates_row_diff_cache(monkeypatch) -> None:
+    monkeypatch.setenv("KEYRGB_ITE8291R3_SKIP_UNCHANGED_ROWS", "1")
+    rows: list[bytes] = []
+    effect_bytes = bytes((0x88, 0x02, 0x00, 0x00, 0x19, 0x00, 0x00, 0x00))
+    device = Ite8291r3KeyboardDevice(lambda _b: 0, lambda _n: effect_bytes, rows.append, report_delay_s=0.0)
+
+    color_map = {(r, c): (r, c, 0) for r in range(protocol.NUM_ROWS) for c in range(protocol.NUM_COLS)}
+    device.set_key_colors(color_map, brightness=30, enable_user_mode=False)
+    assert len(rows) == protocol.NUM_ROWS
+
+    # set_color writes uniform rows through the same transport; the diff cache
+    # must be invalidated so the next set_key_colors rewrites every row even if
+    # its payload matches the pre-set_color frame.
+    device.set_color((10, 20, 30), brightness=30)
+    device.set_key_colors(color_map, brightness=30, enable_user_mode=False)
+    assert len(rows) == 3 * protocol.NUM_ROWS
+
+
+def test_report_delay_default_is_hardware_validated_025ms(monkeypatch) -> None:
+    """No env vars -> the r3 backend uses its validated 0.25 ms pacing default."""
+    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
+
+    monkeypatch.delenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", raising=False)
+    monkeypatch.delenv("KEYRGB_HID_REPORT_DELAY_MS", raising=False)
+    assert _report_delay_s_from_env() == 0.00025
+
+    monkeypatch.setenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", "1.5")
+    assert _report_delay_s_from_env() == 0.0015
+
+    monkeypatch.delenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS")
+    monkeypatch.setenv("KEYRGB_HID_REPORT_DELAY_MS", "0")
+    assert _report_delay_s_from_env() == 0.0

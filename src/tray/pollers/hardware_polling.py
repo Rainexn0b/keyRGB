@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 
+from src.core.effects.reactive.effects import _reactive_active_pulse_mix_or_default
 from src.core.utils.exceptions import is_device_disconnected
 from src.tray.idle_power_state import (
     dim_temp_target_brightness,
@@ -11,8 +12,10 @@ from src.tray.idle_power_state import (
 )
 from src.tray.pollers.hardware import _recovery
 from src.tray.pollers.hardware._decisions import (
+    REACTIVE_PULSE_POLL_DEFER_RETRY_S as _REACTIVE_PULSE_POLL_DEFER_RETRY_S,
     coerce_poll_int as _coerce_poll_int,
     normalize_brightness_to_config_scale as _normalize_brightness_to_config_scale,
+    should_defer_poll_for_reactive_pulses as _should_defer_poll_for_reactive_pulses,
 )
 from src.tray.protocols import IdlePowerTrayProtocol
 
@@ -39,6 +42,24 @@ _execute_blank_recovery = _recovery._execute_blank_recovery
 _power_source_blank_recovery_eligible = _recovery._power_source_blank_recovery_eligible
 _power_source_transition_at = _recovery._power_source_transition_at
 _resolve_tray_callback = _recovery._resolve_tray_callback
+
+_REACTIVE_PULSE_MIX_READ_ERRORS = (AttributeError, TypeError, ValueError)
+
+
+def _reactive_pulse_mix_or_zero(tray: IdlePowerTrayProtocol) -> float:
+    """Read the live reactive pulse mix without taking kb_lock.
+
+    The value is a float written by the render thread; a torn read is harmless
+    here because the deferral decision is advisory. Missing engine/state (unit
+    tests, non-reactive effects) reads as 0.0 = no deferral.
+    """
+    engine = getattr(tray, "engine", None)
+    if engine is None:
+        return 0.0
+    try:
+        return float(_reactive_active_pulse_mix_or_default(engine, default=0.0))
+    except _REACTIVE_PULSE_MIX_READ_ERRORS:
+        return 0.0
 
 # ---------------------------------------------------------------------------
 # Polled-state application (brightness / off transitions)
@@ -217,6 +238,7 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
         last_brightness = None
         last_off_state = None
         last_error_at = 0.0
+        last_real_poll_at = time.monotonic()
 
         def _recover_polling_error(exc: Exception) -> None:
             nonlocal last_error_at
@@ -227,6 +249,23 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
             )
 
         while not polling_lifecycle.shutdown_requested(tray):
+            # While reactive pulses are mid-flight, the poll's synchronous USB
+            # reads would stall the render thread (visible ripple hitch). Defer
+            # on a short retry cadence, bounded by a staleness cap so hardware
+            # state detection cannot starve during continuous typing.
+            if _should_defer_poll_for_reactive_pulses(
+                reactive_pulse_mix=_reactive_pulse_mix_or_zero(tray),
+                now=time.monotonic(),
+                last_real_poll_at=last_real_poll_at,
+            ):
+                if polling_lifecycle.wait_for_shutdown(
+                    tray,
+                    _REACTIVE_PULSE_POLL_DEFER_RETRY_S,
+                    sleep_fn=time.sleep,
+                ):
+                    return
+                continue
+
             polled_state = _run_recoverable_hardware_poll_boundary(
                 lambda lb=last_brightness, lo=last_off_state: _poll_hardware_once(
                     tray,
@@ -235,6 +274,7 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
                 ),
                 on_recoverable=_recover_polling_error,
             )
+            last_real_poll_at = time.monotonic()
             if polled_state is not None:
                 last_brightness, last_off_state = polled_state
 

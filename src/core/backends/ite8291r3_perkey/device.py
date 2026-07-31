@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from collections.abc import Callable, Iterable
 from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
@@ -12,6 +13,24 @@ if TYPE_CHECKING:
     from .usb import PyUsbTransport
 
 _logger = logging.getLogger(__name__)
+
+# Skip USB row writes whose payload is identical to the previous frame's.
+# A full frame costs 12 synchronous transfers (~45ms at 1ms pacing on
+# ITE8291R3, ~21fps); most reactive frames only change a subset of rows, so
+# diffing meaningfully raises the achieved frame rate. Default ON: validated
+# on Tongfang ITE8291R3 hardware (2026-07-31) — row data survives the
+# every-frame user-mode reassert. Set the env var to 0 to disable if a
+# device shows stale or blank rows.
+_SKIP_UNCHANGED_ROWS_ENV = "KEYRGB_ITE8291R3_SKIP_UNCHANGED_ROWS"
+
+
+def _skip_unchanged_rows_enabled() -> bool:
+    return str(os.environ.get(_SKIP_UNCHANGED_ROWS_ENV, "")).strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
 
 
 ControlWriter = Callable[[bytes], int | None]
@@ -96,7 +115,12 @@ def _coerce_effect_payload(effect_data: object) -> tuple[int, ...]:
 
 class Ite8291r3KeyboardDevice:
     keyrgb_hw_speed_policy = "inverted"
-    keyrgb_per_key_mode_policy = "reassert_every_frame"
+    # Hardware-validated 2026-07-31 (Tongfang ITE8291R3): firmware holds user
+    # mode without a per-frame reassert; dropping it saves ~2.5-3ms of USB
+    # traffic per frame (~28fps reactive rendering). If a device ever freezes,
+    # reverts to a hardware effect, or goes dark mid-animation, restore the
+    # reassert via KEYRGB_PER_KEY_MODE_POLICY=reassert_every_frame.
+    keyrgb_per_key_mode_policy = "init_once"
 
     def __init__(
         self,
@@ -119,6 +143,8 @@ class Ite8291r3KeyboardDevice:
         self._write_row_data = write_row_data
         self._transport = transport
         self._report_delay_s = max(0.0, float(report_delay_s))
+        # Last row payloads written via set_key_colors (see _SKIP_UNCHANGED_ROWS_ENV).
+        self._last_row_payloads: list[bytes | None] = [None] * protocol.NUM_ROWS
 
     def _send_control(self, report: bytes) -> None:
         result = self._send_control_report(bytes(report))
@@ -230,6 +256,7 @@ class Ite8291r3KeyboardDevice:
         for row_idx in range(protocol.NUM_ROWS):
             self._set_row_index(row_idx)
             self._write_row(row_report)
+        self._last_row_payloads = [None] * protocol.NUM_ROWS
 
     def set_palette_color(self, slot: int, color) -> None:
         if not (1 <= int(slot) <= 7):
@@ -253,6 +280,7 @@ class Ite8291r3KeyboardDevice:
                     row_colors[col + offset] = colors[(offset + row_idx + int(shift)) % 3]
             self._set_row_index(row_idx)
             self._write_row(protocol.build_row_data_report(row_colors))
+        self._last_row_payloads = [None] * protocol.NUM_ROWS
 
     def set_key_colors(
         self,
@@ -276,9 +304,14 @@ class Ite8291r3KeyboardDevice:
         if enable_user_mode or save:
             self.enable_user_mode(brightness=brightness, save=save)
 
+        skip_unchanged = _skip_unchanged_rows_enabled()
         for row_idx, row_colors in enumerate(rows):
+            payload = protocol.build_row_data_report(row_colors)
+            if skip_unchanged and self._last_row_payloads[row_idx] == payload:
+                continue
             self._set_row_index(row_idx)
-            self._write_row(protocol.build_row_data_report(row_colors))
+            self._write_row(payload)
+            self._last_row_payloads[row_idx] = payload
 
     def close(self) -> None:
         """Release the USB transport if one was provided."""

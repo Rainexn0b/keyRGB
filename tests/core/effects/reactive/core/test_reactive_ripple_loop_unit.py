@@ -101,12 +101,12 @@ class _MockPressSource:
         self._idx = 0
         self.close_called = False
 
-    def poll_slot_id(self, *, dt: float) -> str | None:
+    def poll_slot_ids(self, *, dt: float) -> list[str]:
         if self._idx < len(self._slots):
             result = self._slots[self._idx]
             self._idx += 1
-            return result
-        return None
+            return [] if result is None else [result]
+        return []
 
     def close(self) -> None:
         self.close_called = True
@@ -500,6 +500,62 @@ class TestRunReactiveRippleLoop:
 
         assert api.build_ripple_cm_calls > 0
         assert api.render_calls
+
+    def test_multiple_presses_in_one_frame_each_spawn_a_pulse(self):
+        """A single evdev batch with two keydowns must spawn two pulses, not one."""
+        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+
+        engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
+
+        class _MultiPressSource(_MockPressSource):
+            def poll_slot_ids(self, *, dt: float) -> list[str]:
+                if self._idx:
+                    return []
+                self._idx += 1
+                return ["KEY_A", "KEY_B"]
+
+        spawned: list[tuple[int, int]] = []
+        api = _MockApi(press_source=_MultiPressSource(), mapped_cells=[(0, 0)])
+
+        def _tracking_pulse(*, row, col, age_s, ttl_s, hue_offset):
+            spawned.append((row, col))
+            return SimpleNamespace(row=row, col=col, age_s=age_s, ttl_s=ttl_s, hue_offset=hue_offset)
+
+        api._RainbowPulse = _tracking_pulse
+
+        run_reactive_ripple_loop(engine, api=api)
+
+        assert len(spawned) == 2, "each pressed slot id in the batch should spawn its own pulse"
+        assert api._press.close_called
+
+    def test_loop_uses_rescaled_pace_range_so_slider_5_is_the_middle(self):
+        """The shared 0.25..10 pace range made slider 3 feel like the middle;
+        both reactive loops must use the rescaled 0.25..3.76 range instead."""
+        from src.core.effects.reactive import _fade_loop, _ripple_loop
+        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+
+        # Both loops declare the rescaled range...
+        for module in (_ripple_loop, _fade_loop):
+            assert module._PACE_MIN_FACTOR == 0.25
+            assert module._PACE_MAX_FACTOR == 3.76
+
+        # ...and the ripple loop actually passes it through to api.pace.
+        pace_kwargs: list[dict] = []
+        engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
+        api = _MockApi(press_source=_MockPressSource(slot_id_sequence=(None,)))
+
+        def _tracking_pace(_engine, **kwargs):
+            pace_kwargs.append(kwargs)
+            return 1.0
+
+        api.pace = _tracking_pace  # type: ignore[method-assign]
+
+        run_reactive_ripple_loop(engine, api=api)
+
+        assert pace_kwargs, "loop should call api.pace"
+        for kwargs in pace_kwargs:
+            assert kwargs.get("min_factor") == 0.25
+            assert kwargs.get("max_factor") == 3.76
 
     def test_stopped_replacement_worker_does_not_open_input(self):
         from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop

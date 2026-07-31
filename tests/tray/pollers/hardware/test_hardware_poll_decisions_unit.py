@@ -251,3 +251,24 @@ def test_stable_zero_recovery_circuit_breaker_defaults() -> None:
         now=100.0,
         last_recovery_at=94.0,  # 6 s ago → outside default 5 s cooldown
     )
+
+
+def test_should_defer_poll_for_reactive_pulses() -> None:
+    from src.tray.pollers.hardware._decisions import should_defer_poll_for_reactive_pulses
+
+    # No pulse activity -> never defer.
+    assert not should_defer_poll_for_reactive_pulses(
+        reactive_pulse_mix=0.0, now=100.0, last_real_poll_at=99.0
+    )
+    # Pulses in flight and poll still fresh -> defer.
+    assert should_defer_poll_for_reactive_pulses(
+        reactive_pulse_mix=0.5, now=100.0, last_real_poll_at=97.0
+    )
+    # Pulses in flight but poll is overdue beyond the staleness cap -> poll anyway.
+    assert not should_defer_poll_for_reactive_pulses(
+        reactive_pulse_mix=0.5, now=106.0, last_real_poll_at=97.0
+    )
+    # Boundary: exactly at the cap -> poll anyway (defer window expired).
+    assert not should_defer_poll_for_reactive_pulses(
+        reactive_pulse_mix=0.5, now=102.0, last_real_poll_at=97.0
+    )

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import colorsys
+import logging
+import time
 from dataclasses import dataclass
 from typing import Any
 
@@ -8,7 +10,7 @@ from src.core.effects.colors import hsv_to_rgb
 from src.core.effects.reactive.input import (
     EvdevKeyboardDevices,
     close_evdev_keyboards,
-    poll_keypress_slot_id,
+    poll_keypress_slot_ids,
     try_open_evdev_keyboards,
 )
 
@@ -112,15 +114,16 @@ class _PressSource:
     reopen_interval_s: float = 2.0
     reopen_acc_s: float = 0.0
 
-    def poll_slot_id(self, *, dt: float) -> str | None:
-        """Return a slot id (string) when pressed.
+    def poll_slot_ids(self, *, dt: float) -> list[str]:
+        """Return all slot ids pressed since the last poll.
 
-        For synthetic mode (no evdev devices), returns an empty string "" when
-        a synthetic press should be spawned, and None otherwise.
+        For synthetic mode (no evdev devices), returns [""] when a synthetic
+        press should be spawned, and [] otherwise. The empty string preserves
+        the historical "unmapped press" sentinel used by the effect loops.
         """
-        slot_id = poll_keypress_slot_id(self.devices)
-        if slot_id:
-            return str(slot_id)
+        slot_ids = poll_keypress_slot_ids(self.devices)
+        if slot_ids:
+            return slot_ids
 
         if not self.devices:
             self.reopen_acc_s += float(dt)
@@ -135,9 +138,18 @@ class _PressSource:
             self.spawn_acc += float(dt)
             if self.spawn_acc >= float(self.spawn_interval_s):
                 self.spawn_acc = 0.0
-                return ""
+                return [""]
 
-        return None
+        return []
+
+    def poll_slot_id(self, *, dt: float) -> str | None:
+        """Return a slot id (string) when pressed.
+
+        For synthetic mode (no evdev devices), returns an empty string "" when
+        a synthetic press should be spawned, and None otherwise.
+        """
+        slot_ids = self.poll_slot_ids(dt=dt)
+        return slot_ids[0] if slot_ids else None
 
     def close(self) -> None:
         close_evdev_keyboards(self.devices)
@@ -170,3 +182,96 @@ def _age_pulses_in_place(pulses: list[Any], *, dt: float) -> list[Any]:
             write_idx += 1
     del pulses[write_idx:]
     return pulses
+
+
+# Maximum real frame delta applied to pulse aging. Caps the visible "jump"
+# after scheduling stalls (suspend, GC pause, busy USB bus) so a slow frame
+# fast-forwards gracefully instead of teleporting the animation.
+MAX_FRAME_DT_S: float = 0.25
+
+
+def frame_elapsed_dt_s(*, now_s: float, last_frame_s: float | None, nominal_dt_s: float) -> float:
+    """Real seconds elapsed since the previous frame, clamped to a sane range.
+
+    Aging pulses by the measured frame delta (instead of the nominal 1/60)
+    keeps animation speed constant in wall-clock time even when render work
+    makes frames late. The first frame uses the nominal dt.
+    """
+    if last_frame_s is None:
+        return float(nominal_dt_s)
+    elapsed = float(now_s) - float(last_frame_s)
+    if elapsed <= 0.0:
+        return 0.0
+    return min(elapsed, MAX_FRAME_DT_S)
+
+
+def remaining_frame_delay_s(*, frame_start_s: float, nominal_dt_s: float) -> float:
+    """Sleep budget left in the current frame after render work.
+
+    Compensates for evdev polling / overlay building / USB writes so the loop
+    period stays near nominal_dt_s instead of nominal_dt_s + work time, which
+    is the main source of effective-frame-rate jitter in the reactive loops.
+    """
+    remaining = float(nominal_dt_s) - (time.monotonic() - float(frame_start_s))
+    return max(0.0, remaining)
+
+
+# Per-effect EWMA of frame work time. On slow backends (ITE8291R3 needs ~45ms
+# of USB writes per frame) the nominal 60fps budget is unreachable, so a fixed
+# threshold would flag every frame. The overrun diagnostic instead measures
+# against the backend's own recent norm: a hitch is a frame that is slow
+# *relative to its neighbours*.
+_FRAME_WORK_EWMA: dict[str, float] = {}
+_FRAME_WORK_EWMA_ALPHA: float = 0.05  # ~20-frame horizon
+
+
+def log_frame_overrun_if_slow(
+    *,
+    logger: Any,
+    frame_start_s: float,
+    nominal_dt_s: float,
+    effect_name: str,
+    threshold_factor: float = 1.5,
+) -> None:
+    """DEBUG-log when a frame's work exceeded the adaptive frame budget.
+
+    A late frame is the visible "hitch mid-propagation" artifact: the render
+    thread was stalled (typically by concurrent USB I/O under kb_lock, e.g.
+    the 2s hardware poller's synchronous get_brightness/is_off reads). One
+    extra monotonic call per frame; logging itself is throttled.
+    """
+    from src.core.utils.logging_utils import log_throttled
+
+    work_s = time.monotonic() - float(frame_start_s)
+    key = str(effect_name)
+    avg = _FRAME_WORK_EWMA.get(key, float(nominal_dt_s))
+    avg = avg + _FRAME_WORK_EWMA_ALPHA * (work_s - avg)
+    _FRAME_WORK_EWMA[key] = avg
+    budget_s = max(float(nominal_dt_s), avg) * float(threshold_factor)
+    if work_s <= budget_s:
+        return
+    log_throttled(
+        logger,
+        f"effects.reactive.frame_overrun.{effect_name}",
+        interval_s=10.0,
+        level=logging.DEBUG,
+        msg=(
+            f"Reactive {effect_name} frame overran budget: work={work_s * 1000.0:.1f}ms "
+            f"budget={budget_s * 1000.0:.1f}ms (likely concurrent kb_lock USB I/O)"
+        ),
+    )
+
+
+def pulse_decay_ease_out(*, age_s: float, ttl_s: float) -> float:
+    """Ease-out decay: 1.0 at birth, 0.0 at ttl, zero slope at the end.
+
+    A linear (1 - t) tail visibly snaps off on 8-bit LED hardware; the power
+    curve decelerates into black so the tail dissolves smoothly. Exponent 1.5
+    (rather than a full quadratic) keeps mid-life brightness perceptible on
+    dim decks while preserving the gentle tail-off.
+    """
+    if ttl_s <= 0.0:
+        return 0.0
+    t = max(0.0, min(1.0, float(age_s) / float(ttl_s)))
+    remaining = 1.0 - t
+    return remaining**1.5

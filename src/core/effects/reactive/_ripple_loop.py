@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Callable, Mapping, Sequence
 from operator import attrgetter
 from typing import TYPE_CHECKING, Protocol
 
 from .input import EvdevKeyboardDevices
+from .utils import frame_elapsed_dt_s, log_frame_overrun_if_slow, remaining_frame_delay_s
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
+
+logger = logging.getLogger(__name__)
 
 Color = tuple[int, int, int]
 Key = tuple[int, int]
@@ -15,6 +20,26 @@ ColorMap = dict[Key, Color]
 SlotKeyMap = Mapping[str, Sequence[Key]]
 RippleOverlay = dict[Key, tuple[float, float]]
 _INT_COERCION_ERRORS = (TypeError, ValueError)
+
+# Rainbow hue advance rate in degrees per second. Matches the historical
+# 2.0 deg/frame at the nominal 60 fps frame_dt_s(), expressed per-second so
+# the cycle speed no longer depends on the achieved frame rate.
+_HUE_ADVANCE_DEG_PER_S: float = 120.0
+
+# Base pulse lifetime at pace=1.0. The expanding ring crosses the deck from
+# the pressed key to its farthest corner in this time (radius is normalized
+# per pulse). 0.65s was tuned against frames that really ran ~1.6x slower
+# than nominal; at true 60 fps it produced a barely perceptible ~38 keys/s
+# wavefront. 1.32s lands the wave visibly at the far edge.
+_BASE_PULSE_TTL_S: float = 1.32
+
+# Reactive pace range. The shared quadratic pace mapping (0.25..10) made
+# slider 3 feel like the perceptual middle; capping the max factor at 3.76
+# rescales the curve so slider 5 delivers the old slider-3 pace (1.13x) and
+# slider 10 tops out at the old slider-6 pace. Scoped to the reactive loops
+# so other software effects keep the shared mapping.
+_PACE_MIN_FACTOR: float = 0.25
+_PACE_MAX_FACTOR: float = 3.76
 
 
 def _engine_int_attr_or_default(engine: EffectsEngine, attr_name: str, *, missing_default: int) -> int:
@@ -50,7 +75,7 @@ def _has_per_key_writer(engine: EffectsEngine) -> bool:
 class _PressSourceProtocol(Protocol):
     spawn_interval_s: float
 
-    def poll_slot_id(self, *, dt: float) -> str | None: ...
+    def poll_slot_ids(self, *, dt: float) -> list[str]: ...
 
     def close(self) -> None: ...
 
@@ -187,7 +212,7 @@ class _ReactiveRippleApiProtocol(Protocol):
 
 
 def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiProtocol) -> None:
-    dt = api.frame_dt_s()
+    nominal_dt = api.frame_dt_s()
     if engine.stop_event.is_set():
         return
 
@@ -201,12 +226,24 @@ def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiPr
 
     pulses: list[_RainbowPulseProtocol] = []
     global_hue = 0.0
+    last_frame_s: float | None = None
 
     try:
         if engine.stop_event.is_set():
             return
         while engine.running and not engine.stop_event.is_set():
-            p = api.pace(engine)
+            # Age pulses by the real elapsed frame time (not the nominal dt) so
+            # animation speed stays constant in wall-clock time; sleep only the
+            # remaining frame budget so render work doesn't stretch the period.
+            frame_start_s = time.monotonic()
+            real_dt = frame_elapsed_dt_s(
+                now_s=frame_start_s,
+                last_frame_s=last_frame_s,
+                nominal_dt_s=nominal_dt,
+            )
+            last_frame_s = frame_start_s
+
+            p = api.pace(engine, min_factor=_PACE_MIN_FACTOR, max_factor=_PACE_MAX_FACTOR)
             press.spawn_interval_s = max(0.10, 0.45 / max(0.1, p))
             eff_hw = _engine_int_attr_or_fallback(
                 engine,
@@ -225,31 +262,34 @@ def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiPr
             if eff_hw <= 0:
                 api._set_reactive_active_pulse_mix(engine, target=0.0)
                 api.render(engine, color_map=base)
-                engine.stop_event.wait(dt)
+                log_frame_overrun_if_slow(
+                    logger=logger, frame_start_s=frame_start_s, nominal_dt_s=nominal_dt, effect_name="ripple"
+                )
+                engine.stop_event.wait(remaining_frame_delay_s(frame_start_s=frame_start_s, nominal_dt_s=nominal_dt))
                 continue
 
-            pressed_slot_id = press.poll_slot_id(dt=dt)
-            if pressed_slot_id is not None:
-                mapped_cells = api.mapped_slot_cells(slot_keymap, pressed_slot_id)
-
-                ttl = 0.65 / p
-                if mapped_cells:
-                    for row, col in mapped_cells:
-                        pulses.append(
-                            api._RainbowPulse(
-                                row=int(row),
-                                col=int(col),
-                                age_s=0.0,
-                                ttl_s=ttl,
-                                hue_offset=global_hue,
+            pressed_slot_ids = press.poll_slot_ids(dt=real_dt)
+            if pressed_slot_ids:
+                ttl = _BASE_PULSE_TTL_S / p
+                for pressed_slot_id in pressed_slot_ids:
+                    mapped_cells = api.mapped_slot_cells(slot_keymap, pressed_slot_id)
+                    if mapped_cells:
+                        for row, col in mapped_cells:
+                            pulses.append(
+                                api._RainbowPulse(
+                                    row=int(row),
+                                    col=int(col),
+                                    age_s=0.0,
+                                    ttl_s=ttl,
+                                    hue_offset=global_hue,
+                                )
                             )
-                        )
-                else:
-                    row = api.random.randrange(api.NUM_ROWS)
-                    col = api.random.randrange(api.NUM_COLS)
-                    pulses.append(api._RainbowPulse(row=row, col=col, age_s=0.0, ttl_s=ttl, hue_offset=global_hue))
+                    else:
+                        row = api.random.randrange(api.NUM_ROWS)
+                        col = api.random.randrange(api.NUM_COLS)
+                        pulses.append(api._RainbowPulse(row=row, col=col, age_s=0.0, ttl_s=ttl, hue_offset=global_hue))
 
-            pulses = api._age_pulses_in_place(pulses, dt=dt)
+            pulses = api._age_pulses_in_place(pulses, dt=real_dt)
 
             # Trail length scales the ring width (band), not TTL, so wave speed stays
             # constant and the user perceives a wider/narrower illuminated ring rather
@@ -303,9 +343,13 @@ def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiPr
                 rgb = api.mix(base_rgb, pulse_rgb, t=min(1.0, best_weight))
                 api._render_uniform_fallback(engine, rgb=rgb)
                 # Advance hue at a fixed rate so the rainbow cycles consistently
-                # regardless of typing speed (not pace-coupled).
-                global_hue = (global_hue + 2.0) % 360.0
-                engine.stop_event.wait(dt)
+                # regardless of typing speed (not pace-coupled). Time-based so the
+                # cycle speed is independent of the achieved frame rate.
+                global_hue = (global_hue + _HUE_ADVANCE_DEG_PER_S * real_dt) % 360.0
+                log_frame_overrun_if_slow(
+                    logger=logger, frame_start_s=frame_start_s, nominal_dt_s=nominal_dt, effect_name="ripple"
+                )
+                engine.stop_event.wait(remaining_frame_delay_s(frame_start_s=frame_start_s, nominal_dt_s=nominal_dt))
                 continue
 
             color_map = api.get_engine_color_map_buffer(engine, "_reactive_ripple_frame_map")
@@ -321,7 +365,10 @@ def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiPr
             )
 
             api.render(engine, color_map=color_map)
-            global_hue = (global_hue + 2.0) % 360.0
-            engine.stop_event.wait(dt)
+            global_hue = (global_hue + _HUE_ADVANCE_DEG_PER_S * real_dt) % 360.0
+            log_frame_overrun_if_slow(
+                logger=logger, frame_start_s=frame_start_s, nominal_dt_s=nominal_dt, effect_name="ripple"
+            )
+            engine.stop_event.wait(remaining_frame_delay_s(frame_start_s=frame_start_s, nominal_dt_s=nominal_dt))
     finally:
         press.close()
