@@ -124,5 +124,10 @@ def make_owner_backed_mock_tray(**fields: Any) -> MagicMock:
     tray = MagicMock()
     for key, value in fields.items():
         setattr(tray, key, value)
+    # Mirror the real Config default so MagicMock's numeric protocol default
+    # (float(...) -> 1.0) does not leak into fade-duration assertions.
+    from src.tray.controllers._power._transition_constants import DEFAULT_IDLE_FADE_DURATION_S
+
+    tray.config.idle_fade_duration_s = DEFAULT_IDLE_FADE_DURATION_S
     attach_idle_power_owner(tray, make_idle_power_owner(**owner_kwargs))
     return tray

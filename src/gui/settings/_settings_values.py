@@ -80,6 +80,9 @@ class SettingsValues:
     idle_dim_debounce_enter_polls: int
     idle_dim_debounce_exit_polls: int
 
+    # Fade duration (seconds) for idle/power dim, turn-off, and restore ramps.
+    idle_fade_duration_s: float
+
     time_scheduler_enabled: bool
     day_start_time: str
     night_start_time: str
@@ -136,6 +139,10 @@ def load_settings_values(*, config: settings_reader.SettingsSourceLike, os_autos
         1,
         min(60, reader.read_int("idle_dim_debounce_exit_polls", default=10)),
     )
+    idle_fade_duration_s = max(
+        0.1,
+        min(3.0, reader.read_float("idle_fade_duration_s", default=0.6)),
+    )
 
     time_scheduler_enabled = reader.read_bool("time_scheduler_enabled", default=False)
     day_start_time = reader.read_normalized_str("day_start_time", default="08:00")
@@ -189,6 +196,7 @@ def load_settings_values(*, config: settings_reader.SettingsSourceLike, os_autos
         screen_dim_temp_brightness=screen_dim_temp_brightness,
         idle_dim_debounce_enter_polls=idle_dim_debounce_enter_polls,
         idle_dim_debounce_exit_polls=idle_dim_debounce_exit_polls,
+        idle_fade_duration_s=idle_fade_duration_s,
         time_scheduler_enabled=time_scheduler_enabled,
         day_start_time=day_start_time,
         night_start_time=night_start_time,
@@ -249,6 +257,7 @@ def _apply_settings_values_to_config_unbatched(
 
     config.idle_dim_debounce_enter_polls = max(1, min(60, int(values.idle_dim_debounce_enter_polls)))
     config.idle_dim_debounce_exit_polls = max(1, min(60, int(values.idle_dim_debounce_exit_polls)))
+    config.idle_fade_duration_s = max(0.1, min(3.0, float(values.idle_fade_duration_s)))
 
     config.time_scheduler_enabled = bool(values.time_scheduler_enabled)
     config.day_start_time = str(values.day_start_time or "08:00")

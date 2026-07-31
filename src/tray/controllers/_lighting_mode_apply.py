@@ -135,7 +135,9 @@ def restore_hidden_perkey_rows_from_recovery_hint(
     classify the controller as blank-but-not-off.  Avoid requerying the device
     here: sleeping ITE controllers may wake into their saved startup effect if
     polled unnecessarily.  Row data is written before brightness is raised and
-    no user-mode command or effect restart is issued.
+    no user-mode command or effect restart is issued, except for the opt-in
+    ``KEYRGB_RECOVERY_USER_MODE_SAVE=1`` experiment, which saves the restored
+    scene once so the firmware's first-keypress wake ramp targets current state.
     """
 
     from src.tray.controllers import _lighting_controller_helpers as helpers

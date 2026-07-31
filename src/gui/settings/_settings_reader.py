@@ -68,6 +68,20 @@ class SettingsReader:
             return int(default)
         return safe_int(self.fallback_obj, attr, default)
 
+    def read_float(self, key: str, *, default: float, fallback_attr: str | None = None) -> float:
+        attr = fallback_attr or key
+        if self.settings_view is not None:
+            return read_view_float(
+                self.settings_view,
+                key,
+                default=default,
+                fallback_obj=self.fallback_obj,
+                fallback_attr=attr,
+            )
+        if self.fallback_obj is None:
+            return float(default)
+        return safe_float(self.fallback_obj, attr, default)
+
     def read_optional_int(self, key: str, *, fallback_attr: str | None = None) -> int | None:
         attr = fallback_attr or key
         if self.settings_view is not None:
@@ -171,6 +185,21 @@ def read_view_int(
     return default
 
 
+def read_view_float(
+    settings_view: ConfigSettingsView,
+    key: str,
+    *,
+    default: float,
+    fallback_obj: object | None = None,
+    fallback_attr: str | None = None,
+) -> float:
+    if key in settings_view:
+        return settings_view.read_float(key, default)
+    if fallback_obj is not None and fallback_attr is not None:
+        return safe_float(fallback_obj, fallback_attr, default)
+    return float(default)
+
+
 def read_view_optional_int(
     settings_view: ConfigSettingsView,
     key: str,
@@ -249,6 +278,17 @@ def safe_int(obj: object, name: str, default: int) -> int:
     except _SETTINGS_SAFE_INT_ERRORS:
         logger.exception("Failed reading settings integer attribute '%s'", name)
         return safe_default
+
+
+def safe_float(obj: object, name: str, default: float) -> float:
+    value = safe_getattr_or_default(obj, name, default)
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError, OverflowError):
+        return float(default)
+    except _SETTINGS_INT_COERCE_ERRORS:
+        logger.exception("Failed coercing settings attribute '%s' to float", name)
+        return float(default)
 
 
 def safe_optional_int(obj: object, name: str) -> int | None:

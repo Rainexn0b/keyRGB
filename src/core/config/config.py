@@ -422,6 +422,8 @@ class Config(_lighting_accessors.LightingConfigAccessors):
     idle_dim_debounce_exit_polls = _lighting_props.int_prop(
         "idle_dim_debounce_exit_polls", default=10, min_v=1, max_v=60
     )
+    # Fade duration (seconds) for idle/power dim, turn-off, and restore ramps.
+    idle_fade_duration_s = _lighting_props.float_prop("idle_fade_duration_s", default=0.6, min_v=0.1, max_v=3.0)
 
     # ---- time-of-day brightness scheduler
 

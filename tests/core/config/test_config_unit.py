@@ -241,6 +241,25 @@ def test_reactive_color_per_key_colors_and_screen_dim_props_normalize_values(tmp
     assert cfg.screen_dim_temp_brightness == 1
 
 
+def test_idle_fade_duration_float_prop_normalizes_and_clamps(tmp_path, monkeypatch) -> None:
+    cfg = _make_config(tmp_path, monkeypatch)
+
+    assert cfg.idle_fade_duration_s == 0.6
+
+    cfg.idle_fade_duration_s = 1.2
+    assert cfg.idle_fade_duration_s == 1.2
+    assert cfg._settings["idle_fade_duration_s"] == 1.2
+
+    cfg.idle_fade_duration_s = 0.0
+    assert cfg.idle_fade_duration_s == 0.1
+
+    cfg.idle_fade_duration_s = 99.0
+    assert cfg.idle_fade_duration_s == 3.0
+
+    cfg._settings["idle_fade_duration_s"] = "fast"
+    assert cfg.idle_fade_duration_s == 0.6
+
+
 def test_physical_layout_enum_prop(tmp_path, monkeypatch) -> None:
     cfg = _make_config(tmp_path, monkeypatch)
 

@@ -130,6 +130,13 @@ def test_post_restore_frame_scale_softens_soft_on_matrix_steps() -> None:
         # At damp floor 0.35 → frame floor 0.62
         assert _post_restore_frame_scale(eng) == pytest.approx(0.62)
         assert _resolve_transition_visual_scale(eng) == pytest.approx(0.62)
+        # Once typing begins (DAMPING), the whole-frame fold must stay out:
+        # the pulse damp mutes pulses on its own, and folding the frame would
+        # visibly dim the already steady deck on the first post-restore
+        # keypress (observed on hardware as a ~2s deck-wide dip to 62%).
+        state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
+        assert _post_restore_frame_scale(eng) == pytest.approx(0.62)
+        assert _resolve_transition_visual_scale(eng) == pytest.approx(1.0)
         # Outside restore window, full scale.
         state._reactive_restore_phase = ReactiveRestorePhase.NORMAL
         state._reactive_restore_damp_until = None

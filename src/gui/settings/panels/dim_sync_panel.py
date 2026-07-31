@@ -18,6 +18,7 @@ class DimSyncPanel:
         var_dim_temp_brightness: tk.DoubleVar,
         var_debounce_enter: tk.IntVar,
         var_debounce_exit: tk.IntVar,
+        var_idle_fade_duration: tk.DoubleVar,
         on_toggle: Callable[[], None],
         idle_source_label: str = "Unknown",
     ) -> None:
@@ -26,6 +27,7 @@ class DimSyncPanel:
         self.var_dim_temp_brightness = var_dim_temp_brightness
         self.var_debounce_enter = var_debounce_enter
         self.var_debounce_exit = var_debounce_exit
+        self.var_idle_fade_duration = var_idle_fade_duration
         self._on_toggle = on_toggle
         self._idle_source_label = str(idle_source_label)
 
@@ -141,6 +143,37 @@ class DimSyncPanel:
         self.spn_exit.grid(row=0, column=1, sticky="e")
         self.spn_exit.bind("<Return>", lambda _e: self._on_toggle())
 
+        fade_frame = ttk.Frame(parent)
+        fade_frame.pack(fill="x", pady=(10, 0))
+        fade_desc = ttk.Label(
+            fade_frame,
+            text="Fade length when keyboard lighting dims, turns off, or restores.",
+            font=("Sans", 8),
+        )
+        fade_desc.pack(anchor="w", pady=(0, 4))
+
+        fade_row = ttk.Frame(fade_frame)
+        fade_row.pack(fill="x")
+        fade_row.columnconfigure(0, weight=1)
+        ttk.Label(fade_row, text="Fade duration").grid(row=0, column=0, sticky="w")
+        self.lbl_fade_duration_val = ttk.Label(
+            fade_row,
+            text=f"{float(self.var_idle_fade_duration.get()):.1f} s",
+            font=("Sans", 9),
+        )
+        self.lbl_fade_duration_val.grid(row=0, column=1, sticky="e", padx=(12, 0))
+
+        self.scale_fade_duration = ttk.Scale(
+            fade_frame,
+            from_=0.1,
+            to=3.0,
+            orient="horizontal",
+            variable=self.var_idle_fade_duration,
+            command=lambda v: self._set_label_seconds(self.lbl_fade_duration_val, v),
+        )
+        self.scale_fade_duration.pack(fill="x", pady=(6, 0))
+        self.scale_fade_duration.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())
+
     def apply_enabled_state(self, *, power_management_enabled: bool) -> None:
         state = "normal" if power_management_enabled else "disabled"
         for w in (
@@ -150,6 +183,7 @@ class DimSyncPanel:
             self.scale_dim_temp,
             self.spn_enter,
             self.spn_exit,
+            self.scale_fade_duration,
         ):
             w.configure(state=state)
 
@@ -164,6 +198,23 @@ class DimSyncPanel:
             self.scale_dim_temp.configure(state="normal")
         else:
             self.scale_dim_temp.configure(state="disabled")
+
+    @staticmethod
+    def _set_label_seconds(lbl: ttk.Label, v: float | str) -> None:
+        try:
+            text = f"{float(v):.1f} s"
+        except _LABEL_VALUE_ERRORS:
+            text = "?"
+
+        try:
+            lbl.configure(text=text)
+        except _LABEL_WIDGET_ERRORS:
+            if text == "?":
+                return
+            try:
+                lbl.configure(text="?")
+            except _LABEL_WIDGET_ERRORS:
+                return
 
     @staticmethod
     def _set_label_int(lbl: ttk.Label, v: float | str) -> None:

@@ -221,3 +221,152 @@ def test_restore_hidden_per_key_rows_once_uses_known_hardware_hints() -> None:
         ("rows", ({(0, 0): (1, 2, 3)}, 25, False)),
         ("brightness", 25),
     ]
+
+
+def test_restore_hidden_per_key_rows_once_does_not_save_user_mode_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("KEYRGB_RECOVERY_USER_MODE_SAVE", raising=False)
+    seen: list[tuple[str, object]] = []
+
+    class _Kb:
+        def get_brightness(self) -> int:
+            return 0
+
+        def is_off(self) -> bool:
+            return False
+
+        def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True) -> None:
+            seen.append(("rows", int(brightness)))
+
+        def set_brightness(self, brightness: int) -> None:
+            seen.append(("brightness", int(brightness)))
+
+        def enable_user_mode(self, *, brightness: int, save: bool = False) -> None:
+            raise AssertionError("user-mode save must be opt-in")
+
+    class _Lock:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    handled = restore_hidden_per_key_rows_once(
+        kb=_Kb(),
+        kb_lock=_Lock(),
+        color_map={(0, 0): (1, 2, 3)},
+        brightness=25,
+    )
+
+    assert handled is True
+    assert seen == [("rows", 25), ("brightness", 25)]
+
+
+def test_restore_hidden_per_key_rows_once_saves_user_mode_when_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "1")
+    seen: list[tuple[str, object]] = []
+
+    class _Kb:
+        def get_brightness(self) -> int:
+            return 0
+
+        def is_off(self) -> bool:
+            return False
+
+        def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True) -> None:
+            seen.append(("rows", int(brightness)))
+
+        def set_brightness(self, brightness: int) -> None:
+            seen.append(("brightness", int(brightness)))
+
+        def enable_user_mode(self, *, brightness: int, save: bool = False) -> None:
+            seen.append(("save", (int(brightness), bool(save))))
+
+    class _Lock:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    handled = restore_hidden_per_key_rows_once(
+        kb=_Kb(),
+        kb_lock=_Lock(),
+        color_map={(0, 0): (1, 2, 3)},
+        brightness=25,
+    )
+
+    assert handled is True
+    assert seen == [("rows", 25), ("brightness", 25), ("save", (25, True))]
+
+
+def test_restore_hidden_per_key_rows_once_save_failure_still_reports_handled(monkeypatch) -> None:
+    monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "1")
+    seen: list[tuple[str, object]] = []
+
+    class _Kb:
+        def get_brightness(self) -> int:
+            return 0
+
+        def is_off(self) -> bool:
+            return False
+
+        def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True) -> None:
+            seen.append(("rows", int(brightness)))
+
+        def set_brightness(self, brightness: int) -> None:
+            seen.append(("brightness", int(brightness)))
+
+        def enable_user_mode(self, *, brightness: int, save: bool = False) -> None:
+            raise OSError("device busy")
+
+    class _Lock:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    handled = restore_hidden_per_key_rows_once(
+        kb=_Kb(),
+        kb_lock=_Lock(),
+        color_map={(0, 0): (1, 2, 3)},
+        brightness=25,
+    )
+
+    assert handled is True
+    assert seen == [("rows", 25), ("brightness", 25)]
+
+
+def test_restore_hidden_per_key_rows_once_save_skipped_without_enable_user_mode(monkeypatch) -> None:
+    monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "1")
+    seen: list[tuple[str, object]] = []
+
+    class _Kb:
+        def get_brightness(self) -> int:
+            return 0
+
+        def is_off(self) -> bool:
+            return False
+
+        def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True) -> None:
+            seen.append(("rows", int(brightness)))
+
+        def set_brightness(self, brightness: int) -> None:
+            seen.append(("brightness", int(brightness)))
+
+    class _Lock:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    handled = restore_hidden_per_key_rows_once(
+        kb=_Kb(),
+        kb_lock=_Lock(),
+        color_map={(0, 0): (1, 2, 3)},
+        brightness=25,
+    )
+
+    assert handled is True
+    assert seen == [("rows", 25), ("brightness", 25)]

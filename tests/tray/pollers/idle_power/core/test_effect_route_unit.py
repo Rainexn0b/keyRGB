@@ -25,14 +25,14 @@ def test_classify_hardware() -> None:
     assert classify_effect_route("rainbow", _REACTIVE, _SW) == EffectRoute.HARDWARE
 
 
-def test_should_soft_fade_reactive_perkey_no_soft_fade() -> None:
-    """Reactive effects on per-key hardware handle their own fade."""
+def test_should_soft_fade_reactive_perkey_uses_soft_fade() -> None:
+    """Reactive per-key turn-off soft-fades too; the engine joins the render thread first."""
     assert (
         should_soft_fade_for_turn_off(
             route=EffectRoute.REACTIVE,
             engine_supports_perkey=True,
         )
-        is False
+        is True
     )
 
 

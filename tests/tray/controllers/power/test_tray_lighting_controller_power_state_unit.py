@@ -4,9 +4,9 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from src.tray.controllers._power._transition_constants import (
-    SOFT_OFF_FADE_DURATION_S,
-    SOFT_ON_FADE_DURATION_S,
+    DEFAULT_IDLE_FADE_DURATION_S,
     SOFT_ON_START_BRIGHTNESS,
+    idle_fade_duration_s,
 )
 
 
@@ -51,7 +51,7 @@ class TestTurnOffOn:
             mock_tray,
             brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+            fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
     def test_turn_on_uses_default_25_if_no_last_brightness(self):
@@ -72,7 +72,7 @@ class TestTurnOffOn:
             mock_tray,
             brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+            fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
 
@@ -151,7 +151,7 @@ class TestPowerTurnOffRestore:
         assert mock_tray.is_off is True
         mock_tray.engine.turn_off.assert_called_once_with(
             fade=True,
-            fade_duration_s=SOFT_OFF_FADE_DURATION_S,
+            fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
     def test_power_restore_restores_when_power_forced(self):
@@ -180,7 +180,7 @@ class TestPowerTurnOffRestore:
             mock_tray,
             brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+            fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
     def test_power_restore_restores_when_off_due_to_hardware_reset(self):
@@ -205,7 +205,7 @@ class TestPowerTurnOffRestore:
             mock_tray,
             brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+            fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
     def test_power_restore_does_not_fight_user_forced_off(self):
@@ -341,7 +341,7 @@ class TestPowerTurnOffRestore:
             tray,
             brightness_override=SOFT_ON_START_BRIGHTNESS,
             fade_in=True,
-            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+            fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
     def test_power_restore_loop_effect_uses_in_place_restart(self):
@@ -364,5 +364,31 @@ class TestPowerTurnOffRestore:
             mock_tray,
             brightness_override=None,
             fade_in=False,
-            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+            fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
+
+
+class TestIdleFadeDuration:
+    def test_defaults_when_config_lacks_setting(self):
+        assert idle_fade_duration_s(SimpleNamespace()) == DEFAULT_IDLE_FADE_DURATION_S
+
+    def test_reads_configured_value(self):
+        assert idle_fade_duration_s(SimpleNamespace(idle_fade_duration_s=1.2)) == 1.2
+
+    def test_clamps_to_supported_range(self):
+        assert idle_fade_duration_s(SimpleNamespace(idle_fade_duration_s=0.0)) == 0.1
+        assert idle_fade_duration_s(SimpleNamespace(idle_fade_duration_s=99.0)) == 3.0
+
+    def test_falls_back_on_uncoercible_value(self):
+        assert idle_fade_duration_s(SimpleNamespace(idle_fade_duration_s="fast")) == DEFAULT_IDLE_FADE_DURATION_S
+
+    def test_power_turn_off_uses_configured_fade_duration(self):
+        from src.tray.controllers.lighting_controller import power_turn_off
+        from tests.tray.fakes import make_owner_backed_mock_tray
+
+        mock_tray = make_owner_backed_mock_tray(is_off=False)
+        mock_tray.config.idle_fade_duration_s = 1.2
+
+        power_turn_off(mock_tray)
+
+        mock_tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=1.2)

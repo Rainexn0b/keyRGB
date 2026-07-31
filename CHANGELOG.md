@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Settings/Idle-Power: Add a user-adjustable **Fade duration** slider (0.1–3.0 s, default 0.6 s) under Screen idle/blanking sync, applied to idle dim, turn-off, and restore ramps. The fade machinery already existed on every path but the fixed 0.20/0.42 s durations completed in 3–6 hardware frames on USB-paced ITE controllers and read as an instant step.
+- Effects/Reactive: Stop the post-restore whole-frame ease from dimming the deck on the first keypress after a wake. The 0.62 whole-frame scale exists to soften backdrop-only soft-on matrix steps (`pulse_mix=0`), but it also fired during the first-pulse damp window — which starts whenever the first post-restore keypress arrives, even long after the ramp finished — visibly dipping the already steady deck for ~2 s. The fold is now scoped to the pre-first-pulse restore phase; the first-pulse damp continues to mute only the pulse itself.
+- Tray/Idle-Power: Make the fades actually cover reactive per-key effects. Idle turn-off now soft-fades for reactive per-key output (the engine joins the render thread before the ramp, so the old "render loop handles its own fade" exemption only produced an instant cut to black), and the idle-restore loop-effect ramp now caps reactive base/effect brightness to the fading global level (`_reactive_follow_global_brightness`) for the duration of the fade — previously the per-key base stayed at full brightness, so the brightness guard staircased the wake ramp (+8/frame ≈ 0.3 s) regardless of the configured duration.
+- Effects/Recovery: Add experimental opt-in `KEYRGB_RECOVERY_USER_MODE_SAVE=1`. After a hidden per-key row recovery (ite8291r3 `brightness=0, is_off=False` controller sleep), additionally save the restored scene as the controller's user mode so the firmware's first-keypress wake ramp targets the current scene instead of dipping/flashing toward its stale saved reference. The save is best-effort and never changes the recovery result.
+
 ## 0.30.7 (2026-07-30)
 
 - Tray/Startup: Apply the current power-source profile and brightness synchronously before starting monitor threads or autostarting the effect. This prevents the first frame from briefly using the previous power source's profile/brightness and then stepping through the reactive brightness guard.

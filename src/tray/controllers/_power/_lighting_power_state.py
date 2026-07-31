@@ -11,9 +11,8 @@ from src.tray.protocols import (
 )
 
 from ._transition_constants import (
-    SOFT_OFF_FADE_DURATION_S,
-    SOFT_ON_FADE_DURATION_S,
     SOFT_ON_START_BRIGHTNESS,
+    idle_fade_duration_s,
 )
 
 # ---------------------------------------------------------------------------
@@ -81,7 +80,7 @@ def turn_on_impl(
         tray,
         brightness_override=SOFT_ON_START_BRIGHTNESS,
         fade_in=True,
-        fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+        fade_in_duration_s=idle_fade_duration_s(tray.config),
     )
 
     tray._refresh_ui()
@@ -99,7 +98,7 @@ def power_turn_off_impl(
     _set_power_forced_off(tray, True)
     _set_idle_forced_off(tray, False)
     tray.is_off = True
-    tray.engine.turn_off(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    tray.engine.turn_off(fade=True, fade_duration_s=idle_fade_duration_s(tray.config))
     if software_effect_target_routes_aux_devices(tray):
         turn_off_secondary_software_targets(tray)
     if turn_off_secondary_profile_areas is not None:
@@ -148,7 +147,7 @@ def power_restore_impl(
             tray,
             brightness_override=None,
             fade_in=False,
-            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+            fade_in_duration_s=idle_fade_duration_s(tray.config),
         )
         tray._refresh_ui()
         return
@@ -157,6 +156,6 @@ def power_restore_impl(
         tray,
         brightness_override=SOFT_ON_START_BRIGHTNESS,
         fade_in=True,
-        fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+        fade_in_duration_s=idle_fade_duration_s(tray.config),
     )
     tray._refresh_ui()

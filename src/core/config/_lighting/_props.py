@@ -38,6 +38,16 @@ def _coerce_int(value: object, *, default: int) -> int:
         return int(default)
 
 
+def _coerce_float(value: object, *, default: float) -> float:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except _RECOVERABLE_INT_COERCION_EXCEPTIONS:
+        return float(default)
+    except _CONFIG_HELPER_RUNTIME_ERRORS as exc:
+        _log_config_exception("Failed coercing config float value: %s", exc)
+        return float(default)
+
+
 def _normalize_optional_brightness(owner: object, value: object) -> int | None:
     if value is None:
         return None
@@ -76,6 +86,27 @@ def int_prop(key: str, *, default: int, min_v: int | None = None, max_v: int | N
             v = max(int(min_v), v)
         if max_v is not None:
             v = min(int(max_v), v)
+        self._settings[key] = v
+        self._save()
+
+    return property(_get, _set)
+
+
+def float_prop(key: str, *, default: float, min_v: float | None = None, max_v: float | None = None) -> property:
+    def _get(self) -> float:
+        v = _coerce_float(_read_setting(self._settings, key, default), default=default)
+        if min_v is not None:
+            v = max(float(min_v), v)
+        if max_v is not None:
+            v = min(float(max_v), v)
+        return v
+
+    def _set(self, value: float) -> None:
+        v = _coerce_float(value, default=default)
+        if min_v is not None:
+            v = max(float(min_v), v)
+        if max_v is not None:
+            v = min(float(max_v), v)
         self._settings[key] = v
         self._save()
 

@@ -5,7 +5,7 @@ import time
 from collections.abc import Callable
 
 from src.core.utils.safe_attrs import safe_int_attr
-from src.tray.controllers._power._transition_constants import SOFT_OFF_FADE_DURATION_S, SOFT_ON_FADE_DURATION_S
+from src.tray.controllers._power._transition_constants import idle_fade_duration_s
 from src.tray.idle_power_state import reset_dim_state_on_tray
 from src.tray.pollers.idle_power._transition_actions import (
     apply_dim_temp_brightness,
@@ -133,7 +133,7 @@ def _execute_turn_off(
         msg="Idle-power turn-off failed while stopping engine",
     )
     call_runtime_boundary(
-        lambda: tray.engine.turn_off(fade=use_soft_fade, fade_duration_s=SOFT_OFF_FADE_DURATION_S),
+        lambda: tray.engine.turn_off(fade=use_soft_fade, fade_duration_s=idle_fade_duration_s(tray.config)),
         key="idle_power.turn_off.turn_off",
         level=logging.WARNING,
         msg="Idle-power turn-off failed while writing off state",
@@ -197,7 +197,7 @@ def _execute_dim_to_temp(
             dim_temp_brightness=dim_temp_brightness,
             reactive_effects_set=reactive_effects_set,
             sw_effects_set=sw_effects_set,
-            soft_off_fade_duration_s=SOFT_OFF_FADE_DURATION_S,
+            soft_off_fade_duration_s=idle_fade_duration_s(tray.config),
             set_reactive_transition=set_reactive_transition,
             set_brightness_best_effort=set_brightness_best_effort,
         ),
@@ -239,7 +239,7 @@ def _execute_restore_brightness(
                 perkey_target=perkey_target,
                 reactive_effects_set=reactive_effects_set,
                 sw_effects_set=sw_effects_set,
-                soft_on_fade_duration_s=SOFT_ON_FADE_DURATION_S,
+                soft_on_fade_duration_s=idle_fade_duration_s(tray.config),
                 set_reactive_transition=set_reactive_transition,
                 set_engine_hw_brightness_cap=set_engine_hw_brightness_cap,
                 set_brightness_best_effort=set_brightness_best_effort,

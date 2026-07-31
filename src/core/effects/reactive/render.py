@@ -15,6 +15,10 @@ from ._render_brightness import (
     resolve_reactive_transition_visual_scale as _resolve_reactive_transition_visual_scale_impl,
 )
 from ._render_brightness_debug import log_pulse_visual_scale_change
+from ._render_brightness_support import (
+    ReactiveRestorePhase as _ReactiveRestorePhase,
+    restore_phase_or_default as _restore_phase_or_default,
+)
 from ._render_post_restore import (
     post_restore_frame_scale as _post_restore_frame_scale,
     post_restore_visual_damp as _post_restore_visual_damp,
@@ -112,7 +116,17 @@ def _resolve_transition_visual_scale(engine: EffectsEngine) -> float:
     scale = _resolve_reactive_transition_visual_scale_impl(engine, clamp01_fn=clamp01)
     # Soft-on full-matrix steps after long idle black are backdrop-only
     # (pulse_mix=0). Pulse damp cannot soften them; fold a milder whole-frame
-    # ease while the restore damp window is active.
+    # ease while the restore damp window is active. Scope the fold to the
+    # pre-first-pulse restore phase: once typing begins (DAMPING), the pulse
+    # damp alone mutes pulses, and scaling the whole frame would visibly dim
+    # the already steady deck on the first post-restore keypress.
+    restore_phase = _restore_phase_or_default(
+        engine,
+        default=_ReactiveRestorePhase.NORMAL,
+        logger=logger,
+    )
+    if restore_phase is not _ReactiveRestorePhase.FIRST_PULSE_PENDING:
+        return clamp01(float(scale))
     return clamp01(float(scale) * _post_restore_frame_scale(engine))
 
 

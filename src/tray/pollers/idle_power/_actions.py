@@ -246,8 +246,8 @@ def _set_brightness_best_effort(
 
 def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
     from src.tray.controllers._power._transition_constants import (
-        SOFT_ON_FADE_DURATION_S,
         SOFT_ON_START_BRIGHTNESS,
+        idle_fade_duration_s,
     )
     from src.tray.pollers.idle_power._transition_actions import (
         refresh_ui_best_effort,
@@ -285,13 +285,14 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
         tray.config,
         soft_on_start_brightness=SOFT_ON_START_BRIGHTNESS,
     )
+    fade_duration_s = idle_fade_duration_s(tray.config)
     logger.info(
         "EVENT idle_power:restore_start_policy effect=%s dim_sync_mode=%s brightness_override=%s fade_in=%s fade_in_duration_s=%.2f",
         safe_str_attr(tray.config, "effect", default="none") or "none",
         safe_str_attr(tray.config, "screen_dim_sync_mode", default="off") or "off",
         restore_start_policy.brightness_override,
         restore_start_policy.fade_in,
-        float(SOFT_ON_FADE_DURATION_S),
+        float(fade_duration_s),
     )
 
     _call_runtime_boundary(
@@ -299,7 +300,7 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
             tray,
             brightness_override=restore_start_policy.brightness_override,
             fade_in=restore_start_policy.fade_in,
-            fade_in_duration_s=SOFT_ON_FADE_DURATION_S,
+            fade_in_duration_s=fade_duration_s,
         ),
         on_recoverable=lambda exc: _log_tray_boundary_exception(
             tray,

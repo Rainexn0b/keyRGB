@@ -168,6 +168,7 @@ class PowerSettingsGUI:
         self.var_dim_temp_brightness = tk.DoubleVar(value=float(values.screen_dim_temp_brightness))
         self.var_debounce_enter = tk.IntVar(value=int(values.idle_dim_debounce_enter_polls))
         self.var_debounce_exit = tk.IntVar(value=int(values.idle_dim_debounce_exit_polls))
+        self.var_idle_fade_duration = tk.DoubleVar(value=float(values.idle_fade_duration_s))
 
         self.var_scheduler_enabled = tk.BooleanVar(value=bool(values.time_scheduler_enabled))
         self.var_day_start = tk.StringVar(value=str(values.day_start_time or "08:00"))
@@ -201,6 +202,7 @@ class PowerSettingsGUI:
             var_dim_temp_brightness=self.var_dim_temp_brightness,
             var_debounce_enter=self.var_debounce_enter,
             var_debounce_exit=self.var_debounce_exit,
+            var_idle_fade_duration=self.var_idle_fade_duration,
             on_toggle=self._on_toggle,
             idle_source_label=_detect_idle_power_source(),
         )
@@ -319,6 +321,7 @@ class PowerSettingsGUI:
                 screen_dim_temp_brightness=int(float(self.var_dim_temp_brightness.get())),
                 idle_dim_debounce_enter_polls=int(self.var_debounce_enter.get()),
                 idle_dim_debounce_exit_polls=int(self.var_debounce_exit.get()),
+                idle_fade_duration_s=round(float(self.var_idle_fade_duration.get()), 1),
                 time_scheduler_enabled=bool(self.var_scheduler_enabled.get()),
                 day_start_time=str(self.var_day_start.get() or "08:00"),
                 night_start_time=str(self.var_night_start.get() or "20:00"),

@@ -151,6 +151,7 @@ def _values() -> SettingsValues:
         screen_dim_temp_brightness=7,
         idle_dim_debounce_enter_polls=6,
         idle_dim_debounce_exit_polls=10,
+        idle_fade_duration_s=0.6,
         time_scheduler_enabled=False,
         day_start_time="08:00",
         night_start_time="20:00",
@@ -329,6 +330,7 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_dim_sync_enabled.get() is True
     assert gui.var_dim_sync_mode.get() == "temp"
     assert gui.var_dim_temp_brightness.get() == 7.0
+    assert gui.var_idle_fade_duration.get() == 0.6
     assert gui.var_scheduler_enabled.get() is False
     assert gui.var_day_start.get() == "08:00"
     assert gui.var_night_start.get() == "20:00"
@@ -337,7 +339,7 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_night_base.get() == 20.0
     assert gui.var_night_reactive.get() == 50.0
     assert len(bool_vars) == 12
-    assert len(double_vars) == 7
+    assert len(double_vars) == 8
     assert len(string_vars) == 5
     assert len(int_vars) == 2
 
@@ -392,6 +394,7 @@ def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pyt
     gui.var_dim_temp_brightness = _FakeVar(5.0)
     gui.var_debounce_enter = _FakeVar(6)
     gui.var_debounce_exit = _FakeVar(10)
+    gui.var_idle_fade_duration = _FakeVar(0.6)
     gui.var_scheduler_enabled = _FakeVar(False)
     gui.var_day_start = _FakeVar("08:00")
     gui.var_night_start = _FakeVar("20:00")
@@ -557,6 +560,7 @@ def test_on_toggle_preserves_best_effort_status_when_settings_apply_fails(monkey
     gui.var_dim_temp_brightness = _FakeVar(4.4)
     gui.var_debounce_enter = _FakeVar(6)
     gui.var_debounce_exit = _FakeVar(10)
+    gui.var_idle_fade_duration = _FakeVar(0.6)
     gui.var_scheduler_enabled = _FakeVar(False)
     gui.var_day_start = _FakeVar("08:00")
     gui.var_night_start = _FakeVar("20:00")
@@ -603,6 +607,7 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
     gui.var_dim_temp_brightness = _FakeVar(4.4)
     gui.var_debounce_enter = _FakeVar(6)
     gui.var_debounce_exit = _FakeVar(10)
+    gui.var_idle_fade_duration = _FakeVar(0.6)
     gui.var_scheduler_enabled = _FakeVar(False)
     gui.var_day_start = _FakeVar("08:00")
     gui.var_night_start = _FakeVar("20:00")
@@ -657,6 +662,7 @@ def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.
     gui.var_dim_temp_brightness = _FakeVar(5.0)
     gui.var_debounce_enter = _FakeVar(6)
     gui.var_debounce_exit = _FakeVar(10)
+    gui.var_idle_fade_duration = _FakeVar(0.6)
     gui.var_scheduler_enabled = _FakeVar(False)
     gui.var_day_start = _FakeVar("08:00")
     gui.var_night_start = _FakeVar("20:00")

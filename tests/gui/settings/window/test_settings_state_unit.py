@@ -40,6 +40,7 @@ def _settings_values(**overrides) -> SettingsValues:
         "screen_dim_temp_brightness": 5,
         "idle_dim_debounce_enter_polls": 3,
         "idle_dim_debounce_exit_polls": 5,
+        "idle_fade_duration_s": 0.6,
         "time_scheduler_enabled": False,
         "day_start_time": "08:00",
         "night_start_time": "20:00",
@@ -356,6 +357,7 @@ def test_apply_settings_values_to_config() -> None:
         screen_dim_temp_brightness=1,
         idle_dim_debounce_enter_polls=6,
         idle_dim_debounce_exit_polls=10,
+        idle_fade_duration_s=0.8,
         time_scheduler_enabled=True,
         day_start_time="07:00",
         night_start_time="21:00",
@@ -391,6 +393,7 @@ def test_apply_settings_values_to_config() -> None:
     assert cfg.screen_dim_temp_brightness == 1
     assert cfg.idle_dim_debounce_enter_polls == 6
     assert cfg.idle_dim_debounce_exit_polls == 10
+    assert cfg.idle_fade_duration_s == 0.8
 
     assert cfg.time_scheduler_enabled is True
     assert cfg.day_start_time == "07:00"
@@ -425,6 +428,7 @@ def test_apply_settings_values_to_config_invalid_layout_falls_back_to_auto() -> 
         screen_dim_temp_brightness=5,
         idle_dim_debounce_enter_polls=3,
         idle_dim_debounce_exit_polls=5,
+        idle_fade_duration_s=0.6,
         time_scheduler_enabled=False,
         day_start_time="08:00",
         night_start_time="20:00",

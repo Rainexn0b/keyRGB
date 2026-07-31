@@ -335,7 +335,7 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
 ) -> None:
     import src.tray.pollers.idle_power.polling as ipp
     from src.core.effects.reactive import _render_brightness_support as reactive_support
-    from src.tray.controllers._power._transition_constants import SOFT_ON_FADE_DURATION_S
+    from src.tray.controllers._power._transition_constants import DEFAULT_IDLE_FADE_DURATION_S
 
     monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
 
@@ -354,9 +354,11 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
     state = reactive_support.ensure_reactive_state(tray.engine)
 
     assert state._reactive_disable_pulse_hw_lift_until == pytest.approx(
-        100.0 + max(2.0, float(SOFT_ON_FADE_DURATION_S) + 0.75)
+        100.0 + max(2.0, float(DEFAULT_IDLE_FADE_DURATION_S) + 0.75)
     )
-    assert state._reactive_restore_damp_until == pytest.approx(100.0 + max(4.0, float(SOFT_ON_FADE_DURATION_S) + 2.75))
+    assert state._reactive_restore_damp_until == pytest.approx(
+        100.0 + max(4.0, float(DEFAULT_IDLE_FADE_DURATION_S) + 2.75)
+    )
     assert state._reactive_restore_damp_until > state._reactive_disable_pulse_hw_lift_until
     assert state._reactive_restore_phase is reactive_support.ReactiveRestorePhase.FIRST_PULSE_PENDING
 

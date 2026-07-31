@@ -44,11 +44,16 @@ def should_soft_fade_for_turn_off(
 ) -> bool:
     """Whether a soft fade should be used when turning off during idle.
 
-    Reactive effects with per-key output handle their own fade via the
-    reactive render loop; a hardware soft-fade would conflict. All other
-    combinations use a soft fade for a smooth transition.
+    All routes soft-fade. ``EffectsEngine.turn_off`` stops and joins the effect
+    thread before the fade writes, so even reactive per-key output cannot race
+    the ramp; the rows left on the controller dim smoothly with the global
+    brightness steps. The earlier reactive/per-key exemption assumed the render
+    loop would fade on its own, but no falling transition was ever seeded, so
+    turn-off was an instant cut to black.
     """
-    return not (route == EffectRoute.REACTIVE and bool(engine_supports_perkey))
+
+    _ = (route, engine_supports_perkey)  # kept for the stable predicate seam
+    return True
 
 
 def apply_to_hardware_for_non_reactive(route: EffectRoute) -> bool:

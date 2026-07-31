@@ -72,6 +72,7 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
         var_dim_temp_brightness=_FakeVar(17.2),
         var_debounce_enter=_FakeVar(6),
         var_debounce_exit=_FakeVar(10),
+        var_idle_fade_duration=_FakeVar(0.6),
         on_toggle=lambda: toggle_calls.append("toggle"),
     )
 
@@ -88,15 +89,21 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
     assert panel.scale_dim_temp.kwargs["from_"] == 1
     assert panel.scale_dim_temp.kwargs["to"] == 50
     assert panel.scale_dim_temp.bind_calls[0][0] == "<ButtonRelease-1>"
+    assert panel.lbl_fade_duration_val.kwargs["text"] == "0.6 s"
+    assert panel.scale_fade_duration.kwargs["from_"] == 0.1
+    assert panel.scale_fade_duration.kwargs["to"] == 3.0
+    assert panel.scale_fade_duration.bind_calls[0][0] == "<ButtonRelease-1>"
 
     checks[0].kwargs["command"]()
     radios[0].kwargs["command"]()
     radios[1].kwargs["command"]()
     panel.scale_dim_temp.bind_calls[0][1](None)
     panel.scale_dim_temp.kwargs["command"]("9.8")
+    panel.scale_fade_duration.kwargs["command"]("1.2")
 
     assert toggle_calls == ["toggle", "toggle", "toggle", "toggle"]
     assert panel.lbl_dim_temp_val.options["text"] == "9"
+    assert panel.lbl_fade_duration_val.options["text"] == "1.2 s"
 
 
 class _BadFloat:
@@ -114,6 +121,7 @@ def _make_panel(*, dim_sync_enabled: bool, dim_sync_mode: str) -> dim_sync_panel
     panel.scale_dim_temp = _FakeWidget()
     panel.spn_enter = _FakeWidget()
     panel.spn_exit = _FakeWidget()
+    panel.scale_fade_duration = _FakeWidget()
     panel.lbl_idle_source = _FakeWidget()
     return panel
 
@@ -195,6 +203,7 @@ def test_init_uses_idle_source_label_when_provided(monkeypatch) -> None:
         var_dim_temp_brightness=_FakeVar(10.0),
         var_debounce_enter=_FakeVar(1),
         var_debounce_exit=_FakeVar(1),
+        var_idle_fade_duration=_FakeVar(0.6),
         on_toggle=lambda: None,
         idle_source_label="Wayland compositor idle",
     )

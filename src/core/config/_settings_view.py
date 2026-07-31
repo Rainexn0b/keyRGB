@@ -37,6 +37,13 @@ class ConfigSettingsView(Mapping[str, object]):
         except (TypeError, ValueError, OverflowError):
             return int(default)
 
+    def read_float(self, key: str, default: float) -> float:
+        value = self._values.get(key, default)
+        try:
+            return float(value)  # type: ignore[arg-type]
+        except (TypeError, ValueError, OverflowError):
+            return float(default)
+
     def read_optional_int(self, key: str) -> int | None:
         value = self._values.get(key, None)
         if value is None:

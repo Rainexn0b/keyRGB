@@ -374,7 +374,7 @@ class TestStartCurrentEffect:
 
         assert mock_tray.engine.start_effect.call_args.kwargs["preserve_last_rendered_brightness"] is True
 
-    def test_start_current_effect_idle_restore_loop_effect_uses_legacy_non_hardware_fade_without_follow_global(self):
+    def test_start_current_effect_idle_restore_loop_effect_fades_with_follow_global_cap(self):
         from src.tray.controllers.lighting_controller import start_current_effect
         from src.tray.protocols import set_idle_power_state_field
 
@@ -399,6 +399,15 @@ class TestStartCurrentEffect:
         mock_tray.engine.reactive_brightness = 50
         mock_tray.engine.per_key_brightness = 50
 
+        follow_global_during_fade: list[bool] = []
+
+        def _capture_set_brightness(*args, **kwargs):
+            follow_global_during_fade.append(
+                bool(reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness)
+            )
+
+        mock_tray.engine.set_brightness.side_effect = _capture_set_brightness
+
         start_current_effect(mock_tray, brightness_override=10, fade_in=True, fade_in_duration_s=0.42)
 
         mock_tray.engine.start_effect.assert_called_once_with(
@@ -417,6 +426,10 @@ class TestStartCurrentEffect:
             fade=True,
             fade_duration_s=0.42,
         )
+        # The follow-global cap is active while the ramp runs so reactive
+        # base/effect brightness cannot outrun the fading global level...
+        assert follow_global_during_fade == [True]
+        # ...and is always cleared afterwards.
         assert reactive_support.ensure_reactive_state(mock_tray.engine)._reactive_follow_global_brightness is False
         assert mock_tray.engine.reactive_brightness == 50
         assert mock_tray.engine.per_key_brightness == 50

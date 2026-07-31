@@ -177,12 +177,21 @@ def _apply_effect_fade_ramp(
     )
 
     if plan.is_loop_effect and use_loop_effect_ramp:
-        tray.engine.set_brightness(
-            target_brightness,
-            apply_to_hardware=False,
-            fade=True,
-            fade_duration_s=float(fade_in_duration_s),
-        )
+        # Cap reactive base/effect brightness to the fading global level for the
+        # duration of the ramp, mirroring the generic loop-effect branch below.
+        # Without this the per-key base stays at full brightness while only the
+        # engine state fades, so the brightness guard staircases the visible
+        # restore (+8/frame) and the configured fade duration has no effect.
+        _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", True)
+        try:
+            tray.engine.set_brightness(
+                target_brightness,
+                apply_to_hardware=False,
+                fade=True,
+                fade_duration_s=float(fade_in_duration_s),
+            )
+        finally:
+            _reactive_support.set_engine_attr(tray.engine, "_reactive_follow_global_brightness", False)
         return
 
     follow_global_flag = False

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.tray.controllers._power._transition_constants import SOFT_OFF_FADE_DURATION_S, SOFT_ON_FADE_DURATION_S
+from src.tray.controllers._power._transition_constants import DEFAULT_IDLE_FADE_DURATION_S
 from src.tray.pollers.idle_power.polling import _apply_idle_action
 
 
@@ -31,7 +31,7 @@ def test_turn_off_stops_engine_turns_off_and_sets_idle_forced_flag() -> None:
     _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
 
     tray.engine.stop.assert_called_once()
-    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S)
     assert tray.is_off is True
     assert tray._idle_forced_off is True
     assert tray._dim_temp_active is False
@@ -40,14 +40,14 @@ def test_turn_off_stops_engine_turns_off_and_sets_idle_forced_flag() -> None:
     assert float(tray._last_idle_turn_off_at) > 0.0
 
 
-def test_turn_off_skips_soft_fade_for_reactive_per_key_effects() -> None:
+def test_turn_off_uses_soft_fade_for_reactive_per_key_effects() -> None:
     tray = _mk_tray(effect="reactive_ripple", brightness=25)
     tray.engine.kb = SimpleNamespace(set_key_colors=MagicMock())
 
     _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
 
     tray.engine.stop.assert_called_once()
-    tray.engine.turn_off.assert_called_once_with(fade=False, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S)
     assert tray.is_off is True
     assert tray._idle_forced_off is True
 
@@ -69,7 +69,7 @@ def test_turn_off_keeps_soft_fade_for_reactive_uniform_backend() -> None:
     _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
 
     tray.engine.stop.assert_called_once()
-    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S)
     assert tray.is_off is True
     assert tray._idle_forced_off is True
 
@@ -90,7 +90,7 @@ def test_turn_off_logs_recoverable_stop_failure_and_continues(monkeypatch: pytes
     _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
 
     tray.engine.stop.assert_called_once()
-    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=SOFT_OFF_FADE_DURATION_S)
+    tray.engine.turn_off.assert_called_once_with(fade=True, fade_duration_s=DEFAULT_IDLE_FADE_DURATION_S)
     assert logs == [
         (
             "idle_power.turn_off.stop_engine",
@@ -304,8 +304,8 @@ def test_restore_brightness_for_reactive_effect_seeds_longer_visual_damp_window(
 
     _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
 
-    expected_hw_lift_until = 100.0 + max(2.0, float(SOFT_ON_FADE_DURATION_S) + 0.75)
-    expected_visual_damp_until = 100.0 + max(4.0, float(SOFT_ON_FADE_DURATION_S) + 2.75)
+    expected_hw_lift_until = 100.0 + max(2.0, float(DEFAULT_IDLE_FADE_DURATION_S) + 0.75)
+    expected_visual_damp_until = 100.0 + max(4.0, float(DEFAULT_IDLE_FADE_DURATION_S) + 2.75)
     state = reactive_support.ensure_reactive_state(tray.engine)
 
     assert state._reactive_disable_pulse_hw_lift_until == pytest.approx(expected_hw_lift_until)
@@ -489,7 +489,7 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     state = ensure_reactive_state(engine)
     assert state._reactive_transition_from_brightness == 25
     assert state._reactive_transition_to_brightness == 3
-    assert state._reactive_transition_duration_s == SOFT_OFF_FADE_DURATION_S
+    assert state._reactive_transition_duration_s == DEFAULT_IDLE_FADE_DURATION_S
 
     # Restore must also be atomic + instant, keep reactive_brightness intact.
     tray._dim_temp_active = True
@@ -511,7 +511,7 @@ def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
     # no longer raises hw above global_hw.  Targeting reactive_brightness=50 would
     # overshoot steady-state hw=5 and produce a visible flash on every undim.
     assert state._reactive_transition_to_brightness == 5
-    assert state._reactive_transition_duration_s == SOFT_ON_FADE_DURATION_S
+    assert state._reactive_transition_duration_s == DEFAULT_IDLE_FADE_DURATION_S
 
 
 class _SequencingLock(AbstractContextManager[None]):
