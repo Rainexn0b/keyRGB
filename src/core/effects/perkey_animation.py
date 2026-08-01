@@ -155,18 +155,22 @@ def _enable_user_mode_locked(*, kb_lock, fn: Callable[..., object], brightness: 
 
 
 def _recovery_user_mode_save_enabled() -> bool:
-    return os.environ.get(RECOVERY_USER_MODE_SAVE_ENV) == "1"
+    # Hardware-validated on ite8291r3: after a hidden sleep recovery the
+    # firmware's first-keypress wake ramp no longer drops the deck when the
+    # restored scene was saved as its user mode.  Default on; set the env var
+    # to "0" to opt out.
+    return os.environ.get(RECOVERY_USER_MODE_SAVE_ENV) != "0"
 
 
 def _save_restored_user_mode_best_effort(*, kb, brightness: int) -> None:
-    """Experiment: save the just-restored scene as the controller's user mode.
+    """Save the just-restored scene as the controller's user mode.
 
-    Opt-in via ``KEYRGB_RECOVERY_USER_MODE_SAVE=1``.  The ite8291r3 firmware
-    appears to run its own brief brightness ramp toward its saved reference on
-    the first physical keypress after a controller sleep, which shows up as a
-    deck-wide dip/flash even though userspace never changed brightness.  Saving
-    the restored scene makes that firmware reference match the deck so the wake
-    ramp targets identical state and becomes invisible.
+    Enabled by default; opt out with ``KEYRGB_RECOVERY_USER_MODE_SAVE=0``.
+    The ite8291r3 firmware runs its own brief brightness ramp toward its saved
+    reference on the first physical keypress after a controller sleep, which
+    shows up as a deck-wide dip/drop even though userspace never changed
+    brightness.  Saving the restored scene makes that firmware reference match
+    the deck so the wake ramp targets identical state and becomes invisible.
     """
 
     if not _recovery_user_mode_save_enabled():
@@ -205,11 +209,11 @@ def restore_hidden_per_key_rows_once(
     before the new row writes land. Prefer a hidden row rewrite first, then
     restore brightness.
 
-    When ``KEYRGB_RECOVERY_USER_MODE_SAVE=1`` is set and the backend exposes
-    ``enable_user_mode``, the restored scene is additionally saved as the
-    controller's user mode (after rows and brightness land) so the firmware's
-    first-keypress wake ramp targets the current scene.  A save failure never
-    changes the restore result.
+    When the backend exposes ``enable_user_mode``, the restored scene is
+    additionally saved as the controller's user mode (after rows and brightness
+    land) so the firmware's first-keypress wake ramp targets the current scene.
+    A save failure never changes the restore result.  Set
+    ``KEYRGB_RECOVERY_USER_MODE_SAVE=0`` to disable the save.
     """
 
     def _restore_hidden_rows() -> bool:

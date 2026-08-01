@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: idle-power runtime state machine; policy/sensors/actions already live in sibling modules
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -11,8 +12,13 @@ from src.tray.idle_power_state import (
     read_forced_off_flags,
     read_last_resume_at,
 )
-from src.tray.protocols import IdlePowerTrayProtocol, read_idle_power_state_float_field
+from src.tray.protocols import (
+    IdlePowerTrayProtocol,
+    read_idle_power_state_bool_field,
+    read_idle_power_state_float_field,
+)
 
+from ._actions import restore_from_idle
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S
 from ._input_idle import InputIdleTracker
 from ._power_source_guard import (
@@ -45,6 +51,7 @@ class IdlePollLoopState:
     backlight_state: BacklightState = field(default_factory=BacklightState)
     input_idle_tracker: InputIdleTracker | None = None
     wayland_idle_tracker: object | None = None
+    prev_session_idle: bool | None = None
 
 
 def _run_idle_power_runtime_boundary_best_effort(operation: Callable[[], None]) -> None:
@@ -52,6 +59,52 @@ def _run_idle_power_runtime_boundary_best_effort(operation: Callable[[], None]) 
         operation()
     except _IDLE_POWER_RUNTIME_EXCEPTIONS:  # @quality-exception exception-transparency: idle-power per-iteration config refresh and idle action diagnostics cross recoverable runtime/config boundaries; polling must stay non-fatal without recursive hot-path logging while unexpected defects still propagate
         return
+
+
+def _maybe_restore_from_controller_sleep(
+    tray: IdlePowerTrayProtocol,
+    *,
+    loop_state: IdlePollLoopState,
+    session_idle: bool | None,
+) -> None:
+    """Restore the deck on the first input edge after a controller sleep.
+
+    Only meaningful when the opt-in controller-sleep respect left the deck
+    dark: level-triggered idle restores are suppressed for that state (see
+    ``compute_idle_action``), so a *new* input event re-lights the deck — an
+    evdev activity timestamp newer than the sleep, or a Wayland idle->active
+    transition (covers touchpads and other devices raw evdev cannot see).
+    """
+
+    if not read_idle_power_state_bool_field(
+        tray,
+        attr_name="_controller_sleep_off",
+        state_name="controller_sleep_off",
+        default=False,
+    ):
+        return
+    sleep_at = read_idle_power_state_float_field(
+        tray,
+        attr_name="_controller_sleep_off_at",
+        state_name="controller_sleep_off_at",
+        default=0.0,
+    )
+    if sleep_at <= 0:
+        return
+
+    tracker = loop_state.input_idle_tracker
+    last_activity_at = 0.0
+    if tracker is not None:
+        try:
+            last_activity_at = float(getattr(tracker, "last_activity_at", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            last_activity_at = 0.0
+    wayland_resume_edge = loop_state.prev_session_idle is True and session_idle is False
+    if last_activity_at <= sleep_at and not wayland_resume_edge:
+        return
+
+    logger.info("EVENT idle_power:controller_sleep_restore")
+    restore_from_idle(tray)
 
 
 def _log_idle_action_best_effort(
@@ -259,6 +312,13 @@ def run_idle_power_iteration(
         bool(screen_off),
     )
 
+    _maybe_restore_from_controller_sleep(
+        tray,
+        loop_state=loop_state,
+        session_idle=session_idle,
+    )
+    loop_state.prev_session_idle = session_idle
+
     user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
     action = compute_idle_action_fn(
         dimmed=dimmed,
@@ -283,6 +343,12 @@ def run_idle_power_iteration(
         last_resume_at=read_last_resume_at(tray),
         now=now,
         session_idle=session_idle,
+        controller_sleep_off=read_idle_power_state_bool_field(
+            tray,
+            attr_name="_controller_sleep_off",
+            state_name="controller_sleep_off",
+            default=False,
+        ),
     )
     if _power_source_idle_guard_active(loop_state=loop_state, now=now):
         action = None

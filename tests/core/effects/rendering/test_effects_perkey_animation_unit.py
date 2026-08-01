@@ -223,8 +223,8 @@ def test_restore_hidden_per_key_rows_once_uses_known_hardware_hints() -> None:
     ]
 
 
-def test_restore_hidden_per_key_rows_once_does_not_save_user_mode_by_default(monkeypatch) -> None:
-    monkeypatch.delenv("KEYRGB_RECOVERY_USER_MODE_SAVE", raising=False)
+def test_restore_hidden_per_key_rows_once_does_not_save_user_mode_when_opted_out(monkeypatch) -> None:
+    monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "0")
     seen: list[tuple[str, object]] = []
 
     class _Kb:
@@ -241,7 +241,7 @@ def test_restore_hidden_per_key_rows_once_does_not_save_user_mode_by_default(mon
             seen.append(("brightness", int(brightness)))
 
         def enable_user_mode(self, *, brightness: int, save: bool = False) -> None:
-            raise AssertionError("user-mode save must be opt-in")
+            raise AssertionError("user-mode save must stay disabled when opted out")
 
     class _Lock:
         def __enter__(self):
@@ -261,8 +261,8 @@ def test_restore_hidden_per_key_rows_once_does_not_save_user_mode_by_default(mon
     assert seen == [("rows", 25), ("brightness", 25)]
 
 
-def test_restore_hidden_per_key_rows_once_saves_user_mode_when_enabled(monkeypatch) -> None:
-    monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "1")
+def test_restore_hidden_per_key_rows_once_saves_user_mode_by_default(monkeypatch) -> None:
+    monkeypatch.delenv("KEYRGB_RECOVERY_USER_MODE_SAVE", raising=False)
     seen: list[tuple[str, object]] = []
 
     class _Kb:

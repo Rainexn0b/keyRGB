@@ -40,6 +40,7 @@ from src.tray.pollers.hardware._decisions import (
 from src.tray.protocols import (
     IdlePowerTrayProtocol,
     clear_idle_power_state_field,
+    read_idle_power_state_bool_field,
     read_idle_power_state_float_field,
     set_idle_power_state_field,
 )
@@ -131,9 +132,66 @@ def _hardware_poll_interval_s(tray: IdlePowerTrayProtocol, *, now: float) -> flo
     return _pure_hardware_poll_interval_s(
         now=now,
         last_power_source_transition_at=_power_source_transition_at(tray),
+        pending_zero_confirm_at=pending_zero_confirm_at(tray),
         window_s=POWER_SOURCE_RECOVERY_WINDOW_S,
         fast_s=FAST_HARDWARE_POLL_INTERVAL_S,
         default_s=DEFAULT_HARDWARE_POLL_INTERVAL_S,
+    )
+
+
+def pending_zero_confirm_at(tray: IdlePowerTrayProtocol) -> float:
+    """Read the pending zero-confirmation timestamp (0.0 when none)."""
+
+    try:
+        owner = ensure_tray_idle_power_state(tray)
+        return float(getattr(owner, "pending_zero_confirm_at", 0.0))
+    except (AttributeError, TypeError, ValueError):
+        return 0.0
+
+
+def set_pending_zero_confirm_at(tray: IdlePowerTrayProtocol, value: float) -> None:
+    """Write the pending zero-confirmation timestamp (0.0 clears it)."""
+
+    try:
+        owner = ensure_tray_idle_power_state(tray)
+        owner.pending_zero_confirm_at = max(0.0, float(value))
+    except (AttributeError, TypeError, ValueError):
+        return
+
+
+def controller_sleep_respect_enabled(tray: IdlePowerTrayProtocol) -> bool:
+    """Whether the controller's native sleep timeout is treated as an off state."""
+
+    from src.core.utils.safe_attrs import safe_bool_attr
+
+    return safe_bool_attr(getattr(tray, "config", None), "controller_sleep_respect", default=False)
+
+
+def controller_sleep_off_active(tray: IdlePowerTrayProtocol) -> bool:
+    """Whether the deck was deliberately left dark after a controller sleep."""
+
+    return read_idle_power_state_bool_field(
+        tray,
+        attr_name="_controller_sleep_off",
+        state_name="controller_sleep_off",
+        default=False,
+    )
+
+
+def set_controller_sleep_off(tray: IdlePowerTrayProtocol, value: bool, *, now: float = 0.0) -> None:
+    """Set/clear the controller-sleep-off state (+ its timestamp when setting)."""
+
+    set_idle_power_state_field(
+        tray,
+        attr_name="_controller_sleep_off",
+        state_name="controller_sleep_off",
+        value=bool(value),
+    )
+    set_idle_power_state_field(
+        tray,
+        attr_name="_controller_sleep_off_at",
+        state_name="controller_sleep_off_at",
+        value=float(now) if value else 0.0,
     )
 
 

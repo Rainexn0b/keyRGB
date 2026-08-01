@@ -1,5 +1,7 @@
 """Pure decision helpers for hardware brightness polling (no tray I/O)."""
 
+# @quality-exception file-size-analysis: cohesive pure hardware-poll decision matrix; splitting the decision table would scatter one ownership unit
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -9,6 +11,9 @@ _BRIGHTNESS_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
 
 DEFAULT_HARDWARE_POLL_INTERVAL_S = 2.0
 FAST_HARDWARE_POLL_INTERVAL_S = 0.25
+# How long after a fresh zero-brightness transition the poller keeps the fast
+# interval while waiting for the stable-zero confirmation poll.
+ZERO_CONFIRM_FAST_POLL_WINDOW_S = 1.0
 POWER_SOURCE_RECOVERY_WINDOW_S = 6.0
 POWER_SOURCE_RECOVERY_COOLDOWN_S = 0.75
 STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S = 5.0
@@ -34,6 +39,7 @@ def should_defer_poll_for_reactive_pulses(
     if float(reactive_pulse_mix) <= 0.0:
         return False
     return (float(now) - float(last_real_poll_at)) < float(max_defer_s)
+
 
 # Circuit breaker: after this many consecutive stable-zero recoveries that fail
 # to restore a non-zero brightness read, switch to the long backoff below so the
@@ -121,7 +127,9 @@ def hardware_poll_interval_s(
     *,
     now: float,
     last_power_source_transition_at: float,
+    pending_zero_confirm_at: float = 0.0,
     window_s: float = POWER_SOURCE_RECOVERY_WINDOW_S,
+    zero_confirm_window_s: float = ZERO_CONFIRM_FAST_POLL_WINDOW_S,
     fast_s: float = FAST_HARDWARE_POLL_INTERVAL_S,
     default_s: float = DEFAULT_HARDWARE_POLL_INTERVAL_S,
 ) -> float:
@@ -130,6 +138,12 @@ def hardware_poll_interval_s(
         last_power_source_transition_at=last_power_source_transition_at,
         window_s=window_s,
     ):
+        return fast_s
+    # A fresh zero-brightness read (device not off) needs a fast confirmation
+    # poll: the stable-zero recovery it gates is what re-lights the deck after
+    # an ITE controller sleep, so every full-cadence cycle here is visible
+    # dark time.
+    if pending_zero_confirm_at > 0 and now - pending_zero_confirm_at <= zero_confirm_window_s:
         return fast_s
     return default_s
 

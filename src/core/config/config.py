@@ -408,6 +408,10 @@ class Config(_lighting_accessors.LightingConfigAccessors):
     # ---- screen dim sync
 
     screen_dim_sync_enabled = _lighting_props.bool_prop("screen_dim_sync_enabled", default=True)
+    # Respect the ITE controller's own ~10-minute keyboard-input sleep timeout
+    # as a valid off state (deck stays dark, wakes on new input) instead of
+    # force re-lighting it via the hidden stable-zero recovery.
+    controller_sleep_respect = _lighting_props.bool_prop("controller_sleep_respect", default=False)
     screen_dim_sync_mode = _lighting_props.enum_prop("screen_dim_sync_mode", default="off", allowed=("off", "temp"))
     # Temp brightness is intended to be non-zero; allow 1..50.
     screen_dim_temp_brightness = _lighting_props.int_prop(

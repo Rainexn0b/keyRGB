@@ -19,6 +19,7 @@ class DimSyncPanel:
         var_debounce_enter: tk.IntVar,
         var_debounce_exit: tk.IntVar,
         var_idle_fade_duration: tk.DoubleVar,
+        var_controller_sleep_respect: tk.BooleanVar,
         on_toggle: Callable[[], None],
         idle_source_label: str = "Unknown",
     ) -> None:
@@ -28,6 +29,7 @@ class DimSyncPanel:
         self.var_debounce_enter = var_debounce_enter
         self.var_debounce_exit = var_debounce_exit
         self.var_idle_fade_duration = var_idle_fade_duration
+        self.var_controller_sleep_respect = var_controller_sleep_respect
         self._on_toggle = on_toggle
         self._idle_source_label = str(idle_source_label)
 
@@ -60,6 +62,16 @@ class DimSyncPanel:
             command=self._on_toggle,
         )
         self.chk_dim_sync.pack(anchor="w", pady=(0, 8))
+
+        self.chk_controller_sleep = ttk.Checkbutton(
+            parent,
+            text=(
+                "Let the controller's own sleep timeout turn the keyboard off (~10 min without typing; wakes on input)"
+            ),
+            variable=self.var_controller_sleep_respect,
+            command=self._on_toggle,
+        )
+        self.chk_controller_sleep.pack(anchor="w", pady=(0, 8))
 
         dim_mode = ttk.Frame(parent)
         dim_mode.pack(fill="x")

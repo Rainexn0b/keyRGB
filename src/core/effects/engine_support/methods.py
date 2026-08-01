@@ -63,6 +63,7 @@ def prime_per_key_frame_method(self) -> bool:
         per_key_colors=self.per_key_colors,
         current_color=self.current_color,
         brightness=int(self.brightness),
+        reassert_user_mode=bool(self._device_mode_off),
     )
 
 

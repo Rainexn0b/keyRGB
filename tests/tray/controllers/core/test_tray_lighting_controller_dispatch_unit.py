@@ -553,7 +553,10 @@ class TestStartCurrentEffect:
         mock_tray.engine.kb.set_brightness.assert_called_once_with(35)
         assert mock_tray.is_off is False
 
-    def test_reactive_blank_recovery_restores_hidden_rows_without_user_mode_or_restart(self):
+    def test_reactive_blank_recovery_restores_hidden_rows_without_user_mode_or_restart(self, monkeypatch):
+        # Opt out of the default-on recovery user-mode save so this test stays
+        # scoped to the hidden-row restore contract (covered separately).
+        monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "0")
         from src.tray.controllers import _lighting_mode_apply as helpers
         from src.tray.protocols import set_idle_power_state_field
 

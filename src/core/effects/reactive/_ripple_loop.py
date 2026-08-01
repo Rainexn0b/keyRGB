@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: single reactive ripple render loop; size is the frame pipeline and pulse scheduling, not mixed ownership
 import logging
 import time
 from collections.abc import Callable, Mapping, Sequence

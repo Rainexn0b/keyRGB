@@ -32,6 +32,21 @@ _recover_recent_power_source_blank_best_effort = _recovery._recover_recent_power
 _recover_stable_zero_brightness_best_effort = _recovery._recover_stable_zero_brightness_best_effort
 _refresh_ui_without_icon_animation = _recovery._refresh_ui_without_icon_animation
 _reset_stable_zero_recovery_attempt_count = _recovery.reset_stable_zero_recovery_attempt_count
+_set_pending_zero_confirm_at = _recovery.set_pending_zero_confirm_at
+_controller_sleep_off_active = _recovery.controller_sleep_off_active
+_controller_sleep_respect_enabled = _recovery.controller_sleep_respect_enabled
+_set_controller_sleep_off = _recovery.set_controller_sleep_off
+
+
+def _is_controller_sleep_state(tray: IdlePowerTrayProtocol, *, current_brightness: int, current_off: bool) -> bool:
+    """Classify a polled state via the backend-declared sleep-state policy."""
+
+    from src.core.backends.sleep_state import is_controller_sleep_state
+
+    kb = getattr(getattr(tray, "engine", None), "kb", None)
+    return is_controller_sleep_state(kb, brightness=int(current_brightness), is_off=bool(current_off))
+
+
 _run_recoverable_hardware_poll_boundary = _recovery._run_recoverable_hardware_poll_boundary
 
 # Compatibility facade for the pre-extraction recovery import and monkeypatch
@@ -61,6 +76,7 @@ def _reactive_pulse_mix_or_zero(tray: IdlePowerTrayProtocol) -> float:
     except _REACTIVE_PULSE_MIX_READ_ERRORS:
         return 0.0
 
+
 # ---------------------------------------------------------------------------
 # Polled-state application (brightness / off transitions)
 # ---------------------------------------------------------------------------
@@ -87,12 +103,25 @@ def _apply_polled_hardware_state(
 
     current_brightness = _normalize_brightness_to_config_scale(current_brightness)
 
+    # Controller native sleep honored as an off state: polls keep reading 0
+    # while the deck is deliberately dark; stay quiet until input, a power
+    # restore, or a manual turn-on clears the flag.  A non-zero read means the
+    # firmware woke itself (e.g. its first-keypress ramp) — adopt and resume
+    # normal handling.
+    if _controller_sleep_off_active(tray):
+        if current_brightness > 0:
+            _set_controller_sleep_off(tray, False)
+            tray.is_off = False
+        else:
+            return 0, True
+
     # A non-zero hardware read means the ITE transient-0 window has cleared
     # (see device.py:get_brightness docstring).  Reset the stable-zero
     # recovery circuit-breaker counter so the next genuine stuck-zero gets a
     # fresh quota of recovery attempts.
     if current_brightness > 0:
         _reset_stable_zero_recovery_attempt_count(tray)
+        _set_pending_zero_confirm_at(tray, 0.0)
 
     # Temp-dim is a "screen dimmed" brightness policy, not an off-state. Some
     # backends can briefly report 0 / off while dim-sync brightness is being
@@ -138,6 +167,12 @@ def _apply_polled_hardware_state(
             if _recover_recent_power_source_blank_best_effort(tray, current_brightness=current_brightness):
                 return current_brightness, False
             if zero_brightness_without_off_state:
+                # Fresh zero transition (likely ITE controller sleep): arm a
+                # fast confirmation poll so the stable-zero recovery fires in
+                # ~0.25 s instead of after a full 2 s poll cycle.  Skip when a
+                # forced-off state intentionally wants the deck dark.
+                if not (user_forced_off or power_forced_off or idle_forced_off):
+                    _set_pending_zero_confirm_at(tray, time.monotonic())
                 return current_brightness, False
             tray.is_off = True
         else:
@@ -175,13 +210,30 @@ def _apply_polled_hardware_state(
         _refresh_ui_without_icon_animation(tray)
         return current_brightness, current_off
 
-    if (
-        current_brightness == 0
-        and last_brightness == 0
-        and not bool(current_off)
-        and _recover_stable_zero_brightness_best_effort(tray, current_brightness=current_brightness)
+    if last_brightness == 0 and _is_controller_sleep_state(
+        tray,
+        current_brightness=current_brightness,
+        current_off=current_off,
     ):
-        return current_brightness, False
+        # The confirmation poll ran (fast or normal cadence); stop fast-polling
+        # and let the recovery circuit breaker's cooldown govern any retries.
+        _set_pending_zero_confirm_at(tray, 0.0)
+        if (
+            _controller_sleep_respect_enabled(tray)
+            and not (user_forced_off or power_forced_off or idle_forced_off)
+            and _configured_brightness_intent(tray) > 0
+        ):
+            # Opt-in: honor the controller's native keyboard-input sleep as a
+            # valid off state instead of force re-lighting it.  The idle
+            # runtime restores on the next input edge; power restore and menu
+            # turn-on clear the flag through their normal paths.
+            _set_controller_sleep_off(tray, True, now=time.monotonic())
+            tray.is_off = True
+            _log_polled_hardware_event(tray, "controller_sleep_off")
+            _refresh_ui_without_icon_animation(tray)
+            return current_brightness, True
+        if _recover_stable_zero_brightness_best_effort(tray, current_brightness=current_brightness):
+            return current_brightness, False
 
     return current_brightness, current_off
 

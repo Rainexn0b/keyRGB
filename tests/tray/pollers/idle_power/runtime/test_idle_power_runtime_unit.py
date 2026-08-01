@@ -363,3 +363,69 @@ def test_run_idle_power_iteration_falls_back_to_brightness_when_input_idle_missi
     )
 
     assert captured["dimmed"] is True
+
+
+def _make_controller_sleep_tray(*, sleep_at: float = 100.0):
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
+        config=SimpleNamespace(brightness=25),
+        engine=SimpleNamespace(),
+        is_off=True,
+        controller_sleep_off=True,
+        controller_sleep_off_at=sleep_at,
+        _controller_sleep_off=True,
+        _controller_sleep_off_at=sleep_at,
+    )
+    return tray
+
+
+def test_controller_sleep_restore_on_new_evdev_input_edge(monkeypatch) -> None:
+    tray = _make_controller_sleep_tray(sleep_at=100.0)
+    loop_state = _runtime.IdlePollLoopState()
+    loop_state.input_idle_tracker = SimpleNamespace(last_activity_at=105.0)
+    calls: list[object] = []
+    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+
+    _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=None)
+
+    assert calls == [tray]
+
+
+def test_controller_sleep_restore_skipped_without_new_input(monkeypatch) -> None:
+    tray = _make_controller_sleep_tray(sleep_at=100.0)
+    loop_state = _runtime.IdlePollLoopState()
+    loop_state.input_idle_tracker = SimpleNamespace(last_activity_at=95.0)
+    calls: list[object] = []
+    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+
+    _maybe = _runtime._maybe_restore_from_controller_sleep
+    _maybe(tray, loop_state=loop_state, session_idle=False)
+
+    assert calls == []
+
+
+def test_controller_sleep_restore_on_wayland_resume_edge(monkeypatch) -> None:
+    tray = _make_controller_sleep_tray(sleep_at=100.0)
+    loop_state = _runtime.IdlePollLoopState()
+    loop_state.prev_session_idle = True
+    calls: list[object] = []
+    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+
+    _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=False)
+
+    assert calls == [tray]
+
+
+def test_controller_sleep_restore_noop_without_flag(monkeypatch) -> None:
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(config=SimpleNamespace(brightness=25), engine=SimpleNamespace(), is_off=False)
+    loop_state = _runtime.IdlePollLoopState()
+    loop_state.input_idle_tracker = SimpleNamespace(last_activity_at=999.0)
+    calls: list[object] = []
+    monkeypatch.setattr(_runtime, "restore_from_idle", lambda t: calls.append(t))
+
+    _runtime._maybe_restore_from_controller_sleep(tray, loop_state=loop_state, session_idle=False)
+
+    assert calls == []

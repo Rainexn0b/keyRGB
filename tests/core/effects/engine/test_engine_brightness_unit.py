@@ -123,6 +123,16 @@ def test_fade_brightness_propagates_unexpected_failures() -> None:
         )
 
 
+def test_turn_off_marks_device_mode_off_for_next_start() -> None:
+    engine = _TestEngine()
+    engine._device_mode_off = False
+
+    engine.turn_off()
+
+    assert engine.kb.turn_off_calls == 1
+    assert engine._device_mode_off is True
+
+
 def test_turn_off_logs_traceback_when_cache_write_fails_but_still_turns_off(caplog) -> None:
     engine = _TestEngine()
     engine._fail_cache_write = True

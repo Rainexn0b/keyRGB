@@ -43,6 +43,37 @@ def test_prime_per_key_frame_writes_rows_then_brightness_without_user_mode() -> 
     ]
 
 
+def test_prime_per_key_frame_reasserts_user_mode_after_explicit_turn_off() -> None:
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.calls: list[tuple[str, int | bool]] = []
+
+        def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
+            assert len(color_map) == NUM_ROWS * NUM_COLS
+            self.calls.append(("set_key_colors", bool(enable_user_mode)))
+
+        def set_brightness(self, brightness: int):
+            self.calls.append(("set_brightness", int(brightness)))
+
+    engine = EffectsEngine()
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.brightness = 10
+    engine.current_color = (0, 255, 255)
+    engine.per_key_colors = {(0, 0): (0, 255, 255)}
+    # Simulate an explicit engine.turn_off(): the controller is in its off
+    # effect mode, so row/brightness writes alone cannot re-light the deck.
+    engine._device_mode_off = True
+
+    assert engine._prime_per_key_frame() is True
+    assert spy.calls == [
+        ("set_key_colors", True),
+        ("set_brightness", 10),
+    ]
+
+
 def test_perkey_fade_passes_brightness_kwarg() -> None:
     class SpyKeyboard(NullKeyboard):
         def __init__(self):

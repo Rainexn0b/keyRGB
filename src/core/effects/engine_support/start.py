@@ -66,6 +66,7 @@ class _EngineStart:
     reactive_use_manual_color: bool
     direction: str | None
     _last_hw_mode_brightness: int | None
+    _device_mode_off: bool
     _last_rendered_brightness: int | None
     _thread_generation: int
     stop: Callable[[], None]
@@ -192,6 +193,9 @@ class _EngineStart:
                     self._fade_in_per_key(duration_s=0.06)
                     self._last_hw_mode_brightness = int(self.brightness)
                     self._last_rendered_brightness = int(self.brightness)
+                # Prime (with reassert) and the fade-in fallback both send a
+                # mode command when the device was explicitly turned off.
+                self._device_mode_off = False
             else:
                 self._fade_uniform_color(
                     from_color=prev_color,
@@ -200,11 +204,14 @@ class _EngineStart:
                     duration_s=0.06,
                 )
                 self._last_rendered_brightness = int(self.brightness)
+                # set_color re-enables user mode on the controller.
+                self._device_mode_off = False
         elif self.per_key_colors and hasattr(self.kb, "set_key_colors"):
             from src.core.effects.perkey_animation import enable_user_mode_once
 
             enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=0)
             self._last_hw_mode_brightness = 0
+            self._device_mode_off = False
 
         try:
             self._thread_generation = _thread_generation_or_default(self, default=0) + 1
@@ -259,6 +266,8 @@ class _EngineStart:
             logger.warning("Hardware effect not supported by backend: %s", effect_name)
             with self.kb_lock:
                 self.kb.set_color(tuple(self.current_color), brightness=int(self.brightness))
+            # set_color re-enables user mode on the controller.
+            self._device_mode_off = False
             return
 
         backend_colors = cast(dict[str, int], self.get_backend_colors())
@@ -277,6 +286,9 @@ class _EngineStart:
 
         with self.kb_lock:
             self.kb.set_effect(effect_data)
+        # Programming a hardware effect takes the controller out of its
+        # explicit off mode.
+        self._device_mode_off = False
 
     _get_interval = _get_interval_method
     _clamped_interval = _clamped_interval_method

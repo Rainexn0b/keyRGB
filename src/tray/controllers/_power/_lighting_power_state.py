@@ -37,6 +37,16 @@ def _set_power_forced_off(tray: LightingTrayProtocol, value: bool) -> None:
     set_idle_power_state_field(tray, attr_name="_power_forced_off", state_name="power_forced_off", value=value)
 
 
+def _set_controller_sleep_off(tray: LightingTrayProtocol, value: bool) -> None:
+    """Set controller_sleep_off state via idle power state bridge."""
+    set_idle_power_state_field(
+        tray,
+        attr_name="_controller_sleep_off",
+        state_name="controller_sleep_off",
+        value=value,
+    )
+
+
 def _set_last_resume_at(tray: LightingTrayProtocol, value: float) -> None:
     """Set last_resume_at timestamp via idle power state bridge."""
     set_idle_power_state_field(tray, attr_name="_last_resume_at", state_name="last_resume_at", value=value)
@@ -71,6 +81,7 @@ def turn_on_impl(
     try_log_event(tray, "menu", "turn_on")
     _set_user_forced_off(tray, False)
     _set_idle_forced_off(tray, False)
+    _set_controller_sleep_off(tray, False)
     tray.is_off = False
 
     if tray.config.brightness == 0:
@@ -134,6 +145,8 @@ def power_restore_impl(
 
     if policy_state.should_log_power_restore:
         try_log_event(tray, "power", "restore")
+
+    _set_controller_sleep_off(tray, False)
 
     if not policy_state.should_restore:
         tray.is_off = True

@@ -73,6 +73,7 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
         var_debounce_enter=_FakeVar(6),
         var_debounce_exit=_FakeVar(10),
         var_idle_fade_duration=_FakeVar(0.6),
+        var_controller_sleep_respect=_FakeVar(False),
         on_toggle=lambda: toggle_calls.append("toggle"),
     )
 
@@ -204,6 +205,7 @@ def test_init_uses_idle_source_label_when_provided(monkeypatch) -> None:
         var_debounce_enter=_FakeVar(1),
         var_debounce_exit=_FakeVar(1),
         var_idle_fade_duration=_FakeVar(0.6),
+        var_controller_sleep_respect=_FakeVar(False),
         on_toggle=lambda: None,
         idle_source_label="Wayland compositor idle",
     )

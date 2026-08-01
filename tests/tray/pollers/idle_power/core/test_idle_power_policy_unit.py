@@ -100,6 +100,28 @@ def test_compute_idle_action_temp_dim_mode_dimmed_does_not_repeat_when_dim_temp_
     assert action is None
 
 
+def test_compute_idle_action_suppresses_level_restore_while_controller_sleep_off() -> None:
+    # Session active + is_off would normally level-trigger a restore; while the
+    # opt-in controller-sleep-off state owns the dark deck it must not fire.
+    action = compute_idle_action(
+        dimmed=False,
+        screen_off=False,
+        is_off=True,
+        idle_forced_off=False,
+        dim_temp_active=False,
+        idle_timeout_s=60.0,
+        power_management_enabled=True,
+        screen_dim_sync_enabled=True,
+        screen_dim_sync_mode="off",
+        screen_dim_temp_brightness=5,
+        brightness=25,
+        user_forced_off=False,
+        power_forced_off=False,
+        controller_sleep_off=True,
+    )
+    assert action is None
+
+
 def test_compute_idle_action_restore_brightness_when_undimmed_and_dim_temp_active() -> None:
     action = compute_idle_action(
         dimmed=False,

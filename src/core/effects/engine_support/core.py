@@ -121,6 +121,7 @@ class _EngineCore:
         self._dim_temp_active: bool = False
         self._last_rendered_brightness: int | None = None
         self._last_hw_mode_brightness: int | None = None
+        self._device_mode_off: bool = False
         self._last_reactive_per_key_frame_signature: object | None = None
         self._reactive_state = ReactiveRenderState()
 

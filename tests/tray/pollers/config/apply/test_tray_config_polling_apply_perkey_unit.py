@@ -250,7 +250,10 @@ def test_config_polling_apply_perkey_reasserts_when_backend_requires_it() -> Non
     assert kwargs["enable_user_mode"] is True
 
 
-def test_config_polling_apply_perkey_reuses_hidden_blank_without_user_mode_reassert() -> None:
+def test_config_polling_apply_perkey_reuses_hidden_blank_without_user_mode_reassert(monkeypatch) -> None:
+    # Opt out of the default-on recovery user-mode save so this test stays
+    # scoped to the hidden-blank reuse contract (covered separately).
+    monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "0")
     tray = _mk_tray_for_perkey(
         brightness=30,
         base_color=(1, 2, 3),

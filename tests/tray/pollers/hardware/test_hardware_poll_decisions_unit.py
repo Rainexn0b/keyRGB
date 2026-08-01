@@ -27,6 +27,23 @@ def test_power_source_recovery_window_and_interval() -> None:
     assert hardware_poll_interval_s(now=20.0, last_power_source_transition_at=8.0) == 2.0
 
 
+def test_pending_zero_confirm_uses_fast_interval_within_window() -> None:
+    # No pending confirmation -> normal cadence.
+    assert hardware_poll_interval_s(now=100.0, last_power_source_transition_at=0.0, pending_zero_confirm_at=0.0) == 2.0
+    # Pending confirmation inside the window -> fast confirmation poll.
+    assert (
+        hardware_poll_interval_s(now=100.2, last_power_source_transition_at=0.0, pending_zero_confirm_at=100.0) == 0.25
+    )
+    # Boundary: exactly at the window edge -> still fast.
+    assert (
+        hardware_poll_interval_s(now=101.0, last_power_source_transition_at=0.0, pending_zero_confirm_at=100.0) == 0.25
+    )
+    # Window expired -> back to normal cadence.
+    assert (
+        hardware_poll_interval_s(now=101.1, last_power_source_transition_at=0.0, pending_zero_confirm_at=100.0) == 2.0
+    )
+
+
 def test_blank_recovery_eligibility_gates() -> None:
     assert should_attempt_power_source_blank_recovery(
         now=10.0,
@@ -257,18 +274,10 @@ def test_should_defer_poll_for_reactive_pulses() -> None:
     from src.tray.pollers.hardware._decisions import should_defer_poll_for_reactive_pulses
 
     # No pulse activity -> never defer.
-    assert not should_defer_poll_for_reactive_pulses(
-        reactive_pulse_mix=0.0, now=100.0, last_real_poll_at=99.0
-    )
+    assert not should_defer_poll_for_reactive_pulses(reactive_pulse_mix=0.0, now=100.0, last_real_poll_at=99.0)
     # Pulses in flight and poll still fresh -> defer.
-    assert should_defer_poll_for_reactive_pulses(
-        reactive_pulse_mix=0.5, now=100.0, last_real_poll_at=97.0
-    )
+    assert should_defer_poll_for_reactive_pulses(reactive_pulse_mix=0.5, now=100.0, last_real_poll_at=97.0)
     # Pulses in flight but poll is overdue beyond the staleness cap -> poll anyway.
-    assert not should_defer_poll_for_reactive_pulses(
-        reactive_pulse_mix=0.5, now=106.0, last_real_poll_at=97.0
-    )
+    assert not should_defer_poll_for_reactive_pulses(reactive_pulse_mix=0.5, now=106.0, last_real_poll_at=97.0)
     # Boundary: exactly at the cap -> poll anyway (defer window expired).
-    assert not should_defer_poll_for_reactive_pulses(
-        reactive_pulse_mix=0.5, now=102.0, last_real_poll_at=97.0
-    )
+    assert not should_defer_poll_for_reactive_pulses(reactive_pulse_mix=0.5, now=102.0, last_real_poll_at=97.0)

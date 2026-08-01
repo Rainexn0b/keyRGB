@@ -53,6 +53,70 @@ def test_hardware_polling_does_not_mark_off_from_zero_brightness_without_off_sta
     assert tray.refresh_count == 0
 
 
+def test_fresh_zero_transition_arms_pending_zero_confirm() -> None:
+    tray = _DummyTray(brightness=25, is_off=False)
+
+    _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=25,
+        last_off_state=False,
+    )
+
+    assert tray.tray_idle_power_state.pending_zero_confirm_at > 0
+
+
+def test_fresh_zero_transition_with_forced_off_does_not_arm_pending_zero_confirm() -> None:
+    from tests.tray.fakes import attach_idle_power_owner, make_idle_power_owner
+
+    tray = _DummyTray(brightness=25, is_off=True)
+    attach_idle_power_owner(
+        tray,
+        make_idle_power_owner(user_forced_off=True, last_brightness=25),
+    )
+
+    _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=25,
+        last_off_state=False,
+    )
+
+    assert tray.tray_idle_power_state.pending_zero_confirm_at == 0
+
+
+def test_stable_zero_confirm_poll_clears_pending_zero_confirm() -> None:
+    tray = _DummyTray(brightness=25, is_off=False)
+    tray.tray_idle_power_state.pending_zero_confirm_at = 100.0
+
+    _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=False,
+    )
+
+    assert tray.tray_idle_power_state.pending_zero_confirm_at == 0
+
+
+def test_nonzero_read_clears_pending_zero_confirm() -> None:
+    tray = _DummyTray(brightness=25, is_off=False)
+    tray.tray_idle_power_state.pending_zero_confirm_at = 100.0
+
+    _apply_polled_hardware_state(
+        tray,
+        current_brightness=15,
+        current_off=False,
+        last_brightness=15,
+        last_off_state=False,
+    )
+
+    assert tray.tray_idle_power_state.pending_zero_confirm_at == 0
+
+
 def test_hardware_polling_marks_off_when_zero_brightness_matches_off_state() -> None:
     tray = _DummyTray(brightness=25, is_off=False)
 
@@ -282,3 +346,62 @@ def test_hardware_polling_keeps_recent_power_source_blank_in_recovery_window(mon
     assert last_off is False
     assert tray.is_off is False
     assert tray.refresh_count == 0
+
+
+def test_stable_zero_confirm_enters_controller_sleep_off_when_respected() -> None:
+    tray = _DummyTray(brightness=25, is_off=False)
+    tray.config.controller_sleep_respect = True
+
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=False,
+    )
+
+    owner = tray.tray_idle_power_state
+    assert owner.controller_sleep_off is True
+    assert owner.controller_sleep_off_at > 0
+    assert tray.is_off is True
+    assert (last_brightness, last_off) == (0, True)
+
+
+def test_controller_sleep_off_state_stays_quiet_on_zero_reads() -> None:
+    tray = _DummyTray(brightness=25, is_off=True)
+    tray.config.controller_sleep_respect = True
+    owner = tray.tray_idle_power_state
+    owner.controller_sleep_off = True
+    owner.controller_sleep_off_at = 100.0
+
+    result = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    assert result == (0, True)
+    assert owner.controller_sleep_off is True
+    assert tray.refresh_count == 0
+
+
+def test_nonzero_read_while_controller_sleep_off_clears_flag_and_adopts() -> None:
+    tray = _DummyTray(brightness=25, is_off=True)
+    tray.config.controller_sleep_respect = True
+    owner = tray.tray_idle_power_state
+    owner.controller_sleep_off = True
+    owner.controller_sleep_off_at = 100.0
+
+    last_brightness, _last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=25,
+        current_off=False,
+        last_brightness=0,
+        last_off_state=True,
+    )
+
+    assert owner.controller_sleep_off is False
+    assert tray.is_off is False
+    assert last_brightness == 25

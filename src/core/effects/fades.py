@@ -90,12 +90,18 @@ def prime_per_key_frame(
     per_key_colors: Mapping[Key, Color] | None,
     current_color: Color,
     brightness: int,
+    reassert_user_mode: bool = False,
 ) -> bool:
     """Write the final per-key frame once without a startup fade or mode command.
 
     Row data is programmed before brightness is raised.  This avoids the
     controller-visible full-deck initialization flash that otherwise appears
     when KeyRGB starts or reclaims an ITE controller after firmware sleep.
+
+    Pass ``reassert_user_mode=True`` when the controller was explicitly
+    switched out of user mode (``turn_off`` effect command): row and
+    brightness writes alone leave the deck dark until a mode command
+    re-enables user mode.
     """
 
     if not per_key_colors:
@@ -120,7 +126,7 @@ def prime_per_key_frame(
 
     try:
         with kb_lock:
-            kb.set_key_colors(full_colors, brightness=brightness_hw, enable_user_mode=False)
+            kb.set_key_colors(full_colors, brightness=brightness_hw, enable_user_mode=bool(reassert_user_mode))
             set_brightness = getattr(kb, "set_brightness", None)
             if callable(set_brightness):
                 set_brightness(brightness_hw)

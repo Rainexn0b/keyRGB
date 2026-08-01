@@ -71,6 +71,8 @@ class SettingsValues:
     battery_power_mode: str | None
 
     screen_dim_sync_enabled: bool
+    # Respect the controller's native keyboard-input sleep timeout as an off state.
+    controller_sleep_respect: bool
     # 'off' | 'temp'
     screen_dim_sync_mode: str
     # 1-50 (same brightness scale as `brightness`). Only used when mode == 'temp'.
@@ -126,6 +128,7 @@ def load_settings_values(*, config: settings_reader.SettingsSourceLike, os_autos
     ac_lighting_enabled = reader.read_bool("ac_lighting_enabled", default=True)
     battery_lighting_enabled = reader.read_bool("battery_lighting_enabled", default=True)
     screen_dim_sync_enabled = reader.read_bool("screen_dim_sync_enabled", default=True)
+    controller_sleep_respect = reader.read_bool("controller_sleep_respect", default=False)
     screen_dim_sync_mode = reader.read_normalized_str("screen_dim_sync_mode", default="off")
     screen_dim_temp_brightness = clamp_nonzero_brightness(
         reader.read_int("screen_dim_temp_brightness", default=5),
@@ -192,6 +195,7 @@ def load_settings_values(*, config: settings_reader.SettingsSourceLike, os_autos
         ac_power_mode=ac_power_mode,
         battery_power_mode=battery_power_mode,
         screen_dim_sync_enabled=screen_dim_sync_enabled,
+        controller_sleep_respect=controller_sleep_respect,
         screen_dim_sync_mode=screen_dim_sync_mode,
         screen_dim_temp_brightness=screen_dim_temp_brightness,
         idle_dim_debounce_enter_polls=idle_dim_debounce_enter_polls,
@@ -249,6 +253,7 @@ def _apply_settings_values_to_config_unbatched(
     config.battery_power_mode = normalize_optional_power_mode(values.battery_power_mode)
 
     config.screen_dim_sync_enabled = bool(values.screen_dim_sync_enabled)
+    config.controller_sleep_respect = bool(values.controller_sleep_respect)
 
     mode = str(values.screen_dim_sync_mode or "off").strip().lower()
     config.screen_dim_sync_mode = mode if mode in {"off", "temp"} else "off"

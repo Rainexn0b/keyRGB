@@ -183,6 +183,7 @@ select live controls; **Lighting Profiles** remains the persistent whole-scene e
 | `KEYRGB_TK_SCALING`                     | Float override for UI scaling (High-DPI / fractional scaling).                                                                                                                                    |
 | `KEYRGB_ITE8910_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the `ite8910` backend (mainly for diagnostics / testing).                                                                                           |
 | `KEYRGB_DEBUG_BRIGHTNESS`               | When set to `1`, emits detailed logs for brightness actions and sysfs writes (useful when investigating flashes when restoring from dim). Example: `KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb dev state` |
+| `KEYRGB_RECOVERY_USER_MODE_SAVE`        | After a hidden controller-sleep recovery, KeyRGB saves the restored scene as the controller's user mode (default on) so the firmware's first-keypress wake ramp targets the current scene instead of its stale saved reference. Set to `0` to opt out. |
 
 ### Tray effects (names)
 
@@ -275,7 +276,7 @@ Note: direct ITE backends only enable known-good, whitelisted IDs. Experimental 
 Access **Settings** via the tray menu to configure:
 
 - **Power Management**: toggle LEDs on Suspend/Resume or Lid Close/Open.
-- **Screen Dim Sync**: optionally sync keyboard brightness with desktop-driven screen dimming/brightness changes (e.g. KDE brightness slider).
+- **Screen idle/blanking sync**: optionally turn the keyboard off (or drop to a temporary brightness) when the screen idles/blanks, with an adjustable fade duration for the off/on transitions. You can also let the keyboard controller's own sleep timeout turn the backlight off (ITE firmware blanks the deck after ~10 minutes without typing; it lights again on the next input).
 - **Autostart**: enable “Start KeyRGB on login”.
 - **Backend policy**: opt in to experimental backends. Currently `ite8297`, `ite8233`, `ite8258`, `ite8291`, `ite8291-zones`, and `ite8295-zones` are experimental; the UI labels experimental paths as speculative or research-backed.
 
@@ -312,6 +313,7 @@ Most supported controllers use a fixed LED matrix (e.g., 6×21). To map this to 
 | Per-key not working                                                   | You likely need to run the Keymap Calibrator first.                                                                                                                                                                                                                                                                                 |
 | Brightness works but color does not (Kernel Driver / `kbd_backlight`) | Your sysfs LED node is likely **brightness-only** (no `multi_intensity`, `color`, or `rgb` attribute under `/sys/class/leds/*kbd_backlight*`). KeyRGB can only change color when the kernel exposes RGB attributes (common on Clevo/Tuxedo/System76). On ASUS ROG laptops, use `asusctl` / rog-control-center for Aura/RGB control. |
 | Per-key editor not available on your laptop                           | The per-key editor requires a backend that can address individual LEDs (typically the USB ITE/TongFang path). Many kernel drivers expose only uniform brightness (and sometimes uniform RGB), not per-key RGB.                                                                                                                      |
+| Keyboard backlight turns off by itself after ~10 minutes without typing | This is the ITE controller's own firmware sleep timer; host software cannot disable or re-arm it. By default KeyRGB detects the sleep and re-lights the deck automatically (a brief blink). To leave the deck dark until the next keypress instead, enable **Settings → Screen idle/blanking sync → "Let the controller's own sleep timeout turn the keyboard off"**. |
 
 ## Hardware support and contributing
 

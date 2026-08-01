@@ -31,11 +31,19 @@ def compute_idle_action(
     last_resume_at: float = 0.0,
     now: float = 0.0,
     session_idle: bool | None = None,
+    controller_sleep_off: bool = False,
 ) -> IdleAction:
     if now > 0 and last_resume_at > 0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S:
         return None
 
     if not power_management_enabled:
+        return None
+
+    if controller_sleep_off:
+        # The deck is deliberately dark (controller native sleep, opt-in).
+        # Level-triggered "session active + is_off -> restore" would undo it
+        # on the very next poll; only a new input edge restores (handled by
+        # the idle runtime).  All turn_off branches already no-op when is_off.
         return None
 
     if not screen_dim_sync_enabled:

@@ -55,6 +55,8 @@
   - Use the **calibration/remapping UI** (Visual/Keymap calibrator) and save a profile.
 - **"Flickering or effects fighting"**
   - Ensure other tools (OpenRGB, vendor daemons/TCC) are not controlling the keyboard at the same time.
+- **"Keyboard backlight turns off by itself after ~10 minutes"**
+  - This is the ITE controller's own firmware sleep timer (host software cannot disable or re-arm it). KeyRGB auto-recovers by default; **Settings → Screen idle/blanking sync** has an opt-in to leave the deck dark until the next keypress instead.
 
 ## References (link these when answering)
 

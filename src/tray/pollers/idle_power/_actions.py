@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# @quality-exception file-size-analysis: idle-power action executors (dim/off/restore fades) for one subsystem; runtime/policy already in sibling modules
 import logging
 import os
 import time
@@ -266,6 +267,18 @@ def restore_from_idle(tray: IdlePowerTrayProtocol) -> None:
 
     tray.is_off = False
     set_idle_power_state_field(tray, attr_name="_idle_forced_off", state_name="idle_forced_off", value=False)
+    set_idle_power_state_field(
+        tray,
+        attr_name="_controller_sleep_off",
+        state_name="controller_sleep_off",
+        value=False,
+    )
+    set_idle_power_state_field(
+        tray,
+        attr_name="_controller_sleep_off_at",
+        state_name="controller_sleep_off_at",
+        value=0.0,
+    )
     if hasattr(tray, "engine"):
         _set_engine_hw_brightness_cap(tray.engine, None)
 

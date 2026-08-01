@@ -42,6 +42,18 @@ class TrayIdlePowerState:
     # ``should_attempt_stable_zero_brightness_recovery`` so ITE controllers
     # that persistently report a transient 0 do not restart-spam the keyboard.
     stable_zero_recovery_attempt_count: int = 0
+    # Timestamp of a fresh polled zero-brightness transition (device not off)
+    # that still needs its stable-zero confirmation poll.  While recent, the
+    # hardware poller uses the fast interval so the confirmation — and the
+    # recovery it gates — happens in ~0.25 s instead of a full 2 s cycle,
+    # halving the visible dark time of an ITE controller sleep.
+    pending_zero_confirm_at: float = 0.0
+    # Controller-initiated sleep treated as a valid off state (opt-in via the
+    # controller_sleep_respect setting): the ITE firmware's ~10-minute
+    # keyboard-input timeout blanked the deck and KeyRGB leaves it dark until
+    # new input, a power restore, or a manual turn-on arrives.
+    controller_sleep_off: bool = False
+    controller_sleep_off_at: float = 0.0
     hardware_toggle_restore_effect: str = "none"
     hardware_toggle_restore_per_key_colors: dict[object, object] | None = None
     hardware_toggle_restore_software_target: str = "keyboard"

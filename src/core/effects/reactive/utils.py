@@ -227,7 +227,7 @@ _FRAME_WORK_EWMA_ALPHA: float = 0.05  # ~20-frame horizon
 
 def log_frame_overrun_if_slow(
     *,
-    logger: Any,
+    logger: logging.Logger,
     frame_start_s: float,
     nominal_dt_s: float,
     effect_name: str,

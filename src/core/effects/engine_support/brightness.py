@@ -46,6 +46,7 @@ class _EngineBrightness:
 
     _brightness_fade_token: int
     _brightness_fade_lock: RLock
+    _device_mode_off: bool
 
     def _advance_brightness_fade_token_unlocked(self) -> int:
         current_token = _brightness_fade_token_or_default(self, default=0)
@@ -150,6 +151,10 @@ class _EngineBrightness:
             except _INT_ATTR_ERRORS:
                 logger.exception("Failed to update engine brightness cache during turn_off")
             self.kb.turn_off()
+            # The controller is now in its explicit off mode (ite8291r3
+            # effect 0x01). Row/brightness writes alone will not re-light it;
+            # the next start must reassert user mode first.
+            self._device_mode_off = True
 
     def set_brightness(
         self,

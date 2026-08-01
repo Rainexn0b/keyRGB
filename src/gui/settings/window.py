@@ -164,6 +164,7 @@ class PowerSettingsGUI:
         self.var_battery_power_mode = tk.StringVar(value=self._power_mode_selection_value(values.battery_power_mode))
 
         self.var_dim_sync_enabled = tk.BooleanVar(value=bool(values.screen_dim_sync_enabled))
+        self.var_controller_sleep_respect = tk.BooleanVar(value=bool(values.controller_sleep_respect))
         self.var_dim_sync_mode = tk.StringVar(value=str(values.screen_dim_sync_mode or "off"))
         self.var_dim_temp_brightness = tk.DoubleVar(value=float(values.screen_dim_temp_brightness))
         self.var_debounce_enter = tk.IntVar(value=int(values.idle_dim_debounce_enter_polls))
@@ -203,6 +204,7 @@ class PowerSettingsGUI:
             var_debounce_enter=self.var_debounce_enter,
             var_debounce_exit=self.var_debounce_exit,
             var_idle_fade_duration=self.var_idle_fade_duration,
+            var_controller_sleep_respect=self.var_controller_sleep_respect,
             on_toggle=self._on_toggle,
             idle_source_label=_detect_idle_power_source(),
         )
@@ -317,6 +319,7 @@ class PowerSettingsGUI:
                 ac_power_mode=self._selected_power_mode(self.var_ac_power_mode.get()),
                 battery_power_mode=self._selected_power_mode(self.var_battery_power_mode.get()),
                 screen_dim_sync_enabled=bool(self.var_dim_sync_enabled.get()),
+                controller_sleep_respect=bool(self.var_controller_sleep_respect.get()),
                 screen_dim_sync_mode=str(self.var_dim_sync_mode.get() or "off"),
                 screen_dim_temp_brightness=int(float(self.var_dim_temp_brightness.get())),
                 idle_dim_debounce_enter_polls=int(self.var_debounce_enter.get()),
