@@ -1,6 +1,17 @@
+import runpy
+
 import pytest
 
 import src.tray.entrypoint as entry
+
+
+def test_python_module_entrypoint_delegates_to_main(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[bool] = []
+    monkeypatch.setattr(entry, "main", lambda: calls.append(True))
+
+    runpy.run_module("src.tray.__main__", run_name="__main__")
+
+    assert calls == [True]
 
 
 def test_main_runtime_capture_dispatches_before_tray_startup(monkeypatch):
