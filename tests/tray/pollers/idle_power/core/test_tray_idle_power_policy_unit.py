@@ -24,6 +24,28 @@ def test_dimmed_turns_off() -> None:
     )
 
 
+def test_controller_sleep_state_reaches_policy_without_runtime_signature_error() -> None:
+    assert (
+        _compute_idle_action(
+            dimmed=True,
+            screen_off=False,
+            idle_timeout_s=60.0,
+            is_off=True,
+            idle_forced_off=False,
+            dim_temp_active=False,
+            power_management_enabled=True,
+            screen_dim_sync_enabled=True,
+            screen_dim_sync_mode="off",
+            screen_dim_temp_brightness=5,
+            brightness=25,
+            user_forced_off=False,
+            power_forced_off=False,
+            controller_sleep_off=True,
+        )
+        is None
+    )
+
+
 def test_dimmed_temp_mode_dims() -> None:
     assert (
         _compute_idle_action(
