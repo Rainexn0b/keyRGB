@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.31.2 (2026-08-02)
+
+- Tray/Idle-Power: Carry forward the v0.31.1 Wayland timeout runtime fix that forwards controller-sleep state through the polling policy wrapper, restoring dim/off policy evaluation without the keyword-argument `TypeError`.
+- Release/CI: Cover the `python -m src.tray` entrypoint to restore the Python 3.12 tray coverage gate, reactivate branch CI and its Python 3.10–3.12 runtime matrix with the required test tooling, and require successful remote release validation before publication instead of manually publishing after a failed tag workflow.
+
 ## 0.31.1 (2026-08-02)
 
 - Core/Backends: Centralize backend selection, per-key mode, and controller-sleep policies under `src/core/backends/policies/`; all callers now import canonical leaf modules and the former internal compatibility facades were removed during the beta/0.x compatibility window.
