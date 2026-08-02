@@ -282,18 +282,12 @@ def test_read_udev_input_properties_parses_props(tmp_path, monkeypatch) -> None:
 
     real_path_cls = reactive_input.Path
 
-    class _Path(real_path_cls):  # type: ignore[misc,valid-type]
-        def is_file(self) -> bool:  # type: ignore[override]
-            if str(self).startswith("/run/udev/data/"):
-                return True
-            return super().is_file()
+    def fake_path(value):
+        if str(value).startswith("/run/udev/data/"):
+            return data_file
+        return real_path_cls(value)
 
-        def read_text(self, *args, **kwargs):  # type: ignore[override]
-            if str(self).startswith("/run/udev/data/"):
-                return data_file.read_text(encoding="utf-8")
-            return super().read_text(*args, **kwargs)
-
-    monkeypatch.setattr(reactive_input, "Path", _Path)
+    monkeypatch.setattr(reactive_input, "Path", fake_path)
     props = reactive_input._read_udev_input_properties(str(tmp_path / "event0"))
     assert props == {"ID_INPUT_KEYBOARD": "1", "ID_INPUT_MOUSE": "0"}
     assert reactive_input._udev_device_is_keyboard(str(tmp_path / "event0")) is True
