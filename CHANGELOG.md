@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.31.1 (2026-08-02)
+
+- Core/Backends: Centralize backend selection, per-key mode, and controller-sleep policies under `src/core/backends/policies/`; all callers now import canonical leaf modules and the former internal compatibility facades were removed during the beta/0.x compatibility window.
+- Tray/Idle-Power: Restore Wayland timeout dim/off actions by forwarding the controller-sleep state through the polling policy wrapper instead of raising a keyword-argument `TypeError` on every policy evaluation.
+
 ## 0.31.0 (2026-08-01)
 
 - Tray/Idle-Power: New opt-in setting **"Let the controller's own sleep timeout turn the keyboard off"** (Settings → Screen idle/blanking sync): a confirmed ITE firmware sleep (~10 min without typing) leaves the deck dark instead of force re-lighting it, and it restores with the normal fade on the next input, lid-open/resume, or manual turn-on. Off by default (previous auto-recover behavior unchanged).
