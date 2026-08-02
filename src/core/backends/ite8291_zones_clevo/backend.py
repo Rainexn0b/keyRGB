@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 def experimental_backends_enabled() -> bool:
-    from ..policy import experimental_backends_enabled as _experimental_backends_enabled
+    from ..policies.backend_selection import experimental_backends_enabled as _experimental_backends_enabled
 
     return _experimental_backends_enabled()
 
@@ -100,7 +100,7 @@ def __getattr__(name: str) -> object:
         "BackendIOError",
         "BackendPermissionError",
     }:
-        from .. import exceptions as backend_exceptions
+        import src.core.backends.exceptions as backend_exceptions
 
         return getattr(backend_exceptions, name)
 

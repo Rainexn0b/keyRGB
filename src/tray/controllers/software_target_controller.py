@@ -8,9 +8,9 @@ from src.core.effects.software_targets import (
     SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
     normalize_software_effect_target,
 )
+from src.core.secondary_device_routes import route_for_context_entry
 from src.core.secondary_device_runtime import iter_effective_secondary_routes, secondary_device_simulation_enabled
 from src.core.utils.exceptions import is_permission_denied
-from src.tray.secondary_device_routes import route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry, device_context_controls_available, device_context_entries
 
 from . import (

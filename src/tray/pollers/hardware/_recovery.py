@@ -21,8 +21,12 @@ from typing import TypeVar
 
 from src.tray.idle_power_state import (
     any_forced_off,
+    clear_idle_power_state_field,
     ensure_tray_idle_power_state,
     is_dim_temp_active,
+    read_idle_power_state_bool_field,
+    read_idle_power_state_float_field,
+    set_idle_power_state_field,
 )
 from src.tray.pollers.hardware._decisions import (
     DEFAULT_HARDWARE_POLL_INTERVAL_S,
@@ -37,13 +41,7 @@ from src.tray.pollers.hardware._decisions import (
     should_attempt_power_source_blank_recovery,
     should_attempt_stable_zero_brightness_recovery,
 )
-from src.tray.protocols import (
-    IdlePowerTrayProtocol,
-    clear_idle_power_state_field,
-    read_idle_power_state_bool_field,
-    read_idle_power_state_float_field,
-    set_idle_power_state_field,
-)
+from src.tray.protocols import IdlePowerTrayProtocol
 
 _T = TypeVar("_T")
 

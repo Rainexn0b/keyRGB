@@ -4,11 +4,11 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from src.core.backends import exceptions as _backend_errors
+import src.core.backends.base as _backend_base
+import src.core.backends.exceptions as _backend_errors
 from src.core.utils import exceptions as _exception_utils
 
-from .. import base as _backend_base
-from ..policy import experimental_backends_enabled
+from ..policies.backend_selection import experimental_backends_enabled
 from . import protocol
 
 if TYPE_CHECKING:

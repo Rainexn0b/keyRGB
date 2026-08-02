@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from src.core import secondary_lighting_state
-from src.core.backends.policy import experimental_backends_enabled
+from src.core.backends.policies.backend_selection import experimental_backends_enabled
 from src.core.secondary_device_routes import iter_secondary_routes
 from src.core.secondary_device_runtime import EffectiveSecondaryRoute, iter_effective_secondary_routes
 

@@ -5,7 +5,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 from src.core.utils.safe_attrs import safe_str_attr
-from src.tray.protocols import sync_idle_power_state_field
+from src.tray.idle_power_state import sync_idle_power_state_field
 
 if TYPE_CHECKING:
     from src.tray.protocols import IdlePowerTrayProtocol

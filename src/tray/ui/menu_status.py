@@ -279,10 +279,11 @@ def tray_lighting_mode_text(tray: object) -> str:
 def hardware_effects_menu_text(tray: object) -> str:
     """Return the hardware-effects submenu label with detected count."""
 
+    from src.core.backends.base import normalize_backend_capabilities
+
     tray_state = _menu_status_tray(tray)
-    caps = getattr(tray_state, "backend_caps", None)
-    hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
-    if not hw_effects_supported:
+    caps = normalize_backend_capabilities(getattr(tray_state, "backend_caps", None))
+    if not caps.hardware_effects:
         return "Hardware Effects"
 
     count = len(detected_backend_hw_effect_names(getattr(tray_state, "backend", None)))

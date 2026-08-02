@@ -50,7 +50,7 @@ def test_activate_perkey_profile_runtime_uses_in_place_transition_without_power_
 
 def test_activate_perkey_profile_runtime_marks_power_source_transition_and_restarts_on_decline() -> None:
     from src.core.profile.runtime_activation import activate_perkey_profile_runtime
-    from src.tray.protocols import TrayIdlePowerState
+    from src.tray.idle_power_state import TrayIdlePowerState
 
     tray = _make_tray(transition_result=False)
     tray.tray_idle_power_state = TrayIdlePowerState()
@@ -138,7 +138,7 @@ def test_activate_legacy_profile_preserves_current_secondary_scene() -> None:
 
 def test_activate_perkey_profile_runtime_skips_runtime_apply_while_power_forced_off() -> None:
     from src.core.profile.runtime_activation import activate_perkey_profile_runtime
-    from src.tray.protocols import TrayIdlePowerState
+    from src.tray.idle_power_state import TrayIdlePowerState
 
     tray = _make_tray(power_forced_off=True, transition_result=True)
     apply_profile_to_config = MagicMock()

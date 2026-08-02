@@ -6,13 +6,10 @@ from collections.abc import Mapping
 from operator import attrgetter
 from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
+from src.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from src.core.effects.device import optional_output_transaction
 from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
-from src.core.effects.perkey_animation import (
-    build_full_color_grid,
-    enable_user_mode_once,
-    per_key_mode_requires_frame_reassert,
-)
+from src.core.effects.perkey_animation import build_full_color_grid, enable_user_mode_once
 from src.core.effects.software_targets import average_color_map, render_secondary_uniform_rgb
 from src.core.effects.transitions import avoid_full_black
 from src.core.utils.exceptions import is_device_disconnected

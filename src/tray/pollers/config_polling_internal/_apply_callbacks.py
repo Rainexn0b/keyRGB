@@ -6,7 +6,8 @@ They rely on helpers.py scaffold for "how to apply safely" infrastructure.
 
 from __future__ import annotations
 
-from src.core.effects.perkey_animation import per_key_mode_requires_frame_reassert, restore_hidden_per_key_rows_once
+from src.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
+from src.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 from src.tray.idle_power_state import any_forced_off, read_forced_off_flags
 from src.tray.protocols import ConfigPollingTrayProtocol

@@ -7,11 +7,8 @@ from typing import Protocol, cast
 from src.core.effects.catalog import REACTIVE_EFFECTS, SW_EFFECTS_SET
 from src.core.effects.reactive import _reactive_restore_seed, _render_brightness_support as _reactive_support
 from src.core.utils.safe_attrs import safe_str_attr
-from src.tray.protocols import (
-    IdlePowerTrayProtocol,
-    LightingTrayProtocol,
-    set_idle_power_state_field,
-)
+from src.tray.idle_power_state import set_idle_power_state_field
+from src.tray.protocols import IdlePowerTrayProtocol, LightingTrayProtocol
 
 _LOOP_EFFECTS = frozenset(REACTIVE_EFFECTS) | frozenset(SW_EFFECTS_SET)
 

@@ -34,8 +34,8 @@ def _idle_tray(**fields: Any) -> SimpleNamespace:
 
 
 def test_ensure_idle_state_sets_defaults() -> None:
+    from src.tray.idle_power_state import TrayIdlePowerState
     from src.tray.pollers.idle_power.polling import _ensure_idle_state
-    from src.tray.protocols import TrayIdlePowerState
 
     tray = SimpleNamespace()
     _ensure_idle_state(tray)

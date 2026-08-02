@@ -3,11 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+import src.core.backends.base as base  # noqa: PLR0402 - exact leaf import; package root intentionally exports no facade
 import src.core.backends.exceptions as backend_exceptions
 import src.core.utils.exceptions as device_error_checks
 
-from .. import base, policy
 from ..ite8910_perkey import hidraw as ite8910_hidraw
+from ..policies.backend_selection import experimental_backends_enabled
 from ..shared_hidraw_probe import (
     find_matching_ite8910_style_hidraw_device,
     identifiers_for_hidraw_match,
@@ -77,7 +78,7 @@ class Ite8297Backend(base.KeyboardBackend):
 
         identifiers = identifiers_for_hidraw_match(match)
 
-        if not policy.experimental_backends_enabled():
+        if not experimental_backends_enabled():
             return base.ProbeResult(
                 available=False,
                 reason=(
@@ -100,7 +101,7 @@ class Ite8297Backend(base.KeyboardBackend):
         return base.BackendCapabilities(per_key=False, color=True, hardware_effects=False, palette=False)
 
     def get_device(self) -> base.KeyboardDevice:
-        if not policy.experimental_backends_enabled():
+        if not experimental_backends_enabled():
             raise RuntimeError(
                 "ITE 8297 is classified as experimental. Enable Experimental backends in Settings "
                 "or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 before using it."

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.backends.sleep_state import (
+from src.core.backends.policies.sleep_state import (
     SLEEP_STATE_POLICY_ZERO_BRIGHTNESS_WITHOUT_OFF,
     is_controller_sleep_state,
     sleep_state_policy,

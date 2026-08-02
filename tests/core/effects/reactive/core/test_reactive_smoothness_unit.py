@@ -252,7 +252,7 @@ def test_remaining_frame_delay_s_compensates_render_work(monkeypatch) -> None:
 def test_per_key_mode_policy_env_override(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from src.core.effects.perkey_animation import (
+    from src.core.backends.policies.per_key_mode import (
         PER_KEY_MODE_POLICY_ENV,
         per_key_mode_policy,
         per_key_mode_requires_frame_reassert,

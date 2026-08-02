@@ -16,16 +16,16 @@ from __future__ import annotations
 
 import pytest
 
+from src.tray.idle_power_state import (
+    ensure_tray_idle_power_state,
+    read_idle_power_state_float_field,
+)
 from src.tray.pollers.hardware._recovery import (
     _execute_blank_recovery,
     _power_source_blank_recovery_eligible,
     _recover_recent_power_source_blank_best_effort,
     _recover_stable_zero_brightness_best_effort,
     reset_stable_zero_recovery_attempt_count,
-)
-from src.tray.protocols import (
-    ensure_tray_idle_power_state,
-    read_idle_power_state_float_field,
 )
 from tests.tray.fakes import make_owner_backed_simple_tray
 

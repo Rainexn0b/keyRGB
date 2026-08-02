@@ -9,12 +9,12 @@ from __future__ import annotations
 
 from src.core.effects.perkey_animation import restore_hidden_per_key_rows_once
 from src.core.utils.safe_attrs import safe_int_attr
-from src.tray.protocols import (
-    LightingTrayProtocol,
+from src.tray.idle_power_state import (
     clear_idle_power_state_field,
     read_idle_power_state_optional_bool_field,
     read_idle_power_state_optional_int_field,
 )
+from src.tray.protocols import LightingTrayProtocol
 
 
 def apply_perkey_mode(

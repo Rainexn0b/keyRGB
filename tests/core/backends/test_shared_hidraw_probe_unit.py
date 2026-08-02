@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.backends import shared_hidraw_probe as probe
+import src.core.backends.shared_hidraw_probe as probe
 from src.core.backends.ite8291_perkey import hidraw as ite8291_hidraw
 
 

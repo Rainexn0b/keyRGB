@@ -6,14 +6,14 @@ from collections.abc import Callable
 
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers._power._transition_constants import idle_fade_duration_s
-from src.tray.idle_power_state import reset_dim_state_on_tray
+from src.tray.idle_power_state import reset_dim_state_on_tray, set_idle_power_state_field, sync_idle_power_state_field
 from src.tray.pollers.idle_power._transition_actions import (
     apply_dim_temp_brightness,
     apply_restore_brightness,
     read_effect_name,
     refresh_ui_best_effort,
 )
-from src.tray.protocols import IdlePowerTrayProtocol, set_idle_power_state_field, sync_idle_power_state_field
+from src.tray.protocols import IdlePowerTrayProtocol
 
 
 def _set_idle_state_field(

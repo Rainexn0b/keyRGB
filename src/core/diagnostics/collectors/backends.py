@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Any
 
-from src.core.backends.policy import (
+from src.core.backends.policies.backend_selection import (
     experimental_backends_enabled,
     experimental_evidence_for_backend,
     selection_allowed_for_backend,
@@ -15,7 +15,7 @@ from src.core.backends.policy import (
 from src.core.utils.safe_attrs import safe_int_attr
 
 from ..support import build_backend_speed_probe_plans
-from ._backends_sysfs import sysfs_led_candidates_snapshot, sysfs_mouse_candidates_snapshot
+from .sysfs_backends import sysfs_led_candidates_snapshot, sysfs_mouse_candidates_snapshot
 
 logger = logging.getLogger(__name__)
 

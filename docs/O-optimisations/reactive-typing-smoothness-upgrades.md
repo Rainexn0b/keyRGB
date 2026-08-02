@@ -184,7 +184,8 @@ more hardware evidence before changing.
 ## Lever comparison protocol + other-backends audit (2026-07-31, third pass)
 
 **New diagnostic lever (generic):** `KEYRGB_PER_KEY_MODE_POLICY=init_once` overrides
-any backend's declared per-key mode policy (`perkey_animation.per_key_mode_policy`).
+any backend's declared per-key mode policy
+(`src.core.backends.policies.per_key_mode.per_key_mode_policy`).
 For ITE8291R3 this removes the every-frame user-mode reassert (~2-4ms/frame).
 Failure mode when a device DOES need the reassert: deck freezes, reverts to a
 hardware effect, or goes dark mid-animation. Unset = backend default.

@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 
+from src.core.backends.policies.sleep_state import is_controller_sleep_state
 from src.core.effects.reactive.effects import _reactive_active_pulse_mix_or_default
 from src.core.utils.exceptions import is_device_disconnected
 from src.tray.idle_power_state import (
@@ -40,8 +41,6 @@ _set_controller_sleep_off = _recovery.set_controller_sleep_off
 
 def _is_controller_sleep_state(tray: IdlePowerTrayProtocol, *, current_brightness: int, current_off: bool) -> bool:
     """Classify a polled state via the backend-declared sleep-state policy."""
-
-    from src.core.backends.sleep_state import is_controller_sleep_state
 
     kb = getattr(getattr(tray, "engine", None), "kb", None)
     return is_controller_sleep_state(kb, brightness=int(current_brightness), is_off=bool(current_off))

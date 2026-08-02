@@ -6,8 +6,8 @@ from collections.abc import Callable, Mapping
 from typing import Protocol, TypeAlias
 
 from src.core import secondary_lighting_state
+from src.core.secondary_device_routes import route_for_context_entry
 from src.tray.idle_power_state import any_forced_off
-from src.tray.secondary_device_routes import route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry
 
 from . import _software_target_auxiliary as software_target_auxiliary, secondary_static_scene

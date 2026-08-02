@@ -349,7 +349,7 @@ def test_restore_does_not_restore_when_owner_user_forced_off_and_legacy_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     import src.tray.pollers.idle_power.polling as module
-    from src.tray.protocols import TrayIdlePowerState
+    from src.tray.idle_power_state import TrayIdlePowerState
 
     tray = SimpleNamespace(
         engine=MagicMock(),
@@ -393,7 +393,7 @@ def test_restore_does_restore_when_not_forced_off(
 
 
 def test_dim_to_temp_skips_when_owner_state_matches_and_legacy_values_are_invalid() -> None:
-    from src.tray.protocols import TrayIdlePowerState
+    from src.tray.idle_power_state import TrayIdlePowerState
 
     tray = SimpleNamespace(
         engine=MagicMock(),

@@ -10,14 +10,14 @@ from typing import cast
 from src.core.effects.reactive import _reactive_transition_atomic, _render_brightness_support as _reactive_support
 from src.core.utils.logging_utils import log_throttled
 from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
-from src.tray.idle_power_state import read_last_brightness
-from src.tray.pollers.idle_power._restore_policy import classify_idle_restore_start
-from src.tray.protocols import (
-    IdlePowerTrayProtocol,
+from src.tray.idle_power_state import (
     read_idle_power_state_bool_field,
     read_idle_power_state_optional_int_field,
+    read_last_brightness,
     set_idle_power_state_field,
 )
+from src.tray.pollers.idle_power._restore_policy import classify_idle_restore_start
+from src.tray.protocols import IdlePowerTrayProtocol
 
 logger = logging.getLogger(__name__)
 _RECOVERABLE_EFFECT_NAME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)

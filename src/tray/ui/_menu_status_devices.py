@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from src.core.secondary_device_routes import route_for_context_entry
 from src.core.secondary_device_runtime import EffectiveSecondaryRoute, iter_effective_secondary_routes
-from src.tray.secondary_device_routes import route_for_context_entry
 
 from . import (
     _device_status as _devstat,

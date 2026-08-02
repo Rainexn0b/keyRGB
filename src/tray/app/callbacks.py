@@ -10,7 +10,8 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 
 from src.core.effects.catalog import is_backend_hardware_effect, normalize_effect_name
-from src.tray.protocols import LightingTrayProtocol, ensure_tray_idle_power_state
+from src.tray.idle_power_state import ensure_tray_idle_power_state
+from src.tray.protocols import LightingTrayProtocol
 
 from ..controllers import effect_selection, lighting_controller, secondary_device_controller, software_target_controller
 from ..ui import gui_launch, menu as menu_mod

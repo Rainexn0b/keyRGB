@@ -4,11 +4,11 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from src.core.backends import exceptions as backend_exceptions
+import src.core.backends.base as base  # noqa: PLR0402 - exact leaf import; package root intentionally exports no facade
+import src.core.backends.exceptions as backend_exceptions
 from src.core.utils import exceptions as device_exception_utils
 
-from .. import base
-from ..policy import experimental_backends_enabled
+from ..policies.backend_selection import experimental_backends_enabled
 from ..shared_hidraw_probe import (
     find_matching_ite8291_style_hidraw_device,
     identifiers_for_hidraw_match,

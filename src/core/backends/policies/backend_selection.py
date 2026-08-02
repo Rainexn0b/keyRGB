@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 
-from .base import BackendStability, ExperimentalEvidence, normalize_backend_stability, normalize_experimental_evidence
+from ..base import BackendStability, ExperimentalEvidence, normalize_backend_stability, normalize_experimental_evidence
 
 _BACKEND_POLICY_CONFIG_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 

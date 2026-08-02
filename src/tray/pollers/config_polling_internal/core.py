@@ -3,11 +3,8 @@ from __future__ import annotations
 from src.core.effects.catalog import REACTIVE_EFFECTS, resolve_effect_name_for_backend
 from src.core.effects.software_targets import normalize_software_effect_target
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
-from src.tray.protocols import (
-    ConfigPollingTrayProtocol,
-    ConfigStateResolveTrayProtocol,
-    read_idle_power_state_float_field,
-)
+from src.tray.idle_power_state import read_idle_power_state_float_field
+from src.tray.protocols import ConfigPollingTrayProtocol, ConfigStateResolveTrayProtocol
 
 from . import _planning, _post_fast_path_apply
 from ._apply_callbacks import (

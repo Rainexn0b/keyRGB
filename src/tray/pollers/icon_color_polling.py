@@ -4,7 +4,7 @@ import threading
 import time
 
 from src.core.effects.catalog import resolve_effect_name_for_backend
-from src.tray.protocols import read_idle_power_state_float_field
+from src.tray.idle_power_state import read_idle_power_state_float_field
 
 from . import _lifecycle as polling_lifecycle
 

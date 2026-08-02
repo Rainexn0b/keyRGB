@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.backends.policy import (
+from src.core.backends.policies.backend_selection import (
     experimental_evidence_for_backend,
     experimental_evidence_label,
     stability_for_backend,

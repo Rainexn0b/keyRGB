@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, SupportsInt, runtime_checkable
 
-from src.tray.secondary_device_routes import SecondaryDeviceRoute
+from src.core.secondary_device_routes import SecondaryDeviceRoute
 
 
 class SafeIntAttrReader(Protocol):

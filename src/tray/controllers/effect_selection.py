@@ -13,6 +13,7 @@ import logging
 from collections.abc import Mapping
 from typing import Protocol, cast
 
+from src.core.backends.base import normalize_backend_capabilities
 from src.core.effects.catalog import (
     SW_EFFECTS_SET as SW_EFFECTS,
     is_backend_hardware_effect,
@@ -172,9 +173,9 @@ def apply_effect_selection(tray: LightingTrayProtocol, *, effect_name: str) -> N
     try:
         effect_tray = cast(_EffectSelectionTrayProtocol, tray)
 
-        caps = getattr(effect_tray, "backend_caps", None)
-        per_key_supported = bool(getattr(caps, "per_key", True)) if caps is not None else True
-        hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
+        caps = normalize_backend_capabilities(getattr(effect_tray, "backend_caps", None))
+        per_key_supported = caps.per_key
+        hw_effects_supported = caps.hardware_effects
 
         try:
             effect_name = normalize_effect_name(effect_name)

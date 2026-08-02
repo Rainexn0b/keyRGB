@@ -17,7 +17,10 @@ import src.core.diagnostics.collectors.backends as collectors_backends
 import src.core.diagnostics.io as diagnostics_io
 from src.core.config._settings_view import ConfigSettingsView
 from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
-from src.core.diagnostics.collectors._backends_sysfs import sysfs_led_candidates_snapshot
+from src.core.diagnostics.collectors.sysfs_backends import (
+    sysfs_led_candidates_snapshot,
+    sysfs_mouse_candidates_snapshot,
+)
 from src.core.diagnostics.model import Diagnostics, DiagnosticsConfigSnapshot
 from src.core.diagnostics.support import ITE8910_SPEED_PROBE_KEY
 
@@ -425,7 +428,7 @@ def test_sysfs_mouse_candidates_snapshot_records_rejection_reason(
 
     monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(leds_root))
 
-    snapshot = diagnostics_collectors._backends_sysfs.sysfs_mouse_candidates_snapshot()
+    snapshot = sysfs_mouse_candidates_snapshot()
 
     assert snapshot["candidates_count"] == 1
     assert snapshot["matched_count"] == 0

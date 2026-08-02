@@ -6,12 +6,15 @@ from collections.abc import Callable
 from typing import Protocol, cast
 
 from src.core.profile import profiles
-from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
+from src.core.secondary_device_routes import (
+    BRIGHTNESS_POLICY_INDEPENDENT,
+    SecondaryDeviceRoute,
+    route_for_context_entry,
+)
 from src.core.secondary_device_runtime import acquire_secondary_device
 from src.core.utils.exceptions import is_permission_denied
 from src.tray import secondary_device_power
 from src.tray.protocols import LightingTrayProtocol
-from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry, selected_device_context_entry
 
 from ._lighting_controller_helpers import parse_menu_int, try_log_event

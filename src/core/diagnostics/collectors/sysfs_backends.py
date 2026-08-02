@@ -5,7 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from ._collectors_backends_sysfs_support import (
+from ._sysfs_backends_support import (
     _ACCESS_ERRORS,
     _EXPECTED_RUNTIME_ERRORS,
     _append_error,
@@ -19,7 +19,7 @@ def sysfs_led_candidates_snapshot() -> dict[str, Any]:
     """Collect debug info for Tier 1 sysfs LED selection."""
 
     try:
-        from ..backends.sysfs.common import _is_candidate_led, _leds_root, _score_led_dir
+        from ...backends.sysfs.common import _is_candidate_led, _leds_root, _score_led_dir
     except _EXPECTED_RUNTIME_ERRORS as exc:
         return {"errors": [_exception_snapshot(stage="import_sysfs_common", exc=exc)]}
 
@@ -38,7 +38,7 @@ def sysfs_led_candidates_snapshot() -> dict[str, Any]:
     }
 
     try:
-        from ..backends.sysfs import privileged
+        from ...backends.sysfs import privileged
 
         helper_path = os.fspath(privileged.power_helper_path())
         helper_entry: dict[str, Any] = {
@@ -113,7 +113,7 @@ def sysfs_mouse_candidates_snapshot() -> dict[str, Any]:
     """Collect debug info for auxiliary sysfs mouse candidate selection."""
 
     try:
-        from ..backends.sysfs_mouse.common import _leds_root, inspect_led_candidate
+        from ...backends.sysfs_mouse.common import _leds_root, inspect_led_candidate
     except _EXPECTED_RUNTIME_ERRORS as exc:
         return {"errors": [_exception_snapshot(stage="import_sysfs_mouse_common", exc=exc)]}
 

@@ -10,13 +10,11 @@ from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_at
 from src.tray.idle_power_state import (
     is_dim_temp_active,
     read_forced_off_flags,
-    read_last_resume_at,
-)
-from src.tray.protocols import (
-    IdlePowerTrayProtocol,
     read_idle_power_state_bool_field,
     read_idle_power_state_float_field,
+    read_last_resume_at,
 )
+from src.tray.protocols import IdlePowerTrayProtocol
 
 from ._actions import restore_from_idle
 from ._constants import POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S

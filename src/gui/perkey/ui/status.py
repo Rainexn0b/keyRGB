@@ -9,7 +9,7 @@ from __future__ import annotations
 import tkinter as tk
 from typing import Protocol, cast
 
-from src.core.backends import (
+from src.core.backends.exceptions import (
     BackendBusyError,
     BackendDisconnectedError,
     BackendPermissionError,

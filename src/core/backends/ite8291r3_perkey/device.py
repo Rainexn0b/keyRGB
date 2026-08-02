@@ -125,7 +125,8 @@ class Ite8291r3KeyboardDevice:
     # Firmware sleep signature (hardware-validated 2026-07-31/08-01): after
     # ~605 s without physical keypresses the controller blanks the deck and
     # reports brightness 0 while is_off() stays False (user mode retained).
-    # Explicit declaration of the default policy; see backends/sleep_state.py.
+    # Explicit declaration of the default policy; see
+    # backends/policies/sleep_state.py.
     keyrgb_sleep_state_policy = "zero_brightness_without_off"
 
     def __init__(

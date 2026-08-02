@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.backends.policy import experimental_evidence_label
+from src.core.backends.policies.backend_selection import experimental_evidence_label
 
 
 def extract_unsupported_rgb_controllers_hint(backends_snapshot: dict) -> str:

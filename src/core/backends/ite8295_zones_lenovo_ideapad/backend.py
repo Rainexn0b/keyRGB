@@ -14,7 +14,7 @@ from src.core.backends.exceptions import (
 from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
 
 from ..base import BackendCapabilities, BackendStability, ExperimentalEvidence, KeyboardBackend, ProbeResult
-from ..policy import experimental_backends_enabled
+from ..policies.backend_selection import experimental_backends_enabled
 from . import protocol
 
 if TYPE_CHECKING:

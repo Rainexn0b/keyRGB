@@ -11,7 +11,7 @@ import subprocess
 import time
 from typing import TYPE_CHECKING, SupportsFloat, SupportsIndex, SupportsInt, cast
 
-from src.core.backends import BackendError, format_backend_error
+from src.core.backends.exceptions import BackendError, format_backend_error
 from src.core.utils.safe_attrs import safe_str_attr
 from src.tray.idle_power_state import ensure_tray_idle_power_state
 from src.tray.protocols import TrayIconState

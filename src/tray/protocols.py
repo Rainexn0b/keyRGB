@@ -13,27 +13,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from src.tray import _power_restore_policy, idle_power_state as _idle_power_state
-
 if TYPE_CHECKING:
     from src.core.config import Config
     from src.core.effects.engine import EffectsEngine
     from src.tray.ui.icon import IconVisual
-
-
-TrayIdlePowerState = _idle_power_state.TrayIdlePowerState
-ensure_tray_idle_power_state = _idle_power_state.ensure_tray_idle_power_state
-clear_idle_power_state_field = _idle_power_state.clear_idle_power_state_field
-read_idle_power_state_bool_field = _idle_power_state.read_idle_power_state_bool_field
-read_idle_power_state_float_field = _idle_power_state.read_idle_power_state_float_field
-read_idle_power_state_optional_bool_field = _idle_power_state.read_idle_power_state_optional_bool_field
-read_idle_power_state_optional_int_field = _idle_power_state.read_idle_power_state_optional_int_field
-set_idle_power_state_field = _idle_power_state.set_idle_power_state_field
-sync_idle_power_state_field = _idle_power_state.sync_idle_power_state_field
-LightingPowerRestoreGuardState = _power_restore_policy.LightingPowerRestoreGuardState
-LightingPowerRestorePolicyState = _power_restore_policy.LightingPowerRestorePolicyState
-read_lighting_power_restore_guard_state = _power_restore_policy.read_lighting_power_restore_guard_state
-normalize_lighting_power_restore_policy_state = _power_restore_policy.normalize_lighting_power_restore_policy_state
 
 
 # ---------------------------------------------------------------------------

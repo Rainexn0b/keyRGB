@@ -19,3 +19,5 @@ management, and support tools.
 - `11-multi-device-routing-and-targets.md` — multi-device routing and targets
 - `12-composite-profile-coordination.md` — reference architecture for logical
   routes that must commit one complete physical-controller profile
+- `13-tray-runtime-state-ownership.md` — tray runtime state ownership
+- `14-policy-ownership.md` — policy owners, canonical imports, and compatibility facades

@@ -15,12 +15,12 @@ from src.core.backends.base import (
     normalize_backend_stability,
     normalize_experimental_evidence,
 )
-from src.core.backends.policy import (
+from src.core.backends.policies.backend_selection import (
     experimental_backends_enabled,
     experimental_evidence_for_backend,
     experimental_evidence_label,
 )
-from src.core.backends.registry import BackendSpec, _probe_backend, iter_backends, select_backend
+from src.core.backends.registry import BackendSpec, _probe_backend, _spec_for_backend, iter_backends, select_backend
 
 
 @dataclass
@@ -57,6 +57,21 @@ class DummyBackend:
 class _BrokenStrValue:
     def __str__(self) -> str:
         raise AssertionError("unexpected stringification")
+
+
+def test_spec_for_backend_reads_class_metadata_without_construction() -> None:
+    class ConstructionGuardBackend:
+        name = "construction-guard"
+        priority = 42
+
+        def __init__(self) -> None:
+            raise AssertionError("backend must remain lazy")
+
+    spec = _spec_for_backend(ConstructionGuardBackend)  # type: ignore[arg-type]
+
+    assert spec.name == "construction-guard"
+    assert spec.priority == 42
+    assert spec.factory is ConstructionGuardBackend
 
 
 @pytest.mark.parametrize(

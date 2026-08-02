@@ -13,7 +13,7 @@ from ..base import (
     KeyboardDevice,
     ProbeResult,
 )
-from ..policy import experimental_backends_enabled
+from ..policies.backend_selection import experimental_backends_enabled
 from . import protocol
 
 if TYPE_CHECKING:

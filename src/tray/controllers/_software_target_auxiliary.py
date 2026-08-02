@@ -9,8 +9,8 @@ from src.core.effects.software_targets import (
     SOFTWARE_EFFECT_TARGET_KEYBOARD,
     normalize_software_effect_target,
 )
+from src.core.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.core.secondary_device_runtime import acquire_secondary_device
-from src.tray.secondary_device_routes import SecondaryDeviceRoute, route_for_context_entry
 from src.tray.ui.menu_status import DeviceContextEntry
 
 _TrayT = TypeVar("_TrayT")

@@ -41,6 +41,33 @@ class BackendCapabilities:
     palette: bool
 
 
+DEFAULT_BACKEND_CAPABILITIES = BackendCapabilities(
+    per_key=True,
+    color=True,
+    hardware_effects=True,
+    palette=True,
+)
+
+
+def normalize_backend_capabilities(
+    value: object | None,
+    *,
+    default: BackendCapabilities = DEFAULT_BACKEND_CAPABILITIES,
+) -> BackendCapabilities:
+    """Return one typed capability snapshot with compatibility-safe defaults."""
+
+    if isinstance(value, BackendCapabilities):
+        return value
+    if value is None:
+        return default
+    return BackendCapabilities(
+        per_key=bool(getattr(value, "per_key", default.per_key)),
+        color=bool(getattr(value, "color", default.color)),
+        hardware_effects=bool(getattr(value, "hardware_effects", default.hardware_effects)),
+        palette=bool(getattr(value, "palette", default.palette)),
+    )
+
+
 class BackendStability(str, Enum):
     VALIDATED = "validated"
     EXPERIMENTAL = "experimental"

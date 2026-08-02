@@ -78,7 +78,8 @@ class TestTurnOffOn:
 
 class TestPowerTurnOffRestore:
     def test_normalize_restore_policy_short_circuits_on_user_forced_off(self):
-        from src.tray.protocols import TrayIdlePowerState, normalize_lighting_power_restore_policy_state
+        from src.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
+        from src.tray.idle_power_state import TrayIdlePowerState
 
         idle_sentinel = object()
         power_sentinel = object()
@@ -110,7 +111,7 @@ class TestPowerTurnOffRestore:
         assert tray._power_forced_off is power_sentinel
 
     def test_normalize_restore_policy_clears_forced_flags_and_restores_brightness(self):
-        from src.tray.protocols import normalize_lighting_power_restore_policy_state
+        from src.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
         from tests.tray.fakes import make_owner_backed_simple_tray
 
         tray = make_owner_backed_simple_tray(
@@ -227,7 +228,7 @@ class TestPowerTurnOffRestore:
 
     def test_power_restore_user_forced_off_short_circuits_lower_priority_flag_normalization(self):
         from src.tray.controllers._power._lighting_power_state import power_restore_impl
-        from src.tray.protocols import TrayIdlePowerState
+        from src.tray.idle_power_state import TrayIdlePowerState
 
         idle_sentinel = object()
         power_sentinel = object()
@@ -302,7 +303,7 @@ class TestPowerTurnOffRestore:
 
     def test_power_restore_falls_back_to_owner_when_legacy_flags_are_invalid(self):
         from src.tray.controllers._power._lighting_power_state import power_restore_impl
-        from src.tray.protocols import TrayIdlePowerState
+        from src.tray.idle_power_state import TrayIdlePowerState
 
         start_current_effect = MagicMock()
         tray = SimpleNamespace(

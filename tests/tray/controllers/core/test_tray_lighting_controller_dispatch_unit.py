@@ -376,7 +376,7 @@ class TestStartCurrentEffect:
 
     def test_start_current_effect_idle_restore_loop_effect_fades_with_follow_global_cap(self):
         from src.tray.controllers.lighting_controller import start_current_effect
-        from src.tray.protocols import set_idle_power_state_field
+        from src.tray.idle_power_state import set_idle_power_state_field
 
         mock_tray = MagicMock()
         set_idle_power_state_field(
@@ -558,7 +558,7 @@ class TestStartCurrentEffect:
         # scoped to the hidden-row restore contract (covered separately).
         monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "0")
         from src.tray.controllers import _lighting_mode_apply as helpers
-        from src.tray.protocols import set_idle_power_state_field
+        from src.tray.idle_power_state import set_idle_power_state_field
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 10
@@ -596,7 +596,7 @@ class TestStartCurrentEffect:
 
     def test_perkey_in_place_apply_uses_hardware_blank_hints_without_requery(self):
         from src.tray.controllers import _lighting_mode_apply as helpers
-        from src.tray.protocols import set_idle_power_state_field
+        from src.tray.idle_power_state import set_idle_power_state_field
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 35

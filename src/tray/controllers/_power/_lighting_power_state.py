@@ -3,12 +3,9 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-from src.tray.idle_power_state import read_last_brightness
-from src.tray.protocols import (
-    LightingTrayProtocol,
-    normalize_lighting_power_restore_policy_state,
-    set_idle_power_state_field,
-)
+from src.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
+from src.tray.idle_power_state import read_last_brightness, set_idle_power_state_field
+from src.tray.protocols import LightingTrayProtocol
 
 from ._transition_constants import (
     SOFT_ON_START_BRIGHTNESS,

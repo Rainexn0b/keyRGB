@@ -4,6 +4,7 @@ import logging
 from collections.abc import Callable, Mapping
 from typing import TypeVar
 
+from src.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from src.core.effects.catalog import (
     REACTIVE_EFFECTS,
     SW_EFFECTS_SET as SW_EFFECTS,
@@ -11,7 +12,6 @@ from src.core.effects.catalog import (
     resolve_effect_name_for_backend,
     strip_effect_namespace,
 )
-from src.core.effects.perkey_animation import per_key_mode_requires_frame_reassert
 from src.core.lighting_layers import resolve_render_effect
 from src.core.utils.safe_attrs import safe_int_attr, safe_str_attr
 from src.tray.protocols import LightingTrayProtocol

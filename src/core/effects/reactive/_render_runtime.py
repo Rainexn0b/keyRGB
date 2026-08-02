@@ -4,7 +4,8 @@ import logging
 from collections.abc import Callable, Mapping
 from typing import TYPE_CHECKING
 
-from src.core.effects.perkey_animation import enable_user_mode_once, per_key_mode_requires_frame_reassert
+from src.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
+from src.core.effects.perkey_animation import enable_user_mode_once
 from src.core.effects.software_targets import average_color_map as average_color_map_impl, render_secondary_uniform_rgb
 from src.core.effects.transitions import avoid_full_black
 from src.core.utils.exceptions import is_device_disconnected

@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from typing import TypeVar
 
 from .base import KeyboardBackend, ProbeResult
-from .policy import experimental_backends_enabled, selection_allowed_for_backend, stability_for_backend
+from .policies.backend_selection import (
+    experimental_backends_enabled,
+    selection_allowed_for_backend,
+    stability_for_backend,
+)
 
 logger = logging.getLogger(__name__)
 _BACKEND_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -44,6 +48,12 @@ class BackendSpec:
     factory: Callable[[], KeyboardBackend]
 
 
+def _spec_for_backend(factory: type[KeyboardBackend]) -> BackendSpec:
+    """Build a registry spec from class metadata without constructing a backend."""
+
+    return BackendSpec(name=factory.name, priority=factory.priority, factory=factory)
+
+
 def _run_recoverable_backend_boundary(
     action: Callable[[], _T],
     *,
@@ -77,61 +87,17 @@ def _default_specs() -> list[BackendSpec]:
     from .sysfs import SysfsLedsBackend
 
     return [
-        BackendSpec(
-            name=AsusctlAuraBackend().name,
-            priority=AsusctlAuraBackend().priority,
-            factory=AsusctlAuraBackend,
-        ),
-        BackendSpec(
-            name=Ite8291r3Backend().name,
-            priority=Ite8291r3Backend().priority,
-            factory=Ite8291r3Backend,
-        ),
-        BackendSpec(
-            name=Ite8291Backend().name,
-            priority=Ite8291Backend().priority,
-            factory=Ite8291Backend,
-        ),
-        BackendSpec(
-            name=Ite8258Backend().name,
-            priority=Ite8258Backend().priority,
-            factory=Ite8258Backend,
-        ),
-        BackendSpec(
-            name=Ite8258ChassisBackend().name,
-            priority=Ite8258ChassisBackend().priority,
-            factory=Ite8258ChassisBackend,
-        ),
-        BackendSpec(
-            name=Ite8295ZonesBackend().name,
-            priority=Ite8295ZonesBackend().priority,
-            factory=Ite8295ZonesBackend,
-        ),
-        BackendSpec(
-            name=Ite8291ZonesBackend().name,
-            priority=Ite8291ZonesBackend().priority,
-            factory=Ite8291ZonesBackend,
-        ),
-        BackendSpec(
-            name=Ite8233Backend().name,
-            priority=Ite8233Backend().priority,
-            factory=Ite8233Backend,
-        ),
-        BackendSpec(
-            name=Ite8910Backend().name,
-            priority=Ite8910Backend().priority,
-            factory=Ite8910Backend,
-        ),
-        BackendSpec(
-            name=Ite8297Backend().name,
-            priority=Ite8297Backend().priority,
-            factory=Ite8297Backend,
-        ),
-        BackendSpec(
-            name=SysfsLedsBackend().name,
-            priority=SysfsLedsBackend().priority,
-            factory=SysfsLedsBackend,
-        ),
+        _spec_for_backend(AsusctlAuraBackend),
+        _spec_for_backend(Ite8291r3Backend),
+        _spec_for_backend(Ite8291Backend),
+        _spec_for_backend(Ite8258Backend),
+        _spec_for_backend(Ite8258ChassisBackend),
+        _spec_for_backend(Ite8295ZonesBackend),
+        _spec_for_backend(Ite8291ZonesBackend),
+        _spec_for_backend(Ite8233Backend),
+        _spec_for_backend(Ite8910Backend),
+        _spec_for_backend(Ite8297Backend),
+        _spec_for_backend(SysfsLedsBackend),
     ]
 
 

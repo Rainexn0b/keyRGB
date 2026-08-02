@@ -7,14 +7,15 @@ from typing import Protocol, cast
 
 import src.core.effects.catalog as effects_catalog
 from src.core import secondary_lighting_state
+from src.core.backends.base import normalize_backend_capabilities
 from src.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,
     SecondaryDeviceRoute,
+    route_for_context_entry,
 )
 from src.core.secondary_device_runtime import has_available_secondary_profile_routes
 from src.tray import secondary_device_power
-from src.tray.secondary_device_routes import route_for_context_entry
 
 from . import _menu_callbacks as menu_callbacks, _menu_sections_effects as menu_effects, menu_sections, menu_status
 
@@ -110,10 +111,10 @@ def build_menu_items(
     """Build menu items list for dynamic menu updates."""
 
     tray_state = _menu_tray(tray)
-    caps = getattr(tray_state, "backend_caps", None)
-    per_key_supported = bool(getattr(caps, "per_key", True)) if caps is not None else True
-    hw_effects_supported = bool(getattr(caps, "hardware_effects", True)) if caps is not None else True
-    color_supported = bool(getattr(caps, "color", True)) if caps is not None else True
+    caps = normalize_backend_capabilities(getattr(tray_state, "backend_caps", None))
+    per_key_supported = caps.per_key
+    hw_effects_supported = caps.hardware_effects
+    color_supported = caps.color
 
     menu_status.probe_device_available(tray)
 
