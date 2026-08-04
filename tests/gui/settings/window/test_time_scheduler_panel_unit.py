@@ -111,7 +111,88 @@ def test_panel_creates_expected_widgets() -> None:
     assert len(panel._scales) == 4
 
 
-def test_apply_enabled_state_enables_when_checked() -> None:
+def test_time_commit_normalizes_valid_input_and_saves() -> None:
+    parent = _FakeFrame()
+    toggles: list[None] = []
+    var_day = _FakeVar("8:05")
+
+    panel = time_scheduler_panel.TimeSchedulerPanel(
+        parent,
+        var_enabled=_FakeVar(True),
+        var_day_start=var_day,
+        var_night_start=_FakeVar("20:00"),
+        var_day_base=_FakeVar(25.0),
+        var_day_reactive=_FakeVar(25.0),
+        var_night_base=_FakeVar(10.0),
+        var_night_reactive=_FakeVar(10.0),
+        on_toggle=lambda: toggles.append(None),
+    )
+
+    day_commit = panel.ent_day_start.bind_calls[0][1]
+    day_commit()
+
+    assert var_day.get() == "08:05"
+    assert toggles == [None]
+
+
+def test_time_commit_reverts_invalid_input_to_last_valid_value() -> None:
+    parent = _FakeFrame()
+    toggles: list[None] = []
+    var_night = _FakeVar("20:00")
+
+    panel = time_scheduler_panel.TimeSchedulerPanel(
+        parent,
+        var_enabled=_FakeVar(True),
+        var_day_start=_FakeVar("08:00"),
+        var_night_start=var_night,
+        var_day_base=_FakeVar(25.0),
+        var_day_reactive=_FakeVar(25.0),
+        var_night_base=_FakeVar(10.0),
+        var_night_reactive=_FakeVar(10.0),
+        on_toggle=lambda: toggles.append(None),
+    )
+
+    var_night.set("25:99")
+    night_commit = panel.ent_night_start.bind_calls[0][1]
+    night_commit()
+
+    assert var_night.get() == "20:00"
+    assert toggles == []
+
+
+def test_time_commit_tracks_last_valid_across_commits() -> None:
+    parent = _FakeFrame()
+    var_day = _FakeVar("08:00")
+
+    panel = time_scheduler_panel.TimeSchedulerPanel(
+        parent,
+        var_enabled=_FakeVar(True),
+        var_day_start=var_day,
+        var_night_start=_FakeVar("20:00"),
+        var_day_base=_FakeVar(25.0),
+        var_day_reactive=_FakeVar(25.0),
+        var_night_base=_FakeVar(10.0),
+        var_night_reactive=_FakeVar(10.0),
+        on_toggle=lambda: None,
+    )
+
+    day_commit = panel.ent_day_start.bind_calls[0][1]
+    var_day.set("09:30")
+    day_commit()
+    var_day.set("garbage")
+    day_commit()
+
+    assert var_day.get() == "09:30"
+
+
+def test_normalize_time_text_accepts_and_rejects_expected_shapes() -> None:
+    assert time_scheduler_panel._normalize_time_text("08:00") == "08:00"
+    assert time_scheduler_panel._normalize_time_text("8:05") == "08:05"
+    assert time_scheduler_panel._normalize_time_text(" 23:59 ") == "23:59"
+    assert time_scheduler_panel._normalize_time_text("24:00") is None
+    assert time_scheduler_panel._normalize_time_text("12:60") is None
+    assert time_scheduler_panel._normalize_time_text("noon") is None
+    assert time_scheduler_panel._normalize_time_text("") is None
     parent = _FakeFrame()
 
     panel = time_scheduler_panel.TimeSchedulerPanel(

@@ -4,7 +4,7 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
-_WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+from ._wrap_sync import bind_wraplength_sync
 
 
 class ExperimentalBackendsPanel:
@@ -29,21 +29,7 @@ class ExperimentalBackendsPanel:
             wraplength=420,
         )
         desc.pack(anchor="w", fill="x", pady=(0, 8))
-
-        def _sync_wrap(_event=None) -> None:
-            try:
-                width = int(parent.winfo_width())
-                if width <= 1:
-                    return
-                desc.configure(wraplength=max(260, width - 24))
-            except _WRAP_SYNC_ERRORS:
-                return
-
-        try:
-            parent.bind("<Configure>", _sync_wrap)
-            parent.after(0, _sync_wrap)
-        except _WRAP_SYNC_ERRORS:
-            pass
+        bind_wraplength_sync(parent, [desc])
 
         self.chk_experimental = ttk.Checkbutton(
             parent,

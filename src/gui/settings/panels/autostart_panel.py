@@ -4,6 +4,8 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from ._wrap_sync import bind_wraplength_sync
+
 
 class AutostartPanel:
     def __init__(
@@ -25,6 +27,7 @@ class AutostartPanel:
             wraplength=420,
         )
         as_desc.pack(anchor="w", fill="x", pady=(0, 6))
+        bind_wraplength_sync(parent, [as_desc])
 
         self.chk_autostart = ttk.Checkbutton(
             parent,

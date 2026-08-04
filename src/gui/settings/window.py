@@ -136,15 +136,24 @@ class PowerSettingsGUI:
 
         cols = ttk.Frame(main)
         cols.pack(fill="both", expand=True)
+        # Grid with a uniform column group keeps all three column cells exactly
+        # the same width; pack(expand=True) would preserve each column's
+        # natural (content-driven) width and only split the surplus equally.
+        for column_index in range(3):
+            cols.columnconfigure(column_index, weight=1, uniform="settings_columns")
+
+        # Split the gap evenly on both sides of every column so the column
+        # frames themselves (cell minus padding) stay equal widths.
+        half_gap = _SETTINGS_COLUMN_GAP // 2
 
         self._left = ttk.Frame(cols)
-        self._left.pack(side="left", fill="both", expand=True)
+        self._left.grid(row=0, column=0, sticky="nsew", padx=(half_gap, half_gap))
 
         self._middle = ttk.Frame(cols)
-        self._middle.pack(side="left", fill="both", expand=True, padx=(_SETTINGS_COLUMN_GAP, 0))
+        self._middle.grid(row=0, column=1, sticky="nsew", padx=(half_gap, half_gap))
 
         self._right = ttk.Frame(cols)
-        self._right.pack(side="left", fill="both", expand=True, padx=(_SETTINGS_COLUMN_GAP, 0))
+        self._right.grid(row=0, column=2, sticky="nsew", padx=(half_gap, half_gap))
 
     def _init_vars(self, values: SettingsValues) -> None:
         self.var_enabled = tk.BooleanVar(value=bool(values.power_management_enabled))
@@ -167,8 +176,10 @@ class PowerSettingsGUI:
         self.var_controller_sleep_respect = tk.BooleanVar(value=bool(values.controller_sleep_respect))
         self.var_dim_sync_mode = tk.StringVar(value=str(values.screen_dim_sync_mode or "off"))
         self.var_dim_temp_brightness = tk.DoubleVar(value=float(values.screen_dim_temp_brightness))
-        self.var_debounce_enter = tk.IntVar(value=int(values.idle_dim_debounce_enter_polls))
-        self.var_debounce_exit = tk.IntVar(value=int(values.idle_dim_debounce_exit_polls))
+        # Delays are shown to the user in seconds (0.5s steps); the config
+        # stores them as idle-poll counts (1 poll = 0.5s).
+        self.var_debounce_enter = tk.DoubleVar(value=float(values.idle_dim_debounce_enter_polls) * 0.5)
+        self.var_debounce_exit = tk.DoubleVar(value=float(values.idle_dim_debounce_exit_polls) * 0.5)
         self.var_idle_fade_duration = tk.DoubleVar(value=float(values.idle_fade_duration_s))
 
         self.var_scheduler_enabled = tk.BooleanVar(value=bool(values.time_scheduler_enabled))
@@ -266,6 +277,15 @@ class PowerSettingsGUI:
         # Bind wheel globally within this Tk app, but filter to this toplevel + pointer location.
         self.scroll.bind_mousewheel(self.root)
 
+        # Map at the default size immediately: if the first paint runs with
+        # compressed columns, the dynamic wrap sync temporarily wraps the
+        # description labels into many extra lines, which inflates the
+        # measured content height (and thus the computed window height).
+        try:
+            self.root.geometry(f"{_SETTINGS_DEFAULT_WIDTH}x{_SETTINGS_DEFAULT_HEIGHT}")
+        except _SCROLLREGION_CONFIGURE_ERRORS:
+            pass
+
         # Initial geometry is applied via _apply_geometry after a short delay
         # to ensure it overrides any window manager restoration/defaults.
 
@@ -277,8 +297,12 @@ class PowerSettingsGUI:
 
         self.scroll.finalize_initial_scrollbar_state()
 
-        # Defer geometry application to ensure it overrides any WM defaults
+        # Defer geometry application to ensure it overrides any WM defaults.
         self.root.after(50, self._apply_geometry)
+        # Second pass after async content (wrap syncs, version check, footer
+        # hardware hint) settles, trimming any transient height over-estimate
+        # so the window hugs the actual column content.
+        self.root.after(350, self._apply_geometry)
 
     def _apply_geometry(self) -> None:
         self.root.update_idletasks()
@@ -322,8 +346,8 @@ class PowerSettingsGUI:
                 controller_sleep_respect=bool(self.var_controller_sleep_respect.get()),
                 screen_dim_sync_mode=str(self.var_dim_sync_mode.get() or "off"),
                 screen_dim_temp_brightness=int(float(self.var_dim_temp_brightness.get())),
-                idle_dim_debounce_enter_polls=int(self.var_debounce_enter.get()),
-                idle_dim_debounce_exit_polls=int(self.var_debounce_exit.get()),
+                idle_dim_debounce_enter_polls=self._delay_seconds_to_polls(self.var_debounce_enter.get()),
+                idle_dim_debounce_exit_polls=self._delay_seconds_to_polls(self.var_debounce_exit.get()),
                 idle_fade_duration_s=round(float(self.var_idle_fade_duration.get()), 1),
                 time_scheduler_enabled=bool(self.var_scheduler_enabled.get()),
                 day_start_time=str(self.var_day_start.get() or "08:00"),
@@ -366,6 +390,13 @@ class PowerSettingsGUI:
 
     def run(self) -> None:
         self.root.mainloop()
+
+    @staticmethod
+    def _delay_seconds_to_polls(seconds: float | str) -> int:
+        """Convert a UI delay in seconds to idle-poll counts (1 poll = 0.5s)."""
+
+        polls = round(float(seconds) * 2)
+        return max(1, min(60, polls))
 
     @staticmethod
     def _power_mode_selection_value(power_mode: str | None) -> str:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import tkinter as tk
 import webbrowser
@@ -10,9 +11,11 @@ from pathlib import Path
 from tkinter import ttk
 from urllib.request import Request, urlopen
 
-from src.core.runtime.imports import repo_root_from
+from src.core.runtime.imports import launch_module_subprocess, repo_root_from
 from src.core.utils.version_check import compare_versions, normalize_version_text
 from src.gui.utils.tk_async import run_in_thread
+
+from ._wrap_sync import bind_wraplength_sync
 
 _METADATA_VERSION_LOOKUP_ERRORS = (metadata.PackageNotFoundError,)
 _REPO_ROOT_ERRORS = (OSError, RuntimeError)
@@ -22,6 +25,7 @@ _BROWSER_OPEN_ERRORS = (webbrowser.Error, OSError)
 _STATUS_LABEL_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 _CLIPBOARD_ERRORS = (AttributeError, RuntimeError, tk.TclError)
 _WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_SUPPORT_LAUNCH_ERRORS = (AssertionError, OSError, RuntimeError)
 
 
 class VersionPanel:
@@ -51,23 +55,6 @@ class VersionPanel:
         desc.pack(anchor="w", fill="x", pady=(0, 8))
         self._wrap_labels.append(desc)
 
-        def _sync_wrap(_event=None) -> None:
-            try:
-                width = int(parent.winfo_width())
-                if width <= 1:
-                    return
-                wrap = max(260, width - 24)
-                for label in self._wrap_labels:
-                    label.configure(wraplength=wrap)
-            except _WRAP_SYNC_ERRORS:
-                return
-
-        try:
-            parent.bind("<Configure>", _sync_wrap)
-            parent.after(0, _sync_wrap)
-        except _WRAP_SYNC_ERRORS:
-            pass
-
         grid = ttk.Frame(parent)
         grid.pack(fill="x", pady=(0, 8))
         try:
@@ -90,12 +77,16 @@ class VersionPanel:
         self.lbl_update_status = ttk.Label(parent, text="", font=("Sans", 9), justify="left", wraplength=400)
         self.lbl_update_status.pack(anchor="w", fill="x", pady=(0, 8))
         self._wrap_labels.append(self.lbl_update_status)
+        bind_wraplength_sync(parent, self._wrap_labels)
 
         btn_row = ttk.Frame(parent)
         btn_row.pack(fill="x", pady=(0, 0))
 
         self.btn_open_repo = ttk.Button(btn_row, text="Open repo", command=self._open_repo)
         self.btn_open_repo.pack(side="left")
+
+        self.btn_support_tools = ttk.Button(btn_row, text="Support Tools…", command=self._open_support_tools)
+        self.btn_support_tools.pack(side="left", padx=(8, 0))
 
         self._installed_version = self._installed_version_text()
         self.lbl_installed_version.configure(text=self._installed_version)
@@ -280,4 +271,24 @@ class VersionPanel:
                 status.configure(text="Couldn't open browser (URL copied)")
 
         if status is not None:
+            self._root.after(2000, lambda: status.configure(text=""))
+
+    def _open_support_tools(self) -> None:
+        """Launch the Support Tools window (diagnostics) as a subprocess."""
+
+        try:
+            env = dict(os.environ)
+            env["KEYRGB_SUPPORT_FOCUS"] = "debug"
+            launch_module_subprocess("src.gui.windows.support", anchor=__file__, env=env)
+            ok = True
+        except _SUPPORT_LAUNCH_ERRORS:
+            ok = False
+
+        try:
+            status = self._get_status_label()
+        except _STATUS_LABEL_ERRORS:
+            status = None
+
+        if status is not None:
+            status.configure(text="Opened Support Tools" if ok else "Couldn't open Support Tools")
             self._root.after(2000, lambda: status.configure(text=""))

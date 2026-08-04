@@ -4,6 +4,8 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from ._wrap_sync import bind_wraplength_sync
+
 _LABEL_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
 _LABEL_WIDGET_ERRORS = (RuntimeError, tk.TclError)
 
@@ -35,6 +37,7 @@ class PowerSourcePanel:
             wraplength=400,
         )
         ps_desc.pack(anchor="w", fill="x", pady=(0, 8))
+        bind_wraplength_sync(parent, [ps_desc])
 
         # AC row
         ac_row = ttk.Frame(parent)

@@ -4,6 +4,8 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from ._wrap_sync import bind_wraplength_sync
+
 _LABEL_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
 _LABEL_WIDGET_ERRORS = (RuntimeError, tk.TclError)
 
@@ -16,8 +18,8 @@ class DimSyncPanel:
         var_dim_sync_enabled: tk.BooleanVar,
         var_dim_sync_mode: tk.StringVar,
         var_dim_temp_brightness: tk.DoubleVar,
-        var_debounce_enter: tk.IntVar,
-        var_debounce_exit: tk.IntVar,
+        var_debounce_enter: tk.DoubleVar,
+        var_debounce_exit: tk.DoubleVar,
         var_idle_fade_duration: tk.DoubleVar,
         var_controller_sleep_respect: tk.BooleanVar,
         on_toggle: Callable[[], None],
@@ -47,6 +49,7 @@ class DimSyncPanel:
             wraplength=400,
         )
         dim_desc.pack(anchor="w", fill="x", pady=(0, 8))
+        bind_wraplength_sync(parent, [dim_desc])
 
         self.lbl_idle_source = ttk.Label(
             parent,
@@ -65,13 +68,21 @@ class DimSyncPanel:
 
         self.chk_controller_sleep = ttk.Checkbutton(
             parent,
-            text=(
-                "Let the controller's own sleep timeout turn the keyboard off (~10 min without typing; wakes on input)"
-            ),
+            text="Let the controller's own sleep timeout turn the keyboard off",
             variable=self.var_controller_sleep_respect,
             command=self._on_toggle,
         )
-        self.chk_controller_sleep.pack(anchor="w", pady=(0, 8))
+        self.chk_controller_sleep.pack(anchor="w")
+
+        controller_sleep_desc = ttk.Label(
+            parent,
+            text="The controller sleeps after ~10 min without typing and wakes on input.",
+            font=("Sans", 8),
+            justify="left",
+            wraplength=400,
+        )
+        controller_sleep_desc.pack(anchor="w", fill="x", padx=(24, 0), pady=(0, 8))
+        bind_wraplength_sync(parent, [controller_sleep_desc], margin=48)
 
         dim_mode = ttk.Frame(parent)
         dim_mode.pack(fill="x")
@@ -120,7 +131,7 @@ class DimSyncPanel:
         debounce_frame.pack(fill="x", pady=(10, 0))
         debounce_desc = ttk.Label(
             debounce_frame,
-            text="Delay before reacting to screen idle/blanking (polls x 0.5s each).",
+            text="Delay before reacting to screen idle/blanking, in seconds.",
             font=("Sans", 8),
         )
         debounce_desc.pack(anchor="w", pady=(0, 4))
@@ -131,8 +142,10 @@ class DimSyncPanel:
         ttk.Label(enter_row, text="Turn-off delay").grid(row=0, column=0, sticky="w")
         self.spn_enter = ttk.Spinbox(
             enter_row,
-            from_=1,
-            to=60,
+            from_=0.5,
+            to=30.0,
+            increment=0.5,
+            format="%.1f",
             textvariable=self.var_debounce_enter,
             width=5,
             command=self._on_toggle,
@@ -146,8 +159,10 @@ class DimSyncPanel:
         ttk.Label(exit_row, text="Restore delay").grid(row=0, column=0, sticky="w")
         self.spn_exit = ttk.Spinbox(
             exit_row,
-            from_=1,
-            to=60,
+            from_=0.5,
+            to=30.0,
+            increment=0.5,
+            format="%.1f",
             textvariable=self.var_debounce_exit,
             width=5,
             command=self._on_toggle,

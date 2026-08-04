@@ -29,6 +29,8 @@ class _FakeWidget:
         self.parent = parent
         self.kwargs = kwargs
         self.pack_calls: list[dict[str, object]] = []
+        self.grid_calls: list[dict[str, object]] = []
+        self.columnconfigure_calls: list[dict[str, object]] = []
         self.configure_calls: list[dict[str, object]] = []
         self.bbox_calls: list[object] = []
         self.reqheight = 320
@@ -36,6 +38,12 @@ class _FakeWidget:
 
     def pack(self, **kwargs) -> None:
         self.pack_calls.append(dict(kwargs))
+
+    def grid(self, **kwargs) -> None:
+        self.grid_calls.append(dict(kwargs))
+
+    def columnconfigure(self, index, **kwargs) -> None:
+        self.columnconfigure_calls.append({"index": index, **kwargs})
 
     def configure(self, **kwargs) -> None:
         self.configure_calls.append(dict(kwargs))
@@ -287,9 +295,22 @@ def test_init_layout_builds_frames_bottom_bar_and_scroll(monkeypatch: pytest.Mon
     assert gui.scroll.bg_color == "#123456"
     assert gui.scroll.padding == 10
     assert labels[0].kwargs["text"] == "Settings"
-    assert gui._left.parent is frames[2]
-    assert gui._middle.parent is frames[2]
-    assert gui._right.parent is frames[2]
+    cols_frame = frames[2]
+    assert gui._left.parent is cols_frame
+    assert gui._middle.parent is cols_frame
+    assert gui._right.parent is cols_frame
+
+    # Columns must stay symmetrical: one uniform grid group with equal weights.
+    assert cols_frame.columnconfigure_calls == [
+        {"index": 0, "weight": 1, "uniform": "settings_columns"},
+        {"index": 1, "weight": 1, "uniform": "settings_columns"},
+        {"index": 2, "weight": 1, "uniform": "settings_columns"},
+    ]
+    gap = settings_window._SETTINGS_COLUMN_GAP
+    half_gap = gap // 2
+    assert gui._left.grid_calls == [{"row": 0, "column": 0, "sticky": "nsew", "padx": (half_gap, half_gap)}]
+    assert gui._middle.grid_calls == [{"row": 0, "column": 1, "sticky": "nsew", "padx": (half_gap, half_gap)}]
+    assert gui._right.grid_calls == [{"row": 0, "column": 2, "sticky": "nsew", "padx": (half_gap, half_gap)}]
 
 
 def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -331,6 +352,9 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_dim_sync_enabled.get() is True
     assert gui.var_dim_sync_mode.get() == "temp"
     assert gui.var_dim_temp_brightness.get() == 7.0
+    # UI exposes delays in seconds (0.5s steps); config stores polls.
+    assert gui.var_debounce_enter.get() == 3.0
+    assert gui.var_debounce_exit.get() == 5.0
     assert gui.var_idle_fade_duration.get() == 0.6
     assert gui.var_scheduler_enabled.get() is False
     assert gui.var_day_start.get() == "08:00"
@@ -340,9 +364,9 @@ def test_init_vars_creates_all_expected_tk_variables(monkeypatch: pytest.MonkeyP
     assert gui.var_night_base.get() == 20.0
     assert gui.var_night_reactive.get() == 50.0
     assert len(bool_vars) == 13
-    assert len(double_vars) == 8
+    assert len(double_vars) == 10
     assert len(string_vars) == 5
-    assert len(int_vars) == 2
+    assert len(int_vars) == 0
 
 
 def test_init_panels_builds_panel_stack_with_expected_arguments(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -469,12 +493,13 @@ def test_finalize_layout_applies_state_scroll_and_geometry(monkeypatch: pytest.M
     gui._finalize_layout()
 
     assert calls == ["enabled"]
+    assert gui.root.geometry_calls == ["1320x820"]
     assert gui.scroll.bind_mousewheel_calls == [(gui.root, None)]
     assert gui.scroll.canvas.configure_calls == [{"scrollregion": (1, 2, 3, 4)}]
     assert gui.scroll.canvas.bbox_calls == ["all"]
     assert gui.scroll.finalize_calls == 1
     assert gui.root.update_calls == 1
-    assert gui.root.after_calls == [(50, gui._apply_geometry)]
+    assert gui.root.after_calls == [(50, gui._apply_geometry), (350, gui._apply_geometry)]
 
 
 def test_finalize_layout_swallows_scrollregion_errors() -> None:
@@ -488,7 +513,7 @@ def test_finalize_layout_swallows_scrollregion_errors() -> None:
 
     gui._finalize_layout()
 
-    assert gui.root.after_calls == [(50, gui._apply_geometry)]
+    assert gui.root.after_calls == [(50, gui._apply_geometry), (350, gui._apply_geometry)]
 
 
 def test_apply_geometry_uses_centered_geometry_helper(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -517,7 +542,7 @@ def test_apply_geometry_uses_centered_geometry_helper(monkeypatch: pytest.Monkey
             "footer_height_px": 44,
             "chrome_padding_px": 40,
             "default_w": 1320,
-            "default_h": 860,
+            "default_h": 820,
             "screen_ratio_cap": 0.95,
         }
     ]
@@ -634,6 +659,9 @@ def test_on_toggle_saves_values_updates_state_and_schedules_status_clear(monkeyp
     assert apply_calls[0].battery_lighting_brightness == 8
     assert apply_calls[0].ac_power_mode == PowerMode.BALANCED.value
     assert apply_calls[0].battery_power_mode is None
+    # UI delays are seconds; config persists idle-poll counts (1 poll = 0.5s).
+    assert apply_calls[0].idle_dim_debounce_enter_polls == 12
+    assert apply_calls[0].idle_dim_debounce_exit_polls == 20
     assert apply_calls[0].physical_layout == "ansi"
     assert apply_calls[0].os_autostart_enabled is True
     assert enabled_calls == ["enabled"]
@@ -691,6 +719,16 @@ def test_on_toggle_recovers_os_autostart_var_when_set_fails(monkeypatch: pytest.
     assert gui.var_os_autostart.set_calls == [False]
     assert apply_calls[0].os_autostart_enabled is False
     assert gui.status.configure_calls[0] == {"text": "⚠ Save failed"}
+
+
+def test_delay_seconds_to_polls_converts_and_clamps_to_poll_range() -> None:
+    gui = settings_window.PowerSettingsGUI.__new__(settings_window.PowerSettingsGUI)
+    assert gui._delay_seconds_to_polls(3.0) == 6
+    assert gui._delay_seconds_to_polls(0.6) == 1
+    assert gui._delay_seconds_to_polls(0.0) == 1
+    assert gui._delay_seconds_to_polls(0.1) == 1
+    assert gui._delay_seconds_to_polls(30.0) == 60
+    assert gui._delay_seconds_to_polls(120.0) == 60
 
 
 def test_power_mode_selection_helpers_translate_between_labels_and_values() -> None:

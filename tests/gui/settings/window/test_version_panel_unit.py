@@ -164,6 +164,9 @@ def test_version_panel_init_wires_widgets_and_starts_check(monkeypatch: pytest.M
     assert panel.btn_open_repo.options["text"] == "Open repo"
     assert panel.btn_open_repo.options["command"].__self__ is panel
     assert panel.btn_open_repo.pack_calls == [{"side": "left"}]
+    assert panel.btn_support_tools.options["text"] == "Support Tools…"
+    assert panel.btn_support_tools.options["command"].__self__ is panel
+    assert panel.btn_support_tools.pack_calls == [{"side": "left", "padx": (8, 0)}]
 
 
 def test_installed_version_text_prefers_repo_version_and_marks_dev(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -312,6 +315,62 @@ def test_apply_latest_version_result_covers_compare_branches_and_prerelease_disp
     assert panel.lbl_latest_stable_version.options["text"] == "v1.2.3"
     assert panel.lbl_latest_prerelease_version.options["text"] == "v1.3.0rc1"
     assert panel.lbl_update_status.options["text"] == expected_status
+
+
+def test_open_support_tools_launches_support_window_subprocess(monkeypatch: pytest.MonkeyPatch) -> None:
+    launches: list[tuple[str, dict[str, object]]] = []
+    monkeypatch.setattr(
+        version_panel,
+        "launch_module_subprocess",
+        lambda module, **kwargs: launches.append((module, kwargs)),
+    )
+
+    root = _FakeRoot()
+    status = _FakeWidget(text="")
+    panel = version_panel.VersionPanel.__new__(version_panel.VersionPanel)
+    panel._root = root
+    panel._get_status_label = lambda: status
+
+    panel._open_support_tools()
+
+    assert launches[0][0] == "src.gui.windows.support"
+    assert launches[0][1]["env"]["KEYRGB_SUPPORT_FOCUS"] == "debug"
+    assert status.options["text"] == "Opened Support Tools"
+    assert root.after_calls[0][0] == 2000
+    root.after_calls[0][1]()
+    assert status.options["text"] == ""
+
+
+def test_open_support_tools_reports_launch_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        version_panel,
+        "launch_module_subprocess",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("no python")),
+    )
+
+    root = _FakeRoot()
+    status = _FakeWidget(text="")
+    panel = version_panel.VersionPanel.__new__(version_panel.VersionPanel)
+    panel._root = root
+    panel._get_status_label = lambda: status
+
+    panel._open_support_tools()
+
+    assert status.options["text"] == "Couldn't open Support Tools"
+    assert root.after_calls[0][0] == 2000
+
+
+def test_open_support_tools_tolerates_status_label_lookup_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(version_panel, "launch_module_subprocess", lambda *_args, **_kwargs: None)
+
+    root = _FakeRoot()
+    panel = version_panel.VersionPanel.__new__(version_panel.VersionPanel)
+    panel._root = root
+    panel._get_status_label = lambda: (_ for _ in ()).throw(RuntimeError("no label"))
+
+    panel._open_support_tools()
+
+    assert root.after_calls == []
 
 
 def test_open_repo_sets_status_and_clears_it_after_success(monkeypatch: pytest.MonkeyPatch) -> None:

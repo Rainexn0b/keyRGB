@@ -92,7 +92,7 @@ def prime_per_key_frame(
     brightness: int,
     reassert_user_mode: bool = False,
 ) -> bool:
-    """Write the final per-key frame once without a startup fade or mode command.
+    """Write the final per-key frame once without a startup fade.
 
     Row data is programmed before brightness is raised.  This avoids the
     controller-visible full-deck initialization flash that otherwise appears
@@ -101,7 +101,9 @@ def prime_per_key_frame(
     Pass ``reassert_user_mode=True`` when the controller was explicitly
     switched out of user mode (``turn_off`` effect command): row and
     brightness writes alone leave the deck dark until a mode command
-    re-enables user mode.
+    re-enables user mode.  A fresh process cannot know whether firmware
+    retained that off mode, so an ordinary prime verifies the resulting state
+    and re-enables user mode only when the controller is still off.
     """
 
     if not per_key_colors:
@@ -130,6 +132,11 @@ def prime_per_key_frame(
             set_brightness = getattr(kb, "set_brightness", None)
             if callable(set_brightness):
                 set_brightness(brightness_hw)
+            if not reassert_user_mode and kb.is_off():
+                enable_user_mode = getattr(kb, "enable_user_mode", None)
+                if not callable(enable_user_mode):
+                    return False
+                enable_user_mode(brightness=brightness_hw, save=False)
     except _FADE_RUNTIME_ERRORS:
         return False
     return True

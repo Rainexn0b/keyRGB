@@ -47,7 +47,7 @@ def _next_steps_for_exception(exc: Exception | None) -> str:
     """Return a short, user-facing next step hint for common failure modes."""
 
     if exc is None:
-        return "Try: open Settings → Diagnostics"
+        return "Try: open Settings → Support Tools"
 
     # BackendError hierarchy — more precise than generic PermissionError/OSError checks.
     if isinstance(exc, BackendPermissionError):
@@ -75,7 +75,7 @@ def _next_steps_for_exception(exc: Exception | None) -> str:
     if isinstance(exc, FileNotFoundError):
         return "Try: check the file/path exists"
 
-    return "Try: open Settings → Diagnostics"
+    return "Try: open Settings → Support Tools"
 
 
 def action_failed(action: str, exc: Exception | None = None, *, extra_hint: str | None = None) -> str:

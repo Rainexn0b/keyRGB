@@ -4,6 +4,8 @@ import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from ._wrap_sync import bind_wraplength_sync
+
 
 class PowerManagementPanel:
     def __init__(
@@ -30,6 +32,7 @@ class PowerManagementPanel:
             wraplength=400,
         )
         desc.pack(anchor="w", fill="x", pady=(0, 10))
+        bind_wraplength_sync(parent, [desc])
 
         self.chk_enabled = ttk.Checkbutton(
             parent,

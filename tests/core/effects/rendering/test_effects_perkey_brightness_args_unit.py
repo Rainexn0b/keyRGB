@@ -27,6 +27,9 @@ def test_prime_per_key_frame_writes_rows_then_brightness_without_user_mode() -> 
         def set_brightness(self, brightness: int):
             self.calls.append(("set_brightness", int(brightness)))
 
+        def is_off(self) -> bool:
+            return False
+
     engine = EffectsEngine()
     spy = SpyKeyboard()
     engine.kb = spy
@@ -40,6 +43,47 @@ def test_prime_per_key_frame_writes_rows_then_brightness_without_user_mode() -> 
     assert spy.calls == [
         ("set_key_colors", 10),
         ("set_brightness", 10),
+    ]
+
+
+def test_prime_per_key_frame_recovers_firmware_retained_off_mode_after_rows() -> None:
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.off = True
+            self.calls: list[tuple[str, int | bool]] = []
+
+        def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
+            assert len(color_map) == NUM_ROWS * NUM_COLS
+            self.calls.append(("set_key_colors", bool(enable_user_mode)))
+
+        def set_brightness(self, brightness: int):
+            self.calls.append(("set_brightness", int(brightness)))
+
+        def is_off(self) -> bool:
+            self.calls.append(("is_off", self.off))
+            return self.off
+
+        def enable_user_mode(self, *, brightness: int, save: bool = False):
+            self.calls.append(("enable_user_mode", int(brightness)))
+            assert save is False
+            self.off = False
+
+    engine = EffectsEngine()
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.brightness = 10
+    engine.current_color = (0, 255, 255)
+    engine.per_key_colors = {(0, 0): (0, 255, 255)}
+
+    assert engine._prime_per_key_frame() is True
+    assert spy.off is False
+    assert spy.calls == [
+        ("set_key_colors", False),
+        ("set_brightness", 10),
+        ("is_off", True),
+        ("enable_user_mode", 10),
     ]
 
 

@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.31.3 (2026-08-04)
+
+- GUI/Settings: Keep the three settings columns exactly the same width at any window size by switching the column container to a uniform grid group with evenly split gaps; the left column previously stayed wider because Tk's packer preserved its larger content-driven request (the long controller-sleep checkbox, now split into a short checkbox plus a wrapping detail label).
+- GUI/Settings: Add a **Support Tools…** button (Version section) that launches the diagnostics/support window directly from Settings, and correct the per-key editor's failure hints to point at it — they previously sent users to a "Settings → Diagnostics" entry point that did not exist.
+- GUI/Settings: Re-wrap all panel description labels to the live column width on resize via a shared helper (previously only two panels synced; the rest clipped text at narrower window widths), tighten the default window height floor to the actual content height, and re-apply the computed geometry once async content settles — the initial measure could run while compressed columns had wrapped descriptions into extra lines, leaving a transient over-tall window with dead space below the columns.
+- GUI/Settings: Show idle/blanking Turn-off and Restore delays **in seconds** (0.5 s steps) instead of internal poll counts, converting back to polls at the config boundary; persisted config format is unchanged.
+- GUI/Settings: Validate the time-of-day scheduler's Day/Night start entries on commit — valid input is normalized to zero-padded `HH:MM`, invalid input reverts to the last accepted value instead of being persisted silently.
+- Effects/Startup: Fix the deck staying dark on a fresh start after an explicit turn-off — the hidden per-key startup prime now verifies the resulting controller state and re-enables user mode when the controller is still off, instead of assuming firmware retained user mode.
+
 ## 0.31.2 (2026-08-02)
 
 - Tray/Idle-Power: Carry forward the v0.31.1 Wayland timeout runtime fix that forwards controller-sleep state through the polling policy wrapper, restoring dim/off policy evaluation without the keyword-argument `TypeError`.

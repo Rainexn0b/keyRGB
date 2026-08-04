@@ -1,11 +1,28 @@
 from __future__ import annotations
 
+import re
 import tkinter as tk
 from collections.abc import Callable
 from tkinter import ttk
 
+from ._wrap_sync import bind_wraplength_sync
+
 _LABEL_VALUE_ERRORS = (TypeError, ValueError, OverflowError)
 _LABEL_WIDGET_ERRORS = (RuntimeError, tk.TclError)
+_TIME_TEXT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+_TIME_PATTERN = re.compile(r"^(\d{1,2}):([0-5]\d)$")
+
+
+def _normalize_time_text(value: object) -> str | None:
+    """Return ``HH:MM`` (zero-padded, 24h) for valid input, else ``None``."""
+
+    match = _TIME_PATTERN.match(str(value or "").strip())
+    if not match:
+        return None
+    hours = int(match.group(1))
+    if hours > 23:
+        return None
+    return f"{hours:02d}:{int(match.group(2)):02d}"
 
 
 class TimeSchedulerPanel:
@@ -49,6 +66,7 @@ class TimeSchedulerPanel:
             wraplength=400,
         )
         desc.pack(anchor="w", fill="x", pady=(0, 8))
+        bind_wraplength_sync(parent, [desc])
 
         self.chk_enabled = ttk.Checkbutton(
             parent,
@@ -71,8 +89,9 @@ class TimeSchedulerPanel:
             width=6,
         )
         self.ent_day_start.grid(row=0, column=1, sticky="w", padx=(6, 0))
-        self.ent_day_start.bind("<Return>", lambda _e: self._on_toggle())
-        self.ent_day_start.bind("<FocusOut>", lambda _e: self._on_toggle())
+        day_commit = self._make_time_commit(self.var_day_start, fallback="08:00")
+        self.ent_day_start.bind("<Return>", day_commit)
+        self.ent_day_start.bind("<FocusOut>", day_commit)
 
         ttk.Label(schedule_frame, text="Night starts at", font=("Sans", 9)).grid(
             row=0, column=2, sticky="e", padx=(12, 6)
@@ -83,8 +102,9 @@ class TimeSchedulerPanel:
             width=6,
         )
         self.ent_night_start.grid(row=0, column=3, sticky="e")
-        self.ent_night_start.bind("<Return>", lambda _e: self._on_toggle())
-        self.ent_night_start.bind("<FocusOut>", lambda _e: self._on_toggle())
+        night_commit = self._make_time_commit(self.var_night_start, fallback="20:00")
+        self.ent_night_start.bind("<Return>", night_commit)
+        self.ent_night_start.bind("<FocusOut>", night_commit)
 
         # Day values
         day_frame = ttk.LabelFrame(parent, text="Day values", padding=(8, 5))
@@ -119,6 +139,41 @@ class TimeSchedulerPanel:
             var=self.var_night_reactive,
             row=1,
         )
+
+    def _make_time_commit(self, var: tk.StringVar, *, fallback: str) -> Callable[[object], None]:
+        """Build a commit handler that only saves valid ``HH:MM`` input.
+
+        Valid input is normalized (zero-padded) and saved via ``on_toggle``;
+        invalid input reverts to the last accepted value instead of being
+        persisted silently.
+        """
+
+        last_valid = [_normalize_time_text(self._safe_var_get(var)) or fallback]
+
+        def _commit(_event: object = None) -> None:
+            normalized = _normalize_time_text(self._safe_var_get(var))
+            if normalized is None:
+                try:
+                    var.set(last_valid[0])
+                except _TIME_TEXT_ERRORS:
+                    pass
+                return
+            last_valid[0] = normalized
+            if normalized != str(self._safe_var_get(var)):
+                try:
+                    var.set(normalized)
+                except _TIME_TEXT_ERRORS:
+                    pass
+            self._on_toggle()
+
+        return _commit
+
+    @staticmethod
+    def _safe_var_get(var: tk.StringVar) -> str:
+        try:
+            return str(var.get() or "")
+        except _TIME_TEXT_ERRORS:
+            return ""
 
     def _build_brightness_row(
         self,

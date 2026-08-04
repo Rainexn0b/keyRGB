@@ -81,6 +81,21 @@ def test_init_builds_controls_and_slider_binding(monkeypatch) -> None:
     assert labels[1].kwargs["text"].startswith("React to screen blanking or session idle")
     assert labels[2].kwargs["text"] == "Idle source: Unknown"
     assert checks[0].kwargs["text"] == "Sync keyboard lighting with screen idle/blanking"
+    # The controller-sleep label is split into a short checkbox plus a wrapping
+    # detail label so the left settings column does not end up wider than the
+    # other (uniform) columns.
+    assert checks[1].kwargs["text"] == "Let the controller's own sleep timeout turn the keyboard off"
+    assert "wraplength" not in checks[1].kwargs
+    assert labels[3].kwargs["text"].startswith("The controller sleeps after ~10 min")
+    assert labels[3].kwargs["wraplength"] == 400
+    # Delays are shown in seconds (0.5s steps), not internal poll counts.
+    assert labels[5].kwargs["text"] == "Delay before reacting to screen idle/blanking, in seconds."
+    assert spinboxes[0].kwargs["from_"] == 0.5
+    assert spinboxes[0].kwargs["to"] == 30.0
+    assert spinboxes[0].kwargs["increment"] == 0.5
+    assert spinboxes[0].kwargs["format"] == "%.1f"
+    assert spinboxes[1].kwargs["from_"] == 0.5
+    assert spinboxes[1].kwargs["to"] == 30.0
     assert radios[0].kwargs["value"] == "off"
     assert radios[1].kwargs["value"] == "temp"
     assert panel.lbl_dim_temp_val.kwargs["text"] == "17"
