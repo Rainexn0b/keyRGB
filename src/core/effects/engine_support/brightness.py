@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable
 from threading import RLock
 
-from ..device import KeyboardDeviceProtocol
+from ..device import Color, KeyboardDeviceProtocol, PerKeyColorMap
 from ..transitions import choose_steps
 
 logger = logging.getLogger("src.core.effects.engine_brightness")
@@ -43,6 +43,8 @@ class _EngineBrightness:
     brightness: int
     stop: Callable[[], None]
     _ensure_device_available: Callable[[], bool]
+    current_color: Color
+    per_key_colors: PerKeyColorMap | None
 
     _brightness_fade_token: int
     _brightness_fade_lock: RLock
@@ -136,6 +138,12 @@ class _EngineBrightness:
                 prev = 0
 
             if prev > 1:
+                # A stopped reactive/per-key effect leaves a frozen high-contrast
+                # frame on the controller (bright pulse keys + dark base keys).
+                # Fading global brightness on that uneven map dims perceptually
+                # non-uniformly and reads as flicker.  Flatten to a uniform base
+                # color at the current brightness first so the ramp is smooth.
+                self._flatten_perkey_frame_for_fade(prev)
                 self._fade_brightness(
                     start=prev,
                     end=1,
@@ -155,6 +163,28 @@ class _EngineBrightness:
             # effect 0x01). Row/brightness writes alone will not re-light it;
             # the next start must reassert user mode first.
             self._device_mode_off = True
+
+    def _flatten_perkey_frame_for_fade(self, prev: int) -> None:
+        """Write a uniform base-color frame before an off-fade (best-effort).
+
+        Only meaningful for per-key/reactive output, where a stopped effect
+        leaves a frozen non-uniform frame.  Uniform-color and hardware effects
+        already have a flat frame, so this is a cheap no-op for them.  Never
+        raises — a flatten failure just falls back to fading the frozen frame.
+        """
+
+        per_key = getattr(self, "per_key_colors", None)
+        if not per_key:
+            return
+        set_color = getattr(self.kb, "set_color", None)
+        if not callable(set_color):
+            return
+        try:
+            color = getattr(self, "current_color", None) or (255, 0, 0)
+            with self.kb_lock:
+                set_color((int(color[0]), int(color[1]), int(color[2])), brightness=int(prev))
+        except _BRIGHTNESS_FADE_RUNTIME_ERRORS:
+            logger.debug("turn_off: per-key flatten before fade failed", exc_info=True)
 
     def set_brightness(
         self,

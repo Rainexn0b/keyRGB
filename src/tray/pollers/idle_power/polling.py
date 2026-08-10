@@ -132,6 +132,8 @@ def _compute_idle_action(
     now: float = 0.0,
     session_idle: bool | None = None,
     controller_sleep_off: bool = False,
+    idle_restore_requires_keyboard: bool = False,
+    keyboard_activity_after_idle_off: bool = False,
 ) -> IdleAction:
     from .policy import compute_idle_action
 
@@ -154,6 +156,8 @@ def _compute_idle_action(
         now=now,
         session_idle=session_idle,
         controller_sleep_off=controller_sleep_off,
+        idle_restore_requires_keyboard=idle_restore_requires_keyboard,
+        keyboard_activity_after_idle_off=keyboard_activity_after_idle_off,
     )
 
 

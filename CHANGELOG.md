@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.31.4 (2026-08-10)
+
+- Tray/Idle-Power: Make the opt-in controller-sleep policy reliable during software/reactive effects: confirmed sleep stops rendering, corrects a final in-flight frame, and stays dark until a real non-modifier keypress, power restore, or manual **Turn On**. Mouse, touchpad, compositor-resume, and synthetic modifier-only events no longer wake it; screen-idle off follows the same rule while the option is enabled.
+- Tray/Idle-Power: Restore from explicit off and controller sleep without getting stuck dark: soft-on reasserts user mode at brightness 1, an off command clears the observed ITE stale latch, firmware-first-key wakes restart the stopped effect, and a post-resume guard prevents transient zero reads from undoing idle, power, or manual restores.
+- Tray/Hardware-Poll: Keep default automatic sleep recovery lightweight by healing a running effect through its render loop instead of racing it with a poller brightness write or full restart.
+- Effects/Turn-Off: Flatten frozen per-key/reactive output to its uniform base color before the off-fade for a smoother visual ramp.
+- Tray/UI: Remove the duplicate top-level **Support Tools…** item; it remains available under **Settings → Version**.
+- Runtime/Launcher: When the source virtualenv lacks PyGObject, skip its generated `keyrgb` console script and continue to an independently installed desktop runtime, preserving the native Plasma tray icon path.
+
 ## 0.31.3 (2026-08-04)
 
 - GUI/Settings: Keep the three settings columns exactly the same width at any window size by switching the column container to a uniform grid group with evenly split gaps; the left column previously stayed wider because Tk's packer preserved its larger content-driven request (the long controller-sleep checkbox, now split into a short checkbox plus a wrapping detail label).

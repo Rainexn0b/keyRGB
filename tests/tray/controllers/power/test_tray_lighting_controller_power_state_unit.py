@@ -38,6 +38,7 @@ class TestTurnOffOn:
         mock_tray = make_owner_backed_mock_tray(is_off=True, last_brightness=75)
         mock_tray.config.brightness = 0
         mock_tray.config.effect = "breathe"
+        mock_tray.tray_idle_power_state.last_resume_at = 0.0
 
         with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             turn_on(mock_tray)
@@ -47,6 +48,7 @@ class TestTurnOffOn:
         assert mock_tray.tray_idle_power_state.user_forced_off is False
         assert mock_tray.is_off is False
         assert mock_tray.config.brightness == 75
+        assert float(mock_tray.tray_idle_power_state.last_resume_at) > 0.0
         mock_start.assert_called_once_with(
             mock_tray,
             brightness_override=SOFT_ON_START_BRIGHTNESS,

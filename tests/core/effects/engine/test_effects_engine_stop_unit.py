@@ -359,6 +359,107 @@ def test_initial_perkey_sw_start_primes_single_frame_without_startup_fade(monkey
     engine.stop()
 
 
+def test_soft_on_start_after_turn_off_primes_with_user_mode_reassert(monkeypatch) -> None:
+    """Idle/menu soft-on starts at brightness=1 after turn_off must still prime.
+
+    Historically brightness==1 skipped the per-key prime and only called
+    enable_user_mode(0), so ITE boards stayed dark after screen-idle turn-off
+    until the user toggled the tray Turn Off item.
+    """
+
+    class PerKeyKeyboard(NullKeyboard):
+        def set_key_colors(self, _color_map, *, brightness: int, enable_user_mode: bool = False):
+            del brightness, enable_user_mode
+
+    engine = EffectsEngine()
+    engine.kb = PerKeyKeyboard()
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.per_key_colors = {(0, 0): (0, 255, 255)}
+    engine.brightness = 1  # SOFT_ON_START_BRIGHTNESS
+    engine._device_mode_off = True
+
+    calls: list[str] = []
+    monkeypatch.setattr(engine, "_prime_per_key_frame", lambda: calls.append("prime") or True)
+    monkeypatch.setattr(engine, "_fade_in_per_key", lambda **_kwargs: calls.append("fade"))
+
+    engine._start_sw_effect(
+        target=lambda: None,
+        prev_color=(0, 0, 0),
+        fade_to_color=(0, 255, 255),
+    )
+
+    assert calls == ["prime"]
+    assert engine._device_mode_off is False
+    assert engine._last_hw_mode_brightness == 1
+    engine.stop()
+
+
+def test_soft_on_start_after_firmware_sleep_primes_without_device_mode_off(monkeypatch) -> None:
+    """Controller-sleep restore soft-on must prime even when _device_mode_off is False.
+
+    Firmware sleep reports brightness=0 with is_off=False, so the engine never
+    saw an explicit turn_off. Soft-on at brightness=1 must still prime (and the
+    prime method reasserts user mode for soft-on).
+    """
+
+    class PerKeyKeyboard(NullKeyboard):
+        def set_key_colors(self, _color_map, *, brightness: int, enable_user_mode: bool = False):
+            del brightness, enable_user_mode
+
+    engine = EffectsEngine()
+    engine.kb = PerKeyKeyboard()
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.per_key_colors = {(0, 0): (0, 255, 255)}
+    engine.brightness = 1  # SOFT_ON_START_BRIGHTNESS
+    engine._device_mode_off = False  # firmware sleep path
+
+    calls: list[str] = []
+    monkeypatch.setattr(engine, "_prime_per_key_frame", lambda: calls.append("prime") or True)
+    monkeypatch.setattr(engine, "_fade_in_per_key", lambda **_kwargs: calls.append("fade"))
+
+    engine._start_sw_effect(
+        target=lambda: None,
+        prev_color=(0, 0, 0),
+        fade_to_color=(0, 255, 255),
+    )
+
+    assert calls == ["prime"]
+    assert engine._last_hw_mode_brightness == 1
+    engine.stop()
+
+
+def test_soft_on_uniform_start_after_turn_off_reasserts_via_fade(monkeypatch) -> None:
+    """Soft-on without a per-key map must still re-enable user mode after turn_off."""
+
+    engine = EffectsEngine()
+    engine.kb = NullKeyboard()
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.per_key_colors = None
+    engine.brightness = 1  # SOFT_ON_START_BRIGHTNESS
+    engine._device_mode_off = True
+
+    calls: list[str] = []
+    monkeypatch.setattr(
+        engine,
+        "_fade_uniform_color",
+        lambda **_kwargs: calls.append("fade_uniform"),
+    )
+
+    engine._start_sw_effect(
+        target=lambda: None,
+        prev_color=(0, 0, 0),
+        fade_to_color=(0, 255, 255),
+    )
+
+    assert calls == ["fade_uniform"]
+    assert engine._device_mode_off is False
+    assert engine._last_rendered_brightness == 1
+    engine.stop()
+
+
 def test_sw_to_sw_transition_skips_fade_in() -> None:
     """SW→SW transitions must skip _fade_in_per_key to avoid a dark-dip flicker.
 

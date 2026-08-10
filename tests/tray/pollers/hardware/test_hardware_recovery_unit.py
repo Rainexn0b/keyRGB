@@ -236,6 +236,72 @@ def test_execute_blank_recovery_returns_false_when_no_callback_handles() -> None
     assert tray.is_off is True
 
 
+def test_execute_blank_recovery_heals_via_render_loop_while_effect_running() -> None:
+    """Mid-render blank heals via render-loop re-light, not a poller write.
+
+    Invalidating the engine brightness cache lets the next reactive frame
+    re-assert user mode + brightness in-frame (imperceptible) instead of a
+    poller-side set_brightness that races the render thread (visible dip).
+    """
+
+    from threading import Lock
+    from types import SimpleNamespace
+
+    kb_write_calls: list[int] = []
+    start_calls: list[str] = []
+    events: list[str] = []
+
+    class _Kb:
+        def enable_user_mode(self, *, brightness: int, save: bool = False) -> None:
+            del save
+            kb_write_calls.append(int(brightness))
+
+        def set_brightness(self, brightness: int) -> None:
+            kb_write_calls.append(int(brightness) + 1000)
+
+    engine = SimpleNamespace(
+        running=True,
+        kb=_Kb(),
+        kb_lock=Lock(),
+        brightness=40,
+        _last_hw_mode_brightness=40,
+        _last_rendered_brightness=40,
+        _last_reactive_per_key_frame_signature=("sig",),
+    )
+    tray = _make_recovery_tray(is_off=True, config_brightness=40)
+    tray.engine = engine
+    tray._apply_power_source_perkey_profile_transition = lambda: (_ for _ in ()).throw(
+        AssertionError("should not apply transition")
+    )
+    tray._start_current_effect = lambda: start_calls.append("start") or True
+    tray._refresh_ui = lambda **_kw: None
+    tray._log_event = lambda _cat, action, **_kw: events.append(str(action))
+
+    result = _execute_blank_recovery(
+        tray,
+        current_brightness=0,
+        now=101.0,
+        recovery_stamp_attr="_last_hardware_blank_recovery_at",
+        recovery_stamp_state="last_hardware_blank_recovery_at",
+        log_action="stable_zero_brightness_recover",
+    )
+
+    assert result is True
+    # No direct poller brightness/mode write — render loop self-heals.
+    assert kb_write_calls == []
+    assert start_calls == []
+    # Mode cache set to the hardware-reported blank (0): next frame issues a
+    # plain set_brightness(target) (is_off=False ⇒ user mode retained), not a
+    # full enable_user_mode(save=True) reinit that would flash.
+    assert engine._last_hw_mode_brightness == 0
+    # Rendered-brightness baseline PRESERVED so the step-guard restores the
+    # target instantly instead of ramping 0→8→16… (the flicker regression).
+    assert engine._last_rendered_brightness == 40
+    assert engine._last_reactive_per_key_frame_signature is None
+    assert tray.is_off is False
+    assert events == ["stable_zero_brightness_recover_render_heal"]
+
+
 def test_execute_blank_recovery_does_not_treat_void_restart_as_success() -> None:
     tray = _make_recovery_tray(is_off=True)
     tray._apply_power_source_perkey_profile_transition = lambda: False

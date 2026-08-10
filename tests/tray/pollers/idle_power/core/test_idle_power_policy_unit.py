@@ -269,6 +269,56 @@ def test_compute_idle_action_allows_restore_when_session_is_active() -> None:
     assert action == "restore"
 
 
+def test_compute_idle_action_keypress_only_idle_restore_ignores_trackpad_resume() -> None:
+    action = compute_idle_action(
+        dimmed=False,
+        screen_off=False,
+        is_off=True,
+        idle_forced_off=True,
+        dim_temp_active=False,
+        idle_timeout_s=60.0,
+        power_management_enabled=True,
+        screen_dim_sync_enabled=True,
+        screen_dim_sync_mode="off",
+        screen_dim_temp_brightness=5,
+        brightness=25,
+        user_forced_off=False,
+        power_forced_off=False,
+        last_idle_turn_off_at=100.0,
+        now=240.0,
+        session_idle=False,
+        idle_restore_requires_keyboard=True,
+        keyboard_activity_after_idle_off=False,
+    )
+
+    assert action is None
+
+
+def test_compute_idle_action_keypress_only_idle_restore_allows_keyboard() -> None:
+    action = compute_idle_action(
+        dimmed=False,
+        screen_off=False,
+        is_off=True,
+        idle_forced_off=True,
+        dim_temp_active=False,
+        idle_timeout_s=60.0,
+        power_management_enabled=True,
+        screen_dim_sync_enabled=True,
+        screen_dim_sync_mode="off",
+        screen_dim_temp_brightness=5,
+        brightness=25,
+        user_forced_off=False,
+        power_forced_off=False,
+        last_idle_turn_off_at=100.0,
+        now=240.0,
+        session_idle=False,
+        idle_restore_requires_keyboard=True,
+        keyboard_activity_after_idle_off=True,
+    )
+
+    assert action == "restore"
+
+
 def test_compute_idle_action_suppresses_temp_restore_while_session_still_idle() -> None:
     action = compute_idle_action(
         dimmed=False,

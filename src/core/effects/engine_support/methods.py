@@ -57,13 +57,19 @@ def fade_in_per_key_method(self, *, duration_s: float, steps: int = 12) -> None:
 
 
 def prime_per_key_frame_method(self) -> bool:
+    # Soft-on starts at brightness 1 after idle/menu/controller-sleep restore.
+    # Firmware sleep leaves is_off=False with brightness=0, so _device_mode_off
+    # alone is not always set yet — treat soft-on as requiring user-mode
+    # reassert the same way an explicit turn_off does.
+    start_brightness = int(self.brightness)
+    reassert = bool(self._device_mode_off) or start_brightness <= 1
     return prime_per_key_frame(
         kb=self.kb,
         kb_lock=self.kb_lock,
         per_key_colors=self.per_key_colors,
         current_color=self.current_color,
-        brightness=int(self.brightness),
-        reassert_user_mode=bool(self._device_mode_off),
+        brightness=start_brightness,
+        reassert_user_mode=reassert,
     )
 
 

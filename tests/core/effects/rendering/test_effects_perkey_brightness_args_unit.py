@@ -14,6 +14,7 @@ def test_prime_per_key_frame_writes_rows_then_brightness_without_user_mode() -> 
     class SpyKeyboard(NullKeyboard):
         def __init__(self):
             self.calls: list[tuple[str, int | bool]] = []
+            self._brightness = 0
 
         def enable_user_mode(self, *, brightness: int, save: bool = False):
             del brightness, save
@@ -22,10 +23,15 @@ def test_prime_per_key_frame_writes_rows_then_brightness_without_user_mode() -> 
         def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
             assert len(color_map) == NUM_ROWS * NUM_COLS
             assert enable_user_mode is False
+            self._brightness = int(brightness)
             self.calls.append(("set_key_colors", int(brightness)))
 
         def set_brightness(self, brightness: int):
+            self._brightness = int(brightness)
             self.calls.append(("set_brightness", int(brightness)))
+
+        def get_brightness(self) -> int:
+            return int(self._brightness)
 
         def is_off(self) -> bool:
             return False
@@ -115,6 +121,41 @@ def test_prime_per_key_frame_reasserts_user_mode_after_explicit_turn_off() -> No
     assert spy.calls == [
         ("set_key_colors", True),
         ("set_brightness", 10),
+    ]
+
+
+def test_prime_per_key_frame_reasserts_user_mode_on_soft_on_brightness() -> None:
+    """Soft-on (brightness=1) must reassert even without _device_mode_off.
+
+    Controller firmware sleep never sets _device_mode_off; restore still starts
+    at SOFT_ON_START_BRIGHTNESS=1 and must send enable_user_mode=True.
+    """
+
+    class SpyKeyboard(NullKeyboard):
+        def __init__(self):
+            self.calls: list[tuple[str, int | bool]] = []
+
+        def set_key_colors(self, color_map, *, brightness: int, enable_user_mode: bool = True):
+            assert len(color_map) == NUM_ROWS * NUM_COLS
+            self.calls.append(("set_key_colors", bool(enable_user_mode), int(brightness)))
+
+        def set_brightness(self, brightness: int):
+            self.calls.append(("set_brightness", int(brightness)))
+
+    engine = EffectsEngine()
+    spy = SpyKeyboard()
+    engine.kb = spy
+    engine.device_available = True
+    engine._ensure_device_available = lambda: True  # type: ignore[assignment]
+    engine.brightness = 1
+    engine.current_color = (0, 255, 255)
+    engine.per_key_colors = {(0, 0): (0, 255, 255)}
+    engine._device_mode_off = False
+
+    assert engine._prime_per_key_frame() is True
+    assert spy.calls == [
+        ("set_key_colors", True, 1),
+        ("set_brightness", 1),
     ]
 
 

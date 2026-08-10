@@ -3,21 +3,21 @@ from __future__ import annotations
 import threading
 import time
 
-from src.core.backends.policies.sleep_state import is_controller_sleep_state
-from src.core.effects.reactive.effects import _reactive_active_pulse_mix_or_default
 from src.core.utils.exceptions import is_device_disconnected
 from src.tray.idle_power_state import (
     dim_temp_target_brightness,
     is_dim_temp_active,
     read_forced_off_flags,
+    read_last_resume_at,
 )
-from src.tray.pollers.hardware import _recovery
+from src.tray.pollers.hardware import _controller_sleep, _recovery, _runtime_support
 from src.tray.pollers.hardware._decisions import (
     REACTIVE_PULSE_POLL_DEFER_RETRY_S as _REACTIVE_PULSE_POLL_DEFER_RETRY_S,
     coerce_poll_int as _coerce_poll_int,
     normalize_brightness_to_config_scale as _normalize_brightness_to_config_scale,
     should_defer_poll_for_reactive_pulses as _should_defer_poll_for_reactive_pulses,
 )
+from src.tray.pollers.idle_power._constants import POST_RESUME_IDLE_ACTION_SUPPRESSION_S
 from src.tray.protocols import IdlePowerTrayProtocol
 
 from . import _lifecycle as polling_lifecycle
@@ -37,13 +37,12 @@ _set_pending_zero_confirm_at = _recovery.set_pending_zero_confirm_at
 _controller_sleep_off_active = _recovery.controller_sleep_off_active
 _controller_sleep_respect_enabled = _recovery.controller_sleep_respect_enabled
 _set_controller_sleep_off = _recovery.set_controller_sleep_off
-
-
-def _is_controller_sleep_state(tray: IdlePowerTrayProtocol, *, current_brightness: int, current_off: bool) -> bool:
-    """Classify a polled state via the backend-declared sleep-state policy."""
-
-    kb = getattr(getattr(tray, "engine", None), "kb", None)
-    return is_controller_sleep_state(kb, brightness=int(current_brightness), is_off=bool(current_off))
+_stop_engine_for_controller_sleep_best_effort = _controller_sleep.stop_engine_for_controller_sleep_best_effort
+_clear_post_stop_controller_sleep_write_best_effort = _controller_sleep.clear_post_stop_write_best_effort
+_restart_effect_after_controller_firmware_wake_best_effort = (
+    _controller_sleep.restart_effect_after_firmware_wake_best_effort
+)
+_reactive_pulse_mix_or_zero = _runtime_support.reactive_pulse_mix_or_zero
 
 
 _run_recoverable_hardware_poll_boundary = _recovery._run_recoverable_hardware_poll_boundary
@@ -56,25 +55,6 @@ _execute_blank_recovery = _recovery._execute_blank_recovery
 _power_source_blank_recovery_eligible = _recovery._power_source_blank_recovery_eligible
 _power_source_transition_at = _recovery._power_source_transition_at
 _resolve_tray_callback = _recovery._resolve_tray_callback
-
-_REACTIVE_PULSE_MIX_READ_ERRORS = (AttributeError, TypeError, ValueError)
-
-
-def _reactive_pulse_mix_or_zero(tray: IdlePowerTrayProtocol) -> float:
-    """Read the live reactive pulse mix without taking kb_lock.
-
-    The value is a float written by the render thread; a torn read is harmless
-    here because the deferral decision is advisory. Missing engine/state (unit
-    tests, non-reactive effects) reads as 0.0 = no deferral.
-    """
-    engine = getattr(tray, "engine", None)
-    if engine is None:
-        return 0.0
-    try:
-        return float(_reactive_active_pulse_mix_or_default(engine, default=0.0))
-    except _REACTIVE_PULSE_MIX_READ_ERRORS:
-        return 0.0
-
 
 # ---------------------------------------------------------------------------
 # Polled-state application (brightness / off transitions)
@@ -106,13 +86,27 @@ def _apply_polled_hardware_state(
     # while the deck is deliberately dark; stay quiet until input, a power
     # restore, or a manual turn-on clears the flag.  A non-zero read means the
     # firmware woke itself (e.g. its first-keypress ramp) — adopt and resume
-    # normal handling.
+    # normal handling. A corrective explicit turn-off can retain a non-zero
+    # brightness register while reporting is_off=True; that is still dark and
+    # must not clear the honored-sleep flag.
     if _controller_sleep_off_active(tray):
-        if current_brightness > 0:
+        if current_brightness > 0 and not current_off:
+            # The firmware's own first-keypress wake won the race with the
+            # idle-power evdev loop. Claim the transition before restarting so
+            # that loop will not run a second off->soft-on restore.
             _set_controller_sleep_off(tray, False)
             tray.is_off = False
+            restored = _restart_effect_after_controller_firmware_wake_best_effort(
+                tray,
+                now=time.monotonic(),
+            )
+            _log_polled_hardware_event(
+                tray,
+                "controller_sleep_firmware_wake",
+                effect_restored=bool(restored),
+            )
         else:
-            return 0, True
+            return current_brightness, True
 
     # A non-zero hardware read means the ITE transient-0 window has cleared
     # (see device.py:get_brightness docstring).  Reset the stable-zero
@@ -209,7 +203,7 @@ def _apply_polled_hardware_state(
         _refresh_ui_without_icon_animation(tray)
         return current_brightness, current_off
 
-    if last_brightness == 0 and _is_controller_sleep_state(
+    if last_brightness == 0 and _controller_sleep.classify_polled_state(
         tray,
         current_brightness=current_brightness,
         current_off=current_off,
@@ -217,17 +211,34 @@ def _apply_polled_hardware_state(
         # The confirmation poll ran (fast or normal cadence); stop fast-polling
         # and let the recovery circuit breaker's cooldown govern any retries.
         _set_pending_zero_confirm_at(tray, 0.0)
+        now = time.monotonic()
+        last_resume_at = float(read_last_resume_at(tray) or 0.0)
+        recently_restored = last_resume_at > 0.0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S
         if (
             _controller_sleep_respect_enabled(tray)
             and not (user_forced_off or power_forced_off or idle_forced_off)
             and _configured_brightness_intent(tray) > 0
+            and not recently_restored
         ):
             # Opt-in: honor the controller's native keyboard-input sleep as a
-            # valid off state instead of force re-lighting it.  The idle
-            # runtime restores on the next input edge; power restore and menu
-            # turn-on clear the flag through their normal paths.
-            _set_controller_sleep_off(tray, True, now=time.monotonic())
+            # valid off state instead of force re-lighting it. This contract
+            # applies even when a software/reactive effect was mid-render:
+            # recovering there defeats the explicit "let the controller sleep"
+            # setting and produces the visible off→on flicker it is meant to
+            # avoid.
+            # The idle runtime restores on validated keyboard activity; a
+            # firmware wake observed here is the fallback when hardware wins
+            # that race. Power restore and menu turn-on use their normal paths.
+            #
+            # Skip this stick-dark path for a short window after idle/power
+            # restore: a post-restore firmware transient zero must not undo the
+            # restore and leave the deck stuck until a manual tray toggle.
+            _set_controller_sleep_off(tray, True, now=now)
             tray.is_off = True
+            # Stop any residual effect thread and mark mode-off for the next
+            # soft-on prime (enable_user_mode reassert).
+            if _stop_engine_for_controller_sleep_best_effort(tray):
+                _clear_post_stop_controller_sleep_write_best_effort(tray)
             _log_polled_hardware_event(tray, "controller_sleep_off")
             _refresh_ui_without_icon_animation(tray)
             return current_brightness, True
@@ -235,26 +246,6 @@ def _apply_polled_hardware_state(
             return current_brightness, False
 
     return current_brightness, current_off
-
-
-def _poll_hardware_once(
-    tray: IdlePowerTrayProtocol,
-    *,
-    last_brightness,
-    last_off_state,
-) -> tuple[int, bool]:
-    with tray.engine.kb_lock:
-        current_brightness = tray.engine.kb.get_brightness()
-        current_off = tray.engine.kb.is_off()
-
-    return _apply_polled_hardware_state(
-        tray,
-        raw_brightness=int(current_brightness),
-        current_brightness=int(current_brightness),
-        current_off=bool(current_off),
-        last_brightness=last_brightness,
-        last_off_state=last_off_state,
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -318,10 +309,11 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
                 continue
 
             polled_state = _run_recoverable_hardware_poll_boundary(
-                lambda lb=last_brightness, lo=last_off_state: _poll_hardware_once(
+                lambda lb=last_brightness, lo=last_off_state: _runtime_support.poll_hardware_once(
                     tray,
                     last_brightness=lb,
                     last_off_state=lo,
+                    apply_polled_state_fn=_apply_polled_hardware_state,
                 ),
                 on_recoverable=_recover_polling_error,
             )

@@ -16,10 +16,48 @@ class _InputDeviceProtocol(Protocol):
     def read(self) -> Iterable[object]: ...
 
 
+class _InputEventProtocol(Protocol):
+    type: int
+    code: int
+    value: int
+
+
 _InputDevice: TypeAlias = _InputDeviceProtocol
 
 _RECOVERABLE_SYSFS_READ_EXCEPTIONS = (OSError, UnicodeError, ValueError, InterruptedError, BlockingIOError)
 _RECOVERABLE_DEVICE_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
+
+# Linux input-event codes. A touchpad gesture on the affected KDE/Tongfang
+# setup emits synthetic KEY_LEFTMETA through the physical AT keyboard fd, so
+# device classification alone cannot distinguish it from typing. Require an
+# actual non-modifier key-down before waking keyboard lighting.
+_EV_KEY = 0x01
+_KEY_DOWN = 0x01
+_MODIFIER_KEY_CODES = frozenset(
+    {
+        29,  # KEY_LEFTCTRL
+        42,  # KEY_LEFTSHIFT
+        54,  # KEY_RIGHTSHIFT
+        56,  # KEY_LEFTALT
+        97,  # KEY_RIGHTCTRL
+        100,  # KEY_RIGHTALT
+        125,  # KEY_LEFTMETA
+        126,  # KEY_RIGHTMETA
+    }
+)
+
+
+def _is_keyboard_wake_key_down(event: object) -> bool:
+    """Whether an evdev event is a non-modifier key-down suitable for wake."""
+
+    typed_event = cast(_InputEventProtocol, event)
+    try:
+        event_type = int(typed_event.type)
+        code = int(typed_event.code)
+        value = int(typed_event.value)
+    except (AttributeError, TypeError, ValueError, OverflowError):
+        return False
+    return event_type == _EV_KEY and value == _KEY_DOWN and code not in _MODIFIER_KEY_CODES
 
 
 def _read_udev_input_properties(device_path: str) -> dict[str, str]:
@@ -55,6 +93,12 @@ def _is_user_input_device(device_path: str) -> bool:
     )
 
 
+def _is_keyboard_input_device(device_path: str) -> bool:
+    """Return True only for physical/logical keyboard evdev devices."""
+
+    return _read_udev_input_properties(device_path).get("ID_INPUT_KEYBOARD") == "1"
+
+
 def _default_list_devices() -> Sequence[str]:
     try:
         import evdev
@@ -80,11 +124,13 @@ class InputIdleTracker:
     list_devices_fn: Callable[[], Sequence[str]] = _default_list_devices
     open_device_fn: Callable[[str], _InputDevice] = _default_open_device
     is_input_device_fn: Callable[[str], bool] = _is_user_input_device
+    is_keyboard_device_fn: Callable[[str], bool] = _is_keyboard_input_device
     select_fn: Callable[..., tuple[list, list, list]] = select.select
     refresh_interval_s: float = 30.0
 
     devices: list[_InputDevice] | None = field(default=None, init=False)
     last_activity_at: float = field(default=0.0, init=False)
+    last_keyboard_activity_at: float = field(default=0.0, init=False)
     last_refresh_at: float = field(default=0.0, init=False)
 
     def __post_init__(self) -> None:
@@ -150,11 +196,18 @@ class InputIdleTracker:
                 self.last_activity_at = float(now)
                 # Drain the event queues of ready devices so we do not re-count
                 # the same events on the next poll.
+                keyboard_wake_key_down = False
                 for dev in r:
                     try:
-                        list(dev.read())
+                        events = list(dev.read())
                     except _RECOVERABLE_DEVICE_EXCEPTIONS:
                         continue
+                    if self.is_keyboard_device_fn(str(getattr(dev, "path", ""))) and any(
+                        _is_keyboard_wake_key_down(event) for event in events
+                    ):
+                        keyboard_wake_key_down = True
+                if keyboard_wake_key_down:
+                    self.last_keyboard_activity_at = float(now)
         except _RECOVERABLE_DEVICE_EXCEPTIONS:
             self._refresh_devices()
             return None if not self.devices else self.seconds_since_activity()

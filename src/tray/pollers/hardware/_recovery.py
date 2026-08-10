@@ -270,6 +270,73 @@ def _seed_reactive_restore_damp_best_effort(tray: IdlePowerTrayProtocol) -> None
         return
 
 
+def _configured_recovery_brightness(tray: IdlePowerTrayProtocol) -> int:
+    """Brightness level to reassert during blank recovery (config intent)."""
+
+    intent = _configured_brightness_intent(tray)
+    if intent > 0:
+        return int(intent)
+    try:
+        return max(0, int(tray.engine.brightness))
+    except _BRIGHTNESS_COERCION_ERRORS:
+        return 0
+
+
+def _effect_engine_is_running(tray: IdlePowerTrayProtocol) -> bool:
+    engine = getattr(tray, "engine", None)
+    if engine is None:
+        return False
+    try:
+        return bool(getattr(engine, "running", False))
+    except _HARDWARE_POLL_RECOVERY_EXCEPTIONS:
+        return False
+
+
+def _reassert_user_mode_while_running_best_effort(tray: IdlePowerTrayProtocol) -> bool:
+    """Heal a mid-render blank via the render loop, not a poller brightness write.
+
+    A standalone poller ``set_brightness`` races the reactive render thread for
+    ``kb_lock`` (frame overruns) and shows up as a visible off→on dip.  The
+    reactive render loop already re-applies brightness every frame — but only
+    when its cached ``_last_hw_mode_brightness`` differs from the target.  After
+    a firmware transient-zero the hardware is at 0 while that cache still says
+    40, so the render loop skips the write and the deck stays dark until the
+    poller recovers it.
+
+    Clearing the per-key frame signature and setting ``_last_hw_mode_brightness``
+    to the just-read ``0`` makes the very next frame (~33 ms away for a live
+    reactive effect) call ``apply_hw_brightness`` with ``prev=0`` — a plain
+    ``set_brightness(target)``.  That is the correct minimal heal: these ITE
+    transient-zeros report ``is_off=False`` (user mode retained, only the
+    brightness byte glitched), so no mode command / ``enable_user_mode`` is
+    needed.  Using ``None`` here instead would force ``enable_user_mode_once
+    (save=True)`` — a full user-mode reinit plus a persistent firmware save that
+    visibly flashes and wears flash on every transient.  ``_last_rendered_brightness``
+    is deliberately **preserved**: it is the anti-flicker step-guard baseline,
+    and resetting it would ramp the re-light 0→8→16→… over several frames (the
+    journaled flicker) instead of jumping straight back to the target.
+    """
+
+    if not _effect_engine_is_running(tray):
+        return False
+    engine = getattr(tray, "engine", None)
+    if engine is None:
+        return False
+    try:
+        # Record the hardware's actual (blanked) brightness so the next frame
+        # issues a plain set_brightness(target) rather than skipping (cache
+        # said 40) or doing a save/reinit (None).  Force a frame rewrite by
+        # dropping the signature; keep the step-guard baseline intact.
+        engine._last_hw_mode_brightness = 0
+        try:
+            engine._last_reactive_per_key_frame_signature = None
+        except _HARDWARE_POLL_RECOVERY_EXCEPTIONS:
+            pass
+    except _HARDWARE_POLL_RECOVERY_EXCEPTIONS:
+        return False
+    return True
+
+
 def _execute_blank_recovery(
     tray: IdlePowerTrayProtocol,
     *,
@@ -296,6 +363,19 @@ def _execute_blank_recovery(
     )
 
     try:
+        # Prefer render-loop self-heal while a software effect is already
+        # running — imperceptible single-frame re-light instead of a poller
+        # brightness write that races the render thread (visible off→on dip).
+        if _reassert_user_mode_while_running_best_effort(tray):
+            tray.is_off = False
+            _log_polled_hardware_event(
+                tray,
+                f"{log_action}_render_heal",
+                brightness=int(current_brightness),
+            )
+            _refresh_ui_without_icon_animation(tray)
+            return True
+
         set_idle_power_state_field(
             tray,
             attr_name="_hidden_perkey_restore_brightness_hint",

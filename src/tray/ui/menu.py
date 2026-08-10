@@ -50,7 +50,6 @@ class _MenuTrayProtocol(Protocol):
     _on_selected_device_brightness_clicked: _MenuAction
     _on_selected_device_turn_off_clicked: _MenuAction
     _on_selected_device_turn_on_clicked: _MenuAction
-    _on_support_debug_clicked: _MenuAction
     _on_power_settings_clicked: _MenuAction
     _on_power_mode_settings_clicked: _MenuAction
     _on_off_clicked: _MenuAction
@@ -262,9 +261,8 @@ def build_menu_items(
         item("Software Effects", sw_effects_menu),
         item("Effect Speed", speed_menu),
         pystray.Menu.SEPARATOR,
-        # power mode / settings
+        # power mode / settings (Support Tools lives under Settings → Version)
         *([item("Power Mode", power_menu)] if power_menu is not None else []),
-        item("Support Tools…", tray_state._on_support_debug_clicked),
         item("Settings", tray_state._on_power_settings_clicked),
         pystray.Menu.SEPARATOR,
         # off/on / (active mode) / quit

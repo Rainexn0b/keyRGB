@@ -22,6 +22,13 @@ class _FakeDevice:
         return out
 
 
+@dataclass(frozen=True)
+class _FakeInputEvent:
+    type: int
+    code: int
+    value: int
+
+
 @dataclass
 class _FakeEvdevModule:
     device_paths: list[str]
@@ -43,12 +50,15 @@ def _make_tracker(
     *,
     device_paths: list[str],
     input_device_paths: set[str] | None = None,
+    keyboard_device_paths: set[str] | None = None,
     monotonic_sequence: list[float] | None = None,
 ) -> tuple[input_idle.InputIdleTracker, _FakeEvdevModule]:
     evdev_mod = _FakeEvdevModule(device_paths=device_paths)
 
     if input_device_paths is None:
         input_device_paths = set(device_paths)
+    if keyboard_device_paths is None:
+        keyboard_device_paths = set(device_paths)
 
     def open_device(path: str) -> _FakeDevice:
         return evdev_mod.InputDevice(path)
@@ -69,6 +79,7 @@ def _make_tracker(
         list_devices_fn=evdev_mod.list_devices,
         open_device_fn=open_device,
         is_input_device_fn=is_input,
+        is_keyboard_device_fn=lambda path: path in keyboard_device_paths,
         select_fn=lambda r, w, x, t: ([d for d in r if getattr(d, "events", [])], [], []),
     )
     return tracker, evdev_mod
@@ -107,6 +118,65 @@ def test_seconds_since_activity_resets_on_input_event() -> None:
 
     # After the event is drained, idle grows from the new baseline.
     assert tracker.seconds_since_activity() == 6.0
+
+
+def test_touchpad_activity_does_not_record_keyboard_activity() -> None:
+    tracker, evdev = _make_tracker(
+        device_paths=["/dev/input/event-keyboard", "/dev/input/event-touchpad"],
+        keyboard_device_paths={"/dev/input/event-keyboard"},
+        monotonic_sequence=[0.0, 1.0, 2.0, 5.0, 6.0, 6.0, 12.0, 12.0],
+    )
+
+    tracker.seconds_since_activity()
+    evdev.opened["/dev/input/event-touchpad"].events.append(object())
+    tracker.seconds_since_activity()
+
+    assert tracker.last_activity_at == 6.0
+    assert tracker.last_keyboard_activity_at == 0.0
+
+    evdev.opened["/dev/input/event-keyboard"].events.append(_FakeInputEvent(type=1, code=30, value=1))
+    tracker.seconds_since_activity()
+
+    assert tracker.last_keyboard_activity_at == 12.0
+
+
+def test_modifier_only_keyboard_activity_does_not_record_wake_keypress() -> None:
+    tracker, evdev = _make_tracker(
+        device_paths=["/dev/input/event-keyboard"],
+        monotonic_sequence=[0.0, 1.0, 2.0, 5.0, 6.0, 6.0],
+    )
+
+    tracker.seconds_since_activity()
+    evdev.opened["/dev/input/event-keyboard"].events.extend(
+        [
+            _FakeInputEvent(type=4, code=4, value=125),  # EV_MSC scan
+            _FakeInputEvent(type=1, code=125, value=1),  # KEY_LEFTMETA down
+            _FakeInputEvent(type=0, code=0, value=0),  # EV_SYN
+        ]
+    )
+    tracker.seconds_since_activity()
+
+    assert tracker.last_activity_at == 6.0
+    assert tracker.last_keyboard_activity_at == 0.0
+
+
+def test_non_modifier_key_down_records_wake_keypress() -> None:
+    tracker, evdev = _make_tracker(
+        device_paths=["/dev/input/event-keyboard"],
+        monotonic_sequence=[0.0, 1.0, 2.0, 5.0, 6.0, 6.0],
+    )
+
+    tracker.seconds_since_activity()
+    evdev.opened["/dev/input/event-keyboard"].events.extend(
+        [
+            _FakeInputEvent(type=4, code=4, value=31),
+            _FakeInputEvent(type=1, code=31, value=1),  # KEY_S down
+            _FakeInputEvent(type=0, code=0, value=0),
+        ]
+    )
+    tracker.seconds_since_activity()
+
+    assert tracker.last_keyboard_activity_at == 6.0
 
 
 def test_close_releases_devices() -> None:

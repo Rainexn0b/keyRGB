@@ -170,7 +170,8 @@ def test_menu_hides_items_when_capabilities_disabled(
 
     assert "Hardware Effects" not in labels
     assert "Software Color Editor" not in labels
-    assert "Support Tools…" in labels
+    assert "Support Tools…" not in labels
+    assert "Settings" in labels
     assert "Debug" not in labels
     assert "Open Debug Tools…" not in labels
     assert "Detect New Backends" not in labels
@@ -303,7 +304,8 @@ def test_menu_uses_capability_filtered_body_when_lightbar_context_is_selected(mo
     assert "Static Color…" in labels
     assert "Software Effects" in labels
     assert "Lightbar backend is present but disabled by experimental-backend policy" not in labels
-    assert "Support Tools…" in labels
+    assert "Support Tools…" not in labels
+    assert "Settings" in labels
     assert "Quit" in labels
 
 
@@ -332,7 +334,8 @@ def test_menu_exposes_lightbar_controls_alongside_profile_editor(
     assert "Brightness Override" in labels
     assert "Lighting Profiles" in labels
     assert "Turn Off" in labels
-    assert "Support Tools…" in labels
+    assert "Support Tools…" not in labels
+    assert "Settings" in labels
     assert "Quit" in labels
 
 
@@ -348,7 +351,6 @@ def test_menu_groups_controls_in_the_agreed_order() -> None:
         "Hardware Static Mode",
         "Software Effects",
         "Effect Speed",
-        "Support Tools…",
         "Settings",
         "Turn Off",
         "Quit",

@@ -32,6 +32,8 @@ def compute_idle_action(
     now: float = 0.0,
     session_idle: bool | None = None,
     controller_sleep_off: bool = False,
+    idle_restore_requires_keyboard: bool = False,
+    keyboard_activity_after_idle_off: bool = False,
 ) -> IdleAction:
     if now > 0 and last_resume_at > 0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S:
         return None
@@ -41,9 +43,10 @@ def compute_idle_action(
 
     if controller_sleep_off:
         # The deck is deliberately dark (controller native sleep, opt-in).
-        # Level-triggered "session active + is_off -> restore" would undo it
-        # on the very next poll; only a new input edge restores (handled by
-        # the idle runtime).  All turn_off branches already no-op when is_off.
+        # Dim/off/restore actions stay suppressed here. The idle runtime owns
+        # validated keyboard-evdev restore, with hardware polling handling a
+        # controller first-keypress wake that wins that race. Turn-off branches
+        # already no-op when is_off.
         return None
 
     if not screen_dim_sync_enabled:
@@ -92,6 +95,8 @@ def compute_idle_action(
             return "restore_brightness"
 
         if is_off:
+            if idle_forced_off and idle_restore_requires_keyboard and not keyboard_activity_after_idle_off:
+                return None
             if idle_forced_off and session_idle is True:
                 return None
             if (

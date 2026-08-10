@@ -309,6 +309,51 @@ def test_turn_off_with_fade_and_high_brightness_fades_down() -> None:
     assert engine._brightness_value == 0
 
 
+def test_turn_off_with_fade_flattens_perkey_frame_before_fade() -> None:
+    """Frozen reactive ripple frame must flatten to uniform before the off-fade.
+
+    Fading global brightness on a high-contrast frozen ripple dims unevenly and
+    reads as flicker; a uniform base color at the current brightness first keeps
+    the ramp smooth.  The flatten must land before any fade set_brightness step.
+    """
+
+    engine = _TestEngine()
+    engine._brightness_value = 40
+    engine.per_key_colors = {(0, 0): (255, 0, 0)}
+    engine.current_color = (0, 255, 255)
+
+    color_calls: list[tuple[tuple[int, int, int], int]] = []
+
+    def _set_color(color, *, brightness: int):
+        color_calls.append((tuple(int(c) for c in color), int(brightness)))
+
+    engine.kb.set_color = _set_color
+
+    engine.turn_off(fade=True, fade_duration_s=0.0)
+
+    # Uniform base-color flatten at prev brightness happened before the fade.
+    assert color_calls == [((0, 255, 255), 40)]
+    assert engine.kb.turn_off_calls == 1
+    # Fade steps ran after the flatten (brightness dropped toward 1).
+    assert any(v < 40 for v in engine.kb.brightness_calls)
+
+
+def test_turn_off_with_fade_without_perkey_skips_flatten() -> None:
+    """Uniform/static effects already have a flat frame — no flatten write."""
+
+    engine = _TestEngine()
+    engine._brightness_value = 40
+    engine.per_key_colors = None
+
+    color_calls: list[object] = []
+    engine.kb.set_color = lambda *a, **k: color_calls.append(a)
+
+    engine.turn_off(fade=True, fade_duration_s=0.0)
+
+    assert color_calls == []
+    assert engine.kb.turn_off_calls == 1
+
+
 # ---------------------------------------------------------------------------
 # set_brightness — various paths
 # ---------------------------------------------------------------------------

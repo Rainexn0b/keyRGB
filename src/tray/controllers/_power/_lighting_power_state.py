@@ -76,6 +76,10 @@ def turn_on_impl(
     start_current_effect: Callable[..., object],
 ) -> None:
     try_log_event(tray, "menu", "turn_on")
+    # Same post-resume stamp as idle/power restore: a firmware transient zero
+    # right after soft-on must not re-enter controller_sleep_off and stick the
+    # deck dark until another manual toggle.
+    _set_last_resume_at(tray, time.monotonic())
     _set_user_forced_off(tray, False)
     _set_idle_forced_off(tray, False)
     _set_controller_sleep_off(tray, False)

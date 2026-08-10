@@ -5,6 +5,8 @@ and related runtime behavior.
 
 ## Documents
 
+- `controller-sleep-policy.md` — backend-declared controller sleep, automatic
+  recovery, and opt-in dark-until-keypress behavior
 - `power-mode-verification-refactor-plan.md` — power-mode verification refactor
 
 ## See also

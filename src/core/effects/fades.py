@@ -132,11 +132,23 @@ def prime_per_key_frame(
             set_brightness = getattr(kb, "set_brightness", None)
             if callable(set_brightness):
                 set_brightness(brightness_hw)
-            if not reassert_user_mode and kb.is_off():
-                enable_user_mode = getattr(kb, "enable_user_mode", None)
-                if not callable(enable_user_mode):
-                    return False
-                enable_user_mode(brightness=brightness_hw, save=False)
+            if not reassert_user_mode:
+                # Explicit off mode (is_off) *or* firmware sleep signature
+                # (brightness still 0 with is_off=False) — both need a mode
+                # command; row/brightness writes alone leave ITE decks dark.
+                still_dark = bool(kb.is_off())
+                if not still_dark:
+                    get_brightness = getattr(kb, "get_brightness", None)
+                    if callable(get_brightness):
+                        try:
+                            still_dark = int(get_brightness()) <= 0
+                        except _FADE_RUNTIME_ERRORS:
+                            still_dark = False
+                if still_dark:
+                    enable_user_mode = getattr(kb, "enable_user_mode", None)
+                    if not callable(enable_user_mode):
+                        return False
+                    enable_user_mode(brightness=brightness_hw, save=False)
     except _FADE_RUNTIME_ERRORS:
         return False
     return True

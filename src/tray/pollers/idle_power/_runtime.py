@@ -52,6 +52,40 @@ class IdlePollLoopState:
     prev_session_idle: bool | None = None
 
 
+def _keyboard_activity_after(
+    *,
+    loop_state: IdlePollLoopState,
+    timestamp: float,
+    create_input_idle_tracker_fn: Callable[[], InputIdleTracker] | None,
+    read_input_idle_seconds_fn: Callable[[InputIdleTracker], float | None] | None,
+) -> bool:
+    """Poll evdev if available and test for keyboard activity after a timestamp."""
+
+    if timestamp <= 0:
+        return False
+    tracker = loop_state.input_idle_tracker
+    if tracker is None and create_input_idle_tracker_fn is not None:
+        try:
+            tracker = create_input_idle_tracker_fn()
+            loop_state.input_idle_tracker = tracker
+        except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+            return False
+    if tracker is not None and read_input_idle_seconds_fn is not None:
+        try:
+            # Wayland normally owns idle detection and therefore does not poll
+            # evdev. Poll explicitly for this keypress-only wake policy.
+            read_input_idle_seconds_fn(tracker)
+        except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+            return False
+    if tracker is None:
+        return False
+    try:
+        last_keyboard_activity_at = float(getattr(tracker, "last_keyboard_activity_at", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return False
+    return last_keyboard_activity_at > timestamp
+
+
 def _run_idle_power_runtime_boundary_best_effort(operation: Callable[[], None]) -> None:
     try:
         operation()
@@ -59,19 +93,41 @@ def _run_idle_power_runtime_boundary_best_effort(operation: Callable[[], None]) 
         return
 
 
+def _rearm_controller_sleep_restore(tray: IdlePowerTrayProtocol) -> bool:
+    """Reset the ITE off latch before restoring from honored firmware sleep."""
+
+    try:
+        # Hardware evidence shows that user-mode and brightness writes can be
+        # accepted while the deck remains latched dark after controller sleep.
+        # A fresh explicit off immediately before the normal soft-on sequence
+        # resets that latch, matching the manual off->on recovery path.
+        tray.engine.turn_off()
+    except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+        logger.warning("Controller-sleep hardware re-arm failed", exc_info=True)
+        return False
+    logger.info("EVENT idle_power:controller_sleep_rearm trigger=keyboard_evdev")
+    return True
+
+
 def _maybe_restore_from_controller_sleep(
     tray: IdlePowerTrayProtocol,
     *,
     loop_state: IdlePollLoopState,
     session_idle: bool | None,
+    create_input_idle_tracker_fn: Callable[[], InputIdleTracker] | None = None,
+    read_input_idle_seconds_fn: Callable[[InputIdleTracker], float | None] | None = None,
 ) -> None:
-    """Restore the deck on the first input edge after a controller sleep.
+    """Restore the deck after controller sleep on keyboard activity only.
 
     Only meaningful when the opt-in controller-sleep respect left the deck
-    dark: level-triggered idle restores are suppressed for that state (see
-    ``compute_idle_action``), so a *new* input event re-lights the deck — an
-    evdev activity timestamp newer than the sleep, or a Wayland idle->active
-    transition (covers touchpads and other devices raw evdev cannot see).
+    dark. Restore when evdev reports keyboard activity newer than the sleep
+    timestamp. Mouse, touchpad, and bare compositor resume events deliberately
+    do not wake keyboard lighting: the setting promises to wait for a keypress.
+
+    Do **not** level-trigger on bare ``session_idle is False``: that combined
+    with a false-positive sleep detection (ITE transient zero while reactive
+    was still running) journals as a random off→on soft-on blink.  The opt-in
+    is "leave dark until the next input"; edge/activity restore matches that.
     """
 
     if not read_idle_power_state_bool_field(
@@ -90,18 +146,28 @@ def _maybe_restore_from_controller_sleep(
     if sleep_at <= 0:
         return
 
-    tracker = loop_state.input_idle_tracker
-    last_activity_at = 0.0
-    if tracker is not None:
-        try:
-            last_activity_at = float(getattr(tracker, "last_activity_at", 0.0) or 0.0)
-        except (TypeError, ValueError):
-            last_activity_at = 0.0
-    wayland_resume_edge = loop_state.prev_session_idle is True and session_idle is False
-    if last_activity_at <= sleep_at and not wayland_resume_edge:
+    if not _keyboard_activity_after(
+        loop_state=loop_state,
+        timestamp=sleep_at,
+        create_input_idle_tracker_fn=create_input_idle_tracker_fn,
+        read_input_idle_seconds_fn=read_input_idle_seconds_fn,
+    ):
         return
 
-    logger.info("EVENT idle_power:controller_sleep_restore")
+    # Hardware polling may have observed the controller's own first-keypress
+    # wake and restarted the stopped effect while evdev was being polled. Do
+    # not follow that successful fallback with a second explicit off->soft-on.
+    if not read_idle_power_state_bool_field(
+        tray,
+        attr_name="_controller_sleep_off",
+        state_name="controller_sleep_off",
+        default=False,
+    ):
+        return
+
+    if not _rearm_controller_sleep_restore(tray):
+        return
+    logger.info("EVENT idle_power:controller_sleep_restore trigger=keyboard_evdev")
     restore_from_idle(tray)
 
 
@@ -314,10 +380,29 @@ def run_idle_power_iteration(
         tray,
         loop_state=loop_state,
         session_idle=session_idle,
+        create_input_idle_tracker_fn=create_input_idle_tracker_fn,
+        read_input_idle_seconds_fn=read_input_idle_seconds_fn,
     )
     loop_state.prev_session_idle = session_idle
 
     user_forced_off, power_forced_off, idle_forced_off = read_forced_off_flags(tray)
+    last_idle_turn_off_at = read_idle_power_state_float_field(
+        tray,
+        attr_name="_last_idle_turn_off_at",
+        state_name="last_idle_turn_off_at",
+        default=0.0,
+    )
+    idle_restore_requires_keyboard = bool(
+        idle_forced_off and safe_bool_attr(tray.config, "controller_sleep_respect", default=False)
+    )
+    keyboard_activity_after_idle_off = False
+    if idle_restore_requires_keyboard:
+        keyboard_activity_after_idle_off = _keyboard_activity_after(
+            loop_state=loop_state,
+            timestamp=last_idle_turn_off_at,
+            create_input_idle_tracker_fn=create_input_idle_tracker_fn,
+            read_input_idle_seconds_fn=read_input_idle_seconds_fn,
+        )
     action = compute_idle_action_fn(
         dimmed=dimmed,
         screen_off=bool(screen_off),
@@ -332,12 +417,7 @@ def run_idle_power_iteration(
         brightness=int(brightness),
         user_forced_off=user_forced_off,
         power_forced_off=power_forced_off,
-        last_idle_turn_off_at=read_idle_power_state_float_field(
-            tray,
-            attr_name="_last_idle_turn_off_at",
-            state_name="last_idle_turn_off_at",
-            default=0.0,
-        ),
+        last_idle_turn_off_at=last_idle_turn_off_at,
         last_resume_at=read_last_resume_at(tray),
         now=now,
         session_idle=session_idle,
@@ -347,9 +427,13 @@ def run_idle_power_iteration(
             state_name="controller_sleep_off",
             default=False,
         ),
+        idle_restore_requires_keyboard=idle_restore_requires_keyboard,
+        keyboard_activity_after_idle_off=keyboard_activity_after_idle_off,
     )
     if _power_source_idle_guard_active(loop_state=loop_state, now=now):
         action = None
+    if action == "restore" and idle_restore_requires_keyboard and keyboard_activity_after_idle_off:
+        logger.info("EVENT idle_power:screen_idle_restore trigger=keyboard_evdev")
 
     action_key = build_idle_action_key_fn(
         action=action,

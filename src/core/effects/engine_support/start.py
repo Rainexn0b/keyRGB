@@ -182,35 +182,56 @@ class _EngineStart:
         fade_to_color: Color,
         from_sw_effect: bool = False,
     ) -> None:
+        start_brightness = int(self.brightness)
+        # Soft-on idle/menu/controller-sleep restore starts at
+        # SOFT_ON_START_BRIGHTNESS (1). Two failure modes left ITE boards dark:
+        # 1) brightness==1 skipped the per-key prime and only called
+        #    enable_user_mode(0) after an explicit turn_off;
+        # 2) firmware controller-sleep reports brightness=0 with is_off=False,
+        #    so _device_mode_off stayed False and restore faded with
+        #    enable_user_mode=False — journaled stuck-dark after
+        #    controller_sleep_restore.
+        device_mode_off = bool(self._device_mode_off)
+        soft_on_start = start_brightness == 1
+        # Reassert user mode after explicit turn_off *or* soft-on from a dark
+        # deck (idle restore / menu turn-on / controller-sleep restore).
+        needs_mode_reassert = start_brightness >= 1 and (device_mode_off or soft_on_start)
+        needs_perkey_prime = (
+            bool(self.per_key_colors)
+            and hasattr(self.kb, "set_key_colors")
+            and (start_brightness > 1 or needs_mode_reassert)
+        )
+
         if from_sw_effect:
             pass
-        elif int(self.brightness) > 1:
-            if self.per_key_colors and hasattr(self.kb, "set_key_colors"):
-                if self._prime_per_key_frame():
-                    self._last_hw_mode_brightness = int(self.brightness)
-                    self._last_rendered_brightness = int(self.brightness)
-                else:
-                    self._fade_in_per_key(duration_s=0.06)
-                    self._last_hw_mode_brightness = int(self.brightness)
-                    self._last_rendered_brightness = int(self.brightness)
-                # Prime (with reassert) and the fade-in fallback both send a
-                # mode command when the device was explicitly turned off.
-                self._device_mode_off = False
+        elif needs_perkey_prime:
+            if self._prime_per_key_frame():
+                self._last_hw_mode_brightness = start_brightness
+                self._last_rendered_brightness = start_brightness
             else:
-                self._fade_uniform_color(
-                    from_color=prev_color,
-                    to_color=fade_to_color,
-                    brightness=int(self.brightness),
-                    duration_s=0.06,
-                )
-                self._last_rendered_brightness = int(self.brightness)
-                # set_color re-enables user mode on the controller.
-                self._device_mode_off = False
+                self._fade_in_per_key(duration_s=0.06)
+                self._last_hw_mode_brightness = start_brightness
+                self._last_rendered_brightness = start_brightness
+            # Prime (with reassert) and the fade-in fallback both send a
+            # mode command when the device was explicitly turned off.
+            self._device_mode_off = False
+        elif start_brightness > 1 or needs_mode_reassert:
+            self._fade_uniform_color(
+                from_color=prev_color,
+                to_color=fade_to_color,
+                brightness=start_brightness,
+                duration_s=0.06,
+            )
+            self._last_rendered_brightness = start_brightness
+            # set_color re-enables user mode on the controller.
+            self._device_mode_off = False
         elif self.per_key_colors and hasattr(self.kb, "set_key_colors"):
             from src.core.effects.perkey_animation import enable_user_mode_once
 
-            enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=0)
-            self._last_hw_mode_brightness = 0
+            # Never arm user mode at brightness 0 after a dark deck — ITE
+            # stays unlit; use at least soft-on level 1.
+            enable_user_mode_once(kb=self.kb, kb_lock=self.kb_lock, brightness=max(1, start_brightness))
+            self._last_hw_mode_brightness = max(1, start_brightness)
             self._device_mode_off = False
 
         try:

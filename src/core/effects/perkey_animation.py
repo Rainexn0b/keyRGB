@@ -219,6 +219,9 @@ def restore_hidden_per_key_rows_once(
             return False
 
         with kb_lock:
+            # Hidden blank path: rows land before brightness, user-mode command
+            # deferred to the caller (blank recovery re-asserts; config-apply
+            # reuse stays flash-free with enable_user_mode=False).
             set_key_colors(color_map, brightness=int(brightness), enable_user_mode=False)
             set_brightness(int(brightness))
             _save_restored_user_mode_best_effort(kb=kb, brightness=int(brightness))
