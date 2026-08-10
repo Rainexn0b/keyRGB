@@ -14,12 +14,16 @@ after the functions are extracted to a sibling module.
 
 from __future__ import annotations
 
+import threading
+from types import SimpleNamespace
+
 import pytest
 
 from src.tray.idle_power_state import (
     ensure_tray_idle_power_state,
     read_idle_power_state_float_field,
 )
+from src.tray.pollers.hardware import _controller_sleep, _runtime_support
 from src.tray.pollers.hardware._recovery import (
     _execute_blank_recovery,
     _power_source_blank_recovery_eligible,
@@ -244,9 +248,6 @@ def test_execute_blank_recovery_heals_via_render_loop_while_effect_running() -> 
     poller-side set_brightness that races the render thread (visible dip).
     """
 
-    from threading import Lock
-    from types import SimpleNamespace
-
     kb_write_calls: list[int] = []
     start_calls: list[str] = []
     events: list[str] = []
@@ -262,7 +263,7 @@ def test_execute_blank_recovery_heals_via_render_loop_while_effect_running() -> 
     engine = SimpleNamespace(
         running=True,
         kb=_Kb(),
-        kb_lock=Lock(),
+        kb_lock=threading.Lock(),
         brightness=40,
         _last_hw_mode_brightness=40,
         _last_rendered_brightness=40,
@@ -777,8 +778,6 @@ def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None
         _fake_seed,
     )
 
-    from types import SimpleNamespace
-
     engine = SimpleNamespace()
     config = SimpleNamespace(brightness=20, effect="reactive_ripple")
     tray = make_owner_backed_simple_tray(
@@ -825,8 +824,6 @@ def test_execute_blank_recovery_skips_damp_for_non_reactive_effects(monkeypatch)
         _fake_seed,
     )
 
-    from types import SimpleNamespace
-
     engine = SimpleNamespace()
     config = SimpleNamespace(brightness=20, effect="wave")
     tray = make_owner_backed_simple_tray(
@@ -853,3 +850,152 @@ def test_execute_blank_recovery_skips_damp_for_non_reactive_effects(monkeypatch)
 
     assert result is True
     assert seeded == []
+
+
+# ---------------------------------------------------------------------------
+# Controller-sleep and polling-runtime extraction coverage
+# ---------------------------------------------------------------------------
+
+
+def test_controller_sleep_helpers_classify_stop_and_clear_final_frame() -> None:
+    calls: list[str] = []
+    keyboard = SimpleNamespace(
+        get_brightness=lambda: 8,
+        turn_off=lambda: calls.append("turn_off"),
+    )
+    engine = SimpleNamespace(
+        kb=keyboard,
+        kb_lock=threading.RLock(),
+        stop=lambda: calls.append("stop"),
+        _device_mode_off=False,
+    )
+    tray = SimpleNamespace(engine=engine)
+
+    assert _controller_sleep.classify_polled_state(tray, current_brightness=0, current_off=False) is True
+    assert _controller_sleep.stop_engine_for_controller_sleep_best_effort(tray) is True
+    _controller_sleep.clear_post_stop_write_best_effort(tray)
+
+    assert calls == ["stop", "turn_off"]
+    assert engine._device_mode_off is True
+
+
+def test_controller_sleep_helpers_keep_native_zero_and_contain_runtime_failures() -> None:
+    zero_calls: list[str] = []
+    zero_tray = SimpleNamespace(
+        engine=SimpleNamespace(
+            kb=SimpleNamespace(
+                get_brightness=lambda: 0,
+                turn_off=lambda: zero_calls.append("turn_off"),
+            ),
+            kb_lock=threading.RLock(),
+        )
+    )
+    _controller_sleep.clear_post_stop_write_best_effort(zero_tray)
+    assert zero_calls == []
+
+    failed_stop_tray = SimpleNamespace(
+        engine=SimpleNamespace(
+            stop=lambda: (_ for _ in ()).throw(OSError("unavailable")),
+            _device_mode_off=False,
+        )
+    )
+    assert _controller_sleep.stop_engine_for_controller_sleep_best_effort(failed_stop_tray) is False
+
+    failed_read_tray = SimpleNamespace(
+        engine=SimpleNamespace(
+            kb=SimpleNamespace(get_brightness=lambda: (_ for _ in ()).throw(OSError("unavailable"))),
+            kb_lock=threading.RLock(),
+        )
+    )
+    _controller_sleep.clear_post_stop_write_best_effort(failed_read_tray)
+
+
+def test_firmware_wake_restart_stamps_resume_and_accepts_void_callback() -> None:
+    calls: list[str] = []
+    tray = make_owner_backed_simple_tray(
+        engine=SimpleNamespace(),
+        _start_current_effect=lambda: calls.append("start"),
+        last_resume_at=0.0,
+    )
+
+    assert _controller_sleep.restart_effect_after_firmware_wake_best_effort(tray, now=123.5) is True
+    assert calls == ["start"]
+    assert tray.tray_idle_power_state.last_resume_at == 123.5
+
+
+def test_firmware_wake_restart_uses_public_fallback(monkeypatch) -> None:
+    calls: list[object] = []
+    tray = make_owner_backed_simple_tray(engine=SimpleNamespace(), last_resume_at=0.0)
+    monkeypatch.setattr(
+        "src.tray.controllers.lighting_controller.start_current_effect",
+        lambda target: calls.append(target) or True,
+    )
+
+    assert _controller_sleep.restart_effect_after_firmware_wake_best_effort(tray, now=50.0) is True
+    assert calls == [tray]
+
+
+def test_firmware_wake_restart_logs_recoverable_callback_failure(monkeypatch) -> None:
+    logged: list[Exception] = []
+    tray = make_owner_backed_simple_tray(
+        engine=SimpleNamespace(),
+        _start_current_effect=lambda: (_ for _ in ()).throw(RuntimeError("start failed")),
+    )
+    monkeypatch.setattr(
+        _controller_sleep._recovery,
+        "_log_hardware_polling_error_best_effort",
+        lambda _tray, exc: logged.append(exc),
+    )
+
+    assert _controller_sleep.restart_effect_after_firmware_wake_best_effort(tray, now=75.0) is False
+    assert len(logged) == 1
+
+
+def test_runtime_support_reads_pulse_mix_and_contains_bad_runtime_value(monkeypatch) -> None:
+    tray = SimpleNamespace(engine=object())
+    monkeypatch.setattr(
+        _runtime_support,
+        "_reactive_active_pulse_mix_or_default",
+        lambda _engine, *, default: 0.625,
+    )
+    assert _runtime_support.reactive_pulse_mix_or_zero(tray) == 0.625
+
+    monkeypatch.setattr(
+        _runtime_support,
+        "_reactive_active_pulse_mix_or_default",
+        lambda _engine, *, default: (_ for _ in ()).throw(ValueError("bad pulse")),
+    )
+    assert _runtime_support.reactive_pulse_mix_or_zero(tray) == 0.0
+
+
+def test_runtime_support_polls_coherent_snapshot() -> None:
+    observed: list[dict[str, object]] = []
+    tray = SimpleNamespace(
+        engine=SimpleNamespace(
+            kb=SimpleNamespace(get_brightness=lambda: 17, is_off=lambda: False),
+            kb_lock=threading.RLock(),
+        )
+    )
+
+    def apply_state(target, **fields):
+        observed.append({"tray": target, **fields})
+        return 17, False
+
+    result = _runtime_support.poll_hardware_once(
+        tray,
+        last_brightness=10,
+        last_off_state=True,
+        apply_polled_state_fn=apply_state,
+    )
+
+    assert result == (17, False)
+    assert observed == [
+        {
+            "tray": tray,
+            "raw_brightness": 17,
+            "current_brightness": 17,
+            "current_off": False,
+            "last_brightness": 10,
+            "last_off_state": True,
+        }
+    ]
