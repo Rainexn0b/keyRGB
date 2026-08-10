@@ -186,6 +186,62 @@ def test_apply_polled_state_off_state_change_branch_and_forced_off_gate() -> Non
     assert refreshed["n"] == 0
 
 
+def test_apply_polled_state_off_state_change_clears_unforced_logical_off() -> None:
+    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
+        _refresh_ui=lambda **_kwargs: None,
+        _log_event=lambda *_args, **_kwargs: None,
+        is_off=True,
+    )
+
+    result = _apply_polled_hardware_state(
+        tray,
+        raw_brightness=5,
+        current_brightness=5,
+        current_off=False,
+        last_brightness=5,
+        last_off_state=True,
+    )
+
+    assert result == (5, False)
+    assert tray.is_off is False
+
+
+def test_apply_polled_state_off_change_adopts_successful_recent_blank_recovery(monkeypatch) -> None:
+    import src.tray.pollers.hardware_polling as hp
+    from tests.tray.fakes import make_owner_backed_simple_tray
+
+    tray = make_owner_backed_simple_tray(
+        dim_temp_active=False,
+        dim_temp_target_brightness=None,
+        power_forced_off=False,
+        user_forced_off=False,
+        idle_forced_off=False,
+        _refresh_ui=lambda **_kwargs: None,
+        _log_event=lambda *_args, **_kwargs: None,
+        is_off=False,
+    )
+    monkeypatch.setattr(hp, "_recover_recent_power_source_blank_best_effort", lambda *_args, **_kwargs: True)
+
+    result = hp._apply_polled_hardware_state(
+        tray,
+        raw_brightness=5,
+        current_brightness=5,
+        current_off=True,
+        last_brightness=5,
+        last_off_state=False,
+    )
+
+    assert result == (5, False)
+
+
 def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(
     monkeypatch,
 ) -> None:
