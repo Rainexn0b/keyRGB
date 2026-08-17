@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+## 0.32.0 (2026-08-17)
+
+Pre-release soak build. Public entrypoints and on-disk config/profile JSON stay
+compatible; soak on real hardware before promoting this train.
+
+- Profiles/Storage: Confine reserved `.` / `..` names and give profile JSON,
+  markers, and layout-slot writes the same lock, unique-temp, and fsync contract
+  as config storage.
+- Tray/Runtime: Serialize low-frequency lighting transitions in one coordinator
+  and keep pollers that are still alive from being treated as stopped.
+- Tray/UI: Render menus from stored snapshots instead of live device probes or
+  cpufreq queries.
+- Core/Backends: Fail closed on missing capability evidence, share one backend
+  selection report with diagnostics, and key shared controller state per device.
+- Effects: Map software/reactive frames to live backend geometry and replace
+  reactive/hardware-effect introspection with typed contracts.
+- Config: Partition settings by domain, keep secondary brightness on `0..100`,
+  and raise when ordinary persistence fails.
+- GUI: Move uniform, power-mode, and per-key hardware writes off the Tk callback
+  with generation-aware jobs.
+- Installer/Packaging: Match managed udev rules on uninstall, pin AppImage and
+  Actions inputs, and smoke nested resources from built wheel and sdist.
+- Build/Quality: Fail continue-on-error runs, architecture warnings, unused
+  runtime symbols, and installer ShellCheck; isolate the default test session
+  from host `XDG_*` and real `/sys` writes.
+
 ## 0.31.4 (2026-08-10)
 
 - Tray/Idle-Power: Make the opt-in controller-sleep policy reliable during software/reactive effects: confirmed sleep stops rendering, corrects a final in-flight frame, and stays dark until a real non-modifier keypress, power restore, or manual **Turn On**. Mouse, touchpad, compositor-resume, and synthetic modifier-only events no longer wake it; screen-idle off follows the same rule while the option is enabled.
