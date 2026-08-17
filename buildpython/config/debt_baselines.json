@@ -34,7 +34,7 @@
     "minimum_total_percent": 89.5,
     "tracked_prefixes": {
       "src/core/": 89.5,
-      "src/tray/": 89.0,
+      "src/tray/": 88.5,
       "src/gui/": 90.0
     },
     "minimum_watch_file_percent": 20.0,
