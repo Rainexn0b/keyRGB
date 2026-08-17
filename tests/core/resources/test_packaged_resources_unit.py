@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
+import re
 import shutil
 import subprocess
 import venv
@@ -10,7 +11,6 @@ import zipfile
 from pathlib import Path
 
 import pytest
-import tomllib
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _RESOURCES_ROOT = _REPO_ROOT / "src" / "core" / "resources"
@@ -23,11 +23,18 @@ def _resource_data_files() -> list[Path]:
     )
 
 
+_PACKAGE_DATA_SRC_RE = re.compile(
+    r"(?ms)^\[tool\.setuptools\.package-data\]\s*(?:#[^\n]*\n)*src\s*=\s*\[(.*?)\]"
+)
+
+
 def _package_data_patterns() -> list[str]:
-    data = tomllib.loads(_PYPROJECT.read_text(encoding="utf-8"))
-    patterns = data.get("tool", {}).get("setuptools", {}).get("package-data", {}).get("src")
-    assert isinstance(patterns, list) and patterns, "src package-data patterns must be declared"
-    return [str(pattern) for pattern in patterns]
+    # Parse the declared patterns without tomllib so this module collects on 3.10.
+    match = _PACKAGE_DATA_SRC_RE.search(_PYPROJECT.read_text(encoding="utf-8"))
+    assert match is not None, "src package-data patterns must be declared"
+    patterns = re.findall(r'"([^"]+)"', match.group(1))
+    assert patterns, "src package-data patterns must be declared"
+    return patterns
 
 
 def _matches_package_data(relative_posix: str, patterns: list[str]) -> bool:
