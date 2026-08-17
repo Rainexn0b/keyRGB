@@ -42,6 +42,7 @@ dev = [
     "ruff>=0.16",
     "black>=26.3.1",
     "mypy>=1.20.0,<3.0",
+    "vulture>=2.14",
 ]
 
 [project.urls]
@@ -66,7 +67,8 @@ where = ["."]
 include = ["src*", "buildpython*"]
 
 [tool.setuptools.package-data]
-src = ["*.png", "*.json", "core/*.json", "core/resources/*.json"]
+# Nested resource JSON (reference defaults, per-key tweaks) must ship in wheels.
+src = ["**/*.png", "**/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -104,6 +106,8 @@ ignore_missing_imports = true
 pretty = true
 show_error_codes = true
 warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
 
 [tool.ruff.lint]
 per-file-ignores = { "tests/**/*.py" = ["E402"] }

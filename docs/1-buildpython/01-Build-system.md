@@ -35,11 +35,18 @@ Bare `python -m buildpython` is not a named profile. It selects the live step re
 
 ## Current profiles
 
-- `ci`: compile, import validation, import scan, pip check, pytest, coverage, exception transparency, architecture validation, and repo validation.
-- `debt`: debt-focused checks including code markers, file size, LOC, code hygiene, coverage, exception transparency, architecture validation, and repo validation.
-- `quick`: `ci` plus lightweight debt reporting such as code markers and file size.
-- `full`: `quick` plus optional lint/type checks and deeper debt checks. `Black` stays opt-in through `--with-black`.
-- `release`: `ci` plus `AppImage` and `AppImage Smoke`.
+- `ci`: lint, typing, import/packaging checks, pytest, coverage, exception
+  transparency, code hygiene, file size, dead code, ShellCheck, architecture
+  validation, and repo validation.
+- `debt`: compile, import validation, pytest, then structured debt reports
+  (code markers, file size, LOC, code hygiene, coverage, exception
+  transparency, architecture, repo validation).
+- `quick`: compile, import/packaging checks, pytest, coverage, exception
+  transparency, plus lightweight debt reporting (code markers, file size,
+  architecture, repo validation).
+- `full`: broader local quality gate including lint, typing, dead code,
+  ShellCheck, LOC, and code hygiene. `Black` stays opt-in through `--with-black`.
+- `release`: the `ci` quality set plus `AppImage` and `AppImage Smoke`.
 
 Optional-tool steps auto-skip when their tool is not installed:
 
@@ -47,11 +54,13 @@ Optional-tool steps auto-skip when their tool is not installed:
 - `Ruff Format`
 - `Type Check`
 - `Black`
+- `Dead Code` when `vulture` is unavailable
+- `ShellCheck` when the `shellcheck` binary is unavailable
 - `Coverage` when `coverage` or `pytest` is unavailable
 
 ## Step coverage
 
-The current registry has steps `1` through `19`. See the exact catalog in `docs/1-buildpython/01.1-Build-steps.md`.
+The current registry has steps `1` through `21`. See the exact catalog in `docs/1-buildpython/01.1-Build-steps.md`.
 
 The build runner mixes three kinds of work:
 
@@ -93,6 +102,7 @@ Debt-focused steps write structured reports under the same directory when they r
 - `architecture-validation.{json,csv,md}`
 - `coverage-summary.{json,csv,md}`
 - `exception-transparency.{json,csv,md}`
+- `dead-code-vulture.{json,md,txt}`
 
 `build-summary.md` includes the overall build state plus a debt snapshot of available structured reports. `debt-index.md` is the combined report index for debt-oriented outputs. When present, both surfaces summarize file-size and LOC hotspots so debt-oriented size issues are visible without opening each standalone report.
 

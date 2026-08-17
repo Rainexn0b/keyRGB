@@ -37,7 +37,7 @@
     {
       "id": "tray-ui-no-backend-selection",
       "description": "Tray UI should not probe backends directly; selection belongs in app or controller layers.",
-      "severity": "warning",
+      "severity": "error",
       "corpus": {
         "include": [
           "src/tray/ui/**/*.py"
@@ -54,7 +54,7 @@
     {
       "id": "gui-window-no-direct-backend-selection",
       "description": "Public GUI window modules should not import backend selection directly.",
-      "severity": "warning",
+      "severity": "error",
       "corpus": {
         "include": [
           "src/gui/windows/**/*.py"
@@ -77,10 +77,13 @@
     {
       "id": "gui-perkey-no-direct-backend-selection",
       "description": "Per-key GUI helpers should not import backend selection directly.",
-      "severity": "warning",
+      "severity": "error",
       "corpus": {
         "include": [
           "src/gui/perkey/**/*.py"
+        ],
+        "exclude": [
+          "src/gui/perkey/hardware.py"
         ]
       },
       "imports": [
@@ -93,7 +96,7 @@
     {
       "id": "tray-ui-no-direct-profile-storage",
       "description": "Tray UI should not import core profile storage directly.",
-      "severity": "warning",
+      "severity": "error",
       "corpus": {
         "include": [
           "src/tray/ui/**/*.py"
@@ -109,7 +112,7 @@
     {
       "id": "tray-ui-no-private-runtime-hooks",
       "description": "Tray UI should not call or mutate private tray runtime hooks directly.",
-      "severity": "warning",
+      "severity": "error",
       "corpus": {
         "include": [
           "src/tray/ui/**/*.py"

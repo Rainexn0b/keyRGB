@@ -1,11 +1,58 @@
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
-from buildpython.steps.appimage import python_runtime, tkinter_bundle
+from buildpython.steps.appimage import (
+    build as appimage_build,
+    common as appimage_common,
+    python_runtime,
+    tkinter_bundle,
+)
+
+
+def test_appimagetool_is_pinned_to_versioned_release_with_digest() -> None:
+    assert "continuous" not in appimage_build.APPIMAGETOOL_URL
+    assert f"/{appimage_build.APPIMAGETOOL_VERSION}/" in appimage_build.APPIMAGETOOL_URL
+    assert len(appimage_build.APPIMAGETOOL_SHA256) == 64
+    assert all(ch in "0123456789abcdef" for ch in appimage_build.APPIMAGETOOL_SHA256)
+
+
+def test_download_verified_reuses_matching_file_and_rejects_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "tool.bin"
+    payload = b"pinned-appimagetool-bytes"
+    digest = hashlib.sha256(payload).hexdigest()
+    target.write_bytes(payload)
+
+    def _should_not_download(*_args, **_kwargs):
+        raise AssertionError("download should not run for matching digest")
+
+    monkeypatch.setattr(appimage_common, "download", _should_not_download)
+    appimage_common.download_verified("https://example.invalid/tool.bin", target, expected_sha256=digest)
+    assert target.read_bytes() == payload
+
+    target.write_bytes(b"tampered")
+    downloads: list[tuple[str, Path]] = []
+
+    def _fake_download(url: str, dst: Path) -> None:
+        downloads.append((url, dst))
+        dst.write_bytes(payload)
+
+    monkeypatch.setattr(appimage_common, "download", _fake_download)
+    appimage_common.download_verified("https://example.invalid/tool.bin", target, expected_sha256=digest)
+    assert downloads == [("https://example.invalid/tool.bin", target)]
+    assert target.read_bytes() == payload
+
+    target.write_bytes(b"stale-local-copy")
+    monkeypatch.setattr(appimage_common, "download", lambda url, dst: dst.write_bytes(b"wrong-bytes"))
+    with pytest.raises(SystemExit, match="SHA-256 mismatch"):
+        appimage_common.download_verified("https://example.invalid/tool.bin", target, expected_sha256=digest)
+    assert not target.exists()
 
 
 def test_relative_path_under_prefix_falls_back_when_path_is_outside_prefix(tmp_path) -> None:

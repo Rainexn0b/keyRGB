@@ -11,6 +11,12 @@ from pathlib import Path
 import pytest
 
 from tests._paths import ensure_repo_root_on_sys_path
+from tests._validation_env import (
+    access_tripwire_enabled,
+    hardware_opted_in,
+    led_snapshot_tripwire_enabled,
+    usb_import_tripwire_enabled,
+)
 
 _TESTS_REPO_ROOT = ensure_repo_root_on_sys_path()
 
@@ -19,7 +25,7 @@ _SKIP_AGENT_TESTS_ENV = "KEYRGB_SKIP_AGENT_TESTS"
 
 
 def _hardware_opted_in() -> bool:
-    return os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
+    return hardware_opted_in()
 
 
 # Safety default: during pytest, avoid touching the user's real config/state.
@@ -29,6 +35,15 @@ if not _hardware_opted_in():
         "KEYRGB_CONFIG_DIR",
         tempfile.mkdtemp(prefix="keyrgb-test-config-"),
     )
+    _xdg_root = Path(tempfile.mkdtemp(prefix="keyrgb-test-xdg-"))
+    for name, mode in (("config", 0o755), ("data", 0o755), ("cache", 0o755), ("runtime", 0o700)):
+        path = _xdg_root / name
+        path.mkdir(mode=mode, exist_ok=True)
+        os.chmod(path, mode)
+    os.environ.setdefault("XDG_CONFIG_HOME", str(_xdg_root / "config"))
+    os.environ.setdefault("XDG_DATA_HOME", str(_xdg_root / "data"))
+    os.environ.setdefault("XDG_CACHE_HOME", str(_xdg_root / "cache"))
+    os.environ.setdefault("XDG_RUNTIME_DIR", str(_xdg_root / "runtime"))
 
 
 # Safety default: running pytest should never scan real USB devices unless
@@ -38,39 +53,33 @@ if not _hardware_opted_in():
 
 
 def _install_tripwire() -> None:
-    """Install a hard-fail tripwire for unexpected hardware access during pytest.
+    """Install hardware-access tripwires for the default pytest suite.
 
-    This is intentionally broad and only enabled when:
-    - KEYRGB_TEST_HARDWARE_TRIPWIRE=1
-    - and hardware is NOT opted in.
-
-    It aims to provide a traceback for the first attempted access.
+    Device-node and /sys-write guards are default-on. USB-import blocking stays
+    opt-in because production backends import ``usb`` during unit tests.
     """
 
-    if os.environ.get("KEYRGB_TEST_HARDWARE_TRIPWIRE") != "1":
-        return
-    if _hardware_opted_in():
-        return
+    if usb_import_tripwire_enabled():
+        blocked_prefixes = ("usb",)
 
-    # 1) Block imports that commonly lead to real USB access.
-    blocked_prefixes = ("usb",)
-
-    class _BlockImportsFinder(importlib.abc.MetaPathFinder):
-        def find_spec(self, fullname: str, path, target=None):  # type: ignore[override]
-            # Allow tests that inject fakes via sys.modules.
-            if fullname in sys.modules:
+        class _BlockImportsFinder(importlib.abc.MetaPathFinder):
+            def find_spec(self, fullname: str, path, target=None):  # type: ignore[override]
+                # Allow tests that inject fakes via sys.modules.
+                if fullname in sys.modules:
+                    return
+                if any(fullname == prefix or fullname.startswith(f"{prefix}.") for prefix in blocked_prefixes):
+                    raise RuntimeError(
+                        "Tripwire: attempted to import a hardware/USB module during pytest: "
+                        f"{fullname}\n\n" + "".join(traceback.format_stack(limit=50))
+                    )
                 return
-            if any(fullname == prefix or fullname.startswith(f"{prefix}.") for prefix in blocked_prefixes):
-                raise RuntimeError(
-                    "Tripwire: attempted to import a hardware/USB module during pytest: "
-                    f"{fullname}\n\n" + "".join(traceback.format_stack(limit=50))
-                )
-            return
 
-    # Prepend so it wins.
-    sys.meta_path.insert(0, _BlockImportsFinder())
+        sys.meta_path.insert(0, _BlockImportsFinder())
 
-    # 2) Block writes to /sys and opens to /dev/bus/usb to catch sysfs LED writes
+    if not access_tripwire_enabled():
+        return
+
+    # Block writes to /sys and opens to /dev/bus/usb to catch sysfs LED writes
     # and direct USB device opens.
     _orig_open = builtins.open
 
@@ -201,12 +210,12 @@ def _read_led_snapshot() -> dict[str, str]:
 
 
 def _tripwire_enabled() -> bool:
-    return os.environ.get("KEYRGB_TEST_HARDWARE_TRIPWIRE") == "1" and not _hardware_opted_in()
+    return led_snapshot_tripwire_enabled()
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:  # pragma: no cover
-    # In tripwire mode, record a baseline of candidate keyboard LEDs so we can
-    # detect unexpected state changes even if they happen via C libs / kernel.
+    # In LED-snapshot mode, record a baseline of candidate keyboard LEDs so we
+    # can detect unexpected state changes even if they happen via C libs / kernel.
     global _BASELINE_SYSFS_LEDS
     if not _tripwire_enabled():
         return

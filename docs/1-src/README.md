@@ -21,3 +21,11 @@ management, and support tools.
   routes that must commit one complete physical-controller profile
 - `13-tray-runtime-state-ownership.md` — tray runtime state ownership
 - `14-policy-ownership.md` — policy owners, canonical imports, and compatibility facades
+- `15-config-domain-model.md` — config domain partitions and extras
+- `16-effect-runtime-contracts.md` — reactive API and hardware-effect builders
+- `17-backend-extension.md` — package registration and controller identity
+- `18-diagnostics-purity.md` — readonly diagnostics config and snapshots
+- `19-gui-async-jobs.md` — generation-aware Tk background work
+- `20-tray-view-boundaries.md` — menu rendering reads tray-owned snapshots only
+- `21-validation-layers.md` — default-suite artifact, session, installer, and tripwire layers
+- `22-tool-policy.md` — mypy, dead-code, architecture, and ShellCheck gates

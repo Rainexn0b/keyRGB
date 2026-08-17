@@ -29,6 +29,8 @@ the pipeline changes.
 .venv/bin/python -m buildpython --run-steps=13   # Type Check in the current step map
 .venv/bin/python -m buildpython --run-steps=16   # Code Hygiene in the current step map
 .venv/bin/python -m buildpython --run-steps=19   # Exception Transparency
+.venv/bin/python -m buildpython --run-steps=20   # Dead Code
+.venv/bin/python -m buildpython --run-steps=21   # ShellCheck
 ```
 
 # Full pipeline

@@ -49,7 +49,7 @@ load_saved_appimage_prefs() {
         # Best-effort: record the last installed tag (if any) so we can
         # detect when the on-disk AppImage is older than the latest release.
         if printf '%s' "$val" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
-          KEYRGB_LAST_TAG="$val"
+          export KEYRGB_LAST_TAG="$val"
         fi
         ;;
     esac

@@ -33,6 +33,14 @@ boundaries.
 12. Composite controller profile coordination: [12-composite-profile-coordination.md](12-composite-profile-coordination.md)
 13. Tray runtime state ownership: [13-tray-runtime-state-ownership.md](13-tray-runtime-state-ownership.md)
 14. Policy ownership and canonical imports: [14-policy-ownership.md](14-policy-ownership.md)
+15. Config domain model: [15-config-domain-model.md](15-config-domain-model.md)
+16. Effect runtime contracts: [16-effect-runtime-contracts.md](16-effect-runtime-contracts.md)
+17. Backend extension: [17-backend-extension.md](17-backend-extension.md)
+18. Diagnostics purity: [18-diagnostics-purity.md](18-diagnostics-purity.md)
+19. GUI async jobs: [19-gui-async-jobs.md](19-gui-async-jobs.md)
+20. Tray view boundaries: [20-tray-view-boundaries.md](20-tray-view-boundaries.md)
+21. Validation layers: [21-validation-layers.md](21-validation-layers.md)
+22. Tool policy: [22-tool-policy.md](22-tool-policy.md)
 
 ## Current baseline (already implemented)
 

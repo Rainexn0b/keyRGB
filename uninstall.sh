@@ -85,6 +85,7 @@ curl -fsSL "$base/scripts/lib/optional_components.sh" -o "$tmp/scripts/lib/optio
 curl -fsSL "$base/scripts/lib/privileged_helpers.sh" -o "$tmp/scripts/lib/privileged_helpers.sh"
 curl -fsSL "$base/scripts/lib/user_integration.sh" -o "$tmp/scripts/lib/user_integration.sh"
 curl -fsSL "$base/scripts/lib/user_prompts.sh" -o "$tmp/scripts/lib/user_prompts.sh"
+curl -fsSL "$base/scripts/lib/uninstall_match.sh" -o "$tmp/scripts/lib/uninstall_match.sh"
 curl -fsSL "$base/scripts/uninstall.sh" -o "$tmp/scripts/uninstall.sh"
 
 exec bash "$tmp/scripts/uninstall.sh" "${NEW_ARGS[@]}"

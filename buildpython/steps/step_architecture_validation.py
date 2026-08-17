@@ -159,7 +159,7 @@ def architecture_validation_runner() -> RunResult:
         stdout_lines.append("")
         stdout_lines.append("No architecture violations detected.")
 
-    exit_code = 1 if severity_counts.get("error", 0) > 0 else 0
+    exit_code = 1 if result.findings else 0
     return RunResult(
         command_str="(internal) architecture validation",
         stdout="\n".join(stdout_lines) + "\n",

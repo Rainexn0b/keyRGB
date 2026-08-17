@@ -11,6 +11,14 @@ from ..utils.subproc import RunResult, python_exe, run
 _FINDING_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): (?P<message>.+) \((?P<confidence>\d+)% confidence\)$")
 _SCAN_ROOTS = ("src", "buildpython", "tests")
 _MIN_CONFIDENCE = 80
+_ACTIONABLE_PREFIXES = (
+    "unused function",
+    "unused class",
+    "unused method",
+    "unused import",
+    "unused property",
+    "unused attribute",
+)
 
 
 def _scope_for_path(path: str) -> str:
@@ -52,6 +60,14 @@ def _parse_findings(stdout: str) -> list[dict[str, Any]]:
     return findings
 
 
+def _is_actionable_finding(item: dict[str, Any]) -> bool:
+    path = str(item.get("path") or "")
+    if path.startswith("tests/"):
+        return False
+    message = str(item.get("message") or "").strip().lower()
+    return any(message.startswith(prefix) for prefix in _ACTIONABLE_PREFIXES)
+
+
 def _counts_by_scope(findings: list[dict[str, Any]]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for item in findings:
@@ -65,11 +81,13 @@ def _write_reports(*, report_dir: Path, findings: list[dict[str, Any]], raw_outp
 
     (report_dir / "dead-code-vulture.txt").write_text(raw_output, encoding="utf-8")
 
+    actionable = [item for item in findings if _is_actionable_finding(item)]
     payload = {
         "tool": "vulture",
         "scan_roots": list(_SCAN_ROOTS),
         "min_confidence": _MIN_CONFIDENCE,
         "count": len(findings),
+        "actionable_count": len(actionable),
         "counts_by_scope": _counts_by_scope(findings),
         "findings": findings,
     }
@@ -85,6 +103,7 @@ def _write_reports(*, report_dir: Path, findings: list[dict[str, Any]], raw_outp
         f"- Scope: {', '.join(_SCAN_ROOTS)}",
         f"- Minimum confidence: {_MIN_CONFIDENCE}%",
         f"- Findings: {len(findings)}",
+        f"- Actionable findings: {sum(1 for item in findings if _is_actionable_finding(item))}",
         "",
         "## By scope",
         "",
@@ -126,6 +145,7 @@ def dead_code_runner() -> RunResult:
 
     findings = _parse_findings(result.stdout)
     _write_reports(report_dir=buildlog_dir(), findings=findings, raw_output=result.stdout)
+    actionable = [item for item in findings if _is_actionable_finding(item)]
 
     stdout_lines = [
         "Dead code scan (vulture)",
@@ -133,6 +153,7 @@ def dead_code_runner() -> RunResult:
         f"Scan roots: {', '.join(_SCAN_ROOTS)}",
         f"Minimum confidence: {_MIN_CONFIDENCE}%",
         f"Findings: {len(findings)}",
+        f"Actionable findings: {len(actionable)}",
     ]
 
     counts = _counts_by_scope(findings)
@@ -147,9 +168,15 @@ def dead_code_runner() -> RunResult:
         for item in findings[:80]:
             stdout_lines.append(f"  - {int(item['confidence'])}% {item['path']}:{int(item['line'])} {item['message']}")
 
+    if actionable:
+        stdout_lines.append("")
+        stdout_lines.append("Actionable unused symbols fail this step:")
+        for item in actionable[:40]:
+            stdout_lines.append(f"  - {int(item['confidence'])}% {item['path']}:{int(item['line'])} {item['message']}")
+
     return RunResult(
         command_str=result.command_str,
         stdout="\n".join(stdout_lines) + "\n",
         stderr=result.stderr,
-        exit_code=0,
+        exit_code=1 if actionable else 0,
     )

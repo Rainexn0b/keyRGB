@@ -1,5 +1,7 @@
+# KEYRGB_MANAGED_UDEV_RULE=sysfs-leds
 # Allow KeyRGB to write keyboard backlight sysfs LED attributes.
 #
+
 # Some kernel keyboard lighting drivers expose LED nodes under /sys/class/leds/*kbd_backlight*
 # (e.g. rgb:kbd_backlight, rgb:kbd_backlight_1, rgb:kbd_backlight_2) but default them to
 # root-only writes.

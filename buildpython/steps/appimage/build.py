@@ -11,13 +11,19 @@ from . import (
     bundle_python_runtime,
     bundle_tkinter,
     chmod_x,
-    download,
+    download_verified,
     env_flag,
     run_checked,
     write_text,
 )
 
-APPIMAGETOOL_URL = "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+# Pin appimagetool to a versioned upstream release with an immutable digest.
+# Do not use AppImageKit/continuous: that asset is mutable and unsigned by URL alone.
+APPIMAGETOOL_VERSION = "1.9.1"
+APPIMAGETOOL_URL = (
+    f"https://github.com/AppImage/appimagetool/releases/download/{APPIMAGETOOL_VERSION}/appimagetool-x86_64.AppImage"
+)
+APPIMAGETOOL_SHA256 = "ed4ce84f0d9caff66f50bcca6ff6f35aae54ce8135408b3fa33abfc3cb384eb0"
 
 
 def _first_existing_asset(root: Path, *relative_paths: str) -> Path | None:
@@ -46,10 +52,9 @@ def build_appimage() -> Path:
         shutil.rmtree(appdir)
     work.mkdir(parents=True, exist_ok=True)
 
-    if not appimagetool.exists():
-        print(f"Downloading appimagetool -> {appimagetool}")
-        download(APPIMAGETOOL_URL, appimagetool)
-        chmod_x(appimagetool)
+    print(f"Ensuring appimagetool {APPIMAGETOOL_VERSION} -> {appimagetool}")
+    download_verified(APPIMAGETOOL_URL, appimagetool, expected_sha256=APPIMAGETOOL_SHA256)
+    chmod_x(appimagetool)
 
     bundle_python_runtime(appdir=appdir)
     bundle_tkinter(appdir=appdir)

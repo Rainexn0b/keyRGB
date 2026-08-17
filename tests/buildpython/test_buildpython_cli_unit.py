@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import pytest
 
 from buildpython.core import cli
@@ -66,3 +68,20 @@ def test_capture_runtime_log_rejects_unknown_mode() -> None:
         cli.main(["--capture-runtime-log=everything"])
 
     assert exc_info.value.code == 2
+
+
+def test_build_cli_propagates_runner_failure_with_continue_on_error(monkeypatch) -> None:
+    selected_step = SimpleNamespace(number=1, name="Compile")
+    calls: list[tuple[object, bool, bool]] = []
+    monkeypatch.setattr(cli, "_select_steps", lambda **_kwargs: [selected_step])
+
+    def fake_run(selected, *, verbose: bool, continue_on_error: bool) -> int:
+        calls.append((selected, verbose, continue_on_error))
+        return 9
+
+    monkeypatch.setattr(cli, "run", fake_run)
+
+    exit_code = cli.main(["--run-steps=1", "--continue-on-error"])
+
+    assert exit_code == 9
+    assert calls == [([selected_step], False, True)]

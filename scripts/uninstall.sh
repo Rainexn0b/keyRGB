@@ -7,6 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}" )" && pwd)"
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/common.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/uninstall_match.sh"
 
 usage() {
   cat <<'EOF'
@@ -47,12 +49,6 @@ confirm() {
   read -r -p "$prompt [y/N] " reply || reply=""
   reply="${reply,,}"
   [[ "$reply" == "y" || "$reply" == "yes" ]]
-}
-
-file_has_marker() {
-  local path="$1" marker="$2"
-  [ -f "$path" ] || return 1
-  grep -Fqs -- "$marker" "$path" 2>/dev/null
 }
 
 STATE_DIR="$HOME/.local/share/keyrgb"
@@ -130,84 +126,48 @@ POWER_POLKIT_SRC="$REPO_DIR/system/polkit/90-keyrgb-power-helper.rules"
 POWER_POLKIT_ACTION_DST="/usr/share/polkit-1/actions/org.keyrgb.power-helper.policy"
 POWER_POLKIT_ACTION_SRC="$REPO_DIR/system/polkit/org.keyrgb.power-helper.policy"
 
-if [ -f "$UDEV_DST" ]; then
-  udev_matches_repo=0
-  if [ -f "$UDEV_SRC" ] && cmp -s "$UDEV_SRC" "$UDEV_DST"; then
-    udev_matches_repo=1
-  fi
-  udev_looks_like_keyrgb=0
-  if file_has_marker "$UDEV_DST" "Allow user access to ITE 8291 USB device."; then
-    udev_looks_like_keyrgb=1
+maybe_remove_udev_rule() {
+  local dst="$1" src="$2" label="$3" is_managed_fn="$4" post_remove_note="${5:-}"
+  if [ ! -f "$dst" ]; then
+    return 0
   fi
 
-  if [ "$udev_matches_repo" -eq 1 ] || [ "$udev_looks_like_keyrgb" -eq 1 ]; then
-    if [ "$udev_matches_repo" -ne 1 ]; then
-      log_warn "udev rule does not match this repo version, but appears to be KeyRGB-managed: $UDEV_DST"
+  local matches_repo=0
+  if files_match_exactly "$src" "$dst"; then
+    matches_repo=1
+  fi
+  local looks_like_keyrgb=0
+  if "$is_managed_fn" "$dst"; then
+    looks_like_keyrgb=1
+  fi
+
+  if [ "$matches_repo" -eq 1 ] || [ "$looks_like_keyrgb" -eq 1 ]; then
+    if [ "$matches_repo" -ne 1 ]; then
+      log_warn "$label does not match this repo version, but appears to be KeyRGB-managed: $dst"
     fi
-    if confirm "Remove udev rule $UDEV_DST (requires sudo)?"; then
-      sudo rm -f "$UDEV_DST"
+    if confirm "Remove $label $dst (requires sudo)?"; then
+      sudo rm -f "$dst"
       reload_udev_rules_best_effort
-      log_ok "Removed udev rule"
+      log_ok "Removed $label"
+      if [ -n "$post_remove_note" ]; then
+        log_info "$post_remove_note"
+      fi
     else
-      log_info "Skipped removing udev rule"
+      log_info "Skipped removing $label"
     fi
   else
-    log_warn "udev rule exists but does not look KeyRGB-managed; not removing: $UDEV_DST"
+    log_warn "$label exists but does not look KeyRGB-managed; not removing: $dst"
   fi
-fi
+}
 
-if [ -f "$SYSFS_UDEV_DST" ]; then
-  sysfs_matches_repo=0
-  if [ -f "$SYSFS_UDEV_SRC" ] && cmp -s "$SYSFS_UDEV_SRC" "$SYSFS_UDEV_DST"; then
-    sysfs_matches_repo=1
-  fi
-  sysfs_looks_like_keyrgb=0
-  if file_has_marker "$SYSFS_UDEV_DST" "Allow KeyRGB to write keyboard backlight sysfs LED attributes."; then
-    sysfs_looks_like_keyrgb=1
-  fi
-
-  if [ "$sysfs_matches_repo" -eq 1 ] || [ "$sysfs_looks_like_keyrgb" -eq 1 ]; then
-    if [ "$sysfs_matches_repo" -ne 1 ]; then
-      log_warn "sysfs LED udev rule does not match this repo version, but appears to be KeyRGB-managed: $SYSFS_UDEV_DST"
-    fi
-    if confirm "Remove sysfs LED udev rule $SYSFS_UDEV_DST (requires sudo)?"; then
-      sudo rm -f "$SYSFS_UDEV_DST"
-      reload_udev_rules_best_effort
-      log_ok "Removed sysfs LED udev rule"
-    else
-      log_info "Skipped removing sysfs LED udev rule"
-    fi
-  else
-    log_warn "sysfs LED udev rule exists but does not look KeyRGB-managed; not removing: $SYSFS_UDEV_DST"
-  fi
-fi
-
-if [ -f "$INPUT_UDEV_DST" ]; then
-  input_matches_repo=0
-  if [ -f "$INPUT_UDEV_SRC" ] && cmp -s "$INPUT_UDEV_SRC" "$INPUT_UDEV_DST"; then
-    input_matches_repo=1
-  fi
-  input_looks_like_keyrgb=0
-  if file_has_marker "$INPUT_UDEV_DST" "Reactive Typing effects"; then
-    input_looks_like_keyrgb=1
-  fi
-
-  if [ "$input_matches_repo" -eq 1 ] || [ "$input_looks_like_keyrgb" -eq 1 ]; then
-    if [ "$input_matches_repo" -ne 1 ]; then
-      log_warn "Reactive Typing input udev rule does not match this repo version, but appears KeyRGB-managed: $INPUT_UDEV_DST"
-    fi
-    if confirm "Remove Reactive Typing input udev rule $INPUT_UDEV_DST (requires sudo)?"; then
-      sudo rm -f "$INPUT_UDEV_DST"
-      reload_udev_rules_best_effort
-      log_ok "Removed Reactive Typing input udev rule"
-      log_info "You may need to log out/in for ACLs to refresh."
-    else
-      log_info "Skipped removing Reactive Typing input udev rule"
-    fi
-  else
-    log_warn "Reactive Typing input udev rule exists but does not look KeyRGB-managed; not removing: $INPUT_UDEV_DST"
-  fi
-fi
+maybe_remove_udev_rule "$UDEV_DST" "$UDEV_SRC" "udev rule" is_keyrgb_managed_usb_udev_rule
+maybe_remove_udev_rule "$SYSFS_UDEV_DST" "$SYSFS_UDEV_SRC" "sysfs LED udev rule" is_keyrgb_managed_sysfs_udev_rule
+maybe_remove_udev_rule \
+  "$INPUT_UDEV_DST" \
+  "$INPUT_UDEV_SRC" \
+  "Reactive Typing input udev rule" \
+  is_keyrgb_managed_input_udev_rule \
+  "You may need to log out/in for ACLs to refresh."
 
 remove_helper_and_rule_if_match() {
   local helper_dst="$1" helper_src="$2" rule_dst="$3" rule_src="$4" label="$5"

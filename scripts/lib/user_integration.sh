@@ -421,9 +421,16 @@ warn_if_no_usb_device_best_effort() {
   # tuxedo_keyboard / clevo_wmi) and won't show an ITE USB controller in lsusb.
   # Avoid a confusing warning in that case.
   if [ -d /sys/class/leds ]; then
-    if ls /sys/class/leds 2>/dev/null | grep -Eqi "kbd_backlight"; then
-      return 0
-    fi
+    local led led_name
+    for led in /sys/class/leds/*; do
+      [ -e "$led" ] || continue
+      led_name=$(printf '%s' "${led##*/}" | tr '[:upper:]' '[:lower:]')
+      case "$led_name" in
+        *kbd_backlight*)
+          return 0
+          ;;
+      esac
+    done
   fi
 
   # Common supported ITE USB IDs (8291r3, 8258, and related families).

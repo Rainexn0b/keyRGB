@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import re
+import shutil
 import sys
 import time
 
@@ -228,6 +229,25 @@ def run_step(
         _print_step_footer(outcome, ["vulture not installed"])
         return outcome
 
+    if step.name == "ShellCheck" and shutil.which("shellcheck") is None:
+        duration = time.time() - start
+        _write_log(
+            step,
+            "shellcheck ...",
+            "(skipped: shellcheck not installed)\n",
+            "",
+            0,
+            duration,
+        )
+        outcome = StepOutcome(
+            status="skipped",
+            exit_code=0,
+            duration_s=duration,
+            message="shellcheck not installed",
+        )
+        _print_step_footer(outcome, ["shellcheck not installed"])
+        return outcome
+
     result = step.runner()
     duration = time.time() - start
 
@@ -255,6 +275,18 @@ def run_step(
             print(result.stderr.rstrip())
 
     return outcome
+
+
+def _completed_run_exit_code(summaries: list[summary_module.StepSummary]) -> int:
+    """Return the first failed step's code after every selected step ran."""
+
+    for step in summaries:
+        if step.status == "failure":
+            # A failure status should always carry a nonzero subprocess code,
+            # but retain a safe shell failure if a custom step violates that
+            # invariant.
+            return step.exit_code if step.exit_code != 0 else 1
+    return 0
 
 
 def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
@@ -317,7 +349,8 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
 
             return outcome.exit_code
 
-    passed = all(s.status != "failure" for s in summaries)
+    final_exit_code = _completed_run_exit_code(summaries)
+    passed = final_exit_code == 0
     score = _health_score()
 
     summary_module.write_summary(
@@ -340,4 +373,4 @@ def run(steps: list[Step], *, verbose: bool, continue_on_error: bool) -> int:
     for line in summary_module.build_terminal_build_overview(buildlog_dir(), final_summary):
         print(line)
 
-    return 0
+    return final_exit_code

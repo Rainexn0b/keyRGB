@@ -56,6 +56,7 @@ def steps() -> list[Step]:
     from .step_pip import pip_check_runner
     from .step_quality import code_markers_runner
     from .step_repo_validation import repo_validation_runner
+    from .step_shellcheck import shellcheck_runner
     from .step_type_check import mypy_runner
 
     return [
@@ -146,7 +147,7 @@ def steps() -> list[Step]:
         Step(
             number=13,
             name="Type Check",
-            description="Run mypy type checking (optional)",
+            description="Run mypy type checking on runtime and narrow GUI baseline",
             log_file=_log("step-13-type-check.log"),
             runner=mypy_runner,
         ),
@@ -195,8 +196,15 @@ def steps() -> list[Step]:
         Step(
             number=20,
             name="Dead Code",
-            description="Scan for likely dead symbols with vulture (optional, informational)",
+            description="Fail on unused functions/classes/imports in runtime code",
             log_file=_log("step-20-dead-code.log"),
             runner=dead_code_runner,
+        ),
+        Step(
+            number=21,
+            name="ShellCheck",
+            description="Lint installer and helper shell scripts",
+            log_file=_log("step-21-shellcheck.log"),
+            runner=shellcheck_runner,
         ),
     ]

@@ -353,6 +353,44 @@ def test_scan_architecture_attribute_rules_ignore_private_method_definitions(tmp
     assert result.findings == ()
 
 
+def test_architecture_validation_runner_fails_on_warning_findings(monkeypatch, tmp_path) -> None:
+    (tmp_path / "src/tray/ui").mkdir(parents=True)
+    (tmp_path / "src/tray/ui/menu.py").write_text(
+        "from src.core.backends.registry import select_backend\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "buildpython/config").mkdir(parents=True)
+    (tmp_path / "buildpython/config/architecture_rules.json").write_text(
+        json.dumps(
+            {
+                "rules": [
+                    {
+                        "id": "tray-ui-no-backend-selection",
+                        "description": "demo",
+                        "severity": "warning",
+                        "corpus": {"include": ["src/tray/ui/**/*.py"]},
+                        "patterns": [
+                            {
+                                "regex": "^\\s*(?:from|import)\\s+src\\.core\\.backends\\.registry\\b",
+                                "flags": "m",
+                                "message": "no registry",
+                            }
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")
+
+    result = step_architecture_validation.architecture_validation_runner()
+
+    assert result.exit_code == 1
+    assert "Warnings: 1" in result.stdout
+
+
 def test_architecture_validation_runner_returns_run_result_for_recoverable_rule_errors(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(step_architecture_validation, "repo_root", lambda: tmp_path)
     monkeypatch.setattr(step_architecture_validation, "buildlog_dir", lambda: tmp_path / "buildlog")

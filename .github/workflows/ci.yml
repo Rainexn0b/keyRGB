@@ -15,16 +15,20 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        # Pin major tag v4 to immutable commit SHA.
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        # Pin major tag v5 to immutable commit SHA.
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.12"
           cache: pip
 
       - name: Install dependencies (including dev tools)
         run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
           python -m pip install -e ".[dev]"
@@ -33,6 +37,44 @@ jobs:
         env:
           KEYRGB_HW_TESTS: "0"
         run: python -m buildpython --profile=ci
+
+      - name: Built wheel resource smoke
+        run: |
+          python -m pip install -U build
+          WHEEL_DIR="$RUNNER_TEMP/keyrgb-wheels"
+          SMOKE_ENV="$RUNNER_TEMP/keyrgb-wheel-smoke"
+          python -m build --wheel --outdir "$WHEEL_DIR"
+          python -m venv "$SMOKE_ENV"
+          "$SMOKE_ENV/bin/python" -m pip install --upgrade pip
+          "$SMOKE_ENV/bin/python" -m pip install --no-deps "$WHEEL_DIR"/keyrgb-*.whl
+          KEYRGB_WHEEL_DIR="$WHEEL_DIR" "$SMOKE_ENV/bin/python" - <<'PY'
+          import os
+          import zipfile
+          from pathlib import Path
+
+          from src.core.resources.reference_defaults_specs import (
+              clear_reference_defaults_spec_cache,
+              load_reference_defaults_spec,
+          )
+
+          wheels = sorted(Path(os.environ["KEYRGB_WHEEL_DIR"]).glob("keyrgb-*.whl"))
+          assert len(wheels) == 1, wheels
+          with zipfile.ZipFile(wheels[0]) as archive:
+              names = set(archive.namelist())
+          required = [
+              "src/core/resources/reference_defaults_specs.json",
+              "src/core/resources/reference_defaults_specs/meta.json",
+              "src/core/resources/reference_defaults_specs/keymaps.json",
+              "src/core/resources/reference_defaults_specs/layout_tweaks.json",
+              "src/core/resources/reference_defaults_specs/per_key_tweaks/ansi.json",
+          ]
+          missing = [path for path in required if path not in names]
+          assert not missing, missing
+          clear_reference_defaults_spec_cache()
+          spec = load_reference_defaults_spec("ansi")
+          assert isinstance(spec.get("keymap"), dict) and spec["keymap"]
+          print("wheel resource smoke ok")
+          PY
 
   test:
     name: Runtime Matrix (Py${{ matrix.python-version }})
@@ -45,10 +87,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip

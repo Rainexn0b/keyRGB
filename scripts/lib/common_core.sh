@@ -280,6 +280,8 @@ apt_update_best_effort() {
   tmp="$(mktemp)" || return 1
 
   set +e
+  # Capture apt output in a user-owned tempfile; sudo must not own the redirect.
+  # shellcheck disable=SC2024
   sudo apt-get update >"$tmp" 2>&1
   local rc=$?
   _restore_errexit_state "$had_errexit"
@@ -320,6 +322,8 @@ apt_install_best_effort() {
   tmp="$(mktemp)" || return 1
 
   set +e
+  # Capture apt output in a user-owned tempfile; sudo must not own the redirect.
+  # shellcheck disable=SC2024
   sudo apt-get install -y "${pkgs[@]}" >"$tmp" 2>&1
   local rc=$?
   _restore_errexit_state "$had_errexit"
@@ -462,12 +466,21 @@ download_url_quiet() {
 # verify_downloaded_sha256: verify a downloaded file against a .sha256 sidecar URL.
 # Usage: verify_downloaded_sha256 <file_path> <sha256_url>
 # - Exits non-zero and removes the file on hash mismatch.
-# - Warns and returns 0 (non-fatal) when sha256sum is unavailable or no sidecar is found,
-#   so that installs against older releases that pre-date checksum publishing still work.
+# - By default, missing sidecars are non-fatal so older releases still install.
+# - Set KEYRGB_REQUIRE_CHECKSUM=1 (or true/yes/on) to fail closed when sha256sum
+#   is missing, the sidecar cannot be downloaded, or the sidecar is empty.
 verify_downloaded_sha256() {
   local file_path="$1" sha256_url="$2"
+  local require_checksum=0
+  case "${KEYRGB_REQUIRE_CHECKSUM:-}" in
+    1|true|TRUE|yes|YES|y|Y|on|ON) require_checksum=1 ;;
+  esac
 
   if ! have_cmd sha256sum; then
+    if [ "$require_checksum" -eq 1 ]; then
+      rm -f "$file_path" 2>/dev/null || true
+      die "sha256sum not found; cannot verify integrity of $(basename "$file_path") (KEYRGB_REQUIRE_CHECKSUM=1)."
+    fi
     log_warn "sha256sum not found; skipping integrity check of $(basename "$file_path")."
     return 0
   fi
@@ -477,6 +490,10 @@ verify_downloaded_sha256() {
 
   if ! download_url_quiet "$sha256_url" "$sha256_tmp" 2>/dev/null; then
     rm -f "$sha256_tmp" 2>/dev/null || true
+    if [ "$require_checksum" -eq 1 ]; then
+      rm -f "$file_path" 2>/dev/null || true
+      die "No SHA-256 sidecar found at: $sha256_url (KEYRGB_REQUIRE_CHECKSUM=1). Removed $(basename "$file_path")."
+    fi
     log_warn "No SHA-256 sidecar found at: $sha256_url"
     log_warn "Integrity of $(basename "$file_path") could not be verified. Ensure the release publishes a .sha256 file."
     return 0
@@ -487,6 +504,10 @@ verify_downloaded_sha256() {
   rm -f "$sha256_tmp" 2>/dev/null || true
 
   if [ -z "$expected_hash" ]; then
+    if [ "$require_checksum" -eq 1 ]; then
+      rm -f "$file_path" 2>/dev/null || true
+      die "Checksum sidecar was empty or unreadable for $(basename "$file_path") (KEYRGB_REQUIRE_CHECKSUM=1)."
+    fi
     log_warn "Checksum sidecar was empty or unreadable; skipping integrity check of $(basename "$file_path")."
     return 0
   fi

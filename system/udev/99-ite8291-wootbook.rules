@@ -1,3 +1,4 @@
+# KEYRGB_MANAGED_UDEV_RULE=usb-hidraw
 # Allow user access to supported ITE / Lenovo USB / hidraw devices.
 # Name is based on the ITE8291 Wootbook, but the rules apply to all supported devices (historical artifact)
 

@@ -14,6 +14,12 @@ specs for larger changes.
 
 ### Active follow-up plans
 
+- `2026-08-11/architecture-concerns-plan.md` — confirmation and remediation
+  tracker for the 2026-08-11 architecture review; one finding per pass, with
+  test-first contracts and explicit confirmed/rejected status
+- `2026-08-11/a2-tray-runtime-coordinator-design.md` — approval-gated FIFO
+  coordinator, stale-observation revision, deferred UI, and migration design for
+  A2 serialized tray runtime ownership
 - `2026-07-16/0.30.1-maintainability-follow-up-plan.md` — **0.30.1** patch plan
   (done): top-3 residual weaknesses (orchestration purity, size hotspots,
   multi-layer tests) + bounded code-quality slices after 0.30.0

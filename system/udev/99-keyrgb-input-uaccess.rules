@@ -1,5 +1,7 @@
+# KEYRGB_MANAGED_UDEV_RULE=input-uaccess
 # Allow active local user session to read keyboard input events for reactive effects.
 #
+
 # SECURITY WARNING:
 #   Access to /dev/input/event* allows observing keypresses. This rule uses
 #   seat-based ACLs (uaccess) so only the active local desktop user gets access.

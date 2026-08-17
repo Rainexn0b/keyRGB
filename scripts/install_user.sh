@@ -72,12 +72,12 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --version) KEYRGB_VERSION="${2:-}"; shift 2 ;;
     --asset)
-      KEYRGB_APPIMAGE_ASSET_SET=1
+      export KEYRGB_APPIMAGE_ASSET_SET=1
       KEYRGB_APPIMAGE_ASSET="${2:-}"
       shift 2
       ;;
     --prerelease)
-      KEYRGB_ALLOW_PRERELEASE_SET=1
+      export KEYRGB_ALLOW_PRERELEASE_SET=1
       KEYRGB_ALLOW_PRERELEASE="y"
       shift
       ;;

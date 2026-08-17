@@ -74,7 +74,7 @@ keyrgb-diagnostics
 - Keep behavior capability-driven. Use `BackendCapabilities` and `backend_caps` instead of backend-name special cases where possible.
 - Preserve public script entrypoints in `pyproject.toml` unless the change intentionally alters the user-facing command surface.
 - Keep tray/runtime orchestration in `src/tray/`; avoid duplicating long-running hardware-control logic inside GUI windows.
-- Unit tests must stay hardware-safe by default. Normal `pytest` runs intentionally avoid scanning real USB devices or touching real `/sys` lighting state.
+- Unit tests must stay hardware-safe by default. Normal `pytest` runs isolate config/`XDG_*` roots, disable USB scans, and refuse real `/sys` writes plus `/dev/bus/usb` opens. Broad USB-import blocking stays opt-in via `KEYRGB_TEST_HARDWARE_TRIPWIRE=1`.
 - Do not edit generated output in `buildlog/` or `htmlcov/`.
 
 ## Contributing a feature
@@ -118,7 +118,7 @@ keyrgb-perkey
 2. Gather evidence before writing code: `keyrgb-diagnostics`, `lsusb`, relevant `hidraw` or sysfs paths, permission behavior, and any protocol notes or captures you are relying on.
 3. Add the backend under `src/core/backends/<backend_name>/`. Most backends split into a `backend.py`, `device.py`, and protocol/helper modules.
 4. Implement the backend surface defined in `src/core/backends/base.py`: metadata (`name`, `priority`, `stability`, `experimental_evidence`) plus `probe()`, `capabilities()`, `get_device()`, `dimensions()`, `effects()`, and `colors()`.
-5. Register the backend in `src/core/backends/registry.py`.
+5. Register the backend with a package-owned `BACKEND_REGISTRATION` marker. Keep rename aliases in `src/core/backends/registry.py`.
 6. Start new or weakly proven backends as `experimental` unless there is strong real-hardware validation. Use the evidence tag so diagnostics can distinguish research-backed work from speculative work.
 7. Do not add USB IDs to an existing ITE backend unless protocol compatibility is actually established. Detection similarity is not enough.
 8. Translate permission, busy-device, disconnect, and transport failures into the backend exception types rather than letting raw library errors leak to users.
@@ -176,7 +176,8 @@ If you use numeric step selectors, list steps first. Step numbers can move as th
 - `README.md`
 - `docs/3-contributing/01-build_runner.md`
 - `docs/2-usage/04-hardware_tests.md`
-- `docs/developement/backends/`
+- `docs/B-backend-guides/`
+- `src/core/backends/README.md`
 - `tests/conftest.py` for hardware-safety assumptions in normal test runs
 
 ## Reporting issues
