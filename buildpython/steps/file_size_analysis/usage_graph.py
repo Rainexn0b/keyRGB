@@ -40,8 +40,10 @@ def build_usage_graph(root: Path, *, roots: tuple[str, ...]) -> UsageGraph:
         module_index,
         files=[*external_root_files, *sorted(reachable)],
     )
-    if launched_module_roots.difference(root_paths):
-        root_paths = frozenset(sorted(set(root_paths) | launched_module_roots))
+    registration_roots = _collect_registration_marker_roots(files)
+    extra_roots = launched_module_roots | registration_roots
+    if extra_roots.difference(root_paths):
+        root_paths = frozenset(sorted(set(root_paths) | extra_roots))
         reachable = _reachable_paths(adjacency, root_paths)
 
     return UsageGraph(
@@ -278,6 +280,40 @@ def _scan_external_dependencies(root: Path, path: Path, module_index: dict[str, 
         elif isinstance(node, ast.ImportFrom):
             dependencies.update(_resolve_from_import(node, package_name=package_name, module_index=module_index))
     return dependencies
+
+
+def _collect_registration_marker_roots(files: list[Path]) -> set[Path]:
+    """Treat package registration markers as discovery roots.
+
+    Backend packages are imported by name after scanning for
+    ``BACKEND_REGISTRATION``. That is a real runtime edge the static import
+    graph cannot see from ``registry.py`` alone.
+    """
+
+    roots: set[Path] = set()
+    for path in files:
+        if _defines_backend_registration(path):
+            roots.add(path)
+    return roots
+
+
+def _defines_backend_registration(path: Path) -> bool:
+    try:
+        source = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    try:
+        tree = ast.parse(source, filename=str(path))
+    except SyntaxError:
+        return False
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            if any(isinstance(target, ast.Name) and target.id == "BACKEND_REGISTRATION" for target in node.targets):
+                return True
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if node.target.id == "BACKEND_REGISTRATION":
+                return True
+    return False
 
 
 def _collect_launched_module_roots(module_index: dict[str, Path], *, files: list[Path]) -> set[Path]:

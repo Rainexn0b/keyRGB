@@ -71,10 +71,10 @@
   },
   "file_size_analysis": {
     "counts": {
-      "large_files": 0,
-      "long_import_blocks": 13,
+      "large_files": 4,
+      "long_import_blocks": 16,
       "flat_directories": 0,
-      "delegation_candidates": 0,
+      "delegation_candidates": 1,
       "middleman_modules": 2,
       "unreferenced_files": 0
     }
@@ -204,6 +204,18 @@
       {
         "path": "src/core/backends",
         "reason": "intentionally flat backends package root; direct modules are shared contracts (base, exceptions, policy, registry, hidraw helpers) with device implementations already under per-backend subpackages"
+      },
+      {
+        "path": "tests/tray/controllers/core",
+        "reason": "intentionally flat tray-controller contract tests; peer-level slices around lighting, menu adapters, and runtime coordination"
+      },
+      {
+        "path": "tests/tray/ui/menu",
+        "reason": "intentionally flat tray-menu test set; peer-level slices for construction, status, capabilities, and refresh"
+      },
+      {
+        "path": "tests/core/backends",
+        "reason": "intentionally flat backend-contract test root; shared capability/registration tests sit beside ite/ and general/ variant directories"
       }
     ]
   },

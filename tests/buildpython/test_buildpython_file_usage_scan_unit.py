@@ -170,6 +170,36 @@ def test_unreferenced_scan_treats_reachable_python_m_launches_as_roots(tmp_path,
     assert payload["unreferenced_files"] == []
 
 
+def test_unreferenced_scan_treats_backend_registration_markers_as_roots(tmp_path) -> None:
+    _write_minimal_pyproject(tmp_path)
+    _write_python_file(
+        tmp_path / "src" / "app.py",
+        """
+        def main() -> None:
+            return None
+        """,
+    )
+    _write_python_file(
+        tmp_path / "src" / "core" / "backends" / "demo" / "__init__.py",
+        """
+        from src.core.backends.demo.backend import DemoBackend
+
+        BACKEND_REGISTRATION = DemoBackend
+        """,
+    )
+    _write_python_file(
+        tmp_path / "src" / "core" / "backends" / "demo" / "backend.py",
+        """
+        class DemoBackend:
+            name = "demo"
+        """,
+    )
+
+    rows = scan_unreferenced_file_candidates(tmp_path, roots=("src",))
+
+    assert rows == []
+
+
 def test_unreferenced_scan_treats_launch_module_subprocess_targets_as_roots(tmp_path) -> None:
     _write_minimal_pyproject(tmp_path)
     _write_python_file(
