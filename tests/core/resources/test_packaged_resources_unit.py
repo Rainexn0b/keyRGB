@@ -23,9 +23,7 @@ def _resource_data_files() -> list[Path]:
     )
 
 
-_PACKAGE_DATA_SRC_RE = re.compile(
-    r"(?ms)^\[tool\.setuptools\.package-data\]\s*(?:#[^\n]*\n)*src\s*=\s*\[(.*?)\]"
-)
+_PACKAGE_DATA_SRC_RE = re.compile(r"(?ms)^\[tool\.setuptools\.package-data\]\s*(?:#[^\n]*\n)*src\s*=\s*\[(.*?)\]")
 
 
 def _package_data_patterns() -> list[str]:
