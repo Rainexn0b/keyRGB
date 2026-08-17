@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from src.core.backends.base import DEFAULT_BACKEND_CAPABILITIES, BackendCapabilities
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 
@@ -34,14 +35,20 @@ def test_select_backend_with_introspection_happy_path() -> None:
 
     backend = MagicMock()
     backend.probe.return_value = {"ok": True}
-    backend.capabilities.return_value = {"per_key": False}
+    backend.capabilities.return_value = {"per_key": False, "brightness": True}
 
     with patch("src.tray.app.backend.select_backend", return_value=backend):
         b, probe, caps = select_backend_with_introspection()
 
     assert b is backend
     assert probe == {"ok": True}
-    assert caps == {"per_key": False}
+    assert caps == BackendCapabilities(
+        brightness=True,
+        per_key=False,
+        color=False,
+        hardware_effects=False,
+        palette=False,
+    )
 
 
 def test_load_ite_dimensions_falls_back_and_logs_traceback() -> None:
@@ -85,7 +92,7 @@ def test_select_backend_with_introspection_handles_probe_exception() -> None:
 
     assert b is backend
     assert probe is None
-    assert caps == "caps"
+    assert caps == DEFAULT_BACKEND_CAPABILITIES
     _assert_logged_debug_traceback(logger, "Backend probe failed during tray introspection")
 
 
@@ -119,7 +126,7 @@ def test_select_backend_with_introspection_handles_caps_exception() -> None:
 
     assert b is backend
     assert probe == "probe"
-    assert caps is None
+    assert caps == DEFAULT_BACKEND_CAPABILITIES
     _assert_logged_debug_traceback(logger, "Backend capabilities lookup failed during tray introspection")
 
 

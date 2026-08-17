@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
-from . import _fade_loop, _render_brightness_support as _support, _ripple_loop
+from . import (
+    _base_maps,
+    _fade_loop,
+    _render_brightness_support as _support,
+    _ripple_loop,
+    render as _render_runtime,
+)
 from ._constants import (
     FIRST_ACTIVITY_POST_RESTORE_VISUAL_DAMP_S,
     FIRST_ACTIVITY_PULSE_LIFT_HOLDOFF_S,
@@ -12,7 +18,8 @@ from ._constants import (
     PULSE_MIX_INITIAL_RISE_STEP,
     PULSE_MIX_RISE_STEP,
 )
-from ._effects_api import bind_reactive_effect_exports, reactive_fade_api_for, reactive_ripple_api_for
+from ._effects_api import build_reactive_api
+from .utils import _ripple_radius, _ripple_weight  # noqa: F401 – backward-compat re-exports
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
@@ -21,8 +28,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # see _constants.py
-
-bind_reactive_effect_exports(globals())
 
 
 def _reactive_active_pulse_mix_or_default(engine: EffectsEngine, *, default: float) -> float:
@@ -111,16 +116,28 @@ def _set_reactive_active_pulse_mix(engine: EffectsEngine, *, target: float) -> N
 
 
 def _render_uniform_fallback(engine: EffectsEngine, *, rgb: tuple[int, int, int]) -> None:
-    api = reactive_fade_api_for(__name__)
-    color_map = api.get_engine_color_map_buffer(engine, "_reactive_uniform_fallback_map")
+    color_map = _base_maps.get_engine_color_map_buffer(engine, "_reactive_uniform_fallback_map")
     color_map.clear()
     color_map[(0, 0)] = rgb
-    api.render(engine, color_map=color_map)
+    _render_runtime.render(engine, color_map=color_map)
+
+
+# ---------------------------------------------------------------------------
+# Build immutable API facades (replaces globals().update + sys.modules cast)
+# ---------------------------------------------------------------------------
+_fade_api = build_reactive_api(
+    set_reactive_active_pulse_mix=_set_reactive_active_pulse_mix,
+    render_uniform_fallback=_render_uniform_fallback,
+)
+_ripple_api = build_reactive_api(
+    set_reactive_active_pulse_mix=_set_reactive_active_pulse_mix,
+    render_uniform_fallback=_render_uniform_fallback,
+)
 
 
 def run_reactive_fade(engine: EffectsEngine) -> None:
-    _fade_loop.run_reactive_fade_loop(engine, api=reactive_fade_api_for(__name__))
+    _fade_loop.run_reactive_fade_loop(engine, api=cast(_fade_loop._ReactiveFadeApiProtocol, _fade_api))
 
 
 def run_reactive_ripple(engine: EffectsEngine) -> None:
-    _ripple_loop.run_reactive_ripple_loop(engine, api=reactive_ripple_api_for(__name__))
+    _ripple_loop.run_reactive_ripple_loop(engine, api=cast(_ripple_loop._ReactiveRippleApiProtocol, _ripple_api))

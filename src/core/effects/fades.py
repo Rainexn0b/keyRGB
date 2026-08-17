@@ -91,6 +91,8 @@ def prime_per_key_frame(
     current_color: Color,
     brightness: int,
     reassert_user_mode: bool = False,
+    num_rows: int = NUM_ROWS,
+    num_cols: int = NUM_COLS,
 ) -> bool:
     """Write the final per-key frame once without a startup fade.
 
@@ -120,8 +122,8 @@ def prime_per_key_frame(
         full_colors = build_full_color_grid(
             base_color=base_color,
             per_key_colors=per_key_colors,
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
+            num_rows=int(num_rows),
+            num_cols=int(num_cols),
         )
     except _FADE_SETUP_ERRORS:
         return False
@@ -163,6 +165,8 @@ def fade_in_per_key(
     brightness: int,
     duration_s: float,
     steps: int = 12,
+    num_rows: int = NUM_ROWS,
+    num_cols: int = NUM_COLS,
 ) -> None:
     """Fade in the current per-key map to reduce harsh transitions."""
 
@@ -194,8 +198,8 @@ def fade_in_per_key(
         full_colors = build_full_color_grid(
             base_color=base_color,
             per_key_colors=per_key_colors,
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
+            num_rows=int(num_rows),
+            num_cols=int(num_cols),
         )
     except _FADE_SETUP_ERRORS:
         return

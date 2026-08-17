@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import EffectGridGeometry, all_keys_for, geometry_for_engine
 
 if TYPE_CHECKING:
     from src.core.effects.engine import EffectsEngine
 
 Color = tuple[int, int, int]
 Key = tuple[int, int]
-
-_ALL_KEYS: tuple[Key, ...] = tuple((r, c) for r in range(NUM_ROWS) for c in range(NUM_COLS))
 
 
 def get_engine_color_map_buffer(engine: EffectsEngine, attr_name: str) -> dict[Key, Color]:
@@ -36,9 +34,16 @@ def get_engine_color_map_buffer(engine: EffectsEngine, attr_name: str) -> dict[K
     return created
 
 
-def fill_uniform_color_map(dest: dict[Key, Color], *, color: Color) -> dict[Key, Color]:
+def fill_uniform_color_map(
+    dest: dict[Key, Color],
+    *,
+    color: Color,
+    geometry: EffectGridGeometry | None = None,
+    engine: object | None = None,
+) -> dict[Key, Color]:
+    active_geometry = geometry if geometry is not None else geometry_for_engine(engine)
     dest.clear()
-    for key in _ALL_KEYS:
+    for key in all_keys_for(active_geometry):
         dest[key] = color
     return dest
 

@@ -17,6 +17,8 @@ from src.core.effects.software_targets import (
 
 
 class _SpyKeyboard:
+    backend_caps = SimpleNamespace(per_key=True)
+
     def __init__(self) -> None:
         self.per_key_calls: list[tuple[dict[tuple[int, int], tuple[int, int, int]], int]] = []
 

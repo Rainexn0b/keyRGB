@@ -20,7 +20,14 @@ from src.core.backends.policies.backend_selection import (
     experimental_evidence_for_backend,
     experimental_evidence_label,
 )
-from src.core.backends.registry import BackendSpec, _probe_backend, _spec_for_backend, iter_backends, select_backend
+from src.core.backends.registry import (
+    BackendSpec,
+    _probe_backend,
+    _spec_for_backend,
+    build_backend_selection_report,
+    iter_backends,
+    select_backend,
+)
 
 
 @dataclass
@@ -183,6 +190,33 @@ def test_select_backend_auto_prefers_usable_sysfs_over_higher_confidence_usb(
     backend = select_backend(specs=specs)
     assert backend is not None
     assert backend.name == "sysfs-leds"
+
+
+def test_selection_report_is_canonical_and_probes_each_backend_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    probe_calls: list[str] = []
+
+    class CountingBackend(DummyBackend):
+        def probe(self) -> ProbeResult:
+            probe_calls.append(self.name)
+            return super().probe()
+
+    backends = [
+        CountingBackend("ite8291r3_perkey", 100, True, confidence=95),
+        CountingBackend("sysfs-leds", 10, True, confidence=60),
+    ]
+    monkeypatch.delenv("KEYRGB_BACKEND", raising=False)
+
+    report = build_backend_selection_report(backends)
+
+    assert report.selected is backends[1]
+    assert [evaluation.backend.name for evaluation in report.candidates] == [
+        "sysfs-leds",
+        "ite8291r3_perkey",
+    ]
+    assert [evaluation.auto_safety_tier for evaluation in report.candidates] == [1, 0]
+    assert probe_calls == ["ite8291r3_perkey", "sysfs-leds"]
 
 
 def test_select_backend_auto_uses_usb_when_sysfs_is_unavailable(

@@ -4,6 +4,7 @@ import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from src.core.backends.effect_contract import HardwareEffectBuilder, hardware_effect_builder
 from src.core.backends.exceptions import (
     BACKEND_OPEN_RUNTIME_ERRORS,
     BackendBusyError,
@@ -18,8 +19,6 @@ from ..policies.backend_selection import experimental_backends_enabled
 from . import protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from ..base import KeyboardDevice
     from ..ite8291_perkey.hidraw import HidrawDeviceInfo, HidrawFeatureOutputTransport
 
@@ -69,21 +68,18 @@ def _open_matching_transport() -> tuple[HidrawFeatureOutputTransport, HidrawDevi
     )
 
 
-def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> Callable[..., dict[str, object]]:
+def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> HardwareEffectBuilder:
     args = {"speed": None, "brightness": None}
     for key in extra:
         args[key] = None
 
     def build(**kwargs: object) -> dict[str, object]:
         _ = args
-        for key in kwargs:
-            if key not in args:
-                raise ValueError(f"'{key}' attr is not needed by effect")
         payload: dict[str, object] = {"name": effect_name}
         payload.update(kwargs)
         return payload
 
-    return build
+    return hardware_effect_builder(build, accepted_kwargs=args)
 
 
 @dataclass
@@ -160,7 +156,7 @@ class Ite8295ZonesBackend(KeyboardBackend):
         )
 
     def capabilities(self) -> BackendCapabilities:
-        return BackendCapabilities(per_key=False, color=True, hardware_effects=True, palette=False)
+        return BackendCapabilities(brightness=True, per_key=False, color=True, hardware_effects=True, palette=False)
 
     def get_device(self) -> KeyboardDevice:
         if not experimental_backends_enabled():
@@ -191,7 +187,7 @@ class Ite8295ZonesBackend(KeyboardBackend):
     def dimensions(self) -> tuple[int, int]:
         return (1, protocol.NUM_ZONES)
 
-    def effects(self) -> dict[str, Callable[..., dict[str, object]]]:
+    def effects(self) -> dict[str, HardwareEffectBuilder]:
         return {
             "breathing": _effect_builder("breathing", extra=("color",)),
             "wave": _effect_builder("wave", extra=("direction",)),

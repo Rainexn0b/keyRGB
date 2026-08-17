@@ -152,6 +152,7 @@ class Ite8233Backend(KeyboardBackend):
 
     def capabilities(self) -> BackendCapabilities:
         return BackendCapabilities(
+            brightness=True,
             per_key=False,
             color=True,
             hardware_effects=False,

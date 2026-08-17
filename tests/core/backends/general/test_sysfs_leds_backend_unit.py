@@ -83,6 +83,7 @@ def test_sysfs_backend_capabilities_tolerate_find_leds_oserror(monkeypatch: pyte
 
     caps = backend.capabilities()
 
+    assert caps.brightness is True
     assert caps.per_key is False
     assert caps.color is False
 
@@ -203,15 +204,26 @@ def test_safe_write_text_tripwire_refuses_real_sysfs_under_pytest(
         _safe_write_text(Path("/sys/class/leds/keyrgb-test/brightness"), "1\n")
 
 
-def test_safe_write_text_is_noop_for_real_sysfs_without_tripwire(
+def test_safe_write_text_is_noop_when_access_tripwire_is_explicitly_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("KEYRGB_ALLOW_HARDWARE", raising=False)
+    monkeypatch.delenv("KEYRGB_HW_TESTS", raising=False)
+    monkeypatch.setenv("KEYRGB_TEST_HARDWARE_TRIPWIRE", "0")
+
+    # Should not raise (and should not attempt to write).
+    _safe_write_text(Path("/sys/class/leds/keyrgb-test/brightness"), "1\n")
+
+
+def test_safe_write_text_refuses_real_sysfs_by_default(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("KEYRGB_ALLOW_HARDWARE", raising=False)
     monkeypatch.delenv("KEYRGB_HW_TESTS", raising=False)
     monkeypatch.delenv("KEYRGB_TEST_HARDWARE_TRIPWIRE", raising=False)
 
-    # Should not raise (and should not attempt to write).
-    _safe_write_text(Path("/sys/class/leds/keyrgb-test/brightness"), "1\n")
+    with pytest.raises(RuntimeError, match="Refusing to write real sysfs"):
+        _safe_write_text(Path("/sys/class/leds/keyrgb-test/brightness"), "1\n")
 
 
 def test_is_real_sysfs_path_returns_false_when_resolution_fails_for_non_sysfs_path(

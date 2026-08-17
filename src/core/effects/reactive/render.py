@@ -5,7 +5,8 @@ import time as _time
 from operator import attrgetter
 from typing import TYPE_CHECKING
 
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from src.core.backends.base import supports_per_key_output
+from src.core.effects.matrix_layout import geometry_for_engine
 from src.core.effects.perkey_animation import build_full_color_grid
 
 from ._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
@@ -45,16 +46,6 @@ def _engine_attr_or_default(engine: EffectsEngine, attr_name: str, *, default: o
         return attrgetter(attr_name)(engine)
     except AttributeError:
         return default
-
-
-def _keyboard_attr_or_none(engine: EffectsEngine, attr_name: str) -> object | None:
-    kb = _engine_attr_or_default(engine, "kb", default=None)
-    if kb is None:
-        return None
-    try:
-        return attrgetter(attr_name)(kb)
-    except AttributeError:
-        return None
 
 
 def clamp01(x: float) -> float:
@@ -300,7 +291,7 @@ def pace(engine: EffectsEngine, *, min_factor: float = 0.25, max_factor: float =
 
 
 def has_per_key(engine: EffectsEngine) -> bool:
-    return bool(_keyboard_attr_or_none(engine, "set_key_colors"))
+    return supports_per_key_output(getattr(engine, "backend_caps", None), getattr(engine, "kb", None))
 
 
 def base_color_map(engine: EffectsEngine) -> dict[Key, Color]:
@@ -310,16 +301,17 @@ def base_color_map(engine: EffectsEngine) -> dict[Key, Color]:
         int(base_color_src[1]),
         int(base_color_src[2]),
     )
+    geometry = geometry_for_engine(engine)
 
     per_key = getattr(engine, "per_key_colors", None) or None
     if not per_key:
-        return {(r, c): base_color for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+        return {(r, c): base_color for r in range(geometry.rows) for c in range(geometry.cols)}
 
     full = build_full_color_grid(
         base_color=base_color,
         per_key_colors=per_key,
-        num_rows=NUM_ROWS,
-        num_cols=NUM_COLS,
+        num_rows=geometry.rows,
+        num_cols=geometry.cols,
     )
 
     out: dict[Key, Color] = {}

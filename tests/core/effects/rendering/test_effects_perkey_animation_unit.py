@@ -6,6 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.core.effects.perkey_animation import (
+    build_full_color_grid,
     enable_user_mode_once,
     load_per_key_colors_from_config,
     restore_hidden_per_key_rows_once,
@@ -20,6 +21,19 @@ def test_load_per_key_colors_from_config_returns_mapping(monkeypatch: pytest.Mon
     monkeypatch.setitem(sys.modules, "src.core.config", SimpleNamespace(Config=_Config))
 
     assert load_per_key_colors_from_config() == {(0, 0): (1, 2, 3)}
+
+
+def test_build_full_color_grid_honors_explicit_dimensions() -> None:
+    colors = build_full_color_grid(
+        base_color=(10, 20, 30),
+        per_key_colors={(1, 2): (1, 2, 3)},
+        num_rows=2,
+        num_cols=3,
+    )
+
+    assert set(colors) == {(row, col) for row in range(2) for col in range(3)}
+    assert colors[(0, 0)] == (10, 20, 30)
+    assert colors[(1, 2)] == (1, 2, 3)
 
 
 def test_load_per_key_colors_from_config_falls_back_on_runtime_config_errors(

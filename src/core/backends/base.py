@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Protocol
@@ -35,6 +36,7 @@ class KeyboardDevice(Protocol):
 
 @dataclass(frozen=True)
 class BackendCapabilities:
+    brightness: bool
     per_key: bool
     color: bool
     hardware_effects: bool
@@ -42,10 +44,11 @@ class BackendCapabilities:
 
 
 DEFAULT_BACKEND_CAPABILITIES = BackendCapabilities(
-    per_key=True,
-    color=True,
-    hardware_effects=True,
-    palette=True,
+    brightness=False,
+    per_key=False,
+    color=False,
+    hardware_effects=False,
+    palette=False,
 )
 
 
@@ -54,18 +57,32 @@ def normalize_backend_capabilities(
     *,
     default: BackendCapabilities = DEFAULT_BACKEND_CAPABILITIES,
 ) -> BackendCapabilities:
-    """Return one typed capability snapshot with compatibility-safe defaults."""
+    """Return one typed capability snapshot, failing closed for missing evidence."""
 
     if isinstance(value, BackendCapabilities):
         return value
     if value is None:
         return default
+
+    def _field(name: str, fallback: bool) -> bool:
+        raw = value.get(name, fallback) if isinstance(value, Mapping) else getattr(value, name, fallback)
+        return bool(raw)
+
     return BackendCapabilities(
-        per_key=bool(getattr(value, "per_key", default.per_key)),
-        color=bool(getattr(value, "color", default.color)),
-        hardware_effects=bool(getattr(value, "hardware_effects", default.hardware_effects)),
-        palette=bool(getattr(value, "palette", default.palette)),
+        brightness=_field("brightness", default.brightness),
+        per_key=_field("per_key", default.per_key),
+        color=_field("color", default.color),
+        hardware_effects=_field("hardware_effects", default.hardware_effects),
+        palette=_field("palette", default.palette),
     )
+
+
+def supports_per_key_output(capabilities: object | None, device: object | None) -> bool:
+    """Require both declared capability evidence and an operational writer."""
+
+    declared = capabilities if capabilities is not None else getattr(device, "backend_caps", None)
+    caps = normalize_backend_capabilities(declared)
+    return caps.per_key and callable(getattr(device, "set_key_colors", None))
 
 
 class BackendStability(str, Enum):
@@ -77,6 +94,68 @@ class BackendStability(str, Enum):
 class ExperimentalEvidence(str, Enum):
     SPECULATIVE = "speculative"
     REVERSE_ENGINEERED = "reverse_engineered"
+
+
+class BackendRole(str, Enum):
+    """Classifies whether a backend participates in primary auto-selection.
+
+    PRIMARY backends are candidates for normal selection; AUXILIARY backends
+    are excluded from primary selection but remain visible in diagnostics and
+    secondary-device workflows.
+    """
+
+    PRIMARY = "primary"
+    AUXILIARY = "auxiliary"
+
+
+@dataclass(frozen=True)
+class BackendMetadata:
+    """Static, serialisable metadata that describes a backend type.
+
+    This is the single source of truth for provider, tier, safety, and
+    stability classification.  It lives on the *package* (via
+    ``BackendRegistration``) rather than on individual backend instances, so it
+    is available **before** a backend is constructed and survives even if the
+    factory fails.
+    """
+
+    name: str
+    priority: int
+    role: BackendRole = BackendRole.PRIMARY
+    provider: str | None = None  # "kernel-sysfs", "usb-userspace"
+    stability: BackendStability = BackendStability.VALIDATED
+    experimental_evidence: ExperimentalEvidence | None = None
+
+    def diagnostics_tier(self) -> int | None:
+        """Diagnostics classification tier derived from *provider*.
+
+        * 1 = kernel / sysfs backed
+        * 2 = USB / userspace backed
+        * None = unknown
+        """
+        p = (self.provider or "").strip().lower()
+        if p == "kernel-sysfs":
+            return 1
+        if p == "usb-userspace":
+            return 2
+        return None
+
+    def auto_safety_tier(self) -> int:
+        """Auto-selection safety tier (1 = kernel preferred, 0 = userspace)."""
+        return 1 if self.diagnostics_tier() == 1 else 0
+
+
+@dataclass(frozen=True)
+class BackendRegistration:
+    """Package-owned built-in registration marker.
+
+    Each backend package exposes a ``BACKEND_REGISTRATION`` module-level
+    instance of this type.  The registry discovers these at scan time and
+    derives ``BackendSpec`` objects from them without hand-edited import lists.
+    """
+
+    metadata: BackendMetadata
+    factory: Callable[[], KeyboardBackend]
 
 
 def _normalize_enum_text(value: object) -> str | None:

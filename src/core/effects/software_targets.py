@@ -5,6 +5,7 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Protocol, TypeVar, cast
 
+from src.core.backends.base import supports_per_key_output
 from src.core.effects.transitions import avoid_full_black
 from src.core.utils.exceptions import is_permission_denied
 from src.core.utils.logging_utils import log_throttled
@@ -71,7 +72,7 @@ def software_render_targets(engine: object) -> list[SoftwareRenderTarget]:
             key="keyboard",
             device_type="keyboard",
             device=primary_device,
-            supports_per_key=bool(getattr(primary_device, "set_key_colors", None)),
+            supports_per_key=supports_per_key_output(getattr(engine, "backend_caps", None), primary_device),
         )
     ]
 

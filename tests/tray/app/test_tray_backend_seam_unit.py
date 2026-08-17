@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import src.tray.app.backend as _mod
+from src.core.backends.base import BackendCapabilities
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 # ---------------------------------------------------------------------------
@@ -71,7 +72,13 @@ def test_select_backend_with_introspection_working_backend_returns_all_non_none(
         backend, probe, caps = _mod.select_backend_with_introspection()
     assert backend is fake_backend
     assert probe is fake_probe
-    assert caps is fake_caps
+    assert caps == BackendCapabilities(
+        brightness=False,
+        per_key=True,
+        color=False,
+        hardware_effects=False,
+        palette=False,
+    )
 
 
 def test_select_backend_with_introspection_probe_raises_returns_none_probe():
@@ -87,7 +94,13 @@ def test_select_backend_with_introspection_probe_raises_returns_none_probe():
         backend, probe, caps = _mod.select_backend_with_introspection()
     assert backend is fake_backend
     assert probe is None
-    assert caps is fake_caps
+    assert caps == BackendCapabilities(
+        brightness=False,
+        per_key=False,
+        color=False,
+        hardware_effects=False,
+        palette=False,
+    )
 
 
 def test_select_backend_with_introspection_no_probe_attribute_returns_none_probe():
@@ -98,7 +111,13 @@ def test_select_backend_with_introspection_no_probe_attribute_returns_none_probe
         backend, probe, caps = _mod.select_backend_with_introspection()
     assert backend is fake_backend
     assert probe is None
-    assert caps is fake_caps
+    assert caps == BackendCapabilities(
+        brightness=False,
+        per_key=True,
+        color=False,
+        hardware_effects=False,
+        palette=False,
+    )
 
 
 # ---------------------------------------------------------------------------

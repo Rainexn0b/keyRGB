@@ -19,11 +19,13 @@ class Errno19(OSError):
 
 def _mk_engine(*, key_colors_exc: Exception):
     kb = SimpleNamespace(
+        backend_caps=SimpleNamespace(per_key=True),
         enable_user_mode=lambda **_k: None,
         set_key_colors=MagicMock(side_effect=key_colors_exc),
         set_color=MagicMock(),
     )
     engine = SimpleNamespace(
+        backend_caps=SimpleNamespace(per_key=True),
         kb=kb,
         kb_lock=RLock(),
         brightness=25,

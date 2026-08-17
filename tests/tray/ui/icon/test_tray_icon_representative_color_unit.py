@@ -159,7 +159,7 @@ def test_representative_color_hardware_effect_branch() -> None:
 def test_representative_color_perkey_branch_prefers_perkey_brightness_and_color(monkeypatch) -> None:
     from src.tray.ui.icon import _color
 
-    monkeypatch.setattr(_color, "_representative_perkey_color", lambda _cfg: (100, 80, 60))
+    monkeypatch.setattr(_color, "_representative_perkey_color", lambda _cfg, **_kwargs: (100, 80, 60))
     cfg = SimpleNamespace(effect="perkey", brightness=1, perkey_brightness=20, color=(1, 2, 3))
 
     # perkey_brightness=20 -> icon_brightness=50 -> full scale

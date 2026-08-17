@@ -2,11 +2,23 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.effects.catalog import resolve_effect_name_for_backend
+from src.core.backends.base import BackendCapabilities
+from src.core.effects.catalog import detected_backend_hw_effect_names, resolve_effect_name_for_backend
+
+
+class _HardwareEffectsBackend:
+    def capabilities(self) -> BackendCapabilities:
+        return BackendCapabilities(
+            brightness=True,
+            per_key=False,
+            color=True,
+            hardware_effects=True,
+            palette=False,
+        )
 
 
 def test_resolve_effect_name_preserves_backend_exposed_hardware_effect() -> None:
-    class _Backend:
+    class _Backend(_HardwareEffectsBackend):
         def effects(self):
             return {"wave": object()}
 
@@ -14,7 +26,7 @@ def test_resolve_effect_name_preserves_backend_exposed_hardware_effect() -> None
 
 
 def test_resolve_effect_name_prefers_software_collision_without_hw_prefix() -> None:
-    class _Backend:
+    class _Backend(_HardwareEffectsBackend):
         def effects(self):
             return {"spectrum_cycle": object()}
 
@@ -34,11 +46,19 @@ def test_resolve_effect_name_preserves_forced_hw_name_for_later_runtime_validati
         def effects(self):
             return {}
 
-    assert resolve_effect_name_for_backend("hw:wave", _Backend()) == "wave"
+    assert resolve_effect_name_for_backend("hw:wave", _Backend()) == "none"
+
+
+def test_effect_method_cannot_replace_missing_capability_evidence() -> None:
+    class _Backend:
+        def effects(self):
+            return {"wave": object()}
+
+    assert detected_backend_hw_effect_names(_Backend()) == ()
 
 
 def test_resolve_effect_name_falls_back_when_backend_effect_lookup_raises_runtime_error() -> None:
-    class _Backend:
+    class _Backend(_HardwareEffectsBackend):
         def effects(self):
             raise RuntimeError("effect lookup failed")
 
@@ -46,7 +66,7 @@ def test_resolve_effect_name_falls_back_when_backend_effect_lookup_raises_runtim
 
 
 def test_resolve_effect_name_propagates_unexpected_backend_effect_lookup_failures() -> None:
-    class _Backend:
+    class _Backend(_HardwareEffectsBackend):
         def effects(self):
             raise AssertionError("unexpected effect lookup bug")
 

@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 import src.core.backends.base as base  # noqa: PLR0402 - exact leaf import; package root intentionally exports no facade
 import src.core.backends.exceptions as backend_exceptions
+from src.core.backends.controller_identity import controller_identity
+from src.core.backends.effect_contract import hardware_effect_builder
 from src.core.backends.shared_hidraw_transport import (
     HidrawTransportProxy,
     SharedHidrawTransportManager,
@@ -26,27 +28,34 @@ if TYPE_CHECKING:
 
 
 _transport_manager: SharedHidrawTransportManager | None = None
-_profile_coordinator: Ite8258ChassisProfileCoordinator | None = None
+_profile_coordinators: dict[str, Ite8258ChassisProfileCoordinator] = {}
 
 
 def _get_transport_manager() -> SharedHidrawTransportManager:
-    global _profile_coordinator, _transport_manager
+    global _transport_manager
     if _transport_manager is None:
-        from .profile_coordinator import Ite8258ChassisProfileCoordinator
-
         _transport_manager = SharedHidrawTransportManager()
-        _profile_coordinator = Ite8258ChassisProfileCoordinator()
     return _transport_manager
 
 
-def _get_profile_coordinator() -> Ite8258ChassisProfileCoordinator:
-    global _profile_coordinator
-    _get_transport_manager()
-    if _profile_coordinator is None:
-        from .profile_coordinator import Ite8258ChassisProfileCoordinator
+def _controller_id_for_info(info: object | None) -> str:
+    hidraw = getattr(info, "devnode", None) if info is not None else None
+    return controller_identity(backend_name="ite8258_perkey_chassis", hidraw=hidraw)
 
-        _profile_coordinator = Ite8258ChassisProfileCoordinator()
-    return _profile_coordinator
+
+def _current_controller_id() -> str:
+    return _controller_id_for_info(_find_matching_supported_hidraw_device())
+
+
+def _get_profile_coordinator(controller_id: str | None = None) -> Ite8258ChassisProfileCoordinator:
+    from .profile_coordinator import Ite8258ChassisProfileCoordinator
+
+    resolved = controller_id if controller_id is not None else _current_controller_id()
+    coordinator = _profile_coordinators.get(resolved)
+    if coordinator is None:
+        coordinator = Ite8258ChassisProfileCoordinator()
+        _profile_coordinators[resolved] = coordinator
+    return coordinator
 
 
 def _find_matching_supported_hidraw_device() -> hidraw.HidrawDeviceInfo | None:
@@ -77,14 +86,11 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):
 
     def build(**kwargs: object) -> dict[str, object]:
         _ = args
-        for key in kwargs:
-            if key not in args:
-                raise ValueError(f"'{key}' attr is not needed by effect")
         payload: dict[str, object] = {"name": effect_name}
         payload.update(kwargs)
         return payload
 
-    return build
+    return hardware_effect_builder(build, accepted_kwargs=args)
 
 
 @dataclass
@@ -154,7 +160,7 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
         )
 
     def capabilities(self) -> base.BackendCapabilities:
-        return base.BackendCapabilities(per_key=True, color=True, hardware_effects=True, palette=False)
+        return base.BackendCapabilities(brightness=True, per_key=True, color=True, hardware_effects=True, palette=False)
 
     def _require_experimental(self) -> None:
         if not experimental_backends_enabled():
@@ -163,12 +169,16 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
                 "or set KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 before using it."
             )
 
-    def _acquire_transport_proxy(self) -> HidrawTransportProxy:
+    def _acquire_transport_proxy(self) -> tuple[HidrawTransportProxy, str]:
         self._require_experimental()
+        controller_id = _current_controller_id()
         try:
-            return _get_transport_manager().acquire(
-                self.name,
-                opener=lambda: _open_matching_transport()[0],
+            return (
+                _get_transport_manager().acquire(
+                    controller_id,
+                    opener=lambda: _open_matching_transport()[0],
+                ),
+                controller_id,
             )
         except backend_exceptions.BACKEND_OPEN_RUNTIME_ERRORS as exc:  # @quality-exception exception-transparency: HID transport open is a hardware driver boundary; recoverable driver exceptions are translated to BackendError subclasses here
             if device_exception_utils.is_permission_denied(exc):
@@ -189,17 +199,17 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
             raise backend_exceptions.BackendIOError(f"ITE 8258 chassis HID transport failed: {exc}") from exc
 
     def get_device(self) -> base.KeyboardDevice:
-        proxy = self._acquire_transport_proxy()
+        proxy, controller_id = self._acquire_transport_proxy()
         from .device import Ite8258ChassisKeyboardDevice
 
         return Ite8258ChassisKeyboardDevice(
             proxy.send_feature_report,
             transport=proxy,
-            profile_coordinator=_get_profile_coordinator(),
+            profile_coordinator=_get_profile_coordinator(controller_id),
         )
 
     def get_zone_device(self, zone_key: str) -> object:
-        proxy = self._acquire_transport_proxy()
+        proxy, controller_id = self._acquire_transport_proxy()
         from .device import Ite8258ChassisZoneDevice
 
         if zone_key == "logo":
@@ -217,7 +227,7 @@ class Ite8258ChassisBackend(base.KeyboardBackend):
             zone_name=zone_key,
             led_ids=led_ids,
             transport=proxy,
-            profile_coordinator=_get_profile_coordinator(),
+            profile_coordinator=_get_profile_coordinator(controller_id),
         )
 
     def dimensions(self) -> tuple[int, int]:

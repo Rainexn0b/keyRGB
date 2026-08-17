@@ -98,7 +98,9 @@ class Ite8297Backend(base.KeyboardBackend):
         )
 
     def capabilities(self) -> base.BackendCapabilities:
-        return base.BackendCapabilities(per_key=False, color=True, hardware_effects=False, palette=False)
+        return base.BackendCapabilities(
+            brightness=True, per_key=False, color=True, hardware_effects=False, palette=False
+        )
 
     def get_device(self) -> base.KeyboardDevice:
         if not experimental_backends_enabled():

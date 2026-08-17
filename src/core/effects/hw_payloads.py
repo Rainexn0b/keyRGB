@@ -5,6 +5,10 @@ from collections.abc import Callable, Mapping
 from threading import RLock
 from typing import Protocol, cast
 
+from src.core.backends.effect_contract import (
+    HardwareEffectBuilderProtocol,
+    UnsupportedHardwareEffectArgument,
+)
 from src.core.utils.logging_utils import log_throttled
 
 Color = tuple[int, int, int]
@@ -18,22 +22,8 @@ class _KeyboardHwSpeedPolicyProtocol(Protocol):
     keyrgb_hw_speed_policy: object
 
 
-class _ClosureCodeProtocol(Protocol):
-    co_freevars: tuple[str, ...]
-
-
-class _ClosureCellProtocol(Protocol):
-    cell_contents: object
-
-
-class _ClosureIntrospectableProtocol(Protocol):
-    __code__: _ClosureCodeProtocol
-    __closure__: tuple[_ClosureCellProtocol, ...] | None
-
-
 _KNOWN_COLOR_HW_EFFECTS = frozenset({"breathing", "random", "ripple", "raindrop", "aurora", "fireworks"})
 _KNOWN_RANDOM_SENTINEL_HW_EFFECTS = frozenset({"random"})
-_HW_EFFECT_INTROSPECTION_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 _PALETTE_PROGRAM_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
@@ -54,28 +44,22 @@ def _hw_speed_from_ui_speed(ui_speed: int, *, kb: object) -> int:
 
 
 def allowed_hw_effect_keys(effect_func: Callable[..., object], *, logger: logging.Logger) -> set[str]:
-    """Best-effort introspection of hardware-effect builder callables."""
+    """Return explicitly declared hardware-effect payload fields.
 
-    try:
-        introspectable = cast(_ClosureIntrospectableProtocol, effect_func)
-        freevars = introspectable.__code__.co_freevars
-        closure = introspectable.__closure__
-        if not freevars or not closure:
-            return set()
-        mapping = dict(zip(freevars, [c.cell_contents for c in closure]))
-        args = mapping.get("args")
-        if isinstance(args, dict):
-            return set(args.keys())
-    except _HW_EFFECT_INTROSPECTION_ERRORS as exc:
-        log_throttled(
-            logger,
-            "legacy.effects.allowed_keys",
-            interval_s=120,
-            level=logging.DEBUG,
-            msg="Failed to introspect hardware effect args",
-            exc=exc,
-        )
-    return set()
+    ``logger`` remains in the signature for public compatibility. Builders that
+    predate the explicit contract return an empty set and are called unchanged.
+    """
+
+    del logger
+    accepted = getattr(cast(HardwareEffectBuilderProtocol, effect_func), "accepted_kwargs", None)
+    if not isinstance(accepted, frozenset) or not all(isinstance(key, str) for key in accepted):
+        return set()
+    return set(accepted)
+
+
+def _has_explicit_hw_effect_contract(effect_func: Callable[..., object]) -> bool:
+    accepted = getattr(cast(HardwareEffectBuilderProtocol, effect_func), "accepted_kwargs", None)
+    return isinstance(accepted, frozenset) and all(isinstance(key, str) for key in accepted)
 
 
 def build_hw_effect_payload(
@@ -93,8 +77,8 @@ def build_hw_effect_payload(
 ) -> object:
     """Build payload for a hardware effect.
 
-    Mirrors the previous logic in EffectsEngine._start_hw_effect (including the
-    "drop unsupported keys" retry loop).
+    Builders with explicit metadata are filtered before invocation. Legacy
+    builders without metadata receive the common payload fields unchanged.
     """
 
     # Hardware speed policy is backend-specific.
@@ -110,9 +94,14 @@ def build_hw_effect_payload(
     }
 
     allowed = allowed_hw_effect_keys(effect_func, logger=logger)
+    has_explicit_contract = _has_explicit_hw_effect_contract(effect_func)
 
     normalized_effect_name = str(effect_name or "").strip().lower()
-    supports_color = "color" in allowed or normalized_effect_name in _KNOWN_COLOR_HW_EFFECTS
+    # Undeclared/plugin builders without metadata receive the historical common
+    # fields unchanged. Internal builders publish metadata and are filtered.
+    supports_color = (
+        not has_explicit_contract or "color" in allowed or normalized_effect_name in _KNOWN_COLOR_HW_EFFECTS
+    )
 
     # Palette-based backends (for example ite8291r3_perkey) expose a firmware color
     # slot table. Any hardware effect that accepts a `color` parameter expects
@@ -144,25 +133,19 @@ def build_hw_effect_payload(
     if "color" not in hw_kwargs and supports_color:
         hw_kwargs["color"] = tuple(current_color)
 
-    if direction and "direction" in allowed:
+    if direction and (not has_explicit_contract or "direction" in allowed):
         hw_kwargs["direction"] = direction
 
-    if allowed:
+    if has_explicit_contract:
         hw_kwargs = {k: v for k, v in hw_kwargs.items() if k in allowed}
 
-    last_err: Exception | None = None
     for _ in range(4):
         try:
             return effect_func(**hw_kwargs)
-        except ValueError as exc:
-            msg = str(exc)
-            last_err = exc
-            # Expect errors like: "'speed' attr is not needed by effect"
-            if "attr is not needed" in msg and msg.startswith("'"):
-                bad = msg.split("'", 2)[1]
-                if bad in hw_kwargs:
-                    hw_kwargs.pop(bad, None)
-                    continue
+        except UnsupportedHardwareEffectArgument as exc:
+            if exc.argument in hw_kwargs:
+                hw_kwargs.pop(exc.argument, None)
+                continue
             raise
 
-    raise RuntimeError("Failed to build hardware effect payload") from last_err
+    raise RuntimeError("Failed to build hardware effect payload")

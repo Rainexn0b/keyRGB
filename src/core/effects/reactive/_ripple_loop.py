@@ -7,6 +7,9 @@ from collections.abc import Callable, Mapping, Sequence
 from operator import attrgetter
 from typing import TYPE_CHECKING, Protocol
 
+from src.core.backends.base import supports_per_key_output
+from src.core.effects.matrix_layout import geometry_for_engine
+
 from .input import EvdevKeyboardDevices
 from .utils import frame_elapsed_dt_s, log_frame_overrun_if_slow, remaining_frame_delay_s
 
@@ -65,12 +68,7 @@ def _engine_int_attr_or_fallback(
 
 
 def _has_per_key_writer(engine: EffectsEngine) -> bool:
-    kb = engine.kb
-    try:
-        set_key_colors = attrgetter("set_key_colors")(kb)
-    except AttributeError:
-        return False
-    return bool(set_key_colors)
+    return supports_per_key_output(getattr(engine, "backend_caps", None), getattr(engine, "kb", None))
 
 
 class _PressSourceProtocol(Protocol):
@@ -121,11 +119,20 @@ class _BackdropBrightnessScaleFactorProtocol(Protocol):
 
 
 class _ReactiveRippleApiProtocol(Protocol):
-    _PressSource: _PressSourceFactoryProtocol
-    _RainbowPulse: _RainbowPulseFactoryProtocol
-    random: _RandomProtocol
-    NUM_ROWS: int
-    NUM_COLS: int
+    @property
+    def _PressSource(self) -> _PressSourceFactoryProtocol: ...
+
+    @property
+    def _RainbowPulse(self) -> _RainbowPulseFactoryProtocol: ...
+
+    @property
+    def random(self) -> _RandomProtocol: ...
+
+    @property
+    def NUM_ROWS(self) -> int: ...
+
+    @property
+    def NUM_COLS(self) -> int: ...
 
     def frame_dt_s(self) -> float: ...
 
@@ -178,6 +185,8 @@ class _ReactiveRippleApiProtocol(Protocol):
         pulses: list[_RainbowPulseProtocol],
         *,
         band: float,
+        engine: EffectsEngine | None = None,
+        geometry: object | None = None,
     ) -> RippleOverlay: ...
 
     def get_engine_manual_reactive_color(self, engine: EffectsEngine) -> Color | None: ...
@@ -286,8 +295,9 @@ def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiPr
                                 )
                             )
                     else:
-                        row = api.random.randrange(api.NUM_ROWS)
-                        col = api.random.randrange(api.NUM_COLS)
+                        geometry = geometry_for_engine(engine)
+                        row = api.random.randrange(int(geometry.rows))
+                        col = api.random.randrange(int(geometry.cols))
                         pulses.append(api._RainbowPulse(row=row, col=col, age_s=0.0, ttl_s=ttl, hue_offset=global_hue))
 
             pulses = api._age_pulses_in_place(pulses, dt=real_dt)
@@ -301,7 +311,7 @@ def run_reactive_ripple_loop(engine: EffectsEngine, *, api: _ReactiveRippleApiPr
             trail_scale = max(0.1, min(4.0, ((int(trail_pct) or 40) / 50.0) ** 2))
             band = 2.15 * trail_scale
             overlay = api.get_engine_overlay_buffer(engine, "_reactive_ripple_overlay")
-            api.build_ripple_overlay_into(overlay, pulses, band=band)
+            api.build_ripple_overlay_into(overlay, pulses, band=band, engine=engine)
 
             try:
                 target_mix = max((float(weight) for (weight, _hue) in overlay.values()), default=0.0)

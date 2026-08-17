@@ -143,7 +143,13 @@ class SysfsMouseBackend(KeyboardBackend):
     def capabilities(self) -> BackendCapabilities:
         found = self._find_leds()
         color_supported = bool(found)
-        return BackendCapabilities(per_key=False, color=color_supported, hardware_effects=False, palette=False)
+        return BackendCapabilities(
+            brightness=True,
+            per_key=False,
+            color=color_supported,
+            hardware_effects=False,
+            palette=False,
+        )
 
     def get_device(self) -> KeyboardDevice:
         probe = self.probe()

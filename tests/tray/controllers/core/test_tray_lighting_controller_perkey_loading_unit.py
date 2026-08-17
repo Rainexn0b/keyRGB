@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import cast
 from unittest.mock import MagicMock
 
+from src.core.backends.base import BackendCapabilities
 from src.tray.controllers.lighting_controller import start_current_effect
 from src.tray.protocols import LightingTrayProtocol
 
@@ -18,6 +19,16 @@ class MockEngine:
         self.kb_lock = MagicMock()
         self.kb_lock.__enter__ = MagicMock()
         self.kb_lock.__exit__ = MagicMock()
+        self.backend_caps = BackendCapabilities(
+            brightness=True,
+            per_key=True,
+            color=True,
+            hardware_effects=False,
+            palette=False,
+        )
+
+    def _ensure_device_available(self) -> bool:
+        return True
 
 
 class MockConfig:
@@ -38,6 +49,7 @@ class MockTray:
     def __init__(self):
         self.config = MockConfig()
         self.engine = MockEngine()
+        self.backend_caps = self.engine.backend_caps
         self.is_off = False
 
 

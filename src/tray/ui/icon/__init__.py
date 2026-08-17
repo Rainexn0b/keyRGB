@@ -7,12 +7,9 @@ from typing import Literal, TypeAlias, cast
 from PIL import Image
 
 from src.core.effects.catalog import resolve_effect_name_for_backend
+from src.core.effects.matrix_layout import geometry_for_engine
 from src.core.effects.perkey_animation import build_full_color_grid
 from src.core.lighting_layers import resolve_render_effect
-from src.core.resources.defaults import (
-    REFERENCE_MATRIX_COLS as NUM_COLS,
-    REFERENCE_MATRIX_ROWS as NUM_ROWS,
-)
 
 from . import _color, _draw
 
@@ -136,7 +133,12 @@ def _is_non_uniform_effect(config: TrayIconConfig, *, backend: object | None = N
     return bool("rainbow" in lowered or "cycle" in lowered or "spectrum" in lowered or "aurora" in lowered)
 
 
-def _build_perkey_mosaic_visual(*, config: TrayIconConfig, brightness: int) -> IconVisual | None:
+def _build_perkey_mosaic_visual(
+    *,
+    config: TrayIconConfig,
+    brightness: int,
+    engine: object | None = None,
+) -> IconVisual | None:
     """Build a mosaic visual from the configured base per-key map.
 
     Returns ``None`` if there is no usable non-uniform per-key base map.
@@ -151,24 +153,27 @@ def _build_perkey_mosaic_visual(*, config: TrayIconConfig, brightness: int) -> I
     if base_color is None:
         return None
 
+    geometry = geometry_for_engine(engine)
+    num_rows = int(geometry.rows)
+    num_cols = int(geometry.cols)
     try:
         full = build_full_color_grid(
             base_color=base_color,
             per_key_colors=typed_per_key,
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
+            num_rows=num_rows,
+            num_cols=num_cols,
         )
         it = iter(full.values())
         first = next(it)
         for v in it:
             if v != first:
-                colors_flat = tuple(full[(r, c)] for r in range(NUM_ROWS) for c in range(NUM_COLS))
+                colors_flat = tuple(full[(r, c)] for r in range(num_rows) for c in range(num_cols))
                 return IconVisual(
                     mode="mosaic",
                     scale=_icon_scale_from_brightness(brightness),
                     colors_flat=colors_flat,
-                    rows=NUM_ROWS,
-                    cols=NUM_COLS,
+                    rows=num_rows,
+                    cols=num_cols,
                 )
     except _INT_COERCION_ERRORS:
         return None
@@ -197,10 +202,11 @@ def create_icon_for_state(
     is_off: bool,
     now: float | None = None,
     backend: object | None = None,
+    engine: object | None = None,
 ) -> TrayIconImage:
     """Create the tray icon image for the current state."""
 
-    return render_icon_visual(icon_visual(config=config, is_off=is_off, now=now, backend=backend))
+    return render_icon_visual(icon_visual(config=config, is_off=is_off, now=now, backend=backend, engine=engine))
 
 
 def icon_visual(
@@ -209,6 +215,7 @@ def icon_visual(
     is_off: bool,
     now: float | None = None,
     backend: object | None = None,
+    engine: object | None = None,
 ) -> IconVisual:
     """Describe how the tray icon should look for the current state."""
 
@@ -240,13 +247,13 @@ def icon_visual(
             # When the effect-specific reactive color override is disabled,
             # show the configured base lighting instead of a stale stored
             # reactive color.
-            mosaic = _build_perkey_mosaic_visual(config=config, brightness=brightness)
+            mosaic = _build_perkey_mosaic_visual(config=config, brightness=brightness, engine=engine)
             if mosaic is not None:
                 return mosaic
 
         return IconVisual(
             mode="solid",
-            color=representative_color(config=config, is_off=is_off, now=now, backend=backend),
+            color=representative_color(config=config, is_off=is_off, now=now, backend=backend, engine=engine),
         )
 
     if (not is_off) and base_brightness != 0 and _is_non_uniform_effect(config, backend=backend):
@@ -254,12 +261,12 @@ def icon_visual(
         if effect == "perkey":
             brightness = _config_int_or_default(config, "perkey_brightness", brightness)
 
-            mosaic = _build_perkey_mosaic_visual(config=config, brightness=brightness)
+            mosaic = _build_perkey_mosaic_visual(config=config, brightness=brightness, engine=engine)
             if mosaic is not None:
                 return mosaic
             return IconVisual(
                 mode="solid",
-                color=representative_color(config=config, is_off=is_off, now=now, backend=backend),
+                color=representative_color(config=config, is_off=is_off, now=now, backend=backend, engine=engine),
             )
 
         # Non-uniform non-perkey: use a rainbow K.
@@ -269,7 +276,10 @@ def icon_visual(
             phase=_animated_icon_phase(float(now)),
         )
 
-    return IconVisual(mode="solid", color=representative_color(config=config, is_off=is_off, backend=backend))
+    return IconVisual(
+        mode="solid",
+        color=representative_color(config=config, is_off=is_off, backend=backend, engine=engine),
+    )
 
 
 __all__ = [

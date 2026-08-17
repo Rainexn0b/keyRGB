@@ -14,6 +14,8 @@ class _DummyLock:
 
 
 class _DummyPerKeyKB:
+    backend_caps = SimpleNamespace(per_key=True)
+
     def __init__(self, *, fail_set_brightness: bool = False, per_key_mode_policy: str = "init_once"):
         self.calls: list[tuple[str, int]] = []
         self._fail_set_brightness = bool(fail_set_brightness)
@@ -45,6 +47,7 @@ def _mk_engine(
         per_key_mode_policy=per_key_mode_policy,
     )
     return SimpleNamespace(
+        backend_caps=SimpleNamespace(per_key=True),
         kb=kb,
         kb_lock=_DummyLock(),
         brightness=brightness,

@@ -4,7 +4,7 @@ import math
 from collections.abc import Sequence
 
 from src.core.effects.colors import hsv_to_rgb
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import EffectGridGeometry, geometry_for_engine
 from src.core.effects.reactive.utils import (
     _pick_contrasting_highlight,
     _Pulse,
@@ -62,7 +62,13 @@ def build_ripple_overlay_into(
     pulses: list[_RainbowPulse],
     *,
     band: float,
+    geometry: EffectGridGeometry | None = None,
+    engine: object | None = None,
+    **_ignored: object,
 ) -> dict[Key, tuple[float, float]]:
+    active_geometry = geometry if geometry is not None else geometry_for_engine(engine)
+    rows = int(active_geometry.rows)
+    cols = int(active_geometry.cols)
     dest.clear()
     for pulse in pulses:
         # Normalize the expansion to this pulse's own farthest in-bounds key
@@ -73,7 +79,7 @@ def build_ripple_overlay_into(
         # Trade-off: wave speed becomes location-dependent (a corner press
         # crosses 25 keys per TTL, a center press ~13), which reads as a
         # consistent full-deck crossing time from anywhere.
-        max_d = max(pulse.row, NUM_ROWS - 1 - pulse.row) + max(pulse.col, NUM_COLS - 1 - pulse.col)
+        max_d = max(pulse.row, rows - 1 - pulse.row) + max(pulse.col, cols - 1 - pulse.col)
         if max_d <= 0:
             continue
 
@@ -92,12 +98,12 @@ def build_ripple_overlay_into(
         # instead of scanning the full square and filtering: ~2x fewer cells.
         for dr in range(-radius_i, radius_i + 1):
             r = pulse.row + dr
-            if r < 0 or r >= NUM_ROWS:
+            if r < 0 or r >= rows:
                 continue
             abs_dr = abs(dr)
             for dc in range(abs_dr - radius_i, radius_i - abs_dr + 1):
                 c = pulse.col + dc
-                if c < 0 or c >= NUM_COLS:
+                if c < 0 or c >= cols:
                     continue
                 d = abs_dr + abs(dc)
 
@@ -113,8 +119,14 @@ def build_ripple_overlay_into(
     return dest
 
 
-def build_ripple_overlay(pulses: list[_RainbowPulse], *, band: float) -> dict[Key, tuple[float, float]]:
-    return build_ripple_overlay_into({}, pulses, band=band)
+def build_ripple_overlay(
+    pulses: list[_RainbowPulse],
+    *,
+    band: float,
+    geometry: EffectGridGeometry | None = None,
+    engine: object | None = None,
+) -> dict[Key, tuple[float, float]]:
+    return build_ripple_overlay_into({}, pulses, band=band, geometry=geometry, engine=engine)
 
 
 def build_ripple_color_map_into(

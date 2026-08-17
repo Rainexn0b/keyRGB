@@ -7,6 +7,7 @@ from threading import Event
 
 import pytest
 
+from src.core.backends.base import BackendCapabilities
 from src.core.effects.catalog import hardware_effect_selection_key
 from src.core.effects.device import NullKeyboard
 from src.core.effects.engine import EffectsEngine
@@ -22,6 +23,21 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):  # type: 
         return {"name": effect_name, **kwargs}
 
     return build
+
+
+def _backend_caps(*, per_key: bool = False, hardware_effects: bool = False) -> BackendCapabilities:
+    return BackendCapabilities(
+        brightness=True,
+        per_key=per_key,
+        color=True,
+        hardware_effects=hardware_effects,
+        palette=False,
+    )
+
+
+class _HardwareEffectsBackend:
+    def capabilities(self) -> BackendCapabilities:
+        return _backend_caps(hardware_effects=True)
 
 
 def test_start_effect_stops_previous_software_thread() -> None:
@@ -169,7 +185,7 @@ def test_start_hw_effect_uses_injected_backend_effects() -> None:
         def set_effect(self, effect_data) -> None:
             self.payloads.append(effect_data)
 
-    class DummyBackend:
+    class DummyBackend(_HardwareEffectsBackend):
         def effects(self):
             return {"snake": _effect_builder("snake", extra=("direction", "color"))}
 
@@ -215,7 +231,7 @@ def test_start_effect_accepts_backend_exposed_hw_name() -> None:
         def set_effect(self, effect_data) -> None:
             self.payloads.append(effect_data)
 
-    class DummyBackend:
+    class DummyBackend(_HardwareEffectsBackend):
         def effects(self):
             return {"wave": _effect_builder("wave", extra=("color",))}
 
@@ -238,7 +254,7 @@ def test_start_effect_accepts_backend_exposed_hw_name() -> None:
 
 
 def test_start_effect_prefers_software_for_hw_sw_name_collision() -> None:
-    class DummyBackend:
+    class DummyBackend(_HardwareEffectsBackend):
         def effects(self):
             return {"spectrum_cycle": _effect_builder("hw_spectrum_cycle")}
 
@@ -265,7 +281,7 @@ def test_start_effect_forced_hardware_collision_uses_backend_effect() -> None:
         def set_effect(self, effect_data) -> None:
             self.payloads.append(effect_data)
 
-    class DummyBackend:
+    class DummyBackend(_HardwareEffectsBackend):
         def effects(self):
             return {"spectrum_cycle": _effect_builder("spectrum_cycle")}
 
@@ -337,6 +353,7 @@ def test_initial_perkey_sw_start_primes_single_frame_without_startup_fade(monkey
             del brightness, enable_user_mode
 
     engine = EffectsEngine()
+    engine.backend_caps = _backend_caps(per_key=True)
     engine.kb = PerKeyKeyboard()
     engine.device_available = True
     engine._ensure_device_available = lambda: True  # type: ignore[assignment]
@@ -372,6 +389,7 @@ def test_soft_on_start_after_turn_off_primes_with_user_mode_reassert(monkeypatch
             del brightness, enable_user_mode
 
     engine = EffectsEngine()
+    engine.backend_caps = _backend_caps(per_key=True)
     engine.kb = PerKeyKeyboard()
     engine.device_available = True
     engine._ensure_device_available = lambda: True  # type: ignore[assignment]
@@ -408,6 +426,7 @@ def test_soft_on_start_after_firmware_sleep_primes_without_device_mode_off(monke
             del brightness, enable_user_mode
 
     engine = EffectsEngine()
+    engine.backend_caps = _backend_caps(per_key=True)
     engine.kb = PerKeyKeyboard()
     engine.device_available = True
     engine._ensure_device_available = lambda: True  # type: ignore[assignment]

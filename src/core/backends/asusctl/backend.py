@@ -133,7 +133,13 @@ class AsusctlAuraBackend(KeyboardBackend):
 
     def capabilities(self) -> BackendCapabilities:
         zones = self._zones()
-        return BackendCapabilities(per_key=(len(zones) > 1), color=True, hardware_effects=False, palette=False)
+        return BackendCapabilities(
+            brightness=True,
+            per_key=(len(zones) > 1),
+            color=True,
+            hardware_effects=False,
+            palette=False,
+        )
 
     def get_device(self) -> KeyboardDevice:
         return AsusctlAuraKeyboardDevice(asusctl_path=self._asusctl_path(), zones=self._zones())

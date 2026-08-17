@@ -67,7 +67,27 @@ When adding a new controller or chassis variant:
 If the device is auxiliary-only, keep it as a separate surface instead of
 forcing keyboard-only abstractions to own it.
 
+## Managed udev rules
+
+Installer-managed permission rules live under `system/udev/`:
+
+- `99-ite8291-wootbook.rules` (USB/hidraw uaccess)
+- `99-keyrgb-sysfs-leds.rules`
+- `99-keyrgb-input-uaccess.rules`
+
+Each file carries a stable `KEYRGB_MANAGED_UDEV_RULE=...` marker. Uninstall
+matching (`scripts/lib/uninstall_match.sh`) removes a rule when either:
+
+1. the installed file exactly matches the repo/bootstrap source copy, or
+2. the installed file contains the stable managed marker (or a documented legacy
+   header marker from older releases).
+
+Bootstrap curl uninstalls often lack the `system/udev` source tree, so marker
+matching alone must be enough. Do not identify managed rules only by stale
+comment text that can drift when headers are rewritten.
+
 ## Testing
 
 - Unit tests for selection and probe logic.
 - Optional hardware tests behind `KEYRGB_HW_TESTS=1`.
+- Installer uninstall matching tests under `tests/installer/`.

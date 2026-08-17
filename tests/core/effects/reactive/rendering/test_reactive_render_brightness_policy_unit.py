@@ -15,6 +15,8 @@ class _DummyLock:
 
 
 class _DummyKB:
+    backend_caps = SimpleNamespace(per_key=True)
+
     def __init__(self):
         self.calls: list[tuple[str, int]] = []
 

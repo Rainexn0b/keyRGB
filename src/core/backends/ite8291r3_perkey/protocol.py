@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from typing import SupportsIndex, SupportsInt, cast
 
+from src.core.backends.effect_contract import hardware_effect_builder
+
 VENDOR_ID = 0x048D
 PRODUCT_IDS: list[int] = [0x6004, 0x6006, 0x600B, 0xCE00]
 REV_NUMBER = 0x0003
@@ -199,14 +201,12 @@ def effect(effect_id: int, args: dict[str, tuple[int, int]] | None = None):
             payload[index] = _coerce_int(default)
 
         for key, value in kwargs.items():
-            if key not in args:
-                raise ValueError(f"'{key}' attr is not needed by effect")
             payload[args[key][0]] = _coerce_int(value)
 
         payload[EffectAttrs.EFFECT] = int(effect_id)
         return payload
 
-    return build
+    return hardware_effect_builder(build, accepted_kwargs=args)
 
 
 effects = {

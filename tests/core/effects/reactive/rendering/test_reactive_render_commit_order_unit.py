@@ -14,6 +14,8 @@ class _DummyLock:
 
 
 class _DummyKB:
+    backend_caps = SimpleNamespace(per_key=True)
+
     def __init__(self, *, set_brightness_exc: Exception | None = None):
         self.calls: list[tuple[str, int]] = []
         self._set_brightness_exc = set_brightness_exc

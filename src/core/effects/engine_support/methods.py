@@ -45,6 +45,9 @@ def fade_uniform_color_method(
 
 
 def fade_in_per_key_method(self, *, duration_s: float, steps: int = 12) -> None:
+    from src.core.effects.matrix_layout import geometry_for_engine
+
+    geometry = geometry_for_engine(self)
     fade_in_per_key(
         kb=self.kb,
         kb_lock=self.kb_lock,
@@ -53,6 +56,8 @@ def fade_in_per_key_method(self, *, duration_s: float, steps: int = 12) -> None:
         brightness=int(self.brightness),
         duration_s=duration_s,
         steps=steps,
+        num_rows=int(geometry.rows),
+        num_cols=int(geometry.cols),
     )
 
 
@@ -61,8 +66,11 @@ def prime_per_key_frame_method(self) -> bool:
     # Firmware sleep leaves is_off=False with brightness=0, so _device_mode_off
     # alone is not always set yet — treat soft-on as requiring user-mode
     # reassert the same way an explicit turn_off does.
+    from src.core.effects.matrix_layout import geometry_for_engine
+
     start_brightness = int(self.brightness)
     reassert = bool(self._device_mode_off) or start_brightness <= 1
+    geometry = geometry_for_engine(self)
     return prime_per_key_frame(
         kb=self.kb,
         kb_lock=self.kb_lock,
@@ -70,6 +78,8 @@ def prime_per_key_frame_method(self) -> bool:
         current_color=self.current_color,
         brightness=start_brightness,
         reassert_user_mode=reassert,
+        num_rows=int(geometry.rows),
+        num_cols=int(geometry.cols),
     )
 
 

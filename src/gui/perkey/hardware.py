@@ -5,7 +5,7 @@ import os
 from collections.abc import Callable
 from typing import TypeVar
 
-from src.core.backends.base import KeyboardBackend, KeyboardDevice
+from src.core.backends.base import KeyboardBackend, KeyboardDevice, normalize_backend_capabilities
 from src.core.backends.registry import select_backend
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 from src.core.runtime.hardware_ownership import acquire_hardware_control_lock, release_hardware_control_lock
@@ -64,6 +64,17 @@ def _backend_dimensions_or_reference(backend: object) -> tuple[int, int]:
     )
 
 
+def _backend_supports_per_key(backend: KeyboardBackend | None) -> bool:
+    if backend is None:
+        return False
+    return _recover_runtime_boundary(
+        lambda: normalize_backend_capabilities(backend.capabilities()).per_key,
+        fallback=False,
+        log_key="perkey.hardware.capabilities",
+        log_msg="Backend lacks per-key capability evidence; disabling perkey hardware",
+    )
+
+
 _TRAY_MANAGED_GUI_ENV = "KEYRGB_TRAY_MANAGED_GUI"
 
 
@@ -72,13 +83,17 @@ def _tray_managed_config_only() -> bool:
 
 
 _backend = None if _tray_managed_config_only() else _select_backend()
-NUM_ROWS, NUM_COLS = _backend_dimensions_or_reference(_backend)
+NUM_ROWS, NUM_COLS = (
+    _backend_dimensions_or_reference(_backend)
+    if _backend_supports_per_key(_backend)
+    else (REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS)
+)
 
 
 def get_keyboard() -> KeyboardDevice | None:
     """Return a keyboard instance if the backend is available."""
 
-    if _tray_managed_config_only() or _backend is None:
+    if _tray_managed_config_only() or _backend is None or not _backend_supports_per_key(_backend):
         return None
     if not acquire_hardware_control_lock():
         return None

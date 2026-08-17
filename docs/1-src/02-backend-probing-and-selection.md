@@ -45,14 +45,22 @@ This makes selection explainable and easier to debug.
 
 1. Build a list of backends (registry).
 2. For each backend:
-   - run probe
-   - keep only `available=True`
+    - run probe
+    - record policy eligibility and probe evidence once
+    - keep only policy-enabled entries with `available=True`
 3. Choose winner by:
-   - highest `priority` (e.g. Sysfs=150 > ITE=100)
-   - (tie-breaker: highest `confidence`)
+    - kernel/sysfs safety tier before direct userspace hardware I/O
+    - highest `confidence` within the same safety tier
+    - highest `priority` as the final tie-breaker
 
-This ensures that if a kernel driver is present (sysfs), it takes precedence
-over a userspace driver where that is the safer path.
+`BackendSelectionReport` is the canonical selection evidence. Runtime selection
+returns its selected backend. Diagnostics requests a probe-all report and
+serializes its evaluations and candidate order instead of probing and ranking a
+second time. Diagnostics-only auxiliary probes remain visible but are not listed
+as runtime selection candidates.
+
+This ensures that if a usable kernel driver is present (sysfs), it takes
+precedence over a userspace driver where that is the safer path.
 
 ## Env override behavior
 
@@ -83,7 +91,7 @@ sysfs-leds: available (found /sys/class/leds/clevo::kbd_backlight)
 
 ## Unit tests
 
-- Auto-selection chooses highest confidence
+- Auto-selection prefers the kernel/sysfs safety tier, then confidence and priority
 - Env override respected
 - Unknown override returns None
 - “No backends available” returns None

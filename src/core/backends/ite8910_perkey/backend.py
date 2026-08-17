@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Callable
 from dataclasses import dataclass
 
+from src.core.backends.effect_contract import HardwareEffectBuilder, hardware_effect_builder
 from src.core.backends.exceptions import (
     BACKEND_OPEN_RUNTIME_ERRORS,
     BackendBusyError,
@@ -19,7 +19,7 @@ from .device import Ite8910KeyboardDevice
 from .hidraw import find_matching_hidraw_device, open_matching_hidraw_transport
 
 EffectPayload = dict[str, object]
-EffectBuilder = Callable[..., EffectPayload]
+EffectBuilder = HardwareEffectBuilder
 
 
 def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> EffectBuilder:
@@ -29,14 +29,11 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()) -> EffectB
 
     def build(**kwargs: object) -> EffectPayload:
         _ = args
-        for key in kwargs:
-            if key not in args:
-                raise ValueError(f"'{key}' attr is not needed by effect")
         payload: EffectPayload = {"name": effect_name}
         payload.update(kwargs)
         return payload
 
-    return build
+    return hardware_effect_builder(build, accepted_kwargs=args)
 
 
 @dataclass
@@ -83,7 +80,7 @@ class Ite8910Backend(KeyboardBackend):
         )
 
     def capabilities(self) -> BackendCapabilities:
-        return BackendCapabilities(per_key=True, color=True, hardware_effects=True, palette=False)
+        return BackendCapabilities(brightness=True, per_key=True, color=True, hardware_effects=True, palette=False)
 
     def get_device(self) -> KeyboardDevice:
         try:

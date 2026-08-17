@@ -4,6 +4,7 @@ import os
 import random
 import threading
 import time
+from dataclasses import replace
 
 import src.core.effects.reactive.effects as reactive_effects
 from src.core.effects.engine import EffectsEngine
@@ -130,28 +131,25 @@ def test_reactive_fade_fans_out_one_keypress_to_all_mapped_cells(monkeypatch) ->
     engine.current_color = (255, 0, 0)
     engine.per_key_colors = None
 
-    monkeypatch.setattr(reactive_effects, "frame_dt_s", lambda: 0.01)
-    monkeypatch.setattr(reactive_effects, "try_open_evdev_keyboards", list)
-    monkeypatch.setattr(reactive_effects, "_PressSource", _PressSource)
-    monkeypatch.setattr(reactive_effects, "pace", lambda _engine, **_kwargs: 1.0)
-    monkeypatch.setattr(
-        reactive_effects,
-        "load_active_profile_slot_keymap",
-        lambda: {str(slot_id_for_key_id("auto", "enter") or "enter"): ((1, 2), (1, 3))},
-    )
-    monkeypatch.setattr(reactive_effects, "_age_pulses_in_place", lambda pulses, *, dt: pulses)
-    monkeypatch.setattr(
-        reactive_effects,
-        "build_fade_overlay_into",
-        lambda overlay, pulses: overlay.update(
+    api = replace(
+        reactive_effects._fade_api,
+        frame_dt_s=lambda: 0.01,
+        try_open_evdev_keyboards=list,
+        _PressSource=_PressSource,
+        pace=lambda _engine, **_kwargs: 1.0,
+        load_active_profile_slot_keymap=lambda: {str(slot_id_for_key_id("auto", "enter") or "enter"): ((1, 2), (1, 3))},
+        _age_pulses_in_place=lambda pulses, *, dt: pulses,
+        build_fade_overlay_into=lambda overlay, pulses: overlay.update(
             {(pulse.row, pulse.col): captured_pulses.append((pulse.row, pulse.col)) or 1.0 for pulse in pulses}
         ),
+        build_frame_base_maps=lambda *args, **kwargs: (False, {}, {}),
+        get_engine_overlay_buffer=lambda _engine, _name: {},
+        get_engine_color_map_buffer=lambda _engine, _name: {},
+        render=lambda *args, **kwargs: None,
+        _set_reactive_active_pulse_mix=lambda *args, **kwargs: None,
+        _render_uniform_fallback=lambda *args, **kwargs: None,
     )
-    monkeypatch.setattr(reactive_effects, "build_frame_base_maps", lambda *args, **kwargs: (False, {}, {}))
-    monkeypatch.setattr(reactive_effects, "get_engine_overlay_buffer", lambda _engine, _name: {})
-    monkeypatch.setattr(reactive_effects, "get_engine_color_map_buffer", lambda _engine, _name: {})
-    monkeypatch.setattr(reactive_effects, "render", lambda *args, **kwargs: None)
-    monkeypatch.setattr(reactive_effects, "_set_reactive_active_pulse_mix", lambda *args, **kwargs: None)
+    monkeypatch.setattr(reactive_effects, "_fade_api", api)
 
     run_reactive_fade(engine)
 

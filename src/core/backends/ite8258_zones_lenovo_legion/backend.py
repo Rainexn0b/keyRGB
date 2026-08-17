@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import src.core.backends.base as base  # noqa: PLR0402 - exact leaf import; package root intentionally exports no facade
 import src.core.backends.exceptions as backend_exceptions
+from src.core.backends.effect_contract import hardware_effect_builder
 from src.core.utils import exceptions as device_exception_utils
 
 from ..policies.backend_selection import experimental_backends_enabled
@@ -48,14 +49,11 @@ def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):
 
     def build(**kwargs: object) -> dict[str, object]:
         _ = args
-        for key in kwargs:
-            if key not in args:
-                raise ValueError(f"'{key}' attr is not needed by effect")
         payload: dict[str, object] = {"name": effect_name}
         payload.update(kwargs)
         return payload
 
-    return build
+    return hardware_effect_builder(build, accepted_kwargs=args)
 
 
 @dataclass
@@ -125,7 +123,7 @@ class Ite8258Backend(base.KeyboardBackend):
         )
 
     def capabilities(self) -> base.BackendCapabilities:
-        return base.BackendCapabilities(per_key=True, color=True, hardware_effects=True, palette=False)
+        return base.BackendCapabilities(brightness=True, per_key=True, color=True, hardware_effects=True, palette=False)
 
     def get_device(self) -> base.KeyboardDevice:
         if not experimental_backends_enabled():

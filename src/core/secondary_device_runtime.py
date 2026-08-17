@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 from src.core.backends.base import BackendCapabilities
+from src.core.config._lighting._coercion import normalize_secondary_brightness_value
 from src.core.secondary_device_routes import SecondaryDeviceRoute, iter_secondary_routes
 
 logger = logging.getLogger(__name__)
@@ -107,10 +108,7 @@ def _normalize_color(color: object) -> tuple[int, int, int]:
 
 
 def _clamp_brightness(value: object) -> int:
-    try:
-        return max(0, min(100, int(cast(Any, value))))
-    except (TypeError, ValueError, OverflowError):
-        return 0
+    return normalize_secondary_brightness_value(value, default=0)
 
 
 class SimulatedUniformDevice:
@@ -213,7 +211,7 @@ class _SimulatedSecondaryBackend:
         return True
 
     def capabilities(self) -> BackendCapabilities:
-        return BackendCapabilities(per_key=False, color=True, hardware_effects=False, palette=False)
+        return BackendCapabilities(brightness=True, per_key=False, color=True, hardware_effects=False, palette=False)
 
     def get_device(self) -> SimulatedUniformDevice:
         return _simulated_device_for_route(self.route)

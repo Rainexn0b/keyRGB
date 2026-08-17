@@ -5,6 +5,8 @@ from collections.abc import Callable
 from threading import Event, RLock, Thread
 from typing import Protocol, TypeVar, cast
 
+from src.core.backends.base import BackendCapabilities, normalize_backend_capabilities
+
 from ..device import (
     Color,
     KeyboardBackendProtocol,
@@ -12,6 +14,11 @@ from ..device import (
     NullKeyboard,
     PerKeyColorMap,
     acquire_keyboard,
+)
+from ..matrix_layout import (
+    EffectGridGeometry,
+    effect_geometry_from_dimensions,
+    reference_effect_geometry,
 )
 from ..reactive._reactive_restore_seed import apply_queued_reactive_restore_seed
 from ..reactive._render_brightness_support import ReactiveRenderState
@@ -26,6 +33,10 @@ _BackendDiscoveryValue = TypeVar("_BackendDiscoveryValue")
 
 class _EffectsBackendProtocol(KeyboardBackendProtocol, Protocol):
     name: str
+
+    def capabilities(self) -> BackendCapabilities: ...
+
+    def dimensions(self) -> tuple[int, int]: ...
 
     def effects(self) -> dict[str, HardwareEffectBuilder]: ...
 
@@ -62,6 +73,41 @@ def _backend_name(backend: object | None) -> str:
     return str(name)
 
 
+def _backend_capabilities(backend: object | None) -> BackendCapabilities:
+    if backend is None:
+        return normalize_backend_capabilities(None)
+    capabilities_fn = getattr(backend, "capabilities", None)
+    if not callable(capabilities_fn):
+        return normalize_backend_capabilities(None)
+    try:
+        return normalize_backend_capabilities(capabilities_fn())
+    except _BACKEND_DISCOVERY_ERRORS:
+        logger.exception("Failed to query backend capabilities from '%s'", _backend_name(backend))
+        return normalize_backend_capabilities(None)
+
+
+def _backend_effect_geometry(backend: object | None, *, capabilities: BackendCapabilities) -> EffectGridGeometry:
+    backend_name = None if backend is None else _backend_name(backend)
+    if backend is None or not capabilities.per_key:
+        return reference_effect_geometry(backend_name=backend_name)
+
+    dimensions_fn = getattr(backend, "dimensions", None)
+    if not callable(dimensions_fn):
+        return reference_effect_geometry(backend_name=backend_name)
+
+    try:
+        dimensions = dimensions_fn()
+    except _BACKEND_DISCOVERY_ERRORS:
+        logger.exception("Failed to query backend dimensions from '%s'", backend_name)
+        return reference_effect_geometry(backend_name=backend_name)
+
+    return effect_geometry_from_dimensions(
+        dimensions,
+        backend_name=backend_name,
+        per_key=True,
+    )
+
+
 def _thread_generation_or_default(engine: _EngineCore, *, default: int) -> int:
     try:
         return int(engine._thread_generation)
@@ -92,6 +138,10 @@ class _EngineCore:
 
     def __init__(self, *, backend: _EffectsBackendProtocol | None = None) -> None:
         self.backend = backend
+        self._backend_capabilities_changed: Callable[[BackendCapabilities], None] | None = None
+        self._permission_error_cb: Callable[[Exception], None] | None = None
+        self.backend_caps = _backend_capabilities(backend)
+        self.effect_geometry = _backend_effect_geometry(backend, capabilities=self.backend_caps)
         self.kb_lock = RLock()
         self.device_available = False
         self.kb: KeyboardDeviceProtocol = NullKeyboard()
@@ -131,6 +181,7 @@ class _EngineCore:
     def _ensure_device_available(self) -> bool:
         """Best-effort attempt to connect to the keyboard device."""
 
+        self._refresh_backend_capabilities()
         if self.device_available and not isinstance(self.kb, NullKeyboard):
             return True
 
@@ -143,9 +194,33 @@ class _EngineCore:
         """Update the selected backend and force the next reacquire through it."""
 
         self.backend = backend
+        self._refresh_backend_capabilities()
         self.mark_device_unavailable()
 
+    def set_backend_capabilities_changed_callback(
+        self,
+        callback: Callable[[BackendCapabilities], None] | None,
+    ) -> None:
+        """Publish capability refreshes to the tray's long-lived gating snapshot."""
+
+        self._backend_capabilities_changed = callback
+        if callback is not None:
+            callback(self.backend_caps)
+
+    def _refresh_backend_capabilities(self) -> None:
+        self.backend_caps = _backend_capabilities(self.backend)
+        self.effect_geometry = _backend_effect_geometry(self.backend, capabilities=self.backend_caps)
+        callback = self._backend_capabilities_changed
+        if callback is None:
+            return
+        try:
+            callback(self.backend_caps)
+        except (AttributeError, RuntimeError, TypeError, ValueError):
+            logger.exception("Failed to publish refreshed backend capabilities")
+
     def get_backend_effects(self) -> dict[str, HardwareEffectBuilder]:
+        if not self.backend_caps.hardware_effects:
+            return {}
         backend = self.backend
         return _query_backend_mapping(
             backend,
@@ -154,6 +229,8 @@ class _EngineCore:
         )
 
     def get_backend_colors(self) -> dict[str, object]:
+        if not self.backend_caps.hardware_effects:
+            return {}
         backend = self.backend
         return _query_backend_mapping(
             backend,

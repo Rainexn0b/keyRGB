@@ -171,7 +171,13 @@ class SysfsLedsBackend(KeyboardBackend):
         except _SYSFS_METADATA_ERRORS:
             color_supported = False
 
-        return BackendCapabilities(per_key=False, color=bool(color_supported), hardware_effects=False, palette=False)
+        return BackendCapabilities(
+            brightness=True,
+            per_key=False,
+            color=bool(color_supported),
+            hardware_effects=False,
+            palette=False,
+        )
 
     def get_device(self) -> KeyboardDevice:
         found = self._find_leds()

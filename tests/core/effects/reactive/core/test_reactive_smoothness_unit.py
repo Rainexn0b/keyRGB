@@ -204,21 +204,29 @@ def test_build_ripple_overlay_into_wave_reaches_far_corner_from_interior_press()
     # An interior press near end of life must still light the farthest corner:
     # the radius is normalized to the pulse's own farthest-key distance, so the
     # wave lands at the deck edge instead of dying mid-travel.
-    pulse = _RainbowPulse(row=2, col=10, age_s=0.63, ttl_s=0.65, hue_offset=0.0)
+    geometry_rows = NUM_ROWS
+    geometry_cols = NUM_COLS
+    center_col = geometry_cols // 2
+    pulse = _RainbowPulse(row=2, col=center_col, age_s=0.63, ttl_s=0.65, hue_offset=0.0)
     dest = build_ripple_overlay_into({}, [pulse], band=1.0)
 
-    far_corners = [(5, 20), (0, 20), (5, 0), (0, 0)]
-    farthest = max(far_corners, key=lambda k: abs(k[0] - 2) + abs(k[1] - 10))
+    far_corners = [
+        (geometry_rows - 1, geometry_cols - 1),
+        (0, geometry_cols - 1),
+        (geometry_rows - 1, 0),
+        (0, 0),
+    ]
+    farthest = max(far_corners, key=lambda k: abs(k[0] - 2) + abs(k[1] - center_col))
     assert farthest in dest
     weight, _hue = dest[farthest]
     assert weight > 0.0
 
 
 def test_build_ripple_overlay_into_corner_pulse_lights_until_ttl() -> None:
-    # Corner pulses traverse the full 25-key diagonal and stay lit to the end.
+    # Corner pulses traverse the full diagonal and stay lit to the end.
     pulse = _RainbowPulse(row=0, col=0, age_s=0.63, ttl_s=0.65, hue_offset=0.0)
     dest = build_ripple_overlay_into({}, [pulse], band=1.0)
-    assert (5, 20) in dest
+    assert (NUM_ROWS - 1, NUM_COLS - 1) in dest
 
 
 # ── Real-dt frame timing helpers ─────────────────────────────────────────────

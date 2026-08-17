@@ -13,6 +13,18 @@ def _hardware_allowed() -> bool:
     return os.environ.get("KEYRGB_ALLOW_HARDWARE") == "1" or os.environ.get("KEYRGB_HW_TESTS") == "1"
 
 
+def _access_tripwire_enabled() -> bool:
+    """Refuse real sysfs writes under pytest unless hardware is opted in.
+
+    Default-on. Disable with ``KEYRGB_TEST_HARDWARE_TRIPWIRE=0``.
+    """
+
+    if _hardware_allowed():
+        return False
+    flag = str(os.environ.get("KEYRGB_TEST_HARDWARE_TRIPWIRE") or "").strip().lower()
+    return flag not in {"0", "false", "no", "off"}
+
+
 def _leds_root() -> Path:
     # Test hook: allow overriding the sysfs root.
     root = os.environ.get("KEYRGB_SYSFS_LEDS_ROOT")
@@ -46,7 +58,7 @@ def _is_real_sysfs_path(path: Path) -> bool:
 def _safe_write_text(path: Path, content: str) -> None:
     # Safety: tests must not mutate real hardware state by writing sysfs.
     if os.environ.get("PYTEST_CURRENT_TEST") and not _hardware_allowed() and _is_real_sysfs_path(path):
-        if os.environ.get("KEYRGB_TEST_HARDWARE_TRIPWIRE") == "1":
+        if _access_tripwire_enabled():
             raise RuntimeError(f"Refusing to write real sysfs path under pytest: {path}")
         return
     path.write_text(content, encoding="utf-8")

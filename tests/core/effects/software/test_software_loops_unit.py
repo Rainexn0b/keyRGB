@@ -464,7 +464,11 @@ def test_strobe_invalid_brightness_and_chase_uniform(monkeypatch) -> None:
     monkeypatch.setattr(particles._base, "has_per_key", lambda _e: False)
     monkeypatch.setattr(particles._base, "mix", lambda a, b, *, t: a)
     monkeypatch.setattr(particles._base, "scale", lambda c, s: c)
-    monkeypatch.setattr(particles, "fill_uniform_color_map", lambda m, *, color: m.__setitem__((0, 0), color))
+    monkeypatch.setattr(
+        particles,
+        "fill_uniform_color_map",
+        lambda m, *, color, **_kwargs: m.__setitem__((0, 0), color),
+    )
     monkeypatch.setattr(particles, "scaled_color_map_nonzero", lambda base, *, scale, brightness: base)
 
     engine = SimpleNamespace(

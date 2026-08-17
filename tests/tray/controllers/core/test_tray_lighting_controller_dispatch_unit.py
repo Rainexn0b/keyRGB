@@ -178,6 +178,22 @@ class TestHelperBoundaries:
 
 
 class TestStartCurrentEffect:
+    def test_resolve_start_current_effect_policy_rejects_persisted_perkey_without_capability(self):
+        from src.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = None
+        mock_tray.config.effect = "perkey"
+        mock_tray.config.brightness = 30
+        mock_tray.config.per_key_colors = {(0, 0): (255, 0, 0)}
+
+        policy = _resolve_start_current_effect_policy(mock_tray, brightness_override=None)
+
+        assert policy.effect == "none"
+        assert policy.persist_effect == "none"
+        assert policy.start_plan.is_perkey_mode is False
+        assert policy.start_plan.is_none_mode is True
+
     def test_resolve_start_current_effect_policy_keeps_config_unchanged(self):
         from src.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
 
@@ -939,6 +955,18 @@ class TestStartCurrentEffect:
 
 
 class TestPowerSourcePerkeyProfileTransition:
+    def test_power_source_perkey_transition_requires_capability_evidence(self):
+        from src.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
+
+        mock_tray = MagicMock()
+        mock_tray.backend_caps = None
+
+        with patch("src.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode:
+            handled = apply_power_source_perkey_profile_transition(mock_tray)
+
+        assert handled is False
+        apply_mode.assert_not_called()
+
     def test_apply_power_source_perkey_profile_transition_updates_perkey_mode_in_place(self):
         from src.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
 

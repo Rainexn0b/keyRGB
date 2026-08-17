@@ -10,6 +10,17 @@ Notes:
   many devices; implementing that would require a protocol-level backend.
 """
 
+from src.core.backends.base import BackendMetadata, BackendRegistration, BackendStability
+
 from .backend import AsusctlAuraBackend
 
-__all__ = ["AsusctlAuraBackend"]
+BACKEND_REGISTRATION = BackendRegistration(
+    metadata=BackendMetadata(
+        name="asusctl-aura",
+        priority=120,
+        stability=BackendStability.VALIDATED,
+    ),
+    factory=AsusctlAuraBackend,
+)
+
+__all__ = ["BACKEND_REGISTRATION", "AsusctlAuraBackend"]

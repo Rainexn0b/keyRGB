@@ -465,6 +465,7 @@ def test_backend_get_zone_device_requires_experimental_opt_in(monkeypatch: pytes
 
 def test_backend_get_zone_device_rejects_unknown_zone(monkeypatch: pytest.MonkeyPatch) -> None:
     _ite8258_chassis_backend_module._transport_manager = None
+    _ite8258_chassis_backend_module._profile_coordinators = {}
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 
     sent: list[bytes] = []
@@ -491,6 +492,7 @@ def test_backend_get_zone_device_rejects_unknown_zone(monkeypatch: pytest.Monkey
 
 def test_backend_zone_first_stages_until_keyboard_profile_exists(monkeypatch: pytest.MonkeyPatch) -> None:
     _ite8258_chassis_backend_module._transport_manager = None
+    _ite8258_chassis_backend_module._profile_coordinators = {}
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 
     sent: list[bytes] = []
@@ -530,6 +532,7 @@ def test_backend_zone_first_stages_until_keyboard_profile_exists(monkeypatch: py
 def test_backend_keyboard_and_zone_devices_share_one_transport(monkeypatch: pytest.MonkeyPatch) -> None:
     """Acquiring keyboard + zones opens hidraw once and shares the proxy."""
     _ite8258_chassis_backend_module._transport_manager = None
+    _ite8258_chassis_backend_module._profile_coordinators = {}
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 
     open_count = [0]

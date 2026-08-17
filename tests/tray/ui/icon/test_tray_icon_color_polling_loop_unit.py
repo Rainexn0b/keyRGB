@@ -114,6 +114,43 @@ def test_icon_color_polling_loop_updates_once(monkeypatch) -> None:
     assert calls["n"] == 1
 
 
+def test_icon_poller_requests_refresh_without_accessing_pystray_surface(monkeypatch) -> None:
+    import src.tray.pollers.icon_color_polling as icp
+
+    created = {}
+
+    def fake_thread(*, target, daemon: bool):
+        thread = _FakeThread(target=target, daemon=daemon)
+        created["thread"] = thread
+        return thread
+
+    class _Tray:
+        refreshes = 0
+
+        @property
+        def icon(self):
+            raise AssertionError("poller must not access the pystray surface")
+
+        def _update_icon(self, **_kwargs) -> None:
+            self.refreshes += 1
+
+        def _log_exception(self, *_args, **_kwargs) -> None:
+            return None
+
+    monkeypatch.setattr(icp.threading, "Thread", fake_thread)
+    monkeypatch.setattr(icp, "_compute_icon_sig", lambda _tray: (False, "perkey", 1, 1, (0, 0, 0), False))
+    monkeypatch.setattr(icp, "_should_update_icon", lambda _sig, _last: True)
+    monkeypatch.setattr(icp.time, "sleep", lambda _seconds: (_ for _ in ()).throw(KeyboardInterrupt()))
+    tray = _Tray()
+
+    icp.start_icon_color_polling(tray)
+
+    with pytest.raises(KeyboardInterrupt):
+        created["thread"].target()
+
+    assert tray.refreshes == 1
+
+
 def test_icon_color_polling_skips_first_repaint_during_resume_holdoff(monkeypatch) -> None:
     import src.tray.pollers.icon_color_polling as icp
 

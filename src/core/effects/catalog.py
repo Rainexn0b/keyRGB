@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from typing import Final
 
+from src.core.backends.base import normalize_backend_capabilities
+
 # Hardware effects (built into the keyboard/controller firmware)
 HW_EFFECTS: Final[list[str]] = [
     "rainbow",
@@ -125,6 +127,15 @@ def detected_backend_hw_effect_names(backend: object | None) -> tuple[str, ...]:
     """Return hardware effect keys exposed by the selected backend only."""
 
     names: list[str] = []
+    capabilities_fn = getattr(backend, "capabilities", None) if backend is not None else None
+    if not callable(capabilities_fn):
+        return ()
+    try:
+        if not normalize_backend_capabilities(capabilities_fn()).hardware_effects:
+            return ()
+    except _CATALOG_EFFECT_EXTRACTION_ERRORS:
+        return ()
+
     effect_fn = getattr(backend, "effects", None) if backend is not None else None
     if callable(effect_fn):
         try:
@@ -143,12 +154,9 @@ def detected_backend_hw_effect_names(backend: object | None) -> tuple[str, ...]:
 
 
 def backend_hw_effect_names(backend: object | None) -> tuple[str, ...]:
-    """Return backend hardware effects with a legacy fallback when unknown."""
+    """Return hardware effects backed by explicit capability evidence."""
 
-    detected = detected_backend_hw_effect_names(backend)
-    if detected:
-        return detected
-    return tuple(HW_EFFECTS)
+    return detected_backend_hw_effect_names(backend)
 
 
 def resolve_effect_name_for_backend(effect_name: str, backend: object | None) -> str:

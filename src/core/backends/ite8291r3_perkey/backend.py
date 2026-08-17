@@ -220,7 +220,7 @@ class Ite8291r3Backend(KeyboardBackend):
             )
 
     def capabilities(self) -> BackendCapabilities:
-        return BackendCapabilities(per_key=True, color=True, hardware_effects=True, palette=True)
+        return BackendCapabilities(brightness=True, per_key=True, color=True, hardware_effects=True, palette=True)
 
     def _open_matching_transport(self):
         return open_matching_transport(

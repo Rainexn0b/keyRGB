@@ -114,17 +114,16 @@ class TestApplyEffectSelection:
         assert mock_tray.config.effect == "wave"
         mock_tray._start_current_effect.assert_called_once()
 
-    def test_defaults_to_support_all_when_caps_missing(self):
-        """Should assume all capabilities supported if backend_caps is None."""
+    def test_missing_caps_fail_closed(self):
+        """Missing capability evidence must not enable backend features."""
         from src.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = None
         mock_tray.backend = self._backend("rainbow")
 
-        # Both hardware and per-key effects should work
         apply_effect_selection(mock_tray, effect_name="rainbow")
-        assert mock_tray.config.effect == "rainbow"
+        assert mock_tray.config.effect == "none"
 
         apply_effect_selection(mock_tray, effect_name="perkey")
         assert mock_tray.config.effect == "none"

@@ -81,14 +81,18 @@ def build_full_color_grid(
         int(base_color[1]),
         int(base_color[2]),
     )
-    full: dict[tuple[int, int], tuple[int, int, int]] = {
-        (r, c): base for r in range(int(num_rows)) for c in range(int(num_cols))
-    }
+    rows = int(num_rows)
+    cols = int(num_cols)
+    full: dict[tuple[int, int], tuple[int, int, int]] = {(r, c): base for r in range(rows) for c in range(cols)}
 
     for (row, col), rgb in (per_key_colors or {}).items():
         try:
+            row_i = int(row)
+            col_i = int(col)
+            if row_i < 0 or col_i < 0 or row_i >= rows or col_i >= cols:
+                continue
             rr, gg, bb = rgb
-            full[(int(row), int(col))] = (int(rr), int(gg), int(bb))
+            full[(row_i, col_i)] = (int(rr), int(gg), int(bb))
         except (TypeError, ValueError):
             continue
 

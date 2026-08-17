@@ -8,9 +8,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol, cast
 
 from src.core.effects.catalog import resolve_effect_name_for_backend
+from src.core.effects.matrix_layout import geometry_for_engine
 from src.core.effects.perkey_animation import build_full_color_grid
 from src.core.lighting_layers import resolve_render_effect
-from src.core.resources.defaults import REFERENCE_MATRIX_COLS as NUM_COLS, REFERENCE_MATRIX_ROWS as NUM_ROWS
 from src.core.utils.logging_utils import log_throttled
 
 logger = logging.getLogger(__name__)
@@ -162,7 +162,11 @@ def _weighted_hsv_mean(colors: Iterable[RGBColor]) -> RGBColor:
     return (int(rr * 255), int(gg * 255), int(bb * 255))
 
 
-def _representative_perkey_color(config: _TrayIconColorConfig) -> RGBColor | None:
+def _representative_perkey_color(
+    config: _TrayIconColorConfig,
+    *,
+    engine: object | None = None,
+) -> RGBColor | None:
     per_key = _per_key_color_mapping(config)
     if not per_key:
         return None
@@ -171,13 +175,14 @@ def _representative_perkey_color(config: _TrayIconColorConfig) -> RGBColor | Non
     if not normalized_per_key:
         return None
 
+    geometry = geometry_for_engine(engine)
     base_color = _config_color(config, "color")
     try:
         full = build_full_color_grid(
             base_color=base_color,
             per_key_colors=cast(PerKeyColorMap, per_key),
-            num_rows=NUM_ROWS,
-            num_cols=NUM_COLS,
+            num_rows=int(geometry.rows),
+            num_cols=int(geometry.cols),
         )
     except (TypeError, ValueError, OverflowError):
         return _weighted_hsv_mean(normalized_per_key)
@@ -201,6 +206,7 @@ def representative_color(
     is_off: bool,
     now: float | None = None,
     backend: object | None = None,
+    engine: object | None = None,
 ) -> RGBColor:
     """Pick an RGB color representative of the currently applied state."""
 
@@ -217,6 +223,9 @@ def representative_color(
         resolve_effect_name_fn=lambda effect_name: resolve_effect_name_for_backend(effect_name, backend),
     )
     brightness = _config_int(config, "brightness", 25)
+    geometry = geometry_for_engine(engine)
+    num_rows = int(geometry.rows)
+    num_cols = int(geometry.cols)
 
     # Reactive typing effects can store a separate manual effect color.
     # Respect the "use manual color" toggle; when disabled, the icon should
@@ -230,7 +239,7 @@ def representative_color(
     # Per-key: average of configured colors
     if effect == "perkey":
         brightness = _config_int(config, "perkey_brightness", brightness)
-        base = _representative_perkey_color(config) or _config_color(config, "color")
+        base = _representative_perkey_color(config, engine=engine) or _config_color(config, "color")
 
     # Multi-color effects: cycle a hue so the icon changes.
     elif effect in {"rainbow_wave", "rainbow_swirl", "spectrum_cycle", "color_cycle"}:
@@ -239,10 +248,10 @@ def representative_color(
 
         if effect == "rainbow_wave":
             hue = (now * (0.165 * p)) % 1.0
-            col_den = float(max(1, NUM_COLS - 1))
-            row_den = float(max(1, NUM_ROWS - 1))
-            r = NUM_ROWS // 2
-            c = NUM_COLS // 2
+            col_den = float(max(1, num_cols - 1))
+            row_den = float(max(1, num_rows - 1))
+            r = num_rows // 2
+            c = num_cols // 2
             position = (float(c) / col_den) + (0.18 * (float(r) / row_den))
             h = (hue + position) % 1.0
             rr, gg, bb = colorsys.hsv_to_rgb(h, 1.0, 1.0)
@@ -250,15 +259,15 @@ def representative_color(
 
         elif effect == "rainbow_swirl":
             hue = (now * (0.115 * p)) % 1.0
-            cr = (NUM_ROWS - 1) / 2.0
-            cc = (NUM_COLS - 1) / 2.0
-            r = NUM_ROWS // 2
-            c = NUM_COLS // 2
+            cr = (num_rows - 1) / 2.0
+            cc = (num_cols - 1) / 2.0
+            r = num_rows // 2
+            c = num_cols // 2
             dy = float(r) - cr
             dx = float(c) - cc
             ang = (math.atan2(dy, dx) / (2.0 * math.pi)) % 1.0
             rad = math.hypot(dx, dy)
-            max_r = math.hypot(max(cc, NUM_COLS - 1 - cc), max(cr, NUM_ROWS - 1 - cr))
+            max_r = math.hypot(max(cc, num_cols - 1 - cc), max(cr, num_rows - 1 - cr))
             max_r = max(1e-6, max_r)
             h = (hue + ang + 0.25 * (rad / max_r)) % 1.0
             rr, gg, bb = colorsys.hsv_to_rgb(h, 1.0, 1.0)

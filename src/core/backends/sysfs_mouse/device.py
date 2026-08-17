@@ -15,6 +15,7 @@ class SysfsMouseDevice(SysfsLedKeyboardDevice):
     def capabilities(self) -> BackendCapabilities:
         caps = super().capabilities()
         return BackendCapabilities(
+            brightness=bool(caps.brightness),
             per_key=False,
             color=bool(caps.color),
             hardware_effects=False,

@@ -6,9 +6,10 @@ from collections.abc import Mapping
 from operator import attrgetter
 from typing import TYPE_CHECKING, SupportsIndex, SupportsInt, cast
 
+from src.core.backends.base import supports_per_key_output
 from src.core.backends.policies.per_key_mode import per_key_mode_requires_frame_reassert
 from src.core.effects.device import optional_output_transaction
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import geometry_for_engine
 from src.core.effects.perkey_animation import build_full_color_grid, enable_user_mode_once
 from src.core.effects.software_targets import average_color_map, render_secondary_uniform_rgb
 from src.core.effects.transitions import avoid_full_black
@@ -30,17 +31,6 @@ IntCoercible = SupportsInt | SupportsIndex | str | bytes | bytearray
 def _engine_attr_or_none(engine: EffectsEngine, attr_name: str) -> object | None:
     try:
         return attrgetter(attr_name)(engine)
-    except AttributeError:
-        return None
-
-
-def _keyboard_attr_or_none(engine: EffectsEngine, attr_name: str) -> object | None:
-    try:
-        kb = engine.kb
-    except AttributeError:
-        return None
-    try:
-        return attrgetter(attr_name)(kb)
     except AttributeError:
         return None
 
@@ -174,7 +164,7 @@ def animation_step_s(
 
 
 def has_per_key(engine: EffectsEngine) -> bool:
-    return bool(_keyboard_attr_or_none(engine, "set_key_colors"))
+    return supports_per_key_output(_engine_attr_or_none(engine, "backend_caps"), _engine_attr_or_none(engine, "kb"))
 
 
 def base_color_map(engine: EffectsEngine) -> dict[Key, Color]:
@@ -184,16 +174,17 @@ def base_color_map(engine: EffectsEngine) -> dict[Key, Color]:
         int(base_color_src[1]),
         int(base_color_src[2]),
     )
+    geometry = geometry_for_engine(engine)
 
     per_key = _per_key_colors_or_none(engine)
     if not per_key:
-        return {(r, c): base_color for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+        return {(r, c): base_color for r in range(geometry.rows) for c in range(geometry.cols)}
 
     full = build_full_color_grid(
         base_color=base_color,
         per_key_colors=per_key,
-        num_rows=NUM_ROWS,
-        num_cols=NUM_COLS,
+        num_rows=geometry.rows,
+        num_cols=geometry.cols,
     )
 
     out: dict[Key, Color] = {}

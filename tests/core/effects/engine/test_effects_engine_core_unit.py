@@ -4,7 +4,19 @@ import logging
 
 import pytest
 
+from src.core.backends.base import BackendCapabilities
 from src.core.effects.engine import EffectsEngine
+
+
+class _HardwareEffectsBackend:
+    def capabilities(self) -> BackendCapabilities:
+        return BackendCapabilities(
+            brightness=True,
+            per_key=False,
+            color=True,
+            hardware_effects=True,
+            palette=False,
+        )
 
 
 class _StuckEffectThread:
@@ -112,7 +124,7 @@ def test_start_effect_restores_config_restart_brightness_before_thread_setup(mon
 
 
 def test_get_backend_effects_returns_empty_dict_and_logs_backend_failures(caplog) -> None:
-    class DummyBackend:
+    class DummyBackend(_HardwareEffectsBackend):
         def effects(self):
             raise RuntimeError("effects boom")
 
@@ -126,8 +138,31 @@ def test_get_backend_effects_returns_empty_dict_and_logs_backend_failures(caplog
     assert error_records[-1].exc_info is not None
 
 
+def test_device_ensure_refreshes_dynamic_backend_capabilities() -> None:
+    class DynamicBackend:
+        color = False
+
+        def capabilities(self) -> BackendCapabilities:
+            return BackendCapabilities(
+                brightness=True,
+                per_key=False,
+                color=self.color,
+                hardware_effects=False,
+                palette=False,
+            )
+
+    backend = DynamicBackend()
+    engine = EffectsEngine(backend=backend)
+    engine.device_available = True
+    engine.kb = object()  # type: ignore[assignment]
+    backend.color = True
+
+    assert engine._ensure_device_available() is True
+    assert engine.backend_caps.color is True
+
+
 def test_get_backend_effects_propagates_unexpected_backend_failures() -> None:
-    class DummyBackend:
+    class DummyBackend(_HardwareEffectsBackend):
         def effects(self):
             raise AssertionError("unexpected effects bug")
 
@@ -138,7 +173,7 @@ def test_get_backend_effects_propagates_unexpected_backend_failures() -> None:
 
 
 def test_get_backend_colors_returns_empty_dict_and_logs_backend_failures(caplog) -> None:
-    class DummyBackend:
+    class DummyBackend(_HardwareEffectsBackend):
         def colors(self):
             raise RuntimeError("colors boom")
 
@@ -153,7 +188,7 @@ def test_get_backend_colors_returns_empty_dict_and_logs_backend_failures(caplog)
 
 
 def test_get_backend_colors_propagates_unexpected_backend_failures() -> None:
-    class DummyBackend:
+    class DummyBackend(_HardwareEffectsBackend):
         def colors(self):
             raise AssertionError("unexpected colors bug")
 

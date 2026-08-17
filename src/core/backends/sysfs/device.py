@@ -180,6 +180,7 @@ class SysfsLedKeyboardDevice(KeyboardDevice):
             color_supported = False
 
         return BackendCapabilities(
+            brightness=True,
             per_key=(len(self._zones) > 1),
             color=bool(color_supported),
             hardware_effects=False,

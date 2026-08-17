@@ -68,7 +68,10 @@ class TestHasPerKeyWriter:
     def test_set_key_colors_callable_returns_true(self):
         from src.core.effects.reactive._ripple_loop import _has_per_key_writer
 
-        engine = SimpleNamespace(kb=SimpleNamespace(set_key_colors=lambda keys: None))
+        engine = SimpleNamespace(
+            backend_caps=SimpleNamespace(per_key=True),
+            kb=SimpleNamespace(set_key_colors=lambda keys: None),
+        )
         assert _has_per_key_writer(engine) is True
 
 
@@ -253,7 +256,7 @@ class _MockApi:
     def get_engine_overlay_buffer(self, engine, attr_name: str) -> dict:
         return dict(self._overlay_values)
 
-    def build_ripple_overlay_into(self, dest, pulses, *, band: float) -> None:
+    def build_ripple_overlay_into(self, dest, pulses, *, band: float, **_kwargs) -> None:
         self.overlay_band_calls.append(float(band))
         # overlay values come pre-populated from get_engine_overlay_buffer
 
@@ -308,6 +311,7 @@ def _make_engine(*, reactive_brightness: int = 0, has_per_key_writer: bool = Fal
         kb.set_key_colors = lambda keys: None
 
     engine = SimpleNamespace(
+        backend_caps=SimpleNamespace(per_key=has_per_key_writer),
         running=True,
         stop_event=stop_event,
         reactive_brightness=reactive_brightness,

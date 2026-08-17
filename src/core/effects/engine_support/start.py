@@ -5,6 +5,7 @@ from collections.abc import Callable
 from threading import RLock, Thread
 from typing import Final, Literal, cast
 
+from src.core.backends.base import BackendCapabilities
 from src.core.utils import exceptions as core_exceptions
 
 from .. import catalog as effects_catalog, hw_payloads as effects_hw_payloads
@@ -55,6 +56,7 @@ class _EngineStart:
 
     kb_lock: RLock
     kb: KeyboardDeviceProtocol
+    backend_caps: BackendCapabilities
     running: bool
     thread: Thread | None
     speed: int
@@ -198,7 +200,8 @@ class _EngineStart:
         needs_mode_reassert = start_brightness >= 1 and (device_mode_off or soft_on_start)
         needs_perkey_prime = (
             bool(self.per_key_colors)
-            and hasattr(self.kb, "set_key_colors")
+            and self.backend_caps.per_key
+            and callable(getattr(self.kb, "set_key_colors", None))
             and (start_brightness > 1 or needs_mode_reassert)
         )
 
@@ -225,7 +228,7 @@ class _EngineStart:
             self._last_rendered_brightness = start_brightness
             # set_color re-enables user mode on the controller.
             self._device_mode_off = False
-        elif self.per_key_colors and hasattr(self.kb, "set_key_colors"):
+        elif self.per_key_colors and self.backend_caps.per_key and callable(getattr(self.kb, "set_key_colors", None)):
             from src.core.effects.perkey_animation import enable_user_mode_once
 
             # Never arm user mode at brightness 0 after a dark deck — ITE

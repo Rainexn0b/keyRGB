@@ -6,6 +6,9 @@ from collections.abc import Callable, Mapping, Sequence
 from operator import attrgetter
 from typing import TYPE_CHECKING, Protocol
 
+from src.core.backends.base import supports_per_key_output
+from src.core.effects.matrix_layout import geometry_for_engine
+
 from .input import EvdevKeyboardDevices
 from .utils import frame_elapsed_dt_s, log_frame_overrun_if_slow, remaining_frame_delay_s
 
@@ -57,12 +60,7 @@ def _engine_int_attr_or_fallback(
 
 
 def _has_per_key_writer(engine: EffectsEngine) -> bool:
-    kb = engine.kb
-    try:
-        set_key_colors = attrgetter("set_key_colors")(kb)
-    except AttributeError:
-        return False
-    return bool(set_key_colors)
+    return supports_per_key_output(getattr(engine, "backend_caps", None), getattr(engine, "kb", None))
 
 
 class _PressSourceProtocol(Protocol):
@@ -104,11 +102,20 @@ class _BackdropBrightnessScaleFactorProtocol(Protocol):
 
 
 class _ReactiveFadeApiProtocol(Protocol):
-    _PressSource: _PressSourceFactoryProtocol
-    _Pulse: _PulseFactoryProtocol
-    random: _RandomProtocol
-    NUM_ROWS: int
-    NUM_COLS: int
+    @property
+    def _PressSource(self) -> _PressSourceFactoryProtocol: ...
+
+    @property
+    def _Pulse(self) -> _PulseFactoryProtocol: ...
+
+    @property
+    def random(self) -> _RandomProtocol: ...
+
+    @property
+    def NUM_ROWS(self) -> int: ...
+
+    @property
+    def NUM_COLS(self) -> int: ...
 
     def frame_dt_s(self) -> float: ...
 
@@ -228,8 +235,9 @@ def run_reactive_fade_loop(engine: EffectsEngine, *, api: _ReactiveFadeApiProtoc
                         for row, col in mapped_cells:
                             pulses.append(api._Pulse(row=int(row), col=int(col), age_s=0.0, ttl_s=ttl))
                     else:
-                        row = api.random.randrange(api.NUM_ROWS)
-                        col = api.random.randrange(api.NUM_COLS)
+                        geometry = geometry_for_engine(engine)
+                        row = api.random.randrange(int(geometry.rows))
+                        col = api.random.randrange(int(geometry.cols))
                         pulses.append(api._Pulse(row=row, col=col, age_s=0.0, ttl_s=ttl))
 
             pulses = api._age_pulses_in_place(pulses, dt=real_dt)

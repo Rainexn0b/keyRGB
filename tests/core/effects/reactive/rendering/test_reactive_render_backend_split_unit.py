@@ -12,6 +12,8 @@ class _DummyLock:
 
 
 class _DummyKB:
+    backend_caps = SimpleNamespace(per_key=True)
+
     def __init__(self, *, per_key_mode_policy: str = "init_once"):
         self.calls: list[tuple[str, int]] = []
         self.frames: list[dict[tuple[int, int], tuple[int, int, int]]] = []
@@ -29,6 +31,8 @@ class _DummyKB:
 
 
 class _DummyUniformKB:
+    backend_caps = SimpleNamespace(per_key=False)
+
     def __init__(self):
         self.calls: list[tuple[str, int]] = []
 

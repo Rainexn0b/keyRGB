@@ -4,8 +4,20 @@ import logging
 
 import pytest
 
+from src.core.backends.base import BackendCapabilities
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 from src.gui.perkey import hardware
+
+
+class _PerKeyBackend:
+    def capabilities(self) -> BackendCapabilities:
+        return BackendCapabilities(
+            brightness=True,
+            per_key=True,
+            color=True,
+            hardware_effects=False,
+            palette=False,
+        )
 
 
 def test_select_backend_returns_none_on_recoverable_selection_failure(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -38,7 +50,7 @@ def test_select_backend_propagates_unexpected_selection_failure(monkeypatch: pyt
 
 
 def test_backend_dimensions_or_reference_uses_reference_on_recoverable_failure() -> None:
-    class BrokenBackend:
+    class BrokenBackend(_PerKeyBackend):
         def dimensions(self):
             raise RuntimeError("dimension boom")
 
@@ -49,7 +61,7 @@ def test_backend_dimensions_or_reference_uses_reference_on_recoverable_failure()
 
 
 def test_backend_dimensions_or_reference_propagates_unexpected_failure() -> None:
-    class BrokenBackend:
+    class BrokenBackend(_PerKeyBackend):
         def dimensions(self):
             raise AssertionError("unexpected dimension bug")
 
@@ -75,7 +87,7 @@ def test_get_keyboard_returns_none_on_recoverable_open_failure(monkeypatch: pyte
     seen: dict[str, object] = {}
     err = RuntimeError("open boom")
 
-    class BrokenBackend:
+    class BrokenBackend(_PerKeyBackend):
         def get_device(self):
             raise err
 
@@ -95,7 +107,7 @@ def test_get_keyboard_returns_none_on_recoverable_open_failure(monkeypatch: pyte
 
 
 def test_get_keyboard_propagates_unexpected_open_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    class BrokenBackend:
+    class BrokenBackend(_PerKeyBackend):
         def get_device(self):
             raise AssertionError("unexpected open bug")
 
@@ -116,6 +128,32 @@ def test_get_keyboard_stays_config_only_when_launched_by_tray(monkeypatch: pytes
     assert hardware.get_keyboard() is None
 
 
+def test_get_keyboard_does_not_open_backend_without_per_key_capability(monkeypatch: pytest.MonkeyPatch) -> None:
+    backend = type(
+        "UniformBackend",
+        (),
+        {
+            "capabilities": lambda self: BackendCapabilities(
+                brightness=True,
+                per_key=False,
+                color=True,
+                hardware_effects=False,
+                palette=False,
+            ),
+            "get_device": lambda self: (_ for _ in ()).throw(AssertionError("must not open")),
+        },
+    )()
+    monkeypatch.delenv("KEYRGB_TRAY_MANAGED_GUI", raising=False)
+    monkeypatch.setattr(hardware, "_backend", backend)
+    monkeypatch.setattr(
+        hardware,
+        "acquire_hardware_control_lock",
+        lambda: (_ for _ in ()).throw(AssertionError("must not acquire lock")),
+    )
+
+    assert hardware.get_keyboard() is None
+
+
 def test_get_keyboard_stays_config_only_when_hardware_lock_is_owned(monkeypatch: pytest.MonkeyPatch) -> None:
     class UnexpectedBackend:
         def get_device(self):
@@ -129,7 +167,7 @@ def test_get_keyboard_stays_config_only_when_hardware_lock_is_owned(monkeypatch:
 
 
 def test_get_keyboard_releases_hardware_lock_when_open_fails(monkeypatch: pytest.MonkeyPatch) -> None:
-    class BrokenBackend:
+    class BrokenBackend(_PerKeyBackend):
         def get_device(self):
             raise RuntimeError("open failed")
 

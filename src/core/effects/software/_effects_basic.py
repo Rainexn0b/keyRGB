@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 from src.core.effects.colors import hsv_to_rgb
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import geometry_for_engine
 
 from ._buffers import fill_uniform_color_map, get_engine_color_map_buffer, scale_color_map_into
 from .base import Color, Key, animation_step_s, base_color_map, frame_dt_s, mix, pace, render as base_render
@@ -44,8 +44,11 @@ def run_fire(engine: EffectsEngine, *, render_fn=base_render) -> None:
     color_map = get_engine_color_map_buffer(engine, "_sw_fire_frame_map")
     nominal_dt = frame_dt_s()
     p = pace(engine)
+    geometry = geometry_for_engine(engine)
+    num_rows = int(geometry.rows)
+    num_cols = int(geometry.cols)
 
-    heat = [[0.0 for _ in range(NUM_COLS)] for _ in range(NUM_ROWS)]
+    heat = [[0.0 for _ in range(num_cols)] for _ in range(num_rows)]
 
     def heat_to_rgb(h: float) -> Color:
         hh = max(0.0, min(1.0, float(h)))
@@ -59,29 +62,29 @@ def run_fire(engine: EffectsEngine, *, render_fn=base_render) -> None:
         step_s = animation_step_s(engine, "_sw_fire_tick", nominal_s=nominal_dt)
         step_ratio = step_s / nominal_dt
         cooling = 0.06 * p * step_ratio
-        for r in range(NUM_ROWS):
-            for c in range(NUM_COLS):
+        for r in range(num_rows):
+            for c in range(num_cols):
                 heat[r][c] = max(0.0, heat[r][c] - cooling)
 
         sparks = max(1, round((2 * p) * step_ratio))
         for _ in range(sparks):
-            c = random.randrange(NUM_COLS)
-            r = random.randrange(min(2, NUM_ROWS))
+            c = random.randrange(num_cols)
+            r = random.randrange(min(2, num_rows))
             heat[r][c] = min(1.0, heat[r][c] + random.uniform(0.45, 0.9))
 
-        for r in range(1, NUM_ROWS):
-            for c in range(NUM_COLS):
+        for r in range(1, num_rows):
+            for c in range(num_cols):
                 below = heat[r - 1][c]
                 below_l = heat[r - 1][c - 1] if c > 0 else below
-                below_r = heat[r - 1][c + 1] if c + 1 < NUM_COLS else below
+                below_r = heat[r - 1][c + 1] if c + 1 < num_cols else below
                 heat[r][c] = (below + below_l + below_r) / 3.0
 
         color_map.clear()
-        for r in range(NUM_ROWS):
-            for c in range(NUM_COLS):
+        for r in range(num_rows):
+            for c in range(num_cols):
                 h = heat[r][c]
                 fire_rgb = heat_to_rgb(h)
-                base_rgb = base[(r, c)]
+                base_rgb = base.get((r, c), (255, 0, 0))
                 color_map[(r, c)] = mix(base_rgb, fire_rgb, t=min(1.0, h * 0.95))
 
         render_fn(engine, color_map=color_map)
@@ -138,12 +141,15 @@ def run_rainbow_wave(engine: EffectsEngine, *, render_fn=base_render) -> None:
 
     nominal_dt = frame_dt_s()
     p = pace(engine)
+    geometry = geometry_for_engine(engine)
+    num_rows = int(geometry.rows)
+    num_cols = int(geometry.cols)
 
-    col_den = float(max(1, NUM_COLS - 1))
-    row_den = float(max(1, NUM_ROWS - 1))
+    col_den = float(max(1, num_cols - 1))
+    row_den = float(max(1, num_rows - 1))
     pos: dict[Key, float] = {}
-    for r in range(NUM_ROWS):
-        for c in range(NUM_COLS):
+    for r in range(num_rows):
+        for c in range(num_cols):
             pos[(r, c)] = (float(c) / col_den) + (0.18 * (float(r) / row_den))
 
     hue = 0.0
@@ -167,13 +173,16 @@ def run_rainbow_swirl(engine: EffectsEngine, *, render_fn=base_render) -> None:
 
     nominal_dt = frame_dt_s()
     p = pace(engine)
+    geometry = geometry_for_engine(engine)
+    num_rows = int(geometry.rows)
+    num_cols = int(geometry.cols)
 
-    cr = (NUM_ROWS - 1) / 2.0
-    cc = (NUM_COLS - 1) / 2.0
+    cr = (num_rows - 1) / 2.0
+    cc = (num_cols - 1) / 2.0
     coords: dict[Key, tuple[float, float]] = {}
     max_r = 0.0
-    for r in range(NUM_ROWS):
-        for c in range(NUM_COLS):
+    for r in range(num_rows):
+        for c in range(num_cols):
             dy = float(r) - cr
             dx = float(c) - cc
             ang = (math.atan2(dy, dx) / (2.0 * math.pi)) % 1.0
@@ -211,7 +220,7 @@ def run_spectrum_cycle(engine: EffectsEngine, *, render_fn=base_render) -> None:
         # visible hue variation at high speeds (matches v0.18.1 behaviour).
         hue = (hue + (nominal_dt * (0.22 * p))) % 1.0
         rgb = hsv_to_rgb(hue, 1.0, 1.0)
-        fill_uniform_color_map(color_map, color=rgb)
+        fill_uniform_color_map(color_map, color=rgb, engine=engine)
         render_fn(engine, color_map=color_map)
         engine.stop_event.wait(nominal_dt)
 
@@ -229,7 +238,7 @@ def run_color_cycle(engine: EffectsEngine, *, render_fn=base_render) -> None:
         g = (math.sin(phase + (2.0 * math.pi / 3.0)) + 1.0) / 2.0
         b = (math.sin(phase + (4.0 * math.pi / 3.0)) + 1.0) / 2.0
         rgb = (round(r * 255), round(g * 255), round(b * 255))
-        fill_uniform_color_map(color_map, color=rgb)
+        fill_uniform_color_map(color_map, color=rgb, engine=engine)
         render_fn(engine, color_map=color_map)
 
         # Use constant step so USB write-time jitter is not amplified into

@@ -11,6 +11,7 @@ from src.core.effects.catalog import (
     SW_EFFECTS as _SW_EFFECTS,
 )
 from src.core.effects.engine_support import _EngineBrightness, _EngineCore, _EngineStart
+from src.core.effects.engine_support._contracts import assert_engine_support_contract
 
 
 class EffectsEngine(_EngineCore, _EngineBrightness, _EngineStart):
@@ -23,3 +24,4 @@ class EffectsEngine(_EngineCore, _EngineBrightness, _EngineStart):
 
     def __init__(self, *, backend=None):
         super().__init__(backend=backend)
+        assert_engine_support_contract(self)

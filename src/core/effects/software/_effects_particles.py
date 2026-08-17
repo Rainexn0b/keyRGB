@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from src.core.effects.colors import hsv_to_rgb
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from src.core.effects.matrix_layout import geometry_for_engine
 from src.core.effects.transitions import scaled_color_map_nonzero
 
 from . import base as _base
@@ -38,6 +38,10 @@ def run_twinkle(engine: EffectsEngine, *, render_fn=_base.render) -> None:
     twinkles: list[_Twinkle] = []
     acc = 0.0
 
+    geometry = geometry_for_engine(engine)
+    num_rows = int(geometry.rows)
+    num_cols = int(geometry.cols)
+
     while engine.running and not engine.stop_event.is_set():
         step_s = _base.animation_step_s(engine, "_sw_twinkle_tick", nominal_s=nominal_dt)
         acc += step_s * p
@@ -45,8 +49,8 @@ def run_twinkle(engine: EffectsEngine, *, render_fn=_base.render) -> None:
             acc -= 0.12
             count = 1 if p < 4.5 else 2
             for _ in range(count):
-                rr = random.randrange(NUM_ROWS)
-                cc = random.randrange(NUM_COLS)
+                rr = random.randrange(num_rows)
+                cc = random.randrange(num_cols)
                 h = random.random()
                 twinkles.append(
                     _Twinkle(
@@ -89,6 +93,9 @@ def run_twinkle(engine: EffectsEngine, *, render_fn=_base.render) -> None:
 def run_strobe(engine: EffectsEngine, *, render_fn=_base.render) -> None:
     """Strobe (SW): rapid on/off flashing (OpenRGB-style)."""
 
+    geometry = geometry_for_engine(engine)
+    num_rows = int(geometry.rows)
+    num_cols = int(geometry.cols)
     base = _base.base_color_map(engine)
     try:
         brightness_raw = getattr(engine, "brightness", 25)
@@ -99,7 +106,7 @@ def run_strobe(engine: EffectsEngine, *, render_fn=_base.render) -> None:
     # If the base is fully black but brightness is non-zero, the effect would
     # otherwise appear "stuck off". Fall back to a visible base.
     if brightness > 0 and not any(rgb != (0, 0, 0) for rgb in base.values()):
-        base = {(r, c): (255, 255, 255) for r in range(NUM_ROWS) for c in range(NUM_COLS)}
+        base = {(r, c): (255, 255, 255) for r in range(num_rows) for c in range(num_cols)}
 
     # Avoid writing a full-black frame: some devices/backends interpret
     # (0,0,0) as an "off" latch and won't recover smoothly. Instead, render a
@@ -152,15 +159,18 @@ def run_chase(engine: EffectsEngine, *, render_fn=_base.render) -> None:
     pos = 0.0
     width = 1.6
     color_map = get_engine_color_map_buffer(engine, "_sw_chase_frame_map")
+    geometry = geometry_for_engine(engine)
+    num_cols = int(geometry.cols)
+
     while engine.running and not engine.stop_event.is_set():
         step_s = _base.animation_step_s(engine, "_sw_chase_tick", nominal_s=nominal_dt)
-        pos = (pos + step_s * (3.2 * p)) % float(max(1, NUM_COLS))
+        pos = (pos + step_s * (3.2 * p)) % float(max(1, num_cols))
 
         if not per_key_ok:
-            phase = float(pos) / float(max(1, NUM_COLS))
+            phase = float(pos) / float(max(1, num_cols))
             pulse = 0.35 + 0.65 * (0.5 + 0.5 * math.sin(2.0 * math.pi * phase))
             rgb = _base.mix(background_uniform, highlight, t=pulse)
-            fill_uniform_color_map(color_map, color=rgb)
+            fill_uniform_color_map(color_map, color=rgb, engine=engine)
             render_fn(engine, color_map=color_map)
             engine.stop_event.wait(nominal_dt)
             continue
@@ -168,7 +178,7 @@ def run_chase(engine: EffectsEngine, *, render_fn=_base.render) -> None:
         color_map.clear()
         for (r, c), base_rgb in base.items():
             d = abs(float(c) - pos)
-            d = min(d, float(NUM_COLS) - d)
+            d = min(d, float(num_cols) - d)
             if d <= width:
                 w = 1.0 - (d / max(1e-6, width))
                 color_map[(r, c)] = _base.mix(base_rgb, highlight, t=w)
@@ -197,10 +207,14 @@ def run_rain(engine: EffectsEngine, *, render_fn=_base.render) -> None:
     droplets: list[_RainDrop] = []
 
     def spawn() -> None:
-        col = random.randrange(NUM_COLS)
-        droplets.append(_RainDrop(row=NUM_ROWS - 1, col=col, age_s=0.0, ttl_s=1.1 / p))
+        col = random.randrange(num_cols)
+        droplets.append(_RainDrop(row=num_rows - 1, col=col, age_s=0.0, ttl_s=1.1 / p))
 
     acc = 0.0
+    geometry = geometry_for_engine(engine)
+    num_rows = int(geometry.rows)
+    num_cols = int(geometry.cols)
+
     while engine.running and not engine.stop_event.is_set():
         step_s = _base.animation_step_s(engine, "_sw_rain_tick", nominal_s=nominal_dt)
         acc += step_s * p
@@ -216,12 +230,12 @@ def run_rain(engine: EffectsEngine, *, render_fn=_base.render) -> None:
                 continue
 
             progress = d.age_s / d.ttl_s
-            row_f = (1.0 - progress) * float(NUM_ROWS - 1)
+            row_f = (1.0 - progress) * float(num_rows - 1)
             row = round(row_f)
-            if 0 <= row < NUM_ROWS:
+            if 0 <= row < num_rows:
                 for tail in range(3):
                     rr = row + tail
-                    if rr >= NUM_ROWS:
+                    if rr >= num_rows:
                         break
                     w = max(0.0, 1.0 - (tail * 0.35)) * (1.0 - progress)
                     k = (rr, d.col)

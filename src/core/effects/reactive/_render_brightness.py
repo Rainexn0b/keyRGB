@@ -5,6 +5,8 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
+from src.core.backends.base import supports_per_key_output
+
 from . import _render_brightness_support as _support
 from ._constants import UNIFORM_PULSE_HW_LIFT_STREAK_MIN
 from ._render_brightness_debug import log_hw_lift_decision_change
@@ -100,7 +102,10 @@ def _resolve_hw_brightness_with_pulse_mix(
         - allow_pulse_hw_lift: whether a uniform pulse lift was applied
         - per_key_hw: whether this is a per-key backend
     """
-    per_key_hw = bool(_support.device_attr_or_none(_support.keyboard_or_none(engine), "set_key_colors"))
+    per_key_hw = supports_per_key_output(
+        getattr(engine, "backend_caps", None),
+        _support.keyboard_or_none(engine),
+    )
     uniform_hw_streak_count = _support.increment_uniform_hw_streak(engine, per_key_hw=per_key_hw, logger=_LOGGER)
 
     allow_pulse_hw_lift = False

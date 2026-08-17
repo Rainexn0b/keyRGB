@@ -15,7 +15,7 @@ import pytest
 
 
 class TestAllowedHwEffectKeys:
-    """Test allowed_hw_effect_keys introspection logic."""
+    """Test the explicit accepted-payload metadata contract."""
 
     def test_returns_empty_set_when_no_closure(self):
         """Should return empty set for functions without closure."""
@@ -27,47 +27,35 @@ class TestAllowedHwEffectKeys:
         result = allowed_hw_effect_keys(simple_func, logger=logging.getLogger())
         assert result == set()
 
-    def test_returns_empty_set_on_introspection_error(self):
-        """Should gracefully handle introspection failures."""
+    def test_returns_empty_set_without_explicit_contract(self):
         from src.core.effects.hw_payloads import allowed_hw_effect_keys
 
-        # Mock object without __code__ attribute
         mock_func = MagicMock()
-        del mock_func.__code__
 
         result = allowed_hw_effect_keys(mock_func, logger=logging.getLogger())
         assert result == set()
 
-    def test_propagates_unexpected_introspection_errors(self):
-        """Assertion-style introspection bugs should not be treated as normal fallback."""
+    def test_does_not_touch_callable_closure_internals(self):
         from src.core.effects.hw_payloads import allowed_hw_effect_keys
 
-        class _BrokenCode:
+        class _CallableWithBrokenCode:
             @property
-            def co_freevars(self):
-                raise AssertionError("unexpected introspection bug")
+            def __code__(self):
+                raise AssertionError("closure internals must not be inspected")
 
-        class _BrokenFunc:
-            __code__ = _BrokenCode()
-            __closure__ = ()
+            def __call__(self, **kwargs):
+                return kwargs
 
-        with pytest.raises(AssertionError, match="unexpected introspection bug"):
-            allowed_hw_effect_keys(_BrokenFunc(), logger=logging.getLogger())
+        assert allowed_hw_effect_keys(_CallableWithBrokenCode(), logger=logging.getLogger()) == set()
 
-    def test_extracts_keys_from_closure_with_args_dict(self):
-        """Should extract allowed keys from closure args dict."""
+    def test_extracts_keys_from_declared_builder_contract(self):
+        from src.core.backends.effect_contract import hardware_effect_builder
         from src.core.effects.hw_payloads import allowed_hw_effect_keys
 
-        # Simulate the legacy hardware-effect builder pattern with args stored in a closure
-        def make_effect_func():
-            args = {"speed": None, "brightness": None, "color": None}
-
-            def effect_func(**kwargs):
-                return args
-
-            return effect_func
-
-        func = make_effect_func()
+        func = hardware_effect_builder(
+            lambda **kwargs: kwargs,
+            accepted_kwargs=("speed", "brightness", "color"),
+        )
         result = allowed_hw_effect_keys(func, logger=logging.getLogger())
 
         assert "speed" in result
@@ -358,8 +346,9 @@ class TestBuildHwEffectPayload:
         mock_kb.set_palette_color.assert_not_called()
         assert captured_kwargs["color"] == (17, 34, 51)
 
-    def test_retries_on_unsupported_kwarg_error(self):
-        """Should retry with fewer kwargs when 'attr is not needed' error occurs."""
+    def test_retries_on_typed_unsupported_kwarg_error(self):
+        """Typed builder rejections may remove one field and retry."""
+        from src.core.backends.effect_contract import UnsupportedHardwareEffectArgument
         from src.core.effects.hw_payloads import build_hw_effect_payload
 
         call_count = 0
@@ -368,8 +357,7 @@ class TestBuildHwEffectPayload:
             nonlocal call_count
             call_count += 1
             if call_count == 1 and "brightness" in kwargs:
-                # First call: reject 'brightness'
-                raise ValueError("'brightness' attr is not needed by effect")
+                raise UnsupportedHardwareEffectArgument("brightness")
             return kwargs
 
         result = build_hw_effect_payload(
@@ -390,19 +378,11 @@ class TestBuildHwEffectPayload:
         assert "speed" in result
 
     def test_filters_kwargs_by_allowed_keys_when_available(self):
-        """Should pre-filter kwargs if allowed keys can be determined."""
+        """Should pre-filter kwargs using explicit builder metadata."""
+        from src.core.backends.effect_contract import hardware_effect_builder
         from src.core.effects.hw_payloads import build_hw_effect_payload
 
-        def make_effect_func_with_args():
-            args = {"speed": None}  # Only speed is allowed
-
-            def effect_func(**kwargs):
-                _ = args  # ensure `args` exists in the closure for introspection
-                return kwargs
-
-            return effect_func
-
-        func = make_effect_func_with_args()
+        func = hardware_effect_builder(lambda **kwargs: kwargs, accepted_kwargs=("speed",))
 
         result = build_hw_effect_payload(
             effect_name="test",
@@ -418,7 +398,26 @@ class TestBuildHwEffectPayload:
 
         # Should have filtered to only 'speed' based on closure args
         assert "speed" in result
-        # Test successful execution - actual filtering behavior depends on implementation
+        assert "brightness" not in result
+
+    def test_value_error_text_is_not_parsed_as_a_payload_contract(self):
+        from src.core.effects.hw_payloads import build_hw_effect_payload
+
+        def legacy_error(**kwargs):
+            raise ValueError("'brightness' attr is not needed by effect")
+
+        with pytest.raises(ValueError, match="brightness"):
+            build_hw_effect_payload(
+                effect_name="test",
+                effect_func=legacy_error,
+                ui_speed=5,
+                brightness=50,
+                current_color=(0, 0, 0),
+                hw_colors={},
+                kb=MagicMock(),
+                kb_lock=RLock(),
+                logger=logging.getLogger(),
+            )
 
     def test_raises_on_unexpected_error(self):
         """Should raise ValueError immediately for errors that don't match retry pattern."""
