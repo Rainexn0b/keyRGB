@@ -310,9 +310,12 @@ def _defines_backend_registration(path: Path) -> bool:
         if isinstance(node, ast.Assign):
             if any(isinstance(target, ast.Name) and target.id == "BACKEND_REGISTRATION" for target in node.targets):
                 return True
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.target.id == "BACKEND_REGISTRATION":
-                return True
+        elif (
+            isinstance(node, ast.AnnAssign)
+            and isinstance(node.target, ast.Name)
+            and node.target.id == "BACKEND_REGISTRATION"
+        ):
+            return True
     return False
 
 
