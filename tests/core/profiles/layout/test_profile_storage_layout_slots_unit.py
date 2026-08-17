@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from src.core.resources.layouts import slot_id_for_key_id
 
@@ -89,3 +91,33 @@ class TestLayoutSlotStorage:
                 }
             }
         }
+
+    def test_concurrent_layout_updates_preserve_each_layout(self, monkeypatch, tmp_path) -> None:
+        monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+
+        from src.core.config import layout_slots
+
+        original_load = layout_slots._load_all_layout_slot_overrides
+        reads_completed = threading.Barrier(2)
+
+        def synchronized_load():
+            payload = original_load()
+            reads_completed.wait(timeout=2.0)
+            return payload
+
+        monkeypatch.setattr(layout_slots, "_load_all_layout_slot_overrides", synchronized_load)
+
+        def save(layout_id: str, payload: dict[str, dict[str, object]]) -> None:
+            layout_slots.save_layout_slot_overrides(layout_id, payload)
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [
+                executor.submit(save, "iso", {"nonusbackslash": {"visible": False}}),
+                executor.submit(save, "jis", {"jp_at": {"label": "JP @"}}),
+            ]
+            for future in futures:
+                future.result(timeout=3.0)
+
+        monkeypatch.setattr(layout_slots, "_load_all_layout_slot_overrides", original_load)
+        persisted = json.loads(layout_slots.layout_slots_path().read_text(encoding="utf-8"))["layouts"]
+        assert set(persisted) == {"iso", "jis"}

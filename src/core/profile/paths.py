@@ -10,7 +10,10 @@ from pathlib import Path
 from src.core.config import Config
 from src.core.utils.logging_utils import log_throttled
 
+from .json_storage import read_json_strict, write_json_atomic
+
 DEFAULT_PROFILE_NAME = "default"
+_RESERVED_PROFILE_NAMES = frozenset({".", ".."})
 
 # Older profile names that still resolve to the current built-ins.
 _PROFILE_NAME_ALIASES = {
@@ -23,6 +26,10 @@ BUILTIN_PROFILE_NAMES = (DEFAULT_PROFILE_NAME,)
 
 
 logger = logging.getLogger(__name__)
+
+
+class ProfilePathError(ValueError):
+    """Raised when a profile directory would escape its storage root."""
 
 
 def _resolve_profile_file_path(*, root: Path, new_name: str, old_name: str) -> Path:
@@ -61,11 +68,43 @@ def safe_profile_name(name: str) -> str:
     name = re.sub(r"\s+", "_", name)
     name = re.sub(r"[^A-Za-z0-9_.-]", "", name)
     name = name or DEFAULT_PROFILE_NAME
+    if name in _RESERVED_PROFILE_NAMES:
+        return DEFAULT_PROFILE_NAME
     return _PROFILE_NAME_ALIASES.get(name, name)
 
 
 def profiles_root() -> Path:
     return Config.CONFIG_DIR / "profiles"
+
+
+def _validate_profile_root(candidate: Path, *, profile_name: str) -> Path:
+    """Validate that one candidate is a non-symlink child of profile storage."""
+
+    root_dir = profiles_root()
+
+    try:
+        resolved_root = root_dir.resolve(strict=False)
+        resolved_candidate = candidate.resolve(strict=False)
+    except (OSError, RuntimeError) as exc:
+        raise ProfilePathError(f"Could not validate profile path '{profile_name}'") from exc
+
+    if resolved_candidate == resolved_root or not resolved_candidate.is_relative_to(resolved_root):
+        raise ProfilePathError(f"Profile path '{profile_name}' resolves outside the profiles root")
+    if candidate.is_symlink():
+        raise ProfilePathError(f"Profile path '{profile_name}' must not be a directory symlink")
+    return candidate
+
+
+def _profile_root_path(name: str) -> Path:
+    """Return one validated direct child of the profile storage root.
+
+    Profile names are normalized for compatibility, then the filesystem-resolved
+    path is checked as a defense in depth against existing directory symlinks.
+    Individual profile-directory symlinks are not supported.
+    """
+
+    safe_name = safe_profile_name(name)
+    return _validate_profile_root(profiles_root() / safe_name, profile_name=safe_name)
 
 
 def active_profile_path() -> Path:
@@ -83,48 +122,50 @@ def get_default_profile() -> str:
     """
 
     p = default_profile_path()
-    if p.exists():
-        try:
-            raw = json.loads(p.read_text(encoding="utf-8"))
-            if isinstance(raw, dict) and isinstance(raw.get("name"), str):
-                return safe_profile_name(raw["name"])
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
-            log_throttled(
-                logger,
-                "profile_paths.get_default_profile",
-                interval_s=60,
-                level=logging.DEBUG,
-                msg="Failed to read default profile; using built-in default",
-                exc=exc,
-            )
+    try:
+        raw = read_json_strict(p)
+        if isinstance(raw, dict) and isinstance(raw.get("name"), str):
+            return safe_profile_name(raw["name"])
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        log_throttled(
+            logger,
+            "profile_paths.get_default_profile",
+            interval_s=60,
+            level=logging.DEBUG,
+            msg="Failed to read default profile; using built-in default",
+            exc=exc,
+        )
     return DEFAULT_PROFILE_NAME
 
 
 def set_default_profile(name: str) -> str:
     name = safe_profile_name(name)
-    Config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    default_profile_path().write_text(json.dumps({"name": name}, indent=2), encoding="utf-8")
     ensure_profile(name)
+    Config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    write_json_atomic(default_profile_path(), {"name": name}, sort_keys=False)
     return name
 
 
 def get_active_profile() -> str:
     p = active_profile_path()
-    if p.exists():
-        try:
-            raw = json.loads(p.read_text(encoding="utf-8"))
-            if isinstance(raw, dict) and isinstance(raw.get("name"), str):
-                return safe_profile_name(raw["name"])
-        except (OSError, ValueError, json.JSONDecodeError) as exc:
-            # Best-effort: fall back to default and log only occasionally.
-            log_throttled(
-                logger,
-                "profile_paths.get_active_profile",
-                interval_s=60,
-                level=logging.DEBUG,
-                msg="Failed to read active profile; using default",
-                exc=exc,
-            )
+    try:
+        raw = read_json_strict(p)
+        if isinstance(raw, dict) and isinstance(raw.get("name"), str):
+            return safe_profile_name(raw["name"])
+    except FileNotFoundError:
+        pass
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        # Best-effort: fall back to default and log only occasionally.
+        log_throttled(
+            logger,
+            "profile_paths.get_active_profile",
+            interval_s=60,
+            level=logging.DEBUG,
+            msg="Failed to read active profile; using default",
+            exc=exc,
+        )
     # If we don't have a remembered last active profile, fall back to a
     # user-chosen default profile if configured.
     return get_default_profile()
@@ -132,7 +173,7 @@ def get_active_profile() -> str:
 
 def ensure_profile(name: str) -> Path:
     name = safe_profile_name(name)
-    root_dir = profiles_root()
+    new_root = _profile_root_path(name)
 
     # Rename older built-in directory names to the current name when safe.
     previous_name = None
@@ -140,10 +181,9 @@ def ensure_profile(name: str) -> Path:
         if new == name:
             previous_name = old
             break
-    if previous_name is not None:
-        new_root = root_dir / name
-        old_root = root_dir / previous_name
-        if not new_root.exists() and old_root.exists():
+    if previous_name is not None and not new_root.exists():
+        old_root = _validate_profile_root(profiles_root() / previous_name, profile_name=previous_name)
+        if old_root.exists():
             try:
                 old_root.rename(new_root)
             except OSError as exc:
@@ -161,17 +201,20 @@ def ensure_profile(name: str) -> Path:
         else:
             root = new_root
     else:
-        root = root_dir / name
+        root = new_root
 
     root.mkdir(parents=True, exist_ok=True)
+    # Validate again after migration/creation so an existing or migrated
+    # directory symlink can never become a profile storage root.
+    _validate_profile_root(root, profile_name=name)
     return root
 
 
 def set_active_profile(name: str) -> str:
     name = safe_profile_name(name)
-    Config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    active_profile_path().write_text(json.dumps({"name": name}, indent=2), encoding="utf-8")
     ensure_profile(name)
+    Config.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    write_json_atomic(active_profile_path(), {"name": name}, sort_keys=False)
     return name
 
 
@@ -182,7 +225,7 @@ def list_profiles() -> list[str]:
 
     out: list[str] = []
     for child in root.iterdir():
-        if child.is_dir():
+        if child.is_dir() and not child.is_symlink():
             out.append(child.name)
 
     # Stable ordering: built-ins first, then any custom profiles sorted.
@@ -194,8 +237,12 @@ def delete_profile(name: str) -> bool:
     name = safe_profile_name(name)
     if name in BUILTIN_PROFILE_NAMES:
         return False
-    root = profiles_root() / name
-    if not root.exists():
+    try:
+        root = _profile_root_path(name)
+    except ProfilePathError as exc:
+        logger.warning("Refusing to delete unsafe profile path '%s': %s", name, exc)
+        return False
+    if not root.is_dir():
         return False
     shutil.rmtree(root)
     return True

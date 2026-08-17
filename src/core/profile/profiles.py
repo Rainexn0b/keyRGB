@@ -41,6 +41,7 @@ save_backdrop_mode = backdrop_ops.save_backdrop_mode
 save_backdrop_transparency = backdrop_ops.save_backdrop_transparency
 
 read_json = json_storage.read_json
+update_json_atomic = json_storage.update_json_atomic
 write_json_atomic = json_storage.write_json_atomic
 
 default_profile_path = profile_paths.default_profile_path
@@ -274,16 +275,14 @@ def update_secondary_lighting_area(
 ) -> dict[str, object]:
     """Patch one area in a profile while preserving unknown route data."""
 
-    payload = load_secondary_lighting(name) or {"version": 1, "areas": {}}
-    raw_areas = payload.get("areas")
-    areas: dict[str, object] = dict(raw_areas) if isinstance(raw_areas, Mapping) else {}
-    key = str(state_key or "").strip().lower()
-    raw_entry = areas.get(key)
-    entry: dict[str, object] = dict(raw_entry) if isinstance(raw_entry, Mapping) else {}
-    entry.update(dict(updates))
-    areas[key] = entry
-    payload["areas"] = areas
-    return save_secondary_lighting(payload, name)
+    return storage_ops.update_secondary_lighting_area(
+        state_key=state_key,
+        updates=updates,
+        name=name,
+        paths_for=paths_for,
+        update_json_atomic=update_json_atomic,
+        normalize_secondary_lighting_fn=normalize_secondary_lighting,
+    )
 
 
 def save_lightbar_overlay(

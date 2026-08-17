@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 
+from src.core.config._lighting._coercion import normalize_secondary_brightness_value
+
 KeyCell = tuple[int, int]
 KeyCells = tuple[KeyCell, ...]
 
@@ -34,7 +36,7 @@ def _normalize_secondary_enabled(raw: object) -> bool | None:
 def _normalize_secondary_brightness(raw: object) -> int | None:
     if not isinstance(raw, (int, float)):
         return None
-    return max(0, min(100, int(raw)))
+    return normalize_secondary_brightness_value(raw)
 
 
 def normalize_secondary_lighting(raw: object) -> dict[str, object]:

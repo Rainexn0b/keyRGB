@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .json_storage import read_json, write_json_atomic
+from .json_storage import read_json, update_json_atomic
 from .paths import paths_for
 
 BACKDROP_MODE_BUILTIN = "builtin"
@@ -14,8 +14,13 @@ def _load_backdrop_settings(name: str | None = None) -> dict[str, object]:
     return dict(raw) if isinstance(raw, dict) else {}
 
 
-def _save_backdrop_settings(settings: dict[str, object], name: str | None = None) -> None:
-    write_json_atomic(paths_for(name).backdrop_settings, dict(settings))
+def _set_backdrop_setting(name: str | None, *, key: str, value: object) -> None:
+    def apply_update(raw: object | None) -> dict[str, object]:
+        settings = dict(raw) if isinstance(raw, dict) else {}
+        settings[key] = value
+        return settings
+
+    update_json_atomic(paths_for(name).backdrop_settings, apply_update)
 
 
 def normalize_backdrop_mode(mode: object) -> str:
@@ -28,9 +33,8 @@ def load_backdrop_mode(name: str | None = None) -> str:
 
 
 def save_backdrop_mode(mode: object, name: str | None = None) -> None:
-    settings = _load_backdrop_settings(name)
-    settings["mode"] = normalize_backdrop_mode(mode)
-    _save_backdrop_settings(settings, name)
+    normalized = normalize_backdrop_mode(mode)
+    _set_backdrop_setting(name, key="mode", value=normalized)
 
 
 def _normalize_backdrop_transparency(value: object) -> int:
@@ -49,6 +53,5 @@ def load_backdrop_transparency(name: str | None = None) -> int:
 
 
 def save_backdrop_transparency(transparency: object, name: str | None = None) -> None:
-    settings = _load_backdrop_settings(name)
-    settings["transparency"] = _normalize_backdrop_transparency(transparency)
-    _save_backdrop_settings(settings, name)
+    normalized = _normalize_backdrop_transparency(transparency)
+    _set_backdrop_setting(name, key="transparency", value=normalized)

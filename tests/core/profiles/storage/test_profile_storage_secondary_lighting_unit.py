@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 from src.core.profile import profiles
 
 
@@ -172,5 +175,49 @@ def test_update_secondary_lighting_area_preserves_other_routes_and_unknown_field
                 "brightness": 35,
             },
             "mouse": {"enabled": False, "color": [4, 5, 6]},
+        },
+    }
+
+
+def test_concurrent_secondary_area_updates_do_not_lose_routes(
+    profile_paths_factory,
+    temp_profile_dir,
+    monkeypatch,
+) -> None:
+    paths = profile_paths_factory(temp_profile_dir)
+    monkeypatch.setattr(profiles, "paths_for", lambda _name=None: paths)
+    profiles.save_secondary_lighting({"version": 1, "areas": {}}, "test_profile")
+
+    original_load = profiles.load_secondary_lighting
+    reads_completed = threading.Barrier(2)
+
+    def synchronized_load(name=None):
+        payload = original_load(name)
+        reads_completed.wait(timeout=2.0)
+        return payload
+
+    monkeypatch.setattr(profiles, "load_secondary_lighting", synchronized_load)
+
+    def update(state_key: str, color: list[int]) -> None:
+        profiles.update_secondary_lighting_area(
+            state_key,
+            {"enabled": True, "color": color},
+            "test_profile",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(update, "logo", [1, 2, 3]),
+            executor.submit(update, "mouse", [4, 5, 6]),
+        ]
+        for future in futures:
+            future.result(timeout=3.0)
+
+    monkeypatch.setattr(profiles, "load_secondary_lighting", original_load)
+    assert profiles.load_secondary_lighting("test_profile") == {
+        "version": 1,
+        "areas": {
+            "logo": {"enabled": True, "color": [1, 2, 3]},
+            "mouse": {"enabled": True, "color": [4, 5, 6]},
         },
     }

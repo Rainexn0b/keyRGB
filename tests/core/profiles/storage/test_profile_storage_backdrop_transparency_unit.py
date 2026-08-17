@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
+
 import pytest
 
 from src.core.profile import _backdrop as backdrop_ops, profiles
@@ -111,5 +114,37 @@ class TestBackdropTransparency:
         profiles.save_backdrop_transparency(42, "test_profile")
         profiles.save_backdrop_mode("none", "test_profile")
 
+        assert profiles.load_backdrop_mode("test_profile") == "none"
+        assert profiles.load_backdrop_transparency("test_profile") == 42
+
+    def test_concurrent_mode_and_transparency_updates_preserve_both_fields(
+        self,
+        temp_profile_dir,
+        profile_paths_factory,
+        monkeypatch,
+    ) -> None:
+        _patch_backdrop_paths(monkeypatch, temp_profile_dir, profile_paths_factory)
+        original_load = backdrop_ops._load_backdrop_settings
+        reads_completed = threading.Barrier(2)
+
+        def synchronized_load(name=None):
+            settings = original_load(name)
+            reads_completed.wait(timeout=2.0)
+            return settings
+
+        monkeypatch.setattr(backdrop_ops, "_load_backdrop_settings", synchronized_load)
+
+        def save_mode() -> None:
+            profiles.save_backdrop_mode("none", "test_profile")
+
+        def save_transparency() -> None:
+            profiles.save_backdrop_transparency(42, "test_profile")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = [executor.submit(save_mode), executor.submit(save_transparency)]
+            for future in futures:
+                future.result(timeout=3.0)
+
+        monkeypatch.setattr(backdrop_ops, "_load_backdrop_settings", original_load)
         assert profiles.load_backdrop_mode("test_profile") == "none"
         assert profiles.load_backdrop_transparency("test_profile") == 42

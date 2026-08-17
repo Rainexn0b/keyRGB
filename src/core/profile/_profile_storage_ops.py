@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import cast
 
 from . import _profile_storage_payloads as storage_payloads
@@ -46,6 +46,37 @@ def save_secondary_lighting(
     normalized = normalize_secondary_lighting_fn(payload or {})
     write_json_atomic(paths_for(name).secondary_lighting, normalized)  # type: ignore[attr-defined]
     return cast(dict[str, object], normalized)
+
+
+def update_secondary_lighting_area(
+    *,
+    state_key: str,
+    updates: Mapping[str, object],
+    name: str | None,
+    paths_for: Callable[..., object],
+    update_json_atomic: Callable[..., object],
+    normalize_secondary_lighting_fn: Callable[..., object],
+) -> dict[str, object]:
+    """Patch one area as a locked read-modify-write transaction."""
+
+    key = str(state_key or "").strip().lower()
+
+    def apply_updates(raw: object | None) -> dict[str, object]:
+        if raw is None:
+            payload: dict[str, object] = {"version": 1, "areas": {}}
+        else:
+            payload = cast(dict[str, object], normalize_secondary_lighting_fn(raw))
+        raw_areas = payload.get("areas")
+        areas: dict[str, object] = dict(raw_areas) if isinstance(raw_areas, Mapping) else {}
+        raw_entry = areas.get(key)
+        entry: dict[str, object] = dict(raw_entry) if isinstance(raw_entry, Mapping) else {}
+        entry.update(dict(updates))
+        areas[key] = entry
+        payload["areas"] = areas
+        return cast(dict[str, object], normalize_secondary_lighting_fn(payload))
+
+    updated = update_json_atomic(paths_for(name).secondary_lighting, apply_updates)  # type: ignore[attr-defined]
+    return cast(dict[str, object], updated)
 
 
 def parse_keymap_cell(raw: object) -> KeyCell | None:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from src.core.config.paths import config_dir
-from src.core.profile.json_storage import read_json, write_json_atomic
+from src.core.profile.json_storage import read_json, update_json_atomic
 from src.core.resources.layout import resolve_physical_layout
 from src.core.resources.layout_slots import get_layout_slot_key_ids, sanitize_layout_slot_overrides
 
@@ -21,8 +21,7 @@ def _filter_layout_slot_overrides(
     return {key_id: dict(payload) for key_id, payload in cleaned.items() if key_id in allowed_key_ids}
 
 
-def _load_all_layout_slot_overrides() -> dict[str, dict[str, dict[str, object]]]:
-    raw = read_json(layout_slots_path())
+def _normalize_all_layout_slot_overrides(raw: object) -> dict[str, dict[str, dict[str, object]]]:
     if not isinstance(raw, dict):
         return {}
 
@@ -39,6 +38,10 @@ def _load_all_layout_slot_overrides() -> dict[str, dict[str, dict[str, object]]]
         if filtered:
             out[resolved_layout] = filtered
     return out
+
+
+def _load_all_layout_slot_overrides() -> dict[str, dict[str, dict[str, object]]]:
+    return _normalize_all_layout_slot_overrides(read_json(layout_slots_path()))
 
 
 def _load_prior_profile_slot_overrides(
@@ -82,21 +85,23 @@ def save_layout_slot_overrides(
     slot_overrides: dict[str, dict[str, object]] | None,
 ) -> dict[str, dict[str, object]]:
     resolved_layout = resolve_physical_layout(physical_layout or "auto")
-    all_layouts = _load_all_layout_slot_overrides()
     cleaned = _filter_layout_slot_overrides(resolved_layout, slot_overrides or {})
 
-    if cleaned:
-        all_layouts[resolved_layout] = cleaned
-    else:
-        all_layouts.pop(resolved_layout, None)
+    def apply_update(raw: object | None) -> dict[str, object]:
+        all_layouts = _normalize_all_layout_slot_overrides(raw)
+        if cleaned:
+            all_layouts[resolved_layout] = cleaned
+        else:
+            all_layouts.pop(resolved_layout, None)
 
-    payload = {
-        "layouts": {
-            layout_id: {key_id: dict(layout_payload[key_id]) for key_id in sorted(layout_payload)}
-            for layout_id, layout_payload in sorted(all_layouts.items())
+        return {
+            "layouts": {
+                layout_id: {key_id: dict(layout_payload[key_id]) for key_id in sorted(layout_payload)}
+                for layout_id, layout_payload in sorted(all_layouts.items())
+            }
         }
-    }
-    write_json_atomic(layout_slots_path(), payload)
+
+    update_json_atomic(layout_slots_path(), apply_update)
     return cleaned
 
 
