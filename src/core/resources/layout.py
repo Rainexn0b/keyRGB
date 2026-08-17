@@ -90,7 +90,7 @@ def _units_row_with_spacers(
             x += round(w_units * unit)
             continue
 
-        key_id_str = cast(str, key_id)
+        key_id_str = key_id
         label_str = cast(str, label)
         w = round(w_units * unit)
         out.append(

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from functools import lru_cache
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from .layout_legends import get_layout_legend_labels
 
@@ -162,7 +162,7 @@ def apply_layout_slot_overrides(
         if state is not None and not state.visible:
             continue
         if state is not None and state.label != key.label:
-            out.append(cast("KeyDef", replace(key, label=state.label)))
+            out.append(replace(key, label=state.label))
             continue
         out.append(key)
     return out

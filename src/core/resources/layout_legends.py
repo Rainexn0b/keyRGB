@@ -149,7 +149,7 @@ def apply_layout_legend_pack(
         if label is None or label == key.label:
             out.append(key)
             continue
-        out.append(cast("KeyDef", replace(key, label=label)))
+        out.append(replace(key, label=label))
     return out
 
 

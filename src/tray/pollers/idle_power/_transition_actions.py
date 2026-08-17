@@ -58,7 +58,7 @@ def _seed_reactive_restore_windows(engine: object, *, fade_in_duration_s: float)
         return
     try:
         _reactive_restore_seed.seed_reactive_restore_windows(
-            cast(object, engine),
+            engine,
             fade_in_duration_s=float(fade_in_duration_s),
         )
     except (AttributeError, TypeError, ValueError):
