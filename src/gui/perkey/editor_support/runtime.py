@@ -180,21 +180,30 @@ def commit(
 ) -> None:
     prev_kb = editor.kb
     fallback = tuple(editor.config.color)
-    base = tuple(last_non_black_color_or(editor, fallback))
-    editor.kb, editor.colors = editor._commit_pipeline.commit(
-        kb=editor.kb,
-        colors=dict(editor.colors),
-        config=editor.config,
-        num_rows=hardware.NUM_ROWS,
-        num_cols=hardware.NUM_COLS,
-        base_color=color_utils.rgb_ints(base),
-        fallback_color=color_utils.rgb_ints(fallback),
-        push_fn=keyboard_apply.push_per_key_colors,
-        force=bool(force),
-    )
+    base = tuple(last_non_black_color_or(editor, fallback))  # type: ignore[arg-type]
+    snapshot = dict(editor.colors)  # type: ignore[arg-type]
 
-    if prev_kb is not None and editor.kb is None:
-        status.set_status(editor, status.hardware_write_paused())
+    def work() -> tuple[object, object]:
+        return editor._commit_pipeline.commit(
+            kb=editor.kb,
+            colors=snapshot,
+            config=editor.config,
+            num_rows=hardware.NUM_ROWS,
+            num_cols=hardware.NUM_COLS,
+            base_color=color_utils.rgb_ints(base),
+            fallback_color=color_utils.rgb_ints(fallback),
+            push_fn=keyboard_apply.push_per_key_colors,
+            force=bool(force),
+        )
+
+    def on_done(result: tuple[object, object]) -> None:
+        editor.kb, editor.colors = result
+        if prev_kb is not None and editor.kb is None:
+            status.set_status(editor, status.hardware_write_paused())
+
+    from src.gui.utils.tk_async import submit_gui_work
+
+    submit_gui_work(editor, getattr(editor, "root", None), work, on_done)
 
 
 def load_keymap(

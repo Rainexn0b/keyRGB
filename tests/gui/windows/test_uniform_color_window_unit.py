@@ -120,14 +120,14 @@ def test_resolve_secondary_route_prefers_requested_backend_route() -> None:
     assert result is sentinel
 
 
-def test_probe_color_support_defaults_to_true_when_backend_capability_probe_fails() -> None:
+def test_probe_color_support_fails_closed_when_backend_capability_probe_fails() -> None:
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
 
     class BrokenBackend:
         def capabilities(self):
             raise RuntimeError("boom")
 
-    assert gui._probe_color_support(BrokenBackend()) is True
+    assert gui._probe_color_support(BrokenBackend()) is False
 
 
 def test_probe_color_support_propagates_unexpected_capability_failure() -> None:

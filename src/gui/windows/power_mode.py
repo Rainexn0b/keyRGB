@@ -43,6 +43,8 @@ except ImportError:
     from src.gui.utils.window_icon import apply_keyrgb_window_icon
 
 
+from src.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
+
 logger = logging.getLogger(__name__)
 
 _GUI_RUNTIME_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
@@ -134,6 +136,7 @@ def _format_live_freq_text() -> str:
 class PowerModeSettingsGUI:
     def __init__(self) -> None:
         self.root = tk.Tk()
+        self.tk_jobs = TkAsyncCoordinator()
         self.root.title("KeyRGB - Power Mode Settings")
         apply_keyrgb_window_icon(self.root)
         self.root.minsize(700, 460)
@@ -193,43 +196,57 @@ class PowerModeSettingsGUI:
         self._live_freq_var.set(_format_live_freq_text())
 
     def _refresh_live_freq_preview(self) -> None:
-        try:
-            self._live_freq_var.set(_format_live_freq_text())
-            self.root.after(_LIVE_PREVIEW_INTERVAL_MS, self._refresh_live_freq_preview)
-        except _GEOMETRY_ERRORS:
-            return
+        def on_done(text: str) -> None:
+            try:
+                self._live_freq_var.set(text)
+                self.root.after(_LIVE_PREVIEW_INTERVAL_MS, self._refresh_live_freq_preview)
+            except _GEOMETRY_ERRORS:
+                return
+
+        submit_gui_work(self, getattr(self, "root", None), _format_live_freq_text, on_done)
 
     def _save(self) -> None:
-        was_extreme_active = False
-        try:
-            status = get_status()
-            was_extreme_active = bool(status.supported) and status.mode == PowerMode.EXTREME_SAVER
-        except _GUI_RUNTIME_ERRORS:
-            logger.exception("Failed to read system power mode status before saving target")
+        selected_cap = self._selected_cap_khz()
 
-        self.config.system_power_extreme_cap_khz = self._selected_cap_khz()
-        self._cap_value_var.set(_format_cap_mhz_label(self.config.system_power_extreme_cap_khz))
-
-        if was_extreme_active:
+        def work() -> tuple[int, str]:
+            was_extreme_active = False
             try:
-                if set_mode(PowerMode.EXTREME_SAVER):
-                    self._save_status_var.set("Saved and reapplied Extreme Saver.")
-                else:
-                    self._save_status_var.set(
-                        "Saved. Re-select Extreme Saver if the new target does not apply immediately."
-                    )
+                status = get_status()
+                was_extreme_active = bool(status.supported) and status.mode == PowerMode.EXTREME_SAVER
             except _GUI_RUNTIME_ERRORS:
-                logger.exception("Failed to reapply Extreme Saver after saving target")
-                self._save_status_var.set(
-                    "Saved. Re-select Extreme Saver if the new target does not apply immediately."
-                )
-        else:
-            self._save_status_var.set(
-                "Saved. The new Extreme Saver target applies the next time you choose Extreme Saver."
-            )
-        self._refresh_status()
+                logger.exception("Failed to read system power mode status before saving target")
+
+            self.config.system_power_extreme_cap_khz = selected_cap
+            persisted = int(self.config.system_power_extreme_cap_khz)
+            if was_extreme_active:
+                try:
+                    if set_mode(PowerMode.EXTREME_SAVER):
+                        return persisted, "Saved and reapplied Extreme Saver."
+                    return (
+                        persisted,
+                        "Saved. Re-select Extreme Saver if the new target does not apply immediately.",
+                    )
+                except _GUI_RUNTIME_ERRORS:
+                    logger.exception("Failed to reapply Extreme Saver after saving target")
+                    return (
+                        persisted,
+                        "Saved. Re-select Extreme Saver if the new target does not apply immediately.",
+                    )
+            return persisted, "Saved. The new Extreme Saver target applies the next time you choose Extreme Saver."
+
+        def on_done(result: tuple[int, str]) -> None:
+            persisted, message = result
+            self._cap_value_var.set(_format_cap_mhz_label(persisted))
+            self._save_status_var.set(message)
+            self._refresh_status()
+
+        submit_gui_work(self, getattr(self, "root", None), work, on_done)
 
     def _close(self) -> None:
+        try:
+            self.tk_jobs.cancel()
+        except AttributeError:
+            pass
         self.root.destroy()
 
     def _build_ui(self) -> None:

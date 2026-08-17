@@ -19,10 +19,6 @@ SignalHandler: TypeAlias = Callable[[int | None, object | None], object]
 TkExceptionHandler: TypeAlias = Callable[[type[BaseException], BaseException, TracebackType | None], object]
 
 
-class _ColorCapabilitiesProtocol(Protocol):
-    color: object
-
-
 class _BackendWithCapabilitiesProtocol(Protocol):
     def capabilities(self) -> object | None: ...
 
@@ -74,19 +70,19 @@ def probe_color_support(
     logger: logging.Logger,
 ) -> bool:
     try:
+        from src.core.backends.base import normalize_backend_capabilities
+
         backend = select_backend_fn()
-        caps = backend.capabilities() if backend is not None else None
-        if caps is None:
+        if backend is None:
+            # Reactive color remains editable in explicit config-only mode.
             return True
-        if hasattr(caps, "color"):
-            return bool(cast(_ColorCapabilitiesProtocol, caps).color)
-        return True
+        return normalize_backend_capabilities(backend.capabilities()).color
     except _BACKEND_CAPABILITY_ERRORS:
         logger.debug(
-            "Failed to probe backend capabilities for the reactive color window; assuming RGB support",
+            "Failed to probe backend capabilities for the reactive color window; disabling RGB controls",
             exc_info=True,
         )
-        return True
+        return False
 
 
 def build_description_section(

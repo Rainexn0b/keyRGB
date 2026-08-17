@@ -9,10 +9,6 @@ from src.core.secondary_device_routes import SecondaryDeviceRoute, route_for_bac
 from src.core.secondary_device_runtime import acquire_secondary_device, backend_for_secondary_route
 
 
-class _ColorCapabilitiesProtocol(Protocol):
-    color: object
-
-
 class _UniformColorDeviceProtocol(Protocol):
     def set_color(self, color: object, *, brightness: int) -> object: ...
 
@@ -80,21 +76,20 @@ def select_backend_best_effort(
 
 def probe_color_support(backend: _UniformColorBackendProtocol | None, *, logger: logging.Logger) -> bool:
     if backend is None:
+        # No selected backend is an explicit config-only editor mode, not
+        # positive hardware capability evidence.
         return True
 
     try:
-        caps = backend.capabilities()
-        if caps is None:
-            return True
-        if hasattr(caps, "color"):
-            return bool(cast(_ColorCapabilitiesProtocol, caps).color)
-        return True
+        from src.core.backends.base import normalize_backend_capabilities
+
+        return normalize_backend_capabilities(backend.capabilities()).color
     except _BACKEND_CAPABILITY_ERRORS:
         logger.debug(
-            "Failed to probe backend capabilities for the uniform color window; assuming RGB support",
+            "Failed to probe backend capabilities for the uniform color window; disabling RGB controls",
             exc_info=True,
         )
-        return True
+        return False
 
 
 def acquire_device_best_effort(

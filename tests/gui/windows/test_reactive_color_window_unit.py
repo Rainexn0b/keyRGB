@@ -345,13 +345,13 @@ def test_constructor_handles_programmatic_brightness_sync_callback(monkeypatch) 
     assert gui._reactive_trail_label.grid_calls == [{"row": 0, "column": 2, "sticky": "e", "padx": (10, 5)}]
 
 
-def test_probe_color_support_defaults_true_when_backend_probe_fails() -> None:
+def test_probe_color_support_fails_closed_when_backend_probe_fails() -> None:
     result = reactive_color.reactive_color_bootstrap.probe_color_support(
         select_backend_fn=lambda: (_ for _ in ()).throw(RuntimeError("boom")),
         logger=reactive_color.logger,
     )
 
-    assert result is True
+    assert result is False
 
 
 def test_build_description_section_syncs_wrap_for_existing_and_later_labels() -> None:

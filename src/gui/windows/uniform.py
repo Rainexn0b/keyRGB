@@ -13,6 +13,7 @@ from src.core.runtime.hardware_ownership import acquire_hardware_control_lock, r
 from src.core.runtime.imports import ensure_repo_root_on_sys_path
 from src.core.utils.exceptions import is_device_busy
 from src.gui.theme import apply_clam_theme
+from src.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from src.gui.utils.window_geometry import compute_centered_window_geometry
 from src.gui.utils.window_icon import apply_keyrgb_window_icon
 
@@ -72,6 +73,7 @@ class UniformColorGUI:
         self._target_label = target_state.target_label
 
         self.root = tk.Tk()
+        self.tk_jobs = TkAsyncCoordinator()
         self.root.title(f"KeyRGB - {self._target_label} Color")
         apply_keyrgb_window_icon(self.root)
         self.root.minsize(460, 520)
@@ -207,26 +209,43 @@ class UniformColorGUI:
             device_write_errors=_UNIFORM_DEVICE_WRITE_ERRORS,
         )
 
+    def _schedule_color_apply(self, r: int, g: int, b: int, brightness: int) -> None:
+        color = (r, g, b)
+
+        def work() -> uniform_color_interactions.ColorApplyResult:
+            return self._apply_color(r, g, b, brightness)
+
+        def on_done(result: uniform_color_interactions.ColorApplyResult) -> None:
+            uniform_color_interactions.set_apply_status(
+                target_label=str(self._target_label),
+                color=color,
+                result=result,
+                set_status_fn=self._set_status,
+            )
+
+        submit_gui_work(self, getattr(self, "root", None), work, on_done)
+
     def _on_color_release(self, r, g, b):
-        uniform_color_interactions.on_color_release(
-            self,
-            r,
-            g,
-            b,
-            time_monotonic=time.monotonic,
-            apply_color_fn=self._apply_color,
-            set_status_fn=self._set_status,
-        )
+        brightness = int(self._ensure_brightness_nonzero())
+        self._commit_color_to_config(r, g, b)
+        self._last_drag_committed_color = (r, g, b)
+        self._last_drag_commit_ts = time.monotonic()
+        self._schedule_color_apply(r, g, b, brightness)
 
     def _on_apply(self):
-        uniform_color_interactions.on_apply(
-            self,
-            get_color_fn=None if self.color_wheel is None else self.color_wheel.get_color,
-            apply_color_fn=self._apply_color,
-            set_status_fn=self._set_status,
-        )
+        if not self._color_supported or self.color_wheel is None:
+            self._set_status("✗ RGB color control is not supported on this backend", ok=False)
+            return
+        r, g, b = self.color_wheel.get_color()
+        brightness = int(self._ensure_brightness_nonzero())
+        self._commit_color_to_config(r, g, b)
+        self._schedule_color_apply(r, g, b, brightness)
 
     def _on_close(self):
+        try:
+            self.tk_jobs.cancel()
+        except AttributeError:
+            pass
         device = getattr(self, "kb", None)
         self.kb = None
         close = getattr(device, "close", None)

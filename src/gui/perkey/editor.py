@@ -69,10 +69,12 @@ class PerKeyEditor:
     def __init__(self):
         from src.core.config import Config
         from src.gui.theme import apply_clam_theme
+        from src.gui.utils.tk_async import TkAsyncCoordinator
         from src.gui.utils.window_icon import apply_keyrgb_window_icon
 
         from . import color_utils, commit_pipeline, profile_management, window_geometry
 
+        self.tk_jobs = TkAsyncCoordinator()
         editor_bootstrap.initialize_editor(
             self,
             tk=tk,
@@ -136,6 +138,11 @@ class PerKeyEditor:
         editor_ui.build_editor_ui(self)
 
     def _on_close(self) -> None:
+        try:
+            self.tk_jobs.cancel()
+        except AttributeError:
+            pass
+
         def _save_current_profile() -> None:
             profile_var = vars(self)["_profile_name_var"]
             requested = profile_var.get()
