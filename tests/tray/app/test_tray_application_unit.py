@@ -100,6 +100,8 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
     assert tray.backend_probe == "probe"
     assert tray.backend_caps == {"caps": True}
     assert tray.device_discovery == {"candidates": [{"device_type": "lightbar"}]}
+    assert hasattr(tray, "system_power_status")
+    assert hasattr(tray, "effective_secondary_routes")
     assert tray.selected_device_context == "lightbar:048d:7001"
     assert tray.tray_idle_power_state.idle_forced_off is False
     assert tray.tray_idle_power_state.user_forced_off is False
@@ -110,6 +112,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
     assert tray._idle_forced_off is False
     assert tray._user_forced_off is False
     assert tray._power_forced_off is False
+    assert tray.runtime_coordinator.stop_and_drain(timeout_s=1.0) is True
 
 
 def test_init_handles_profile_migration_engine_fallback_and_permission_cb_failure(monkeypatch):
@@ -174,6 +177,7 @@ def test_init_handles_profile_migration_engine_fallback_and_permission_cb_failur
     assert isinstance(tray.engine, FakeEngine)
     assert tray.power_manager is fake_pm
     assert calls == {"set_backend": 1, "start_power": 1, "start_polling": 1, "autostart": 1}
+    assert tray.runtime_coordinator.stop_and_drain(timeout_s=1.0) is True
 
 
 def test_init_failure_cleans_partially_started_runtime(monkeypatch):
@@ -199,7 +203,10 @@ def test_init_failure_cleans_partially_started_runtime(monkeypatch):
     monkeypatch.setattr(
         app.app_lifecycle,
         "shutdown_tray_runtime_best_effort",
-        lambda tray: calls.append((tray.engine, tray.power_manager)),
+        lambda tray: (
+            tray.runtime_coordinator.stop_and_drain(timeout_s=1.0),
+            calls.append((tray.engine, tray.power_manager)),
+        ),
     )
 
     with pytest.raises(RuntimeError, match="polling"):
@@ -600,13 +607,21 @@ def test_notify_permission_issue_ignores_non_permission_errors(monkeypatch):
 
 
 def test_on_quit_clicked_closes_secondary_cache_stops_power_engine_and_icon(monkeypatch):
+    import threading
+
     calls = {"pm": 0, "cache": 0, "engine": 0, "icon": 0}
+    icon_stopped = threading.Event()
 
     tray = SimpleNamespace(
         power_manager=SimpleNamespace(stop_monitoring=lambda: calls.__setitem__("pm", calls["pm"] + 1)),
         engine=SimpleNamespace(stop=lambda: calls.__setitem__("engine", calls["engine"] + 1)),
     )
-    icon = SimpleNamespace(stop=lambda: calls.__setitem__("icon", calls["icon"] + 1))
+
+    def stop_icon() -> None:
+        calls["icon"] += 1
+        icon_stopped.set()
+
+    icon = SimpleNamespace(stop=stop_icon)
     monkeypatch.setattr(
         "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
         lambda _tray: calls.__setitem__("cache", calls["cache"] + 1),
@@ -614,6 +629,7 @@ def test_on_quit_clicked_closes_secondary_cache_stops_power_engine_and_icon(monk
 
     app.KeyRGBTray._on_quit_clicked(tray, icon, None)
 
+    assert icon_stopped.wait(timeout=1.0)
     assert calls == {"pm": 1, "cache": 1, "engine": 1, "icon": 1}
 
 

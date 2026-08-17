@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from src.core.secondary_device_routes import route_for_context_entry
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute, iter_effective_secondary_routes
+from src.core.secondary_device_runtime import EffectiveSecondaryRoute
+from src.tray.controllers.view_snapshots import read_effective_secondary_routes
 
 from . import (
     _device_status as _devstat,
@@ -138,7 +139,10 @@ def device_context_entries(
             entries.append(entry)
 
     seen_state_keys = _candidate_state_keys(entries)
-    for effective in iter_effective_secondary_routes():
+    for raw_effective in read_effective_secondary_routes(tray_state):
+        if not isinstance(raw_effective, EffectiveSecondaryRoute):
+            continue
+        effective = raw_effective
         if not effective.available or effective.state_key in seen_state_keys:
             continue
         entries.append(
@@ -170,16 +174,6 @@ def selected_device_context_key(
         return current
 
     fallback = str(available[0].get("key") or "keyboard") if available else "keyboard"
-    try:
-        tray_state.selected_device_context = fallback
-    except AttributeError:
-        pass
-    try:
-        cfg = getattr(tray_state, "config", None)
-        if cfg is not None:
-            cfg.tray_device_context = fallback
-    except AttributeError:
-        pass
     return fallback
 
 
@@ -259,20 +253,4 @@ def probe_device_available(
     """Best-effort device availability probe."""
 
     tray_state = menu_status_tray(tray)
-    ensure = recover_menu_status_value(
-        lambda: getattr(getattr(tray_state, "engine", None), "_ensure_device_available", None),
-        default=None,
-        key="tray.menu.ensure_device",
-        msg="Failed to ensure device availability",
-        recoverable=recoverable_device_availability_exceptions,
-    )
-    if callable(ensure):
-        recover_menu_status_value(
-            ensure,
-            default=None,
-            key="tray.menu.ensure_device",
-            msg="Failed to ensure device availability",
-            recoverable=recoverable_device_availability_exceptions,
-        )
-
     return bool(getattr(getattr(tray_state, "engine", None), "device_available", True))

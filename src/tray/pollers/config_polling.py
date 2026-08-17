@@ -7,6 +7,7 @@ from pathlib import Path
 
 from src.core.effects.catalog import SW_EFFECTS_SET as SW_EFFECTS
 from src.core.utils.exceptions import is_device_disconnected
+from src.tray.controllers.runtime_coordination import run_tray_transition
 from src.tray.protocols import ConfigPollingTrayProtocol
 
 from . import _lifecycle as polling_lifecycle
@@ -19,6 +20,19 @@ from .config_polling_internal.core import (
 )
 
 _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
+def _reload_and_apply_config_transition(
+    tray: ConfigPollingTrayProtocol,
+    *,
+    cause: str,
+    apply_from_config,
+) -> None:
+    def reload_and_apply_transition() -> None:
+        tray.config.reload()
+        apply_from_config(cause=cause)
+
+    run_tray_transition(tray, reload_and_apply_transition)
 
 
 def _compute_config_apply_state(tray: ConfigPollingTrayProtocol) -> ConfigApplyState:
@@ -115,8 +129,11 @@ def start_config_polling(
         throttle_s: float | None = None,
     ) -> float:
         try:
-            tray.config.reload()
-            apply_from_config(cause=cause)
+            _reload_and_apply_config_transition(
+                tray,
+                cause=cause,
+                apply_from_config=apply_from_config,
+            )
         except _CONFIG_POLLING_THREAD_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: config reload/apply in the polling thread is a best-effort runtime boundary; recoverable config or device failures must be logged and contained while unexpected defects still propagate
             if throttle_s is None:
                 _log_polling_exception(error_message, exc)

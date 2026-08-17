@@ -176,9 +176,11 @@ def is_reactive_effect(effect: str) -> bool:
 
 
 def ensure_device_best_effort(tray: LightingTrayProtocol) -> None:
-    ensure = getattr(getattr(tray, "engine", None), "_ensure_device_available", None)
-    if callable(ensure):
-        ensure()
+    engine = tray.engine
+    engine._ensure_device_available()
+    from src.core.backends.base import normalize_backend_capabilities
+
+    tray.backend_caps = normalize_backend_capabilities(engine.backend_caps)
 
 
 def set_engine_perkey_from_config_for_sw_effect(tray: LightingTrayProtocol) -> None:

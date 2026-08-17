@@ -18,6 +18,11 @@ from src.core.power.monitoring.power_supply_sysfs import read_on_ac_power
 from src.tray.controllers._brightness_layer import apply_layered_brightness_update
 from src.tray.controllers._lighting_controller_helpers import _log_tray_exception, try_log_event
 from src.tray.controllers.lighting_controller import start_current_effect
+from src.tray.controllers.runtime_coordination import (
+    capture_transition_revision,
+    run_tray_observation_if_current,
+    run_tray_transition,
+)
 from src.tray.idle_power_state import is_system_forced_off, is_user_forced_off
 from src.tray.pollers import _lifecycle as polling_lifecycle
 
@@ -52,6 +57,34 @@ def _active_power_source_base_brightness(
 
 
 def _apply_time_scheduler_brightness(
+    tray: LightingTrayProtocol,
+    base_brightness: int | None,
+    reactive_brightness: int | None,
+    *,
+    observation_revision: int | None = None,
+) -> bool:
+    if observation_revision is not None:
+        outcome = run_tray_observation_if_current(
+            tray,
+            observation_revision,
+            lambda: _apply_time_scheduler_brightness_owned(
+                tray,
+                base_brightness,
+                reactive_brightness,
+            ),
+        )
+        return bool(outcome.accepted and outcome.value)
+    return run_tray_transition(
+        tray,
+        lambda: _apply_time_scheduler_brightness_owned(
+            tray,
+            base_brightness,
+            reactive_brightness,
+        ),
+    )
+
+
+def _apply_time_scheduler_brightness_owned(
     tray: LightingTrayProtocol,
     base_brightness: int | None,
     reactive_brightness: int | None,
@@ -101,6 +134,7 @@ def _is_night(now: datetime, day_start: tuple[int, int], night_start: tuple[int,
 
 
 def _run_scheduler_iteration(tray: LightingTrayProtocol) -> None:
+    observation_revision = capture_transition_revision(tray)
     state = resolve_scheduler_brightness_state(
         tray.config,
         now=datetime.now(),  # noqa: DTZ005 – local time is intentional for day/night scheduling
@@ -120,6 +154,7 @@ def _run_scheduler_iteration(tray: LightingTrayProtocol) -> None:
         tray,
         _active_power_source_base_brightness(state, on_ac=on_ac),
         state.active_reactive_brightness,
+        observation_revision=observation_revision,
     )
 
 
@@ -139,6 +174,7 @@ def _scheduler_loop(
 
     while not shutdown_requested_fn():
         try:
+            observation_revision = capture_transition_revision(tray)
             state = resolve_scheduler_brightness_state(
                 tray.config,
                 now=now_fn(),
@@ -157,6 +193,7 @@ def _scheduler_loop(
                         tray,
                         base_brightness,
                         state.active_reactive_brightness,
+                        observation_revision=observation_revision,
                     )
                     if applied:
                         base_deferred = state.defer_base_to_power_policy and base_brightness is None

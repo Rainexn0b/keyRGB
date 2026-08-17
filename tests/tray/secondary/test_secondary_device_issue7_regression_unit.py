@@ -53,7 +53,6 @@ from src.tray.pollers.config_polling_internal._config_apply_state import (
     _safe_tuple_attr,
     build_config_apply_state,
 )
-from src.tray.ui import _menu_status_devices
 
 # The issue #7 mode table. Static application owns the saved scene; animated
 # effects render over it and must not redefine it. Copied from the plan so the
@@ -184,20 +183,7 @@ def issue7_factory(monkeypatch: pytest.MonkeyPatch):
             backend=None,
             backend_probe=None,
             device_discovery={"candidates": []},
-            secondary_device_controls={},
-            is_off=bool(is_off),
-            last_brightness=0,
-            _log_event=MagicMock(),
-            _log_exception=MagicMock(),
-            _notify_permission_issue=MagicMock(),
-        )
-        state.tray = tray
-
-        # Parent availability: the composite ITE 8258 chassis parent is present.
-        monkeypatch.setattr(
-            _menu_status_devices,
-            "iter_effective_secondary_routes",
-            lambda: tuple(
+            effective_secondary_routes=tuple(
                 EffectiveSecondaryRoute(
                     route=route,
                     available=True,
@@ -206,7 +192,14 @@ def issue7_factory(monkeypatch: pytest.MonkeyPatch):
                 )
                 for route in iter_virtual_routes()
             ),
+            secondary_device_controls={},
+            is_off=bool(is_off),
+            last_brightness=0,
+            _log_event=MagicMock(),
+            _log_exception=MagicMock(),
+            _notify_permission_issue=MagicMock(),
         )
+        state.tray = tray
 
         # Route resolution: the three virtual zones resolve to spy devices at
         # every binding site that production code reaches.

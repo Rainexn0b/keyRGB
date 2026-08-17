@@ -66,12 +66,15 @@ def test_shutdown_tray_runtime_stops_producers_before_engine_close(monkeypatch) 
     from src.tray.app import lifecycle
 
     calls: list[str] = []
-    thread = SimpleNamespace(join=lambda *, timeout: calls.append(f"join:{timeout}"))
+    thread = SimpleNamespace(join=lambda *, timeout: calls.append(f"join:{timeout}"), is_alive=lambda: False)
     event = SimpleNamespace(set=lambda: calls.append("pollers:set"))
     tray = SimpleNamespace(
         _polling_shutdown_event=event,
         _polling_threads=[thread],
         power_manager=SimpleNamespace(stop_monitoring=lambda: calls.append("power:stop")),
+        runtime_coordinator=SimpleNamespace(
+            stop_and_drain=lambda *, timeout_s: calls.append(f"coordinator:stop:{timeout_s}") or True
+        ),
         engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
     )
     monkeypatch.setattr(
@@ -81,7 +84,14 @@ def test_shutdown_tray_runtime_stops_producers_before_engine_close(monkeypatch) 
 
     lifecycle.shutdown_tray_runtime_best_effort(tray)
 
-    assert calls == ["pollers:set", "join:2.0", "power:stop", "engine:close", "secondary:close"]
+    assert calls == [
+        "pollers:set",
+        "join:2.0",
+        "power:stop",
+        "coordinator:stop:2.0",
+        "engine:close",
+        "secondary:close",
+    ]
 
 
 def test_shutdown_tray_runtime_keeps_secondary_targets_open_if_engine_worker_is_stuck(monkeypatch) -> None:
@@ -106,6 +116,77 @@ def test_shutdown_tray_runtime_keeps_secondary_targets_open_if_engine_worker_is_
     lifecycle.shutdown_tray_runtime_best_effort(tray)
 
     assert calls == ["engine:close"]
+
+
+def test_shutdown_tray_runtime_does_not_teardown_engine_while_poller_is_alive(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from src.tray.app import lifecycle
+
+    calls: list[str] = []
+    poller = SimpleNamespace(
+        join=lambda *, timeout: calls.append(f"poller:join:{timeout}"),
+        is_alive=lambda: calls.append("poller:alive") or True,
+    )
+    tray = SimpleNamespace(
+        _polling_shutdown_event=SimpleNamespace(set=lambda: calls.append("pollers:set")),
+        _polling_threads=[poller],
+        power_manager=SimpleNamespace(stop_monitoring=lambda: calls.append("power:stop") or True),
+        engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        lambda _tray: calls.append("secondary:close"),
+    )
+
+    lifecycle.shutdown_tray_runtime_best_effort(tray)
+
+    assert calls == ["pollers:set", "poller:join:2.0", "poller:alive", "power:stop"]
+
+
+def test_shutdown_tray_runtime_does_not_teardown_engine_while_power_monitor_is_alive(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from src.tray.app import lifecycle
+
+    calls: list[str] = []
+    tray = SimpleNamespace(
+        _polling_threads=[],
+        power_manager=SimpleNamespace(stop_monitoring=lambda: calls.append("power:stop") or False),
+        engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        lambda _tray: calls.append("secondary:close"),
+    )
+
+    lifecycle.shutdown_tray_runtime_best_effort(tray)
+
+    assert calls == ["power:stop"]
+
+
+def test_shutdown_tray_runtime_does_not_teardown_engine_while_coordinator_is_alive(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from src.tray.app import lifecycle
+
+    calls: list[str] = []
+    tray = SimpleNamespace(
+        _polling_threads=[],
+        power_manager=None,
+        runtime_coordinator=SimpleNamespace(
+            stop_and_drain=lambda *, timeout_s: calls.append(f"coordinator:stop:{timeout_s}") or False
+        ),
+        engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
+    )
+    monkeypatch.setattr(
+        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        lambda _tray: calls.append("secondary:close"),
+    )
+
+    lifecycle.shutdown_tray_runtime_best_effort(tray)
+
+    assert calls == ["coordinator:stop:2.0"]
 
 
 def test_maybe_autostart_effect_calls_start_when_enabled_and_not_off() -> None:
@@ -136,3 +217,49 @@ def test_maybe_autostart_effect_skips_when_off_or_disabled() -> None:
 
     maybe_autostart_effect(tray2)
     tray2._start_current_effect.assert_not_called()
+
+
+def test_maybe_autostart_effect_rechecks_off_state_after_newer_transition() -> None:
+    import threading
+    import time
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from src.tray.app.lifecycle import maybe_autostart_effect
+    from src.tray.controllers.runtime_coordination import run_tray_transition
+    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+
+    coordinator = TrayRuntimeCoordinator()
+    off_transition_started = threading.Event()
+    release_off_transition = threading.Event()
+    tray = SimpleNamespace(
+        runtime_coordinator=coordinator,
+        config=SimpleNamespace(autostart=True),
+        is_off=False,
+        _start_current_effect=MagicMock(),
+    )
+
+    def turn_off() -> None:
+        off_transition_started.set()
+        release_off_transition.wait()
+        tray.is_off = True
+
+    off_thread = threading.Thread(target=lambda: run_tray_transition(tray, turn_off))
+    autostart_thread = threading.Thread(target=lambda: maybe_autostart_effect(tray))
+    try:
+        off_thread.start()
+        assert off_transition_started.wait(timeout=1.0)
+        autostart_thread.start()
+        deadline = time.monotonic() + 1.0
+        while coordinator.capture_revision() < 2 and time.monotonic() < deadline:
+            threading.Event().wait(0.001)
+        assert coordinator.capture_revision() >= 2
+        release_off_transition.set()
+        off_thread.join(timeout=1.0)
+        autostart_thread.join(timeout=1.0)
+    finally:
+        release_off_transition.set()
+        assert coordinator.stop_and_drain(timeout_s=1.0) is True
+
+    assert tray.is_off is True
+    tray._start_current_effect.assert_not_called()

@@ -31,6 +31,7 @@ _FloatCoercible = str | bytes | bytearray | SupportsFloat | SupportsIndex
 
 if TYPE_CHECKING:
     from src.core.config import Config
+    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
     from src.tray.idle_power_state import TrayIdlePowerState
 
 
@@ -106,8 +107,11 @@ class KeyRGBTray(KeyRGBTrayDelegateMixin):
     backend_probe: object | None
     backend_caps: object | None
     device_discovery: object | None
+    system_power_status: object | None
+    effective_secondary_routes: tuple[object, ...]
     selected_device_context: str
     tray_icon_state: TrayIconState
+    runtime_coordinator: TrayRuntimeCoordinator
     _dim_sync_suppressed_logged: bool
     _event_last_at: dict[str, float]
     _permission_notice_sent: bool

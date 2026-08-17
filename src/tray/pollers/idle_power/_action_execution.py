@@ -4,6 +4,7 @@ import logging
 import time
 from collections.abc import Callable
 
+from src.core.backends.base import supports_per_key_output
 from src.core.utils.safe_attrs import safe_int_attr
 from src.tray.controllers._power._transition_constants import idle_fade_duration_s
 from src.tray.idle_power_state import reset_dim_state_on_tray, set_idle_power_state_field, sync_idle_power_state_field
@@ -96,7 +97,7 @@ def execute_idle_action(
 
 def _engine_supports_per_key_output(engine: object) -> bool:
     kb = getattr(engine, "kb", None)
-    return callable(getattr(kb, "set_key_colors", None))
+    return supports_per_key_output(getattr(engine, "backend_caps", None), kb)
 
 
 def _execute_turn_off(

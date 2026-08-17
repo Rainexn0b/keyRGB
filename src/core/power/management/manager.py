@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from src.core.profile import profiles as perkey_profiles, runtime_activation as profile_runtime_activation
 
@@ -63,18 +63,110 @@ list_perkey_profiles = perkey_profiles.list_profiles
 _DEFAULT_POWER_SOURCE_POLL_INTERVAL_S = _battery_saver._DEFAULT_POWER_SOURCE_POLL_INTERVAL_S
 
 
+def _run_tray_transition_if_available(tray: object, action):
+    try:
+        run_transition = vars(tray).get("run_runtime_transition")
+    except TypeError:
+        run_transition = None
+    if run_transition is None and callable(getattr(type(tray), "run_runtime_transition", None)):
+        run_transition = tray.run_runtime_transition  # type: ignore[attr-defined]
+    return run_transition(action) if callable(run_transition) else action()
+
+
+def _capture_tray_transition_revision(tray: object) -> int | None:
+    if not callable(getattr(type(tray), "capture_runtime_transition_revision", None)):
+        return None
+    return tray.capture_runtime_transition_revision()  # type: ignore[attr-defined]
+
+
+def _active_tray_transition_revision(tray: object) -> int | None:
+    if not callable(getattr(type(tray), "active_runtime_transition_revision", None)):
+        return None
+    return tray.active_runtime_transition_revision()  # type: ignore[attr-defined]
+
+
+def _tray_callable(tray: object, name: str):
+    try:
+        instance_callback = vars(tray).get(name)
+    except TypeError:
+        instance_callback = None
+    if callable(instance_callback):
+        return instance_callback
+    attr = getattr(tray, name, None)
+    if callable(attr):
+        return attr
+    return None
+
+
 def activate_perkey_profile(tray: object, profile_name: str) -> None:
-    profile_runtime_activation.activate_perkey_profile_runtime(
-        cast(object, tray),
-        profile_name,
-        set_active_profile_fn=perkey_profiles.set_active_profile,
-        load_per_key_colors_fn=perkey_profiles.load_per_key_colors,
-        apply_profile_to_config_fn=perkey_profiles.apply_profile_to_config,
-        load_secondary_lighting_fn=perkey_profiles.load_secondary_lighting,
-        mark_power_source_transition=True,
-        refresh_menu=False,
-        monotonic_fn=time.monotonic,
-    )
+    def activate_transition() -> None:
+        start_current_effect = _tray_callable(tray, "_start_current_effect")
+        update_icon = _tray_callable(tray, "_update_icon")
+        apply_transition = _tray_callable(tray, "_apply_power_source_perkey_profile_transition")
+
+        def _is_power_forced_off() -> bool:
+            try:
+                tray_vars = vars(tray)
+            except TypeError:
+                tray_vars = {}
+            if "_power_forced_off" in tray_vars:
+                return bool(tray_vars["_power_forced_off"])
+            owner = getattr(tray, "tray_idle_power_state", None)
+            if owner is None:
+                return False
+            return getattr(owner, "power_forced_off", False) is True
+
+        def _store_secondary_lighting(payload) -> None:
+            try:
+                vars(tray)["_active_secondary_lighting"] = payload
+            except (AttributeError, TypeError):
+                return
+
+        def _mark_power_source_transition(name: str, changed_at: float) -> None:
+            try:
+                tray._last_power_source_transition_at = float(changed_at)  # type: ignore[attr-defined]
+            except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                pass
+            try:
+                tray._last_power_source_transition_profile_name = str(name)  # type: ignore[attr-defined]
+            except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                pass
+            owner = getattr(tray, "tray_idle_power_state", None)
+            if owner is None:
+                return
+            try:
+                owner.last_power_source_transition_at = float(changed_at)
+                owner.last_power_source_transition_profile_name = str(name)
+            except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                return
+
+        def _set_is_off(value: bool) -> None:
+            try:
+                tray.is_off = bool(value)  # type: ignore[attr-defined]
+            except (AttributeError, OSError, RuntimeError, TypeError, ValueError):
+                return
+
+        profile_runtime_activation.activate_perkey_profile_runtime(
+            getattr(tray, "config", None),
+            profile_name,
+            set_active_profile_fn=perkey_profiles.set_active_profile,
+            load_per_key_colors_fn=perkey_profiles.load_per_key_colors,
+            apply_profile_to_config_fn=perkey_profiles.apply_profile_to_config,
+            load_secondary_lighting_fn=perkey_profiles.load_secondary_lighting,
+            is_power_forced_off_fn=_is_power_forced_off,
+            set_is_off_fn=_set_is_off,
+            store_secondary_lighting_fn=_store_secondary_lighting,
+            apply_runtime_transition_fn=((lambda: bool(apply_transition())) if apply_transition is not None else None),
+            start_current_effect_fn=((lambda: start_current_effect()) if start_current_effect is not None else None),
+            update_icon_fn=((lambda: update_icon()) if update_icon is not None else None),
+            update_menu_fn=None,
+            mark_power_source_transition_fn=_mark_power_source_transition,
+            mark_power_source_transition=True,
+            refresh_menu=False,
+            monotonic_fn=time.monotonic,
+        )
+
+    _run_tray_transition_if_available(tray, activate_transition)
 
 
 _POWER_MANAGER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
@@ -96,11 +188,15 @@ class PowerManager:
         self.kb_controller = keyboard_controller
         self._config = config or _Config()
         self.monitoring = False
-        self.monitor_thread = None
-        self._battery_thread = None
-        self._lid_thread = None
+        self.monitor_thread: threading.Thread | None = None
+        self._battery_thread: threading.Thread | None = None
+        self._lid_thread: threading.Thread | None = None
         self._monitor_process: object | None = None
         self._monitor_process_lock = threading.Lock()
+        self._power_event_generation = 0
+        self._power_event_generation_lock = threading.Lock()
+        self._power_event_context = threading.local()
+        self._battery_iteration_context = threading.local()
         self._saved_state = None
         self._event_policy = PowerEventPolicy()
         self._stable_on_ac: bool | None = None
@@ -157,9 +253,9 @@ class PowerManager:
         # Actual actions are gated in the event handlers.
         power_monitor_runner.start_monitoring(self, thread_factory=threading.Thread)
 
-    def stop_monitoring(self):
-        """Stop monitoring power events."""
-        power_monitor_runner.stop_monitoring(self, join_timeout_s=2)
+    def stop_monitoring(self) -> bool:
+        """Stop monitoring power events and report whether all workers stopped."""
+        return power_monitor_runner.stop_monitoring(self, join_timeout_s=2)
 
     def _register_monitor_process(self, process: object) -> None:
         with self._monitor_process_lock:
@@ -186,15 +282,31 @@ class PowerManager:
     # ---- battery saver (dim on AC unplug)
 
     def _run_battery_saver_iteration(self, policy, *, poll_interval_s: float) -> bool:
-        return _battery_saver.run_battery_saver_iteration(
-            self,
-            policy,
-            poll_interval_s=poll_interval_s,
-            classify_fn=self._classify_battery_saver_iteration,
-            execute_plan_fn=self._execute_battery_saver_iteration_plan,
-            sync_lid_fn=self._sync_lid_state_from_system,
-            keyboard_is_power_event_forced_off_fn=self._keyboard_is_power_event_forced_off,
+        def run_iteration_transition() -> bool:
+            self._battery_iteration_context.defer_sleep = True
+            try:
+                return _battery_saver.run_battery_saver_iteration(
+                    self,
+                    policy,
+                    poll_interval_s=poll_interval_s,
+                    classify_fn=self._classify_battery_saver_iteration,
+                    execute_plan_fn=self._execute_battery_saver_iteration_plan,
+                    sync_lid_fn=self._sync_lid_state_from_system,
+                    keyboard_is_power_event_forced_off_fn=self._keyboard_is_power_event_forced_off,
+                    sleep_fn=lambda _seconds: None,
+                )
+            finally:
+                del self._battery_iteration_context.defer_sleep
+
+        did_sleep = bool(
+            _run_tray_transition_if_available(
+                self.kb_controller,
+                run_iteration_transition,
+            )
         )
+        if did_sleep:
+            time.sleep(poll_interval_s)
+        return did_sleep
 
     def _sync_lid_state_from_system(self) -> None:
         _battery_saver.sync_lid_state_from_system(self)
@@ -211,14 +323,24 @@ class PowerManager:
         )
 
     def _execute_battery_saver_iteration_plan(self, plan, *, poll_interval_s: float) -> bool:
-        return _battery_saver.execute_battery_saver_iteration_plan(
-            self,
-            plan,
-            poll_interval_s=poll_interval_s,
-            apply_brightness_fn=self._apply_brightness_policy,
-            activate_power_mode_fn=self._activate_power_source_mode,
-            activate_perkey_profile_fn=self._activate_power_source_perkey_profile,
-        )
+        if bool(getattr(plan, "should_sleep", False)) and bool(
+            getattr(self._battery_iteration_context, "defer_sleep", False)
+        ):
+            return True
+
+        def execute_plan() -> bool:
+            return _battery_saver.execute_battery_saver_iteration_plan(
+                self,
+                plan,
+                poll_interval_s=poll_interval_s,
+                apply_brightness_fn=self._apply_brightness_policy,
+                activate_power_mode_fn=self._activate_power_source_mode,
+                activate_perkey_profile_fn=self._activate_power_source_perkey_profile,
+            )
+
+        if bool(getattr(plan, "should_sleep", False)):
+            return execute_plan()
+        return bool(_run_tray_transition_if_available(self.kb_controller, execute_plan))
 
     def _battery_saver_loop(self) -> None:
         """Poll AC online state and apply a simple dim/restore policy."""
@@ -343,7 +465,33 @@ class PowerManager:
             log_info_fn=logger.info,
             sleep_fn=time.sleep,
             invoke_keyboard_method_fn=self._invoke_keyboard_method,
+            should_invoke_fn=self._power_event_is_current,
         )
+
+    def _begin_power_event(self) -> int:
+        with self._power_event_generation_lock:
+            self._power_event_generation += 1
+            return self._power_event_generation
+
+    def _power_event_is_current(self) -> bool:
+        generation = getattr(self._power_event_context, "generation", None)
+        if generation is None:
+            return True
+        with self._power_event_generation_lock:
+            if int(generation) != self._power_event_generation:
+                return False
+        transition_revision = getattr(self._power_event_context, "transition_revision", None)
+        if transition_revision is None:
+            return True
+        return _capture_tray_transition_revision(self.kb_controller) == int(transition_revision)
+
+    def _run_received_power_event(self, action) -> None:
+        generation = self._begin_power_event()
+        self._power_event_context.generation = generation
+        try:
+            action()
+        finally:
+            del self._power_event_context.generation
 
     def _invoke_keyboard_method(self, method_name: str) -> None:
         invoke_keyboard_method(
@@ -362,55 +510,98 @@ class PowerManager:
         kb_method_name: str,
         delay_s: float = 0.0,
     ) -> None:
-        self._handle_power_event(
-            enabled=self._is_enabled(),
-            action_enabled=self._flag(flag_name, True),
-            log_message=log_message,
-            delay_s=delay_s,
-            policy_method=policy_method,
-            expected_action_type=expected_action_type,
-            kb_method_name=kb_method_name,
+        event_generation = getattr(self._power_event_context, "generation", None)
+
+        def dispatch_transition() -> None:
+            previous_generation = getattr(self._power_event_context, "generation", None)
+            previous_transition_revision = getattr(self._power_event_context, "transition_revision", None)
+            if event_generation is not None:
+                self._power_event_context.generation = event_generation
+            active_revision = _active_tray_transition_revision(self.kb_controller)
+            if active_revision is not None:
+                self._power_event_context.transition_revision = active_revision
+            try:
+                self._handle_power_event(
+                    enabled=self._is_enabled(),
+                    action_enabled=self._flag(flag_name, True),
+                    log_message=log_message,
+                    delay_s=delay_s,
+                    policy_method=policy_method,
+                    expected_action_type=expected_action_type,
+                    kb_method_name=kb_method_name,
+                )
+            finally:
+                if previous_generation is None:
+                    try:
+                        del self._power_event_context.generation
+                    except AttributeError:
+                        pass
+                else:
+                    self._power_event_context.generation = previous_generation
+                if previous_transition_revision is None:
+                    try:
+                        del self._power_event_context.transition_revision
+                    except AttributeError:
+                        pass
+                else:
+                    self._power_event_context.transition_revision = previous_transition_revision
+
+        _run_tray_transition_if_available(
+            self.kb_controller,
+            dispatch_transition,
         )
 
     def _on_suspend(self) -> None:
         """Called when system is about to suspend."""
-        self._dispatch_power_event_route(
-            flag_name="power_off_on_suspend",
-            log_message="System suspending - turning off keyboard backlight",
-            policy_method=self._event_policy.handle_power_off_event,
-            expected_action_type=TurnOffFromEvent,
-            kb_method_name="turn_off",
+        self._run_received_power_event(
+            lambda: self._dispatch_power_event_route(
+                flag_name="power_off_on_suspend",
+                log_message="System suspending - turning off keyboard backlight",
+                policy_method=self._event_policy.handle_power_off_event,
+                expected_action_type=TurnOffFromEvent,
+                kb_method_name="turn_off",
+            )
         )
 
     def _on_resume(self) -> None:
         """Called when system resumes from suspend."""
-        self._dispatch_power_event_route(
-            flag_name="power_restore_on_resume",
-            log_message="System resumed - restoring keyboard backlight",
-            delay_s=0.5,
-            policy_method=self._event_policy.handle_power_restore_event,
-            expected_action_type=RestoreFromEvent,
-            kb_method_name="restore",
+        self._run_received_power_event(
+            lambda: self._dispatch_power_event_route(
+                flag_name="power_restore_on_resume",
+                log_message="System resumed - restoring keyboard backlight",
+                delay_s=0.5,
+                policy_method=self._event_policy.handle_power_restore_event,
+                expected_action_type=RestoreFromEvent,
+                kb_method_name="restore",
+            )
         )
 
     def _on_lid_close(self) -> None:
         """Called when lid is closed."""
-        self._lid_closed = True
-        self._dispatch_power_event_route(
-            flag_name="power_off_on_lid_close",
-            log_message="Lid closed - turning off keyboard backlight",
-            policy_method=self._event_policy.handle_power_off_event,
-            expected_action_type=TurnOffFromEvent,
-            kb_method_name="turn_off",
-        )
+
+        def handle_lid_close() -> None:
+            self._lid_closed = True
+            self._dispatch_power_event_route(
+                flag_name="power_off_on_lid_close",
+                log_message="Lid closed - turning off keyboard backlight",
+                policy_method=self._event_policy.handle_power_off_event,
+                expected_action_type=TurnOffFromEvent,
+                kb_method_name="turn_off",
+            )
+
+        self._run_received_power_event(handle_lid_close)
 
     def _on_lid_open(self) -> None:
         """Called when lid is opened."""
-        self._lid_closed = False
-        self._dispatch_power_event_route(
-            flag_name="power_restore_on_lid_open",
-            log_message="Lid opened - restoring keyboard backlight",
-            policy_method=self._event_policy.handle_power_restore_event,
-            expected_action_type=RestoreFromEvent,
-            kb_method_name="restore",
-        )
+
+        def handle_lid_open() -> None:
+            self._lid_closed = False
+            self._dispatch_power_event_route(
+                flag_name="power_restore_on_lid_open",
+                log_message="Lid opened - restoring keyboard backlight",
+                policy_method=self._event_policy.handle_power_restore_event,
+                expected_action_type=RestoreFromEvent,
+                kb_method_name="restore",
+            )
+
+        self._run_received_power_event(handle_lid_open)

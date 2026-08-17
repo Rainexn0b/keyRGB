@@ -16,7 +16,9 @@ def test_update_icon_sets_icon_image(monkeypatch) -> None:
     calls = {"n": 0}
 
     monkeypatch.setattr(
-        refresh.icon_mod, "representative_color", lambda *, config, is_off, now=None, backend=None: (1, 2, 3)
+        refresh.icon_mod,
+        "representative_color",
+        lambda *, config, is_off, now=None, backend=None, engine=None: (1, 2, 3),
     )
     monkeypatch.setattr(
         refresh.icon_mod,
@@ -38,16 +40,21 @@ def test_update_menu_noop_without_icon(monkeypatch) -> None:
     update_menu(tray)
 
 
-def test_update_menu_reloads_and_builds_menu(monkeypatch) -> None:
+def test_update_menu_builds_from_committed_state_without_reloading(monkeypatch) -> None:
     from src.tray.ui import refresh
 
-    tray = SimpleNamespace(icon=SimpleNamespace(menu=None), config=SimpleNamespace(reload=lambda: None))
+    reload_calls: list[str] = []
+    tray = SimpleNamespace(
+        icon=SimpleNamespace(menu=None),
+        config=SimpleNamespace(reload=lambda: reload_calls.append("reload")),
+    )
 
     monkeypatch.setattr(refresh.runtime, "get_pystray", lambda: (object(), object()))
     monkeypatch.setattr(refresh.menu_mod, "build_menu", lambda tray, *, pystray, item: "MENU")
 
     refresh.update_menu(tray)
     assert tray.icon.menu == "MENU"
+    assert reload_calls == []
 
 
 def test_refresh_ui_calls_both(monkeypatch) -> None:

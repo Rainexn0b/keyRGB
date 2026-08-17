@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from src.core.power.system import PowerMode
+from src.tray.controllers.runtime_coordination import run_tray_transition
 
 _MenuAction = Callable[[object, object], None]
 _MenuChecked = Callable[[object], bool]
@@ -30,18 +31,8 @@ class _ItemFactoryProtocol(Protocol):
     def __call__(self, text: str, action: object | None = None, **kwargs: object) -> object: ...
 
 
-class _SystemPowerStatusProtocol(Protocol):
-    @property
-    def supported(self) -> bool: ...
-
-    @property
-    def identifiers(self) -> Mapping[str, str]: ...
-
-    @property
-    def mode(self) -> PowerMode | None: ...
-
-
-_GetStatus = Callable[[], _SystemPowerStatusProtocol]
+_ReadStatus = Callable[[object], object | None]
+_RefreshStatus = Callable[[object], object]
 
 
 class _SetModeProtocol(Protocol):
@@ -94,7 +85,8 @@ class _ActivatePerkeyProfileProtocol(Protocol):
 class ProfilePowerMenuBuilder:
     make_profile_activation_callback: _MakeProfileActivationCallbackProtocol
     log_menu_debug: _LogMenuDebugProtocol
-    get_status: _GetStatus
+    read_status: _ReadStatus
+    refresh_status: _RefreshStatus
     set_mode: _SetModeProtocol
     set_system_power_result: _SetSystemPowerResultProtocol
     refresh_system_power_menu: _RefreshSystemPowerMenuProtocol
@@ -110,30 +102,33 @@ class ProfilePowerMenuBuilder:
         item: _ItemFactoryProtocol,
     ) -> object | None:
         try:
-            status = self.get_status()
-            if not status.supported:
+            status = self.read_status(tray)
+            if status is None or not bool(getattr(status, "supported", False)):
                 return None
-            can_apply = status.identifiers.get("can_apply") == "true"
+            raw_identifiers = getattr(status, "identifiers", None)
+            identifiers = raw_identifiers if isinstance(raw_identifiers, Mapping) else {}
+            can_apply = identifiers.get("can_apply") == "true"
+            current_mode = getattr(status, "mode", None)
 
             return pystray.Menu(
                 item(
                     "Extreme Saver",
                     self._system_power_callback(tray, PowerMode.EXTREME_SAVER),
-                    checked=self._checked_system_power_mode(PowerMode.EXTREME_SAVER),
+                    checked=self._checked_system_power_mode(PowerMode.EXTREME_SAVER, current_mode),
                     enabled=can_apply,
                     radio=True,
                 ),
                 item(
                     "Balanced",
                     self._system_power_callback(tray, PowerMode.BALANCED),
-                    checked=self._checked_system_power_mode(PowerMode.BALANCED),
+                    checked=self._checked_system_power_mode(PowerMode.BALANCED, current_mode),
                     enabled=can_apply,
                     radio=True,
                 ),
                 item(
                     "Performance",
                     self._system_power_callback(tray, PowerMode.PERFORMANCE),
-                    checked=self._checked_system_power_mode(PowerMode.PERFORMANCE),
+                    checked=self._checked_system_power_mode(PowerMode.PERFORMANCE, current_mode),
                     enabled=can_apply,
                     radio=True,
                 ),
@@ -191,27 +186,30 @@ class ProfilePowerMenuBuilder:
 
     def _system_power_callback(self, tray: object, mode: PowerMode) -> _MenuAction:
         def _cb(_icon: object, _item: object) -> None:
-            try:
-                ok = self.set_mode(mode)
-                self.set_system_power_result(tray, bool(ok))
-            except _SYSTEM_POWER_CALLBACK_EXCEPTIONS as exc:
-                self.set_system_power_result(tray, False)
-                self.log_menu_debug(
-                    "tray.menu.system_power.click",
-                    "System power mode activation failed",
-                    exc,
-                    interval_s=60,
-                )
-            finally:
-                self.refresh_system_power_menu(tray)
+            def apply_power_mode_transition() -> None:
+                try:
+                    ok = self.set_mode(mode)
+                    self.refresh_status(tray)
+                    self.set_system_power_result(tray, bool(ok))
+                except _SYSTEM_POWER_CALLBACK_EXCEPTIONS as exc:
+                    self.refresh_status(tray)
+                    self.set_system_power_result(tray, False)
+                    self.log_menu_debug(
+                        "tray.menu.system_power.click",
+                        "System power mode activation failed",
+                        exc,
+                        interval_s=60,
+                    )
+                finally:
+                    self.refresh_system_power_menu(tray)
+
+            run_tray_transition(tray, apply_power_mode_transition)
 
         return _cb
 
-    def _checked_system_power_mode(self, mode: PowerMode) -> _MenuChecked:
-        current_mode = mode
-
+    def _checked_system_power_mode(self, mode: PowerMode, current_mode: object) -> _MenuChecked:
         def _is_checked(_item: object) -> bool:
-            return self.get_status().mode == current_mode
+            return current_mode == mode
 
         return _is_checked
 

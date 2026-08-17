@@ -4,9 +4,13 @@ import logging
 from collections.abc import Callable
 from typing import Protocol
 
-from src.core.power.system import get_status, set_mode
+from src.core.power.system import set_mode
 from src.core.utils.logging_utils import log_throttled
 from src.tray.controllers import menu_adapters as profile_power_menu_actions
+from src.tray.controllers.view_snapshots import (
+    read_system_power_status,
+    refresh_system_power_snapshot,
+)
 
 from ._menu_sections_profile_power import ProfilePowerMenuBuilder
 
@@ -78,7 +82,8 @@ def _profile_power_menu_builder() -> ProfilePowerMenuBuilder:
     return ProfilePowerMenuBuilder(
         make_profile_activation_callback=_make_profile_activation_callback,
         log_menu_debug=_log_menu_debug,
-        get_status=get_status,
+        read_status=read_system_power_status,
+        refresh_status=refresh_system_power_snapshot,
         set_mode=set_mode,
         set_system_power_result=profile_power_menu_actions.set_system_power_last_ok,
         refresh_system_power_menu=profile_power_menu_actions.update_menu_if_present,

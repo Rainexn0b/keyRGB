@@ -7,6 +7,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol, cast, overload
 
+from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+from src.tray.controllers.view_snapshots import refresh_tray_view_snapshots
 from src.tray.idle_power_state import ensure_tray_idle_power_state
 from src.tray.protocols import TrayIconState
 
@@ -170,6 +172,7 @@ def build_tray_prebootstrap_state(tray: object) -> TrayPreBootstrapState:
         is_off=False,
         tray_icon_state=TrayIconState(),
         tray_idle_power_state=idle_power_state,
+        runtime_coordinator=TrayRuntimeCoordinator(),
         power_forced_off=idle_power_state.power_forced_off,
         user_forced_off=idle_power_state.user_forced_off,
         idle_forced_off=idle_power_state.idle_forced_off,
@@ -193,7 +196,11 @@ def build_tray_bootstrap_state(*, bindings: TrayInitBindings) -> TrayBootstrapSt
     backend, backend_probe, backend_caps = bindings.select_backend_with_introspection()
     engine = bindings.create_effects_engine(EffectsEngine, backend=backend)
 
-    ite_rows, ite_cols = bindings.load_ite_dimensions()
+    geometry = getattr(engine, "effect_geometry", None)
+    if geometry is not None:
+        ite_rows, ite_cols = int(geometry.rows), int(geometry.cols)
+    else:
+        ite_rows, ite_cols = bindings.load_ite_dimensions()
 
     return TrayBootstrapState(
         config=config,
@@ -217,6 +224,13 @@ def start_tray_runtime(
     notify_permission_issue: _PermissionIssueCallback,
 ) -> _MonitoringPowerManager:
     runtime_tray = cast(_LifecyclePollingTray, tray)
+
+    coordinator = getattr(tray, "runtime_coordinator", None)
+    start_coordinator = getattr(coordinator, "start", None)
+    if callable(start_coordinator):
+        start_coordinator()
+
+    refresh_tray_view_snapshots(tray)
 
     bindings.install_permission_error_callback_best_effort(state.engine, notify_permission_issue)
     bindings.configure_engine_software_targets(runtime_tray)

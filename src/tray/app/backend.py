@@ -10,7 +10,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from src.core.backends.base import KeyboardBackend
+from src.core.backends.base import DEFAULT_BACKEND_CAPABILITIES, KeyboardBackend, normalize_backend_capabilities
 from src.core.backends.registry import select_backend
 from src.core.diagnostics.device_discovery import collect_device_discovery
 from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
@@ -81,8 +81,8 @@ def select_backend_with_introspection() -> tuple[KeyboardBackend | None, object 
     )
 
     backend_caps = _run_best_effort(
-        lambda: backend.capabilities() if backend is not None else None,
-        fallback=None,
+        lambda: normalize_backend_capabilities(backend.capabilities()) if backend is not None else None,
+        fallback=DEFAULT_BACKEND_CAPABILITIES if backend is not None else None,
         recoverable_errors=_TRAY_BACKEND_RUNTIME_ERRORS,
         on_recoverable=_log_debug_boundary(
             logger=logger,

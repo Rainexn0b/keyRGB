@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from src.tray.protocols import TrayIconState
 
 if TYPE_CHECKING:
+    from src.core.backends.base import BackendCapabilities
     from src.core.config import Config
+    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
     from src.tray.idle_power_state import TrayIdlePowerState
 
 
@@ -17,6 +20,7 @@ class _TrayPreBootstrapWritable(Protocol):
     is_off: bool
     tray_icon_state: TrayIconState
     tray_idle_power_state: TrayIdlePowerState
+    runtime_coordinator: TrayRuntimeCoordinator
     _power_forced_off: bool
     _user_forced_off: bool
     _idle_forced_off: bool
@@ -36,6 +40,7 @@ class TrayPreBootstrapState:
     is_off: bool
     tray_icon_state: TrayIconState
     tray_idle_power_state: TrayIdlePowerState
+    runtime_coordinator: TrayRuntimeCoordinator
     power_forced_off: bool
     user_forced_off: bool
     idle_forced_off: bool
@@ -53,6 +58,7 @@ class TrayPreBootstrapState:
         tray.is_off = self.is_off
         tray.tray_icon_state = self.tray_icon_state
         tray.tray_idle_power_state = self.tray_idle_power_state
+        tray.runtime_coordinator = self.runtime_coordinator
         owner = self.tray_idle_power_state
         owner.power_forced_off = bool(self.power_forced_off)
         owner.user_forced_off = bool(self.user_forced_off)
@@ -93,6 +99,14 @@ class _TrayBootstrapWritable(Protocol):
     _ite_cols: int
 
 
+@runtime_checkable
+class _BackendCapabilitiesPublisher(Protocol):
+    def set_backend_capabilities_changed_callback(
+        self,
+        callback: Callable[[BackendCapabilities], None] | None,
+    ) -> None: ...
+
+
 @dataclass(slots=True)
 class TrayBootstrapState:
     config: Config
@@ -112,6 +126,10 @@ class TrayBootstrapState:
         tray.backend = self.backend
         tray.backend_probe = self.backend_probe
         tray.backend_caps = self.backend_caps
+        if isinstance(self.engine, _BackendCapabilitiesPublisher):
+            self.engine.set_backend_capabilities_changed_callback(
+                lambda capabilities: setattr(tray, "backend_caps", capabilities)
+            )
         tray.device_discovery = self.device_discovery
         tray.selected_device_context = self.selected_device_context
         tray._ite_rows = self.ite_rows

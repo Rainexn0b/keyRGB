@@ -69,14 +69,55 @@ class TestPowerManagerMonitoringThreads:
         pm.monitor_thread = MagicMock()
         pm._battery_thread = MagicMock()
         pm._lid_thread = MagicMock()
+        pm.monitor_thread.is_alive.return_value = False
+        pm._battery_thread.is_alive.return_value = False
+        pm._lid_thread.is_alive.return_value = False
         process = MagicMock()
         pm._monitor_process = process
 
-        pm.stop_monitoring()
+        quiesced = pm.stop_monitoring()
 
         assert pm.monitoring is False
+        assert quiesced is True
         process.terminate.assert_called_once()
         pm.monitor_thread.join.assert_called_once_with(timeout=2)
+        pm._lid_thread.join.assert_called_once_with(timeout=2)
+        pm._battery_thread.join.assert_called_once_with(timeout=2)
+
+    def test_stop_monitoring_reports_worker_still_alive_after_bounded_join(self):
+        from src.core.power.management.manager import PowerManager
+
+        pm = PowerManager(MagicMock())
+        pm.monitoring = True
+        pm.monitor_thread = MagicMock()
+        pm.monitor_thread.is_alive.return_value = False
+        pm._lid_thread = MagicMock()
+        pm._lid_thread.is_alive.return_value = True
+        pm._battery_thread = MagicMock()
+        pm._battery_thread.is_alive.return_value = False
+
+        quiesced = pm.stop_monitoring()
+
+        assert quiesced is False
+        pm.monitor_thread.is_alive.assert_called_once_with()
+        pm._lid_thread.is_alive.assert_called_once_with()
+        pm._battery_thread.is_alive.assert_called_once_with()
+
+    def test_stop_monitoring_continues_after_join_error_and_reports_not_quiesced(self):
+        from src.core.power.management.manager import PowerManager
+
+        pm = PowerManager(MagicMock())
+        pm.monitoring = True
+        pm.monitor_thread = MagicMock()
+        pm.monitor_thread.join.side_effect = RuntimeError("not started")
+        pm._lid_thread = MagicMock()
+        pm._lid_thread.is_alive.return_value = False
+        pm._battery_thread = MagicMock()
+        pm._battery_thread.is_alive.return_value = False
+
+        quiesced = pm.stop_monitoring()
+
+        assert quiesced is False
         pm._lid_thread.join.assert_called_once_with(timeout=2)
         pm._battery_thread.join.assert_called_once_with(timeout=2)
 

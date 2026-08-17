@@ -14,8 +14,8 @@ from src.core.secondary_device_routes import (
     SecondaryDeviceRoute,
     route_for_context_entry,
 )
-from src.core.secondary_device_runtime import has_available_secondary_profile_routes
 from src.tray import secondary_device_power
+from src.tray.controllers.view_snapshots import secondary_profile_routes_available
 
 from . import _menu_callbacks as menu_callbacks, _menu_sections_effects as menu_effects, menu_sections, menu_status
 
@@ -29,10 +29,6 @@ class _MenuConfigProtocol(Protocol):
     speed: int
     brightness: int
     software_effect_target: object
-
-
-class _ReloadableMenuConfigProtocol(_MenuConfigProtocol, Protocol):
-    def reload(self) -> None: ...
 
 
 class _MenuTrayProtocol(Protocol):
@@ -63,16 +59,8 @@ class _MenuTrayProtocol(Protocol):
     def _on_software_effect_target_clicked(self, target_key: str) -> None: ...
 
 
-class _ReloadableMenuTrayProtocol(Protocol):
-    config: _ReloadableMenuConfigProtocol
-
-
 def _menu_tray(tray: object) -> _MenuTrayProtocol:
     return cast(_MenuTrayProtocol, tray)
-
-
-def _reloadable_menu_tray(tray: object) -> _ReloadableMenuTrayProtocol:
-    return cast(_ReloadableMenuTrayProtocol, tray)
 
 
 def normalize_effect_label(label: str) -> str:
@@ -114,13 +102,12 @@ def build_menu_items(
     per_key_supported = caps.per_key
     hw_effects_supported = caps.hardware_effects
     color_supported = caps.color
-
-    menu_status.probe_device_available(tray)
+    brightness_supported = caps.brightness
 
     # Determine current mode for lockdown logic
     sw_mode = menu_status.is_software_mode(tray)
     hw_mode = menu_status.is_hardware_mode(tray)
-    secondary_lighting_supported = has_available_secondary_profile_routes()
+    secondary_lighting_supported = secondary_profile_routes_available(tray)
 
     all_device_entries = menu_status.device_context_entries(tray)
     if not all_device_entries:
@@ -182,7 +169,11 @@ def build_menu_items(
     ]
 
     if selected_is_keyboard:
-        selected_brightness_item = item("Brightness Override", brightness_menu)
+        selected_brightness_item = (
+            item("Brightness Override", brightness_menu)
+            if brightness_supported
+            else item("Brightness Override (not supported)", None, enabled=False)
+        )
         hardware_mode_items: list[object] = [
             item(
                 "Hardware Static Mode",
@@ -288,6 +279,4 @@ def build_menu(
 ) -> object:
     """Build a pystray.Menu object."""
 
-    tray_state = _reloadable_menu_tray(tray)
-    tray_state.config.reload()
     return pystray.Menu(*build_menu_items(tray, pystray=pystray, item=item))

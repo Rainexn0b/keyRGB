@@ -7,6 +7,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
+from src.tray.controllers.runtime_coordination import (
+    capture_transition_revision,
+    run_tray_observation_if_current,
+    run_tray_transition,
+)
 from src.tray.idle_power_state import (
     is_dim_temp_active,
     read_forced_off_flags,
@@ -116,6 +121,7 @@ def _maybe_restore_from_controller_sleep(
     session_idle: bool | None,
     create_input_idle_tracker_fn: Callable[[], InputIdleTracker] | None = None,
     read_input_idle_seconds_fn: Callable[[InputIdleTracker], float | None] | None = None,
+    observation_revision: int | None = None,
 ) -> None:
     """Restore the deck after controller sleep on keyboard activity only.
 
@@ -154,21 +160,23 @@ def _maybe_restore_from_controller_sleep(
     ):
         return
 
-    # Hardware polling may have observed the controller's own first-keypress
-    # wake and restarted the stopped effect while evdev was being polled. Do
-    # not follow that successful fallback with a second explicit off->soft-on.
-    if not read_idle_power_state_bool_field(
-        tray,
-        attr_name="_controller_sleep_off",
-        state_name="controller_sleep_off",
-        default=False,
-    ):
-        return
+    def restore_transition() -> None:
+        # Hardware polling may have observed the controller's own first-keypress
+        # wake and restarted the stopped effect while evdev was being polled. Do
+        # not follow that successful fallback with a second explicit off->soft-on.
+        if not read_idle_power_state_bool_field(
+            tray,
+            attr_name="_controller_sleep_off",
+            state_name="controller_sleep_off",
+            default=False,
+        ):
+            return
+        if not _rearm_controller_sleep_restore(tray):
+            return
+        logger.info("EVENT idle_power:controller_sleep_restore trigger=keyboard_evdev")
+        restore_from_idle(tray)
 
-    if not _rearm_controller_sleep_restore(tray):
-        return
-    logger.info("EVENT idle_power:controller_sleep_restore trigger=keyboard_evdev")
-    restore_from_idle(tray)
+    run_tray_observation_if_current(tray, observation_revision, restore_transition)
 
 
 def _log_idle_action_best_effort(
@@ -286,7 +294,8 @@ def run_idle_power_iteration(
 ) -> None:
     ensure_idle_state_fn(tray)
 
-    _reload_idle_power_config_best_effort(tray)
+    run_tray_transition(tray, lambda: _reload_idle_power_config_best_effort(tray))
+    observation_revision = capture_transition_revision(tray)
     now = float(now_monotonic_fn())
     read_on_ac = read_on_ac_power_fn or _read_on_ac_power_best_effort
     _update_power_source_idle_guard(
@@ -382,6 +391,7 @@ def run_idle_power_iteration(
         session_idle=session_idle,
         create_input_idle_tracker_fn=create_input_idle_tracker_fn,
         read_input_idle_seconds_fn=read_input_idle_seconds_fn,
+        observation_revision=observation_revision,
     )
     loop_state.prev_session_idle = session_idle
 
@@ -461,4 +471,12 @@ def run_idle_power_iteration(
             dim_temp_brightness=int(dim_temp_brightness),
         )
 
-    apply_idle_action_fn(tray, action=action, dim_temp_brightness=int(dim_temp_brightness))
+    run_tray_observation_if_current(
+        tray,
+        observation_revision,
+        lambda: apply_idle_action_fn(
+            tray,
+            action=action,
+            dim_temp_brightness=int(dim_temp_brightness),
+        ),
+    )

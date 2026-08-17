@@ -5,6 +5,7 @@ import logging
 from collections.abc import Callable
 from typing import Protocol, cast
 
+from src.core.config._lighting._coercion import normalize_secondary_brightness_value
 from src.core.profile import profiles
 from src.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
@@ -55,7 +56,7 @@ def _persist_secondary_state_to_active_profile(
         return
     updates: dict[str, object] = {}
     if brightness is not None and getattr(route, "brightness_policy", None) == BRIGHTNESS_POLICY_INDEPENDENT:
-        updates["brightness"] = max(0, min(100, int(brightness)))
+        updates["brightness"] = normalize_secondary_brightness_value(brightness, default=0)
     if enabled is not None:
         updates["enabled"] = bool(enabled)
     if not updates:

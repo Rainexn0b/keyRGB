@@ -4,6 +4,10 @@ import threading
 import time
 
 from src.core.utils.exceptions import is_device_disconnected
+from src.tray.controllers.runtime_coordination import (
+    capture_transition_revision,
+    run_tray_observation_if_current,
+)
 from src.tray.idle_power_state import (
     dim_temp_target_brightness,
     is_dim_temp_active,
@@ -253,6 +257,20 @@ def _apply_polled_hardware_state(
 # ---------------------------------------------------------------------------
 
 
+def _apply_hardware_observation_if_current(
+    tray: IdlePowerTrayProtocol,
+    revision: int | None,
+    *args,
+    **kwargs,
+) -> tuple[int, bool] | None:
+    outcome = run_tray_observation_if_current(
+        tray,
+        revision,
+        lambda: _apply_polled_hardware_state(*args, **kwargs),
+    )
+    return outcome.value if outcome.accepted else None
+
+
 def _mark_device_unavailable_best_effort(tray: IdlePowerTrayProtocol) -> None:
     try:
         tray.engine.mark_device_unavailable()
@@ -281,14 +299,21 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
         last_off_state = None
         last_error_at = 0.0
         last_real_poll_at = time.monotonic()
+        poll_revision: int | None = None
 
         def _recover_polling_error(exc: Exception) -> None:
             nonlocal last_error_at
-            last_error_at = _handle_hardware_polling_exception(
+            outcome = run_tray_observation_if_current(
                 tray,
-                exc,
-                last_error_at=last_error_at,
+                poll_revision,
+                lambda: _handle_hardware_polling_exception(
+                    tray,
+                    exc,
+                    last_error_at=last_error_at,
+                ),
             )
+            if outcome.accepted and outcome.value is not None:
+                last_error_at = outcome.value
 
         while not polling_lifecycle.shutdown_requested(tray):
             # While reactive pulses are mid-flight, the poll's synchronous USB
@@ -308,12 +333,22 @@ def start_hardware_polling(tray: IdlePowerTrayProtocol) -> threading.Thread:
                     return
                 continue
 
+            poll_revision = capture_transition_revision(tray)
+
+            def apply_current_observation(*args, revision=poll_revision, **kwargs):
+                return _apply_hardware_observation_if_current(
+                    tray,
+                    revision,
+                    *args,
+                    **kwargs,
+                )
+
             polled_state = _run_recoverable_hardware_poll_boundary(
                 lambda lb=last_brightness, lo=last_off_state: _runtime_support.poll_hardware_once(
                     tray,
                     last_brightness=lb,
                     last_off_state=lo,
-                    apply_polled_state_fn=_apply_polled_hardware_state,
+                    apply_polled_state_fn=apply_current_observation,
                 ),
                 on_recoverable=_recover_polling_error,
             )

@@ -47,12 +47,16 @@ def test_sw_effects_menu_first_item_is_reactive_typing_settings() -> None:
 def test_system_power_callback_uses_runtime_helper_collaborators(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[tuple[str, object]] = []
 
-    monkeypatch.setattr(
-        menu_sections,
-        "get_status",
-        lambda: SimpleNamespace(supported=True, identifiers={"can_apply": "true"}, mode=None),
+    tray = SimpleNamespace(
+        _on_power_mode_settings_clicked=lambda *_args, **_kwargs: None,
+        system_power_status=SimpleNamespace(supported=True, identifiers={"can_apply": "true"}, mode=None),
     )
     monkeypatch.setattr(menu_sections, "set_mode", lambda _mode: True)
+    monkeypatch.setattr(
+        menu_sections,
+        "refresh_system_power_snapshot",
+        lambda current_tray: calls.append(("snapshot", current_tray)),
+    )
     monkeypatch.setattr(
         menu_sections.profile_power_menu_actions,
         "set_system_power_last_ok",
@@ -64,13 +68,12 @@ def test_system_power_callback_uses_runtime_helper_collaborators(monkeypatch: py
         lambda tray: calls.append(("refresh", tray)),
     )
 
-    tray = SimpleNamespace(_on_power_mode_settings_clicked=lambda *_args, **_kwargs: None)
     menu_items = menu_sections.build_system_power_mode_menu(tray, pystray=_Pystray(), item=_item)
 
     assert isinstance(menu_items, list)
     menu_items[0].action(None, None)
 
-    assert calls == [("status", True), ("refresh", tray)]
+    assert calls == [("snapshot", tray), ("status", True), ("refresh", tray)]
 
 
 def test_system_power_menu_includes_settings_entry() -> None:
@@ -79,7 +82,8 @@ def test_system_power_menu_includes_settings_entry() -> None:
     menu_items = menu_sections.ProfilePowerMenuBuilder(
         make_profile_activation_callback=lambda action, **_kwargs: lambda *_a, **_k: action(),
         log_menu_debug=lambda *_args, **_kwargs: None,
-        get_status=lambda: SimpleNamespace(supported=True, identifiers={"can_apply": "true"}, mode=None),
+        read_status=lambda _tray: SimpleNamespace(supported=True, identifiers={"can_apply": "true"}, mode=None),
+        refresh_status=lambda _tray: None,
         set_mode=lambda _mode: True,
         set_system_power_result=lambda *_args, **_kwargs: None,
         refresh_system_power_menu=lambda *_args, **_kwargs: None,

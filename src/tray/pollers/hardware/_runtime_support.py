@@ -24,8 +24,8 @@ def poll_hardware_once(
     *,
     last_brightness: object,
     last_off_state: object,
-    apply_polled_state_fn: Callable[..., tuple[int, bool]],
-) -> tuple[int, bool]:
+    apply_polled_state_fn: Callable[..., tuple[int, bool] | None],
+) -> tuple[int, bool] | None:
     """Read one coherent hardware snapshot and pass it to the state reducer."""
 
     with tray.engine.kb_lock:

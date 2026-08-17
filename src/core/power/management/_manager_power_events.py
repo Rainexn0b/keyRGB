@@ -85,15 +85,19 @@ def execute_power_event_plan(
     log_info_fn: Callable[[str], None],
     sleep_fn: Callable[[float], None],
     invoke_keyboard_method_fn: Callable[[str], None],
+    should_invoke_fn: Callable[[], bool] = lambda: True,
 ) -> None:
     if not plan.should_invoke:
         return
 
-    if plan.should_log:
-        log_info_fn(log_message)
-
     if plan.delay_s > 0:
         sleep_fn(plan.delay_s)
+
+    if not should_invoke_fn():
+        return
+
+    if plan.should_log:
+        log_info_fn(log_message)
 
     for _ in range(plan.action_count):
         invoke_keyboard_method_fn(kb_method_name)

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Protocol, TypeAlias, TypeVar
 
+from src.core.backends.base import normalize_backend_capabilities
 from src.tray.idle_power_state import set_last_brightness
 from src.tray.protocols import ConfigPollingTrayProtocol
 
@@ -166,6 +167,11 @@ def apply_post_fast_path_execution(
     def _apply_current() -> None:
         apply_mode = classify_apply_mode(current.effect)
         if apply_mode == "perkey":
+            caps = normalize_backend_capabilities(getattr(tray, "backend_caps", None))
+            if not caps.per_key:
+                tray.config.effect = "none"
+                apply_uniform_fn(tray, current, cause=f"{cause}: per-key unsupported")
+                return
             reassert_user_mode = True
             try:
                 already_perkey = getattr(last_applied, "effect", None) == "perkey"

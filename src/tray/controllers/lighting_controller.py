@@ -283,6 +283,10 @@ def apply_power_source_perkey_profile_transition(tray: LightingTrayProtocol) -> 
     """Apply a power-source per-key profile transition without a full restart when possible."""
 
     try:
+        from src.core.backends.base import normalize_backend_capabilities
+
+        if not normalize_backend_capabilities(tray.backend_caps).per_key:
+            return False
         effect = lighting_controller_helpers.get_effect_name(tray)
         if effect == "perkey":
             lighting_mode_apply.apply_perkey_mode(

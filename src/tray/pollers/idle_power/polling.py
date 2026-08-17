@@ -9,6 +9,8 @@ from collections.abc import Callable
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from src.tray.controllers.runtime_coordination import run_tray_transition
+
 from .. import _lifecycle as polling_lifecycle
 from ._polling_support import (
     call_best_effort as _call_best_effort_impl,
@@ -243,16 +245,18 @@ def _apply_idle_action(
 ) -> None:
     from ._actions import apply_idle_action
 
-    reactive_effects_set, sw_effects_set = _effect_sets()
+    def apply_transition() -> None:
+        reactive_effects_set, sw_effects_set = _effect_sets()
+        apply_idle_action(
+            tray,
+            action=action,
+            dim_temp_brightness=int(dim_temp_brightness),
+            restore_from_idle_fn=_restore_from_idle,
+            reactive_effects_set=reactive_effects_set,
+            sw_effects_set=sw_effects_set,
+        )
 
-    return apply_idle_action(
-        tray,
-        action=action,
-        dim_temp_brightness=int(dim_temp_brightness),
-        restore_from_idle_fn=_restore_from_idle,
-        reactive_effects_set=reactive_effects_set,
-        sw_effects_set=sw_effects_set,
-    )
+    run_tray_transition(tray, apply_transition)
 
 
 def _debounce_dim_and_screen_off(

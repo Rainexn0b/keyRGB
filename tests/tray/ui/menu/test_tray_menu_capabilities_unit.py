@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import SimpleNamespace
 from typing import ClassVar
 
 import pytest
@@ -42,6 +43,7 @@ def fake_item(text, _action, **kwargs):
 class DummyCaps:
     per_key: bool
     hardware_effects: bool
+    brightness: bool = True
     color: bool = True
     palette: bool = False
 
@@ -75,6 +77,8 @@ class DummyTray:
         self.backend = None
         self.backend_probe = None
         self.device_discovery = None
+        self.system_power_status = None
+        self.effective_secondary_routes = ()
         self.selected_device_context = "keyboard"
 
     # Callbacks referenced by menu builder
@@ -149,6 +153,9 @@ def test_menu_uses_detected_backend_hardware_effects_count(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     class DummyBackend:
+        def capabilities(self):
+            return DummyCaps(per_key=True, hardware_effects=True)
+
         def effects(self):
             return {"rainbow": object(), "breathing": object(), "wave": object()}
 
@@ -178,9 +185,11 @@ def test_menu_hides_items_when_capabilities_disabled(
     assert "Open Backend Discovery…" not in labels
 
 
-def test_menu_keeps_lighting_editor_for_uniform_keyboard_with_secondary_device(monkeypatch) -> None:
-    monkeypatch.setattr(tray_menu, "has_available_secondary_profile_routes", lambda: True)
+def test_menu_keeps_lighting_editor_for_uniform_keyboard_with_secondary_device() -> None:
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+    tray.effective_secondary_routes = (
+        SimpleNamespace(available=True, route=SimpleNamespace(supports_profile_state=True)),
+    )
     tray.device_discovery = {
         "candidates": [
             {
@@ -208,6 +217,16 @@ def test_menu_hides_uniform_color_picker_when_color_capability_disabled(
     assert "Hardware Static Mode" in labels
     assert "Hardware Uniform Color…" not in labels
     assert not any(label.startswith("Hardware Effects") for label in labels)
+
+
+def test_menu_marks_brightness_unsupported_when_capability_metadata_is_missing() -> None:
+    tray = DummyTray(None)  # type: ignore[arg-type]
+
+    items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
+    brightness = next(item for item in items if isinstance(item, dict) and item["text"].startswith("Brightness"))
+
+    assert brightness["text"] == "Brightness Override (not supported)"
+    assert brightness["enabled"] is False
 
 
 def test_menu_hides_hardware_color_and_effect_rows_in_software_mode(
@@ -508,14 +527,17 @@ def test_software_target_toggle_uses_pystray_compatible_arity_and_flips_policy(
     assert selected == ["all_uniform_capable", "keyboard"]
 
 
-def test_menu_resets_invalid_selected_context_to_keyboard(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_menu_renders_invalid_selected_context_fallback_without_mutating_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.selected_device_context = "missing:device"
+    tray.config.tray_device_context = "missing:device"
 
     items = tray_menu.build_menu_items(tray, pystray=FakePystray, item=fake_item)
 
-    assert tray.selected_device_context == "keyboard"
-    assert tray.config.tray_device_context == "keyboard"
+    assert tray.selected_device_context == "missing:device"
+    assert tray.config.tray_device_context == "missing:device"
     assert "Keyboard" in items[0]["text"]
 
 
@@ -603,12 +625,8 @@ def test_tray_active_indicator_falls_back_to_unknown_when_profile_lookup_raises(
     assert "unknown" in mode_text
 
 
-def test_system_power_mode_menu_returns_none_when_status_lookup_raises_runtime_error(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_system_power_mode_menu_returns_none_when_status_snapshot_is_missing() -> None:
     from src.tray.ui import menu_sections
-
-    monkeypatch.setattr(menu_sections, "get_status", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
 
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
 
@@ -639,16 +657,15 @@ def test_menu_includes_system_power_item_when_builder_returns_menu(
     assert "Power Mode" in labels
 
 
-def test_system_power_menu_contains_power_mode_settings_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_system_power_menu_contains_power_mode_settings_entry() -> None:
     from src.tray.ui import menu_sections
 
-    monkeypatch.setattr(
-        menu_sections,
-        "get_status",
-        lambda: type("Status", (), {"supported": True, "identifiers": {"can_apply": "true"}, "mode": None})(),
-    )
-
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
+    tray.system_power_status = type(
+        "Status",
+        (),
+        {"supported": True, "identifiers": {"can_apply": "true"}, "mode": None},
+    )()
     power_menu = menu_sections.build_system_power_mode_menu(tray, pystray=FakePystray, item=fake_item)
 
     assert isinstance(power_menu, FakeMenu)

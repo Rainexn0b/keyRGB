@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -290,6 +291,36 @@ def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(
         t.target()
 
     assert calls["apply"] == 1
+
+
+def test_stale_hardware_observation_is_rejected_after_newer_transition(monkeypatch) -> None:
+    import src.tray.pollers.hardware_polling as hp
+    from src.tray.controllers.runtime_coordination import run_tray_transition
+    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+
+    coordinator = TrayRuntimeCoordinator()
+    tray = SimpleNamespace(runtime_coordinator=coordinator)
+    apply = MagicMock(return_value=(0, True))
+    monkeypatch.setattr(hp, "_apply_polled_hardware_state", apply)
+
+    try:
+        stale_revision = coordinator.capture_revision()
+        run_tray_transition(tray, lambda: None)
+        result = hp._apply_hardware_observation_if_current(
+            tray,
+            stale_revision,
+            tray,
+            raw_brightness=0,
+            current_brightness=0,
+            current_off=True,
+            last_brightness=25,
+            last_off_state=False,
+        )
+    finally:
+        assert coordinator.stop_and_drain(timeout_s=1.0) is True
+
+    assert result is None
+    apply.assert_not_called()
 
 
 def test_start_hardware_polling_exception_path_calls_handler(monkeypatch) -> None:

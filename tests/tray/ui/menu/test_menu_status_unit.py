@@ -41,10 +41,6 @@ class _UnexpectedBrokenPerKeyColors:
         raise AssertionError("unexpected per-key status bug")
 
 
-class _EnsureFailure(RuntimeError):
-    pass
-
-
 class _UnexpectedEnsureFailure(AssertionError):
     pass
 
@@ -99,8 +95,9 @@ def test_is_software_mode_propagates_unexpected_per_key_length_errors() -> None:
         menu_status.is_software_mode(tray)
 
 
-def test_probe_device_available_logs_and_preserves_engine_state_when_ensure_raises(monkeypatch) -> None:
+def test_probe_device_available_is_read_only_and_does_not_ensure_device(monkeypatch) -> None:
     logged: list[tuple[str, str, Exception]] = []
+    ensure_calls: list[str] = []
 
     monkeypatch.setattr(
         menu_status,
@@ -110,26 +107,23 @@ def test_probe_device_available_logs_and_preserves_engine_state_when_ensure_rais
 
     engine = SimpleNamespace(
         device_available=False,
-        _ensure_device_available=lambda: (_ for _ in ()).throw(_EnsureFailure("boom")),
+        _ensure_device_available=lambda: ensure_calls.append("ensure"),
     )
     tray = SimpleNamespace(engine=engine)
 
     assert menu_status.probe_device_available(tray) is False
-    assert len(logged) == 1
-    assert logged[0][0] == "tray.menu.ensure_device"
-    assert "device availability" in logged[0][1].lower()
-    assert isinstance(logged[0][2], _EnsureFailure)
+    assert ensure_calls == []
+    assert logged == []
 
 
-def test_probe_device_available_propagates_unexpected_ensure_errors() -> None:
+def test_probe_device_available_does_not_invoke_unexpected_ensure_boundary() -> None:
     engine = SimpleNamespace(
         device_available=False,
         _ensure_device_available=lambda: (_ for _ in ()).throw(_UnexpectedEnsureFailure("unexpected ensure bug")),
     )
     tray = SimpleNamespace(engine=engine)
 
-    with pytest.raises(_UnexpectedEnsureFailure, match="unexpected ensure bug"):
-        menu_status.probe_device_available(tray)
+    assert menu_status.probe_device_available(tray) is False
 
 
 def test_tray_lighting_mode_text_uses_active_perkey_profile_name(monkeypatch) -> None:

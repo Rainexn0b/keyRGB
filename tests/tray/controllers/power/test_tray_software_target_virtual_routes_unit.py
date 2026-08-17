@@ -7,10 +7,23 @@ import pytest
 
 from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED, iter_virtual_routes
 from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.tray.ui import _menu_status_devices
 
 
-def _make_tray() -> SimpleNamespace:
+def _effective_virtual_routes(*, available: bool) -> tuple[EffectiveSecondaryRoute, ...]:
+    if not available:
+        return ()
+    return tuple(
+        EffectiveSecondaryRoute(
+            route=route,
+            available=True,
+            simulated=False,
+            availability_source="test",
+        )
+        for route in iter_virtual_routes()
+    )
+
+
+def _make_tray(*, available: bool = True) -> SimpleNamespace:
     return SimpleNamespace(
         config=SimpleNamespace(
             software_effect_target="all_uniform_capable",
@@ -30,6 +43,7 @@ def _make_tray() -> SimpleNamespace:
         backend=None,
         backend_probe=None,
         device_discovery={"candidates": []},
+        effective_secondary_routes=_effective_virtual_routes(available=available),
         secondary_device_controls={},
         is_off=False,
         _log_event=MagicMock(),
@@ -38,32 +52,9 @@ def _make_tray() -> SimpleNamespace:
     )
 
 
-def _patch_parent_availability(monkeypatch: pytest.MonkeyPatch, available: bool) -> None:
-    monkeypatch.setattr(
-        _menu_status_devices,
-        "iter_effective_secondary_routes",
-        lambda: (
-            tuple(
-                EffectiveSecondaryRoute(
-                    route=route,
-                    available=available,
-                    simulated=False,
-                    availability_source="test",
-                )
-                for route in iter_virtual_routes()
-            )
-            if available
-            else ()
-        ),
-    )
-
-
-def test_secondary_software_render_targets_include_virtual_routes_when_parent_available(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_secondary_software_render_targets_include_virtual_routes_when_parent_available() -> None:
     from src.tray.controllers.software_target_controller import secondary_software_render_targets
 
-    _patch_parent_availability(monkeypatch, True)
     tray = _make_tray()
 
     targets = secondary_software_render_targets(tray)
@@ -72,25 +63,19 @@ def test_secondary_software_render_targets_include_virtual_routes_when_parent_av
     assert keys == {"ite8258-chassis-logo", "ite8258-chassis-neon", "ite8258-chassis-vent"}
 
 
-def test_secondary_software_render_targets_exclude_virtual_routes_when_parent_unavailable(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_secondary_software_render_targets_exclude_virtual_routes_when_parent_unavailable() -> None:
     from src.tray.controllers.software_target_controller import secondary_software_render_targets
 
-    _patch_parent_availability(monkeypatch, False)
-    tray = _make_tray()
+    tray = _make_tray(available=False)
 
     targets = secondary_software_render_targets(tray)
 
     assert targets == []
 
 
-def test_software_effect_target_options_enable_all_mode_with_virtual_routes(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_software_effect_target_options_enable_all_mode_with_virtual_routes() -> None:
     from src.tray.controllers.software_target_controller import software_effect_target_options
 
-    _patch_parent_availability(monkeypatch, True)
     tray = _make_tray()
 
     options = software_effect_target_options(tray)
@@ -129,8 +114,6 @@ def test_restore_secondary_software_targets_applies_to_virtual_routes(monkeypatc
     from src.core import secondary_device_routes
     from src.tray.controllers import _software_target_auxiliary
     from src.tray.controllers.software_target_controller import restore_secondary_software_targets
-
-    _patch_parent_availability(monkeypatch, True)
 
     applied: list[tuple[str, str, tuple[int, ...], int]] = []
 

@@ -215,6 +215,7 @@ def test_software_render_batches_primary_and_all_chassis_zones_once() -> None:
     assert isinstance(keyboard, Ite8258ChassisKeyboardDevice)
 
     engine = SimpleNamespace(
+        backend_caps=SimpleNamespace(per_key=True),
         kb=keyboard,
         kb_lock=RLock(),
         brightness=25,

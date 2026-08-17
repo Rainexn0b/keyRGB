@@ -24,7 +24,12 @@ def apply_perkey_mode(
     reassert_user_mode: bool = True,
 ) -> None:
     # Local import avoids import cycle: helpers re-exports this module.
+    from src.core.backends.base import normalize_backend_capabilities
     from src.tray.controllers import _lighting_controller_helpers as helpers
+
+    if not normalize_backend_capabilities(tray.backend_caps).per_key:
+        apply_uniform_none_mode(tray, brightness_override=brightness_override)
+        return
 
     def _clear_hidden_restore_hints() -> None:
         clear_idle_power_state_field(
@@ -140,7 +145,11 @@ def restore_hidden_perkey_rows_from_recovery_hint(
     scene once so the firmware's first-keypress wake ramp targets current state.
     """
 
+    from src.core.backends.base import normalize_backend_capabilities
     from src.tray.controllers import _lighting_controller_helpers as helpers
+
+    if not normalize_backend_capabilities(tray.backend_caps).per_key:
+        return False
 
     known_brightness = read_idle_power_state_optional_int_field(
         tray,

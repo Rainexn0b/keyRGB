@@ -6,7 +6,7 @@ import pytest
 
 from src.core.secondary_device_routes import iter_virtual_routes
 from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.tray.ui import _menu_status_devices, menu_status
+from src.tray.ui import menu_status
 
 
 def _keyboard_only_entries(entries: list[dict]) -> list[dict]:
@@ -17,33 +17,26 @@ def _virtual_entries(entries: list[dict]) -> list[dict]:
     return [e for e in entries if e.get("device_type") in {"logo", "neon", "vent"}]
 
 
-def _patch_effective_virtual_routes(monkeypatch: pytest.MonkeyPatch, *, available: bool) -> None:
-    monkeypatch.setattr(
-        _menu_status_devices,
-        "iter_effective_secondary_routes",
-        lambda: (
-            tuple(
-                EffectiveSecondaryRoute(
-                    route=route,
-                    available=available,
-                    simulated=False,
-                    availability_source="test",
-                )
-                for route in iter_virtual_routes()
-            )
-            if available
-            else ()
-        ),
+def _effective_virtual_routes(*, available: bool) -> tuple[EffectiveSecondaryRoute, ...]:
+    if not available:
+        return ()
+    return tuple(
+        EffectiveSecondaryRoute(
+            route=route,
+            available=True,
+            simulated=False,
+            availability_source="test",
+        )
+        for route in iter_virtual_routes()
     )
 
 
-def test_device_context_entries_include_virtual_routes_when_parent_available(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_effective_virtual_routes(monkeypatch, available=True)
-
+def test_device_context_entries_include_virtual_routes_when_parent_available() -> None:
     tray = SimpleNamespace(
         backend=None,
         backend_probe=None,
         device_discovery={"candidates": []},
+        effective_secondary_routes=_effective_virtual_routes(available=True),
     )
 
     entries = menu_status.device_context_entries(tray)
@@ -64,13 +57,12 @@ def test_device_context_entries_include_virtual_routes_when_parent_available(mon
     assert {e["status"] for e in virtual} == {"supported"}
 
 
-def test_device_context_entries_exclude_virtual_routes_when_parent_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_effective_virtual_routes(monkeypatch, available=False)
-
+def test_device_context_entries_exclude_virtual_routes_when_parent_unavailable() -> None:
     tray = SimpleNamespace(
         backend=None,
         backend_probe=None,
         device_discovery={"candidates": []},
+        effective_secondary_routes=_effective_virtual_routes(available=False),
     )
 
     entries = menu_status.device_context_entries(tray)
@@ -79,13 +71,12 @@ def test_device_context_entries_exclude_virtual_routes_when_parent_unavailable(m
     assert len(_keyboard_only_entries(entries)) == 1
 
 
-def test_virtual_route_text_uses_display_name(monkeypatch: pytest.MonkeyPatch) -> None:
-    _patch_effective_virtual_routes(monkeypatch, available=True)
-
+def test_virtual_route_text_uses_display_name() -> None:
     tray = SimpleNamespace(
         backend=None,
         backend_probe=SimpleNamespace(identifiers={"usb_vid": "0x048d", "usb_pid": "0xc197"}),
         device_discovery={"candidates": []},
+        effective_secondary_routes=_effective_virtual_routes(available=True),
     )
 
     entries = menu_status.device_context_entries(tray)
@@ -101,10 +92,13 @@ def test_virtual_route_text_uses_display_name(monkeypatch: pytest.MonkeyPatch) -
 def test_simulation_context_entries_expose_all_registered_routes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KEYRGB_SIMULATE_SECONDARY_DEVICES", "1")
 
+    from src.core.secondary_device_runtime import iter_effective_secondary_routes
+
     tray = SimpleNamespace(
         backend=None,
         backend_probe=None,
         device_discovery={"candidates": []},
+        effective_secondary_routes=iter_effective_secondary_routes(),
     )
 
     entries = menu_status.device_context_entries(tray)

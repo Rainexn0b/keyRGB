@@ -55,10 +55,11 @@ def run_battery_saver_iteration(
     execute_plan_fn,
     sync_lid_fn,
     keyboard_is_power_event_forced_off_fn,
+    sleep_fn=None,
 ) -> bool:
     sync_lid_fn()
 
-    sleep = _manager_module().time.sleep
+    sleep = sleep_fn or _manager_module().time.sleep
     if manager._lid_closed and manager._flag("power_off_on_lid_close", True):
         sleep(poll_interval_s)
         return True

@@ -6,11 +6,15 @@ import logging
 from collections.abc import Callable
 from typing import Protocol
 
+logger = logging.getLogger(__name__)
+
 
 class _JoinableThreadProtocol(Protocol):
     def start(self) -> None: ...
 
     def join(self, timeout: float | None = None) -> None: ...
+
+    def is_alive(self) -> bool: ...
 
 
 class _ThreadFactoryProtocol(Protocol):
@@ -38,6 +42,21 @@ class _PowerMonitorManagerProtocol(Protocol):
     def _register_monitor_process(self, process: object) -> None: ...
 
     def _unregister_monitor_process(self, process: object) -> None: ...
+
+    def _terminate_monitor_process(self) -> None: ...
+
+
+class _PowerMonitorStopManagerProtocol(Protocol):
+    monitoring: bool
+
+    @property
+    def monitor_thread(self) -> _JoinableThreadProtocol | None: ...
+
+    @property
+    def _battery_thread(self) -> _JoinableThreadProtocol | None: ...
+
+    @property
+    def _lid_thread(self) -> _JoinableThreadProtocol | None: ...
 
     def _terminate_monitor_process(self) -> None: ...
 
@@ -93,17 +112,37 @@ def start_monitoring(manager: _PowerMonitorManagerProtocol, *, thread_factory: _
     manager._battery_thread.start()
 
 
-def stop_monitoring(manager: _PowerMonitorManagerProtocol, *, join_timeout_s: int) -> None:
-    """Stop monitoring and join worker threads best-effort."""
+def _join_monitor_thread(thread: _JoinableThreadProtocol | None, *, timeout_s: int) -> bool:
+    """Join one monitor worker and report whether it is confirmed stopped."""
+
+    if thread is None:
+        return True
+    try:
+        thread.join(timeout=timeout_s)
+    except (RuntimeError, TypeError):
+        logger.debug("Failed to join power-monitor worker during shutdown", exc_info=True)
+        return False
+    try:
+        return not bool(thread.is_alive())
+    except (AttributeError, RuntimeError, TypeError):
+        logger.debug("Failed to verify power-monitor worker shutdown", exc_info=True)
+        return False
+
+
+def stop_monitoring(manager: _PowerMonitorStopManagerProtocol, *, join_timeout_s: int) -> bool:
+    """Stop monitoring and report whether every worker is quiescent."""
 
     manager.monitoring = False
     manager._terminate_monitor_process()
-    if manager.monitor_thread:
-        manager.monitor_thread.join(timeout=join_timeout_s)
-    if manager._lid_thread:
-        manager._lid_thread.join(timeout=join_timeout_s)
-    if manager._battery_thread:
-        manager._battery_thread.join(timeout=join_timeout_s)
+    worker_states = (
+        _join_monitor_thread(manager.monitor_thread, timeout_s=join_timeout_s),
+        _join_monitor_thread(manager._lid_thread, timeout_s=join_timeout_s),
+        _join_monitor_thread(manager._battery_thread, timeout_s=join_timeout_s),
+    )
+    quiesced = all(worker_states)
+    if not quiesced:
+        logger.warning("Power monitoring workers remain active or unverifiable after shutdown")
+    return quiesced
 
 
 def run_monitor_loop(

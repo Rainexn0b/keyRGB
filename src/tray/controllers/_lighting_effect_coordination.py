@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from src.core.backends.base import normalize_backend_capabilities
 from src.core.effects.reactive import _render_brightness_support as _reactive_support
 from src.core.lighting_layers import resolve_render_effect
 from src.tray.idle_power_state import read_idle_power_state_bool_field
@@ -117,11 +118,16 @@ def _resolve_start_current_effect_policy(
     raw_effect = safe_str_attr_fn(tray.config, "effect", default="none") or "none"
     backend = getattr(tray, "backend", None)
     selected_effect = resolve_effect_name_for_backend_fn(raw_effect, backend)
+    caps = normalize_backend_capabilities(getattr(tray, "backend_caps", None))
+    if selected_effect == "perkey" and not caps.per_key:
+        selected_effect = "none"
     effect = resolve_render_effect(
         selected_effect=selected_effect,
         per_key_colors=getattr(tray.config, "per_key_colors", None),
         resolve_effect_name_fn=lambda effect_name: resolve_effect_name_for_backend_fn(effect_name, backend),
     )
+    if effect == "perkey" and not caps.per_key:
+        effect = "none"
     persist_effect = selected_effect if selected_effect != raw_effect else None
     start_plan = classify_start_current_effect_fn(tray, effect)
 

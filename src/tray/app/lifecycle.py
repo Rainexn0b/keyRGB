@@ -11,6 +11,7 @@ import logging
 import threading
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar, cast
 
+from ..controllers.runtime_coordination import run_tray_transition
 from ..pollers.config_polling import start_config_polling
 from ..pollers.hardware_polling import start_hardware_polling
 from ..pollers.icon_color_polling import start_icon_color_polling
@@ -29,7 +30,7 @@ if TYPE_CHECKING:
 class _MonitoringPowerManager(Protocol):
     def start_monitoring(self) -> None: ...
 
-    def stop_monitoring(self) -> None: ...
+    def stop_monitoring(self) -> bool | None: ...
 
 
 _PowerManagerT_co = TypeVar("_PowerManagerT_co", bound=_MonitoringPowerManager, covariant=True)
@@ -124,8 +125,8 @@ def start_all_polling(tray: _LifecyclePollingTray, *, ite_num_rows: int, ite_num
     _record_polling_thread(tray, start_time_scheduler_polling(tray))
 
 
-def stop_all_polling(tray: object, *, join_timeout_s: float = 2.0) -> None:
-    """Signal and join every poller before device teardown begins."""
+def stop_all_polling(tray: object, *, join_timeout_s: float = 2.0) -> bool:
+    """Signal and join every poller, returning whether all workers stopped."""
 
     event = vars(tray).get("_polling_shutdown_event")
     set_event = getattr(event, "set", None)
@@ -134,33 +135,74 @@ def stop_all_polling(tray: object, *, join_timeout_s: float = 2.0) -> None:
 
     threads = vars(tray).get("_polling_threads")
     if not isinstance(threads, list):
-        return
+        return True
+    unquiesced_threads: list[object] = []
     for thread in tuple(threads):
         join = getattr(thread, "join", None)
         if not callable(join):
+            unquiesced_threads.append(thread)
             continue
         try:
             join(timeout=max(0.0, float(join_timeout_s)))
         except (RuntimeError, TypeError):
+            unquiesced_threads.append(thread)
             logger.debug("Failed to join tray polling thread during shutdown", exc_info=True)
-    threads.clear()
+            continue
+
+        is_alive = getattr(thread, "is_alive", None)
+        if not callable(is_alive):
+            unquiesced_threads.append(thread)
+            continue
+        try:
+            if bool(is_alive()):
+                unquiesced_threads.append(thread)
+        except _SHUTDOWN_RECOVERABLE_ERRORS:
+            unquiesced_threads.append(thread)
+            logger.debug("Failed to verify tray polling thread shutdown", exc_info=True)
+
+    threads[:] = unquiesced_threads
+    if unquiesced_threads:
+        logger.warning(
+            "Tray shutdown still has %d active or unverifiable polling worker(s)",
+            len(unquiesced_threads),
+        )
+    return not unquiesced_threads
 
 
 def shutdown_tray_runtime_best_effort(tray: object) -> None:
     """Quiesce runtime producers and release devices in safe order."""
 
+    producers_quiesced = True
     try:
-        stop_all_polling(tray)
+        producers_quiesced = stop_all_polling(tray)
     except _SHUTDOWN_RECOVERABLE_ERRORS:
+        producers_quiesced = False
         logger.debug("Failed to stop tray pollers during shutdown", exc_info=True)
 
     power_manager = getattr(tray, "power_manager", None)
     stop_monitoring = getattr(power_manager, "stop_monitoring", None)
     if callable(stop_monitoring):
         try:
-            stop_monitoring()
+            if stop_monitoring() is False:
+                producers_quiesced = False
         except _SHUTDOWN_RECOVERABLE_ERRORS:
+            producers_quiesced = False
             logger.debug("Failed to stop power monitoring during shutdown", exc_info=True)
+
+    if not producers_quiesced:
+        logger.warning("Skipping effects engine teardown because runtime producers are still active")
+        return
+
+    coordinator = getattr(tray, "runtime_coordinator", None)
+    stop_and_drain = getattr(coordinator, "stop_and_drain", None)
+    if callable(stop_and_drain):
+        try:
+            if stop_and_drain(timeout_s=2.0) is False:
+                logger.warning("Skipping effects engine teardown because the runtime coordinator is still active")
+                return
+        except _SHUTDOWN_RECOVERABLE_ERRORS:
+            logger.debug("Failed to stop tray runtime coordinator during shutdown", exc_info=True)
+            return
 
     engine = getattr(tray, "engine", None)
     engine_close = getattr(engine, "close", None)
@@ -201,5 +243,8 @@ def maybe_autostart_effect(tray: _AutostartEffectTray) -> None:
     Assumes the tray has `config`, `is_off`, and `_start_current_effect`.
     """
 
-    if getattr(tray.config, "autostart", False) and not tray.is_off:
-        tray._start_current_effect()
+    def autostart_transition() -> None:
+        if getattr(tray.config, "autostart", False) and not tray.is_off:
+            tray._start_current_effect()
+
+    run_tray_transition(tray, autostart_transition)

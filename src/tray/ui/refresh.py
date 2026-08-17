@@ -10,17 +10,9 @@ from ..protocols import ensure_tray_icon_state
 from . import icon as icon_mod, menu as menu_mod, menu_sections
 
 
-class _ReloadableConfigProtocol(icon_mod.TrayIconConfig, Protocol):
-    def reload(self) -> None: ...
-
-
 class _IconRefreshTrayProtocol(Protocol):
     config: icon_mod.TrayIconConfig
     is_off: bool
-
-
-class _MenuRefreshTrayProtocol(Protocol):
-    config: _ReloadableConfigProtocol
 
 
 class _TrayIconImageSurfaceProtocol(Protocol):
@@ -33,10 +25,6 @@ class _TrayIconMenuSurfaceProtocol(Protocol):
 
 def _icon_refresh_tray(tray: object) -> _IconRefreshTrayProtocol:
     return cast(_IconRefreshTrayProtocol, tray)
-
-
-def _menu_refresh_tray(tray: object) -> _MenuRefreshTrayProtocol:
-    return cast(_MenuRefreshTrayProtocol, tray)
 
 
 def _icon_surface(icon: object | None) -> _TrayIconImageSurfaceProtocol | None:
@@ -105,6 +93,7 @@ def update_icon(tray: object, *, animate: bool = True) -> None:
         is_off=typed_tray.is_off,
         now=now,
         backend=getattr(tray, "backend", None),
+        engine=getattr(tray, "engine", None),
     )
 
     last = st.visual
@@ -152,8 +141,6 @@ def update_menu(tray: object) -> None:
     if tray_icon is None:
         return
 
-    typed_tray = _menu_refresh_tray(tray)
-    typed_tray.config.reload()
     pystray, item = _menu_runtime()
     tray_icon.menu = menu_mod.build_menu(tray, pystray=pystray, item=item)
 

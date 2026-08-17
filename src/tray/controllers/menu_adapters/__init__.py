@@ -3,7 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from typing import Protocol, cast
 
-from src.core.profile import profiles as core_profiles, runtime_activation as profile_runtime_activation
+from src.core.profile import profiles as core_profiles
+from src.tray.controllers.profile_activation import activate_perkey_profile
 
 __all__ = [
     "activate_perkey_profile",
@@ -50,14 +51,3 @@ def update_menu_if_present(tray: object) -> None:
     if not callable(update_menu):
         return
     cast(Callable[[], None], update_menu)()
-
-
-def activate_perkey_profile(tray: object, profile_name: str) -> None:
-    profile_runtime_activation.activate_perkey_profile_runtime(
-        cast(object, tray),
-        profile_name,
-        set_active_profile_fn=core_profiles.set_active_profile,
-        load_per_key_colors_fn=core_profiles.load_per_key_colors,
-        apply_profile_to_config_fn=core_profiles.apply_profile_to_config,
-        load_secondary_lighting_fn=core_profiles.load_secondary_lighting,
-    )

@@ -59,6 +59,76 @@ is not "missing dataclasses" but **remaining flag sprawl and private-attr reach*
 | `_permission_notice_sent` | Permission callback path | One-shot |
 | `_event_last_at` | Event debounce | Multi-cause throttle |
 
+### Serialized runtime transitions
+
+`TrayRuntimeCoordinator` in `src/tray/controllers/runtime_coordinator.py` is the
+single owner for low-frequency lighting transitions. Production creates it in
+prebootstrap and starts it before power workers and pollers.
+
+- Pystray callbacks, config apply, scheduler apply, idle actions, hardware
+  observation apply, power-source iterations and power-event controller calls
+  enter one FIFO command boundary.
+- Existing tray/controller facades remain synchronous. Nested facade calls on
+  the owner execute inline, avoiding self-deadlock and duplicate revisions.
+- A revision is assigned when each root command is accepted. Hardware, idle and
+  scheduler probes carry the revision captured before observation; stale results
+  are discarded. Delayed power restores also require both the latest power-event
+  generation and the active coordinator revision.
+- Config reload/classification that participates in a transition executes on the
+  owner. Sensor probing may remain outside when its result is revision-gated.
+- Icon/menu requests made during a command are coalesced and flushed by the
+  waiting caller after ownership is released. This prevents Xorg mainloop lock
+  inversion and preserves non-animated hardware refresh requests.
+- Menu rendering is read-only. It must not reload config, reconnect devices,
+  query OS power sysfs, probe secondary backends, or persist fallback state.
+  Power-mode and secondary-route labels come from
+  `src/tray/controllers/view_snapshots.py`.
+- High-frequency effect frames, render-local caches and backend-local I/O locks
+  remain outside this owner.
+
+Shutdown first stops pollers and power workers, then drains/verifies the
+coordinator, then closes the effects engine and secondary targets. Quit starts
+that sequence outside the pystray callback thread so native UI dispatch can
+finish while pollers are joining.
+
+### Pystray native-thread affinity
+
+KeyRGB owns **refresh preparation and facade routing**; pystray owns dispatch to
+its native event-loop thread. This distinction is part of the supported Linux
+adapter contract:
+
+- `Icon.run()` remains on the application main thread.
+- KeyRGB mutations of the pystray image and menu are centralized in
+  `src/tray/ui/refresh.py` and use only the public `Icon.icon` and `Icon.menu`
+  properties. Pollers request those facades and must not access the pystray
+  surface directly.
+- In pystray 0.19.5, the GTK/AppIndicator implementations schedule native work
+  with `GObject.idle_add`; the Xorg implementation rewrites update operations
+  into messages handled by its mainloop thread. Current upstream retains those
+  dispatch mechanisms.
+- Do not hold a KeyRGB lock while invoking a pystray public mutation: Xorg may
+  wait synchronously for its mainloop, so a callback taking the same lock can
+  deadlock. Do not add a second generic UI dispatcher unless a supported
+  backend is demonstrated to lack native dispatch.
+- Direct access to pystray private/native backend fields remains prohibited. If
+  a future backend changes this public-property contract, isolate that backend
+  behind a tray UI adapter and add backend-specific integration evidence.
+
+### Profile activation boundary
+
+Core profile activation (`src/core/profile/runtime_activation.py`) applies profile
+data to shared config through injected load/apply functions only. It does not
+resolve private tray methods or tray-owned attributes by name.
+
+Tray-owned runtime side effects are wired explicitly by callers:
+
+- menu activation uses `src/tray/controllers/profile_activation.py`
+- power-source profile switches supply duck-typed hooks from the tray object
+  without importing tray packages into core
+
+Order remains config apply first, then optional runtime lighting transition or
+effect start, then icon/menu refresh.
+
 ## Rules for new state
 
 1. Prefer extending `TrayIdlePowerState`, `TrayIconState`, or a new **named** bag
@@ -68,6 +138,8 @@ is not "missing dataclasses" but **remaining flag sprawl and private-attr reach*
 3. Do not import tray modules from `src/core` (architecture rule).
 4. Config apply classification stays pure (`ConfigApplyPlan`); execution stays in
    poller helpers.
+5. Core profile activation must accept explicit hooks; do not reintroduce private
+   tray method lookup from `src/core/profile/`.
 
 ## Write privileges
 
@@ -78,7 +150,7 @@ is not "missing dataclasses" but **remaining flag sprawl and private-attr reach*
 | `idle_forced_off` | Idle-power action executor | `is_system_forced_off` |
 | `dim_temp_active`, target | Screen-dim sync / idle-power actions | `is_dim_temp_active`, `dim_temp_target_brightness` |
 | `last_brightness` | Brightness layer and config/power restore paths | `read_last_brightness` |
-| `is_off` | Lighting controller and power transition orchestration | Controller protocol / explicit state |
+| `is_off` | Runtime coordinator through lighting/power/idle transitions | Controller protocol / explicit state |
 
 New code must not write the legacy private attributes directly. Writers should
 use `set_idle_power_state_field`, `set_last_brightness`, or a purpose-specific
@@ -117,6 +189,27 @@ external/test seams have migrated.
 2. Stop dual-writing instance attrs in helpers once production paths and
    remaining fakes are owner-only.
 3. Optionally drop legacy attributes from protocols once external seams are gone.
+
+## Shutdown liveness contract
+
+Tray pollers and power-monitor workers are runtime producers: they can still
+read effect state or reach hardware while shutting down. Their owner must
+therefore confirm worker liveness after every bounded join rather than treating
+the join timeout as proof that a worker exited.
+
+- `src/tray/app/lifecycle.py` owns the tray polling shutdown event and registered
+  poller handles. `stop_all_polling()` returns a quiescence result and retains
+  active or unverifiable handles so a later shutdown attempt can retry them.
+- `PowerManager.stop_monitoring()` returns the corresponding aggregate result
+  for its monitor, lid, and battery workers. A failed join does not prevent the
+  remaining workers from receiving their own bounded join.
+- `shutdown_tray_runtime_best_effort()` signals/stops both producer groups. If
+  either group remains active or cannot be verified, it leaves the effects
+  engine and secondary device cache open rather than racing worker activity
+  against device teardown.
+- A legacy/custom power manager returning `None` remains compatible and is
+  treated as having honored its synchronous stop contract. Implementations that
+  can time out should return an explicit boolean result.
 
 ## Related
 

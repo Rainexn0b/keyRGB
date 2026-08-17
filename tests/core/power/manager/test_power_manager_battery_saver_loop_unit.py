@@ -525,3 +525,56 @@ class TestPowerManagerBatterySaverLoop:
         assert mock_kb._last_power_source_transition_profile_name == "battery"
         mock_kb._update_icon.assert_called_once()
         mock_kb._update_menu.assert_not_called()
+
+    def test_power_source_iteration_cannot_finish_after_newer_serialized_transition(self):
+        import threading
+        import time
+
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+        from src.tray.controllers.runtime_coordination import run_tray_transition
+        from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+
+        class _Tray:
+            def __init__(self) -> None:
+                self.runtime_coordinator = TrayRuntimeCoordinator()
+                self.is_off = True
+
+            def run_runtime_transition(self, action):
+                return run_tray_transition(self, action)
+
+        tray = _Tray()
+        pm = PowerManager(tray, config=MagicMock())
+        iteration_started = threading.Event()
+        release_iteration = threading.Event()
+
+        def run_iteration(*_args, **_kwargs) -> bool:
+            iteration_started.set()
+            release_iteration.wait()
+            tray.is_off = False
+            return False
+
+        iteration = threading.Thread(target=lambda: pm._run_battery_saver_iteration(MagicMock(), poll_interval_s=0.0))
+        manual_off = threading.Thread(
+            target=lambda: run_tray_transition(tray, lambda: setattr(tray, "is_off", True)),
+        )
+
+        try:
+            with patch.object(manager_module._battery_saver, "run_battery_saver_iteration", side_effect=run_iteration):
+                iteration.start()
+                assert iteration_started.wait(timeout=1.0)
+                manual_off.start()
+                deadline = time.monotonic() + 1.0
+                while tray.runtime_coordinator.capture_revision() < 2 and time.monotonic() < deadline:
+                    threading.Event().wait(0.001)
+                assert tray.runtime_coordinator.capture_revision() >= 2
+                release_iteration.set()
+                iteration.join(timeout=1.0)
+                manual_off.join(timeout=1.0)
+        finally:
+            release_iteration.set()
+            assert tray.runtime_coordinator.stop_and_drain(timeout_s=1.0) is True
+
+        assert not iteration.is_alive()
+        assert not manual_off.is_alive()
+        assert tray.is_off is True

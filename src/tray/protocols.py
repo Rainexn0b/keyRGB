@@ -225,3 +225,5 @@ class LightingTrayProtocol(
     Protocol,
 ):
     """Minimal protocol for tray lighting controller functions."""
+
+    backend_caps: object | None
