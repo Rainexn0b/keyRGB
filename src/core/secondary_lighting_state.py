@@ -11,6 +11,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import TypeAlias, cast
 
+from src.core.config._lighting._coercion import normalize_secondary_brightness_value
 from src.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,
@@ -32,10 +33,7 @@ def normalize_color(value: object, default: RGB = (255, 0, 0)) -> RGB:
 
 
 def normalize_brightness(value: object, default: int = 25) -> int:
-    try:
-        return max(0, min(100, int(cast(int, value))))
-    except (TypeError, ValueError, OverflowError):
-        return max(0, min(100, int(default)))
+    return normalize_secondary_brightness_value(value, default=default)
 
 
 def normalize_enabled(value: object, default: bool) -> bool:

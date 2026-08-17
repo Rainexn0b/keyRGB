@@ -65,6 +65,17 @@ state interpretation but remain separate output paths.
 7. `src/core/secondary_lighting_state.py` owns interpretation of profile/config area
     state, including legacy brightness-to-enabled fallback. Runtime consumers must not
     duplicate those coercion rules.
+8. Brightness domain units stay separate:
+   - primary keyboard / power-source overrides: persisted `0..50` with 5-step snap
+     (`normalize_brightness_value`);
+   - reactive precise brightness: persisted `0..50` without snap
+     (`normalize_precise_brightness_value`);
+   - independent secondary-route brightness in profiles, config mirrors, and shared
+     state interpretation: persisted `0..100` without snap
+     (`normalize_secondary_brightness_value`).
+   Hardware backends may still clamp to device UI maxima (often `0..50`) at write
+   time; storage and interpretation must not re-apply the primary keyboard grid to
+   secondary independent values.
 
 ## Secondary scene authority
 

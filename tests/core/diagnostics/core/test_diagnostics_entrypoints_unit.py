@@ -76,10 +76,11 @@ def test_collect_diagnostics_filters_usb_targets_and_tolerates_power_mode_failur
 
     diagnostics = diagnostics_mod.collect_diagnostics(include_usb=True)
 
-    assert diagnostics.dmi == {"sys_vendor": "Tongfang"}
-    assert diagnostics.system == {"os": "linux"}
-    assert diagnostics.hints == {"platform_devices": ["platform-device"], "modules": ["tuxedo_keyboard"]}
-    assert list(diagnostics.usb_devices) == [{"node": "/dev/hidraw0"}]
+    payload = diagnostics.to_dict()
+    assert payload["dmi"] == {"sys_vendor": "Tongfang"}
+    assert payload["system"] == {"os": "linux"}
+    assert payload["hints"] == {"platform_devices": ["platform-device"], "modules": ["tuxedo_keyboard"]}
+    assert payload["usb_devices"] == [{"node": "/dev/hidraw0"}]
     assert captured_usb_targets == [(0x048D, 0xCE00)]
 
 

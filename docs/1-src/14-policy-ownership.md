@@ -45,3 +45,20 @@ truth and cannot drift back to historical paths.
 3. Keep firmware timing out of application policy where possible: classify the
    reported state instead of hardcoding a controller timeout.
 4. Add focused normalization/classification tests before wiring the consumer.
+
+## Config persistence errors
+
+`ConfigPersistenceError` is raised when a configuration write cannot be committed
+to disk:
+
+- ordinary property setters and profile-apply helpers call `Config._save()` and
+  raise on failure after restoring in-memory settings to the last successful
+  persisted snapshot;
+- `batch_update()` raises the same error class after rolling back the transaction
+  snapshot when the final write fails.
+
+Callers at long-running tray/GUI boundaries may treat `ConfigPersistenceError`
+(an `OSError` subclass) as a recoverable runtime failure and log/degrade, but
+they must not ignore it by discarding a boolean save result. Load-time coercion
+that best-effort rewrites on-disk shape may still swallow save callback failures
+after logging.

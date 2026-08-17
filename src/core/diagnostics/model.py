@@ -8,32 +8,43 @@ from typing import Any
 from src.core.config._settings_view import ConfigSettingsView
 
 
+def unfreeze_snapshot(value: object) -> object:
+    if isinstance(value, Mapping):
+        return {str(key): unfreeze_snapshot(item) for key, item in value.items()}
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return [unfreeze_snapshot(item) for item in value]
+    return value
+
+
+def freeze_snapshot(value: object) -> object:
+    """Return a detached deep-frozen copy of nested mappings and sequences."""
+
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): freeze_snapshot(item) for key, item in value.items()})
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+        return tuple(freeze_snapshot(item) for item in value)
+    return value
+
+
 def _readonly_settings(settings: ConfigSettingsView | Mapping[str, Any] | None) -> ConfigSettingsView:
-    if isinstance(settings, ConfigSettingsView):
-        return settings
-    return ConfigSettingsView.from_mapping(settings)
+    source = settings.to_dict() if isinstance(settings, ConfigSettingsView) else settings
+    frozen = freeze_snapshot(source if isinstance(source, Mapping) else {})
+    return ConfigSettingsView.from_mapping(frozen if isinstance(frozen, Mapping) else {})
 
 
 def _readonly_config_mapping(config: Mapping[str, Any] | None) -> Mapping[str, Any]:
-    if not isinstance(config, Mapping):
-        return MappingProxyType({})
-    if isinstance(config, dict):
-        return MappingProxyType(config)
-    return MappingProxyType(dict(config))
+    frozen = freeze_snapshot(config if isinstance(config, Mapping) else {})
+    return frozen if isinstance(frozen, Mapping) else MappingProxyType({})
 
 
 def _readonly_mapping(value: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Wrap a mapping in MappingProxyType for readonly access through the snapshot."""
-    if isinstance(value, MappingProxyType):
-        return value
-    return MappingProxyType(value)
+    frozen = freeze_snapshot(value)
+    return frozen if isinstance(frozen, Mapping) else MappingProxyType({})
 
 
 def _readonly_sequence(value: Sequence[Any]) -> tuple[Any, ...]:
-    """Convert a sequence to tuple for immutability."""
-    if isinstance(value, tuple):
-        return value
-    return tuple(value)
+    frozen = freeze_snapshot(value)
+    return frozen if isinstance(frozen, tuple) else (frozen,)
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,7 +71,7 @@ class DiagnosticsConfigSnapshot:
         if self.mtime is not None:
             payload["mtime"] = int(self.mtime)
         if self.settings:
-            payload["settings"] = self.settings_view().to_dict()
+            payload["settings"] = unfreeze_snapshot(self.settings_view().to_dict())
         if self.per_key_colors_count is not None:
             payload["per_key_colors_count"] = int(self.per_key_colors_count)
         if self.error is not None:
@@ -112,20 +123,20 @@ class Diagnostics:
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "dmi": dict(self.dmi),
-            "leds": list(self.leds),
-            "sysfs_leds": list(self.sysfs_leds),
-            "usb_ids": list(self.usb_ids),
-            "env": dict(self.env),
-            "virt": dict(self.virt),
-            "system": dict(self.system),
-            "hints": dict(self.hints),
-            "app": dict(self.app),
-            "power_supply": dict(self.power_supply),
-            "backends": dict(self.backends),
-            "usb_devices": list(self.usb_devices),
+            "dmi": unfreeze_snapshot(self.dmi),
+            "leds": unfreeze_snapshot(self.leds),
+            "sysfs_leds": unfreeze_snapshot(self.sysfs_leds),
+            "usb_ids": unfreeze_snapshot(self.usb_ids),
+            "env": unfreeze_snapshot(self.env),
+            "virt": unfreeze_snapshot(self.virt),
+            "system": unfreeze_snapshot(self.system),
+            "hints": unfreeze_snapshot(self.hints),
+            "app": unfreeze_snapshot(self.app),
+            "power_supply": unfreeze_snapshot(self.power_supply),
+            "backends": unfreeze_snapshot(self.backends),
+            "usb_devices": unfreeze_snapshot(self.usb_devices),
             "config": self.config.to_dict()
             if isinstance(self.config, DiagnosticsConfigSnapshot)
-            else dict(self.config),
-            "process": dict(self.process),
+            else unfreeze_snapshot(self.config),
+            "process": unfreeze_snapshot(self.process),
         }

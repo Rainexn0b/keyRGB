@@ -42,6 +42,24 @@ def _coerce_int(value: object, *, default: int = 0) -> int:
         return default
 
 
+def test_secondary_device_brightness_round_trip_keeps_non_grid_values() -> None:
+    cfg = _FakeConfig()
+
+    accessors.set_secondary_device_brightness(cfg, "lightbar", 75, compatibility_key="lightbar_brightness")
+    stored = accessors.get_secondary_device_brightness(
+        cfg,
+        "lightbar",
+        fallback_keys=("lightbar_brightness",),
+        default=0,
+        default_setting_fn=_default_setting,
+        coerce_int_setting_fn=_coerce_int,
+    )
+
+    assert stored == 75
+    assert cfg._settings["lightbar_brightness"] == 75
+    assert cfg._settings["secondary_device_state"] == {"lightbar": {"brightness": 75}}
+
+
 def test_set_secondary_device_brightness_preserves_existing_color_field() -> None:
     cfg = _FakeConfig(
         _settings={
@@ -57,7 +75,7 @@ def test_set_secondary_device_brightness_preserves_existing_color_field() -> Non
 
     assert cfg._settings["secondary_device_state"] == {
         "mouse": {
-            "brightness": 15,
+            "brightness": 17,
             "color": [1, 2, 3],
         }
     }
@@ -126,7 +144,8 @@ def test_get_secondary_device_brightness_falls_back_to_compatibility_key_then_no
         coerce_int_setting_fn=_coerce_int,
     )
 
-    assert brightness == 25
+    # Independent secondary brightness uses 0..100 without primary 5-step snap.
+    assert brightness == 23
 
 
 def test_get_secondary_device_enabled_prefers_explicit_state_over_legacy_brightness() -> None:

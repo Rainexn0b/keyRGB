@@ -120,9 +120,10 @@ def test_diagnostics_to_dict_preserves_shape_with_immutable_fields() -> None:
     assert isinstance(output["usb_ids"], list)
 
 
-def test_diagnostics_mapping_config_is_readonly_but_keeps_caller_mapping_values() -> None:
-    """Confirm that plain mapping config is readonly through snapshot but reflects caller mutations."""
-    config_mapping = {"backend": "auto", "effect": "wave"}
+def test_diagnostics_mapping_config_is_detached_and_deeply_readonly() -> None:
+    """Confirm that plain mapping config is detached and nested-readonly."""
+    nested = {"effect": "wave"}
+    config_mapping = {"backend": "auto", "nested": nested}
 
     diag = Diagnostics(
         dmi={},
@@ -141,13 +142,14 @@ def test_diagnostics_mapping_config_is_readonly_but_keeps_caller_mapping_values(
         process={},
     )
 
-    # Cannot mutate through the snapshot (wrapped in MappingProxyType).
     with pytest.raises(TypeError):
         diag.config["backend"] = "ite8291r3_perkey"  # type: ignore[index]
+    with pytest.raises(TypeError):
+        diag.config["nested"]["effect"] = "solid"  # type: ignore[index]
 
-    # But if caller still has the original reference and mutates it, snapshot reflects the change.
     config_mapping["backend"] = "ite8291r3_perkey"
-    assert diag.to_dict()["config"] == {"backend": "ite8291r3_perkey", "effect": "wave"}
+    nested["effect"] = "solid"
+    assert diag.to_dict()["config"] == {"backend": "auto", "nested": {"effect": "wave"}}
 
 
 def test_diagnostics_config_snapshot_is_immutable() -> None:

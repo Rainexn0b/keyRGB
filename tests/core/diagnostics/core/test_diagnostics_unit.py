@@ -62,8 +62,8 @@ def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch,
     # Backend diagnostics should include tier/provider/priority metadata.
     probes = diag.backends.get("probes")
     assert isinstance(probes, Sequence) and not isinstance(probes, str)
-    assert any(isinstance(p, dict) and p.get("name") == "sysfs-leds" for p in probes)
-    sysfs_probe = next(p for p in probes if isinstance(p, dict) and p.get("name") == "sysfs-leds")
+    assert any(isinstance(p, Mapping) and p.get("name") == "sysfs-leds" for p in probes)
+    sysfs_probe = next(p for p in probes if isinstance(p, Mapping) and p.get("name") == "sysfs-leds")
     assert sysfs_probe.get("tier") == 1
     assert sysfs_probe.get("provider") == "kernel-sysfs"
     assert isinstance(sysfs_probe.get("priority"), int)
@@ -150,6 +150,7 @@ def test_format_diagnostics_text_includes_backend_capabilities_dimensions_and_ma
                     "confidence": 83,
                     "reason": "hidraw device present (/dev/hidraw3)",
                     "capabilities": {
+                        "brightness": True,
                         "per_key": True,
                         "color": True,
                         "hardware_effects": True,
@@ -174,7 +175,7 @@ def test_format_diagnostics_text_includes_backend_capabilities_dimensions_and_ma
 
     text = format_diagnostics_text(diag)
 
-    assert "capabilities: per_key=True color=True hardware_effects=True palette=False" in text
+    assert "capabilities: brightness=True per_key=True color=True hardware_effects=True palette=False" in text
     assert "dimensions: rows=7 cols=20" in text
     assert "keyboard_matrix: cells=140 mapped_leds=101 sparse_holes=39" in text
 
@@ -231,7 +232,7 @@ def test_diagnostics_config_snapshot_wraps_settings_in_typed_settings_view() -> 
     assert snap.to_dict()["settings"] == {"brightness": "25", "effect": "wave"}
 
 
-def test_diagnostics_mapping_config_is_readonly_but_keeps_caller_mapping_values() -> None:
+def test_diagnostics_mapping_config_is_readonly_and_detached_from_caller() -> None:
     config_mapping = {"backend": "auto"}
 
     diag = Diagnostics(
@@ -255,7 +256,7 @@ def test_diagnostics_mapping_config_is_readonly_but_keeps_caller_mapping_values(
         diag.config["backend"] = "ite8291r3_perkey"  # type: ignore[index]
 
     config_mapping["backend"] = "ite8291r3_perkey"
-    assert diag.to_dict()["config"] == {"backend": "ite8291r3_perkey"}
+    assert diag.to_dict()["config"] == {"backend": "auto"}
 
 
 def test_format_empty_diagnostics() -> None:
@@ -566,8 +567,8 @@ def test_backend_probe_snapshot_logs_selection_boundary_failures(
     monkeypatch.setattr(backend_registry, "iter_backends", list)
     monkeypatch.setattr(
         backend_registry,
-        "select_backend",
-        lambda: (_ for _ in ()).throw(RuntimeError("selection failed")),
+        "build_backend_selection_report",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("selection failed")),
     )
 
     with caplog.at_level(logging.DEBUG, logger=collectors_backends.__name__):
@@ -585,6 +586,46 @@ def test_backend_probe_snapshot_logs_selection_boundary_failures(
     assert records[-1].exc_info is not None
 
 
+def test_backend_probe_snapshot_uses_registry_candidate_order_without_reprobing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import src.core.backends.registry as backend_registry
+    from src.core.backends.base import ProbeResult
+
+    probe_calls: list[str] = []
+
+    class Backend:
+        stability = "validated"
+
+        def __init__(self, name: str, priority: int, confidence: int) -> None:
+            self.name = name
+            self.priority = priority
+            self._confidence = confidence
+
+        def probe(self) -> ProbeResult:
+            probe_calls.append(self.name)
+            return ProbeResult(available=True, reason="test", confidence=self._confidence)
+
+    usb = Backend("ite8291r3_perkey", 100, 95)
+    sysfs = Backend("sysfs-leds", 10, 60)
+    monkeypatch.setattr(collectors_backends, "_selection_is_blocked_under_pytest", lambda: (False, None))
+    monkeypatch.setattr(collectors_backends, "build_backend_speed_probe_plans", lambda backends_snapshot: [])
+    monkeypatch.setattr(collectors_backends, "_iter_auxiliary_probe_backends", list)
+    monkeypatch.setattr(collectors_backends, "sysfs_led_candidates_snapshot", dict)
+    monkeypatch.setattr(collectors_backends, "sysfs_mouse_candidates_snapshot", dict)
+    monkeypatch.setattr(backend_registry, "iter_backends", lambda: [usb, sysfs])
+
+    snapshot = collectors_backends.backend_probe_snapshot()
+
+    assert snapshot["selected"] == "sysfs-leds"
+    assert [candidate["name"] for candidate in snapshot["candidates_sorted"]] == [
+        "sysfs-leds",
+        "ite8291r3_perkey",
+    ]
+    assert snapshot["selection"]["policy"] == "kernel/sysfs safety tier, then confidence, then priority"
+    assert probe_calls == ["ite8291r3_perkey", "sysfs-leds"]
+
+
 def test_backend_probe_snapshot_propagates_unexpected_selection_boundary_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -597,8 +638,8 @@ def test_backend_probe_snapshot_propagates_unexpected_selection_boundary_failure
     monkeypatch.setattr(backend_registry, "iter_backends", list)
     monkeypatch.setattr(
         backend_registry,
-        "select_backend",
-        lambda: (_ for _ in ()).throw(AssertionError("unexpected selection bug")),
+        "build_backend_selection_report",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("unexpected selection bug")),
     )
 
     with pytest.raises(AssertionError, match="unexpected selection bug"):
@@ -608,16 +649,23 @@ def test_backend_probe_snapshot_propagates_unexpected_selection_boundary_failure
 def test_iter_auxiliary_probe_backends_propagates_unexpected_registration_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    original_import = __import__
+    from src.core.backends.registry import BackendSpec
 
-    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name.endswith("sysfs_mouse.backend"):
-            raise AssertionError("unexpected auxiliary import bug")
-        return original_import(name, globals, locals, fromlist, level)
+    def boom() -> object:
+        raise AssertionError("unexpected auxiliary factory bug")
 
-    monkeypatch.setattr("builtins.__import__", fake_import)
+    monkeypatch.setattr(
+        "src.core.backends.registry.iter_auxiliary_specs",
+        lambda: [
+            BackendSpec(
+                name="sysfs-mouse",
+                priority=10,
+                factory=boom,
+            )
+        ],
+    )
 
-    with pytest.raises(AssertionError, match="unexpected auxiliary import bug"):
+    with pytest.raises(AssertionError, match="unexpected auxiliary factory bug"):
         collectors_backends._iter_auxiliary_probe_backends()
 
 

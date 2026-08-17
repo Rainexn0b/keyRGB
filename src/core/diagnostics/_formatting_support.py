@@ -298,11 +298,11 @@ def _collect_candidate_usb_ids(*, usb_ids: object, usb_devices: object) -> list[
             if norm in {"048d:8910", "048d:8911"} and norm not in seen_candidate_usb_ids:
                 seen_candidate_usb_ids.append(norm)
 
-    if seen_candidate_usb_ids or not isinstance(usb_devices, list):
+    if seen_candidate_usb_ids or not isinstance(usb_devices, Sequence) or isinstance(usb_devices, str):
         return seen_candidate_usb_ids
 
     for dev in usb_devices:
-        if not isinstance(dev, dict):
+        if not isinstance(dev, Mapping):
             continue
         vid_i = parse_hex_int(str(dev.get("idVendor") or ""))
         pid_i = parse_hex_int(str(dev.get("idProduct") or ""))
@@ -318,7 +318,7 @@ def _read_sysfs_backend_probe(probes: list[object]) -> tuple[bool, str]:
     sysfs_reason = ""
     sysfs_available = False
     for probe in probes:
-        if not isinstance(probe, dict):
+        if not isinstance(probe, Mapping):
             continue
         if str(probe.get("name") or "").strip().lower() != "sysfs-leds":
             continue

@@ -6,7 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, cast
 
-from ._coercion import normalize_rgb_triplet
+from ._coercion import normalize_rgb_triplet, normalize_secondary_brightness_value
 
 RgbTriplet = tuple[int, int, int]
 _MISSING = object()
@@ -32,9 +32,6 @@ class SecondaryDeviceAccessorConfig(Protocol):
     DEFAULTS: object
 
     def _save(self) -> None: ...
-
-    @staticmethod
-    def _normalize_brightness_value(value: int) -> int: ...
 
 
 @dataclass
@@ -175,7 +172,10 @@ def get_secondary_device_brightness(
         default_setting_fn=default_setting_fn,
         getter=_SecondaryDeviceEntry.brightness,
     )
-    return config._normalize_brightness_value(coerce_int_setting_fn(raw_value, default=default))
+    return normalize_secondary_brightness_value(
+        coerce_int_setting_fn(raw_value, default=default),
+        default=default,
+    )
 
 
 def _normalize_secondary_enabled(value: object) -> bool | None:
@@ -253,7 +253,7 @@ def set_secondary_device_brightness(
     compatibility_key: str | None = None,
 ) -> None:
     normalized_key = normalize_secondary_state_key(state_key)
-    brightness = config._normalize_brightness_value(value)
+    brightness = normalize_secondary_brightness_value(value)
     state = _SecondaryDeviceStateBoundary.from_config(config)
     entry = state.entry(normalized_key)
     entry.set_brightness(brightness)

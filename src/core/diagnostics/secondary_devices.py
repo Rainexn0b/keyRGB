@@ -1,22 +1,96 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Mapping
 from typing import Any
 
 from src.core import secondary_lighting_state
 from src.core.backends.policies.backend_selection import experimental_backends_enabled
+from src.core.diagnostics.model import freeze_snapshot
 from src.core.secondary_device_routes import iter_secondary_routes
 from src.core.secondary_device_runtime import EffectiveSecondaryRoute, iter_effective_secondary_routes
 
 _READ_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+logger = logging.getLogger(__name__)
+
+
+class ReadonlyDiagnosticsConfig:
+    """Detached read-only config view for diagnostics. Never persists."""
+
+    def __init__(self, settings: Mapping[str, object]) -> None:
+        self._settings = dict(settings)
+        self.tray_device_context = str(self._settings.get("tray_device_context") or "keyboard")
+        self.software_effect_target = str(self._settings.get("software_effect_target") or "keyboard")
+        self.brightness = self._settings.get("brightness", 0)
+
+    def _state_entry(self, state_key: object) -> Mapping[str, object]:
+        raw_state = self._settings.get("secondary_device_state")
+        if not isinstance(raw_state, Mapping):
+            return {}
+        entry = raw_state.get(str(state_key or "").strip().lower())
+        return entry if isinstance(entry, Mapping) else {}
+
+    def _fallback_value(self, fallback_keys: tuple[str, ...], default: object) -> object:
+        for key in fallback_keys:
+            if key in self._settings:
+                return self._settings[key]
+        return default
+
+    def get_secondary_device_brightness(
+        self,
+        state_key: object,
+        *,
+        fallback_keys: tuple[str, ...] = (),
+        default: object = 0,
+    ) -> object:
+        entry = self._state_entry(state_key)
+        if "brightness" in entry:
+            return entry["brightness"]
+        return self._fallback_value(fallback_keys, default)
+
+    def get_secondary_device_enabled(
+        self,
+        state_key: object,
+        *,
+        fallback_keys: tuple[str, ...] = (),
+        default: object = False,
+    ) -> object:
+        entry = self._state_entry(state_key)
+        if "enabled" in entry:
+            return entry["enabled"]
+        return self._fallback_value(fallback_keys, default)
+
+    def get_secondary_device_color(
+        self,
+        state_key: object,
+        *,
+        fallback_keys: tuple[str, ...] = (),
+        default: object = (255, 0, 0),
+    ) -> object:
+        entry = self._state_entry(state_key)
+        if "color" in entry:
+            return entry["color"]
+        return self._fallback_value(fallback_keys, default)
 
 
 def _load_config() -> object | None:
     try:
-        from src.core.config import Config
+        from src.core.config.defaults import DEFAULTS
+        from src.core.config.file_storage import load_config_settings
+        from src.core.config.paths import config_file_path
 
-        return Config()
+        loaded = load_config_settings(
+            config_file=config_file_path(),
+            defaults=DEFAULTS,
+            retries=1,
+            retry_delay=0.0,
+            logger=logger,
+        )
     except _READ_ERRORS:
         return None
+    if not isinstance(loaded, Mapping):
+        return None
+    return ReadonlyDiagnosticsConfig(loaded)
 
 
 def _config_value(config: object | None, attr: str, default: object = None) -> object:
@@ -144,13 +218,14 @@ def _secondary_device_state(config: object | None) -> dict[str, Any]:
     return state
 
 
-def secondary_devices_snapshot(candidates: list[dict[str, Any]] | None) -> dict[str, Any]:
+def secondary_devices_snapshot(candidates: list[dict[str, Any]] | None) -> Mapping[str, Any]:
     """Build a read-only snapshot of secondary/auxiliary device state.
 
     Captures everything needed to confirm, from a support bundle, whether
     auxiliary lighting devices (e.g. Legion Gen10 logo/neon/vent chassis zones)
     are detected, whether the tray would surface controls for them, and why not
-    if a zone's parent backend is unavailable. No devices are opened.
+    if a zone's parent backend is unavailable. No devices are opened and no
+    mutable ``Config`` instance is constructed.
     """
     config = _load_config()
 
@@ -165,7 +240,7 @@ def secondary_devices_snapshot(candidates: list[dict[str, Any]] | None) -> dict[
         bool(route.get("available")) and bool(route.get("supports_software_target")) for route in effective_routes
     )
 
-    return {
+    snapshot = {
         "experimental_backends_enabled": bool(experimental_backends_enabled()),
         "selected_device_context": str(_config_value(config, "tray_device_context", "keyboard") or "keyboard"),
         "software_effect_target": {
@@ -179,6 +254,8 @@ def secondary_devices_snapshot(candidates: list[dict[str, Any]] | None) -> dict[
         "expected_profile_editor_rows": expected_editor_rows,
         "secondary_device_state": _secondary_device_state(config),
     }
+    frozen = freeze_snapshot(snapshot)
+    return frozen if isinstance(frozen, Mapping) else snapshot
 
 
-__all__ = ["secondary_devices_snapshot"]
+__all__ = ["ReadonlyDiagnosticsConfig", "secondary_devices_snapshot"]

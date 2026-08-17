@@ -56,12 +56,34 @@ still resolve to matrix cells in the final render path.
 Backends report matrix dimensions and hardware capabilities. Physical layout
 selection belongs to the shared keyboard reference model and setup flow.
 
+5. Effect-grid geometry is owned by the effects engine.
+
+Physical slot IDs still resolve to matrix cells, but the live software/reactive
+frame matrix comes from `EffectsEngine.effect_geometry`:
+
+- per-key backends supply rows/cols through `dimensions()`;
+- non-per-key backends keep the reference matrix and reduce to uniform output;
+- tray `_ite_rows/_ite_cols` and icon mosaics read that same owner;
+- out-of-range profile cells are ignored rather than rewritten on disk.
+
+See `src/core/effects/matrix_layout.py` and the engine geometry snapshot.
+
 ## Affected UX surfaces
 
 - Keyboard Setup physical layout selection
 - Keymap calibrator selection and assignment
 - Per-key editor hit testing and overlay tweaks
 - Reactive input fan-out from logical key to mapped cells
+
+## Packaged resource data
+
+Starter defaults and layout specs live under `src/core/resources/` as nested JSON
+(including `reference_defaults_specs/` and `per_key_tweaks/`). Wheels must ship
+the full tree: `[tool.setuptools.package-data]` uses recursive `**/*.json` (and
+`**/*.png`) globs under the `src` package. Editable installs hide packaging gaps
+because they read the checkout; CI and
+`tests/core/resources/test_packaged_resources_unit.py` build/install a real wheel
+and load the ANSI reference defaults to catch omissions.
 
 ## Test strategy
 

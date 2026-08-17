@@ -12,9 +12,12 @@ from src.core.config._lighting._coercion import (
     normalize_brightness_value,
     normalize_precise_brightness_value,
     normalize_rgb_triplet,
+    normalize_secondary_brightness_value,
     normalize_trail_percent_value,
 )
 from src.core.config._lighting._props import bool_prop, enum_prop, int_prop, optional_brightness_prop
+from src.core.profile._profile_storage_payloads import normalize_secondary_lighting
+from src.core.secondary_lighting_state import normalize_brightness as shared_secondary_normalize_brightness
 
 
 def test_normalize_brightness_value_handles_invalid_zero_and_low_nonzero_values() -> None:
@@ -29,6 +32,45 @@ def test_normalize_precise_brightness_value_preserves_nonzero_single_steps() -> 
     assert normalize_precise_brightness_value(1) == 1
     assert normalize_precise_brightness_value(42) == 42
     assert normalize_precise_brightness_value(99) == 50
+
+
+def test_normalize_secondary_brightness_value_uses_0_100_without_primary_snap() -> None:
+    assert normalize_secondary_brightness_value(object()) == 25
+    assert normalize_secondary_brightness_value(object(), default=7) == 7
+    assert normalize_secondary_brightness_value(-3) == 0
+    assert normalize_secondary_brightness_value(0) == 0
+    assert normalize_secondary_brightness_value(1) == 1
+    assert normalize_secondary_brightness_value(17) == 17
+    assert normalize_secondary_brightness_value(75) == 75
+    assert normalize_secondary_brightness_value(100) == 100
+    assert normalize_secondary_brightness_value(140) == 100
+
+
+def test_primary_and_secondary_brightness_domain_units_stay_distinct() -> None:
+    # Primary keyboard brightness remains the 0..50, 5-step hardware grid.
+    assert normalize_brightness_value(17) == 15
+    assert normalize_brightness_value(75) == 50
+    # Independent secondary brightness keeps single-step 0..100 storage units.
+    assert normalize_secondary_brightness_value(17) == 17
+    assert normalize_secondary_brightness_value(75) == 75
+
+
+def test_secondary_brightness_normalizers_agree_across_config_profile_and_state() -> None:
+    samples = (-1, 0, 1, 17, 50, 75, 100, 140, "bad")
+    for sample in samples:
+        expected = normalize_secondary_brightness_value(sample if sample != "bad" else object())
+        if sample == "bad":
+            assert shared_secondary_normalize_brightness(object()) == expected
+            continue
+        assert shared_secondary_normalize_brightness(sample) == expected
+        payload = normalize_secondary_lighting(
+            {"version": 1, "areas": {"lightbar": {"brightness": sample}}},
+        )
+        areas = payload["areas"]
+        assert isinstance(areas, dict)
+        entry = areas["lightbar"]
+        assert isinstance(entry, dict)
+        assert entry["brightness"] == expected
 
 
 def test_normalize_trail_percent_value_clamps_and_defaults() -> None:

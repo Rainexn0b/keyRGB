@@ -2,29 +2,36 @@
 
 from __future__ import annotations
 
-# @quality-exception file-size-analysis: Config facade class; lighting accessors already live under config/_lighting/
+# @quality-exception file-size-analysis: Config facade class; domain accessors live in sibling modules
 import logging
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from copy import deepcopy
 from typing import Any, Literal, overload
 
-from src.core.effects import software_targets as _software_targets
-
 from . import defaults as _defaults, file_storage as _file_storage, paths as _paths, perkey_colors as _perkey_colors
+from ._app_accessors import AppConfigAccessors
 from ._lighting import (
     _coercion as _lighting_coercion,
     _effect_speed_overrides as _effect_speed_boundary,
     _lighting_accessors,
-    _props as _lighting_props,
 )
+from ._power_accessors import PowerConfigAccessors
+from ._scheduler_accessors import SchedulerConfigAccessors
 from ._settings_view import ConfigSettingsView
+from .document import ConfigDocument
+from .domains import ConfigDomain
 
 logger = logging.getLogger(__name__)
 
 
 class ConfigPersistenceError(OSError):
-    """Raised when an explicitly transactional configuration update cannot persist."""
+    """Raised when configuration changes cannot be persisted to disk.
+
+    Ordinary property setters and ``batch_update()`` both surface this error.
+    Failed ordinary saves restore in-memory settings to the last persisted
+    snapshot so callers do not keep a silently divergent dirty view.
+    """
 
 
 def _normalized_optional_string(value: object) -> str | None:
@@ -34,8 +41,19 @@ def _normalized_optional_string(value: object) -> str | None:
     return normalized or None
 
 
-class Config(_lighting_accessors.LightingConfigAccessors):
-    """Configuration manager for KeyRGB."""
+class Config(
+    AppConfigAccessors,
+    SchedulerConfigAccessors,
+    PowerConfigAccessors,
+    _lighting_accessors.LightingConfigAccessors,
+):
+    """Configuration manager for KeyRGB.
+
+    Public property facades stay stable. Internally, settings live in a
+    ``ConfigDocument`` whose keys are partitioned by ``ConfigDomain`` so lighting,
+    power, idle/display, scheduler, layout, secondary, and app concerns are not
+    one undifferentiated bag. On-disk JSON remains a flat mapping.
+    """
 
     # Kept for backward compatibility with existing callers.
     CONFIG_DIR = _paths.config_dir()
@@ -59,7 +77,8 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         self.CONFIG_FILE = _paths.config_file_path()
         self.CONFIG_DIR.mkdir(parents=True, exist_ok=True)
         loaded = self._load()
-        self._settings: dict[str, Any] = loaded if loaded is not None else deepcopy(self.DEFAULTS)
+        initial = loaded if loaded is not None else deepcopy(self.DEFAULTS)
+        self._document = ConfigDocument.from_mapping(initial)
         self._persisted_settings: dict[str, Any] = deepcopy(self._settings)
         self._save_defer_depth = 0
         self._save_pending = False
@@ -72,6 +91,16 @@ class Config(_lighting_accessors.LightingConfigAccessors):
             self._last_reload_mtime_ns: int | None = self.CONFIG_FILE.stat().st_mtime_ns
         except OSError:
             self._last_reload_mtime_ns = None
+
+    @property
+    def _settings(self) -> dict[str, Any]:
+        """Live flat settings mapping (compat surface for accessors and tests)."""
+
+        return self._document.values
+
+    @_settings.setter
+    def _settings(self, value: dict[str, Any]) -> None:
+        self._document.replace(value)
 
     def _load(self, *, retries: int = 3, retry_delay: float = 0.02) -> dict[str, Any] | None:
         """Load settings from file.
@@ -112,7 +141,23 @@ class Config(_lighting_accessors.LightingConfigAccessors):
             self._last_reload_mtime_ns = mtime_ns
 
     def _save(self) -> None:
-        self._persist_changes()
+        """Persist outstanding in-memory changes or raise ``ConfigPersistenceError``.
+
+        While ``batch_update()`` is active, this only marks the transaction dirty.
+        Outside a batch, a failed write restores settings from the last successful
+        persisted snapshot before raising so ordinary setters cannot leave a
+        silently divergent dirty view.
+        """
+
+        if self._save_defer_depth > 0:
+            self._persist_changes()
+            return
+
+        if self._persist_changes():
+            return
+
+        self._settings = deepcopy(self._persisted_settings)
+        raise ConfigPersistenceError("Could not persist configuration")
 
     def _persist_changes(self) -> bool:
         if self._save_defer_depth > 0:
@@ -170,6 +215,8 @@ class Config(_lighting_accessors.LightingConfigAccessors):
                 if should_save and not self._persist_changes():
                     if snapshot is not None:
                         self._settings = snapshot
+                    else:
+                        self._settings = deepcopy(self._persisted_settings)
                     raise ConfigPersistenceError("Could not persist configuration transaction")
 
     def apply_perkey_profile_state(
@@ -240,7 +287,7 @@ class Config(_lighting_accessors.LightingConfigAccessors):
                         merged[field] = [max(0, min(255, int(channel))) for channel in value]
                 elif field == "brightness":
                     if isinstance(value, (int, float)):
-                        merged[field] = max(0, min(100, int(value)))
+                        merged[field] = _lighting_coercion.normalize_secondary_brightness_value(value)
                 else:
                     merged[str(field)] = value
             state[key] = merged
@@ -270,6 +317,22 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         """Return a readonly typed snapshot view of current settings."""
 
         return ConfigSettingsView.from_mapping(self._settings)
+
+    def document(self) -> ConfigDocument:
+        """Return the live domain-aware settings document."""
+
+        return self._document
+
+    def domain_view(self, domain: ConfigDomain | str) -> Mapping[str, object]:
+        """Readonly projection of one config domain's present keys."""
+
+        resolved = domain if isinstance(domain, ConfigDomain) else ConfigDomain(str(domain))
+        return self._document.section(resolved)
+
+    def extras_view(self) -> Mapping[str, object]:
+        """Readonly projection of unknown keys retained for forward compatibility."""
+
+        return self._document.extras()
 
     @overload
     def _get_required_scalar(self, key: Literal["effect"]) -> str: ...
@@ -370,84 +433,3 @@ class Config(_lighting_accessors.LightingConfigAccessors):
         overrides = self._ensure_effect_speed_overrides()
         overrides.assign(effect_name, self._normalize_effect_speed(speed, default=0))
         self._save()
-
-    # ---- common boolean/int settings
-
-    autostart = _lighting_props.bool_prop("autostart", default=True)
-    experimental_backends_enabled = _lighting_props.bool_prop("experimental_backends_enabled", default=False)
-    os_autostart = _lighting_props.bool_prop("os_autostart", default=False)
-    power_management_enabled = _lighting_props.bool_prop("power_management_enabled", default=True)
-    power_off_on_suspend = _lighting_props.bool_prop("power_off_on_suspend", default=True)
-    power_off_on_lid_close = _lighting_props.bool_prop("power_off_on_lid_close", default=True)
-    power_restore_on_resume = _lighting_props.bool_prop("power_restore_on_resume", default=True)
-    power_restore_on_lid_open = _lighting_props.bool_prop("power_restore_on_lid_open", default=True)
-    system_power_extreme_cap_khz = _lighting_props.int_prop(
-        "system_power_extreme_cap_khz",
-        default=800000,
-        min_v=400000,
-        max_v=5000000,
-    )
-
-    # Battery saver (legacy)
-    battery_saver_enabled = _lighting_props.bool_prop("battery_saver_enabled", default=False)
-    battery_saver_brightness = _lighting_props.int_prop("battery_saver_brightness", default=25, min_v=0, max_v=50)
-
-    # Power-source lighting and optional power-mode selection
-    ac_lighting_enabled = _lighting_props.bool_prop("ac_lighting_enabled", default=True)
-    battery_lighting_enabled = _lighting_props.bool_prop("battery_lighting_enabled", default=True)
-    ac_power_mode = _lighting_props.optional_str_prop("ac_power_mode")
-    battery_power_mode = _lighting_props.optional_str_prop("battery_power_mode")
-    ac_perkey_profile_name = _lighting_props.optional_str_prop("ac_perkey_profile_name")
-    battery_perkey_profile_name = _lighting_props.optional_str_prop("battery_perkey_profile_name")
-
-    # ---- power-source lighting brightness overrides (optional)
-
-    ac_lighting_brightness = _lighting_props.optional_brightness_prop("ac_lighting_brightness")
-    battery_lighting_brightness = _lighting_props.optional_brightness_prop("battery_lighting_brightness")
-
-    # ---- screen dim sync
-
-    screen_dim_sync_enabled = _lighting_props.bool_prop("screen_dim_sync_enabled", default=True)
-    # Respect the ITE controller's own ~10-minute keyboard-input sleep timeout
-    # as a valid off state (deck stays dark, wakes on new input) instead of
-    # force re-lighting it via the hidden stable-zero recovery.
-    controller_sleep_respect = _lighting_props.bool_prop("controller_sleep_respect", default=False)
-    screen_dim_sync_mode = _lighting_props.enum_prop("screen_dim_sync_mode", default="off", allowed=("off", "temp"))
-    # Temp brightness is intended to be non-zero; allow 1..50.
-    screen_dim_temp_brightness = _lighting_props.int_prop(
-        "screen_dim_temp_brightness",
-        default=5,
-        min_v=1,
-        max_v=50,
-    )
-    idle_dim_debounce_enter_polls = _lighting_props.int_prop(
-        "idle_dim_debounce_enter_polls", default=6, min_v=1, max_v=60
-    )
-    idle_dim_debounce_exit_polls = _lighting_props.int_prop(
-        "idle_dim_debounce_exit_polls", default=10, min_v=1, max_v=60
-    )
-    # Fade duration (seconds) for idle/power dim, turn-off, and restore ramps.
-    idle_fade_duration_s = _lighting_props.float_prop("idle_fade_duration_s", default=0.6, min_v=0.1, max_v=3.0)
-
-    # ---- time-of-day brightness scheduler
-
-    time_scheduler_enabled = _lighting_props.bool_prop("time_scheduler_enabled", default=False)
-    day_start_time = _lighting_props.str_prop("day_start_time", default="08:00")
-    night_start_time = _lighting_props.str_prop("night_start_time", default="20:00")
-    day_base_brightness = _lighting_props.int_prop("day_base_brightness", default=40, min_v=0, max_v=50)
-    day_reactive_brightness = _lighting_props.int_prop("day_reactive_brightness", default=50, min_v=0, max_v=50)
-    night_base_brightness = _lighting_props.int_prop("night_base_brightness", default=20, min_v=0, max_v=50)
-    night_reactive_brightness = _lighting_props.int_prop("night_reactive_brightness", default=50, min_v=0, max_v=50)
-
-    # Physical keyboard layout for the per-key editor / calibrator overlay.
-    physical_layout = _lighting_props.enum_prop(
-        "physical_layout",
-        default="auto",
-        allowed=("auto", "ansi", "iso", "ks", "abnt", "jis"),
-    )
-
-    software_effect_target = _lighting_props.enum_prop(
-        "software_effect_target",
-        default="keyboard",
-        allowed=_software_targets.SOFTWARE_EFFECT_TARGETS,
-    )

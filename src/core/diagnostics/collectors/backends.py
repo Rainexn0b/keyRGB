@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 
 _BACKEND_METADATA_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 _IDENTIFIER_NORMALIZATION_ERRORS = (AttributeError, TypeError, ValueError)
-_SORT_VALUE_ERRORS = (OverflowError, RuntimeError, TypeError, ValueError)
 _BACKEND_PROBE_ERRORS = (AttributeError, ImportError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
@@ -29,16 +28,20 @@ def _log_snapshot_boundary(message: str, exc: Exception) -> None:
     logger.log(logging.DEBUG, message, exc_info=(type(exc), exc, exc.__traceback__))
 
 
-def _coerce_sort_value(value: object) -> int:
-    if value is None:
-        return 0
+def _metadata_for_backend_name(name: str):
     try:
-        return int(value)  # type: ignore[call-overload]
-    except _SORT_VALUE_ERRORS:
-        return 0
+        from ...backends.registry import get_metadata_for_backend_name
+
+        return get_metadata_for_backend_name(name)
+    except _BACKEND_PROBE_ERRORS as exc:
+        _log_snapshot_boundary("Failed to resolve backend metadata during diagnostics collection", exc)
+        return None
 
 
 def _tier_for_backend_name(name: str) -> int | None:
+    metadata = _metadata_for_backend_name(name)
+    if metadata is not None:
+        return metadata.diagnostics_tier()
     normalized = (name or "").strip().lower()
     if normalized == "sysfs-leds":
         return 1
@@ -50,6 +53,9 @@ def _tier_for_backend_name(name: str) -> int | None:
 
 
 def _provider_for_backend_name(name: str) -> str | None:
+    metadata = _metadata_for_backend_name(name)
+    if metadata is not None:
+        return metadata.provider
     normalized = (name or "").strip().lower()
     if normalized == "sysfs-leds":
         return "kernel-sysfs"
@@ -71,7 +77,7 @@ def _capabilities_for_backend(backend: object) -> dict[str, bool] | None:
         return None
 
     out: dict[str, bool] = {}
-    for name in ("per_key", "color", "hardware_effects", "palette"):
+    for name in ("brightness", "per_key", "color", "hardware_effects", "palette"):
         try:
             out[name] = bool(getattr(capabilities, name))
         except _BACKEND_METADATA_ERRORS:
@@ -127,20 +133,32 @@ def _disable_usb_scan_under_pytest_if_needed() -> Iterator[None]:
                 os.environ["KEYRGB_DISABLE_USB_SCAN"] = restore_disable_usb_scan
 
 
-def _probe_backend(backend: object) -> dict[str, Any]:
+def _probe_backend(
+    backend: object,
+    *,
+    probe_result: object | None = None,
+    selection_result: tuple[bool, str | None] | None = None,
+) -> dict[str, Any]:
     try:
-        probe_fn = getattr(backend, "probe", None)
-        if callable(probe_fn):
-            result = probe_fn()
+        if probe_result is not None:
+            result = probe_result
             available = bool(getattr(result, "available", False))
             reason = str(getattr(result, "reason", ""))
             confidence = safe_int_attr(result, "confidence", default=0)
             identifiers = getattr(result, "identifiers", None)
         else:
-            available = bool(getattr(backend, "is_available")())  # noqa: B009 - backend capability is duck-typed
-            reason = "is_available"
-            confidence = 50 if available else 0
-            identifiers = None
+            probe_fn = getattr(backend, "probe", None)
+            if callable(probe_fn):
+                result = probe_fn()
+                available = bool(getattr(result, "available", False))
+                reason = str(getattr(result, "reason", ""))
+                confidence = safe_int_attr(result, "confidence", default=0)
+                identifiers = getattr(result, "identifiers", None)
+            else:
+                available = bool(getattr(backend, "is_available")())  # noqa: B009 - backend is duck-typed
+                reason = "is_available"
+                confidence = 50 if available else 0
+                identifiers = None
     except _BACKEND_PROBE_ERRORS as exc:
         _log_snapshot_boundary("Failed to probe backend during diagnostics collection", exc)
         available = False
@@ -170,7 +188,9 @@ def _probe_backend(backend: object) -> dict[str, Any]:
         pass
 
     try:
-        selection_enabled, selection_reason = selection_allowed_for_backend(backend)
+        selection_enabled, selection_reason = (
+            selection_result if selection_result is not None else selection_allowed_for_backend(backend)
+        )
         entry["selection_enabled"] = bool(selection_enabled)
         if selection_reason:
             entry["selection_reason"] = selection_reason
@@ -214,10 +234,13 @@ def _selection_is_blocked_under_pytest() -> tuple[bool, str | None]:
     return True, "selection disabled under pytest unless KEYRGB_ALLOW_HARDWARE=1"
 
 
-def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _collect_available_candidates(
+    probes_by_name: dict[str, dict[str, Any]], candidate_names: list[str]
+) -> list[dict[str, Any]]:
     available_candidates: list[dict[str, Any]] = []
-    for probe in probes:
-        if not probe.get("available"):
+    for name in candidate_names:
+        probe = probes_by_name.get(name)
+        if probe is None:
             continue
         available_candidates.append(
             {
@@ -225,6 +248,7 @@ def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str
                 "confidence": probe.get("confidence"),
                 "priority": probe.get("priority"),
                 "tier": probe.get("tier"),
+                "selection_safety_tier": probe.get("selection_safety_tier"),
                 "provider": probe.get("provider"),
                 "stability": probe.get("stability"),
                 "experimental_evidence": probe.get("experimental_evidence"),
@@ -236,22 +260,14 @@ def _collect_available_candidates(probes: list[dict[str, Any]]) -> list[dict[str
             }
         )
 
-    available_candidates.sort(
-        key=lambda entry: (
-            _coerce_sort_value(entry.get("confidence")),
-            _coerce_sort_value(entry.get("priority")),
-        ),
-        reverse=True,
-    )
-
     return available_candidates
 
 
 def _iter_auxiliary_probe_backends() -> list[object]:
     try:
-        from ...backends.sysfs_mouse.backend import SysfsMouseBackend
+        from ...backends.registry import iter_auxiliary_specs, iter_backends
 
-        return [SysfsMouseBackend()]
+        return [backend for backend in iter_backends(specs=iter_auxiliary_specs())]
     except _BACKEND_PROBE_ERRORS as exc:
         _log_snapshot_boundary("Failed to register auxiliary diagnostics probe backends", exc)
         return []
@@ -261,32 +277,41 @@ def backend_probe_snapshot() -> dict[str, Any]:
     """Collect backend probe results (best-effort)."""
 
     try:
-        from ...backends.registry import iter_backends, select_backend
+        from ...backends.registry import build_backend_selection_report, iter_backends
     except _BACKEND_PROBE_ERRORS as exc:
         _log_snapshot_boundary("Failed to import backend registry during diagnostics collection", exc)
         return {}
 
+    requested = os.environ.get("KEYRGB_BACKEND") or "auto"
     probes: list[dict[str, Any]] = []
+    selection_report = None
     with _disable_usb_scan_under_pytest_if_needed():
-        for backend in iter_backends():
-            probes.append(_probe_backend(backend))
+        backends = iter_backends()
+        try:
+            selection_report = build_backend_selection_report(backends, requested=requested, probe_all=True)
+        except _BACKEND_PROBE_ERRORS as exc:
+            _log_snapshot_boundary("Failed to resolve selected backend during diagnostics collection", exc)
+
+        if selection_report is not None:
+            for evaluation in selection_report.evaluations:
+                entry = _probe_backend(
+                    evaluation.backend,
+                    probe_result=evaluation.result,
+                    selection_result=(evaluation.selection_enabled, evaluation.selection_reason),
+                )
+                entry["selection_safety_tier"] = evaluation.auto_safety_tier
+                probes.append(entry)
         for auxiliary_backend in _iter_auxiliary_probe_backends():
             probes.append(_probe_backend(auxiliary_backend))
 
-    requested = os.environ.get("KEYRGB_BACKEND") or "auto"
-
     selection_blocked, selection_blocked_reason = _selection_is_blocked_under_pytest()
-
-    selected = None
-    try:
-        if not selection_blocked:
-            selected_backend = select_backend()
-            selected = getattr(selected_backend, "name", None) if selected_backend is not None else None
-    except _BACKEND_PROBE_ERRORS as exc:
-        _log_snapshot_boundary("Failed to resolve selected backend during diagnostics collection", exc)
-        selected = None
-
-    available_candidates = _collect_available_candidates(probes)
+    selected_backend = None if selection_blocked or selection_report is None else selection_report.selected
+    selected = getattr(selected_backend, "name", None) if selected_backend is not None else None
+    probes_by_name = {str(probe.get("name") or ""): probe for probe in probes}
+    candidate_names = (
+        [evaluation.backend.name for evaluation in selection_report.candidates] if selection_report is not None else []
+    )
+    available_candidates = _collect_available_candidates(probes_by_name, candidate_names)
     guided_speed_probes = build_backend_speed_probe_plans(backends_snapshot={"selected": selected, "probes": probes})
 
     return {
@@ -294,8 +319,10 @@ def backend_probe_snapshot() -> dict[str, Any]:
         "requested": requested,
         "probes": probes,
         "selection": {
-            "policy": "highest confidence wins; priority is tie-breaker",
-            "requested_effective": requested,
+            "policy": "kernel/sysfs safety tier, then confidence, then priority",
+            "requested_effective": (
+                selection_report.requested_effective if selection_report is not None else requested
+            ),
             "blocked": selection_blocked,
             "blocked_reason": selection_blocked_reason,
             "experimental_backends_enabled": bool(experimental_backends_enabled()),

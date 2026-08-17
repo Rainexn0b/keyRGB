@@ -88,7 +88,9 @@ def _append_backends(lines: list[str], backends: object) -> None:
             caps = p.get("capabilities")
             if isinstance(caps, Mapping) and caps:
                 lines.append(
-                    "      capabilities: per_key={per_key} color={color} hardware_effects={hardware_effects} palette={palette}".format(
+                    "      capabilities: brightness={brightness} per_key={per_key} color={color} "
+                    "hardware_effects={hardware_effects} palette={palette}".format(
+                        brightness=caps.get("brightness"),
                         per_key=caps.get("per_key"),
                         color=caps.get("color"),
                         hardware_effects=caps.get("hardware_effects"),

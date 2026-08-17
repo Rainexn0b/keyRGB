@@ -6,6 +6,7 @@ from .collectors.backends import backend_probe_snapshot
 from .device_discovery_support.formatting import format_device_discovery_text as _format_device_discovery_text
 from .device_discovery_support.payload import build_device_discovery_payload
 from .hidraw import hidraw_devices_snapshot
+from .model import unfreeze_snapshot
 from .secondary_devices import secondary_devices_snapshot
 from .snapshots import usb_ids_snapshot
 from .usb import usb_devices_snapshot
@@ -22,7 +23,9 @@ def collect_device_discovery(*, include_usb: bool = True) -> dict[str, Any]:
         usb_devices_loader=usb_devices_snapshot,
     )
     candidates = payload.get("candidates")
-    payload["secondary_devices"] = secondary_devices_snapshot(candidates if isinstance(candidates, list) else None)
+    payload["secondary_devices"] = unfreeze_snapshot(
+        secondary_devices_snapshot(candidates if isinstance(candidates, list) else None)
+    )
     return payload
 
 

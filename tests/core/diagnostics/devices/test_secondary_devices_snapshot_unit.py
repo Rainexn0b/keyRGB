@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
+
 from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
@@ -73,7 +75,7 @@ def test_zones_available_when_parent_probe_succeeds(monkeypatch) -> None:
     assert snap["secondary_device_state"]["ite8258_chassis_logo"] == {
         "enabled": True,
         "brightness": 40,
-        "color": [1, 2, 3],
+        "color": (1, 2, 3),
     }
 
 
@@ -165,5 +167,39 @@ def test_snapshot_tolerates_missing_config(monkeypatch) -> None:
 
     assert snap["selected_device_context"] == "keyboard"
     assert snap["software_effect_target"]["current"] == "keyboard"
-    assert snap["auxiliary_candidates"] == []
+    assert list(snap["auxiliary_candidates"]) == []
     assert snap["secondary_device_state"] == {}
+
+
+def test_secondary_snapshot_is_deeply_readonly(monkeypatch) -> None:
+    _patch_config(monkeypatch, _StubConfig())
+    _patch_parent_probe(monkeypatch, available=False, reason="no matching hidraw device")
+
+    snap = secondary_devices.secondary_devices_snapshot([])
+
+    with pytest.raises(TypeError):
+        snap["selected_device_context"] = "logo"  # type: ignore[index]
+    with pytest.raises(TypeError):
+        snap["software_effect_target"]["current"] = "all"  # type: ignore[index]
+
+
+def test_secondary_snapshot_does_not_construct_mutable_config(monkeypatch) -> None:
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("diagnostics must not construct Config")
+
+    monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "0")
+    monkeypatch.setattr("src.core.config.config.Config.__init__", _boom)
+    loaded = {
+        "tray_device_context": "keyboard",
+        "software_effect_target": "keyboard",
+        "secondary_device_state": {},
+    }
+    monkeypatch.setattr(
+        "src.core.config.file_storage.load_config_settings",
+        lambda **_kwargs: loaded,
+    )
+    _patch_parent_probe(monkeypatch, available=False, reason="no matching hidraw device")
+
+    snap = secondary_devices.secondary_devices_snapshot([])
+
+    assert snap["selected_device_context"] == "keyboard"

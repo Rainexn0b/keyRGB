@@ -115,35 +115,26 @@ def usb_ids_snapshot(*, include_usb: bool) -> list[str]:
     return usb_ids
 
 
-def env_snapshot() -> dict[str, str]:
-    env_keys = [
-        "KEYRGB_BACKEND",
-        "KEYRGB_USE_INSTALLED_ITE",
-        "KEYRGB_DISABLE_USB_SCAN",
-        "KEYRGB_SIMULATE_SECONDARY_DEVICES",
-        "KEYRGB_ALLOW_HARDWARE",
-        "KEYRGB_HW_TESTS",
-        "KEYRGB_DEBUG",
-        "KEYRGB_DEBUG_BRIGHTNESS",
-        "KEYRGB_HID_REPORT_DELAY_MS",
-        "KEYRGB_ITE8291_REPORT_DELAY_MS",
-        "KEYRGB_ITE8291_ZONES_CLEVO_REPORT_DELAY_MS",
-        "KEYRGB_ITE8291R3_REPORT_DELAY_MS",
-        "KEYRGB_ITE8295_ZONES_LENOVO_IDEAPAD_REPORT_DELAY_MS",
-        "KEYRGB_ITE8910_REPORT_DELAY_MS",
-        "KEYRGB_ITE8233_NONE_CHASSIS_LIGHTBAR_CLEVO_REPORT_DELAY_MS",
-        "KEYRGB_ITE8297_REPORT_DELAY_MS",
-        "KEYRGB_ITE8258_ZONES_LENOVO_LEGION_REPORT_DELAY_MS",
-        "KEYRGB_ITE8258_PERKEY_CHASSIS_REPORT_DELAY_MS",
-        "XDG_CURRENT_DESKTOP",
-        "DESKTOP_SESSION",
-    ]
+_DESKTOP_ENV_KEYS = ("XDG_CURRENT_DESKTOP", "DESKTOP_SESSION", "XDG_SESSION_TYPE")
+
+
+def env_snapshot(environ: dict[str, str] | None = None) -> dict[str, str]:
+    """Report the live KeyRGB policy environment plus desktop-session keys.
+
+    Every present ``KEYRGB_*`` variable is included so diagnostics stay complete
+    as new policy knobs are added. Desktop keys remain an explicit allowlist.
+    """
+
+    source = os.environ if environ is None else environ
     env: dict[str, str] = {}
-    for k in env_keys:
-        v = os.environ.get(k)
-        if v:
-            env[k] = v
-    return env
+    for key, value in source.items():
+        if str(key).startswith("KEYRGB_") and value:
+            env[str(key)] = str(value)
+    for key in _DESKTOP_ENV_KEYS:
+        desktop_value = source.get(key)
+        if desktop_value:
+            env[key] = str(desktop_value)
+    return dict(sorted(env.items()))
 
 
 def virt_snapshot() -> dict[str, str]:

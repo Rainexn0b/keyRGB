@@ -50,6 +50,27 @@ def normalize_precise_brightness_value(value: object) -> int:
     return max(0, min(50, normalized))
 
 
+def normalize_secondary_brightness_value(value: object, *, default: int = 25) -> int:
+    """Clamp independent secondary-route brightness to the persisted 0..100 range.
+
+    Secondary independent brightness is a distinct domain unit from primary
+    keyboard brightness (0..50 with optional 5-step snap). Keep the scales
+    separate so profile payloads, config mirrors, and runtime interpretation
+    cannot silently re-snap or re-range each other.
+    """
+
+    try:
+        normalized = _coerce_int(value)
+    except _BRIGHTNESS_COERCION_ERRORS:
+        try:
+            normalized = _coerce_int(default)
+        except _BRIGHTNESS_COERCION_ERRORS:
+            return 25
+        return max(0, min(100, normalized))
+
+    return max(0, min(100, normalized))
+
+
 def normalize_trail_percent_value(value: object) -> int:
     """Clamp reactive trail length to the persisted 1..100 range."""
 

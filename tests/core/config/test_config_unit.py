@@ -329,11 +329,11 @@ def test_lightbar_color_and_brightness_persist_independently(tmp_path, monkeypat
     cfg.lightbar_brightness = 17
     cfg.lightbar_color = ("9", "10", "bad")
 
-    assert cfg.lightbar_brightness == 15
+    assert cfg.lightbar_brightness == 17
     assert cfg.lightbar_color == (9, 10, 0)
 
     cfg2 = Config()
-    assert cfg2.lightbar_brightness == 15
+    assert cfg2.lightbar_brightness == 17
     assert cfg2.lightbar_color == (9, 10, 0)
 
 
@@ -345,11 +345,11 @@ def test_secondary_device_state_persists_for_generic_aux_routes(tmp_path, monkey
     cfg.set_secondary_device_brightness("mouse", 17)
     cfg.set_secondary_device_color("mouse", ("1", "bad", "99"))
 
-    assert cfg.get_secondary_device_brightness("mouse") == 15
+    assert cfg.get_secondary_device_brightness("mouse") == 17
     assert cfg.get_secondary_device_color("mouse") == (1, 0, 99)
 
     cfg2 = Config()
-    assert cfg2.get_secondary_device_brightness("mouse") == 15
+    assert cfg2.get_secondary_device_brightness("mouse") == 17
     assert cfg2.get_secondary_device_color("mouse") == (1, 0, 99)
 
 
@@ -366,7 +366,7 @@ def test_secondary_device_brightness_prefers_first_compatibility_key(tmp_path, m
             fallback_keys=("legacy_primary", "legacy_secondary"),
             default=0,
         )
-        == 40
+        == 42
     )
 
 
@@ -441,6 +441,9 @@ def test_brightness_color_and_direction_accessors_cover_fallback_paths(tmp_path,
     cfg._settings["effect"] = BadString()
     cfg._settings["brightness"] = "11"
     assert cfg.brightness == 11
+    # Invalid in-memory effect values must not block later property reads; restore a
+    # serializable value before exercising setters that persist.
+    cfg._settings["effect"] = "none"
 
     monkeypatch.setattr(cfg, "_normalize_brightness_value", lambda value: 17)
 
@@ -588,17 +591,22 @@ def test_set_effect_speed_raises_type_error_for_non_string_effect_name(tmp_path,
         raise AssertionError("TypeError was not raised")
 
 
-def test_set_effect_speed_logs_io_failures_without_raising(tmp_path, monkeypatch, caplog) -> None:
-    from src.core.config import file_storage
+def test_set_effect_speed_raises_and_rolls_back_on_io_failures(tmp_path, monkeypatch, caplog) -> None:
+    from src.core.config import ConfigPersistenceError, file_storage
 
     cfg = _make_config(tmp_path, monkeypatch)
+    original_speeds = dict(cfg._settings.get("effect_speeds") or {})
 
     monkeypatch.setattr(file_storage.os, "replace", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("boom")))
 
-    with caplog.at_level(logging.WARNING, logger="src.core.config.config"):
+    with (
+        caplog.at_level(logging.WARNING, logger="src.core.config.config"),
+        pytest.raises(ConfigPersistenceError, match="Could not persist configuration"),
+    ):
         cfg.set_effect_speed("wave", 7)
 
-    assert cfg._settings["effect_speeds"]["wave"] == 7
+    assert cfg._settings.get("effect_speeds") == original_speeds
+    assert cfg._settings == cfg._persisted_settings
     records = [record for record in caplog.records if "Failed to save config" in record.getMessage()]
     assert records
     assert records[-1].exc_info is not None
@@ -709,3 +717,40 @@ def test_batch_update_rolls_back_when_persistence_fails(tmp_path, monkeypatch) -
 
     assert config.brightness == original_brightness
     assert config.effect == original_effect
+
+
+def test_ordinary_setter_raises_and_rolls_back_when_persistence_fails(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config, ConfigPersistenceError, file_storage
+
+    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+    config = Config()
+    original_brightness = config.brightness
+    original_effect = config.effect
+    monkeypatch.setattr(file_storage, "merge_config_settings_atomic", lambda **_kwargs: None)
+
+    with pytest.raises(ConfigPersistenceError, match="Could not persist configuration"):
+        config.brightness = 3
+
+    assert config.brightness == original_brightness
+    assert config.effect == original_effect
+    assert config._settings == config._persisted_settings
+
+
+def test_apply_perkey_profile_state_raises_when_persistence_fails(tmp_path, monkeypatch) -> None:
+    from src.core.config import Config, ConfigPersistenceError, file_storage
+
+    monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
+    config = Config()
+    original_colors = dict(config.per_key_colors)
+    original_brightness = config.brightness
+    monkeypatch.setattr(file_storage, "merge_config_settings_atomic", lambda **_kwargs: None)
+
+    with pytest.raises(ConfigPersistenceError, match="Could not persist configuration"):
+        config.apply_perkey_profile_state(
+            {(0, 0): (1, 2, 3)},
+            effect_brightness=40,
+            perkey_brightness=40,
+        )
+
+    assert config.per_key_colors == original_colors
+    assert config.brightness == original_brightness
