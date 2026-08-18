@@ -48,17 +48,35 @@ class KeyRGBTrayDelegateMixin:
             return
         _application_module().update_tray_menu(self)
 
-    def _refresh_ui(self, *, animate_icon: bool = True) -> None:
-        """Refresh both icon and menu.
+    def _refresh_ui(self, *, animate_icon: bool = True, refresh_menu: bool = True) -> None:
+        """Refresh the tray icon and, by default, rebuild the live menu.
 
-        Convenience wrapper to keep call sites small.
+        Automatic power/idle/hardware paths must pass ``refresh_menu=False``.
+        Rebuilding a live AppIndicator/SNI menu during AC/DC or idle transitions
+        can crash KDE plasmashell while the menu or its hover timer is active.
         """
 
         try:
             self._update_icon(animate=animate_icon)
         except TypeError:
             self._update_icon()
-        self._update_menu()
+        if refresh_menu:
+            self._update_menu()
+
+    def _refresh_system_power_view(self) -> None:
+        """Refresh the stored power-mode snapshot, then request a menu rebuild.
+
+        Automatic AC/DC mode applies use this so the Power Mode menu shows the
+        real mode. The menu rebuild is deferred through the runtime
+        coordinator and executes after the transition completes — never
+        mid-transition (KDE plasmashell QMenu host crash).
+        """
+
+        def _refresh_view() -> None:
+            _application_module().refresh_system_power_snapshot(self)
+            self._update_menu()
+
+        run_tray_transition(self, _refresh_view)
 
     def _start_current_effect(self, **kwargs) -> bool:
         return bool(run_tray_transition(self, lambda: _application_module().start_current_effect(self, **kwargs)))

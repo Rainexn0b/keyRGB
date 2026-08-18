@@ -255,7 +255,48 @@ class TestPowerManagerBatterySaverLoop:
             pm._activate_power_source_mode(PowerMode.EXTREME_SAVER)
 
         set_mode.assert_called_once_with(PowerMode.EXTREME_SAVER, allow_interactive=False)
+        mock_kb._refresh_system_power_view.assert_called_once_with()
+        # The manager never rebuilds the menu directly; the tray delegate
+        # defers one coalesced rebuild until after the transition completes.
         mock_kb._update_menu.assert_not_called()
+
+    def test_activate_power_source_mode_skips_view_refresh_when_apply_fails(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+        from src.core.power.system import PowerMode
+
+        mock_kb = MagicMock()
+        pm = PowerManager(mock_kb, config=MagicMock())
+
+        with patch.object(manager_module, "set_system_power_mode", return_value=False):
+            pm._activate_power_source_mode(PowerMode.EXTREME_SAVER)
+
+        mock_kb._refresh_system_power_view.assert_not_called()
+        mock_kb._update_menu.assert_not_called()
+
+    def test_activate_power_source_mode_tolerates_tray_without_view_refresh(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+        from src.core.power.system import PowerMode
+
+        pm = PowerManager(SimpleNamespace(), config=MagicMock())
+
+        with patch.object(manager_module, "set_system_power_mode", return_value=True):
+            pm._activate_power_source_mode(PowerMode.PERFORMANCE)
+
+    def test_activate_power_source_mode_contains_view_refresh_errors(self):
+        from src.core.power.management import manager as manager_module
+        from src.core.power.management.manager import PowerManager
+        from src.core.power.system import PowerMode
+
+        mock_kb = MagicMock()
+        mock_kb._refresh_system_power_view.side_effect = RuntimeError("view boom")
+        pm = PowerManager(mock_kb, config=MagicMock())
+
+        with patch.object(manager_module, "set_system_power_mode", return_value=True):
+            pm._activate_power_source_mode(PowerMode.EXTREME_SAVER)
+
+        mock_kb._refresh_system_power_view.assert_called_once_with()
 
     def test_battery_saver_loop_covers_common_branches_and_actions(self):
         from src.core.power.management.manager import PowerManager

@@ -79,6 +79,11 @@ prebootstrap and starts it before power workers and pollers.
 - Icon/menu requests made during a command are coalesced and flushed by the
   waiting caller after ownership is released. This prevents Xorg mainloop lock
   inversion and preserves non-animated hardware refresh requests.
+- Automatic power-source, idle, scheduler, and hardware-poller paths may update
+  the tray icon but must not rebuild the live AppIndicator/SNI menu. Rebuilding
+  that menu during AC/DC or idle transitions can crash KDE plasmashell while
+  the menu or its hover timer is active. User clicks and config-file edits
+  still refresh the menu.
 - Menu rendering is read-only. It must not reload config, reconnect devices,
   query OS power sysfs, probe secondary backends, or persist fallback state.
   Power-mode and secondary-route labels come from

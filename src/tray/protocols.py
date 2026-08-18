@@ -95,7 +95,7 @@ class _HasIdleDimState(Protocol):
 
 
 class _RefreshUi(Protocol):
-    def _refresh_ui(self, *, animate_icon: bool = True) -> None: ...
+    def _refresh_ui(self, *, animate_icon: bool = True, refresh_menu: bool = True) -> None: ...
 
 
 class _RefreshTrayUi(_RefreshUi, Protocol):

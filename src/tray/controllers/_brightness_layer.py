@@ -27,6 +27,7 @@ def apply_layered_brightness_update(
     reactive_brightness: int | None,
     reactive_source_label: str | None = None,
     start_current_effect: Callable[[LightingTrayProtocol], object],
+    refresh_menu: bool = True,
 ) -> None:
     if base_brightness is None and reactive_brightness is None:
         return
@@ -65,7 +66,7 @@ def apply_layered_brightness_update(
             fade=fade_down,
             fade_duration_s=fade_s,
         )
-        tray._refresh_ui()
+        tray._refresh_ui(refresh_menu=refresh_menu)
         return
 
     if reactive_brightness is not None:
@@ -90,7 +91,7 @@ def apply_layered_brightness_update(
             fade_duration_s=fade_s,
         )
         tray.is_off = False
-        tray._refresh_ui()
+        tray._refresh_ui(refresh_menu=refresh_menu)
         return
 
     tray.config.brightness = brightness
@@ -102,4 +103,4 @@ def apply_layered_brightness_update(
     )
     if not bool(getattr(tray, "is_off", False)) and not is_sw_effect:
         start_current_effect(tray)
-    tray._refresh_ui()
+    tray._refresh_ui(refresh_menu=refresh_menu)

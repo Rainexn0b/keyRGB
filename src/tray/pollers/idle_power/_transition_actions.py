@@ -237,6 +237,11 @@ def refresh_ui_best_effort(
 
         def refresh_without_icon_animation() -> None:
             try:
+                refresh_fn(animate_icon=False, refresh_menu=False)
+                return
+            except TypeError:
+                pass
+            try:
                 refresh_fn(animate_icon=False)
             except TypeError:
                 refresh_fn()

@@ -182,8 +182,8 @@ def test_execute_blank_recovery_success_apply_transition_handled() -> None:
     assert len(log_events) == 1
     assert log_events[0]["args"][1] == "power_source_blank_recover"
     assert log_events[0]["fields"]["brightness"] == 30
-    # refresh called without icon animation
-    assert refresh_calls == [{"animate_icon": False}]
+    # refresh called without icon animation or a live menu rebuild
+    assert refresh_calls == [{"animate_icon": False, "refresh_menu": False}]
 
 
 def test_execute_blank_recovery_falls_back_to_start_current_effect() -> None:

@@ -168,7 +168,7 @@ def apply_from_config_once(
     if str(cause or "") == "startup" and last_applied is None and _startup_loop_effect_already_running(tray, current):
         return current, last_apply_warn_at
 
-    if str(cause or "") == "mtime_change" and current.perkey_sig is not None:
+    if str(cause or "") == "mtime_change":
         now = float(monotonic_fn())
         if should_skip_config_apply_for_power_source_transition(
             cause=str(cause or ""),

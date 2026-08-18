@@ -82,7 +82,7 @@ def test_apply_mode_is_classified_on_plan() -> None:
     )
 
 
-def test_skip_power_source_transition_only_for_perkey_mtime() -> None:
+def test_skip_power_source_transition_for_mtime_applies() -> None:
     perkey = ConfigApplyState(
         effect="perkey",
         speed=4,
@@ -115,7 +115,7 @@ def test_skip_power_source_transition_only_for_perkey_mtime() -> None:
             current=uniform,
             recent_power_source_transition=True,
         )
-        is False
+        is True
     )
     assert (
         should_skip_config_apply_for_power_source_transition(

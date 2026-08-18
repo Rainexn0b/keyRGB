@@ -50,10 +50,16 @@ def should_skip_config_apply_for_power_source_transition(
     current: ConfigApplyState,
     recent_power_source_transition: bool,
 ) -> bool:
-    """Pure gate: suppress per-key mtime applies briefly after AC/battery profile swaps."""
+    """Pure gate: suppress mtime applies briefly after AC/battery lighting writes.
+
+    Power-source brightness and profile swaps persist config.json. The config
+    poller must not re-apply that write and rebuild the live tray menu in the
+    same window — that path crashes KDE's AppIndicator/SNI host.
+    """
 
     if not recent_power_source_transition:
         return False
     if str(cause or "") != "mtime_change":
         return False
-    return current.perkey_sig is not None
+    _ = current
+    return True

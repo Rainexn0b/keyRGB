@@ -175,7 +175,8 @@ def stabilize_on_ac_state(manager: BatterySaverManager, raw_on_ac: bool | None) 
     return manager._stable_on_ac
 
 
-def activate_power_source_mode(mode: object) -> None:
-    applied = _manager_module().set_system_power_mode(mode, allow_interactive=False)
-    if not bool(applied):
+def activate_power_source_mode(mode: object) -> bool:
+    applied = bool(_manager_module().set_system_power_mode(mode, allow_interactive=False))
+    if not applied:
         logger.warning("Power-source mode activation did not apply for %s", getattr(mode, "value", mode))
+    return applied

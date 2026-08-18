@@ -108,7 +108,7 @@ def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_h
     )
     assert tray.config.reactive_brightness == 40
     assert tray.engine.reactive_brightness == 40
-    tray._refresh_ui.assert_called_once_with()
+    tray._refresh_ui.assert_called_once_with(refresh_menu=False)
 
 
 def test_run_scheduler_iteration_uses_ac_brightness_as_day_primary_when_configured() -> None:
@@ -156,7 +156,7 @@ def test_run_scheduler_iteration_uses_ac_brightness_as_day_primary_when_configur
         fade=False,
         fade_duration_s=0.25,
     )
-    tray._refresh_ui.assert_called_once_with()
+    tray._refresh_ui.assert_called_once_with(refresh_menu=False)
 
 
 def test_run_scheduler_iteration_applies_day_base_when_only_inactive_power_source_override_exists() -> None:

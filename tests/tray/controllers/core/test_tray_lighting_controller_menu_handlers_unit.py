@@ -126,7 +126,7 @@ class TestOnBrightnessClicked:
             fade_duration_s=0.25,
         )
         mock_start.assert_called_once_with(mock_tray)
-        mock_tray._refresh_ui.assert_called_once_with()
+        mock_tray._refresh_ui.assert_called_once_with(refresh_menu=True)
 
     def test_on_brightness_clicked_does_not_restart_software_effect(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
@@ -147,7 +147,7 @@ class TestOnBrightnessClicked:
             fade_duration_s=0.25,
         )
         mock_start.assert_not_called()
-        mock_tray._refresh_ui.assert_called_once_with()
+        mock_tray._refresh_ui.assert_called_once_with(refresh_menu=True)
 
     def test_on_brightness_clicked_preserves_reactive_brightness_for_reactive_effect(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
@@ -175,7 +175,7 @@ class TestOnBrightnessClicked:
             fade_duration_s=0.25,
         )
         mock_start.assert_not_called()
-        mock_tray._refresh_ui.assert_called_once_with()
+        mock_tray._refresh_ui.assert_called_once_with(refresh_menu=True)
 
     def test_on_brightness_clicked_updates_rendered_perkey_state_without_restart(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
@@ -200,7 +200,7 @@ class TestOnBrightnessClicked:
             fade_duration_s=0.25,
         )
         mock_start.assert_not_called()
-        mock_tray._refresh_ui.assert_called_once_with()
+        mock_tray._refresh_ui.assert_called_once_with(refresh_menu=True)
 
     def test_on_brightness_clicked_updates_rendered_base_only_perkey_state_without_restart(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked
@@ -225,7 +225,7 @@ class TestOnBrightnessClicked:
             fade_duration_s=0.25,
         )
         mock_start.assert_not_called()
-        mock_tray._refresh_ui.assert_called_once_with()
+        mock_tray._refresh_ui.assert_called_once_with(refresh_menu=True)
 
     def test_on_brightness_clicked_saves_nonzero_to_last_brightness(self):
         from src.tray.controllers.lighting_controller import on_brightness_clicked

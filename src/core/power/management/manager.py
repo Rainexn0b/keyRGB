@@ -368,7 +368,25 @@ class PowerManager:
         return sync_config_brightness(self._config, brightness, logger=logger)
 
     def _activate_power_source_mode(self, mode) -> None:
-        _battery_saver.activate_power_source_mode(mode)
+        applied = _battery_saver.activate_power_source_mode(mode)
+        if not applied:
+            return
+        self._refresh_system_power_view_best_effort()
+
+    def _refresh_system_power_view_best_effort(self) -> None:
+        """Keep the tray's power-mode view honest after an automatic apply.
+
+        Refreshes the stored snapshot and requests one menu rebuild that the
+        tray defers through the runtime coordinator until the transition
+        completes — never mid-transition (KDE QMenu host crash).
+        """
+        refresh = getattr(self.kb_controller, "_refresh_system_power_view", None)
+        if not callable(refresh):
+            return
+        try:
+            refresh()
+        except (AttributeError, OSError, RuntimeError, TypeError, ValueError) as exc:
+            logger.debug("System power view refresh failed after mode apply: %s", exc)
 
     def _activate_power_source_perkey_profile(self, profile_name: str) -> None:
         available_profiles = {str(name) for name in list_perkey_profiles()}

@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, SupportsFloat, SupportsIndex, SupportsInt, cas
 
 from src.core.backends.exceptions import BackendError, format_backend_error
 from src.core.utils.safe_attrs import safe_str_attr
+from src.tray.controllers import view_snapshots as tray_view_snapshots
 from src.tray.idle_power_state import ensure_tray_idle_power_state
 from src.tray.protocols import TrayIconState
 
@@ -59,6 +60,7 @@ icon_mod = app_runtime_deps.icon_mod
 menu_mod = app_runtime_deps.menu_mod
 update_tray_icon = app_runtime_deps.update_tray_icon
 update_tray_menu = app_runtime_deps.update_tray_menu
+refresh_system_power_snapshot = tray_view_snapshots.refresh_system_power_snapshot
 is_permission_denied = app_runtime_deps.is_permission_denied
 logger = logging.getLogger(__name__)
 callbacks = app_runtime_deps.callbacks

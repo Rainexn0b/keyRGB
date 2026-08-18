@@ -117,6 +117,7 @@ def _apply_time_scheduler_brightness_owned(
             reactive_brightness=reactive_brightness_int,
             reactive_source_label="time-scheduler",
             start_current_effect=start_current_effect,
+            refresh_menu=False,
         )
     except _SCHEDULER_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: time-scheduler brightness application crosses config setters, backend runtime calls, and UI callbacks; must remain non-fatal
         _log_tray_exception(tray, "Failed to apply time-scheduler brightness: %s", exc)

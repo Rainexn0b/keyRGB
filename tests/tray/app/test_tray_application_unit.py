@@ -250,6 +250,22 @@ def test_refresh_ui_can_disable_icon_animation():
     assert calls == {"animate": False, "menu": 1}
 
 
+def test_refresh_ui_can_skip_live_menu_rebuild():
+    calls = {"animate": None, "menu": 0}
+
+    class Dummy:
+        def _update_icon(self, *, animate=True):
+            calls["animate"] = animate
+
+        def _update_menu(self):
+            calls["menu"] += 1
+
+    dummy = Dummy()
+    app.KeyRGBTray._refresh_ui(dummy, animate_icon=False, refresh_menu=False)
+
+    assert calls == {"animate": False, "menu": 0}
+
+
 def test_log_event_formats_fields_sorted_and_throttles(monkeypatch):
     tray = SimpleNamespace(_event_last_at={})
     logged = []
@@ -651,6 +667,22 @@ def test_update_icon_and_menu_delegate_to_refresh_helpers(monkeypatch):
     app.KeyRGBTray._update_icon(tray)
     app.KeyRGBTray._update_menu(tray)
     assert calls == {"icon": 1, "menu": 1}
+
+
+def test_refresh_system_power_view_delegate_refreshes_snapshot_and_menu(monkeypatch):
+    calls = []
+    tray = SimpleNamespace(_update_menu=lambda: calls.append("menu"))
+
+    monkeypatch.setattr(
+        app,
+        "refresh_system_power_snapshot",
+        lambda _self: calls.append("snapshot"),
+    )
+
+    app.KeyRGBTray._refresh_system_power_view(tray)
+    # Snapshot must be stored before the menu rebuild is requested so the
+    # rebuilt menu renders the fresh mode.
+    assert calls == ["snapshot", "menu"]
 
 
 def test_effect_and_power_wrappers_delegate(monkeypatch):

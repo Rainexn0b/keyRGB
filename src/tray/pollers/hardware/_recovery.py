@@ -80,6 +80,11 @@ def _log_polled_hardware_event(tray: IdlePowerTrayProtocol, action: str, **field
 
 def _refresh_ui_without_icon_animation(tray: IdlePowerTrayProtocol) -> None:
     try:
+        tray._refresh_ui(animate_icon=False, refresh_menu=False)
+        return
+    except TypeError:
+        pass
+    try:
         tray._refresh_ui(animate_icon=False)
     except TypeError:
         tray._refresh_ui()

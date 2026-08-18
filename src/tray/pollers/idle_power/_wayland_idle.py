@@ -14,6 +14,29 @@ _RECOVERABLE_WAYLAND_EXCEPTIONS = (AttributeError, ImportError, OSError, Runtime
 logger = logging.getLogger(__name__)
 
 
+def _coerce_protocol_version(value: object) -> int:
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return 0
+    return 0
+
+
+def negotiated_bind_version(advertised: object, supported: object) -> int:
+    """Bind at the highest version both the compositor and client understand."""
+
+    advertised_i = _coerce_protocol_version(advertised)
+    supported_i = _coerce_protocol_version(supported)
+    if advertised_i < 1 or supported_i < 1:
+        return 1
+    return min(advertised_i, supported_i)
+
+
 class WaylandIdleTracker:
     """Session-level idle tracker using the Wayland ext-idle-notify-v1 protocol.
 
@@ -57,12 +80,15 @@ class WaylandIdleTracker:
         registry = display.get_registry()
 
         found: dict[str, int | None] = {"seat": None, "notifier": None}
+        advertised: dict[str, int] = {"seat": 0, "notifier": 0}
 
         def _on_global(registry_proxy: object, name: int, interface: str, version: int) -> None:
             if interface == WlSeat.name and found["seat"] is None:
                 found["seat"] = name
+                advertised["seat"] = negotiated_bind_version(version, version)
             elif interface == ExtIdleNotifierV1.name and found["notifier"] is None:
                 found["notifier"] = name
+                advertised["notifier"] = negotiated_bind_version(version, version)
 
         registry.dispatcher["global"] = _on_global
         display.roundtrip()
@@ -74,8 +100,16 @@ class WaylandIdleTracker:
             raise RuntimeError("Required Wayland globals (wl_seat, ext_idle_notifier_v1) not available")
 
         self._display = display
-        self._seat = registry.bind(seat_global_name, WlSeat, WlSeat.version)
-        self._idle_notifier = registry.bind(notifier_global_name, ExtIdleNotifierV1, ExtIdleNotifierV1.version)
+        self._seat = registry.bind(
+            seat_global_name,
+            WlSeat,
+            negotiated_bind_version(advertised["seat"], WlSeat.version),
+        )
+        self._idle_notifier = registry.bind(
+            notifier_global_name,
+            ExtIdleNotifierV1,
+            negotiated_bind_version(advertised["notifier"], ExtIdleNotifierV1.version),
+        )
         self._available = True
         logger.info("Wayland idle tracker connected (timeout=%d ms)", self._timeout_ms)
 

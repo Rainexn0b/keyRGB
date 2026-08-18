@@ -36,10 +36,19 @@ class _FakeNotifier(_FakeProxy):
 
 
 class _FakeRegistry:
-    def __init__(self, *, seat_name: int | None = 1, notifier_name: int | None = 2) -> None:
+    def __init__(
+        self,
+        *,
+        seat_name: int | None = 1,
+        notifier_name: int | None = 2,
+        seat_version: int = 1,
+        notifier_version: int = 1,
+    ) -> None:
         self.dispatcher: dict[str, Any] = {}
         self.seat_name = seat_name
         self.notifier_name = notifier_name
+        self.seat_version = seat_version
+        self.notifier_version = notifier_version
         self.bound: list[tuple[int, object, object]] = []
 
     def bind(self, name: int, iface: object, version: object) -> object:
@@ -79,9 +88,14 @@ class _FakeDisplay:
         if handler is None:
             return
         if self.registry.seat_name is not None:
-            handler(self.registry, self.registry.seat_name, _WlSeat.name, 1)
+            handler(self.registry, self.registry.seat_name, _WlSeat.name, self.registry.seat_version)
         if self.registry.notifier_name is not None:
-            handler(self.registry, self.registry.notifier_name, _ExtIdleNotifierV1.name, 1)
+            handler(
+                self.registry,
+                self.registry.notifier_name,
+                _ExtIdleNotifierV1.name,
+                self.registry.notifier_version,
+            )
 
     def flush(self) -> None:
         if self.flush_error is not None:
@@ -171,6 +185,37 @@ def test_wayland_idle_tracker_connects_and_tracks_idle_events(monkeypatch: pytes
     tracker.close()
     assert display.disconnected is True
     assert tracker.is_idle() is None
+
+
+def test_negotiated_bind_version_never_exceeds_advertised_or_supported() -> None:
+    assert wayland_idle.negotiated_bind_version(10, 11) == 10
+    assert wayland_idle.negotiated_bind_version(11, 10) == 10
+    assert wayland_idle.negotiated_bind_version(0, 11) == 1
+    assert wayland_idle.negotiated_bind_version("nope", 11) == 1
+
+
+def test_wayland_idle_tracker_binds_advertised_seat_version(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _install_fake_pywayland(monkeypatch)
+    monkeypatch.setattr(_WlSeat, "version", 11)
+    monkeypatch.setattr(_ExtIdleNotifierV1, "version", 2)
+
+    original_init = _FakeDisplay.__init__
+
+    def init_older_compositor(self: _FakeDisplay, display_name_or_fd: object = None) -> None:
+        original_init(self, display_name_or_fd)
+        self.registry = _FakeRegistry(seat_version=10, notifier_version=1)
+
+    monkeypatch.setattr(_FakeDisplay, "__init__", init_older_compositor)
+
+    tracker = wayland_idle.WaylandIdleTracker(timeout_ms=1000, select_fn=lambda *_a, **_k: ([], [], []))
+    display = _FakeDisplay.instances[-1]
+    assert display.registry.bound == [
+        (1, _WlSeat, 10),
+        (2, _ExtIdleNotifierV1, 1),
+    ]
+    tracker.close()
 
 
 def test_wayland_idle_tracker_requires_globals(monkeypatch: pytest.MonkeyPatch) -> None:

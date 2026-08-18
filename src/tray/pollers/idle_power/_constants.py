@@ -19,3 +19,9 @@ POST_RESUME_IDLE_ACTION_SUPPRESSION_S: float = 10.0
 # suppressed.  Some desktop environments lower panel brightness on battery; that
 # should become the new baseline, not a fake idle dim/off event.
 POST_POWER_SOURCE_CHANGE_IDLE_ACTION_SUPPRESSION_S: float = 5.0
+
+# After repeated Wayland idle-tracker connection failures, wait before opening
+# another compositor connection. A protocol error (for example binding wl_seat
+# above the advertised version) otherwise reconnects on every idle poll.
+WAYLAND_IDLE_RECONNECT_BACKOFF_S: float = 5.0
+WAYLAND_IDLE_RECONNECT_FAILURE_THRESHOLD: int = 2

@@ -5,9 +5,11 @@ Extracted from ``_runtime.py`` (WS1 / A7 slice 1).
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from typing import Any
 
+from ._constants import WAYLAND_IDLE_RECONNECT_BACKOFF_S, WAYLAND_IDLE_RECONNECT_FAILURE_THRESHOLD
 from ._input_idle import InputIdleTracker
 
 _IDLE_POWER_RUNTIME_EXCEPTIONS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
@@ -27,24 +29,60 @@ def read_session_idle_state(
     return bool(float(idle_s) >= float(idle_timeout_s))
 
 
+def _wayland_idle_now() -> float:
+    return float(time.monotonic())
+
+
+def _note_wayland_idle_failure(loop_state: object, *, now: float) -> None:
+    try:
+        previous = getattr(loop_state, "wayland_idle_fail_count", 0) or 0
+        fail_count = int(previous) + 1
+    except (TypeError, ValueError):
+        fail_count = 1
+    setattr(loop_state, "wayland_idle_fail_count", fail_count)  # noqa: B010 - loop state is duck-typed
+    if fail_count < int(WAYLAND_IDLE_RECONNECT_FAILURE_THRESHOLD):
+        return
+    setattr(  # noqa: B010 - loop state is duck-typed
+        loop_state,
+        "wayland_idle_retry_at",
+        float(now) + float(WAYLAND_IDLE_RECONNECT_BACKOFF_S),
+    )
+
+
+def _wayland_idle_retry_blocked(loop_state: object, *, now: float) -> bool:
+    try:
+        retry_at = float(getattr(loop_state, "wayland_idle_retry_at", 0.0) or 0.0)
+    except (TypeError, ValueError):
+        return False
+    return retry_at > float(now)
+
+
 def read_wayland_dimmed_state(
     *,
     loop_state: object,
     timeout_s: float,
     create_wayland_idle_tracker_fn: Callable[[int], Any | None],
     read_wayland_idle_fn: Callable[[Any], bool | None],
+    monotonic_fn: Callable[[], float] = _wayland_idle_now,
 ) -> bool | None:
     timeout_ms = int(float(timeout_s) * 1000)
     if timeout_ms <= 0:
         return None
 
+    now = float(monotonic_fn())
     wayland_idle_tracker = getattr(loop_state, "wayland_idle_tracker", None)
     if wayland_idle_tracker is None:
+        if _wayland_idle_retry_blocked(loop_state, now=now):
+            return None
         try:
             wayland_idle_tracker = create_wayland_idle_tracker_fn(timeout_ms)
             setattr(loop_state, "wayland_idle_tracker", wayland_idle_tracker)  # noqa: B010 - loop state is duck-typed
         except _IDLE_POWER_RUNTIME_EXCEPTIONS:
+            _note_wayland_idle_failure(loop_state, now=now)
             setattr(loop_state, "wayland_idle_tracker", None)  # noqa: B010 - loop state is duck-typed
+            return None
+        if wayland_idle_tracker is None:
+            _note_wayland_idle_failure(loop_state, now=now)
             return None
 
     tracker = wayland_idle_tracker
@@ -62,17 +100,21 @@ def read_wayland_dimmed_state(
     if result is None:
         # The tracker's Wayland connection is broken (is_idle returned
         # None after a dispatch/read/flush failure).  Close and drop the
-        # cached tracker so the next poll recreates a fresh connection
+        # cached tracker so a later poll can recreate a fresh connection
         # instead of reusing a dead proxy for the entire session — which
-        # would silently fall back to the brightness heuristic.
+        # would silently fall back to the brightness heuristic. Repeated
+        # failures back off so a protocol error cannot reconnect-storm KWin.
         try:
             close = getattr(tracker, "close", None)
             if callable(close):
                 close()
         except _IDLE_POWER_RUNTIME_EXCEPTIONS:
             pass
+        _note_wayland_idle_failure(loop_state, now=now)
         setattr(loop_state, "wayland_idle_tracker", None)  # noqa: B010 - loop state is duck-typed
+        return None
 
+    setattr(loop_state, "wayland_idle_fail_count", 0)  # noqa: B010 - loop state is duck-typed
     return result
 
 

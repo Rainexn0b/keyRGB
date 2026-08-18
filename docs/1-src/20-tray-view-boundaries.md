@@ -27,7 +27,11 @@ fields such as `backend_probe.identifiers`, `device_discovery`, and
 
 Checked radio state is captured from the snapshot at build time. Applying a
 system power mode is a runtime transition: it may observe OS state, store a
-fresh snapshot, then request a menu rebuild.
+fresh snapshot, then request one coalesced menu rebuild that the runtime
+coordinator executes after the transition completes — never mid-transition.
+Other automatic AC/DC paths (brightness, on/off, idle, scheduler, hardware
+poller) must not rebuild the live menu at all: rebuilding an open
+AppIndicator/SNI menu can crash KDE plasmashell.
 
 ## Non-goals
 

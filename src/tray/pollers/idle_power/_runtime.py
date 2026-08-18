@@ -54,6 +54,8 @@ class IdlePollLoopState:
     backlight_state: BacklightState = field(default_factory=BacklightState)
     input_idle_tracker: InputIdleTracker | None = None
     wayland_idle_tracker: object | None = None
+    wayland_idle_fail_count: int = 0
+    wayland_idle_retry_at: float = 0.0
     prev_session_idle: bool | None = None
 
 

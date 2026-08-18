@@ -475,7 +475,11 @@ def test_apply_from_config_once_logs_refresh_ui_exception_throttled() -> None:
     tray = _mk_tray_base(effect="none", brightness=10)
     tray._refresh_ui.side_effect = RuntimeError("boom")
 
-    with patch.object(config_polling.time, "monotonic", side_effect=[100.0, 120.0, 200.0]):
+    with patch.object(
+        config_polling.time,
+        "monotonic",
+        side_effect=[100.0, 100.0, 110.0, 120.0, 190.0, 200.0],
+    ):
         _, warn_at = _apply_from_config_once(
             tray,
             ite_num_rows=6,

@@ -248,6 +248,66 @@ def test_read_wayland_dimmed_state_drops_broken_tracker_for_recovery() -> None:
     assert loop_state.wayland_idle_tracker is not None
 
 
+def test_read_wayland_dimmed_state_backs_off_after_repeated_failures() -> None:
+    first = _FakeWaylandIdleTracker(idle=None)
+    second = _FakeWaylandIdleTracker(idle=None)
+    created: list[_FakeWaylandIdleTracker] = []
+    loop_state = _runtime.IdlePollLoopState()
+
+    def create_tracker(_timeout_ms: int) -> Any:
+        tracker = second if created else first
+        created.append(tracker)
+        return tracker
+
+    clock = {"now": 10.0}
+
+    first_result = _runtime_sensors.read_wayland_dimmed_state(
+        loop_state=loop_state,
+        timeout_s=10.0,
+        create_wayland_idle_tracker_fn=create_tracker,
+        read_wayland_idle_fn=lambda tracker: tracker.is_idle(),
+        monotonic_fn=lambda: clock["now"],
+    )
+    second_result = _runtime_sensors.read_wayland_dimmed_state(
+        loop_state=loop_state,
+        timeout_s=10.0,
+        create_wayland_idle_tracker_fn=create_tracker,
+        read_wayland_idle_fn=lambda tracker: tracker.is_idle(),
+        monotonic_fn=lambda: clock["now"],
+    )
+    blocked = _runtime_sensors.read_wayland_dimmed_state(
+        loop_state=loop_state,
+        timeout_s=10.0,
+        create_wayland_idle_tracker_fn=create_tracker,
+        read_wayland_idle_fn=lambda tracker: tracker.is_idle(),
+        monotonic_fn=lambda: clock["now"],
+    )
+
+    assert first_result is None
+    assert second_result is None
+    assert blocked is None
+    assert created == [first, second]
+    assert first.closed is True
+    assert second.closed is True
+
+    clock["now"] = 16.0
+    recovered = _FakeWaylandIdleTracker(idle=False)
+
+    def create_recovered(_timeout_ms: int) -> Any:
+        created.append(recovered)
+        return recovered
+
+    result = _runtime_sensors.read_wayland_dimmed_state(
+        loop_state=loop_state,
+        timeout_s=10.0,
+        create_wayland_idle_tracker_fn=create_recovered,
+        read_wayland_idle_fn=lambda tracker: tracker.is_idle(),
+        monotonic_fn=lambda: clock["now"],
+    )
+    assert result is False
+    assert created[-1] is recovered
+
+
 def test_run_idle_power_iteration_uses_wayland_via_fallback_when_kde_dim_timeout_none() -> None:
     """Integration: when KDE dim timeout is None but Wayland is available,
     the iteration should use the Wayland tracker with the general idle

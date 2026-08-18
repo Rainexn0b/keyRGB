@@ -115,7 +115,7 @@ def power_turn_off_impl(
         turn_off_secondary_software_targets(tray)
     if turn_off_secondary_profile_areas is not None:
         turn_off_secondary_profile_areas(tray)
-    tray._refresh_ui()
+    tray._refresh_ui(refresh_menu=False)
 
 
 def power_restore_impl(
@@ -163,7 +163,7 @@ def power_restore_impl(
             fade_in=False,
             fade_in_duration_s=idle_fade_duration_s(tray.config),
         )
-        tray._refresh_ui()
+        tray._refresh_ui(refresh_menu=False)
         return
 
     start_current_effect(
@@ -172,4 +172,4 @@ def power_restore_impl(
         fade_in=True,
         fade_in_duration_s=idle_fade_duration_s(tray.config),
     )
-    tray._refresh_ui()
+    tray._refresh_ui(refresh_menu=False)

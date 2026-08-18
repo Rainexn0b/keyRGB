@@ -28,6 +28,8 @@ class TestApplyBrightnessFromPowerPolicy:
             25, apply_to_hardware=True, fade=True, fade_duration_s=0.25
         )
         mock_start.assert_called_once_with(mock_tray)
+        mock_tray._refresh_ui.assert_called_once_with(refresh_menu=False)
+        assert mock_tray.tray_idle_power_state.last_power_source_transition_at > 0.0
 
     def test_apply_brightness_from_power_policy_does_not_restart_software_effect(self):
         from src.tray.controllers.lighting_controller import apply_brightness_from_power_policy
@@ -137,7 +139,7 @@ class TestApplyBrightnessFromPowerPolicy:
         mock_tray.engine.set_brightness.assert_called_once_with(
             25, apply_to_hardware=False, fade=True, fade_duration_s=0.25
         )
-        mock_tray._refresh_ui.assert_called_once_with()
+        mock_tray._refresh_ui.assert_called_once_with(refresh_menu=False)
         mock_start.assert_not_called()
         assert len(logs) == 1
         assert logs[0][0] == "Failed to apply power policy reactive brightness: %s"
