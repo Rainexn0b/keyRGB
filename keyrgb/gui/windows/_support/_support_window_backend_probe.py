@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Protocol, cast
@@ -28,12 +29,15 @@ _auto_run_backend_speed_probe_via_tray_config = _probe_config._auto_run_backend_
 
 
 class _ProbeButtonLike(Protocol):
-    def configure(self, **kwargs: object) -> None: ...
+    def configure(self, *args: object, **kwargs: object) -> object: ...
 
 
 class _SupportWindowLike(Protocol):
-    root: object
-    btn_run_speed_probe: _ProbeButtonLike
+    @property
+    def root(self) -> tk.Misc: ...
+
+    @property
+    def btn_run_speed_probe(self) -> _ProbeButtonLike: ...
 
     def _merge_supplemental_evidence(self, payload: dict[str, object] | None) -> None: ...
 
@@ -126,10 +130,12 @@ class _AskProbeNotesDialogFn(Protocol):
 class _RunInThreadFn(Protocol):
     def __call__(
         self,
-        root: object,
+        root: tk.Misc,
         work: Callable[[], _ProbeResult],
         on_done: Callable[[_ProbeResult], None],
-    ) -> None: ...
+        *,
+        delay_ms: int = ...,
+    ) -> object: ...
 
 
 def _build_backend_speed_probe_messages(

@@ -74,7 +74,7 @@ def run_backend_speed_probe(
     *,
     prompt: bool,
     current_backend_speed_probe_plan_fn: _backend_probe._CurrentBackendSpeedProbePlanFn,
-    messagebox: _tasks._MessageBox,
+    messagebox: object,
     tk_runtime_errors: tuple[type[BaseException], ...],
     run_in_thread: _backend_probe._RunInThreadFn,
     config_cls: _backend_probe._ProbeConfigFactory,

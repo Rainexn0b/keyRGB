@@ -134,19 +134,21 @@ stricter campaign.
 **Progress (2026-08-19 — C2 full exit).** Folded `keyrgb/gui` into the
 primary mypy invocation and deleted the skip-mode tuple. Ten follow-imports
 errors were real signature mismatches (protocol covariance, `Mapping` key
-invariance, `Config` property/setter shape). `support.py` still has
-targeted `# type: ignore[arg-type]` on facade call sites; those remain
-required even with follow-imports=normal.
+invariance, `Config` property/setter shape).
+
+**Progress (2026-08-19 — facade ignore cleanup).** Dropped the remaining
+`# type: ignore[arg-type]` from `support.py` and `calibrator/app.py`. Helper
+protocols now use covariant `@property` members, declared dynamically-set
+widgets, and a single `cast()` at Tk-module boundaries so the facades pass
+real `tk`/`ttk`/`messagebox` modules without ignores.
 
 Notable batch-3 techniques:
 - Declare dynamically-initialized attributes on `PerKeyEditor` /
   `ReactiveColorGUI` so they satisfy the editor/window protocols.
 - Protocol data members as `@property` for covariance (Tk `BooleanVar` /
   `StringVar` vs local variable protocols).
-- Check-time-only mixin bases and targeted `cast()` at Tk-overload /
-  module-vs-Protocol boundaries. `support.py` keeps a small set of
-  `# type: ignore[arg-type]` on facade call sites where many local
-  protocols meet real Tk modules.
+  - Check-time-only mixin bases and targeted `cast()` at Tk-overload /
+    module-vs-Protocol boundaries.
 - Reverted a TYPE_CHECKING-only base class on `SupportToolsGUI` (would
   have been a runtime `NameError`).
 

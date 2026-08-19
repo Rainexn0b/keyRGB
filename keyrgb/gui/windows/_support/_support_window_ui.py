@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from . import (
     _support_window_ui_sections as support_window_ui_sections,
     _support_window_ui_shared as support_window_ui_shared,
@@ -39,19 +41,21 @@ _bind_wrap_sync = support_window_ui_shared.bind_wrap_sync
 def build_window(
     window: _SupportWindowProtocol,
     *,
-    ttk: _TtkModuleProtocol,
-    scrolledtext: _ScrolledTextModuleProtocol,
+    ttk: object,
+    scrolledtext: object,
     center_window_on_screen: CenterWindowOnScreenFn,
 ) -> None:
-    _configure_run_check_styles(window, ttk=ttk)
+    ttk_mod = cast(_TtkModuleProtocol, ttk)
+    scrolledtext_mod = cast(_ScrolledTextModuleProtocol, scrolledtext)
+    _configure_run_check_styles(window, ttk=ttk_mod)
 
-    main = ttk.Frame(window.root, padding=18)
+    main = ttk_mod.Frame(window.root, padding=18)
     main.pack(fill="both", expand=True)
     window._main_frame = main
     _reset_wrap_targets(window)
 
-    ttk.Label(main, text="Support Tools", font=("Sans", 14, "bold")).pack(anchor="w", pady=(0, 6))
-    intro_label = ttk.Label(
+    ttk_mod.Label(main, text="Support Tools", font=("Sans", 14, "bold")).pack(anchor="w", pady=(0, 6))
+    intro_label = ttk_mod.Label(
         main,
         text=(
             "Run read-only support scans directly from the tray workflow.\n"
@@ -64,39 +68,39 @@ def build_window(
     intro_label.pack(anchor="w", pady=(0, 12))
     _register_wrap_target(window, label=intro_label, owner=main, padding=36, minimum=360)
 
-    window.status_label = ttk.Label(main, text="", font=("Sans", 9))
+    window.status_label = ttk_mod.Label(main, text="", font=("Sans", 9))
     window.status_label.pack(anchor="w", pady=(0, 10))
 
-    window.checks_frame = ttk.LabelFrame(main, text="Run Checks", padding=12)
+    window.checks_frame = ttk_mod.LabelFrame(main, text="Run Checks", padding=12)
     window.checks_frame.pack(fill="x", pady=(0, 12))
-    build_checks_section(window, window.checks_frame, ttk=ttk)
+    build_checks_section(window, window.checks_frame, ttk=ttk_mod)
 
-    results_row = ttk.Frame(main)
+    results_row = ttk_mod.Frame(main)
     results_row.pack(fill="both", expand=True, pady=(0, 12))
     results_row.columnconfigure(0, weight=1, uniform="pane")
     results_row.columnconfigure(1, weight=1, uniform="pane")
     results_row.rowconfigure(0, weight=1)
 
-    window.debug_frame = ttk.LabelFrame(results_row, text="Debug", padding=12)
+    window.debug_frame = ttk_mod.LabelFrame(results_row, text="Debug", padding=12)
     window.debug_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 6))
-    build_debug_section(window, window.debug_frame, ttk=ttk, scrolledtext=scrolledtext)
+    build_debug_section(window, window.debug_frame, ttk=ttk_mod, scrolledtext=scrolledtext_mod)
 
-    window.discovery_frame = ttk.LabelFrame(results_row, text="Detect New Backends", padding=12)
+    window.discovery_frame = ttk_mod.LabelFrame(results_row, text="Detect New Backends", padding=12)
     window.discovery_frame.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
     build_discovery_section(
         window,
         window.discovery_frame,
-        ttk=ttk,
-        scrolledtext=scrolledtext,
+        ttk=ttk_mod,
+        scrolledtext=scrolledtext_mod,
     )
 
-    window.issue_frame = ttk.LabelFrame(main, text="Prepare Support Issue", padding=12)
+    window.issue_frame = ttk_mod.LabelFrame(main, text="Prepare Support Issue", padding=12)
     window.issue_frame.pack(fill="both", expand=True, pady=(0, 12))
-    build_issue_section(window, window.issue_frame, ttk=ttk, scrolledtext=scrolledtext)
+    build_issue_section(window, window.issue_frame, ttk=ttk_mod, scrolledtext=scrolledtext_mod)
 
-    window.bundle_frame = ttk.LabelFrame(main, text="Support Bundle", padding=12)
+    window.bundle_frame = ttk_mod.LabelFrame(main, text="Support Bundle", padding=12)
     window.bundle_frame.pack(fill="x")
-    build_bundle_section(window, window.bundle_frame, ttk=ttk)
+    build_bundle_section(window, window.bundle_frame, ttk=ttk_mod)
 
     _bind_wrap_sync(
         window,

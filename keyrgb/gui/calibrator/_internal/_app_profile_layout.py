@@ -4,9 +4,11 @@ from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Protocol, TypeAlias
 
-from PIL import Image
+from PIL import Image, ImageTk
 
 from keyrgb.core.resources.layout import KeyDef
+from keyrgb.gui.reference.overlay_geometry import CanvasTransform
+from keyrgb.gui.utils.deck_render_cache import DeckRenderCache
 
 KeyCell: TypeAlias = tuple[int, int]
 KeyCells: TypeAlias = tuple[KeyCell, ...]
@@ -17,12 +19,15 @@ LayoutSlotOverrides: TypeAlias = dict[str, dict[str, object]]
 
 
 class _CalibratorConfigLike(Protocol):
-    physical_layout: str | None
-    layout_legend_pack: str | None
+    @property
+    def physical_layout(self) -> object: ...
+
+    @property
+    def layout_legend_pack(self) -> object: ...
 
 
 class _ConfigurableWidget(Protocol):
-    def configure(self, **kwargs: object) -> object: ...
+    def configure(self, *args: object, **kwargs: object) -> object: ...
 
 
 class _PreviewLike(Protocol):
@@ -43,31 +48,43 @@ class _ProbeLike(Protocol):
     def clear_selection(self) -> None: ...
 
 
-class _DeckRenderCacheLike(Protocol):
-    def clear(self) -> None: ...
-
-
 class _BoolVarLike(Protocol):
     def get(self) -> bool: ...
 
 
 class _CalibratorAppLike(Protocol):
     profile_name: str
-    cfg: _CalibratorConfigLike | None
+
+    @property
+    def cfg(self) -> _CalibratorConfigLike | None: ...
+
     keymap: Keymap
     layout_tweaks: LayoutTweaks
     per_key_layout_tweaks: PerKeyLayoutTweaks
     layout_slot_overrides: LayoutSlotOverrides
-    preview: _PreviewLike
-    probe: _ProbeLike
-    lbl_status: _ConfigurableWidget
-    lbl_cell: _ConfigurableWidget
-    canvas: object
+
+    @property
+    def preview(self) -> _PreviewLike: ...
+
+    @property
+    def probe(self) -> _ProbeLike: ...
+
+    @property
+    def lbl_status(self) -> _ConfigurableWidget: ...
+
+    @property
+    def lbl_cell(self) -> _ConfigurableWidget: ...
+
+    @property
+    def canvas(self) -> object: ...
+
     _deck_pil: Image.Image | None
-    _deck_tk: object | None
-    _deck_render_cache: _DeckRenderCacheLike
-    _transform: object | None
-    _show_backdrop_var: _BoolVarLike
+    _deck_tk: ImageTk.PhotoImage | None
+    _deck_render_cache: DeckRenderCache[ImageTk.PhotoImage]
+    _transform: CanvasTransform | None
+
+    @property
+    def _show_backdrop_var(self) -> _BoolVarLike: ...
 
     def _redraw(self) -> None: ...
 

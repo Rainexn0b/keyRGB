@@ -7,7 +7,7 @@ DialogFileTypes: TypeAlias = list[tuple[str, str]]
 
 
 class _ConfigurableWidget(Protocol):
-    def configure(self, **kwargs: object) -> None: ...
+    def configure(self, *args: object, **kwargs: object) -> object: ...
 
 
 class _TextWidget(_ConfigurableWidget, Protocol):
@@ -21,7 +21,7 @@ class _RootWidget(Protocol):
 
     def clipboard_append(self, value: str) -> None: ...
 
-    def after(self, delay_ms: int, callback: Callable[[], None]) -> None: ...
+    def after(self, delay_ms: int, callback: Callable[[], object]) -> object: ...
 
 
 class _SaveAsFilenameFn(Protocol):

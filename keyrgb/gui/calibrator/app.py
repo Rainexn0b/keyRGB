@@ -11,6 +11,11 @@ from ._internal import _app_runtime_deps
 
 if TYPE_CHECKING:
     from keyrgb.core.resources.layout import KeyDef
+    from keyrgb.gui.calibrator._app_bootstrap import (
+        _BindableWidgetProtocol,
+        _BoolVarProtocol,
+        _ConfigurableWidgetProtocol,
+    )
     from keyrgb.gui.reference import overlay_geometry
     from keyrgb.gui.utils import deck_render_cache
 
@@ -75,10 +80,10 @@ _CalibratorAppLike = _app_runtime_deps._CalibratorAppLike
 
 class KeymapCalibrator(tk.Tk):
     # Set by _app_bootstrap.build_widgets() during __init__
-    canvas: tk.Canvas
-    lbl_cell: ttk.Label
-    lbl_status: ttk.Label
-    _show_backdrop_var: tk.BooleanVar
+    canvas: _BindableWidgetProtocol
+    lbl_cell: _ConfigurableWidgetProtocol
+    lbl_status: _ConfigurableWidgetProtocol
+    _show_backdrop_var: _BoolVarProtocol
 
     def __init__(self) -> None:
         super().__init__()
@@ -122,9 +127,9 @@ class KeymapCalibrator(tk.Tk):
         self._transform: overlay_geometry.CanvasTransform | None = None
 
         _app_bootstrap.build_widgets(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
-            tk=tk,  # type: ignore[arg-type]  # tkinter module vs _TkModuleProtocol
-            ttk=ttk,  # type: ignore[arg-type]  # tkinter.ttk module vs _TtkModuleProtocol
+            self,
+            tk=tk,
+            ttk=ttk,
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
             wrap_sync_errors=_WRAP_SYNC_ERRORS,
         )
@@ -133,14 +138,14 @@ class KeymapCalibrator(tk.Tk):
 
     def _on_show_backdrop_changed(self) -> None:
         _app_logic.on_show_backdrop_changed(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            self,
             load_backdrop_image=load_backdrop_image,
             load_backdrop_mode=profiles.load_backdrop_mode,
         )
 
     def _reset_keymap_defaults(self) -> None:
         _app_logic.reset_keymap_defaults(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            self,
             parse_default_keymap_fn=_parse_default_keymap,
             sanitize_keymap_cells=profile_management.sanitize_keymap_cells,
             num_rows=MATRIX_ROWS,
@@ -150,33 +155,33 @@ class KeymapCalibrator(tk.Tk):
         )
 
     def _restore_original_config(self) -> None:
-        _app_logic.restore_original_config(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+        _app_logic.restore_original_config(self)
 
     def _on_close(self) -> None:
-        _app_logic.on_close(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+        _app_logic.on_close(self)
 
     def _load_deck_image(self) -> None:
         _app_logic.load_deck_image_for_calibrator(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            self,
             load_backdrop_image=load_backdrop_image,
             load_backdrop_mode=profiles.load_backdrop_mode,
         )
 
     def _apply_current_probe(self) -> None:
-        _app_logic.apply_current_probe(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+        _app_logic.apply_current_probe(self)
 
     def _prev(self) -> None:
-        _app_logic.prev_cell(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+        _app_logic.prev_cell(self)
 
     def _next(self) -> None:
-        _app_logic.next_cell(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+        _app_logic.next_cell(self)
 
     def _skip(self) -> None:
-        _app_logic.skip_cell(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+        _app_logic.skip_cell(self)
 
     def _assign(self) -> None:
         _app_logic.assign_current_cell(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            self,
             probe_selected_slot_id_fn=_probe_selected_slot_id,
             probe_selected_key_id_fn=_probe_selected_key_id,
             keymap_cells_for=profile_management.keymap_cells_for,
@@ -186,19 +191,19 @@ class KeymapCalibrator(tk.Tk):
 
     def _save(self) -> None:
         _app_logic.save_current_keymap(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            self,
             save_keymap_fn=_save_keymap,
             keymap_path_fn=_keymap_path,
             physical_layout_id_fn=_physical_layout_id,
         )
 
     def _save_and_close(self) -> None:
-        _app_logic.save_and_close(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+        _app_logic.save_and_close(self)
 
     def _redraw(self) -> None:
         _app_logic.redraw(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
-            redraw_calibration_canvas=redraw_calibration_canvas,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            self,
+            redraw_calibration_canvas=redraw_calibration_canvas,
             probe_selected_slot_id_fn=_probe_selected_slot_id,
             probe_selected_key_id_fn=_probe_selected_key_id,
             physical_layout_id_fn=_physical_layout_id,
@@ -207,7 +212,7 @@ class KeymapCalibrator(tk.Tk):
 
     def _on_click(self, e: tk.Event) -> None:
         _app_logic.on_click(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            self,
             e,
             hit_test_fn=self._hit_test,
             keymap_cells_for=profile_management.keymap_cells_for,
@@ -216,10 +221,10 @@ class KeymapCalibrator(tk.Tk):
 
     def _hit_test(self, x: int, y: int) -> KeyDef | None:
         return _app_logic.hit_test_point(
-            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            self,
             x,
             y,
-            hit_test=hit_test,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            hit_test=hit_test,
             visible_layout_keys_fn=_visible_layout_keys,
             image_size=layout_resources.BASE_IMAGE_SIZE,
         )

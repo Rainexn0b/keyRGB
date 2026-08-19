@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import tkinter as tk
 from collections.abc import Callable
-from typing import Protocol, TypeAlias
+from typing import Protocol, TypeAlias, cast
 
 _JsonDict: TypeAlias = dict[str, object]
 
@@ -18,11 +19,12 @@ _SUPPORT_COLLECTION_ERRORS = (
 
 
 class _ConfigurableWidget(Protocol):
-    def configure(self, **kwargs: object) -> None: ...
+    def configure(self, *args: object, **kwargs: object) -> object: ...
 
 
 class _TaskWindowBase(Protocol):
-    root: object
+    @property
+    def root(self) -> tk.Misc: ...
 
     def _set_status(self, text: str, *, ok: bool = True) -> None: ...
 
@@ -32,9 +34,15 @@ class _TaskWindowBase(Protocol):
 
 
 class _DebugWindow(_TaskWindowBase, Protocol):
-    btn_run_debug: _ConfigurableWidget
-    btn_copy_debug: _ConfigurableWidget
-    txt_debug: object
+    @property
+    def btn_run_debug(self) -> _ConfigurableWidget: ...
+
+    @property
+    def btn_copy_debug(self) -> _ConfigurableWidget: ...
+
+    @property
+    def txt_debug(self) -> object: ...
+
     _diagnostics_json: str
 
     def _set_text(self, widget: object, text: str) -> None: ...
@@ -43,9 +51,15 @@ class _DebugWindow(_TaskWindowBase, Protocol):
 
 
 class _DiscoveryWindow(_TaskWindowBase, Protocol):
-    btn_run_discovery: _ConfigurableWidget
-    btn_copy_discovery: _ConfigurableWidget
-    txt_discovery: object
+    @property
+    def btn_run_discovery(self) -> _ConfigurableWidget: ...
+
+    @property
+    def btn_copy_discovery(self) -> _ConfigurableWidget: ...
+
+    @property
+    def txt_discovery(self) -> object: ...
+
     _discovery_json: str
     _supplemental_evidence: _JsonDict | None
 
@@ -57,7 +71,9 @@ class _DiscoveryWindow(_TaskWindowBase, Protocol):
 
 
 class _EvidenceWindow(_TaskWindowBase, Protocol):
-    btn_collect_evidence: _ConfigurableWidget
+    @property
+    def btn_collect_evidence(self) -> _ConfigurableWidget: ...
+
     _discovery_json: str
 
     def _parsed_json(self, text: str) -> _JsonDict | None: ...
@@ -76,10 +92,12 @@ class _CollectDiagnosticsText(Protocol):
 class _RunDebugInThread(Protocol):
     def __call__(
         self,
-        root: object,
+        root: tk.Misc,
         work: Callable[[], str],
         on_done: Callable[[str], None],
-    ) -> None: ...
+        *,
+        delay_ms: int = ...,
+    ) -> object: ...
 
 
 class _CollectDeviceDiscovery(Protocol):
@@ -93,10 +111,12 @@ class _FormatDeviceDiscoveryText(Protocol):
 class _RunDiscoveryInThread(Protocol):
     def __call__(
         self,
-        root: object,
+        root: tk.Misc,
         work: Callable[[], tuple[str, str]],
         on_done: Callable[[tuple[str, str]], None],
-    ) -> None: ...
+        *,
+        delay_ms: int = ...,
+    ) -> object: ...
 
 
 class _CurrentCapturePlanFn(Protocol):
@@ -104,7 +124,13 @@ class _CurrentCapturePlanFn(Protocol):
 
 
 class _MessageBox(Protocol):
-    def askyesno(self, title: str, message: str, *, parent: object) -> object: ...
+    def askyesno(
+        self,
+        title: str | None = None,
+        message: str | None = None,
+        *,
+        parent: object = ...,
+    ) -> object: ...
 
 
 class _CollectAdditionalEvidence(Protocol):
@@ -114,10 +140,12 @@ class _CollectAdditionalEvidence(Protocol):
 class _RunEvidenceInThread(Protocol):
     def __call__(
         self,
-        root: object,
+        root: tk.Misc,
         work: Callable[[], object],
         on_done: Callable[[object], None],
-    ) -> None: ...
+        *,
+        delay_ms: int = ...,
+    ) -> object: ...
 
 
 def _json_dict(value: object) -> _JsonDict | None:
@@ -209,7 +237,7 @@ def collect_missing_evidence(
     *,
     prompt: bool,
     current_capture_plan_fn: _CurrentCapturePlanFn,
-    messagebox: _MessageBox,
+    messagebox: object,
     tk_runtime_errors: tuple[type[BaseException], ...],
     collect_additional_evidence: _CollectAdditionalEvidence,
     run_in_thread: _RunEvidenceInThread,
@@ -225,7 +253,7 @@ def collect_missing_evidence(
         if needs_privileged:
             message += " This may prompt for an administrator password."
         try:
-            ok = bool(messagebox.askyesno("Collect Missing Evidence", message, parent=window.root))
+            ok = bool(cast(_MessageBox, messagebox).askyesno("Collect Missing Evidence", message, parent=window.root))
         except tk_runtime_errors:
             ok = False
         if not ok:

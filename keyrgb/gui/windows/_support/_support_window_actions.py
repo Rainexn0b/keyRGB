@@ -17,7 +17,13 @@ CanRunBackendSpeedProbeFn: TypeAlias = Callable[[], bool]
 
 
 class _MessageBoxLike(Protocol):
-    def askyesno(self, title: str, message: str, parent: object | None = None) -> object: ...
+    def askyesno(
+        self,
+        title: str | None = None,
+        message: str | None = None,
+        *,
+        parent: object = ...,
+    ) -> object: ...
 
 
 class _ParsedJsonFn(Protocol):
@@ -181,7 +187,7 @@ def maybe_prompt_for_missing_evidence(
     window: object,
     *,
     current_capture_plan_fn: CapturePlanFn,
-    messagebox: _MessageBoxLike,
+    messagebox: object,
     tk_runtime_errors: tuple[type[BaseException], ...],
 ) -> None:
     support_window = _support_window(window)
@@ -203,7 +209,11 @@ def maybe_prompt_for_missing_evidence(
     message += "\n\nCollect missing evidence now?"
 
     try:
-        ok = bool(messagebox.askyesno("Collect Missing Evidence", message, parent=support_window.root))
+        ok = bool(
+            cast(_MessageBoxLike, messagebox).askyesno(
+                "Collect Missing Evidence", message, parent=support_window.root
+            )
+        )
     except tk_runtime_errors:
         ok = False
     if ok:
@@ -215,7 +225,7 @@ def maybe_prompt_for_backend_speed_probe(
     *,
     current_backend_speed_probe_plan_fn: BackendSpeedProbePlanFn,
     can_run_backend_speed_probe_fn: CanRunBackendSpeedProbeFn,
-    messagebox: _MessageBoxLike,
+    messagebox: object,
     tk_runtime_errors: tuple[type[BaseException], ...],
 ) -> None:
     support_window = _support_window(window)
@@ -234,7 +244,11 @@ def maybe_prompt_for_backend_speed_probe(
         "Run the probe now?"
     )
     try:
-        ok = bool(messagebox.askyesno("Run Backend Speed Probe", message, parent=support_window.root))
+        ok = bool(
+            cast(_MessageBoxLike, messagebox).askyesno(
+                "Run Backend Speed Probe", message, parent=support_window.root
+            )
+        )
     except tk_runtime_errors:
         ok = False
     if ok:

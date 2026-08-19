@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Protocol, TypeAlias, cast
 
 _JsonDict: TypeAlias = dict[str, object]
@@ -14,11 +14,17 @@ class _WindowRoot(Protocol):
 
 
 class _SupportWindow(Protocol):
-    root: _WindowRoot
+    @property
+    def root(self) -> _WindowRoot: ...
+
     _diagnostics_json: str
     _discovery_json: str
-    _supplemental_evidence: object
-    _issue_report: Mapping[str, object] | None
+
+    @property
+    def _supplemental_evidence(self) -> dict[str, object] | None: ...
+
+    @property
+    def _issue_report(self) -> dict[str, object] | None: ...
 
     def _set_status(self, text: str, *, ok: bool = True) -> None: ...
 

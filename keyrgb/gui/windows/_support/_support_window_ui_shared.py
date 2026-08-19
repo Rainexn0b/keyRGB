@@ -10,7 +10,7 @@ AfterCallback: TypeAlias = Callable[[], None]
 
 
 class _WrapTargetLabelProtocol(Protocol):
-    def configure(self, **kwargs: object) -> None: ...
+    def configure(self, *args: object, **kwargs: object) -> object: ...
 
 
 class _WrapTargetOwnerProtocol(Protocol):
@@ -24,17 +24,17 @@ class _StyleProtocol(Protocol):
 
 
 class _StyleFactoryProtocol(Protocol):
-    def __call__(self, master: object) -> _StyleProtocol: ...
+    def __call__(self, *args: object, **kwargs: object) -> _StyleProtocol: ...
 
 
 class _WidgetProtocol(Protocol):
-    def configure(self, **kwargs: object) -> None: ...
+    def configure(self, *args: object, **kwargs: object) -> object: ...
 
-    def pack(self, *args: object, **kwargs: object) -> None: ...
+    def pack(self, *args: object, **kwargs: object) -> object: ...
 
-    def grid(self, *args: object, **kwargs: object) -> None: ...
+    def grid(self, *args: object, **kwargs: object) -> object: ...
 
-    def bind(self, sequence: str, callback: BindCallback, add: object = None) -> None: ...
+    def bind(self, *args: object, **kwargs: object) -> object: ...
 
     def focus_set(self) -> None: ...
 
@@ -54,11 +54,11 @@ class _TextWidgetProtocol(_WidgetProtocol, Protocol):
 
 
 class _WidgetFactoryProtocol(Protocol):
-    def __call__(self, parent: object | None = None, **kwargs: object) -> _WidgetProtocol: ...
+    def __call__(self, *args: object, **kwargs: object) -> _WidgetProtocol: ...
 
 
 class _TextWidgetFactoryProtocol(Protocol):
-    def __call__(self, parent: object | None = None, **kwargs: object) -> _TextWidgetProtocol: ...
+    def __call__(self, *args: object, **kwargs: object) -> _TextWidgetProtocol: ...
 
 
 class _TtkModuleProtocol(Protocol):
@@ -73,19 +73,20 @@ class _ScrolledTextModuleProtocol(Protocol):  # noqa: PYI046 – re-exported in 
     ScrolledText: _TextWidgetFactoryProtocol
 
 
-class _RootProtocol(Protocol):
-    def after(self, delay_ms: int, callback: AfterCallback) -> None: ...
+class _RootProtocol(Protocol):  # noqa: PYI046 – re-exported in _support_window_ui.py
+    def after(self, delay_ms: int, callback: AfterCallback) -> object: ...
 
 
 WrapTarget: TypeAlias = tuple[_WrapTargetLabelProtocol, _WrapTargetOwnerProtocol, int, int]
 ButtonCommand: TypeAlias = Callable[[], None]
 ActionRowSpec: TypeAlias = tuple[str, ButtonCommand, str]
 CheckActionSpec: TypeAlias = tuple[str, ButtonCommand, str, str, str]
-CenterWindowOnScreenFn: TypeAlias = Callable[[_RootProtocol], None]
+CenterWindowOnScreenFn: TypeAlias = Callable[[tk.Tk | tk.Toplevel], None]
 
 
 class _SupportWindowProtocol(Protocol):
-    root: _RootProtocol
+    @property
+    def root(self) -> tk.Tk: ...
     _bg_color: str
     _fg_color: str
     _main_frame: _WidgetProtocol

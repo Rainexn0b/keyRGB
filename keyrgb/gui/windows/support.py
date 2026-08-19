@@ -9,9 +9,13 @@ from ._support import _support_window_geometry
 from ._support._support_window_text_io import copy_text, save_text_via_dialog, set_status, set_text
 
 if TYPE_CHECKING:
-    from keyrgb.gui.windows._support._support_window_geometry import _MainFrame
     from keyrgb.gui.windows._support._support_window_state import (
         SupportSessionState as _SupportSessionState,
+    )
+    from keyrgb.gui.windows._support._support_window_ui_shared import (
+        WrapTarget,
+        _TextWidgetProtocol,
+        _WidgetProtocol,
     )
 
 tk = _support_window_runtime_deps.tk
@@ -50,7 +54,30 @@ _GEOMETRY_APPLY_ERRORS = _support_window_runtime_deps._GEOMETRY_APPLY_ERRORS
 
 
 class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
-    _main_frame: _MainFrame
+    _main_frame: _WidgetProtocol
+    _wrap_targets: list[WrapTarget]
+    status_label: _WidgetProtocol
+    checks_frame: _WidgetProtocol
+    debug_frame: _WidgetProtocol
+    discovery_frame: _WidgetProtocol
+    issue_frame: _WidgetProtocol
+    bundle_frame: _WidgetProtocol
+    issue_meta_label: _WidgetProtocol
+    txt_debug: _TextWidgetProtocol
+    txt_discovery: _TextWidgetProtocol
+    txt_issue: _TextWidgetProtocol
+    btn_run_debug: _WidgetProtocol
+    btn_run_speed_probe: _WidgetProtocol
+    btn_run_discovery: _WidgetProtocol
+    btn_copy_debug: _WidgetProtocol
+    btn_save_debug: _WidgetProtocol
+    btn_copy_discovery: _WidgetProtocol
+    btn_save_discovery: _WidgetProtocol
+    btn_copy_issue: _WidgetProtocol
+    btn_save_issue: _WidgetProtocol
+    btn_collect_evidence: _WidgetProtocol
+    btn_open_issue: _WidgetProtocol
+    btn_save_bundle: _WidgetProtocol
 
     def __init__(self) -> None:
         self.root = tk.Tk()
@@ -65,10 +92,10 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         self._support_session = support_window_state.SupportSessionState()
 
         support_window_ui.build_window(
-            self,  # type: ignore[arg-type]
-            ttk=ttk,  # type: ignore[arg-type]
-            scrolledtext=scrolledtext,  # type: ignore[arg-type]
-            center_window_on_screen=center_window_on_screen,  # type: ignore[arg-type]
+            self,
+            ttk=ttk,
+            scrolledtext=scrolledtext,
+            center_window_on_screen=center_window_on_screen,
         )
         self.root.after(50, self._apply_geometry)
 
@@ -88,7 +115,7 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
 
     def _apply_initial_focus(self) -> None:
         support_window_ui.apply_initial_focus(
-            self,  # type: ignore[arg-type]
+            self,
             focus_env=str(os.environ.get("KEYRGB_SUPPORT_FOCUS") or "debug").strip().lower(),
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
         )
@@ -130,7 +157,7 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
         support_actions.maybe_prompt_for_missing_evidence(
             self,
             current_capture_plan_fn=self._current_capture_plan,
-            messagebox=messagebox,  # type: ignore[arg-type]
+            messagebox=messagebox,
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
         )
 
@@ -139,7 +166,7 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
             self,
             current_backend_speed_probe_plan_fn=self._current_backend_speed_probe_plan,
             can_run_backend_speed_probe_fn=self._can_run_backend_speed_probe,
-            messagebox=messagebox,  # type: ignore[arg-type]
+            messagebox=messagebox,
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
         )
 
@@ -178,40 +205,40 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
 
     def run_debug(self) -> None:
         support_jobs.run_debug(
-            self,  # type: ignore[arg-type]
+            self,
             collect_diagnostics_text=collect_diagnostics_text,
-            run_in_thread=run_in_thread,  # type: ignore[arg-type]
+            run_in_thread=run_in_thread,
             logger=logger,
         )
 
     def run_discovery(self) -> None:
         support_jobs.run_discovery(
-            self,  # type: ignore[arg-type]
+            self,
             collect_device_discovery=collect_device_discovery,
             format_device_discovery_text=format_device_discovery_text,
-            run_in_thread=run_in_thread,  # type: ignore[arg-type]
+            run_in_thread=run_in_thread,
             logger=logger,
         )
 
     def collect_missing_evidence(self, *, prompt: bool = True) -> None:
         support_jobs.collect_missing_evidence(
-            self,  # type: ignore[arg-type]
+            self,
             prompt=prompt,
             current_capture_plan_fn=self._current_capture_plan,
-            messagebox=messagebox,  # type: ignore[arg-type]
+            messagebox=messagebox,
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
             collect_additional_evidence=collect_additional_evidence,
-            run_in_thread=run_in_thread,  # type: ignore[arg-type]
+            run_in_thread=run_in_thread,
         )
 
     def run_backend_speed_probe(self, *, prompt: bool = True) -> None:
         support_jobs.run_backend_speed_probe(
-            self,  # type: ignore[arg-type]
+            self,
             prompt=prompt,
             current_backend_speed_probe_plan_fn=self._current_backend_speed_probe_plan,
-            messagebox=messagebox,  # type: ignore[arg-type]
+            messagebox=messagebox,
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
-            run_in_thread=run_in_thread,  # type: ignore[arg-type]
+            run_in_thread=run_in_thread,
             config_cls=Config,
             tray_pid=str(os.environ.get("KEYRGB_TRAY_PID") or ""),
             tk=tk,
@@ -268,7 +295,7 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
 
     def save_support_bundle(self) -> None:
         support_jobs.save_support_bundle(
-            self,  # type: ignore[arg-type]
+            self,
             asksaveasfilename=filedialog.asksaveasfilename,
             build_support_bundle_payload=build_support_bundle_payload,
             logger=logger,
@@ -278,7 +305,7 @@ class SupportToolsGUI(support_session_bridge.SupportWindowSessionBridgeMixin):
 
     def open_issue_form(self) -> None:
         support_jobs.open_issue_form(
-            self,  # type: ignore[arg-type]
+            self,
             issue_url=ISSUE_URL,
             open_browser=webbrowser.open,
             browser_open_errors=_BROWSER_OPEN_ERRORS,

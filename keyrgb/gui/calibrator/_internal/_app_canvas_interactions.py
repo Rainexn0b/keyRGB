@@ -1,22 +1,24 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
-from typing import TYPE_CHECKING, Protocol, TypeAlias
+from typing import TYPE_CHECKING, Protocol, TypeAlias, cast
 
 if TYPE_CHECKING:
-    from PIL import Image
+    import tkinter as tk
+
+    from PIL import Image, ImageTk
 
     from keyrgb.core.resources.layout import KeyDef
+    from keyrgb.gui.reference.overlay_geometry import CanvasTransform
+    from keyrgb.gui.utils.deck_render_cache import DeckRenderCache
 
     from ._app_profile_layout import (
         KeyCells,
-        Keymap,
         LayoutSlotOverrides,
         LayoutTweaks,
         PerKeyLayoutTweaks,
         PhysicalLayoutIdFn,
         _CalibratorAppLike,
-        _DeckRenderCacheLike,
         _ProbeSelectedIdentityFn,
         _SelectedLayoutLegendPackFn,
         _VisibleLayoutKeysFn,
@@ -41,18 +43,18 @@ class _RedrawCalibrationCanvasFn(Protocol):
     def __call__(
         self,
         *,
-        canvas: object,
+        canvas: tk.Canvas,
         deck_pil: Image.Image | None,
-        deck_render_cache: _DeckRenderCacheLike,
+        deck_render_cache: DeckRenderCache[ImageTk.PhotoImage],
         layout_tweaks: LayoutTweaks,
         per_key_layout_tweaks: PerKeyLayoutTweaks,
-        keymap: Keymap,
+        keymap: dict[str, object],
         selected_slot_id: str | None = None,
         selected_key_id: str | None = None,
         physical_layout: str = "auto",
         legend_pack_id: str | None = None,
         slot_overrides: LayoutSlotOverrides | None = None,
-    ) -> tuple[object, object | None]: ...
+    ) -> tuple[CanvasTransform, ImageTk.PhotoImage | None]: ...
 
 
 class _ClickEvent(Protocol):
@@ -68,13 +70,13 @@ class _CanvasHitTestFn(Protocol):
     def __call__(
         self,
         *,
-        transform: object,
+        transform: CanvasTransform,
         x: int,
         y: int,
         layout_tweaks: LayoutTweaks,
         per_key_layout_tweaks: PerKeyLayoutTweaks,
-        keys: Iterable[KeyDef],
-        image_size: ImageSize,
+        keys: Iterable[KeyDef] = ...,
+        image_size: ImageSize = ...,
     ) -> KeyDef | None: ...
 
 
@@ -89,12 +91,12 @@ def redraw(
 ) -> None:
     physical_layout = physical_layout_id_fn(app)
     app._transform, app._deck_tk = redraw_calibration_canvas(
-        canvas=app.canvas,
+        canvas=cast("tk.Canvas", app.canvas),
         deck_pil=app._deck_pil,
         deck_render_cache=app._deck_render_cache,
         layout_tweaks=app.layout_tweaks,
         per_key_layout_tweaks=app.per_key_layout_tweaks,
-        keymap=app.keymap,
+        keymap=cast(dict[str, object], app.keymap),
         selected_slot_id=probe_selected_slot_id_fn(app),
         selected_key_id=probe_selected_key_id_fn(app),
         physical_layout=physical_layout,
