@@ -13,9 +13,20 @@ _PROBE_AUTOMATION_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, Va
 
 
 class _ProbeConfigLike(Protocol):
-    _settings: object
-    effect: object
-    speed: object
+    @property
+    def _settings(self) -> object: ...
+
+    @property
+    def effect(self) -> object: ...
+
+    @effect.setter
+    def effect(self, value: str) -> None: ...
+
+    @property
+    def speed(self) -> object: ...
+
+    @speed.setter
+    def speed(self, value: int) -> None: ...
 
     def _save(self) -> None: ...
 

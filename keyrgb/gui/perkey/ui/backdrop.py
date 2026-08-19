@@ -57,7 +57,7 @@ class _SaveBackdropImageProtocol(Protocol):
 
 
 class _SaveBackdropModeProtocol(Protocol):
-    def __call__(self, mode: str, profile_name: str) -> None: ...
+    def __call__(self, mode: object, name: str | None = None) -> None: ...
 
 
 class _ResetBackdropImageProtocol(Protocol):

@@ -63,7 +63,7 @@ class _StatusModule(Protocol):
 
 
 class _DefaultLayoutTweaksLoader(Protocol):
-    def __call__(self, physical_layout: str) -> dict[str, float]: ...
+    def __call__(self, physical_layout: str | None, /) -> dict[str, float]: ...
 
 
 class _OverlayModule(Protocol):

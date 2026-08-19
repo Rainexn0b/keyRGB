@@ -122,9 +122,9 @@ class KeymapCalibrator(tk.Tk):
         self._transform: overlay_geometry.CanvasTransform | None = None
 
         _app_bootstrap.build_widgets(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
-            tk=tk,  # type: ignore[arg-type]  # tkinter module satisfies _TkModuleProtocol; mypy can't verify with --follow-imports=skip
-            ttk=ttk,  # type: ignore[arg-type]  # tkinter.ttk module satisfies _TtkModuleProtocol; mypy can't verify with --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            tk=tk,  # type: ignore[arg-type]  # tkinter module vs _TkModuleProtocol
+            ttk=ttk,  # type: ignore[arg-type]  # tkinter.ttk module vs _TtkModuleProtocol
             tk_runtime_errors=_TK_RUNTIME_ERRORS,
             wrap_sync_errors=_WRAP_SYNC_ERRORS,
         )
@@ -133,14 +133,14 @@ class KeymapCalibrator(tk.Tk):
 
     def _on_show_backdrop_changed(self) -> None:
         _app_logic.on_show_backdrop_changed(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             load_backdrop_image=load_backdrop_image,
             load_backdrop_mode=profiles.load_backdrop_mode,
         )
 
     def _reset_keymap_defaults(self) -> None:
         _app_logic.reset_keymap_defaults(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             parse_default_keymap_fn=_parse_default_keymap,
             sanitize_keymap_cells=profile_management.sanitize_keymap_cells,
             num_rows=MATRIX_ROWS,
@@ -150,33 +150,33 @@ class KeymapCalibrator(tk.Tk):
         )
 
     def _restore_original_config(self) -> None:
-        _app_logic.restore_original_config(self)  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+        _app_logic.restore_original_config(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
 
     def _on_close(self) -> None:
-        _app_logic.on_close(self)  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+        _app_logic.on_close(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
 
     def _load_deck_image(self) -> None:
         _app_logic.load_deck_image_for_calibrator(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             load_backdrop_image=load_backdrop_image,
             load_backdrop_mode=profiles.load_backdrop_mode,
         )
 
     def _apply_current_probe(self) -> None:
-        _app_logic.apply_current_probe(self)  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+        _app_logic.apply_current_probe(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
 
     def _prev(self) -> None:
-        _app_logic.prev_cell(self)  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+        _app_logic.prev_cell(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
 
     def _next(self) -> None:
-        _app_logic.next_cell(self)  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+        _app_logic.next_cell(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
 
     def _skip(self) -> None:
-        _app_logic.skip_cell(self)  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+        _app_logic.skip_cell(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
 
     def _assign(self) -> None:
         _app_logic.assign_current_cell(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             probe_selected_slot_id_fn=_probe_selected_slot_id,
             probe_selected_key_id_fn=_probe_selected_key_id,
             keymap_cells_for=profile_management.keymap_cells_for,
@@ -186,19 +186,19 @@ class KeymapCalibrator(tk.Tk):
 
     def _save(self) -> None:
         _app_logic.save_current_keymap(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             save_keymap_fn=_save_keymap,
             keymap_path_fn=_keymap_path,
             physical_layout_id_fn=_physical_layout_id,
         )
 
     def _save_and_close(self) -> None:
-        _app_logic.save_and_close(self)  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+        _app_logic.save_and_close(self)  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
 
     def _redraw(self) -> None:
         _app_logic.redraw(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
-            redraw_calibration_canvas=redraw_calibration_canvas,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
+            redraw_calibration_canvas=redraw_calibration_canvas,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             probe_selected_slot_id_fn=_probe_selected_slot_id,
             probe_selected_key_id_fn=_probe_selected_key_id,
             physical_layout_id_fn=_physical_layout_id,
@@ -207,7 +207,7 @@ class KeymapCalibrator(tk.Tk):
 
     def _on_click(self, e: tk.Event) -> None:
         _app_logic.on_click(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             e,
             hit_test_fn=self._hit_test,
             keymap_cells_for=profile_management.keymap_cells_for,
@@ -216,10 +216,10 @@ class KeymapCalibrator(tk.Tk):
 
     def _hit_test(self, x: int, y: int) -> KeyDef | None:
         return _app_logic.hit_test_point(
-            self,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            self,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             x,
             y,
-            hit_test=hit_test,  # type: ignore[arg-type]  # Protocol structural check blocked by --follow-imports=skip
+            hit_test=hit_test,  # type: ignore[arg-type]  # Calibrator facade vs local helper protocols
             visible_layout_keys_fn=_visible_layout_keys,
             image_size=layout_resources.BASE_IMAGE_SIZE,
         )

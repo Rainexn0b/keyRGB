@@ -79,9 +79,9 @@ green; curl-install flow re-verified.
 
 ## C2 — Typing parity for the GUI layer
 
-`src/gui/**` is excluded from mypy (262 errors if enabled repo-wide);
-correctness there rests on tests alone (90.42% coverage). Deliberate and
-documented — pay down incrementally instead of a big bang:
+`keyrgb/gui/**` is now on the same mypy gate as core/tray (follow-imports=normal).
+The incremental skip-mode ratchet is closed. Remaining GUI typing debt is local
+(`# type: ignore` on a few Tk/protocol facade call sites), not an exclusion:
 
 1. Opt in the smallest leaf modules first (e.g. `gui/windows/uniform.py`,
    `gui/theme/`), fix to zero errors, add to the mypy include set.
@@ -130,6 +130,13 @@ follow-up (not required to close C2's incremental ratchet): drop
 `--follow-imports=skip` and fold `keyrgb/gui` into the primary mypy invocation
 so cross-package imports use real types instead of Any. That is a separate,
 stricter campaign.
+
+**Progress (2026-08-19 — C2 full exit).** Folded `keyrgb/gui` into the
+primary mypy invocation and deleted the skip-mode tuple. Ten follow-imports
+errors were real signature mismatches (protocol covariance, `Mapping` key
+invariance, `Config` property/setter shape). `support.py` still has
+targeted `# type: ignore[arg-type]` on facade call sites; those remain
+required even with follow-imports=normal.
 
 Notable batch-3 techniques:
 - Declare dynamically-initialized attributes on `PerKeyEditor` /

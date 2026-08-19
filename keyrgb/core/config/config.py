@@ -225,7 +225,7 @@ class Config(
         *,
         effect_brightness: int | None = None,
         perkey_brightness: int | None = None,
-        secondary_lighting: Mapping[object, object] | None = None,
+        secondary_lighting: Mapping[str, object] | None = None,
     ) -> None:
         """Persist keyboard and optional secondary profile state atomically."""
 
@@ -238,7 +238,7 @@ class Config(
             self._merge_secondary_profile_state(secondary_lighting)
         self._save()
 
-    def _merge_secondary_profile_state(self, payload: Mapping[object, object]) -> None:
+    def _merge_secondary_profile_state(self, payload: Mapping[str, object]) -> None:
         raw_areas = payload.get("areas")
         if not isinstance(raw_areas, Mapping):
             return

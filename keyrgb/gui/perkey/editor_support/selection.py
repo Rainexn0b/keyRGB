@@ -20,8 +20,11 @@ RgbColor: TypeAlias = tuple[int, int, int]
 
 
 class _VisibleLayoutKeyProtocol(Protocol):
-    key_id: str
-    slot_id: str | None
+    @property
+    def key_id(self) -> str: ...
+
+    @property
+    def slot_id(self) -> str | None: ...
 
 
 _VisibleKeyMap: TypeAlias = dict[str, _VisibleLayoutKeyProtocol]

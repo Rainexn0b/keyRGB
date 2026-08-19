@@ -3,6 +3,8 @@ from __future__ import annotations
 import tkinter as tk
 from typing import TYPE_CHECKING
 
+from PIL import Image
+
 from keyrgb.core.resources.layout import BASE_IMAGE_SIZE, KeyDef, get_layout_keys
 from keyrgb.gui.reference import overlay_geometry as _overlay_geometry
 from keyrgb.gui.utils.deck_render_cache import DeckRenderCache
@@ -43,7 +45,7 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
     def __init__(self, parent, editor: PerKeyEditor, **kwargs):
         super().__init__(parent, **kwargs)
         self.editor = editor
-        self._deck_img: object | None = None
+        self._deck_img: Image.Image | None = None
         self._deck_img_tk: object | None = None
         self._deck_render_cache: DeckRenderCache[object] = DeckRenderCache()
         self._deck_drawn_bbox: tuple[int, int, int, int] | None = None

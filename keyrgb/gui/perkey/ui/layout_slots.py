@@ -21,10 +21,17 @@ class _LayoutSlotsBodyProtocol(Protocol):
 
 
 class _LayoutSlotStateProtocol(Protocol):
-    key_id: str
-    visible: bool
-    label: str
-    default_label: str
+    @property
+    def key_id(self) -> str: ...
+
+    @property
+    def visible(self) -> bool: ...
+
+    @property
+    def label(self) -> str: ...
+
+    @property
+    def default_label(self) -> str: ...
 
 
 class _LayoutSlotIdentityOwner(Protocol):

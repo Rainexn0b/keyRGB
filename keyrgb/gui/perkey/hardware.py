@@ -54,7 +54,7 @@ def _coerce_backend_dimensions_pair(backend: KeyboardBackend) -> tuple[int, int]
     return int(rows), int(cols)
 
 
-def _backend_dimensions_or_reference(backend: object) -> tuple[int, int]:
+def _backend_dimensions_or_reference(backend: KeyboardBackend | None) -> tuple[int, int]:
     if backend is None:
         return REFERENCE_MATRIX_ROWS, REFERENCE_MATRIX_COLS
 

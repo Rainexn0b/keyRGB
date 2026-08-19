@@ -172,7 +172,7 @@ def apply_profile_to_config(
     cfg: object,
     colors: dict[tuple[int, int], tuple[int, int, int]],
     *,
-    secondary_lighting: Mapping[object, object] | None = None,
+    secondary_lighting: Mapping[str, object] | None = None,
     safe_profile_name: Callable[..., object],
     get_active_profile: Callable[..., object],
     log_throttled: Callable[..., object],
