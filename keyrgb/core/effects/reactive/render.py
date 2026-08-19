@@ -287,7 +287,7 @@ def pace(engine: EffectsEngine, *, min_factor: float = 0.25, max_factor: float =
     t = float(s) / 10.0
     t = t * t
 
-    return float(float(min_factor) + (float(max_factor) - float(min_factor)) * t)
+    return float(min_factor + (max_factor - min_factor) * t)
 
 
 def has_per_key(engine: EffectsEngine) -> bool:
