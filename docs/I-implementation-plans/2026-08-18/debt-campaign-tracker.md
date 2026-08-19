@@ -24,7 +24,7 @@ dated plans.
 | C2 | Typing parity for the Tk GUI layer | P1 | M | todo |
 | C3 | Indirection tax containment (lazy imports, compat facades) | P2 | M | monitoring |
 | C4 | Onboarding map upkeep (498 files, `_private` nesting) | P2 | S | monitoring |
-| C5 | Release infrastructure (Node 20 action deprecation, local ShellCheck) | P1 | S | todo |
+| C5 | Release infrastructure (Node 20 action deprecation, local ShellCheck) | P1 | S | monitoring |
 | C6 | Hygiene budget paydown (defensive_conversion / hasattr_coupling / cleanup_hotspot) | P2 | S | todo |
 
 ---
@@ -107,10 +107,12 @@ small-files/single-owner discipline stays.
 
 ## C5 — Release infrastructure
 
-- **Node.js 20 deprecation (do soon).** The v0.32.1 release workflow emitted the
-  Node 20 deprecation annotation for pinned actions (`actions/checkout`,
-  `actions/setup-python`, `softprops/action-gh-release`). Bump the pinned SHAs
-  to Node 24-compatible releases before the runner image removes Node 20.
+- **Node.js 20 deprecation (done 2026-08-18).** Bumped `actions/checkout` to
+  v5.0.1 (`93cb6efe…`) and `actions/setup-python` to v6.3.0 (`ece7cb06…`) in
+  `ci.yml`/`release.yml`; both are Node 24-native. `softprops/action-gh-release`
+  stays at v2.6.2 (`3bb12739…`) — already the latest release; it still declares
+  `node20` upstream, so one deprecation annotation will remain until upstream
+  cuts a Node 24 release. Re-check upstream before 0.33.0.
   Keep the pin-to-SHA policy (see `.github/workflows/release.yml` comments).
 - **Local ShellCheck gap.** `buildpython --profile=release` skips ShellCheck
   when not installed locally; CI covers it. Add a dev-env note (or install
