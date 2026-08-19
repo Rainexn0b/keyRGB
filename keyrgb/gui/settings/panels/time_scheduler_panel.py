@@ -192,13 +192,14 @@ class TimeSchedulerPanel:
         lbl_val = ttk.Label(row_frame, text=str(int(var.get())), font=("Sans", 9), width=3)
         lbl_val.grid(row=0, column=1, sticky="e", padx=(12, 0))
 
+        _label_ref = lbl_val
         scale = ttk.Scale(
             parent,
             from_=0,
             to=50,
             orient="horizontal",
             variable=var,
-            command=lambda v, lbl=lbl_val: self._set_label_int(lbl, v),
+            command=lambda v: self._set_label_int(_label_ref, v),
         )
         scale.pack(fill="x", pady=(1, 0))
         scale.bind("<ButtonRelease-1>", lambda _e: self._on_toggle())

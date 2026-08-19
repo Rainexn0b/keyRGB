@@ -16,6 +16,7 @@ from __future__ import annotations
 import tkinter as tk
 from dataclasses import replace
 from tkinter import ttk
+from typing import TypeAlias
 
 from keyrgb.core import config as core_config
 from keyrgb.gui import theme as gui_theme
@@ -43,7 +44,7 @@ detect_os_autostart_enabled = os_autostart.detect_os_autostart_enabled
 apply_clam_theme = gui_theme.apply_clam_theme
 apply_keyrgb_window_icon = window_icon.apply_keyrgb_window_icon
 load_settings_values = settings_state.load_settings_values
-SettingsValues = settings_state.SettingsValues
+SettingsValues: TypeAlias = settings_state.SettingsValues
 compute_centered_window_geometry = window_geometry.compute_centered_window_geometry
 
 _detect_idle_power_source = _swc.detect_idle_power_source

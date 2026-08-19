@@ -310,12 +310,14 @@ def _complete_backend_speed_probe(
         notes = None
 
     completed_at = datetime.now(timezone.utc).isoformat()
+    raw_speeds = plan.get("requested_ui_speeds")
+    raw_samples = plan.get("samples")
     result = {
         "backend": plan.get("backend"),
         "effect_name": plan.get("effect_name"),
         "selection_effect_name": selection_effect_name,
-        "requested_ui_speeds": list(plan.get("requested_ui_speeds") or []),
-        "samples": list(plan.get("samples") or []),
+        "requested_ui_speeds": list(raw_speeds if isinstance(raw_speeds, list) else []),
+        "samples": list(raw_samples if isinstance(raw_samples, list) else []),
         "started_at": started_at,
         "completed_at": completed_at,
         "execution_mode": str((automation_result or {}).get("execution_mode") or "auto"),

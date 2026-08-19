@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Protocol, TypeVar
+from typing import Any, Protocol, TypeAlias, TypeVar
 
 from keyrgb.core.config._settings_view import ConfigSettingsView
 from keyrgb.core.utils.safe_attrs import safe_int_attr
@@ -26,7 +26,7 @@ class SettingsConfigLike(Protocol):
     def __setattr__(self, name: str, value: object) -> None: ...
 
 
-SettingsSourceLike = SettingsConfigLike | ConfigSettingsView | Mapping[str, Any]
+SettingsSourceLike: TypeAlias = SettingsConfigLike | ConfigSettingsView | Mapping[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -253,7 +253,7 @@ def safe_getattr_or_default(obj: object, name: str, default: _DefaultT) -> objec
 
 def coerce_int_or_fallback(value: object, *, fallback: int | None) -> int | None:
     try:
-        return int(value)
+        return int(value)  # type: ignore[call-overload]  # try/except handles non-int-compatible objects
     except (TypeError, ValueError, OverflowError):
         return fallback
     except _SETTINGS_INT_COERCE_ERRORS:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from typing import Protocol, TypeAlias
+from typing import Protocol, TypeAlias, cast
 
 from keyrgb.core.profile import profiles
 from keyrgb.core.secondary_device_routes import (
@@ -77,7 +77,7 @@ def initialize_drag_state(gui: _UniformDragState, *, drag_commit_interval: float
     gui._drag_commit_interval = float(drag_commit_interval)
 
 
-def log_color_apply_failure(exc: Exception, *, debug_enabled: bool, logger: object) -> None:
+def log_color_apply_failure(exc: Exception, *, debug_enabled: bool, logger: logging.Logger) -> None:
     if debug_enabled:
         logger.exception("Error setting color")
         return
@@ -109,7 +109,9 @@ def commit_color_to_config(gui: _UniformTargetState, r: int, g: int, b: int) -> 
 def initial_color(gui: _UniformTargetState) -> Color:
     if gui._target_is_secondary:
         return current_secondary_color(gui)
-    return tuple(gui.config.color) if isinstance(gui.config.color, list) else gui.config.color
+    if isinstance(gui.config.color, list):
+        return cast(Color, tuple(gui.config.color))
+    return gui.config.color
 
 
 def current_brightness(gui: _UniformTargetState) -> int:

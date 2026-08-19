@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import cast
+
 from ..profile_management import keymap_cells_for
 from . import _sample_tool_support as _support
 from .selection import select_visible_identity
@@ -9,7 +11,25 @@ from .status import (
     sample_tool_unmapped_key,
     set_status,
 )
-from .wheel_apply import on_wheel_color_release_ui
+from .wheel_apply import _WheelApplyEditorProtocol, on_wheel_color_release_ui
+
+
+def _adapt_release_fn(
+    editor: _support._SampleToolEditorProtocol,
+    r: int,
+    g: int,
+    b: int,
+    *,
+    num_rows: int,
+    num_cols: int,
+) -> None:
+    """Thin adapter so the default release callback satisfies _ApplyReleaseFn."""
+    on_wheel_color_release_ui(
+        cast(_WheelApplyEditorProtocol, editor),
+        r, g, b,
+        num_rows=num_rows,
+        num_cols=num_cols,
+    )
 
 
 def on_sample_tool_toggled_ui(editor: _support._SampleToolToggleEditorProtocol) -> None:
@@ -28,7 +48,7 @@ def on_key_clicked_ui(
     *,
     num_rows: int,
     num_cols: int,
-    apply_release_fn: _support._ApplyReleaseFn = on_wheel_color_release_ui,
+    apply_release_fn: _support._ApplyReleaseFn = _adapt_release_fn,
 ) -> None:
     """Handle a click on a key in the per-key canvas.
 
@@ -84,7 +104,7 @@ def on_slot_clicked_ui(
     *,
     num_rows: int,
     num_cols: int,
-    apply_release_fn: _support._ApplyReleaseFn = on_wheel_color_release_ui,
+    apply_release_fn: _support._ApplyReleaseFn = _adapt_release_fn,
 ) -> None:
     enabled = _support._sample_tool_enabled(editor)
 

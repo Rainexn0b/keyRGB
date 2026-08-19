@@ -23,7 +23,7 @@ _LIGHTBAR_DISCOVERY_ERRORS = (
 LayoutSlotOverrides = dict[str, dict[str, object]]
 LayoutTweaks = dict[str, float]
 PerKeyLayoutTweaks = dict[str, dict[str, float]]
-BoundaryLogger = Callable[[str, str, Exception], None]
+BoundaryLogger = Callable[[str, str, BaseException], None]
 
 
 class _PathExistsProtocol(Protocol):
@@ -204,7 +204,7 @@ def sync_layout_legend_pack_ui(
         log_boundary_exception(
             "perkey.editor.legend_pack_var",
             "Failed to update perkey legend pack variable",
-            cast(Exception, exc),
+            exc,
         )
 
     refresh_choices = refresh_legend_pack_choices_or_none_fn(layout_setup_controls_or_none_fn(app))

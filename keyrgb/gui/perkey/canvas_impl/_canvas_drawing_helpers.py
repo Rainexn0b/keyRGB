@@ -11,16 +11,12 @@ ShapeRect: TypeAlias = tuple[float, float, float, float]
 FloatCoercible: TypeAlias = SupportsFloat | SupportsIndex | str | bytes | bytearray
 
 
-class _ResolvedLegendPackFn(Protocol):
-    def __call__(self) -> str | None: ...
-
-
-class _VisibleLayoutKeysFn(Protocol):
-    def __call__(self) -> Iterable[KeyDef]: ...
-
-
 class _VisibleLayoutKeysSurface(Protocol):
     def _visible_layout_keys(self) -> Iterable[KeyDef]: ...
+
+
+class _ResolvedLayoutLegendPackIdOwner(Protocol):
+    _resolved_layout_legend_pack_id: Callable[[], str | None]
 
 
 class _ValueGetterFn(Protocol):
@@ -28,7 +24,7 @@ class _ValueGetterFn(Protocol):
 
 
 class _MeasuredFontProtocol(Protocol):
-    def configure(self, *, size: int) -> None: ...
+    def configure(self, *, size: int) -> object: ...
 
     def measure(self, text: str) -> int: ...
 
@@ -40,17 +36,17 @@ def _visible_layout_keys_or_none(canvas: object) -> list[KeyDef] | None:
         return None
     if not callable(visible_keys_getter):
         return None
-    return list(cast(_VisibleLayoutKeysFn, visible_keys_getter)())
+    return list(visible_keys_getter())
 
 
 def _resolved_layout_legend_pack_id_or_none(editor: object) -> str | None:
     try:
-        resolve_legend_pack = cast(_ResolvedLegendPackFn, editor)._resolved_layout_legend_pack_id
+        resolve_legend_pack = cast(_ResolvedLayoutLegendPackIdOwner, editor)._resolved_layout_legend_pack_id
     except AttributeError:
         return None
     if not callable(resolve_legend_pack):
         return None
-    return cast(_ResolvedLegendPackFn, resolve_legend_pack)()
+    return resolve_legend_pack()
 
 
 def _fit_key_label(

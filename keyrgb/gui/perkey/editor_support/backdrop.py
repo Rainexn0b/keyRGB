@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import tkinter as tk
 from collections.abc import Callable
-from typing import Protocol
+from typing import Protocol, cast
 
-BoundaryLogger = Callable[[str, str, Exception], None]
+BoundaryLogger = Callable[[str, str, BaseException], None]
 
 
 class _TkVarProtocol(Protocol):
@@ -120,7 +120,7 @@ def persist_backdrop_transparency(
 ) -> None:
     app._backdrop_transparency_save_job = None
     try:
-        transparency = round(float(app.backdrop_transparency.get()))
+        transparency = round(float(cast(float, app.backdrop_transparency.get())))
     except value_coercion_errors + tk_call_errors:
         return
 

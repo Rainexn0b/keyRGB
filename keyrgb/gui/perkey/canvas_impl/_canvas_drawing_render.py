@@ -19,26 +19,6 @@ class _CanvasTransformProtocol(Protocol):
     def to_canvas(self, rect: tuple[float, float, float, float]) -> tuple[float, float, float, float]: ...
 
 
-class _InsetPixelsProtocol(Protocol):
-    def __call__(self, width_px: float, height_px: float, inset_value: float) -> float: ...
-
-
-class _CanvasCreatePolygonProtocol(Protocol):
-    def __call__(self, points: Sequence[float], **kwargs: object) -> CanvasItemId: ...
-
-
-class _CanvasCreateRectangleProtocol(Protocol):
-    def __call__(self, x1: float, y1: float, x2: float, y2: float, **kwargs: object) -> CanvasItemId: ...
-
-
-class _CanvasCreateTextProtocol(Protocol):
-    def __call__(self, x: float, y: float, **kwargs: object) -> CanvasItemId: ...
-
-
-class _CanvasTagBindProtocol(Protocol):
-    def __call__(self, tag_or_id: str, event: str, callback: Callable[[object], None]) -> None: ...
-
-
 class _KeyCanvasRectProtocol(Protocol):
     def __call__(
         self,
@@ -137,13 +117,21 @@ class _PerKeyCanvasEditorProtocol(Protocol):
 
 class _CanvasRenderSurfaceProtocol(Protocol):
     editor: _PerKeyCanvasEditorProtocol
-    _inset_pixels: _InsetPixelsProtocol
-    create_polygon: _CanvasCreatePolygonProtocol
-    create_rectangle: _CanvasCreateRectangleProtocol
-    create_text: _CanvasCreateTextProtocol
-    tag_bind: _CanvasTagBindProtocol
     key_rects: dict[str, CanvasItemId]
     key_texts: dict[str, CanvasItemId]
+
+    def _inset_pixels(self, width_px: float, height_px: float, inset_value: float) -> float: ...
+
+    # Method members (not settable attributes) so real tk.Canvas overloads
+    # satisfy the protocol. Extra *args/**kwargs keep the surface honest
+    # without duplicating typeshed overloads.
+    def create_polygon(self, *args: object, **kwargs: object) -> CanvasItemId: ...
+
+    def create_rectangle(self, *args: object, **kwargs: object) -> CanvasItemId: ...
+
+    def create_text(self, *args: object, **kwargs: object) -> CanvasItemId: ...
+
+    def tag_bind(self, tag_or_id: str, event: str, callback: Callable[[object], None]) -> object: ...
 
 
 def resolve_visible_keys(
@@ -276,8 +264,11 @@ def render_visible_keys(
         canvas.key_texts[key.key_id] = text_id
         canvas.key_texts[slot_id] = text_id
 
+        def _on_slot_click(_e: object, *, _sid: str = slot_id) -> None:
+            editor.on_slot_clicked(_sid)
+
         canvas.tag_bind(
             f"pslot_{slot_id}",
             "<Button-1>",
-            lambda _e, sid=slot_id: editor.on_slot_clicked(sid),
+            _on_slot_click,
         )

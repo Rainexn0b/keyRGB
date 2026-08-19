@@ -22,6 +22,13 @@ class _BrightnessWheel(Protocol):
     def set_brightness_percent(self, percent: int) -> None: ...
 
 
+class _ReactiveConfig(Protocol):
+    reactive_use_manual_color: bool
+    reactive_color: ReactiveColor
+    reactive_brightness: int
+    reactive_trail_percent: int
+
+
 def read_reactive_brightness_percent(config: object, *, logger: logging.Logger) -> int | None:
     raw = getattr(config, "reactive_brightness", getattr(config, "brightness", 0))
     try:
@@ -74,7 +81,7 @@ def sync_color_wheel_brightness(
 
 
 def commit_color_to_config(
-    config: object,
+    config: _ReactiveConfig,
     use_manual_var: _WritableVariable,
     color: ReactiveColor,
     *,
@@ -90,7 +97,7 @@ def commit_color_to_config(
 
 
 def commit_brightness_to_config(
-    config: object,
+    config: _ReactiveConfig,
     brightness_percent: float | None,
     *,
     logger: logging.Logger,
@@ -144,7 +151,7 @@ def sync_reactive_trail_widgets(
 
 
 def commit_trail_to_config(
-    config: object,
+    config: _ReactiveConfig,
     trail_percent: float | None,
     *,
     logger: logging.Logger,

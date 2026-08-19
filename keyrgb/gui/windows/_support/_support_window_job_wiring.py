@@ -1,6 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from typing import Protocol
+
+
+class _SaveSupportBundleFn(Protocol):
+    def __call__(self, window: object, **kwargs: object) -> None: ...
+
+
+class _OpenIssueFormFn(Protocol):
+    def __call__(self, window: object, **kwargs: object) -> None: ...
+
+
+class _SupportJobsLike(Protocol):
+    save_support_bundle: _SaveSupportBundleFn
+    open_issue_form: _OpenIssueFormFn
 
 
 def build_run_debug_job_kwargs(
@@ -69,7 +83,7 @@ def build_open_issue_form_job_kwargs(
 def dispatch_save_support_bundle_job(
     window: object,
     *,
-    support_jobs: object,
+    support_jobs: _SupportJobsLike,
     asksaveasfilename: Callable[..., str],
     build_support_bundle_payload: Callable[..., dict[str, object]],
     logger: object,
@@ -91,7 +105,7 @@ def dispatch_save_support_bundle_job(
 def dispatch_open_issue_form_job(
     window: object,
     *,
-    support_jobs: object,
+    support_jobs: _SupportJobsLike,
     issue_url: str,
     open_browser: Callable[..., bool],
     browser_open_errors: tuple[type[BaseException], ...],

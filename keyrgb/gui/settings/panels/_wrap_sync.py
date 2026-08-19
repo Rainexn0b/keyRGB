@@ -16,7 +16,9 @@ WRAP_SYNC_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueE
 
 
 class _WrapLabel(Protocol):
-    def configure(self, **kwargs: object) -> object: ...
+    # Only wraplength syncing is required; both tk.Label and ttk.Label accept
+    # an int-valued wraplength keyword and return a value we ignore.
+    def configure(self, *, wraplength: int) -> object: ...
 
 
 def bind_wraplength_sync(

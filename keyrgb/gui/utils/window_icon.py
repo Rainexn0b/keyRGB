@@ -19,7 +19,7 @@ _WINDOW_ICON_APPLY_ERRORS = _WINDOW_ICON_LOAD_ERRORS + (LookupError,)
 
 
 def _rasterize_svg_window_icon_with_cairosvg(path_str: str):
-    from PIL import Image  # type: ignore
+    from PIL import Image
 
     cairosvg = importlib.import_module("cairosvg")
     svg2png = cairosvg.svg2png
@@ -29,14 +29,14 @@ def _rasterize_svg_window_icon_with_cairosvg(path_str: str):
 
 
 def _rasterize_svg_window_icon_with_gdkpixbuf(path_str: str):
-    from PIL import Image  # type: ignore
+    from PIL import Image
 
     gi = importlib.import_module("gi")
     require_version = getattr(gi, "require_version", None)
     if callable(require_version):
         require_version("GdkPixbuf", "2.0")
 
-    from gi.repository import GdkPixbuf  # type: ignore
+    from gi.repository import GdkPixbuf
 
     pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(
         path_str,
@@ -118,7 +118,7 @@ def find_keyrgb_logo_path() -> Path | None:
 
 @lru_cache(maxsize=4)
 def _load_cached_window_icon_image(path_str: str, mtime_ns: int):
-    from PIL import Image  # type: ignore
+    from PIL import Image
 
     if path_str.lower().endswith(".svg"):
         icon = _rasterize_svg_window_icon(path_str)
@@ -145,7 +145,7 @@ def apply_keyrgb_window_icon(window: tk.Misc) -> None:
     """
 
     try:
-        from PIL import ImageTk  # type: ignore
+        from PIL import ImageTk
 
         candidate_paths: list[Path] = []
         preferred_path = find_keyrgb_logo_path()
@@ -161,7 +161,7 @@ def apply_keyrgb_window_icon(window: tk.Misc) -> None:
                 photo = ImageTk.PhotoImage(img)
 
                 # Prevent garbage collection.
-                window.keyrgb_icon_image = photo
+                window.keyrgb_icon_image = photo  # type: ignore[attr-defined]  # dynamic attribute on tk.Misc to prevent GC
 
                 iconphoto = getattr(window, "iconphoto", None)
                 if callable(iconphoto):

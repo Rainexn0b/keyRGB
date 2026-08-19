@@ -147,9 +147,10 @@ def refresh_layout_slots_ui(editor: object) -> None:
             typed_editor._physical_layout,
             _layout_slot_overrides_or_empty(editor),
         )
+    body_parent = cast(tk.Misc, body)
     if not states:
         ttk.Label(
-            body,
+            body_parent,
             text="This layout has no optional key positions.",
             font=("Sans", 9),
             wraplength=_body_wraplength(body),
@@ -159,11 +160,11 @@ def refresh_layout_slots_ui(editor: object) -> None:
 
     for index, state in enumerate(states):
         slot_id = _layout_slot_id(state)
-        row = ttk.Frame(body)
+        row = ttk.Frame(body_parent)
         row.grid(row=index, column=0, sticky="ew", pady=(0, 4))
         row.columnconfigure(1, weight=1)
 
-        visible_var = cast(_BooleanVarProtocol, tk.BooleanVar(value=state.visible))
+        visible_var: tk.BooleanVar = tk.BooleanVar(value=state.visible)
         ttk.Checkbutton(
             row,
             text=state.key_id,
@@ -171,7 +172,7 @@ def refresh_layout_slots_ui(editor: object) -> None:
             command=_layout_slot_visibility_callback(typed_editor, slot_id=slot_id, var=visible_var),
         ).grid(row=0, column=0, sticky="w", padx=(0, 8))
 
-        label_var = cast(_StringVarProtocol, tk.StringVar(value=state.label))
+        label_var: tk.StringVar = tk.StringVar(value=state.label)
         entry = ttk.Entry(row, textvariable=label_var, width=18)
         entry.grid(row=0, column=1, sticky="ew")
         commit_label = _layout_slot_label_callback(typed_editor, slot_id=slot_id, var=label_var)

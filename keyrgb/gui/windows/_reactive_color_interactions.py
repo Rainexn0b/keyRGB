@@ -46,25 +46,36 @@ class _ReactiveManualConfig(Protocol):
 
 
 class _ReactiveColorDragState(Protocol):
-    _last_drag_commit_ts: object
-    _drag_commit_interval: object
+    _last_drag_commit_ts: float
+    _drag_commit_interval: float
     _last_drag_committed_color: object | None
 
 
 class _ManualToggleGui(Protocol):
     _color_supported: bool
-    _use_manual_var: _MutableVariable
-    config: _ReactiveManualConfig
+
+    @property
+    def _use_manual_var(self) -> _MutableVariable: ...
+
+    @property
+    def config(self) -> _ReactiveManualConfig: ...
 
 
 class _ReactiveVisualModeGui(Protocol):
-    _reactive_vivid_visuals_var: _MutableVariable
-    config: _ReactiveManualConfig
+    @property
+    def _reactive_vivid_visuals_var(self) -> _MutableVariable: ...
+
+    @property
+    def config(self) -> _ReactiveManualConfig: ...
+
+
+class _FloatReadable(Protocol):
+    def get(self) -> float: ...
 
 
 class _ReactiveBrightnessGui(Protocol):
     _reactive_brightness_label: _ConfigurableWidget
-    _reactive_brightness_var: _ReadableVariable
+    _reactive_brightness_var: _FloatReadable
     color_wheel: _BrightnessWheel | None
     _use_manual_var: _MutableVariable
     _last_drag_commit_ts: float
@@ -77,7 +88,7 @@ class _ReactiveBrightnessGui(Protocol):
 
 class _ReactiveTrailGui(Protocol):
     _reactive_trail_label: _ConfigurableWidget
-    _reactive_trail_var: _ReadableVariable
+    _reactive_trail_var: _FloatReadable
 
     def _commit_trail_to_config(self, trail_percent: float | None) -> int | None: ...
 

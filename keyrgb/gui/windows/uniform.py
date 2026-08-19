@@ -8,6 +8,7 @@ import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
+from typing import TYPE_CHECKING, TypeAlias, cast
 
 from keyrgb.core.runtime.hardware_ownership import acquire_hardware_control_lock, release_hardware_control_lock
 from keyrgb.core.runtime.imports import ensure_repo_root_on_sys_path
@@ -16,6 +17,9 @@ from keyrgb.gui.theme import apply_clam_theme
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
+
+if TYPE_CHECKING:
+    from keyrgb.gui.windows._uniform_color_state import _UniformStatusLabel
 
 logger = logging.getLogger(__name__)
 _DEVICE_APPLY_ERRORS = (AttributeError, RuntimeError, TypeError, ValueError)
@@ -49,7 +53,7 @@ except ImportError:
     )
 
 
-SecondaryDeviceRoute = uniform_color_bootstrap.SecondaryDeviceRoute
+SecondaryDeviceRoute: TypeAlias = uniform_color_bootstrap.SecondaryDeviceRoute
 select_backend = uniform_color_bootstrap.select_backend
 route_for_backend_name = uniform_color_bootstrap.route_for_backend_name
 route_for_device_type = uniform_color_bootstrap.route_for_device_type
@@ -59,6 +63,8 @@ class UniformColorGUI:
     """Simple GUI for selecting a uniform keyboard color."""
 
     _secondary_route: SecondaryDeviceRoute | None = None
+    _main_frame: ttk.Frame
+    status_label: _UniformStatusLabel
 
     def __init__(self):
         target_state = uniform_init_adapter.resolve_target_route_state(
@@ -169,8 +175,8 @@ class UniformColorGUI:
             logger=logger,
         )
 
-    def _set_status(self, msg: str, *, ok: bool) -> None:
-        uniform_color_state.set_status(self, msg, ok=ok)
+    def _set_status(self, message: str, *, ok: bool) -> None:
+        uniform_color_state.set_status(self, message, ok=ok)
 
     def _ensure_brightness_nonzero(self) -> int:
         return uniform_color_state.ensure_brightness_nonzero(self)

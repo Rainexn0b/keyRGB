@@ -1,26 +1,45 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Protocol, cast
+
+
+class _SlotIdForKeyIdLookup(Protocol):
+    def _slot_id_for_key_id(self, key_id: str) -> object: ...
+
+
+class _KeyIdForSlotIdLookup(Protocol):
+    def _key_id_for_slot_id(self, slot_id: str) -> object: ...
 
 
 def _slot_id_for_key_id_or_none(editor: object, key_id: str | None) -> str | None:
     if key_id is None:
         return None
     try:
-        slot_lookup = editor._slot_id_for_key_id
+        slot_lookup = cast(_SlotIdForKeyIdLookup, editor)._slot_id_for_key_id
     except AttributeError:
         return None
-    return slot_lookup(key_id) if callable(slot_lookup) else None
+    if not callable(slot_lookup):
+        return None
+    resolved = slot_lookup(key_id)
+    if not resolved:
+        return None
+    return str(resolved)
 
 
 def _key_id_for_slot_id_or_none(editor: object, slot_id: str | None) -> str | None:
     if slot_id is None:
         return None
     try:
-        key_lookup = editor._key_id_for_slot_id
+        key_lookup = cast(_KeyIdForSlotIdLookup, editor)._key_id_for_slot_id
     except AttributeError:
         return None
-    return key_lookup(slot_id) if callable(key_lookup) else None
+    if not callable(key_lookup):
+        return None
+    resolved = key_lookup(slot_id)
+    if not resolved:
+        return None
+    return str(resolved)
 
 
 @dataclass

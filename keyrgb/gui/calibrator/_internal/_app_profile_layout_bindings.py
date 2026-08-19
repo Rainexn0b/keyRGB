@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Protocol
+from typing import Protocol, TypeAlias
 
 from keyrgb.core.resources.layout import KeyDef
 
 from . import _app_profile_layout
 
-Keymap = _app_profile_layout.Keymap
-LayoutTweaks = _app_profile_layout.LayoutTweaks
-PerKeyLayoutTweaks = _app_profile_layout.PerKeyLayoutTweaks
-LayoutSlotOverrides = _app_profile_layout.LayoutSlotOverrides
-_CalibratorConfigLike = _app_profile_layout._CalibratorConfigLike
-_CalibratorAppLike = _app_profile_layout._CalibratorAppLike
+Keymap: TypeAlias = _app_profile_layout.Keymap
+LayoutTweaks: TypeAlias = _app_profile_layout.LayoutTweaks
+PerKeyLayoutTweaks: TypeAlias = _app_profile_layout.PerKeyLayoutTweaks
+LayoutSlotOverrides: TypeAlias = _app_profile_layout.LayoutSlotOverrides
+_CalibratorConfigLike: TypeAlias = _app_profile_layout._CalibratorConfigLike
+_CalibratorAppLike: TypeAlias = _app_profile_layout._CalibratorAppLike
 
 
 class _ProfileManagementLike(Protocol):

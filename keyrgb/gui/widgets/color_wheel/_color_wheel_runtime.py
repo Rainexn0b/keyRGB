@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Protocol, TypeVar
 
 ColorRGB = tuple[int, int, int]
-_PhotoImageT = TypeVar("_PhotoImageT")
+_PhotoImageT_co = TypeVar("_PhotoImageT_co", covariant=True)
 
 
 class _StyleProtocol(Protocol):
@@ -17,8 +17,8 @@ class _ThemeBackgroundWidget(Protocol):
     def cget(self, option: str) -> object: ...
 
 
-class _PhotoImageFactory(Protocol[_PhotoImageT]):
-    def __call__(self, *, file: str) -> _PhotoImageT: ...
+class _PhotoImageFactory(Protocol[_PhotoImageT_co]):
+    def __call__(self, *, file: str) -> _PhotoImageT_co: ...
 
 
 def resolve_theme_bg_hex(
@@ -57,9 +57,9 @@ def load_wheel_photo_image(
     wheel_cache_path_fn: Callable[..., Path],
     build_wheel_ppm_bytes_fn: Callable[..., bytes],
     write_bytes_atomic_fn: Callable[[Path, bytes], None],
-    photo_image_factory: _PhotoImageFactory[_PhotoImageT],
+    photo_image_factory: _PhotoImageFactory[_PhotoImageT_co],
     unlink_fn: Callable[[str], None],
-) -> _PhotoImageT:
+) -> _PhotoImageT_co:
     wheel_path = wheel_cache_path_fn(size=size, bg_rgb=bg_rgb, center_size=center_size)
     ppm_bytes: bytes | None = None
 
@@ -92,9 +92,9 @@ def load_wheel_photo_image(
 def _load_wheel_photo_image_from_temp(
     ppm_bytes: bytes,
     *,
-    photo_image_factory: _PhotoImageFactory[_PhotoImageT],
+    photo_image_factory: _PhotoImageFactory[_PhotoImageT_co],
     unlink_fn: Callable[[str], None],
-) -> _PhotoImageT:
+) -> _PhotoImageT_co:
     tmp_path: str | None = None
     try:
         with tempfile.NamedTemporaryFile(prefix="keyrgb_color_wheel_", suffix=".ppm", delete=False) as handle:

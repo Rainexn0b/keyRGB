@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import tkinter as tk
+
 
 def apply_centered_geometry(
-    root: object,
-    main_frame: object,
+    root: tk.Tk,
+    main_frame: tk.Misc,
     *,
     compute_geometry_fn,
     apply_errors: tuple[type[BaseException], ...],

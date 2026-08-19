@@ -21,7 +21,7 @@ from .utils import (
 )
 
 
-class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
+class ColorWheel(_ColorWheelUIMixin, ttk.Frame):  # type: ignore[misc]  # "size" attr conflicts with Grid.size (tkinter); intentional override
     """
     A circular color wheel widget for intuitive color selection.
     """
@@ -54,7 +54,7 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         self._theme_bg_rgb = hex_to_rgb(self._theme_bg_hex)
         self._theme_border_hex = derive_border_hex(self._theme_bg_rgb)
 
-        self.size = size  # type: ignore[assignment]
+        self.size = size
         self.radius = size // 2
         # RGB is always on the 0..255 per-channel scale.
         self.callback: ColorWheelCallback | None = callback
@@ -90,26 +90,26 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
 
     def _invoke_callback(
         self,
-        cb: ColorWheelCallback | None,
-        r: int,
-        g: int,
-        b: int,
+        callback: ColorWheelCallback | None,
+        red: int,
+        green: int,
+        blue: int,
         *,
         source: str | None = None,
         brightness_percent: float | None = None,
     ) -> None:
         if source is None and brightness_percent is None:
-            invoke_callback(cb, int(r), int(g), int(b))
+            invoke_callback(callback, int(red), int(green), int(blue))
         elif source is None:
-            invoke_callback(cb, int(r), int(g), int(b), brightness_percent=brightness_percent)
+            invoke_callback(callback, int(red), int(green), int(blue), brightness_percent=brightness_percent)
         elif brightness_percent is None:
-            invoke_callback(cb, int(r), int(g), int(b), source=source)
+            invoke_callback(callback, int(red), int(green), int(blue), source=source)
         else:
             invoke_callback(
-                cb,
-                int(r),
-                int(g),
-                int(b),
+                callback,
+                int(red),
+                int(green),
+                int(blue),
                 source=source,
                 brightness_percent=brightness_percent,
             )
@@ -186,19 +186,19 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
             tags="selector",
         )
 
-    def _on_click(self, event) -> None:
+    def _on_click(self, event: object | None = None) -> None:
         """Handle mouse click on the color wheel."""
-        if not self._wheel_ready:
+        if not self._wheel_ready or event is None:
             return
-        self._select_color_at(event.x, event.y)
+        self._select_color_at(event.x, event.y)  # type: ignore[attr-defined]  # event is tk.Event at runtime (tkinter callback contract)
 
-    def _on_drag(self, event) -> None:
+    def _on_drag(self, event: object | None = None) -> None:
         """Handle mouse drag on the color wheel."""
-        if not self._wheel_ready:
+        if not self._wheel_ready or event is None:
             return
-        self._select_color_at(event.x, event.y)
+        self._select_color_at(event.x, event.y)  # type: ignore[attr-defined]  # event is tk.Event at runtime (tkinter callback contract)
 
-    def _on_release(self, event) -> None:
+    def _on_release(self, event: object | None = None) -> None:
         """Handle mouse release on the color wheel."""
         if not self._wheel_ready:
             return
@@ -298,12 +298,12 @@ class ColorWheel(_ColorWheelUIMixin, ttk.Frame):
         """Get the current selected color as (r, g, b) tuple (0..255 each)."""
         return self.current_color
 
-    def set_color(self, r: int, g: int, b: int) -> None:
+    def set_color(self, red: int, green: int, blue: int) -> None:
         """Set the color programmatically."""
-        self.current_color = (int(r), int(g), int(b))
+        self.current_color = (int(red), int(green), int(blue))
 
-        # Coto HSV
-        r_norm, g_norm, b_norm = float(r) / 255.0, float(g) / 255.0, float(b) / 255.0
+        # Convert to HSV
+        r_norm, g_norm, b_norm = float(red) / 255.0, float(green) / 255.0, float(blue) / 255.0
         h, s, v = colorsys.rgb_to_hsv(r_norm, g_norm, b_norm)
 
         self.current_hue = h

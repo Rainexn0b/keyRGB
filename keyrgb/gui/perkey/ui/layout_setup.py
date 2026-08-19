@@ -23,15 +23,15 @@ class _ComboboxProtocol(Protocol):
 
     def grid(self, **kwargs: object) -> None: ...
 
-    def bind(self, event: str, callback: object, add: object | None = None) -> object | None: ...
+    def bind(self, *args: object, **kwargs: object) -> object: ...
 
-    def configure(self, **kwargs: object) -> None: ...
+    def configure(self, *args: object, **kwargs: object) -> object: ...
 
 
 class _GridFrameProtocol(Protocol):
     def grid(self, **kwargs: object) -> None: ...
 
-    def columnconfigure(self, index: int, *, weight: int) -> None: ...
+    def columnconfigure(self, *args: object, **kwargs: object) -> object: ...
 
 
 class _DropdownProtocol(Protocol):
@@ -114,7 +114,7 @@ class LayoutSetupControls(ttk.LabelFrame):
             state="readonly",
             width=22,
         )
-        editor._layout_combo = layout_combo
+        editor._layout_combo = cast(_ComboboxProtocol, layout_combo)
         current_label = _ID_TO_LABEL.get(editor._physical_layout, _LAYOUT_LABELS[0])
         layout_combo.set(current_label)
         layout_combo.grid(row=0, column=1, sticky="ew", padx=(8, 0))
@@ -139,7 +139,7 @@ class LayoutSetupControls(ttk.LabelFrame):
             state="readonly",
             width=22,
         )
-        editor._legend_pack_combo = legend_pack_combo
+        editor._legend_pack_combo = cast(_ComboboxProtocol, legend_pack_combo)
         legend_pack_combo.grid(row=1, column=1, sticky="ew", padx=(8, 0), pady=(8, 0))
         legend_pack_combo.bind("<<ComboboxSelected>>", self._on_legend_pack_select)
         legend_pack_dropdown = UpwardListboxDropdown(
@@ -178,7 +178,7 @@ class LayoutSetupControls(ttk.LabelFrame):
         layout_slots_frame.columnconfigure(0, weight=1)
 
         layout_slots_body = ttk.Frame(layout_slots_frame)
-        editor._layout_slots_body = layout_slots_body
+        editor._layout_slots_body = cast(_GridFrameProtocol, layout_slots_body)
         layout_slots_body.grid(row=0, column=0, sticky="ew")
         layout_slots_body.columnconfigure(0, weight=1)
 

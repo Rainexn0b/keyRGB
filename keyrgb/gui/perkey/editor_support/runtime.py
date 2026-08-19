@@ -180,8 +180,8 @@ def commit(
 ) -> None:
     prev_kb = editor.kb
     fallback = tuple(editor.config.color)
-    base = tuple(last_non_black_color_or(editor, fallback))  # type: ignore[arg-type]
-    snapshot = dict(editor.colors)  # type: ignore[arg-type]
+    base: tuple[int, ...] = tuple(last_non_black_color_or(editor, fallback))  # type: ignore[arg-type]
+    snapshot = dict(editor.colors)  # type: ignore[call-overload]
 
     def work() -> tuple[object, object]:
         return editor._commit_pipeline.commit(

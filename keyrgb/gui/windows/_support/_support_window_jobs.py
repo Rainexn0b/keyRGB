@@ -86,7 +86,7 @@ def run_backend_speed_probe(
     _ = messagebox
     return _backend_probe.run_backend_speed_probe(
         window,
-        **_backend_speed_probe_run_kwargs(
+        **_backend_speed_probe_run_kwargs(  # type: ignore[arg-type]
             prompt=prompt,
             current_backend_speed_probe_plan_fn=current_backend_speed_probe_plan_fn,
             tk_runtime_errors=tk_runtime_errors,

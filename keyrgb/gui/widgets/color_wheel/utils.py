@@ -1,6 +1,5 @@
 import math
-
-from ._color_wheel_ui import ColorWheelCallback
+from collections.abc import Callable
 
 # Type aliases
 # RGB color is (0..255, 0..255, 0..255)
@@ -47,7 +46,7 @@ def derive_border_hex(bg_rgb: ColorRGB) -> str:
 
 
 def invoke_callback(
-    cb: ColorWheelCallback | None,
+    cb: Callable[..., object] | None,
     red: int,
     green: int,
     blue: int,
@@ -67,7 +66,8 @@ def invoke_callback(
         if source is None and brightness_percent is None:
             cb(red, green, blue)
         elif source is None:
-            cb(red, green, blue, brightness_percent=float(brightness_percent))
+            if brightness_percent is not None:
+                cb(red, green, blue, brightness_percent=float(brightness_percent))
         elif brightness_percent is None:
             cb(red, green, blue, source=str(source))
         else:

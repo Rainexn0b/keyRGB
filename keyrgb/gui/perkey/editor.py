@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import tkinter as tk
 from tkinter import ttk
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol, cast
 
 from keyrgb.core.diagnostics.device_discovery import collect_device_discovery
 from keyrgb.core.profile import profiles
@@ -20,14 +20,24 @@ from .editor_support import (
     layout as editor_layout,
     selection as editor_selection,
 )
+from .editor_support.backdrop import _BackdropEditorProtocol
+from .editor_support.layout_state import _LayoutEditorAppProtocol
+from .editor_support.selection import _SlotSelectionProtocol
 from .ui import sample_tool
+from .ui._sample_tool_support import _SampleToolEditorProtocol, _SampleToolToggleEditorProtocol
+from .ui.wheel_apply import _WheelApplyEditorProtocol
 
 if TYPE_CHECKING:
     from keyrgb.core.backends.base import KeyboardDevice
     from keyrgb.core.config import Config
+    from keyrgb.gui.widgets.color_wheel import ColorWheel
 
     from .commit_pipeline import PerKeyCommitPipeline
     from .profile_management import PerKeyColors
+
+
+class _LastNonBlackColorOwner(Protocol):
+    _last_non_black_color: object
 
 logger = logging.getLogger(__name__)
 
@@ -42,29 +52,38 @@ _BACKDROP_PERSISTENCE_ERRORS = (AttributeError, OSError, TypeError, ValueError)
 _HARDWARE_CLOSE_ERRORS = (AttributeError, OSError, RuntimeError, TypeError, ValueError)
 
 
-def _log_boundary_exception(key: str, msg: str, exc: Exception) -> None:
+def _log_boundary_exception(key: str, msg: str, exc: BaseException) -> None:
     log_throttled(logger, key, interval_s=60, level=logging.DEBUG, msg=msg, exc=exc)
 
 
 def _last_non_black_color_or(editor: object, default: object) -> object:
     try:
-        return editor._last_non_black_color
+        return cast(_LastNonBlackColorOwner, editor)._last_non_black_color
     except AttributeError:
         return default
 
 
 class PerKeyEditor:
-    # Attributes initialized by editor_bootstrap.initialize_editor
+    # Attributes initialized by editor_bootstrap.initialize_editor / build_ui
     root: object
     config: Config
     kb: KeyboardDevice | None
     colors: PerKeyColors
     _commit_pipeline: PerKeyCommitPipeline
+    overlay_scope: tk.StringVar
+    layout_tweaks: dict[str, float]
     per_key_layout_tweaks: dict[str, dict[str, float]]
     lightbar_overlay: dict[str, bool | float]
     secondary_lighting: dict[str, object] | None
     profile_name: str
     _physical_layout: str
+    color_wheel: ColorWheel
+    _last_non_black_color: tuple[int, int, int]
+    keymap: dict[str, object]
+    layout_slot_overrides: dict[str, dict[str, object]] | None
+    selected_slot_id: str | None
+    has_lightbar_device: bool
+    backdrop_transparency: object
 
     def __init__(self):
         from keyrgb.core.config import Config
@@ -103,7 +122,7 @@ class PerKeyEditor:
 
     def _on_backdrop_transparency_changed(self, value: str) -> None:
         editor_backdrop.on_backdrop_transparency_changed(
-            self,
+            cast(_BackdropEditorProtocol, self),
             value,
             value_coercion_errors=_VALUE_COERCION_ERRORS,
             tk_call_errors=_TK_CALL_ERRORS,
@@ -111,11 +130,14 @@ class PerKeyEditor:
         )
 
     def _apply_backdrop_transparency_redraw(self) -> None:
-        editor_backdrop.apply_backdrop_transparency_redraw(self, log_boundary_exception=_log_boundary_exception)
+        editor_backdrop.apply_backdrop_transparency_redraw(
+            cast(_BackdropEditorProtocol, self),
+            log_boundary_exception=_log_boundary_exception,
+        )
 
     def _persist_backdrop_transparency(self) -> None:
         editor_backdrop.persist_backdrop_transparency(
-            self,
+            cast(_BackdropEditorProtocol, self),
             profiles=profiles,
             value_coercion_errors=_VALUE_COERCION_ERRORS,
             tk_call_errors=_TK_CALL_ERRORS,
@@ -125,7 +147,7 @@ class PerKeyEditor:
 
     def _on_backdrop_mode_changed(self, _event=None) -> None:
         editor_backdrop.on_backdrop_mode_changed(
-            self,
+            cast(_BackdropEditorProtocol, self),
             profiles=profiles,
             tk_call_errors=_TK_CALL_ERRORS,
             backdrop_persistence_errors=_BACKDROP_PERSISTENCE_ERRORS,
@@ -189,7 +211,7 @@ class PerKeyEditor:
 
     def _sync_layout_legend_pack_ui(self) -> None:
         editor_layout.sync_layout_legend_pack_ui(
-            self,
+            cast(_LayoutEditorAppProtocol, self),
             tk_call_errors=_TK_CALL_ERRORS,
             log_boundary_exception=_log_boundary_exception,
         )
@@ -219,25 +241,25 @@ class PerKeyEditor:
         )
 
     def _persist_layout_slot_overrides(self) -> None:
-        editor_layout.persist_layout_slot_overrides(self)
+        editor_layout.persist_layout_slot_overrides(cast(_LayoutEditorAppProtocol, self))
 
     def _set_layout_slot_visibility(self, slot_id: str, visible: bool) -> None:
-        editor_layout.set_layout_slot_visibility(self, slot_id, visible)
+        editor_layout.set_layout_slot_visibility(cast(_LayoutEditorAppProtocol, self), slot_id, visible)
 
     def _set_layout_slot_label(self, slot_id: str, label: str) -> None:
-        editor_layout.set_layout_slot_label(self, slot_id, label)
+        editor_layout.set_layout_slot_label(cast(_LayoutEditorAppProtocol, self), slot_id, label)
 
     def select_slot_id(self, slot_id: str) -> None:
         lighting_areas_panel = vars(self).get("_lighting_areas_panel")
         if lighting_areas_panel is not None:
             lighting_areas_panel.select_keyboard()
-        editor_selection.select_slot_id(self, slot_id)
+        editor_selection.select_slot_id(cast(_SlotSelectionProtocol, self), slot_id)
 
     def _on_sample_tool_toggled(self) -> None:
-        on_sample_tool_toggled_ui(self)
+        on_sample_tool_toggled_ui(cast(_SampleToolToggleEditorProtocol, self))
 
     def on_slot_clicked(self, slot_id: str) -> None:
-        on_slot_clicked_ui(self, slot_id, num_rows=NUM_ROWS, num_cols=NUM_COLS)
+        on_slot_clicked_ui(cast(_SampleToolEditorProtocol, self), slot_id, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def sync_overlay_vars(self):
         self.overlay_controls.sync_vars_from_scope()
@@ -264,13 +286,13 @@ class PerKeyEditor:
         lighting_areas_panel = vars(self).get("_lighting_areas_panel")
         if lighting_areas_panel is not None and lighting_areas_panel.apply_wheel_color((r, g, b), released=False):
             return
-        editor_actions.on_wheel_color_change(self, r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
+        editor_actions.on_wheel_color_change(cast(_WheelApplyEditorProtocol, self), r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _on_color_release(self, r: int, g: int, b: int):
         lighting_areas_panel = vars(self).get("_lighting_areas_panel")
         if lighting_areas_panel is not None and lighting_areas_panel.apply_wheel_color((r, g, b), released=True):
             return
-        editor_actions.on_wheel_color_release(self, r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
+        editor_actions.on_wheel_color_release(cast(_WheelApplyEditorProtocol, self), r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
 
     def _set_backdrop(self):
         editor_actions.set_backdrop(self)

@@ -88,6 +88,61 @@ documented — pay down incrementally instead of a big bang:
 2. Ratchet: no module leaves the include set once added.
 3. Exit: exclusion removed; GUI covered by the same mypy gate as core/tray.
 
+**Progress (2026-08-19, batch 1).** The opt-in tuple
+(`_GUI_PURE_MYPY_TARGETS` in `buildpython/steps/step_type_check.py`) grew from
+8 to 109 modules — every `keyrgb/gui/**` module that passes mypy
+(`--follow-imports=skip`) in the *combined* run with zero code changes. Note
+the combined run is stricter than per-file runs: cross-references between
+listed roots resolve to real types, so modules that pass individually can fail
+in combination (12 did). Backlog: 50 modules need real annotation work —
+38 fail individually, plus those 12 combination failures.
+
+**Progress (2026-08-19, batch 2).** All 12 combination-failure modules fixed
+with honest typing (zero `type: ignore`) and added to the tuple, now at 121
+modules:
+
+- `_wrap_sync._WrapLabel.configure` narrowed to the one real call shape
+  (`configure(*, wraplength: int) -> object`) — satisfies both `tk.Label` and
+  `ttk.Label` stubs without `Any`.
+- `_settings_scheduler._SchedulerValuesProtocol` members became read-only
+  properties with precise types, matching the frozen `SettingsValues`
+  dataclass.
+- `_DialogContainer` gained the existing `_GridWidget` protocol base.
+- per-key `editor_support/actions.py` editor params narrowed from `object` to
+  the six real editor protocols (TYPE_CHECKING imports); dropdown `set_value`
+  lambdas rewritten to return `None`; `_PerKeyCanvasEditorProtocol`-style
+  narrowing for profile config; a typed adapter for the sample-tool release
+  callback default.
+- `perkey/canvas.py` + `canvas_impl` mixins: Tk-shadow protocol attributes
+  replaced by a check-time-only base (`tk.Canvas if TYPE_CHECKING else
+  object`), so mixins use real tkinter stub signatures with zero runtime
+  change; `_CanvasPointEvent` members became read-only properties (fixes
+  `bind` contravariance); `KeyboardCanvas.editor` redeclared with the
+  concrete `PerKeyEditor` type to resolve the mixin protocol conflict.
+
+Backlog: 38 modules still fail mypy individually (next batches).
+
+**Progress (2026-08-19, batch 3 — C2 exit for skip-mode).** All 159
+`keyrgb/gui/**` modules now pass `mypy --follow-imports=skip` in one combined
+run and are listed in `_GUI_PURE_MYPY_TARGETS`. The GUI layer is gated the
+same way as the existing 8-module baseline, just complete. Remaining
+follow-up (not required to close C2's incremental ratchet): drop
+`--follow-imports=skip` and fold `keyrgb/gui` into the primary mypy invocation
+so cross-package imports use real types instead of Any. That is a separate,
+stricter campaign.
+
+Notable batch-3 techniques:
+- Declare dynamically-initialized attributes on `PerKeyEditor` /
+  `ReactiveColorGUI` so they satisfy the editor/window protocols.
+- Protocol data members as `@property` for covariance (Tk `BooleanVar` /
+  `StringVar` vs local variable protocols).
+- Check-time-only mixin bases and targeted `cast()` at Tk-overload /
+  module-vs-Protocol boundaries. `support.py` keeps a small set of
+  `# type: ignore[arg-type]` on facade call sites where many local
+  protocols meet real Tk modules.
+- Reverted a TYPE_CHECKING-only base class on `SupportToolsGUI` (would
+  have been a runtime `NameError`).
+
 ## C3 — Indirection tax containment
 
 Function-level imports and `__getattr__` compat facades are deliberate (import

@@ -15,16 +15,21 @@ KEYDEF_BY_SLOT_ID = _canvas_identity.KEYDEF_BY_SLOT_ID
 
 
 class _EditorBackedCanvas(Protocol):
-    editor: object
+    @property
+    def editor(self) -> object: ...
 
 
 class _LayoutTweaksEditor(Protocol):
-    layout_tweaks: Mapping[str, object]
-    per_key_layout_tweaks: Mapping[str, object]
+    @property
+    def layout_tweaks(self) -> Mapping[str, object]: ...
+
+    @property
+    def per_key_layout_tweaks(self) -> Mapping[str, object]: ...
 
 
 class _HitTestCanvas(Protocol):
-    editor: _LayoutTweaksEditor
+    @property
+    def editor(self) -> _LayoutTweaksEditor: ...
 
     def _canvas_transform(self) -> object | None: ...
 

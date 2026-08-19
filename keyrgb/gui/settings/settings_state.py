@@ -9,6 +9,7 @@ Implementation is split across:
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TypeAlias
 
 from keyrgb.gui.settings import _settings_values as settings_values
 
@@ -16,7 +17,7 @@ from keyrgb.gui.settings import _settings_values as settings_values
 # ``settings_state.datetime`` and still affect apply paths.
 datetime = datetime  # noqa: PLW0127 – module-level binding for test monkeypatch
 
-SettingsValues = settings_values.SettingsValues
+SettingsValues: TypeAlias = settings_values.SettingsValues
 clamp_brightness = settings_values.clamp_brightness
 clamp_nonzero_brightness = settings_values.clamp_nonzero_brightness
 load_settings_values = settings_values.load_settings_values

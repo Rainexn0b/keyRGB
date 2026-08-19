@@ -147,8 +147,8 @@ class PowerSourcePanel:
             self.scale_battery_brightness,
         ):
             w.configure(state=state)
-        for w in (self.combo_ac_power_mode, self.combo_battery_power_mode):
-            w.configure(state=combo_state)
+        for combo in (self.combo_ac_power_mode, self.combo_battery_power_mode):
+            combo.configure(state=combo_state)
 
     @staticmethod
     def _set_label_int(lbl: ttk.Label, v: float | str) -> None:

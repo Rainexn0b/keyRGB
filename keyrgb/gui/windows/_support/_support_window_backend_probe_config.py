@@ -58,21 +58,22 @@ class ProbeConfigSnapshot:
 
     @classmethod
     def from_snapshot(cls, snapshot: _SnapshotInput) -> ProbeConfigSnapshot:
-        if isinstance(snapshot, cls):
-            return snapshot
+        if isinstance(snapshot, dict):
+            effect_speeds = _copy_effect_speeds(snapshot.get("effect_speeds"))
 
-        effect_speeds = _copy_effect_speeds(snapshot.get("effect_speeds"))
+            try:
+                raw_speed = snapshot.get("speed")
+                speed = int(raw_speed) if isinstance(raw_speed, (int, float, str)) else 0
+            except (TypeError, ValueError, OverflowError):
+                speed = 0
 
-        try:
-            speed = int(snapshot.get("speed") or 0)
-        except (TypeError, ValueError, OverflowError):
-            speed = 0
+            return cls(
+                effect=str(snapshot.get("effect") or "none"),
+                speed=max(0, min(10, speed)),
+                effect_speeds=effect_speeds,
+            )
 
-        return cls(
-            effect=str(snapshot.get("effect") or "none"),
-            speed=max(0, min(10, speed)),
-            effect_speeds=effect_speeds,
-        )
+        return snapshot
 
     def effect_speeds_copy(self) -> dict[str, object] | None:
         return _copy_effect_speeds(self.effect_speeds)
@@ -154,9 +155,10 @@ def _auto_run_backend_speed_probe_via_tray_config(
     snapshot = probe_config_snapshot_fn(config)
     effect_name = str(plan.get("effect_name") or "").strip()
     selection_effect_name = str(plan.get("selection_effect_name") or effect_name).strip() or effect_name
+    _raw_speeds = plan.get("requested_ui_speeds")
     requested_ui_speeds = [
         max(0, min(10, int(value)))
-        for value in plan.get("requested_ui_speeds") or []
+        for value in (_raw_speeds if isinstance(_raw_speeds, list) else [])
         if isinstance(value, int | float) or str(value).strip().isdigit()
     ]
 

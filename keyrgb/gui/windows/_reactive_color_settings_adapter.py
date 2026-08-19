@@ -24,15 +24,33 @@ class _ColorWheel(Protocol):
 
 
 class _ReactiveColorSettingsGUI(Protocol):
-    status_label: _StatusLabel
-    root: _Root
-    config: object
-    color_wheel: _ColorWheel | None
-    _use_manual_var: _Variable
-    _reactive_brightness_var: _Variable
-    _reactive_brightness_label: _StatusLabel
-    _reactive_trail_var: _Variable
-    _reactive_trail_label: _StatusLabel
+    @property
+    def status_label(self) -> _StatusLabel: ...
+
+    @property
+    def root(self) -> _Root: ...
+
+    @property
+    def config(self) -> object: ...
+
+    @property
+    def color_wheel(self) -> _ColorWheel | None: ...
+
+    @property
+    def _use_manual_var(self) -> _Variable: ...
+
+    @property
+    def _reactive_brightness_var(self) -> _Variable: ...
+
+    @property
+    def _reactive_brightness_label(self) -> _StatusLabel: ...
+
+    @property
+    def _reactive_trail_var(self) -> _Variable: ...
+
+    @property
+    def _reactive_trail_label(self) -> _StatusLabel: ...
+
     _color_supported: bool
     _last_drag_commit_ts: float
     _last_drag_committed_color: tuple[int, int, int] | None

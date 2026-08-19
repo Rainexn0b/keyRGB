@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import logging
+import tkinter as tk
 from collections.abc import Callable, Mapping, Sequence
 from tkinter import TclError, font as tkfont
-from typing import TYPE_CHECKING, Protocol, TypeAlias
+from typing import TYPE_CHECKING, Protocol, TypeAlias, cast
 
 from PIL import Image, ImageTk
 
@@ -30,6 +31,11 @@ representative_cell = DEFAULT_CANVAS_DRAWING_RUNTIME.representative_cell
 
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:  # pragma: no cover - typing-only base
+    _CanvasBase = tk.Canvas
+else:
+    _CanvasBase = object
 
 _BACKDROP_RENDER_ERRORS = (AttributeError, OSError, RuntimeError, TclError, TypeError, ValueError)
 
@@ -60,50 +66,39 @@ class _InsetPixelsProtocol(Protocol):
     def __call__(self, width_px: float, height_px: float, inset_value: float) -> float: ...
 
 
-class _CanvasCreateImageProtocol(Protocol):
-    def __call__(self, x: float, y: float, **kwargs: object) -> CanvasItemId: ...
-
-
-class _CanvasCreatePolygonProtocol(Protocol):
-    def __call__(self, points: Sequence[float], **kwargs: object) -> CanvasItemId: ...
-
-
-class _CanvasCreateRectangleProtocol(Protocol):
-    def __call__(self, x1: float, y1: float, x2: float, y2: float, **kwargs: object) -> CanvasItemId: ...
-
-
-class _CanvasCreateTextProtocol(Protocol):
-    def __call__(self, x: float, y: float, **kwargs: object) -> CanvasItemId: ...
-
-
-class _CanvasDeleteProtocol(Protocol):
-    def __call__(self, tag_or_id: str) -> None: ...
-
-
-class _CanvasItemConfigProtocol(Protocol):
-    def __call__(self, item_id: CanvasItemId, **kwargs: object) -> None: ...
-
-
-class _CanvasTagBindProtocol(Protocol):
-    def __call__(self, tag_or_id: str, event: str, callback: Callable[[object], None]) -> None: ...
-
-
-class _CanvasSizeGetterProtocol(Protocol):
-    def __call__(self) -> int: ...
-
-
 class _PerKeyCanvasEditorProtocol(Protocol):
-    profile_name: object
-    _physical_layout: str | None
-    layout_slot_overrides: LayoutSlotOverrides | None
-    layout_tweaks: LayoutTweaks
-    per_key_layout_tweaks: PerKeyLayoutTweaks
-    keymap: Mapping[str, object]
-    colors: Mapping[KeyCell, RGBColor]
-    selected_slot_id: str | None
-    has_lightbar_device: bool
-    lightbar_overlay: dict[str, object] | None
-    backdrop_transparency: object
+    @property
+    def profile_name(self) -> object: ...
+
+    @property
+    def _physical_layout(self) -> str | None: ...
+
+    @property
+    def layout_slot_overrides(self) -> LayoutSlotOverrides | None: ...
+
+    @property
+    def layout_tweaks(self) -> Mapping[str, float]: ...
+
+    @property
+    def per_key_layout_tweaks(self) -> Mapping[str, Mapping[str, float]]: ...
+
+    @property
+    def keymap(self) -> Mapping[str, object]: ...
+
+    @property
+    def colors(self) -> Mapping[KeyCell, RGBColor]: ...
+
+    @property
+    def selected_slot_id(self) -> str | None: ...
+
+    @property
+    def has_lightbar_device(self) -> bool: ...
+
+    @property
+    def lightbar_overlay(self) -> Mapping[str, object] | None: ...
+
+    @property
+    def backdrop_transparency(self) -> object: ...
 
     def on_slot_clicked(self, slot_id: str) -> None: ...
 
@@ -137,21 +132,15 @@ def _shape_polygon_points(shape_rects: Sequence[ShapeRect]) -> list[float]:
     return drawing_helpers._shape_polygon_points(shape_rects)
 
 
-class _KeyboardCanvasDrawingMixin:
-    # Attributes/methods provided by tk.Canvas and KeyboardCanvas
+class _KeyboardCanvasDrawingMixin(_CanvasBase):
+    # Attributes/methods provided by KeyboardCanvas (the concrete subclass).
+    # tk.Canvas members (create_image, create_rectangle, delete, itemconfig,
+    # winfo_*, ...) come from the check-time-only _CanvasBase so they carry
+    # the real tkinter stub signatures instead of shadow protocols.
     editor: _PerKeyCanvasEditorProtocol
     _canvas_transform: Callable[[], CanvasTransform | None]
     _deck_render_cache: _DeckRenderCacheProtocol
     _inset_pixels: _InsetPixelsProtocol
-    create_image: _CanvasCreateImageProtocol
-    create_polygon: _CanvasCreatePolygonProtocol
-    create_rectangle: _CanvasCreateRectangleProtocol
-    create_text: _CanvasCreateTextProtocol
-    delete: _CanvasDeleteProtocol
-    itemconfig: _CanvasItemConfigProtocol
-    tag_bind: _CanvasTagBindProtocol
-    winfo_height: _CanvasSizeGetterProtocol
-    winfo_width: _CanvasSizeGetterProtocol
     _deck_img: Image.Image | None
     _deck_img_tk: object | None
     _deck_drawn_bbox: DrawnDeckBBox | None
@@ -192,13 +181,15 @@ class _KeyboardCanvasDrawingMixin:
             get_layout_keys=get_layout_keys,
         )
         drawing_render.render_visible_keys(
-            canvas=self,
+            # tk.Canvas create_* overloads cannot structurally satisfy a single
+            # protocol signature; this mixin is a Canvas at runtime.
+            canvas=cast(drawing_render._CanvasRenderSurfaceProtocol, self),
             transform=t,
             visible_keys=visible_keys,
             physical_layout=physical_layout,
-            key_canvas_rect=key_canvas_rect,
-            key_canvas_hit_rects=key_canvas_hit_rects,
-            key_draw_style=key_draw_style,
+            key_canvas_rect=cast(drawing_render._KeyCanvasRectProtocol, key_canvas_rect),
+            key_canvas_hit_rects=cast(drawing_render._KeyCanvasHitRectsProtocol, key_canvas_hit_rects),
+            key_draw_style=cast(drawing_render._KeyDrawStyleFactoryProtocol, key_draw_style),
             keymap_cells_for=keymap_cells_for,
             representative_cell=representative_cell,
             shape_polygon_points=_shape_polygon_points,

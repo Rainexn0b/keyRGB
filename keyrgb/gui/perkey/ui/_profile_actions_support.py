@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tkinter as tk
 from collections.abc import Callable, Sequence
 from functools import lru_cache
 from logging import Logger
@@ -77,9 +78,14 @@ class _SelectSlotIdOwner(Protocol):
     def select_slot_id(self, slot_id: str) -> None: ...
 
 
+class _ProfileConfigProtocol(Protocol):
+    ac_perkey_profile_name: str | None
+    battery_perkey_profile_name: str | None
+
+
 class _PerKeyProfileEditorProtocol(Protocol):
-    root: object
-    config: object
+    root: tk.Misc
+    config: _ProfileConfigProtocol
     colors: PerKeyColors
     keymap: Keymap
     _physical_layout: str

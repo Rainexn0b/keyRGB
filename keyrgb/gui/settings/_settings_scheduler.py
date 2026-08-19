@@ -7,11 +7,16 @@ from typing import Protocol
 
 
 class _SchedulerValuesProtocol(Protocol):
-    time_scheduler_enabled: bool
-    day_start_time: object
-    night_start_time: object
-    night_reactive_brightness: int
-    day_reactive_brightness: int
+    @property
+    def time_scheduler_enabled(self) -> bool: ...
+    @property
+    def day_start_time(self) -> str: ...
+    @property
+    def night_start_time(self) -> str: ...
+    @property
+    def night_reactive_brightness(self) -> int: ...
+    @property
+    def day_reactive_brightness(self) -> int: ...
 
 
 def parse_scheduler_time(value: object) -> tuple[int, int] | None:

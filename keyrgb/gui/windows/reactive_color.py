@@ -9,8 +9,14 @@ import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
+from typing import TYPE_CHECKING, cast
 
 from keyrgb.core.runtime.imports import ensure_repo_root_on_sys_path
+
+if TYPE_CHECKING:
+    from keyrgb.core.config import Config as ConfigType
+    from keyrgb.gui.widgets.color_wheel import ColorWheel as ColorWheelType
+    from keyrgb.gui.windows._reactive_color_settings_adapter import ReactiveColorSettingsAdapter
 
 logger = logging.getLogger(__name__)
 _GEOMETRY_APPLY_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
@@ -49,7 +55,23 @@ reactive_color_ui = _runtime.reactive_color_ui
 
 
 class ReactiveColorGUI:
-    _settings_adapter: _settings_adapter.ReactiveColorSettingsAdapter | None = None
+    _settings_adapter: ReactiveColorSettingsAdapter | None = None
+    root: tk.Tk
+    config: ConfigType
+    _main_frame: ttk.Frame
+    _color_supported: bool
+    _use_manual_var: tk.BooleanVar
+    _reactive_vivid_visuals_var: tk.BooleanVar
+    _reactive_brightness_var: tk.DoubleVar
+    _reactive_brightness_label: ttk.Label
+    _reactive_trail_var: tk.DoubleVar
+    _reactive_trail_label: ttk.Label
+    color_wheel: ColorWheelType | None
+    status_label: ttk.Label
+    _last_drag_commit_ts: float
+    _last_drag_committed_color: tuple[int, int, int] | None
+    _drag_commit_interval: float
+    _last_drag_committed_brightness: int | None
 
     def __init__(self):
         self.root = tk.Tk()
@@ -109,11 +131,14 @@ class ReactiveColorGUI:
             sigint=signal.SIGINT,
         )
 
-    def _get_settings_adapter(self) -> _settings_adapter.ReactiveColorSettingsAdapter:
+    def _get_settings_adapter(self) -> ReactiveColorSettingsAdapter:
         adapter = self._settings_adapter
         if adapter is None:
             adapter = _settings_adapter.ReactiveColorSettingsAdapter(
-                self,
+                # Tk Variable stubs cannot structurally satisfy the adapter's
+                # _Variable/_StatusLabel protocols (set() value types / config
+                # overloads). The instance provides those members at runtime.
+                cast(_settings_adapter._ReactiveColorSettingsGUI, self),
                 runtime_module=_runtime,
                 tk_error=tk.TclError,
                 logger=logger,
@@ -159,10 +184,17 @@ class ReactiveColorGUI:
         return self._get_settings_adapter().commit_trail_to_config(trail_percent)
 
     def _on_toggle_manual(self) -> None:
-        reactive_color_interactions._on_toggle_manual(self, tk_error=tk.TclError, logger=logger)
+        reactive_color_interactions._on_toggle_manual(
+            cast(reactive_color_interactions._ManualToggleGui, self),
+            tk_error=tk.TclError,
+            logger=logger,
+        )
 
     def _on_toggle_reactive_visual_mode(self) -> None:
-        reactive_color_interactions._on_toggle_reactive_visual_mode(self, logger=logger)
+        reactive_color_interactions._on_toggle_reactive_visual_mode(
+            cast(reactive_color_interactions._ReactiveVisualModeGui, self),
+            logger=logger,
+        )
 
     def _on_reactive_brightness_change(self, value: str | float) -> None:
         _wiring.dispatch_brightness_change(

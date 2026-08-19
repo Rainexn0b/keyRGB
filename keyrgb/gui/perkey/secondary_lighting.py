@@ -5,12 +5,13 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass
+from typing import TypeAlias
 
 from keyrgb.core import secondary_lighting_state
 from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT, SecondaryDeviceRoute
 from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute, iter_effective_secondary_routes
 
-RGB = secondary_lighting_state.RGB
+RGB: TypeAlias = tuple[int, int, int]
 
 
 @dataclass(frozen=True)

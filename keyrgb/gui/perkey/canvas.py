@@ -35,6 +35,11 @@ KEYDEF_BY_SLOT_ID: dict[str, KeyDef] = _canvas_services.KEYDEF_BY_SLOT_ID
 
 
 class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.Canvas):
+    # Both mixins declare `editor` with their own narrow editor protocols;
+    # redeclaring it here with the concrete editor type resolves the
+    # base-class conflict and gives this class the precise editor type.
+    editor: PerKeyEditor
+
     def __init__(self, parent, editor: PerKeyEditor, **kwargs):
         super().__init__(parent, **kwargs)
         self.editor = editor
@@ -58,12 +63,12 @@ class KeyboardCanvas(_KeyboardCanvasEventMixin, _KeyboardCanvasDrawingMixin, tk.
 
         self._load_deck_image()
 
-    def _inset_pixels(self, w_px: float, h_px: float, inset_value: float) -> float:
+    def _inset_pixels(self, width_px: float, height_px: float, inset_value: float) -> float:
         x1, _y1, _x2, _y2 = inset_bbox(
             x1=0.0,
             y1=0.0,
-            x2=float(w_px),
-            y2=float(h_px),
+            x2=float(width_px),
+            y2=float(height_px),
             inset_value=float(inset_value),
         )
         return float(x1)

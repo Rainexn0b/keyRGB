@@ -13,42 +13,6 @@ from typing import Protocol, TypeAlias
 ColorRGB: TypeAlias = tuple[int, int, int]
 
 
-class _PackWidget(Protocol):
-    def pack(self, **kwargs: object) -> None: ...
-
-
-class _GridWidget(Protocol):
-    def grid(self, **kwargs: object) -> None: ...
-
-
-class _BindableWidget(Protocol):
-    def bind(self, sequence: str, callback: object) -> None: ...
-
-
-class _ConfigurableWidget(Protocol):
-    def config(self, **kwargs: object) -> None: ...
-
-    def configure(self, **kwargs: object) -> None: ...
-
-
-class _CanvasWidget(_PackWidget, _GridWidget, _BindableWidget, Protocol):
-    def delete(self, tag: object) -> None: ...
-
-    def create_rectangle(self, *args: object, **kwargs: object) -> None: ...
-
-
-class _LabelWidget(_GridWidget, _ConfigurableWidget, Protocol):
-    pass
-
-
-class _ScaleWidget(_GridWidget, Protocol):
-    pass
-
-
-class _EntryWidget(_GridWidget, _BindableWidget, Protocol):
-    pass
-
-
 class _StringVarProtocol(Protocol):
     def get(self) -> str: ...
 
@@ -98,8 +62,8 @@ class _InvokeCallbackFn(Protocol):
         green: int,
         blue: int,
         *,
-        source: str,
-        brightness_percent: float,
+        source: str | None = ...,
+        brightness_percent: float | None = ...,
     ) -> None: ...
 
 
@@ -107,8 +71,8 @@ class _ColorWheelUIMixin:
     # Attributes/methods provided by ColorWheel
     callback: ColorWheelCallback | None
     release_callback: ColorWheelCallback | None
-    canvas: _CanvasWidget
-    preview_canvas: _CanvasWidget
+    canvas: tk.Canvas
+    preview_canvas: tk.Canvas
     current_color: ColorRGB
     current_value: float
     size: int
@@ -117,17 +81,17 @@ class _ColorWheelUIMixin:
     _brightness_label_text: str
     _theme_bg_hex: str | None
     _theme_border_hex: str | None
-    brightness_title_label: _LabelWidget
+    brightness_title_label: ttk.Label
     brightness_var: _DoubleVarProtocol
-    brightness_slider: _ScaleWidget
-    brightness_label: _LabelWidget
-    rgb_label: _LabelWidget | None
+    brightness_slider: ttk.Scale
+    brightness_label: ttk.Label
+    rgb_label: ttk.Label | None
     rgb_r_var: _StringVarProtocol
     rgb_g_var: _StringVarProtocol
     rgb_b_var: _StringVarProtocol
-    rgb_r_entry: _EntryWidget
-    rgb_g_entry: _EntryWidget
-    rgb_b_entry: _EntryWidget
+    rgb_r_entry: ttk.Entry
+    rgb_g_entry: ttk.Entry
+    rgb_b_entry: ttk.Entry
     _rgb_entry_syncing: bool
     set_color: _SetColorFn
     _invoke_callback: _InvokeCallbackFn
@@ -141,7 +105,7 @@ class _ColorWheelUIMixin:
         bg = self._theme_bg_hex or "#2b2b2b"
         border = self._theme_border_hex or "#666666"
         # Canvas for the color wheel
-        self.canvas = tk.Canvas(self, width=self.size, height=self.size, highlightthickness=0, bg=bg)
+        self.canvas = tk.Canvas(self, width=self.size, height=self.size, highlightthickness=0, bg=bg)  # type: ignore[arg-type]  # self is ttk.Frame at runtime (mixin pattern)
         self.canvas.pack(pady=10)
 
         # Bind mouse events
@@ -151,7 +115,7 @@ class _ColorWheelUIMixin:
 
         if bool(getattr(self, "show_brightness_slider", True)):
             # Brightness/Value slider
-            brightness_frame = ttk.Frame(self)
+            brightness_frame = ttk.Frame(self)  # type: ignore[arg-type]  # self is ttk.Frame at runtime (mixin pattern)
             brightness_frame.pack(fill="x", padx=20, pady=10)
             brightness_frame.columnconfigure(1, weight=1)
 
@@ -175,7 +139,7 @@ class _ColorWheelUIMixin:
             self.brightness_label.grid(row=0, column=2, sticky="e", padx=(10, 5))
 
         # Color preview
-        preview_frame = ttk.Frame(self)
+        preview_frame = ttk.Frame(self)  # type: ignore[arg-type]  # self is ttk.Frame at runtime (mixin pattern)
         preview_frame.pack(fill="x", padx=20, pady=10)
         preview_frame.columnconfigure(2, weight=1)
 
@@ -198,7 +162,7 @@ class _ColorWheelUIMixin:
             self.rgb_label.grid(row=0, column=2, sticky="w", padx=(10, 0))
 
         # Manual RGB input (useful for copying exact values).
-        manual_frame = ttk.Frame(self)
+        manual_frame = ttk.Frame(self)  # type: ignore[arg-type]  # self is ttk.Frame at runtime (mixin pattern)
         manual_frame.pack(fill="x", padx=20, pady=(0, 10))
 
         ttk.Label(manual_frame, text="RGB:").grid(row=0, column=0, sticky="w", padx=(0, 8))

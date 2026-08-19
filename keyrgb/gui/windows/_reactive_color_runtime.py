@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from typing import cast
 
 from keyrgb.core.backends.registry import select_backend
 from keyrgb.core.config import Config
@@ -23,7 +24,7 @@ def commit_brightness_to_config(
     logger: logging.Logger,
 ) -> int | None:
     return _reactive_color_state.commit_brightness_to_config(
-        config,
+        cast(_reactive_color_state._ReactiveConfig, config),
         brightness_percent,
         logger=logger,
     )
@@ -38,8 +39,8 @@ def commit_color_to_config(
     logger: logging.Logger,
 ) -> None:
     _reactive_color_state.commit_color_to_config(
-        config,
-        use_manual_var,
+        cast(_reactive_color_state._ReactiveConfig, config),
+        cast(_reactive_color_state._WritableVariable, use_manual_var),
         color,
         tk_error=tk_error,
         logger=logger,
@@ -53,7 +54,7 @@ def commit_trail_to_config(
     logger: logging.Logger,
 ) -> int | None:
     return _reactive_color_state.commit_trail_to_config(
-        config,
+        cast(_reactive_color_state._ReactiveConfig, config),
         trail_percent,
         logger=logger,
     )
@@ -76,8 +77,8 @@ def sync_color_wheel_brightness(
     logger: logging.Logger,
 ) -> None:
     _reactive_color_state.sync_color_wheel_brightness(
-        color_wheel,
-        use_manual_var,
+        cast(_reactive_color_state._BrightnessWheel | None, color_wheel),
+        cast(_reactive_color_state._ReadableVariable, use_manual_var),
         percent=percent,
         tk_error=tk_error,
         logger=logger,
@@ -93,8 +94,8 @@ def sync_reactive_brightness_widgets(
     logger: logging.Logger,
 ) -> None:
     _reactive_color_state.sync_reactive_brightness_widgets(
-        brightness_var,
-        brightness_label,
+        cast(_reactive_color_state._WritableVariable, brightness_var),
+        cast(_reactive_color_state._ConfigurableWidget, brightness_label),
         percent=percent,
         tk_error=tk_error,
         logger=logger,
@@ -110,8 +111,8 @@ def sync_reactive_trail_widgets(
     logger: logging.Logger,
 ) -> None:
     _reactive_color_state.sync_reactive_trail_widgets(
-        trail_var,
-        trail_label,
+        cast(_reactive_color_state._WritableVariable, trail_var),
+        cast(_reactive_color_state._ConfigurableWidget, trail_label),
         percent=percent,
         tk_error=tk_error,
         logger=logger,

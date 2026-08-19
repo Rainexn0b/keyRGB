@@ -3,9 +3,14 @@ from __future__ import annotations
 import logging
 import tkinter as tk
 from collections.abc import Callable
-from typing import Protocol, SupportsFloat, cast
+from typing import TYPE_CHECKING, Protocol, SupportsFloat, cast
 
 from keyrgb.core.utils.logging_utils import log_throttled
+
+if TYPE_CHECKING:  # pragma: no cover - typing-only base
+    _CanvasBase = tk.Canvas
+else:
+    _CanvasBase = object
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +24,9 @@ class _TkVarProtocol(Protocol):
 
 
 class _CanvasEventEditorProtocol(Protocol):
-    overlay_scope: _TkVarProtocol
+    # Read-only so a concrete StringVar (or any .get() holder) is accepted.
+    @property
+    def overlay_scope(self) -> _TkVarProtocol: ...
 
     def on_slot_clicked(self, slot_id: str) -> None: ...
 
@@ -44,22 +51,6 @@ class _HitTestSlotIdSurface(Protocol):
     def _hit_test_slot_id(self, x: float, y: float) -> str | None: ...
 
 
-class _AfterScheduler(Protocol):
-    def __call__(self, delay_ms: int, callback: Callable[[], None]) -> str: ...
-
-
-class _ConfigureCursor(Protocol):
-    def __call__(self, *, cursor: str) -> object: ...
-
-
-class _FindWithTag(Protocol):
-    def __call__(self, tag: str) -> tuple[int, ...]: ...
-
-
-class _GetTags(Protocol):
-    def __call__(self, item: int) -> tuple[str, ...]: ...
-
-
 class _CursorForEdges(Protocol):
     def __call__(self, edges: str) -> str: ...
 
@@ -73,8 +64,14 @@ class _ResizeEdgesForPoint(Protocol):
 
 
 class _CanvasPointEvent(Protocol):
-    x: SupportsFloat
-    y: SupportsFloat
+    # Read-only properties so tkinter Event (x: int / y: int) satisfies this
+    # protocol: mutable attribute members would be invariant and reject int
+    # against SupportsFloat.
+    @property
+    def x(self) -> SupportsFloat: ...
+
+    @property
+    def y(self) -> SupportsFloat: ...
 
 
 def _selected_overlay_identity_or_none(editor: object) -> str | None:
@@ -133,15 +130,13 @@ def _hit_test_slot_id_or_none(canvas: object, *, x: float, y: float) -> str | No
     return hit_test(x, y)
 
 
-class _KeyboardCanvasEventMixin:
-    # Attributes/methods provided by tk.Canvas and KeyboardCanvas
+class _KeyboardCanvasEventMixin(_CanvasBase):
+    # Attributes/methods provided by KeyboardCanvas (the concrete subclass).
+    # tk.Canvas members (after, configure, find_withtag, gettags, ...) come
+    # from the check-time-only _CanvasBase so they carry the real tkinter
+    # stub signatures instead of shadow protocols.
     editor: _CanvasEventEditorProtocol
     _resize_job: str | None
-    after: _AfterScheduler
-    after_cancel: Callable[[str], None]
-    configure: _ConfigureCursor
-    find_withtag: _FindWithTag
-    gettags: _GetTags
     _cursor_for_edges: _CursorForEdges
     _point_in_key_bbox: _PointInKeyBbox
     redraw: Callable[[], None]

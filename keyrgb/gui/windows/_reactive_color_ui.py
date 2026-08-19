@@ -280,7 +280,7 @@ def build_reactive_window_ui(
         color_wheel = color_wheel_cls(
             main,
             size=350,
-            initial_color=tuple(initial),
+            initial_color=initial,
             callback=gui_state._on_color_change,
             release_callback=gui_state._on_color_release,
             show_brightness_slider=False,

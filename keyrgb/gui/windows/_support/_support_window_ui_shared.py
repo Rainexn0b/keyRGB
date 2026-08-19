@@ -145,8 +145,8 @@ class _RegisterWrapTargetFn(Protocol):  # noqa: PYI046 – re-exported in _suppo
         self,
         window: object,
         *,
-        label: object,
-        owner: object,
+        label: _WrapTargetLabelProtocol,
+        owner: _WrapTargetOwnerProtocol,
         padding: int,
         minimum: int,
     ) -> None: ...
@@ -240,7 +240,11 @@ def _mix_colors(base: str, target: str, ratio: float) -> str:
     base_rgb = _hex_to_rgb(base)
     target_rgb = _hex_to_rgb(target)
     clamped = max(0.0, min(1.0, float(ratio)))
-    mixed = tuple(round(base_rgb[index] + (target_rgb[index] - base_rgb[index]) * clamped) for index in range(3))
+    mixed: tuple[int, int, int] = (
+        round(base_rgb[0] + (target_rgb[0] - base_rgb[0]) * clamped),
+        round(base_rgb[1] + (target_rgb[1] - base_rgb[1]) * clamped),
+        round(base_rgb[2] + (target_rgb[2] - base_rgb[2]) * clamped),
+    )
     return _rgb_to_hex(mixed)
 
 
