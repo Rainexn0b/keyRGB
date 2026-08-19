@@ -12,6 +12,7 @@ jobs:
   quality:
     name: Quality Gate (Python 3.12)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -79,6 +80,7 @@ jobs:
   test:
     name: Runtime Matrix (Py${{ matrix.python-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: quality
     strategy:
       fail-fast: false

@@ -12,6 +12,7 @@ jobs:
   appimage:
     name: Build + Upload AppImage
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
