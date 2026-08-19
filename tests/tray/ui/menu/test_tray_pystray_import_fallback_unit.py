@@ -6,7 +6,7 @@ import types
 
 def test_get_pystray_falls_back_to_xorg_on_broken_gi(monkeypatch):
     # Import locally to ensure we exercise module-level caching behavior.
-    from src.tray.integrations import runtime
+    from keyrgb.tray.integrations import runtime
 
     # Reset cached module state for the test.
     monkeypatch.setattr(runtime, "_pystray_mod", None)
@@ -37,7 +37,7 @@ def test_get_pystray_falls_back_to_xorg_on_broken_gi(monkeypatch):
 
 
 def test_get_pystray_prefers_gtk_when_backend_is_unset(monkeypatch):
-    from src.tray.integrations import runtime
+    from keyrgb.tray.integrations import runtime
 
     monkeypatch.setattr(runtime, "_pystray_mod", None)
     monkeypatch.setattr(runtime, "_pystray_item", None)
@@ -65,7 +65,7 @@ def test_get_pystray_prefers_gtk_when_backend_is_unset(monkeypatch):
 
 
 def test_get_pystray_prefers_appindicator_when_kde_wayland(monkeypatch):
-    from src.tray.integrations import runtime
+    from keyrgb.tray.integrations import runtime
 
     monkeypatch.setattr(runtime, "_pystray_mod", None)
     monkeypatch.setattr(runtime, "_pystray_item", None)

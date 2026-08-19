@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.tray.pollers.time_scheduler import (
+from keyrgb.tray.pollers.time_scheduler import (
     _active_power_source_base_brightness,
     _is_night,
     _parse_time,
@@ -96,7 +96,7 @@ def test_run_scheduler_iteration_applies_day_base_brightness_when_power_policy_h
         def now() -> datetime:
             return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
-    with patch("src.tray.pollers.time_scheduler.datetime", _FakeDateTime):
+    with patch("keyrgb.tray.pollers.time_scheduler.datetime", _FakeDateTime):
         _run_scheduler_iteration(tray)
 
     assert tray.config.brightness == 25
@@ -141,8 +141,8 @@ def test_run_scheduler_iteration_uses_ac_brightness_as_day_primary_when_configur
             return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     with (
-        patch("src.tray.pollers.time_scheduler.datetime", _FakeDateTime),
-        patch("src.tray.pollers.time_scheduler.read_on_ac_power", return_value=True),
+        patch("keyrgb.tray.pollers.time_scheduler.datetime", _FakeDateTime),
+        patch("keyrgb.tray.pollers.time_scheduler.read_on_ac_power", return_value=True),
     ):
         _run_scheduler_iteration(tray)
 
@@ -189,8 +189,8 @@ def test_run_scheduler_iteration_applies_day_base_when_only_inactive_power_sourc
             return datetime(2024, 1, 1, 12, 0, tzinfo=timezone.utc)
 
     with (
-        patch("src.tray.pollers.time_scheduler.datetime", _FakeDateTime),
-        patch("src.tray.pollers.time_scheduler.read_on_ac_power", return_value=True),
+        patch("keyrgb.tray.pollers.time_scheduler.datetime", _FakeDateTime),
+        patch("keyrgb.tray.pollers.time_scheduler.read_on_ac_power", return_value=True),
     ):
         _run_scheduler_iteration(tray)
 
@@ -216,7 +216,7 @@ def test_active_power_source_base_brightness_uses_day_policy() -> None:
     config.ac_lighting_brightness = 40
     config.battery_lighting_brightness = 20
 
-    from src.core.brightness_layers import resolve_scheduler_brightness_state
+    from keyrgb.core.brightness_layers import resolve_scheduler_brightness_state
 
     state = resolve_scheduler_brightness_state(
         config,
@@ -241,7 +241,7 @@ def test_active_power_source_base_brightness_uses_lower_value_at_night() -> None
     config.ac_lighting_brightness = 40
     config.battery_lighting_brightness = 15
 
-    from src.core.brightness_layers import resolve_scheduler_brightness_state
+    from keyrgb.core.brightness_layers import resolve_scheduler_brightness_state
 
     state = resolve_scheduler_brightness_state(
         config,
@@ -255,7 +255,7 @@ def test_active_power_source_base_brightness_uses_lower_value_at_night() -> None
 
 
 def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
-    from src.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
     from tests.tray.fakes import make_owner_backed_mock_tray
 
     tray = make_owner_backed_mock_tray(
@@ -294,7 +294,7 @@ def test_scheduler_loop_retries_same_key_after_power_forced_off_skip() -> None:
         raise StopLoop
 
     with (
-        patch("src.tray.pollers.time_scheduler.read_on_ac_power", return_value=True),
+        patch("keyrgb.tray.pollers.time_scheduler.read_on_ac_power", return_value=True),
         pytest.raises(StopLoop),
     ):
         _scheduler_loop(

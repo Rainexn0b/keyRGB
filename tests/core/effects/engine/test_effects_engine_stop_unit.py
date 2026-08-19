@@ -7,10 +7,10 @@ from threading import Event
 
 import pytest
 
-from src.core.backends.base import BackendCapabilities
-from src.core.effects.catalog import hardware_effect_selection_key
-from src.core.effects.device import NullKeyboard
-from src.core.effects.engine import EffectsEngine
+from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.core.effects.catalog import hardware_effect_selection_key
+from keyrgb.core.effects.device import NullKeyboard
+from keyrgb.core.effects.engine import EffectsEngine
 
 
 def _effect_builder(effect_name: str, *, extra: tuple[str, ...] = ()):  # type: ignore[no-untyped-def]
@@ -526,7 +526,7 @@ def test_permission_denied_effect_thread_logs_traceback_and_notifies_callback(ca
     seen: list[Exception] = []
     engine._permission_error_cb = lambda exc: seen.append(exc)
 
-    with caplog.at_level(logging.WARNING, logger="src.core.effects.engine_start"):
+    with caplog.at_level(logging.WARNING, logger="keyrgb.core.effects.engine_start"):
         engine._start_sw_effect(
             target=lambda: (_ for _ in ()).throw(PermissionError("denied")),
             prev_color=(0, 0, 0),
@@ -549,12 +549,12 @@ def test_permission_denied_effect_thread_logs_traceback_and_notifies_callback(ca
 
 
 def test_permission_error_callback_logs_recoverable_runtime_failures(caplog) -> None:
-    from src.core.effects.engine_support.start import _notify_permission_error_callback_best_effort
+    from keyrgb.core.effects.engine_support.start import _notify_permission_error_callback_best_effort
 
     class _Engine:
         _permission_error_cb = staticmethod(lambda _exc: (_ for _ in ()).throw(RuntimeError("callback failed")))
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_start"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_start"):
         _notify_permission_error_callback_best_effort(_Engine(), PermissionError("denied"))
 
     records = [record for record in caplog.records if "Permission error callback failed" in record.getMessage()]
@@ -563,7 +563,7 @@ def test_permission_error_callback_logs_recoverable_runtime_failures(caplog) -> 
 
 
 def test_permission_error_callback_propagates_unexpected_failures() -> None:
-    from src.core.effects.engine_support.start import _notify_permission_error_callback_best_effort
+    from keyrgb.core.effects.engine_support.start import _notify_permission_error_callback_best_effort
 
     class _Engine:
         _permission_error_cb = staticmethod(
@@ -585,7 +585,7 @@ def test_disconnect_effect_thread_logs_traceback_even_if_marking_unavailable_fai
 
     engine.mark_device_unavailable = fail_mark_unavailable  # type: ignore[assignment]
 
-    with caplog.at_level(logging.WARNING, logger="src.core.effects.engine_start"):
+    with caplog.at_level(logging.WARNING, logger="keyrgb.core.effects.engine_start"):
         engine._start_sw_effect(
             target=lambda: (_ for _ in ()).throw(OSError(19, "No such device")),
             prev_color=(0, 0, 0),
@@ -623,7 +623,7 @@ def test_effect_thread_propagates_unexpected_failures_to_thread_excepthook(monke
     seen: list[threading.ExceptHookArgs] = []
     monkeypatch.setattr(threading, "excepthook", seen.append)
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_start"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_start"):
         engine._start_sw_effect(
             target=lambda: (_ for _ in ()).throw(AssertionError("unexpected thread bug")),
             prev_color=(0, 0, 0),
@@ -642,14 +642,14 @@ def test_effect_thread_propagates_unexpected_failures_to_thread_excepthook(monke
 
 
 def test_mark_device_unavailable_logs_recoverable_runtime_failures(caplog) -> None:
-    from src.core.effects.engine_support.start import _mark_device_unavailable_best_effort
+    from keyrgb.core.effects.engine_support.start import _mark_device_unavailable_best_effort
 
     class _Engine:
         @staticmethod
         def mark_device_unavailable() -> None:
             raise RuntimeError("mark failed")
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_start"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_start"):
         _mark_device_unavailable_best_effort(_Engine())
 
     records = [
@@ -662,7 +662,7 @@ def test_mark_device_unavailable_logs_recoverable_runtime_failures(caplog) -> No
 
 
 def test_mark_device_unavailable_propagates_unexpected_failures() -> None:
-    from src.core.effects.engine_support.start import _mark_device_unavailable_best_effort
+    from keyrgb.core.effects.engine_support.start import _mark_device_unavailable_best_effort
 
     class _Engine:
         @staticmethod
@@ -674,7 +674,7 @@ def test_mark_device_unavailable_propagates_unexpected_failures() -> None:
 
 
 def test_managed_effect_thread_join_suppresses_recoverable_cleanup_failures() -> None:
-    from src.core.effects.engine_support.start import _ManagedEffectThread
+    from keyrgb.core.effects.engine_support.start import _ManagedEffectThread
 
     class _BrokenEngine:
         @property
@@ -691,7 +691,7 @@ def test_managed_effect_thread_join_suppresses_recoverable_cleanup_failures() ->
 
 
 def test_managed_effect_thread_join_propagates_unexpected_cleanup_failures() -> None:
-    from src.core.effects.engine_support.start import _ManagedEffectThread
+    from keyrgb.core.effects.engine_support.start import _ManagedEffectThread
 
     class _BrokenEngine:
         @property

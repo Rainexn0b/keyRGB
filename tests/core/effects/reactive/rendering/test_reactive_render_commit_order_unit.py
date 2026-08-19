@@ -33,7 +33,7 @@ class _DummyKB:
 
 
 def test_render_uses_set_brightness_after_first_frame() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -68,7 +68,7 @@ def test_render_uses_set_brightness_after_first_frame() -> None:
 
 
 def test_render_uses_enable_user_mode_on_first_frame() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -91,7 +91,7 @@ def test_render_uses_enable_user_mode_on_first_frame() -> None:
 
 
 def test_render_set_brightness_always_after_data_when_dimming() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -116,7 +116,7 @@ def test_render_set_brightness_always_after_data_when_dimming() -> None:
 
 
 def test_render_set_brightness_after_data_when_brightening() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -141,7 +141,7 @@ def test_render_set_brightness_after_data_when_brightening() -> None:
 
 
 def test_apply_hw_brightness_reinitializes_user_mode_for_recoverable_runtime_errors() -> None:
-    from src.core.effects.reactive._render_runtime import apply_hw_brightness
+    from keyrgb.core.effects.reactive._render_runtime import apply_hw_brightness
 
     kb = _DummyKB(set_brightness_exc=OSError("boom"))
     engine = SimpleNamespace(
@@ -157,7 +157,7 @@ def test_apply_hw_brightness_reinitializes_user_mode_for_recoverable_runtime_err
 
 
 def test_apply_hw_brightness_propagates_unexpected_brightness_errors() -> None:
-    from src.core.effects.reactive._render_runtime import apply_hw_brightness
+    from keyrgb.core.effects.reactive._render_runtime import apply_hw_brightness
 
     class UnexpectedBrightnessError(Exception):
         pass

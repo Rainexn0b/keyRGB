@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from src.core.profile.runtime_activation import activate_perkey_profile_runtime
+from keyrgb.core.profile.runtime_activation import activate_perkey_profile_runtime
 
 
 def test_activate_perkey_profile_runtime_uses_in_place_transition_without_power_marker() -> None:
@@ -198,7 +198,7 @@ def test_activation_applies_config_before_effect_and_ui_callbacks() -> None:
 def test_core_activation_has_no_private_tray_method_contract() -> None:
     from pathlib import Path
 
-    source = Path("src/core/profile/runtime_activation.py").read_text(encoding="utf-8")
+    source = Path("keyrgb/core/profile/runtime_activation.py").read_text(encoding="utf-8")
 
     assert "getattr(tray" not in source
     assert "vars(tray)" not in source

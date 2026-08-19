@@ -1,7 +1,7 @@
 # Audit: `ite8291_zones` — ITE 8291 4-zone CE00 bcdDevice=0x0002 backend
 
 **Audit date:** 2026-07-04  
-**Backend source:** `src/core/backends/ite8291_zones/` (4 files, ~440 LOC)  
+**Backend source:** `keyrgb/core/backends/ite8291_zones/` (4 files, ~440 LOC)  
 **Test file:** `tests/core/backends/ite/test_ite8291_zones_backend_unit.py` (18 tests)  
 **Stability:** `EXPERIMENTAL`  
 **Evidence level:** `REVERSE_ENGINEERED`  
@@ -9,7 +9,7 @@
 
 ## References
 
-1. **tuxedo-drivers** `src/ite_8291/ite_8291.c` — the canonical kernel driver. The zone-mode
+1. **tuxedo-drivers** `keyrgb/ite_8291/ite_8291.c` — the canonical kernel driver. The zone-mode
    functions (`ite8291_zones_write_on`, `ite8291_zones_write_off`,
    `ite8291_zones_write_state`) and the firmware split logic
    (`hdev->product == 0xce00 && driver_data->bcd_device == 0x0002`) are the sole public

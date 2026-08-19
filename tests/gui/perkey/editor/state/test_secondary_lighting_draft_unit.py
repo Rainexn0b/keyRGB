@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT, SecondaryDeviceRoute
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.gui.perkey.secondary_lighting import SecondaryLightingDraft
+from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT, SecondaryDeviceRoute
+from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute
+from keyrgb.gui.perkey.secondary_lighting import SecondaryLightingDraft
 
 
 def _effective(

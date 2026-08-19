@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from src.tray.pollers.config_polling import ConfigApplyState, _apply_from_config_once
+from keyrgb.tray.pollers.config_polling import ConfigApplyState, _apply_from_config_once
 
 
 def _mk_tray_for_perkey(*, brightness: int, base_color=(9, 8, 7), per_key_colors=None) -> MagicMock:
@@ -308,7 +308,7 @@ def test_config_polling_skips_recent_power_source_mtime_reapply() -> None:
         reactive_color=(10, 20, 30),
     )
 
-    with patch("src.tray.pollers.config_polling.time.monotonic", return_value=100.0):
+    with patch("keyrgb.tray.pollers.config_polling.time.monotonic", return_value=100.0):
         new_last_applied, last_warn_at = _apply_from_config_once(
             tray,
             ite_num_rows=1,

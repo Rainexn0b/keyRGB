@@ -20,7 +20,7 @@ Each backend package owns a module-level `BACKEND_REGISTRATION`:
 | `provider` | package | `kernel-sysfs` or `usb-userspace` when known |
 | `stability` / `experimental_evidence` | package | Policy classification |
 
-`src/core/backends/registry.py` discovers those markers from backend packages.
+`keyrgb/core/backends/registry.py` discovers those markers from backend packages.
 Primary specs are derived from `role=primary` and sorted by priority, then name.
 Auxiliary backends such as `sysfs-mouse` are discovered the same way and exposed
 through `iter_auxiliary_specs()` for diagnostics.
@@ -40,7 +40,7 @@ falls back to the backend name so existing one-controller sharing is preserved.
 
 ## How to add a built-in backend
 
-1. Create `src/core/backends/<package>/` with the backend class.
+1. Create `keyrgb/core/backends/<package>/` with the backend class.
 2. Export `BACKEND_REGISTRATION` from that package `__init__.py`.
 3. Set `role=auxiliary` only for non-primary devices.
 4. Do not add USB IDs without hardware evidence, diagnostics, and tests.

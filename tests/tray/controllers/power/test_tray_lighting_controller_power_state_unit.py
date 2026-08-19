@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from src.tray.controllers._power._transition_constants import (
+from keyrgb.tray.controllers._power._transition_constants import (
     DEFAULT_IDLE_FADE_DURATION_S,
     SOFT_ON_START_BRIGHTNESS,
     idle_fade_duration_s,
@@ -16,7 +16,7 @@ def _lock_mock() -> MagicMock:
 
 class TestTurnOffOn:
     def test_turn_off_sets_flags_and_calls_engine(self):
-        from src.tray.controllers.lighting_controller import turn_off
+        from keyrgb.tray.controllers.lighting_controller import turn_off
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(is_off=False)
@@ -32,7 +32,7 @@ class TestTurnOffOn:
         mock_tray._refresh_ui.assert_called_once()
 
     def test_turn_on_clears_flags_and_restores_brightness(self):
-        from src.tray.controllers.lighting_controller import turn_on
+        from keyrgb.tray.controllers.lighting_controller import turn_on
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(is_off=True, last_brightness=75)
@@ -40,7 +40,7 @@ class TestTurnOffOn:
         mock_tray.config.effect = "breathe"
         mock_tray.tray_idle_power_state.last_resume_at = 0.0
 
-        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             turn_on(mock_tray)
 
         assert mock_tray._user_forced_off is False
@@ -57,7 +57,7 @@ class TestTurnOffOn:
         )
 
     def test_turn_on_uses_default_25_if_no_last_brightness(self):
-        from src.tray.controllers.lighting_controller import turn_on
+        from keyrgb.tray.controllers.lighting_controller import turn_on
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(is_off=True, last_brightness=0)
@@ -66,7 +66,7 @@ class TestTurnOffOn:
         mock_tray.config.color = (255, 255, 255)
         mock_tray.engine.kb_lock = _lock_mock()
 
-        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             turn_on(mock_tray)
 
         assert mock_tray.config.brightness == 25
@@ -80,8 +80,8 @@ class TestTurnOffOn:
 
 class TestPowerTurnOffRestore:
     def test_normalize_restore_policy_short_circuits_on_user_forced_off(self):
-        from src.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         idle_sentinel = object()
         power_sentinel = object()
@@ -113,7 +113,7 @@ class TestPowerTurnOffRestore:
         assert tray._power_forced_off is power_sentinel
 
     def test_normalize_restore_policy_clears_forced_flags_and_restores_brightness(self):
-        from src.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
+        from keyrgb.tray._power_restore_policy import normalize_lighting_power_restore_policy_state
         from tests.tray.fakes import make_owner_backed_simple_tray
 
         tray = make_owner_backed_simple_tray(
@@ -141,7 +141,7 @@ class TestPowerTurnOffRestore:
         assert tray.config.brightness == 40
 
     def test_power_turn_off_sets_power_forced_flag(self):
-        from src.tray.controllers.lighting_controller import power_turn_off
+        from keyrgb.tray.controllers.lighting_controller import power_turn_off
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(is_off=False)
@@ -158,7 +158,7 @@ class TestPowerTurnOffRestore:
         )
 
     def test_power_restore_restores_when_power_forced(self):
-        from src.tray.controllers.lighting_controller import power_restore
+        from keyrgb.tray.controllers.lighting_controller import power_restore
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(
@@ -171,7 +171,7 @@ class TestPowerTurnOffRestore:
         mock_tray.config.brightness = 0
         mock_tray.config.effect = "breathe"
 
-        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             power_restore(mock_tray)
 
         assert mock_tray._power_forced_off is False
@@ -187,7 +187,7 @@ class TestPowerTurnOffRestore:
         )
 
     def test_power_restore_restores_when_off_due_to_hardware_reset(self):
-        from src.tray.controllers.lighting_controller import power_restore
+        from keyrgb.tray.controllers.lighting_controller import power_restore
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(
@@ -199,7 +199,7 @@ class TestPowerTurnOffRestore:
         mock_tray.config.brightness = 25
         mock_tray.config.effect = "none"
 
-        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             power_restore(mock_tray)
 
         assert mock_tray.is_off is False
@@ -212,7 +212,7 @@ class TestPowerTurnOffRestore:
         )
 
     def test_power_restore_does_not_fight_user_forced_off(self):
-        from src.tray.controllers.lighting_controller import power_restore
+        from keyrgb.tray.controllers.lighting_controller import power_restore
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(
@@ -223,14 +223,14 @@ class TestPowerTurnOffRestore:
         )
         mock_tray.config.brightness = 25
 
-        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             power_restore(mock_tray)
 
         mock_start.assert_not_called()
 
     def test_power_restore_user_forced_off_short_circuits_lower_priority_flag_normalization(self):
-        from src.tray.controllers._power._lighting_power_state import power_restore_impl
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.tray.controllers._power._lighting_power_state import power_restore_impl
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         idle_sentinel = object()
         power_sentinel = object()
@@ -252,7 +252,7 @@ class TestPowerTurnOffRestore:
         )
         start_current_effect = MagicMock()
 
-        with patch("src.tray.controllers._power._lighting_power_state.time.monotonic", return_value=21.0):
+        with patch("keyrgb.tray.controllers._power._lighting_power_state.time.monotonic", return_value=21.0):
             power_restore_impl(
                 tray,
                 try_log_event=MagicMock(),
@@ -272,7 +272,7 @@ class TestPowerTurnOffRestore:
         start_current_effect.assert_not_called()
 
     def test_power_restore_reads_owner_state_when_legacy_flags_missing(self):
-        from src.tray.controllers._power._lighting_power_state import power_restore_impl
+        from keyrgb.tray.controllers._power._lighting_power_state import power_restore_impl
         from tests.tray.fakes import make_owner_backed_simple_tray
 
         tray = make_owner_backed_simple_tray(
@@ -288,7 +288,7 @@ class TestPowerTurnOffRestore:
         for name in ("_user_forced_off", "_idle_forced_off", "_power_forced_off", "_last_brightness"):
             vars(tray).pop(name, None)
 
-        with patch("src.tray.controllers._power._lighting_power_state.time.monotonic", return_value=42.0):
+        with patch("keyrgb.tray.controllers._power._lighting_power_state.time.monotonic", return_value=42.0):
             power_restore_impl(
                 tray,
                 try_log_event=MagicMock(),
@@ -304,8 +304,8 @@ class TestPowerTurnOffRestore:
         assert tray.tray_idle_power_state.last_resume_at == 42.0
 
     def test_power_restore_falls_back_to_owner_when_legacy_flags_are_invalid(self):
-        from src.tray.controllers._power._lighting_power_state import power_restore_impl
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.tray.controllers._power._lighting_power_state import power_restore_impl
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         start_current_effect = MagicMock()
         tray = SimpleNamespace(
@@ -325,7 +325,7 @@ class TestPowerTurnOffRestore:
             _refresh_ui=MagicMock(),
         )
 
-        with patch("src.tray.controllers._power._lighting_power_state.time.monotonic", return_value=9.0):
+        with patch("keyrgb.tray.controllers._power._lighting_power_state.time.monotonic", return_value=9.0):
             power_restore_impl(
                 tray,
                 try_log_event=MagicMock(),
@@ -348,7 +348,7 @@ class TestPowerTurnOffRestore:
         )
 
     def test_power_restore_loop_effect_uses_in_place_restart(self):
-        from src.tray.controllers.lighting_controller import power_restore
+        from keyrgb.tray.controllers.lighting_controller import power_restore
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(
@@ -360,7 +360,7 @@ class TestPowerTurnOffRestore:
         mock_tray.config.brightness = 25
         mock_tray.config.effect = "reactive_ripple"
 
-        with patch("src.tray.controllers.lighting_controller.start_current_effect") as mock_start:
+        with patch("keyrgb.tray.controllers.lighting_controller.start_current_effect") as mock_start:
             power_restore(mock_tray)
 
         mock_start.assert_called_once_with(
@@ -386,7 +386,7 @@ class TestIdleFadeDuration:
         assert idle_fade_duration_s(SimpleNamespace(idle_fade_duration_s="fast")) == DEFAULT_IDLE_FADE_DURATION_S
 
     def test_power_turn_off_uses_configured_fade_duration(self):
-        from src.tray.controllers.lighting_controller import power_turn_off
+        from keyrgb.tray.controllers.lighting_controller import power_turn_off
         from tests.tray.fakes import make_owner_backed_mock_tray
 
         mock_tray = make_owner_backed_mock_tray(is_off=False)

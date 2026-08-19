@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.effects.reactive.render import pulse_brightness_scale_factor
+from keyrgb.core.effects.reactive.render import pulse_brightness_scale_factor
 
 
 class _DummyEngine:
@@ -56,7 +56,7 @@ def test_pulse_brightness_keeps_direct_slider_scale_on_very_dim_backdrops() -> N
 
 
 def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
-    from src.core.effects.reactive._render_brightness_support import (
+    from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
         ensure_reactive_state,
     )
@@ -68,7 +68,7 @@ def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
     state._reactive_restore_damp_until = 102.0
     state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
 
-    import src.core.effects.reactive.render as render_module
+    import keyrgb.core.effects.reactive.render as render_module
 
     original_monotonic = render_module.time.monotonic
     render_module.time.monotonic = lambda: 100.0
@@ -80,11 +80,11 @@ def test_pulse_brightness_damps_very_dim_post_restore_bursts() -> None:
 
 def test_queued_restore_seed_survives_engine_state_reset() -> None:
     """Pre-start queue must re-apply after stop()-style ReactiveRenderState()."""
-    from src.core.effects.reactive._reactive_restore_seed import (
+    from keyrgb.core.effects.reactive._reactive_restore_seed import (
         apply_queued_reactive_restore_seed,
         seed_reactive_restore_windows,
     )
-    from src.core.effects.reactive._render_brightness_support import (
+    from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRenderState,
         ReactiveRestorePhase,
         ensure_reactive_state,
@@ -110,11 +110,11 @@ def test_queued_restore_seed_survives_engine_state_reset() -> None:
 
 def test_post_restore_frame_scale_softens_soft_on_matrix_steps() -> None:
     """Whole-frame scale during restore damp covers pulse_mix=0 soft-on pops."""
-    from src.core.effects.reactive._render_brightness_support import (
+    from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
         ensure_reactive_state,
     )
-    from src.core.effects.reactive.render import _post_restore_frame_scale, _resolve_transition_visual_scale
+    from keyrgb.core.effects.reactive.render import _post_restore_frame_scale, _resolve_transition_visual_scale
 
     eng = _DummyEngine(brightness=20, reactive_brightness=50)
     eng.per_key_colors = {(0, 0): (0, 0, 0)}
@@ -123,7 +123,7 @@ def test_post_restore_frame_scale_softens_soft_on_matrix_steps() -> None:
     state._reactive_restore_damp_until = 104.0
     state._reactive_restore_phase = ReactiveRestorePhase.FIRST_PULSE_PENDING
 
-    import src.core.effects.reactive.render as render_module
+    import keyrgb.core.effects.reactive.render as render_module
 
     original_monotonic = render_module.time.monotonic
     render_module.time.monotonic = lambda: 100.0
@@ -154,7 +154,7 @@ def test_pulse_brightness_damps_normal_base_post_restore_bursts() -> None:
     so a normal base like 20 kept pulse_scale=1.0 on the first rapid burst after
     long idle off — a brief deck-wide flash with reactive_ripple.
     """
-    from src.core.effects.reactive._render_brightness_support import (
+    from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
         ensure_reactive_state,
     )
@@ -166,7 +166,7 @@ def test_pulse_brightness_damps_normal_base_post_restore_bursts() -> None:
     state._reactive_restore_damp_until = 102.0
     state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
 
-    import src.core.effects.reactive.render as render_module
+    import keyrgb.core.effects.reactive.render as render_module
 
     original_monotonic = render_module.time.monotonic
     render_module.time.monotonic = lambda: 100.0
@@ -184,7 +184,7 @@ def test_pulse_brightness_damps_normal_base_post_restore_bursts() -> None:
 
 def test_pulse_brightness_damps_eff_le_hw_path_during_restore() -> None:
     """Restore damp also applies when reactive slider is not above backdrop hw."""
-    from src.core.effects.reactive._render_brightness_support import (
+    from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
         ensure_reactive_state,
     )
@@ -196,7 +196,7 @@ def test_pulse_brightness_damps_eff_le_hw_path_during_restore() -> None:
     state._reactive_restore_damp_until = 102.0
     state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
 
-    import src.core.effects.reactive.render as render_module
+    import keyrgb.core.effects.reactive.render as render_module
 
     original_monotonic = render_module.time.monotonic
     render_module.time.monotonic = lambda: 100.0
@@ -210,8 +210,8 @@ def test_pulse_brightness_damps_eff_le_hw_path_during_restore() -> None:
 
 
 def test_pulse_brightness_reseeds_restore_damp_on_first_post_restore_pulse() -> None:
-    from src.core.effects.reactive import effects
-    from src.core.effects.reactive._render_brightness_support import (
+    from keyrgb.core.effects.reactive import effects
+    from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
         ensure_reactive_state,
     )
@@ -223,7 +223,7 @@ def test_pulse_brightness_reseeds_restore_damp_on_first_post_restore_pulse() -> 
     state._reactive_restore_damp_until = 99.0
     state._reactive_restore_phase = ReactiveRestorePhase.FIRST_PULSE_PENDING
 
-    import src.core.effects.reactive.render as render_module
+    import keyrgb.core.effects.reactive.render as render_module
 
     original_monotonic = render_module.time.monotonic
     render_module.time.monotonic = lambda: 100.0
@@ -237,9 +237,9 @@ def test_pulse_brightness_reseeds_restore_damp_on_first_post_restore_pulse() -> 
 def test_wake_path_reseeds_restore_damp_after_initial_window_expires(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.effects.reactive import _render_brightness_support as reactive_support, effects
-    from src.core.effects.reactive.render import _resolve_brightness
-    from src.tray.pollers.idle_power._transition_actions import _seed_reactive_restore_windows
+    from keyrgb.core.effects.reactive import _render_brightness_support as reactive_support, effects
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.tray.pollers.idle_power._transition_actions import _seed_reactive_restore_windows
 
     class _Clock:
         def __init__(self, now: float) -> None:
@@ -249,11 +249,11 @@ def test_wake_path_reseeds_restore_damp_after_initial_window_expires(
             return self.now
 
     clock = _Clock(100.0)
-    monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", clock.monotonic)
-    monkeypatch.setattr("src.core.effects.reactive.effects.time.monotonic", clock.monotonic)
-    monkeypatch.setattr("src.core.effects.reactive.render.time.monotonic", clock.monotonic)
-    monkeypatch.setattr("src.core.effects.reactive._render_brightness.time.monotonic", clock.monotonic)
-    monkeypatch.setattr("src.core.effects.reactive._render_brightness_support.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._transition_actions.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("keyrgb.core.effects.reactive.effects.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("keyrgb.core.effects.reactive.render.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("keyrgb.core.effects.reactive._render_brightness.time.monotonic", clock.monotonic)
+    monkeypatch.setattr("keyrgb.core.effects.reactive._render_brightness_support.time.monotonic", clock.monotonic)
 
     eng = _DummyEngine(brightness=5, reactive_brightness=50)
     eng.per_key_colors = {(0, 0): (0, 0, 0)}
@@ -305,7 +305,7 @@ def test_pulse_brightness_logs_visual_scale_under_debug(monkeypatch, caplog) -> 
 
     monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
 
-    with caplog.at_level(logging.INFO, logger="src.core.effects.reactive.render"):
+    with caplog.at_level(logging.INFO, logger="keyrgb.core.effects.reactive.render"):
         pulse_brightness_scale_factor(eng)
 
     messages = [record.getMessage() for record in caplog.records if "reactive_pulse_visual:" in record.getMessage()]
@@ -317,7 +317,7 @@ def test_pulse_brightness_logs_visual_scale_under_debug(monkeypatch, caplog) -> 
 
 
 def test_pulse_brightness_logs_post_restore_damp_under_debug(monkeypatch, caplog) -> None:
-    from src.core.effects.reactive._render_brightness_support import (
+    from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
         ensure_reactive_state,
     )
@@ -330,9 +330,9 @@ def test_pulse_brightness_logs_post_restore_damp_under_debug(monkeypatch, caplog
     state._reactive_restore_phase = ReactiveRestorePhase.DAMPING
 
     monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
-    monkeypatch.setattr("src.core.effects.reactive.render.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.core.effects.reactive.render.time.monotonic", lambda: 100.0)
 
-    with caplog.at_level(logging.INFO, logger="src.core.effects.reactive.render"):
+    with caplog.at_level(logging.INFO, logger="keyrgb.core.effects.reactive.render"):
         pulse_brightness_scale_factor(eng)
 
     messages = [record.getMessage() for record in caplog.records if "reactive_pulse_visual:" in record.getMessage()]
@@ -348,7 +348,7 @@ def test_pulse_brightness_does_not_damp_normal_first_activity_holdoff() -> None:
     eng.per_key_brightness = 5
     eng._reactive_disable_pulse_hw_lift_until = 102.0
 
-    import src.core.effects.reactive.render as render_module
+    import keyrgb.core.effects.reactive.render as render_module
 
     original_monotonic = render_module.time.monotonic
     render_module.time.monotonic = lambda: 100.0
@@ -384,7 +384,7 @@ def test_subtle_visual_mode_softens_midrange_per_key_pulse_scale() -> None:
 
 
 def test_active_pulse_mix_does_not_lift_hw_on_per_key_backends() -> None:
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     eng = _DummyEngine(brightness=10, reactive_brightness=50)
     eng._last_rendered_brightness = 10
@@ -397,7 +397,7 @@ def test_active_pulse_mix_does_not_lift_hw_on_per_key_backends() -> None:
 
 
 def test_active_pulse_mix_can_lift_hw_on_uniform_backends() -> None:
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
     eng._last_rendered_brightness = 10
@@ -410,7 +410,7 @@ def test_active_pulse_mix_can_lift_hw_on_uniform_backends() -> None:
 
 
 def test_active_pulse_mix_can_lift_after_uniform_backend_streak() -> None:
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
     eng._last_rendered_brightness = 10
@@ -428,7 +428,7 @@ def test_active_pulse_mix_can_lift_after_uniform_backend_streak() -> None:
 
 
 def test_idle_without_active_pulse_keeps_hw_at_profile_brightness() -> None:
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     eng = _DummyEngine(brightness=10, reactive_brightness=50)
     eng._last_rendered_brightness = 10
@@ -441,7 +441,7 @@ def test_idle_without_active_pulse_keeps_hw_at_profile_brightness() -> None:
 
 
 def test_follow_global_brightness_clamps_reactive_backdrop_during_soft_start() -> None:
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     eng = _DummyEngine(brightness=2, reactive_brightness=50)
     eng._last_rendered_brightness = 2
@@ -457,7 +457,7 @@ def test_follow_global_brightness_clamps_reactive_backdrop_during_soft_start() -
 
 
 def test_pulse_return_to_idle_skips_guard_tail() -> None:
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
     # Previous frame was a fully lifted pulse.
@@ -473,7 +473,7 @@ def test_pulse_return_to_idle_skips_guard_tail() -> None:
 
 
 def test_active_pulse_mix_lift_is_suppressed_during_post_transition_cooldown() -> None:
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
     eng._last_rendered_brightness = 10
@@ -487,7 +487,7 @@ def test_active_pulse_mix_lift_is_suppressed_during_post_transition_cooldown() -
 
 
 def test_resolve_brightness_logs_hw_lift_cooldown_reason_under_debug(monkeypatch, caplog) -> None:
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     now = 100.0
     eng = _DummyEngine(brightness=10, reactive_brightness=50, has_per_key=False)
@@ -497,13 +497,13 @@ def test_resolve_brightness_logs_hw_lift_cooldown_reason_under_debug(monkeypatch
     eng._reactive_disable_pulse_hw_lift_until = now + 2.5
 
     monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
-    monkeypatch.setattr("src.core.effects.reactive._render_brightness.time.monotonic", lambda: now)
+    monkeypatch.setattr("keyrgb.core.effects.reactive._render_brightness.time.monotonic", lambda: now)
     monkeypatch.setattr(
-        "src.core.effects.reactive._render_brightness_support.time.monotonic",
+        "keyrgb.core.effects.reactive._render_brightness_support.time.monotonic",
         lambda: now,
     )
 
-    with caplog.at_level(logging.INFO, logger="src.core.effects.reactive.render"):
+    with caplog.at_level(logging.INFO, logger="keyrgb.core.effects.reactive.render"):
         _resolve_brightness(eng)
 
     messages = [record.getMessage() for record in caplog.records if "reactive_hw_lift:" in record.getMessage()]

@@ -19,12 +19,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.tray.idle_power_state import (
+from keyrgb.tray.idle_power_state import (
     ensure_tray_idle_power_state,
     read_idle_power_state_float_field,
 )
-from src.tray.pollers.hardware import _controller_sleep, _runtime_support
-from src.tray.pollers.hardware._recovery import (
+from keyrgb.tray.pollers.hardware import _controller_sleep, _runtime_support
+from keyrgb.tray.pollers.hardware._recovery import (
     _execute_blank_recovery,
     _power_source_blank_recovery_eligible,
     _recover_recent_power_source_blank_best_effort,
@@ -108,7 +108,7 @@ def test_power_source_blank_recovery_not_eligible_within_cooldown() -> None:
 def test_power_source_blank_recovery_uses_monotonic_when_now_is_none(monkeypatch) -> None:
     """When now=None, the function falls back to time.monotonic()."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 101.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 101.0)
 
     tray = _make_recovery_tray()
     tray._last_power_source_transition_at = 100.0
@@ -473,7 +473,7 @@ def test_execute_blank_recovery_sets_hidden_hints_during_apply_call() -> None:
 def test_recover_recent_power_source_blank_returns_false_when_not_eligible(monkeypatch) -> None:
     """When the recovery window is not active, do not attempt recovery."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0)
 
     apply_calls: list[bool] = []
 
@@ -493,7 +493,7 @@ def test_recover_recent_power_source_blank_returns_false_when_not_eligible(monke
 def test_recover_recent_power_source_blank_writes_power_source_stamp(monkeypatch) -> None:
     """On success, the power_source_blank recovery timestamp is written."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 101.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 101.0)
 
     tray = _make_recovery_tray(is_off=True)
     tray._last_power_source_transition_at = 100.0
@@ -535,7 +535,7 @@ def test_recover_recent_power_source_blank_writes_power_source_stamp(monkeypatch
 def test_recover_stable_zero_returns_false_when_brightness_nonzero(monkeypatch) -> None:
     """Stable-zero recovery only fires when current_brightness is exactly 0."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray()
     tray._last_power_source_transition_at = 0.0
@@ -552,7 +552,7 @@ def test_recover_stable_zero_returns_false_when_brightness_nonzero(monkeypatch) 
 def test_recover_stable_zero_returns_false_when_dim_temp_active(monkeypatch) -> None:
     """Dim-temp state suppresses stable-zero recovery (treat as transient)."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray(dim_temp_active=True)
     tray._last_power_source_transition_at = 0.0
@@ -569,7 +569,7 @@ def test_recover_stable_zero_returns_false_when_dim_temp_active(monkeypatch) -> 
 def test_recover_stable_zero_returns_false_when_any_forced_off(monkeypatch) -> None:
     """Forced-off state suppresses stable-zero recovery (intentional off)."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray(user_forced_off=True)
     tray._last_power_source_transition_at = 0.0
@@ -586,7 +586,7 @@ def test_recover_stable_zero_returns_false_when_any_forced_off(monkeypatch) -> N
 def test_recover_stable_zero_writes_hardware_blank_stamp(monkeypatch) -> None:
     """On success, the hardware_blank recovery timestamp is written (not the power_source one)."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray(is_off=False)
     tray._last_power_source_transition_at = 0.0
@@ -623,7 +623,7 @@ def test_recover_stable_zero_writes_hardware_blank_stamp(monkeypatch) -> None:
 def test_recover_stable_zero_respects_cooldown(monkeypatch) -> None:
     """A recovery within the cooldown window is rejected."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray()
     tray._last_power_source_transition_at = 0.0
@@ -647,7 +647,7 @@ def test_recover_stable_zero_respects_cooldown(monkeypatch) -> None:
 def test_recover_stable_zero_increments_attempt_count(monkeypatch) -> None:
     """A successful recovery increments the consecutive-attempt counter."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 100.0)
 
     tray = _make_recovery_tray(is_off=False)
     tray._last_power_source_transition_at = 0.0
@@ -670,7 +670,7 @@ def test_recover_stable_zero_increments_attempt_count(monkeypatch) -> None:
 def test_recover_stable_zero_circuit_breaker_enters_backoff(monkeypatch) -> None:
     """After max consecutive attempts, the long backoff window blocks recovery."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 110.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 110.0)
 
     tray = _make_recovery_tray(is_off=False)
     tray._last_power_source_transition_at = 0.0
@@ -715,7 +715,7 @@ def test_execute_blank_recovery_writes_stamp_even_when_callback_raises(monkeypat
     must already be in place to block the next poll cycle.
     """
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 200.0)
 
     tray = _make_recovery_tray()
     tray._last_power_source_transition_at = 0.0
@@ -765,7 +765,7 @@ def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None
     pulse intensity.
     """
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0)
 
     seeded: list[float] = []
 
@@ -774,7 +774,7 @@ def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None
 
     # Patch the late import target so the damp-seeding helper picks it up.
     monkeypatch.setattr(
-        "src.core.effects.reactive._reactive_restore_seed.seed_reactive_restore_windows",
+        "keyrgb.core.effects.reactive._reactive_restore_seed.seed_reactive_restore_windows",
         _fake_seed,
     )
 
@@ -812,7 +812,7 @@ def test_execute_blank_recovery_seeds_reactive_restore_damp(monkeypatch) -> None
 def test_execute_blank_recovery_skips_damp_for_non_reactive_effects(monkeypatch) -> None:
     """Non-reactive effects do not trigger damp seeding."""
 
-    monkeypatch.setattr("src.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware._recovery.time.monotonic", lambda: 300.0)
 
     seeded: list[float] = []
 
@@ -820,7 +820,7 @@ def test_execute_blank_recovery_skips_damp_for_non_reactive_effects(monkeypatch)
         seeded.append(float(fade_in_duration_s))
 
     monkeypatch.setattr(
-        "src.core.effects.reactive._reactive_restore_seed.seed_reactive_restore_windows",
+        "keyrgb.core.effects.reactive._reactive_restore_seed.seed_reactive_restore_windows",
         _fake_seed,
     )
 
@@ -927,7 +927,7 @@ def test_firmware_wake_restart_uses_public_fallback(monkeypatch) -> None:
     calls: list[object] = []
     tray = make_owner_backed_simple_tray(engine=SimpleNamespace(), last_resume_at=0.0)
     monkeypatch.setattr(
-        "src.tray.controllers.lighting_controller.start_current_effect",
+        "keyrgb.tray.controllers.lighting_controller.start_current_effect",
         lambda target: calls.append(target) or True,
     )
 

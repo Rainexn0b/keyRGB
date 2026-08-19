@@ -19,7 +19,7 @@ class TestAllowedHwEffectKeys:
 
     def test_returns_empty_set_when_no_closure(self):
         """Should return empty set for functions without closure."""
-        from src.core.effects.hw_payloads import allowed_hw_effect_keys
+        from keyrgb.core.effects.hw_payloads import allowed_hw_effect_keys
 
         def simple_func():
             return "test"
@@ -28,7 +28,7 @@ class TestAllowedHwEffectKeys:
         assert result == set()
 
     def test_returns_empty_set_without_explicit_contract(self):
-        from src.core.effects.hw_payloads import allowed_hw_effect_keys
+        from keyrgb.core.effects.hw_payloads import allowed_hw_effect_keys
 
         mock_func = MagicMock()
 
@@ -36,7 +36,7 @@ class TestAllowedHwEffectKeys:
         assert result == set()
 
     def test_does_not_touch_callable_closure_internals(self):
-        from src.core.effects.hw_payloads import allowed_hw_effect_keys
+        from keyrgb.core.effects.hw_payloads import allowed_hw_effect_keys
 
         class _CallableWithBrokenCode:
             @property
@@ -49,8 +49,8 @@ class TestAllowedHwEffectKeys:
         assert allowed_hw_effect_keys(_CallableWithBrokenCode(), logger=logging.getLogger()) == set()
 
     def test_extracts_keys_from_declared_builder_contract(self):
-        from src.core.backends.effect_contract import hardware_effect_builder
-        from src.core.effects.hw_payloads import allowed_hw_effect_keys
+        from keyrgb.core.backends.effect_contract import hardware_effect_builder
+        from keyrgb.core.effects.hw_payloads import allowed_hw_effect_keys
 
         func = hardware_effect_builder(
             lambda **kwargs: kwargs,
@@ -68,7 +68,7 @@ class TestBuildHwEffectPayload:
 
     def test_ite8910_uses_direct_speed_scale(self):
         """ITE8910 should preserve the UI speed ordering instead of inverting it."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         class FakeIte8910Keyboard:
             keyrgb_hw_speed_policy = "direct"
@@ -96,7 +96,7 @@ class TestBuildHwEffectPayload:
 
     def test_ite8291r3_inverts_speed_scale(self):
         """Vendored ite8291r3_perkey uses 0 = fastest, 10 = slowest."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         class FakeIte8291r3Keyboard:
             keyrgb_hw_speed_policy = "inverted"
@@ -127,7 +127,7 @@ class TestBuildHwEffectPayload:
 
     def test_ite8291r3_slowest_speed_conversion(self):
         """Lowest UI speed should stay slowest on the ite8291r3_perkey backend."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         class FakeIte8291r3Keyboard:
             keyrgb_hw_speed_policy = "inverted"
@@ -155,7 +155,7 @@ class TestBuildHwEffectPayload:
 
     def test_passes_brightness_unchanged(self):
         """Brightness should be passed through as-is."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         captured_kwargs = {}
 
@@ -179,7 +179,7 @@ class TestBuildHwEffectPayload:
 
     def test_breathing_effect_sets_palette_color(self):
         """Breathing effect should program palette slot and use slot index."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         mock_kb = MagicMock()
         kb_lock = RLock()
@@ -209,7 +209,7 @@ class TestBuildHwEffectPayload:
 
     def test_breathing_palette_failure_logs_traceback_and_keeps_payload(self, caplog):
         """Should preserve payload building and log exception context on palette failure."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         mock_kb = MagicMock()
         mock_kb.set_palette_color.side_effect = OSError("palette write failed")
@@ -247,7 +247,7 @@ class TestBuildHwEffectPayload:
         assert any(record.exc_info and isinstance(record.exc_info[1], OSError) for record in records)
 
     def test_breathing_palette_failure_propagates_unexpected_errors(self):
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         mock_kb = MagicMock()
         mock_kb.set_palette_color.side_effect = AssertionError("unexpected palette bug")
@@ -270,7 +270,7 @@ class TestBuildHwEffectPayload:
 
     def test_palette_backend_color_effect_uses_palette_slot(self):
         """Palette-based hardware effects should never receive raw RGB tuples."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         mock_kb = MagicMock()
         captured_kwargs = {}
@@ -296,7 +296,7 @@ class TestBuildHwEffectPayload:
 
     def test_palette_backend_random_effect_preserves_random_sentinel(self):
         """Palette backends should keep firmware-random effects on the random slot."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         mock_kb = MagicMock()
         captured_kwargs = {}
@@ -322,7 +322,7 @@ class TestBuildHwEffectPayload:
 
     def test_direct_rgb_random_effect_passes_color_tuple(self):
         """Direct-RGB backends should keep tuple colors for hardware random variants."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         mock_kb = MagicMock()
         captured_kwargs = {}
@@ -348,8 +348,8 @@ class TestBuildHwEffectPayload:
 
     def test_retries_on_typed_unsupported_kwarg_error(self):
         """Typed builder rejections may remove one field and retry."""
-        from src.core.backends.effect_contract import UnsupportedHardwareEffectArgument
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.backends.effect_contract import UnsupportedHardwareEffectArgument
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         call_count = 0
 
@@ -379,8 +379,8 @@ class TestBuildHwEffectPayload:
 
     def test_filters_kwargs_by_allowed_keys_when_available(self):
         """Should pre-filter kwargs using explicit builder metadata."""
-        from src.core.backends.effect_contract import hardware_effect_builder
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.backends.effect_contract import hardware_effect_builder
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         func = hardware_effect_builder(lambda **kwargs: kwargs, accepted_kwargs=("speed",))
 
@@ -401,7 +401,7 @@ class TestBuildHwEffectPayload:
         assert "brightness" not in result
 
     def test_value_error_text_is_not_parsed_as_a_payload_contract(self):
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         def legacy_error(**kwargs):
             raise ValueError("'brightness' attr is not needed by effect")
@@ -421,7 +421,7 @@ class TestBuildHwEffectPayload:
 
     def test_raises_on_unexpected_error(self):
         """Should raise ValueError immediately for errors that don't match retry pattern."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         def always_failing_func(**kwargs):
             raise ValueError("Unexpected error format")
@@ -441,7 +441,7 @@ class TestBuildHwEffectPayload:
 
     def test_ite8291r3_clamps_speed_to_valid_range(self):
         """ite8291r3_perkey speed inversion should still clamp to [0, 10]."""
-        from src.core.effects.hw_payloads import build_hw_effect_payload
+        from keyrgb.core.effects.hw_payloads import build_hw_effect_payload
 
         class FakeIte8291r3Keyboard:
             keyrgb_hw_speed_policy = "inverted"

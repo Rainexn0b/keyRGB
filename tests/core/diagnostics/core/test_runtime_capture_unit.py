@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.diagnostics import runtime_capture
+from keyrgb.core.diagnostics import runtime_capture
 
 
 def test_runtime_environment_selects_exact_debug_mode() -> None:
@@ -55,7 +55,7 @@ def test_source_runtime_uses_active_python_without_external_runtime(tmp_path: Pa
         "-B",
         "-u",
         "-m",
-        "src.tray",
+        "keyrgb.tray",
     ]
 
 

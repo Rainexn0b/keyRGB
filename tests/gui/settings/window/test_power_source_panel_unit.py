@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.settings.panels import power_source_panel
+from keyrgb.gui.settings.panels import power_source_panel
 
 
 class _FakeWidget:

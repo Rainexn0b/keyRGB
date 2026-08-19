@@ -13,8 +13,8 @@ class TestApplyProfileToConfig:
 
     def test_apply_profile_preserves_selected_effect_and_sets_colors(self):
         """apply_profile_to_config should update the base map without forcing the selected effect."""
-        from src.core.config import Config
-        from src.core.profile.profiles import apply_profile_to_config
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile.profiles import apply_profile_to_config
 
         cfg = Config()
         cfg.effect = "rainbow"
@@ -29,8 +29,8 @@ class TestApplyProfileToConfig:
 
     def test_apply_profile_bumps_brightness_if_zero(self):
         """If brightness is 0, apply_profile_to_config should set it to 50."""
-        from src.core.config import Config
-        from src.core.profile.profiles import apply_profile_to_config
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile.profiles import apply_profile_to_config
 
         cfg = Config()
         cfg.effect = "none"
@@ -43,8 +43,8 @@ class TestApplyProfileToConfig:
 
     def test_apply_profile_persists_single_complete_config_snapshot(self, monkeypatch):
         """Profile switches should not expose intermediate config states to pollers."""
-        from src.core.config import Config
-        from src.core.profile.profiles import apply_profile_to_config
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile.profiles import apply_profile_to_config
 
         cfg = Config()
         cfg._settings["effect"] = "none"
@@ -66,8 +66,8 @@ class TestApplyProfileToConfig:
         assert cfg.per_key_colors == colors
 
     def test_apply_profile_persists_secondary_state_in_same_snapshot(self, monkeypatch):
-        from src.core.config import Config
-        from src.core.profile.profiles import apply_profile_to_config
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile.profiles import apply_profile_to_config
 
         cfg = Config()
         cfg._settings["effect"] = "none"
@@ -105,8 +105,8 @@ class TestApplyProfileToConfig:
         }
 
     def test_explicit_empty_secondary_profile_disables_known_routes_and_preserves_unknown_state(self, monkeypatch):
-        from src.core.config import Config
-        from src.core.profile.profiles import apply_profile_to_config
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile.profiles import apply_profile_to_config
 
         cfg = Config()
         cfg._settings["secondary_device_state"] = {
@@ -135,8 +135,8 @@ class TestApplyProfileToConfig:
         assert state["future_route"] == {"enabled": True, "future": "preserve"}
 
     def test_partial_secondary_profile_disables_only_omitted_known_routes(self, monkeypatch):
-        from src.core.config import Config
-        from src.core.profile.profiles import apply_profile_to_config
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile.profiles import apply_profile_to_config
 
         cfg = Config()
         cfg._settings["secondary_device_state"] = {
@@ -160,10 +160,10 @@ class TestApplyProfileToConfig:
 
     def test_apply_light_profile_restores_built_in_baseline_brightness(self, monkeypatch):
         """The built-in light profile should restore the normal full baseline."""
-        from src.core.config import Config
-        from src.core.profile.profiles import apply_profile_to_config
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile.profiles import apply_profile_to_config
 
-        monkeypatch.setattr("src.core.profile.profiles.get_active_profile", lambda: "default")
+        monkeypatch.setattr("keyrgb.core.profile.profiles.get_active_profile", lambda: "default")
 
         cfg = Config()
         cfg.effect = "perkey"
@@ -179,10 +179,10 @@ class TestApplyProfileToConfig:
         assert cfg.effect == "perkey"
 
     def test_migrate_builtin_light_profile_repairs_stale_dim_level(self, monkeypatch):
-        from src.core.config import Config
-        from src.core.profile.profiles import migrate_builtin_profile_brightness
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile.profiles import migrate_builtin_profile_brightness
 
-        monkeypatch.setattr("src.core.profile.profiles.get_active_profile", lambda: "default")
+        monkeypatch.setattr("keyrgb.core.profile.profiles.get_active_profile", lambda: "default")
 
         cfg = Config()
         cfg.effect = "perkey"
@@ -198,8 +198,8 @@ class TestApplyProfileToConfig:
         assert cfg.perkey_brightness == 50
 
     def test_migrate_builtin_profile_logs_active_profile_lookup_failure(self, monkeypatch):
-        from src.core.config import Config
-        from src.core.profile import profiles
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile import profiles
 
         logs: list[tuple[str, str, BaseException | None]] = []
 
@@ -222,8 +222,8 @@ class TestApplyProfileToConfig:
         assert isinstance(logs[0][2], RuntimeError)
 
     def test_migrate_builtin_profile_propagates_unexpected_active_profile_lookup_failure(self, monkeypatch):
-        from src.core.config import Config
-        from src.core.profile import profiles
+        from keyrgb.core.config import Config
+        from keyrgb.core.profile import profiles
 
         monkeypatch.setattr(profiles, "get_active_profile", lambda: (_ for _ in ()).throw(AssertionError("boom")))
 
@@ -231,7 +231,7 @@ class TestApplyProfileToConfig:
             profiles.migrate_builtin_profile_brightness(Config())
 
     def test_apply_light_profile_logs_brightness_set_failure_and_continues(self, monkeypatch):
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         logs: list[tuple[str, str, BaseException | None]] = []
 
@@ -274,7 +274,7 @@ class TestApplyProfileToConfig:
         assert isinstance(logs[0][2], RuntimeError)
 
     def test_apply_profile_propagates_unexpected_brightness_getter_failure(self, monkeypatch):
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         class ConfigStub:
             def __init__(self) -> None:
@@ -293,7 +293,7 @@ class TestApplyProfileToConfig:
             profiles.apply_profile_to_config(ConfigStub(), {(0, 0): (1, 2, 3)})
 
     def test_apply_profile_propagates_unexpected_brightness_setter_failure(self, monkeypatch):
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         class ConfigStub:
             def __init__(self) -> None:

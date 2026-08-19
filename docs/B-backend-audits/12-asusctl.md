@@ -1,7 +1,7 @@
 # Audit: `asusctl` — ASUS Aura CLI backend
 
 **Audit date:** 2026-07-04  
-**Backend source:** `src/core/backends/asusctl/` (3 files, ~319 LOC)  
+**Backend source:** `keyrgb/core/backends/asusctl/` (3 files, ~319 LOC)  
 **Test file:** `tests/core/backends/general/test_asusctl_backend_unit.py` (26 tests)  
 **Stability:** `VALIDATED`  
 **Evidence level:** N/A (CLI integration)  

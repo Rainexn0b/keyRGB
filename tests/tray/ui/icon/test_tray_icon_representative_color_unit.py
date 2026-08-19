@@ -17,20 +17,20 @@ import pytest
     ],
 )
 def test_normalized_rgb_or_none_branches(value: object, expected: tuple[int, int, int] | None) -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     assert _color._normalized_rgb_or_none(value) == expected
 
 
 def test_normalized_color_values_filters_invalid_entries() -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     raw_colors = [(1, 2, 3), (1, 2), "255,0,0", 123, (7, 8, 9)]
     assert _color._normalized_color_values(raw_colors) == ((1, 2, 3), (7, 8, 9))
 
 
 def test_config_value_recovers_from_property_runtime_error() -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     class _Cfg:
         @property
@@ -41,20 +41,20 @@ def test_config_value_recovers_from_property_runtime_error() -> None:
 
 
 def test_weighted_hsv_mean_fallback_empty_iterable_uses_default() -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     assert _color._weighted_hsv_mean(()) == (255, 0, 128)
 
 
 def test_weighted_hsv_mean_fallback_total_too_low_uses_arithmetic_mean() -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     # Black values keep v=0, so weighted total remains 0 and arithmetic fallback is used.
     assert _color._weighted_hsv_mean(((0, 0, 0), (0, 0, 0))) == (0, 0, 0)
 
 
 def test_weighted_hsv_mean_fallback_zero_vector_uses_arithmetic_mean(monkeypatch) -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     monkeypatch.setattr(_color.math, "cos", lambda _ang: 0.0)
     monkeypatch.setattr(_color.math, "sin", lambda _ang: 0.0)
@@ -64,7 +64,7 @@ def test_weighted_hsv_mean_fallback_zero_vector_uses_arithmetic_mean(monkeypatch
 
 
 def test_representative_perkey_color_fallback_when_grid_build_fails(monkeypatch) -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     def _raise_grid_error(**_kwargs):
         raise ValueError("bad mapping")
@@ -80,7 +80,7 @@ def test_representative_perkey_color_fallback_when_grid_build_fails(monkeypatch)
 
 
 def test_representative_perkey_color_uses_full_grid_when_available(monkeypatch) -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     def _fake_build_full_color_grid(**_kwargs):
         return {(0, 0): (10, 20, 30), (0, 1): (200, 100, 50)}
@@ -96,7 +96,7 @@ def test_representative_perkey_color_uses_full_grid_when_available(monkeypatch) 
 
 
 def test_representative_color_boosts_visibility_at_low_brightness() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     # At low brightness, the icon should be brighter than a 1:1 mapping.
     # With 1:3 scaling, brightness=5 -> icon_brightness=15 -> scale=0.3.
@@ -107,7 +107,7 @@ def test_representative_color_boosts_visibility_at_low_brightness() -> None:
 
 
 def test_representative_color_clamps_min_visibility() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     # Even extremely low brightness should keep a minimum icon visibility.
     # brightness=1 -> icon_brightness=3 -> scale=0.06 but clamped to 0.25.
@@ -118,7 +118,7 @@ def test_representative_color_clamps_min_visibility() -> None:
 
 
 def test_representative_color_clamps_max() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     # High brightness should not exceed full intensity.
     cfg = SimpleNamespace(effect="none", brightness=50, color=(10, 20, 30))
@@ -126,7 +126,7 @@ def test_representative_color_clamps_max() -> None:
 
 
 def test_representative_color_off_state_returns_off_color() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     cfg = SimpleNamespace(effect="none", brightness=50, color=(255, 0, 0))
     assert representative_color(config=cfg, is_off=True, now=0.0) == (64, 64, 64)
@@ -137,7 +137,7 @@ def test_representative_color_off_state_returns_off_color() -> None:
     ["rainbow_wave", "rainbow_swirl", "color_cycle", "spectrum_cycle"],
 )
 def test_representative_color_multicolor_effects(effect: str) -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     cfg = SimpleNamespace(effect=effect, brightness=25, speed=5, color=(1, 2, 3))
     out = representative_color(config=cfg, is_off=False, now=123.0)
@@ -147,7 +147,7 @@ def test_representative_color_multicolor_effects(effect: str) -> None:
 
 
 def test_representative_color_hardware_effect_branch() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     cfg = SimpleNamespace(effect="rainbow", brightness=20, speed=5, color=(1, 2, 3))
     out = representative_color(config=cfg, is_off=False, now=15.0)
@@ -157,7 +157,7 @@ def test_representative_color_hardware_effect_branch() -> None:
 
 
 def test_representative_color_perkey_branch_prefers_perkey_brightness_and_color(monkeypatch) -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     monkeypatch.setattr(_color, "_representative_perkey_color", lambda _cfg, **_kwargs: (100, 80, 60))
     cfg = SimpleNamespace(effect="perkey", brightness=1, perkey_brightness=20, color=(1, 2, 3))
@@ -167,14 +167,14 @@ def test_representative_color_perkey_branch_prefers_perkey_brightness_and_color(
 
 
 def test_representative_color_non_reactive_default_path_uses_config_color() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     cfg = SimpleNamespace(effect="static", brightness=10, color=(20, 40, 60))
     assert representative_color(config=cfg, is_off=False, now=0.0) == (12, 24, 36)
 
 
 def test_representative_color_reactive_manual_false_uses_saved_perkey_fallback(monkeypatch) -> None:
-    from src.tray.ui.icon import _color
+    from keyrgb.tray.ui.icon import _color
 
     monkeypatch.setattr(_color, "_representative_saved_perkey_color", lambda _cfg: (5, 10, 15))
     cfg = SimpleNamespace(
@@ -189,7 +189,7 @@ def test_representative_color_reactive_manual_false_uses_saved_perkey_fallback(m
 
 
 def test_representative_color_reactive_manual_true_uses_manual_reactive_color() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     cfg = SimpleNamespace(
         effect="reactive_fade",
@@ -202,7 +202,7 @@ def test_representative_color_reactive_manual_true_uses_manual_reactive_color() 
 
 
 def test_representative_color_brightness_scaling_clamps_low_and_high() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     low = SimpleNamespace(effect="none", brightness=-10, color=(100, 50, 0))
     high = SimpleNamespace(effect="none", brightness=999, color=(100, 50, 0))
@@ -212,7 +212,7 @@ def test_representative_color_brightness_scaling_clamps_low_and_high() -> None:
 
 
 def test_representative_color_reactive_typing_never_black_when_on() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     # Default dim profile can have a black base color, but the tray icon should
     # still remain visible.
@@ -227,7 +227,7 @@ def test_representative_color_reactive_typing_never_black_when_on() -> None:
 
 
 def test_representative_color_reactive_typing_uses_base_brightness_not_reactive_brightness() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     # The tray icon should reflect the keyboard/profile brightness (policies)
     # and not the reactive pulse intensity.
@@ -242,7 +242,7 @@ def test_representative_color_reactive_typing_uses_base_brightness_not_reactive_
 
 
 def test_representative_color_reactive_manual_color_respects_toggle() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     cfg = SimpleNamespace(
         effect="reactive_ripple",
@@ -260,7 +260,7 @@ def test_representative_color_reactive_manual_color_respects_toggle() -> None:
 
 
 def test_representative_color_reactive_uses_uniform_perkey_profile_color_when_manual_disabled() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     cfg = SimpleNamespace(
         effect="reactive_ripple",
@@ -276,7 +276,7 @@ def test_representative_color_reactive_uses_uniform_perkey_profile_color_when_ma
 
 
 def test_representative_color_perkey_falls_back_to_base_color_for_malformed_entries() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     cfg = SimpleNamespace(
         effect="perkey",
@@ -290,7 +290,7 @@ def test_representative_color_perkey_falls_back_to_base_color_for_malformed_entr
 
 
 def test_representative_color_handles_config_property_exceptions_non_fatally() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     class _Cfg:
         effect = "reactive_fade"
@@ -310,7 +310,7 @@ def test_representative_color_handles_config_property_exceptions_non_fatally() -
 
 
 def test_representative_color_propagates_unexpected_config_property_errors() -> None:
-    from src.tray.ui.icon import representative_color
+    from keyrgb.tray.ui.icon import representative_color
 
     class _Cfg:
         effect = "reactive_fade"
@@ -327,7 +327,7 @@ def test_representative_color_propagates_unexpected_config_property_errors() -> 
 
 
 def test_icon_visual_reactive_uses_base_mosaic_when_manual_color_disabled() -> None:
-    from src.tray.ui.icon import icon_visual
+    from keyrgb.tray.ui.icon import icon_visual
 
     cfg = SimpleNamespace(
         effect="reactive_fade",
@@ -350,7 +350,7 @@ def test_icon_visual_reactive_uses_base_mosaic_when_manual_color_disabled() -> N
 
 
 def test_icon_visual_reactive_uses_effect_color_when_manual_color_enabled() -> None:
-    from src.tray.ui.icon import icon_visual
+    from keyrgb.tray.ui.icon import icon_visual
 
     cfg = SimpleNamespace(
         effect="reactive_ripple",
@@ -371,7 +371,7 @@ def test_icon_visual_reactive_uses_effect_color_when_manual_color_enabled() -> N
 
 
 def test_icon_visual_reactive_ripple_uses_animated_rainbow_when_manual_color_disabled() -> None:
-    from src.tray.ui.icon import icon_visual
+    from keyrgb.tray.ui.icon import icon_visual
 
     cfg = SimpleNamespace(
         effect="reactive_ripple",
@@ -389,7 +389,7 @@ def test_icon_visual_reactive_ripple_uses_animated_rainbow_when_manual_color_dis
 
 
 def test_icon_visual_reactive_falls_back_to_base_brightness_when_perkey_brightness_read_fails() -> None:
-    from src.tray.ui import icon
+    from keyrgb.tray.ui import icon
 
     class _Cfg:
         effect = "reactive_ripple"
@@ -410,7 +410,7 @@ def test_icon_visual_reactive_falls_back_to_base_brightness_when_perkey_brightne
 
 
 def test_icon_visual_perkey_non_uniform_builds_full_grid_once(monkeypatch) -> None:
-    from src.tray.ui import icon
+    from keyrgb.tray.ui import icon
 
     calls = {"count": 0}
 
@@ -438,7 +438,7 @@ def test_icon_visual_perkey_non_uniform_builds_full_grid_once(monkeypatch) -> No
 
 
 def test_icon_visual_perkey_falls_back_to_base_brightness_when_perkey_brightness_read_fails() -> None:
-    from src.tray.ui import icon
+    from keyrgb.tray.ui import icon
 
     class _Cfg:
         effect = "perkey"
@@ -457,7 +457,7 @@ def test_icon_visual_perkey_falls_back_to_base_brightness_when_perkey_brightness
 
 
 def test_icon_visual_perkey_uniform_override_skips_full_grid_build(monkeypatch) -> None:
-    from src.tray.ui import icon
+    from keyrgb.tray.ui import icon
 
     calls = {"count": 0}
 

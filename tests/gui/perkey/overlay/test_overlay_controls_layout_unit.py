@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import src.gui.perkey.overlay.controls as overlay_controls_module
+import keyrgb.gui.perkey.overlay.controls as overlay_controls_module
 
 
 class _FakeVar:

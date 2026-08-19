@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from src.gui.perkey.ui.backdrop import reset_backdrop_ui, set_backdrop_ui
+from keyrgb.gui.perkey.ui.backdrop import reset_backdrop_ui, set_backdrop_ui
 
 
 class DummyLabel:

@@ -7,10 +7,10 @@ bootstrap typing work. This is a map for debt paydown (D1), not a full redesign.
 
 | Container | Module | Applied when | Holds |
 |---|---|---|---|
-| `TrayPreBootstrapState` | `src/tray/app/_application_state.py` | Before backend/engine wiring | Icon, off flags, dim-temp, brightness cache, event debounce map, permission notice, pending notifications, idle-power state object |
+| `TrayPreBootstrapState` | `keyrgb/tray/app/_application_state.py` | Before backend/engine wiring | Icon, off flags, dim-temp, brightness cache, event debounce map, permission notice, pending notifications, idle-power state object |
 | `TrayBootstrapState` | same | After backend selection | Config, engine, backend/probe/caps, discovery, selected device context, ITE matrix dims |
-| `TrayIdlePowerState` | `src/tray/idle_power_state.py` | Via pre-bootstrap | Idle/power dim policy runtime fields |
-| `TrayIconState` | `src/tray/protocols.py` | Via pre-bootstrap | Icon color / mask presentation |
+| `TrayIdlePowerState` | `keyrgb/tray/idle_power_state.py` | Via pre-bootstrap | Idle/power dim policy runtime fields |
+| `TrayIconState` | `keyrgb/tray/protocols.py` | Via pre-bootstrap | Icon color / mask presentation |
 
 Bootstrap still **flattens** these containers onto `KeyRGBTray` attributes via
 `apply_to()` so existing controllers/pollers can keep attribute access. The debt
@@ -45,7 +45,7 @@ is not "missing dataclasses" but **remaining flag sprawl and private-attr reach*
 
 | Surface | Primary owner | Notes |
 |---|---|---|
-| Secondary routes | `src/core/secondary_device_routes.py` | Static route table |
+| Secondary routes | `keyrgb/core/secondary_device_routes.py` | Static route table |
 | Profile secondary state | Config / profile | `secondary_device_state` |
 | Composite coordinator | `ite8258_perkey_chassis.profile_coordinator` | Shared HID profile namespace |
 | Software targets | Tray software-target controller | Fan-out for SW effects |
@@ -61,7 +61,7 @@ is not "missing dataclasses" but **remaining flag sprawl and private-attr reach*
 
 ### Serialized runtime transitions
 
-`TrayRuntimeCoordinator` in `src/tray/controllers/runtime_coordinator.py` is the
+`TrayRuntimeCoordinator` in `keyrgb/tray/controllers/runtime_coordinator.py` is the
 single owner for low-frequency lighting transitions. Production creates it in
 prebootstrap and starts it before power workers and pollers.
 
@@ -87,7 +87,7 @@ prebootstrap and starts it before power workers and pollers.
 - Menu rendering is read-only. It must not reload config, reconnect devices,
   query OS power sysfs, probe secondary backends, or persist fallback state.
   Power-mode and secondary-route labels come from
-  `src/tray/controllers/view_snapshots.py`.
+  `keyrgb/tray/controllers/view_snapshots.py`.
 - High-frequency effect frames, render-local caches and backend-local I/O locks
   remain outside this owner.
 
@@ -104,7 +104,7 @@ adapter contract:
 
 - `Icon.run()` remains on the application main thread.
 - KeyRGB mutations of the pystray image and menu are centralized in
-  `src/tray/ui/refresh.py` and use only the public `Icon.icon` and `Icon.menu`
+  `keyrgb/tray/ui/refresh.py` and use only the public `Icon.icon` and `Icon.menu`
   properties. Pollers request those facades and must not access the pystray
   surface directly.
 - In pystray 0.19.5, the GTK/AppIndicator implementations schedule native work
@@ -121,13 +121,13 @@ adapter contract:
 
 ### Profile activation boundary
 
-Core profile activation (`src/core/profile/runtime_activation.py`) applies profile
+Core profile activation (`keyrgb/core/profile/runtime_activation.py`) applies profile
 data to shared config through injected load/apply functions only. It does not
 resolve private tray methods or tray-owned attributes by name.
 
 Tray-owned runtime side effects are wired explicitly by callers:
 
-- menu activation uses `src/tray/controllers/profile_activation.py`
+- menu activation uses `keyrgb/tray/controllers/profile_activation.py`
 - power-source profile switches supply duck-typed hooks from the tray object
   without importing tray packages into core
 
@@ -138,13 +138,13 @@ effect start, then icon/menu refresh.
 
 1. Prefer extending `TrayIdlePowerState`, `TrayIconState`, or a new **named** bag
    over adding another `_private` flag on `KeyRGBTray`.
-2. Controllers and pollers should take **narrow protocols** (see `src/tray/protocols.py`)
+2. Controllers and pollers should take **narrow protocols** (see `keyrgb/tray/protocols.py`)
    rather than the full tray type.
-3. Do not import tray modules from `src/core` (architecture rule).
+3. Do not import tray modules from `keyrgb/core` (architecture rule).
 4. Config apply classification stays pure (`ConfigApplyPlan`); execution stays in
    poller helpers.
 5. Core profile activation must accept explicit hooks; do not reintroduce private
-   tray method lookup from `src/core/profile/`.
+   tray method lookup from `keyrgb/core/profile/`.
 
 ## Write privileges
 
@@ -164,7 +164,7 @@ external/test seams have migrated.
 
 ## Progress (2026-07-15)
 
-- Preferred **read** API lives on `src/tray/idle_power_state.py`:
+- Preferred **read** API lives on `keyrgb/tray/idle_power_state.py`:
   - forced-off: `read_forced_off_flags`, `any_forced_off`, `is_user_forced_off`,
     `is_system_forced_off`
   - dim/resume: `is_dim_temp_active`, `dim_temp_target_brightness`, `read_last_resume_at`
@@ -202,7 +202,7 @@ read effect state or reach hardware while shutting down. Their owner must
 therefore confirm worker liveness after every bounded join rather than treating
 the join timeout as proof that a worker exited.
 
-- `src/tray/app/lifecycle.py` owns the tray polling shutdown event and registered
+- `keyrgb/tray/app/lifecycle.py` owns the tray polling shutdown event and registered
   poller handles. `stop_all_polling()` returns a quiescence result and retains
   active or unverifiable handles so a later shutdown attempt can retry them.
 - `PowerManager.stop_monitoring()` returns the corresponding aggregate result

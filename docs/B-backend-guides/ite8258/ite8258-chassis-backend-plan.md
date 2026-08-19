@@ -23,7 +23,7 @@ The goal is to add support for the `0xc197` path under a dedicated `ite8258-chas
 
 ## Current repo status
 
-The repo now contains an experimental keyboard-first `ite8258-chassis` backend under `src/core/backends/ite8258_perkey_chassis/`.
+The repo now contains an experimental keyboard-first `ite8258-chassis` backend under `keyrgb/core/backends/ite8258_perkey_chassis/`.
 
 Current implemented scope:
 
@@ -48,11 +48,11 @@ Still intentionally missing:
 This plan is based on:
 
 - GitHub issue `#7` (`Hardware support: Lenovo Legion Pro 7 16IAX10H (048d:c197)`)
-- the current KeyRGB `ite8258` backend in `src/core/backends/ite8258/`
+- the current KeyRGB `ite8258` backend in `keyrgb/core/backends/ite8258/`
 - OpenRGB `Controllers/LenovoControllers/LenovoUSBController_Gen7_8/`
 - the validated KeyRGB ITE backends:
-  - `src/core/backends/ite8291r3/`
-  - `src/core/backends/ite8910/`
+  - `keyrgb/core/backends/ite8291r3/`
+  - `keyrgb/core/backends/ite8910/`
 
 ## Confirmed Evidence
 
@@ -71,7 +71,7 @@ This plan is based on:
 - no sysfs keyboard LED path was detected
 - no backend was selected
 - the existing `ite8258` probe reported `no matching hidraw device`
-- this is expected with the current code because `src/core/backends/ite8258/protocol.py` only allows `0xC195`
+- this is expected with the current code because `keyrgb/core/backends/ite8258/protocol.py` only allows `0xC195`
 
 ### Upstream OpenRGB match
 
@@ -102,7 +102,7 @@ Important topology conclusion from the upstream zone model:
 
 ### What should not happen
 
-Do not add `0xC197` to `src/core/backends/ite8258/protocol.py` `SUPPORTED_PRODUCT_IDS` as a one-line PID extension.
+Do not add `0xC197` to `keyrgb/core/backends/ite8258/protocol.py` `SUPPORTED_PRODUCT_IDS` as a one-line PID extension.
 
 That would reuse the wrong device model:
 
@@ -143,11 +143,11 @@ The two validated ITE backends already show what a full KeyRGB backend implement
 
 It covers:
 
-- backend probe and selection policy in `src/core/backends/ite8291r3/backend.py`
-- transport ownership and open/close behavior in `src/core/backends/ite8291r3/usb.py`
+- backend probe and selection policy in `keyrgb/core/backends/ite8291r3/backend.py`
+- transport ownership and open/close behavior in `keyrgb/core/backends/ite8291r3/usb.py`
 - protocol and device facade in:
-  - `src/core/backends/ite8291r3/protocol.py`
-  - `src/core/backends/ite8291r3/device.py`
+  - `keyrgb/core/backends/ite8291r3/protocol.py`
+  - `keyrgb/core/backends/ite8291r3/device.py`
 - explicit unsupported-device rejection and variant gating
 - backend-specific runtime hints such as speed-policy and per-key-mode-policy metadata
 - permission and busy/disconnect translation into typed backend errors
@@ -161,12 +161,12 @@ The `0xC197` implementation should copy this level of completeness, not just its
 
 It covers:
 
-- hidraw discovery and transport ownership in `src/core/backends/ite8910/hidraw.py`
-- backend surface in `src/core/backends/ite8910/backend.py`
+- hidraw discovery and transport ownership in `keyrgb/core/backends/ite8910/hidraw.py`
+- backend surface in `keyrgb/core/backends/ite8910/backend.py`
 - protocol builders and state handling in:
-  - `src/core/backends/ite8910/protocol.py`
-  - `src/core/backends/ite8910/_protocol_effects.py`
-- device facade in `src/core/backends/ite8910/device.py`
+  - `keyrgb/core/backends/ite8910/protocol.py`
+  - `keyrgb/core/backends/ite8910/_protocol_effects.py`
+- device facade in `keyrgb/core/backends/ite8910/device.py`
 - exact packet-shape tests and translation tests under `tests/core/backends/ite8910/`
 
 The `0xC197` path should use this backend as the reference for:
@@ -199,10 +199,10 @@ That is the bar set by `ite8291r3` and `ite8910`.
 
 Recommended package shape:
 
-- `src/core/backends/ite8258_perkey_chassis/__init__.py`
-- `src/core/backends/ite8258_perkey_chassis/backend.py`
-- `src/core/backends/ite8258_perkey_chassis/protocol.py`
-- `src/core/backends/ite8258_perkey_chassis/device.py`
+- `keyrgb/core/backends/ite8258_perkey_chassis/__init__.py`
+- `keyrgb/core/backends/ite8258_perkey_chassis/backend.py`
+- `keyrgb/core/backends/ite8258_perkey_chassis/protocol.py`
+- `keyrgb/core/backends/ite8258_perkey_chassis/device.py`
 - either:
   - reuse the current shared hidraw-matching pattern from `ite8910` / `ite8291`, or
   - add a small backend-local hidraw helper if the match rules need to differ
@@ -235,7 +235,7 @@ Current status: partially complete.
 
 Scope:
 
-- add the new backend package under `src/core/backends/`
+- add the new backend package under `keyrgb/core/backends/`
 - add detection for `0xC197`
 - land the first runtime cut as opt-in experimental so the keyboard path is usable without claiming full chassis parity
 - translate the known OpenRGB Gen10 packet family into KeyRGB packet builders for:

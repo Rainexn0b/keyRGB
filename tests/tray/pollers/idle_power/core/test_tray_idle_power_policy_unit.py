@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.tray.pollers.idle_power.polling import _compute_idle_action
+from keyrgb.tray.pollers.idle_power.polling import _compute_idle_action
 
 
 def test_dimmed_turns_off() -> None:

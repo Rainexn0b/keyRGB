@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.effects.engine import EffectsEngine
-from src.core.effects.engine_support._contracts import assert_engine_support_contract
+from keyrgb.core.effects.engine import EffectsEngine
+from keyrgb.core.effects.engine_support._contracts import assert_engine_support_contract
 
 
 def test_effects_engine_satisfies_shared_mixin_contract() -> None:

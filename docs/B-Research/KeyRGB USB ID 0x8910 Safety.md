@@ -160,7 +160,7 @@ The targeted, modular approach established by keyRGB—focusing strictly on spec
 
 Given that the existing backends (asusctl, ite8291r3, ite8297, sysfs) are wholly incompatible with the 0x8910 protocol, the only mathematically sound and secure resolution to the user's inquiry is the construction of a dedicated, parallel backend within the keyRGB source tree.
 
-To create a new directory (e.g., src/core/backends/ite8910/) and implement safe control, the following rigorous engineering blueprint must be strictly adhered to.
+To create a new directory (e.g., keyrgb/core/backends/ite8910/) and implement safe control, the following rigorous engineering blueprint must be strictly adhered to.
 
 #### 1. Surgical Interface Detachment via PyUSB
 
@@ -232,7 +232,7 @@ Addressing the user query submitted regarding issue #2 in the Rainexn0b/keyRGB r
 
 It is definitively unsafe and structurally invalid to attempt to enable the 0x8910 USB ID by injecting it into any of the existing backends. The communication protocols utilized by the ite8291r3 (TongFang specific) and the ite8297 (standalone LED controller) are completely disparate from the firmware logic of the 0x8910.1 Forcing this integration will result in malformed HID payload transmissions, inevitably leading to firmware state corruption and the catastrophic detachment of the Linux input drivers, thereby disabling the user's keyboard and composite touchpad interfaces.5
 
-However, the 0x8910 hardware is highly compatible with the foundational architecture of the keyRGB application. The optimal and sole safe resolution is to author an entirely distinct, parallel backend (e.g., ite8910) within the src/core/backends/ directory. This new module must leverage pyusb with surgical precision, exclusively detaching the kernel driver from the specific non-input interface responsible for LED configuration.
+However, the 0x8910 hardware is highly compatible with the foundational architecture of the keyRGB application. The optimal and sole safe resolution is to author an entirely distinct, parallel backend (e.g., ite8910) within the keyrgb/core/backends/ directory. This new module must leverage pyusb with surgical precision, exclusively detaching the kernel driver from the specific non-input interface responsible for LED configuration.
 
 By adapting the proven command structures from the open-source ite-829x C reference driver into Python, the developer can establish a secure communication pipeline. Furthermore, the inherent design of keyRGB—specifically its interactive Keymap Calibrator tool—provides the perfect mechanism to resolve the physical layout fragmentation present across the various ODMs (Clevo, Avell, Lenovo) utilizing this silicon.3 Executing this strategic implementation will yield a highly robust user-space driver, granting users flawless per-key RGB customization while strictly preserving the integrity and safety of the system's core input hardware.
 

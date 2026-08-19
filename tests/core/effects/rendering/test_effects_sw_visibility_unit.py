@@ -6,11 +6,11 @@ import threading
 import time
 from dataclasses import replace
 
-import src.core.effects.reactive.effects as reactive_effects
-from src.core.effects.engine import EffectsEngine
-from src.core.effects.reactive.effects import run_reactive_fade
-from src.core.effects.software.effects import run_chase
-from src.core.resources.layouts import slot_id_for_key_id
+import keyrgb.core.effects.reactive.effects as reactive_effects
+from keyrgb.core.effects.engine import EffectsEngine
+from keyrgb.core.effects.reactive.effects import run_reactive_fade
+from keyrgb.core.effects.software.effects import run_chase
+from keyrgb.core.resources.layouts import slot_id_for_key_id
 
 
 class UniformOnlyKeyboard:

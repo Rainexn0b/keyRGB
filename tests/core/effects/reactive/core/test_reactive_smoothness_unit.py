@@ -13,13 +13,13 @@ from __future__ import annotations
 import sys
 from types import SimpleNamespace
 
-import src.core.effects.reactive.input as reactive_input
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
-from src.core.effects.reactive._ripple_helpers import (
+import keyrgb.core.effects.reactive.input as reactive_input
+from keyrgb.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from keyrgb.core.effects.reactive._ripple_helpers import (
     build_fade_overlay_into,
     build_ripple_overlay_into,
 )
-from src.core.effects.reactive.utils import (
+from keyrgb.core.effects.reactive.utils import (
     _PressSource,
     _Pulse,
     _RainbowPulse,
@@ -56,7 +56,7 @@ def _fake_select_all(readers, _writers, _errors, _timeout):
 
 
 def test_poll_keypress_slot_ids_collects_every_press_in_batch(monkeypatch) -> None:
-    from src.core.resources.layouts import slot_id_for_key_id
+    from keyrgb.core.resources.layouts import slot_id_for_key_id
 
     events = [
         SimpleNamespace(type=1, value=1, code=30),  # KEY_A down
@@ -78,7 +78,7 @@ def test_poll_keypress_slot_ids_collects_every_press_in_batch(monkeypatch) -> No
 
 
 def test_poll_keypress_slot_id_singular_returns_first_press(monkeypatch) -> None:
-    from src.core.resources.layouts import slot_id_for_key_id
+    from keyrgb.core.resources.layouts import slot_id_for_key_id
 
     events = [
         SimpleNamespace(type=1, value=1, code=30),
@@ -118,7 +118,7 @@ def test_press_source_poll_slot_ids_synthetic_spawn() -> None:
 
 def test_press_source_poll_slot_ids_returns_all_real_presses(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.effects.reactive.utils.poll_keypress_slot_ids",
+        "keyrgb.core.effects.reactive.utils.poll_keypress_slot_ids",
         lambda _devices: ["slot-a", "slot-b"],
     )
 
@@ -245,7 +245,7 @@ def test_frame_elapsed_dt_s_measures_real_delta_and_clamps() -> None:
 
 
 def test_remaining_frame_delay_s_compensates_render_work(monkeypatch) -> None:
-    import src.core.effects.reactive.utils as reactive_utils
+    import keyrgb.core.effects.reactive.utils as reactive_utils
 
     monkeypatch.setattr(reactive_utils.time, "monotonic", lambda: 10.006)
     # 6 ms of work in a 16.67 ms frame -> sleep ~10.67 ms, not the full dt.
@@ -260,7 +260,7 @@ def test_remaining_frame_delay_s_compensates_render_work(monkeypatch) -> None:
 def test_per_key_mode_policy_env_override(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from src.core.backends.policies.per_key_mode import (
+    from keyrgb.core.backends.policies.per_key_mode import (
         PER_KEY_MODE_POLICY_ENV,
         per_key_mode_policy,
         per_key_mode_requires_frame_reassert,

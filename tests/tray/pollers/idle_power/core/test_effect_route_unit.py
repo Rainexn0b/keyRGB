@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.tray.pollers.idle_power._effect_route import (
+from keyrgb.tray.pollers.idle_power._effect_route import (
     EffectRoute,
     apply_to_hardware_for_non_reactive,
     classify_effect_route,

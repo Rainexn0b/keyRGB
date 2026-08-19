@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.perkey.editor_support.ui as editor_ui
+import keyrgb.gui.perkey.editor_support.ui as editor_ui
 
 
 class _FakeVar:

@@ -44,7 +44,7 @@ def _make_evdev() -> object:
 
 class TestKeyboardLetterKeys:
     def test_returns_set_of_26_keys(self):
-        from src.core.effects.reactive._evdev_specs import keyboard_letter_keys
+        from keyrgb.core.effects.reactive._evdev_specs import keyboard_letter_keys
 
         evdev = _make_evdev()
         result = keyboard_letter_keys(evdev)
@@ -52,7 +52,7 @@ class TestKeyboardLetterKeys:
         assert len(result) == 26
 
     def test_contains_key_a_and_key_z(self):
-        from src.core.effects.reactive._evdev_specs import keyboard_letter_keys
+        from keyrgb.core.effects.reactive._evdev_specs import keyboard_letter_keys
 
         evdev = _make_evdev()
         result = keyboard_letter_keys(evdev)
@@ -62,7 +62,7 @@ class TestKeyboardLetterKeys:
 
 class TestKeyboardControlKeys:
     def test_returns_set(self):
-        from src.core.effects.reactive._evdev_specs import keyboard_control_keys
+        from keyrgb.core.effects.reactive._evdev_specs import keyboard_control_keys
 
         evdev = _make_evdev()
         result = keyboard_control_keys(evdev)
@@ -70,7 +70,7 @@ class TestKeyboardControlKeys:
         assert len(result) > 0
 
     def test_contains_space_and_enter(self):
-        from src.core.effects.reactive._evdev_specs import keyboard_control_keys
+        from keyrgb.core.effects.reactive._evdev_specs import keyboard_control_keys
 
         evdev = _make_evdev()
         result = keyboard_control_keys(evdev)
@@ -80,13 +80,13 @@ class TestKeyboardControlKeys:
 
 class TestSpecialKeyNames:
     def test_dict_is_present_and_has_entries(self):
-        from src.core.effects.reactive._evdev_specs import SPECIAL_KEY_NAMES
+        from keyrgb.core.effects.reactive._evdev_specs import SPECIAL_KEY_NAMES
 
         assert isinstance(SPECIAL_KEY_NAMES, dict)
         assert len(SPECIAL_KEY_NAMES) > 0
 
     def test_known_entries(self):
-        from src.core.effects.reactive._evdev_specs import SPECIAL_KEY_NAMES
+        from keyrgb.core.effects.reactive._evdev_specs import SPECIAL_KEY_NAMES
 
         # Spot-check a couple of entries that should always be present
         assert "PRINT" in SPECIAL_KEY_NAMES or any("prtsc" in v for v in SPECIAL_KEY_NAMES.values())

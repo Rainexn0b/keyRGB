@@ -32,7 +32,7 @@ The research identified **5 priority tiers** for expansion:
 
 **Implementation:**
 ```python
-# File: src/core/backends/ite8291r3.py
+# File: keyrgb/core/backends/ite8291r3.py
 # Add to the USB PID list
 SUPPORTED_PIDS = [0xce00, 0x6004, 0x6006, 0x6008, 0x600b]
 ```
@@ -76,7 +76,7 @@ Add the following rows to the USB ID table:
 
 **Implementation logic:**
 ```python
-# File: src/core/backends/sysfs_leds.py
+# File: keyrgb/core/backends/sysfs_leds.py
 def _supports_multicolor(self) -> bool:
     """Check if device supports multi_intensity (Tuxedo/Clevo RGB)"""
     if self._led_path is None:
@@ -198,12 +198,12 @@ LED_PATTERNS = [
 
 **Implementation approach:**
 
-1. **Create new backend file:** `src/core/backends/ite8297.py`
+1. **Create new backend file:** `keyrgb/core/backends/ite8297.py`
 2. **Base on ite8291r3.py structure** but with protocol changes
 3. **Protocol dialect pattern:** Use a "polymorphic" driver approach
 
 ```python
-# File: src/core/backends/ite8297.py
+# File: keyrgb/core/backends/ite8297.py
 
 class Ite8297Backend(KeyboardBackend):
     """ITE 8297 RGB Controller (Gigabyte RGB Fusion 2 protocol)"""
@@ -278,14 +278,14 @@ class Ite8297Device(KeyboardDevice):
 
 **Implementation:**
 
-1. **Create new backend:** `src/core/backends/asus_aura.py`
+1. **Create new backend:** `keyrgb/core/backends/asus_aura.py`
 2. **Reference implementations:**
    - `flukejones/rog-core` (Rust)
    - `asusctl` (daemon)
    - OpenRGB ASUS controller
 
 ```python
-# File: src/core/backends/asus_aura.py
+# File: keyrgb/core/backends/asus_aura.py
 
 class AsusAuraBackend(KeyboardBackend):
     """ASUS Aura RGB Controller"""
@@ -327,14 +327,14 @@ class AsusAuraBackend(KeyboardBackend):
 
 **Implementation approach:**
 
-1. **Create new backend:** `src/core/backends/msi_steelseries.py`
+1. **Create new backend:** `keyrgb/core/backends/msi_steelseries.py`
 2. **Port from:** `Askannz/msi-perkeyrgb` (Python script)
 3. **Key differences:**
    - Lighting control via separate USB HID device
    - 64-byte packets defining color regions or per-key maps
 
 ```python
-# File: src/core/backends/msi_steelseries.py
+# File: keyrgb/core/backends/msi_steelseries.py
 
 class MsiSteelSeriesBackend(KeyboardBackend):
     """MSI SteelSeries RGB Controller"""

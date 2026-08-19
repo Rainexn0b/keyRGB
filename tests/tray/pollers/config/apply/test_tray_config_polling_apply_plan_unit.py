@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from src.tray.pollers.config_polling_internal._apply_plan import (
+from keyrgb.tray.pollers.config_polling_internal._apply_plan import (
     classify_apply_mode,
     classify_config_apply_plan,
     should_skip_config_apply_for_power_source_transition,
 )
-from src.tray.pollers.config_polling_internal.core import ConfigApplyState
+from keyrgb.tray.pollers.config_polling_internal.core import ConfigApplyState
 
 
 def _mk_state(*, effect: str = "rainbow_wave", brightness: int = 25) -> ConfigApplyState:

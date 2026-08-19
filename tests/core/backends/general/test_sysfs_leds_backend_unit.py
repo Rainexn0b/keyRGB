@@ -9,10 +9,10 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.backends.sysfs import SysfsLedsBackend
-from src.core.backends.sysfs.common import _is_real_sysfs_path, _leds_root, _safe_write_text, _write_int
-from src.core.backends.sysfs.device import SysfsLedKeyboardDevice
-from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
+from keyrgb.core.backends.sysfs import SysfsLedsBackend
+from keyrgb.core.backends.sysfs.common import _is_real_sysfs_path, _leds_root, _safe_write_text, _write_int
+from keyrgb.core.backends.sysfs.device import SysfsLedKeyboardDevice
+from keyrgb.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 
 def _make_led(tmp_path: Path, name: str, *, brightness: int, max_brightness: int) -> Path:
@@ -68,7 +68,7 @@ def test_sysfs_backend_probe_tolerates_led_enumeration_oserror(monkeypatch: pyte
         def iterdir(self):
             raise PermissionError("denied")
 
-    monkeypatch.setattr("src.core.backends.sysfs.backend.common._leds_root", lambda: _BrokenRoot())
+    monkeypatch.setattr("keyrgb.core.backends.sysfs.backend.common._leds_root", lambda: _BrokenRoot())
 
     backend = SysfsLedsBackend()
     probe = backend.probe()
@@ -245,7 +245,7 @@ def test_write_int_ignores_debug_logging_failures(
 ) -> None:
     monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
     monkeypatch.setattr(
-        "src.core.backends.sysfs.common.logger.info",
+        "keyrgb.core.backends.sysfs.common.logger.info",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
@@ -260,7 +260,7 @@ def test_write_int_propagates_unexpected_debug_logging_failures(
 ) -> None:
     monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
     monkeypatch.setattr(
-        "src.core.backends.sysfs.common.logger.info",
+        "keyrgb.core.backends.sysfs.common.logger.info",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
     )
 
@@ -278,7 +278,7 @@ def test_sysfs_device_set_brightness_ignores_recoverable_debug_logging_failures(
     dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
 
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.logger.info",
+        "keyrgb.core.backends.sysfs.device.logger.info",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
@@ -295,7 +295,7 @@ def test_sysfs_device_set_brightness_propagates_unexpected_debug_logging_failure
     dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
 
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.logger.info",
+        "keyrgb.core.backends.sysfs.device.logger.info",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
     )
 
@@ -315,7 +315,7 @@ def test_sysfs_device_set_color_ignores_recoverable_debug_logging_failures(
     dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
 
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.logger.info",
+        "keyrgb.core.backends.sysfs.device.logger.info",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
@@ -335,7 +335,7 @@ def test_sysfs_device_set_color_propagates_unexpected_debug_logging_failures(
     dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
 
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.logger.info",
+        "keyrgb.core.backends.sysfs.device.logger.info",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected logger bug")),
     )
 
@@ -500,7 +500,7 @@ def test_sysfs_device_defensive_readers_and_power_state_helpers(
     dev = SysfsLedKeyboardDevice(primary_led_dir=led_dir)
 
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.common._read_int", lambda _path: (_ for _ in ()).throw(error_cls("nope"))
+        "keyrgb.core.backends.sysfs.device.common._read_int", lambda _path: (_ for _ in ()).throw(error_cls("nope"))
     )
     assert dev._max() == 1
     assert dev._read_sysfs_brightness() == 0
@@ -523,10 +523,10 @@ def test_sysfs_zone_brightness_uses_helper_or_raises_for_primary(
     dev = SysfsLedKeyboardDevice(primary_led_dir=primary)
 
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.common._write_int",
+        "keyrgb.core.backends.sysfs.device.common._write_int",
         lambda _path, _value: (_ for _ in ()).throw(PermissionError("deny")),
     )
-    monkeypatch.setattr("src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: False)
+    monkeypatch.setattr("keyrgb.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: False)
 
     with pytest.raises(PermissionError):
         dev._set_zone_brightness(primary, 5)
@@ -534,9 +534,9 @@ def test_sysfs_zone_brightness_uses_helper_or_raises_for_primary(
     assert dev._set_zone_brightness(other, 5) is None
 
     helper_calls: list[tuple[str, int, tuple[int, int, int] | None]] = []
-    monkeypatch.setattr("src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
+    monkeypatch.setattr("keyrgb.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.privileged.run_led_apply",
+        "keyrgb.core.backends.sysfs.device.privileged.run_led_apply",
         lambda *, led, brightness, rgb: helper_calls.append((led, brightness, rgb)) or True,
     )
 
@@ -544,7 +544,7 @@ def test_sysfs_zone_brightness_uses_helper_or_raises_for_primary(
     assert helper_calls == [(primary.name, 7, None)]
 
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.privileged.run_led_apply",
+        "keyrgb.core.backends.sysfs.device.privileged.run_led_apply",
         lambda *, led, brightness, rgb: False,
     )
     with pytest.raises(PermissionError):
@@ -578,10 +578,10 @@ def test_sysfs_device_set_color_file_zone_permission_error_raises_without_helper
             raise PermissionError("deny")
         path.write_text("unexpected\n", encoding="utf-8")
 
-    monkeypatch.setattr("src.core.backends.sysfs.device.common._safe_write_text", fake_safe_write)
-    monkeypatch.setattr("src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
+    monkeypatch.setattr("keyrgb.core.backends.sysfs.device.common._safe_write_text", fake_safe_write)
+    monkeypatch.setattr("keyrgb.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.privileged.run_led_apply",
+        "keyrgb.core.backends.sysfs.device.privileged.run_led_apply",
         lambda *, led, brightness, rgb: helper_calls.append((led, brightness, rgb)) or True,
     )
 
@@ -603,12 +603,12 @@ def test_sysfs_device_set_color_helper_fallbacks_for_multi_and_color_attrs(
     calls: list[tuple[str, int, tuple[int, int, int] | None]] = []
 
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.common._safe_write_text",
+        "keyrgb.core.backends.sysfs.device.common._safe_write_text",
         lambda _path, _content: (_ for _ in ()).throw(PermissionError("deny")),
     )
-    monkeypatch.setattr("src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
+    monkeypatch.setattr("keyrgb.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.privileged.run_led_apply",
+        "keyrgb.core.backends.sysfs.device.privileged.run_led_apply",
         lambda *, led, brightness, rgb: calls.append((led, brightness, rgb)) or True,
     )
 
@@ -635,10 +635,10 @@ def test_sysfs_device_set_color_rgb_attr_primary_failure_does_not_use_helper(
             raise PermissionError("deny")
         raise AssertionError(path)
 
-    monkeypatch.setattr("src.core.backends.sysfs.device.common._safe_write_text", fake_safe_write)
-    monkeypatch.setattr("src.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
+    monkeypatch.setattr("keyrgb.core.backends.sysfs.device.common._safe_write_text", fake_safe_write)
+    monkeypatch.setattr("keyrgb.core.backends.sysfs.device.privileged.helper_supports_led_apply", lambda: True)
     monkeypatch.setattr(
-        "src.core.backends.sysfs.device.privileged.run_led_apply",
+        "keyrgb.core.backends.sysfs.device.privileged.run_led_apply",
         lambda *, led, brightness, rgb: helper_calls.append((led, brightness, rgb)) or True,
     )
 
@@ -704,7 +704,7 @@ def test_sysfs_backend_probe_reports_permission_failures(monkeypatch: pytest.Mon
     monkeypatch.setenv("KEYRGB_SYSFS_LEDS_ROOT", str(tmp_path / "class" / "leds"))
 
     # Pretend helper does NOT support LED apply for this test.
-    import src.core.backends.sysfs.privileged as sysfs_privileged
+    import keyrgb.core.backends.sysfs.privileged as sysfs_privileged
 
     monkeypatch.setattr(sysfs_privileged, "helper_supports_led_apply", lambda: False)
 
@@ -745,7 +745,7 @@ def test_sysfs_backend_probe_allows_helper_when_not_writable(monkeypatch: pytest
     monkeypatch.setattr(os, "access", fake_access)
 
     # Pretend helper supports LED apply.
-    import src.core.backends.sysfs.privileged as sysfs_privileged
+    import keyrgb.core.backends.sysfs.privileged as sysfs_privileged
 
     monkeypatch.setattr(sysfs_privileged, "helper_supports_led_apply", lambda: True)
 
@@ -769,7 +769,7 @@ def test_sysfs_backend_probe_accepts_ite8297_via_helper(monkeypatch: pytest.Monk
 
     monkeypatch.setattr(os, "access", fake_access)
 
-    import src.core.backends.sysfs.privileged as sysfs_privileged
+    import keyrgb.core.backends.sysfs.privileged as sysfs_privileged
 
     monkeypatch.setattr(sysfs_privileged, "helper_supports_led_apply", lambda: True)
 

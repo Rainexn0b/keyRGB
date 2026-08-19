@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.power.management import PowerManager
+from keyrgb.core.power.management import PowerManager
 
 
 def test_power_manager_has_expected_methods() -> None:

@@ -65,7 +65,7 @@ Fish users should prefer `.venv/bin/python ...` directly instead of sourcing the
 
 ```bash
 .venv/bin/python -c "import gi; print('gi ok')"
-.venv/bin/python -c "from src.tray.integrations.runtime import _gi_is_working; print(_gi_is_working())"
+.venv/bin/python -c "from keyrgb.tray.integrations.runtime import _gi_is_working; print(_gi_is_working())"
 ```
 
 ## Common commands
@@ -74,7 +74,7 @@ Fish users should prefer `.venv/bin/python ...` directly instead of sourcing the
 .venv/bin/python -m pytest tests/
 .venv/bin/python -m buildpython --profile=ci
 .venv/bin/python -m buildpython --profile=full --with-black
-.venv/bin/python -m src.tray.entrypoint
+.venv/bin/python -m keyrgb.tray.entrypoint
 ```
 
 ## Rebuild a broken venv

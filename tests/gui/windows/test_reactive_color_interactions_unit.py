@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from src.gui.windows import _reactive_color_interactions as ix
+from keyrgb.gui.windows import _reactive_color_interactions as ix
 
 
 class _TkError(Exception):

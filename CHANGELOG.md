@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Packaging: Rename the import root from the generic `src` to the project-named `keyrgb` package (flat layout). Entry points now read `keyrgb.tray.entrypoint:main` etc., the repo dev launcher moved to `keyrgb.sh`, and AppImage/CI/buildpython reference the new layout. Installed command names (`keyrgb`, `keyrgb-perkey`, …) are unchanged.
+
 ## 0.32.1 (2026-08-18)
 
 - Tray/Power: After automatic AC/battery power-mode applies, refresh the stored system power-mode snapshot and request one coalesced menu rebuild that the runtime coordinator executes after the transition completes, so the Power Mode menu shows the real active mode instead of a stale startup snapshot. Mid-transition rebuilds and the brightness/on-off/idle/scheduler paths stay rebuild-free (KDE AppIndicator QMenu host crash).

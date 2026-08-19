@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.tray.app.application as app
+import keyrgb.tray.app.application as app
 
 
 def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
@@ -106,7 +106,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
     assert tray.tray_idle_power_state.idle_forced_off is False
     assert tray.tray_idle_power_state.user_forced_off is False
     assert tray.tray_idle_power_state.power_forced_off is False
-    from src.tray.protocols import TrayIconState
+    from keyrgb.tray.protocols import TrayIconState
 
     assert isinstance(tray.tray_icon_state, TrayIconState)
     assert tray._idle_forced_off is False
@@ -116,7 +116,7 @@ def test_init_wires_dependencies_and_starts_pollers(monkeypatch):
 
 
 def test_init_handles_profile_migration_engine_fallback_and_permission_cb_failure(monkeypatch):
-    import src.core.profile as profile_pkg
+    import keyrgb.core.profile as profile_pkg
 
     calls = {"set_backend": 0, "start_power": 0, "start_polling": 0, "autostart": 0}
 
@@ -639,7 +639,7 @@ def test_on_quit_clicked_closes_secondary_cache_stops_power_engine_and_icon(monk
 
     icon = SimpleNamespace(stop=stop_icon)
     monkeypatch.setattr(
-        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        "keyrgb.tray.controllers.software_target_controller.close_secondary_software_target_cache",
         lambda _tray: calls.__setitem__("cache", calls["cache"] + 1),
     )
 

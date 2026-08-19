@@ -6,7 +6,7 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-import src.gui.windows.support as support_window
+import keyrgb.gui.windows.support as support_window
 from tests.gui.windows.support._support_window_test_fakes import (
     FakeRoot as _FakeRoot,
     FakeText as _FakeText,

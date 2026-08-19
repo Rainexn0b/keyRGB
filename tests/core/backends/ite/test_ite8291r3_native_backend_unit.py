@@ -5,10 +5,10 @@ from threading import RLock
 
 import pytest
 
-from src.core.backends.ite8291r3_perkey import protocol
-from src.core.backends.ite8291r3_perkey.backend import Ite8291r3Backend
-from src.core.backends.ite8291r3_perkey.device import Ite8291r3KeyboardDevice
-from src.core.effects.hw_payloads import allowed_hw_effect_keys, build_hw_effect_payload
+from keyrgb.core.backends.ite8291r3_perkey import protocol
+from keyrgb.core.backends.ite8291r3_perkey.backend import Ite8291r3Backend
+from keyrgb.core.backends.ite8291r3_perkey.device import Ite8291r3KeyboardDevice
+from keyrgb.core.effects.hw_payloads import allowed_hw_effect_keys, build_hw_effect_payload
 
 
 def test_protocol_effect_builder_uses_expected_defaults() -> None:
@@ -104,7 +104,7 @@ def test_backend_effects_and_colors_are_native_protocol_maps() -> None:
 
 
 def test_report_delay_env_helper_defaults_to_validated_025_ms(monkeypatch) -> None:
-    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
+    from keyrgb.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
     monkeypatch.delenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", raising=False)
     monkeypatch.delenv("KEYRGB_HID_REPORT_DELAY_MS", raising=False)
@@ -112,21 +112,21 @@ def test_report_delay_env_helper_defaults_to_validated_025_ms(monkeypatch) -> No
 
 
 def test_report_delay_env_helper_parses_ms(monkeypatch) -> None:
-    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
+    from keyrgb.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
     monkeypatch.setenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", "2.5")
     assert _report_delay_s_from_env() == 0.0025
 
 
 def test_report_delay_env_helper_allows_zero_to_disable(monkeypatch) -> None:
-    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
+    from keyrgb.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
     monkeypatch.setenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", "0")
     assert _report_delay_s_from_env() == 0.0
 
 
 def test_report_delay_env_helper_falls_back_to_global(monkeypatch) -> None:
-    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
+    from keyrgb.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
     monkeypatch.delenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", raising=False)
     monkeypatch.setenv("KEYRGB_HID_REPORT_DELAY_MS", "4")
@@ -135,7 +135,7 @@ def test_report_delay_env_helper_falls_back_to_global(monkeypatch) -> None:
 
 def test_device_applies_report_delay_between_reports(monkeypatch) -> None:
     sleeps: list[float] = []
-    monkeypatch.setattr("src.core.backends._report_pacing.time.sleep", sleeps.append)
+    monkeypatch.setattr("keyrgb.core.backends._report_pacing.time.sleep", sleeps.append)
 
     controls: list[bytes] = []
     rows: list[bytes] = []
@@ -154,7 +154,7 @@ def test_device_applies_report_delay_between_reports(monkeypatch) -> None:
 
 
 def test_coerce_helpers_reject_invalid_inputs() -> None:
-    from src.core.backends.ite8291r3_perkey import device as device_mod
+    from keyrgb.core.backends.ite8291r3_perkey import device as device_mod
 
     with pytest.raises(ValueError, match="RGB 3-tuple"):
         device_mod._coerce_rgb(object())
@@ -171,7 +171,7 @@ def test_coerce_helpers_reject_invalid_inputs() -> None:
 
 
 def test_coerce_effect_payload_from_name_dict_and_list() -> None:
-    from src.core.backends.ite8291r3_perkey import device as device_mod
+    from keyrgb.core.backends.ite8291r3_perkey import device as device_mod
 
     named = device_mod._coerce_effect_payload({"name": "wave", "speed": 3, "brightness": 20})
     assert named[0] == protocol.effects["wave"](speed=3, brightness=20)[0]
@@ -379,7 +379,7 @@ def test_device_set_color_invalidates_row_diff_cache(monkeypatch) -> None:
 
 def test_report_delay_default_is_hardware_validated_025ms(monkeypatch) -> None:
     """No env vars -> the r3 backend uses its validated 0.25 ms pacing default."""
-    from src.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
+    from keyrgb.core.backends.ite8291r3_perkey.backend import _report_delay_s_from_env
 
     monkeypatch.delenv("KEYRGB_ITE8291R3_PERKEY_REPORT_DELAY_MS", raising=False)
     monkeypatch.delenv("KEYRGB_HID_REPORT_DELAY_MS", raising=False)

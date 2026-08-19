@@ -13,7 +13,7 @@ GUI UX for every new device.
 
 ## Current structure
 
-Backends live under `src/core/backends/`.
+Backends live under `keyrgb/core/backends/`.
 
 - `base.py`: backend interface + `BackendCapabilities`
 - `registry.py`: backend enumeration + selection (`KEYRGB_BACKEND`)

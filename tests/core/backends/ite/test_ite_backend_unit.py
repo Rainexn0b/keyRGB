@@ -28,7 +28,7 @@ def test_ite_backend_smoke() -> None:
         except ImportError:
             return
 
-    from src.core.backends.registry import select_backend
+    from keyrgb.core.backends.registry import select_backend
 
     backend = select_backend()
     assert backend is not None, "No backend selected; cannot run hardware test"

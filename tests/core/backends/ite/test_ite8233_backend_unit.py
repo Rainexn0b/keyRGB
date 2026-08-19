@@ -8,18 +8,18 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.backends.base import BackendStability, ExperimentalEvidence
-from src.core.backends.exceptions import BackendIOError
-from src.core.backends.ite8233_none_chassis_lightbar_clevo import (
+from keyrgb.core.backends.base import BackendStability, ExperimentalEvidence
+from keyrgb.core.backends.exceptions import BackendIOError
+from keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo import (
     backend as ite8233_backend_module,
     protocol as ite8233_protocol,
 )
-from src.core.backends.ite8233_none_chassis_lightbar_clevo.backend import (
+from keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend import (
     Ite8233Backend,
     _find_matching_supported_hidraw_device,
     _open_matching_transport,
 )
-from src.core.backends.ite8233_none_chassis_lightbar_clevo.device import Ite8233LightbarDevice
+from keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.device import Ite8233LightbarDevice
 
 
 def test_ite8233_backend_metadata_is_research_backed_experimental() -> None:
@@ -90,7 +90,7 @@ def test_ite8233_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
+        "keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
         lambda: DummyMatch(),
     )
 
@@ -112,7 +112,7 @@ def test_ite8233_probe_reports_vendor_lightbar_7000_when_opted_in(monkeypatch: p
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
+        "keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
         lambda: DummyMatch(),
     )
 
@@ -134,7 +134,7 @@ def test_ite8233_probe_reports_vendor_lightbar_6010_when_opted_in(monkeypatch: p
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
+        "keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
         lambda: DummyMatch(),
     )
 
@@ -154,7 +154,7 @@ def test_ite8233_get_device_requires_experimental_opt_in(monkeypatch: pytest.Mon
 
 def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
+        "keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend._find_matching_supported_hidraw_device",
         lambda: None,
     )
 
@@ -167,7 +167,7 @@ def test_ite8233_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPat
 
     err = PermissionError("permission denied")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
         lambda: (_ for _ in ()).throw(err),
     )
 
@@ -180,7 +180,7 @@ def test_ite8233_get_device_reraises_non_permission_errors(monkeypatch: pytest.M
 
     err = RuntimeError("transport failed")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
         lambda: (_ for _ in ()).throw(err),
     )
 
@@ -193,7 +193,7 @@ def test_ite8233_get_device_propagates_unexpected_open_errors(monkeypatch: pytes
 
     err = AssertionError("unexpected transport bug")
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
         lambda: (_ for _ in ()).throw(err),
     )
 
@@ -216,7 +216,7 @@ def test_ite8233_get_device_returns_lightbar_device_when_transport_opens(monkeyp
         product_id = 0x7000
 
     monkeypatch.setattr(
-        "src.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8233_none_chassis_lightbar_clevo.backend._open_matching_transport",
         lambda: (DummyTransport(), DummyInfo()),
     )
 

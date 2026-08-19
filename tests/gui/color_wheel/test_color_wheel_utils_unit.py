@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.gui.widgets.color_wheel.utils import (
+from keyrgb.gui.widgets.color_wheel.utils import (
     derive_border_hex,
     hex_to_rgb,
     hsv_to_xy,

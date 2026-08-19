@@ -25,7 +25,7 @@ This summary is based on:
 
 - `Lightbar Backend Research for keyRGB.md`
 - GitHub issue `#5` (`Hardware support: Support for secondary ITE USB device (048d:7001) – likely lightbar / auxiliary RGB zones`)
-- The current backend architecture in `src/core/backends/`
+- The current backend architecture in `keyrgb/core/backends/`
 - Upstream OpenRGB `ClevoLightbarController` for `0x048d:0x7001`
 - Upstream tuxedo-drivers `ite_8291_lb` driver with explicit `0x7001` handling
 
@@ -488,7 +488,7 @@ Keep `ite8233` experimental and explicitly opt-in while collecting issue-5-style
 Recommended reporter test path:
 
 ```bash
-KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 KEYRGB_BACKEND=ite8233 ./keyrgb
+KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS=1 KEYRGB_BACKEND=ite8233 ./keyrgb.sh
 ```
 
 Ask the reporter to verify this exact first-release scope:

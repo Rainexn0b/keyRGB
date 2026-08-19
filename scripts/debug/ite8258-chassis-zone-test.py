@@ -41,8 +41,8 @@ def _main() -> int:
 
     os.environ.setdefault("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
 
-    from src.core.backends.ite8258_perkey_chassis.backend import Ite8258ChassisBackend
-    from src.core.backends.ite8258_perkey_chassis.device import (
+    from keyrgb.core.backends.ite8258_perkey_chassis.backend import Ite8258ChassisBackend
+    from keyrgb.core.backends.ite8258_perkey_chassis.device import (
         Ite8258ChassisKeyboardDevice,
         Ite8258ChassisZoneDevice,
     )

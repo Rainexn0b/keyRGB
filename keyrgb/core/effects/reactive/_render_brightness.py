@@ -1,0 +1,311 @@
+from __future__ import annotations
+
+import logging
+import time
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
+from keyrgb.core.backends.base import supports_per_key_output
+
+from . import _render_brightness_support as _support
+from ._constants import UNIFORM_PULSE_HW_LIFT_STREAK_MIN
+from ._render_brightness_debug import log_hw_lift_decision_change
+from ._render_brightness_guard import apply_brightness_step_guard
+from ._render_brightness_transition import (
+    _clear_transition_state,
+    resolve_reactive_transition_brightness,
+    resolve_reactive_transition_visual_scale,
+)
+
+# Public re-exports for callers that import transition helpers from this module.
+__all__ = [
+    "_clear_transition_state",
+    "resolve_brightness",
+    "resolve_reactive_transition_brightness",
+    "resolve_reactive_transition_visual_scale",
+]
+
+if TYPE_CHECKING:
+    from keyrgb.core.effects.engine import EffectsEngine
+
+
+_LOGGER = logging.getLogger(__name__)
+_MISSING = object()
+
+
+def _can_lift_hw_brightness(
+    *,
+    per_key_hw: bool,
+    uniform_hw_streak_count: int,
+    pulse_mix: float,
+    effective_brightness: int,
+    current_hw_brightness: int,
+    cooldown_active: bool,
+) -> bool:
+    """Return whether a uniform-only backend may temporarily raise hardware brightness.
+
+    Per-key backends keep hardware brightness fixed and express reactive intensity
+    through per-key color contrast instead (invariant #2). Uniform-only backends
+    need a short stable-frame gate before lifting hardware brightness so the first
+    keypress of a burst does not produce an immediate full-frame spike.
+
+    The 6-frame streak gate ensures that at least 6 consecutive frames of active
+    pulse have been observed before allowing a brightness lift. This prevents
+    single-frame brightness spikes on the first keypress after idle.
+
+    Args:
+        per_key_hw: True if the backend supports per-key colors.
+        uniform_hw_streak_count: Consecutive frames with active pulse on uniform.
+        pulse_mix: Current pulse intensity (0.0..1.0).
+        effective_brightness: The effect (reactive) brightness target.
+        current_hw_brightness: The current idle hardware brightness.
+        cooldown_active: True if pulse-hw-lift is in cooldown (post-restore holdoff).
+
+    Returns:
+        True if hardware brightness should be lifted for the pulse.
+    """
+
+    if per_key_hw:
+        return False
+    if uniform_hw_streak_count < UNIFORM_PULSE_HW_LIFT_STREAK_MIN:
+        return False
+    return pulse_mix > 0.0 and effective_brightness > current_hw_brightness and not cooldown_active
+
+
+def _resolve_hw_brightness_with_pulse_mix(
+    engine: EffectsEngine,
+    *,
+    global_hw: int,
+    base: int,
+    eff: int,
+    dim_temp_active: bool,
+    clamp01_fn: Callable[[float], float],
+    logger: logging.Logger,
+) -> tuple[int, int, bool, bool]:
+    """Resolve hardware brightness considering pulse-time lifts and dim-temp.
+
+    This is the core brightness resolution for reactive effects. It determines
+    the actual hardware brightness to send to the keyboard, considering:
+
+    1. Per-key backends: hardware brightness stays fixed at max(global_hw, base).
+       Pulses are expressed through per-key color contrast only (invariant #2).
+    2. Uniform backends: may temporarily raise hardware brightness above the
+       idle level to make pulses visible, but only after the streak gate
+       (6 consecutive frames of active pulse) and only when not in cooldown.
+    3. Dim-temp mode: hardware brightness is clamped to the dim target and
+       pulse lifts are completely suppressed (invariant #4).
+
+    Returns:
+        (hw, idle_hw, allow_pulse_hw_lift, per_key_hw) where:
+        - hw: the final hardware brightness to send
+        - idle_hw: the idle (non-pulse) hardware brightness
+        - allow_pulse_hw_lift: whether a uniform pulse lift was applied
+        - per_key_hw: whether this is a per-key backend
+    """
+    per_key_hw = supports_per_key_output(
+        getattr(engine, "backend_caps", None),
+        _support.keyboard_or_none(engine),
+    )
+    uniform_hw_streak_count = _support.increment_uniform_hw_streak(engine, per_key_hw=per_key_hw, logger=_LOGGER)
+
+    allow_pulse_hw_lift = False
+    pulse_mix = 0.0
+    cooldown_active = False
+    cooldown_remaining_s = 0.0
+    reason = "idle"
+    if dim_temp_active:
+        hw = global_hw
+        idle_hw = hw
+        reason = "dim_temp_active"
+    else:
+        raw_pulse_mix = _support.read_engine_attr(
+            engine,
+            "_reactive_active_pulse_mix",
+            missing_default=0.0,
+            error_default=0.0,
+            logger=logger,
+        )
+        pulse_mix = _support.coerce_float(raw_pulse_mix or 0.0, default=0.0) or 0.0
+        if pulse_mix is None:
+            pulse_mix = 0.0
+        pulse_mix = clamp01_fn(pulse_mix)
+
+        raw_until = _support.read_engine_attr(
+            engine,
+            "_reactive_disable_pulse_hw_lift_until",
+            missing_default=None,
+            error_default=None,
+            logger=logger,
+        )
+        until_s = _support.coerce_float(raw_until, default=None)
+        if until_s is not None:
+            cooldown_remaining_s = max(0.0, float(until_s) - float(time.monotonic()))
+
+        hw = max(global_hw, base)
+        idle_hw = hw
+        cooldown_active = _support.pulse_hw_lift_temporarily_disabled(engine, logger=_LOGGER)
+        allow_pulse_hw_lift = _can_lift_hw_brightness(
+            per_key_hw=per_key_hw,
+            uniform_hw_streak_count=uniform_hw_streak_count,
+            pulse_mix=pulse_mix,
+            effective_brightness=eff,
+            current_hw_brightness=hw,
+            cooldown_active=cooldown_active,
+        )
+        if allow_pulse_hw_lift:
+            pulse_hw = round(float(hw) + (float(eff - hw) * pulse_mix))
+            hw = max(hw, pulse_hw)
+
+        if per_key_hw:
+            reason = "per_key_hw"
+        elif pulse_mix <= 0.0:
+            reason = "no_pulse"
+        elif uniform_hw_streak_count < UNIFORM_PULSE_HW_LIFT_STREAK_MIN:
+            reason = "streak_gate"
+        elif eff <= hw:
+            reason = "eff_not_above_hw"
+        elif cooldown_active:
+            reason = "cooldown"
+        elif allow_pulse_hw_lift:
+            reason = "allowed"
+
+    log_hw_lift_decision_change(
+        engine,
+        logger=logger,
+        reason=reason,
+        per_key_hw=per_key_hw,
+        uniform_hw_streak_count=uniform_hw_streak_count,
+        pulse_mix=float(pulse_mix),
+        cooldown_active=cooldown_active,
+        cooldown_remaining_s=float(cooldown_remaining_s),
+        allow_pulse_hw_lift=allow_pulse_hw_lift,
+        global_hw=global_hw,
+        base=base,
+        eff=eff,
+        idle_hw=idle_hw,
+        hw=hw,
+        dim_temp_active=dim_temp_active,
+    )
+    return hw, idle_hw, allow_pulse_hw_lift, per_key_hw
+
+
+def resolve_brightness(
+    engine: EffectsEngine,
+    *,
+    max_step_per_frame: int,
+    clamp01_fn: Callable[[float], float],
+    logger: logging.Logger,
+) -> tuple[int, int, int]:
+    """Resolve (base_hw, effect_hw, hw_brightness) for mixed-content rendering."""
+
+    raw_eff = _support.read_engine_attr(
+        engine,
+        "reactive_brightness",
+        missing_default=_MISSING,
+        error_default=25,
+        logger=logger,
+    )
+    if raw_eff is _MISSING:
+        raw_eff = _support.read_engine_attr(
+            engine,
+            "brightness",
+            missing_default=25,
+            error_default=25,
+            logger=logger,
+        )
+    eff = _support.coerce_brightness(raw_eff or 0, default=25)
+    if eff is None:
+        eff = 25
+
+    raw_global_hw = _support.read_engine_attr(
+        engine,
+        "brightness",
+        missing_default=25,
+        error_default=25,
+        logger=logger,
+    )
+    global_hw = _support.coerce_brightness(raw_global_hw or 0, default=25)
+    if global_hw is None:
+        global_hw = 25
+
+    base = 0
+    if _support.read_engine_attr(
+        engine,
+        "per_key_colors",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    ):
+        raw_base = _support.read_engine_attr(
+            engine,
+            "per_key_brightness",
+            missing_default=0,
+            error_default=0,
+            logger=logger,
+        )
+        base = _support.coerce_brightness(raw_base or 0, default=0) or 0
+
+    transition = resolve_reactive_transition_brightness(engine, clamp01_fn=clamp01_fn)
+    if transition is not None:
+        transition_brightness, rising = transition
+        eff = min(eff, transition_brightness)
+        if rising:
+            global_hw = min(global_hw, transition_brightness)
+            base = min(base, transition_brightness)
+        else:
+            global_hw = max(global_hw, transition_brightness)
+            base = max(base, transition_brightness)
+
+    if _support.bool_attr_or_default(engine, "_reactive_follow_global_brightness", default=False):
+        eff = min(eff, global_hw)
+        base = min(base, global_hw)
+
+    dim_temp_active = _support.bool_attr_or_default(engine, "_dim_temp_active", default=False)
+    hw, idle_hw, allow_pulse_hw_lift, per_key_hw = _resolve_hw_brightness_with_pulse_mix(
+        engine,
+        global_hw=global_hw,
+        base=base,
+        eff=eff,
+        dim_temp_active=dim_temp_active,
+        clamp01_fn=clamp01_fn,
+        logger=logger,
+    )
+
+    policy_cap: int | None = None
+    raw_cap = _support.read_engine_attr(
+        engine,
+        "_hw_brightness_cap",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    if raw_cap is not None:
+        policy_cap = _support.coerce_brightness(raw_cap, default=None)
+
+    if policy_cap is not None:
+        hw = min(hw, policy_cap)
+
+    hw = max(0, min(50, hw))
+
+    prev = _support.read_engine_attr(
+        engine,
+        "_last_rendered_brightness",
+        missing_default=None,
+        error_default=None,
+        logger=logger,
+    )
+    prev_i = 0 if prev is None else _support.coerce_int(prev, default=None)
+    hw = apply_brightness_step_guard(
+        hw=hw,
+        prev_i=prev_i,
+        max_step_per_frame=max_step_per_frame,
+        dim_temp_active=dim_temp_active,
+        allow_pulse_hw_lift=allow_pulse_hw_lift,
+        per_key_hw=per_key_hw,
+        idle_hw=idle_hw,
+        eff=eff,
+        policy_cap=policy_cap,
+        logger=logger,
+    )
+
+    return base, eff, hw

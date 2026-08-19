@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.tray.pollers import hardware_polling
+from keyrgb.tray.pollers import hardware_polling
 
 
 class Errno19(Exception):

@@ -5,12 +5,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import src.core.power.management._manager_helpers as manager_helpers
-from src.core.power.system import PowerMode
+import keyrgb.core.power.management._manager_helpers as manager_helpers
+from keyrgb.core.power.system import PowerMode
 
 
 def test_build_power_source_loop_inputs_preserves_overrides_when_power_mode_lookup_raises() -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
 
     class _Config:
         power_management_enabled = True
@@ -56,7 +56,7 @@ def test_build_power_source_loop_inputs_preserves_overrides_when_power_mode_look
 
 
 def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
 
     config = MagicMock()
     config.reload = MagicMock()
@@ -81,7 +81,7 @@ def test_build_power_source_loop_inputs_honors_management_enabled_alias() -> Non
 def test_build_power_source_loop_inputs_composes_night_scheduler_base_with_power_source_overrides(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
 
     class _Config:
         power_management_enabled = True
@@ -134,7 +134,7 @@ def test_build_power_source_loop_inputs_composes_night_scheduler_base_with_power
 def test_build_power_source_loop_inputs_keeps_power_source_brightness_primary_by_day(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
 
     class _Config:
         power_management_enabled = True
@@ -180,8 +180,8 @@ def test_build_power_source_loop_inputs_keeps_power_source_brightness_primary_by
 
 
 def test_apply_power_source_actions_logs_controller_failures_and_keeps_processing() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import ApplyBrightness, RestoreKeyboard, TurnOffKeyboard
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import ApplyBrightness, RestoreKeyboard, TurnOffKeyboard
 
     class _Controller:
         def turn_off(self) -> None:
@@ -192,7 +192,7 @@ def test_apply_power_source_actions_logs_controller_failures_and_keeps_processin
 
     apply_brightness = MagicMock()
 
-    with patch("src.core.power.management._manager_helpers.logger.exception") as exc:
+    with patch("keyrgb.core.power.management._manager_helpers.logger.exception") as exc:
         apply_power_source_actions(
             kb_controller=_Controller(),
             actions=(TurnOffKeyboard(), RestoreKeyboard(), ApplyBrightness(25)),
@@ -208,15 +208,15 @@ def test_apply_power_source_actions_logs_controller_failures_and_keeps_processin
 
 
 def test_apply_power_source_actions_propagates_unexpected_controller_failures() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import TurnOffKeyboard
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import TurnOffKeyboard
 
     class _Controller:
         def turn_off(self) -> None:
             raise AssertionError("unexpected turn off bug")
 
     with (
-        patch("src.core.power.management._manager_helpers.logger.exception") as exc,
+        patch("keyrgb.core.power.management._manager_helpers.logger.exception") as exc,
         pytest.raises(AssertionError, match="unexpected turn off bug"),
     ):
         apply_power_source_actions(
@@ -231,12 +231,12 @@ def test_apply_power_source_actions_propagates_unexpected_controller_failures() 
 
 
 def test_apply_power_source_actions_dispatches_power_mode_activation_and_logs_runtime_failures() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import ActivatePowerMode
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import ActivatePowerMode
 
     activate_power_mode = MagicMock(side_effect=RuntimeError("mode failed"))
 
-    with patch("src.core.power.management._manager_helpers.logger.exception") as exc:
+    with patch("keyrgb.core.power.management._manager_helpers.logger.exception") as exc:
         apply_power_source_actions(
             kb_controller=MagicMock(),
             actions=(ActivatePowerMode(PowerMode.BALANCED),),
@@ -250,12 +250,12 @@ def test_apply_power_source_actions_dispatches_power_mode_activation_and_logs_ru
 
 
 def test_apply_power_source_actions_dispatches_profile_activation_and_logs_runtime_failures() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import ActivatePerkeyProfile
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import ActivatePerkeyProfile
 
     activate_perkey_profile = MagicMock(side_effect=RuntimeError("profile failed"))
 
-    with patch("src.core.power.management._manager_helpers.logger.exception") as exc:
+    with patch("keyrgb.core.power.management._manager_helpers.logger.exception") as exc:
         apply_power_source_actions(
             kb_controller=MagicMock(),
             actions=(ActivatePerkeyProfile("gaming"),),
@@ -269,7 +269,7 @@ def test_apply_power_source_actions_dispatches_profile_activation_and_logs_runti
 
 
 def test_is_intentionally_off_requires_literal_true_for_controller_flags() -> None:
-    from src.core.power.management._manager_helpers import is_intentionally_off
+    from keyrgb.core.power.management._manager_helpers import is_intentionally_off
 
     class _Controller:
         user_forced_off = 1
@@ -286,7 +286,7 @@ def test_is_intentionally_off_requires_literal_true_for_controller_flags() -> No
 
 
 def test_is_power_event_forced_off_checks_legacy_then_typed_owner() -> None:
-    from src.core.power.management._manager_helpers import is_power_event_forced_off
+    from keyrgb.core.power.management._manager_helpers import is_power_event_forced_off
 
     assert is_power_event_forced_off(MagicMock(_power_forced_off=True)) is True
     assert (
@@ -304,7 +304,7 @@ def test_is_power_event_forced_off_checks_legacy_then_typed_owner() -> None:
 
 
 def test_is_intentionally_off_returns_false_when_safe_int_reader_raises() -> None:
-    from src.core.power.management._manager_helpers import is_intentionally_off
+    from keyrgb.core.power.management._manager_helpers import is_intentionally_off
 
     class _Controller:
         @property

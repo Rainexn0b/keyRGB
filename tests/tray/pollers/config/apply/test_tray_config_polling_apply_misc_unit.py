@@ -5,10 +5,10 @@ from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
-from src.tray.pollers import config_polling
-from src.tray.pollers.config_polling import ConfigApplyState, _apply_from_config_once
-from src.tray.pollers.config_polling_internal import _planning, core as config_polling_core
-from src.tray.pollers.config_polling_internal._apply_plan import ConfigApplyPlan
+from keyrgb.tray.pollers import config_polling
+from keyrgb.tray.pollers.config_polling import ConfigApplyState, _apply_from_config_once
+from keyrgb.tray.pollers.config_polling_internal import _planning, core as config_polling_core
+from keyrgb.tray.pollers.config_polling_internal._apply_plan import ConfigApplyPlan
 
 
 def _mk_tray_base(*, effect: str, brightness: int) -> MagicMock:

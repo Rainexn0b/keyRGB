@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.tray.pollers.idle_power import _input_idle, _source_probe, _wayland_idle
+from keyrgb.tray.pollers.idle_power import _input_idle, _source_probe, _wayland_idle
 
 
 class _FakeWaylandTracker:

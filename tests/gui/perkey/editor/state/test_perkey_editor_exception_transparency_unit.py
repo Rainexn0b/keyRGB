@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.perkey.editor as perkey_editor
-from src.gui.perkey.editor import PerKeyEditor
+import keyrgb.gui.perkey.editor as perkey_editor
+from keyrgb.gui.perkey.editor import PerKeyEditor
 
 
 class _FakeVar:

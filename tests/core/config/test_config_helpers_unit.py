@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.config._lighting._coercion import (
+from keyrgb.core.config._lighting._coercion import (
     _clamp_rgb_channel,
     coerce_loaded_settings,
     normalize_brightness_value,
@@ -15,9 +15,9 @@ from src.core.config._lighting._coercion import (
     normalize_secondary_brightness_value,
     normalize_trail_percent_value,
 )
-from src.core.config._lighting._props import bool_prop, enum_prop, int_prop, optional_brightness_prop
-from src.core.profile._profile_storage_payloads import normalize_secondary_lighting
-from src.core.secondary_lighting_state import normalize_brightness as shared_secondary_normalize_brightness
+from keyrgb.core.config._lighting._props import bool_prop, enum_prop, int_prop, optional_brightness_prop
+from keyrgb.core.profile._profile_storage_payloads import normalize_secondary_lighting
+from keyrgb.core.secondary_lighting_state import normalize_brightness as shared_secondary_normalize_brightness
 
 
 def test_normalize_brightness_value_handles_invalid_zero_and_low_nonzero_values() -> None:

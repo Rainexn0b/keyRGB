@@ -13,18 +13,18 @@ without destabilizing keyboard behavior.
 
 ## Current owner modules
 
-- `src/core/secondary_device_routes.py` — declarative route/capability registry
-- `src/core/secondary_device_runtime.py` — availability, acquisition, and simulation
-- `src/core/secondary_lighting_state.py` — shared profile/config state interpretation
-- `src/core/profile/` — persistent whole-scene profile component
-- `src/tray/ui/menu_status.py`
-- `src/tray/ui/menu.py`
-- `src/tray/controllers/secondary_device_controller.py`
-- `src/tray/controllers/secondary_static_scene.py`
-- `src/tray/controllers/software_target_controller.py`
-- `src/core/diagnostics/secondary_devices.py`
-- `src/gui/perkey/secondary_lighting.py`
-- `src/gui/windows/uniform.py`
+- `keyrgb/core/secondary_device_routes.py` — declarative route/capability registry
+- `keyrgb/core/secondary_device_runtime.py` — availability, acquisition, and simulation
+- `keyrgb/core/secondary_lighting_state.py` — shared profile/config state interpretation
+- `keyrgb/core/profile/` — persistent whole-scene profile component
+- `keyrgb/tray/ui/menu_status.py`
+- `keyrgb/tray/ui/menu.py`
+- `keyrgb/tray/controllers/secondary_device_controller.py`
+- `keyrgb/tray/controllers/secondary_static_scene.py`
+- `keyrgb/tray/controllers/software_target_controller.py`
+- `keyrgb/core/diagnostics/secondary_devices.py`
+- `keyrgb/gui/perkey/secondary_lighting.py`
+- `keyrgb/gui/windows/uniform.py`
 
 ## Architecture flow
 
@@ -62,7 +62,7 @@ state interpretation but remain separate output paths.
 6. Brightness routing is explicit: standalone devices may be independent, composite
    chassis zones follow the keyboard/controller brightness, and software effect speed
    remains one global render setting.
-7. `src/core/secondary_lighting_state.py` owns interpretation of profile/config area
+7. `keyrgb/core/secondary_lighting_state.py` owns interpretation of profile/config area
     state, including legacy brightness-to-enabled fallback. Runtime consumers must not
     duplicate those coercion rules.
 8. Brightness domain units stay separate:

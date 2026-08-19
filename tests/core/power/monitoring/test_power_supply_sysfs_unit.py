@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.power.monitoring.power_supply_sysfs import (
+from keyrgb.core.power.monitoring.power_supply_sysfs import (
     iter_ac_online_files,
     read_on_ac_power,
 )

@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.gui.perkey.editor_support.dirty_state import confirm_destructive_action, is_dirty, mark_saved, saved_snapshot
+from keyrgb.gui.perkey.editor_support.dirty_state import (
+    confirm_destructive_action,
+    is_dirty,
+    mark_saved,
+    saved_snapshot,
+)
 
 
 def _editor() -> SimpleNamespace:

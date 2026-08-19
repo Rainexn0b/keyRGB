@@ -8,7 +8,7 @@ The bug has surfaced twice because earlier fixes only patched `_infer_mode` heur
 
 ## Root Cause
 
-The failure chain is in `src/core/power/system/modes.py`:
+The failure chain is in `keyrgb/core/power/system/modes.py`:
 
 1. `PowerSourceLoopPolicy` emits `ActivatePowerMode(PowerMode.PERFORMANCE)`.
 2. `_activate_power_source_mode` calls `set_mode(PowerMode.PERFORMANCE, allow_interactive=False)`.
@@ -35,7 +35,7 @@ Decouple `set_mode` success from `_mode_is_active`.
 
 ### What changes
 
-In `src/core/power/system/modes.py`, change `set_mode` so that:
+In `keyrgb/core/power/system/modes.py`, change `set_mode` so that:
 
 - If `_apply_mode_sysfs` completes **without raising**, consider the direct-write path successful. Do **not** gate success on `_mode_is_active`.
 - If direct writes raise `PermissionError` or `OSError`, fall through to the privileged helper as before.
@@ -51,7 +51,7 @@ In `src/core/power/system/modes.py`, change `set_mode` so that:
 
 ### Code target
 
-- `src/core/power/system/modes.py` — `set_mode`
+- `keyrgb/core/power/system/modes.py` — `set_mode`
 - `tests/core/power/monitoring/test_system_power_modes_unit.py` — update `test_set_mode_returns_false_when_helper_succeeds_but_mode_stays_wrong` to reflect the new contract, and add tests for the direct-write-success path.
 
 ## Long-Term Refactor
@@ -90,7 +90,7 @@ Separate the three responsibilities that are currently tangled in `modes.py`.
 
 Move `_apply_mode_sysfs`, `_write_scaling_freq_range`, `_write_mode_epp_preferences`, `_set_boost_enabled`, and the helper invocation into a dedicated module:
 
-- **New file**: `src/core/power/system/_apply.py`
+- **New file**: `keyrgb/core/power/system/_apply.py`
 - **Responsibility**: Write cpufreq knobs. Return `True` if all applicable writes completed, `False` if any required write failed.
 - **No verification logic**: This module must not import or call `_infer_mode` or `get_status`.
 
@@ -98,7 +98,7 @@ Move `_apply_mode_sysfs`, `_write_scaling_freq_range`, `_write_mode_epp_preferen
 
 Move `_infer_mode`, `_read_boost_enabled`, `_read_epp`, and `get_status` into a dedicated module:
 
-- **New file**: `src/core/power/system/_observe.py`
+- **New file**: `keyrgb/core/power/system/_observe.py`
 - **Responsibility**: Read sysfs and return the best-guess `PowerMode`.
 - **No write logic**: This module must not import or call any write helpers.
 - **Relax heuristics** as part of the move:
@@ -108,7 +108,7 @@ Move `_infer_mode`, `_read_boost_enabled`, `_read_epp`, and `get_status` into a 
 
 #### 3. Make `modes.py` a thin facade
 
-`src/core/power/system/modes.py` becomes a public facade that wires apply + observation together for callers that still want both, but does not use observation to veto apply success:
+`keyrgb/core/power/system/modes.py` becomes a public facade that wires apply + observation together for callers that still want both, but does not use observation to veto apply success:
 
 ```python
 def set_mode(mode: PowerMode, *, allow_interactive: bool = True) -> bool:
@@ -131,7 +131,7 @@ In the apply layer, `_write_mode_epp_preferences` currently catches `OSError` an
 
 #### 5. Update the power-source loop
 
-In `src/core/power/management/manager.py`:
+In `keyrgb/core/power/management/manager.py`:
 
 - `_activate_power_source_mode` should continue to log when `set_mode` returns `False` (real write/helper failure).
 - Add an **optional** diagnostic log when `get_status().mode` disagrees with the desired mode, but do not treat it as a failure.
@@ -150,11 +150,11 @@ In `src/core/power/management/manager.py`:
 
 | File | Change |
 |------|--------|
-| `src/core/power/system/modes.py` | Make `set_mode` trust write success; keep `_mode_is_active` for observation only; optionally re-export from new modules. |
-| `src/core/power/system/_apply.py` | **New.** Extract all sysfs write logic and helper invocation. No readback. |
-| `src/core/power/system/_observe.py` | **New.** Extract `_infer_mode`, `get_status`, and all read helpers. Relax EPP heuristics. |
-| `src/core/power/system/__init__.py` | Re-export public names (`PowerMode`, `PowerModeStatus`, `set_mode`, `get_status`, `is_supported`). |
-| `src/core/power/management/manager.py` | Update `_activate_power_source_mode` to log mismatches without retrying. |
+| `keyrgb/core/power/system/modes.py` | Make `set_mode` trust write success; keep `_mode_is_active` for observation only; optionally re-export from new modules. |
+| `keyrgb/core/power/system/_apply.py` | **New.** Extract all sysfs write logic and helper invocation. No readback. |
+| `keyrgb/core/power/system/_observe.py` | **New.** Extract `_infer_mode`, `get_status`, and all read helpers. Relax EPP heuristics. |
+| `keyrgb/core/power/system/__init__.py` | Re-export public names (`PowerMode`, `PowerModeStatus`, `set_mode`, `get_status`, `is_supported`). |
+| `keyrgb/core/power/management/manager.py` | Update `_activate_power_source_mode` to log mismatches without retrying. |
 | `tests/core/power/monitoring/test_system_power_modes_unit.py` | Update test contracts; add mixed-policy and `balance_performance` detection tests. |
 | `tests/core/power/manager/test_power_manager_battery_saver_loop_unit.py` | Add test for "apply succeeds but observation disagrees" scenario. |
 
@@ -178,6 +178,6 @@ In `src/core/power/management/manager.py`:
 ## Related Context
 
 - [CHANGELOG.md](../../CHANGELOG.md) — v0.25.3 entry notes the previous `_infer_mode` improvement; v0.25.4–v0.25.5 entries note helper/polkit changes.
-- `src/core/power/system/modes.py` — current monolithic module.
-- `src/core/power/policies/power_source_loop_policy.py` — the retry logic that amplifies the bug.
-- `src/core/power/management/manager.py` — `_activate_power_source_mode` and the power-source loop.
+- `keyrgb/core/power/system/modes.py` — current monolithic module.
+- `keyrgb/core/power/policies/power_source_loop_policy.py` — the retry logic that amplifies the bug.
+- `keyrgb/core/power/management/manager.py` — `_activate_power_source_mode` and the power-source loop.

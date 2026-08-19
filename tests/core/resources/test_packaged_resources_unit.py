@@ -13,7 +13,7 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
-_RESOURCES_ROOT = _REPO_ROOT / "src" / "core" / "resources"
+_RESOURCES_ROOT = _REPO_ROOT / "keyrgb" / "core" / "resources"
 _PYPROJECT = _REPO_ROOT / "pyproject.toml"
 
 
@@ -23,15 +23,15 @@ def _resource_data_files() -> list[Path]:
     )
 
 
-_PACKAGE_DATA_SRC_RE = re.compile(r"(?ms)^\[tool\.setuptools\.package-data\]\s*(?:#[^\n]*\n)*src\s*=\s*\[(.*?)\]")
+_PACKAGE_DATA_SRC_RE = re.compile(r"(?ms)^\[tool\.setuptools\.package-data\]\s*(?:#[^\n]*\n)*keyrgb\s*=\s*\[(.*?)\]")
 
 
 def _package_data_patterns() -> list[str]:
     # Parse the declared patterns without tomllib so this module collects on 3.10.
     match = _PACKAGE_DATA_SRC_RE.search(_PYPROJECT.read_text(encoding="utf-8"))
-    assert match is not None, "src package-data patterns must be declared"
+    assert match is not None, "keyrgb package-data patterns must be declared"
     patterns = re.findall(r'"([^"]+)"', match.group(1))
-    assert patterns, "src package-data patterns must be declared"
+    assert patterns, "keyrgb package-data patterns must be declared"
     return patterns
 
 
@@ -85,9 +85,9 @@ def test_reference_defaults_manifest_closure_exists_and_contains_valid_json() ->
 def test_package_data_patterns_cover_all_resource_data_files() -> None:
     patterns = _package_data_patterns()
     missing = [
-        path.relative_to(_REPO_ROOT / "src").as_posix()
+        path.relative_to(_REPO_ROOT / "keyrgb").as_posix()
         for path in _resource_data_files()
-        if not _matches_package_data(path.relative_to(_REPO_ROOT / "src").as_posix(), patterns)
+        if not _matches_package_data(path.relative_to(_REPO_ROOT / "keyrgb").as_posix(), patterns)
     ]
     assert missing == [], f"package-data patterns omit resource files: {missing}"
 
@@ -97,7 +97,7 @@ def test_package_data_patterns_cover_nested_reference_defaults_closure() -> None
     missing = [
         rel
         for rel in _required_reference_defaults_relpaths()
-        if not rel.startswith("src/") or not _matches_package_data(rel.removeprefix("src/"), patterns)
+        if not rel.startswith("keyrgb/") or not _matches_package_data(rel.removeprefix("keyrgb/"), patterns)
     ]
     assert missing == [], f"package-data patterns omit nested reference defaults: {missing}"
 
@@ -123,8 +123,8 @@ def _stage_src_tree(tmp_path: Path) -> Path:
     shutil.copy2(_PYPROJECT, staging / "pyproject.toml")
     shutil.copy2(_REPO_ROOT / "README.md", staging / "README.md")
     shutil.copytree(
-        _REPO_ROOT / "src",
-        staging / "src",
+        _REPO_ROOT / "keyrgb",
+        staging / "keyrgb",
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
     )
     return staging
@@ -140,7 +140,7 @@ def _prepare_build_env(tmp_path: Path, *, name: str) -> tuple[Path, Path]:
 
 def _assert_installed_reference_defaults_load(env_python: Path) -> None:
     probe = """
-from src.core.resources.reference_defaults_specs import (
+from keyrgb.core.resources.reference_defaults_specs import (
     clear_reference_defaults_spec_cache,
     load_reference_defaults_spec,
 )

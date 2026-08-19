@@ -10,7 +10,7 @@ result.
 
 ## Contract
 
-`src/gui/utils/tk_async.py` owns the worker helper:
+`keyrgb/gui/utils/tk_async.py` owns the worker helper:
 
 | API | Role |
 |---|---|

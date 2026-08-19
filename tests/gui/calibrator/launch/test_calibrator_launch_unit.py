@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.gui.calibrator import launch as calibrator_launch
+from keyrgb.gui.calibrator import launch as calibrator_launch
 
 
 def test_launch_keymap_calibrator_uses_runtime_launch_helper(tmp_path: Path, monkeypatch) -> None:
@@ -24,7 +24,7 @@ def test_launch_keymap_calibrator_uses_runtime_launch_helper(tmp_path: Path, mon
 
     assert launch_calls == [
         {
-            "module_name": "src.gui.calibrator",
+            "module_name": "keyrgb.gui.calibrator",
             "anchor": str(anchor),
             "no_bytecode": False,
         }

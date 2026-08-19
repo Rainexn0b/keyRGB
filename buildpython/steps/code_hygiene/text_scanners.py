@@ -46,14 +46,14 @@ _DEFENSIVE_PATTERNS = [
 
 _HASATTR_PATTERN = re.compile(r'\bhasattr\s*\(\s*\w+\s*,\s*["\']_')
 _SETATTR_PATTERN = re.compile(r'\bsetattr\s*\(\s*\w+\s*,\s*["\']_')
-_HASATTR_EXCLUDE_PATHS = ["src/tests/", "tests/"]
+_HASATTR_EXCLUDE_PATHS = ["keyrgb/tests/", "tests/"]
 
-_ANY_CHECK_PREFIX = "src/"
+_ANY_CHECK_PREFIX = "keyrgb/"
 _TEST_NAME_PATTERN = re.compile(r"^test_[a-z0-9_]+_(unit|integration|e2e)\.py$")
 
 _GETATTR_PATTERN = re.compile(r'\bgetattr\s*\(\s*\w+\s*,\s*["\']_')
 _DELATTR_PATTERN = re.compile(r'\bdelattr\s*\(\s*\w+\s*,\s*["\']_')
-_GETATTR_EXCLUDE_PATHS = ["src/tests/", "tests/"]
+_GETATTR_EXCLUDE_PATHS = ["keyrgb/tests/", "tests/"]
 
 _CLEANUP_MARKERS = [
     _compile_pattern(r"#\s*", "TO", "DO", ignore_case=True),
@@ -66,7 +66,7 @@ _CLEANUP_MARKERS = [
     _compile_pattern("migrate_", "le", "gacy", ignore_case=True),
     _compile_pattern("compat", "_", ignore_case=True),
 ]
-_CLEANUP_EXCLUDE_PATHS = ["src/tests/", "tests/"]
+_CLEANUP_EXCLUDE_PATHS = ["keyrgb/tests/", "tests/"]
 _CLEANUP_MARKER_MESSAGE = _join_parts(
     "Cleanup/",
     "fa",

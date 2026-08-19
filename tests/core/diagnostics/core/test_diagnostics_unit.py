@@ -11,18 +11,18 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-import src.core.backends.sysfs.common as sysfs_common
-import src.core.diagnostics.collectors as diagnostics_collectors
-import src.core.diagnostics.collectors.backends as collectors_backends
-import src.core.diagnostics.io as diagnostics_io
-from src.core.config._settings_view import ConfigSettingsView
-from src.core.diagnostics import collect_diagnostics, format_diagnostics_text
-from src.core.diagnostics.collectors.sysfs_backends import (
+import keyrgb.core.backends.sysfs.common as sysfs_common
+import keyrgb.core.diagnostics.collectors as diagnostics_collectors
+import keyrgb.core.diagnostics.collectors.backends as collectors_backends
+import keyrgb.core.diagnostics.io as diagnostics_io
+from keyrgb.core.config._settings_view import ConfigSettingsView
+from keyrgb.core.diagnostics import collect_diagnostics, format_diagnostics_text
+from keyrgb.core.diagnostics.collectors.sysfs_backends import (
     sysfs_led_candidates_snapshot,
     sysfs_mouse_candidates_snapshot,
 )
-from src.core.diagnostics.model import Diagnostics, DiagnosticsConfigSnapshot
-from src.core.diagnostics.support import ITE8910_SPEED_PROBE_KEY
+from keyrgb.core.diagnostics.model import Diagnostics, DiagnosticsConfigSnapshot
+from keyrgb.core.diagnostics.support import ITE8910_SPEED_PROBE_KEY
 
 
 def test_collect_diagnostics_reads_dmi_and_leds(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -558,7 +558,7 @@ def test_backend_probe_snapshot_logs_selection_boundary_failures(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    import src.core.backends.registry as backend_registry
+    import keyrgb.core.backends.registry as backend_registry
 
     monkeypatch.setattr(collectors_backends, "_selection_is_blocked_under_pytest", lambda: (False, None))
     monkeypatch.setattr(collectors_backends, "build_backend_speed_probe_plans", lambda backends_snapshot: [])
@@ -589,8 +589,8 @@ def test_backend_probe_snapshot_logs_selection_boundary_failures(
 def test_backend_probe_snapshot_uses_registry_candidate_order_without_reprobing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import src.core.backends.registry as backend_registry
-    from src.core.backends.base import ProbeResult
+    import keyrgb.core.backends.registry as backend_registry
+    from keyrgb.core.backends.base import ProbeResult
 
     probe_calls: list[str] = []
 
@@ -629,7 +629,7 @@ def test_backend_probe_snapshot_uses_registry_candidate_order_without_reprobing(
 def test_backend_probe_snapshot_propagates_unexpected_selection_boundary_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import src.core.backends.registry as backend_registry
+    import keyrgb.core.backends.registry as backend_registry
 
     monkeypatch.setattr(collectors_backends, "_selection_is_blocked_under_pytest", lambda: (False, None))
     monkeypatch.setattr(collectors_backends, "build_backend_speed_probe_plans", lambda backends_snapshot: [])
@@ -649,13 +649,13 @@ def test_backend_probe_snapshot_propagates_unexpected_selection_boundary_failure
 def test_iter_auxiliary_probe_backends_propagates_unexpected_registration_failures(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.backends.registry import BackendSpec
+    from keyrgb.core.backends.registry import BackendSpec
 
     def boom() -> object:
         raise AssertionError("unexpected auxiliary factory bug")
 
     monkeypatch.setattr(
-        "src.core.backends.registry.iter_auxiliary_specs",
+        "keyrgb.core.backends.registry.iter_auxiliary_specs",
         lambda: [
             BackendSpec(
                 name="sysfs-mouse",

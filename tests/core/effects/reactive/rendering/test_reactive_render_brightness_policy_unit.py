@@ -31,7 +31,7 @@ class _DummyKB:
 
 
 def test_reactive_render_caps_hw_brightness_to_engine_brightness() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -50,7 +50,7 @@ def test_reactive_render_caps_hw_brightness_to_engine_brightness() -> None:
 
 
 def test_reactive_render_caps_hw_brightness_to_policy_cap_without_dim_flag() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -70,8 +70,8 @@ def test_reactive_render_caps_hw_brightness_to_policy_cap_without_dim_flag() -> 
 
 
 def test_reactive_render_ramps_from_zero_when_last_rendered_brightness_is_none() -> None:
-    from src.core.effects.reactive._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -94,7 +94,7 @@ def test_reactive_render_ramps_from_zero_when_last_rendered_brightness_is_none()
 
 
 def test_render_guard_bypassed_for_dim_temp_downward_jump() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -118,8 +118,8 @@ def test_render_guard_bypassed_for_dim_temp_downward_jump() -> None:
 
 
 def test_render_guard_still_active_for_upward_jumps_under_dim_temp() -> None:
-    from src.core.effects.reactive._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -143,7 +143,7 @@ def test_render_guard_still_active_for_upward_jumps_under_dim_temp() -> None:
 
 
 def test_per_key_reactive_pulse_respects_dim_temp_lock() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -167,7 +167,7 @@ def test_per_key_reactive_pulse_respects_dim_temp_lock() -> None:
 
 
 def test_render_logs_visual_scale_under_debug(monkeypatch, caplog) -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -187,7 +187,7 @@ def test_render_logs_visual_scale_under_debug(monkeypatch, caplog) -> None:
 
     monkeypatch.setenv("KEYRGB_DEBUG_BRIGHTNESS", "1")
 
-    with caplog.at_level(logging.INFO, logger="src.core.effects.reactive.render"):
+    with caplog.at_level(logging.INFO, logger="keyrgb.core.effects.reactive.render"):
         render(engine, color_map={(0, 0): (255, 255, 255)})
 
     messages = [record.getMessage() for record in caplog.records if "reactive_render_visual:" in record.getMessage()]
@@ -198,7 +198,7 @@ def test_render_logs_visual_scale_under_debug(monkeypatch, caplog) -> None:
 
 
 def test_resolve_brightness_logs_traceback_when_engine_attr_read_raises(caplog) -> None:
-    from src.core.effects.reactive import render as render_module
+    from keyrgb.core.effects.reactive import render as render_module
 
     class _BrokenEngine:
         brightness = 7
@@ -213,7 +213,7 @@ def test_resolve_brightness_logs_traceback_when_engine_attr_read_raises(caplog) 
         def reactive_brightness(self):
             raise RuntimeError("reactive getter failed")
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.reactive.render"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.reactive.render"):
         base, eff, hw = render_module._resolve_brightness(_BrokenEngine())
 
     assert (base, eff, hw) == (0, 25, 7)
@@ -228,7 +228,7 @@ def test_resolve_brightness_logs_traceback_when_engine_attr_read_raises(caplog) 
 
 
 def test_resolve_brightness_propagates_unexpected_engine_attr_read_errors() -> None:
-    from src.core.effects.reactive import render as render_module
+    from keyrgb.core.effects.reactive import render as render_module
 
     class _BrokenEngine:
         brightness = 7
@@ -248,12 +248,12 @@ def test_resolve_brightness_propagates_unexpected_engine_attr_read_errors() -> N
 
 
 def test_clear_transition_state_logs_runtime_setter_failures(caplog) -> None:
-    from src.core.effects.reactive._render_brightness import _clear_transition_state
-    from src.core.effects.reactive._render_brightness_support import ReactiveRenderState
+    from keyrgb.core.effects.reactive._render_brightness import _clear_transition_state
+    from keyrgb.core.effects.reactive._render_brightness_support import ReactiveRenderState
 
     engine = SimpleNamespace(_reactive_state=ReactiveRenderState())
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.reactive._render_brightness"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.reactive._render_brightness"):
         _clear_transition_state(engine)
 
     # All transition attributes should be set to None in the state.
@@ -265,8 +265,8 @@ def test_clear_transition_state_logs_runtime_setter_failures(caplog) -> None:
 
 
 def test_clear_transition_state_propagates_unexpected_setter_failures() -> None:
-    from src.core.effects.reactive._render_brightness import _clear_transition_state
-    from src.core.effects.reactive._render_brightness_support import ReactiveRenderState
+    from keyrgb.core.effects.reactive._render_brightness import _clear_transition_state
+    from keyrgb.core.effects.reactive._render_brightness_support import ReactiveRenderState
 
     # _clear_transition_state uses set_engine_attr which routes writes to
     # the ReactiveRenderState dataclass. Since the dataclass uses slots=True
@@ -282,7 +282,7 @@ def test_clear_transition_state_propagates_unexpected_setter_failures() -> None:
 
 
 def test_set_uniform_hw_streak_clamps_negative_values_to_zero() -> None:
-    from src.core.effects.reactive._render_brightness_support import ensure_reactive_state, set_uniform_hw_streak
+    from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state, set_uniform_hw_streak
 
     engine = SimpleNamespace(_reactive_uniform_hw_streak=9)
 

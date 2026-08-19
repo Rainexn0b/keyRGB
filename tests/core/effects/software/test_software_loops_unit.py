@@ -14,13 +14,13 @@ import pytest
 
 
 def test_software_clamp_preserves_nan_instead_of_promoting_to_full_scale() -> None:
-    from src.core.effects.software.base import clamp01
+    from keyrgb.core.effects.software.base import clamp01
 
     assert math.isnan(clamp01(float("nan")))
 
 
 def test_speed_mapping_has_strong_top_end() -> None:
-    from src.core.effects.software.base import pace as _pace
+    from keyrgb.core.effects.software.base import pace as _pace
 
     class E:
         def __init__(self, speed: int):
@@ -37,7 +37,7 @@ def test_speed_mapping_has_strong_top_end() -> None:
 
 
 def test_speed_mapping_preserves_none_and_invalid_fallbacks() -> None:
-    from src.core.effects.software.base import pace as _pace
+    from keyrgb.core.effects.software.base import pace as _pace
 
     assert _pace(SimpleNamespace(speed=None)) == pytest.approx(_pace(SimpleNamespace(speed=0)))
     assert _pace(SimpleNamespace(speed="fast")) == pytest.approx(_pace(SimpleNamespace(speed=4)))
@@ -45,7 +45,7 @@ def test_speed_mapping_preserves_none_and_invalid_fallbacks() -> None:
 
 
 def test_animation_step_returns_nominal_without_prior_tick() -> None:
-    from src.core.effects.software.base import animation_step_s
+    from keyrgb.core.effects.software.base import animation_step_s
 
     engine = SimpleNamespace()
 
@@ -56,7 +56,7 @@ def test_animation_step_returns_nominal_without_prior_tick() -> None:
 
 
 def test_animation_step_uses_elapsed_when_within_clamp() -> None:
-    from src.core.effects.software.base import animation_step_s
+    from keyrgb.core.effects.software.base import animation_step_s
 
     engine = SimpleNamespace(_tick=10.0)
 
@@ -67,7 +67,7 @@ def test_animation_step_uses_elapsed_when_within_clamp() -> None:
 
 
 def test_animation_step_clamps_large_frame_gaps() -> None:
-    from src.core.effects.software.base import animation_step_s
+    from keyrgb.core.effects.software.base import animation_step_s
 
     engine = SimpleNamespace(_tick=10.0)
 
@@ -78,7 +78,7 @@ def test_animation_step_clamps_large_frame_gaps() -> None:
 
 
 def test_animation_step_ignores_uncoercible_prior_tick() -> None:
-    from src.core.effects.software.base import animation_step_s
+    from keyrgb.core.effects.software.base import animation_step_s
 
     engine = SimpleNamespace(_tick=object())
 
@@ -98,7 +98,7 @@ class _ReadOnlyTickEngine:
 
 
 def test_animation_step_tolerates_read_only_tick_attr() -> None:
-    from src.core.effects.software.base import animation_step_s
+    from keyrgb.core.effects.software.base import animation_step_s
 
     engine = _ReadOnlyTickEngine(10.0)
 
@@ -119,7 +119,7 @@ def test_animation_step_tolerates_read_only_tick_attr() -> None:
     ],
 )
 def test_effect_loops_wait_before_second_iteration(effect_runner: str, per_key_ok: bool) -> None:
-    from src.core.effects.software import _effects_basic, _effects_particles
+    from keyrgb.core.effects.software import _effects_basic, _effects_particles
 
     class StopEvent:
         def __init__(self) -> None:
@@ -262,11 +262,11 @@ class TestStrobeToggling:
 
 class TestReactiveKeyMapping:
     def test_evdev_key_name_to_key_id_letters_digits(self):
-        from src.core.effects.reactive.input import (
+        from keyrgb.core.effects.reactive.input import (
             evdev_key_name_to_key_id as _evdev_key_name_to_key_id,
             evdev_key_name_to_slot_id as _evdev_key_name_to_slot_id,
         )
-        from src.core.resources.layouts import slot_id_for_key_id
+        from keyrgb.core.resources.layouts import slot_id_for_key_id
 
         assert _evdev_key_name_to_key_id("KEY_A") == "a"
         assert _evdev_key_name_to_key_id("KEY_1") == "1"
@@ -274,11 +274,11 @@ class TestReactiveKeyMapping:
         assert _evdev_key_name_to_slot_id("KEY_A") == str(slot_id_for_key_id("auto", "a") or "a")
 
     def test_evdev_key_name_to_key_id_specials(self):
-        from src.core.effects.reactive.input import (
+        from keyrgb.core.effects.reactive.input import (
             evdev_key_name_to_key_id as _evdev_key_name_to_key_id,
             evdev_key_name_to_slot_id as _evdev_key_name_to_slot_id,
         )
-        from src.core.resources.layouts import slot_id_for_key_id
+        from keyrgb.core.resources.layouts import slot_id_for_key_id
 
         assert _evdev_key_name_to_key_id("KEY_LEFTSHIFT") == "lshift"
         assert _evdev_key_name_to_key_id("KEY_RIGHTALT") == "ralt"
@@ -349,9 +349,9 @@ def test_smooth_cycling_effects_use_constant_frame_step(effect_runner: str, modu
     """
     import importlib
 
-    from src.core.effects.software import _effects_basic, _effects_particles  # noqa: F401
+    from keyrgb.core.effects.software import _effects_basic, _effects_particles  # noqa: F401
 
-    mod = importlib.import_module(f"src.core.effects.software.{module}")
+    mod = importlib.import_module(f"keyrgb.core.effects.software.{module}")
 
     class StopEvent:
         def __init__(self) -> None:
@@ -396,7 +396,7 @@ def test_smooth_cycling_effects_use_constant_frame_step(effect_runner: str, modu
 
 def test_particle_effects_multiple_ticks_with_fast_pace(monkeypatch) -> None:
     """Exercise spawn/age/overlay branches across a few wait cycles."""
-    from src.core.effects.software import _effects_particles as particles
+    from keyrgb.core.effects.software import _effects_particles as particles
 
     class StopEvent:
         def __init__(self, max_waits: int) -> None:
@@ -444,7 +444,7 @@ def test_particle_effects_multiple_ticks_with_fast_pace(monkeypatch) -> None:
 
 
 def test_strobe_invalid_brightness_and_chase_uniform(monkeypatch) -> None:
-    from src.core.effects.software import _effects_particles as particles
+    from keyrgb.core.effects.software import _effects_particles as particles
 
     class StopEvent:
         def __init__(self) -> None:

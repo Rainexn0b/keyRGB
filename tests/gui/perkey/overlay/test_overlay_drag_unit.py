@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.perkey.overlay.drag import OverlayDragController
+from keyrgb.gui.perkey.overlay.drag import OverlayDragController
 
 
 class _FakeVar:

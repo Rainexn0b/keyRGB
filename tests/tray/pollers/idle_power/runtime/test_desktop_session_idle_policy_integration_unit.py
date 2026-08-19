@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.tray.pollers.idle_power._desktop_timeout import read_kde_dim_timeout
-from src.tray.pollers.idle_power.policy import compute_idle_action
+from keyrgb.tray.pollers.idle_power._desktop_timeout import read_kde_dim_timeout
+from keyrgb.tray.pollers.idle_power.policy import compute_idle_action
 
 
 def test_kde_session_dim_timeout_drives_idle_policy_action(tmp_path: Path) -> None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src.gui.calibrator import app as calibrator_app
-from src.gui.perkey import hardware as perkey_hardware
+from keyrgb.gui.calibrator import app as calibrator_app
+from keyrgb.gui.perkey import hardware as perkey_hardware
 
 
 def test_calibrator_uses_backend_dimensions() -> None:

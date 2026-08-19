@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.tray.ui.icon import _draw as icon_draw
+from keyrgb.tray.ui.icon import _draw as icon_draw
 
 
 def test_create_icon_reuses_cached_image_for_same_color(monkeypatch) -> None:

@@ -16,14 +16,14 @@ class _FakeThread:
 
 
 def test_normalize_color_hits_exception_path() -> None:
-    from src.tray.pollers.icon_color_polling import _normalize_color
+    from keyrgb.tray.pollers.icon_color_polling import _normalize_color
 
     # int(object()) raises TypeError -> should fall back via typed coercion handling.
     assert _normalize_color((object(), 2, 3)) == (0, 0, 0)
 
 
 def test_compute_icon_sig_speed_and_brightness_bad_int_fall_back_to_zero() -> None:
-    from src.tray.pollers import icon_color_polling as icp
+    from keyrgb.tray.pollers import icon_color_polling as icp
 
     tray = SimpleNamespace(
         is_off=False,
@@ -36,7 +36,7 @@ def test_compute_icon_sig_speed_and_brightness_bad_int_fall_back_to_zero() -> No
 
 
 def test_start_icon_color_polling_starts_daemon_thread(monkeypatch) -> None:
-    import src.tray.pollers.icon_color_polling as icp
+    import keyrgb.tray.pollers.icon_color_polling as icp
 
     created = {}
 
@@ -54,7 +54,7 @@ def test_start_icon_color_polling_starts_daemon_thread(monkeypatch) -> None:
 
 
 def test_icon_color_polling_loop_logs_then_exits_on_log_exception(monkeypatch) -> None:
-    import src.tray.pollers.icon_color_polling as icp
+    import keyrgb.tray.pollers.icon_color_polling as icp
 
     created = {}
 
@@ -82,7 +82,7 @@ def test_icon_color_polling_loop_logs_then_exits_on_log_exception(monkeypatch) -
 
 
 def test_icon_color_polling_loop_updates_once(monkeypatch) -> None:
-    import src.tray.pollers.icon_color_polling as icp
+    import keyrgb.tray.pollers.icon_color_polling as icp
 
     created = {}
 
@@ -115,7 +115,7 @@ def test_icon_color_polling_loop_updates_once(monkeypatch) -> None:
 
 
 def test_icon_poller_requests_refresh_without_accessing_pystray_surface(monkeypatch) -> None:
-    import src.tray.pollers.icon_color_polling as icp
+    import keyrgb.tray.pollers.icon_color_polling as icp
 
     created = {}
 
@@ -152,7 +152,7 @@ def test_icon_poller_requests_refresh_without_accessing_pystray_surface(monkeypa
 
 
 def test_icon_color_polling_skips_first_repaint_during_resume_holdoff(monkeypatch) -> None:
-    import src.tray.pollers.icon_color_polling as icp
+    import keyrgb.tray.pollers.icon_color_polling as icp
 
     created = {}
 
@@ -184,7 +184,7 @@ def test_icon_color_polling_skips_first_repaint_during_resume_holdoff(monkeypatc
 
 
 def test_icon_color_polling_loop_propagates_unexpected_update_errors(monkeypatch) -> None:
-    import src.tray.pollers.icon_color_polling as icp
+    import keyrgb.tray.pollers.icon_color_polling as icp
 
     created = {}
 

@@ -4,12 +4,12 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.diagnostics.device_discovery import collect_device_discovery, format_device_discovery_text
+from keyrgb.core.diagnostics.device_discovery import collect_device_discovery, format_device_discovery_text
 
 
 def test_collect_device_discovery_marks_experimental_disabled_candidate(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
             "selected": "ite8291r3_perkey",
             "probes": [
@@ -24,9 +24,11 @@ def test_collect_device_discovery_marks_experimental_disabled_candidate(monkeypa
             ],
         },
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:7001"])
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:7001"]
+    )
+    monkeypatch.setattr(
+        "keyrgb.core.diagnostics.device_discovery.usb_devices_snapshot",
         lambda targets: [
             {
                 "idVendor": "0x048d",
@@ -37,7 +39,7 @@ def test_collect_device_discovery_marks_experimental_disabled_candidate(monkeypa
         ],
     )
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.hidraw_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.hidraw_devices_snapshot",
         lambda: [{"vendor_id": "0x048d", "product_id": "0x7001", "devnode": "/dev/hidraw1"}],
     )
 
@@ -57,12 +59,14 @@ def test_collect_device_discovery_marks_experimental_disabled_candidate(monkeypa
 
 def test_collect_device_discovery_flags_unrecognized_ite_device(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {"selected": None, "probes": []},
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:1234"])
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:1234"]
+    )
+    monkeypatch.setattr(
+        "keyrgb.core.diagnostics.device_discovery.usb_devices_snapshot",
         lambda targets: [
             {
                 "idVendor": "0x048d",
@@ -72,7 +76,7 @@ def test_collect_device_discovery_flags_unrecognized_ite_device(monkeypatch) -> 
             }
         ],
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
+    monkeypatch.setattr("keyrgb.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
 
     payload = collect_device_discovery(include_usb=True)
 
@@ -148,7 +152,7 @@ def test_format_device_discovery_text_includes_sysfs_aux_candidate_details() -> 
 
 def test_collect_device_discovery_marks_supported_experimental_candidate(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
             "selected": "ite8233_none_chassis_lightbar_clevo",
             "probes": [
@@ -162,9 +166,11 @@ def test_collect_device_discovery_marks_supported_experimental_candidate(monkeyp
             ],
         },
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:7001"])
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:7001"]
+    )
+    monkeypatch.setattr(
+        "keyrgb.core.diagnostics.device_discovery.usb_devices_snapshot",
         lambda targets: [
             {
                 "idVendor": "0x048d",
@@ -174,7 +180,7 @@ def test_collect_device_discovery_marks_supported_experimental_candidate(monkeyp
             }
         ],
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
+    monkeypatch.setattr("keyrgb.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
 
     payload = collect_device_discovery(include_usb=True)
 
@@ -184,7 +190,7 @@ def test_collect_device_discovery_marks_supported_experimental_candidate(monkeyp
 
 def test_collect_device_discovery_includes_sysfs_mouse_aux_candidate(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
             "selected": "sysfs-leds",
             "probes": [
@@ -203,9 +209,9 @@ def test_collect_device_discovery_includes_sysfs_mouse_aux_candidate(monkeypatch
             ],
         },
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: [])
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_devices_snapshot", lambda targets: [])
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
+    monkeypatch.setattr("keyrgb.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: [])
+    monkeypatch.setattr("keyrgb.core.diagnostics.device_discovery.usb_devices_snapshot", lambda targets: [])
+    monkeypatch.setattr("keyrgb.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
 
     payload = collect_device_discovery(include_usb=True)
 
@@ -217,7 +223,7 @@ def test_collect_device_discovery_includes_sysfs_mouse_aux_candidate(monkeypatch
 
 def test_collect_device_discovery_recommends_bug_report_for_supported_validated_backend(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
             "selected": "sysfs-leds",
             "probes": [
@@ -231,9 +237,11 @@ def test_collect_device_discovery_recommends_bug_report_for_supported_validated_
             ],
         },
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:600b"])
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:600b"]
+    )
+    monkeypatch.setattr(
+        "keyrgb.core.diagnostics.device_discovery.usb_devices_snapshot",
         lambda targets: [
             {
                 "idVendor": "0x048d",
@@ -243,7 +251,7 @@ def test_collect_device_discovery_recommends_bug_report_for_supported_validated_
             }
         ],
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
+    monkeypatch.setattr("keyrgb.core.diagnostics.device_discovery.hidraw_devices_snapshot", list)
 
     payload = collect_device_discovery(include_usb=True)
 
@@ -253,7 +261,7 @@ def test_collect_device_discovery_recommends_bug_report_for_supported_validated_
 
 def test_collect_device_discovery_marks_ite8258_candidate_as_keyboard(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
             "selected": None,
             "probes": [
@@ -268,9 +276,11 @@ def test_collect_device_discovery_marks_ite8258_candidate_as_keyboard(monkeypatc
             ],
         },
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:c195"])
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:c195"]
+    )
+    monkeypatch.setattr(
+        "keyrgb.core.diagnostics.device_discovery.usb_devices_snapshot",
         lambda targets: [
             {
                 "idVendor": "0x048d",
@@ -281,7 +291,7 @@ def test_collect_device_discovery_marks_ite8258_candidate_as_keyboard(monkeypatc
         ],
     )
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.hidraw_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.hidraw_devices_snapshot",
         lambda: [{"vendor_id": "0x048d", "product_id": "0xc195", "devnode": "/dev/hidraw7"}],
     )
 
@@ -294,7 +304,7 @@ def test_collect_device_discovery_marks_ite8258_candidate_as_keyboard(monkeypatc
 
 def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
             "selected": None,
             "probes": [
@@ -309,9 +319,11 @@ def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monk
             ],
         },
     )
-    monkeypatch.setattr("src.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:c963"])
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.usb_ids_snapshot", lambda *, include_usb: ["048d:c963"]
+    )
+    monkeypatch.setattr(
+        "keyrgb.core.diagnostics.device_discovery.usb_devices_snapshot",
         lambda targets: [
             {
                 "idVendor": "0x048d",
@@ -322,7 +334,7 @@ def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monk
         ],
     )
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.hidraw_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.hidraw_devices_snapshot",
         lambda: [{"vendor_id": "0x048d", "product_id": "0xc963", "devnode": "/dev/hidraw9"}],
     )
 
@@ -335,7 +347,7 @@ def test_collect_device_discovery_marks_ite8295_zones_candidate_as_keyboard(monk
 
 def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimental_disabled(monkeypatch) -> None:
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.backend_probe_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.backend_probe_snapshot",
         lambda: {
             "selected": None,
             "probes": [
@@ -351,11 +363,11 @@ def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimenta
         },
     )
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.usb_ids_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.usb_ids_snapshot",
         lambda *, include_usb: ["048d:c193", "048d:c197"],
     )
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.usb_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.usb_devices_snapshot",
         lambda targets: [
             {
                 "idVendor": "0x048d",
@@ -372,7 +384,7 @@ def test_collect_device_discovery_marks_ite8258_chassis_candidate_as_experimenta
         ],
     )
     monkeypatch.setattr(
-        "src.core.diagnostics.device_discovery.hidraw_devices_snapshot",
+        "keyrgb.core.diagnostics.device_discovery.hidraw_devices_snapshot",
         lambda: [{"vendor_id": "0x048d", "product_id": "0xc197", "devnode": "/dev/hidraw11"}],
     )
 

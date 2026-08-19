@@ -8,7 +8,7 @@ from typing import Any, ClassVar
 
 import pytest
 
-from src.tray.pollers.idle_power import _wayland_idle as wayland_idle
+from keyrgb.tray.pollers.idle_power import _wayland_idle as wayland_idle
 
 
 class _FakeProxy:

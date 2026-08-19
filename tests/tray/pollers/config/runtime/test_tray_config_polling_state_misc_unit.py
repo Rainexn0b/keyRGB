@@ -4,13 +4,13 @@ from types import SimpleNamespace
 from typing import ClassVar
 from unittest.mock import MagicMock
 
-from src.tray.pollers.config_polling import (
+from keyrgb.tray.pollers.config_polling import (
     ConfigApplyState,
     _compute_config_apply_state,
     _maybe_apply_fast_path,
     _state_for_log,
 )
-from src.tray.pollers.config_polling_internal._apply_callbacks import _sync_reactive
+from keyrgb.tray.pollers.config_polling_internal._apply_callbacks import _sync_reactive
 
 
 def test_compute_config_apply_state_perkey_sig_handles_unorderable_items() -> None:

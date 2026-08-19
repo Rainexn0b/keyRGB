@@ -37,7 +37,7 @@ def _mk_engine(*, current_color=(255, 0, 0), brightness: int = 25, speed: int = 
 
 
 def test_get_engine_color_map_buffer_bypasses_hostile_engine_attribute_lookup() -> None:
-    from src.core.effects.software._buffers import get_engine_color_map_buffer
+    from keyrgb.core.effects.software._buffers import get_engine_color_map_buffer
 
     class _HostileEngine:
         def __getattribute__(self, name: str):
@@ -56,7 +56,7 @@ def test_get_engine_color_map_buffer_bypasses_hostile_engine_attribute_lookup() 
 
 
 def test_get_engine_color_map_buffer_degrades_when_engine_cannot_store_buffers() -> None:
-    from src.core.effects.software._buffers import get_engine_color_map_buffer
+    from keyrgb.core.effects.software._buffers import get_engine_color_map_buffer
 
     class _SlotOnlyEngine:
         __slots__ = ()
@@ -72,7 +72,7 @@ def test_get_engine_color_map_buffer_degrades_when_engine_cannot_store_buffers()
 
 
 def test_get_engine_color_map_buffer_reraises_unexpected_assignment_failures() -> None:
-    from src.core.effects.software._buffers import get_engine_color_map_buffer
+    from keyrgb.core.effects.software._buffers import get_engine_color_map_buffer
 
     class _BrokenSlotEngine:
         __slots__ = ()
@@ -85,7 +85,7 @@ def test_get_engine_color_map_buffer_reraises_unexpected_assignment_failures() -
 
 
 def test_run_breathing_reuses_frame_map() -> None:
-    from src.core.effects.software._effects_basic import run_breathing
+    from keyrgb.core.effects.software._effects_basic import run_breathing
 
     engine = _mk_engine()
     seen_ids: list[int] = []
@@ -100,7 +100,7 @@ def test_run_breathing_reuses_frame_map() -> None:
 
 
 def test_run_color_cycle_reuses_frame_map() -> None:
-    from src.core.effects.software._effects_basic import run_color_cycle
+    from keyrgb.core.effects.software._effects_basic import run_color_cycle
 
     engine = _mk_engine()
     seen_ids: list[int] = []
@@ -115,7 +115,7 @@ def test_run_color_cycle_reuses_frame_map() -> None:
 
 
 def test_run_strobe_reuses_frame_map() -> None:
-    from src.core.effects.software._effects_particles import run_strobe
+    from keyrgb.core.effects.software._effects_particles import run_strobe
 
     engine = _mk_engine()
     seen_ids: list[int] = []
@@ -130,7 +130,7 @@ def test_run_strobe_reuses_frame_map() -> None:
 
 
 def test_run_chase_uniform_fallback_reuses_frame_map() -> None:
-    from src.core.effects.software._effects_particles import run_chase
+    from keyrgb.core.effects.software._effects_particles import run_chase
 
     engine = _mk_engine(current_color=(0, 200, 255), speed=8)
     seen_ids: list[int] = []
@@ -145,7 +145,7 @@ def test_run_chase_uniform_fallback_reuses_frame_map() -> None:
 
 
 def test_run_rainbow_wave_reuses_frame_map() -> None:
-    from src.core.effects.software._effects_basic import run_rainbow_wave
+    from keyrgb.core.effects.software._effects_basic import run_rainbow_wave
 
     engine = _mk_engine(speed=8)
     seen_ids: list[int] = []
@@ -160,7 +160,7 @@ def test_run_rainbow_wave_reuses_frame_map() -> None:
 
 
 def test_run_twinkle_reuses_frame_map() -> None:
-    from src.core.effects.software._effects_particles import run_twinkle
+    from keyrgb.core.effects.software._effects_particles import run_twinkle
 
     engine = _mk_engine(speed=8)
     seen_ids: list[int] = []
@@ -175,7 +175,7 @@ def test_run_twinkle_reuses_frame_map() -> None:
 
 
 def test_run_random_reuses_transition_buffers() -> None:
-    from src.core.effects.software._effects_basic import run_random
+    from keyrgb.core.effects.software._effects_basic import run_random
 
     engine = _mk_engine(speed=8)
     prev_ids: list[int] = []

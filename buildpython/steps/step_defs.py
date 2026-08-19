@@ -16,7 +16,7 @@ def steps() -> list[Step]:
 
     def compileall_runner():
         return run(
-            [python_exe(), "-m", "compileall", "-q", "src"],
+            [python_exe(), "-m", "compileall", "-q", "keyrgb"],
             cwd=str(root),
             env_overrides={"KEYRGB_HW_TESTS": "0"},
         )
@@ -31,7 +31,7 @@ def steps() -> list[Step]:
                 "-m",
                 "ruff",
                 "check",
-                "src",
+                "keyrgb",
                 "buildpython",
                 "scripts/release",
                 "tests",

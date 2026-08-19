@@ -5,8 +5,8 @@ from threading import RLock
 
 import pytest
 
-from src.core.effects import device
-from src.core.effects.device import NullKeyboard, acquire_keyboard
+from keyrgb.core.effects import device
+from keyrgb.core.effects.device import NullKeyboard, acquire_keyboard
 
 
 def test_acquire_keyboard_under_pytest_disables_hardware_by_default(

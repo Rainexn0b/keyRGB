@@ -11,7 +11,7 @@ class TestPerKeyColorsLoadSave:
 
     def test_save_and_load_colors_roundtrip(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """Save then load per-key colors should preserve data."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir)
@@ -31,8 +31,8 @@ class TestPerKeyColorsLoadSave:
 
     def test_load_colors_returns_default_if_missing(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """If colors.json doesn't exist, return DEFAULT_COLORS."""
-        from src.core.profile import profiles
-        from src.core.resources.defaults import DEFAULT_COLORS
+        from keyrgb.core.profile import profiles
+        from keyrgb.core.resources.defaults import DEFAULT_COLORS
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir, per_key_colors=temp_profile_dir / "nonexistent_colors.json")
@@ -45,7 +45,7 @@ class TestPerKeyColorsLoadSave:
 
     def test_load_colors_skips_invalid_entries(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """load_per_key_colors should skip entries with bad coords or RGB values."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         colors_file = temp_profile_dir / "colors.json"
         colors_file.write_text(

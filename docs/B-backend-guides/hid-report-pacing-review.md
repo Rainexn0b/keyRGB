@@ -6,7 +6,7 @@ Back-to-back HID reports were causing the ITE8291r3 controller (and potentially 
 
 ## What Changed
 
-- Added a shared helper module: `src/core/backends/_report_pacing.py`
+- Added a shared helper module: `keyrgb/core/backends/_report_pacing.py`
   - Default delay: `1 ms` (`DEFAULT_HID_REPORT_DELAY_S = 0.001`)
   - Global env override: `KEYRGB_HID_REPORT_DELAY_MS`
   - Per-backend env override: `KEYRGB_<BACKEND_NAME>_REPORT_DELAY_MS`, with backend punctuation normalized to underscores
@@ -18,15 +18,15 @@ The following backends now sleep after each HID feature or output report:
 
 | Backend | Path |
 |---------|------|
-| `ite8291r3` | `src/core/backends/ite8291r3/device.py` + `backend.py` |
-| `ite8291` | `src/core/backends/ite8291/hidraw.py` |
-| `ite8291-zones` | `src/core/backends/ite8291/hidraw.py` |
-| `ite8295-zones` | `src/core/backends/ite8291/hidraw.py` |
-| `ite8910` | `src/core/backends/ite8910/hidraw.py` |
-| `ite8233` (experimental) | `src/core/backends/ite8910/hidraw.py` |
-| `ite8297` (experimental) | `src/core/backends/ite8910/hidraw.py` |
-| `ite8258` (experimental) | `src/core/backends/ite8291/hidraw.py` |
-| `ite8258-chassis` (experimental, shared proxy) | `src/core/backends/ite8291/hidraw.py` + `src/core/backends/shared_hidraw_transport.py` |
+| `ite8291r3` | `keyrgb/core/backends/ite8291r3/device.py` + `backend.py` |
+| `ite8291` | `keyrgb/core/backends/ite8291/hidraw.py` |
+| `ite8291-zones` | `keyrgb/core/backends/ite8291/hidraw.py` |
+| `ite8295-zones` | `keyrgb/core/backends/ite8291/hidraw.py` |
+| `ite8910` | `keyrgb/core/backends/ite8910/hidraw.py` |
+| `ite8233` (experimental) | `keyrgb/core/backends/ite8910/hidraw.py` |
+| `ite8297` (experimental) | `keyrgb/core/backends/ite8910/hidraw.py` |
+| `ite8258` (experimental) | `keyrgb/core/backends/ite8291/hidraw.py` |
+| `ite8258-chassis` (experimental, shared proxy) | `keyrgb/core/backends/ite8291/hidraw.py` + `keyrgb/core/backends/shared_hidraw_transport.py` |
 
 Backends intentionally **not** changed:
 
@@ -43,11 +43,11 @@ Backends intentionally **not** changed:
 
 ## Reactive Typing Idle Traffic Reduction
 
-- `src/core/effects/reactive/_render_runtime.py` now skips duplicate rendered per-key frames for backends that set `reassert_every_frame=True`, reducing unnecessary reports while still honoring per-frame reassert when the frame actually changes.
+- `keyrgb/core/effects/reactive/_render_runtime.py` now skips duplicate rendered per-key frames for backends that set `reassert_every_frame=True`, reducing unnecessary reports while still honoring per-frame reassert when the frame actually changes.
 
 ## Diagnostics
 
-- `src/core/diagnostics/snapshots.py` now captures `KEYRGB_HID_REPORT_DELAY_MS` alongside known per-backend report-delay overrides.
+- `keyrgb/core/diagnostics/snapshots.py` now captures `KEYRGB_HID_REPORT_DELAY_MS` alongside known per-backend report-delay overrides.
 
 ## Documentation
 

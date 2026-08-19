@@ -5,22 +5,22 @@ from pathlib import Path
 
 import pytest
 
-from src.core.backends.base import BackendStability, ExperimentalEvidence
-from src.core.backends.exceptions import BackendIOError
-from src.core.backends.ite8258_perkey_chassis import (
+from keyrgb.core.backends.base import BackendStability, ExperimentalEvidence
+from keyrgb.core.backends.exceptions import BackendIOError
+from keyrgb.core.backends.ite8258_perkey_chassis import (
     backend as _ite8258_chassis_backend_module,
     protocol,
 )
-from src.core.backends.ite8258_perkey_chassis.backend import (
+from keyrgb.core.backends.ite8258_perkey_chassis.backend import (
     Ite8258ChassisBackend,
     _find_matching_supported_hidraw_device,
     _open_matching_transport,
 )
-from src.core.backends.ite8258_perkey_chassis.device import (
+from keyrgb.core.backends.ite8258_perkey_chassis.device import (
     Ite8258ChassisKeyboardDevice,
     Ite8258ChassisZoneDevice,
 )
-from src.core.backends.ite8258_perkey_chassis.profile_coordinator import (
+from keyrgb.core.backends.ite8258_perkey_chassis.profile_coordinator import (
     Ite8258ChassisProfileCoordinator,
     ProfileCommitDisposition,
 )
@@ -260,7 +260,7 @@ def test_backend_probe_reports_unavailable_when_scan_disabled(monkeypatch: pytes
 def test_backend_probe_reports_unavailable_when_no_matching_device(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._find_matching_supported_hidraw_device",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._find_matching_supported_hidraw_device",
         lambda: None,
     )
 
@@ -280,7 +280,7 @@ def test_backend_probe_reports_detected_but_disabled_until_opted_in(monkeypatch:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._find_matching_supported_hidraw_device",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._find_matching_supported_hidraw_device",
         lambda: DummyMatch(),
     )
 
@@ -302,7 +302,7 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._find_matching_supported_hidraw_device",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._find_matching_supported_hidraw_device",
         lambda: DummyMatch(),
     )
 
@@ -315,7 +315,7 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
 
 def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._find_matching_supported_hidraw_device",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._find_matching_supported_hidraw_device",
         lambda: None,
     )
 
@@ -334,7 +334,7 @@ def test_backend_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     err = PermissionError("permission denied")
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
         lambda: (_ for _ in ()).throw(err),
     )
 
@@ -346,7 +346,7 @@ def test_backend_get_device_reraises_non_permission_errors(monkeypatch: pytest.M
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     err = OSError("transport failed")
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
         lambda: (_ for _ in ()).throw(err),
     )
 
@@ -368,7 +368,7 @@ def test_backend_get_device_returns_keyboard_device_when_transport_opens(monkeyp
         devnode = Path("/dev/hidraw11")
 
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
         lambda: (DummyTransport(), DummyInfo()),
     )
 
@@ -482,7 +482,7 @@ def test_backend_get_zone_device_rejects_unknown_zone(monkeypatch: pytest.Monkey
         devnode = Path("/dev/hidraw11")
 
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
         lambda: (DummyTransport(), DummyInfo()),
     )
 
@@ -509,7 +509,7 @@ def test_backend_zone_first_stages_until_keyboard_profile_exists(monkeypatch: py
         devnode = Path("/dev/hidraw11")
 
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
         lambda: (DummyTransport(), DummyInfo()),
     )
 
@@ -555,7 +555,7 @@ def test_backend_keyboard_and_zone_devices_share_one_transport(monkeypatch: pyte
         return DummyTransport(), DummyInfo()
 
     monkeypatch.setattr(
-        "src.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8258_perkey_chassis.backend._open_matching_transport",
         _opener,
     )
 
@@ -1062,7 +1062,7 @@ def test_concurrent_output_transactions_are_serialized_not_coalesced() -> None:
 
 
 def test_device_coerce_helpers_and_error_edges() -> None:
-    from src.core.backends.ite8258_perkey_chassis import device as device_mod
+    from keyrgb.core.backends.ite8258_perkey_chassis import device as device_mod
 
     assert device_mod._coerce_int("12") == 12
     with pytest.raises(ValueError, match="RGB"):

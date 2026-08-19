@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.power.monitoring import acpi_monitoring
+from keyrgb.core.power.monitoring import acpi_monitoring
 
 
 class _FakeStdout:

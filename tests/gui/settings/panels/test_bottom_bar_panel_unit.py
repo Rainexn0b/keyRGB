@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.gui.settings.panels import bottom_bar_panel
+from keyrgb.gui.settings.panels import bottom_bar_panel
 
 
 def _install_fake_ttk(

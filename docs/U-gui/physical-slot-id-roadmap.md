@@ -6,9 +6,9 @@ Related context:
 
 - `docs/D-bug-reports/issue-4/issue-4.md`
 - `docs/D-bug-reports/issue-4/issue-4.1.md`
-- `src/core/resources/layouts/`
-- `src/core/resources/layout_slots.py`
-- `src/core/effects/reactive/input.py`
+- `keyrgb/core/resources/layouts/`
+- `keyrgb/core/resources/layout_slots.py`
+- `keyrgb/core/effects/reactive/input.py`
 
 ## Why this doc exists
 
@@ -47,16 +47,16 @@ starts.
 
 Physical layout families are already catalogue-based:
 
-- `src/core/resources/layouts/catalog.py` exposes the built-in physical layout list
-- `src/core/resources/layouts/_api.py` resolves `auto` to a concrete layout ID
-- `src/core/resources/layout_specs.json` uses inherited specs instead of fully duplicated layouts
-- `src/core/resources/reference_defaults_specs.json` already follows the same inherited model for starter defaults
+- `keyrgb/core/resources/layouts/catalog.py` exposes the built-in physical layout list
+- `keyrgb/core/resources/layouts/_api.py` resolves `auto` to a concrete layout ID
+- `keyrgb/core/resources/layout_specs.json` uses inherited specs instead of fully duplicated layouts
+- `keyrgb/core/resources/reference_defaults_specs.json` already follows the same inherited model for starter defaults
 
 The per-key editor and calibrator already persist some layout-specific UI data:
 
-- `src/core/config/layout_slots.py`
-- `src/core/profile/profiles.py`
-- `src/gui/perkey/editor.py`
+- `keyrgb/core/config/layout_slots.py`
+- `keyrgb/core/profile/profiles.py`
+- `keyrgb/gui/perkey/editor.py`
 
 That current `layout_slot_overrides` layer already proves two useful things:
 
@@ -71,7 +71,7 @@ values as the stable identity.
 Examples:
 
 - layout specs define visible keys with IDs like `q`, `w`, `a`, `z`
-- reactive input maps evdev names directly onto those IDs in `src/core/effects/reactive/input.py`
+- reactive input maps evdev names directly onto those IDs in `keyrgb/core/effects/reactive/input.py`
 - keymaps persist logical key IDs against those overlay IDs
 
 This creates a conceptual mismatch:
@@ -276,7 +276,7 @@ Goal:
 
 Recommended steps:
 
-1. Create a `src/core/resources/legends/` package parallel to `layouts/`.
+1. Create a `keyrgb/core/resources/legends/` package parallel to `layouts/`.
 2. Add a small built-in legend pack catalogue.
 3. Resolve legends by:
    - physical layout family
@@ -347,20 +347,20 @@ The migration should preserve these guarantees:
 
 Current owner files likely involved in the migration:
 
-- `src/core/resources/layout.py`
-- `src/core/resources/layout_specs.json`
-- `src/core/resources/layouts/_api.py`
-- `src/core/resources/layout_slots.py`
-- `src/core/config/layout_slots.py`
-- `src/core/profile/profiles.py`
-- `src/gui/perkey/editor.py`
-- `src/gui/calibrator/app.py`
-- `src/core/effects/reactive/input.py`
+- `keyrgb/core/resources/layout.py`
+- `keyrgb/core/resources/layout_specs.json`
+- `keyrgb/core/resources/layouts/_api.py`
+- `keyrgb/core/resources/layout_slots.py`
+- `keyrgb/core/config/layout_slots.py`
+- `keyrgb/core/profile/profiles.py`
+- `keyrgb/gui/perkey/editor.py`
+- `keyrgb/gui/calibrator/app.py`
+- `keyrgb/core/effects/reactive/input.py`
 
 Likely new owner areas:
 
-- `src/core/resources/legends/`
-- a slot identity or slot binding helper near `src/core/resources/layouts/`
+- `keyrgb/core/resources/legends/`
+- a slot identity or slot binding helper near `keyrgb/core/resources/layouts/`
 
 ## Non-goals
 

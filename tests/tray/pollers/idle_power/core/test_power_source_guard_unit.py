@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.tray.pollers.idle_power._power_source_guard import (
+from keyrgb.tray.pollers.idle_power._power_source_guard import (
     plan_power_source_guard_update,
     power_source_idle_guard_active,
 )

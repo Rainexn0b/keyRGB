@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.gui.perkey.ui import selection as ui_sel
+from keyrgb.gui.perkey.ui import selection as ui_sel
 
 
 def test_lookup_helpers_handle_missing_attrs() -> None:

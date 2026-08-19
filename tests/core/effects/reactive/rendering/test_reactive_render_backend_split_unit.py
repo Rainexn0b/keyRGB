@@ -47,7 +47,7 @@ class _DummyUniformKB:
 
 
 def test_per_key_reactive_pulse_keeps_hw_at_profile_brightness() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -71,8 +71,8 @@ def test_per_key_reactive_pulse_keeps_hw_at_profile_brightness() -> None:
 
 
 def test_per_key_reactive_frame_fans_out_average_color_to_enabled_secondaries(monkeypatch) -> None:
-    from src.core.effects.reactive import _render_runtime
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive import _render_runtime
+    from keyrgb.core.effects.reactive.render import render
 
     secondary_frames: list[tuple[tuple[int, int, int], int]] = []
     monkeypatch.setattr(
@@ -100,7 +100,7 @@ def test_per_key_reactive_frame_fans_out_average_color_to_enabled_secondaries(mo
 
 
 def test_per_key_reactive_pulse_first_frame_initializes_mode_at_profile_brightness() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -125,7 +125,7 @@ def test_per_key_reactive_pulse_first_frame_initializes_mode_at_profile_brightne
 
 
 def test_per_key_reactive_reassert_policy_reinitializes_each_frame() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB(per_key_mode_policy="reassert_every_frame")
     engine = SimpleNamespace(
@@ -151,7 +151,7 @@ def test_per_key_reactive_reassert_policy_reinitializes_each_frame() -> None:
 
 
 def test_per_key_reactive_init_once_policy_skips_duplicate_idle_frame() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB(per_key_mode_policy="init_once")
     engine = SimpleNamespace(
@@ -181,7 +181,7 @@ def test_per_key_reactive_init_once_policy_skips_duplicate_idle_frame() -> None:
 
 
 def test_per_key_reactive_reassert_policy_skips_duplicate_idle_frame() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB(per_key_mode_policy="reassert_every_frame")
     engine = SimpleNamespace(
@@ -208,7 +208,7 @@ def test_per_key_reactive_reassert_policy_skips_duplicate_idle_frame() -> None:
 
 
 def test_per_key_reactive_duplicate_frame_cache_keeps_animating_changed_frames() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB(per_key_mode_policy="reassert_every_frame")
     engine = SimpleNamespace(
@@ -238,7 +238,7 @@ def test_per_key_reactive_duplicate_frame_cache_keeps_animating_changed_frames()
 
 
 def test_uniform_reactive_pulse_can_still_lift_hw_brightness() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyUniformKB()
     engine = SimpleNamespace(
@@ -265,7 +265,7 @@ def test_uniform_reactive_pulse_can_still_lift_hw_brightness() -> None:
 
 
 def test_uniform_reactive_pulse_returns_directly_to_idle_brightness() -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyUniformKB()
     engine = SimpleNamespace(
@@ -289,7 +289,7 @@ def test_uniform_reactive_pulse_returns_directly_to_idle_brightness() -> None:
 
 
 def test_per_key_restore_transition_scales_frame_between_hw_steps(monkeypatch) -> None:
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     kb = _DummyKB()
     engine = SimpleNamespace(
@@ -310,7 +310,7 @@ def test_per_key_restore_transition_scales_frame_between_hw_steps(monkeypatch) -
         _last_hw_mode_brightness=1,
     )
 
-    monkeypatch.setattr("src.core.effects.reactive._render_brightness.time.monotonic", lambda: 100.35)
+    monkeypatch.setattr("keyrgb.core.effects.reactive._render_brightness.time.monotonic", lambda: 100.35)
 
     render(engine, color_map={(0, 0): (100, 50, 25)})
 

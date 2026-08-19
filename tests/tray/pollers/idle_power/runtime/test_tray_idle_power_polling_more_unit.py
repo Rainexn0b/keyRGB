@@ -34,8 +34,8 @@ def _idle_tray(**fields: Any) -> SimpleNamespace:
 
 
 def test_ensure_idle_state_sets_defaults() -> None:
-    from src.tray.idle_power_state import TrayIdlePowerState
-    from src.tray.pollers.idle_power.polling import _ensure_idle_state
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.pollers.idle_power.polling import _ensure_idle_state
 
     tray = SimpleNamespace()
     _ensure_idle_state(tray)
@@ -49,7 +49,7 @@ def test_ensure_idle_state_sets_defaults() -> None:
 
 
 def test_ensure_idle_state_syncs_existing_legacy_values_into_state_owner() -> None:
-    from src.tray.pollers.idle_power.polling import _ensure_idle_state
+    from keyrgb.tray.pollers.idle_power.polling import _ensure_idle_state
 
     tray = SimpleNamespace(
         _idle_forced_off=True,
@@ -83,9 +83,9 @@ def test_backlight_state_baselines_persist_across_ensure_idle_state(tmp_path) ->
     iteration would copy empty dicts back into state, clobbering baselines and
     causing dim/undim oscillation (visible as keyboard flickering).
     """
-    import src.tray.pollers.idle_power.polling as ipp
-    from src.tray.pollers.idle_power._runtime import IdlePollLoopState, run_idle_power_iteration
-    from src.tray.pollers.idle_power.sensors import read_dimmed_state
+    import keyrgb.tray.pollers.idle_power.polling as ipp
+    from keyrgb.tray.pollers.idle_power._runtime import IdlePollLoopState, run_idle_power_iteration
+    from keyrgb.tray.pollers.idle_power.sensors import read_dimmed_state
 
     backlight = tmp_path / "sys" / "class" / "backlight" / "intel_backlight"
     backlight.mkdir(parents=True, exist_ok=True)
@@ -183,7 +183,7 @@ def test_backlight_state_baselines_persist_across_ensure_idle_state(tmp_path) ->
 
 
 def test_read_logind_idle_seconds_parsing_and_monotonic(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     # Active idle: now_us(2_000_000) - idle_since_us(1_000_000) = 1s
     monkeypatch.setattr(ipp.time, "monotonic", lambda: 2.0)
@@ -226,7 +226,7 @@ def test_read_logind_idle_seconds_parsing_and_monotonic(monkeypatch) -> None:
 
 
 def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     calls = {"start": 0, "refresh": 0, "log": 0}
 
@@ -261,8 +261,8 @@ def test_restore_from_idle_best_effort_and_log_swallow(monkeypatch) -> None:
 
 
 def test_restore_from_idle_records_resume_timestamp(monkeypatch) -> None:
-    import src.tray.pollers.idle_power._actions as actions_module
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power._actions as actions_module
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     monkeypatch.setattr(actions_module.time, "monotonic", lambda: 123.0)
 
@@ -275,8 +275,8 @@ def test_restore_from_idle_records_resume_timestamp(monkeypatch) -> None:
 
 
 def test_restore_from_idle_syncs_owner_state_fields(monkeypatch) -> None:
-    import src.tray.pollers.idle_power._actions as actions_module
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power._actions as actions_module
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     monkeypatch.setattr(actions_module.time, "monotonic", lambda: 456.0)
 
@@ -291,7 +291,7 @@ def test_restore_from_idle_syncs_owner_state_fields(monkeypatch) -> None:
 
 
 def test_restore_from_idle_refreshes_icon_without_animation_when_supported() -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     calls: dict[str, object] = {"animate_icon": None}
 
@@ -310,8 +310,8 @@ def test_restore_from_idle_refreshes_icon_without_animation_when_supported() -> 
 
 
 def test_restore_from_idle_loop_effect_uses_soft_on_start() -> None:
-    import src.tray.pollers.idle_power.polling as ipp
-    from src.tray.controllers._power._transition_constants import SOFT_ON_START_BRIGHTNESS
+    import keyrgb.tray.pollers.idle_power.polling as ipp
+    from keyrgb.tray.controllers._power._transition_constants import SOFT_ON_START_BRIGHTNESS
 
     received: dict[str, object] = {}
 
@@ -333,11 +333,11 @@ def test_restore_from_idle_loop_effect_uses_soft_on_start() -> None:
 def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
     monkeypatch,
 ) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
-    from src.core.effects.reactive import _render_brightness_support as reactive_support
-    from src.tray.controllers._power._transition_constants import DEFAULT_IDLE_FADE_DURATION_S
+    import keyrgb.tray.pollers.idle_power.polling as ipp
+    from keyrgb.core.effects.reactive import _render_brightness_support as reactive_support
+    from keyrgb.tray.controllers._power._transition_constants import DEFAULT_IDLE_FADE_DURATION_S
 
-    monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
 
     tray = _idle_tray(
         last_resume_at=0.0,
@@ -364,8 +364,8 @@ def test_restore_from_idle_reactive_effect_seeds_restore_timers_after_restart(
 
 
 def test_restore_from_idle_non_loop_effect_uses_soft_on_start() -> None:
-    import src.tray.controllers._power._transition_constants as transition_constants
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.controllers._power._transition_constants as transition_constants
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     received: dict[str, object] = {}
 
@@ -385,8 +385,8 @@ def test_restore_from_idle_non_loop_effect_uses_soft_on_start() -> None:
 
 
 def test_restore_from_idle_logs_tray_logger_failure_with_fallback(monkeypatch) -> None:
-    import src.tray.pollers.idle_power._actions as actions_module
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power._actions as actions_module
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     logs: list[tuple[str, str, BaseException | None]] = []
 
@@ -417,7 +417,7 @@ def test_restore_from_idle_logs_tray_logger_failure_with_fallback(monkeypatch) -
 
 
 def test_restore_from_idle_propagates_unexpected_tray_logger_failure() -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     tray = _idle_tray(
         _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("restore failed")),
@@ -429,7 +429,7 @@ def test_restore_from_idle_propagates_unexpected_tray_logger_failure() -> None:
 
 
 def test_restore_from_idle_propagates_unexpected_restore_errors() -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     tray = _idle_tray(
         _start_current_effect=lambda **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected restore bug")),
@@ -442,7 +442,7 @@ def test_restore_from_idle_propagates_unexpected_restore_errors() -> None:
 def test_apply_idle_action_dim_to_temp_respects_is_off_and_sw_effect(
     monkeypatch,
 ) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     engine_calls = {"n": 0, "apply_to_hardware": None}
 
@@ -491,7 +491,7 @@ def test_apply_idle_action_dim_to_temp_respects_is_off_and_sw_effect(
 
 
 def test_apply_idle_action_restore_branch_gated_by_forced_off(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     called = {"n": 0}
 
@@ -519,7 +519,7 @@ def test_apply_idle_action_restore_branch_gated_by_forced_off(monkeypatch) -> No
 
 
 def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     created = {}
     input_tracker = SimpleNamespace(closed=False)
@@ -593,7 +593,7 @@ def test_start_idle_power_polling_thread_wiring_and_one_iteration(monkeypatch) -
 
 
 def test_start_idle_power_polling_suppresses_dim_sync_for_asusctl_backend(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     created = {}
 
@@ -650,7 +650,7 @@ def test_start_idle_power_polling_suppresses_dim_sync_for_asusctl_backend(monkey
 
 
 def test_start_idle_power_polling_allows_dim_sync_for_asusctl_with_env_override(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     monkeypatch.setenv("KEYRGB_ALLOW_DIM_SYNC_ASUSCTL", "1")
 
@@ -706,7 +706,7 @@ def test_start_idle_power_polling_allows_dim_sync_for_asusctl_with_env_override(
 
 
 def test_effective_screen_dim_sync_enabled_logs_event_failures(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     logged: list[tuple[str, Exception]] = []
 
@@ -726,7 +726,7 @@ def test_effective_screen_dim_sync_enabled_logs_event_failures(monkeypatch) -> N
 
 
 def test_effective_screen_dim_sync_enabled_propagates_unexpected_event_failures() -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     tray = SimpleNamespace(
         backend=SimpleNamespace(name="asusctl-aura"),
@@ -740,7 +740,7 @@ def test_effective_screen_dim_sync_enabled_propagates_unexpected_event_failures(
 
 
 def test_start_idle_power_polling_logs_loop_errors_with_module_fallback(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     created = {}
     module_logs: list[tuple[str, Exception]] = []
@@ -792,7 +792,7 @@ def test_start_idle_power_polling_logs_loop_errors_with_module_fallback(monkeypa
 
 
 def test_start_idle_power_polling_propagates_unexpected_logger_failures(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     created = {}
     run_calls = {"count": 0}
@@ -831,7 +831,7 @@ def test_start_idle_power_polling_propagates_unexpected_logger_failures(monkeypa
 
 
 def test_start_idle_power_polling_propagates_unexpected_loop_errors(monkeypatch) -> None:
-    import src.tray.pollers.idle_power.polling as ipp
+    import keyrgb.tray.pollers.idle_power.polling as ipp
 
     created = {}
     run_calls = {"count": 0}

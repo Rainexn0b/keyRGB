@@ -8,10 +8,10 @@ from .models import HygieneIssue
 _SOURCE_PARSE_ERRORS = (OSError, SyntaxError, ValueError)
 
 _RUNTIME_COPY_WATCH_PATHS = [
-    "src/core/effects/",
-    "src/tray/controllers/",
-    "src/tray/pollers/",
-    "src/tray/ui/",
+    "keyrgb/core/effects/",
+    "keyrgb/tray/controllers/",
+    "keyrgb/tray/pollers/",
+    "keyrgb/tray/ui/",
 ]
 
 _RUNTIME_COPY_FUNCTION_PREFIXES = (
@@ -48,15 +48,15 @@ _RUNTIME_COPY_SOURCE_TOKENS = (
 )
 
 _RUNTIME_COPY_IGNORE_SNIPPETS: dict[str, set[str]] = {
-    "src/core/effects/reactive/render.py": {
+    "keyrgb/core/effects/reactive/render.py": {
         "dict(color_map)",
         "color_map",
     },
-    "src/tray/pollers/config_polling_internal/helpers.py": {
+    "keyrgb/tray/pollers/config_polling_internal/helpers.py": {
         "dict(configured_map)",
         "configured_map",
     },
-    "src/tray/ui/icon_draw.py": {
+    "keyrgb/tray/ui/icon_draw.py": {
         "_rainbow_gradient_64(phase_q).copy()",
         "underlay.copy()",
         "underlay",

@@ -5,8 +5,8 @@ These tests exercise the complete idle-power action path with real policy and
 action functions, verifying that brightness stays bounded during transitions.
 """
 
-from src.tray.pollers.idle_power.policy import compute_idle_action
-from src.tray.pollers.idle_power.sensors import BacklightState
+from keyrgb.tray.pollers.idle_power.policy import compute_idle_action
+from keyrgb.tray.pollers.idle_power.sensors import BacklightState
 
 
 class TestDimTempRestorePolicyCycle:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.gui.perkey.canvas_impl.canvas_hit_testing import (
+from keyrgb.gui.perkey.canvas_impl.canvas_hit_testing import (
     cursor_for_edges,
     point_in_bbox,
     point_near_bbox,

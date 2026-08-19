@@ -12,12 +12,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.config._settings_view import ConfigSettingsView
-from src.core.power.system import PowerMode
+from keyrgb.core.config._settings_view import ConfigSettingsView
+from keyrgb.core.power.system import PowerMode
 
 
 def _make_config(tmp_path, monkeypatch):
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setenv("KEYRGB_CONFIG_PATH", str(tmp_path / "cfg" / "config.json"))
@@ -45,14 +45,14 @@ def test_experimental_backends_enabled_persists(tmp_path, monkeypatch) -> None:
 
     cfg.experimental_backends_enabled = True
 
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg2 = Config()
     assert cfg2.experimental_backends_enabled is True
 
 
 def test_system_power_extreme_cap_khz_persists_and_clamps(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
     assert cfg.system_power_extreme_cap_khz == 800000
@@ -117,7 +117,7 @@ def test_brightness_property_uses_rendered_perkey_state_for_saved_base_map(tmp_p
 
 
 def test_reload_skips_disk_load_when_mtime_is_unchanged(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
     cfg._last_reload_mtime_ns = 123
@@ -132,7 +132,7 @@ def test_reload_skips_disk_load_when_mtime_is_unchanged(tmp_path, monkeypatch) -
 
 
 def test_reload_replaces_settings_when_file_mtime_changes(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
     cfg._settings["effect"] = "rainbow"
@@ -188,7 +188,7 @@ def test_reactive_and_optional_brightness_getters_fall_back_safely(tmp_path, mon
 
 
 def test_ac_battery_perkey_profile_props_persist_and_normalize(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -285,7 +285,7 @@ def test_physical_layout_enum_prop(tmp_path, monkeypatch) -> None:
 
 
 def test_layout_legend_pack_persists_and_normalizes(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -302,7 +302,7 @@ def test_layout_legend_pack_persists_and_normalizes(tmp_path, monkeypatch) -> No
 
 
 def test_tray_device_context_persists_and_normalizes(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -319,7 +319,7 @@ def test_tray_device_context_persists_and_normalizes(tmp_path, monkeypatch) -> N
 
 
 def test_lightbar_color_and_brightness_persist_independently(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -338,7 +338,7 @@ def test_lightbar_color_and_brightness_persist_independently(tmp_path, monkeypat
 
 
 def test_secondary_device_state_persists_for_generic_aux_routes(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -383,7 +383,7 @@ def test_secondary_device_color_uses_default_fallback_keys_in_order(tmp_path, mo
 
 
 def test_software_effect_target_persists_and_normalizes(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
 
@@ -539,7 +539,7 @@ def test_effect_speed_snapshot_is_public_detached_copy(tmp_path, monkeypatch) ->
 
 
 def test_set_effect_speed_persists_to_disk(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg = _make_config(tmp_path, monkeypatch)
     cfg.set_effect_speed("fire", 8)
@@ -592,7 +592,7 @@ def test_set_effect_speed_raises_type_error_for_non_string_effect_name(tmp_path,
 
 
 def test_set_effect_speed_raises_and_rolls_back_on_io_failures(tmp_path, monkeypatch, caplog) -> None:
-    from src.core.config import ConfigPersistenceError, file_storage
+    from keyrgb.core.config import ConfigPersistenceError, file_storage
 
     cfg = _make_config(tmp_path, monkeypatch)
     original_speeds = dict(cfg._settings.get("effect_speeds") or {})
@@ -600,7 +600,7 @@ def test_set_effect_speed_raises_and_rolls_back_on_io_failures(tmp_path, monkeyp
     monkeypatch.setattr(file_storage.os, "replace", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("boom")))
 
     with (
-        caplog.at_level(logging.WARNING, logger="src.core.config.config"),
+        caplog.at_level(logging.WARNING, logger="keyrgb.core.config.config"),
         pytest.raises(ConfigPersistenceError, match="Could not persist configuration"),
     ):
         cfg.set_effect_speed("wave", 7)
@@ -637,7 +637,7 @@ def test_lightbar_color_falls_back_and_logs_when_defaults_lookup_raises(tmp_path
     cfg.DEFAULTS = BrokenDefaults()
     cfg._settings["lightbar_color"] = None
 
-    with caplog.at_level(logging.ERROR, logger="src.core.config.config"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.config.config"):
         assert cfg.lightbar_color == (255, 0, 0)
 
     records = [
@@ -662,7 +662,7 @@ def test_lightbar_color_propagates_unexpected_defaults_lookup_failures(tmp_path,
 
 
 def test_stale_config_instances_merge_unrelated_updates(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     first = Config()
@@ -677,7 +677,7 @@ def test_stale_config_instances_merge_unrelated_updates(tmp_path, monkeypatch) -
 
 
 def test_batch_update_persists_once(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config, file_storage
+    from keyrgb.core.config import Config, file_storage
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     config = Config()
@@ -703,7 +703,7 @@ def test_batch_update_persists_once(tmp_path, monkeypatch) -> None:
 
 
 def test_batch_update_rolls_back_when_persistence_fails(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config, ConfigPersistenceError, file_storage
+    from keyrgb.core.config import Config, ConfigPersistenceError, file_storage
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     config = Config()
@@ -720,7 +720,7 @@ def test_batch_update_rolls_back_when_persistence_fails(tmp_path, monkeypatch) -
 
 
 def test_ordinary_setter_raises_and_rolls_back_when_persistence_fails(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config, ConfigPersistenceError, file_storage
+    from keyrgb.core.config import Config, ConfigPersistenceError, file_storage
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     config = Config()
@@ -737,7 +737,7 @@ def test_ordinary_setter_raises_and_rolls_back_when_persistence_fails(tmp_path, 
 
 
 def test_apply_perkey_profile_state_raises_when_persistence_fails(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config, ConfigPersistenceError, file_storage
+    from keyrgb.core.config import Config, ConfigPersistenceError, file_storage
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     config = Config()

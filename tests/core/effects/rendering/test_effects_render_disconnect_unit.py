@@ -7,8 +7,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.effects.reactive import render as reactive_render
-from src.core.effects.software import base as sw_base
+from keyrgb.core.effects.reactive import render as reactive_render
+from keyrgb.core.effects.software import base as sw_base
 
 
 class Errno19(OSError):

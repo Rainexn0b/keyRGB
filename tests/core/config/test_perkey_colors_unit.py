@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.config.perkey_colors import deserialize_per_key_colors, serialize_per_key_colors
+from keyrgb.core.config.perkey_colors import deserialize_per_key_colors, serialize_per_key_colors
 
 
 class _BrokenInt:

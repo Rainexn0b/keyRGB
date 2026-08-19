@@ -20,7 +20,7 @@ def test_load_architecture_rules_parses_flags_and_corpus(tmp_path) -> None:
                         "description": "Demo",
                         "severity": "warning",
                         "corpus": {
-                            "include": ["src/**/*.py"],
+                            "include": ["keyrgb/**/*.py"],
                             "exclude": ["tests/**/*.py"],
                         },
                         "patterns": [
@@ -42,7 +42,7 @@ def test_load_architecture_rules_parses_flags_and_corpus(tmp_path) -> None:
     assert len(rules) == 1
     assert rules[0].rule_id == "demo-rule"
     assert rules[0].severity == "warning"
-    assert rules[0].include_globs == ("src/**/*.py",)
+    assert rules[0].include_globs == ("keyrgb/**/*.py",)
     assert rules[0].exclude_globs == ("tests/**/*.py",)
     assert rules[0].patterns[0].compiled.flags & re.MULTILINE
     assert rules[0].patterns[0].compiled.flags & re.IGNORECASE
@@ -60,11 +60,11 @@ def test_load_architecture_rules_parses_import_rules(tmp_path) -> None:
                         "description": "GUI logic bleed",
                         "severity": "warning",
                         "corpus": {
-                            "include": ["src/gui/**/*.py"],
+                            "include": ["keyrgb/gui/**/*.py"],
                         },
                         "imports": [
                             {
-                                "module": "src.core.backends.registry",
+                                "module": "keyrgb.core.backends.registry",
                                 "message": "GUI should not import backend selection directly",
                             }
                         ],
@@ -80,7 +80,7 @@ def test_load_architecture_rules_parses_import_rules(tmp_path) -> None:
     assert len(rules) == 1
     assert rules[0].patterns == ()
     assert len(rules[0].imports) == 1
-    assert rules[0].imports[0].module == "src.core.backends.registry"
+    assert rules[0].imports[0].module == "keyrgb.core.backends.registry"
     assert rules[0].imports[0].message == "GUI should not import backend selection directly"
     assert rules[0].attributes == ()
 
@@ -96,7 +96,7 @@ def test_load_architecture_rules_parses_attribute_rules(tmp_path) -> None:
                         "description": "Tray UI private hook bleed",
                         "severity": "warning",
                         "corpus": {
-                            "include": ["src/tray/ui/**/*.py"],
+                            "include": ["keyrgb/tray/ui/**/*.py"],
                         },
                         "attributes": [
                             {
@@ -123,15 +123,15 @@ def test_load_architecture_rules_parses_attribute_rules(tmp_path) -> None:
 
 def test_scan_architecture_reports_matches_and_respects_excludes(tmp_path) -> None:
     root = tmp_path / "repo"
-    (root / "src/core").mkdir(parents=True)
+    (root / "keyrgb/core").mkdir(parents=True)
     (root / "tests").mkdir(parents=True)
 
-    (root / "src/core/bad.py").write_text(
-        "from src.tray.app.application import App\n",
+    (root / "keyrgb/core/bad.py").write_text(
+        "from keyrgb.tray.app.application import App\n",
         encoding="utf-8",
     )
     (root / "tests/ignored.py").write_text(
-        "from src.tray.app.application import App\n",
+        "from keyrgb.tray.app.application import App\n",
         encoding="utf-8",
     )
 
@@ -145,12 +145,12 @@ def test_scan_architecture_reports_matches_and_respects_excludes(tmp_path) -> No
                         "description": "Core boundary",
                         "severity": "error",
                         "corpus": {
-                            "include": ["src/**/*.py"],
+                            "include": ["keyrgb/**/*.py"],
                             "exclude": ["tests/**"],
                         },
                         "patterns": [
                             {
-                                "regex": "^\\s*(?:from|import)\\s+src\\.tray\\b",
+                                "regex": "^\\s*(?:from|import)\\s+keyrgb\\.tray\\b",
                                 "flags": "m",
                                 "message": "No tray import",
                             }
@@ -168,21 +168,21 @@ def test_scan_architecture_reports_matches_and_respects_excludes(tmp_path) -> No
     assert result.rules_checked == 1
     assert result.scanned_files == 1
     assert len(result.findings) == 1
-    assert result.findings[0].path == "src/core/bad.py"
+    assert result.findings[0].path == "keyrgb/core/bad.py"
     assert result.findings[0].line == 1
     assert result.findings[0].rule_id == "core-boundary"
 
 
 def test_scan_architecture_reports_import_rule_matches_and_respects_excludes(tmp_path) -> None:
     root = tmp_path / "repo"
-    (root / "src/gui/windows").mkdir(parents=True)
+    (root / "keyrgb/gui/windows").mkdir(parents=True)
 
-    (root / "src/gui/windows/uniform.py").write_text(
-        "from src.core.backends.registry import select_backend\n",
+    (root / "keyrgb/gui/windows/uniform.py").write_text(
+        "from keyrgb.core.backends.registry import select_backend\n",
         encoding="utf-8",
     )
-    (root / "src/gui/windows/_runtime.py").write_text(
-        "from src.core.backends.registry import select_backend\n",
+    (root / "keyrgb/gui/windows/_runtime.py").write_text(
+        "from keyrgb.core.backends.registry import select_backend\n",
         encoding="utf-8",
     )
 
@@ -196,12 +196,12 @@ def test_scan_architecture_reports_import_rule_matches_and_respects_excludes(tmp
                         "description": "GUI windows should not import backend selection directly.",
                         "severity": "warning",
                         "corpus": {
-                            "include": ["src/gui/windows/**/*.py"],
-                            "exclude": ["src/gui/windows/_*.py"],
+                            "include": ["keyrgb/gui/windows/**/*.py"],
+                            "exclude": ["keyrgb/gui/windows/_*.py"],
                         },
                         "imports": [
                             {
-                                "module": "src.core.backends.registry",
+                                "module": "keyrgb.core.backends.registry",
                                 "message": "GUI window modules should not import backend selection directly.",
                             }
                         ],
@@ -218,17 +218,17 @@ def test_scan_architecture_reports_import_rule_matches_and_respects_excludes(tmp
     assert result.rules_checked == 1
     assert result.scanned_files == 1
     assert len(result.findings) == 1
-    assert result.findings[0].path == "src/gui/windows/uniform.py"
+    assert result.findings[0].path == "keyrgb/gui/windows/uniform.py"
     assert result.findings[0].line == 1
     assert result.findings[0].rule_id == "gui-window-no-direct-backend-selection"
-    assert result.findings[0].regex == "import:src.core.backends.registry"
+    assert result.findings[0].regex == "import:keyrgb.core.backends.registry"
 
 
 def test_scan_architecture_matches_importfrom_submodule_extensions(tmp_path) -> None:
     root = tmp_path / "repo"
-    (root / "src/tray/ui").mkdir(parents=True)
-    (root / "src/tray/ui/menu_status.py").write_text(
-        "from src.core.profile import profiles\n",
+    (root / "keyrgb/tray/ui").mkdir(parents=True)
+    (root / "keyrgb/tray/ui/menu_status.py").write_text(
+        "from keyrgb.core.profile import profiles\n",
         encoding="utf-8",
     )
 
@@ -242,11 +242,11 @@ def test_scan_architecture_matches_importfrom_submodule_extensions(tmp_path) -> 
                         "description": "Tray UI should not import profile storage directly.",
                         "severity": "warning",
                         "corpus": {
-                            "include": ["src/tray/ui/**/*.py"],
+                            "include": ["keyrgb/tray/ui/**/*.py"],
                         },
                         "imports": [
                             {
-                                "module": "src.core.profile.profiles",
+                                "module": "keyrgb.core.profile.profiles",
                                 "message": "Tray UI should not import core profile storage directly.",
                             }
                         ],
@@ -261,15 +261,15 @@ def test_scan_architecture_matches_importfrom_submodule_extensions(tmp_path) -> 
     result = scan_architecture(root, rules)
 
     assert len(result.findings) == 1
-    assert result.findings[0].path == "src/tray/ui/menu_status.py"
+    assert result.findings[0].path == "keyrgb/tray/ui/menu_status.py"
     assert result.findings[0].line == 1
-    assert result.findings[0].regex == "import:src.core.profile.profiles"
+    assert result.findings[0].regex == "import:keyrgb.core.profile.profiles"
 
 
 def test_scan_architecture_reports_attribute_rule_matches(tmp_path) -> None:
     root = tmp_path / "repo"
-    (root / "src/tray/ui").mkdir(parents=True)
-    (root / "src/tray/ui/menu_sections.py").write_text(
+    (root / "keyrgb/tray/ui").mkdir(parents=True)
+    (root / "keyrgb/tray/ui/menu_sections.py").write_text(
         "def update(tray):\n    tray._update_menu()\n    tray._system_power_last_ok = False\n",
         encoding="utf-8",
     )
@@ -284,7 +284,7 @@ def test_scan_architecture_reports_attribute_rule_matches(tmp_path) -> None:
                         "description": "Tray UI private hook bleed",
                         "severity": "warning",
                         "corpus": {
-                            "include": ["src/tray/ui/**/*.py"],
+                            "include": ["keyrgb/tray/ui/**/*.py"],
                         },
                         "attributes": [
                             {
@@ -316,8 +316,8 @@ def test_scan_architecture_reports_attribute_rule_matches(tmp_path) -> None:
 
 def test_scan_architecture_attribute_rules_ignore_private_method_definitions(tmp_path) -> None:
     root = tmp_path / "repo"
-    (root / "src/tray/ui").mkdir(parents=True)
-    (root / "src/tray/ui/protocols.py").write_text(
+    (root / "keyrgb/tray/ui").mkdir(parents=True)
+    (root / "keyrgb/tray/ui/protocols.py").write_text(
         "class Demo:\n    def _update_menu(self):\n        return None\n",
         encoding="utf-8",
     )
@@ -332,7 +332,7 @@ def test_scan_architecture_attribute_rules_ignore_private_method_definitions(tmp
                         "description": "Tray UI private hook bleed",
                         "severity": "warning",
                         "corpus": {
-                            "include": ["src/tray/ui/**/*.py"],
+                            "include": ["keyrgb/tray/ui/**/*.py"],
                         },
                         "attributes": [
                             {
@@ -354,9 +354,9 @@ def test_scan_architecture_attribute_rules_ignore_private_method_definitions(tmp
 
 
 def test_architecture_validation_runner_fails_on_warning_findings(monkeypatch, tmp_path) -> None:
-    (tmp_path / "src/tray/ui").mkdir(parents=True)
-    (tmp_path / "src/tray/ui/menu.py").write_text(
-        "from src.core.backends.registry import select_backend\n",
+    (tmp_path / "keyrgb/tray/ui").mkdir(parents=True)
+    (tmp_path / "keyrgb/tray/ui/menu.py").write_text(
+        "from keyrgb.core.backends.registry import select_backend\n",
         encoding="utf-8",
     )
     (tmp_path / "buildpython/config").mkdir(parents=True)
@@ -368,10 +368,10 @@ def test_architecture_validation_runner_fails_on_warning_findings(monkeypatch, t
                         "id": "tray-ui-no-backend-selection",
                         "description": "demo",
                         "severity": "warning",
-                        "corpus": {"include": ["src/tray/ui/**/*.py"]},
+                        "corpus": {"include": ["keyrgb/tray/ui/**/*.py"]},
                         "patterns": [
                             {
-                                "regex": "^\\s*(?:from|import)\\s+src\\.core\\.backends\\.registry\\b",
+                                "regex": "^\\s*(?:from|import)\\s+keyrgb\\.core\\.backends\\.registry\\b",
                                 "flags": "m",
                                 "message": "no registry",
                             }

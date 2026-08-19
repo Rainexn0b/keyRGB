@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.tray import secondary_device_power
+from keyrgb.tray import secondary_device_power
 
 
 def _route(**overrides: object) -> SimpleNamespace:

@@ -46,7 +46,7 @@ def example():
     except Exception:  # @quality-exception exception-transparency: shutdown cleanup boundary
         pass
 """.strip(),
-        rel_path="src/example.py",
+        rel_path="keyrgb/example.py",
     )
 
     assert findings == []
@@ -62,7 +62,7 @@ def example():
     except Exception:
         pass
 """.strip(),
-        rel_path="src/example.py",
+        rel_path="keyrgb/example.py",
     )
 
     counts: dict[str, int] = {}
@@ -82,7 +82,7 @@ def example():
     except Exception:  # @quality-exception coverage: tracked by another step
         pass
 """.strip(),
-        rel_path="src/example.py",
+        rel_path="keyrgb/example.py",
     )
 
     counts: dict[str, int] = {}
@@ -102,7 +102,7 @@ def example():
     except Exception:  # @quality-exception exception-transparency
         pass
 """.strip(),
-        rel_path="src/example.py",
+        rel_path="keyrgb/example.py",
     )
 
     counts: dict[str, int] = {}
@@ -116,7 +116,7 @@ def example():
 def test_exception_transparency_scan_classifies_broad_handlers_without_waivers() -> None:
     findings = _scan_python_source(
         """
-from src.core.utils.logging_utils import log_throttled
+from keyrgb.core.utils.logging_utils import log_throttled
 
 def example(logger):
     try:
@@ -144,7 +144,7 @@ def example(logger):
     except BaseException:
         return None
 """.strip(),
-        rel_path="src/example.py",
+        rel_path="keyrgb/example.py",
     )
 
     counts: dict[str, int] = {}
@@ -176,7 +176,7 @@ def example():
     except BROAD_ERRORS:
         pass
 """.strip(),
-        rel_path="src/example.py",
+        rel_path="keyrgb/example.py",
     )
 
     counts = Counter(finding.category for finding in findings)
@@ -192,7 +192,7 @@ def example():
     except BaseException:  # @quality-exception exception-transparency: finalizer boundary
         pass
 """.strip(),
-        rel_path="src/example.py",
+        rel_path="keyrgb/example.py",
     )
 
     assert [finding.category for finding in findings] == ["baseexception_catch"]
@@ -204,14 +204,14 @@ def test_exception_transparency_scan_skips_unparseable_source() -> None:
 def broken(:
     pass
 """.strip(),
-        rel_path="src/example.py",
+        rel_path="keyrgb/example.py",
     )
 
     assert findings == []
 
 
 def test_exception_transparency_collect_findings_skips_unreadable_files(tmp_path, monkeypatch) -> None:
-    readable = tmp_path / "src" / "ok.py"
+    readable = tmp_path / "keyrgb" / "ok.py"
     unreadable = tmp_path / "buildpython" / "blocked.py"
     readable.parent.mkdir(parents=True)
     unreadable.parent.mkdir(parents=True)
@@ -243,7 +243,7 @@ def example():
 
 
 def test_exception_transparency_collect_annotation_inventory_groups_valid_tags_by_subtree(tmp_path) -> None:
-    tray_file = tmp_path / "src" / "tray" / "runtime.py"
+    tray_file = tmp_path / "keyrgb" / "tray" / "runtime.py"
     helper_file = tmp_path / "buildpython" / "core" / "helpers.py"
     tray_file.parent.mkdir(parents=True)
     helper_file.parent.mkdir(parents=True)
@@ -274,13 +274,13 @@ def ignored_helper():
     inventory = collect_annotation_inventory(tmp_path)
 
     assert inventory.total == 3
-    assert inventory.by_subtree == (("src/tray", 2), ("buildpython/core", 1))
+    assert inventory.by_subtree == (("keyrgb/tray", 2), ("buildpython/core", 1))
 
 
 def test_exception_transparency_reports_include_annotation_inventory(tmp_path) -> None:
     inventory = ExceptionTransparencyAnnotationInventory(
         total=3,
-        by_subtree=(("src/tray", 2), ("src/core", 1)),
+        by_subtree=(("keyrgb/tray", 2), ("keyrgb/core", 1)),
     )
 
     stdout_lines = build_stdout([], Counter(), 0, inventory)
@@ -294,33 +294,33 @@ def test_exception_transparency_reports_include_annotation_inventory(tmp_path) -
     assert payload["annotation_inventory"] == {
         "total": 3,
         "by_subtree": [
-            {"subtree": "src/tray", "count": 2},
-            {"subtree": "src/core", "count": 1},
+            {"subtree": "keyrgb/tray", "count": 2},
+            {"subtree": "keyrgb/core", "count": 1},
         ],
     }
     assert "## Runtime-Boundary Annotation Inventory" in report_md
-    assert "| src/tray | 2 |" in report_md
+    assert "| keyrgb/tray | 2 |" in report_md
 
 
 def test_path_budget_regressions_flag_specific_hotspots() -> None:
     issues = [
         HygieneIssue(
             category="silent_broad_except",
-            path="src/tray/app/application.py",
+            path="keyrgb/tray/app/application.py",
             line=1,
             message="msg",
             snippet="except Exception:",
         ),
         HygieneIssue(
             category="silent_broad_except",
-            path="src/tray/app/application.py",
+            path="keyrgb/tray/app/application.py",
             line=2,
             message="msg",
             snippet="except Exception:",
         ),
         HygieneIssue(
             category="fallback_broad_except",
-            path="src/core/config/config.py",
+            path="keyrgb/core/config/config.py",
             line=3,
             message="msg",
             snippet="except Exception:",
@@ -330,14 +330,14 @@ def test_path_budget_regressions_flag_specific_hotspots() -> None:
         counts={},
         gated_categories=set(),
         path_budgets={
-            "silent_broad_except": {"src/tray/app/application.py": 1},
-            "fallback_broad_except": {"src/core/config/config.py": 2},
+            "silent_broad_except": {"keyrgb/tray/app/application.py": 1},
+            "fallback_broad_except": {"keyrgb/core/config/config.py": 2},
         },
     )
 
     regressions = _path_budget_regressions(issues, baseline)
 
-    assert regressions == [("silent_broad_except", "src/tray/app/application.py", 2, 1)]
+    assert regressions == [("silent_broad_except", "keyrgb/tray/app/application.py", 2, 1)]
 
 
 def test_load_hygiene_baseline_returns_empty_on_invalid_json(tmp_path) -> None:
@@ -373,7 +373,7 @@ def test_code_hygiene_runner_uses_cleanup_hotspot_threshold_from_baseline(tmp_pa
     issues = [
         HygieneIssue(
             category="cleanup_hotspot",
-            path="src/example.py",
+            path="keyrgb/example.py",
             line=line,
             message="msg",
             snippet="# TODO",
@@ -415,7 +415,7 @@ def test_code_hygiene_runner_uses_gated_non_cleanup_baselines(tmp_path, monkeypa
     issues = [
         HygieneIssue(
             category="silent_broad_except",
-            path="src/example.py",
+            path="keyrgb/example.py",
             line=1,
             message="msg",
             snippet="except Exception:",
@@ -435,8 +435,8 @@ def test_code_hygiene_runner_uses_gated_non_cleanup_baselines(tmp_path, monkeypa
 
 def test_hygiene_detectors_ignore_missing_or_unparseable_sources(tmp_path) -> None:
     root = tmp_path
-    missing_file = root / "src" / "missing.py"
-    broken_file = root / "src" / "tray" / "ui" / "broken.py"
+    missing_file = root / "keyrgb" / "missing.py"
+    broken_file = root / "keyrgb" / "tray" / "ui" / "broken.py"
     broken_file.parent.mkdir(parents=True)
     broken_file.write_text("def broken(:\n    pass\n", encoding="utf-8")
 
@@ -502,7 +502,7 @@ def test_text_scanners_do_not_self_flag_cleanup_or_defensive_patterns() -> None:
 
 def test_any_type_hint_scanner_covers_all_src_including_gui_paths(tmp_path) -> None:
     root = tmp_path
-    gui_target = root / "src" / "gui" / "perkey" / "editor.py"
+    gui_target = root / "keyrgb" / "gui" / "perkey" / "editor.py"
     helper_target = root / "buildpython" / "helper.py"
     gui_target.parent.mkdir(parents=True)
     helper_target.parent.mkdir(parents=True)
@@ -520,12 +520,12 @@ def test_any_type_hint_scanner_covers_all_src_including_gui_paths(tmp_path) -> N
 
     assert [(issue.path, issue.line, issue.message) for issue in issues] == [
         (
-            "src/gui/perkey/editor.py",
+            "keyrgb/gui/perkey/editor.py",
             3,
             "Parameter typed as Any - consider Protocol or concrete type",
         ),
         (
-            "src/gui/perkey/editor.py",
+            "keyrgb/gui/perkey/editor.py",
             3,
             "Return typed as Any - consider Protocol or concrete type",
         ),
@@ -536,19 +536,19 @@ def test_any_type_hint_scanner_covers_all_src_including_gui_paths(tmp_path) -> N
 def test_build_coverage_report_tracks_prefixes_and_watch_files() -> None:
     payload = {
         "files": {
-            "src/core/config/config.py": {
+            "keyrgb/core/config/config.py": {
                 "summary": {
                     "covered_lines": 50,
                     "num_statements": 100,
                 }
             },
-            "src/tray/app/application.py": {
+            "keyrgb/tray/app/application.py": {
                 "summary": {
                     "covered_lines": 20,
                     "num_statements": 40,
                 }
             },
-            "src/core/backends/sysfs/device.py": {
+            "keyrgb/core/backends/sysfs/device.py": {
                 "summary": {
                     "covered_lines": 0,
                     "num_statements": 30,
@@ -563,12 +563,12 @@ def test_build_coverage_report_tracks_prefixes_and_watch_files() -> None:
     baseline = CoverageBaseline(
         minimum_total_percent=40.0,
         tracked_prefixes={
-            "src/core/": 45.0,
-            "src/tray/": 40.0,
+            "keyrgb/core/": 45.0,
+            "keyrgb/tray/": 40.0,
         },
         watch_files=(
-            "src/core/backends/sysfs/device.py",
-            "src/core/config/config.py",
+            "keyrgb/core/backends/sysfs/device.py",
+            "keyrgb/core/config/config.py",
         ),
     )
 
@@ -576,18 +576,18 @@ def test_build_coverage_report_tracks_prefixes_and_watch_files() -> None:
 
     assert report["summary"]["total_percent"] == 41.18
     tracked = {item["prefix"]: item for item in report["tracked_prefixes"]}
-    assert tracked["src/core/"]["percent"] == 38.46
-    assert tracked["src/core/"]["status"] == "fail"
-    assert tracked["src/tray/"]["percent"] == 50.0
+    assert tracked["keyrgb/core/"]["percent"] == 38.46
+    assert tracked["keyrgb/core/"]["status"] == "fail"
+    assert tracked["keyrgb/tray/"]["percent"] == 50.0
     watch = {item["path"]: item for item in report["watch_files"]}
-    assert watch["src/core/backends/sysfs/device.py"]["percent"] == 0.0
+    assert watch["keyrgb/core/backends/sysfs/device.py"]["percent"] == 0.0
     assert len(report["baseline"]["regressions"]) == 1
 
 
 def test_build_coverage_report_fails_missing_and_undercovered_watch_files() -> None:
     payload = {
         "files": {
-            "src/core/present.py": {
+            "keyrgb/core/present.py": {
                 "summary": {
                     "covered_lines": 1,
                     "num_statements": 10,
@@ -599,18 +599,18 @@ def test_build_coverage_report_fails_missing_and_undercovered_watch_files() -> N
     baseline = CoverageBaseline(
         minimum_total_percent=None,
         tracked_prefixes={},
-        watch_files=("src/core/present.py", "src/core/missing.py"),
+        watch_files=("keyrgb/core/present.py", "keyrgb/core/missing.py"),
         minimum_watch_file_percent=20.0,
     )
 
     report = build_coverage_report(payload, baseline)
 
     watch = {item["path"]: item for item in report["watch_files"]}
-    assert watch["src/core/present.py"]["status"] == "fail"
-    assert watch["src/core/missing.py"]["status"] == "missing"
+    assert watch["keyrgb/core/present.py"]["status"] == "fail"
+    assert watch["keyrgb/core/missing.py"]["status"] == "missing"
     assert {(item["kind"], item["target"]) for item in report["baseline"]["regressions"]} == {
-        ("watch_file", "src/core/present.py"),
-        ("watch_missing", "src/core/missing.py"),
+        ("watch_file", "keyrgb/core/present.py"),
+        ("watch_missing", "keyrgb/core/missing.py"),
     }
 
 
@@ -642,12 +642,14 @@ def test_write_debt_index_aggregates_reports(tmp_path) -> None:
                 "annotation_inventory": {
                     "total": 102,
                     "by_subtree": [
-                        {"subtree": "src/tray", "count": 63},
-                        {"subtree": "src/core", "count": 36},
-                        {"subtree": "src/gui", "count": 3},
+                        {"subtree": "keyrgb/tray", "count": 63},
+                        {"subtree": "keyrgb/core", "count": 36},
+                        {"subtree": "keyrgb/gui", "count": 3},
                     ],
                 },
-                "top_files_by_category": {"broad_except_unlogged": [{"path": "src/core/config/config.py", "count": 3}]},
+                "top_files_by_category": {
+                    "broad_except_unlogged": [{"path": "keyrgb/core/config/config.py", "count": 3}]
+                },
             }
         ),
         encoding="utf-8",
@@ -681,7 +683,7 @@ def test_write_debt_index_aggregates_reports(tmp_path) -> None:
     debt_index_md = (buildlog_dir / "debt-index.md").read_text(encoding="utf-8")
 
     assert "Runtime-boundary annotations: 102" in debt_index_md
-    assert "Top annotation subtrees: src/tray (63), src/core (36), src/gui (3)" in debt_index_md
+    assert "Top annotation subtrees: keyrgb/tray (63), keyrgb/core (36), keyrgb/gui (3)" in debt_index_md
 
 
 def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> None:
@@ -702,14 +704,14 @@ def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> Non
                 "annotation_inventory": {
                     "total": 102,
                     "by_subtree": [
-                        {"subtree": "src/tray", "count": 63},
-                        {"subtree": "src/core", "count": 36},
-                        {"subtree": "src/gui", "count": 3},
+                        {"subtree": "keyrgb/tray", "count": 63},
+                        {"subtree": "keyrgb/core", "count": 36},
+                        {"subtree": "keyrgb/gui", "count": 3},
                     ],
                 },
                 "top_files_by_category": {
-                    "broad_except_unlogged": [{"path": "src/core/config/config.py", "count": 3}],
-                    "broad_except_total": [{"path": "src/core/config/config.py", "count": 4}],
+                    "broad_except_unlogged": [{"path": "keyrgb/core/config/config.py", "count": 3}],
+                    "broad_except_total": [{"path": "keyrgb/core/config/config.py", "count": 4}],
                 },
             }
         ),
@@ -721,8 +723,8 @@ def test_terminal_debt_snapshot_includes_exception_transparency(tmp_path) -> Non
     assert any("total 6 (205)" in line for line in lines)
     assert any("unlogged 4" in line for line in lines)
     assert any("annotated 102" in line for line in lines)
-    assert any("Top unlogged" in line and "src/core/config/config.py" in line for line in lines)
-    assert any("Top annotated" in line and "src/tray" in line for line in lines)
+    assert any("Top unlogged" in line and "keyrgb/core/config/config.py" in line for line in lines)
+    assert any("Top annotated" in line and "keyrgb/tray" in line for line in lines)
 
 
 def test_write_summary_includes_exception_transparency_annotation_inventory(tmp_path) -> None:
@@ -743,9 +745,9 @@ def test_write_summary_includes_exception_transparency_annotation_inventory(tmp_
                 "annotation_inventory": {
                     "total": 102,
                     "by_subtree": [
-                        {"subtree": "src/tray", "count": 63},
-                        {"subtree": "src/core", "count": 36},
-                        {"subtree": "src/gui", "count": 3},
+                        {"subtree": "keyrgb/tray", "count": 63},
+                        {"subtree": "keyrgb/core", "count": 36},
+                        {"subtree": "keyrgb/gui", "count": 3},
                     ],
                 },
                 "top_files_by_category": {},
@@ -767,7 +769,7 @@ def test_write_summary_includes_exception_transparency_annotation_inventory(tmp_
     build_summary_md = (buildlog_dir / "build-summary.md").read_text(encoding="utf-8")
 
     assert "Runtime-boundary annotations: 102" in build_summary_md
-    assert "Top annotation subtrees: src/tray (63), src/core (36), src/gui (3)" in build_summary_md
+    assert "Top annotation subtrees: keyrgb/tray (63), keyrgb/core (36), keyrgb/gui (3)" in build_summary_md
 
 
 def test_terminal_debt_snapshot_marks_missing_coverage_capture(tmp_path) -> None:
@@ -906,9 +908,9 @@ def test_terminal_coverage_highlight_summarizes_total_and_prefixes(tmp_path) -> 
                 "summary": {"total_percent": 59.49},
                 "baseline": {"regressions": []},
                 "tracked_prefixes": [
-                    {"prefix": "src/core/", "percent": 73.28},
-                    {"prefix": "src/tray/", "percent": 73.85},
-                    {"prefix": "src/gui/", "percent": 27.50},
+                    {"prefix": "keyrgb/core/", "percent": 73.28},
+                    {"prefix": "keyrgb/tray/", "percent": 73.85},
+                    {"prefix": "keyrgb/gui/", "percent": 27.50},
                 ],
                 "watch_files": [],
             }
@@ -930,9 +932,9 @@ def test_terminal_build_overview_includes_status_health_and_coverage(tmp_path) -
                 "summary": {"total_percent": 59.49},
                 "baseline": {"regressions": []},
                 "tracked_prefixes": [
-                    {"prefix": "src/core/", "percent": 73.28},
-                    {"prefix": "src/tray/", "percent": 73.85},
-                    {"prefix": "src/gui/", "percent": 27.50},
+                    {"prefix": "keyrgb/core/", "percent": 73.28},
+                    {"prefix": "keyrgb/tray/", "percent": 73.85},
+                    {"prefix": "keyrgb/gui/", "percent": 27.50},
                 ],
                 "watch_files": [],
             }

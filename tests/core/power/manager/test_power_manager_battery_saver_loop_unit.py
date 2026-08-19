@@ -10,7 +10,7 @@ import pytest
 
 class TestPowerManagerBatterySaverLoop:
     def test_stabilize_on_ac_state_requires_two_consecutive_changed_samples(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock(), config=MagicMock())
 
@@ -21,7 +21,7 @@ class TestPowerManagerBatterySaverLoop:
         assert pm._stabilize_on_ac_state(True) is True
 
     def test_stabilize_on_ac_state_reuses_last_stable_value_when_read_is_unavailable(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock(), config=MagicMock())
 
@@ -31,8 +31,8 @@ class TestPowerManagerBatterySaverLoop:
         assert pm._stabilize_on_ac_state(False) is False
 
     def test_classify_battery_saver_iteration_returns_classifier_plan_with_existing_runtime_inputs(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         cfg = MagicMock()
@@ -66,8 +66,8 @@ class TestPowerManagerBatterySaverLoop:
         )
 
     def test_execute_battery_saver_iteration_plan_sleeps_and_returns_true_for_sleep_plan(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock(), config=MagicMock())
         plan = SimpleNamespace(should_sleep=True, actions=("ignored",))
@@ -83,8 +83,8 @@ class TestPowerManagerBatterySaverLoop:
         apply_actions.assert_not_called()
 
     def test_execute_battery_saver_iteration_plan_applies_actions_and_returns_false(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb, config=MagicMock())
@@ -108,7 +108,7 @@ class TestPowerManagerBatterySaverLoop:
         )
 
     def test_run_battery_saver_iteration_delegates_classification_then_execution(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock(), config=MagicMock())
         fake_policy = MagicMock()
@@ -128,8 +128,8 @@ class TestPowerManagerBatterySaverLoop:
         ]
 
     def test_run_battery_saver_iteration_pauses_source_actions_while_lid_closed(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
 
         cfg = MagicMock()
         cfg.reload = MagicMock()
@@ -151,9 +151,9 @@ class TestPowerManagerBatterySaverLoop:
         pm._execute_battery_saver_iteration_plan.assert_not_called()
 
     def test_run_battery_saver_iteration_detects_closed_lid_and_pauses_source_actions(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
         mock_kb._power_forced_off = False
@@ -181,9 +181,9 @@ class TestPowerManagerBatterySaverLoop:
         pm._execute_battery_saver_iteration_plan.assert_not_called()
 
     def test_run_battery_saver_iteration_pauses_source_actions_while_power_event_forced_off(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
         mock_kb._power_forced_off = True
@@ -203,9 +203,9 @@ class TestPowerManagerBatterySaverLoop:
         pm._execute_battery_saver_iteration_plan.assert_not_called()
 
     def test_run_battery_saver_iteration_pauses_source_actions_for_bridge_power_forced_off_state(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
         mock_kb._power_forced_off = False
@@ -223,8 +223,8 @@ class TestPowerManagerBatterySaverLoop:
         pm._execute_battery_saver_iteration_plan.assert_not_called()
 
     def test_run_battery_saver_iteration_keeps_source_actions_when_lid_close_off_is_disabled(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
 
         cfg = MagicMock()
         cfg.reload = MagicMock()
@@ -244,9 +244,9 @@ class TestPowerManagerBatterySaverLoop:
         pm._execute_battery_saver_iteration_plan.assert_called_once_with(plan, poll_interval_s=2.0)
 
     def test_activate_power_source_mode_uses_noninteractive_auth(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.core.power.system import PowerMode
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.core.power.system import PowerMode
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb, config=MagicMock())
@@ -261,9 +261,9 @@ class TestPowerManagerBatterySaverLoop:
         mock_kb._update_menu.assert_not_called()
 
     def test_activate_power_source_mode_skips_view_refresh_when_apply_fails(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.core.power.system import PowerMode
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.core.power.system import PowerMode
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb, config=MagicMock())
@@ -275,9 +275,9 @@ class TestPowerManagerBatterySaverLoop:
         mock_kb._update_menu.assert_not_called()
 
     def test_activate_power_source_mode_tolerates_tray_without_view_refresh(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.core.power.system import PowerMode
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.core.power.system import PowerMode
 
         pm = PowerManager(SimpleNamespace(), config=MagicMock())
 
@@ -285,9 +285,9 @@ class TestPowerManagerBatterySaverLoop:
             pm._activate_power_source_mode(PowerMode.PERFORMANCE)
 
     def test_activate_power_source_mode_contains_view_refresh_errors(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.core.power.system import PowerMode
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.core.power.system import PowerMode
 
         mock_kb = MagicMock()
         mock_kb._refresh_system_power_view.side_effect = RuntimeError("view boom")
@@ -299,8 +299,8 @@ class TestPowerManagerBatterySaverLoop:
         mock_kb._refresh_system_power_view.assert_called_once_with()
 
     def test_battery_saver_loop_covers_common_branches_and_actions(self):
-        from src.core.power.management.manager import PowerManager
-        from src.core.power.policies.power_source_loop_policy import (
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.core.power.policies.power_source_loop_policy import (
             ApplyBrightness,
             RestoreKeyboard,
             TurnOffKeyboard,
@@ -356,19 +356,19 @@ class TestPowerManagerBatterySaverLoop:
 
         with (
             patch(
-                "src.core.power.management.manager.read_on_ac_power",
+                "keyrgb.core.power.management.manager.read_on_ac_power",
                 side_effect=on_ac_values,
             ),
             patch(
-                "src.core.power.management.manager.PowerSourceLoopPolicy",
+                "keyrgb.core.power.management.manager.PowerSourceLoopPolicy",
                 return_value=fake_policy,
             ),
             patch(
-                "src.core.power.management.manager.time.monotonic",
+                "keyrgb.core.power.management.manager.time.monotonic",
                 return_value=123.0,
             ),
             patch(
-                "src.core.power.management.manager.time.sleep",
+                "keyrgb.core.power.management.manager.time.sleep",
                 side_effect=_sleep,
             ),
         ):
@@ -379,7 +379,7 @@ class TestPowerManagerBatterySaverLoop:
         pm._apply_brightness_policy.assert_called_once_with(42)
 
     def test_battery_saver_loop_logs_and_continues_on_exception(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         cfg = MagicMock()
@@ -393,15 +393,15 @@ class TestPowerManagerBatterySaverLoop:
 
         with (
             patch(
-                "src.core.power.management.manager.read_on_ac_power",
+                "keyrgb.core.power.management.manager.read_on_ac_power",
                 side_effect=RuntimeError("boom"),
             ),
             patch(
-                "src.core.power.management.manager.time.sleep",
+                "keyrgb.core.power.management.manager.time.sleep",
                 side_effect=_sleep,
             ),
             patch(
-                "src.core.power.management.manager.logger.exception",
+                "keyrgb.core.power.management.manager.logger.exception",
             ) as exc,
         ):
             pm._battery_saver_loop()
@@ -409,7 +409,7 @@ class TestPowerManagerBatterySaverLoop:
         exc.assert_called_once()
 
     def test_battery_saver_loop_propagates_unexpected_exceptions(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         cfg = MagicMock()
@@ -420,7 +420,7 @@ class TestPowerManagerBatterySaverLoop:
 
         with (
             patch(
-                "src.core.power.management.manager.read_on_ac_power",
+                "keyrgb.core.power.management.manager.read_on_ac_power",
                 side_effect=AssertionError("unexpected battery loop bug"),
             ),
             pytest.raises(AssertionError, match="unexpected battery loop bug"),
@@ -428,7 +428,7 @@ class TestPowerManagerBatterySaverLoop:
             pm._battery_saver_loop()
 
     def test_battery_saver_loop_respects_ac_battery_overrides_for_light_profile(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         mock_kb.is_off = False
@@ -457,23 +457,23 @@ class TestPowerManagerBatterySaverLoop:
 
         with (
             patch(
-                "src.core.power.management.manager.read_on_ac_power",
+                "keyrgb.core.power.management.manager.read_on_ac_power",
                 return_value=True,
             ),
             patch(
-                "src.core.power.management.manager.get_system_power_status",
+                "keyrgb.core.power.management.manager.get_system_power_status",
                 return_value=SimpleNamespace(supported=True, mode=None),
             ),
             patch(
-                "src.core.power.management.manager.PowerSourceLoopPolicy",
+                "keyrgb.core.power.management.manager.PowerSourceLoopPolicy",
                 return_value=fake_policy,
             ),
             patch(
-                "src.core.power.management.manager.time.monotonic",
+                "keyrgb.core.power.management.manager.time.monotonic",
                 return_value=123.0,
             ),
             patch(
-                "src.core.power.management.manager.time.sleep",
+                "keyrgb.core.power.management.manager.time.sleep",
                 side_effect=_sleep,
             ),
         ):
@@ -487,8 +487,8 @@ class TestPowerManagerBatterySaverLoop:
         assert inputs.battery_brightness_override == 5
 
     def test_activate_power_source_perkey_profile_skips_missing_profile(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock(), config=MagicMock())
 
@@ -503,9 +503,9 @@ class TestPowerManagerBatterySaverLoop:
         warning.assert_called_once_with("Skipping missing power-source lighting profile '%s'", "battery")
 
     def test_activate_power_source_perkey_profile_uses_tray_transition_when_available(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
         mock_kb.config = SimpleNamespace(brightness=25, effect="perkey", per_key_colors={(0, 0): (1, 2, 3)})
@@ -539,9 +539,9 @@ class TestPowerManagerBatterySaverLoop:
         mock_kb._update_menu.assert_not_called()
 
     def test_activate_power_source_perkey_profile_restarts_when_tray_transition_declines(self):
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
         mock_kb.config = SimpleNamespace(brightness=25, effect="reactive_ripple", per_key_colors={(0, 0): (1, 2, 3)})
@@ -571,10 +571,10 @@ class TestPowerManagerBatterySaverLoop:
         import threading
         import time
 
-        from src.core.power.management import manager as manager_module
-        from src.core.power.management.manager import PowerManager
-        from src.tray.controllers.runtime_coordination import run_tray_transition
-        from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+        from keyrgb.core.power.management import manager as manager_module
+        from keyrgb.core.power.management.manager import PowerManager
+        from keyrgb.tray.controllers.runtime_coordination import run_tray_transition
+        from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
         class _Tray:
             def __init__(self) -> None:

@@ -9,7 +9,7 @@ and must not acquire hardware or query OS power sysfs.
 
 ## Contract
 
-`src/tray/controllers/view_snapshots.py` owns the presentation snapshots:
+`keyrgb/tray/controllers/view_snapshots.py` owns the presentation snapshots:
 
 | Snapshot | Tray attribute | Observed when |
 |---|---|---|
@@ -20,7 +20,7 @@ Menu builders may only read those attributes (and other tray-owned presentation
 fields such as `backend_probe.identifiers`, `device_discovery`, and
 `engine.device_available`). They must not call:
 
-- `src.core.power.system.get_status()`
+- `keyrgb.core.power.system.get_status()`
 - `iter_effective_secondary_routes()`
 - backend `probe()` / `is_available()`
 - engine `_ensure_device_available()`

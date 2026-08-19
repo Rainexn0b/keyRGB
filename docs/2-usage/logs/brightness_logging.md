@@ -45,7 +45,7 @@ in `docs/2-usage/venv/setup.md`.
 
 The previous `buildpython --capture-runtime-log` interface remains as a
 compatibility wrapper for contributor workflows. Runtime capture itself is
-owned by `src/core/diagnostics/runtime_capture.py` and does not depend on
+owned by `keyrgb/core/diagnostics/runtime_capture.py` and does not depend on
 `buildpython`.
 
 ### What to grep for at the flash timestamp
@@ -71,7 +71,7 @@ keyrgb --capture-runtime-log=brightness
 ## Runtime debug
 
 ```bash
-KEYRGB_DEBUG=1 ./keyrgb
-KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb
-KEYRGB_DEBUG=1 KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb
+KEYRGB_DEBUG=1 ./keyrgb.sh
+KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb.sh
+KEYRGB_DEBUG=1 KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb.sh
 ```

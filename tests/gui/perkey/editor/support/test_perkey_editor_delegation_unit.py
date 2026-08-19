@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.gui.perkey.editor import PerKeyEditor, _last_non_black_color_or
+from keyrgb.gui.perkey.editor import PerKeyEditor, _last_non_black_color_or
 
 
 def test_last_non_black_color_or_handles_missing_attr() -> None:
@@ -16,7 +16,7 @@ def test_last_non_black_color_or_handles_missing_attr() -> None:
 
 
 def test_editor_action_methods_delegate(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.gui.perkey.editor as editor_mod
+    import keyrgb.gui.perkey.editor as editor_mod
 
     actions = SimpleNamespace(
         save_layout_tweaks=MagicMock(),
@@ -79,7 +79,7 @@ def test_editor_action_methods_delegate(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 def test_color_change_routes_to_lighting_areas_when_present(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.gui.perkey.editor as editor_mod
+    import keyrgb.gui.perkey.editor as editor_mod
 
     wheel = MagicMock()
     monkeypatch.setattr(
@@ -99,7 +99,7 @@ def test_color_change_routes_to_lighting_areas_when_present(monkeypatch: pytest.
 
 
 def test_select_slot_id_selects_keyboard_area_first(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.gui.perkey.editor as editor_mod
+    import keyrgb.gui.perkey.editor as editor_mod
 
     select = MagicMock()
     monkeypatch.setattr(editor_mod.editor_selection, "select_slot_id", select)
@@ -112,7 +112,7 @@ def test_select_slot_id_selects_keyboard_area_first(monkeypatch: pytest.MonkeyPa
 
 
 def test_on_close_saves_closes_hardware_and_destroys(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.gui.perkey.editor as editor_mod
+    import keyrgb.gui.perkey.editor as editor_mod
 
     closed: list[str] = []
     destroyed: list[str] = []
@@ -153,7 +153,7 @@ def test_on_close_saves_closes_hardware_and_destroys(monkeypatch: pytest.MonkeyP
 
 
 def test_on_close_handles_guard_failure_cancel_and_close_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.gui.perkey.editor as editor_mod
+    import keyrgb.gui.perkey.editor as editor_mod
 
     # guard raises -> early return
     monkeypatch.setattr(
@@ -191,7 +191,7 @@ def test_on_close_handles_guard_failure_cancel_and_close_errors(monkeypatch: pyt
 
 
 def test_backdrop_and_layout_helpers_delegate(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.gui.perkey.editor as editor_mod
+    import keyrgb.gui.perkey.editor as editor_mod
 
     backdrop = SimpleNamespace(
         on_backdrop_transparency_changed=MagicMock(),
@@ -226,22 +226,22 @@ def test_backdrop_and_layout_helpers_delegate(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_build_ui_and_main_delegate(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.gui.perkey.editor as editor_mod
+    import keyrgb.gui.perkey.editor as editor_mod
 
     build = MagicMock()
     monkeypatch.setitem(
-        __import__("sys").modules, "src.gui.perkey.editor_support.ui", SimpleNamespace(build_editor_ui=build)
+        __import__("sys").modules, "keyrgb.gui.perkey.editor_support.ui", SimpleNamespace(build_editor_ui=build)
     )
     # ensure import path
-    import src.gui.perkey.editor_support.ui as ui_mod
+    import keyrgb.gui.perkey.editor_support.ui as ui_mod
 
     monkeypatch.setattr(ui_mod, "build_editor_ui", build)
     PerKeyEditor._build_ui(SimpleNamespace())
     build.assert_called_once()
 
     launch = MagicMock()
-    monkeypatch.setitem(__import__("sys").modules, "src.gui.perkey.launch", SimpleNamespace(main=launch))
-    import src.gui.perkey.launch as launch_mod
+    monkeypatch.setitem(__import__("sys").modules, "keyrgb.gui.perkey.launch", SimpleNamespace(main=launch))
+    import keyrgb.gui.perkey.launch as launch_mod
 
     monkeypatch.setattr(launch_mod, "main", launch)
     editor_mod.main()

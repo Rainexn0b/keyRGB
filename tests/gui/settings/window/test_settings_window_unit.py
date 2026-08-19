@@ -6,9 +6,9 @@ from types import ModuleType, SimpleNamespace
 
 import pytest
 
-import src.gui.settings.window as settings_window
-from src.core.power.system import PowerMode
-from src.gui.settings.settings_state import SettingsValues
+import keyrgb.gui.settings.window as settings_window
+from keyrgb.core.power.system import PowerMode
+from keyrgb.gui.settings.settings_state import SettingsValues
 
 
 class _FakeVar:
@@ -234,9 +234,9 @@ def test_start_footer_hardware_probe_runs_worker_and_updates_hint(monkeypatch: p
     gui.root = _FakeRoot()
     gui.bottom_bar_panel = _FakeBottomBarPanel(None, on_close=lambda: None)
 
-    fake_collectors = ModuleType("src.core.diagnostics.collectors.backends")
+    fake_collectors = ModuleType("keyrgb.core.diagnostics.collectors.backends")
     fake_collectors.backend_probe_snapshot = lambda: "snapshot"
-    monkeypatch.setitem(sys.modules, "src.core.diagnostics.collectors.backends", fake_collectors)
+    monkeypatch.setitem(sys.modules, "keyrgb.core.diagnostics.collectors.backends", fake_collectors)
     monkeypatch.setattr(settings_window, "extract_unsupported_rgb_controllers_hint", lambda snap: f"hint:{snap}")
 
     run_calls: list[tuple[object, object, object, int]] = []
@@ -259,9 +259,9 @@ def test_start_footer_hardware_probe_swallows_worker_and_footer_errors(monkeypat
     gui.root = _FakeRoot()
     gui.bottom_bar_panel = SimpleNamespace(set_hardware_hint=lambda text: (_ for _ in ()).throw(RuntimeError(text)))
 
-    fake_collectors = ModuleType("src.core.diagnostics.collectors.backends")
+    fake_collectors = ModuleType("keyrgb.core.diagnostics.collectors.backends")
     fake_collectors.backend_probe_snapshot = lambda: (_ for _ in ()).throw(RuntimeError("boom"))
-    monkeypatch.setitem(sys.modules, "src.core.diagnostics.collectors.backends", fake_collectors)
+    monkeypatch.setitem(sys.modules, "keyrgb.core.diagnostics.collectors.backends", fake_collectors)
     monkeypatch.setattr(settings_window, "run_in_thread", lambda root, work, on_done, *, delay_ms: on_done(work()))
 
     gui._start_footer_hardware_probe()

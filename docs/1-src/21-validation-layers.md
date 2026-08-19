@@ -22,7 +22,7 @@ hardware-access refusal belong in the same contract.
 
 ## Hardware tripwire
 
-`tests/conftest.py` and `src/core/backends/sysfs/common.py` share one policy:
+`tests/conftest.py` and `keyrgb/core/backends/sysfs/common.py` share one policy:
 
 - Device-access guards are **on** unless hardware is opted in or
   `KEYRGB_TEST_HARDWARE_TRIPWIRE=0`.

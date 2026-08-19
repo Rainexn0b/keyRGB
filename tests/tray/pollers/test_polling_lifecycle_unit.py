@@ -22,7 +22,7 @@ class _Event:
 
 
 def test_wait_for_shutdown_uses_event_wait_instead_of_fallback_sleep() -> None:
-    from src.tray.pollers._lifecycle import wait_for_shutdown
+    from keyrgb.tray.pollers._lifecycle import wait_for_shutdown
 
     calls: list[str] = []
     event = _Event(calls, wait_result=True)
@@ -39,7 +39,7 @@ def test_wait_for_shutdown_uses_event_wait_instead_of_fallback_sleep() -> None:
 
 
 def test_wait_for_shutdown_falls_back_to_supplied_sleep_without_event() -> None:
-    from src.tray.pollers._lifecycle import wait_for_shutdown
+    from keyrgb.tray.pollers._lifecycle import wait_for_shutdown
 
     sleeps: list[float] = []
 
@@ -48,7 +48,7 @@ def test_wait_for_shutdown_falls_back_to_supplied_sleep_without_event() -> None:
 
 
 def test_shutdown_requested_reflects_registered_event() -> None:
-    from src.tray.pollers._lifecycle import shutdown_requested
+    from keyrgb.tray.pollers._lifecycle import shutdown_requested
 
     calls: list[str] = []
     event = _Event(calls)
@@ -60,7 +60,7 @@ def test_shutdown_requested_reflects_registered_event() -> None:
 
 
 def test_stop_all_polling_signals_before_joining_every_registered_thread() -> None:
-    from src.tray.app.lifecycle import stop_all_polling
+    from keyrgb.tray.app.lifecycle import stop_all_polling
 
     calls: list[str] = []
     event = _Event(calls)
@@ -77,7 +77,7 @@ def test_stop_all_polling_signals_before_joining_every_registered_thread() -> No
 
 
 def test_stop_all_polling_continues_after_recoverable_join_error() -> None:
-    from src.tray.app.lifecycle import stop_all_polling
+    from keyrgb.tray.app.lifecycle import stop_all_polling
 
     calls: list[str] = []
 
@@ -100,7 +100,7 @@ def test_stop_all_polling_continues_after_recoverable_join_error() -> None:
 
 
 def test_stop_all_polling_reports_and_retains_worker_still_alive_after_join() -> None:
-    from src.tray.app.lifecycle import stop_all_polling
+    from keyrgb.tray.app.lifecycle import stop_all_polling
 
     calls: list[str] = []
     stopped = SimpleNamespace(
@@ -128,7 +128,7 @@ def test_stop_all_polling_reports_and_retains_worker_still_alive_after_join() ->
 
 
 def test_stop_all_polling_retains_worker_without_liveness_probe() -> None:
-    from src.tray.app.lifecycle import stop_all_polling
+    from keyrgb.tray.app.lifecycle import stop_all_polling
 
     worker = SimpleNamespace(join=lambda *, timeout: None)
     threads = [worker]

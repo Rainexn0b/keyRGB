@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core.backends.base import (
+from keyrgb.core.backends.base import (
     DEFAULT_BACKEND_CAPABILITIES,
     BackendCapabilities,
     normalize_backend_capabilities,
     supports_per_key_output,
 )
-from src.core.effects.device import NullKeyboard
+from keyrgb.core.effects.device import NullKeyboard
 
 
 def test_normalize_backend_capabilities_defaults_missing_value_to_unsupported() -> None:

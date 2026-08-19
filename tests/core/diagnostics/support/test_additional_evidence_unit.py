@@ -8,7 +8,7 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.diagnostics.support import evidence
+from keyrgb.core.diagnostics.support import evidence
 
 
 def test_build_additional_evidence_plan_for_attention_candidate() -> None:

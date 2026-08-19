@@ -8,19 +8,19 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.backends.base import (
+from keyrgb.core.backends.base import (
     BackendStability,
     ExperimentalEvidence,
     ProbeResult,
     normalize_backend_stability,
     normalize_experimental_evidence,
 )
-from src.core.backends.policies.backend_selection import (
+from keyrgb.core.backends.policies.backend_selection import (
     experimental_backends_enabled,
     experimental_evidence_for_backend,
     experimental_evidence_label,
 )
-from src.core.backends.registry import (
+from keyrgb.core.backends.registry import (
     BackendSpec,
     _probe_backend,
     _spec_for_backend,
@@ -486,7 +486,7 @@ def test_experimental_backends_enabled_returns_false_when_config_read_fails(monk
         def experimental_backends_enabled(self) -> bool:
             raise RuntimeError("config boom")
 
-    monkeypatch.setattr("src.core.config.Config", BrokenConfig)
+    monkeypatch.setattr("keyrgb.core.config.Config", BrokenConfig)
 
     assert experimental_backends_enabled() is False
 
@@ -499,7 +499,7 @@ def test_experimental_backends_enabled_propagates_unexpected_config_failures(mon
         def experimental_backends_enabled(self) -> bool:
             raise AssertionError("unexpected config bug")
 
-    monkeypatch.setattr("src.core.config.Config", BrokenConfig)
+    monkeypatch.setattr("keyrgb.core.config.Config", BrokenConfig)
 
     with pytest.raises(AssertionError, match="unexpected config bug"):
         experimental_backends_enabled()

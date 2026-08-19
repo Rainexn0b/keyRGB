@@ -8,9 +8,9 @@ from .models import HygieneIssue
 
 _SOURCE_PARSE_ERRORS = (OSError, SyntaxError, ValueError)
 
-_FORBIDDEN_API_EXCLUDE_PATHS = ["src/tests/", "tests/"]
-_RESOURCE_LEAK_EXCLUDE_PATHS = ["src/tests/", "tests/"]
-_BROAD_EXCEPT_EXCLUDE_PATHS = ["src/tests/", "tests/"]
+_FORBIDDEN_API_EXCLUDE_PATHS = ["keyrgb/tests/", "tests/"]
+_RESOURCE_LEAK_EXCLUDE_PATHS = ["keyrgb/tests/", "tests/"]
+_BROAD_EXCEPT_EXCLUDE_PATHS = ["keyrgb/tests/", "tests/"]
 
 _BROAD_EXCEPTION_MESSAGES = {
     "silent_broad_except": "broad exception handler silently swallows failure - add logging or explicit recovery",

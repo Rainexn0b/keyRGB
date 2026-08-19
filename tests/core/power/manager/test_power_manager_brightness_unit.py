@@ -13,7 +13,7 @@ class TestPowerManagerBrightnessPolicyApplication:
 
     def test_apply_brightness_uses_controller_hook_if_present(self):
         """If kb_controller has apply_brightness_from_power_policy, prefer it."""
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         mock_kb.apply_brightness_from_power_policy = MagicMock()
@@ -25,8 +25,8 @@ class TestPowerManagerBrightnessPolicyApplication:
 
     def test_apply_brightness_fallback_to_engine_if_no_hook(self):
         """If no dedicated hook, fall back to config + engine.set_brightness."""
-        from src.core.config import Config
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.config import Config
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         del mock_kb.apply_brightness_from_power_policy
@@ -42,8 +42,8 @@ class TestPowerManagerBrightnessPolicyApplication:
         assert cfg.effect_brightness == 50
 
     def test_apply_brightness_fallback_syncs_base_only_perkey_state(self):
-        from src.core.config import Config
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.config import Config
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         del mock_kb.apply_brightness_from_power_policy
@@ -67,7 +67,7 @@ class TestPowerManagerBrightnessPolicyApplication:
 
     def test_apply_brightness_handles_missing_engine_gracefully(self):
         """If engine is missing or raises, don't crash."""
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock(spec=[])
 
@@ -76,7 +76,7 @@ class TestPowerManagerBrightnessPolicyApplication:
 
     def test_apply_brightness_ignores_negative_values(self):
         """Negative brightness is a no-op."""
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         mock_kb.apply_brightness_from_power_policy = MagicMock()
@@ -89,7 +89,7 @@ class TestPowerManagerBrightnessPolicyApplication:
 
 class TestPowerManagerApplyBrightnessExceptionPaths:
     def test_apply_brightness_policy_handles_config_set_exception(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         class _ConfigRaisingOnSet:
             effect = "wave"
@@ -111,14 +111,14 @@ class TestPowerManagerApplyBrightnessExceptionPaths:
 
         pm = PowerManager(mock_kb, config=_ConfigRaisingOnSet())
 
-        with patch("src.core.power.management.manager.logger.warning") as warn:
+        with patch("keyrgb.core.power.management.manager.logger.warning") as warn:
             pm._apply_brightness_policy(10)
 
         warn.assert_called_once()
         mock_kb.engine.set_brightness.assert_called_once_with(10)
 
     def test_apply_brightness_policy_logs_if_engine_set_brightness_raises(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock(spec=["engine"])
         mock_kb.engine = MagicMock()
@@ -126,13 +126,13 @@ class TestPowerManagerApplyBrightnessExceptionPaths:
 
         pm = PowerManager(mock_kb)
 
-        with patch("src.core.power.management.manager.logger.exception") as exc:
+        with patch("keyrgb.core.power.management.manager.logger.exception") as exc:
             pm._apply_brightness_policy(10)
 
         exc.assert_called_once()
 
     def test_apply_brightness_policy_propagates_unexpected_failures(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         mock_kb.apply_brightness_from_power_policy = MagicMock(side_effect=AssertionError("unexpected brightness bug"))

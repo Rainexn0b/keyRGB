@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.core.diagnostics.device_discovery_support.formatting import format_device_discovery_text
+from keyrgb.core.diagnostics.device_discovery_support.formatting import format_device_discovery_text
 
 
 def test_format_includes_secondary_virtual_aux_and_expected_contexts() -> None:

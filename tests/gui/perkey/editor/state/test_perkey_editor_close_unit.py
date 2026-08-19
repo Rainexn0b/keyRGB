@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.gui.perkey import editor as editor_module
+from keyrgb.gui.perkey import editor as editor_module
 
 
 def test_perkey_editor_close_releases_device_and_hardware_lock(monkeypatch) -> None:

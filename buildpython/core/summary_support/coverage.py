@@ -46,7 +46,7 @@ def build_terminal_coverage_highlight(buildlog_dir: Path) -> str | None:
             if not isinstance(prefix, str):
                 continue
             label = prefix.rstrip("/")
-            label = label.removeprefix("src/")
+            label = label.removeprefix("keyrgb/")
             if isinstance(percent, (int, float)):
                 prefix_parts.append(f"{label} {float(percent):.2f}%")
         if prefix_parts:

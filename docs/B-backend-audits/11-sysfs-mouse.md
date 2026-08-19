@@ -1,7 +1,7 @@
 # Audit: `sysfs-mouse` — auxiliary sysfs LED backend for mice
 
 **Audit date:** 2026-07-04  
-**Backend source:** `src/core/backends/sysfs_mouse/` (3 files, ~412 LOC)  
+**Backend source:** `keyrgb/core/backends/sysfs_mouse/` (3 files, ~412 LOC)  
 **Test file:** `tests/core/backends/general/test_sysfs_mouse_backend_unit.py` (4 tests)  
 **Stability:** `EXPERIMENTAL`  
 **Evidence level:** `SPECULATIVE`  

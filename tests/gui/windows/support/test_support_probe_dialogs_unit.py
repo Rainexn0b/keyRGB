@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from src.gui.windows._support import (
+from keyrgb.gui.windows._support import (
     _support_window_probe_dialog_layout as layout,
     _support_window_probe_dialogs as dialogs,
 )

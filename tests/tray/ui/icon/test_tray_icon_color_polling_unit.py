@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.tray.pollers import icon_color_polling as icp
+from keyrgb.tray.pollers import icon_color_polling as icp
 
 
 def test_compute_icon_sig_normalizes_fields():

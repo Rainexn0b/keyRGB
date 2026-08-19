@@ -1,7 +1,7 @@
 # Audit: `ite8258-chassis` — Lenovo Legion Pro 7 Gen10 composite ITE 8258 backend
 
 - **Audit date:** 2026-07-04 (Issue #7 regression addendum: 2026-07-15)
-- **Backend source:** `src/core/backends/ite8258_perkey_chassis/`
+- **Backend source:** `keyrgb/core/backends/ite8258_perkey_chassis/`
 - **Test file:** `tests/core/backends/ite/test_ite8258_chassis_backend_unit.py` (+ Issue #7 integration test)
 - **Stability:** `EXPERIMENTAL`
 - **Evidence level:** `REVERSE_ENGINEERED`

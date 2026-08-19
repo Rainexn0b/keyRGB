@@ -5,7 +5,7 @@ from threading import RLock
 
 import pytest
 
-from src.core.effects.engine_support.brightness import (
+from keyrgb.core.effects.engine_support.brightness import (
     _brightness_fade_token_or_default,
     _device_available_or_default,
     _EngineBrightness,
@@ -67,7 +67,7 @@ def test_bump_brightness_fade_token_logs_traceback_when_lock_fails(caplog) -> No
     engine = _TestEngine()
     engine._brightness_fade_lock = _FailEnterLock()  # type: ignore[assignment]
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_brightness"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_brightness"):
         token = engine._bump_brightness_fade_token()
 
     assert token == 1
@@ -87,7 +87,7 @@ def test_fade_brightness_logs_traceback_when_device_write_fails(caplog) -> None:
     engine.kb.fail_set_brightness = True
     engine._brightness_fade_token = 1
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_brightness"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_brightness"):
         engine._fade_brightness(
             start=25,
             end=10,
@@ -137,7 +137,7 @@ def test_turn_off_logs_traceback_when_cache_write_fails_but_still_turns_off(capl
     engine = _TestEngine()
     engine._fail_cache_write = True
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_brightness"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_brightness"):
         engine.turn_off()
 
     assert engine.stop_calls == 1
@@ -183,7 +183,7 @@ def test_bump_brightness_fade_token_bare_fallback_logs_and_returns_minus_one(cap
     engine = _BrokenAdvanceEngine()
     engine._brightness_fade_lock = _FailEnterLock()  # type: ignore[assignment]
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_brightness"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_brightness"):
         token = engine._bump_brightness_fade_token()
 
     assert token == -1
@@ -205,7 +205,7 @@ def test_fade_brightness_returns_immediately_when_start_equals_end() -> None:
 
 def test_fade_brightness_with_positive_duration_uses_multiple_steps(monkeypatch) -> None:
     """Covers the duration_s > 0 branch (choose_steps / dt calculation) and time.sleep call."""
-    import src.core.effects.engine_support.brightness as _bmod
+    import keyrgb.core.effects.engine_support.brightness as _bmod
 
     sleep_calls: list[float] = []
     monkeypatch.setattr(_bmod.time, "sleep", sleep_calls.append)
@@ -227,7 +227,7 @@ def test_fade_brightness_with_positive_duration_uses_multiple_steps(monkeypatch)
 
 def test_fade_brightness_continue_when_val_equals_start(monkeypatch) -> None:
     """First interpolation step rounds back to start → continue; second step writes."""
-    import src.core.effects.engine_support.brightness as _bmod
+    import keyrgb.core.effects.engine_support.brightness as _bmod
 
     sleep_calls: list[float] = []
     monkeypatch.setattr(_bmod.time, "sleep", sleep_calls.append)
@@ -274,7 +274,7 @@ def test_fade_brightness_logs_when_token_comparison_raises(caplog) -> None:
     engine = _NoTokenReadEngine()
     engine._brightness_value = 25
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_brightness"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_brightness"):
         engine._fade_brightness(
             start=25,
             end=10,
@@ -397,7 +397,7 @@ def test_set_brightness_logs_debug_when_env_set(monkeypatch, caplog) -> None:
     engine = _TestEngine()
     engine._brightness_value = 10
 
-    with caplog.at_level(logging.INFO, logger="src.core.effects.engine_brightness"):
+    with caplog.at_level(logging.INFO, logger="keyrgb.core.effects.engine_brightness"):
         engine.set_brightness(20)
 
     info_msgs = [r.getMessage() for r in caplog.records if r.levelno == logging.INFO]

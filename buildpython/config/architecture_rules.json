@@ -6,12 +6,12 @@
       "severity": "error",
       "corpus": {
         "include": [
-          "src/core/**/*.py"
+          "keyrgb/core/**/*.py"
         ]
       },
       "patterns": [
         {
-          "regex": "^\\s*(?:from|import)\\s+src\\.(?:tray|gui)\\b",
+          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.(?:tray|gui)\\b",
           "flags": "m",
           "message": "Core modules must not import tray or gui modules."
         }
@@ -23,12 +23,12 @@
       "severity": "error",
       "corpus": {
         "include": [
-          "src/gui/**/*.py"
+          "keyrgb/gui/**/*.py"
         ]
       },
       "patterns": [
         {
-          "regex": "^\\s*(?:from|import)\\s+src\\.tray\\b",
+          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.tray\\b",
           "flags": "m",
           "message": "GUI modules must not import tray runtime modules."
         }
@@ -40,12 +40,12 @@
       "severity": "error",
       "corpus": {
         "include": [
-          "src/tray/ui/**/*.py"
+          "keyrgb/tray/ui/**/*.py"
         ]
       },
       "patterns": [
         {
-          "regex": "^\\s*(?:from|import)\\s+src\\.core\\.backends\\.registry\\b",
+          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.core\\.backends\\.registry\\b",
           "flags": "m",
           "message": "Tray UI should not import backend selection directly."
         }
@@ -57,19 +57,19 @@
       "severity": "error",
       "corpus": {
         "include": [
-          "src/gui/windows/**/*.py"
+          "keyrgb/gui/windows/**/*.py"
         ],
         "exclude": [
-          "src/gui/windows/_*.py"
+          "keyrgb/gui/windows/_*.py"
         ]
       },
       "imports": [
         {
-          "module": "src.core.backends.registry",
+          "module": "keyrgb.core.backends.registry",
           "message": "GUI window modules should not import backend selection directly; move selection into bootstrap or target adapters."
         },
         {
-          "module": "src.core.secondary_device_routes",
+          "module": "keyrgb.core.secondary_device_routes",
           "message": "GUI window modules should not import secondary-device route registries directly; resolve routes in bootstrap or adapters."
         }
       ]
@@ -80,15 +80,15 @@
       "severity": "error",
       "corpus": {
         "include": [
-          "src/gui/perkey/**/*.py"
+          "keyrgb/gui/perkey/**/*.py"
         ],
         "exclude": [
-          "src/gui/perkey/hardware.py"
+          "keyrgb/gui/perkey/hardware.py"
         ]
       },
       "imports": [
         {
-          "module": "src.core.backends.registry",
+          "module": "keyrgb.core.backends.registry",
           "message": "Per-key GUI helpers should not import backend selection directly; expose backend and device access through bootstrap or injected helpers."
         }
       ]
@@ -99,12 +99,12 @@
       "severity": "error",
       "corpus": {
         "include": [
-          "src/tray/ui/**/*.py"
+          "keyrgb/tray/ui/**/*.py"
         ]
       },
       "imports": [
         {
-          "module": "src.core.profile.profiles",
+          "module": "keyrgb.core.profile.profiles",
           "message": "Tray UI should not import core profile storage directly; use callbacks, app services, or controller adapters."
         }
       ]
@@ -115,7 +115,7 @@
       "severity": "error",
       "corpus": {
         "include": [
-          "src/tray/ui/**/*.py"
+          "keyrgb/tray/ui/**/*.py"
         ]
       },
       "attributes": [
@@ -143,13 +143,13 @@
       "severity": "error",
       "corpus": {
         "include": [
-          "src/**/*.py",
+          "keyrgb/**/*.py",
           "buildpython/**/*.py"
         ]
       },
       "patterns": [
         {
-          "regex": "^\\s*(?:from|import)\\s+src\\.core\\.effects\\.ite_backend\\b",
+          "regex": "^\\s*(?:from|import)\\s+keyrgb\\.core\\.effects\\.ite_backend\\b",
           "flags": "m",
           "message": "Legacy src.core.effects.ite_backend imports are forbidden."
         }

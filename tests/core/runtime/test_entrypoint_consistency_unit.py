@@ -10,10 +10,10 @@ import re
 
 _ROOT = pathlib.Path(__file__).resolve().parents[3]
 _PYPROJECT = _ROOT / "pyproject.toml"
-_WRAPPER = _ROOT / "keyrgb"
+_WRAPPER = _ROOT / "keyrgb.sh"
 
-EXPECTED_CONSOLE_SCRIPT = "src.tray.entrypoint:main"
-EXPECTED_MODULE = "src.tray"
+EXPECTED_CONSOLE_SCRIPT = "keyrgb.tray.entrypoint:main"
+EXPECTED_MODULE = "keyrgb.tray"
 
 
 def _read_pyproject_text() -> str:
@@ -30,7 +30,7 @@ def _read_wrapper_text() -> str:
 
 
 def test_keyrgb_script_entry_in_pyproject():
-    """[project.scripts] must declare keyrgb = 'src.tray.entrypoint:main'."""
+    """[project.scripts] must declare keyrgb = 'keyrgb.tray.entrypoint:main'."""
     text = _read_pyproject_text()
     # Match the assignment inside [project.scripts]
     match = re.search(r"^\s*keyrgb\s*=\s*[\"']([^\"']+)[\"']", text, re.MULTILINE)
@@ -47,7 +47,7 @@ def test_keyrgb_script_entry_in_pyproject():
 
 
 def test_wrapper_invokes_correct_module():
-    """keyrgb wrapper must pass '-m src.tray' to Python."""
+    """keyrgb wrapper must pass '-m keyrgb.tray' to Python."""
     text = _read_wrapper_text()
     assert f"-m {EXPECTED_MODULE}" in text, f"keyrgb wrapper does not contain '-m {EXPECTED_MODULE}'"
 

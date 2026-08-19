@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from src.gui.windows import power_mode
+from keyrgb.gui.windows import power_mode
 
 
 class _FakeVar:

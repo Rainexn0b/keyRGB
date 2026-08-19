@@ -37,7 +37,7 @@ names because they do not follow the `ITE<chip>` convention.
 ## 2. Renames applied
 
 The following directories and canonical backend names were changed. Old names
-continue to work via aliases in `src/core/backends/registry.py`.
+continue to work via aliases in `keyrgb/core/backends/registry.py`.
 
 | Old name | New canonical name | Old directory | New directory |
 |---|---|---|---|
@@ -57,18 +57,18 @@ Secondary device route identifiers (e.g., `ite8258-chassis-logo`) and the
 
 ### Files touched by the rename
 
-- `src/core/backends/registry.py` — alias map, `name` attributes, imports
-- `src/core/backends/ite8291r3_perkey/` — renamed + `name` updated
-- `src/core/backends/ite8910_perkey/` — renamed + `name` updated
-- `src/core/backends/ite8291_perkey/` — renamed + `name` updated
-- `src/core/backends/ite8258_zones/` — renamed + `name` updated
-- `src/core/backends/ite8233_lightbar/` — renamed + `name` updated
-- `src/core/backends/ite8297_uniform/` — renamed + `name` updated
-- `src/core/backends/README.md` — new naming policy and inventory
-- `src/tray/app/_startup.py` — startup hints use canonical names
-- `src/tray/ui/_device_status.py` — display-name lookup uses canonical names
-- `src/core/secondary_device_routes.py` — alias resolution before route matching
-- `src/core/diagnostics/_classify.py` — classification strings use canonical names
+- `keyrgb/core/backends/registry.py` — alias map, `name` attributes, imports
+- `keyrgb/core/backends/ite8291r3_perkey/` — renamed + `name` updated
+- `keyrgb/core/backends/ite8910_perkey/` — renamed + `name` updated
+- `keyrgb/core/backends/ite8291_perkey/` — renamed + `name` updated
+- `keyrgb/core/backends/ite8258_zones/` — renamed + `name` updated
+- `keyrgb/core/backends/ite8233_lightbar/` — renamed + `name` updated
+- `keyrgb/core/backends/ite8297_uniform/` — renamed + `name` updated
+- `keyrgb/core/backends/README.md` — new naming policy and inventory
+- `keyrgb/tray/app/_startup.py` — startup hints use canonical names
+- `keyrgb/tray/ui/_device_status.py` — display-name lookup uses canonical names
+- `keyrgb/core/secondary_device_routes.py` — alias resolution before route matching
+- `keyrgb/core/diagnostics/_classify.py` — classification strings use canonical names
 - `tests/core/backends/test_report_pacing_unit.py` — updated env key expectations
 - `tests/core/backends/ite/test_ite8291r3_native_backend_unit.py` — updated env key
 - `tests/core/backends/general/test_backend_registry_unit.py` — alias-resolution coverage
@@ -121,7 +121,7 @@ Secondary device route identifiers (e.g., `ite8258-chassis-logo`) and the
 
 - `tests/core/backends/ tests/tray/ tests/core/diagnostics/` — **1300 passed, 1 skipped**
 - `python -m buildpython --run-steps=19` — **PASS** (exception-transparency health 100/100)
-- `ruff check src/core/backends/ tests/core/backends/ tests/tray/ src/tray/app/_startup.py` — 5 pre-existing unused-import warnings in unrelated test files (not introduced by this change)
+- `ruff check keyrgb/core/backends/ tests/core/backends/ tests/tray/ keyrgb/tray/app/_startup.py` — 5 pre-existing unused-import warnings in unrelated test files (not introduced by this change)
 
 ---
 
@@ -136,12 +136,12 @@ Secondary device route identifiers (e.g., `ite8258-chassis-logo`) and the
 
 ## 6. References
 
-- `src/core/backends/README.md` — finalized naming policy and backend inventory
+- `keyrgb/core/backends/README.md` — finalized naming policy and backend inventory
 - `docs/B-backend-audits/00-index.md` — full audit plan and status
 - `docs/B-backend-audits/09-ite8295-zones.md` — ITE8295_zones audit
 - `docs/B-backend-audits/10-ite8233.md` — ITE8233 lightbar audit
 - `docs/B-backend-audits/12-asusctl.md` — ASUS Aura CLI audit
-- `src/core/backends/registry.py` — alias resolution
+- `keyrgb/core/backends/registry.py` — alias resolution
 - `system/udev/99-ite8291-wootbook.rules`
 
 ---

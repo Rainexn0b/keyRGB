@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.gui import calibrator
-from src.gui.calibrator import launch as calibrator_launch
-from src.gui.calibrator.app import main as app_main
+from keyrgb.gui import calibrator
+from keyrgb.gui.calibrator import launch as calibrator_launch
+from keyrgb.gui.calibrator.app import main as app_main
 
 
 def test_calibrator_package_re_exports_main() -> None:
@@ -34,7 +34,7 @@ def test_launch_keymap_calibrator_uses_structural_repo_root_for_packaged_layout(
 
     assert launch_calls == [
         {
-            "module_name": "src.gui.calibrator",
+            "module_name": "keyrgb.gui.calibrator",
             "anchor": str(anchor),
             "no_bytecode": False,
         }

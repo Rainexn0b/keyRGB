@@ -276,7 +276,7 @@ def profile_paths_factory():
         backdrop_settings: Path | None = None,
         secondary_lighting: Path | None = None,
     ):
-        from src.core.profile.paths import ProfilePaths
+        from keyrgb.core.profile.paths import ProfilePaths
 
         return ProfilePaths(
             root=root,

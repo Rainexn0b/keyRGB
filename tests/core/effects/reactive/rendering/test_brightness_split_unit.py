@@ -13,7 +13,7 @@ import json
 
 
 def test_brightness_is_decoupled_by_mode(tmp_path, monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
     monkeypatch.setenv("KEYRGB_CONFIG_PATH", str(tmp_path / "cfg" / "config.json"))
@@ -48,7 +48,7 @@ def test_old_config_migrates_perkey_brightness(tmp_path, monkeypatch) -> None:
     We migrate perkey_brightness from brightness on first load.
     """
 
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     cfg_dir = tmp_path / "cfg"
     cfg_dir.mkdir(parents=True, exist_ok=True)

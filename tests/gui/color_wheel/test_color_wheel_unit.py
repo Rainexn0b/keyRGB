@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.widgets.color_wheel.color_wheel as color_wheel_module
-from src.gui.widgets.color_wheel.color_wheel import ColorWheel
+import keyrgb.gui.widgets.color_wheel.color_wheel as color_wheel_module
+from keyrgb.gui.widgets.color_wheel.color_wheel import ColorWheel
 
 
 class _FakeCanvas:

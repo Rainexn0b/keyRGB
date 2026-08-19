@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from src.tray.pollers.idle_power import sensors
+from keyrgb.tray.pollers.idle_power import sensors
 
 
 def _write_text(path, text: str) -> None:

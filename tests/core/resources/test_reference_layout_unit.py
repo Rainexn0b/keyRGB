@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import src.core.resources.layout as layout_mod
-import src.core.resources.layout_slots as layout_slots_mod
-from src.core.resources.layout import (
+import keyrgb.core.resources.layout as layout_mod
+import keyrgb.core.resources.layout_slots as layout_slots_mod
+from keyrgb.core.resources.layout import (
     ISO_ONLY_KEY_IDS,
     KeyDef,
     build_layout,
@@ -11,8 +11,12 @@ from src.core.resources.layout import (
     resolve_physical_layout,
     slot_id_for_key_id,
 )
-from src.core.resources.layout_slots import apply_layout_slot_overrides, clear_layout_slot_cache, get_layout_slot_states
-from src.core.resources.layout_specs import load_layout_spec
+from keyrgb.core.resources.layout_slots import (
+    apply_layout_slot_overrides,
+    clear_layout_slot_cache,
+    get_layout_slot_states,
+)
+from keyrgb.core.resources.layout_specs import load_layout_spec
 
 
 def test_reference_layout_includes_iso_extra_key() -> None:

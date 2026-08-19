@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.resources.defaults import get_default_lightbar_overlay
-from src.gui.perkey import lightbar_controls
+from keyrgb.core.resources.defaults import get_default_lightbar_overlay
+from keyrgb.gui.perkey import lightbar_controls
 
 
 class _FakeVar:

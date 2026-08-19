@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import fcntl
 
-from src.core.runtime import hardware_ownership
+from keyrgb.core.runtime import hardware_ownership
 
 
 def test_hardware_control_lock_is_exclusive_and_releasable(monkeypatch, tmp_path) -> None:

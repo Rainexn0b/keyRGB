@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.reference.overlay_geometry import (
+from keyrgb.gui.reference.overlay_geometry import (
     CanvasTransform,
     apply_global_tweak,
     apply_per_key_tweak,

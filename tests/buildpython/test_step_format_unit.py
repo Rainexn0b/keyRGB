@@ -23,7 +23,7 @@ def test_ruff_format_check_runner_covers_runtime_and_tooling_surfaces(monkeypatc
             "ruff",
             "format",
             "--check",
-            "src",
+            "keyrgb",
             "buildpython",
             "scripts/release",
             "tests",

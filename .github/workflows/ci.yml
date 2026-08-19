@@ -52,7 +52,7 @@ jobs:
           import zipfile
           from pathlib import Path
 
-          from src.core.resources.reference_defaults_specs import (
+          from keyrgb.core.resources.reference_defaults_specs import (
               clear_reference_defaults_spec_cache,
               load_reference_defaults_spec,
           )
@@ -62,11 +62,11 @@ jobs:
           with zipfile.ZipFile(wheels[0]) as archive:
               names = set(archive.namelist())
           required = [
-              "src/core/resources/reference_defaults_specs.json",
-              "src/core/resources/reference_defaults_specs/meta.json",
-              "src/core/resources/reference_defaults_specs/keymaps.json",
-              "src/core/resources/reference_defaults_specs/layout_tweaks.json",
-              "src/core/resources/reference_defaults_specs/per_key_tweaks/ansi.json",
+              "keyrgb/core/resources/reference_defaults_specs.json",
+              "keyrgb/core/resources/reference_defaults_specs/meta.json",
+              "keyrgb/core/resources/reference_defaults_specs/keymaps.json",
+              "keyrgb/core/resources/reference_defaults_specs/layout_tweaks.json",
+              "keyrgb/core/resources/reference_defaults_specs/per_key_tweaks/ansi.json",
           ]
           missing = [path for path in required if path not in names]
           assert not missing, missing

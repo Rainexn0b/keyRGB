@@ -13,7 +13,7 @@ import pytest
 class TestPowerManagerEventHandlers:
     """Test lid/suspend event handlers."""
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_suspend_records_intent_off_not_transient_is_off(self, mock_policy_cls):
         """Suspend should report user intent, not transient tray.is_off.
 
@@ -21,8 +21,8 @@ class TestPowerManagerEventHandlers:
         still want suspend/resume restore decisions to reflect user intent.
         """
 
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         mock_kb = MagicMock()
         mock_kb.is_off = True
@@ -45,10 +45,10 @@ class TestPowerManagerEventHandlers:
         inputs = args[0]
         assert inputs.is_off is False
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_on_suspend_calls_turn_off_when_enabled(self, mock_policy_cls):
         """_on_suspend should call kb.turn_off() when flags allow."""
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         mock_kb = MagicMock()
         mock_kb.is_off = False
@@ -66,9 +66,9 @@ class TestPowerManagerEventHandlers:
 
         mock_kb.turn_off.assert_called_once()
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_on_suspend_defaults_to_enabled_when_config_reload_raises_runtime_error(self, mock_policy_cls):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         class _ConfigBrokenReload:
             def reload(self):
@@ -82,16 +82,16 @@ class TestPowerManagerEventHandlers:
         mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
         mock_policy_cls.return_value = mock_policy_instance
 
-        with patch("src.core.power.management.manager.logger.exception") as exc:
+        with patch("keyrgb.core.power.management.manager.logger.exception") as exc:
             pm = PowerManager(mock_kb, config=_ConfigBrokenReload())
             pm._on_suspend()
 
         mock_kb.turn_off.assert_called_once()
         assert exc.call_count == 2
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_on_suspend_defaults_to_enabled_when_management_flag_read_raises_runtime_error(self, mock_policy_cls):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         class _ConfigBrokenFlagRead:
             def reload(self):
@@ -111,17 +111,17 @@ class TestPowerManagerEventHandlers:
         mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
         mock_policy_cls.return_value = mock_policy_instance
 
-        with patch("src.core.power.management.manager.logger.exception") as exc:
+        with patch("keyrgb.core.power.management.manager.logger.exception") as exc:
             pm = PowerManager(mock_kb, config=_ConfigBrokenFlagRead())
             pm._on_suspend()
 
         mock_kb.turn_off.assert_called_once()
         exc.assert_called_once_with("Failed to read power management config flag '%s'", "management_enabled")
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_on_suspend_skips_when_disabled(self, mock_policy_cls):
         """_on_suspend should not call turn_off when power_management_enabled=False."""
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         mock_kb.turn_off = MagicMock()
@@ -133,10 +133,10 @@ class TestPowerManagerEventHandlers:
 
         mock_kb.turn_off.assert_not_called()
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_on_resume_calls_restore_when_enabled(self, mock_policy_cls):
         """_on_resume should call kb.restore() when flags allow."""
-        from src.core.power.management.manager import PowerManager, RestoreFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent
 
         mock_kb = MagicMock()
         mock_kb.is_off = True
@@ -155,10 +155,10 @@ class TestPowerManagerEventHandlers:
 
         mock_kb.restore.assert_called_once()
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_on_lid_close_calls_turn_off_when_enabled(self, mock_policy_cls):
         """_on_lid_close should call kb.turn_off() when flags allow."""
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         mock_kb = MagicMock()
         mock_kb.is_off = False
@@ -176,10 +176,10 @@ class TestPowerManagerEventHandlers:
 
         mock_kb.turn_off.assert_called_once()
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_on_lid_open_calls_restore_when_enabled(self, mock_policy_cls):
         """_on_lid_open should call kb.restore() when flags allow."""
-        from src.core.power.management.manager import PowerManager, RestoreFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent
 
         mock_kb = MagicMock()
         mock_kb.is_off = True
@@ -197,9 +197,9 @@ class TestPowerManagerEventHandlers:
 
         mock_kb.restore.assert_called_once()
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_lid_handlers_track_lid_closed_state(self, mock_policy_cls):
-        from src.core.power.management.manager import PowerManager, RestoreFromEvent, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent, TurnOffFromEvent
 
         mock_kb = MagicMock()
         mock_kb.is_off = False
@@ -222,10 +222,10 @@ class TestPowerManagerEventHandlers:
         pm._on_lid_open()
         assert pm._lid_closed is False
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_delayed_resume_is_discarded_after_newer_suspend(self, mock_policy_cls):
-        from src.core.power.management.manager import PowerManager, RestoreFromEvent, TurnOffFromEvent
-        from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+        from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent, TurnOffFromEvent
+        from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
         mock_kb = MagicMock()
         mock_kb.is_off = False
@@ -258,7 +258,7 @@ class TestPowerManagerEventHandlers:
             release_resume.wait()
 
         try:
-            with patch("src.core.power.management.manager.time.sleep", side_effect=blocked_sleep):
+            with patch("keyrgb.core.power.management.manager.time.sleep", side_effect=blocked_sleep):
                 resume = threading.Thread(target=pm._on_resume)
                 resume.start()
                 assert sleep_started.wait(timeout=1.0)
@@ -277,16 +277,16 @@ class TestPowerManagerEventHandlers:
         mock_kb.turn_off.assert_called_once_with()
         mock_kb.restore.assert_not_called()
 
-    @patch("src.core.power.management.manager.PowerEventPolicy")
+    @patch("keyrgb.core.power.management.manager.PowerEventPolicy")
     def test_delayed_resume_is_discarded_after_newer_manual_transition(self, mock_policy_cls):
-        from src.core.power.management.manager import PowerManager, RestoreFromEvent
-        from src.tray.controllers.runtime_coordination import (
+        from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent
+        from keyrgb.tray.controllers.runtime_coordination import (
             active_transition_revision,
             capture_transition_revision,
             run_tray_transition,
         )
-        from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         class _Tray:
             is_off = False
@@ -326,7 +326,7 @@ class TestPowerManagerEventHandlers:
             target=lambda: tray.run_runtime_transition(tray.turn_off),
         )
         try:
-            with patch("src.core.power.management.manager.time.sleep", side_effect=blocked_sleep):
+            with patch("keyrgb.core.power.management.manager.time.sleep", side_effect=blocked_sleep):
                 resume.start()
                 assert sleep_started.wait(timeout=1.0)
                 manual_off.start()
@@ -348,15 +348,15 @@ class TestPowerManagerEventHandlers:
 
     def test_handle_power_event_catches_exceptions_in_kb_methods(self):
         """If kb.turn_off/restore raises, _handle_power_event should not crash."""
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         mock_kb = MagicMock()
         mock_kb.is_off = False
         mock_kb.turn_off = MagicMock(side_effect=RuntimeError("hardware error"))
 
         with (
-            patch("src.core.power.management.manager.PowerEventPolicy") as mock_policy_cls,
-            patch("src.core.power.management.manager.logger.exception") as exc,
+            patch("keyrgb.core.power.management.manager.PowerEventPolicy") as mock_policy_cls,
+            patch("keyrgb.core.power.management.manager.logger.exception") as exc,
         ):
             mock_policy_instance = MagicMock()
             mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
@@ -371,13 +371,13 @@ class TestPowerManagerEventHandlers:
         exc.assert_called_once()
 
     def test_handle_power_event_propagates_unexpected_keyboard_method_errors(self):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         mock_kb = MagicMock()
         mock_kb.is_off = False
         mock_kb.turn_off = MagicMock(side_effect=AssertionError("unexpected keyboard bug"))
 
-        with patch("src.core.power.management.manager.PowerEventPolicy") as mock_policy_cls:
+        with patch("keyrgb.core.power.management.manager.PowerEventPolicy") as mock_policy_cls:
             mock_policy_instance = MagicMock()
             mock_policy_instance.handle_power_off_event.return_value = MagicMock(actions=[TurnOffFromEvent()])
             mock_policy_cls.return_value = mock_policy_instance
@@ -392,7 +392,7 @@ class TestPowerManagerEventHandlers:
 
 class TestPowerManagerEventHandlerRoutingSeams:
     def test_on_suspend_delegates_suspend_route_metadata_to_shared_helper(self):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         pm = PowerManager(MagicMock())
 
@@ -412,7 +412,7 @@ class TestPowerManagerEventHandlerRoutingSeams:
         assert kwargs["policy_method"].__name__ == "handle_power_off_event"
 
     def test_on_resume_delegates_restore_route_metadata_with_wakeup_delay(self):
-        from src.core.power.management.manager import PowerManager, RestoreFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent
 
         pm = PowerManager(MagicMock())
 
@@ -433,7 +433,7 @@ class TestPowerManagerEventHandlerRoutingSeams:
         assert kwargs["policy_method"].__name__ == "handle_power_restore_event"
 
     def test_on_lid_close_delegates_turn_off_route_metadata_to_shared_helper(self):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         pm = PowerManager(MagicMock())
 
@@ -453,7 +453,7 @@ class TestPowerManagerEventHandlerRoutingSeams:
         assert kwargs["policy_method"].__name__ == "handle_power_off_event"
 
     def test_on_lid_open_delegates_restore_route_metadata_to_shared_helper(self):
-        from src.core.power.management.manager import PowerManager, RestoreFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, RestoreFromEvent
 
         pm = PowerManager(MagicMock())
 
@@ -473,7 +473,7 @@ class TestPowerManagerEventHandlerRoutingSeams:
         assert kwargs["policy_method"].__name__ == "handle_power_restore_event"
 
     def test_dispatch_power_event_route_uses_enablement_and_flag_outputs_as_is(self):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         pm = PowerManager(MagicMock())
         enabled = object()
@@ -508,11 +508,11 @@ class TestPowerManagerEventHandlerRoutingSeams:
 
 class TestPowerManagerEventPolicyEvaluationSeams:
     def test_get_keyboard_intent_state_returns_helper_result(self):
-        from src.core.power.management.manager import PowerManager, safe_int_attr
+        from keyrgb.core.power.management.manager import PowerManager, safe_int_attr
 
         pm = PowerManager(MagicMock())
 
-        with patch("src.core.power.management.manager.is_intentionally_off", return_value=True) as intent_state:
+        with patch("keyrgb.core.power.management.manager.is_intentionally_off", return_value=True) as intent_state:
             assert pm._get_keyboard_intent_state() is True
 
         intent_state.assert_called_once_with(
@@ -522,12 +522,12 @@ class TestPowerManagerEventPolicyEvaluationSeams:
         )
 
     def test_get_keyboard_intent_state_logs_and_returns_none_on_runtime_error(self):
-        from src.core.power.management.manager import PowerManager, logger
+        from keyrgb.core.power.management.manager import PowerManager, logger
 
         pm = PowerManager(MagicMock())
 
         with (
-            patch("src.core.power.management.manager.is_intentionally_off", side_effect=RuntimeError("boom")),
+            patch("keyrgb.core.power.management.manager.is_intentionally_off", side_effect=RuntimeError("boom")),
             patch.object(logger, "exception") as log_exception,
         ):
             assert pm._get_keyboard_intent_state() is None
@@ -535,13 +535,13 @@ class TestPowerManagerEventPolicyEvaluationSeams:
         log_exception.assert_called_once_with("Power event intent-state evaluation failed")
 
     def test_get_keyboard_intent_state_propagates_unexpected_errors(self):
-        from src.core.power.management.manager import PowerManager, logger
+        from keyrgb.core.power.management.manager import PowerManager, logger
 
         pm = PowerManager(MagicMock())
 
         with (
             patch(
-                "src.core.power.management.manager.is_intentionally_off",
+                "keyrgb.core.power.management.manager.is_intentionally_off",
                 side_effect=AssertionError("unexpected intent bug"),
             ),
             patch.object(logger, "exception") as log_exception,
@@ -552,7 +552,7 @@ class TestPowerManagerEventPolicyEvaluationSeams:
         log_exception.assert_not_called()
 
     def test_evaluate_power_event_policy_short_circuits_when_intent_state_is_unavailable(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock())
         policy_method = MagicMock()
@@ -571,7 +571,7 @@ class TestPowerManagerEventPolicyEvaluationSeams:
         policy_method.assert_not_called()
 
     def test_evaluate_power_event_policy_logs_policy_failures_with_existing_message(self):
-        from src.core.power.management.manager import PowerManager, logger
+        from keyrgb.core.power.management.manager import PowerManager, logger
 
         pm = PowerManager(MagicMock())
         policy_method = MagicMock(side_effect=RuntimeError("policy boom"))
@@ -596,12 +596,12 @@ class TestPowerManagerEventPolicyEvaluationSeams:
 
 class TestPowerManagerHandlePowerEventBranches:
     def test_handle_power_event_returns_when_policy_raises(self):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
 
-        with patch("src.core.power.management.manager.logger.exception") as exc:
+        with patch("keyrgb.core.power.management.manager.logger.exception") as exc:
             pm._handle_power_event(
                 enabled=True,
                 action_enabled=True,
@@ -614,7 +614,7 @@ class TestPowerManagerHandlePowerEventBranches:
         exc.assert_called_once()
 
     def test_handle_power_event_propagates_unexpected_policy_errors(self):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         pm = PowerManager(MagicMock())
 
@@ -629,7 +629,7 @@ class TestPowerManagerHandlePowerEventBranches:
             )
 
     def test_handle_power_event_filters_action_type_and_action_enabled(self):
-        from src.core.power.management.manager import (
+        from keyrgb.core.power.management.manager import (
             PowerManager,
             RestoreFromEvent,
             TurnOffFromEvent,
@@ -664,7 +664,7 @@ class TestPowerManagerHandlePowerEventBranches:
         mock_kb.turn_off.assert_called_once()
 
     def test_handle_power_event_sleeps_and_logs_only_once_for_multiple_actions(self):
-        from src.core.power.management.manager import PowerManager, TurnOffFromEvent
+        from keyrgb.core.power.management.manager import PowerManager, TurnOffFromEvent
 
         mock_kb = MagicMock()
         mock_kb.turn_off = MagicMock()
@@ -675,8 +675,8 @@ class TestPowerManagerHandlePowerEventBranches:
         policy_method = MagicMock(return_value=result)
 
         with (
-            patch("src.core.power.management.manager.time.sleep") as sleep,
-            patch("src.core.power.management.manager.logger.info") as info,
+            patch("keyrgb.core.power.management.manager.time.sleep") as sleep,
+            patch("keyrgb.core.power.management.manager.logger.info") as info,
         ):
             pm._handle_power_event(
                 enabled=True,
@@ -693,7 +693,7 @@ class TestPowerManagerHandlePowerEventBranches:
         assert mock_kb.turn_off.call_count == 2
 
     def test_handle_power_event_reports_intent_off_from_user_flags_and_config(self):
-        from src.core.power.management.manager import (
+        from keyrgb.core.power.management.manager import (
             PowerEventInputs,
             PowerManager,
             TurnOffFromEvent,
@@ -738,7 +738,7 @@ class TestPowerManagerHandlePowerEventBranches:
         )
         assert captured["inputs"].is_off is True
 
-        from src.tray.idle_power_state import TrayIdlePowerState
+        from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
         kb3 = MagicMock()
         kb3.user_forced_off = False

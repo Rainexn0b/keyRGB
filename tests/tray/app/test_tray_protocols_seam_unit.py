@@ -6,7 +6,7 @@ and the ensure_tray_icon_state fallback behavior.
 
 from types import SimpleNamespace
 
-from src.tray.protocols import TrayIconState, ensure_tray_icon_state
+from keyrgb.tray.protocols import TrayIconState, ensure_tray_icon_state
 
 
 def test_ensure_tray_icon_state_returns_owned_instance():

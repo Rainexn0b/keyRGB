@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.backends._report_pacing import (
+from keyrgb.core.backends._report_pacing import (
     backend_report_delay_env_key,
     hid_report_delay_s_from_env,
     sleep_after_hid_report,
@@ -38,7 +38,7 @@ def test_invalid_backend_specific_delay_falls_back_to_global(monkeypatch) -> Non
 def test_sleep_after_hid_report_allows_zero_to_disable(monkeypatch) -> None:
     sleeps: list[float] = []
     monkeypatch.setenv("KEYRGB_ITE8258_PERKEY_CHASSIS_REPORT_DELAY_MS", "0")
-    monkeypatch.setattr("src.core.backends._report_pacing.time.sleep", sleeps.append)
+    monkeypatch.setattr("keyrgb.core.backends._report_pacing.time.sleep", sleeps.append)
 
     sleep_after_hid_report(backend_name="ite8258_perkey_chassis")
 

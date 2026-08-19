@@ -14,18 +14,18 @@ from unittest.mock import patch
 # Tripwire: any accidental real USB/hidraw open should fail loudly in CI.
 os.environ.setdefault("KEYRGB_TEST_HARDWARE_TRIPWIRE", "1")
 
-from src.core.backends.ite8258_perkey_chassis import protocol
-from src.core.backends.ite8258_perkey_chassis.device import (
+from keyrgb.core.backends.ite8258_perkey_chassis import protocol
+from keyrgb.core.backends.ite8258_perkey_chassis.device import (
     Ite8258ChassisKeyboardDevice,
     Ite8258ChassisZoneDevice,
 )
-from src.core.backends.ite8258_perkey_chassis.profile_coordinator import (
+from keyrgb.core.backends.ite8258_perkey_chassis.profile_coordinator import (
     Ite8258ChassisProfileCoordinator,
 )
-from src.core.secondary_device_routes import SecondaryDeviceRoute, iter_secondary_routes
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.tray.controllers.secondary_static_scene import authoritative_payload_from_config
-from src.tray.pollers.config_polling_internal import helpers as polling_helpers
+from keyrgb.core.secondary_device_routes import SecondaryDeviceRoute, iter_secondary_routes
+from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute
+from keyrgb.tray.controllers.secondary_static_scene import authoritative_payload_from_config
+from keyrgb.tray.pollers.config_polling_internal import helpers as polling_helpers
 
 
 def _route_for(state_key: str) -> SecondaryDeviceRoute:
@@ -156,7 +156,7 @@ def test_uniform_mode_change_with_legacy_mirror_commits_full_composite_scene_onc
 
     def reconcile(tray_obj, payload, *, animated: bool) -> None:
         # Inject effective inventory and in-memory devices for the real reconcile path.
-        from src.tray.controllers import secondary_static_scene as scene
+        from keyrgb.tray.controllers import secondary_static_scene as scene
 
         if payload is None:
             scene.apply_secondary_static_scene(
@@ -171,7 +171,7 @@ def test_uniform_mode_change_with_legacy_mirror_commits_full_composite_scene_onc
             return
         raise AssertionError(f"expected legacy fallback payload, got {payload!r} (animated={animated})")
 
-    from src.tray.pollers.config_polling_internal import _apply_callbacks
+    from keyrgb.tray.pollers.config_polling_internal import _apply_callbacks
 
     # Invoke the real config-poller callback. This protects the placement of
     # secondary reconciliation inside the primary output transaction.
@@ -205,8 +205,8 @@ def test_uniform_mode_change_with_legacy_mirror_commits_full_composite_scene_onc
 
 
 def test_software_render_batches_primary_and_all_chassis_zones_once() -> None:
-    from src.core.effects.software import base as software_base
-    from src.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
+    from keyrgb.core.effects.software import base as software_base
+    from keyrgb.core.effects.software_targets import SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE
 
     sent: list[bytes] = []
     coordinator = Ite8258ChassisProfileCoordinator()
@@ -272,8 +272,8 @@ def test_complete_materialized_mirror_is_authoritative_and_disables_omitted_inte
     neon_route = _route_for("ite8258_chassis_neon")
     vent_route = _route_for("ite8258_chassis_vent")
 
-    from src.core.effects.device import optional_output_transaction
-    from src.tray.controllers import secondary_static_scene as scene
+    from keyrgb.core.effects.device import optional_output_transaction
+    from keyrgb.tray.controllers import secondary_static_scene as scene
 
     tray = SimpleNamespace(config=config, engine=SimpleNamespace(kb=keyboard))
 

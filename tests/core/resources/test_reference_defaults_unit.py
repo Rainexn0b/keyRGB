@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from src.core.resources import defaults
-from src.core.resources.defaults import (
+from keyrgb.core.resources import defaults
+from keyrgb.core.resources.defaults import (
     DEFAULT_COLORS,
     DEFAULT_KEYMAP,
     REFERENCE_MATRIX_COLS,
@@ -13,8 +13,8 @@ from src.core.resources.defaults import (
     get_default_layout_tweaks,
     get_default_per_key_tweaks,
 )
-from src.core.resources.layout import build_layout
-from src.core.resources.reference_defaults_specs import (
+from keyrgb.core.resources.layout import build_layout
+from keyrgb.core.resources.reference_defaults_specs import (
     clear_reference_defaults_spec_cache,
     load_reference_defaults_spec,
 )

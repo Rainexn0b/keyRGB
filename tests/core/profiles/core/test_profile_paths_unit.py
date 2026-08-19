@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from src.core.config import Config
-from src.core.profile import paths
+from keyrgb.core.config import Config
+from keyrgb.core.profile import paths
 
 
 def test_safe_profile_name_aliases_light_and_sanitizes() -> None:

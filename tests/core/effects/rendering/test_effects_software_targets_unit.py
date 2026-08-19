@@ -6,8 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.effects.software import base as software_base
-from src.core.effects.software_targets import (
+from keyrgb.core.effects.software import base as software_base
+from keyrgb.core.effects.software_targets import (
     SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
     SOFTWARE_EFFECT_TARGET_KEYBOARD,
     normalize_software_effect_target,
@@ -135,7 +135,7 @@ def test_render_secondary_uniform_rgb_keeps_permission_callback_failures_non_fat
     def capture_log(*args, **kwargs) -> None:
         logged_messages.append(kwargs["msg"])
 
-    monkeypatch.setattr("src.core.effects.software_targets.log_throttled", capture_log)
+    monkeypatch.setattr("keyrgb.core.effects.software_targets.log_throttled", capture_log)
 
     engine = SimpleNamespace(
         kb=_SpyKeyboard(),
@@ -161,7 +161,7 @@ def test_render_secondary_uniform_rgb_keeps_permission_callback_failures_non_fat
 def test_render_secondary_uniform_rgb_propagates_unexpected_permission_callback_failures(monkeypatch) -> None:
     secondary = _PermissionDeniedSecondaryTarget()
 
-    monkeypatch.setattr("src.core.effects.software_targets.log_throttled", lambda *args, **kwargs: None)
+    monkeypatch.setattr("keyrgb.core.effects.software_targets.log_throttled", lambda *args, **kwargs: None)
 
     engine = SimpleNamespace(
         kb=_SpyKeyboard(),
@@ -187,7 +187,7 @@ def test_render_secondary_uniform_rgb_logs_recoverable_target_failures(monkeypat
     def capture_log(*args, **kwargs) -> None:
         logged_messages.append(kwargs["msg"])
 
-    monkeypatch.setattr("src.core.effects.software_targets.log_throttled", capture_log)
+    monkeypatch.setattr("keyrgb.core.effects.software_targets.log_throttled", capture_log)
 
     engine = SimpleNamespace(
         kb=_SpyKeyboard(),
@@ -210,7 +210,7 @@ def test_render_secondary_uniform_rgb_logs_recoverable_target_failures(monkeypat
 def test_render_secondary_uniform_rgb_propagates_unexpected_target_failures(monkeypatch) -> None:
     secondary = _UnexpectedFailingSecondaryTarget()
 
-    monkeypatch.setattr("src.core.effects.software_targets.log_throttled", lambda *args, **kwargs: None)
+    monkeypatch.setattr("keyrgb.core.effects.software_targets.log_throttled", lambda *args, **kwargs: None)
 
     engine = SimpleNamespace(
         kb=_SpyKeyboard(),

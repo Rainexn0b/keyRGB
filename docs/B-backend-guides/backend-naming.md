@@ -15,7 +15,7 @@ ITE<chip>_<capability>[_<capability>...][_<oem>]
 
 **Canonical rules (including the hard max-four post-chip appendages limit and
 coarse chassis tokens) live in**
-[`src/core/backends/README.md`](../../src/core/backends/README.md).
+[`keyrgb/core/backends/README.md`](../../src/core/backends/README.md).
 Do not invent longer surface-inventory names; put logo/neon/vent detail on
 secondary routes and in support docs.
 
@@ -91,9 +91,9 @@ Examples:
 
 Renamed backends keep backward-compatible aliases so existing user config
 (`KEYRGB_BACKEND`, saved profiles) continues to work. Aliases are resolved in
-`src/core/backends/registry.py::_BACKEND_NAME_ALIASES`.
+`keyrgb/core/backends/registry.py::_BACKEND_NAME_ALIASES`.
 
-See `src/core/backends/README.md` for the full alias table and policy.
+See `keyrgb/core/backends/README.md` for the full alias table and policy.
 
 ## Current `ite8258` direction
 

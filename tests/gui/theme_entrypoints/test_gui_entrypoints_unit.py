@@ -9,9 +9,9 @@ import pytest
 @pytest.mark.parametrize(
     ("run_module_name", "target_module_name"),
     [
-        ("src.gui.calibrator.__main__", "src.gui.calibrator.app"),
-        ("src.gui.perkey.__main__", "src.gui.perkey.launch"),
-        ("src.gui.settings.__main__", "src.gui.settings.window"),
+        ("keyrgb.gui.calibrator.__main__", "keyrgb.gui.calibrator.app"),
+        ("keyrgb.gui.perkey.__main__", "keyrgb.gui.perkey.launch"),
+        ("keyrgb.gui.settings.__main__", "keyrgb.gui.settings.window"),
     ],
 )
 def test_gui_module_trampolines_invoke_main(

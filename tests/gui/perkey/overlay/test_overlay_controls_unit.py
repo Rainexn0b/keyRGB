@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.perkey.overlay.controls import OverlayControls
+from keyrgb.gui.perkey.overlay.controls import OverlayControls
 
 
 class _FakeVar:

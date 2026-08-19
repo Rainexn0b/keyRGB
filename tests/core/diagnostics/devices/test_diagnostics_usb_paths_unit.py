@@ -4,16 +4,16 @@ from pathlib import Path
 
 import pytest
 
-import src.core.diagnostics.paths as paths_mod
-import src.core.diagnostics.usb as usb_mod
-from src.core.diagnostics.paths import (
+import keyrgb.core.diagnostics.paths as paths_mod
+import keyrgb.core.diagnostics.usb as usb_mod
+from keyrgb.core.diagnostics.paths import (
     config_file_path,
     sysfs_dmi_root,
     sysfs_leds_root,
     sysfs_usb_devices_root,
     usb_devnode_root,
 )
-from src.core.diagnostics.usb import usb_devices_snapshot
+from keyrgb.core.diagnostics.usb import usb_devices_snapshot
 
 
 def test_diagnostics_paths_use_expected_defaults(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

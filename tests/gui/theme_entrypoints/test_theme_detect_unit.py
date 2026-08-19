@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.theme import detect
+from keyrgb.core.theme import detect
 
 
 def test_detect_theme_override_accepts_dark_light_and_rejects_other_values(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-import src.tray.pollers.idle_power.polling as ipp
+import keyrgb.tray.pollers.idle_power.polling as ipp
 
 
 def test_build_idle_action_key_is_stable_for_inputs():

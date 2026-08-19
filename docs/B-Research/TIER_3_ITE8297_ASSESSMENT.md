@@ -151,14 +151,14 @@ python3 -c "import liquidctl; print(dir(liquidctl))"
    - Release v0.6.1
 
 2. **If liquidctl supports 8297:**
-   - Create `src/core/backends/ite8297.py` wrapper
+   - Create `keyrgb/core/backends/ite8297.py` wrapper
    - Add liquidctl to install.sh
    - Update requirements.txt
    - Test with device (if available)
    - Release v0.6.1
 
 #### Path B: Custom Implementation (Medium Effort)
-1. **Create `src/core/backends/ite8297_custom.py`:**
+1. **Create `keyrgb/core/backends/ite8297_custom.py`:**
    - Base on ite8291r3.py structure
    - Implement Gigabyte RGB Fusion 2 protocol
    - Reference OpenRGB source code for packet structure
@@ -185,7 +185,7 @@ python3 -c "import liquidctl; print(dir(liquidctl))"
 ### File Structure
 
 ```
-src/core/backends/ite8297_custom.py
+keyrgb/core/backends/ite8297_custom.py
 ├── Ite8297Backend (KeyboardBackend wrapper)
 │   ├── name: "ite8297-custom"
 │   ├── priority: 95 (lower than 8291's 100)

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT, SecondaryDeviceRoute
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.gui.perkey.editor import PerKeyEditor
-from src.gui.perkey.secondary_lighting import SecondaryLightingDraft
-from src.gui.perkey.ui import lighting_areas
+from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT, SecondaryDeviceRoute
+from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute
+from keyrgb.gui.perkey.editor import PerKeyEditor
+from keyrgb.gui.perkey.secondary_lighting import SecondaryLightingDraft
+from keyrgb.gui.perkey.ui import lighting_areas
 
 
 def _draft() -> SecondaryLightingDraft:
@@ -119,7 +119,7 @@ def test_selecting_keyboard_slot_returns_shared_wheel_to_keyboard(monkeypatch) -
     editor = PerKeyEditor.__new__(PerKeyEditor)
     editor._lighting_areas_panel = SimpleNamespace(select_keyboard=lambda: calls.append("keyboard"))
     monkeypatch.setattr(
-        "src.gui.perkey.editor.editor_selection.select_slot_id",
+        "keyrgb.gui.perkey.editor.editor_selection.select_slot_id",
         lambda _editor, slot_id: calls.append(slot_id),
     )
 

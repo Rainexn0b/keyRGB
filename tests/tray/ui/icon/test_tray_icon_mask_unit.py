@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from PIL import Image
 
-from src.tray.ui.icon import _mask as icon_mask
+from keyrgb.tray.ui.icon import _mask as icon_mask
 
 
 def test_candidate_tray_mask_paths_includes_deduped_parent_candidates_and_cwd(monkeypatch, tmp_path) -> None:
@@ -32,7 +32,7 @@ def test_candidate_tray_mask_paths_includes_deduped_parent_candidates_and_cwd(mo
 
 
 def test_candidate_tray_mask_paths_swallows_cwd_oserror_and_dedupes_usr_candidates(monkeypatch) -> None:
-    monkeypatch.setattr(icon_mask, "__file__", "/usr/share/keyrgb/src/tray/ui/icon/_mask.py")
+    monkeypatch.setattr(icon_mask, "__file__", "/usr/share/keyrgb/keyrgb/tray/ui/icon/_mask.py")
 
     def _raise_oserror() -> Path:
         raise OSError("cwd unavailable")

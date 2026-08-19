@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.gui.perkey import keyboard_apply
-from src.gui.perkey.keyboard_apply import push_per_key_colors
+from keyrgb.gui.perkey import keyboard_apply
+from keyrgb.gui.perkey.keyboard_apply import push_per_key_colors
 
 
 def test_push_per_key_colors_returns_none_when_keyboard_handle_is_missing() -> None:

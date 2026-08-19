@@ -151,7 +151,7 @@ If you installed via the installer, run KeyRGB from your app menu or start it fr
 | ----------------------- | --------------------------------------------------------- |
 | `keyrgb`                | Start the tray app (background).                          |
 | `keyrgb --capture-runtime-log` | Capture a full foreground runtime diagnostic log. |
-| `./keyrgb`              | Run attached to terminal (dev mode).                      |
+| `./keyrgb.sh`              | Run attached to terminal (dev mode).                      |
 | `keyrgb-perkey`         | Open the per-key editor.                                  |
 | `keyrgb-uniform`        | Open the uniform-color GUI.                               |
 | `keyrgb-reactive-color` | Open the reactive typing color GUI.                       |
@@ -182,7 +182,7 @@ select live controls; **Lighting Profiles** remains the persistent whole-scene e
 | `KEYRGB_DEBUG=1`                        | Enable verbose debug logging.                                                                                                                                                                     |
 | `KEYRGB_TK_SCALING`                     | Float override for UI scaling (High-DPI / fractional scaling).                                                                                                                                    |
 | `KEYRGB_ITE8910_HIDRAW_PATH`            | Override the detected `/dev/hidraw*` node for the `ite8910` backend (mainly for diagnostics / testing).                                                                                           |
-| `KEYRGB_DEBUG_BRIGHTNESS`               | When set to `1`, emits detailed logs for brightness actions and sysfs writes (useful when investigating flashes when restoring from dim). Example: `KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb dev state` |
+| `KEYRGB_DEBUG_BRIGHTNESS`               | When set to `1`, emits detailed logs for brightness actions and sysfs writes (useful when investigating flashes when restoring from dim). Example: `KEYRGB_DEBUG_BRIGHTNESS=1 ./keyrgb.sh dev state` |
 | `KEYRGB_RECOVERY_USER_MODE_SAVE`        | After a hidden controller-sleep recovery, KeyRGB saves the restored scene as the controller's user mode (default on) so the firmware's first-keypress wake ramp targets the current scene instead of its stale saved reference. Set to `0` to opt out. |
 
 ### Tray effects (names)

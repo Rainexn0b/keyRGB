@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src.core.backends.base import BackendMetadata, BackendRegistration, BackendRole, BackendStability
-from src.core.backends.registry import (
+from keyrgb.core.backends.base import BackendMetadata, BackendRegistration, BackendRole, BackendStability
+from keyrgb.core.backends.registry import (
     _invalidate_discovery_cache,
     discover_backend_registrations,
     get_metadata_for_backend_name,

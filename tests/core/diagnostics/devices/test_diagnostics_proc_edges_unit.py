@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-import src.core.diagnostics.proc as proc_mod
-from src.core.diagnostics.proc import proc_open_holders
+import keyrgb.core.diagnostics.proc as proc_mod
+from keyrgb.core.diagnostics.proc import proc_open_holders
 
 
 class _FakeProcRoot:

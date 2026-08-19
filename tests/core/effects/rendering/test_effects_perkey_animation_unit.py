@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.effects.perkey_animation import (
+from keyrgb.core.effects.perkey_animation import (
     build_full_color_grid,
     enable_user_mode_once,
     load_per_key_colors_from_config,
@@ -18,7 +18,7 @@ def test_load_per_key_colors_from_config_returns_mapping(monkeypatch: pytest.Mon
         def __init__(self) -> None:
             self.per_key_colors = {(0, 0): (1, 2, 3)}
 
-    monkeypatch.setitem(sys.modules, "src.core.config", SimpleNamespace(Config=_Config))
+    monkeypatch.setitem(sys.modules, "keyrgb.core.config", SimpleNamespace(Config=_Config))
 
     assert load_per_key_colors_from_config() == {(0, 0): (1, 2, 3)}
 
@@ -44,7 +44,7 @@ def test_load_per_key_colors_from_config_falls_back_on_runtime_config_errors(
         def per_key_colors(self):
             raise ValueError("bad persisted colors")
 
-    monkeypatch.setitem(sys.modules, "src.core.config", SimpleNamespace(Config=_Config))
+    monkeypatch.setitem(sys.modules, "keyrgb.core.config", SimpleNamespace(Config=_Config))
 
     assert load_per_key_colors_from_config() == {}
 
@@ -57,14 +57,14 @@ def test_load_per_key_colors_from_config_propagates_unexpected_errors(
         def per_key_colors(self):
             raise AssertionError("unexpected config bug")
 
-    monkeypatch.setitem(sys.modules, "src.core.config", SimpleNamespace(Config=_Config))
+    monkeypatch.setitem(sys.modules, "keyrgb.core.config", SimpleNamespace(Config=_Config))
 
     with pytest.raises(AssertionError, match="unexpected config bug"):
         load_per_key_colors_from_config()
 
 
 def test_enable_user_mode_once_logs_recoverable_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.effects import perkey_animation
+    from keyrgb.core.effects import perkey_animation
 
     seen: dict[str, object] = {}
 

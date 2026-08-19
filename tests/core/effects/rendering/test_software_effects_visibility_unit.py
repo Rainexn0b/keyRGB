@@ -17,7 +17,7 @@ class _StopEvent:
 
 
 def test_strobe_off_frame_not_full_black_when_brightness_nonzero(monkeypatch) -> None:
-    from src.core.effects.software import effects as sw
+    from keyrgb.core.effects.software import effects as sw
 
     rendered: list[dict] = []
 
@@ -44,7 +44,7 @@ def test_strobe_off_frame_not_full_black_when_brightness_nonzero(monkeypatch) ->
 
 
 def test_chase_visible_even_when_current_color_black(monkeypatch) -> None:
-    from src.core.effects.software import effects as sw
+    from keyrgb.core.effects.software import effects as sw
 
     rendered: list[dict] = []
 

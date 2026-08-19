@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.tray.pollers.idle_power.policy import compute_idle_action
+from keyrgb.tray.pollers.idle_power.policy import compute_idle_action
 
 
 def test_compute_idle_action_returns_none_when_user_forced_off() -> None:

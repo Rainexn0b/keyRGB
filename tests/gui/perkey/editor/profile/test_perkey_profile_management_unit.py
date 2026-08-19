@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core.resources.layouts import slot_id_for_key_id
-from src.gui.perkey import profile_management
+from keyrgb.core.resources.layouts import slot_id_for_key_id
+from keyrgb.gui.perkey import profile_management
 
 
 def test_sanitize_keymap_cells_drops_out_of_range_entries() -> None:

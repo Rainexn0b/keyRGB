@@ -8,8 +8,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-import src.core.power.management._manager_helpers as manager_helpers
-from src.core.power.system import PowerMode
+import keyrgb.core.power.management._manager_helpers as manager_helpers
+from keyrgb.core.power.system import PowerMode
 
 # ---------------------------------------------------------------------------
 # apply_power_source_actions — single-action dispatch
@@ -17,8 +17,8 @@ from src.core.power.system import PowerMode
 
 
 def test_apply_power_source_actions_turn_off_calls_kb_turn_off() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import TurnOffKeyboard
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import TurnOffKeyboard
 
     kb = MagicMock()
     apply_power_source_actions(
@@ -34,8 +34,8 @@ def test_apply_power_source_actions_turn_off_calls_kb_turn_off() -> None:
 
 
 def test_apply_power_source_actions_restore_calls_kb_restore() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import RestoreKeyboard
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import RestoreKeyboard
 
     kb = MagicMock()
     apply_power_source_actions(
@@ -51,8 +51,8 @@ def test_apply_power_source_actions_restore_calls_kb_restore() -> None:
 
 
 def test_apply_power_source_actions_apply_brightness_calls_callback_with_value() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import ApplyBrightness
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import ApplyBrightness
 
     apply_brightness = MagicMock()
     apply_power_source_actions(
@@ -72,8 +72,8 @@ def test_apply_power_source_actions_apply_brightness_calls_callback_with_value()
 
 
 def test_apply_power_source_actions_mixed_list_triggers_all_side_effects_in_sequence() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import (
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import (
         ApplyBrightness,
         RestoreKeyboard,
         TurnOffKeyboard,
@@ -109,8 +109,8 @@ def test_apply_power_source_actions_mixed_list_triggers_all_side_effects_in_sequ
 
 def test_apply_power_source_actions_controller_runtime_error_is_swallowed_and_loop_continues() -> None:
     """A RuntimeError from a controller action must be caught; subsequent actions still run."""
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import ApplyBrightness, TurnOffKeyboard
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import ApplyBrightness, TurnOffKeyboard
 
     class _FailingController:
         def turn_off(self) -> None:
@@ -118,7 +118,7 @@ def test_apply_power_source_actions_controller_runtime_error_is_swallowed_and_lo
 
     apply_brightness = MagicMock()
 
-    with patch("src.core.power.management._manager_helpers.logger.exception") as mock_exc:
+    with patch("keyrgb.core.power.management._manager_helpers.logger.exception") as mock_exc:
         apply_power_source_actions(
             kb_controller=_FailingController(),
             actions=(TurnOffKeyboard(), ApplyBrightness(15)),
@@ -162,11 +162,11 @@ def test_pipeline_on_ac_enabled_no_overrides_does_not_turn_off_keyboard() -> Non
     The policy must not emit a TurnOffKeyboard action on the first tick when
     the keyboard is already on and ac_enabled=True.
     """
-    from src.core.power.management._manager_helpers import (
+    from keyrgb.core.power.management._manager_helpers import (
         apply_power_source_actions,
         build_power_source_loop_inputs,
     )
-    from src.core.power.policies.power_source_loop_policy import PowerSourceLoopPolicy
+    from keyrgb.core.power.policies.power_source_loop_policy import PowerSourceLoopPolicy
 
     _values = {"brightness": 50, "battery_saver_brightness": 25}
 
@@ -201,8 +201,8 @@ def test_pipeline_on_ac_enabled_no_overrides_does_not_turn_off_keyboard() -> Non
 
 
 def test_apply_power_source_actions_activate_power_mode_calls_callback() -> None:
-    from src.core.power.management._manager_helpers import apply_power_source_actions
-    from src.core.power.policies.power_source_loop_policy import ActivatePowerMode
+    from keyrgb.core.power.management._manager_helpers import apply_power_source_actions
+    from keyrgb.core.power.policies.power_source_loop_policy import ActivatePowerMode
 
     activate_power_mode = MagicMock()
     apply_power_source_actions(
@@ -217,8 +217,8 @@ def test_apply_power_source_actions_activate_power_mode_calls_callback() -> None
 
 
 def test_pipeline_emits_power_mode_activation_for_configured_ac_mode() -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
-    from src.core.power.policies.power_source_loop_policy import ActivatePowerMode, PowerSourceLoopPolicy
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.policies.power_source_loop_policy import ActivatePowerMode, PowerSourceLoopPolicy
 
     class _PowerModeConfig(_FakeConfig):
         ac_power_mode = PowerMode.BALANCED.value
@@ -245,8 +245,8 @@ def test_pipeline_emits_power_mode_activation_for_configured_ac_mode() -> None:
 
 
 def test_pipeline_emits_battery_power_mode_when_battery_lighting_is_disabled() -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
-    from src.core.power.policies.power_source_loop_policy import (
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.policies.power_source_loop_policy import (
         ActivatePowerMode,
         PowerSourceLoopPolicy,
         TurnOffKeyboard,
@@ -292,8 +292,8 @@ def test_pipeline_emits_battery_power_mode_when_battery_lighting_is_disabled() -
 
 
 def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
-    from src.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
 
     class _NightConfig(_FakeConfig):
         time_scheduler_enabled = True
@@ -338,8 +338,8 @@ def test_pipeline_on_ac_at_night_uses_scheduler_night_brightness(monkeypatch: py
 def test_pipeline_on_ac_by_day_keeps_power_source_brightness_primary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
-    from src.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
 
     class _DayConfig(_FakeConfig):
         time_scheduler_enabled = True
@@ -384,8 +384,8 @@ def test_pipeline_on_ac_by_day_keeps_power_source_brightness_primary(
 def test_pipeline_on_ac_by_day_uses_scheduler_brightness_when_active_power_source_brightness_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
-    from src.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.policies.power_source_loop_policy import ApplyBrightness, PowerSourceLoopPolicy
 
     class _DayFallbackConfig(_FakeConfig):
         time_scheduler_enabled = True
@@ -429,8 +429,8 @@ def test_pipeline_on_ac_by_day_uses_scheduler_brightness_when_active_power_sourc
 
 
 def test_pipeline_emits_perkey_profile_activation_for_configured_ac_profile() -> None:
-    from src.core.power.management._manager_helpers import build_power_source_loop_inputs
-    from src.core.power.policies.power_source_loop_policy import ActivatePerkeyProfile, PowerSourceLoopPolicy
+    from keyrgb.core.power.management._manager_helpers import build_power_source_loop_inputs
+    from keyrgb.core.power.policies.power_source_loop_policy import ActivatePerkeyProfile, PowerSourceLoopPolicy
 
     class _PerkeyProfileConfig(_FakeConfig):
         ac_perkey_profile_name = "gaming"

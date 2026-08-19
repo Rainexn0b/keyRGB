@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.resources.layout_slots import LayoutSlotState
-from src.gui.perkey.editor_support import layout as layout_mod, layout_state as layout_state_mod
+from keyrgb.core.resources.layout_slots import LayoutSlotState
+from keyrgb.gui.perkey.editor_support import layout as layout_mod, layout_state as layout_state_mod
 
 
 class _Panel:

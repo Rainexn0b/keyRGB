@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.effects.reactive.render import (
+from keyrgb.core.effects.reactive.render import (
     _resolve_brightness,
     apply_backdrop_brightness_scale,
     backdrop_brightness_scale_factor,
@@ -123,7 +123,7 @@ def test_scaling_application() -> None:
 
 
 def test_build_frame_base_maps_reuses_uniform_buffer() -> None:
-    from src.core.effects.reactive._base_maps import build_frame_base_maps
+    from keyrgb.core.effects.reactive._base_maps import build_frame_base_maps
 
     engine = FakeEngine(global_hw=25, eff=25, base=50, per_key_colors=None, last_rendered=25)
 
@@ -149,7 +149,7 @@ def test_build_frame_base_maps_reuses_uniform_buffer() -> None:
 
 
 def test_build_frame_base_maps_reuses_per_key_backdrop_buffers() -> None:
-    from src.core.effects.reactive._base_maps import build_frame_base_maps
+    from keyrgb.core.effects.reactive._base_maps import build_frame_base_maps
 
     engine = FakeEngine(
         global_hw=50,
@@ -183,7 +183,7 @@ def test_build_frame_base_maps_reuses_per_key_backdrop_buffers() -> None:
 
 
 def test_build_frame_base_maps_skips_scaled_copy_when_factor_is_one() -> None:
-    from src.core.effects.reactive._base_maps import build_frame_base_maps
+    from keyrgb.core.effects.reactive._base_maps import build_frame_base_maps
 
     engine = FakeEngine(
         global_hw=5,
@@ -206,7 +206,7 @@ def test_build_frame_base_maps_skips_scaled_copy_when_factor_is_one() -> None:
 
 
 def test_get_engine_color_map_buffer_bypasses_hostile_engine_attribute_lookup() -> None:
-    from src.core.effects.reactive._base_maps import get_engine_color_map_buffer
+    from keyrgb.core.effects.reactive._base_maps import get_engine_color_map_buffer
 
     class _HostileEngine:
         def __getattribute__(self, name: str):
@@ -225,7 +225,7 @@ def test_get_engine_color_map_buffer_bypasses_hostile_engine_attribute_lookup() 
 
 
 def test_get_engine_color_map_buffer_degrades_when_engine_cannot_store_buffers() -> None:
-    from src.core.effects.reactive._base_maps import get_engine_color_map_buffer
+    from keyrgb.core.effects.reactive._base_maps import get_engine_color_map_buffer
 
     class _SlotOnlyEngine:
         __slots__ = ()
@@ -241,7 +241,7 @@ def test_get_engine_color_map_buffer_degrades_when_engine_cannot_store_buffers()
 
 
 def test_fill_per_key_backdrop_map_accepts_duck_typed_items_objects() -> None:
-    from src.core.effects.reactive._base_maps import fill_per_key_backdrop_map
+    from keyrgb.core.effects.reactive._base_maps import fill_per_key_backdrop_map
 
     class _DuckTypedPerKeyColors:
         def items(self):
@@ -269,8 +269,8 @@ def test_fill_per_key_backdrop_map_logs_once_and_preserves_uniform_base_on_broke
     caplog,
     monkeypatch,
 ) -> None:
-    from src.core.effects.reactive._base_maps import fill_per_key_backdrop_map
-    from src.core.utils import logging_utils
+    from keyrgb.core.effects.reactive._base_maps import fill_per_key_backdrop_map
+    from keyrgb.core.utils import logging_utils
 
     class _BrokenItems:
         def items(self):
@@ -289,7 +289,7 @@ def test_fill_per_key_backdrop_map_logs_once_and_preserves_uniform_base_on_broke
     first_dest = {(9, 9): (1, 1, 1)}
     second_dest = {(8, 8): (2, 2, 2)}
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.reactive._base_maps"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.reactive._base_maps"):
         first_result = fill_per_key_backdrop_map(
             first_dest,
             base_color=(3, 4, 5),
@@ -320,7 +320,7 @@ def test_fill_per_key_backdrop_map_logs_once_and_preserves_uniform_base_on_broke
 
 
 def test_fill_per_key_backdrop_map_propagates_unexpected_iteration_errors() -> None:
-    from src.core.effects.reactive._base_maps import fill_per_key_backdrop_map
+    from keyrgb.core.effects.reactive._base_maps import fill_per_key_backdrop_map
 
     class _BrokenItems:
         def items(self):

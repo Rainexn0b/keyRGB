@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
+from keyrgb.core.utils.exceptions import is_device_busy, is_device_disconnected, is_permission_denied
 
 
 class _BrokenStrError(Exception):

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.resources.defaults import get_default_lightbar_overlay
-from src.gui.perkey.lightbar_layout import lightbar_rect_for_size, normalize_lightbar_overlay
+from keyrgb.core.resources.defaults import get_default_lightbar_overlay
+from keyrgb.gui.perkey.lightbar_layout import lightbar_rect_for_size, normalize_lightbar_overlay
 
 
 def test_normalize_lightbar_overlay_clamps_supported_ranges() -> None:

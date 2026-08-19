@@ -22,5 +22,5 @@ reference implementations (OpenRGB, tuxedo-drivers, pobrn/ite8291r3-ctl, etc.).
 
 ## See also
 
-- `src/core/backends/README.md` — finalized backend naming policy and inventory
+- `keyrgb/core/backends/README.md` — finalized backend naming policy and inventory
 - `docs/B-backend-guides/backend-naming.md` — naming rules for new backends

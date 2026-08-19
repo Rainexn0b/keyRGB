@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-from src.gui.perkey.editor_support import runtime as editor_runtime
+from keyrgb.gui.perkey.editor_support import runtime as editor_runtime
 
 
 class _Scope:

@@ -62,9 +62,9 @@ def build_appimage() -> Path:
 
     lib_root = appdir / "usr" / "lib" / "keyrgb"
     site_packages = lib_root / "site-packages"
-    src_dst = lib_root / "src"
+    src_dst = lib_root / "keyrgb"
 
-    shutil.copytree(root / "src", src_dst)
+    shutil.copytree(root / "keyrgb", src_dst)
 
     assets_dst = lib_root / "assets"
     assets_dst.mkdir(parents=True, exist_ok=True)
@@ -146,7 +146,7 @@ def build_appimage() -> Path:
             'export GI_TYPELIB_PATH="$HERE/usr/lib/girepository-1.0${GI_TYPELIB_PATH:+:$GI_TYPELIB_PATH}"',
             'export TCL_LIBRARY="$HERE/usr/lib/tcl8.6"',
             'export TK_LIBRARY="$HERE/usr/lib/tk8.6"',
-            'exec "$HERE/usr/bin/python3" -B -m src.tray "$@"',
+            'exec "$HERE/usr/bin/python3" -B -m keyrgb.tray "$@"',
             "",
         ]
     )

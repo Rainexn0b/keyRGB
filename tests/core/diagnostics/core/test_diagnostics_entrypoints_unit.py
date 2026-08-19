@@ -8,10 +8,10 @@ from pathlib import Path as RealPath
 
 import pytest
 
-import src.core.diagnostics.proc as proc_mod
-from src.core import diagnostics as diagnostics_mod
-from src.core.diagnostics.model import Diagnostics
-from src.core.diagnostics.proc import proc_open_holders
+import keyrgb.core.diagnostics.proc as proc_mod
+from keyrgb.core import diagnostics as diagnostics_mod
+from keyrgb.core.diagnostics.model import Diagnostics
+from keyrgb.core.diagnostics.proc import proc_open_holders
 
 
 def _sample_diagnostics() -> Diagnostics:
@@ -152,7 +152,7 @@ def test_diagnostics_module_trampoline_invokes_package_main(monkeypatch: pytest.
 
     monkeypatch.setattr(diagnostics_mod, "main", lambda: called.append(True))
 
-    runpy.run_module("src.core.diagnostics.__main__", run_name="__main__")
+    runpy.run_module("keyrgb.core.diagnostics.__main__", run_name="__main__")
 
     assert called == [True]
 

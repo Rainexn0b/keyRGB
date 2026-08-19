@@ -4,10 +4,10 @@ from threading import RLock
 
 import pytest
 
-from src.core.effects.device import NullKeyboard
-from src.core.effects.engine import EffectsEngine
-from src.core.effects.fades import fade_in_per_key
-from src.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
+from keyrgb.core.effects.device import NullKeyboard
+from keyrgb.core.effects.engine import EffectsEngine
+from keyrgb.core.effects.fades import fade_in_per_key
+from keyrgb.core.effects.matrix_layout import NUM_COLS, NUM_ROWS
 
 
 def test_prime_per_key_frame_writes_rows_then_brightness_without_user_mode() -> None:

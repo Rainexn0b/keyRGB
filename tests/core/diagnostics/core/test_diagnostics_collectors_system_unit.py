@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.core.diagnostics.collectors.system as collectors_system
-import src.core.power.system as power_system
+import keyrgb.core.diagnostics.collectors.system as collectors_system
+import keyrgb.core.power.system as power_system
 
 
 def _patch_module_path(

@@ -6,7 +6,7 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.diagnostics import hidraw
+from keyrgb.core.diagnostics import hidraw
 
 
 def test_read_hidraw_report_descriptor_reads_size_and_payload(monkeypatch) -> None:

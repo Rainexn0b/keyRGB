@@ -4,14 +4,14 @@ from types import SimpleNamespace
 
 
 def test_update_icon_noop_without_icon(monkeypatch) -> None:
-    from src.tray.ui.refresh import update_icon
+    from keyrgb.tray.ui.refresh import update_icon
 
     tray = SimpleNamespace(icon=None, config=SimpleNamespace(), is_off=False)
     update_icon(tray)
 
 
 def test_update_icon_sets_icon_image(monkeypatch) -> None:
-    from src.tray.ui import refresh
+    from keyrgb.tray.ui import refresh
 
     calls = {"n": 0}
 
@@ -34,14 +34,14 @@ def test_update_icon_sets_icon_image(monkeypatch) -> None:
 
 
 def test_update_menu_noop_without_icon(monkeypatch) -> None:
-    from src.tray.ui.refresh import update_menu
+    from keyrgb.tray.ui.refresh import update_menu
 
     tray = SimpleNamespace(icon=None, config=SimpleNamespace(reload=lambda: None))
     update_menu(tray)
 
 
 def test_update_menu_builds_from_committed_state_without_reloading(monkeypatch) -> None:
-    from src.tray.ui import refresh
+    from keyrgb.tray.ui import refresh
 
     reload_calls: list[str] = []
     tray = SimpleNamespace(
@@ -58,7 +58,7 @@ def test_update_menu_builds_from_committed_state_without_reloading(monkeypatch) 
 
 
 def test_refresh_ui_calls_both(monkeypatch) -> None:
-    from src.tray.ui import refresh
+    from keyrgb.tray.ui import refresh
 
     calls = {"icon": 0, "menu": 0}
 

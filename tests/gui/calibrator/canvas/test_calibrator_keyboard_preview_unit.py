@@ -4,8 +4,8 @@ import logging
 
 import pytest
 
-from src.gui.calibrator.helpers import keyboard_preview
-from src.gui.calibrator.helpers.keyboard_preview import KeyboardPreviewSession, _full_black_map
+from keyrgb.gui.calibrator.helpers import keyboard_preview
+from keyrgb.gui.calibrator.helpers.keyboard_preview import KeyboardPreviewSession, _full_black_map
 
 
 class _FakeConfig:

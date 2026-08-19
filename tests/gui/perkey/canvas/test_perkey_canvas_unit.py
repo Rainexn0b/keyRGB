@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.perkey.canvas as perkey_canvas
-from src.gui.perkey.canvas import KeyboardCanvas
+import keyrgb.gui.perkey.canvas as perkey_canvas
+from keyrgb.gui.perkey.canvas import KeyboardCanvas
 
 
 class _FakeVar:

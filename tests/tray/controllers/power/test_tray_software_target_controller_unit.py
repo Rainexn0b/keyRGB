@@ -41,11 +41,11 @@ def _make_tray() -> SimpleNamespace:
 
 
 def test_apply_software_effect_target_selection_persists_and_restores_when_leaving_all_mode() -> None:
-    from src.tray.controllers.software_target_controller import apply_software_effect_target_selection
+    from keyrgb.tray.controllers.software_target_controller import apply_software_effect_target_selection
 
     tray = _make_tray()
 
-    with patch("src.tray.controllers.software_target_controller.restore_secondary_software_targets") as restore:
+    with patch("keyrgb.tray.controllers.software_target_controller.restore_secondary_software_targets") as restore:
         result = apply_software_effect_target_selection(tray, "keyboard")
 
     assert result == "keyboard"
@@ -55,7 +55,7 @@ def test_apply_software_effect_target_selection_persists_and_restores_when_leavi
 
 
 def test_secondary_software_render_targets_reuses_cached_proxy_instances() -> None:
-    from src.tray.controllers.software_target_controller import secondary_software_render_targets
+    from keyrgb.tray.controllers.software_target_controller import secondary_software_render_targets
 
     tray = _make_tray()
 
@@ -70,8 +70,8 @@ def test_secondary_software_render_targets_reuses_cached_proxy_instances() -> No
 def test_secondary_software_render_targets_use_all_simulated_routes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
-    from src.tray.controllers.software_target_controller import secondary_software_render_targets
+    from keyrgb.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
+    from keyrgb.tray.controllers.software_target_controller import secondary_software_render_targets
 
     monkeypatch.setenv(SIMULATION_ENVIRONMENT_VARIABLE, "1")
     tray = _make_tray()
@@ -95,8 +95,8 @@ def test_secondary_software_render_targets_use_all_simulated_routes(
 def test_cached_secondary_target_acquires_through_runtime_seam(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.tray.controllers import _software_target_auxiliary
-    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+    from keyrgb.tray.controllers import _software_target_auxiliary
+    from keyrgb.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
 
     calls: list[object] = []
 
@@ -126,7 +126,7 @@ def test_cached_secondary_target_acquires_through_runtime_seam(
 
 
 def test_cached_secondary_target_invalidates_cache_on_recoverable_device_error() -> None:
-    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+    from keyrgb.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
 
     calls = {"get_device": 0}
 
@@ -156,8 +156,8 @@ def test_cached_secondary_target_invalidates_cache_on_recoverable_device_error()
 
 
 def test_cached_secondary_target_close_releases_handle_idempotently(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.tray.controllers import _software_target_auxiliary
-    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+    from keyrgb.tray.controllers import _software_target_auxiliary
+    from keyrgb.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
 
     close_calls: list[bool] = []
 
@@ -183,7 +183,7 @@ def test_cached_secondary_target_close_releases_handle_idempotently(monkeypatch:
 
 
 def test_secondary_target_cache_prunes_removed_targets() -> None:
-    from src.tray.controllers import _software_target_auxiliary
+    from keyrgb.tray.controllers import _software_target_auxiliary
 
     closed: list[str] = []
 
@@ -205,7 +205,7 @@ def test_secondary_target_cache_prunes_removed_targets() -> None:
 
 
 def test_secondary_target_cache_close_clears_all_targets() -> None:
-    from src.tray.controllers import _software_target_auxiliary
+    from keyrgb.tray.controllers import _software_target_auxiliary
 
     closed: list[str] = []
 
@@ -225,7 +225,7 @@ def test_secondary_target_cache_close_clears_all_targets() -> None:
 
 
 def test_cached_secondary_target_propagates_unexpected_device_error_without_invalidating_cache() -> None:
-    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+    from keyrgb.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
 
     calls = {"get_device": 0}
 
@@ -255,7 +255,7 @@ def test_cached_secondary_target_propagates_unexpected_device_error_without_inva
 
 
 def test_software_effect_target_options_enable_all_mode_when_auxiliary_device_exists() -> None:
-    from src.tray.controllers.software_target_controller import software_effect_target_options
+    from keyrgb.tray.controllers.software_target_controller import software_effect_target_options
 
     tray = _make_tray()
 
@@ -268,7 +268,7 @@ def test_software_effect_target_options_enable_all_mode_when_auxiliary_device_ex
 
 
 def test_configure_engine_software_targets_logs_recoverable_engine_setter_failure() -> None:
-    from src.tray.controllers.software_target_controller import configure_engine_software_targets
+    from keyrgb.tray.controllers.software_target_controller import configure_engine_software_targets
 
     class _Engine:
         def __init__(self) -> None:
@@ -294,17 +294,17 @@ def test_configure_engine_software_targets_logs_recoverable_engine_setter_failur
 
 
 def test_restore_secondary_software_targets_bubbles_unhandled_exceptions() -> None:
-    from src.tray.controllers.software_target_controller import restore_secondary_software_targets
+    from keyrgb.tray.controllers.software_target_controller import restore_secondary_software_targets
 
     tray = _make_tray()
 
     with (
         patch(
-            "src.tray.controllers.software_target_controller._iter_secondary_targets",
+            "keyrgb.tray.controllers.software_target_controller._iter_secondary_targets",
             return_value=[({}, object())],
         ),
         patch(
-            "src.tray.controllers.software_target_controller._restore_target_from_config",
+            "keyrgb.tray.controllers.software_target_controller._restore_target_from_config",
             side_effect=LookupError("unexpected bug"),
         ),
         pytest.raises(LookupError, match="unexpected bug"),
@@ -313,15 +313,15 @@ def test_restore_secondary_software_targets_bubbles_unhandled_exceptions() -> No
 
 
 def test_handle_secondary_target_error_falls_back_to_logger_when_tray_logging_raises() -> None:
-    from src.tray.controllers.software_target_controller import _handle_secondary_target_error
+    from keyrgb.tray.controllers.software_target_controller import _handle_secondary_target_error
 
     original_exc = RuntimeError("device failed")
     tray = _make_tray()
     tray._log_exception.side_effect = RuntimeError("logger failed")
 
     with (
-        patch("src.tray.controllers.software_target_controller.logger.exception") as log_exception,
-        patch("src.tray.controllers.software_target_controller.logger.error") as log_error,
+        patch("keyrgb.tray.controllers.software_target_controller.logger.exception") as log_exception,
+        patch("keyrgb.tray.controllers.software_target_controller.logger.error") as log_error,
     ):
         _handle_secondary_target_error(tray, original_exc, action="restore_secondary_software_target")
 
@@ -340,12 +340,12 @@ def test_handle_secondary_target_error_falls_back_to_logger_when_tray_logging_ra
 
 
 def test_try_log_event_logs_recoverable_runtime_errors() -> None:
-    from src.tray.controllers.software_target_controller import _try_log_event
+    from keyrgb.tray.controllers.software_target_controller import _try_log_event
 
     tray = _make_tray()
     tray._log_event.side_effect = RuntimeError("event logger failed")
 
-    with patch("src.tray.controllers.software_target_controller.logger.exception") as log_exception:
+    with patch("keyrgb.tray.controllers.software_target_controller.logger.exception") as log_exception:
         _try_log_event(tray, "menu", "set_software_effect_target", old="keyboard", new="all_uniform_capable")
 
     tray._log_event.assert_called_once_with(
@@ -357,7 +357,7 @@ def test_try_log_event_logs_recoverable_runtime_errors() -> None:
 
 
 def test_try_log_event_propagates_unexpected_runtime_errors() -> None:
-    from src.tray.controllers.software_target_controller import _try_log_event
+    from keyrgb.tray.controllers.software_target_controller import _try_log_event
 
     tray = _make_tray()
     tray._log_event.side_effect = AssertionError("unexpected event logger bug")
@@ -367,21 +367,21 @@ def test_try_log_event_propagates_unexpected_runtime_errors() -> None:
 
 
 def test_handle_secondary_target_error_propagates_unexpected_notify_callback_errors() -> None:
-    from src.tray.controllers.software_target_controller import _handle_secondary_target_error
+    from keyrgb.tray.controllers.software_target_controller import _handle_secondary_target_error
 
     original_exc = PermissionError("permission denied")
     tray = _make_tray()
     tray._notify_permission_issue.side_effect = AssertionError("unexpected notify bug")
 
     with (
-        patch("src.tray.controllers.software_target_controller.is_permission_denied", return_value=True),
+        patch("keyrgb.tray.controllers.software_target_controller.is_permission_denied", return_value=True),
         pytest.raises(AssertionError, match="unexpected notify bug"),
     ):
         _handle_secondary_target_error(tray, original_exc, action="restore_secondary_software_target")
 
 
 def test_log_boundary_exception_propagates_unexpected_logger_failures() -> None:
-    from src.tray.controllers.software_target_controller import _log_boundary_exception
+    from keyrgb.tray.controllers.software_target_controller import _log_boundary_exception
 
     tray = _make_tray()
     tray._log_exception.side_effect = AssertionError("unexpected logger bug")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.profile import profiles
+from keyrgb.core.profile import profiles
 
 
 class TestProfileStorageLightbarOverlayUnit:

@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.power.system import PowerMode
-from src.tray.ui import menu as tray_menu, menu_sections, menu_status
+from keyrgb.core.power.system import PowerMode
+from keyrgb.tray.ui import menu as tray_menu, menu_sections, menu_status
 from tests.tray.ui.menu.test_tray_menu_capabilities_unit import (
     DummyCaps,
     DummyTray,
@@ -23,9 +23,9 @@ def test_menu_construction_does_not_query_os_power_or_probe_secondary_routes(
     def _fail_routes() -> object:
         raise AssertionError("menu must not probe secondary routes")
 
-    monkeypatch.setattr("src.core.power.system.get_status", _fail_status)
-    monkeypatch.setattr("src.core.power.system._observe.get_status", _fail_status)
-    monkeypatch.setattr("src.core.secondary_device_runtime.iter_effective_secondary_routes", _fail_routes)
+    monkeypatch.setattr("keyrgb.core.power.system.get_status", _fail_status)
+    monkeypatch.setattr("keyrgb.core.power.system._observe.get_status", _fail_status)
+    monkeypatch.setattr("keyrgb.core.secondary_device_runtime.iter_effective_secondary_routes", _fail_routes)
 
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.system_power_status = SimpleNamespace(
@@ -70,7 +70,7 @@ def test_device_context_entries_do_not_call_live_effective_route_probe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "src.core.secondary_device_runtime.iter_effective_secondary_routes",
+        "keyrgb.core.secondary_device_runtime.iter_effective_secondary_routes",
         lambda: (_ for _ in ()).throw(AssertionError("live probe")),
     )
 

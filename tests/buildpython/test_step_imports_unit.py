@@ -22,7 +22,7 @@ def test_import_validation_runner_reports_probe_failures(monkeypatch, tmp_path) 
 
     def fake_probe(module: str, *, cwd):
         assert cwd == tmp_path
-        if module == "src.gui.perkey":
+        if module == "keyrgb.gui.perkey":
             return _probe_result(
                 module,
                 stderr="Traceback (most recent call last):\nImportError: gui boom\n",
@@ -35,7 +35,7 @@ def test_import_validation_runner_reports_probe_failures(monkeypatch, tmp_path) 
     result = step_imports.import_validation_runner()
 
     assert result.exit_code == 1
-    assert "Failed to import src.gui.perkey: gui boom" in result.stdout
+    assert "Failed to import keyrgb.gui.perkey: gui boom" in result.stdout
     assert "ImportError: gui boom" in result.stdout
 
 
@@ -54,7 +54,7 @@ def test_import_validation_runner_skips_gui_imports_without_tk(monkeypatch, tmp_
     result = step_imports.import_validation_runner()
 
     assert result.exit_code == 0
-    assert seen == ["src.tray.entrypoint"]
+    assert seen == ["keyrgb.tray.entrypoint"]
     assert "Tkinter not available; skipped Tk GUI imports." in result.stdout
 
 

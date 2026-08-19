@@ -6,10 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.perkey.ui._profile_actions_ui as actions_ui
-import src.gui.perkey.ui.profile_actions as actions
-from src.core.resources.layouts import slot_id_for_key_id
-from src.gui.perkey.profile_management import ActivatedProfile, DeleteProfileResult, keymap_cells_for, primary_cell
+import keyrgb.gui.perkey.ui._profile_actions_ui as actions_ui
+import keyrgb.gui.perkey.ui.profile_actions as actions
+from keyrgb.core.resources.layouts import slot_id_for_key_id
+from keyrgb.gui.perkey.profile_management import ActivatedProfile, DeleteProfileResult, keymap_cells_for, primary_cell
 
 
 class DummyVar:

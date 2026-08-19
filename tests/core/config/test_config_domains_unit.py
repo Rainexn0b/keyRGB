@@ -4,10 +4,10 @@ from types import MappingProxyType
 
 import pytest
 
-from src.core.config import Config
-from src.core.config.defaults import DEFAULTS
-from src.core.config.document import ConfigDocument
-from src.core.config.domains import (
+from keyrgb.core.config import Config
+from keyrgb.core.config.defaults import DEFAULTS
+from keyrgb.core.config.document import ConfigDocument
+from keyrgb.core.config.domains import (
     ALL_KNOWN_KEYS,
     DOMAIN_KEYS,
     ConfigDomain,
@@ -96,7 +96,7 @@ def test_reload_replaces_document_values_and_keeps_facade(tmp_path, monkeypatch)
     cfg._settings["vendor_preview"] = 1
     cfg._save()
 
-    from src.core.config import Config as ConfigCls
+    from keyrgb.core.config import Config as ConfigCls
 
     cfg2 = ConfigCls()
     assert cfg2.effect == "wave"

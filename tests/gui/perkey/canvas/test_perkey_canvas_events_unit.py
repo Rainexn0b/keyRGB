@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.perkey.canvas_impl._canvas_events as canvas_events
-from src.gui.perkey.canvas_impl._canvas_events import _KeyboardCanvasEventMixin
+import keyrgb.gui.perkey.canvas_impl._canvas_events as canvas_events
+from keyrgb.gui.perkey.canvas_impl._canvas_events import _KeyboardCanvasEventMixin
 
 
 class _FakeVar:

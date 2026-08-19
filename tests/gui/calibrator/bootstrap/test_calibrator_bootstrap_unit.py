@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import src.gui.calibrator._app_bootstrap as calibrator_bootstrap
+import keyrgb.gui.calibrator._app_bootstrap as calibrator_bootstrap
 
 
 class _FakeApp:

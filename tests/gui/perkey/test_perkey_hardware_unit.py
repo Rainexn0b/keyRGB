@@ -4,9 +4,9 @@ import logging
 
 import pytest
 
-from src.core.backends.base import BackendCapabilities
-from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
-from src.gui.perkey import hardware
+from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
+from keyrgb.gui.perkey import hardware
 
 
 class _PerKeyBackend:

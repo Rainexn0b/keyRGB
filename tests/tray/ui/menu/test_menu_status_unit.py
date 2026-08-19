@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.tray.ui import menu_status
+from keyrgb.tray.ui import menu_status
 
 
 class _BlockedSelectedDeviceContextTray:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import src.gui.perkey.editor as perkey_editor
-from src.gui.perkey.editor import PerKeyEditor
+import keyrgb.gui.perkey.editor as perkey_editor
+from keyrgb.gui.perkey.editor import PerKeyEditor
 
 
 def test_select_slot_id_applies_visible_key_and_finalizes_selection() -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.utils.key_draw_style import KeyDrawStyle, key_draw_style
+from keyrgb.gui.utils.key_draw_style import KeyDrawStyle, key_draw_style
 
 
 def test_key_draw_style_for_unmapped_unselected_key() -> None:

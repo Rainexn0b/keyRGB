@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from src.core.backends.base import BackendCapabilities
-from src.core.effects.engine import EffectsEngine
-from src.core.effects.matrix_layout import (
+from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.core.effects.engine import EffectsEngine
+from keyrgb.core.effects.matrix_layout import (
     REFERENCE_EFFECT_GEOMETRY,
     EffectGridGeometry,
     effect_geometry_from_dimensions,
     geometry_for_engine,
 )
-from src.core.effects.software import base as software_base
+from keyrgb.core.effects.software import base as software_base
 
 
 class _PerKeyBackend:

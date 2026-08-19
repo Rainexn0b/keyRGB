@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import src.gui.windows.support as support_window
+import keyrgb.gui.windows.support as support_window
 
 
 class FakeWidget:

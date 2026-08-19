@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.power.system import PowerMode, PowerModeStatus
-from src.tray.controllers import view_snapshots
+from keyrgb.core.power.system import PowerMode, PowerModeStatus
+from keyrgb.tray.controllers import view_snapshots
 
 
 def test_refresh_system_power_snapshot_stores_observed_status() -> None:

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from src.core.resources.layouts import slot_id_for_key_id
+from keyrgb.core.resources.layouts import slot_id_for_key_id
 
 
 class TestLayoutPerKeyLoadSave:
@@ -13,7 +13,7 @@ class TestLayoutPerKeyLoadSave:
 
     def test_save_and_load_per_key_tweaks_roundtrip(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """Save then load per-key tweaks should preserve data."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir)
@@ -32,7 +32,7 @@ class TestLayoutPerKeyLoadSave:
 
     def test_load_per_key_clamps_inset_per_key(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """Per-key inset should be clamped to [0.0, 0.20]."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         layout_file = temp_profile_dir / "layout_per_key.json"
         layout_file.write_text(json.dumps({"KEY1": {"inset": 0.50}}))
@@ -48,7 +48,7 @@ class TestLayoutPerKeyLoadSave:
     def test_load_per_key_uses_layout_specific_default_if_missing(
         self, temp_profile_dir, profile_paths_factory, monkeypatch
     ):
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         def mock_paths(_name):
             return profile_paths_factory(

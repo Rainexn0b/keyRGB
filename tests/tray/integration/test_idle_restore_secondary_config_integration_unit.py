@@ -8,17 +8,17 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core.secondary_device_routes import SecondaryDeviceRoute
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.tray.controllers.secondary_static_scene import apply_secondary_static_scene
-from src.tray.idle_power_state import (
+from keyrgb.core.secondary_device_routes import SecondaryDeviceRoute
+from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute
+from keyrgb.tray.controllers.secondary_static_scene import apply_secondary_static_scene
+from keyrgb.tray.idle_power_state import (
     is_dim_temp_active,
     set_idle_power_state_field,
 )
-from src.tray.pollers.config_polling_internal._apply_plan import classify_config_apply_plan
-from src.tray.pollers.config_polling_internal.core import ConfigApplyState
-from src.tray.pollers.idle_power.policy import compute_idle_action
-from src.tray.pollers.idle_power.polling import _apply_idle_action
+from keyrgb.tray.pollers.config_polling_internal._apply_plan import classify_config_apply_plan
+from keyrgb.tray.pollers.config_polling_internal.core import ConfigApplyState
+from keyrgb.tray.pollers.idle_power.policy import compute_idle_action
+from keyrgb.tray.pollers.idle_power.polling import _apply_idle_action
 from tests.tray.fakes import make_owner_backed_simple_tray
 
 

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.utils.safe_attrs import (
+from keyrgb.core.utils.safe_attrs import (
     safe_bool_attr,
     safe_float_attr,
     safe_int_attr,

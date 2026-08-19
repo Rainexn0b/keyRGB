@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.core.effects.reactive import _render_brightness_support as reactive_support
+from keyrgb.core.effects.reactive import _render_brightness_support as reactive_support
 
 
 def _lock_mock() -> MagicMock:
@@ -14,20 +14,20 @@ def _lock_mock() -> MagicMock:
 
 class TestParseMenuInt:
     def test_parse_menu_int_strips_radio_markers(self):
-        from src.tray.controllers._lighting_controller_helpers import parse_menu_int
+        from keyrgb.tray.controllers._lighting_controller_helpers import parse_menu_int
 
         assert parse_menu_int("🔘 50") == 50
         assert parse_menu_int("⚪ 75") == 75
         assert parse_menu_int("100") == 100
 
     def test_parse_menu_int_returns_none_on_invalid(self):
-        from src.tray.controllers._lighting_controller_helpers import parse_menu_int
+        from keyrgb.tray.controllers._lighting_controller_helpers import parse_menu_int
 
         assert parse_menu_int("not a number") is None
         assert parse_menu_int("🔘 abc") is None
 
     def test_parse_menu_int_logs_when_stringification_raises(self, caplog):
-        from src.tray.controllers._lighting_controller_helpers import parse_menu_int
+        from keyrgb.tray.controllers._lighting_controller_helpers import parse_menu_int
 
         class BadMenuItem:
             def __str__(self) -> str:
@@ -41,7 +41,7 @@ class TestParseMenuInt:
         assert records[0].exc_info is not None
 
     def test_parse_menu_int_propagates_unexpected_stringification_errors(self):
-        from src.tray.controllers._lighting_controller_helpers import parse_menu_int
+        from keyrgb.tray.controllers._lighting_controller_helpers import parse_menu_int
 
         class BadMenuItem:
             def __str__(self) -> str:
@@ -53,7 +53,7 @@ class TestParseMenuInt:
 
 class TestHelperBoundaries:
     def test_config_per_key_colors_logs_recoverable_getter_failure(self, caplog):
-        from src.tray.controllers._lighting_controller_helpers import _config_per_key_colors_ref
+        from keyrgb.tray.controllers._lighting_controller_helpers import _config_per_key_colors_ref
 
         class BadConfig:
             @property
@@ -68,7 +68,7 @@ class TestHelperBoundaries:
         assert records[0].exc_info is not None
 
     def test_set_engine_attr_best_effort_logs_recoverable_runtime_error(self):
-        from src.tray.controllers._lighting_controller_helpers import _set_engine_attr_best_effort
+        from keyrgb.tray.controllers._lighting_controller_helpers import _set_engine_attr_best_effort
 
         class RejectingEngine:
             def __init__(self):
@@ -101,7 +101,7 @@ class TestHelperBoundaries:
         assert tray.engine.per_key_colors is None
 
     def test_log_tray_exception_falls_back_to_module_logger_when_tray_logger_raises(self):
-        from src.tray.controllers import _lighting_controller_helpers as helpers
+        from keyrgb.tray.controllers import _lighting_controller_helpers as helpers
 
         original_exc = RuntimeError("hardware error")
         tray = MagicMock()
@@ -125,7 +125,7 @@ class TestHelperBoundaries:
         )
 
     def test_log_tray_exception_propagates_unexpected_logger_failures(self):
-        from src.tray.controllers import _lighting_controller_helpers as helpers
+        from keyrgb.tray.controllers import _lighting_controller_helpers as helpers
 
         original_exc = RuntimeError("hardware error")
         tray = MagicMock()
@@ -135,12 +135,12 @@ class TestHelperBoundaries:
             helpers._log_tray_exception(tray, "Helper error: %s", original_exc)
 
     def test_try_log_event_logs_recoverable_runtime_errors(self):
-        from src.tray.controllers._lighting_controller_helpers import try_log_event
+        from keyrgb.tray.controllers._lighting_controller_helpers import try_log_event
 
         tray = MagicMock()
         tray._log_event = MagicMock(side_effect=RuntimeError("event logger failed"))
 
-        with patch("src.tray.controllers._lighting_controller_helpers.logger.error") as log_error:
+        with patch("keyrgb.tray.controllers._lighting_controller_helpers.logger.error") as log_error:
             try_log_event(tray, "tray", "clicked", effect="wave")
 
         tray._log_event.assert_called_once_with("tray", "clicked", effect="wave")
@@ -149,7 +149,7 @@ class TestHelperBoundaries:
         assert str(log_error.call_args.args[1]) == "event logger failed"
 
     def test_try_log_event_propagates_unexpected_logger_errors(self):
-        from src.tray.controllers._lighting_controller_helpers import try_log_event
+        from keyrgb.tray.controllers._lighting_controller_helpers import try_log_event
 
         tray = MagicMock()
         tray._log_event = MagicMock(side_effect=AssertionError("unexpected event logger bug"))
@@ -158,7 +158,7 @@ class TestHelperBoundaries:
             try_log_event(tray, "tray", "clicked", effect="wave")
 
     def test_get_effect_name_prefers_live_engine_effect_over_config_snapshot(self):
-        from src.tray.controllers._lighting_controller_helpers import get_effect_name
+        from keyrgb.tray.controllers._lighting_controller_helpers import get_effect_name
 
         tray = MagicMock()
         tray.engine.current_effect = "reactive_ripple"
@@ -167,7 +167,7 @@ class TestHelperBoundaries:
         assert get_effect_name(tray) == "reactive_ripple"
 
     def test_get_effect_name_promotes_base_only_state_when_engine_effect_is_unset(self):
-        from src.tray.controllers._lighting_controller_helpers import get_effect_name
+        from keyrgb.tray.controllers._lighting_controller_helpers import get_effect_name
 
         tray = MagicMock()
         tray.engine.current_effect = None
@@ -179,7 +179,7 @@ class TestHelperBoundaries:
 
 class TestStartCurrentEffect:
     def test_resolve_start_current_effect_policy_rejects_persisted_perkey_without_capability(self):
-        from src.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
+        from keyrgb.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = None
@@ -195,7 +195,7 @@ class TestStartCurrentEffect:
         assert policy.start_plan.is_none_mode is True
 
     def test_resolve_start_current_effect_policy_keeps_config_unchanged(self):
-        from src.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
+        from keyrgb.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "none"
@@ -211,7 +211,7 @@ class TestStartCurrentEffect:
         assert mock_tray.config.effect == "none"
 
     def test_resolve_start_current_effect_policy_promotes_base_only_state_to_perkey_runtime(self):
-        from src.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
+        from keyrgb.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "none"
@@ -227,7 +227,7 @@ class TestStartCurrentEffect:
         assert mock_tray.config.effect == "none"
 
     def test_resolve_start_current_effect_policy_reports_canonical_effect_persist(self):
-        from src.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
+        from keyrgb.tray.controllers.lighting_controller import _resolve_start_current_effect_policy
 
         backend = MagicMock()
         backend.effects.return_value = {"rainbow_wave": object()}
@@ -247,7 +247,7 @@ class TestStartCurrentEffect:
         assert mock_tray.config.effect == "hw:rainbow_wave"
 
     def test_classify_start_current_effect_marks_perkey_static_path(self):
-        from src.tray.controllers.lighting_controller import _classify_start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import _classify_start_current_effect
 
         tray = MagicMock()
         plan = _classify_start_current_effect(tray, effect="perkey")
@@ -257,7 +257,7 @@ class TestStartCurrentEffect:
         assert plan.is_loop_effect is False
 
     def test_classify_start_current_effect_marks_loop_effect(self):
-        from src.tray.controllers.lighting_controller import _classify_start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import _classify_start_current_effect
 
         tray = MagicMock()
         plan = _classify_start_current_effect(tray, effect="rainbow_wave")
@@ -267,7 +267,7 @@ class TestStartCurrentEffect:
         assert plan.is_loop_effect is True
 
     def test_plan_effect_fade_ramp_marks_loop_effect_as_non_hardware(self):
-        from src.tray.controllers.lighting_controller import _plan_effect_fade_ramp
+        from keyrgb.tray.controllers.lighting_controller import _plan_effect_fade_ramp
 
         plan = _plan_effect_fade_ramp(
             effect="rainbow_wave",
@@ -281,7 +281,7 @@ class TestStartCurrentEffect:
         assert plan.apply_to_hardware is False
 
     def test_plan_effect_fade_ramp_marks_hardware_effect_as_hardware(self):
-        from src.tray.controllers.lighting_controller import _plan_effect_fade_ramp
+        from keyrgb.tray.controllers.lighting_controller import _plan_effect_fade_ramp
 
         plan = _plan_effect_fade_ramp(
             effect="breathe",
@@ -295,7 +295,7 @@ class TestStartCurrentEffect:
         assert plan.apply_to_hardware is True
 
     def test_prepare_effect_engine_state_loads_perkey_for_software_effect(self):
-        from src.tray.controllers import _lighting_effect_coordination
+        from keyrgb.tray.controllers import _lighting_effect_coordination
 
         mock_tray = MagicMock()
         _lighting_effect_coordination.prepare_effect_engine_state(
@@ -310,7 +310,7 @@ class TestStartCurrentEffect:
         mock_tray.engine.mark_cleared.assert_not_called()
 
     def test_prepare_effect_engine_state_clears_perkey_for_hardware_effect(self):
-        from src.tray.controllers import _lighting_effect_coordination
+        from keyrgb.tray.controllers import _lighting_effect_coordination
 
         mock_tray = MagicMock()
         _lighting_effect_coordination.prepare_effect_engine_state(
@@ -325,7 +325,7 @@ class TestStartCurrentEffect:
         mock_tray.engine.mark_sw.assert_not_called()
 
     def test_start_current_effect_fade_for_loop_effect_uses_non_hardware_brightness_write(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "rainbow_wave"
@@ -373,7 +373,7 @@ class TestStartCurrentEffect:
         assert mock_tray.engine.per_key_brightness == 50
 
     def test_start_current_effect_forwards_config_restart_brightness_preservation(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "rainbow_wave"
@@ -391,8 +391,8 @@ class TestStartCurrentEffect:
         assert mock_tray.engine.start_effect.call_args.kwargs["preserve_last_rendered_brightness"] is True
 
     def test_start_current_effect_idle_restore_loop_effect_fades_with_follow_global_cap(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
-        from src.tray.idle_power_state import set_idle_power_state_field
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
         mock_tray = MagicMock()
         set_idle_power_state_field(
@@ -451,7 +451,7 @@ class TestStartCurrentEffect:
         assert mock_tray.engine.per_key_brightness == 50
 
     def test_start_current_effect_fade_for_hardware_effect_uses_hardware_fade(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "breathe"
@@ -483,7 +483,7 @@ class TestStartCurrentEffect:
         )
 
     def test_perkey_effect_calls_set_key_colors(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "perkey"
@@ -500,7 +500,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_perkey_in_place_apply_skips_user_mode_reassertion(self):
-        from src.tray.controllers import _lighting_mode_apply as helpers
+        from keyrgb.tray.controllers import _lighting_mode_apply as helpers
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 35
@@ -522,7 +522,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_perkey_in_place_apply_reasserts_when_backend_requires_it(self):
-        from src.tray.controllers import _lighting_mode_apply as helpers
+        from keyrgb.tray.controllers import _lighting_mode_apply as helpers
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 35
@@ -545,7 +545,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_perkey_in_place_apply_reuses_hidden_blank_without_user_mode_reassert(self):
-        from src.tray.controllers import _lighting_mode_apply as helpers
+        from keyrgb.tray.controllers import _lighting_mode_apply as helpers
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 35
@@ -573,8 +573,8 @@ class TestStartCurrentEffect:
         # Opt out of the default-on recovery user-mode save so this test stays
         # scoped to the hidden-row restore contract (covered separately).
         monkeypatch.setenv("KEYRGB_RECOVERY_USER_MODE_SAVE", "0")
-        from src.tray.controllers import _lighting_mode_apply as helpers
-        from src.tray.idle_power_state import set_idle_power_state_field
+        from keyrgb.tray.controllers import _lighting_mode_apply as helpers
+        from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 10
@@ -611,8 +611,8 @@ class TestStartCurrentEffect:
         mock_tray.engine.kb.set_brightness.assert_called_once_with(10)
 
     def test_perkey_in_place_apply_uses_hardware_blank_hints_without_requery(self):
-        from src.tray.controllers import _lighting_mode_apply as helpers
-        from src.tray.idle_power_state import set_idle_power_state_field
+        from keyrgb.tray.controllers import _lighting_mode_apply as helpers
+        from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 35
@@ -653,7 +653,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_perkey_turns_off_if_brightness_zero(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "perkey"
@@ -666,7 +666,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is True
 
     def test_none_effect_calls_set_color(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "none"
@@ -681,7 +681,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_none_effect_restores_auxiliary_targets_when_shared_policy_is_enabled(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "none"
@@ -702,14 +702,14 @@ class TestStartCurrentEffect:
         mock_tray.secondary_device_controls = {"lightbar:048d:7001": True}
         mock_tray.config.software_effect_target = "all_uniform_capable"
 
-        with patch("src.tray.controllers.lighting_controller.restore_secondary_software_targets") as restore:
+        with patch("keyrgb.tray.controllers.lighting_controller.restore_secondary_software_targets") as restore:
             start_current_effect(mock_tray)
 
         mock_tray.engine.kb.set_color.assert_called_once_with((255, 0, 0), brightness=75)
         restore.assert_called_once_with(mock_tray)
 
     def test_animated_effect_starts_engine(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "breathe"
@@ -735,7 +735,7 @@ class TestStartCurrentEffect:
         assert mock_tray.is_off is False
 
     def test_start_current_effect_handles_exception_gracefully(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "wave"
@@ -749,7 +749,7 @@ class TestStartCurrentEffect:
         assert str(mock_tray._log_exception.call_args.args[1]) == "hardware error"
 
     def test_start_current_effect_reports_success(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "breathe"
@@ -762,7 +762,7 @@ class TestStartCurrentEffect:
         assert start_current_effect(mock_tray) is True
 
     def test_start_current_effect_propagates_unexpected_startup_errors(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "wave"
@@ -772,7 +772,7 @@ class TestStartCurrentEffect:
             start_current_effect(mock_tray)
 
     def test_start_current_effect_logs_ensure_device_failures(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "wave"
@@ -786,7 +786,7 @@ class TestStartCurrentEffect:
         assert isinstance(mock_tray._log_exception.call_args.args[1], RuntimeError)
 
     def test_start_current_effect_falls_back_to_logger_when_tray_logging_raises(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         original_exc = RuntimeError("hardware error")
         mock_tray = MagicMock()
@@ -795,8 +795,8 @@ class TestStartCurrentEffect:
         mock_tray._log_exception = MagicMock(side_effect=RuntimeError("logger failed"))
 
         with (
-            patch("src.tray.controllers.lighting_controller.logger.exception") as log_exception,
-            patch("src.tray.controllers.lighting_controller.logger.error") as log_error,
+            patch("keyrgb.tray.controllers.lighting_controller.logger.exception") as log_exception,
+            patch("keyrgb.tray.controllers.lighting_controller.logger.error") as log_error,
         ):
             start_current_effect(mock_tray)
 
@@ -815,7 +815,7 @@ class TestStartCurrentEffect:
         assert exc_info[2] is not None
 
     def test_start_current_effect_propagates_unexpected_tray_logging_errors(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         original_exc = RuntimeError("hardware error")
         mock_tray = MagicMock()
@@ -827,7 +827,7 @@ class TestStartCurrentEffect:
             start_current_effect(mock_tray)
 
     def test_log_boundary_exception_propagates_unexpected_logger_errors(self):
-        from src.tray.controllers.lighting_controller import _log_boundary_exception
+        from keyrgb.tray.controllers.lighting_controller import _log_boundary_exception
 
         tray = MagicMock()
         tray._log_exception = MagicMock(side_effect=AssertionError("unexpected logger bug"))
@@ -836,7 +836,7 @@ class TestStartCurrentEffect:
             _log_boundary_exception(tray, "Failed to mark device unavailable: %s", RuntimeError("boom"))
 
     def test_start_current_effect_runtime_exception_tuple_is_runtime_category(self):
-        from src.tray.controllers.lighting_controller import _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS
+        from keyrgb.tray.controllers.lighting_controller import _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS
 
         assert _START_CURRENT_EFFECT_RUNTIME_EXCEPTIONS == (
             AttributeError,
@@ -848,7 +848,7 @@ class TestStartCurrentEffect:
         )
 
     def test_tray_logger_callback_exception_tuple_is_runtime_category(self):
-        from src.tray.controllers.lighting_controller import _TRAY_LOGGER_CALLBACK_EXCEPTIONS
+        from keyrgb.tray.controllers.lighting_controller import _TRAY_LOGGER_CALLBACK_EXCEPTIONS
 
         assert _TRAY_LOGGER_CALLBACK_EXCEPTIONS == (
             AttributeError,
@@ -859,7 +859,7 @@ class TestStartCurrentEffect:
         )
 
     def test_log_boundary_exception_falls_back_to_module_logger_with_traceback(self):
-        from src.tray.controllers.lighting_controller import _log_boundary_exception
+        from keyrgb.tray.controllers.lighting_controller import _log_boundary_exception
 
         tray = MagicMock()
         tray._log_exception = MagicMock(side_effect=RuntimeError("logger failed"))
@@ -870,8 +870,8 @@ class TestStartCurrentEffect:
         except RuntimeError as raised_exc:
             original_exc = raised_exc
             with (
-                patch("src.tray.controllers.lighting_controller.logger.exception") as log_exception,
-                patch("src.tray.controllers.lighting_controller.logger.error") as log_error,
+                patch("keyrgb.tray.controllers.lighting_controller.logger.exception") as log_exception,
+                patch("keyrgb.tray.controllers.lighting_controller.logger.error") as log_error,
             ):
                 _log_boundary_exception(tray, "Error starting effect: %s", original_exc)
 
@@ -889,7 +889,7 @@ class TestStartCurrentEffect:
         assert original_exc.__traceback__ is not None
 
     def test_start_current_effect_logs_mark_unavailable_failure_on_disconnect(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         class DisconnectError(OSError):
             def __init__(self):
@@ -908,7 +908,7 @@ class TestStartCurrentEffect:
         assert str(mock_tray._log_exception.call_args[0][1]) == "mark failed"
 
     def test_start_current_effect_logs_notification_failure_for_permission_errors(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         mock_tray = MagicMock()
         mock_tray.config.effect = "wave"
@@ -923,7 +923,7 @@ class TestStartCurrentEffect:
         assert str(mock_tray._log_exception.call_args[0][1]) == "notify failed"
 
     def test_start_current_effect_resolves_prefixed_hardware_name_before_engine_start(self):
-        from src.tray.controllers.lighting_controller import start_current_effect
+        from keyrgb.tray.controllers.lighting_controller import start_current_effect
 
         backend = MagicMock()
         backend.effects.return_value = {"rainbow_wave": object()}
@@ -956,29 +956,29 @@ class TestStartCurrentEffect:
 
 class TestPowerSourcePerkeyProfileTransition:
     def test_power_source_perkey_transition_requires_capability_evidence(self):
-        from src.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
+        from keyrgb.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = None
 
-        with patch("src.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode:
+        with patch("keyrgb.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode:
             handled = apply_power_source_perkey_profile_transition(mock_tray)
 
         assert handled is False
         apply_mode.assert_not_called()
 
     def test_apply_power_source_perkey_profile_transition_updates_perkey_mode_in_place(self):
-        from src.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
+        from keyrgb.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
 
         mock_tray = MagicMock()
         mock_tray.config.brightness = 25
 
         with (
             patch(
-                "src.tray.controllers.lighting_controller.lighting_controller_helpers.get_effect_name",
+                "keyrgb.tray.controllers.lighting_controller.lighting_controller_helpers.get_effect_name",
                 return_value="perkey",
             ),
-            patch("src.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
+            patch("keyrgb.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
         ):
             handled = apply_power_source_perkey_profile_transition(mock_tray)
 
@@ -986,7 +986,7 @@ class TestPowerSourcePerkeyProfileTransition:
         apply_mode.assert_called_once_with(mock_tray, brightness_override=25, reassert_user_mode=False)
 
     def test_apply_power_source_perkey_profile_transition_updates_software_effect_in_place(self):
-        from src.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
+        from keyrgb.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
 
         mock_tray = MagicMock()
         mock_tray.is_off = True
@@ -994,18 +994,18 @@ class TestPowerSourcePerkeyProfileTransition:
 
         with (
             patch(
-                "src.tray.controllers.lighting_controller.lighting_controller_helpers.get_effect_name",
+                "keyrgb.tray.controllers.lighting_controller.lighting_controller_helpers.get_effect_name",
                 return_value="reactive_ripple",
             ),
             patch(
-                "src.tray.controllers.lighting_controller.lighting_controller_helpers.is_software_effect",
+                "keyrgb.tray.controllers.lighting_controller.lighting_controller_helpers.is_software_effect",
                 return_value=True,
             ),
             patch(
-                "src.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
+                "keyrgb.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
             ) as set_sw_state,
             patch(
-                "src.tray.controllers.lighting_controller.lighting_mode_apply.restore_hidden_perkey_rows_from_recovery_hint"
+                "keyrgb.tray.controllers.lighting_controller.lighting_mode_apply.restore_hidden_perkey_rows_from_recovery_hint"
             ) as hidden_restore,
         ):
             handled = apply_power_source_perkey_profile_transition(mock_tray)
@@ -1016,7 +1016,7 @@ class TestPowerSourcePerkeyProfileTransition:
         hidden_restore.assert_called_once_with(mock_tray, brightness_override=10)
 
     def test_apply_power_source_perkey_profile_transition_uses_live_engine_effect_before_config_perkey(self):
-        from src.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
+        from keyrgb.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
 
         mock_tray = MagicMock()
         mock_tray.is_off = True
@@ -1024,9 +1024,9 @@ class TestPowerSourcePerkeyProfileTransition:
         mock_tray.config.effect = "perkey"
 
         with (
-            patch("src.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
+            patch("keyrgb.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
             patch(
-                "src.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
+                "keyrgb.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
             ) as set_sw_state,
         ):
             handled = apply_power_source_perkey_profile_transition(mock_tray)
@@ -1037,22 +1037,22 @@ class TestPowerSourcePerkeyProfileTransition:
         set_sw_state.assert_called_once_with(mock_tray)
 
     def test_apply_power_source_perkey_profile_transition_returns_false_for_nonsoftware_effect(self):
-        from src.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
+        from keyrgb.tray.controllers.lighting_controller import apply_power_source_perkey_profile_transition
 
         mock_tray = MagicMock()
 
         with (
             patch(
-                "src.tray.controllers.lighting_controller.lighting_controller_helpers.get_effect_name",
+                "keyrgb.tray.controllers.lighting_controller.lighting_controller_helpers.get_effect_name",
                 return_value="breathing",
             ),
             patch(
-                "src.tray.controllers.lighting_controller.lighting_controller_helpers.is_software_effect",
+                "keyrgb.tray.controllers.lighting_controller.lighting_controller_helpers.is_software_effect",
                 return_value=False,
             ),
-            patch("src.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
+            patch("keyrgb.tray.controllers.lighting_controller.lighting_mode_apply.apply_perkey_mode") as apply_mode,
             patch(
-                "src.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
+                "keyrgb.tray.controllers.lighting_controller.lighting_controller_helpers.set_engine_perkey_from_config_for_sw_effect"
             ) as set_sw_state,
         ):
             handled = apply_power_source_perkey_profile_transition(mock_tray)

@@ -27,12 +27,12 @@ The reference keyboard model now has three related layers:
 
 Current owner modules:
 
-- `src/core/resources/layouts/`
-- `src/core/resources/layout_slots.py`
-- `src/core/profile/profiles.py`
-- `src/gui/perkey/profile_management.py`
-- `src/gui/calibrator/app.py`
-- `src/gui/reference/overlay_geometry.py`
+- `keyrgb/core/resources/layouts/`
+- `keyrgb/core/resources/layout_slots.py`
+- `keyrgb/core/profile/profiles.py`
+- `keyrgb/gui/perkey/profile_management.py`
+- `keyrgb/gui/calibrator/app.py`
+- `keyrgb/gui/reference/overlay_geometry.py`
 
 ## Rules
 
@@ -66,7 +66,7 @@ frame matrix comes from `EffectsEngine.effect_geometry`:
 - tray `_ite_rows/_ite_cols` and icon mosaics read that same owner;
 - out-of-range profile cells are ignored rather than rewritten on disk.
 
-See `src/core/effects/matrix_layout.py` and the engine geometry snapshot.
+See `keyrgb/core/effects/matrix_layout.py` and the engine geometry snapshot.
 
 ## Affected UX surfaces
 
@@ -77,7 +77,7 @@ See `src/core/effects/matrix_layout.py` and the engine geometry snapshot.
 
 ## Packaged resource data
 
-Starter defaults and layout specs live under `src/core/resources/` as nested JSON
+Starter defaults and layout specs live under `keyrgb/core/resources/` as nested JSON
 (including `reference_defaults_specs/` and `per_key_tweaks/`). Wheels must ship
 the full tree: `[tool.setuptools.package-data]` uses recursive `**/*.json` (and
 `**/*.png`) globs under the `src` package. Editable installs hide packaging gaps

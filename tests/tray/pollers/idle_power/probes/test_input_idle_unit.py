@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-import src.tray.pollers.idle_power._input_idle as input_idle
+import keyrgb.tray.pollers.idle_power._input_idle as input_idle
 
 
 @dataclass

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.gui.perkey.editor_support import selection as sel
+from keyrgb.gui.perkey.editor_support import selection as sel
 
 
 def _key(key_id: str, slot_id: str | None = None) -> SimpleNamespace:

@@ -5,11 +5,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.resources.layout import BASE_IMAGE_SIZE, KeyDef
-from src.core.resources.layouts import slot_id_for_key_id
-from src.gui.calibrator import app as calibrator_app
-from src.gui.calibrator.helpers.probe import CalibrationProbeState
-from src.gui.reference.overlay_geometry import CanvasTransform
+from keyrgb.core.resources.layout import BASE_IMAGE_SIZE, KeyDef
+from keyrgb.core.resources.layouts import slot_id_for_key_id
+from keyrgb.gui.calibrator import app as calibrator_app
+from keyrgb.gui.calibrator.helpers.probe import CalibrationProbeState
+from keyrgb.gui.reference.overlay_geometry import CanvasTransform
 
 
 class _FakeLabel:

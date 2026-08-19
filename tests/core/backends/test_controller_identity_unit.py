@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from src.core.backends.controller_identity import controller_identity
-from src.core.backends.ite8258_perkey_chassis import backend as chassis_backend
-from src.core.backends.ite8258_perkey_chassis.profile_coordinator import Ite8258ChassisProfileCoordinator
-from src.core.backends.shared_hidraw_transport import SharedHidrawTransportManager
+from keyrgb.core.backends.controller_identity import controller_identity
+from keyrgb.core.backends.ite8258_perkey_chassis import backend as chassis_backend
+from keyrgb.core.backends.ite8258_perkey_chassis.profile_coordinator import Ite8258ChassisProfileCoordinator
+from keyrgb.core.backends.shared_hidraw_transport import SharedHidrawTransportManager
 
 
 class _MockTransport:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.gui.perkey.editor import PerKeyEditor
+from keyrgb.gui.perkey.editor import PerKeyEditor
 
 
 class DummyPanel:

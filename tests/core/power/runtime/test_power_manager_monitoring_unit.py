@@ -9,7 +9,7 @@ import pytest
 
 class TestPowerManagerMonitoringThreads:
     def test_start_monitoring_starts_two_daemon_threads(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
@@ -24,7 +24,7 @@ class TestPowerManagerMonitoringThreads:
             return t
 
         with patch(
-            "src.core.power.management.manager.threading.Thread",
+            "keyrgb.core.power.management.manager.threading.Thread",
             side_effect=_fake_thread,
         ) as th:
             pm.start_monitoring()
@@ -37,18 +37,18 @@ class TestPowerManagerMonitoringThreads:
         created[1].start.assert_called_once()
 
     def test_start_monitoring_is_noop_when_already_monitoring(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
         pm.monitoring = True
 
-        with patch("src.core.power.management.manager.threading.Thread") as th:
+        with patch("keyrgb.core.power.management.manager.threading.Thread") as th:
             pm.start_monitoring()
         th.assert_not_called()
 
     def test_prime_power_source_state_runs_one_iteration_without_sleep(self):
-        from src.core.power.management.manager import PowerManager, PowerSourceLoopPolicy
+        from keyrgb.core.power.management.manager import PowerManager, PowerSourceLoopPolicy
 
         pm = PowerManager(MagicMock())
         pm._run_battery_saver_iteration = MagicMock(return_value=False)
@@ -61,7 +61,7 @@ class TestPowerManagerMonitoringThreads:
         assert pm._run_battery_saver_iteration.call_args.kwargs == {"poll_interval_s": 0.0}
 
     def test_stop_monitoring_joins_threads_best_effort(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
@@ -85,7 +85,7 @@ class TestPowerManagerMonitoringThreads:
         pm._battery_thread.join.assert_called_once_with(timeout=2)
 
     def test_stop_monitoring_reports_worker_still_alive_after_bounded_join(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock())
         pm.monitoring = True
@@ -104,7 +104,7 @@ class TestPowerManagerMonitoringThreads:
         pm._battery_thread.is_alive.assert_called_once_with()
 
     def test_stop_monitoring_continues_after_join_error_and_reports_not_quiesced(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock())
         pm.monitoring = True
@@ -122,7 +122,7 @@ class TestPowerManagerMonitoringThreads:
         pm._battery_thread.join.assert_called_once_with(timeout=2)
 
     def test_register_monitor_process_after_stop_terminates_it_immediately(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         pm = PowerManager(MagicMock())
         process = MagicMock()
@@ -134,13 +134,13 @@ class TestPowerManagerMonitoringThreads:
 
 class TestPowerManagerMonitorLoopFallbacks:
     def test_monitor_loop_calls_monitor_prepare_for_sleep(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
         pm.monitoring = True
 
-        with patch("src.core.power.management.manager.monitor_prepare_for_sleep") as mon:
+        with patch("keyrgb.core.power.management.manager.monitor_prepare_for_sleep") as mon:
             pm._monitor_loop()
 
         mon.assert_called_once()
@@ -153,7 +153,7 @@ class TestPowerManagerMonitorLoopFallbacks:
         assert callable(kwargs["on_process_stopped"])
 
     def test_monitor_loop_falls_back_to_acpi_when_dbus_monitor_missing(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
@@ -162,10 +162,10 @@ class TestPowerManagerMonitorLoopFallbacks:
 
         with (
             patch(
-                "src.core.power.management.manager.monitor_prepare_for_sleep",
+                "keyrgb.core.power.management.manager.monitor_prepare_for_sleep",
                 side_effect=FileNotFoundError,
             ),
-            patch("src.core.power.management.manager.logger.warning") as warn,
+            patch("keyrgb.core.power.management.manager.logger.warning") as warn,
         ):
             pm._monitor_loop()
 
@@ -173,7 +173,7 @@ class TestPowerManagerMonitorLoopFallbacks:
         pm._monitor_acpi_events.assert_called_once()
 
     def test_monitor_loop_catches_unexpected_exceptions(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
@@ -181,17 +181,17 @@ class TestPowerManagerMonitorLoopFallbacks:
 
         with (
             patch(
-                "src.core.power.management.manager.monitor_prepare_for_sleep",
+                "keyrgb.core.power.management.manager.monitor_prepare_for_sleep",
                 side_effect=RuntimeError("boom"),
             ),
-            patch("src.core.power.management.manager.logger.exception") as exc,
+            patch("keyrgb.core.power.management.manager.logger.exception") as exc,
         ):
             pm._monitor_loop()
 
         exc.assert_called_once()
 
     def test_monitor_loop_propagates_unexpected_exceptions(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
@@ -199,7 +199,7 @@ class TestPowerManagerMonitorLoopFallbacks:
 
         with (
             patch(
-                "src.core.power.management.manager.monitor_prepare_for_sleep",
+                "keyrgb.core.power.management.manager.monitor_prepare_for_sleep",
                 side_effect=AssertionError("unexpected monitor bug"),
             ),
             pytest.raises(AssertionError, match="unexpected monitor bug"),
@@ -207,13 +207,13 @@ class TestPowerManagerMonitorLoopFallbacks:
             pm._monitor_loop()
 
     def test_start_lid_monitor_wires_callbacks(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
         pm.monitoring = True
 
-        with patch("src.core.power.management.manager.start_sysfs_lid_monitoring") as start:
+        with patch("keyrgb.core.power.management.manager.start_sysfs_lid_monitoring") as start:
             lid_thread = start.return_value
             pm._start_lid_monitor()
 
@@ -226,13 +226,13 @@ class TestPowerManagerMonitorLoopFallbacks:
         assert pm._lid_thread is lid_thread
 
     def test_monitor_acpi_events_wires_callbacks(self):
-        from src.core.power.management.manager import PowerManager
+        from keyrgb.core.power.management.manager import PowerManager
 
         mock_kb = MagicMock()
         pm = PowerManager(mock_kb)
         pm.monitoring = True
 
-        with patch("src.core.power.management.manager.monitor_acpi_events") as mon:
+        with patch("keyrgb.core.power.management.manager.monitor_acpi_events") as mon:
             pm._monitor_acpi_events()
 
         mon.assert_called_once()

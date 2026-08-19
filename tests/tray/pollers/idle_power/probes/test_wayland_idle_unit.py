@@ -5,8 +5,8 @@ from typing import Any
 
 import pytest
 
-from src.tray.pollers.idle_power import _runtime, _runtime_sensors
-from src.tray.pollers.idle_power._wayland_idle import create_wayland_idle_tracker
+from keyrgb.tray.pollers.idle_power import _runtime, _runtime_sensors
+from keyrgb.tray.pollers.idle_power._wayland_idle import create_wayland_idle_tracker
 
 
 class _FakeWaylandIdleTracker:

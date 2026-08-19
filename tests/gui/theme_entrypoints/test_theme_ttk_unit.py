@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.theme import ttk as ttk_theme
+from keyrgb.gui.theme import ttk as ttk_theme
 
 
 class _FakeStyle:

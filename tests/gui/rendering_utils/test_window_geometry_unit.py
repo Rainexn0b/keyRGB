@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.utils.window_geometry import compute_centered_window_geometry
+from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 
 
 class _FakeRoot:

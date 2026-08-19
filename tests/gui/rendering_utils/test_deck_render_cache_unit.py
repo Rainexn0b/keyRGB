@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from PIL import Image
 
-from src.gui.utils.deck_render_cache import DeckRenderCache
+from keyrgb.gui.utils.deck_render_cache import DeckRenderCache
 
 
 def test_deck_render_cache_reuses_photo_for_same_inputs() -> None:

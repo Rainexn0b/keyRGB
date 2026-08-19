@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.power.policies.power_source_loop_policy import (
+from keyrgb.core.power.policies.power_source_loop_policy import (
     ActivatePerkeyProfile,
     ActivatePowerMode,
     ApplyBrightness,
@@ -9,7 +9,7 @@ from src.core.power.policies.power_source_loop_policy import (
     RestoreKeyboard,
     TurnOffKeyboard,
 )
-from src.core.power.system import PowerMode
+from keyrgb.core.power.system import PowerMode
 
 
 def _inputs(**overrides) -> PowerSourceLoopInputs:

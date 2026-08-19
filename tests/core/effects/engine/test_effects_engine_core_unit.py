@@ -4,8 +4,8 @@ import logging
 
 import pytest
 
-from src.core.backends.base import BackendCapabilities
-from src.core.effects.engine import EffectsEngine
+from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.core.effects.engine import EffectsEngine
 
 
 class _HardwareEffectsBackend:
@@ -130,7 +130,7 @@ def test_get_backend_effects_returns_empty_dict_and_logs_backend_failures(caplog
 
     engine = EffectsEngine(backend=DummyBackend())
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_core"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_core"):
         assert engine.get_backend_effects() == {}
 
     error_records = [record for record in caplog.records if "Failed to query backend effects" in record.getMessage()]
@@ -179,7 +179,7 @@ def test_get_backend_colors_returns_empty_dict_and_logs_backend_failures(caplog)
 
     engine = EffectsEngine(backend=DummyBackend())
 
-    with caplog.at_level(logging.ERROR, logger="src.core.effects.engine_core"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.core.effects.engine_core"):
         assert engine.get_backend_colors() == {}
 
     error_records = [record for record in caplog.records if "Failed to query backend colors" in record.getMessage()]

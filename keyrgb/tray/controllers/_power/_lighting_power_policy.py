@@ -1,0 +1,54 @@
+from __future__ import annotations
+
+import time
+from collections.abc import Callable
+
+from keyrgb.tray.controllers._brightness_layer import apply_layered_brightness_update
+from keyrgb.tray.controllers._lighting_controller_helpers import _log_tray_exception
+from keyrgb.tray.idle_power_state import is_system_forced_off, is_user_forced_off, set_idle_power_state_field
+from keyrgb.tray.protocols import LightingTrayProtocol
+
+_BRIGHTNESS_COERCION_EXCEPTIONS = (TypeError, ValueError, OverflowError)
+# Power-policy brightness apply (config/engine/UI); LookupError kept for tested UI callback failures.
+_POWER_POLICY_RUNTIME_EXCEPTIONS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
+
+
+def apply_brightness_from_power_policy_impl(
+    tray: LightingTrayProtocol,
+    brightness: int,
+    *,
+    start_current_effect: Callable[[LightingTrayProtocol], object],
+) -> None:
+    try:
+        brightness_int = int(brightness)
+    except _BRIGHTNESS_COERCION_EXCEPTIONS:
+        return
+
+    if brightness_int < 0:
+        return
+
+    if is_user_forced_off(tray):
+        return
+
+    if is_system_forced_off(tray):
+        return
+
+    try:
+        apply_layered_brightness_update(
+            tray,
+            source="power_policy",
+            base_brightness=brightness_int,
+            reactive_brightness=None,
+            reactive_source_label="power policy",
+            start_current_effect=start_current_effect,
+            refresh_menu=False,
+        )
+        set_idle_power_state_field(
+            tray,
+            attr_name="_last_power_source_transition_at",
+            state_name="last_power_source_transition_at",
+            value=float(time.monotonic()),
+        )
+    except _POWER_POLICY_RUNTIME_EXCEPTIONS as exc:  # @quality-exception exception-transparency: power-policy application crosses config setters, backend runtime calls, and UI callbacks; must remain non-fatal
+        _log_tray_exception(tray, "Failed to apply tray lighting power-policy brightness: %s", exc)
+        return

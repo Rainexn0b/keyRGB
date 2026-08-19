@@ -51,24 +51,24 @@ Issues = "https://github.com/Rainexn0b/keyRGB/issues"
 Repository = "https://github.com/Rainexn0b/keyRGB"
 
 [project.scripts]
-keyrgb = "src.tray.entrypoint:main"
-keyrgb-perkey = "src.gui.perkey:main"
-keyrgb-uniform = "src.gui.windows.uniform:main"
-keyrgb-reactive-color = "src.gui.windows.reactive_color:main"
-keyrgb-calibrate = "src.gui.calibrator:main"
-keyrgb-settings = "src.gui.settings:main"
-keyrgb-diagnostics = "src.core.diagnostics:main"
+keyrgb = "keyrgb.tray.entrypoint:main"
+keyrgb-perkey = "keyrgb.gui.perkey:main"
+keyrgb-uniform = "keyrgb.gui.windows.uniform:main"
+keyrgb-reactive-color = "keyrgb.gui.windows.reactive_color:main"
+keyrgb-calibrate = "keyrgb.gui.calibrator:main"
+keyrgb-settings = "keyrgb.gui.settings:main"
+keyrgb-diagnostics = "keyrgb.core.diagnostics:main"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["src*", "buildpython*"]
+include = ["keyrgb*", "buildpython*"]
 
 [tool.setuptools.package-data]
 # Nested resource JSON (reference defaults, per-key tweaks) must ship in wheels.
-src = ["**/*.png", "**/*.json"]
+keyrgb = ["**/*.png", "**/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -79,8 +79,8 @@ pythonpath = ["."]
 addopts = "-v"
 
 [tool.coverage.run]
-source = ["src"]
-omit = ["tests/*", "src/*_legacy.py"]
+source = ["keyrgb"]
+omit = ["tests/*", "keyrgb/*_legacy.py"]
 
 [tool.coverage.report]
 exclude_lines = [

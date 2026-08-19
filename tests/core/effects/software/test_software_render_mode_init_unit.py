@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core.effects.software import base as sw_base
+from keyrgb.core.effects.software import base as sw_base
 
 
 class _DummyLock:

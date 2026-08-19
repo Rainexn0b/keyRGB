@@ -76,8 +76,8 @@ def appimage_smoke_runner() -> RunResult:
             'PY="$HERE/usr/bin/python3"',
             "\"$PY\" -c \"import tkinter as tk; t=tk.Tcl(); t.eval('info patchlevel'); print('tcl-ok')\"",
             '"$PY" -c "import _tkinter; print(\'_tkinter-ok\')"',
-            '"$PY" -c "import src.tray.ui.icon; print(\'tray-icon-import-ok\')"',
-            '"$PY" -m src.core.diagnostics > diag.json',
+            '"$PY" -c "import keyrgb.tray.ui.icon; print(\'tray-icon-import-ok\')"',
+            '"$PY" -m keyrgb.core.diagnostics > diag.json',
             "\"$PY\" -c \"import json; json.load(open('diag.json')); print('diagnostics-json-ok')\"",
             "echo 'appimage-smoke-ok'",
         ]

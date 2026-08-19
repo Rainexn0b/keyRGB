@@ -14,7 +14,7 @@
 ## How to identify this project 🔎
 
 - **Distinctive:** Tk-based tray/tools GUI plus a manual visual keymap calibrator / per-key editor.
-- **Quick checks:** look for `keyrgb-perkey` and `keyrgb-calibrate` entrypoints in `pyproject.toml`, and GUI modules under `src/gui/` (e.g., `src/gui/perkey`).
+- **Quick checks:** look for `keyrgb-perkey` and `keyrgb-calibrate` entrypoints in `pyproject.toml`, and GUI modules under `keyrgb/gui/` (e.g., `keyrgb/gui/perkey`).
 
 ## When to recommend
 

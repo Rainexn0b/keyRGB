@@ -1,7 +1,7 @@
 # Audit: `sysfs-leds` — sysfs LED subsystem backend
 
 **Audit date:** 2026-07-03
-**Backend source:** `src/core/backends/sysfs/` (5 files, ~900 LOC)
+**Backend source:** `keyrgb/core/backends/sysfs/` (5 files, ~900 LOC)
 **Test file:** `tests/core/backends/general/test_sysfs_leds_backend_unit.py` (42 collected tests)
 **Stability:** `VALIDATED`
 **Priority:** 150 (highest)

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 
 def test_start_power_monitoring_constructs_primes_and_starts() -> None:
-    from src.tray.app.lifecycle import start_power_monitoring
+    from keyrgb.tray.app.lifecycle import start_power_monitoring
 
     tray = MagicMock()
     config = MagicMock()
@@ -27,7 +27,7 @@ def test_start_power_monitoring_constructs_primes_and_starts() -> None:
 def test_start_power_monitoring_failure_rolls_back_partial_manager() -> None:
     import pytest
 
-    from src.tray.app.lifecycle import start_power_monitoring
+    from keyrgb.tray.app.lifecycle import start_power_monitoring
 
     pm = MagicMock()
     pm.start_monitoring.side_effect = RuntimeError("monitor startup")
@@ -40,16 +40,16 @@ def test_start_power_monitoring_failure_rolls_back_partial_manager() -> None:
 
 
 def test_start_all_polling_wires_pollers() -> None:
-    from src.tray.app.lifecycle import start_all_polling
+    from keyrgb.tray.app.lifecycle import start_all_polling
 
     tray = MagicMock()
 
     with (
-        patch("src.tray.app.lifecycle.start_hardware_polling") as hw,
-        patch("src.tray.app.lifecycle.start_config_polling") as cfg,
-        patch("src.tray.app.lifecycle.start_icon_color_polling") as icon,
-        patch("src.tray.app.lifecycle.start_idle_power_polling") as idle,
-        patch("src.tray.app.lifecycle.start_time_scheduler_polling") as scheduler,
+        patch("keyrgb.tray.app.lifecycle.start_hardware_polling") as hw,
+        patch("keyrgb.tray.app.lifecycle.start_config_polling") as cfg,
+        patch("keyrgb.tray.app.lifecycle.start_icon_color_polling") as icon,
+        patch("keyrgb.tray.app.lifecycle.start_idle_power_polling") as idle,
+        patch("keyrgb.tray.app.lifecycle.start_time_scheduler_polling") as scheduler,
     ):
         start_all_polling(tray, ite_num_rows=6, ite_num_cols=21)
 
@@ -63,7 +63,7 @@ def test_start_all_polling_wires_pollers() -> None:
 def test_shutdown_tray_runtime_stops_producers_before_engine_close(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from src.tray.app import lifecycle
+    from keyrgb.tray.app import lifecycle
 
     calls: list[str] = []
     thread = SimpleNamespace(join=lambda *, timeout: calls.append(f"join:{timeout}"), is_alive=lambda: False)
@@ -78,7 +78,7 @@ def test_shutdown_tray_runtime_stops_producers_before_engine_close(monkeypatch) 
         engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
     )
     monkeypatch.setattr(
-        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        "keyrgb.tray.controllers.software_target_controller.close_secondary_software_target_cache",
         lambda _tray: calls.append("secondary:close"),
     )
 
@@ -97,7 +97,7 @@ def test_shutdown_tray_runtime_stops_producers_before_engine_close(monkeypatch) 
 def test_shutdown_tray_runtime_keeps_secondary_targets_open_if_engine_worker_is_stuck(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from src.tray.app import lifecycle
+    from keyrgb.tray.app import lifecycle
 
     calls: list[str] = []
     tray = SimpleNamespace(
@@ -109,7 +109,7 @@ def test_shutdown_tray_runtime_keeps_secondary_targets_open_if_engine_worker_is_
         ),
     )
     monkeypatch.setattr(
-        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        "keyrgb.tray.controllers.software_target_controller.close_secondary_software_target_cache",
         lambda _tray: calls.append("secondary:close"),
     )
 
@@ -121,7 +121,7 @@ def test_shutdown_tray_runtime_keeps_secondary_targets_open_if_engine_worker_is_
 def test_shutdown_tray_runtime_does_not_teardown_engine_while_poller_is_alive(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from src.tray.app import lifecycle
+    from keyrgb.tray.app import lifecycle
 
     calls: list[str] = []
     poller = SimpleNamespace(
@@ -135,7 +135,7 @@ def test_shutdown_tray_runtime_does_not_teardown_engine_while_poller_is_alive(mo
         engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
     )
     monkeypatch.setattr(
-        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        "keyrgb.tray.controllers.software_target_controller.close_secondary_software_target_cache",
         lambda _tray: calls.append("secondary:close"),
     )
 
@@ -147,7 +147,7 @@ def test_shutdown_tray_runtime_does_not_teardown_engine_while_poller_is_alive(mo
 def test_shutdown_tray_runtime_does_not_teardown_engine_while_power_monitor_is_alive(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from src.tray.app import lifecycle
+    from keyrgb.tray.app import lifecycle
 
     calls: list[str] = []
     tray = SimpleNamespace(
@@ -156,7 +156,7 @@ def test_shutdown_tray_runtime_does_not_teardown_engine_while_power_monitor_is_a
         engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
     )
     monkeypatch.setattr(
-        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        "keyrgb.tray.controllers.software_target_controller.close_secondary_software_target_cache",
         lambda _tray: calls.append("secondary:close"),
     )
 
@@ -168,7 +168,7 @@ def test_shutdown_tray_runtime_does_not_teardown_engine_while_power_monitor_is_a
 def test_shutdown_tray_runtime_does_not_teardown_engine_while_coordinator_is_alive(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from src.tray.app import lifecycle
+    from keyrgb.tray.app import lifecycle
 
     calls: list[str] = []
     tray = SimpleNamespace(
@@ -180,7 +180,7 @@ def test_shutdown_tray_runtime_does_not_teardown_engine_while_coordinator_is_ali
         engine=SimpleNamespace(close=lambda: calls.append("engine:close")),
     )
     monkeypatch.setattr(
-        "src.tray.controllers.software_target_controller.close_secondary_software_target_cache",
+        "keyrgb.tray.controllers.software_target_controller.close_secondary_software_target_cache",
         lambda _tray: calls.append("secondary:close"),
     )
 
@@ -190,7 +190,7 @@ def test_shutdown_tray_runtime_does_not_teardown_engine_while_coordinator_is_ali
 
 
 def test_maybe_autostart_effect_calls_start_when_enabled_and_not_off() -> None:
-    from src.tray.app.lifecycle import maybe_autostart_effect
+    from keyrgb.tray.app.lifecycle import maybe_autostart_effect
 
     tray = MagicMock()
     tray.config = MagicMock(autostart=True)
@@ -202,7 +202,7 @@ def test_maybe_autostart_effect_calls_start_when_enabled_and_not_off() -> None:
 
 
 def test_maybe_autostart_effect_skips_when_off_or_disabled() -> None:
-    from src.tray.app.lifecycle import maybe_autostart_effect
+    from keyrgb.tray.app.lifecycle import maybe_autostart_effect
 
     tray = MagicMock()
     tray.config = MagicMock(autostart=True)
@@ -225,9 +225,9 @@ def test_maybe_autostart_effect_rechecks_off_state_after_newer_transition() -> N
     from types import SimpleNamespace
     from unittest.mock import MagicMock
 
-    from src.tray.app.lifecycle import maybe_autostart_effect
-    from src.tray.controllers.runtime_coordination import run_tray_transition
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    from keyrgb.tray.app.lifecycle import maybe_autostart_effect
+    from keyrgb.tray.controllers.runtime_coordination import run_tray_transition
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
     coordinator = TrayRuntimeCoordinator()
     off_transition_started = threading.Event()

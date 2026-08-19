@@ -31,24 +31,24 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core import secondary_device_routes
-from src.core.effects.catalog import REACTIVE_EFFECTS
-from src.core.effects.software_targets import (
+from keyrgb.core import secondary_device_routes
+from keyrgb.core.effects.catalog import REACTIVE_EFFECTS
+from keyrgb.core.effects.software_targets import (
     SOFTWARE_EFFECT_TARGET_ALL_UNIFORM_CAPABLE,
     SOFTWARE_EFFECT_TARGET_KEYBOARD,
     normalize_software_effect_target,
     software_render_targets,
 )
-from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED, iter_virtual_routes
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
-from src.tray.controllers import _software_target_auxiliary, software_target_controller
-from src.tray.controllers.software_target_controller import (
+from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED, iter_virtual_routes
+from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute
+from keyrgb.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
+from keyrgb.tray.controllers import _software_target_auxiliary, software_target_controller
+from keyrgb.tray.controllers.software_target_controller import (
     apply_software_effect_target_selection,
     restore_secondary_software_targets,
     secondary_software_render_targets,
 )
-from src.tray.pollers.config_polling_internal._config_apply_state import (
+from keyrgb.tray.pollers.config_polling_internal._config_apply_state import (
     _safe_perkey_signature,
     _safe_tuple_attr,
     build_config_apply_state,

@@ -11,7 +11,7 @@ class TestLayoutGlobalLoadSave:
 
     def test_save_and_load_layout_global_roundtrip(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """Save then load layout tweaks should preserve data."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir)
@@ -27,7 +27,7 @@ class TestLayoutGlobalLoadSave:
 
     def test_load_layout_global_clamps_inset(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """inset should be clamped to [0.0, 0.20]."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         layout_file = temp_profile_dir / "layout.json"
         layout_file.write_text(json.dumps({"dx": 0, "dy": 0, "sx": 1, "sy": 1, "inset": 0.99}))
@@ -42,7 +42,7 @@ class TestLayoutGlobalLoadSave:
 
     def test_load_layout_global_returns_default_if_missing(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """If layout.json doesn't exist, return defaults."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir, layout_global=temp_profile_dir / "nonexistent_layout.json")
@@ -55,7 +55,7 @@ class TestLayoutGlobalLoadSave:
     def test_load_layout_global_uses_layout_specific_default_if_missing(
         self, temp_profile_dir, profile_paths_factory, monkeypatch
     ):
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir, layout_global=temp_profile_dir / "nonexistent_layout.json")

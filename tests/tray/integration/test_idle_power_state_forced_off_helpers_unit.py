@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.tray.idle_power_state import (
+from keyrgb.tray.idle_power_state import (
     TrayIdlePowerState,
     any_forced_off,
     dim_temp_target_brightness,
@@ -82,8 +82,8 @@ def test_last_brightness_helpers_ignore_non_positive() -> None:
 
 
 def test_keyrgb_tray_idle_power_properties_are_owner_backed() -> None:
-    from src.tray.app.application import KeyRGBTray
-    from src.tray.idle_power_state import TrayIdlePowerState, set_idle_power_state_field
+    from keyrgb.tray.app.application import KeyRGBTray
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState, set_idle_power_state_field
 
     tray = object.__new__(KeyRGBTray)
     owner = TrayIdlePowerState()

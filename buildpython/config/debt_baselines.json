@@ -33,22 +33,22 @@
   "coverage": {
     "minimum_total_percent": 89.5,
     "tracked_prefixes": {
-      "src/core/": 89.5,
-      "src/tray/": 88.5,
-      "src/gui/": 90.0
+      "keyrgb/core/": 89.5,
+      "keyrgb/tray/": 88.5,
+      "keyrgb/gui/": 90.0
     },
     "minimum_watch_file_percent": 20.0,
     "watch_files": [
-      "src/core/backends/sysfs/device.py",
-      "src/core/backends/asusctl/backend.py",
-      "src/core/backends/asusctl/device.py",
-      "src/core/backends/ite8291r3_perkey/usb.py",
-      "src/core/backends/shared_hidraw_transport.py",
-      "src/core/effects/engine_support/core.py",
-      "src/core/power/management/manager.py",
-      "src/tray/app/application.py",
-      "src/core/config/config.py",
-      "src/core/runtime/hardware_ownership.py"
+      "keyrgb/core/backends/sysfs/device.py",
+      "keyrgb/core/backends/asusctl/backend.py",
+      "keyrgb/core/backends/asusctl/device.py",
+      "keyrgb/core/backends/ite8291r3_perkey/usb.py",
+      "keyrgb/core/backends/shared_hidraw_transport.py",
+      "keyrgb/core/effects/engine_support/core.py",
+      "keyrgb/core/power/management/manager.py",
+      "keyrgb/tray/app/application.py",
+      "keyrgb/core/config/config.py",
+      "keyrgb/core/runtime/hardware_ownership.py"
     ]
   },
   "exception_transparency": {
@@ -82,15 +82,15 @@
   "flat_directories": {
     "allowed": [
       {
-        "path": "src/core/effects/reactive",
+        "path": "keyrgb/core/effects/reactive",
         "reason": "intentionally flat effect-runtime module set; all 14 files are peer-level implementation units with no natural sub-grouping"
       },
       {
-        "path": "src/gui/settings/panels",
+        "path": "keyrgb/gui/settings/panels",
         "reason": "intentionally flat settings-panel set; every file is a distinct settings panel and they are all peer-level siblings with no natural sub-group"
       },
       {
-        "path": "src/tray/pollers/idle_power",
+        "path": "keyrgb/tray/pollers/idle_power",
         "reason": "intentionally flat idle-power pipeline; all files form a single subsystem (policy, logind probe, actions, transitions, sensors) with no coherent split"
       },
       {
@@ -102,47 +102,47 @@
         "reason": "intentionally flat AppImage builder; each file is a distinct bundle type (python_runtime, pygobject, appindicator, tkinter) plus common helpers and entry point"
       },
       {
-        "path": "src/gui/utils",
+        "path": "keyrgb/gui/utils",
         "reason": "intentionally flat GUI utilities collection; files are disparate helpers (window geometry, icon, async, backdrop cache, deck render cache) with no coherent sub-group"
       },
       {
-        "path": "src/gui/perkey/ui",
+        "path": "keyrgb/gui/perkey/ui",
         "reason": "intentionally flat per-key editor UI; all 13 files are independent per-panel components sharing a common pattern; intra-panel cross-imports (calibrator\u2192status, keymap\u2192status, layout_setup\u2192layout_slots) and existing test groupings (panels/, tools/) document the conceptual structure without requiring a forced sub-split"
       },
       {
-        "path": "src/gui/perkey/editor_support",
+        "path": "keyrgb/gui/perkey/editor_support",
         "reason": "intentionally flat per-key editor support package; direct modules are peer-level editor backdrop, bootstrap, layout/state, runtime, selection, and UI helpers with no coherent sub-group"
       },
       {
-        "path": "src/gui/settings",
+        "path": "keyrgb/gui/settings",
         "reason": "intentionally flat settings window package; direct modules are root-level window helpers (window.py, __main__.py, diagnostics_runner.py, hardware_hint.py, os_autostart.py, scrollable_area.py, settings_state.py) with no coherent sub-group beyond the existing panels/ subpackage"
       },
       {
-        "path": "src/gui/windows/_support",
+        "path": "keyrgb/gui/windows/_support",
         "reason": "intentionally flat support-window helper package; 14 direct modules are peer-level helpers for one support window flow (actions, backend probes, dialogs, jobs, state, tasks, text IO, UI) with no coherent sub-group beyond the existing _support package boundary"
       },
       {
-        "path": "src/tray/ui",
+        "path": "keyrgb/tray/ui",
         "reason": "intentionally flat tray menu package; direct modules are menu construction layers (menu.py, menu_sections.py, menu_status.py, _menu_callbacks.py, refresh.py, _device_status.py, gui_launch.py) with icon rendering already extracted into icon/ subpackage"
       },
       {
-        "path": "src/core/diagnostics",
+        "path": "keyrgb/core/diagnostics",
         "reason": "intentionally flat diagnostics root; 14 files span distinct collection concerns (backends, sysfs, device candidates, formatting) already partially organised into collectors/, device_discovery_support/, support/ subdirectories; remaining direct files are peer-level collection modules"
       },
       {
-        "path": "src/core/profile",
+        "path": "keyrgb/core/profile",
         "reason": "intentionally flat profile package root; 8 direct modules are peer-level profile storage, apply, payload, path, and backdrop units with no coherent sub-group below the existing package boundary"
       },
       {
-        "path": "src/core/config",
+        "path": "keyrgb/core/config",
         "reason": "intentionally flat config package root; 8 direct modules are peer-level config concerns (defaults, paths, storage, per-key colors, logging, version checks) behind the stable config facade"
       },
       {
-        "path": "src/core/effects",
+        "path": "keyrgb/core/effects",
         "reason": "intentionally flat effects root; 13 files are module-level coordination and type objects (catalog, colors, demo, device, engine, fades, hw_payloads, matrix_layout, perkey_animation, software_targets, timing, transitions) with subsystems already in engine_support/, reactive/, software/"
       },
       {
-        "path": "src/core/resources",
+        "path": "keyrgb/core/resources",
         "reason": "intentionally flat resources root; 8 files are distinct resource loaders (defaults, layout, layout_legends, layout_slots, _layout_components) with sub-types already in layouts/ and reference_defaults_specs/"
       },
       {
@@ -150,31 +150,31 @@
         "reason": "intentionally flat build-step root; 14 files are one-per-step orchestrators plus shared reports/quality_exceptions; 6 subdirectories already group multi-file steps (appimage, architecture_validation, code_hygiene, exception_transparency, file_size_analysis, code_markers)"
       },
       {
-        "path": "src/gui/perkey",
+        "path": "keyrgb/gui/perkey",
         "reason": "intentionally flat per-key editor root; 12 files are root-level editor concerns (canvas, editor, window_geometry, profile_management, hardware, color_utils, commit_pipeline, lightbar_layout, lightbar_controls, keyboard_apply) with sub-concerns in canvas_impl/, editor_support/, ops/, overlay/, ui/"
       },
       {
-        "path": "src/gui/perkey/canvas_impl",
+        "path": "keyrgb/gui/perkey/canvas_impl",
         "reason": "intentionally flat per-key canvas implementation package; 8 direct modules are peer-level drawing, render, events, identity, services, and hit-testing units with no coherent sub-group"
       },
       {
-        "path": "src/gui/windows",
+        "path": "keyrgb/gui/windows",
         "reason": "intentionally flat window package root; 11 direct modules are peer-level reactive, uniform, and support window entry/UI helpers, with support-specific internals already extracted into _support/"
       },
       {
-        "path": "src/tray/app",
+        "path": "keyrgb/tray/app",
         "reason": "intentionally flat tray app package root; 9 direct modules are peer-level lifecycle, startup, callback, notification, binding, and backend wiring units with no coherent sub-group below the existing app boundary"
       },
       {
-        "path": "src/tray/controllers",
+        "path": "keyrgb/tray/controllers",
         "reason": "intentionally flat tray controllers root; direct modules are peer-level controller facades and seam/coordination helpers, with specialised concerns already grouped under _power/ and menu_adapters/"
       },
       {
-        "path": "src/tray/pollers/config_polling_internal",
+        "path": "keyrgb/tray/pollers/config_polling_internal",
         "reason": "intentionally flat config-polling internal package; direct modules are peer-level state, planning, fast-path, and apply-support helpers behind the stable src.tray.pollers.config_polling facade"
       },
       {
-        "path": "src/core/power/management",
+        "path": "keyrgb/core/power/management",
         "reason": "intentionally flat power-management package root; direct modules are peer-level manager orchestration units (runtime deps, config helpers, source iteration, event handling, monitor loop) behind the stable manager facade"
       },
       {
@@ -198,11 +198,11 @@
         "reason": "intentionally flat tray-app test root; direct test modules are peer-level behavior slices (application, backend seam, callbacks, entrypoint, lifecycle, protocols, startup bootstrap) around one tray-app boundary"
       },
       {
-        "path": "src/tray",
+        "path": "keyrgb/tray",
         "reason": "intentionally flat tray package root; direct modules are public entry/protocol/idle-power/secondary facades with subsystems already under app/, controllers/, integrations/, pollers/, startup/, ui/"
       },
       {
-        "path": "src/core/backends",
+        "path": "keyrgb/core/backends",
         "reason": "intentionally flat backends package root; direct modules are shared contracts (base, exceptions, policy, registry, hidraw helpers) with device implementations already under per-backend subpackages"
       },
       {

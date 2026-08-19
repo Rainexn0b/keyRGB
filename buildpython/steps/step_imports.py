@@ -7,10 +7,10 @@ from ..utils.paths import repo_root
 from ..utils.subproc import RunResult
 
 DEFAULT_IMPORTS = [
-    "src.tray.entrypoint",
+    "keyrgb.tray.entrypoint",
     # Tk-based GUIs are optional in CI environments where tkinter isn't present.
-    "src.gui.perkey",
-    "src.gui.calibrator",
+    "keyrgb.gui.perkey",
+    "keyrgb.gui.calibrator",
 ]
 
 
@@ -27,7 +27,7 @@ def import_validation_runner() -> RunResult:
     has_tk = _has_tkinter()
 
     for mod in DEFAULT_IMPORTS:
-        if not has_tk and mod.startswith("src.gui."):
+        if not has_tk and mod.startswith("keyrgb.gui."):
             continue
         probe = probe_module_import(mod, cwd=root)
         if not probe.ok:
@@ -45,7 +45,7 @@ def import_validation_runner() -> RunResult:
         command_str="(internal) import validation",
         stdout=(
             "All imports OK:\n"
-            + "\n".join(f"  - {m}" for m in DEFAULT_IMPORTS if has_tk or not m.startswith("src.gui."))
+            + "\n".join(f"  - {m}" for m in DEFAULT_IMPORTS if has_tk or not m.startswith("keyrgb.gui."))
             + ("\n\n(Note: Tkinter not available; skipped Tk GUI imports.)\n" if not has_tk else "\n")
         ),
         stderr="",

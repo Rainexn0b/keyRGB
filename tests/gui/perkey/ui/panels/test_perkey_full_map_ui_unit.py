@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.ui.full_map import ensure_full_map_ui
+from keyrgb.gui.perkey.ui.full_map import ensure_full_map_ui
 
 
 @dataclass

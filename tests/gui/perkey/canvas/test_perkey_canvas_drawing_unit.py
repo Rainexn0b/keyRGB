@@ -7,8 +7,8 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-import src.gui.perkey.canvas_impl._canvas_drawing as canvas_drawing
-from src.gui.perkey.canvas_impl._canvas_drawing import (
+import keyrgb.gui.perkey.canvas_impl._canvas_drawing as canvas_drawing
+from keyrgb.gui.perkey.canvas_impl._canvas_drawing import (
     _KeyboardCanvasDrawingMixin,
     _shape_polygon_points,
 )

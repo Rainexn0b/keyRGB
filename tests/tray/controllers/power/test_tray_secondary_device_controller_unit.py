@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call
 
 import pytest
 
-from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
+from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
 
 
 def _make_lightbar_route(*, device_factory):
@@ -23,7 +23,7 @@ def _make_lightbar_route(*, device_factory):
 @pytest.fixture(autouse=True)
 def _stub_profile_brightness_persistence(monkeypatch):
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.profiles.update_secondary_lighting_area",
+        "keyrgb.tray.controllers.secondary_device_controller.profiles.update_secondary_lighting_area",
         lambda state_key, updates: {"version": 1, "areas": {state_key: dict(updates)}},
     )
 
@@ -42,7 +42,7 @@ def _make_tray() -> SimpleNamespace:
 
 
 def test_apply_selected_secondary_brightness_updates_lightbar_device(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
     seen: list[int] = []
@@ -52,11 +52,11 @@ def test_apply_selected_secondary_brightness_updates_lightbar_device(monkeypatch
             seen.append(int(brightness))
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -69,7 +69,7 @@ def test_apply_selected_secondary_brightness_updates_lightbar_device(monkeypatch
 
 
 def test_turn_off_selected_secondary_device_turns_off_lightbar(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import turn_off_selected_secondary_device
+    from keyrgb.tray.controllers.secondary_device_controller import turn_off_selected_secondary_device
 
     tray = _make_tray()
     calls = {"off": 0}
@@ -79,11 +79,11 @@ def test_turn_off_selected_secondary_device_turns_off_lightbar(monkeypatch) -> N
             calls["off"] += 1
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -96,7 +96,7 @@ def test_turn_off_selected_secondary_device_turns_off_lightbar(monkeypatch) -> N
 
 
 def test_turn_on_selected_secondary_device_restores_last_nonzero_brightness(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import (
+    from keyrgb.tray.controllers.secondary_device_controller import (
         turn_off_selected_secondary_device,
         turn_on_selected_secondary_device,
     )
@@ -113,11 +113,11 @@ def test_turn_on_selected_secondary_device_restores_last_nonzero_brightness(monk
             seen.append(int(brightness))
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -133,7 +133,7 @@ def test_turn_on_selected_secondary_device_restores_last_nonzero_brightness(monk
 
 
 def test_turn_on_selected_secondary_device_defaults_to_25_without_saved_brightness(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import turn_on_selected_secondary_device
+    from keyrgb.tray.controllers.secondary_device_controller import turn_on_selected_secondary_device
 
     tray = _make_tray()
     tray.config.lightbar_brightness = 0
@@ -144,11 +144,11 @@ def test_turn_on_selected_secondary_device_defaults_to_25_without_saved_brightne
             seen.append(int(brightness))
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -159,17 +159,17 @@ def test_turn_on_selected_secondary_device_defaults_to_25_without_saved_brightne
 
 
 def test_apply_selected_secondary_brightness_notifies_permission_errors(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
     err = PermissionError("denied")
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: (_ for _ in ()).throw(err)),
     )
 
@@ -178,7 +178,7 @@ def test_apply_selected_secondary_brightness_notifies_permission_errors(monkeypa
 
 
 def test_apply_selected_secondary_brightness_logs_recoverable_config_write_errors(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     class DummyConfig:
         @property
@@ -198,11 +198,11 @@ def test_apply_selected_secondary_brightness_logs_recoverable_config_write_error
             seen.append(int(brightness))
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -216,7 +216,7 @@ def test_apply_selected_secondary_brightness_logs_recoverable_config_write_error
 
 
 def test_apply_selected_secondary_brightness_logs_notify_callback_failures(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
     err = PermissionError("denied")
@@ -224,11 +224,11 @@ def test_apply_selected_secondary_brightness_logs_notify_callback_failures(monke
     tray._notify_permission_issue.side_effect = notify_err
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: (_ for _ in ()).throw(err)),
     )
 
@@ -241,7 +241,7 @@ def test_apply_selected_secondary_brightness_logs_notify_callback_failures(monke
 
 
 def test_apply_selected_secondary_brightness_logs_recoverable_device_failures(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
 
@@ -251,11 +251,11 @@ def test_apply_selected_secondary_brightness_logs_recoverable_device_failures(mo
             raise RuntimeError("device failed")
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -267,18 +267,18 @@ def test_apply_selected_secondary_brightness_logs_recoverable_device_failures(mo
 
 
 def test_apply_selected_secondary_brightness_propagates_unexpected_notify_callback_failures(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
     err = PermissionError("denied")
     tray._notify_permission_issue.side_effect = AssertionError("unexpected notify bug")
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: (_ for _ in ()).throw(err)),
     )
 
@@ -287,7 +287,7 @@ def test_apply_selected_secondary_brightness_propagates_unexpected_notify_callba
 
 
 def test_apply_selected_secondary_brightness_propagates_unexpected_device_failures(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
 
@@ -297,11 +297,11 @@ def test_apply_selected_secondary_brightness_propagates_unexpected_device_failur
             raise AssertionError("unexpected device bug")
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -310,7 +310,7 @@ def test_apply_selected_secondary_brightness_propagates_unexpected_device_failur
 
 
 def test_apply_selected_secondary_brightness_logs_menu_refresh_failures(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
     menu_err = RuntimeError("menu failed")
@@ -322,11 +322,11 @@ def test_apply_selected_secondary_brightness_logs_menu_refresh_failures(monkeypa
             seen.append(int(brightness))
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -336,7 +336,7 @@ def test_apply_selected_secondary_brightness_logs_menu_refresh_failures(monkeypa
 
 
 def test_apply_selected_secondary_brightness_propagates_unexpected_menu_refresh_failures(monkeypatch) -> None:
-    from src.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
+    from keyrgb.tray.controllers.secondary_device_controller import apply_selected_secondary_brightness
 
     tray = _make_tray()
     tray._update_menu.side_effect = AssertionError("unexpected menu bug")
@@ -346,11 +346,11 @@ def test_apply_selected_secondary_brightness_propagates_unexpected_menu_refresh_
             del brightness
 
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -359,7 +359,7 @@ def test_apply_selected_secondary_brightness_propagates_unexpected_menu_refresh_
 
 
 def test_apply_selected_secondary_brightness_falls_back_to_module_logging_when_tray_logger_fails(monkeypatch) -> None:
-    from src.tray.controllers import secondary_device_controller as controller
+    from keyrgb.tray.controllers import secondary_device_controller as controller
 
     tray = _make_tray()
     logger_err = RuntimeError("logger failed")
@@ -376,11 +376,11 @@ def test_apply_selected_secondary_brightness_falls_back_to_module_logging_when_t
     monkeypatch.setattr(controller.logger, "error", module_error)
     monkeypatch.setattr(controller.logger, "exception", module_exception)
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.selected_device_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.selected_device_context_entry",
         lambda tray_obj: {"key": tray_obj.selected_device_context, "device_type": "lightbar"},
     )
     monkeypatch.setattr(
-        "src.tray.controllers.secondary_device_controller.route_for_context_entry",
+        "keyrgb.tray.controllers.secondary_device_controller.route_for_context_entry",
         lambda entry: _make_lightbar_route(device_factory=lambda: DummyDevice()),
     )
 
@@ -396,7 +396,7 @@ def test_apply_selected_secondary_brightness_falls_back_to_module_logging_when_t
 
 
 def test_log_boundary_exception_propagates_unexpected_tray_logger_failures() -> None:
-    from src.tray.controllers.secondary_device_controller import _log_boundary_exception
+    from keyrgb.tray.controllers.secondary_device_controller import _log_boundary_exception
 
     tray = _make_tray()
     tray._log_exception.side_effect = AssertionError("unexpected logger bug")

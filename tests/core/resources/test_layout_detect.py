@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import src.core.resources.layouts.detect as detect_mod
-from src.core.resources.layouts.detect import detect_physical_layout
+import keyrgb.core.resources.layouts.detect as detect_mod
+from keyrgb.core.resources.layouts.detect import detect_physical_layout
 
 
 def test_detect_iso_when_key_102nd_present(tmp_path):
@@ -16,7 +16,7 @@ def test_detect_iso_when_key_102nd_present(tmp_path):
     # word0 (bits 0..63):  bit 30 → 0x40000000
     caps.write_text("400000 40000000\n")
 
-    with patch("src.core.resources.layouts.detect.glob.glob", return_value=[str(caps)]):
+    with patch("keyrgb.core.resources.layouts.detect.glob.glob", return_value=[str(caps)]):
         assert detect_physical_layout() == "iso"
 
 
@@ -27,7 +27,7 @@ def test_detect_ansi_when_key_102nd_absent(tmp_path):
     # Only KEY_A (bit 30) set.
     caps.write_text("0 40000000\n")
 
-    with patch("src.core.resources.layouts.detect.glob.glob", return_value=[str(caps)]):
+    with patch("keyrgb.core.resources.layouts.detect.glob.glob", return_value=[str(caps)]):
         assert detect_physical_layout() == "ansi"
 
 
@@ -38,13 +38,13 @@ def test_detect_auto_when_no_keyboard(tmp_path):
     # Only power button codes, no KEY_A.
     caps.write_text("0 1\n")
 
-    with patch("src.core.resources.layouts.detect.glob.glob", return_value=[str(caps)]):
+    with patch("keyrgb.core.resources.layouts.detect.glob.glob", return_value=[str(caps)]):
         assert detect_physical_layout() == "auto"
 
 
 def test_detect_auto_when_no_devices():
     """No sysfs devices at all → auto."""
-    with patch("src.core.resources.layouts.detect.glob.glob", return_value=[]):
+    with patch("keyrgb.core.resources.layouts.detect.glob.glob", return_value=[]):
         assert detect_physical_layout() == "auto"
 
 
@@ -55,7 +55,7 @@ def test_detect_auto_when_only_generic_at_keyboard_reports_key_102nd(tmp_path):
     (tmp_path / "input0" / "name").write_text("AT Translated Set 2 keyboard\n")
     caps.write_text("400000 40000000\n")
 
-    with patch("src.core.resources.layouts.detect.glob.glob", return_value=[str(caps)]):
+    with patch("keyrgb.core.resources.layouts.detect.glob.glob", return_value=[str(caps)]):
         assert detect_physical_layout() == "auto"
 
 
@@ -130,7 +130,7 @@ def test_detect_layout_skips_unreadable_and_blank_capability_files(tmp_path, mon
     monkeypatch.setattr(Path, "read_text", fake_read_text)
 
     with patch(
-        "src.core.resources.layouts.detect.glob.glob",
+        "keyrgb.core.resources.layouts.detect.glob.glob",
         return_value=[str(unreadable), str(blank), str(ansi)],
     ):
         assert detect_physical_layout() == "ansi"

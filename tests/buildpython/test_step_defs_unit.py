@@ -26,7 +26,7 @@ def test_ruff_runner_checks_runtime_and_tooling_surfaces(monkeypatch) -> None:
             "-m",
             "ruff",
             "check",
-            "src",
+            "keyrgb",
             "buildpython",
             "scripts/release",
             "tests",

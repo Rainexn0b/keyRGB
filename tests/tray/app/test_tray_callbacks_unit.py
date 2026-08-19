@@ -6,7 +6,7 @@ import pytest
 
 
 def test_refresh_ui_best_effort_swallows_recoverable_runtime_errors() -> None:
-    from src.tray.app.callbacks import _refresh_ui_best_effort
+    from keyrgb.tray.app.callbacks import _refresh_ui_best_effort
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock(side_effect=RuntimeError("refresh failed"))
@@ -17,7 +17,7 @@ def test_refresh_ui_best_effort_swallows_recoverable_runtime_errors() -> None:
 
 
 def test_refresh_ui_best_effort_propagates_unexpected_errors() -> None:
-    from src.tray.app.callbacks import _refresh_ui_best_effort
+    from keyrgb.tray.app.callbacks import _refresh_ui_best_effort
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock(side_effect=AssertionError("unexpected refresh bug"))
@@ -27,7 +27,7 @@ def test_refresh_ui_best_effort_propagates_unexpected_errors() -> None:
 
 
 def test_update_menu_best_effort_swallows_recoverable_runtime_errors() -> None:
-    from src.tray.app.callbacks import _update_menu_best_effort
+    from keyrgb.tray.app.callbacks import _update_menu_best_effort
 
     tray = MagicMock()
     tray._update_menu = MagicMock(side_effect=RuntimeError("update failed"))
@@ -38,7 +38,7 @@ def test_update_menu_best_effort_swallows_recoverable_runtime_errors() -> None:
 
 
 def test_update_menu_best_effort_propagates_unexpected_errors() -> None:
-    from src.tray.app.callbacks import _update_menu_best_effort
+    from keyrgb.tray.app.callbacks import _update_menu_best_effort
 
     tray = MagicMock()
     tray._update_menu = MagicMock(side_effect=AssertionError("unexpected update bug"))
@@ -48,17 +48,17 @@ def test_update_menu_best_effort_propagates_unexpected_errors() -> None:
 
 
 def test_on_effect_clicked_normalizes_and_refreshes() -> None:
-    from src.tray.app.callbacks import on_effect_clicked
+    from keyrgb.tray.app.callbacks import on_effect_clicked
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
 
     with (
         patch(
-            "src.tray.app.callbacks.menu_mod.normalize_effect_label",
+            "keyrgb.tray.app.callbacks.menu_mod.normalize_effect_label",
             return_value="Wave",
         ) as norm,
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
     ):
         on_effect_clicked(tray, item=object())
 
@@ -68,12 +68,12 @@ def test_on_effect_clicked_normalizes_and_refreshes() -> None:
 
 
 def test_on_effect_key_clicked_normalizes_key_and_refreshes() -> None:
-    from src.tray.app.callbacks import on_effect_key_clicked
+    from keyrgb.tray.app.callbacks import on_effect_key_clicked
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
 
-    with patch("src.tray.app.callbacks.apply_effect_selection") as apply:
+    with patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply:
         on_effect_key_clicked(tray, effect_name="  HW_Uniform  ")
 
     apply.assert_called_once_with(tray, effect_name="hw_uniform")
@@ -81,8 +81,8 @@ def test_on_effect_key_clicked_normalizes_key_and_refreshes() -> None:
 
 
 def test_on_effect_key_clicked_snapshots_software_state_when_entering_hardware_effect_mode() -> None:
-    from src.tray.app.callbacks import on_effect_key_clicked
-    from src.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.app.callbacks import on_effect_key_clicked
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
@@ -94,9 +94,9 @@ def test_on_effect_key_clicked_snapshots_software_state_when_entering_hardware_e
     tray.backend = object()
 
     with (
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
-        patch("src.tray.app.callbacks.is_hardware_mode", return_value=False),
-        patch("src.tray.app.callbacks.is_backend_hardware_effect", return_value=True),
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.is_hardware_mode", return_value=False),
+        patch("keyrgb.tray.app.callbacks.is_backend_hardware_effect", return_value=True),
     ):
         on_effect_key_clicked(tray, effect_name="wave")
 
@@ -110,8 +110,8 @@ def test_on_effect_key_clicked_snapshots_software_state_when_entering_hardware_e
 
 
 def test_on_effect_key_clicked_snapshots_hardware_state_when_leaving_hardware_mode_for_software_effect() -> None:
-    from src.tray.app.callbacks import on_effect_key_clicked
-    from src.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.app.callbacks import on_effect_key_clicked
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
@@ -120,9 +120,9 @@ def test_on_effect_key_clicked_snapshots_hardware_state_when_leaving_hardware_mo
     tray.config.color = (4, 5, 6)
 
     with (
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
-        patch("src.tray.app.callbacks.is_hardware_mode", return_value=True),
-        patch("src.tray.app.callbacks.is_backend_hardware_effect", return_value=False),
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.is_hardware_mode", return_value=True),
+        patch("keyrgb.tray.app.callbacks.is_backend_hardware_effect", return_value=False),
     ):
         on_effect_key_clicked(tray, effect_name="reactive_ripple")
 
@@ -133,14 +133,14 @@ def test_on_effect_key_clicked_snapshots_hardware_state_when_leaving_hardware_mo
 
 
 def test_speed_and_brightness_callbacks_delegate() -> None:
-    from src.tray.app.callbacks import on_brightness_clicked_cb, on_speed_clicked_cb
+    from keyrgb.tray.app.callbacks import on_brightness_clicked_cb, on_speed_clicked_cb
 
     tray = MagicMock()
     item = object()
 
     with (
-        patch("src.tray.app.callbacks.on_speed_clicked") as sp,
-        patch("src.tray.app.callbacks.on_brightness_clicked") as br,
+        patch("keyrgb.tray.app.callbacks.on_speed_clicked") as sp,
+        patch("keyrgb.tray.app.callbacks.on_brightness_clicked") as br,
     ):
         on_speed_clicked_cb(tray, item)
         on_brightness_clicked_cb(tray, item)
@@ -150,7 +150,7 @@ def test_speed_and_brightness_callbacks_delegate() -> None:
 
 
 def test_on_device_context_clicked_updates_selection_and_menu() -> None:
-    from src.tray.app.callbacks import on_device_context_clicked
+    from keyrgb.tray.app.callbacks import on_device_context_clicked
 
     tray = MagicMock()
     tray._update_menu = MagicMock()
@@ -165,7 +165,7 @@ def test_on_device_context_clicked_updates_selection_and_menu() -> None:
 
 
 def test_on_device_context_clicked_returns_when_selection_is_read_only() -> None:
-    from src.tray.app.callbacks import on_device_context_clicked
+    from keyrgb.tray.app.callbacks import on_device_context_clicked
 
     class _Config:
         tray_device_context = "keyboard"
@@ -190,7 +190,7 @@ def test_on_device_context_clicked_returns_when_selection_is_read_only() -> None
 
 
 def test_on_device_context_clicked_ignores_read_only_config_and_updates_menu() -> None:
-    from src.tray.app.callbacks import on_device_context_clicked
+    from keyrgb.tray.app.callbacks import on_device_context_clicked
 
     class _Config:
         @property
@@ -213,12 +213,12 @@ def test_on_device_context_clicked_ignores_read_only_config_and_updates_menu() -
 
 
 def test_on_software_effect_target_clicked_updates_policy_and_menu() -> None:
-    from src.tray.app.callbacks import on_software_effect_target_clicked
+    from keyrgb.tray.app.callbacks import on_software_effect_target_clicked
 
     tray = MagicMock()
     tray._update_menu = MagicMock()
 
-    with patch("src.tray.app.callbacks.apply_software_effect_target_selection") as apply:
+    with patch("keyrgb.tray.app.callbacks.apply_software_effect_target_selection") as apply:
         on_software_effect_target_clicked(tray, "all_uniform_capable")
 
     apply.assert_called_once_with(tray, "all_uniform_capable")
@@ -226,11 +226,11 @@ def test_on_software_effect_target_clicked_updates_policy_and_menu() -> None:
 
 
 def test_on_off_and_on_turn_on_delegate() -> None:
-    from src.tray.app.callbacks import on_off_clicked, on_turn_on_clicked
+    from keyrgb.tray.app.callbacks import on_off_clicked, on_turn_on_clicked
 
     tray = MagicMock()
 
-    with patch("src.tray.app.callbacks.turn_off") as off, patch("src.tray.app.callbacks.turn_on") as on:
+    with patch("keyrgb.tray.app.callbacks.turn_off") as off, patch("keyrgb.tray.app.callbacks.turn_on") as on:
         on_off_clicked(tray)
         on_turn_on_clicked(tray)
 
@@ -239,8 +239,8 @@ def test_on_off_and_on_turn_on_delegate() -> None:
 
 
 def test_on_hardware_static_mode_clicked_applies_effect_and_refreshes() -> None:
-    from src.tray.app.callbacks import on_hardware_static_mode_clicked
-    from src.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.app.callbacks import on_hardware_static_mode_clicked
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
@@ -250,8 +250,8 @@ def test_on_hardware_static_mode_clicked_applies_effect_and_refreshes() -> None:
     tray.config.software_effect_target = "all_uniform_capable"
 
     with (
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
-        patch("src.tray.app.callbacks.is_hardware_mode", return_value=False),
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.is_hardware_mode", return_value=False),
     ):
         on_hardware_static_mode_clicked(tray)
 
@@ -263,8 +263,8 @@ def test_on_hardware_static_mode_clicked_applies_effect_and_refreshes() -> None:
 
 
 def test_on_hardware_static_mode_clicked_restores_previous_software_state_when_already_in_hardware_mode() -> None:
-    from src.tray.app.callbacks import on_hardware_static_mode_clicked
-    from src.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.app.callbacks import on_hardware_static_mode_clicked
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
@@ -278,8 +278,8 @@ def test_on_hardware_static_mode_clicked_restores_previous_software_state_when_a
     tray.config.color = (1, 2, 3)
 
     with (
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
-        patch("src.tray.app.callbacks.is_hardware_mode", return_value=True),
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.is_hardware_mode", return_value=True),
     ):
         on_hardware_static_mode_clicked(tray)
 
@@ -292,8 +292,8 @@ def test_on_hardware_static_mode_clicked_restores_previous_software_state_when_a
 
 
 def test_on_hardware_static_mode_clicked_restores_previous_hardware_effect_when_reentering_hardware_mode() -> None:
-    from src.tray.app.callbacks import on_hardware_static_mode_clicked
-    from src.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.app.callbacks import on_hardware_static_mode_clicked
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
@@ -303,8 +303,8 @@ def test_on_hardware_static_mode_clicked_restores_previous_hardware_effect_when_
     )
 
     with (
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
-        patch("src.tray.app.callbacks.is_hardware_mode", return_value=False),
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.is_hardware_mode", return_value=False),
     ):
         on_hardware_static_mode_clicked(tray)
 
@@ -316,8 +316,8 @@ def test_on_hardware_static_mode_clicked_restores_previous_hardware_effect_when_
 def test_on_hardware_static_mode_clicked_switches_hardware_effect_to_hardware_static_without_restoring_software() -> (
     None
 ):
-    from src.tray.app.callbacks import on_hardware_static_mode_clicked
-    from src.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.app.callbacks import on_hardware_static_mode_clicked
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
@@ -326,8 +326,8 @@ def test_on_hardware_static_mode_clicked_switches_hardware_effect_to_hardware_st
     tray.config.color = (2, 3, 4)
 
     with (
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
-        patch("src.tray.app.callbacks.is_hardware_mode", return_value=True),
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.is_hardware_mode", return_value=True),
     ):
         on_hardware_static_mode_clicked(tray)
 
@@ -338,8 +338,8 @@ def test_on_hardware_static_mode_clicked_switches_hardware_effect_to_hardware_st
 
 
 def test_on_hardware_static_mode_clicked_falls_back_to_hw_uniform_when_last_hardware_state_was_static() -> None:
-    from src.tray.app.callbacks import on_hardware_static_mode_clicked
-    from src.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.app.callbacks import on_hardware_static_mode_clicked
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
@@ -349,8 +349,8 @@ def test_on_hardware_static_mode_clicked_falls_back_to_hw_uniform_when_last_hard
     )
 
     with (
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
-        patch("src.tray.app.callbacks.is_hardware_mode", return_value=False),
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.is_hardware_mode", return_value=False),
     ):
         on_hardware_static_mode_clicked(tray)
 
@@ -360,15 +360,15 @@ def test_on_hardware_static_mode_clicked_falls_back_to_hw_uniform_when_last_hard
 
 
 def test_on_hardware_color_clicked_applies_effect_refreshes_and_launches_gui() -> None:
-    from src.tray.app.callbacks import on_hardware_color_clicked
+    from keyrgb.tray.app.callbacks import on_hardware_color_clicked
 
     tray = MagicMock()
     tray._refresh_ui = MagicMock()
 
     with (
-        patch("src.tray.app.callbacks.apply_effect_selection") as apply,
-        patch("src.tray.app.callbacks.is_hardware_mode", return_value=False),
-        patch("src.tray.app.callbacks.launch_uniform_gui") as launch,
+        patch("keyrgb.tray.app.callbacks.apply_effect_selection") as apply,
+        patch("keyrgb.tray.app.callbacks.is_hardware_mode", return_value=False),
+        patch("keyrgb.tray.app.callbacks.launch_uniform_gui") as launch,
     ):
         on_hardware_color_clicked(tray)
 
@@ -378,20 +378,21 @@ def test_on_hardware_color_clicked_applies_effect_refreshes_and_launches_gui() -
 
 
 def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_lightbar() -> None:
-    from src.tray.app.callbacks import on_selected_device_color_clicked
+    from keyrgb.tray.app.callbacks import on_selected_device_color_clicked
 
     tray = MagicMock()
     tray.selected_device_context = "lightbar:048d:7001"
 
     with (
         patch(
-            "src.tray.app.callbacks.selected_device_context_entry",
+            "keyrgb.tray.app.callbacks.selected_device_context_entry",
             return_value={"key": "lightbar:048d:7001", "device_type": "lightbar"},
         ),
         patch(
-            "src.tray.app.callbacks.selected_secondary_backend_name", return_value="ite8233_none_chassis_lightbar_clevo"
+            "keyrgb.tray.app.callbacks.selected_secondary_backend_name",
+            return_value="ite8233_none_chassis_lightbar_clevo",
         ),
-        patch("src.tray.app.callbacks.launch_uniform_gui") as launch,
+        patch("keyrgb.tray.app.callbacks.launch_uniform_gui") as launch,
     ):
         on_selected_device_color_clicked(tray)
 
@@ -401,18 +402,18 @@ def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_ligh
 
 
 def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_mouse() -> None:
-    from src.tray.app.callbacks import on_selected_device_color_clicked
+    from keyrgb.tray.app.callbacks import on_selected_device_color_clicked
 
     tray = MagicMock()
     tray.selected_device_context = "mouse:sysfs:usbmouse__rgb"
 
     with (
         patch(
-            "src.tray.app.callbacks.selected_device_context_entry",
+            "keyrgb.tray.app.callbacks.selected_device_context_entry",
             return_value={"key": "mouse:sysfs:usbmouse__rgb", "device_type": "mouse"},
         ),
-        patch("src.tray.app.callbacks.selected_secondary_backend_name", return_value="sysfs-mouse"),
-        patch("src.tray.app.callbacks.launch_uniform_gui") as launch,
+        patch("keyrgb.tray.app.callbacks.selected_secondary_backend_name", return_value="sysfs-mouse"),
+        patch("keyrgb.tray.app.callbacks.launch_uniform_gui") as launch,
     ):
         on_selected_device_color_clicked(tray)
 
@@ -420,17 +421,17 @@ def test_on_selected_device_color_clicked_launches_targeted_uniform_gui_for_mous
 
 
 def test_on_selected_device_brightness_clicked_delegates_to_secondary_controller() -> None:
-    from src.tray.app.callbacks import on_selected_device_brightness_clicked
+    from keyrgb.tray.app.callbacks import on_selected_device_brightness_clicked
 
     tray = MagicMock()
     item = object()
 
     with (
         patch(
-            "src.tray.app.callbacks.selected_device_context_entry",
+            "keyrgb.tray.app.callbacks.selected_device_context_entry",
             return_value={"key": "lightbar:048d:7001", "device_type": "lightbar"},
         ),
-        patch("src.tray.app.callbacks.apply_selected_secondary_brightness") as apply,
+        patch("keyrgb.tray.app.callbacks.apply_selected_secondary_brightness") as apply,
     ):
         on_selected_device_brightness_clicked(tray, item)
 
@@ -438,16 +439,16 @@ def test_on_selected_device_brightness_clicked_delegates_to_secondary_controller
 
 
 def test_on_selected_device_turn_off_clicked_delegates_to_secondary_controller() -> None:
-    from src.tray.app.callbacks import on_selected_device_turn_off_clicked
+    from keyrgb.tray.app.callbacks import on_selected_device_turn_off_clicked
 
     tray = MagicMock()
 
     with (
         patch(
-            "src.tray.app.callbacks.selected_device_context_entry",
+            "keyrgb.tray.app.callbacks.selected_device_context_entry",
             return_value={"key": "lightbar:048d:7001", "device_type": "lightbar"},
         ),
-        patch("src.tray.app.callbacks.turn_off_selected_secondary_device") as turn_off_secondary,
+        patch("keyrgb.tray.app.callbacks.turn_off_selected_secondary_device") as turn_off_secondary,
     ):
         on_selected_device_turn_off_clicked(tray)
 
@@ -455,16 +456,16 @@ def test_on_selected_device_turn_off_clicked_delegates_to_secondary_controller()
 
 
 def test_on_selected_device_turn_on_clicked_delegates_to_secondary_controller() -> None:
-    from src.tray.app.callbacks import on_selected_device_turn_on_clicked
+    from keyrgb.tray.app.callbacks import on_selected_device_turn_on_clicked
 
     tray = MagicMock()
 
     with (
         patch(
-            "src.tray.app.callbacks.selected_device_context_entry",
+            "keyrgb.tray.app.callbacks.selected_device_context_entry",
             return_value={"key": "lightbar:048d:7001", "device_type": "lightbar"},
         ),
-        patch("src.tray.app.callbacks.turn_on_selected_secondary_device") as turn_on_secondary,
+        patch("keyrgb.tray.app.callbacks.turn_on_selected_secondary_device") as turn_on_secondary,
     ):
         on_selected_device_turn_on_clicked(tray)
 
@@ -472,9 +473,9 @@ def test_on_selected_device_turn_on_clicked_delegates_to_secondary_controller() 
 
 
 def test_support_window_callbacks_launch_with_expected_focus() -> None:
-    from src.tray.app.callbacks import on_backend_discovery_clicked, on_support_debug_clicked
+    from keyrgb.tray.app.callbacks import on_backend_discovery_clicked, on_support_debug_clicked
 
-    with patch("src.tray.app.callbacks.launch_support_gui") as launch:
+    with patch("keyrgb.tray.app.callbacks.launch_support_gui") as launch:
         on_support_debug_clicked()
         on_backend_discovery_clicked()
 
@@ -483,9 +484,9 @@ def test_support_window_callbacks_launch_with_expected_focus() -> None:
 
 
 def test_on_power_mode_settings_clicked_launches_power_mode_settings_gui() -> None:
-    from src.tray.app.callbacks import on_power_mode_settings_clicked
+    from keyrgb.tray.app.callbacks import on_power_mode_settings_clicked
 
-    with patch("src.tray.app.callbacks.launch_power_mode_settings_gui") as launch:
+    with patch("keyrgb.tray.app.callbacks.launch_power_mode_settings_gui") as launch:
         on_power_mode_settings_clicked()
 
     launch.assert_called_once_with()

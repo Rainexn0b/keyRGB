@@ -8,7 +8,7 @@ ensure_repo_root_on_sys_path()
 
 
 def test_config_has_reactive_color_defaults(monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     # Ensure we don't touch user config location.
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", os.path.join(REPO_ROOT, "buildlog", "test-config-reactive"))
@@ -24,7 +24,7 @@ def test_config_has_reactive_color_defaults(monkeypatch) -> None:
 
 
 def test_config_persists_reactive_color(monkeypatch) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     tmp_dir = os.path.join(REPO_ROOT, "buildlog", "test-config-reactive-persist")
     monkeypatch.setenv("KEYRGB_CONFIG_DIR", tmp_dir)

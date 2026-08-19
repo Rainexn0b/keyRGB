@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.effects.transitions import avoid_full_black, choose_steps, scaled_color_map_nonzero
+from keyrgb.core.effects.transitions import avoid_full_black, choose_steps, scaled_color_map_nonzero
 
 
 def test_choose_steps_duration_non_positive_returns_one() -> None:

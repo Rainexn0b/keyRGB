@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from src.core.backends.ite8291_perkey import hidraw, protocol
+from keyrgb.core.backends.ite8291_perkey import hidraw, protocol
 
 
 def test_parse_hid_id_and_uevent_helpers(tmp_path: Path) -> None:

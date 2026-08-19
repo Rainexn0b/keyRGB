@@ -199,7 +199,7 @@ def inventory_subtree(rel_path: str) -> str:
     parts = [part for part in normalized.split("/") if part]
     if not parts:
         return normalized
-    if len(parts) >= 2 and parts[0] in {"src", "buildpython"}:
+    if len(parts) >= 2 and parts[0] in {"keyrgb", "buildpython"}:
         return "/".join(parts[:2])
     return parts[0]
 

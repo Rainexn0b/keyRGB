@@ -16,7 +16,7 @@ def _wait_for_revision(coordinator, expected: int) -> bool:
 
 
 def test_coordinator_serializes_reentrant_transition_without_new_revision() -> None:
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
     coordinator = TrayRuntimeCoordinator()
     calls: list[str] = []
@@ -36,7 +36,7 @@ def test_coordinator_serializes_reentrant_transition_without_new_revision() -> N
 
 
 def test_coordinator_rejects_observation_captured_before_newer_transition() -> None:
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
     coordinator = TrayRuntimeCoordinator()
     calls: list[str] = []
@@ -59,7 +59,7 @@ def test_coordinator_rejects_observation_captured_before_newer_transition() -> N
 
 
 def test_coordinator_flushes_coalesced_ui_request_on_waiting_caller() -> None:
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator, UiRefreshRequest
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator, UiRefreshRequest
 
     coordinator = TrayRuntimeCoordinator()
     caller_thread_id = threading.get_ident()
@@ -84,7 +84,7 @@ def test_coordinator_flushes_coalesced_ui_request_on_waiting_caller() -> None:
 
 
 def test_coordinator_propagates_transition_exception_and_remains_usable() -> None:
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
     coordinator = TrayRuntimeCoordinator()
 
@@ -98,7 +98,7 @@ def test_coordinator_propagates_transition_exception_and_remains_usable() -> Non
 
 
 def test_coordinator_reports_stuck_owner_and_stops_accepting_new_work() -> None:
-    from src.tray.controllers.runtime_coordinator import CoordinatorStoppedError, TrayRuntimeCoordinator
+    from keyrgb.tray.controllers.runtime_coordinator import CoordinatorStoppedError, TrayRuntimeCoordinator
 
     coordinator = TrayRuntimeCoordinator()
     action_started = threading.Event()
@@ -128,8 +128,8 @@ def test_coordinator_reports_stuck_owner_and_stops_accepting_new_work() -> None:
 def test_transition_adapter_defers_and_coalesces_ui_on_calling_thread() -> None:
     from types import SimpleNamespace
 
-    from src.tray.controllers.runtime_coordination import defer_ui_refresh, run_tray_transition
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    from keyrgb.tray.controllers.runtime_coordination import defer_ui_refresh, run_tray_transition
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
     coordinator = TrayRuntimeCoordinator()
     caller_thread_id = threading.get_ident()
@@ -158,7 +158,7 @@ def test_transition_adapter_defers_and_coalesces_ui_on_calling_thread() -> None:
 def test_transition_adapter_keeps_coordinator_free_fakes_synchronous() -> None:
     from types import SimpleNamespace
 
-    from src.tray.controllers.runtime_coordination import run_tray_transition
+    from keyrgb.tray.controllers.runtime_coordination import run_tray_transition
 
     caller_thread_id = threading.get_ident()
     action_threads: list[int] = []
@@ -175,9 +175,9 @@ def test_transition_adapter_keeps_coordinator_free_fakes_synchronous() -> None:
 def test_config_apply_cannot_finish_after_newer_serialized_user_turn_off() -> None:
     from types import SimpleNamespace
 
-    from src.tray.controllers.runtime_coordination import run_tray_transition
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
-    from src.tray.pollers.config_polling import _reload_and_apply_config_transition
+    from keyrgb.tray.controllers.runtime_coordination import run_tray_transition
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    from keyrgb.tray.pollers.config_polling import _reload_and_apply_config_transition
 
     coordinator = TrayRuntimeCoordinator()
     apply_started = threading.Event()
@@ -229,10 +229,10 @@ def test_config_apply_cannot_finish_after_newer_serialized_user_turn_off() -> No
 def test_scheduler_apply_cannot_relight_after_newer_serialized_user_turn_off(monkeypatch) -> None:
     from types import SimpleNamespace
 
-    from src.tray.controllers.runtime_coordination import run_tray_transition
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
-    from src.tray.idle_power_state import TrayIdlePowerState
-    from src.tray.pollers import time_scheduler
+    from keyrgb.tray.controllers.runtime_coordination import run_tray_transition
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.pollers import time_scheduler
 
     coordinator = TrayRuntimeCoordinator()
     apply_started = threading.Event()

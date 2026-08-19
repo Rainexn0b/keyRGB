@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+from keyrgb.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
 
 def test_hardware_polling_dim_temp_target_does_not_refresh_or_toggle_off() -> None:

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+from keyrgb.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
 
 @dataclass
@@ -243,7 +243,7 @@ def test_hardware_polling_recovers_recent_power_source_blank_without_marking_off
     tray._last_power_source_transition_at = 100.0
     tray._apply_power_source_perkey_profile_transition = MagicMock(return_value=True)
 
-    monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
 
     last_brightness, last_off = _apply_polled_hardware_state(
         tray,
@@ -268,7 +268,7 @@ def test_hardware_polling_recovers_stable_zero_without_off_state(monkeypatch) ->
     tray = _DummyTray(brightness=25, is_off=False)
     tray._start_current_effect = MagicMock()
 
-    monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 200.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 200.0)
 
     last_brightness, last_off = _apply_polled_hardware_state(
         tray,
@@ -293,7 +293,7 @@ def test_hardware_polling_does_not_recover_stable_zero_when_forced_off(monkeypat
     tray = _DummyTray(brightness=25, is_off=True, power_forced_off=True)
     tray._start_current_effect = MagicMock()
 
-    monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 200.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 200.0)
 
     last_brightness, last_off = _apply_polled_hardware_state(
         tray,
@@ -315,7 +315,7 @@ def test_hardware_polling_stable_zero_recovery_obeys_cooldown(monkeypatch) -> No
     tray._last_hardware_blank_recovery_at = 198.0
     tray._start_current_effect = MagicMock()
 
-    monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 200.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 200.0)
 
     _apply_polled_hardware_state(
         tray,
@@ -334,7 +334,7 @@ def test_hardware_polling_keeps_recent_power_source_blank_in_recovery_window(mon
     tray = _DummyTray(brightness=25, is_off=False)
     tray._last_power_source_transition_at = 100.0
 
-    monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
 
     last_brightness, last_off = _apply_polled_hardware_state(
         tray,
@@ -403,7 +403,7 @@ def test_controller_sleep_off_is_honored_while_effect_engine_running(monkeypatch
         return True
 
     monkeypatch.setattr(
-        "src.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
         _fake_recover,
     )
 
@@ -440,7 +440,7 @@ def test_controller_sleep_off_keeps_native_zero_without_redundant_turn_off(monke
         kb_lock=threading.RLock(),
     )
     monkeypatch.setattr(
-        "src.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
         lambda *_args, **_kwargs: True,
     )
 
@@ -466,8 +466,8 @@ def test_controller_sleep_off_suppressed_immediately_after_idle_restore(monkeypa
 
     import time
 
-    from src.tray.idle_power_state import set_idle_power_state_field
-    from src.tray.pollers.idle_power._constants import POST_RESUME_IDLE_ACTION_SUPPRESSION_S
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.pollers.idle_power._constants import POST_RESUME_IDLE_ACTION_SUPPRESSION_S
 
     tray = _DummyTray(brightness=25, is_off=False)
     tray.config.controller_sleep_respect = True
@@ -485,7 +485,7 @@ def test_controller_sleep_off_suppressed_immediately_after_idle_restore(monkeypa
         return True
 
     monkeypatch.setattr(
-        "src.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
         _fake_recover,
     )
 
@@ -532,7 +532,7 @@ def test_nonzero_read_while_controller_sleep_off_restarts_stopped_effect(monkeyp
     owner.controller_sleep_off_at = 100.0
     start_calls: list[str] = []
     tray._start_current_effect = lambda: start_calls.append("start") or True
-    monkeypatch.setattr("src.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.hardware_polling.time.monotonic", lambda: 101.0)
 
     last_brightness, _last_off = _apply_polled_hardware_state(
         tray,

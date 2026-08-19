@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.tray.pollers.config_polling import ConfigApplyState, _maybe_apply_fast_path
-from src.tray.pollers.config_polling_internal._apply_callbacks import _sync_software_target_policy
+from keyrgb.tray.pollers.config_polling import ConfigApplyState, _maybe_apply_fast_path
+from keyrgb.tray.pollers.config_polling_internal._apply_callbacks import _sync_software_target_policy
 
 
 def _mk_tray(*, engine_running: bool = True) -> MagicMock:
@@ -210,7 +210,7 @@ def test_fastpath_software_target_change_updates_policy_without_restart() -> Non
     )
 
     with patch(
-        "src.tray.pollers.config_polling_internal._fast_path.apply_callbacks._sync_software_target_policy"
+        "keyrgb.tray.pollers.config_polling_internal._fast_path.apply_callbacks._sync_software_target_policy"
     ) as sync_policy:
         handled, new_last = _maybe_apply_fast_path(tray, last_applied=last, current=current)
 
@@ -245,9 +245,11 @@ def test_sync_software_target_policy_logs_config_setter_failure_and_still_update
 
     with (
         patch(
-            "src.tray.pollers.config_polling_internal.helpers.configure_engine_software_targets"
+            "keyrgb.tray.pollers.config_polling_internal.helpers.configure_engine_software_targets"
         ) as configure_targets,
-        patch("src.tray.pollers.config_polling_internal.helpers.restore_secondary_software_targets") as restore_targets,
+        patch(
+            "keyrgb.tray.pollers.config_polling_internal.helpers.restore_secondary_software_targets"
+        ) as restore_targets,
     ):
         _sync_software_target_policy(tray, current)
 

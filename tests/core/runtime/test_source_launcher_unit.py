@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-SOURCE_LAUNCHER = ROOT / "keyrgb"
+SOURCE_LAUNCHER = ROOT / "keyrgb.sh"
 
 
 def _write_executable(path: Path, content: str) -> None:
@@ -91,5 +91,5 @@ def test_source_launcher_keeps_local_python_when_gi_is_available(tmp_path: Path)
         capture_output=True,
     )
 
-    assert marker.read_text(encoding="utf-8") == "-B -m src.tray --probe\n"
+    assert marker.read_text(encoding="utf-8") == "-B -m keyrgb.tray --probe\n"
     assert result.stderr == ""

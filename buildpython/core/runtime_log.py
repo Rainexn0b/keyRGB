@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.diagnostics.runtime_capture import (
+from keyrgb.core.diagnostics.runtime_capture import (
     RUNTIME_LAUNCHERS,
     RUNTIME_LOG_MODES,
     RUNTIME_LOG_NAME,

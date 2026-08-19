@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.backends.ite8291r3_perkey import usb
+from keyrgb.core.backends.ite8291r3_perkey import usb
 
 
 class _FakeUsbError(OSError):

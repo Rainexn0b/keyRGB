@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.windows import (
+from keyrgb.gui.windows import (
     _uniform_color_bootstrap as uniform_color_bootstrap,
     _uniform_color_ui as uniform_color_ui,
     uniform,
@@ -164,8 +164,8 @@ def test_select_backend_best_effort_uses_secondary_route_backend(monkeypatch) ->
 def test_secondary_uniform_window_uses_runtime_backend_and_device_in_simulation(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.secondary_device_routes import route_for_device_type
-    from src.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
+    from keyrgb.core.secondary_device_routes import route_for_device_type
+    from keyrgb.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
 
     monkeypatch.setenv(SIMULATION_ENVIRONMENT_VARIABLE, "1")
     route = route_for_device_type("logo")
@@ -262,7 +262,7 @@ def test_commit_color_to_config_uses_secondary_route_state(monkeypatch) -> None:
     enabled_calls: list[tuple[str, bool]] = []
     profile_updates: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(
-        "src.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
+        "keyrgb.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
         lambda state_key, updates: profile_updates.append((state_key, dict(updates))),
     )
 
@@ -289,7 +289,7 @@ def test_commit_color_to_config_uses_secondary_route_state(monkeypatch) -> None:
 
 
 def test_secondary_uniform_color_uses_primary_brightness_for_shared_zone() -> None:
-    from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED
+    from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED
 
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
     gui.config = SimpleNamespace(
@@ -307,7 +307,7 @@ def test_secondary_uniform_color_uses_primary_brightness_for_shared_zone() -> No
 
 
 def test_secondary_uniform_color_does_not_store_brightness_for_shared_zone() -> None:
-    from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED
+    from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED
 
     writes: list[int] = []
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
@@ -328,12 +328,12 @@ def test_secondary_uniform_color_does_not_store_brightness_for_shared_zone() -> 
 
 
 def test_secondary_uniform_color_stores_independent_brightness_in_active_profile(monkeypatch) -> None:
-    from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
+    from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
 
     config_writes: list[tuple[str, int, str | None]] = []
     profile_updates: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(
-        "src.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
+        "keyrgb.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
         lambda state_key, updates: profile_updates.append((state_key, dict(updates))),
     )
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)
@@ -356,11 +356,11 @@ def test_secondary_uniform_color_stores_independent_brightness_in_active_profile
 
 
 def test_secondary_uniform_color_zero_brightness_preserves_profile_restore_value(monkeypatch) -> None:
-    from src.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
+    from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_INDEPENDENT
 
     profile_updates: list[tuple[str, dict[str, object]]] = []
     monkeypatch.setattr(
-        "src.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
+        "keyrgb.gui.windows._uniform_color_state.profiles.update_secondary_lighting_area",
         lambda state_key, updates: profile_updates.append((state_key, dict(updates))),
     )
     gui = uniform.UniformColorGUI.__new__(uniform.UniformColorGUI)

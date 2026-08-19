@@ -5,7 +5,7 @@ import ast
 from dataclasses import dataclass
 from pathlib import Path
 
-_TOP_LEVEL_ROOT_FILES = ("keyrgb", "keyrgb-tuxedo")
+_TOP_LEVEL_ROOT_FILES = ("keyrgb.sh", "keyrgb-tuxedo")
 _EXTERNAL_ROOT_DIRS = ("scripts",)
 
 
@@ -88,7 +88,7 @@ def _module_name_for_path(root: Path, path: Path) -> str | None:
 
     if rel_path.suffix != ".py":
         return None
-    if not rel_path.parts or rel_path.parts[0] not in {"src", "buildpython"}:
+    if not rel_path.parts or rel_path.parts[0] not in {"keyrgb", "buildpython"}:
         return None
 
     parts = list(rel_path.parts)
@@ -192,7 +192,7 @@ def _collect_root_paths(
             root_paths.add(path)
 
     for module_name, path in module_index.items():
-        if path.name == "__main__.py" and module_name.startswith(("src.", "buildpython.")):
+        if path.name == "__main__.py" and module_name.startswith(("keyrgb.", "buildpython.")):
             root_paths.add(path)
 
     for external_path in external_root_files:
@@ -231,7 +231,7 @@ def _entrypoint_modules_from_pyproject(root: Path) -> set[str]:
 
         entrypoint = value[1:closing_quote]
         module_name = entrypoint.split(":", 1)[0].strip()
-        if module_name.startswith(("src", "buildpython")):
+        if module_name.startswith(("keyrgb", "buildpython")):
             modules.add(module_name)
 
     return modules
@@ -353,7 +353,7 @@ def _launched_module_names(path: Path) -> set[str]:
                 if token != "-m":
                     continue
                 module_name = tokens[index + 1]
-                if module_name.startswith(("src.", "buildpython.")):
+                if module_name.startswith(("keyrgb.", "buildpython.")):
                     module_names.add(module_name)
     return module_names
 
@@ -365,7 +365,7 @@ def _dynamic_module_call_names(node: ast.Call, *, path: Path) -> set[str]:
     names: set[str] = set()
     for expr in node.args[:1]:
         module_name = _module_name_string(expr, path=path)
-        if module_name is not None and module_name.startswith(("src.", "buildpython.")):
+        if module_name is not None and module_name.startswith(("keyrgb.", "buildpython.")):
             names.add(module_name)
     return names
 
@@ -405,7 +405,7 @@ def _joined_module_name_string(expr: ast.JoinedStr, *, path: Path) -> str | None
 
 def _repo_root_for_module_path(path: Path) -> Path:
     for parent in [path.parent, *path.parents]:
-        if parent.name in {"src", "buildpython"}:
+        if parent.name in {"keyrgb", "buildpython"}:
             return parent.parent
     return path.parent
 

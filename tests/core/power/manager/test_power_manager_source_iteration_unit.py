@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from src.core.power.management._manager_source_iteration import (
+from keyrgb.core.power.management._manager_source_iteration import (
     IterationDisposition,
     classify_power_source_iteration,
     stabilize_power_source_state,

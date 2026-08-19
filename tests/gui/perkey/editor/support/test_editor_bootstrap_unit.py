@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.gui.perkey.editor_support import bootstrap
+from keyrgb.gui.perkey.editor_support import bootstrap
 
 
 class _Var:

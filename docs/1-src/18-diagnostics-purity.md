@@ -27,9 +27,9 @@ JSON must be detached from collector internals.
 
 | Surface | Module |
 |---|---|
-| Freeze/unfreeze | `src/core/diagnostics/model.py` |
-| Environment snapshot | `src/core/diagnostics/snapshots.py` |
-| Secondary-device snapshot | `src/core/diagnostics/secondary_devices.py` |
+| Freeze/unfreeze | `keyrgb/core/diagnostics/model.py` |
+| Environment snapshot | `keyrgb/core/diagnostics/snapshots.py` |
+| Secondary-device snapshot | `keyrgb/core/diagnostics/secondary_devices.py` |
 
 ## Non-goals
 

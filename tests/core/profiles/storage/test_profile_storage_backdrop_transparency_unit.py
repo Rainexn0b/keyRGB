@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 
-from src.core.profile import _backdrop as backdrop_ops, profiles
+from keyrgb.core.profile import _backdrop as backdrop_ops, profiles
 
 
 class _BrokenInt:

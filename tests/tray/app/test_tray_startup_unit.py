@@ -4,13 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.tray.app._startup import migrate_builtin_profile_brightness_best_effort
+from keyrgb.tray.app._startup import migrate_builtin_profile_brightness_best_effort
 
 
 def test_migrate_builtin_profile_brightness_best_effort_runs_migration(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.profile import profiles as core_profiles
+    from keyrgb.core.profile import profiles as core_profiles
 
     calls: list[object] = []
     config = SimpleNamespace()
@@ -25,7 +25,7 @@ def test_migrate_builtin_profile_brightness_best_effort_runs_migration(
 def test_migrate_builtin_profile_brightness_best_effort_swallows_recoverable_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.profile import profiles as core_profiles
+    from keyrgb.core.profile import profiles as core_profiles
 
     monkeypatch.setattr(
         core_profiles,
@@ -39,7 +39,7 @@ def test_migrate_builtin_profile_brightness_best_effort_swallows_recoverable_err
 def test_migrate_builtin_profile_brightness_best_effort_propagates_unexpected_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.profile import profiles as core_profiles
+    from keyrgb.core.profile import profiles as core_profiles
 
     monkeypatch.setattr(
         core_profiles,

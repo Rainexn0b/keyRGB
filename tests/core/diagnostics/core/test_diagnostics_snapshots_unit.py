@@ -5,7 +5,7 @@ import types
 
 import pytest
 
-from src.core.diagnostics import snapshots
+from keyrgb.core.diagnostics import snapshots
 
 
 class _MissingNode:

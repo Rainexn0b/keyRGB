@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.backends.policies.sleep_state import (
+from keyrgb.core.backends.policies.sleep_state import (
     SLEEP_STATE_POLICY_ZERO_BRIGHTNESS_WITHOUT_OFF,
     is_controller_sleep_state,
     sleep_state_policy,
@@ -36,6 +36,6 @@ def test_unreadable_values_are_not_sleep_state() -> None:
 
 
 def test_ite8291r3_device_declares_default_policy() -> None:
-    from src.core.backends.ite8291r3_perkey.device import Ite8291r3KeyboardDevice
+    from keyrgb.core.backends.ite8291r3_perkey.device import Ite8291r3KeyboardDevice
 
     assert Ite8291r3KeyboardDevice.keyrgb_sleep_state_policy == SLEEP_STATE_POLICY_ZERO_BRIGHTNESS_WITHOUT_OFF

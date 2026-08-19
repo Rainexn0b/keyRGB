@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core.effects.catalog import REACTIVE_EFFECTS
-from src.tray.pollers.config_polling_internal.core import (
+from keyrgb.core.effects.catalog import REACTIVE_EFFECTS
+from keyrgb.tray.pollers.config_polling_internal.core import (
     ConfigApplyState,
     classify_apply_from_config,
     compute_config_apply_state,

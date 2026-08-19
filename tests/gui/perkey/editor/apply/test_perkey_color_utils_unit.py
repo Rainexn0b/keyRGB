@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.perkey.color_utils import coerce_rgb_triplet, initial_last_non_black_color, rgb_ints
+from keyrgb.gui.perkey.color_utils import coerce_rgb_triplet, initial_last_non_black_color, rgb_ints
 
 
 def test_coerce_rgb_triplet_converts_three_values_to_ints() -> None:

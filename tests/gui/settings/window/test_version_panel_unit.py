@@ -7,7 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.settings.panels import version_panel
+from keyrgb.gui.settings.panels import version_panel
 
 
 class _FakeWidget:
@@ -333,7 +333,7 @@ def test_open_support_tools_launches_support_window_subprocess(monkeypatch: pyte
 
     panel._open_support_tools()
 
-    assert launches[0][0] == "src.gui.windows.support"
+    assert launches[0][0] == "keyrgb.gui.windows.support"
     assert launches[0][1]["env"]["KEYRGB_SUPPORT_FOCUS"] == "debug"
     assert status.options["text"] == "Opened Support Tools"
     assert root.after_calls[0][0] == 2000

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.resources.layout import KeyDef
-from src.core.resources.layout_tweak_autosync import (
+from keyrgb.core.resources.layout import KeyDef
+from keyrgb.core.resources.layout_tweak_autosync import (
     _apply_global_factory,
     _apply_per_key,
     _build_items,
@@ -14,7 +14,7 @@ from src.core.resources.layout_tweak_autosync import (
     _snap_rows,
     _sync_similar_sizes,
 )
-from src.gui.perkey.overlay.autosync import auto_sync_per_key_overlays
+from keyrgb.gui.perkey.overlay.autosync import auto_sync_per_key_overlays
 
 
 def _key(key_id: str, rect: tuple[int, int, int, int]) -> KeyDef:

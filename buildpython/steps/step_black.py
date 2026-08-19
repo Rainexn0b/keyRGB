@@ -16,7 +16,7 @@ def black_check_runner() -> RunResult:
             "black",
             "--check",
             "--diff",
-            "src",
+            "keyrgb",
             "buildpython",
         ],
         cwd=str(root),

@@ -26,7 +26,7 @@ class TestLoadConfigSettings:
 
     def test_load_returns_defaults_when_file_missing(self, temp_config_dir):
         """If config file doesn't exist, return defaults."""
-        from src.core.config.file_storage import load_config_settings
+        from keyrgb.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "missing.json"
         defaults = {"brightness": 50, "effect": "breathe"}
@@ -41,7 +41,7 @@ class TestLoadConfigSettings:
 
     def test_load_merges_defaults_with_loaded_data(self, temp_config_dir):
         """Loaded config should be merged with defaults (loaded wins)."""
-        from src.core.config.file_storage import load_config_settings
+        from keyrgb.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"brightness": 75, "new_key": "value"}))
@@ -59,7 +59,7 @@ class TestLoadConfigSettings:
 
     def test_load_normalizes_effect_to_lowercase(self, temp_config_dir):
         """If effect is present, it should be lowercased."""
-        from src.core.config.file_storage import load_config_settings
+        from keyrgb.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"effect": "BREATHE"}))
@@ -74,7 +74,7 @@ class TestLoadConfigSettings:
 
     def test_load_normalizes_return_effect_after_effect_to_lowercase(self, temp_config_dir):
         """If return_effect_after_effect is present, it should be lowercased."""
-        from src.core.config.file_storage import load_config_settings
+        from keyrgb.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"return_effect_after_effect": "PERKEY"}))
@@ -90,7 +90,7 @@ class TestLoadConfigSettings:
     @pytest.mark.parametrize("older_effect_name", ["static", "pulse", "breathing_sw", "fire", "random", "rain"])
     def test_load_maps_removed_older_effect_names_to_none(self, temp_config_dir, older_effect_name):
         """Removed older effect names should be normalized to a safe fallback."""
-        from src.core.config.file_storage import load_config_settings
+        from keyrgb.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"effect": older_effect_name}), encoding="utf-8")
@@ -105,7 +105,7 @@ class TestLoadConfigSettings:
 
     def test_load_retries_on_json_decode_error(self, temp_config_dir):
         """If JSON is malformed, load should retry and eventually return None."""
-        from src.core.config.file_storage import load_config_settings
+        from keyrgb.core.config.file_storage import load_config_settings
 
         logger = MagicMock()
         config_file = temp_config_dir / "config.json"
@@ -129,7 +129,7 @@ class TestLoadConfigSettings:
 
     def test_load_returns_none_on_persistent_io_error(self, temp_config_dir):
         """If file exists but raises OSError, return None."""
-        from src.core.config.file_storage import load_config_settings
+        from keyrgb.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"brightness": 50}))
@@ -146,7 +146,7 @@ class TestLoadConfigSettings:
 
     def test_load_treats_non_dict_json_as_empty(self, temp_config_dir):
         """If JSON loads but isn't a dict, treat as empty dict."""
-        from src.core.config.file_storage import load_config_settings
+        from keyrgb.core.config.file_storage import load_config_settings
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps([1, 2, 3]))  # array, not dict
@@ -166,7 +166,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_creates_config_dir_if_missing(self, tmp_path):
         """save should create the config directory if it doesn't exist."""
-        from src.core.config.file_storage import save_config_settings_atomic
+        from keyrgb.core.config.file_storage import save_config_settings_atomic
 
         config_dir = tmp_path / "nonexistent" / "config"
         config_file = config_dir / "config.json"
@@ -186,7 +186,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_uses_atomic_replace(self, temp_config_dir):
         """save should write to temp file then replace original."""
-        from src.core.config.file_storage import save_config_settings_atomic
+        from keyrgb.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text(json.dumps({"old": "data"}))
@@ -208,7 +208,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_cleans_up_temp_file_on_success(self, temp_config_dir):
         """After successful save, temp file should be removed."""
-        from src.core.config.file_storage import save_config_settings_atomic
+        from keyrgb.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         settings = {"brightness": 50}
@@ -226,7 +226,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_handles_write_exception_gracefully(self, temp_config_dir):
         """If write fails, save should not crash."""
-        from src.core.config.file_storage import save_config_settings_atomic
+        from keyrgb.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         settings = {"brightness": 50}
@@ -251,7 +251,7 @@ class TestSaveConfigSettingsAtomic:
         assert exc_info[2] is not None
 
     def test_save_fails_without_writing_when_lock_cannot_be_acquired(self, temp_config_dir, monkeypatch):
-        from src.core.config import file_storage
+        from keyrgb.core.config import file_storage
 
         config_file = temp_config_dir / "config.json"
         config_file.write_text('{"effect": "none"}', encoding="utf-8")
@@ -269,7 +269,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_attempts_temp_cleanup_even_on_failure(self, temp_config_dir):
         """Even if os.replace fails, save should try to clean up temp file."""
-        from src.core.config.file_storage import save_config_settings_atomic
+        from keyrgb.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         settings = {"brightness": 50}
@@ -288,7 +288,7 @@ class TestSaveConfigSettingsAtomic:
 
     def test_save_logs_debug_when_temp_cleanup_fails(self, temp_config_dir):
         """Temp-file unlink failures should be logged at debug level, not raised."""
-        from src.core.config.file_storage import save_config_settings_atomic
+        from keyrgb.core.config.file_storage import save_config_settings_atomic
 
         config_file = temp_config_dir / "config.json"
         logger = MagicMock()
@@ -315,7 +315,7 @@ class TestJsonStorageAtomic:
 
     def test_write_json_atomic_creates_parent_dirs(self, tmp_path):
         """write_json_atomic should create parent directories."""
-        from src.core.profile.json_storage import write_json_atomic
+        from keyrgb.core.profile.json_storage import write_json_atomic
 
         nested_file = tmp_path / "a" / "b" / "c" / "data.json"
         payload = {"key": "value"}
@@ -328,7 +328,7 @@ class TestJsonStorageAtomic:
 
     def test_write_json_atomic_uses_temp_then_replace(self, tmp_path):
         """write_json_atomic should write to .tmp then replace."""
-        from src.core.profile.json_storage import write_json_atomic
+        from keyrgb.core.profile.json_storage import write_json_atomic
 
         target = tmp_path / "data.json"
         target.write_text(json.dumps({"old": "data"}))
@@ -346,14 +346,14 @@ class TestJsonStorageAtomic:
 
     def test_read_json_returns_none_on_missing_file(self, tmp_path):
         """read_json should return None if file doesn't exist."""
-        from src.core.profile.json_storage import read_json
+        from keyrgb.core.profile.json_storage import read_json
 
         result = read_json(tmp_path / "missing.json")
         assert result is None
 
     def test_read_json_returns_none_on_decode_error(self, tmp_path):
         """read_json should return None if JSON is malformed."""
-        from src.core.profile.json_storage import read_json
+        from keyrgb.core.profile.json_storage import read_json
 
         bad_file = tmp_path / "bad.json"
         bad_file.write_text("{not valid json")

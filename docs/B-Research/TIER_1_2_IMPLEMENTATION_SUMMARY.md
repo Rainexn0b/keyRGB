@@ -16,7 +16,7 @@ Successfully implemented **Tier 1** (Immediate Wins) and **Tier 2** (Universal S
 ### 1.1 Added ITE 8291 USB Product IDs
 
 **Files Modified:**
-- `src/core/backends/ite8291r3.py`
+- `keyrgb/core/backends/ite8291r3.py`
 - `docs/B-Research/initial.md`
 
 **Changes:**
@@ -47,7 +47,7 @@ Successfully implemented **Tier 1** (Immediate Wins) and **Tier 2** (Universal S
 ### 2.1 Enhanced LED Pattern Matching
 
 **Files Modified:**
-- `src/core/backends/sysfs_leds.py`
+- `keyrgb/core/backends/sysfs_leds.py`
 
 **Changes:**
 - Expanded `_is_candidate_led()` to recognize 8 additional LED patterns:

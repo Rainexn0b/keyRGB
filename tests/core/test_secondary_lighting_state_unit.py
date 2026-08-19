@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core import secondary_lighting_state
-from src.core.secondary_device_routes import (
+from keyrgb.core import secondary_lighting_state
+from keyrgb.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,
     SecondaryDeviceRoute,

@@ -3,10 +3,10 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import ClassVar
 
-from src.core.effects.catalog import REACTIVE_EFFECTS
-from src.core.effects.software_targets import normalize_software_effect_target
-from src.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
-from src.tray.pollers.config_polling_internal._config_apply_state import (
+from keyrgb.core.effects.catalog import REACTIVE_EFFECTS
+from keyrgb.core.effects.software_targets import normalize_software_effect_target
+from keyrgb.core.utils.safe_attrs import safe_bool_attr, safe_int_attr, safe_str_attr
+from keyrgb.tray.pollers.config_polling_internal._config_apply_state import (
     ConfigApplyState,
     _safe_perkey_signature,
     _safe_tuple_attr,

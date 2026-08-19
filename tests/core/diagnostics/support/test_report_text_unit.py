@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.core.diagnostics.support import _report_text as rt
+from keyrgb.core.diagnostics.support import _report_text as rt
 
 
 def test_join_and_selected_backend_helpers() -> None:

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.settings import scrollable_area
+from keyrgb.gui.settings import scrollable_area
 
 
 class _FakeCanvas:

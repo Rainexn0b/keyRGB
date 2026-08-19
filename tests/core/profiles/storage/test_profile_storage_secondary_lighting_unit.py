@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from src.core.profile import profiles
+from keyrgb.core.profile import profiles
 
 
 def test_profile_paths_include_secondary_lighting(profile_paths_factory, temp_profile_dir) -> None:

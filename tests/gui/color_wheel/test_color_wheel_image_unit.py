@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.gui.widgets.color_wheel import color_wheel_image
+from keyrgb.gui.widgets.color_wheel import color_wheel_image
 
 
 def _split_ppm(ppm: bytes) -> tuple[bytes, bytes, bytes, bytes]:

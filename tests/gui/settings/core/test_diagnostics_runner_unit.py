@@ -6,7 +6,7 @@ from types import ModuleType
 
 import pytest
 
-import src.gui.settings.diagnostics_runner as runner
+import keyrgb.gui.settings.diagnostics_runner as runner
 
 
 def test_expected_holder_pids_uses_tray_pid_env(monkeypatch) -> None:
@@ -222,10 +222,10 @@ def test_collect_diagnostics_text_serializes_payload_and_injects_warnings(monkey
         calls["include_usb"] = include_usb
         return FakeDiagnostics()
 
-    fake_module = ModuleType("src.core.diagnostics")
+    fake_module = ModuleType("keyrgb.core.diagnostics")
     fake_module.collect_diagnostics = fake_collect_diagnostics  # type: ignore[attr-defined]
 
-    monkeypatch.setitem(sys.modules, "src.core.diagnostics", fake_module)
+    monkeypatch.setitem(sys.modules, "keyrgb.core.diagnostics", fake_module)
     monkeypatch.setattr(runner, "_expected_holder_pids", lambda: set())
 
     payload = json.loads(runner.collect_diagnostics_text(include_usb=False))
@@ -254,10 +254,10 @@ def test_collect_diagnostics_text_omits_warnings_when_busy_holders_are_expected(
         assert include_usb is True
         return FakeDiagnostics()
 
-    fake_module = ModuleType("src.core.diagnostics")
+    fake_module = ModuleType("keyrgb.core.diagnostics")
     fake_module.collect_diagnostics = fake_collect_diagnostics  # type: ignore[attr-defined]
 
-    monkeypatch.setitem(sys.modules, "src.core.diagnostics", fake_module)
+    monkeypatch.setitem(sys.modules, "keyrgb.core.diagnostics", fake_module)
     monkeypatch.setattr(runner, "_expected_holder_pids", lambda: {77})
 
     payload = json.loads(runner.collect_diagnostics_text())
@@ -282,10 +282,10 @@ def test_collect_diagnostics_text_sorts_json_keys(monkeypatch) -> None:
                 "usb_devices": [],
             }
 
-    fake_module = ModuleType("src.core.diagnostics")
+    fake_module = ModuleType("keyrgb.core.diagnostics")
     fake_module.collect_diagnostics = lambda *, include_usb: FakeDiagnostics()  # type: ignore[attr-defined]
 
-    monkeypatch.setitem(sys.modules, "src.core.diagnostics", fake_module)
+    monkeypatch.setitem(sys.modules, "keyrgb.core.diagnostics", fake_module)
     monkeypatch.setattr(runner, "_expected_holder_pids", lambda: set())
 
     text = runner.collect_diagnostics_text()
@@ -318,10 +318,10 @@ def test_collect_diagnostics_text_preserves_sysfs_mouse_candidate_details(monkey
                 "usb_devices": [],
             }
 
-    fake_module = ModuleType("src.core.diagnostics")
+    fake_module = ModuleType("keyrgb.core.diagnostics")
     fake_module.collect_diagnostics = lambda *, include_usb: FakeDiagnostics()  # type: ignore[attr-defined]
 
-    monkeypatch.setitem(sys.modules, "src.core.diagnostics", fake_module)
+    monkeypatch.setitem(sys.modules, "keyrgb.core.diagnostics", fake_module)
     monkeypatch.setattr(runner, "_expected_holder_pids", lambda: set())
 
     payload = json.loads(runner.collect_diagnostics_text())

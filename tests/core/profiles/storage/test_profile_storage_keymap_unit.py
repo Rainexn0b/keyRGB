@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from src.core.resources.layouts import slot_id_for_key_id
+from keyrgb.core.resources.layouts import slot_id_for_key_id
 
 
 class TestKeymapLoadSave:
@@ -13,7 +13,7 @@ class TestKeymapLoadSave:
 
     def test_save_and_load_keymap_roundtrip(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """Save then load keymap should preserve data."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir)
@@ -34,8 +34,8 @@ class TestKeymapLoadSave:
 
     def test_load_keymap_returns_default_if_missing(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """If keymap.json doesn't exist, load_keymap should return default."""
-        from src.core.profile import profiles
-        from src.core.resources.defaults import DEFAULT_KEYMAP
+        from keyrgb.core.profile import profiles
+        from keyrgb.core.resources.defaults import DEFAULT_KEYMAP
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir, keymap=temp_profile_dir / "nonexistent_keymap.json")
@@ -60,7 +60,7 @@ class TestKeymapLoadSave:
     def test_load_keymap_uses_layout_specific_default_if_missing(
         self, temp_profile_dir, profile_paths_factory, monkeypatch
     ):
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         def mock_paths(_name):
             return profile_paths_factory(temp_profile_dir, keymap=temp_profile_dir / "nonexistent_keymap.json")
@@ -76,7 +76,7 @@ class TestKeymapLoadSave:
 
     def test_load_keymap_skips_invalid_entries(self, temp_profile_dir, profile_paths_factory, monkeypatch):
         """load_keymap should skip entries with wrong types or bad coords."""
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         keymap_file = temp_profile_dir / "keymap.json"
         keymap_file.write_text(
@@ -104,7 +104,7 @@ class TestKeymapLoadSave:
     def test_save_keymap_persists_multi_cell_entries_as_lists(
         self, temp_profile_dir, profile_paths_factory, monkeypatch
     ):
-        from src.core.profile import profiles
+        from keyrgb.core.profile import profiles
 
         keymap_file = temp_profile_dir / "keymap.json"
 

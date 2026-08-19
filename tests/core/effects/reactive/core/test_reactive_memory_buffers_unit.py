@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.effects.reactive._ripple_helpers import (
+from keyrgb.core.effects.reactive._ripple_helpers import (
     build_fade_overlay_into,
     build_ripple_color_map_into,
     build_ripple_overlay_into,
     get_engine_overlay_buffer,
 )
-from src.core.effects.reactive.utils import _age_pulses_in_place, _Pulse, _RainbowPulse
+from keyrgb.core.effects.reactive.utils import _age_pulses_in_place, _Pulse, _RainbowPulse
 
 
 def test_age_pulses_in_place_reuses_list_and_drops_expired() -> None:
@@ -259,8 +259,8 @@ def test_build_ripple_color_map_into_dark_profile_per_key_backdrop_scales_mix_we
 
 def test_build_ripple_overlay_into_band_controls_ring_width() -> None:
     """Wider band means more keys are illuminated around the wavefront."""
-    from src.core.effects.reactive._ripple_helpers import build_ripple_overlay_into
-    from src.core.effects.reactive.utils import _RainbowPulse
+    from keyrgb.core.effects.reactive._ripple_helpers import build_ripple_overlay_into
+    from keyrgb.core.effects.reactive.utils import _RainbowPulse
 
     pulse = _RainbowPulse(row=3, col=10, age_s=0.3, ttl_s=0.65, hue_offset=0.0)
 

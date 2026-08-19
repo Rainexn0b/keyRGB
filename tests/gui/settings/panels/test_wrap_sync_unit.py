@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.settings.panels import _wrap_sync
+from keyrgb.gui.settings.panels import _wrap_sync
 
 
 class _FakeWidget:

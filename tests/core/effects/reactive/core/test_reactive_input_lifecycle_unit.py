@@ -4,11 +4,11 @@ import logging
 import sys
 from types import SimpleNamespace
 
-import src.core.effects.reactive as reactive_pkg
-import src.core.effects.reactive.input as reactive_input
-from src.core.effects.reactive.input import close_evdev_keyboards, reactive_synthetic_fallback_enabled
-from src.core.effects.reactive.utils import _PressSource
-from src.core.resources.layouts import slot_id_for_key_id
+import keyrgb.core.effects.reactive as reactive_pkg
+import keyrgb.core.effects.reactive.input as reactive_input
+from keyrgb.core.effects.reactive.input import close_evdev_keyboards, reactive_synthetic_fallback_enabled
+from keyrgb.core.effects.reactive.utils import _PressSource
+from keyrgb.core.resources.layouts import slot_id_for_key_id
 
 
 class _FakeDevice:
@@ -39,8 +39,8 @@ def test_reactive_synthetic_fallback_is_opt_in(monkeypatch) -> None:
 def test_press_source_retries_evdev_open_without_spawning_synthetic(monkeypatch) -> None:
     reopened = [_FakeDevice()]
 
-    monkeypatch.setattr("src.core.effects.reactive.utils.poll_keypress_slot_ids", lambda _devices: [])
-    monkeypatch.setattr("src.core.effects.reactive.utils.try_open_evdev_keyboards", lambda: reopened)
+    monkeypatch.setattr("keyrgb.core.effects.reactive.utils.poll_keypress_slot_ids", lambda _devices: [])
+    monkeypatch.setattr("keyrgb.core.effects.reactive.utils.try_open_evdev_keyboards", lambda: reopened)
 
     press = _PressSource(
         devices=[],
@@ -130,7 +130,7 @@ def test_try_open_evdev_keyboards_closes_unknown_non_keyboards(monkeypatch) -> N
 
 
 def test_load_active_profile_keymap_logs_failures_and_returns_empty_map(monkeypatch) -> None:
-    import src.core.profile as profile_pkg
+    import keyrgb.core.profile as profile_pkg
 
     logs: list[tuple[tuple[object, ...], dict[str, object]]] = []
     fake_profiles = SimpleNamespace(
@@ -149,7 +149,7 @@ def test_load_active_profile_keymap_logs_failures_and_returns_empty_map(monkeypa
 
 
 def test_load_active_profile_keymap_normalizes_single_and_multi_cell_entries(monkeypatch) -> None:
-    import src.core.profile as profile_pkg
+    import keyrgb.core.profile as profile_pkg
 
     fake_profiles = SimpleNamespace(
         get_active_profile=lambda: "default",

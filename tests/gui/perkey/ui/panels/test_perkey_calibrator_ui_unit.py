@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from src.gui.perkey.ui.calibrator import run_keymap_calibrator_ui
+from keyrgb.gui.perkey.ui.calibrator import run_keymap_calibrator_ui
 
 
 class DummyLabel:

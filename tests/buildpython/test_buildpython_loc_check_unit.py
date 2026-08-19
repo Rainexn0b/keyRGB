@@ -14,17 +14,17 @@ def _write_python_file(path: Path, *, total_lines: int) -> None:
 
 
 def test_loc_check_runner_uses_bucketed_thresholds_and_relaxed_test_limits(tmp_path, monkeypatch) -> None:
-    _write_python_file(tmp_path / "src" / "monitor.py", total_lines=360)
+    _write_python_file(tmp_path / "keyrgb" / "monitor.py", total_lines=360)
     _write_python_file(tmp_path / "buildpython" / "refactor.py", total_lines=420)
-    _write_python_file(tmp_path / "src" / "critical.py", total_lines=500)
-    _write_python_file(tmp_path / "src" / "severe.py", total_lines=560)
+    _write_python_file(tmp_path / "keyrgb" / "critical.py", total_lines=500)
+    _write_python_file(tmp_path / "keyrgb" / "severe.py", total_lines=560)
 
     _write_python_file(tmp_path / "tests" / "test_monitor.py", total_lines=420)
     _write_python_file(tmp_path / "tests" / "test_refactor.py", total_lines=470)
     _write_python_file(tmp_path / "tests" / "test_critical.py", total_lines=520)
     _write_python_file(tmp_path / "tests" / "test_severe.py", total_lines=620)
 
-    _write_python_file(tmp_path / "src" / "ignored.py", total_lines=349)
+    _write_python_file(tmp_path / "keyrgb" / "ignored.py", total_lines=349)
     _write_python_file(tmp_path / "tests" / "test_ignored.py", total_lines=399)
 
     monkeypatch.setattr(step_loc_check, "repo_root", lambda: tmp_path)
@@ -73,7 +73,7 @@ def test_loc_check_runner_uses_bucketed_thresholds_and_relaxed_test_limits(tmp_p
 
 
 def test_loc_check_runner_omits_zero_count_buckets_in_stdout(tmp_path, monkeypatch) -> None:
-    _write_python_file(tmp_path / "src" / "severe_only.py", total_lines=560)
+    _write_python_file(tmp_path / "keyrgb" / "severe_only.py", total_lines=560)
 
     monkeypatch.setattr(step_loc_check, "repo_root", lambda: tmp_path)
 
@@ -87,7 +87,7 @@ def test_loc_check_runner_omits_zero_count_buckets_in_stdout(tmp_path, monkeypat
 
 
 def test_loc_check_runner_writes_empty_report_when_no_files_exceed_thresholds(tmp_path, monkeypatch) -> None:
-    _write_python_file(tmp_path / "src" / "small.py", total_lines=349)
+    _write_python_file(tmp_path / "keyrgb" / "small.py", total_lines=349)
     _write_python_file(tmp_path / "tests" / "test_small.py", total_lines=399)
 
     monkeypatch.setattr(step_loc_check, "repo_root", lambda: tmp_path)

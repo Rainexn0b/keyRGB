@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 
 def test_activate_perkey_profile_uses_shared_in_place_transition_path() -> None:
-    from src.tray.controllers import menu_adapters
+    from keyrgb.tray.controllers import menu_adapters
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     tray = make_owner_backed_simple_tray(

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-import src.gui.perkey.ui.profile_actions as actions
+import keyrgb.gui.perkey.ui.profile_actions as actions
 
 
 def test_lazy_import_facades_delegate(monkeypatch: pytest.MonkeyPatch) -> None:

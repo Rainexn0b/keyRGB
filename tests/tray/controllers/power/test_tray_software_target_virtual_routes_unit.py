@@ -5,8 +5,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED, iter_virtual_routes
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
+from keyrgb.core.secondary_device_routes import BRIGHTNESS_POLICY_PRIMARY_SHARED, iter_virtual_routes
+from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute
 
 
 def _effective_virtual_routes(*, available: bool) -> tuple[EffectiveSecondaryRoute, ...]:
@@ -53,7 +53,7 @@ def _make_tray(*, available: bool = True) -> SimpleNamespace:
 
 
 def test_secondary_software_render_targets_include_virtual_routes_when_parent_available() -> None:
-    from src.tray.controllers.software_target_controller import secondary_software_render_targets
+    from keyrgb.tray.controllers.software_target_controller import secondary_software_render_targets
 
     tray = _make_tray()
 
@@ -64,7 +64,7 @@ def test_secondary_software_render_targets_include_virtual_routes_when_parent_av
 
 
 def test_secondary_software_render_targets_exclude_virtual_routes_when_parent_unavailable() -> None:
-    from src.tray.controllers.software_target_controller import secondary_software_render_targets
+    from keyrgb.tray.controllers.software_target_controller import secondary_software_render_targets
 
     tray = _make_tray(available=False)
 
@@ -74,7 +74,7 @@ def test_secondary_software_render_targets_exclude_virtual_routes_when_parent_un
 
 
 def test_software_effect_target_options_enable_all_mode_with_virtual_routes() -> None:
-    from src.tray.controllers.software_target_controller import software_effect_target_options
+    from keyrgb.tray.controllers.software_target_controller import software_effect_target_options
 
     tray = _make_tray()
 
@@ -87,7 +87,7 @@ def test_software_effect_target_options_enable_all_mode_with_virtual_routes() ->
 
 
 def test_cached_secondary_target_set_color_reaches_virtual_zone_device() -> None:
-    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+    from keyrgb.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
 
     sent: list[tuple[str, tuple[int, int, int], int]] = []
 
@@ -111,9 +111,9 @@ def test_cached_secondary_target_set_color_reaches_virtual_zone_device() -> None
 
 
 def test_restore_secondary_software_targets_applies_to_virtual_routes(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core import secondary_device_routes
-    from src.tray.controllers import _software_target_auxiliary
-    from src.tray.controllers.software_target_controller import restore_secondary_software_targets
+    from keyrgb.core import secondary_device_routes
+    from keyrgb.tray.controllers import _software_target_auxiliary
+    from keyrgb.tray.controllers.software_target_controller import restore_secondary_software_targets
 
     applied: list[tuple[str, str, tuple[int, ...], int]] = []
 
@@ -160,7 +160,7 @@ def test_restore_secondary_software_targets_applies_to_virtual_routes(monkeypatc
 
 
 def test_cached_secondary_target_closes_device_on_invalidation() -> None:
-    from src.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
+    from keyrgb.tray.controllers.software_target_controller import _CachedSecondarySoftwareTarget
 
     close_calls: list[bool] = []
 

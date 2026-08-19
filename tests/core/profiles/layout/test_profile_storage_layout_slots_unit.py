@@ -4,14 +4,14 @@ import json
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
-from src.core.resources.layouts import slot_id_for_key_id
+from keyrgb.core.resources.layouts import slot_id_for_key_id
 
 
 class TestLayoutSlotStorage:
     def test_save_and_load_layout_slots_roundtrip(self, monkeypatch, tmp_path) -> None:
         monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
 
-        from src.core.config import layout_slots
+        from keyrgb.core.config import layout_slots
 
         payload = {
             "nonusbackslash": {"visible": False},
@@ -35,7 +35,7 @@ class TestLayoutSlotStorage:
     ) -> None:
         monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
 
-        from src.core.config import layout_slots
+        from keyrgb.core.config import layout_slots
 
         slot_file = layout_slots.layout_slots_path()
         slot_file.parent.mkdir(parents=True, exist_ok=True)
@@ -62,7 +62,7 @@ class TestLayoutSlotStorage:
         cfg_dir = tmp_path / "cfg"
         monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(cfg_dir))
 
-        from src.core.config import layout_slots
+        from keyrgb.core.config import layout_slots
 
         prior_file = cfg_dir / "profiles" / "test_profile" / "layout_slots.json"
         prior_file.parent.mkdir(parents=True, exist_ok=True)
@@ -95,7 +95,7 @@ class TestLayoutSlotStorage:
     def test_concurrent_layout_updates_preserve_each_layout(self, monkeypatch, tmp_path) -> None:
         monkeypatch.setenv("KEYRGB_CONFIG_DIR", str(tmp_path / "cfg"))
 
-        from src.core.config import layout_slots
+        from keyrgb.core.config import layout_slots
 
         original_load = layout_slots._load_all_layout_slot_overrides
         reads_completed = threading.Barrier(2)

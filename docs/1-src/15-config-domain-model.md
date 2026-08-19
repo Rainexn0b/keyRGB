@@ -13,16 +13,16 @@ one undifferentiated mutable bag.
 
 | Layer | Module | Responsibility |
 |---|---|---|
-| Public facade | `src/core/config/config.py` (`Config`) | Persistence, reload/save/batch, stable property API |
-| Document | `src/core/config/document.py` (`ConfigDocument`) | Live settings identity + domain/extras projections |
-| Domain registry | `src/core/config/domains.py` | Key partition and classification |
-| Lighting accessors | `src/core/config/_lighting/` | Effect, brightness, reactive, per-key, secondary routes |
-| Power accessors | `src/core/config/_power_accessors.py` | Lid/suspend and AC/battery lighting policy |
-| Scheduler accessors | `src/core/config/_scheduler_accessors.py` | Idle/display dim sync and day/night schedule |
-| App/layout accessors | `src/core/config/_app_accessors.py` | Autostart, experimental flags, physical layout, software target |
-| Readonly snapshot | `src/core/config/_settings_view.py` | Typed scalar/map view for GUI/settings readers |
-| Defaults | `src/core/config/defaults.py` | Authoritative default flat map |
-| Storage | `src/core/config/file_storage.py` | Atomic load/merge/save |
+| Public facade | `keyrgb/core/config/config.py` (`Config`) | Persistence, reload/save/batch, stable property API |
+| Document | `keyrgb/core/config/document.py` (`ConfigDocument`) | Live settings identity + domain/extras projections |
+| Domain registry | `keyrgb/core/config/domains.py` | Key partition and classification |
+| Lighting accessors | `keyrgb/core/config/_lighting/` | Effect, brightness, reactive, per-key, secondary routes |
+| Power accessors | `keyrgb/core/config/_power_accessors.py` | Lid/suspend and AC/battery lighting policy |
+| Scheduler accessors | `keyrgb/core/config/_scheduler_accessors.py` | Idle/display dim sync and day/night schedule |
+| App/layout accessors | `keyrgb/core/config/_app_accessors.py` | Autostart, experimental flags, physical layout, software target |
+| Readonly snapshot | `keyrgb/core/config/_settings_view.py` | Typed scalar/map view for GUI/settings readers |
+| Defaults | `keyrgb/core/config/defaults.py` | Authoritative default flat map |
+| Storage | `keyrgb/core/config/file_storage.py` | Atomic load/merge/save |
 
 ## Domains
 

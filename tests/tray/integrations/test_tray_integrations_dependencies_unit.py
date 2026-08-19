@@ -8,7 +8,7 @@ import pytest
 
 
 def test_load_tray_dependencies_primary_import_succeeds() -> None:
-    from src.tray.integrations.dependencies import load_tray_dependencies
+    from keyrgb.tray.integrations.dependencies import load_tray_dependencies
 
     EffectsEngine, Config, PowerManager = load_tray_dependencies()
 
@@ -20,7 +20,7 @@ def test_load_tray_dependencies_primary_import_succeeds() -> None:
 def test_load_tray_dependencies_falls_back_to_repo_root_on_importerror(
     monkeypatch,
 ) -> None:
-    import src.tray.integrations.dependencies as deps
+    import keyrgb.tray.integrations.dependencies as deps
 
     ensure = MagicMock()
     monkeypatch.setattr(deps, "ensure_repo_root_on_sys_path", ensure)
@@ -30,7 +30,7 @@ def test_load_tray_dependencies_falls_back_to_repo_root_on_importerror(
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
         # Force the first attempt to fail, then allow fallback import to proceed.
-        if name == "src.core.effects.engine" and not state["raised"]:
+        if name == "keyrgb.core.effects.engine" and not state["raised"]:
             state["raised"] = True
             raise ImportError("forced")
         return orig_import(name, globals, locals, fromlist, level)
@@ -50,7 +50,7 @@ def test_load_tray_dependencies_falls_back_to_repo_root_on_importerror(
 
 
 def test_load_tray_dependencies_propagates_unexpected_repo_root_bug(monkeypatch) -> None:
-    import src.tray.integrations.dependencies as deps
+    import keyrgb.tray.integrations.dependencies as deps
 
     monkeypatch.setattr(
         deps,
@@ -62,7 +62,7 @@ def test_load_tray_dependencies_propagates_unexpected_repo_root_bug(monkeypatch)
     state = {"raised": False}
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name == "src.core.effects.engine" and not state["raised"]:
+        if name == "keyrgb.core.effects.engine" and not state["raised"]:
             state["raised"] = True
             raise ImportError("forced")
         return orig_import(name, globals, locals, fromlist, level)

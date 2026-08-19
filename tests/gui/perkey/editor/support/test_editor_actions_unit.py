@@ -7,15 +7,15 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.gui.perkey import (
+from keyrgb.gui.perkey import (
     color_utils as color_utils_mod,
     keyboard_apply as keyboard_apply_mod,
     overlay as overlay_mod,
     profile_management as profile_management_mod,
     ui as ui_pkg,
 )
-from src.gui.perkey.editor_support import actions, runtime as runtime_mod
-from src.gui.perkey.ui import (
+from keyrgb.gui.perkey.editor_support import actions, runtime as runtime_mod
+from keyrgb.gui.perkey.ui import (
     _profile_actions_ui as profile_actions_ui_mod,
     backdrop as backdrop_mod,
     bulk_color as bulk_color_mod,
@@ -53,7 +53,7 @@ def test_actions_delegate_runtime_layout_and_commit(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(runtime_mod, "auto_sync_per_key_overlays", auto_sync)
     monkeypatch.setattr(runtime_mod, "commit", commit)
     monkeypatch.setattr(runtime_mod, "load_keymap", load_keymap)
-    monkeypatch.setattr("src.core.resources.defaults.get_default_layout_tweaks", defaults)
+    monkeypatch.setattr("keyrgb.core.resources.defaults.get_default_layout_tweaks", defaults)
 
     editor = object()
     profiles = object()

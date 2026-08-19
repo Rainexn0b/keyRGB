@@ -66,6 +66,6 @@ The current regression suite intentionally splits behavior by backend class:
 - Pulse-brightness tests prove that reactive intensity remains separate from
   steady-state hardware brightness on per-key backends.
 
-If reactive flicker returns, inspect `src/core/effects/reactive/render.py`
+If reactive flicker returns, inspect `keyrgb/core/effects/reactive/render.py`
 first. In practice, most regressions come from changing `_resolve_brightness()`
 or the ordering of `set_key_colors`, `set_color`, and `set_brightness`.

@@ -6,10 +6,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.tray import _idle_power_fields as fields
+from keyrgb.tray import _idle_power_fields as fields
 
 # Import public package first to avoid circular import with _idle_power_fields.
-from src.tray.idle_power_state import ensure_tray_idle_power_state
+from keyrgb.tray.idle_power_state import ensure_tray_idle_power_state
 
 
 def test_normalize_field_names_and_aliases() -> None:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.backends.base import BackendCapabilities
-from src.core.effects.catalog import detected_backend_hw_effect_names, resolve_effect_name_for_backend
+from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.core.effects.catalog import detected_backend_hw_effect_names, resolve_effect_name_for_backend
 
 
 class _HardwareEffectsBackend:

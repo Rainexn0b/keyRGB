@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.tray.ui import menu, menu_sections
+from keyrgb.tray.ui import menu, menu_sections
 
 
 class _MenuItem:
@@ -34,7 +34,7 @@ def test_sw_effects_menu_first_item_is_reactive_typing_settings() -> None:
     confirmed after the rename from 'Reactive Typing Color...'."""
     import inspect
 
-    from src.tray.ui import _menu_sections_effects as menu_effects
+    from keyrgb.tray.ui import _menu_sections_effects as menu_effects
 
     # Label lives in the extracted effects section builder (WS1 / A8).
     src = inspect.getsource(menu_effects)
@@ -102,7 +102,7 @@ def test_system_power_menu_includes_settings_entry() -> None:
 
 
 def test_perkey_profile_callback_logs_recoverable_runtime_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.profile import profiles as core_profiles
+    from keyrgb.core.profile import profiles as core_profiles
 
     logged: list[tuple[str, str, Exception]] = []
 
@@ -172,7 +172,7 @@ def test_perkey_profile_callback_uses_profile_activation_helper(monkeypatch: pyt
 
 
 def test_perkey_profile_callback_propagates_unexpected_errors(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.profile import profiles as core_profiles
+    from keyrgb.core.profile import profiles as core_profiles
 
     monkeypatch.setattr(core_profiles, "list_profiles", lambda: ["gaming"])
     monkeypatch.setattr(core_profiles, "get_active_profile", lambda: None)

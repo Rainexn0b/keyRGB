@@ -4,7 +4,7 @@ from types import SimpleNamespace
 from typing import ClassVar
 from unittest.mock import MagicMock
 
-from src.core.power.management._manager_brightness_execution import (
+from keyrgb.core.power.management._manager_brightness_execution import (
     classify_brightness_execution,
     execute_brightness_execution,
 )
@@ -107,7 +107,7 @@ def test_classify_and_execute_brightness_noop_without_hook_or_engine() -> None:
 
 class TestApplyBrightnessPolicySeam:
     def test_negative_brightness_is_noop(self) -> None:
-        from src.core.power.management._manager_brightness_execution import apply_brightness_policy
+        from keyrgb.core.power.management._manager_brightness_execution import apply_brightness_policy
 
         run_boundary = MagicMock()
         apply_brightness_policy(
@@ -120,7 +120,7 @@ class TestApplyBrightnessPolicySeam:
         run_boundary.assert_not_called()
 
     def test_zero_brightness_enters_boundary(self) -> None:
-        from src.core.power.management._manager_brightness_execution import apply_brightness_policy
+        from keyrgb.core.power.management._manager_brightness_execution import apply_brightness_policy
 
         invoked = []
 
@@ -138,7 +138,7 @@ class TestApplyBrightnessPolicySeam:
         assert invoked == ["Battery saver brightness apply failed"]
 
     def test_delegates_classify_and_execute_via_boundary(self) -> None:
-        from src.core.power.management._manager_brightness_execution import apply_brightness_policy
+        from keyrgb.core.power.management._manager_brightness_execution import apply_brightness_policy
 
         kb = MagicMock()
         kb.apply_brightness_from_power_policy = MagicMock()
@@ -160,7 +160,7 @@ class TestApplyBrightnessPolicySeam:
 
 class TestSyncConfigBrightnessSeam:
     def test_sets_global_brightness_on_non_perkey_config(self) -> None:
-        from src.core.power.management._manager_brightness_execution import sync_config_brightness
+        from keyrgb.core.power.management._manager_brightness_execution import sync_config_brightness
 
         class _Config:
             def __init__(self) -> None:
@@ -185,7 +185,7 @@ class TestSyncConfigBrightnessSeam:
         assert config.perkey_brightness == 20
 
     def test_sets_global_and_perkey_brightness_for_base_only_state(self) -> None:
-        from src.core.power.management._manager_brightness_execution import sync_config_brightness
+        from keyrgb.core.power.management._manager_brightness_execution import sync_config_brightness
 
         class _Config:
             def __init__(self) -> None:
@@ -218,7 +218,7 @@ class TestSyncConfigBrightnessSeam:
         assert config.perkey_brightness == 35
 
     def test_logs_warning_on_runtime_error(self) -> None:
-        from src.core.power.management._manager_brightness_execution import sync_config_brightness
+        from keyrgb.core.power.management._manager_brightness_execution import sync_config_brightness
 
         class _BadConfig:
             effect = "wave"

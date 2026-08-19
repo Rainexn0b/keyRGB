@@ -10,7 +10,7 @@ import pytest
 
 
 def test_serialization_failure_preserves_existing_target(tmp_path: Path) -> None:
-    from src.core.profile.json_storage import write_json_atomic
+    from keyrgb.core.profile.json_storage import write_json_atomic
 
     target = tmp_path / "profile.json"
     original = {"profile": "last-valid"}
@@ -26,7 +26,7 @@ def test_serialization_failure_preserves_existing_target(tmp_path: Path) -> None
 
 
 def test_replace_failure_preserves_existing_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.profile.json_storage import write_json_atomic
+    from keyrgb.core.profile.json_storage import write_json_atomic
 
     target = tmp_path / "profile.json"
     original = {"profile": "last-valid"}
@@ -46,7 +46,7 @@ def test_replace_failure_preserves_existing_target(tmp_path: Path, monkeypatch: 
 
 
 def test_successful_write_leaves_valid_json_and_no_temp_file(tmp_path: Path) -> None:
-    from src.core.profile.json_storage import write_json_atomic
+    from keyrgb.core.profile.json_storage import write_json_atomic
 
     target = tmp_path / "nested" / "profile.json"
     payload = {"profile": "new", "colors": [[1, 2, 3]]}
@@ -58,7 +58,7 @@ def test_successful_write_leaves_valid_json_and_no_temp_file(tmp_path: Path) -> 
 
 
 def test_successful_write_flushes_file_content_before_replace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.profile.json_storage import write_json_atomic
+    from keyrgb.core.profile.json_storage import write_json_atomic
 
     fsync_calls: list[int] = []
     monkeypatch.setattr(os, "fsync", fsync_calls.append)
@@ -72,7 +72,7 @@ def test_concurrent_writers_complete_without_sharing_a_temp_file(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.profile.json_storage import write_json_atomic
+    from keyrgb.core.profile.json_storage import write_json_atomic
 
     target = tmp_path / "profile.json"
     fixed_temp = target.with_suffix(".json.tmp")
@@ -102,7 +102,7 @@ def test_concurrent_writers_complete_without_sharing_a_temp_file(
 
 
 def test_reader_waits_for_locked_update_and_observes_completed_payload(tmp_path: Path) -> None:
-    from src.core.profile.json_storage import read_json, update_json_atomic, write_json_atomic
+    from keyrgb.core.profile.json_storage import read_json, update_json_atomic, write_json_atomic
 
     target = tmp_path / "profile.json"
     write_json_atomic(target, {"value": "old"})

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.settings.panels import experimental_backends_panel
+from keyrgb.gui.settings.panels import experimental_backends_panel
 
 
 class _FakeWidget:

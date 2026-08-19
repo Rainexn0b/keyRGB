@@ -8,8 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.tray.controllers import _software_target_profile as profile
-from src.tray.ui.menu_status import DeviceContextEntry
+from keyrgb.tray.controllers import _software_target_profile as profile
+from keyrgb.tray.ui.menu_status import DeviceContextEntry
 
 
 def _entry(**overrides: Any) -> DeviceContextEntry:
@@ -106,7 +106,7 @@ def test_reconcile_secondary_profile_state_applies_static_scene_when_payload_non
 ) -> None:
     apply_scene = MagicMock()
     monkeypatch.setattr(
-        "src.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
+        "keyrgb.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
         apply_scene,
     )
     tray = SimpleNamespace()
@@ -127,7 +127,7 @@ def test_reconcile_secondary_profile_state_skips_static_scene_when_animated_and_
 ) -> None:
     apply_scene = MagicMock()
     monkeypatch.setattr(
-        "src.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
+        "keyrgb.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
         apply_scene,
     )
 
@@ -147,11 +147,11 @@ def test_reconcile_secondary_profile_state_turns_off_removed_targets_when_animat
 ) -> None:
     apply_scene = MagicMock()
     monkeypatch.setattr(
-        "src.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
+        "keyrgb.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
         apply_scene,
     )
     monkeypatch.setattr(
-        "src.tray.controllers._software_target_profile.any_forced_off",
+        "keyrgb.tray.controllers._software_target_profile.any_forced_off",
         lambda _tray: False,
     )
 
@@ -199,11 +199,11 @@ def test_reconcile_secondary_profile_state_handles_turn_off_runtime_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
-        "src.tray.controllers._software_target_profile.any_forced_off",
+        "keyrgb.tray.controllers._software_target_profile.any_forced_off",
         lambda _tray: False,
     )
     monkeypatch.setattr(
-        "src.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
+        "keyrgb.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
         MagicMock(),
     )
 
@@ -230,7 +230,7 @@ def test_reconcile_secondary_profile_state_applies_static_scene_when_not_animate
 ) -> None:
     apply_scene = MagicMock()
     monkeypatch.setattr(
-        "src.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
+        "keyrgb.tray.controllers._software_target_profile.secondary_static_scene.apply_secondary_static_scene",
         apply_scene,
     )
     tray = SimpleNamespace()

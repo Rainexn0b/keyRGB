@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import src.tray.pollers.idle_power._desktop_timeout as desktop_timeout
+import keyrgb.tray.pollers.idle_power._desktop_timeout as desktop_timeout
 
 
 def test_read_kde_dim_timeout_returns_ac_timeout(tmp_path: Path) -> None:

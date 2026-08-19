@@ -23,7 +23,7 @@ import pathlib
 import re
 
 _ROOT = pathlib.Path(__file__).resolve().parents[4]
-_BACKENDS_DIR = _ROOT / "src" / "core" / "backends"
+_BACKENDS_DIR = _ROOT / "keyrgb" / "core" / "backends"
 _UDEV_RULES = _ROOT / "system" / "udev" / "99-ite8291-wootbook.rules"
 
 # Backends that talk to the device over USB control transfers (pyusb) instead of
@@ -66,7 +66,7 @@ def _ite_backend_packages() -> list[str]:
 
 
 def _protocol_pids(package: str) -> tuple[int, ...]:
-    protocol = importlib.import_module(f"src.core.backends.{package}.protocol")
+    protocol = importlib.import_module(f"keyrgb.core.backends.{package}.protocol")
     for attr in _PID_ATTRS:
         value = getattr(protocol, attr, None)
         if value is None:

@@ -13,7 +13,7 @@ def ruff_format_check_runner() -> RunResult:
             "ruff",
             "format",
             "--check",
-            "src",
+            "keyrgb",
             "buildpython",
             "scripts/release",
             "tests",

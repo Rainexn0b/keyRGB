@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.power.monitoring.login1_monitoring import iter_prepare_for_sleep_events
+from keyrgb.core.power.monitoring.login1_monitoring import iter_prepare_for_sleep_events
 
 
 class _FakeStdout:
@@ -50,7 +50,7 @@ def test_iter_prepare_for_sleep_events_ignores_missing_value_line() -> None:
 def test_monitor_prepare_for_sleep_calls_on_started_and_emits_callbacks(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.power.monitoring import login1_monitoring
+    from keyrgb.core.power.monitoring import login1_monitoring
 
     fake = _FakeProcess(
         [
@@ -96,7 +96,7 @@ def test_monitor_prepare_for_sleep_calls_on_started_and_emits_callbacks(
 def test_monitor_prepare_for_sleep_ignores_unexpected_boolean_value(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.power.monitoring import login1_monitoring
+    from keyrgb.core.power.monitoring import login1_monitoring
 
     fake = _FakeProcess(
         [
@@ -126,7 +126,7 @@ def test_monitor_prepare_for_sleep_ignores_unexpected_boolean_value(
 def test_monitor_prepare_for_sleep_does_not_callback_after_shutdown_during_read(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.power.monitoring import login1_monitoring
+    from keyrgb.core.power.monitoring import login1_monitoring
 
     running = {"value": True}
     fake = _FakeProcess(

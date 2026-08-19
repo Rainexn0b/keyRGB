@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from threading import Event
 
-from src.gui.utils import tk_async
+from keyrgb.gui.utils import tk_async
 
 
 class _ClosedRoot:

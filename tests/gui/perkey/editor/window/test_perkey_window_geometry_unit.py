@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.perkey.window_geometry import (
+from keyrgb.gui.perkey.window_geometry import (
     apply_perkey_editor_geometry,
     compute_perkey_editor_min_content_size,
     fit_perkey_editor_geometry_to_content,

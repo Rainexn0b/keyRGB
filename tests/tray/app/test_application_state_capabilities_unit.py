@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.core.backends.base import BackendCapabilities
-from src.tray.app._application_state import TrayBootstrapState
+from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.tray.app._application_state import TrayBootstrapState
 
 
 def _caps(*, color: bool) -> BackendCapabilities:

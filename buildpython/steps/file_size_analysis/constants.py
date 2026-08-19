@@ -16,8 +16,8 @@ DELEGATION_ALIAS_BINDINGS_MIN = 4
 DELEGATION_DELEGATING_CALLABLES_MIN = 6
 DELEGATION_SCORE_MIN = 10
 
-SIZE_SCAN_ROOTS = ("src", "buildpython")
-DIRECTORY_SCAN_ROOTS = ("src", "buildpython", "tests")
+SIZE_SCAN_ROOTS = ("keyrgb", "buildpython")
+DIRECTORY_SCAN_ROOTS = ("keyrgb", "buildpython", "tests")
 
 
 def file_bucket(line_count: int) -> str | None:

@@ -4,14 +4,14 @@ from ..utils.paths import repo_root
 from ..utils.subproc import RunResult, python_exe, run
 
 _GUI_PURE_MYPY_TARGETS = (
-    "src/gui/perkey/ops/color_map_ops.py",
-    "src/gui/perkey/ops/color_apply_ops.py",
-    "src/gui/perkey/color_utils.py",
-    "src/gui/perkey/editor_support/dirty_state.py",
-    "src/gui/reference/overlay_geometry.py",
-    "src/gui/settings/_settings_scheduler.py",
-    "src/gui/utils/key_draw_style.py",
-    "src/gui/windows/_support/_support_window_geometry.py",
+    "keyrgb/gui/perkey/ops/color_map_ops.py",
+    "keyrgb/gui/perkey/ops/color_apply_ops.py",
+    "keyrgb/gui/perkey/color_utils.py",
+    "keyrgb/gui/perkey/editor_support/dirty_state.py",
+    "keyrgb/gui/reference/overlay_geometry.py",
+    "keyrgb/gui/settings/_settings_scheduler.py",
+    "keyrgb/gui/utils/key_draw_style.py",
+    "keyrgb/gui/windows/_support/_support_window_geometry.py",
 )
 
 
@@ -35,8 +35,8 @@ def mypy_runner() -> RunResult:
             python_exe(),
             "-m",
             "mypy",
-            "src/core",
-            "src/tray",
+            "keyrgb/core",
+            "keyrgb/tray",
             "buildpython",
             "scripts/release",
             "tests/buildpython",

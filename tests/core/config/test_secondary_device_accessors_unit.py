@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from src.core.config._lighting import _secondary_device_accessors as accessors
+from keyrgb.core.config._lighting import _secondary_device_accessors as accessors
 
 
 @dataclass

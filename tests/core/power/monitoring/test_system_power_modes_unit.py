@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-import src.core.power.system._apply as system_apply
-import src.core.power.system.modes as system_modes
-from src.core.power.system import PowerMode, get_status, is_supported, set_mode
+import keyrgb.core.power.system._apply as system_apply
+import keyrgb.core.power.system.modes as system_modes
+from keyrgb.core.power.system import PowerMode, get_status, is_supported, set_mode
 
 
 def _make_policy(root: Path, name: str, *, max_khz: int = 2500000, min_khz: int = 400000) -> Path:
@@ -81,7 +81,7 @@ def test_system_power_mode_balanced_restores_max(monkeypatch: pytest.MonkeyPatch
 
 
 def test_system_power_mode_uses_configured_extreme_cap(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    from src.core.config import Config
+    from keyrgb.core.config import Config
 
     root = tmp_path / "cpufreq"
     _make_policy(root, "policy0", max_khz=3000000)

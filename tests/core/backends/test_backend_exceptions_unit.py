@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.backends.exceptions import (
+from keyrgb.core.backends.exceptions import (
     BackendBusyError,
     BackendDisconnectedError,
     BackendError,

@@ -11,9 +11,9 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-import src.tray.app.backend as _mod
-from src.core.backends.base import BackendCapabilities
-from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
+import keyrgb.tray.app.backend as _mod
+from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 # ---------------------------------------------------------------------------
 # load_ite_dimensions

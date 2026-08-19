@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.backends.effect_contract import (
+from keyrgb.core.backends.effect_contract import (
     UnsupportedHardwareEffectArgument,
     hardware_effect_builder,
 )
@@ -29,11 +29,11 @@ def test_hardware_effect_builder_rejects_unknown_field_with_typed_error() -> Non
 
 
 def test_internal_hardware_backends_publish_builder_metadata() -> None:
-    from src.core.backends.ite8258_perkey_chassis.backend import _effect_builder as ite8258_perkey_builder
-    from src.core.backends.ite8258_zones_lenovo_legion.backend import _effect_builder as ite8258_zones_builder
-    from src.core.backends.ite8291r3_perkey.protocol import effect as ite8291r3_builder
-    from src.core.backends.ite8295_zones_lenovo_ideapad.backend import _effect_builder as ite8295_zones_builder
-    from src.core.backends.ite8910_perkey.backend import _effect_builder as ite8910_builder
+    from keyrgb.core.backends.ite8258_perkey_chassis.backend import _effect_builder as ite8258_perkey_builder
+    from keyrgb.core.backends.ite8258_zones_lenovo_legion.backend import _effect_builder as ite8258_zones_builder
+    from keyrgb.core.backends.ite8291r3_perkey.protocol import effect as ite8291r3_builder
+    from keyrgb.core.backends.ite8295_zones_lenovo_ideapad.backend import _effect_builder as ite8295_zones_builder
+    from keyrgb.core.backends.ite8910_perkey.backend import _effect_builder as ite8910_builder
 
     builders = (
         ite8258_perkey_builder("wave", extra=("direction",)),

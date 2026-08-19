@@ -23,7 +23,7 @@ class TestApplyEffectSelection:
 
     def test_none_effect_stops_engine_and_sets_static_color(self):
         """'none' effect should stop engine and set static color."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
@@ -39,7 +39,7 @@ class TestApplyEffectSelection:
 
     def test_stop_effect_behaves_like_none(self):
         """'stop' effect should behave the same as 'none'."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.engine.kb_lock = MagicMock(__enter__=lambda s: None, __exit__=lambda s, *a: None)
@@ -52,7 +52,7 @@ class TestApplyEffectSelection:
 
     def test_hardware_effect_blocked_when_not_supported(self):
         """Hardware effects should fall back to 'none' if not supported."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=False, per_key=True)
@@ -68,7 +68,7 @@ class TestApplyEffectSelection:
 
     def test_perkey_effect_blocked_when_not_supported(self):
         """Per-key effects should fall back to 'none' if not supported."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(per_key=False, hardware_effects=True)
@@ -82,8 +82,8 @@ class TestApplyEffectSelection:
 
     def test_perkey_effect_loads_colors_when_supported(self, monkeypatch):
         """Per-key effect should explicitly load colors from profile when per-key is supported."""
-        from src.tray.controllers import effect_selection
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers import effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         # Mock profile loading
         expected_colors = {(0, 0): (255, 0, 0)}
@@ -103,7 +103,7 @@ class TestApplyEffectSelection:
 
     def test_regular_effect_starts_engine_normally(self):
         """Regular supported effects should start the engine normally."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
@@ -116,7 +116,7 @@ class TestApplyEffectSelection:
 
     def test_missing_caps_fail_closed(self):
         """Missing capability evidence must not enable backend features."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = None
@@ -130,7 +130,7 @@ class TestApplyEffectSelection:
 
     def test_hardware_effects_list_blocked_correctly(self):
         """All hardware effects in the list should be blocked when not supported."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=False, per_key=True)
@@ -154,7 +154,7 @@ class TestApplyEffectSelection:
 
     def test_stop_sets_uniform_color(self):
         """Stopping an effect should set uniform color when no per-key colors."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
@@ -176,7 +176,7 @@ class TestApplyEffectSelection:
 
     def test_stop_stays_in_software_mode_if_perkey_colors_exist(self):
         """Stopping an effect should stay in software mode if per-key colors exist."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
@@ -197,7 +197,7 @@ class TestApplyEffectSelection:
 
     def test_software_effect_reuses_config_perkey_mapping(self):
         """Software-mode setup should reuse the config's per-key mapping instead of cloning it."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
@@ -211,7 +211,7 @@ class TestApplyEffectSelection:
 
     def test_hw_uniform_forces_hardware_mode_even_if_perkey_colors_exist(self):
         """Selecting hardware uniform should clear per-key gating and unlock HW mode."""
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
@@ -233,7 +233,7 @@ class TestApplyEffectSelection:
         assert mock_tray.is_off is False
 
     def test_prefixed_hardware_effect_can_override_software_name_collision(self):
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
@@ -249,7 +249,7 @@ class TestApplyEffectSelection:
         mock_tray._start_current_effect.assert_called_once()
 
     def test_load_per_key_colors_logs_traceback_when_profile_load_fails(self, monkeypatch):
-        from src.tray.controllers import effect_selection
+        from keyrgb.tray.controllers import effect_selection
 
         debug = MagicMock()
         broken_profiles = MagicMock()
@@ -265,7 +265,7 @@ class TestApplyEffectSelection:
         assert debug.call_args.kwargs["exc_info"] is True
 
     def test_load_per_key_colors_reraises_unexpected_exceptions(self, monkeypatch):
-        from src.tray.controllers import effect_selection
+        from keyrgb.tray.controllers import effect_selection
 
         broken_profiles = MagicMock()
         broken_profiles.get_active_profile.return_value = "default"
@@ -277,8 +277,8 @@ class TestApplyEffectSelection:
             effect_selection._load_per_key_colors_from_profile(MagicMock())
 
     def test_permission_notification_failure_is_logged(self, monkeypatch):
-        from src.tray.controllers import effect_selection
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers import effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         log_exception = MagicMock()
         permission_error = PermissionError("denied")
@@ -299,8 +299,8 @@ class TestApplyEffectSelection:
         assert str(log_exception.call_args[0][1]) == "notify failed"
 
     def test_recoverable_effect_selection_failure_is_logged(self, monkeypatch):
-        from src.tray.controllers import effect_selection
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers import effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         log_exception = MagicMock()
         monkeypatch.setattr(effect_selection.logger, "exception", log_exception)
@@ -317,7 +317,7 @@ class TestApplyEffectSelection:
         assert str(log_exception.call_args[0][1]) == "boom"
 
     def test_unexpected_effect_selection_failure_propagates(self):
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         mock_tray = MagicMock()
         mock_tray.backend_caps = MagicMock(hardware_effects=True, per_key=True)
@@ -328,7 +328,7 @@ class TestApplyEffectSelection:
             apply_effect_selection(mock_tray, effect_name="wave")
 
     def test_permission_notification_unexpected_failure_propagates(self, monkeypatch):
-        from src.tray.controllers.effect_selection import apply_effect_selection
+        from keyrgb.tray.controllers.effect_selection import apply_effect_selection
 
         permission_error = PermissionError("denied")
 

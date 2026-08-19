@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.power.policies.power_event_policy import (
+from keyrgb.core.power.policies.power_event_policy import (
     PowerEventInputs,
     PowerEventPolicy,
     RestoreKeyboard,

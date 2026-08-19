@@ -14,7 +14,7 @@ COMMENTED_CODE_RE = re.compile(
 
 def iter_source_files() -> list[Path]:
     root = repo_root()
-    src = root / "src"
+    src = root / "keyrgb"
     if not src.exists():
         return []
 

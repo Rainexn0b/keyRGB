@@ -4,9 +4,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.secondary_device_routes import iter_virtual_routes
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.tray.ui import menu_status
+from keyrgb.core.secondary_device_routes import iter_virtual_routes
+from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute
+from keyrgb.tray.ui import menu_status
 
 
 def _keyboard_only_entries(entries: list[dict]) -> list[dict]:
@@ -92,7 +92,7 @@ def test_virtual_route_text_uses_display_name() -> None:
 def test_simulation_context_entries_expose_all_registered_routes(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KEYRGB_SIMULATE_SECONDARY_DEVICES", "1")
 
-    from src.core.secondary_device_runtime import iter_effective_secondary_routes
+    from keyrgb.core.secondary_device_runtime import iter_effective_secondary_routes
 
     tray = SimpleNamespace(
         backend=None,

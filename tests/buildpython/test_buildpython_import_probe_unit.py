@@ -17,10 +17,10 @@ def test_probe_module_import_returns_success_when_subprocess_succeeds(monkeypatc
         ),
     )
 
-    result = probe_module_import("src.tray.entrypoint", cwd=tmp_path)
+    result = probe_module_import("keyrgb.tray.entrypoint", cwd=tmp_path)
 
     assert result.ok is True
-    assert result.module == "src.tray.entrypoint"
+    assert result.module == "keyrgb.tray.entrypoint"
     assert result.stderr == ""
 
 

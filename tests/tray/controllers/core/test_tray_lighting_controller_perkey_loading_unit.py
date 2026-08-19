@@ -3,9 +3,9 @@ from __future__ import annotations
 from typing import cast
 from unittest.mock import MagicMock
 
-from src.core.backends.base import BackendCapabilities
-from src.tray.controllers.lighting_controller import start_current_effect
-from src.tray.protocols import LightingTrayProtocol
+from keyrgb.core.backends.base import BackendCapabilities
+from keyrgb.tray.controllers.lighting_controller import start_current_effect
+from keyrgb.tray.protocols import LightingTrayProtocol
 
 
 class MockEngine:

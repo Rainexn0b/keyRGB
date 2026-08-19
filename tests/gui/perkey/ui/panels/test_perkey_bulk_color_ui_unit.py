@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.ui.bulk_color import clear_all_ui, fill_all_ui
+from keyrgb.gui.perkey.ui.bulk_color import clear_all_ui, fill_all_ui
 
 
 class DummyLabel:

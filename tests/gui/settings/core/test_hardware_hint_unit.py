@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gui.settings.hardware_hint import extract_unsupported_rgb_controllers_hint
+from keyrgb.gui.settings.hardware_hint import extract_unsupported_rgb_controllers_hint
 
 
 def test_hardware_hint_reports_experimental_ite8910_toggle_path() -> None:

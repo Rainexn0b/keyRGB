@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.gui.perkey.commit_pipeline import PerKeyCommitPipeline
+from keyrgb.gui.perkey.commit_pipeline import PerKeyCommitPipeline
 
 
 @dataclass

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.core.power.policies.battery_saver_policy import BatterySaverPolicy
+from keyrgb.core.power.policies.battery_saver_policy import BatterySaverPolicy
 
 
 def test_battery_saver_dims_on_unplug_and_restores_on_ac() -> None:

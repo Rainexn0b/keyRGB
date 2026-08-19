@@ -44,7 +44,7 @@ boundaries.
 
 ## Current baseline (already implemented)
 
-- Backend registry exists under src/core/backends.
+- Backend registry exists under keyrgb/core/backends.
 - Env override supported: `KEYRGB_BACKEND`.
 - Capability-gated tray and GUI flows route through the selected backend.
 - Current backend mix includes sysfs, multiple ITE hidraw paths, and optional

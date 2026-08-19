@@ -4,8 +4,8 @@ from dataclasses import FrozenInstanceError
 
 import pytest
 
-from src.core.effects.reactive import _effects_api
-from src.core.effects.reactive.effects import _fade_api, _ripple_api
+from keyrgb.core.effects.reactive import _effects_api
+from keyrgb.core.effects.reactive.effects import _fade_api, _ripple_api
 
 _FADE_MEMBERS = (
     "_PressSource",

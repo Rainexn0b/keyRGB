@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from src.core.backends.shared_hidraw_transport import (
+from keyrgb.core.backends.shared_hidraw_transport import (
     HidrawTransportProxy,
     SharedHidrawTransportManager,
 )
@@ -166,18 +166,18 @@ def test_send_and_write_are_routed_through_underlying_transport() -> None:
 
 
 def test_shared_proxy_uses_transport_level_pacing_once(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.core.backends.ite8291_perkey.hidraw import HidrawFeatureOutputTransport
+    from keyrgb.core.backends.ite8291_perkey.hidraw import HidrawFeatureOutputTransport
 
     sleeps: list[float] = []
     ioctl_payloads: list[bytes] = []
     monkeypatch.setenv("KEYRGB_ITE8258_PERKEY_CHASSIS_REPORT_DELAY_MS", "2")
-    monkeypatch.setattr("src.core.backends._report_pacing.time.sleep", sleeps.append)
+    monkeypatch.setattr("keyrgb.core.backends._report_pacing.time.sleep", sleeps.append)
 
     def fake_ioctl(fd: int, request: int, payload: bytearray, mutate_flag: bool) -> None:
         _ = fd, request, mutate_flag
         ioctl_payloads.append(bytes(payload))
 
-    monkeypatch.setattr("src.core.backends.ite8291_perkey.hidraw.fcntl.ioctl", fake_ioctl)
+    monkeypatch.setattr("keyrgb.core.backends.ite8291_perkey.hidraw.fcntl.ioctl", fake_ioctl)
 
     transport = HidrawFeatureOutputTransport.__new__(HidrawFeatureOutputTransport)
     transport.devnode = Path("/dev/hidraw-test")

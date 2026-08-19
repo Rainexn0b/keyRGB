@@ -5,8 +5,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.tray.pollers import config_polling
-from src.tray.pollers.config_polling import start_config_polling
+from keyrgb.tray.pollers import config_polling
+from keyrgb.tray.pollers.config_polling import start_config_polling
 
 
 def _mk_tray_base(*, effect: str, brightness: int) -> MagicMock:

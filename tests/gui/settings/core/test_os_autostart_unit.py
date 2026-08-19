@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from src.gui.settings import os_autostart
+from keyrgb.gui.settings import os_autostart
 
 
 def test_autostart_desktop_path_uses_home_config_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

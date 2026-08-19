@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 
-import src.tray.pollers.idle_power.polling as ipp
+import keyrgb.tray.pollers.idle_power.polling as ipp
 
 
 def test_read_logind_idle_seconds_returns_none_when_run_fails(monkeypatch):

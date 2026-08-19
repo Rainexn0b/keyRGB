@@ -2,14 +2,14 @@ import runpy
 
 import pytest
 
-import src.tray.entrypoint as entry
+import keyrgb.tray.entrypoint as entry
 
 
 def test_python_module_entrypoint_delegates_to_main(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[bool] = []
     monkeypatch.setattr(entry, "main", lambda: calls.append(True))
 
-    runpy.run_module("src.tray.__main__", run_name="__main__")
+    runpy.run_module("keyrgb.tray.__main__", run_name="__main__")
 
     assert calls == [True]
 

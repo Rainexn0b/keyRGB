@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
-from src.core.brightness_layers import compose_power_source_brightness_overrides, resolve_scheduler_brightness_state
+from keyrgb.core.brightness_layers import compose_power_source_brightness_overrides, resolve_scheduler_brightness_state
 
 
 def test_resolve_scheduler_brightness_state_applies_day_window_without_power_source_override() -> None:

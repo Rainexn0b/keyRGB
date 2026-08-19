@@ -7,11 +7,11 @@ from typing import ClassVar
 
 import pytest
 
-from src.core.config._settings_view import ConfigSettingsView
-from src.core.diagnostics.model import DiagnosticsConfigSnapshot
-from src.core.power.system import PowerMode
-from src.gui.settings import settings_state
-from src.gui.settings.settings_state import (
+from keyrgb.core.config._settings_view import ConfigSettingsView
+from keyrgb.core.diagnostics.model import DiagnosticsConfigSnapshot
+from keyrgb.core.power.system import PowerMode
+from keyrgb.gui.settings import settings_state
+from keyrgb.gui.settings.settings_state import (
     SettingsValues,
     apply_settings_values_to_config,
     clamp_brightness,
@@ -158,7 +158,7 @@ def test_load_settings_malformed_property_and_coercion_values_fall_back_safely(c
         def autostart(self) -> bool:
             raise RuntimeError("boom")
 
-    with caplog.at_level(logging.ERROR, logger="src.gui.settings.settings_state"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.gui.settings.settings_state"):
         values = load_settings_values(config=Config(), os_autostart_enabled=True)
 
     assert values.autostart is True
@@ -201,7 +201,7 @@ def test_load_settings_malformed_string_values_fall_back_safely(caplog) -> None:
         def physical_layout(self) -> str:
             raise RuntimeError("boom")
 
-    with caplog.at_level(logging.ERROR, logger="src.gui.settings.settings_state"):
+    with caplog.at_level(logging.ERROR, logger="keyrgb.gui.settings.settings_state"):
         values = load_settings_values(config=Config(), os_autostart_enabled=True)
 
     assert values.screen_dim_sync_mode == "off"
@@ -501,7 +501,7 @@ def test_internal_settings_apply_converts_default_utc_clock_to_local_time(
 ) -> None:
     from datetime import timezone
 
-    from src.gui.settings import _settings_values as settings_values
+    from keyrgb.gui.settings import _settings_values as settings_values
 
     cfg = SimpleNamespace(reactive_brightness=50)
 

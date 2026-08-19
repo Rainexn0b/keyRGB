@@ -9,8 +9,8 @@ from buildpython.utils.subproc import RunResult
 def test_parse_findings_extracts_confidence_and_scope() -> None:
     stdout = "\n".join(  # noqa: FLY002 - multi-line fixture payload is clearer as an explicit list
         [
-            "src/core/example.py:10: unused variable 'x' (100% confidence)",
-            "src/gui/example.py:12: unused import 'y' (90% confidence)",
+            "keyrgb/core/example.py:10: unused variable 'x' (100% confidence)",
+            "keyrgb/gui/example.py:12: unused import 'y' (90% confidence)",
             "noise line that should be ignored",
         ]
     )
@@ -18,18 +18,18 @@ def test_parse_findings_extracts_confidence_and_scope() -> None:
     findings = step_dead_code._parse_findings(stdout)
 
     assert len(findings) == 2
-    assert findings[0]["path"] == "src/core/example.py"
+    assert findings[0]["path"] == "keyrgb/core/example.py"
     assert findings[0]["line"] == 10
     assert findings[0]["confidence"] == 100
-    assert findings[0]["scope"] == "src/core"
-    assert findings[1]["scope"] == "src/gui"
+    assert findings[0]["scope"] == "keyrgb/core"
+    assert findings[1]["scope"] == "keyrgb/gui"
 
 
 def test_dead_code_runner_treats_unused_variables_as_informational(monkeypatch, tmp_path) -> None:
     fake_stdout = "\n".join(  # noqa: FLY002 - multi-line fixture payload is clearer as an explicit list
         [
-            "src/tray/icon.py:7: unused variable 'outline' (100% confidence)",
-            "src/gui/example.py:12: unused variable 'tag_or_id' (90% confidence)",
+            "keyrgb/tray/icon.py:7: unused variable 'outline' (100% confidence)",
+            "keyrgb/gui/example.py:12: unused variable 'tag_or_id' (90% confidence)",
         ]
     )
 
@@ -55,21 +55,21 @@ def test_dead_code_runner_treats_unused_variables_as_informational(monkeypatch, 
     assert "Dead code scan (vulture)" in result.stdout
     assert "Findings: 2" in result.stdout
     assert "Actionable findings: 0" in result.stdout
-    assert "src/tray: 1" in result.stdout
-    assert "src/gui: 1" in result.stdout
+    assert "keyrgb/tray: 1" in result.stdout
+    assert "keyrgb/gui: 1" in result.stdout
 
     report_dir = tmp_path / "buildlog" / "keyrgb"
     payload = json.loads((report_dir / "dead-code-vulture.json").read_text(encoding="utf-8"))
     assert payload["count"] == 2
     assert payload["actionable_count"] == 0
-    assert payload["counts_by_scope"]["src/gui"] == 1
-    assert payload["counts_by_scope"]["src/tray"] == 1
+    assert payload["counts_by_scope"]["keyrgb/gui"] == 1
+    assert payload["counts_by_scope"]["keyrgb/tray"] == 1
     assert (report_dir / "dead-code-vulture.md").exists()
     assert (report_dir / "dead-code-vulture.txt").exists()
 
 
 def test_dead_code_runner_fails_on_unused_runtime_functions(monkeypatch, tmp_path) -> None:
-    fake_stdout = "src/core/example.py:4: unused function 'legacy_helper' (100% confidence)\n"
+    fake_stdout = "keyrgb/core/example.py:4: unused function 'legacy_helper' (100% confidence)\n"
 
     monkeypatch.setattr(step_dead_code, "repo_root", lambda: tmp_path)
     monkeypatch.setattr(step_dead_code, "buildlog_dir", lambda: tmp_path / "buildlog" / "keyrgb")

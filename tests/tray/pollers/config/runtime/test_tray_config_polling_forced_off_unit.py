@@ -5,7 +5,7 @@ from unittest.mock import ANY, MagicMock
 
 import pytest
 
-from src.tray.pollers.config_polling import ConfigApplyState, _apply_from_config_once
+from keyrgb.tray.pollers.config_polling import ConfigApplyState, _apply_from_config_once
 
 
 def _mk_tray(*, brightness: int, effect: str = "rainbow_wave") -> MagicMock:
@@ -35,7 +35,7 @@ def _mk_tray(*, brightness: int, effect: str = "rainbow_wave") -> MagicMock:
     ["user_forced_off", "power_forced_off", "idle_forced_off"],
 )
 def test_forced_off_skip_prevents_fastpath_brightness_update(flag_name: str) -> None:
-    from src.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
     tray = _mk_tray(brightness=30, effect="rainbow_wave")
     tray.is_off = True
@@ -89,7 +89,7 @@ def test_forced_off_skip_prevents_fastpath_brightness_update(flag_name: str) -> 
 
 
 def test_forced_off_skip_logs_update_menu_failure() -> None:
-    from src.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
     tray = _mk_tray(brightness=30, effect="rainbow_wave")
     tray.is_off = True

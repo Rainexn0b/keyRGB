@@ -5,8 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.core.backends.shared_hidraw_probe as probe
-from src.core.backends.ite8291_perkey import hidraw as ite8291_hidraw
+import keyrgb.core.backends.shared_hidraw_probe as probe
+from keyrgb.core.backends.ite8291_perkey import hidraw as ite8291_hidraw
 
 
 def test_usb_scan_disabled(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -17,7 +17,7 @@ class _FakeThread:
 
 
 def test_normalize_brightness_invalid_returns_zero() -> None:
-    from src.tray.pollers.hardware_polling import _normalize_brightness_to_config_scale
+    from keyrgb.tray.pollers.hardware_polling import _normalize_brightness_to_config_scale
 
     assert _normalize_brightness_to_config_scale("nope") == 0  # type: ignore[arg-type]
 
@@ -25,7 +25,7 @@ def test_normalize_brightness_invalid_returns_zero() -> None:
 def test_apply_polled_state_logs_brightness_change_but_swallows_log_errors(
     monkeypatch,
 ) -> None:
-    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+    from keyrgb.tray.pollers.hardware_polling import _apply_polled_hardware_state
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     def boom(*_a, **_kw):
@@ -56,7 +56,7 @@ def test_apply_polled_state_logs_brightness_change_but_swallows_log_errors(
 
 
 def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> None:
-    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+    from keyrgb.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
     refreshed = {"n": 0}
     animate_flags: list[bool] = []
@@ -96,7 +96,7 @@ def test_apply_polled_state_logs_off_state_change_but_swallows_log_errors() -> N
 
 
 def test_apply_polled_state_propagates_unexpected_log_event_errors() -> None:
-    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+    from keyrgb.tray.pollers.hardware_polling import _apply_polled_hardware_state
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     tray = make_owner_backed_simple_tray(
@@ -122,7 +122,7 @@ def test_apply_polled_state_propagates_unexpected_log_event_errors() -> None:
 
 
 def test_apply_polled_state_dim_temp_target_bad_int_is_ignored(monkeypatch) -> None:
-    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+    from keyrgb.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
     class BadInt:
         def __int__(self):
@@ -156,7 +156,7 @@ def test_apply_polled_state_dim_temp_target_bad_int_is_ignored(monkeypatch) -> N
 
 
 def test_apply_polled_state_off_state_change_branch_and_forced_off_gate() -> None:
-    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+    from keyrgb.tray.pollers.hardware_polling import _apply_polled_hardware_state
 
     refreshed = {"n": 0}
 
@@ -188,7 +188,7 @@ def test_apply_polled_state_off_state_change_branch_and_forced_off_gate() -> Non
 
 
 def test_apply_polled_state_off_state_change_clears_unforced_logical_off() -> None:
-    from src.tray.pollers.hardware_polling import _apply_polled_hardware_state
+    from keyrgb.tray.pollers.hardware_polling import _apply_polled_hardware_state
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     tray = make_owner_backed_simple_tray(
@@ -216,7 +216,7 @@ def test_apply_polled_state_off_state_change_clears_unforced_logical_off() -> No
 
 
 def test_apply_polled_state_off_change_adopts_successful_recent_blank_recovery(monkeypatch) -> None:
-    import src.tray.pollers.hardware_polling as hp
+    import keyrgb.tray.pollers.hardware_polling as hp
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     tray = make_owner_backed_simple_tray(
@@ -246,7 +246,7 @@ def test_apply_polled_state_off_change_adopts_successful_recent_blank_recovery(m
 def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(
     monkeypatch,
 ) -> None:
-    import src.tray.pollers.hardware_polling as hp
+    import keyrgb.tray.pollers.hardware_polling as hp
 
     created = {}
 
@@ -294,9 +294,9 @@ def test_start_hardware_polling_creates_daemon_thread_and_loop_runs_once(
 
 
 def test_stale_hardware_observation_is_rejected_after_newer_transition(monkeypatch) -> None:
-    import src.tray.pollers.hardware_polling as hp
-    from src.tray.controllers.runtime_coordination import run_tray_transition
-    from src.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    import keyrgb.tray.pollers.hardware_polling as hp
+    from keyrgb.tray.controllers.runtime_coordination import run_tray_transition
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
 
     coordinator = TrayRuntimeCoordinator()
     tray = SimpleNamespace(runtime_coordinator=coordinator)
@@ -324,7 +324,7 @@ def test_stale_hardware_observation_is_rejected_after_newer_transition(monkeypat
 
 
 def test_start_hardware_polling_exception_path_calls_handler(monkeypatch) -> None:
-    import src.tray.pollers.hardware_polling as hp
+    import keyrgb.tray.pollers.hardware_polling as hp
 
     created = {}
 
@@ -370,7 +370,7 @@ def test_start_hardware_polling_exception_path_calls_handler(monkeypatch) -> Non
 
 
 def test_start_hardware_polling_uses_fast_poll_interval_after_power_source_transition(monkeypatch) -> None:
-    import src.tray.pollers.hardware_polling as hp
+    import keyrgb.tray.pollers.hardware_polling as hp
 
     created = {}
 
@@ -416,7 +416,7 @@ def test_start_hardware_polling_uses_fast_poll_interval_after_power_source_trans
 
 
 def test_start_hardware_polling_propagates_unexpected_loop_errors(monkeypatch) -> None:
-    import src.tray.pollers.hardware_polling as hp
+    import keyrgb.tray.pollers.hardware_polling as hp
 
     created = {}
 

@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.tray.pollers.idle_power import _runtime
+from keyrgb.tray.pollers.idle_power import _runtime
 
 
 def _make_tray(*, reload_fn, log_event_fn):
@@ -167,7 +167,7 @@ def test_run_idle_power_iteration_suppresses_dim_sync_during_power_source_change
 
 
 def test_run_idle_power_iteration_passes_session_idle_for_restore_candidate() -> None:
-    from src.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
     captured: dict[str, object] = {}
     tray = _make_tray(reload_fn=lambda: None, log_event_fn=lambda *_args, **_kwargs: None)
@@ -483,7 +483,7 @@ def test_controller_sleep_polls_keyboard_tracker_alongside_wayland(monkeypatch) 
 def test_controller_sleep_evdev_restore_yields_to_firmware_wake_claim(monkeypatch) -> None:
     """Do not rearm if hardware polling already restored the firmware wake."""
 
-    from src.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
     tray = _make_controller_sleep_tray(sleep_at=100.0)
     loop_state = _runtime.IdlePollLoopState()
@@ -514,8 +514,8 @@ def test_controller_sleep_evdev_restore_yields_to_firmware_wake_claim(monkeypatc
 
 
 def test_screen_idle_off_ignores_wayland_resume_until_keyboard_activity() -> None:
-    from src.tray.idle_power_state import set_idle_power_state_field
-    from src.tray.pollers.idle_power.policy import compute_idle_action
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.pollers.idle_power.policy import compute_idle_action
 
     tray = _make_tray(reload_fn=lambda: None, log_event_fn=lambda *_args, **_kwargs: None)
     tray.config.controller_sleep_respect = True

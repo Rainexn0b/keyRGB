@@ -4,7 +4,7 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.diagnostics.support import (
+from keyrgb.core.diagnostics.support import (
     ITE8291R3_SPEED_PROBE_KEY,
     ITE8910_SPEED_PROBE_KEY,
     build_backend_speed_probe_plan,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-LOC_SCAN_ROOTS = ("src", "buildpython", "tests")
+LOC_SCAN_ROOTS = ("keyrgb", "buildpython", "tests")
 
 
 @dataclass(frozen=True)

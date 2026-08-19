@@ -10,19 +10,19 @@ from types import SimpleNamespace
 
 class TestEngineIntAttrOrDefault:
     def test_missing_attribute_returns_missing_default(self):
-        from src.core.effects.reactive._ripple_loop import _engine_int_attr_or_default
+        from keyrgb.core.effects.reactive._ripple_loop import _engine_int_attr_or_default
 
         engine = SimpleNamespace()
         assert _engine_int_attr_or_default(engine, "nonexistent", missing_default=42) == 42
 
     def test_valid_string_attr_returns_int(self):
-        from src.core.effects.reactive._ripple_loop import _engine_int_attr_or_default
+        from keyrgb.core.effects.reactive._ripple_loop import _engine_int_attr_or_default
 
         engine = SimpleNamespace(some_attr="5")
         assert _engine_int_attr_or_default(engine, "some_attr", missing_default=0) == 5
 
     def test_none_attr_returns_zero(self):
-        from src.core.effects.reactive._ripple_loop import _engine_int_attr_or_default
+        from keyrgb.core.effects.reactive._ripple_loop import _engine_int_attr_or_default
 
         engine = SimpleNamespace(some_attr=None)
         # int(None or 0) == int(0) == 0, not missing_default
@@ -34,14 +34,14 @@ class TestEngineIntAttrOrDefault:
 
 class TestEngineIntAttrOrFallback:
     def test_valid_attr_delegates_to_default(self):
-        from src.core.effects.reactive._ripple_loop import _engine_int_attr_or_fallback
+        from keyrgb.core.effects.reactive._ripple_loop import _engine_int_attr_or_fallback
 
         engine = SimpleNamespace(brightness=25)
         result = _engine_int_attr_or_fallback(engine, "brightness", missing_default=0, error_default=-1)
         assert result == 25
 
     def test_coercion_error_returns_error_default(self):
-        from src.core.effects.reactive._ripple_loop import _engine_int_attr_or_fallback
+        from keyrgb.core.effects.reactive._ripple_loop import _engine_int_attr_or_fallback
 
         # "not_a_number" is truthy so `int("not_a_number" or 0)` raises ValueError
         engine = SimpleNamespace(bad_attr="not_a_number")
@@ -54,19 +54,19 @@ class TestEngineIntAttrOrFallback:
 
 class TestHasPerKeyWriter:
     def test_no_set_key_colors_attr_returns_false(self):
-        from src.core.effects.reactive._ripple_loop import _has_per_key_writer
+        from keyrgb.core.effects.reactive._ripple_loop import _has_per_key_writer
 
         engine = SimpleNamespace(kb=SimpleNamespace())  # no set_key_colors
         assert _has_per_key_writer(engine) is False
 
     def test_set_key_colors_none_returns_false(self):
-        from src.core.effects.reactive._ripple_loop import _has_per_key_writer
+        from keyrgb.core.effects.reactive._ripple_loop import _has_per_key_writer
 
         engine = SimpleNamespace(kb=SimpleNamespace(set_key_colors=None))
         assert _has_per_key_writer(engine) is False
 
     def test_set_key_colors_callable_returns_true(self):
-        from src.core.effects.reactive._ripple_loop import _has_per_key_writer
+        from keyrgb.core.effects.reactive._ripple_loop import _has_per_key_writer
 
         engine = SimpleNamespace(
             backend_caps=SimpleNamespace(per_key=True),
@@ -329,7 +329,7 @@ def _make_engine(*, reactive_brightness: int = 0, has_per_key_writer: bool = Fal
 class TestRunReactiveRippleLoop:
     def test_eff_hw_zero_exits_after_render_base(self):
         """eff_hw=0: skips pulse logic, renders base, then exits on next wait()."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=0)
         api = _MockApi()
@@ -341,7 +341,7 @@ class TestRunReactiveRippleLoop:
 
     def test_press_close_always_called_in_finally(self):
         """press.close() is called regardless of loop exit path."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=0)
         api = _MockApi()
@@ -352,7 +352,7 @@ class TestRunReactiveRippleLoop:
 
     def test_per_key_writer_path_calls_build_and_render(self):
         """With per-key writer and eff_hw>0, build_ripple_color_map_into and render are called."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         press = _MockPressSource(slot_id_sequence=(None,))
@@ -366,7 +366,7 @@ class TestRunReactiveRippleLoop:
 
     def test_uniform_fallback_no_per_key_writer(self):
         """Without per-key writer, _render_uniform_fallback is called instead of render."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=False)
         press = _MockPressSource(slot_id_sequence=(None,))
@@ -380,7 +380,7 @@ class TestRunReactiveRippleLoop:
 
     def test_pressed_key_with_mapped_cells_spawns_pulses(self):
         """When press returns a slot_id and mapped_cells are non-empty, pulses are appended."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         press = _MockPressSource(slot_id_sequence=("KEY_A",))
@@ -394,7 +394,7 @@ class TestRunReactiveRippleLoop:
 
     def test_pressed_key_no_mapped_cells_uses_random_row_col(self):
         """When mapped_cells is empty, random row/col is used for the new pulse."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         press = _MockPressSource(slot_id_sequence=("KEY_B",))
@@ -416,7 +416,7 @@ class TestRunReactiveRippleLoop:
 
     def test_uniform_fallback_with_overlay_values_computes_best_weight(self):
         """Uniform fallback with overlay values computes best_weight/best_hue."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=False)
         press = _MockPressSource(slot_id_sequence=(None,))
@@ -429,7 +429,7 @@ class TestRunReactiveRippleLoop:
 
     def test_uniform_fallback_with_manual_color_skips_hsv(self):
         """Uniform fallback with manual color uses manual instead of hsv_to_rgb."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=False)
         press = _MockPressSource(slot_id_sequence=(None,))
@@ -441,7 +441,7 @@ class TestRunReactiveRippleLoop:
 
     def test_uniform_fallback_with_pulse_scale_below_one_calls_scale(self):
         """Uniform fallback with pulse_scale < 0.999 invokes api.scale."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=False)
         press = _MockPressSource(slot_id_sequence=(None,))
@@ -461,7 +461,7 @@ class TestRunReactiveRippleLoop:
 
     def test_uniform_fallback_empty_base_map_uses_black(self):
         """Uniform fallback with empty base map uses (0, 0, 0) as base_rgb."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=False)
         press = _MockPressSource(slot_id_sequence=(None,))
@@ -473,7 +473,7 @@ class TestRunReactiveRippleLoop:
 
     def test_trail_width_is_decoupled_from_speed_pace(self):
         """Wave thickness should depend on reactive_trail_percent, not on pace."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         slow_engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         slow_engine.reactive_trail_percent = 50
@@ -494,7 +494,7 @@ class TestRunReactiveRippleLoop:
 
     def test_per_key_writer_path_with_per_key_backdrop_active(self):
         """per_key_backdrop_active=True flows correctly through build_ripple_color_map_into."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         press = _MockPressSource(slot_id_sequence=(None,))
@@ -507,7 +507,7 @@ class TestRunReactiveRippleLoop:
 
     def test_multiple_presses_in_one_frame_each_spawn_a_pulse(self):
         """A single evdev batch with two keydowns must spawn two pulses, not one."""
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
 
@@ -535,8 +535,8 @@ class TestRunReactiveRippleLoop:
     def test_loop_uses_rescaled_pace_range_so_slider_5_is_the_middle(self):
         """The shared 0.25..10 pace range made slider 3 feel like the middle;
         both reactive loops must use the rescaled 0.25..3.76 range instead."""
-        from src.core.effects.reactive import _fade_loop, _ripple_loop
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive import _fade_loop, _ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         # Both loops declare the rescaled range...
         for module in (_ripple_loop, _fade_loop):
@@ -562,7 +562,7 @@ class TestRunReactiveRippleLoop:
             assert kwargs.get("max_factor") == 3.76
 
     def test_stopped_replacement_worker_does_not_open_input(self):
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         engine.stop_event = _AlreadySetEvent()
@@ -576,7 +576,7 @@ class TestRunReactiveRippleLoop:
         assert not api.press.close_called
 
     def test_worker_stopped_during_input_open_closes_without_rendering(self):
-        from src.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
+        from keyrgb.core.effects.reactive._ripple_loop import run_reactive_ripple_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         engine.stop_event = _SetAfterFirstCheckEvent()
@@ -590,7 +590,7 @@ class TestRunReactiveRippleLoop:
         assert api.press.close_called
 
     def test_stopped_fade_replacement_worker_does_not_open_input(self):
-        from src.core.effects.reactive._fade_loop import run_reactive_fade_loop
+        from keyrgb.core.effects.reactive._fade_loop import run_reactive_fade_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         engine.stop_event = _AlreadySetEvent()
@@ -604,7 +604,7 @@ class TestRunReactiveRippleLoop:
         assert not api.press.close_called
 
     def test_fade_worker_stopped_during_input_open_closes_without_rendering(self):
-        from src.core.effects.reactive._fade_loop import run_reactive_fade_loop
+        from keyrgb.core.effects.reactive._fade_loop import run_reactive_fade_loop
 
         engine = _make_engine(reactive_brightness=25, has_per_key_writer=True)
         engine.stop_event = _SetAfterFirstCheckEvent()

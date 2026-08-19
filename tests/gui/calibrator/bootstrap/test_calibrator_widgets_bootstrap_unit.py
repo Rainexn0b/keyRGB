@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
-from src.gui.calibrator import _app_bootstrap as boot
+from keyrgb.gui.calibrator import _app_bootstrap as boot
 
 
 class _Widget:

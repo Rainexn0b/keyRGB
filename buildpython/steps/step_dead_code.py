@@ -9,7 +9,7 @@ from ..utils.paths import buildlog_dir, repo_root
 from ..utils.subproc import RunResult, python_exe, run
 
 _FINDING_RE = re.compile(r"^(?P<path>.+?):(?P<line>\d+): (?P<message>.+) \((?P<confidence>\d+)% confidence\)$")
-_SCAN_ROOTS = ("src", "buildpython", "tests")
+_SCAN_ROOTS = ("keyrgb", "buildpython", "tests")
 _MIN_CONFIDENCE = 80
 _ACTIONABLE_PREFIXES = (
     "unused function",
@@ -22,14 +22,14 @@ _ACTIONABLE_PREFIXES = (
 
 
 def _scope_for_path(path: str) -> str:
-    if path.startswith("src/core/"):
-        return "src/core"
-    if path.startswith("src/gui/"):
-        return "src/gui"
-    if path.startswith("src/tray/"):
-        return "src/tray"
-    if path.startswith("src/"):
-        return "src/other"
+    if path.startswith("keyrgb/core/"):
+        return "keyrgb/core"
+    if path.startswith("keyrgb/gui/"):
+        return "keyrgb/gui"
+    if path.startswith("keyrgb/tray/"):
+        return "keyrgb/tray"
+    if path.startswith("keyrgb/"):
+        return "keyrgb/other"
     if path.startswith("buildpython/"):
         return "buildpython"
     if path.startswith("tests/"):

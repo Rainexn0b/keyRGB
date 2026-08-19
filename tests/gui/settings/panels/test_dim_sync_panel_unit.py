@@ -3,7 +3,7 @@ from __future__ import annotations
 import tkinter as tk
 from types import SimpleNamespace
 
-from src.gui.settings.panels import dim_sync_panel
+from keyrgb.gui.settings.panels import dim_sync_panel
 
 
 class _FakeWidget:

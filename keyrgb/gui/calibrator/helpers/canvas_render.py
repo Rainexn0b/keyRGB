@@ -1,0 +1,124 @@
+from __future__ import annotations
+
+import tkinter as tk
+from tkinter import font as tkfont
+from typing import TypeAlias
+
+from PIL import Image, ImageTk
+
+from keyrgb.core.resources.layout import BASE_IMAGE_SIZE, get_layout_keys
+from keyrgb.gui.perkey.profile_management import keymap_cells_for
+from keyrgb.gui.reference.overlay_geometry import (
+    CanvasTransform,
+    calc_centered_drawn_bbox,
+    transform_from_drawn_bbox,
+)
+from keyrgb.gui.utils.deck_render_cache import DeckRenderCache
+from keyrgb.gui.utils.key_draw_style import key_draw_style
+
+from .geometry import key_canvas_bbox
+
+LayoutTweaks: TypeAlias = dict[str, float]
+PerKeyLayoutTweaks: TypeAlias = dict[str, dict[str, float]]
+
+_LABEL_FIT_ERRORS = (AttributeError, RuntimeError, tk.TclError, TypeError, ValueError)
+
+
+def redraw_calibration_canvas(
+    *,
+    canvas: tk.Canvas,
+    deck_pil: Image.Image | None,
+    deck_render_cache: DeckRenderCache[ImageTk.PhotoImage],
+    layout_tweaks: LayoutTweaks,
+    per_key_layout_tweaks: PerKeyLayoutTweaks,
+    keymap: dict[str, object],
+    selected_slot_id: str | None = None,
+    selected_key_id: str | None = None,
+    physical_layout: str = "auto",
+    legend_pack_id: str | None = None,
+    slot_overrides: dict[str, dict[str, object]] | None = None,
+) -> tuple[CanvasTransform, ImageTk.PhotoImage | None]:
+    canvas.delete("all")
+
+    cw = max(1, int(canvas.winfo_width()))
+    ch = max(1, int(canvas.winfo_height()))
+    x0, y0, dw, dh, _scale = calc_centered_drawn_bbox(canvas_w=cw, canvas_h=ch, image_size=BASE_IMAGE_SIZE)
+    transform = transform_from_drawn_bbox(x0=x0, y0=y0, draw_w=dw, draw_h=dh, image_size=BASE_IMAGE_SIZE)
+
+    deck_tk: ImageTk.PhotoImage | None = None
+    if deck_pil is not None:
+        deck_tk = deck_render_cache.get_or_create(
+            deck_image=deck_pil,
+            draw_size=(dw, dh),
+            transparency_pct=0.0,
+            photo_factory=ImageTk.PhotoImage,
+        )
+        if deck_tk is not None:
+            canvas.create_image(x0, y0, anchor="nw", image=deck_tk)
+
+    visible_keys = get_layout_keys(physical_layout, legend_pack_id=legend_pack_id, slot_overrides=slot_overrides)
+    for key in visible_keys:
+        x1, y1, x2, y2 = key_canvas_bbox(
+            transform=transform,
+            key=key,
+            layout_tweaks=layout_tweaks,
+            per_key_layout_tweaks=per_key_layout_tweaks,
+            image_size=BASE_IMAGE_SIZE,
+        )
+        mapped = keymap_cells_for(
+            keymap,
+            key.key_id,
+            slot_id=str(getattr(key, "slot_id", None) or key.key_id),
+            physical_layout=physical_layout,
+        )
+        key_slot_id = str(getattr(key, "slot_id", None) or key.key_id)
+        selected_identity = str(selected_slot_id or selected_key_id or "")
+        style = key_draw_style(mapped=bool(mapped), selected=selected_identity == key_slot_id)
+
+        canvas.create_rectangle(
+            x1,
+            y1,
+            x2,
+            y2,
+            outline=style.outline,
+            width=style.width,
+            fill=style.fill,
+            stipple=style.stipple,
+            dash=style.dash,
+            tags=(f"pkey_{key.key_id}", "pkey"),
+        )
+
+        label, font_size = _fit_key_label(key.label, key_w=max(1, int(x2 - x1)), key_h=max(1, int(y2 - y1)))
+        canvas.create_text(
+            (x1 + x2) / 2,
+            (y1 + y2) / 2,
+            text=label,
+            fill=style.text_fill,
+            font=("TkDefaultFont", font_size),
+            tags=(f"pkey_{key.key_id}", "pkey"),
+        )
+
+    return transform, deck_tk
+
+
+def _fit_key_label(label: str, *, key_w: int, key_h: int) -> tuple[str, int]:
+    font_size = max(7, min(11, int(min(key_w, key_h) * 0.30)))
+    max_text_w = max(1, key_w - 6)
+    fitted_label = label
+
+    try:
+        font_obj = tkfont.Font(font=("TkDefaultFont", font_size))
+        while font_size > 6 and font_obj.measure(fitted_label) > max_text_w:
+            font_size -= 1
+            font_obj.configure(size=font_size)
+        if font_obj.measure(fitted_label) > max_text_w:
+            ellipsis = "…"
+            if font_obj.measure(ellipsis) <= max_text_w:
+                trimmed = fitted_label
+                while trimmed and font_obj.measure(trimmed + ellipsis) > max_text_w:
+                    trimmed = trimmed[:-1]
+                fitted_label = (trimmed + ellipsis) if trimmed else ellipsis
+    except _LABEL_FIT_ERRORS:
+        pass
+
+    return fitted_label, font_size

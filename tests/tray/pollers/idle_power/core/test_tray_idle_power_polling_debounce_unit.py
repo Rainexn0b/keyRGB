@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import src.tray.pollers.idle_power.polling as ipp
+import keyrgb.tray.pollers.idle_power.polling as ipp
 
 
 def test_debounce_dimmed_requires_two_true_polls():

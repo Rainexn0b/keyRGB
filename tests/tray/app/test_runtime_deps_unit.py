@@ -1,6 +1,6 @@
 from types import ModuleType
 
-from src.tray.app import _runtime_deps
+from keyrgb.tray.app import _runtime_deps
 
 
 def test_lazy_module_ref_imports_once_and_forwards_attributes(monkeypatch):

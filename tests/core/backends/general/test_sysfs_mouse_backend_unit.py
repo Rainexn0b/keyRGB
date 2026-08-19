@@ -9,7 +9,7 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.backends.sysfs_mouse.backend import SysfsMouseBackend
+from keyrgb.core.backends.sysfs_mouse.backend import SysfsMouseBackend
 
 
 def _make_led(tmp_path: Path, name: str, *, brightness: int, max_brightness: int) -> Path:
@@ -185,7 +185,7 @@ def test_sysfs_mouse_backend_probe_uses_helper_when_not_writable(
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(os, "access", lambda path, mode: mode == os.R_OK)
 
-    import src.core.backends.sysfs.privileged as sysfs_privileged
+    import keyrgb.core.backends.sysfs.privileged as sysfs_privileged
 
     monkeypatch.setattr(sysfs_privileged, "helper_can_apply_led", lambda _led, color_kind=None: True)
     monkeypatch.setattr(sysfs_privileged, "helper_supports_led_apply", lambda: True)

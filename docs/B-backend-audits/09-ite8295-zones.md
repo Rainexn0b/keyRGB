@@ -1,7 +1,7 @@
 # Audit: `ite8295_zones` — Lenovo 4-zone keyboard (ITE 8295)
 
 **Audit date:** 2026-07-04  
-**Backend source:** `src/core/backends/ite8295_zones/` (4 files, ~620 LOC)  
+**Backend source:** `keyrgb/core/backends/ite8295_zones/` (4 files, ~620 LOC)  
 **Test file:** `tests/core/backends/ite/test_ite8295_zones_backend_unit.py` (20 tests)  
 **Stability:** `EXPERIMENTAL`  
 **Evidence level:** `REVERSE_ENGINEERED`  

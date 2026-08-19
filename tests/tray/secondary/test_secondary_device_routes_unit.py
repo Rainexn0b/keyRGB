@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.secondary_device_routes import (
+from keyrgb.core.secondary_device_routes import (
     BRIGHTNESS_POLICIES,
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,

@@ -7,12 +7,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.core.secondary_device_routes import (
+from keyrgb.core.secondary_device_routes import (
     SecondaryDeviceRoute,
     iter_secondary_routes,
     route_for_device_type,
 )
-from src.core.secondary_device_runtime import (
+from keyrgb.core.secondary_device_runtime import (
     SIMULATION_ENVIRONMENT_VARIABLE,
     acquire_secondary_device,
     backend_for_secondary_route,

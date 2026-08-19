@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.gui.widgets.color_wheel._color_wheel_ui as color_wheel_ui
-from src.gui.widgets.color_wheel._color_wheel_ui import _ColorWheelUIMixin
+import keyrgb.gui.widgets.color_wheel._color_wheel_ui as color_wheel_ui
+from keyrgb.gui.widgets.color_wheel._color_wheel_ui import _ColorWheelUIMixin
 
 
 class _FakeCanvas:

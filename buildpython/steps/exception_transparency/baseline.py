@@ -34,7 +34,7 @@ def should_exclude(path: Path, root: Path) -> bool:
 
 
 def iter_python_files(root: Path) -> Iterable[Path]:
-    for folder in [root / "src", root / "buildpython"]:
+    for folder in [root / "keyrgb", root / "buildpython"]:
         if not folder.exists():
             continue
         for path in folder.rglob("*.py"):

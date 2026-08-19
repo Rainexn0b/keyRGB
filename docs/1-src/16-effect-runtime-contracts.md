@@ -11,7 +11,7 @@ mutated module globals, and exception message text are not contracts.
 
 ## Engine support contract
 
-`src/core/effects/engine_support/_contracts.py` defines the state and operations
+`keyrgb/core/effects/engine_support/_contracts.py` defines the state and operations
 shared by `_EngineCore`, `_EngineBrightness`, and `_EngineStart`.
 `EffectsEngine` validates this contract at construction, so a missing mixin
 dependency fails immediately with its member name rather than during a later
@@ -22,7 +22,7 @@ The public `EffectsEngine` methods and mixin composition remain stable.
 
 ## Reactive loop dependency contract
 
-`ReactiveApiFacade` in `src/core/effects/reactive/_effects_api.py` is a frozen,
+`ReactiveApiFacade` in `keyrgb/core/effects/reactive/_effects_api.py` is a frozen,
 slot-backed dependency object. `effects.py` constructs concrete fade and ripple
 facades and passes them directly to the loop functions.
 
@@ -37,7 +37,7 @@ dependencies relevant to the test.
 
 ## Hardware-effect builder contract
 
-`src/core/backends/effect_contract.py` owns hardware payload builder metadata:
+`keyrgb/core/backends/effect_contract.py` owns hardware payload builder metadata:
 
 - `HardwareEffectBuilder.accepted_kwargs` declares supported payload fields;
 - `UnsupportedHardwareEffectArgument` carries the rejected field as structured

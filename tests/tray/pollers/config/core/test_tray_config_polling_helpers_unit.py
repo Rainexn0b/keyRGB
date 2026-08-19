@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from src.tray.pollers.config_polling_internal import helpers
+from keyrgb.tray.pollers.config_polling_internal import helpers
 
 
 def _mk_tray() -> SimpleNamespace:

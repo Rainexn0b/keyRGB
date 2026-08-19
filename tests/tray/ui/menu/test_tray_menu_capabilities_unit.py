@@ -10,12 +10,12 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.secondary_device_routes import (
+from keyrgb.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,
     SecondaryDeviceRoute,
 )
-from src.tray.ui import menu as tray_menu
+from keyrgb.tray.ui import menu as tray_menu
 
 
 class FakeMenu:
@@ -590,7 +590,7 @@ def test_menu_includes_active_mode_indicator_between_off_and_quit(
 def test_tray_active_indicator_shows_perkey_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.profile import profiles as core_profiles
+    from keyrgb.core.profile import profiles as core_profiles
 
     monkeypatch.setattr(core_profiles, "get_active_profile", lambda: "default")
 
@@ -609,7 +609,7 @@ def test_tray_active_indicator_shows_perkey_profile(
 def test_tray_active_indicator_falls_back_to_unknown_when_profile_lookup_raises(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.profile import profiles as core_profiles
+    from keyrgb.core.profile import profiles as core_profiles
 
     monkeypatch.setattr(core_profiles, "get_active_profile", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
 
@@ -626,7 +626,7 @@ def test_tray_active_indicator_falls_back_to_unknown_when_profile_lookup_raises(
 
 
 def test_system_power_mode_menu_returns_none_when_status_snapshot_is_missing() -> None:
-    from src.tray.ui import menu_sections
+    from keyrgb.tray.ui import menu_sections
 
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
 
@@ -658,7 +658,7 @@ def test_menu_includes_system_power_item_when_builder_returns_menu(
 
 
 def test_system_power_menu_contains_power_mode_settings_entry() -> None:
-    from src.tray.ui import menu_sections
+    from keyrgb.tray.ui import menu_sections
 
     tray = DummyTray(DummyCaps(per_key=False, hardware_effects=False))
     tray.system_power_status = type(
@@ -676,8 +676,8 @@ def test_system_power_menu_contains_power_mode_settings_entry() -> None:
 def test_perkey_profiles_menu_falls_back_to_editor_when_profile_listing_raises_runtime_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.profile import profiles as core_profiles
-    from src.tray.ui import menu_sections
+    from keyrgb.core.profile import profiles as core_profiles
+    from keyrgb.tray.ui import menu_sections
 
     monkeypatch.setattr(core_profiles, "list_profiles", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
 

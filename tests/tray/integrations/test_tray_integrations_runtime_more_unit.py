@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.tray.integrations import runtime
+from keyrgb.tray.integrations import runtime
 
 
 @pytest.fixture(autouse=True)

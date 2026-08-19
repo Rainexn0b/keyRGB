@@ -6,8 +6,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.tray.controllers._power._transition_constants import DEFAULT_IDLE_FADE_DURATION_S
-from src.tray.pollers.idle_power.polling import _apply_idle_action
+from keyrgb.tray.controllers._power._transition_constants import DEFAULT_IDLE_FADE_DURATION_S
+from keyrgb.tray.pollers.idle_power.polling import _apply_idle_action
 
 
 def _mk_tray(*, effect: str = "rainbow_wave", brightness: int = 25) -> MagicMock:
@@ -55,7 +55,7 @@ def test_turn_off_uses_soft_fade_for_reactive_per_key_effects() -> None:
 def test_turn_off_records_idle_turn_off_timestamp(monkeypatch: pytest.MonkeyPatch) -> None:
     tray = _mk_tray(effect="wave", brightness=25)
 
-    monkeypatch.setattr("src.tray.pollers.idle_power._action_execution.time.monotonic", lambda: 123.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._action_execution.time.monotonic", lambda: 123.0)
 
     _apply_idle_action(tray, action="turn_off", dim_temp_brightness=5)
 
@@ -75,7 +75,7 @@ def test_turn_off_keeps_soft_fade_for_reactive_uniform_backend() -> None:
 
 
 def test_turn_off_logs_recoverable_stop_failure_and_continues(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.tray.pollers.idle_power._actions as actions_module
+    import keyrgb.tray.pollers.idle_power._actions as actions_module
 
     logs: list[tuple[str, str, BaseException | None]] = []
 
@@ -146,7 +146,7 @@ def test_dim_to_temp_uses_hw_write_only_for_non_software_effects(effect: str, ex
 
 
 def test_dim_to_temp_uses_legacy_brightness_signature_without_logging(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.tray.pollers.idle_power._actions as actions_module
+    import keyrgb.tray.pollers.idle_power._actions as actions_module
 
     logs: list[tuple[str, str, BaseException | None]] = []
 
@@ -172,7 +172,7 @@ def test_dim_to_temp_uses_legacy_brightness_signature_without_logging(monkeypatc
 
 
 def test_dim_to_temp_logs_recoverable_brightness_write_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.tray.pollers.idle_power._actions as actions_module
+    import keyrgb.tray.pollers.idle_power._actions as actions_module
 
     logs: list[tuple[str, str, BaseException | None]] = []
 
@@ -201,7 +201,7 @@ def test_dim_to_temp_logs_recoverable_brightness_write_failure(monkeypatch: pyte
 
 
 def test_dim_to_temp_logs_effect_name_failure_and_falls_back_to_none(monkeypatch: pytest.MonkeyPatch) -> None:
-    import src.tray.pollers.idle_power._actions as actions_module
+    import keyrgb.tray.pollers.idle_power._actions as actions_module
 
     logs: list[tuple[str, str, BaseException | None]] = []
 
@@ -293,14 +293,14 @@ def test_restore_brightness_for_reactive_effect_restores_perkey_brightness() -> 
 def test_restore_brightness_for_reactive_effect_seeds_longer_visual_damp_window(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    from src.core.effects.reactive import _render_brightness_support as reactive_support
+    from keyrgb.core.effects.reactive import _render_brightness_support as reactive_support
 
     tray = _mk_tray(effect="reactive_ripple", brightness=30)
     tray.config.perkey_brightness = 55
     tray._dim_temp_active = True
     tray._dim_temp_target_brightness = 5
 
-    monkeypatch.setattr("src.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
+    monkeypatch.setattr("keyrgb.tray.pollers.idle_power._transition_actions.time.monotonic", lambda: 100.0)
 
     _apply_idle_action(tray, action="restore_brightness", dim_temp_brightness=5)
 
@@ -331,8 +331,8 @@ def test_restore_brightness_does_nothing_if_tray_is_off() -> None:
 def test_restore_does_not_restore_when_user_forced_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import src.tray.pollers.idle_power.polling as module
-    from src.tray.idle_power_state import set_idle_power_state_field
+    import keyrgb.tray.pollers.idle_power.polling as module
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
 
     tray = _mk_tray(effect="wave", brightness=25)
     set_idle_power_state_field(tray, attr_name="_user_forced_off", state_name="user_forced_off", value=True)
@@ -348,8 +348,8 @@ def test_restore_does_not_restore_when_user_forced_off(
 def test_restore_does_not_restore_when_owner_user_forced_off_and_legacy_missing(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import src.tray.pollers.idle_power.polling as module
-    from src.tray.idle_power_state import TrayIdlePowerState
+    import keyrgb.tray.pollers.idle_power.polling as module
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = SimpleNamespace(
         engine=MagicMock(),
@@ -380,7 +380,7 @@ def test_restore_does_not_restore_when_owner_user_forced_off_and_legacy_missing(
 def test_restore_does_restore_when_not_forced_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import src.tray.pollers.idle_power.polling as module
+    import keyrgb.tray.pollers.idle_power.polling as module
 
     tray = _mk_tray(effect="wave", brightness=25)
 
@@ -393,7 +393,7 @@ def test_restore_does_restore_when_not_forced_off(
 
 
 def test_dim_to_temp_skips_when_owner_state_matches_and_legacy_values_are_invalid() -> None:
-    from src.tray.idle_power_state import TrayIdlePowerState
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
 
     tray = SimpleNamespace(
         engine=MagicMock(),
@@ -455,7 +455,7 @@ class _StrictEngine:
 
 
 def test_dim_sync_reactive_lock_in_no_flashy_side_effects() -> None:
-    from src.core.effects.reactive._render_brightness_support import ensure_reactive_state
+    from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     engine = _StrictEngine()
@@ -556,7 +556,7 @@ class _OrderingEngine:
 
 
 def test_dim_sync_reactive_ordering_under_lock() -> None:
-    from src.tray.idle_power_state import set_idle_power_state_field
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
     from tests.tray.fakes import make_owner_backed_simple_tray
 
     engine = _OrderingEngine()

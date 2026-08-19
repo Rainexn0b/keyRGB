@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 from types import SimpleNamespace
 
-from src.core.secondary_device_routes import (
+from keyrgb.core.secondary_device_routes import (
     BRIGHTNESS_POLICY_INDEPENDENT,
     BRIGHTNESS_POLICY_PRIMARY_SHARED,
     SecondaryDeviceRoute,
 )
-from src.core.secondary_device_runtime import EffectiveSecondaryRoute
-from src.tray.controllers.secondary_static_scene import (
+from keyrgb.core.secondary_device_runtime import EffectiveSecondaryRoute
+from keyrgb.tray.controllers.secondary_static_scene import (
     apply_secondary_static_route,
     apply_secondary_static_scene,
     authoritative_payload_from_config,
@@ -85,7 +85,7 @@ def test_partial_legacy_secondary_config_mirror_is_not_an_explicit_off_scene() -
 
 
 def test_complete_profile_mirror_builds_authoritative_payload() -> None:
-    from src.core.secondary_device_routes import iter_secondary_routes
+    from keyrgb.core.secondary_device_routes import iter_secondary_routes
 
     areas = {
         route.state_key: {
@@ -113,8 +113,8 @@ def test_unknown_route_entries_do_not_satisfy_known_route_completeness() -> None
 
 
 def test_simulated_new_registered_route_makes_old_mirror_non_authoritative(monkeypatch) -> None:
-    from src.core import secondary_device_routes as routes_mod
-    from src.tray.controllers import secondary_static_scene as scene
+    from keyrgb.core import secondary_device_routes as routes_mod
+    from keyrgb.tray.controllers import secondary_static_scene as scene
 
     old_routes = routes_mod.iter_secondary_routes()
     areas = {
@@ -202,7 +202,7 @@ def test_static_scene_route_failure_logs_traceback(caplog) -> None:
         def close(self) -> None:
             return None
 
-    with caplog.at_level(logging.WARNING, logger="src.tray.controllers.secondary_static_scene"):
+    with caplog.at_level(logging.WARNING, logger="keyrgb.tray.controllers.secondary_static_scene"):
         assert (
             apply_secondary_static_scene(
                 tray,
@@ -477,8 +477,8 @@ def test_global_profile_area_turn_off_covers_legacy_scene_without_payload() -> N
 
 
 def test_animated_secondary_targets_follow_active_profile_enabled_routes(monkeypatch) -> None:
-    from src.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
-    from src.tray.controllers.software_target_controller import secondary_software_render_targets
+    from keyrgb.core.secondary_device_runtime import SIMULATION_ENVIRONMENT_VARIABLE
+    from keyrgb.tray.controllers.software_target_controller import secondary_software_render_targets
 
     monkeypatch.setenv(SIMULATION_ENVIRONMENT_VARIABLE, "1")
     tray = SimpleNamespace(

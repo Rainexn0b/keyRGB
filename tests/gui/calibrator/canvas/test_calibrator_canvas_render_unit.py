@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from src.gui.calibrator.helpers import canvas_render
+from keyrgb.gui.calibrator.helpers import canvas_render
 
 
 class _FakeCanvas:

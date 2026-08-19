@@ -71,12 +71,12 @@ def _mk_engine(
 # ---------------------------------------------------------------------------
 
 
-from src.core.effects.reactive._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
+from keyrgb.core.effects.reactive._constants import MAX_BRIGHTNESS_STEP_PER_FRAME
 
 
 def test_guard_clamps_large_upward_jump() -> None:
     """Brightness jump > MAX_BRIGHTNESS_STEP_PER_FRAME is clamped."""
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=50, last_rendered=3)
     _, _, hw = _resolve_brightness(engine)
@@ -85,7 +85,7 @@ def test_guard_clamps_large_upward_jump() -> None:
 
 def test_guard_clamps_large_downward_jump() -> None:
     """Brightness drop > MAX_BRIGHTNESS_STEP_PER_FRAME is clamped."""
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=3, per_key_brightness=3, reactive_brightness=3, last_rendered=50)
     _, _, hw = _resolve_brightness(engine)
@@ -94,7 +94,7 @@ def test_guard_clamps_large_downward_jump() -> None:
 
 def test_guard_allows_small_change() -> None:
     """Changes within MAX_BRIGHTNESS_STEP_PER_FRAME are not clamped."""
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=45, last_rendered=50)
     _, _, hw = _resolve_brightness(engine)
@@ -106,7 +106,7 @@ def test_guard_ramps_from_zero_on_first_frame_after_restart() -> None:
     """After stop() resets _last_rendered_brightness to None, the guard treats
     None as 0 so the first rendered frame ramps up from dark instead of
     jumping straight to target brightness."""
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=50, last_rendered=None)
     _, _, hw = _resolve_brightness(engine)
@@ -116,7 +116,7 @@ def test_guard_ramps_from_zero_on_first_frame_after_restart() -> None:
 
 def test_guard_converges_over_multiple_frames() -> None:
     """Repeated frames should ramp brightness toward the target."""
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(brightness=50, last_rendered=3)
     frames = []
@@ -134,7 +134,7 @@ def test_guard_converges_over_multiple_frames() -> None:
 
 def test_guard_works_with_dim_temp_cap() -> None:
     """Guard still respects policy cap during ramp."""
-    from src.core.effects.reactive.render import _resolve_brightness
+    from keyrgb.core.effects.reactive.render import _resolve_brightness
 
     engine = _mk_engine(
         brightness=3,
@@ -158,7 +158,7 @@ def test_guard_works_with_dim_temp_cap() -> None:
 
 def test_transition_cap_ramps_reactive_restore(monkeypatch) -> None:
     """A reactive restore transition should cap brightness to the interpolated value."""
-    import src.core.effects.reactive.render as render_module
+    import keyrgb.core.effects.reactive.render as render_module
 
     engine = _mk_engine(brightness=25, per_key_brightness=25, reactive_brightness=50, last_rendered=3)
     engine._reactive_transition_from_brightness = 3
@@ -184,7 +184,7 @@ def test_transition_cap_ramps_reactive_dim(monkeypatch) -> None:
     the transition + dim_temp_active path with no cap: hw tracks the
     transition value (14 at 50%) instead of being clamped to the dim target.
     """
-    import src.core.effects.reactive.render as render_module
+    import keyrgb.core.effects.reactive.render as render_module
 
     engine = _mk_engine(
         brightness=3,
@@ -223,7 +223,7 @@ def test_render_updates_last_rendered_brightness() -> None:
     When starting from None (post-stop), the guard ramps from 0 so the first
     frame value is MAX_BRIGHTNESS_STEP_PER_FRAME, not the raw target.
     """
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     engine = _mk_engine(brightness=25, last_rendered=None)
     color_map = {(0, 0): (255, 255, 255)}
@@ -236,7 +236,7 @@ def test_render_updates_last_rendered_brightness() -> None:
 
 def test_render_ramps_brightness_over_multiple_frames() -> None:
     """Simulated dim → restore: brightness should ramp smoothly, not jump."""
-    from src.core.effects.reactive.render import render
+    from keyrgb.core.effects.reactive.render import render
 
     # Start at dim brightness
     engine = _mk_engine(
@@ -287,7 +287,7 @@ def test_render_ramps_brightness_over_multiple_frames() -> None:
 
 def test_dim_temp_active_propagated_to_engine_on_dim() -> None:
     """_set_engine_hw_brightness_cap should set _dim_temp_active on the engine."""
-    from src.tray.pollers.idle_power._actions import _set_engine_hw_brightness_cap
+    from keyrgb.tray.pollers.idle_power._actions import _set_engine_hw_brightness_cap
 
     engine = SimpleNamespace(_hw_brightness_cap=None, _dim_temp_active=False)
 
@@ -298,7 +298,7 @@ def test_dim_temp_active_propagated_to_engine_on_dim() -> None:
 
 def test_dim_temp_active_cleared_on_engine_on_restore() -> None:
     """_set_engine_hw_brightness_cap(None) should clear both cap and flag."""
-    from src.tray.pollers.idle_power._actions import _set_engine_hw_brightness_cap
+    from keyrgb.tray.pollers.idle_power._actions import _set_engine_hw_brightness_cap
 
     engine = SimpleNamespace(_hw_brightness_cap=5, _dim_temp_active=True)
 
@@ -309,8 +309,8 @@ def test_dim_temp_active_cleared_on_engine_on_restore() -> None:
 
 def test_engine_init_has_proper_dim_attributes() -> None:
     """EffectsEngine.__init__ should declare _hw_brightness_cap and _dim_temp_active."""
-    from src.core.effects.engine import EffectsEngine
-    from src.core.effects.reactive._render_brightness_support import ensure_reactive_state
+    from keyrgb.core.effects.engine import EffectsEngine
+    from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
 
     engine = EffectsEngine()
     assert hasattr(engine, "_hw_brightness_cap")

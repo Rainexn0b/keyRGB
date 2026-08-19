@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from src.core.backends.base import BackendStability, ExperimentalEvidence
-from src.core.backends.exceptions import BackendIOError
-from src.core.backends.ite8291_perkey import protocol
-from src.core.backends.ite8291_perkey.backend import (
+from keyrgb.core.backends.base import BackendStability, ExperimentalEvidence
+from keyrgb.core.backends.exceptions import BackendIOError
+from keyrgb.core.backends.ite8291_perkey import protocol
+from keyrgb.core.backends.ite8291_perkey.backend import (
     Ite8291Backend,
     _find_matching_supported_hidraw_device,
     _open_matching_transport,
 )
-from src.core.backends.ite8291_perkey.device import Ite8291KeyboardDevice
+from keyrgb.core.backends.ite8291_perkey.device import Ite8291KeyboardDevice
 
 
 def test_protocol_builds_expected_user_mode_report() -> None:
@@ -145,7 +145,9 @@ def test_backend_probe_reports_unavailable_when_scan_disabled(monkeypatch: pytes
 
 def test_backend_probe_reports_unavailable_when_no_matching_device(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
-    monkeypatch.setattr("src.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: None)
+    monkeypatch.setattr(
+        "keyrgb.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: None
+    )
 
     result = Ite8291Backend().probe()
 
@@ -164,7 +166,7 @@ def test_backend_probe_reports_detected_but_disabled_until_opted_in(monkeypatch:
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.delenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", raising=False)
     monkeypatch.setattr(
-        "src.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
+        "keyrgb.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
     )
 
     result = Ite8291Backend().probe()
@@ -185,7 +187,7 @@ def test_backend_probe_rejects_zone_only_ce00_variant(monkeypatch: pytest.Monkey
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
+        "keyrgb.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
     )
 
     result = Ite8291Backend().probe()
@@ -206,7 +208,7 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
     monkeypatch.delenv("KEYRGB_DISABLE_USB_SCAN", raising=False)
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
+        "keyrgb.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: DummyMatch()
     )
 
     result = Ite8291Backend().probe()
@@ -217,8 +219,10 @@ def test_backend_probe_reports_available_when_opted_in(monkeypatch: pytest.Monke
 
 
 def test_open_matching_transport_raises_when_no_supported_device(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("src.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: None)
-    monkeypatch.setattr("src.core.backends.ite8291_perkey.hidraw.find_matching_hidraw_device", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "keyrgb.core.backends.ite8291_perkey.backend._find_matching_supported_hidraw_device", lambda: None
+    )
+    monkeypatch.setattr("keyrgb.core.backends.ite8291_perkey.hidraw.find_matching_hidraw_device", lambda **kwargs: None)
 
     with pytest.raises(FileNotFoundError, match="No hidraw device found"):
         _open_matching_transport()
@@ -235,7 +239,7 @@ def test_backend_get_device_wraps_permission_error(monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     err = PermissionError("permission denied")
     monkeypatch.setattr(
-        "src.core.backends.ite8291_perkey.backend._open_matching_transport", lambda: (_ for _ in ()).throw(err)
+        "keyrgb.core.backends.ite8291_perkey.backend._open_matching_transport", lambda: (_ for _ in ()).throw(err)
     )
 
     with pytest.raises(PermissionError, match="udev rules"):
@@ -246,7 +250,7 @@ def test_backend_get_device_reraises_non_permission_errors(monkeypatch: pytest.M
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     err = OSError("transport failed")
     monkeypatch.setattr(
-        "src.core.backends.ite8291_perkey.backend._open_matching_transport", lambda: (_ for _ in ()).throw(err)
+        "keyrgb.core.backends.ite8291_perkey.backend._open_matching_transport", lambda: (_ for _ in ()).throw(err)
     )
 
     with pytest.raises(BackendIOError, match="transport failed"):
@@ -256,7 +260,7 @@ def test_backend_get_device_reraises_non_permission_errors(monkeypatch: pytest.M
 def test_backend_get_device_propagates_unexpected_open_errors(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "1")
     monkeypatch.setattr(
-        "src.core.backends.ite8291_perkey.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8291_perkey.backend._open_matching_transport",
         lambda: (_ for _ in ()).throw(AssertionError("unexpected transport bug")),
     )
 
@@ -285,7 +289,7 @@ def test_backend_get_device_returns_keyboard_device_when_transport_opens(monkeyp
         devnode = Path("/dev/hidraw7")
 
     monkeypatch.setattr(
-        "src.core.backends.ite8291_perkey.backend._open_matching_transport",
+        "keyrgb.core.backends.ite8291_perkey.backend._open_matching_transport",
         lambda: (DummyTransport(), DummyInfo()),
     )
 

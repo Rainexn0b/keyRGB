@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from src.core.resources.layouts import (
+from keyrgb.core.resources.layouts import (
     LAYOUT_CATALOG,
     LayoutDef,
     clear_layout_cache,
@@ -14,7 +14,7 @@ from src.core.resources.layouts import (
     resolve_layout_id,
     resolve_layout_legend_pack_id,
 )
-from src.core.resources.layouts.catalog import VALID_LAYOUT_IDS, get_layout_def
+from keyrgb.core.resources.layouts.catalog import VALID_LAYOUT_IDS, get_layout_def
 
 # ------------------------------------------------------------------ catalog --
 
@@ -104,14 +104,14 @@ def test_resolve_layout_id_empty_string_defaults() -> None:
 
 def test_resolve_layout_id_auto_inconclusive_defaults_to_ansi() -> None:
     clear_layout_cache()
-    with patch("src.core.resources.layouts.detect.detect_physical_layout", return_value="auto"):
+    with patch("keyrgb.core.resources.layouts.detect.detect_physical_layout", return_value="auto"):
         assert resolve_layout_id("auto") == "ansi"
     clear_layout_cache()
 
 
 def test_resolve_layout_id_auto_uses_detected_concrete_layout() -> None:
     clear_layout_cache()
-    with patch("src.core.resources.layouts.detect.detect_physical_layout", return_value="jis"):
+    with patch("keyrgb.core.resources.layouts.detect.detect_physical_layout", return_value="jis"):
         assert resolve_layout_id("auto") == "jis"
     clear_layout_cache()
 

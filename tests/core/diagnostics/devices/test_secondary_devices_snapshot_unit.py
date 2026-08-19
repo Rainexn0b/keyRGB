@@ -8,7 +8,7 @@ from tests._paths import ensure_repo_root_on_sys_path
 
 ensure_repo_root_on_sys_path()
 
-from src.core.diagnostics import secondary_devices
+from keyrgb.core.diagnostics import secondary_devices
 
 
 class _StubConfig:
@@ -32,7 +32,7 @@ def _patch_config(monkeypatch, config) -> None:
 
 
 def _patch_parent_probe(monkeypatch, *, available: bool, reason: str) -> None:
-    from src.core.backends.ite8258_perkey_chassis.backend import Ite8258ChassisBackend
+    from keyrgb.core.backends.ite8258_perkey_chassis.backend import Ite8258ChassisBackend
 
     monkeypatch.setattr(
         Ite8258ChassisBackend,
@@ -188,14 +188,14 @@ def test_secondary_snapshot_does_not_construct_mutable_config(monkeypatch) -> No
         raise AssertionError("diagnostics must not construct Config")
 
     monkeypatch.setenv("KEYRGB_ENABLE_EXPERIMENTAL_BACKENDS", "0")
-    monkeypatch.setattr("src.core.config.config.Config.__init__", _boom)
+    monkeypatch.setattr("keyrgb.core.config.config.Config.__init__", _boom)
     loaded = {
         "tray_device_context": "keyboard",
         "software_effect_target": "keyboard",
         "secondary_device_state": {},
     }
     monkeypatch.setattr(
-        "src.core.config.file_storage.load_config_settings",
+        "keyrgb.core.config.file_storage.load_config_settings",
         lambda **_kwargs: loaded,
     )
     _patch_parent_probe(monkeypatch, available=False, reason="no matching hidraw device")

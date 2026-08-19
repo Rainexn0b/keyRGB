@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.power.monitoring import lid_monitoring
+from keyrgb.core.power.monitoring import lid_monitoring
 
 
 class _ImmediateThread:

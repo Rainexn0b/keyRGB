@@ -34,7 +34,7 @@ These strings are often useful for heuristics, support triage, and quirk rules.
 - detected auxiliary devices such as a lightbar path
 - secondary-device state: chassis-zone detection, parent-backend availability,
   expected tray device-context rows, software-target state (see
-  `src/core/diagnostics/secondary_devices.py`)
+  `keyrgb/core/diagnostics/secondary_devices.py`)
 
 ### Environment / conflicts
 

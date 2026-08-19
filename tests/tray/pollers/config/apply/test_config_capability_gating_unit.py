@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from src.tray.pollers.config_polling_internal._post_fast_path_apply import apply_post_fast_path_execution
+from keyrgb.tray.pollers.config_polling_internal._post_fast_path_apply import apply_post_fast_path_execution
 
 
 def test_persisted_perkey_config_falls_back_to_uniform_without_capability() -> None:

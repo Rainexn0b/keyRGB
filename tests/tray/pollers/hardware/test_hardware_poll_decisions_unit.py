@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from src.tray.pollers.hardware._decisions import (
+from keyrgb.tray.pollers.hardware._decisions import (
     classify_brightness_change_persist,
     classify_off_state_change_persist,
     hardware_poll_interval_s,
@@ -271,7 +271,7 @@ def test_stable_zero_recovery_circuit_breaker_defaults() -> None:
 
 
 def test_should_defer_poll_for_reactive_pulses() -> None:
-    from src.tray.pollers.hardware._decisions import should_defer_poll_for_reactive_pulses
+    from keyrgb.tray.pollers.hardware._decisions import should_defer_poll_for_reactive_pulses
 
     # No pulse activity -> never defer.
     assert not should_defer_poll_for_reactive_pulses(reactive_pulse_mix=0.0, now=100.0, last_real_poll_at=99.0)

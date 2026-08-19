@@ -13,13 +13,13 @@ right evidence without needing maintainer-only knowledge first.
 
 ## Current owner modules
 
-- `src/gui/windows/support.py`
-- `src/tray/ui/menu.py`
-- `src/core/diagnostics/device_discovery.py`
-- `src/core/diagnostics/secondary_devices.py`
-- `src/core/diagnostics/backend_speed_probe.py`
-- `src/core/diagnostics/support_reports.py`
-- `src/core/diagnostics/additional_evidence.py`
+- `keyrgb/gui/windows/support.py`
+- `keyrgb/tray/ui/menu.py`
+- `keyrgb/core/diagnostics/device_discovery.py`
+- `keyrgb/core/diagnostics/secondary_devices.py`
+- `keyrgb/core/diagnostics/backend_speed_probe.py`
+- `keyrgb/core/diagnostics/support_reports.py`
+- `keyrgb/core/diagnostics/additional_evidence.py`
 
 ## Current flow
 
@@ -53,7 +53,7 @@ not in hidden debug-only code paths.
 5. Secondary-device state must be self-describing.
 
 The discovery payload carries a `secondary_devices` section (see
-`src/core/diagnostics/secondary_devices.py`) that reports, read-only, whether
+`keyrgb/core/diagnostics/secondary_devices.py`) that reports, read-only, whether
 auxiliary lighting devices and composite chassis zones (e.g. Legion Gen10
 logo/neon/vent) are detected, whether their parent backend probe is available
 (and the reason when it is not), which tray device-context rows would render,

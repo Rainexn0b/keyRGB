@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.core.diagnostics.model import Diagnostics, DiagnosticsConfigSnapshot
+from keyrgb.core.diagnostics.model import Diagnostics, DiagnosticsConfigSnapshot
 
 
 def test_diagnostics_dict_fields_are_readonly_through_snapshot() -> None:

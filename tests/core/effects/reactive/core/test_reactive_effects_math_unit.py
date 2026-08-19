@@ -13,27 +13,27 @@ from types import SimpleNamespace
 
 class TestRippleWeight:
     def test_weight_is_zero_far_from_ring(self):
-        from src.core.effects.reactive.effects import _ripple_weight
+        from keyrgb.core.effects.reactive.effects import _ripple_weight
 
         w = _ripple_weight(d=10, radius=2.0, intensity=1.0, band=1.35)
         assert w == 0.0
 
     def test_weight_is_positive_on_ring(self):
-        from src.core.effects.reactive.effects import _ripple_weight
+        from keyrgb.core.effects.reactive.effects import _ripple_weight
 
         w = _ripple_weight(d=3, radius=3.0, intensity=0.8, band=1.35)
         assert w > 0.0
 
 
 def test_reactive_clamp_preserves_nan_instead_of_promoting_to_full_scale() -> None:
-    from src.core.effects.reactive.render import clamp01
+    from keyrgb.core.effects.reactive.render import clamp01
 
     assert math.isnan(clamp01(float("nan")))
 
 
 class TestRippleRadius:
     def test_radius_interpolates(self):
-        from src.core.effects.reactive.effects import _ripple_radius
+        from keyrgb.core.effects.reactive.effects import _ripple_radius
 
         assert _ripple_radius(age_s=0.0, ttl_s=1.0, min_radius=0.0, max_radius=8.0) == 0.0
         assert _ripple_radius(age_s=1.0, ttl_s=1.0, min_radius=0.0, max_radius=8.0) == 8.0
@@ -42,8 +42,8 @@ class TestRippleRadius:
 
 
 def test_set_reactive_active_pulse_mix_logs_traceback_when_cache_write_fails(caplog) -> None:
-    from src.core.effects.reactive import effects
-    from src.core.effects.reactive._render_brightness_support import ReactiveRenderState
+    from keyrgb.core.effects.reactive import effects
+    from keyrgb.core.effects.reactive._render_brightness_support import ReactiveRenderState
 
     # Create an engine with a ReactiveRenderState whose _reactive_active_pulse_mix
     # field is explicitly set. Since _set_reactive_active_pulse_mix now writes
@@ -60,8 +60,8 @@ def test_set_reactive_active_pulse_mix_logs_traceback_when_cache_write_fails(cap
 
 
 def test_set_reactive_active_pulse_mix_ramps_up_instead_of_single_frame_jump() -> None:
-    from src.core.effects.reactive import effects
-    from src.core.effects.reactive._render_brightness_support import ensure_reactive_state
+    from keyrgb.core.effects.reactive import effects
+    from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
 
     engine = SimpleNamespace(_reactive_state=None)
     state = ensure_reactive_state(engine)
@@ -77,8 +77,8 @@ def test_set_reactive_active_pulse_mix_ramps_up_instead_of_single_frame_jump() -
 
 
 def test_set_reactive_active_pulse_mix_preserves_tail_decay_on_drop_to_zero() -> None:
-    from src.core.effects.reactive import effects
-    from src.core.effects.reactive._render_brightness_support import ensure_reactive_state
+    from keyrgb.core.effects.reactive import effects
+    from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
 
     engine = SimpleNamespace(_reactive_state=None)
     state = ensure_reactive_state(engine)
@@ -90,8 +90,8 @@ def test_set_reactive_active_pulse_mix_preserves_tail_decay_on_drop_to_zero() ->
 
 
 def test_set_reactive_active_pulse_mix_sets_first_activity_lift_holdoff() -> None:
-    from src.core.effects.reactive import effects
-    from src.core.effects.reactive._render_brightness_support import ensure_reactive_state
+    from keyrgb.core.effects.reactive import effects
+    from keyrgb.core.effects.reactive._render_brightness_support import ensure_reactive_state
 
     engine = SimpleNamespace(_reactive_state=None)
     state = ensure_reactive_state(engine)
@@ -107,8 +107,8 @@ def test_set_reactive_active_pulse_mix_sets_first_activity_lift_holdoff() -> Non
 def test_set_reactive_active_pulse_mix_refreshes_restore_visual_damp_on_first_pulse(
     monkeypatch,
 ) -> None:
-    from src.core.effects.reactive import effects
-    from src.core.effects.reactive._render_brightness_support import (
+    from keyrgb.core.effects.reactive import effects
+    from keyrgb.core.effects.reactive._render_brightness_support import (
         ReactiveRestorePhase,
         ensure_reactive_state,
     )
@@ -130,7 +130,7 @@ def test_set_reactive_active_pulse_mix_refreshes_restore_visual_damp_on_first_pu
 def test_fade_loop_per_key_backdrop_applies_pulse_scale_to_mix_weight() -> None:
     """Fade loop per-key backdrop path: pulse_scale controls mix weight so the reactive
     brightness slider remains effective even when the boost color is black or white."""
-    from src.core.effects.reactive._ripple_helpers import build_ripple_color_map_into
+    from keyrgb.core.effects.reactive._ripple_helpers import build_ripple_color_map_into
 
     # All-white backdrop: contrasting highlight is black; scale(black, x) == black.
     # Mix-weight path must still produce a visible gradient.
@@ -167,7 +167,7 @@ def test_global_hue_formula_is_fixed_rate_not_pace_coupled() -> None:
     import ast
     import inspect
 
-    from src.core.effects.reactive import _ripple_loop
+    from keyrgb.core.effects.reactive import _ripple_loop
 
     source = inspect.getsource(_ripple_loop.run_reactive_ripple_loop)
     tree = ast.parse(source)

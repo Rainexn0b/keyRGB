@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from src.core.power.management._manager_power_events import (
+from keyrgb.core.power.management._manager_power_events import (
     PowerEventExecutionPlan,
     build_power_event_execution_plan,
     build_power_event_inputs,

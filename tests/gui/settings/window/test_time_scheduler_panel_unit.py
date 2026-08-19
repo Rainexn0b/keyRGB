@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.gui.settings.panels import time_scheduler_panel
+from keyrgb.gui.settings.panels import time_scheduler_panel
 
 
 class _FakeWidget:

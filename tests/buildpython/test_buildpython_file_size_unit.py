@@ -152,14 +152,14 @@ def _write_small_thin_facade(path: Path) -> None:
 
 
 def test_file_size_runner_reports_bucketed_sizes_import_blocks_and_flat_directories(tmp_path, monkeypatch) -> None:
-    _write_python_file(tmp_path / "src" / "refactor.py", total_lines=360, import_lines=22)
+    _write_python_file(tmp_path / "keyrgb" / "refactor.py", total_lines=360, import_lines=22)
     _write_python_file(tmp_path / "buildpython" / "critical.py", total_lines=420, import_lines=30)
-    _write_python_file(tmp_path / "src" / "severe.py", total_lines=520, import_lines=40)
-    _write_python_file(tmp_path / "src" / "extreme.py", total_lines=620, import_lines=0)
-    _write_delegation_candidate(tmp_path / "src" / "delegation_candidate.py")
+    _write_python_file(tmp_path / "keyrgb" / "severe.py", total_lines=520, import_lines=40)
+    _write_python_file(tmp_path / "keyrgb" / "extreme.py", total_lines=620, import_lines=0)
+    _write_delegation_candidate(tmp_path / "keyrgb" / "delegation_candidate.py")
 
     for index in range(9):
-        _write_small_python_file(tmp_path / "src" / "flat" / f"module_{index}.py")
+        _write_small_python_file(tmp_path / "keyrgb" / "flat" / f"module_{index}.py")
     for index in range(10):
         _write_small_python_file(tmp_path / "tests" / "flat" / f"test_case_{index}.py")
 
@@ -191,15 +191,15 @@ def test_file_size_runner_reports_bucketed_sizes_import_blocks_and_flat_director
     assert payload["counts"]["flat_directories"] == 2
     assert payload["counts"].get("flat_directories_allowed", 0) == 0
     assert payload["counts"]["delegation_candidates"] == 1
-    assert payload["files"][0]["path"] == "src/extreme.py"
+    assert payload["files"][0]["path"] == "keyrgb/extreme.py"
     assert payload["files"][0]["bucket"] == "EXTREME"
-    assert payload["import_blocks"][0]["path"] == "src/severe.py"
+    assert payload["import_blocks"][0]["path"] == "keyrgb/severe.py"
     assert payload["import_blocks"][0]["level"] == "SEVERE"
-    assert [item["path"] for item in payload["flat_directories"]] == ["tests/flat", "src/flat"]
+    assert [item["path"] for item in payload["flat_directories"]] == ["tests/flat", "keyrgb/flat"]
     # Both directories have 0 subdirs so density equals file count — ordering preserved.
     assert payload["flat_directories"][0]["flatness_density"] == 10.0
     assert payload["flat_directories"][1]["flatness_density"] == 9.0
-    assert payload["delegation_candidates"][0]["path"] == "src/delegation_candidate.py"
+    assert payload["delegation_candidates"][0]["path"] == "keyrgb/delegation_candidate.py"
     assert payload["delegation_candidates"][0]["score"] == 10
 
     markdown = (tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.md").read_text(encoding="utf-8")
@@ -220,12 +220,12 @@ def test_debt_index_includes_file_size_structure_sections(tmp_path) -> None:
                     "flat_directories": 1,
                     "delegation_candidates": 1,
                 },
-                "files": [{"path": "src/demo.py", "lines": 410, "bucket": "CRITICAL"}],
-                "import_blocks": [{"path": "src/demo.py", "lines": 24, "statements": 12, "level": "WARNING"}],
-                "flat_directories": [{"path": "src/demo", "direct_python_files": 6, "subdirectories": 0}],
+                "files": [{"path": "keyrgb/demo.py", "lines": 410, "bucket": "CRITICAL"}],
+                "import_blocks": [{"path": "keyrgb/demo.py", "lines": 24, "statements": 12, "level": "WARNING"}],
+                "flat_directories": [{"path": "keyrgb/demo", "direct_python_files": 6, "subdirectories": 0}],
                 "delegation_candidates": [
                     {
-                        "path": "src/delegation.py",
+                        "path": "keyrgb/delegation.py",
                         "score": 12,
                         "import_lines": 24,
                         "alias_bindings": 4,
@@ -239,17 +239,17 @@ def test_debt_index_includes_file_size_structure_sections(tmp_path) -> None:
 
     payload = build_debt_index(buildlog_dir)
 
-    assert payload["sections"]["file_size"]["import_blocks"][0]["path"] == "src/demo.py"
-    assert payload["sections"]["file_size"]["flat_directories"][0]["path"] == "src/demo"
-    assert payload["sections"]["file_size"]["delegation_candidates"][0]["path"] == "src/delegation.py"
+    assert payload["sections"]["file_size"]["import_blocks"][0]["path"] == "keyrgb/demo.py"
+    assert payload["sections"]["file_size"]["flat_directories"][0]["path"] == "keyrgb/demo"
+    assert payload["sections"]["file_size"]["delegation_candidates"][0]["path"] == "keyrgb/delegation.py"
 
     write_debt_index(buildlog_dir)
     markdown = (buildlog_dir / "debt-index.md").read_text(encoding="utf-8")
     assert "## File size" in markdown
     assert "- Import blocks: warning=1, critical=0, severe=0" in markdown
-    assert "- Flattest directory: src/demo (6 direct Python files)" in markdown
+    assert "- Flattest directory: keyrgb/demo (6 direct Python files)" in markdown
     assert "- Delegation candidates: 1" in markdown
-    assert "- Top delegation candidate: src/delegation.py (score=12)" in markdown
+    assert "- Top delegation candidate: keyrgb/delegation.py (score=12)" in markdown
 
 
 def test_terminal_debt_snapshot_includes_file_size_highlights(tmp_path) -> None:
@@ -264,12 +264,12 @@ def test_terminal_debt_snapshot_includes_file_size_highlights(tmp_path) -> None:
                     "flat_directories": 2,
                     "delegation_candidates": 1,
                 },
-                "files": [{"path": "src/extreme.py", "lines": 620, "bucket": "EXTREME"}],
-                "import_blocks": [{"path": "src/severe.py", "lines": 40, "statements": 40, "level": "SEVERE"}],
+                "files": [{"path": "keyrgb/extreme.py", "lines": 620, "bucket": "EXTREME"}],
+                "import_blocks": [{"path": "keyrgb/severe.py", "lines": 40, "statements": 40, "level": "SEVERE"}],
                 "flat_directories": [{"path": "tests/flat", "direct_python_files": 7, "subdirectories": 0}],
                 "delegation_candidates": [
                     {
-                        "path": "src/delegation.py",
+                        "path": "keyrgb/delegation.py",
                         "score": 12,
                         "import_lines": 24,
                         "alias_bindings": 4,
@@ -285,10 +285,10 @@ def test_terminal_debt_snapshot_includes_file_size_highlights(tmp_path) -> None:
 
     assert any("refactor 1" in line for line in lines)
     assert any("import-warn 1" in line for line in lines)
-    assert any("Top import" in line and "src/severe.py" in line for line in lines)
+    assert any("Top import" in line and "keyrgb/severe.py" in line for line in lines)
     assert any("Top flat-dir" in line and "tests/flat" in line for line in lines)
     assert any("delegations 1" in line for line in lines)
-    assert any("Top delegation" in line and "src/delegation.py" in line for line in lines)
+    assert any("Top delegation" in line and "keyrgb/delegation.py" in line for line in lines)
 
 
 def test_flat_directory_density_sort_ranks_unsubdivided_before_well_organised(tmp_path, monkeypatch) -> None:
@@ -298,13 +298,13 @@ def test_flat_directory_density_sort_ranks_unsubdivided_before_well_organised(tm
     """
     # Genuinely flat: 10 files, 0 subdirs → density 10.0
     for index in range(10):
-        _write_small_python_file(tmp_path / "src" / "flat_pure" / f"module_{index}.py")
+        _write_small_python_file(tmp_path / "keyrgb" / "flat_pure" / f"module_{index}.py")
 
     # Well-organised: 14 files under a parent that also has 6 subdirs → density 14/7 = 2.0
     for index in range(14):
-        _write_small_python_file(tmp_path / "src" / "organised" / f"module_{index}.py")
+        _write_small_python_file(tmp_path / "keyrgb" / "organised" / f"module_{index}.py")
     for sub in range(6):
-        _write_small_python_file(tmp_path / "src" / "organised" / f"sub_{sub}" / "placeholder.py")
+        _write_small_python_file(tmp_path / "keyrgb" / "organised" / f"sub_{sub}" / "placeholder.py")
 
     monkeypatch.setattr(step_size, "repo_root", lambda: tmp_path)
 
@@ -315,13 +315,13 @@ def test_flat_directory_density_sort_ranks_unsubdivided_before_well_organised(tm
     paths = [item["path"] for item in payload["flat_directories"]]
 
     # flat_pure (density 10.0) must appear before organised (density 2.0)
-    assert "src/flat_pure" in paths
-    assert "src/organised" in paths
-    assert paths.index("src/flat_pure") < paths.index("src/organised")
+    assert "keyrgb/flat_pure" in paths
+    assert "keyrgb/organised" in paths
+    assert paths.index("keyrgb/flat_pure") < paths.index("keyrgb/organised")
 
     densities = {item["path"]: item["flatness_density"] for item in payload["flat_directories"]}
-    assert densities["src/flat_pure"] == 10.0
-    assert densities["src/organised"] == 2.0
+    assert densities["keyrgb/flat_pure"] == 10.0
+    assert densities["keyrgb/organised"] == 2.0
 
 
 def test_load_flat_directory_allowlist_reads_configured_entries(tmp_path) -> None:
@@ -332,8 +332,8 @@ def test_load_flat_directory_allowlist_reads_configured_entries(tmp_path) -> Non
             {
                 "flat_directories": {
                     "allowed": [
-                        {"path": "src/design/primitives", "reason": "design catalogue, intentionally flat"},
-                        {"path": "src/other", "reason": "legacy layout"},
+                        {"path": "keyrgb/design/primitives", "reason": "design catalogue, intentionally flat"},
+                        {"path": "keyrgb/other", "reason": "legacy layout"},
                     ]
                 }
             }
@@ -344,8 +344,8 @@ def test_load_flat_directory_allowlist_reads_configured_entries(tmp_path) -> Non
     allowlist = load_flat_directory_allowlist(tmp_path)
 
     assert allowlist == {
-        "src/design/primitives": "design catalogue, intentionally flat",
-        "src/other": "legacy layout",
+        "keyrgb/design/primitives": "design catalogue, intentionally flat",
+        "keyrgb/other": "legacy layout",
     }
 
 
@@ -360,15 +360,15 @@ def test_repo_flat_directory_allowlist_includes_intentional_package_roots() -> N
     allowlist = load_flat_directory_allowlist(repo_root)
 
     expected_reason_fragments = {
-        "src/core/config": "config package root",
-        "src/core/power/management": "power-management package root",
-        "src/core/profile": "profile package root",
-        "src/gui/perkey/editor_support": "editor support package",
-        "src/gui/perkey/canvas_impl": "canvas implementation package",
-        "src/gui/windows": "window package root",
-        "src/gui/windows/_support": "support-window helper package",
-        "src/tray/app": "tray app package root",
-        "src/tray/pollers/config_polling_internal": "config-polling internal package",
+        "keyrgb/core/config": "config package root",
+        "keyrgb/core/power/management": "power-management package root",
+        "keyrgb/core/profile": "profile package root",
+        "keyrgb/gui/perkey/editor_support": "editor support package",
+        "keyrgb/gui/perkey/canvas_impl": "canvas implementation package",
+        "keyrgb/gui/windows": "window package root",
+        "keyrgb/gui/windows/_support": "support-window helper package",
+        "keyrgb/tray/app": "tray app package root",
+        "keyrgb/tray/pollers/config_polling_internal": "config-polling internal package",
         "tests/core/backends/ite": "backend-variant test set",
         "tests/core/power/manager": "power-manager test root",
         "tests/core/effects/reactive/core": "reactive-effects-core test root",
@@ -387,7 +387,7 @@ def test_repo_flat_directory_allowlist_promotes_tests_buildpython_but_leaves_cal
 
     assert "tests/buildpython" in allowlist
     assert "buildpython validation test root" in allowlist["tests/buildpython"]
-    assert "src/gui/calibrator" not in allowlist
+    assert "keyrgb/gui/calibrator" not in allowlist
 
 
 def test_scan_flat_directories_splits_hits_and_allowed(tmp_path) -> None:
@@ -396,36 +396,36 @@ def test_scan_flat_directories_splits_hits_and_allowed(tmp_path) -> None:
     #   flagged_b  — 9 files, 0 subdirs, NOT in allowlist → hit
     #   exempted   — 9 files, 0 subdirs, IN allowlist    → allowed
     for i in range(9):
-        _write_small_python_file(tmp_path / "src" / "flagged_a" / f"m{i}.py")
-        _write_small_python_file(tmp_path / "src" / "flagged_b" / f"m{i}.py")
-        _write_small_python_file(tmp_path / "src" / "exempted" / f"m{i}.py")
+        _write_small_python_file(tmp_path / "keyrgb" / "flagged_a" / f"m{i}.py")
+        _write_small_python_file(tmp_path / "keyrgb" / "flagged_b" / f"m{i}.py")
+        _write_small_python_file(tmp_path / "keyrgb" / "exempted" / f"m{i}.py")
 
-    allowlist = {"src/exempted": "intentionally flat design catalogue"}
+    allowlist = {"keyrgb/exempted": "intentionally flat design catalogue"}
     hits, allowed = scan_flat_directories(tmp_path, allowlist=allowlist)
 
     hit_paths = {item["path"] for item in hits}
     allowed_paths = {item["path"] for item in allowed}
 
-    assert "src/flagged_a" in hit_paths
-    assert "src/flagged_b" in hit_paths
-    assert "src/exempted" not in hit_paths
-    assert "src/exempted" in allowed_paths
+    assert "keyrgb/flagged_a" in hit_paths
+    assert "keyrgb/flagged_b" in hit_paths
+    assert "keyrgb/exempted" not in hit_paths
+    assert "keyrgb/exempted" in allowed_paths
 
     # The allowed entry must carry the reason string.
-    exempted_entry = next(item for item in allowed if item["path"] == "src/exempted")
+    exempted_entry = next(item for item in allowed if item["path"] == "keyrgb/exempted")
     assert exempted_entry["allowed_reason"] == "intentionally flat design catalogue"
     assert exempted_entry["flatness_density"] == 9.0
 
 
 def test_scan_flat_directories_allowlist_entry_appears_in_json_report(tmp_path, monkeypatch) -> None:
     for i in range(9):
-        _write_small_python_file(tmp_path / "src" / "exempt_dir" / f"m{i}.py")
+        _write_small_python_file(tmp_path / "keyrgb" / "exempt_dir" / f"m{i}.py")
 
     # Inject allowlist via config file.
     config_dir = tmp_path / "buildpython" / "config"
     config_dir.mkdir(parents=True)
     (config_dir / "debt_baselines.json").write_text(
-        json.dumps({"flat_directories": {"allowed": [{"path": "src/exempt_dir", "reason": "test exemption"}]}}),
+        json.dumps({"flat_directories": {"allowed": [{"path": "keyrgb/exempt_dir", "reason": "test exemption"}]}}),
         encoding="utf-8",
     )
 
@@ -436,45 +436,45 @@ def test_scan_flat_directories_allowlist_entry_appears_in_json_report(tmp_path, 
     payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.json").read_text(encoding="utf-8"))
     assert payload["counts"]["flat_directories"] == 0
     assert payload["counts"]["flat_directories_allowed"] == 1
-    assert payload["flat_directories_allowed"][0]["path"] == "src/exempt_dir"
+    assert payload["flat_directories_allowed"][0]["path"] == "keyrgb/exempt_dir"
     assert payload["flat_directories_allowed"][0]["allowed_reason"] == "test exemption"
 
     markdown = (tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.md").read_text(encoding="utf-8")
     assert "## Flat directories suppressed by allowlist" in markdown
     assert "test exemption" in markdown
-    assert "[allowed] src/exempt_dir" in result.stdout
+    assert "[allowed] keyrgb/exempt_dir" in result.stdout
 
 
 def test_scan_import_block_skips_small_pure_export_init_facade(tmp_path) -> None:
-    facade_path = tmp_path / "src" / "package" / "__init__.py"
+    facade_path = tmp_path / "keyrgb" / "package" / "__init__.py"
     _write_export_facade(facade_path)
 
     assert scan_import_block(facade_path) is None
 
 
 def test_scan_import_block_still_flags_non_init_export_facade(tmp_path) -> None:
-    module_path = tmp_path / "src" / "package" / "exports.py"
+    module_path = tmp_path / "keyrgb" / "package" / "exports.py"
     _write_export_facade(module_path)
 
     assert scan_import_block(module_path) == (26, 3)
 
 
 def test_scan_import_block_still_flags_init_facade_with_more_than_three_imports(tmp_path) -> None:
-    facade_path = tmp_path / "src" / "package" / "__init__.py"
+    facade_path = tmp_path / "keyrgb" / "package" / "__init__.py"
     _write_export_facade(facade_path, extra_leading_imports=1)
 
     assert scan_import_block(facade_path) == (27, 4)
 
 
 def test_scan_delegation_candidate_skips_small_low_density_thin_facade(tmp_path) -> None:
-    facade_path = tmp_path / "src" / "facade.py"
+    facade_path = tmp_path / "keyrgb" / "facade.py"
     _write_small_thin_facade(facade_path)
 
     assert scan_delegation_candidate(facade_path) is None
 
 
 def test_scan_delegation_candidate_still_flags_dense_small_delegate_module(tmp_path) -> None:
-    candidate_path = tmp_path / "src" / "delegation_candidate.py"
+    candidate_path = tmp_path / "keyrgb" / "delegation_candidate.py"
     _write_delegation_candidate(candidate_path)
 
     result = scan_delegation_candidate(candidate_path)
@@ -485,26 +485,26 @@ def test_scan_delegation_candidate_still_flags_dense_small_delegate_module(tmp_p
 
 def test_file_size_runner_suppresses_file_level_quality_exception_waivers(tmp_path, monkeypatch) -> None:
     _write_python_file(
-        tmp_path / "src" / "waived_large.py",
+        tmp_path / "keyrgb" / "waived_large.py",
         total_lines=420,
         import_lines=24,
     )
-    waived_large = tmp_path / "src" / "waived_large.py"
+    waived_large = tmp_path / "keyrgb" / "waived_large.py"
     waived_large.write_text(
         "# @quality-exception file-size-analysis: generated compatibility shim module\n"
         + waived_large.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
 
-    _write_delegation_candidate(tmp_path / "src" / "waived_delegation.py")
-    waived_delegation = tmp_path / "src" / "waived_delegation.py"
+    _write_delegation_candidate(tmp_path / "keyrgb" / "waived_delegation.py")
+    waived_delegation = tmp_path / "keyrgb" / "waived_delegation.py"
     waived_delegation.write_text(
         "# @quality-exception file-size-analysis: temporary facade retained for API stability\n"
         + waived_delegation.read_text(encoding="utf-8"),
         encoding="utf-8",
     )
 
-    _write_python_file(tmp_path / "src" / "active_large.py", total_lines=410, import_lines=22)
+    _write_python_file(tmp_path / "keyrgb" / "active_large.py", total_lines=410, import_lines=22)
 
     monkeypatch.setattr(step_size, "repo_root", lambda: tmp_path)
 
@@ -512,8 +512,8 @@ def test_file_size_runner_suppresses_file_level_quality_exception_waivers(tmp_pa
 
     assert result.exit_code == 0
     assert "Quality-exception waivers: 2" in result.stdout
-    assert "[waived] src/waived_large.py" in result.stdout
-    assert "[waived] src/waived_delegation.py" in result.stdout
+    assert "[waived] keyrgb/waived_large.py" in result.stdout
+    assert "[waived] keyrgb/waived_delegation.py" in result.stdout
 
     payload = json.loads((tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.json").read_text(encoding="utf-8"))
 
@@ -521,13 +521,13 @@ def test_file_size_runner_suppresses_file_level_quality_exception_waivers(tmp_pa
     assert payload["waivers"]["step_slug"] == "file-size-analysis"
     assert payload["waivers"]["files_total"] == 2
     waived_paths = {item["path"] for item in payload["waivers"]["files"]}
-    assert waived_paths == {"src/waived_large.py", "src/waived_delegation.py"}
+    assert waived_paths == {"keyrgb/waived_large.py", "keyrgb/waived_delegation.py"}
 
-    assert all(item["path"] != "src/waived_large.py" for item in payload["files"])
-    assert all(item["path"] != "src/waived_large.py" for item in payload["import_blocks"])
-    assert all(item["path"] != "src/waived_delegation.py" for item in payload["delegation_candidates"])
-    assert any(item["path"] == "src/active_large.py" for item in payload["files"])
+    assert all(item["path"] != "keyrgb/waived_large.py" for item in payload["files"])
+    assert all(item["path"] != "keyrgb/waived_large.py" for item in payload["import_blocks"])
+    assert all(item["path"] != "keyrgb/waived_delegation.py" for item in payload["delegation_candidates"])
+    assert any(item["path"] == "keyrgb/active_large.py" for item in payload["files"])
 
     markdown = (tmp_path / "buildlog" / "keyrgb" / "file-size-analysis.md").read_text(encoding="utf-8")
     assert "## Quality-exception waivers" in markdown
-    assert "src/waived_large.py" in markdown
+    assert "keyrgb/waived_large.py" in markdown

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from src.gui.windows import reactive_color
+from keyrgb.gui.windows import reactive_color
 
 
 class _FakeVar:

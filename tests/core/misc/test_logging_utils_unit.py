@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-from src.core.utils import logging_utils
+from keyrgb.core.utils import logging_utils
 
 
 def test_log_throttled_throttles_repeated_logs_for_same_logger_and_key(caplog, monkeypatch) -> None:

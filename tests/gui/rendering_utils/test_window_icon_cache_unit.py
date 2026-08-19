@@ -6,7 +6,7 @@ from io import BytesIO
 import pytest
 from PIL import Image
 
-from src.gui.utils import window_icon
+from keyrgb.gui.utils import window_icon
 
 
 class DummyWindow:

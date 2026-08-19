@@ -1,0 +1,285 @@
+"""Tray application facade.
+
+This module keeps the stable `KeyRGBTray` surface and tray monkeypatch seams.
+"""
+
+from __future__ import annotations
+
+import logging
+import shutil
+import subprocess
+import time
+from typing import TYPE_CHECKING, SupportsFloat, SupportsIndex, SupportsInt, cast
+
+from keyrgb.core.backends.exceptions import BackendError, format_backend_error
+from keyrgb.core.utils.safe_attrs import safe_str_attr
+from keyrgb.tray.controllers import view_snapshots as tray_view_snapshots
+from keyrgb.tray.idle_power_state import ensure_tray_idle_power_state
+from keyrgb.tray.protocols import TrayIconState
+
+from . import (
+    _application_bindings as application_bindings,
+    _application_notifications as application_notifications,
+    _runtime_deps as app_runtime_deps,
+    _startup as tray_startup,
+    lifecycle as app_lifecycle,
+)
+from ._application_state import TrayBootstrapState
+from ._delegates import KeyRGBTrayDelegateMixin
+
+_IntCoercible = str | bytes | bytearray | SupportsInt | SupportsIndex
+_FloatCoercible = str | bytes | bytearray | SupportsFloat | SupportsIndex
+
+if TYPE_CHECKING:
+    from keyrgb.core.config import Config
+    from keyrgb.tray.controllers.runtime_coordinator import TrayRuntimeCoordinator
+    from keyrgb.tray.idle_power_state import TrayIdlePowerState
+
+
+select_backend_with_introspection = app_runtime_deps.select_backend_with_introspection
+select_device_discovery_snapshot = app_runtime_deps.select_device_discovery_snapshot
+load_ite_dimensions = app_runtime_deps.load_ite_dimensions
+build_permission_denied_message = tray_startup.build_permission_denied_message
+create_effects_engine = tray_startup.create_effects_engine
+flush_pending_notifications = tray_startup.flush_pending_notifications
+install_permission_error_callback_best_effort = tray_startup.install_permission_error_callback_best_effort
+migrate_builtin_profile_brightness_best_effort = tray_startup.migrate_builtin_profile_brightness_best_effort
+apply_brightness_from_power_policy = app_runtime_deps.apply_brightness_from_power_policy
+apply_power_source_perkey_profile_transition = app_runtime_deps.apply_power_source_perkey_profile_transition
+power_restore = app_runtime_deps.power_restore
+power_turn_off = app_runtime_deps.power_turn_off
+start_current_effect = app_runtime_deps.start_current_effect
+configure_engine_software_targets = app_runtime_deps.configure_engine_software_targets
+close_secondary_software_target_cache = app_runtime_deps.close_secondary_software_target_cache
+load_tray_dependencies = app_runtime_deps.load_tray_dependencies
+maybe_autostart_effect = app_runtime_deps.maybe_autostart_effect
+start_all_polling = app_runtime_deps.start_all_polling
+start_power_monitoring = app_runtime_deps.start_power_monitoring
+runtime = app_runtime_deps.runtime
+icon_mod = app_runtime_deps.icon_mod
+menu_mod = app_runtime_deps.menu_mod
+update_tray_icon = app_runtime_deps.update_tray_icon
+update_tray_menu = app_runtime_deps.update_tray_menu
+refresh_system_power_snapshot = tray_view_snapshots.refresh_system_power_snapshot
+is_permission_denied = app_runtime_deps.is_permission_denied
+logger = logging.getLogger(__name__)
+callbacks = app_runtime_deps.callbacks
+
+
+def _init_bindings() -> application_bindings.TrayInitBindings:
+    """Read current module aliases at call time to preserve monkeypatch seams."""
+
+    return application_bindings.TrayInitBindings(
+        load_tray_dependencies=load_tray_dependencies,
+        migrate_builtin_profile_brightness_best_effort=migrate_builtin_profile_brightness_best_effort,
+        select_backend_with_introspection=select_backend_with_introspection,
+        select_device_discovery_snapshot=select_device_discovery_snapshot,
+        create_effects_engine=create_effects_engine,
+        load_ite_dimensions=load_ite_dimensions,
+        install_permission_error_callback_best_effort=install_permission_error_callback_best_effort,
+        configure_engine_software_targets=configure_engine_software_targets,
+        start_power_monitoring=start_power_monitoring,
+        start_all_polling=start_all_polling,
+        maybe_autostart_effect=maybe_autostart_effect,
+    )
+
+
+def _run_bindings() -> application_bindings.TrayRunBindings:
+    """Read current runtime collaborators at call time to preserve tests."""
+
+    return application_bindings.TrayRunBindings(
+        get_pystray=runtime.get_pystray,  # type: ignore[arg-type]
+        create_icon_for_state=icon_mod.create_icon_for_state,
+        build_menu=menu_mod.build_menu,
+        flush_pending_notifications=flush_pending_notifications,
+        logger=logger,
+    )
+
+
+class KeyRGBTray(KeyRGBTrayDelegateMixin):
+    """System tray application for KeyRGB."""
+
+    icon: object | None
+    is_off: bool
+    tray_idle_power_state: TrayIdlePowerState
+    config: Config
+    engine: object
+    power_manager: object | None
+    backend: object | None
+    backend_probe: object | None
+    backend_caps: object | None
+    device_discovery: object | None
+    system_power_status: object | None
+    effective_secondary_routes: tuple[object, ...]
+    selected_device_context: str
+    tray_icon_state: TrayIconState
+    runtime_coordinator: TrayRuntimeCoordinator
+    _dim_sync_suppressed_logged: bool
+    _event_last_at: dict[str, float]
+    _permission_notice_sent: bool
+    _pending_notifications: list[tuple[str, str]]
+    _ite_rows: int
+    _ite_cols: int
+
+    def __init__(self) -> None:
+        prebootstrap_state = application_bindings.build_tray_prebootstrap_state(self)
+        prebootstrap_state.apply_to(self)
+
+        # Backend selection and startup wiring are used for capability-driven UI gating.
+        bindings = _init_bindings()
+        bootstrap_state = application_bindings.build_tray_bootstrap_state(bindings=bindings)
+        self._apply_bootstrap_state(bootstrap_state)
+        self.power_manager = None
+        runtime_started = False
+        try:
+            self.power_manager = application_bindings.start_tray_runtime(
+                self,
+                state=bootstrap_state,
+                bindings=bindings,
+                notify_permission_issue=self._notify_permission_issue,
+            )
+            runtime_started = True
+        finally:
+            if not runtime_started:
+                app_lifecycle.shutdown_tray_runtime_best_effort(self)
+
+    def _apply_bootstrap_state(self, state: TrayBootstrapState) -> None:
+        state.apply_to(self)
+
+    # Owner-backed compatibility surface for idle/power flags. Instance attrs on
+    # fakes/tests still work via the dual-write helpers; KeyRGBTray stores truth
+    # on tray_idle_power_state only.
+    @property
+    def _power_forced_off(self) -> bool:
+        return bool(ensure_tray_idle_power_state(self).power_forced_off)
+
+    @_power_forced_off.setter
+    def _power_forced_off(self, value: object) -> None:
+        ensure_tray_idle_power_state(self).power_forced_off = bool(value)
+
+    @property
+    def _user_forced_off(self) -> bool:
+        return bool(ensure_tray_idle_power_state(self).user_forced_off)
+
+    @_user_forced_off.setter
+    def _user_forced_off(self, value: object) -> None:
+        ensure_tray_idle_power_state(self).user_forced_off = bool(value)
+
+    @property
+    def _idle_forced_off(self) -> bool:
+        return bool(ensure_tray_idle_power_state(self).idle_forced_off)
+
+    @_idle_forced_off.setter
+    def _idle_forced_off(self, value: object) -> None:
+        ensure_tray_idle_power_state(self).idle_forced_off = bool(value)
+
+    @property
+    def _dim_temp_active(self) -> bool:
+        return bool(ensure_tray_idle_power_state(self).dim_temp_active)
+
+    @_dim_temp_active.setter
+    def _dim_temp_active(self, value: object) -> None:
+        ensure_tray_idle_power_state(self).dim_temp_active = bool(value)
+
+    @property
+    def _dim_temp_target_brightness(self) -> int | None:
+        return ensure_tray_idle_power_state(self).dim_temp_target_brightness
+
+    @_dim_temp_target_brightness.setter
+    def _dim_temp_target_brightness(self, value: object) -> None:
+        owner = ensure_tray_idle_power_state(self)
+        if value is None:
+            owner.dim_temp_target_brightness = None
+            return
+        try:
+            owner.dim_temp_target_brightness = int(cast(_IntCoercible, value))
+        except (TypeError, ValueError, OverflowError):
+            owner.dim_temp_target_brightness = None
+
+    @property
+    def _last_brightness(self) -> int:
+        return int(ensure_tray_idle_power_state(self).last_brightness)
+
+    @_last_brightness.setter
+    def _last_brightness(self, value: object) -> None:
+        owner = ensure_tray_idle_power_state(self)
+        try:
+            brightness = int(cast(_IntCoercible, value))
+        except (TypeError, ValueError, OverflowError):
+            return
+        if brightness > 0:
+            owner.last_brightness = brightness
+
+    @property
+    def _last_resume_at(self) -> float:
+        return float(ensure_tray_idle_power_state(self).last_resume_at)
+
+    @_last_resume_at.setter
+    def _last_resume_at(self, value: object) -> None:
+        owner = ensure_tray_idle_power_state(self)
+        try:
+            owner.last_resume_at = float(cast(_FloatCoercible, value))
+        except (TypeError, ValueError, OverflowError):
+            owner.last_resume_at = 0.0
+
+    # ---- notifications
+
+    def _notify(self, title: str, message: str) -> None:
+        """Best-effort user notification.
+
+        Tries tray notifications first (pystray), then falls back to notify-send.
+        If the icon isn't created yet (early startup), queues the message.
+        """
+
+        application_notifications.notify(
+            self,
+            title,
+            message,
+            logger=logger,
+            shutil_module=shutil,
+            subprocess_module=subprocess,
+        )
+
+    def _notify_permission_issue(self, exc: Exception | None = None) -> None:
+        """Show a one-time notification for missing permissions."""
+
+        application_notifications.notify_permission_issue(
+            self,
+            exc,
+            logger=logger,
+            is_permission_denied=is_permission_denied,
+            build_permission_denied_message=build_permission_denied_message,
+            backend_error_cls=BackendError,
+            format_backend_error=format_backend_error,
+            safe_str_attr=safe_str_attr,
+        )
+
+    # ---- logging helpers
+
+    def _log_exception(self, msg: str, exc: Exception):
+        application_notifications.log_exception(msg, exc, logger=logger)
+
+    def _log_event(self, source: str, action: str, **fields) -> None:
+        """Log a human-readable event cause.
+
+        Intended to help diagnose flicker by showing *why* brightness/off/effect
+        changes are being applied (menu vs. pollers vs. power policy, etc.).
+        """
+
+        application_notifications.log_event(
+            self,
+            source,
+            action,
+            logger=logger,
+            monotonic_fn=time.monotonic,
+            **fields,
+        )
+
+    # ---- run
+
+    def run(self):
+        application_bindings.run_tray(
+            self,
+            bindings=_run_bindings(),
+            state=application_bindings.build_tray_run_state(self),
+        )

@@ -59,14 +59,14 @@ def _iter_py_files() -> list[Path]:
     root = repo_root()
     files: list[Path] = []
 
-    for base in [root / "src", root / "buildpython"]:
+    for base in [root / "keyrgb", root / "buildpython"]:
         if not base.exists():
             continue
         for p in base.rglob("*.py"):
             if "__pycache__" in p.parts:
                 continue
             # Exclude tests from import-scan (they may reference optional hardware/integration modules)
-            if base.name == "src" and "tests" in p.parts:
+            if base.name == "keyrgb" and "tests" in p.parts:
                 continue
             files.append(p)
 
@@ -118,7 +118,7 @@ def import_scan_runner() -> RunResult:
         all_imports.update(_parse_imports(p))
 
     # Filter out obvious project-internal top-levels
-    ignore = {"src", "buildpython"}
+    ignore = {"keyrgb", "buildpython"}
     candidates = sorted(i for i in all_imports if i not in stdlib and i not in ignore)
 
     missing: list[str] = []

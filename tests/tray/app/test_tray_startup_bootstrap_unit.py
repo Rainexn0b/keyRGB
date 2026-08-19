@@ -2,7 +2,7 @@ import logging
 
 import pytest
 
-from src.tray.startup import bootstrap
+from keyrgb.tray.startup import bootstrap
 
 
 @pytest.fixture(autouse=True)

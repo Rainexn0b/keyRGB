@@ -4,14 +4,14 @@ import subprocess
 
 import pytest
 
-from src.core.backends.asusctl.backend import AsusctlAuraBackend, _env_flag, _parse_asusctl_zones
-from src.core.backends.asusctl.device import (
+from keyrgb.core.backends.asusctl.backend import AsusctlAuraBackend, _env_flag, _parse_asusctl_zones
+from keyrgb.core.backends.asusctl.device import (
     AsusctlAuraKeyboardDevice,
     _asusctl_level_to_brightness,
     _brightness_to_asusctl_level,
     _rgb_to_hex,
 )
-from src.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
+from keyrgb.core.resources.defaults import REFERENCE_MATRIX_COLS, REFERENCE_MATRIX_ROWS
 
 
 def test_rgb_and_brightness_helpers_normalize_values() -> None:
@@ -194,7 +194,7 @@ def test_backend_probe_collects_identifiers(monkeypatch: pytest.MonkeyPatch) -> 
     backend = AsusctlAuraBackend()
 
     monkeypatch.setenv("KEYRGB_ASUSCTL_PATH", "/usr/bin/asusctl")
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
 
     def fake_run(args: list[str], *, timeout_s: float = 2.0):
         if args == ["info"]:
@@ -231,7 +231,7 @@ def test_backend_probe_reports_disabled_or_missing_binary(monkeypatch: pytest.Mo
     assert "disabled" in disabled.reason
 
     monkeypatch.delenv("KEYRGB_ASUSCTL_DISABLE")
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: None)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: None)
     missing = backend.probe()
     assert missing.available is False
     assert missing.reason == "asusctl not found"
@@ -255,7 +255,7 @@ def test_backend_probe_reports_info_exception(monkeypatch: pytest.MonkeyPatch) -
     backend = AsusctlAuraBackend()
 
     monkeypatch.delenv("KEYRGB_ASUSCTL_DISABLE", raising=False)
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
     monkeypatch.setattr(
         backend, "_run", lambda args, timeout_s=2.0: (_ for _ in ()).throw(subprocess.TimeoutExpired(args, 2.0))
     )
@@ -271,7 +271,7 @@ def test_backend_probe_propagates_unexpected_info_bug(monkeypatch: pytest.Monkey
     backend = AsusctlAuraBackend()
 
     monkeypatch.delenv("KEYRGB_ASUSCTL_DISABLE", raising=False)
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
     monkeypatch.setattr(backend, "_run", lambda args, timeout_s=2.0: (_ for _ in ()).throw(RuntimeError("boom")))
 
     with pytest.raises(RuntimeError, match="boom"):
@@ -282,7 +282,7 @@ def test_backend_probe_reports_nonzero_info_return(monkeypatch: pytest.MonkeyPat
     backend = AsusctlAuraBackend()
 
     monkeypatch.delenv("KEYRGB_ASUSCTL_DISABLE", raising=False)
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
     monkeypatch.setattr(
         backend,
         "_run",
@@ -304,7 +304,7 @@ def test_backend_probe_reports_empty_info_output(monkeypatch: pytest.MonkeyPatch
     backend = AsusctlAuraBackend()
 
     monkeypatch.delenv("KEYRGB_ASUSCTL_DISABLE", raising=False)
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
     monkeypatch.setattr(
         backend,
         "_run",
@@ -327,7 +327,7 @@ def test_backend_run_wraps_subprocess_with_resolved_binary(monkeypatch: pytest.M
         calls.append((list(cmd), bool(text), bool(capture_output), float(timeout), bool(check)))
         return subprocess.CompletedProcess(list(cmd), 0, stdout="ok", stderr="")
 
-    monkeypatch.setattr("src.core.backends.asusctl.backend.subprocess.run", fake_run)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.subprocess.run", fake_run)
 
     proc = backend._run(["info"], timeout_s=1.5)
 
@@ -340,7 +340,7 @@ def test_backend_probe_ignores_duplicate_and_non_key_value_lines(monkeypatch: py
 
     monkeypatch.setenv("KEYRGB_ASUSCTL_PATH", "/usr/bin/asusctl")
     monkeypatch.delenv("KEYRGB_ASUSCTL_DISABLE", raising=False)
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
 
     def fake_run(args: list[str], *, timeout_s: float = 2.0):
         if args == ["info"]:
@@ -371,7 +371,7 @@ def test_backend_probe_swallows_aura_help_exception(monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setenv("KEYRGB_ASUSCTL_PATH", "/usr/bin/asusctl")
     monkeypatch.delenv("KEYRGB_ASUSCTL_DISABLE", raising=False)
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
 
     def fake_run(args: list[str], *, timeout_s: float = 2.0):
         if args == ["info"]:
@@ -396,7 +396,7 @@ def test_backend_probe_propagates_unexpected_aura_help_bug(monkeypatch: pytest.M
 
     monkeypatch.setenv("KEYRGB_ASUSCTL_PATH", "/usr/bin/asusctl")
     monkeypatch.delenv("KEYRGB_ASUSCTL_DISABLE", raising=False)
-    monkeypatch.setattr("src.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
+    monkeypatch.setattr("keyrgb.core.backends.asusctl.backend.shutil.which", lambda exe: exe)
 
     def fake_run(args: list[str], *, timeout_s: float = 2.0):
         if args == ["info"]:

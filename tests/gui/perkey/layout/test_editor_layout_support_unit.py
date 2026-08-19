@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-import src.gui.perkey.editor_support.layout as editor_layout
+import keyrgb.gui.perkey.editor_support.layout as editor_layout
 
 
 def test_normalize_layout_legend_pack_uses_layout_module_loader(monkeypatch) -> None:

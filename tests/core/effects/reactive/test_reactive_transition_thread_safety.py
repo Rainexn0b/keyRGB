@@ -5,7 +5,7 @@ See improvement plan Item 1 — thread safety for ReactiveRenderState transition
 
 import threading
 
-from src.core.effects.reactive._reactive_transition_atomic import (
+from keyrgb.core.effects.reactive._reactive_transition_atomic import (
     ReactiveRenderState,
     clear_transition_atomic,
     read_transition_atomic,

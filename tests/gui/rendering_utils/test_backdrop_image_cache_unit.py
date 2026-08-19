@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from src.gui.utils import backdrop_image_cache
-from src.gui.utils.backdrop_image_cache import clear_cached_backdrop_images, load_cached_backdrop_image
-from src.gui.utils.profile_backdrop_storage import load_backdrop_image
+from keyrgb.gui.utils import backdrop_image_cache
+from keyrgb.gui.utils.backdrop_image_cache import clear_cached_backdrop_images, load_cached_backdrop_image
+from keyrgb.gui.utils.profile_backdrop_storage import load_backdrop_image
 
 
 def _save_rgba(path, color: tuple[int, int, int, int]) -> None:
@@ -140,10 +140,10 @@ def test_backdrop_image_candidates_ignores_cwd_fallback_oserror(tmp_path, monkey
 
 def test_backdrop_image_candidates_uses_structural_repo_root_for_packaged_layout(tmp_path, monkeypatch) -> None:
     runtime_root = tmp_path / "usr" / "lib" / "keyrgb"
-    anchor = runtime_root / "src" / "gui" / "utils" / "backdrop_image_cache.py"
+    anchor = runtime_root / "keyrgb" / "gui" / "utils" / "backdrop_image_cache.py"
     anchor.parent.mkdir(parents=True)
     anchor.touch()
-    (runtime_root / "src").mkdir(exist_ok=True)
+    (runtime_root / "keyrgb").mkdir(exist_ok=True)
 
     monkeypatch.setattr(backdrop_image_cache, "__file__", str(anchor))
 
