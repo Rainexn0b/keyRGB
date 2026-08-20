@@ -39,7 +39,7 @@ def test_runtime_environment_full_mode_enables_all_debug_flags() -> None:
 
 
 def test_discover_source_root_prefers_checkout_cwd(tmp_path: Path, monkeypatch) -> None:
-    (tmp_path / "src" / "tray").mkdir(parents=True)
+    (tmp_path / "keyrgb" / "tray").mkdir(parents=True)
     (tmp_path / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
     monkeypatch.setattr(runtime_capture.Path, "cwd", lambda: tmp_path)
 

@@ -52,7 +52,7 @@ class _RuntimeProcess(Protocol):
 
 def _is_source_root(path: Path) -> bool:
     try:
-        return (path / "pyproject.toml").is_file() and (path / "src" / "tray").is_dir()
+        return (path / "pyproject.toml").is_file() and (path / "keyrgb" / "tray").is_dir()
     except OSError:
         return False
 
