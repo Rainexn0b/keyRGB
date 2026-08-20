@@ -140,6 +140,53 @@ def test_render_set_brightness_after_data_when_brightening() -> None:
     assert ops.index("set_key_colors") < ops.index("set_brightness")
 
 
+def test_render_skips_hardware_commit_when_engine_not_running() -> None:
+    from keyrgb.core.effects.reactive.render import render
+
+    kb = _DummyKB()
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        running=False,
+        brightness=40,
+        reactive_brightness=40,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=40,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _last_rendered_brightness=40,
+        _last_hw_mode_brightness=40,
+    )
+
+    render(engine, color_map={(0, 0): (255, 255, 255)})
+
+    assert kb.calls == []
+
+
+def test_render_skips_hardware_commit_when_device_mode_off() -> None:
+    from keyrgb.core.effects.reactive.render import render
+
+    kb = _DummyKB()
+    engine = SimpleNamespace(
+        kb=kb,
+        kb_lock=_DummyLock(),
+        running=True,
+        _device_mode_off=True,
+        brightness=40,
+        reactive_brightness=40,
+        per_key_colors={(0, 0): (255, 255, 255)},
+        per_key_brightness=40,
+        _hw_brightness_cap=None,
+        _dim_temp_active=False,
+        _last_rendered_brightness=0,
+        _last_hw_mode_brightness=40,
+    )
+
+    render(engine, color_map={(0, 0): (255, 255, 255)})
+
+    assert kb.calls == []
+
+
 def test_apply_hw_brightness_reinitializes_user_mode_for_recoverable_runtime_errors() -> None:
     from keyrgb.core.effects.reactive._render_runtime import apply_hw_brightness
 

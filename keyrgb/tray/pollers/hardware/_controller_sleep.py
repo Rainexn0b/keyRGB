@@ -40,8 +40,10 @@ def stop_engine_for_controller_sleep_best_effort(tray: IdlePowerTrayProtocol) ->
 
     engine = tray.engine
     try:
-        engine.stop()
+        # Latch mode-off before stop() so an in-flight render that still holds
+        # kb_lock skips its hardware commit instead of ramping 0→8 into sleep.
         engine._device_mode_off = True
+        engine.stop()
     except _HARDWARE_POLL_RECOVERY_EXCEPTIONS:
         return False
     return True

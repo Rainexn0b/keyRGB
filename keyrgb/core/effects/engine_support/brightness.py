@@ -7,6 +7,7 @@ from collections.abc import Callable
 from threading import RLock
 
 from ..device import Color, KeyboardDeviceProtocol, PerKeyColorMap
+from ..software_targets import average_color_map
 from ..transitions import choose_steps
 
 logger = logging.getLogger("keyrgb.core.effects.engine_brightness")
@@ -180,7 +181,12 @@ class _EngineBrightness:
         if not callable(set_color):
             return
         try:
-            color = getattr(self, "current_color", None) or (255, 0, 0)
+            # Flatten to the per-key base average so a config `color` (or the
+            # (255,0,0) fallback) cannot flash a different hue over the map.
+            color = average_color_map(per_key)
+            if color == (0, 0, 0):
+                fallback = getattr(self, "current_color", None) or (255, 0, 0)
+                color = (int(fallback[0]), int(fallback[1]), int(fallback[2]))
             with self.kb_lock:
                 set_color((int(color[0]), int(color[1]), int(color[2])), brightness=int(prev))
         except _BRIGHTNESS_FADE_RUNTIME_ERRORS:

@@ -94,6 +94,18 @@ def test_power_source_blank_recovery_not_eligible_when_brightness_intent_zero() 
     assert _power_source_blank_recovery_eligible(tray, now=101.0) is False
 
 
+def test_power_source_blank_recovery_not_eligible_immediately_after_resume() -> None:
+    """A lid/power restore fade must not be fought by a blank-heal."""
+
+    tray = _make_recovery_tray()
+    tray._last_power_source_transition_at = 100.0
+    tray._last_power_source_blank_recovery_at = 0.0
+    tray._last_resume_at = 100.0
+
+    assert _power_source_blank_recovery_eligible(tray, now=101.0) is False
+    assert _power_source_blank_recovery_eligible(tray, now=103.0) is True
+
+
 def test_power_source_blank_recovery_not_eligible_within_cooldown() -> None:
     """Recovery was attempted very recently — must wait for cooldown."""
 

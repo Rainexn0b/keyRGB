@@ -319,7 +319,7 @@ def test_turn_off_with_fade_flattens_perkey_frame_before_fade() -> None:
 
     engine = _TestEngine()
     engine._brightness_value = 40
-    engine.per_key_colors = {(0, 0): (255, 0, 0)}
+    engine.per_key_colors = {(0, 0): (255, 0, 0), (0, 1): (255, 0, 0)}
     engine.current_color = (0, 255, 255)
 
     color_calls: list[tuple[tuple[int, int, int], int]] = []
@@ -331,8 +331,9 @@ def test_turn_off_with_fade_flattens_perkey_frame_before_fade() -> None:
 
     engine.turn_off(fade=True, fade_duration_s=0.0)
 
-    # Uniform base-color flatten at prev brightness happened before the fade.
-    assert color_calls == [((0, 255, 255), 40)]
+    # Flatten uses the per-key base average, not config current_color, so a
+    # lime/red profile mismatch cannot flash the wrong hue before the fade.
+    assert color_calls == [((255, 0, 0), 40)]
     assert engine.kb.turn_off_calls == 1
     # Fade steps ran after the flatten (brightness dropped toward 1).
     assert any(v < 40 for v in engine.kb.brightness_calls)

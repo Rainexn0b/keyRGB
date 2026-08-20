@@ -31,6 +31,7 @@ from keyrgb.tray.idle_power_state import (
 from keyrgb.tray.pollers.hardware._decisions import (
     DEFAULT_HARDWARE_POLL_INTERVAL_S,
     FAST_HARDWARE_POLL_INTERVAL_S,
+    POWER_SOURCE_POST_RESUME_SUPPRESSION_S,
     POWER_SOURCE_RECOVERY_COOLDOWN_S,
     POWER_SOURCE_RECOVERY_WINDOW_S,
     STABLE_ZERO_BRIGHTNESS_BACKOFF_S,
@@ -221,6 +222,17 @@ def _power_source_blank_recovery_eligible(tray: IdlePowerTrayProtocol, *, now: f
         )
     except _BRIGHTNESS_COERCION_ERRORS:
         last_recovery_at = 0.0
+    try:
+        last_resume_at = read_idle_power_state_float_field(
+            tray,
+            attr_name="_last_resume_at",
+            state_name="last_resume_at",
+            default=0.0,
+        )
+    except _BRIGHTNESS_COERCION_ERRORS:
+        last_resume_at = 0.0
+    if last_resume_at > 0.0 and (when - last_resume_at) < POWER_SOURCE_POST_RESUME_SUPPRESSION_S:
+        return False
     return should_attempt_power_source_blank_recovery(
         now=when,
         last_power_source_transition_at=_power_source_transition_at(tray),

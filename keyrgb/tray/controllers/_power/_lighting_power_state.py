@@ -156,16 +156,9 @@ def power_restore_impl(
     tray.engine.current_color = (0, 0, 0)
     tray.is_off = False
 
-    if policy_state.is_loop_effect:
-        start_current_effect(
-            tray,
-            brightness_override=None,
-            fade_in=False,
-            fade_in_duration_s=idle_fade_duration_s(tray.config),
-        )
-        tray._refresh_ui(refresh_menu=False)
-        return
-
+    # Lid/suspend is a cold start even for loop/reactive effects. Restarting
+    # in place at full brightness skips the enable_user_mode@1 prime and shows
+    # up as a snap-on plus a later 10→0→10 blank-heal flicker.
     start_current_effect(
         tray,
         brightness_override=SOFT_ON_START_BRIGHTNESS,

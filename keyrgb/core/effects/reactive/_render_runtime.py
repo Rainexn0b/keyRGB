@@ -30,6 +30,21 @@ _REACTIVE_RENDER_RUNTIME_ERRORS = (AttributeError, LookupError, OSError, Runtime
 _REACTIVE_RENDER_CLEANUP_ERRORS = (AttributeError, LookupError, OSError, RuntimeError, TypeError, ValueError)
 
 
+def _reactive_hardware_writes_allowed(engine: EffectsEngine) -> bool:
+    """Skip in-flight frames once the engine is stopping or mode-off.
+
+    Controller-sleep honor stops the effect after a firmware zero. A frame
+    already past the loop check can still acquire ``kb_lock`` and write a
+    brightness-guard ramp (0→8) into the sleeping controller. Treat an
+    explicit ``running is False`` or ``_device_mode_off`` latch as a hard
+    stop on hardware commits. Engines that omit those attrs still write.
+    """
+
+    if getattr(engine, "running", True) is False:
+        return False
+    return getattr(engine, "_device_mode_off", False) is not True
+
+
 def _last_hw_mode_brightness_or_none(engine: EffectsEngine) -> int | None:
     try:
         return engine._last_hw_mode_brightness
@@ -95,6 +110,8 @@ def render_per_key_frame(
         brightness_hw = 0
         rendered_color_map: Mapping[Key, Color] = color_map
         with engine.kb_lock:
+            if not _reactive_hardware_writes_allowed(engine):
+                return True
             _, _, brightness_hw = resolve_brightness(engine)
             transition_visual_scale = resolve_transition_visual_scale(engine)
             log_render_visual_scale_change(
@@ -111,6 +128,8 @@ def render_per_key_frame(
             mode_uninitialized = _last_hw_mode_brightness_or_none(engine) is None
             frame_signature = _per_key_frame_signature(rendered_color_map, brightness_hw=brightness_hw)
             if not mode_uninitialized and frame_signature == _last_reactive_per_key_frame_signature_or_none(engine):
+                return True
+            if not _reactive_hardware_writes_allowed(engine):
                 return True
 
             need_mode_init = reassert_every_frame or mode_uninitialized
@@ -169,6 +188,8 @@ def render_uniform_frame(
     brightness_hw = 0
 
     with engine.kb_lock:
+        if not _reactive_hardware_writes_allowed(engine):
+            return
         _, _, brightness_hw = resolve_brightness(engine)
         engine._last_rendered_brightness = brightness_hw
         r, g, b = avoid_full_black(rgb=rgb, target_rgb=rgb, brightness=int(brightness_hw))

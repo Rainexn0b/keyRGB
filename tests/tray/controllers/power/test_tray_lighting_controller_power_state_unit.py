@@ -347,7 +347,7 @@ class TestPowerTurnOffRestore:
             fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 
-    def test_power_restore_loop_effect_uses_in_place_restart(self):
+    def test_power_restore_loop_effect_uses_soft_on_fade(self):
         from keyrgb.tray.controllers.lighting_controller import power_restore
         from tests.tray.fakes import make_owner_backed_mock_tray
 
@@ -365,8 +365,8 @@ class TestPowerTurnOffRestore:
 
         mock_start.assert_called_once_with(
             mock_tray,
-            brightness_override=None,
-            fade_in=False,
+            brightness_override=SOFT_ON_START_BRIGHTNESS,
+            fade_in=True,
             fade_in_duration_s=DEFAULT_IDLE_FADE_DURATION_S,
         )
 

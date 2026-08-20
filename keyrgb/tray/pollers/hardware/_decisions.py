@@ -16,6 +16,9 @@ FAST_HARDWARE_POLL_INTERVAL_S = 0.25
 ZERO_CONFIRM_FAST_POLL_WINDOW_S = 1.0
 POWER_SOURCE_RECOVERY_WINDOW_S = 6.0
 POWER_SOURCE_RECOVERY_COOLDOWN_S = 0.75
+# After lid/power restore, hardware can still report 0 while the 0.6s fade
+# primes user mode. A blank-heal in that window fights the fade (10→0→10).
+POWER_SOURCE_POST_RESUME_SUPPRESSION_S = 2.5
 STABLE_ZERO_BRIGHTNESS_RECOVERY_COOLDOWN_S = 5.0
 
 # Reactive-pulse poll deferral. The poller's two synchronous USB reads hold
