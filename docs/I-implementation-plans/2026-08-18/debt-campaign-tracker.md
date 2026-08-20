@@ -21,11 +21,11 @@ dated plans.
 | ID | Campaign | Priority | Effort | Status |
 |---:|---|:---:|:---:|---|
 | C1 | Package identity: rename import root `src` → `keyrgb` | P1 | L | done |
-| C2 | Typing parity for the Tk GUI layer | P1 | M | todo |
+| C2 | Typing parity for the Tk GUI layer | P1 | M | done |
 | C3 | Indirection tax containment (lazy imports, compat facades) | P2 | M | monitoring |
 | C4 | Onboarding map upkeep (498 files, `_private` nesting) | P2 | S | monitoring |
 | C5 | Release infrastructure (Node 20 action deprecation, local ShellCheck) | P1 | S | monitoring |
-| C6 | Hygiene budget paydown (defensive_conversion / hasattr_coupling / cleanup_hotspot) | P2 | S | todo |
+| C6 | Hygiene budget paydown (defensive_conversion / hasattr_coupling / cleanup_hotspot) | P2 | S | monitoring |
 
 ---
 
@@ -80,8 +80,7 @@ green; curl-install flow re-verified.
 ## C2 — Typing parity for the GUI layer
 
 `keyrgb/gui/**` is now on the same mypy gate as core/tray (follow-imports=normal).
-The incremental skip-mode ratchet is closed. Remaining GUI typing debt is local
-(`# type: ignore` on a few Tk/protocol facade call sites), not an exclusion:
+The incremental skip-mode ratchet and the facade-ignore cleanup are closed.
 
 1. Opt in the smallest leaf modules first (e.g. `gui/windows/uniform.py`,
    `gui/theme/`), fix to zero errors, add to the mypy include set.
@@ -171,16 +170,15 @@ small-files/single-owner discipline stays.
 
 ## C5 — Release infrastructure
 
-- **Node.js 20 deprecation (done 2026-08-18).** Bumped `actions/checkout` to
-  v5.0.1 (`93cb6efe…`) and `actions/setup-python` to v6.3.0 (`ece7cb06…`) in
-  `ci.yml`/`release.yml`; both are Node 24-native. `softprops/action-gh-release`
-  stays at v2.6.2 (`3bb12739…`) — already the latest release; it still declares
-  `node20` upstream, so one deprecation annotation will remain until upstream
-  cuts a Node 24 release. Re-check upstream before 0.33.0.
-  Keep the pin-to-SHA policy (see `.github/workflows/release.yml` comments).
-- **Local ShellCheck gap.** `buildpython --profile=release` skips ShellCheck
-  when not installed locally; CI covers it. Add a dev-env note (or install
-  instruction) to `docs/3-contributing/01-build_runner.md`.
+- **Node.js 20 deprecation (done 2026-08-18 / 2026-08-19).** Bumped
+  `actions/checkout` to v5 and `actions/setup-python` to v6 (Node 24-native),
+  then `softprops/action-gh-release` to v3.0.2 (`3d0d9888…`, `runs.using:
+  node24`). Keep the pin-to-SHA policy (see `.github/workflows/release.yml`
+  comments).
+- **Local ShellCheck gap (done 2026-08-19).** `buildpython --profile=release`
+  still skips ShellCheck when the binary is missing; CI installs it. Dev-env
+  install note is in `docs/3-contributing/01-build_runner.md` (`dnf install
+  ShellCheck`).
 
 ## C6 — Hygiene budget paydown
 
@@ -189,8 +187,8 @@ in the v0.32.1 release gate:
 
 | Category | Active / budget | Item | Action |
 |---|---|---|---|
-| defensive_conversion | 1 / 1 | `src/core/effects/reactive/render.py:290` nested `float(float(…))` | Flatten the conversion; restores headroom |
-| hasattr_coupling | 1 / 3 | `src/core/effects/reactive/_render_brightness_support.py:109` `setattr` on private attr | Typed state object next time the render state is touched |
+| defensive_conversion | 0 / 0 | `pace()` nested `float(float(…))` | **Done 2026-08-19.** Flattened; budget locked at 0. |
+| hasattr_coupling | 0 / 0 | `ensure_reactive_state` `setattr` on `_reactive_state` | **Done 2026-08-19.** Assign through `_ReactiveStateOwner`; budget locked at 0. |
 | cleanup_hotspot | 6 / 6 | `legacy_snapshot_from_config` family (old D15) | Intentional v0.28→v0.29 profile-migration compat for issue #7 installs; keep until the migration window closes, then remove and reclaim the budget |
 
 ## Accepted with exception (not campaigns)
@@ -206,10 +204,12 @@ in the v0.32.1 release gate:
 
 ## Phase plan
 
-1. **Phase 1 (next):** C1 package rename + C5 actions bump (independent, land
-   separately).
-2. **Phase 2:** C2 first mypy opt-in batch; C6 quick wins.
-3. **Continuous:** C3/C4 guardrails; budget rule enforcement via release gate.
+1. **Phase 1–2 (done):** C1 package rename, C2 GUI mypy parity, C5 Actions /
+   ShellCheck note, C6 quick wins (`defensive_conversion`, `hasattr_coupling`).
+2. **Remaining:** C6 `cleanup_hotspot` stays until the issue #7 migration
+   window closes; C3/C4 are guardrails.
+3. **Continuous:** C3/C4 facade/map rules; budget rule enforcement via the
+   release gate.
 
 ## Cross-references
 

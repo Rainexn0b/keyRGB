@@ -33,6 +33,14 @@ the pipeline changes.
 .venv/bin/python -m buildpython --run-steps=21   # ShellCheck
 ```
 
+Step 21 runs `shellcheck -x` on the managed installer/helper scripts. CI
+installs ShellCheck. A local run **skips** the step when the binary is missing
+(`command -v shellcheck`). On Fedora/Nobara:
+
+```bash
+sudo dnf install ShellCheck
+```
+
 # Full pipeline
 
 Run the full pipeline with no trailing path argument.

@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from operator import attrgetter
+from typing import Protocol, cast
 
 _LOGGER = logging.getLogger(__name__)
 _INT_COERCION_ERRORS = (TypeError, ValueError, OverflowError)
@@ -74,6 +75,10 @@ class ReactiveRenderState:
     _reactive_debug_render_visual_state: tuple[object, ...] | None = None
 
 
+class _ReactiveStateOwner(Protocol):
+    _reactive_state: ReactiveRenderState
+
+
 _REACTIVE_STATE_ATTR_NAMES = frozenset(ReactiveRenderState.__annotations__)
 
 
@@ -106,7 +111,7 @@ def ensure_reactive_state(engine: object) -> ReactiveRenderState:
         _copy_reactive_state_attrs(state, hydrated)
     _copy_reactive_state_attrs(engine, hydrated)
     try:
-        setattr(engine, "_reactive_state", hydrated)  # noqa: B010 - engine state is intentionally duck-typed
+        cast(_ReactiveStateOwner, engine)._reactive_state = hydrated
     except (AttributeError, TypeError, ValueError):
         pass
     return hydrated

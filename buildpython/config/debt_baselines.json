@@ -2,7 +2,7 @@
   "code_hygiene": {
     "counts": {
       "defensive_conversion": 0,
-      "hasattr_coupling": 3,
+      "hasattr_coupling": 0,
       "any_type_hint": 0,
       "runtime_copy_hotspot": 0,
       "test_naming": 0,

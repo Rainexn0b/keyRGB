@@ -63,8 +63,8 @@ jobs:
           cat keyrgb-x86_64.AppImage.sha256
 
       - name: Upload AppImage to GitHub Release
-        # Pin major tag v2 to immutable commit SHA.
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        # Pin major tag v3 to immutable commit SHA (Node 24 runner).
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3.0.2
         with:
           files: |
             dist/*.AppImage

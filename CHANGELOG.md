@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Packaging: Rename the import root from the generic `src` to the project-named `keyrgb` package (flat layout). Entry points now read `keyrgb.tray.entrypoint:main` etc., the repo dev launcher moved to `keyrgb.sh`, and AppImage/CI/buildpython reference the new layout. Installed command names (`keyrgb`, `keyrgb-perkey`, …) are unchanged.
+- Build/Quality: Fold `keyrgb/gui` into the primary mypy gate, lock the last `hasattr_coupling` / `defensive_conversion` hygiene hits at budget 0, and pin `softprops/action-gh-release` to the Node 24 v3.0.2 release.
 
 ## 0.32.1 (2026-08-18)
 
