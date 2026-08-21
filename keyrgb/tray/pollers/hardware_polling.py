@@ -134,6 +134,10 @@ def _apply_polled_hardware_state(
     if current_brightness == 0 and (bool(current_off) or user_forced_off or power_forced_off or idle_forced_off):
         current_off = True
 
+    now = time.monotonic()
+    last_resume_at = float(read_last_resume_at(tray) or 0.0)
+    recently_restored = last_resume_at > 0.0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S
+
     if last_brightness is not None and current_brightness != last_brightness:
         _log_polled_hardware_event(
             tray,
@@ -169,7 +173,18 @@ def _apply_polled_hardware_state(
                 # ~0.25 s instead of after a full 2 s poll cycle.  Skip when a
                 # forced-off state intentionally wants the deck dark.
                 if not (user_forced_off or power_forced_off or idle_forced_off):
-                    _set_pending_zero_confirm_at(tray, time.monotonic())
+                    _set_pending_zero_confirm_at(tray, now)
+                # A zero right after restore is a transient glitch, not a
+                # stable sleep.  Recover on the first read instead of waiting
+                # for the confirmation poll — the 2 s cadence would otherwise
+                # leave the deck dark for seconds.
+                if (
+                    recently_restored
+                    and not (user_forced_off or power_forced_off or idle_forced_off)
+                    and _configured_brightness_intent(tray) > 0
+                    and _recover_stable_zero_brightness_best_effort(tray, current_brightness=current_brightness)
+                ):
+                    return current_brightness, False
                 return current_brightness, False
             tray.is_off = True
         else:
@@ -215,9 +230,6 @@ def _apply_polled_hardware_state(
         # The confirmation poll ran (fast or normal cadence); stop fast-polling
         # and let the recovery circuit breaker's cooldown govern any retries.
         _set_pending_zero_confirm_at(tray, 0.0)
-        now = time.monotonic()
-        last_resume_at = float(read_last_resume_at(tray) or 0.0)
-        recently_restored = last_resume_at > 0.0 and (now - last_resume_at) < POST_RESUME_IDLE_ACTION_SUPPRESSION_S
         if (
             _controller_sleep_respect_enabled(tray)
             and not (user_forced_off or power_forced_off or idle_forced_off)

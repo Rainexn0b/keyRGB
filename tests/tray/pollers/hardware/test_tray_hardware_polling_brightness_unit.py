@@ -504,6 +504,76 @@ def test_controller_sleep_off_suppressed_immediately_after_idle_restore(monkeypa
     assert (last_brightness, last_off) == (0, False)
 
 
+def test_stable_zero_recovers_on_first_zero_read_during_restore_window(monkeypatch) -> None:
+    """A transient zero during the post-restore window must not wait for a
+    confirmation poll — the keyboard just faded on, so a zero is a glitch."""
+
+    import time
+
+    from keyrgb.tray.idle_power_state import set_idle_power_state_field
+
+    tray = _DummyTray(brightness=25, is_off=False)
+    set_idle_power_state_field(
+        tray,
+        attr_name="_last_resume_at",
+        state_name="last_resume_at",
+        value=time.monotonic() - 2.0,  # 2s ago, within the suppression window
+    )
+
+    recovery_calls: list[int] = []
+
+    def _fake_recover(_tray, *, current_brightness: int) -> bool:
+        recovery_calls.append(int(current_brightness))
+        return True
+
+    monkeypatch.setattr(
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        _fake_recover,
+    )
+
+    # First zero read after restore: last_brightness > 0 (was at 34 mid-fade).
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=34,
+        last_off_state=False,
+    )
+
+    assert recovery_calls == [0]
+    assert (last_brightness, last_off) == (0, False)
+
+
+def test_stable_zero_does_not_fast_recover_outside_restore_window(monkeypatch) -> None:
+    """Without a recent restore, a fresh zero read should not recover on the
+    first poll — it may be a genuine controller sleep that needs confirmation."""
+
+    tray = _DummyTray(brightness=25, is_off=False)
+    tray.config.controller_sleep_respect = True
+
+    recovery_calls: list[int] = []
+
+    def _fake_recover(_tray, *, current_brightness: int) -> bool:
+        recovery_calls.append(int(current_brightness))
+        return True
+
+    monkeypatch.setattr(
+        "keyrgb.tray.pollers.hardware_polling._recover_stable_zero_brightness_best_effort",
+        _fake_recover,
+    )
+
+    last_brightness, last_off = _apply_polled_hardware_state(
+        tray,
+        current_brightness=0,
+        current_off=False,
+        last_brightness=34,
+        last_off_state=False,
+    )
+
+    assert recovery_calls == []
+    assert (last_brightness, last_off) == (0, False)
+
+
 def test_controller_sleep_off_state_stays_quiet_on_zero_reads() -> None:
     tray = _DummyTray(brightness=25, is_off=True)
     tray.config.controller_sleep_respect = True
