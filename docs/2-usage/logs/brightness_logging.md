@@ -35,13 +35,13 @@ Use the source launcher when intentionally testing uninstalled code:
 keyrgb --capture-runtime-log=full --runtime-log-launcher=source
 ```
 
-The source launcher prefers an external installed KeyRGB runtime as its
-dependency host while keeping the checkout authoritative through its working
-directory and `PYTHONPATH`. This lets an installed AppImage provide its bundled
-PyGObject/Ayatana AppIndicator stack, so KDE Wayland source captures retain the
-normal shaped icon. If no external runtime is available, it falls back to the
-active Python; that environment must then provide the tray dependencies listed
-in `docs/2-usage/venv/setup.md`.
+The source launcher runs the active Python as `-m keyrgb.tray` from the
+checkout. It does **not** exec an installed AppImage: those binaries ignore
+`PYTHONPATH` and would log shipped `src.*` code instead of local changes.
+The venv must provide the tray dependencies listed in
+`docs/2-usage/venv/setup.md`; without PyGObject the Plasma icon may fall back
+to XEmbed. Use `--runtime-log-launcher=installed` (the default) when you
+intentionally want the packaged runtime.
 
 The previous `buildpython --capture-runtime-log` interface remains as a
 compatibility wrapper for contributor workflows. Runtime capture itself is

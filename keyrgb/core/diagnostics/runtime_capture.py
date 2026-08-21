@@ -134,12 +134,10 @@ def _runtime_command(*, launcher: str, source_root: Path | None) -> list[str]:
             raise RuntimeLogCaptureError(
                 "No KeyRGB source checkout was detected. Run from the checkout or select the installed launcher."
             )
-        try:
-            # Keep checkout code authoritative while an external AppImage or
-            # installation supplies its desktop-native runtime dependencies.
-            return _installed_runtime_command(source_root)
-        except RuntimeLogCaptureError:
-            return [sys.executable, "-B", "-u", "-m", "keyrgb.tray"]
+        # Always use the active interpreter. An installed AppImage is a
+        # bundled runtime and ignores PYTHONPATH, so preferring it here made
+        # "source" captures log shipped src.* code instead of the checkout.
+        return [sys.executable, "-B", "-u", "-m", "keyrgb.tray"]
     raise RuntimeLogCaptureError(f"Unknown runtime log launcher: {launcher!r}")
 
 

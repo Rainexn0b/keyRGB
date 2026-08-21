@@ -59,7 +59,9 @@ def test_source_runtime_uses_active_python_without_external_runtime(tmp_path: Pa
     ]
 
 
-def test_source_runtime_prefers_external_installed_runtime(tmp_path: Path, monkeypatch) -> None:
+def test_source_runtime_uses_active_python_even_when_appimage_is_on_path(
+    tmp_path: Path, monkeypatch
+) -> None:
     root = tmp_path / "repo"
     root.mkdir()
     external_launcher = tmp_path / "bin" / "keyrgb"
@@ -67,7 +69,13 @@ def test_source_runtime_prefers_external_installed_runtime(tmp_path: Path, monke
     external_launcher.write_text("#!/bin/sh\n", encoding="utf-8")
     monkeypatch.setattr(runtime_capture.shutil, "which", lambda _name: str(external_launcher))
 
-    assert runtime_capture._runtime_command(launcher="source", source_root=root) == [str(external_launcher.resolve())]
+    assert runtime_capture._runtime_command(launcher="source", source_root=root) == [
+        sys.executable,
+        "-B",
+        "-u",
+        "-m",
+        "keyrgb.tray",
+    ]
 
 
 def test_source_runtime_requires_detectable_checkout() -> None:
