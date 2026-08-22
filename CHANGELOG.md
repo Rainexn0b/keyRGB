@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Packaging: Stop shipping the `buildpython` checkout helper in the installable `keyrgb` wheel/sdist. `python -m buildpython` still works from a repo checkout; end-user installs own only `keyrgb/`.
+
 ## 0.33.0 (2026-08-22)
 
 Breaking for source-checkout developers and downstream scripts: the import root is now `keyrgb`, so `python -m src.tray`, `python -m src.gui.perkey`, and `from src.core…` no longer work — use `./keyrgb.sh`, `python -m keyrgb.tray`, or `from keyrgb.core…`. Installed command names (`keyrgb`, `keyrgb-perkey`, …) and on-disk user config/profiles are unchanged.

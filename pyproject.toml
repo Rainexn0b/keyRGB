@@ -64,7 +64,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["keyrgb*", "buildpython*"]
+include = ["keyrgb*"]
 
 [tool.setuptools.package-data]
 # Nested resource JSON (reference defaults, per-key tweaks) must ship in wheels.

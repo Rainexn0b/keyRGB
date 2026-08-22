@@ -29,6 +29,18 @@ def _read_wrapper_text() -> str:
 # ---------------------------------------------------------------------------
 
 
+def test_setuptools_package_discovery_is_keyrgb_only():
+    """The installable distribution must not include the buildpython checkout helper."""
+    text = _read_pyproject_text()
+    match = re.search(
+        r"(?ms)^\[tool\.setuptools\.packages\.find\].*?^include\s*=\s*\[(.*?)\]",
+        text,
+    )
+    assert match is not None, "Could not find [tool.setuptools.packages.find] include list"
+    includes = re.findall(r'"([^"]+)"', match.group(1))
+    assert includes == ["keyrgb*"], f"package discovery include is {includes!r}, expected ['keyrgb*']"
+
+
 def test_keyrgb_script_entry_in_pyproject():
     """[project.scripts] must declare keyrgb = 'keyrgb.tray.entrypoint:main'."""
     text = _read_pyproject_text()

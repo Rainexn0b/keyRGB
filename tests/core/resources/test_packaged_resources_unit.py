@@ -127,6 +127,11 @@ def _stage_src_tree(tmp_path: Path) -> Path:
         staging / "keyrgb",
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
     )
+    # Plant a decoy checkout helper so a packages.find include of buildpython*
+    # would leak into the built artifact and fail the assertions below.
+    decoy = staging / "buildpython"
+    decoy.mkdir()
+    (decoy / "__init__.py").write_text("# decoy checkout helper\n", encoding="utf-8")
     return staging
 
 
@@ -161,6 +166,21 @@ print("ok")
     )
     assert loaded.returncode == 0, f"installed artifact failed resource load:\n{loaded.stdout}"
     assert "ok" in loaded.stdout
+
+
+def _assert_buildpython_not_importable(env_python: Path, *, cwd: Path) -> None:
+    env = {key: value for key, value in os.environ.items() if key != "PYTHONPATH"}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    leaked = subprocess.run(
+        [str(env_python), "-c", "import buildpython"],
+        check=False,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
+    )
+    assert leaked.returncode != 0, f"installed artifact must not import buildpython:\n{leaked.stdout}"
 
 
 def _build_and_install_wheel(tmp_path: Path) -> tuple[Path, Path]:
@@ -211,8 +231,11 @@ def test_built_wheel_contains_and_loads_reference_defaults_closure(tmp_path: Pat
         names = set(archive.namelist())
     missing = [rel for rel in required if rel not in names]
     assert missing == [], f"built wheel is missing packaged resources: {missing}"
+    leaked = sorted(name for name in names if name.startswith("buildpython/"))
+    assert leaked == [], f"built wheel must not ship the buildpython helper: {leaked}"
 
     _assert_installed_reference_defaults_load(env_python)
+    _assert_buildpython_not_importable(env_python, cwd=tmp_path)
 
 
 def test_built_sdist_installs_and_loads_reference_defaults_closure(tmp_path: Path) -> None:
@@ -223,3 +246,4 @@ def test_built_sdist_installs_and_loads_reference_defaults_closure(tmp_path: Pat
         pytest.skip(f"sdist build tooling unavailable: {exc}")
 
     _assert_installed_reference_defaults_load(env_python)
+    _assert_buildpython_not_importable(env_python, cwd=tmp_path)

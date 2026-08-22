@@ -71,6 +71,8 @@ jobs:
           ]
           missing = [path for path in required if path not in names]
           assert not missing, missing
+          leaked = sorted(name for name in names if name.startswith("buildpython/"))
+          assert not leaked, leaked
           clear_reference_defaults_spec_cache()
           spec = load_reference_defaults_spec("ansi")
           assert isinstance(spec.get("keymap"), dict) and spec["keymap"]
