@@ -68,7 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/main/install.sh -o
 Pinned release (reproducible bootstrap scripts):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/v0.33.0/install.sh -o install.sh && bash install.sh
+curl -fsSL https://raw.githubusercontent.com/Rainexn0b/keyRGB/v0.33.1/install.sh -o install.sh && bash install.sh
 ```
 
 AppImage install without system package changes:
@@ -137,7 +137,7 @@ From a checkout, run the tray with `./keyrgb.sh` or `python -m keyrgb.tray`. The
 | `--pip` | Legacy alias for the editable developer install. |
 | `--clone` | Clone repo and install from source. |
 | `--clone-dir <path>` | Clone target directory. |
-| `--version <tag>` | Install a specific tag such as `v0.33.0`. |
+| `--version <tag>` | Install a specific tag such as `v0.33.1`. |
 | `--asset <name>` | Override the AppImage filename. |
 | `--prerelease` | Allow prereleases when resolving the latest AppImage. |
 | `--no-system-deps` | Skip system package changes such as kernel-driver or polkit installs. |
