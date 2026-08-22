@@ -42,7 +42,10 @@ def _reactive_hardware_writes_allowed(engine: EffectsEngine) -> bool:
 
     if getattr(engine, "running", True) is False:
         return False
-    return getattr(engine, "_device_mode_off", False) is not True
+    try:
+        return engine._device_mode_off is not True
+    except AttributeError:
+        return True
 
 
 def _last_hw_mode_brightness_or_none(engine: EffectsEngine) -> int | None:
