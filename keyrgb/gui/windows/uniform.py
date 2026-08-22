@@ -8,7 +8,7 @@ import time
 import tkinter as tk
 from pathlib import Path
 from tkinter import ttk
-from typing import TYPE_CHECKING, TypeAlias, cast
+from typing import TYPE_CHECKING, TypeAlias
 
 from keyrgb.core.runtime.hardware_ownership import acquire_hardware_control_lock, release_hardware_control_lock
 from keyrgb.core.runtime.imports import ensure_repo_root_on_sys_path
@@ -40,7 +40,7 @@ try:
         _uniform_init_adapter as uniform_init_adapter,
     )
 except ImportError:
-    # Fallback for direct execution (e.g. `python src/gui/windows/uniform.py`).
+    # Fallback for direct execution (e.g. `python keyrgb/gui/windows/uniform.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
     from keyrgb.core.config import Config
     from keyrgb.gui.widgets.color_wheel import ColorWheel

@@ -27,7 +27,7 @@ _T = TypeVar("_T")
 
 # Map deprecated backend names to their canonical replacement. Users who set
 # KEYRGB_BACKEND=<old_name> will transparently resolve to the canonical backend.
-# See src/core/backends/README.md for the naming convention.
+# See keyrgb/core/backends/README.md for the naming convention.
 _BACKEND_NAME_ALIASES: dict[str, str] = {
     "ite8291r3": "ite8291r3_perkey",
     "ite8910": "ite8910_perkey",

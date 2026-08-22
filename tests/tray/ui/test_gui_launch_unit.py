@@ -10,10 +10,10 @@ def test_launch_perkey_gui_uses_structural_repo_root_for_packaged_layout(
     monkeypatch,
 ) -> None:
     runtime_root = tmp_path / "usr" / "lib" / "keyrgb"
-    anchor = runtime_root / "src" / "tray" / "ui" / "gui_launch.py"
+    anchor = runtime_root / "keyrgb" / "tray" / "ui" / "gui_launch.py"
     anchor.parent.mkdir(parents=True)
     anchor.touch()
-    (runtime_root / "src").mkdir(exist_ok=True)
+    (runtime_root / "keyrgb").mkdir(exist_ok=True)
 
     launch_calls: list[dict[str, object]] = []
 
@@ -60,10 +60,10 @@ def test_launch_power_mode_settings_gui_uses_structural_repo_root_for_packaged_l
     monkeypatch,
 ) -> None:
     runtime_root = tmp_path / "usr" / "lib" / "keyrgb"
-    anchor = runtime_root / "src" / "tray" / "ui" / "gui_launch.py"
+    anchor = runtime_root / "keyrgb" / "tray" / "ui" / "gui_launch.py"
     anchor.parent.mkdir(parents=True)
     anchor.touch()
-    (runtime_root / "src").mkdir(exist_ok=True)
+    (runtime_root / "keyrgb").mkdir(exist_ok=True)
 
     launch_calls: list[dict[str, object]] = []
 

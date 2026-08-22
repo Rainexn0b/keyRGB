@@ -96,7 +96,7 @@ def test_every_ite_backend_pids_covered_by_correct_udev_rule_type() -> None:
     assert hidraw_pids, 'no KERNEL=="hidraw*" product IDs parsed from udev rules'
 
     packages = _ite_backend_packages()
-    assert packages, "no ITE backend packages found under src/core/backends"
+    assert packages, "no ITE backend packages found under keyrgb/core/backends"
 
     for package in packages:
         pids = _protocol_pids(package)

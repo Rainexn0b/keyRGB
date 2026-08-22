@@ -8,8 +8,8 @@ exercised indirectly through ``_apply_polled_hardware_state``):
 - ``_recover_recent_power_source_blank_best_effort``
 - ``_recover_stable_zero_brightness_best_effort``
 
-Imports go through ``src.tray.pollers.hardware_polling`` so they stay valid
-after the functions are extracted to a sibling module.
+Imports go through ``keyrgb.tray.pollers.hardware._recovery`` since the
+functions were extracted to that sibling module.
 """
 
 from __future__ import annotations

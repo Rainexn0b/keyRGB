@@ -1,4 +1,4 @@
-"""Integration seam tests for src/tray/app/backend.py.
+"""Integration seam tests for keyrgb/tray/app/backend.py.
 
 Tests cover the three public functions:
 - load_ite_dimensions()

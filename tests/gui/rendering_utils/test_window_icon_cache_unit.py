@@ -233,7 +233,7 @@ def test_apply_keyrgb_window_icon_falls_back_to_png_when_svg_cannot_be_rasterize
 
 def test_find_keyrgb_logo_path_prefers_repo_asset_over_installed_icon(tmp_path, monkeypatch) -> None:
     repo_root = tmp_path / "repo"
-    repo_utils = repo_root / "src" / "gui" / "utils"
+    repo_utils = repo_root / "keyrgb" / "gui" / "utils"
     repo_assets = repo_root / "assets"
     home_dir = tmp_path / "home"
     home_icon_dir = home_dir / ".local" / "share" / "icons"

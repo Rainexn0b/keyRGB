@@ -1,4 +1,4 @@
-"""Unit tests for src/core/resources/layouts/ catalog package."""
+"""Unit tests for keyrgb/core/resources/layouts/ catalog package."""
 
 from __future__ import annotations
 

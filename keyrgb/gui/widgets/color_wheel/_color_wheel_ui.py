@@ -1,6 +1,6 @@
 """UI helpers for the ColorWheel widget.
 
-This module exists to keep src/gui/widgets/color_wheel.py smaller and easier
+This module exists to keep keyrgb/gui/widgets/color_wheel.py smaller and easier
 to navigate while keeping behavior unchanged.
 """
 

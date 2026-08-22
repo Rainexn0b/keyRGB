@@ -17,10 +17,10 @@ def test_launch_keymap_calibrator_uses_structural_repo_root_for_packaged_layout(
     monkeypatch,
 ) -> None:
     runtime_root = tmp_path / "usr" / "lib" / "keyrgb"
-    anchor = runtime_root / "src" / "gui" / "calibrator" / "launch.py"
+    anchor = runtime_root / "keyrgb" / "gui" / "calibrator" / "launch.py"
     anchor.parent.mkdir(parents=True)
     anchor.touch()
-    (runtime_root / "src").mkdir(exist_ok=True)
+    (runtime_root / "keyrgb").mkdir(exist_ok=True)
 
     launch_calls: list[dict[str, object]] = []
 

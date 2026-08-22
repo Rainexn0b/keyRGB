@@ -32,7 +32,7 @@ try:
         _reactive_color_wiring as _wiring,
     )
 except ImportError:
-    # Fallback for direct execution (e.g. `python src/gui/windows/reactive_color.py`).
+    # Fallback for direct execution (e.g. `python keyrgb/gui/windows/reactive_color.py`).
     ensure_repo_root_on_sys_path(Path(__file__))
     from keyrgb.gui.windows import (
         _reactive_color_geometry as _geometry,

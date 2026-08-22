@@ -31,7 +31,7 @@ def repo_root_from(anchor: str | Path) -> Path:
         except OSError:
             continue
 
-    # Fallback: assume we're somewhere under `<root>/src/...`.
+    # Fallback: assume we're somewhere under `<root>/keyrgb/...`.
     # Prefer the parent of the `keyrgb/` package when we can see it directly.
     try:
         src_index = next(index for index, parent in enumerate(anchor_path.parents) if parent.name == "keyrgb")
@@ -68,7 +68,7 @@ def launcher_cwd_from(anchor: str | Path) -> str:
     """Return launcher cwd rooted at :func:`repo_root_from`.
 
     Launcher modules expect this path to exist because subprocess targets are
-    imported from the checked-out or packaged ``src`` tree.
+    imported from the checked-out or packaged ``keyrgb`` tree.
     """
 
     launcher_cwd = repo_root_cwd_from(anchor, require_exists=True)

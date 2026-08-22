@@ -151,7 +151,7 @@
         {
           "regex": "^\\s*(?:from|import)\\s+keyrgb\\.core\\.effects\\.ite_backend\\b",
           "flags": "m",
-          "message": "Legacy src.core.effects.ite_backend imports are forbidden."
+          "message": "Legacy keyrgb.core.effects.ite_backend imports are forbidden."
         }
       ]
     }
