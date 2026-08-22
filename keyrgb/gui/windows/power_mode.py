@@ -8,20 +8,20 @@ import tkinter as tk
 from tkinter import ttk
 
 from keyrgb.core.config import Config
-from keyrgb.core.power.system import (
-    DEFAULT_EXTREME_SAVER_CAP_KHZ,
-    MAX_EXTREME_SAVER_CAP_KHZ,
-    MIN_EXTREME_SAVER_CAP_KHZ,
-    PowerMode,
-    get_current_freq_stats_khz,
-    get_status,
-    normalize_extreme_saver_cap_khz,
-    set_mode,
-)
+from keyrgb.core.power import system as _power_system
 from keyrgb.gui.theme import apply_clam_theme
 from keyrgb.gui.utils.tk_async import TkAsyncCoordinator, submit_gui_work
 from keyrgb.gui.utils.window_geometry import compute_centered_window_geometry
 from keyrgb.gui.utils.window_icon import apply_keyrgb_window_icon
+
+DEFAULT_EXTREME_SAVER_CAP_KHZ = _power_system.DEFAULT_EXTREME_SAVER_CAP_KHZ
+MAX_EXTREME_SAVER_CAP_KHZ = _power_system.MAX_EXTREME_SAVER_CAP_KHZ
+MIN_EXTREME_SAVER_CAP_KHZ = _power_system.MIN_EXTREME_SAVER_CAP_KHZ
+PowerMode = _power_system.PowerMode
+get_current_freq_stats_khz = _power_system.get_current_freq_stats_khz
+get_status = _power_system.get_status
+normalize_extreme_saver_cap_khz = _power_system.normalize_extreme_saver_cap_khz
+set_mode = _power_system.set_mode
 
 logger = logging.getLogger(__name__)
 
