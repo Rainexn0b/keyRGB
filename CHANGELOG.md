@@ -6,6 +6,7 @@
 - Tests: Use pytest `pythonpath = ["."]` as the only import bootstrap. Drop the extra `tests/_paths` sys.path insert from conftest and individual suites.
 - Runtime: Drop direct-execution `ImportError` + `sys.path` fallbacks from the uniform, reactive-color, and power-mode GUIs and from tray dependency loading. Launch via console scripts or `python -m keyrgb…`.
 - Docs: Point living repo/build/contributing notes at `keyrgb/` instead of the old `src/` import root. The `docs/1-src/` lane id stays (permanent); its README now says it documents the `keyrgb/` package.
+- Docs: Refresh the README with a hardware compatibility matrix, canonical backend names, checkout launch notes (`./keyrgb.sh` / `python -m keyrgb.tray`), and the updated tray/settings screenshots.
 
 ## 0.33.0 (2026-08-22)
 

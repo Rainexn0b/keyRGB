@@ -30,14 +30,14 @@
     - Clevo/Tuxedo: `tuxedo-drivers` / `clevo-xsm-wmi`
     - System76: standard ACPI drivers
   - 2) **USB direct (fallback):** userspace `ite8291r3` / `hidapi` for Tongfang devices without kernel RGB.
-- **Force backend:** `KEYRGB_BACKEND=auto|ite8291r3|sysfs-leds`
+- **Force backend:** `KEYRGB_BACKEND=auto|sysfs-leds|ite8291r3_perkey` (old short names such as `ite8291r3` still alias)
 - **Debug logs:** `KEYRGB_DEBUG=1` and `KEYRGB_DEBUG_BRIGHTNESS=1`
 
 ## Supported hardware keywords
 
 - **Chassis/OEM:** Tongfang (Uniwill / white-label rebrands)
 - **Brands:** XMG, Schenker, Tuxedo, PC Specialist, Eluktronics, Maingear, Monster Notebook, Aftershock, Mechrevo, **Wootbook**
-- **USB / controller IDs:** `048d:ce00` (ITE), ITE8291, ITE8297; Wootbook often uses **product ID `0x600B`**
+- **USB / controller IDs:** `048d:ce00` (ITE TongFang), ITE8291 / ITE8297; Wootbook often uses **product ID `0x600B`**. Lenovo Legion Gen10: `048d:c195` (24-zone), `048d:c197` (per-key + chassis).
 
 ## Wootbook / Lenovo Gen10 note
 
