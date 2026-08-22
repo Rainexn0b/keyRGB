@@ -39,6 +39,7 @@ if TYPE_CHECKING:
 class _LastNonBlackColorOwner(Protocol):
     _last_non_black_color: object
 
+
 logger = logging.getLogger(__name__)
 
 NUM_ROWS = hardware.NUM_ROWS
@@ -286,13 +287,17 @@ class PerKeyEditor:
         lighting_areas_panel = vars(self).get("_lighting_areas_panel")
         if lighting_areas_panel is not None and lighting_areas_panel.apply_wheel_color((r, g, b), released=False):
             return
-        editor_actions.on_wheel_color_change(cast(_WheelApplyEditorProtocol, self), r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
+        editor_actions.on_wheel_color_change(
+            cast(_WheelApplyEditorProtocol, self), r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS
+        )
 
     def _on_color_release(self, r: int, g: int, b: int):
         lighting_areas_panel = vars(self).get("_lighting_areas_panel")
         if lighting_areas_panel is not None and lighting_areas_panel.apply_wheel_color((r, g, b), released=True):
             return
-        editor_actions.on_wheel_color_release(cast(_WheelApplyEditorProtocol, self), r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS)
+        editor_actions.on_wheel_color_release(
+            cast(_WheelApplyEditorProtocol, self), r, g, b, num_rows=NUM_ROWS, num_cols=NUM_COLS
+        )
 
     def _set_backdrop(self):
         editor_actions.set_backdrop(self)

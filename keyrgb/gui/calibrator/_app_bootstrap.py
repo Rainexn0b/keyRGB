@@ -204,7 +204,9 @@ def build_widgets(
     ttk_mod.Button(btns, text="Prev", command=app._prev).grid(row=0, column=0, sticky="ew", padx=(0, 6))
     ttk_mod.Button(btns, text="Next", command=app._next).grid(row=0, column=1, sticky="ew")
 
-    ttk_mod.Button(side, text="Assign selected key", command=app._assign).grid(row=4, column=0, sticky="ew", pady=(10, 0))
+    ttk_mod.Button(side, text="Assign selected key", command=app._assign).grid(
+        row=4, column=0, sticky="ew", pady=(10, 0)
+    )
     ttk_mod.Button(side, text="Skip (nothing lit)", command=app._skip).grid(row=5, column=0, sticky="ew", pady=(6, 0))
 
     app._show_backdrop_var = tk_mod.BooleanVar(value=True)
@@ -219,7 +221,9 @@ def build_widgets(
         row=7, column=0, sticky="ew", pady=(18, 0)
     )
     ttk_mod.Button(side, text="Save", command=app._save).grid(row=8, column=0, sticky="ew", pady=(18, 0))
-    ttk_mod.Button(side, text="Save && Close", command=app._save_and_close).grid(row=9, column=0, sticky="ew", pady=(6, 0))
+    ttk_mod.Button(side, text="Save && Close", command=app._save_and_close).grid(
+        row=9, column=0, sticky="ew", pady=(6, 0)
+    )
 
     def _assign_from_event(_event: _tk.Event) -> None:
         app._assign()

@@ -59,9 +59,7 @@ def test_source_runtime_uses_active_python_without_external_runtime(tmp_path: Pa
     ]
 
 
-def test_source_runtime_uses_active_python_even_when_appimage_is_on_path(
-    tmp_path: Path, monkeypatch
-) -> None:
+def test_source_runtime_uses_active_python_even_when_appimage_is_on_path(tmp_path: Path, monkeypatch) -> None:
     root = tmp_path / "repo"
     root.mkdir()
     external_launcher = tmp_path / "bin" / "keyrgb"

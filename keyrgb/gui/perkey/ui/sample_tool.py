@@ -26,7 +26,9 @@ def _adapt_release_fn(
     """Thin adapter so the default release callback satisfies _ApplyReleaseFn."""
     on_wheel_color_release_ui(
         cast(_WheelApplyEditorProtocol, editor),
-        r, g, b,
+        r,
+        g,
+        b,
         num_rows=num_rows,
         num_cols=num_cols,
     )

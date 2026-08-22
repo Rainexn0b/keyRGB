@@ -210,9 +210,7 @@ def maybe_prompt_for_missing_evidence(
 
     try:
         ok = bool(
-            cast(_MessageBoxLike, messagebox).askyesno(
-                "Collect Missing Evidence", message, parent=support_window.root
-            )
+            cast(_MessageBoxLike, messagebox).askyesno("Collect Missing Evidence", message, parent=support_window.root)
         )
     except tk_runtime_errors:
         ok = False
@@ -245,9 +243,7 @@ def maybe_prompt_for_backend_speed_probe(
     )
     try:
         ok = bool(
-            cast(_MessageBoxLike, messagebox).askyesno(
-                "Run Backend Speed Probe", message, parent=support_window.root
-            )
+            cast(_MessageBoxLike, messagebox).askyesno("Run Backend Speed Probe", message, parent=support_window.root)
         )
     except tk_runtime_errors:
         ok = False

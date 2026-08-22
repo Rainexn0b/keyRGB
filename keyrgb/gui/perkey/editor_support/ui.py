@@ -297,8 +297,7 @@ def build_editor_ui(editor) -> None:
         values_provider=lambda: profile_action_ui.power_source_profile_options(editor),
         get_current_value=lambda: editor._ac_power_source_profile_var.get(),
         set_value=lambda value: (
-            editor._ac_power_source_profile_var.set(value)
-            or editor._save_power_source_profile_policy()
+            editor._ac_power_source_profile_var.set(value) or editor._save_power_source_profile_policy()
         ),
         bg=getattr(editor, "bg_color", "#2b2b2b"),
         fg=getattr(editor, "fg_color", "#ffffff"),
@@ -323,8 +322,7 @@ def build_editor_ui(editor) -> None:
         values_provider=lambda: profile_action_ui.power_source_profile_options(editor),
         get_current_value=lambda: editor._battery_power_source_profile_var.get(),
         set_value=lambda value: (
-            editor._battery_power_source_profile_var.set(value)
-            or editor._save_power_source_profile_policy()
+            editor._battery_power_source_profile_var.set(value) or editor._save_power_source_profile_policy()
         ),
         bg=getattr(editor, "bg_color", "#2b2b2b"),
         fg=getattr(editor, "fg_color", "#ffffff"),

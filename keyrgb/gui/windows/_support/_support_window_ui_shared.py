@@ -87,6 +87,7 @@ CenterWindowOnScreenFn: TypeAlias = Callable[[tk.Tk | tk.Toplevel], None]
 class _SupportWindowProtocol(Protocol):
     @property
     def root(self) -> tk.Tk: ...
+
     _bg_color: str
     _fg_color: str
     _main_frame: _WidgetProtocol

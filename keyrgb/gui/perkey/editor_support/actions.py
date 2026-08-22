@@ -95,13 +95,17 @@ def commit(
     )
 
 
-def on_wheel_color_change(editor: _WheelApplyEditorProtocol, r: int, g: int, b: int, *, num_rows: int, num_cols: int) -> None:
+def on_wheel_color_change(
+    editor: _WheelApplyEditorProtocol, r: int, g: int, b: int, *, num_rows: int, num_cols: int
+) -> None:
     from ..ui import wheel_apply
 
     wheel_apply.on_wheel_color_change_ui(editor, r, g, b, num_rows=num_rows, num_cols=num_cols)
 
 
-def on_wheel_color_release(editor: _WheelApplyEditorProtocol, r: int, g: int, b: int, *, num_rows: int, num_cols: int) -> None:
+def on_wheel_color_release(
+    editor: _WheelApplyEditorProtocol, r: int, g: int, b: int, *, num_rows: int, num_cols: int
+) -> None:
     from ..ui import wheel_apply
 
     wheel_apply.on_wheel_color_release_ui(editor, r, g, b, num_rows=num_rows, num_cols=num_cols)
