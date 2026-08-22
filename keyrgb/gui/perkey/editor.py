@@ -35,6 +35,8 @@ if TYPE_CHECKING:
     from .commit_pipeline import PerKeyCommitPipeline
     from .profile_management import PerKeyColors
 
+# @quality-exception file-size-analysis: public PerKeyEditor facade; actions, bootstrap, layout, and UI already live in editor_support/ and ui/
+
 
 class _LastNonBlackColorOwner(Protocol):
     _last_non_black_color: object
