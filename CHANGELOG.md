@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+## 0.33.0 (2026-08-22)
+
+Breaking for source-checkout developers and downstream scripts: the import root is now `keyrgb`, so `python -m src.tray`, `python -m src.gui.perkey`, and `from src.core…` no longer work — use `./keyrgb.sh`, `python -m keyrgb.tray`, or `from keyrgb.core…`. Installed command names (`keyrgb`, `keyrgb-perkey`, …) and on-disk user config/profiles are unchanged.
+
 - Packaging: Rename the import root from the generic `src` to the project-named `keyrgb` package (flat layout). Entry points now read `keyrgb.tray.entrypoint:main` etc., the repo dev launcher moved to `keyrgb.sh`, and AppImage/CI/buildpython reference the new layout. Installed command names (`keyrgb`, `keyrgb-perkey`, …) are unchanged.
+- Packaging: Sweep leftover `src/` path fixtures, comments, and tooling strings after the rename — launcher and repo-root tests now model the real packaged `usr/lib/keyrgb/keyrgb/` layout, and runtime-log source detection keys on `keyrgb/tray`.
+- Tray/Runtime: Stop the firmware-sleep and lid-restore flicker found in the runtime log — controller sleep latches mode-off before `stop()` and skips in-flight reactive commits so the brightness guard cannot write into a sleeping ITE, off-fades flatten to the per-key base average, and lid/power restore now soft-ons from brightness 1 with a 2.5 s blank-heal suppression after resume.
+- Tray/Hardware-Poll: Recover immediately from a transient zero read during the post-restore window — the stable-zero check no longer waits for a second confirmation 2 s later when the hardware just faded on, cutting a ~4 s dark pause.
+- Diagnostics/Runtime Capture: `--runtime-log-launcher=source` now always runs the active interpreter as `-m keyrgb.tray` instead of preferring an installed AppImage that ignores `PYTHONPATH`, so captured logs reflect the working tree.
 - Build/Quality: Fold `keyrgb/gui` into the primary mypy gate, lock the last `hasattr_coupling` / `defensive_conversion` hygiene hits at budget 0, and pin `softprops/action-gh-release` to the Node 24 v3.0.2 release.
 
 ## 0.32.1 (2026-08-18)
